@@ -69,7 +69,7 @@ interface MountOptions {
 const ODrawerSlotStub = {
   name: "ODrawer",
   template: "<div class='o-drawer'><slot /></div>",
-  props: ["open", "title", "primaryButtonLabel", "secondaryButtonLabel", "formId"],
+  props: ["open", "title", "primary", "secondary", "formId"],
   emits: ["update:open", "click:primary", "click:secondary"],
 };
 
@@ -570,8 +570,8 @@ describe("BillingGroup.vue", () => {
       const removeButton = button(wrapper, "org-group-remove-member-child-1")!;
       const removeLabel = i18n.global.t("billing.billingGroup.remove");
       expect(removeLabel).toBe("Remove");
-      expect(removeButton.props("variant")).toBe("ghost-destructive");
-      expect(removeButton.props("size")).toBe("icon-sm");
+      expect(removeButton.props("variant")).toBe("danger-ghost");
+      expect(removeButton.props("iconOnly")).toBe(true);
       expect(removeButton.attributes("title")).toBe(removeLabel);
       expect(removeButton.attributes("aria-label")).toBe(removeLabel);
     });
@@ -604,7 +604,7 @@ describe("BillingGroup.vue", () => {
         await flushPromises();
 
         const removeDialog = dialog(wrapper, "org-group-remove-dialog");
-        expect(removeDialog.props("primaryButtonVariant")).toBe("destructive");
+        expect(removeDialog.props("primary")?.variant).toBe("danger");
         const name = removeDialog.find('[data-test="org-group-remove-dialog-name"]');
         expect(name.text()).toBe("Child One");
         expect(name.classes()).toContain("font-semibold");

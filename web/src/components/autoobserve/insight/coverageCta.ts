@@ -210,7 +210,7 @@ const partsOf = (
   copy: Partial<Omit<CellCopy, "why">> & { why: I18nText | null },
 ): InsightParts => ({
   id,
-  chip: { label: raw(""), variant: "default-soft", tone: "info" },
+  chip: { label: raw(""), variant: "neutral", tone: "info" },
   headline: raw(""),
   why: copy.why,
   whyDetail: null,

@@ -198,7 +198,7 @@ describe("UnpricedModelsTable", () => {
     );
     expect(wrapper.find('[data-test="model-pricing-unpriced-empty"]').exists()).toBe(false);
 
-    await wrapper.find('[data-test="o2-empty-state-action-retry"]').trigger("click");
+    await wrapper.find('[data-test="o2-empty-state-action"]').trigger("click");
     expect(wrapper.emitted("refresh")).toHaveLength(1);
   });
 

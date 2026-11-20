@@ -29,15 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="ai-queue-detail-page"
     :back="backTarget"
     :title="queue?.name ? raw(queue.name) : t('aiObservability.queues.detail.fallbackTitle')"
-    :subtitle="raw(queue?.description)"
-    icon="fact-check"
+    :about="queue?.description ? raw(queue.description) : undefined"
     bleed
     :scroll="false"
   >
     <template #actions>
       <OButton
         variant="primary"
-        size="sm"
         :disabled="!items.length"
         data-test="ai-queue-detail-start-review"
         @click="startReviewing()"
@@ -64,8 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-for="cfg in queue.scoreConfigs"
             :key="cfg.scoreConfigId"
-            :variant="isStale(cfg) ? 'orange-soft' : 'default-soft'"
-            shape="rounded"
+            :tone="isStale(cfg) ? 'warn' : 'neutral'"
           >
             {{ raw(`${cfg.name} v${cfg.version}`) }}
           </OTag>
@@ -77,8 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="queue?.targetDatasetId"
           variant="ghost"
-          size="sm"
-          icon-left="table-chart"
+          icon="table-chart"
           data-test="ai-queue-detail-dataset"
           @click="openDataset"
         >
@@ -97,30 +93,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :loading="loading"
-        show-index
         :global-filter="search"
-        :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
         :default-columns="false"
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="ai-queue-items"
-        width="100%"
         class="h-full w-full"
         @row-click="startReviewing"
       >
         <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+          <ORefreshButton
+            :last-run-at="loadedAt"
             :loading="loading"
             data-test="ai-queue-detail-refresh-btn"
             @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" />
-          </OButton>
+          />
         </template>
 
         <template #toolbar>
@@ -129,7 +118,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="min-w-0 flex-1 md:min-w-48"
             :placeholder="t('aiObservability.queues.detail.searchPlaceholder')"
             data-test="ai-queue-detail-search-input"
-            clearable
           />
           <OStatStrip
             :items="summaryStats"
@@ -146,21 +134,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div class="flex items-center justify-center py-8">
-            <OEmptyState
-              size="hero"
-              illustration="check"
-              :title="t('aiObservability.queues.detail.emptyTitle')"
-              :description="t('aiObservability.queues.detail.emptyBody')"
-              :filtered="Boolean(search) || statusFilters.length > 0"
-              data-test="ai-queue-detail-empty-state"
-              @action="clearFilters"
-            />
-          </div>
+          <OEmptyState
+            :kind="Boolean(search) || statusFilters.length > 0 ? 'filtered' : 'first-run'"
+            :icon="Boolean(search) || statusFilters.length > 0 ? undefined : 'task-alt'"
+            :title="t('aiObservability.queues.detail.emptyTitle')"
+            :text="t('aiObservability.queues.detail.emptyBody')"
+            data-test="ai-queue-detail-empty-state"
+            @action="clearFilters"
+          />
         </template>
 
         <template #cell-refType="{ row }">
-          <OTag :variant="refTypeVariant(row.refType)" shape="rounded">
+          <OTag :tone="refTypeVariant(row.refType)">
             {{ raw(row.refType) }}
           </OTag>
         </template>
@@ -182,10 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-status="{ row }">
-          <OTag
-            :variant="row.status === 'reviewed' ? 'success-soft' : 'default-soft'"
-            shape="rounded"
-          >
+          <OTag :tone="row.status === 'reviewed' ? 'ok' : 'neutral'">
             {{ t(`aiObservability.queues.detail.status.${row.status}`) }}
           </OTag>
         </template>
@@ -193,9 +175,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-actions="{ row }">
           <div class="flex justify-end">
             <OButton
-              variant="outline"
-              size="sm-toolbar"
-              icon-right="arrow-forward"
+              variant="secondary"
+              icon-end="arrow-forward"
               :data-test="`ai-queue-detail-review-${row.id}`"
               @click.stop="startReviewing(row)"
             >
@@ -217,19 +198,18 @@ import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
-import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -258,17 +238,13 @@ const queueId = computed<string>(() => String(route.params.id ?? ""));
 const queue = ref<LlmQueue | null>(null);
 const items = ref<LlmQueueItem[]>([]);
 const loading = ref(false);
+const loadedAt = ref<number | null>(null);
 const search = ref("");
 const statusFilters = ref<LlmQueueItemStatus[]>([]);
 
-// Real browser back when there's history to pop.
-const { goBack: backToQueues } = useSmartBack(() => ({
-  name: "aiQueues",
-  query: orgQuery.value,
-}));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.queues"),
-  onClick: backToQueues,
+  to: { name: "aiQueues", query: orgQuery.value },
 }));
 
 const pendingCount = computed(() => items.value.filter((i) => i.status === "pending").length);
@@ -322,10 +298,10 @@ function isStale(cfg: LlmQueueBinding): boolean {
   return cfg.latestVersion !== undefined && cfg.latestVersion > cfg.version;
 }
 
-function refTypeVariant(refType: QueueRefType): BadgeVariant {
-  if (refType === "span") return "purple-soft";
-  if (refType === "session") return "teal-soft";
-  return "blue-soft";
+function refTypeVariant(refType: QueueRefType): ChipTone {
+  if (refType === "span") return "neutral";
+  if (refType === "session") return "neutral";
+  return "neutral";
 }
 
 const columns = computed<OTableColumnDef<LlmQueueItem>[]>(() => [
@@ -387,6 +363,7 @@ async function refresh() {
     ]);
     queue.value = queueRow;
     items.value = queueItems;
+    loadedAt.value = Date.now();
   } catch {
     toast({ variant: "error", message: t("aiObservability.queues.detail.loadError") });
   } finally {

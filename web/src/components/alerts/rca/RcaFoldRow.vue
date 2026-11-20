@@ -18,9 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <li class="flex min-w-0 list-none items-start gap-2" :class="flush ? '' : 'px-1.5 py-0.5'">
     <OCollapsible
-      :model-value="open"
+      :open="open"
       class="min-w-0 flex-1"
-      @update:model-value="(value: boolean) => $emit('update:open', value)"
+      @update:open="(value: boolean) => $emit('update:open', value)"
     >
       <template #trigger>
         <span class="flex min-w-0 flex-1 items-center gap-3" data-test="rca-fold-row-toggle">
@@ -42,13 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <slot />
           </span>
           <slot name="meta" />
-          <OIcon
-            data-test="rca-fold-row-chevron"
-            name="expand-more"
-            size="sm"
-            class="text-icon-color shrink-0 transition-transform duration-150 motion-reduce:transition-none"
-            :class="open ? 'rotate-180' : ''"
-          />
         </span>
       </template>
       <div v-if="$slots.body" class="flex flex-col gap-2 px-2 pb-2" data-test="rca-fold-row-body">
@@ -63,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 withDefaults(

@@ -70,7 +70,7 @@ const mountHistory = async () => {
       plugins: [i18n, store, router],
       stubs: {
         ODialog: { template: "<div />", props: ["open"] },
-        DateTime: { template: "<div />" },
+        ODateTimeRange: { template: "<div />" },
         OTable: OTableRowsStub,
         OSelect: { template: "<div />" },
         NoData: { template: "<div />" },

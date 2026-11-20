@@ -358,10 +358,10 @@ function onPromoted(name: string) {
     <div class="border-border-default shrink-0 border-b px-3">
       <div class="mb-3 flex h-8.5 items-center gap-2">
         <OIcon name="data-object" size="sm" class="text-text-secondary" aria-hidden="true" />
-        <h3 class="text-text-heading m-0 text-base font-semibold">
+        <h3 class="text-text-heading m-0 text-sm font-semibold">
           {{ t("synthetics.variablesPanel.title") }}
         </h3>
-        <OBadge variant="default" size="sm" data-test="synthetics-check-variables-panel-count">{{
+        <OBadge tone="neutral" size="sm" data-test="synthetics-check-variables-panel-count">{{
           headerCountText
         }}</OBadge>
         <OTooltip :content="t('synthetics.variablesPanel.resolutionOrder')" side="bottom">
@@ -373,9 +373,10 @@ function onPromoted(name: string) {
           />
         </OTooltip>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs-sq"
-          icon-left="close"
+          size="sm"
+          icon="close"
           class="ms-auto"
           :aria-label="t('synthetics.variablesPanel.closePanel')"
           data-test="synthetics-check-variables-panel-close-btn"
@@ -399,8 +400,8 @@ function onPromoted(name: string) {
           t("synthetics.variablesPanel.removed", { name: lastRemoved.variable.name })
         }}</OTruncatedText>
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           data-test="synthetics-check-variables-panel-undo-btn"
           @click="undoRemove"
         >
@@ -410,12 +411,10 @@ function onPromoted(name: string) {
 
       <OEmptyState
         v-if="variables.length === 0 && !adding && !unionRows.length"
-        size="block"
-        illustration="function"
+        icon="functions"
         :title="t('synthetics.variablesPanel.emptyTitle')"
-        :description="t('synthetics.variablesPanel.emptyBody')"
+        :text="t('synthetics.variablesPanel.emptyBody')"
         :action-label="t('synthetics.authNetwork.addVariable')"
-        action-icon="add"
         data-test="synthetics-check-variables-panel-empty"
         @action="openAdd"
       />
@@ -425,12 +424,12 @@ function onPromoted(name: string) {
           <h4 class="text-text-heading m-0 text-sm font-semibold">
             {{ t("synthetics.variablesPanel.local") }}
           </h4>
-          <OBadge variant="default" size="sm">{{ variables.length }}</OBadge>
+          <OBadge tone="neutral" size="sm">{{ variables.length }}</OBadge>
           <OButton
             icon-only
-            icon-left="add"
-            variant="outline"
-            size="icon"
+            icon="add"
+            variant="ghost"
+            size="xs"
             class="ms-auto"
             :aria-label="t('synthetics.authNetwork.addVariable')"
             data-test="synthetics-check-variables-panel-add-variable-btn"
@@ -466,13 +465,12 @@ function onPromoted(name: string) {
               />
               <div class="flex items-center gap-2">
                 <OButton
-                  size="sm"
-                  variant="outline"
+                  variant="secondary"
                   class="gap-1.5"
                   :data-test="`synthetics-check-variables-panel-edit-secure-${index}-switch`"
                   @click="draft.secure = !draft.secure"
                 >
-                  <OSwitch :model-value="draft.secure" size="md" />
+                  <OSwitch :model-value="draft.secure" />
                   <OIcon name="lock" size="sm" />
                   <OTooltip
                     :content="
@@ -485,8 +483,7 @@ function onPromoted(name: string) {
                 </OButton>
                 <span class="flex-1" aria-hidden="true" />
                 <OButton
-                  variant="outline"
-                  size="sm-action"
+                  variant="secondary"
                   :data-test="`synthetics-check-variables-panel-edit-cancel-${index}-btn`"
                   @click="closeForm"
                 >
@@ -494,7 +491,6 @@ function onPromoted(name: string) {
                 </OButton>
                 <OButton
                   variant="primary"
-                  size="sm-action"
                   :data-test="`synthetics-check-variables-panel-edit-save-${index}-btn`"
                   @click="commitEdit"
                 >
@@ -529,9 +525,9 @@ function onPromoted(name: string) {
               <div class="ms-auto flex shrink-0 items-center gap-1">
                 <OButton
                   icon-only
-                  icon-left="edit"
+                  icon="edit"
                   variant="ghost"
-                  size="icon"
+                  size="xs"
                   :aria-label="t('synthetics.variablesPanel.editVariable', { name: variable.name })"
                   :data-test="`synthetics-check-variables-panel-edit-${index}-btn`"
                   @click="openEdit(index)"
@@ -541,9 +537,9 @@ function onPromoted(name: string) {
                 <OButton
                   v-if="checkId && isSaved(variable)"
                   icon-only
-                  icon-left="drive-file-move"
+                  icon="drive-file-move"
                   variant="ghost"
-                  size="icon"
+                  size="xs"
                   :aria-label="t('synthetics.promoteCheck.action', { name: variable.name })"
                   :data-test="`synthetics-check-variables-panel-promote-${index}-btn`"
                   @click="promoting = variable"
@@ -552,9 +548,9 @@ function onPromoted(name: string) {
                 </OButton>
                 <OButton
                   icon-only
-                  icon-left="delete"
+                  icon="delete"
                   variant="ghost"
-                  size="icon"
+                  size="xs"
                   :aria-label="
                     t('synthetics.variablesPanel.removeVariable', { name: variable.name })
                   "
@@ -592,13 +588,12 @@ function onPromoted(name: string) {
           />
           <div class="flex items-center gap-2">
             <OButton
-              size="sm"
-              variant="outline"
+              variant="secondary"
               class="gap-1.5"
               data-test="synthetics-check-variables-panel-add-secure-switch"
               @click="draft.secure = !draft.secure"
             >
-              <OSwitch :model-value="draft.secure" size="md" />
+              <OSwitch :model-value="draft.secure" />
               <OIcon name="lock" size="sm" />
               <OTooltip
                 :content="
@@ -611,8 +606,7 @@ function onPromoted(name: string) {
             </OButton>
             <span class="flex-1" aria-hidden="true" />
             <OButton
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               data-test="synthetics-check-variables-panel-add-cancel-btn"
               @click="closeForm"
             >
@@ -620,7 +614,6 @@ function onPromoted(name: string) {
             </OButton>
             <OButton
               variant="primary"
-              size="sm-action"
               data-test="synthetics-check-variables-panel-add-btn"
               @click="commitAdd"
             >
@@ -643,9 +636,8 @@ function onPromoted(name: string) {
       v-model:open="removeDialogOpen"
       size="sm"
       :title="t('synthetics.variablesPanel.removeTitle')"
-      :primary-button-label="t('common.ok')"
-      primary-button-variant="destructive"
-      :secondary-button-label="t('common.cancel')"
+      :primary="{ label: t('common.ok'), variant: 'danger' }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="synthetics-check-variables-panel-remove-dialog"
       @click:primary="confirmRemove"
       @click:secondary="pendingRemoveIndex = null"

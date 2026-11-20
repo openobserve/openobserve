@@ -28,12 +28,10 @@ const mountWith = (props: Partial<typeof HEALTHY>) =>
     global: { plugins: [i18n] },
   });
 
-/** The verdict on one check, read off its status glyph. */
+/** The verdict on one check, read off its status marker. */
 const verdictOf = (wrapper: ReturnType<typeof mountWith>, id: string): string => {
   const row = wrapper.find(`[data-test='dbm-empty-check-${id}']`);
-  if (!row.exists()) return "absent";
-  const glyph = row.find("span").text().trim();
-  return glyph === "✓" ? "ok" : glyph === "✕" ? "fail" : "note";
+  return row.exists() ? (row.attributes("data-status") ?? "") : "absent";
 };
 
 describe("DbmEmptyState", () => {

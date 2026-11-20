@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="links.data.value && !links.isError.value" #status>
       <OTag
         v-if="!links.data.value.slack_serves_org"
-        variant="default-soft"
+        tone="neutral"
         size="sm"
         data-test="oncall-slack-state"
       >
@@ -59,13 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTag>
       <OTag
         v-else-if="links.data.value.links.length"
-        variant="success-soft"
+        tone="ok"
         size="sm"
         data-test="oncall-slack-state"
       >
         {{ t("oncall.reachLinked") }}
       </OTag>
-      <OTag v-else variant="default-soft" size="sm" data-test="oncall-slack-state">
+      <OTag v-else tone="neutral" size="sm" data-test="oncall-slack-state">
         {{ t("oncall.reachNotLinked") }}
       </OTag>
     </template>
@@ -73,8 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="links.data.value && !links.data.value.slack_serves_org" #action>
       <OButton
         v-if="admin"
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         data-test="oncall-slack-settings-link"
         @click="openSlackSettings"
       >

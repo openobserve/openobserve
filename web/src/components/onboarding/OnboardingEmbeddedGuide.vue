@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="needsRumToken" class="mb-2 flex justify-end px-3">
       <OButton
         variant="primary"
-        size="sm"
         :loading="createRumToken.isPending.value"
         data-test="onboarding-embedded-guide-rum-token"
         @click="generateRumToken"
@@ -29,27 +28,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("ingestion.generateRUMTokenLabel") }}
       </OButton>
     </div>
-    <OBanner
+    <OInlineNotice
       v-if="failed"
-      variant="error"
-      dense
-      inline-actions
+      tone="err"
       class="mx-3 mt-3"
-      :content="t('onboarding.guide.loadFailed')"
+      :message="t('onboarding.guide.loadFailed')"
       data-test="onboarding-embedded-guide-failed"
     >
       <template #actions>
         <OButton
-          as="a"
           :href="resolved.href"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="onboarding-embedded-guide-open-app"
         >
           {{ t("onboarding.guide.openInApp") }}
         </OButton>
       </template>
-    </OBanner>
+    </OInlineNotice>
     <!-- Only to a page that declares them, so the email never lands on a page root as an attribute. -->
     <component
       :is="page.component"
@@ -80,7 +75,7 @@ import type {
 import { FIRST_EVENT_REPORTER } from "@/composables/firstEvent/firstEventReporter";
 import { queryClient } from "@/composables/query/queryClient";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { createRumTokenMutation, rumTokensQuery } from "@/services/api_keys.queries";
 import analytics from "@/services/product_analytics";

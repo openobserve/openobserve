@@ -17,7 +17,6 @@ describe("notifyTrialBlocked", () => {
     expect(openToasts()).toHaveLength(1);
     const [record] = openToasts();
     expect(record.variant).toBe("info");
-    expect(record.title).toBe("Your trial has ended");
     expect(record.message).toBe("Logs needs a plan. Choose one on this page to keep using it.");
   });
 

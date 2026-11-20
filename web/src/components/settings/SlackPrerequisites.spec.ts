@@ -86,9 +86,9 @@ describe("SlackPrerequisites", () => {
     expect(rows[3].find('[data-test="slack-prereq-fix"]').text()).toContain(
       "O2_AI_INTERNAL_SECRET",
     );
-    const fix = rows[3].findComponent({ name: "OCode" });
+    const fix = rows[3].findComponent({ name: "OCodeBlock" });
     expect(fix.exists()).toBe(true);
-    expect(fix.props()).toMatchObject({ block: true, copyable: true });
+    expect(fix.props()).toMatchObject({ wrap: true, copyable: true });
     expect(rows[3].find('[data-test="slack-prereq-result"]').attributes("data-status")).toBe(
       "fail",
     );
@@ -118,9 +118,7 @@ describe("SlackPrerequisites", () => {
 
   it("wraps a long fix command inside its box instead of running under the copy icon", () => {
     const fix = mountChecks().findAll('[data-test="slack-prereq-fix"]')[0];
-    expect(fix.classes()).toEqual(
-      expect.arrayContaining(["[&>code]:whitespace-pre-wrap", "[&>code]:wrap-anywhere"]),
-    );
+    expect(fix.find("pre").classes()).toContain("o2-code-pre--wrap");
   });
 
   it("S4 says every prerequisite passes only without warnings, and adds the warnings to a failure", () => {

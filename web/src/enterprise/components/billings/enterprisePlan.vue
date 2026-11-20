@@ -16,11 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCard
-    class="border-card-glass-border bg-card-glass-bg rounded-default dark:bg-surface-base dark:border-border-default row-span-7 grid! h-full w-full grid-rows-subgrid gap-0 border shadow-none max-lg:row-span-1 max-lg:flex!"
+    flush
+    class="row-span-7 grid! h-full w-full grid-rows-subgrid gap-0 max-lg:row-span-1 max-lg:flex! [&>[data-test=o-card-body]]:contents"
   >
+    <!-- The body is display:contents so its sections stay rows of the shared subgrid across plans. -->
     <div class="flex items-start justify-between gap-3 px-4 py-3">
       <div>
-        <h3 class="text-text-heading m-0 text-base leading-6 font-semibold">
+        <h3 class="text-text-heading m-0 text-sm leading-5 font-semibold">
           {{ t("billing.enterpriseLabel") }}
         </h3>
         <p class="text-text-secondary m-0 text-xs leading-4 font-normal">
@@ -38,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="billing-plans-enterprise-price"
       >
         <div class="flex min-h-4 items-center">
-          <OTag variant="primary-soft" size="xs" :label="t('billing.discountTag')" />
+          <OTag tone="accent" size="sm" :label="t('billing.discountTag')" />
         </div>
         <span class="text-text-heading text-2xl leading-7 font-semibold">{{
           raw(price.price)
@@ -58,7 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-body text-sm leading-5">{{ t("billing.pricingErrorMessage") }}</span>
         <OButton
           variant="ghost"
-          size="sm"
           class="ms-2"
           data-test="billing-pricing-retry"
           @click="$emit('retry-pricing')"
@@ -101,8 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex justify-between px-4 pt-2 pb-3">
       <OButton
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         block
         data-test="billing-plans-enterprise-contact-btn"
         @click="contactSales"

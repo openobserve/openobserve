@@ -3,12 +3,12 @@
  *
  * Enterprise-only. The Branch is the N-way generalisation of Condition: each path is an
  * optional label plus a ConditionBuilder, evaluated TOP-DOWN with FIRST MATCH WINS, and a
- * permanent trailing "Everything Else" arm so every record leaves by exactly one handle.
+ * permanent trailing "Everything else" arm so every record leaves by exactly one handle.
  * Row order is therefore routing, not decoration.
  *
  * The node shipped in #14027 (2026-09-03), two days AFTER the Workflows E2E suite merged in
  * #14065 — so until this file it had no end-to-end coverage at all. A silent-reroute defect
- * (deleting a wired path re-points its destination at "Everything Else" on reload) was found
+ * (deleting a wired path re-points its destination at "Everything else" on reload) was found
  * by hand in that gap; BR-04 pins the half of the guard that already works. The regression
  * for the defect itself is deliberately NOT here — it fails until the fix lands.
  *

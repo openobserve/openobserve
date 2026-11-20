@@ -263,7 +263,7 @@ describe("status variants", () => {
     expect(STATUS_VARIANT[status]).toBe(variant);
   });
 
-  it("uses only OProgressBar variants", () => {
+  it("uses only the four status variants", () => {
     for (const variant of Object.values(STATUS_VARIANT)) {
       expect(["default", "success", "warning", "danger"]).toContain(variant);
     }

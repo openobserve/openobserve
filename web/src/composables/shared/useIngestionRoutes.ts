@@ -140,7 +140,7 @@ const useIngestionRoutes = () => {
       name: "ingestion",
       component: Ingestion,
       meta: {
-        titleKey: "menu.ingestionText",
+        titleKey: "menu.ingestion",
         allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {

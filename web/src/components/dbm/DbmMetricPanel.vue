@@ -46,8 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="byOptions?.length"
         :model-value="by"
         :options="byOptions"
-        size="sm"
-        appearance="inline"
+        variant="filter"
         :searchable="false"
         class="shrink-0"
         :data-test="`dbm-metric-panel-by-${panelKey}`"
@@ -99,27 +98,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated:data-zoom="emit('zoom', $event)"
         @error="onPanelError"
       />
-      <OSkeleton v-else type="rect" class="rounded-default h-full w-full" />
+      <OSkeleton v-else shape="block" class="h-full w-full" />
       <!-- A stream-permission 403 named, instead of the engine's raw
            "Unauthorized Access" body text. Non-403 errors keep the engine's
            own rendering. -->
       <div
         v-if="noAccess"
-        class="bg-surface-base absolute inset-0 mx-2 mb-2 flex flex-col items-center justify-center gap-2"
+        class="bg-surface-base absolute inset-0 mx-2 mb-2 px-3"
         :data-test="`dbm-metric-panel-no-access-${panelKey}`"
       >
-        <OIcon name="lock" class="text-text-muted size-5" />
-        <span class="text-text-secondary max-w-full px-4 text-center text-xs">
-          {{ t("dbm.metrics.noAccess", { stream: streamName }) }}
-        </span>
+        <OEmptyState
+          size="compact"
+          kind="denied"
+          :title="t('dbm.metrics.noAccess', { stream: streamName })"
+        />
       </div>
       <div
         v-else-if="streamMissing"
-        class="bg-surface-base absolute inset-0 mx-2 mb-2 flex items-center justify-center"
+        class="bg-surface-base absolute inset-0 mx-2 mb-2 px-3"
         :data-test="`dbm-metric-panel-not-collecting-${panelKey}`"
       >
         <OEmptyState
-          size="inline"
+          size="compact"
           icon="database"
           :title="t('dbm.metrics.serverStreamMissing.title')"
           :action-label="t('dbm.metrics.serverStreamMissing.action')"

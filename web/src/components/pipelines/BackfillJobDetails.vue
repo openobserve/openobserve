@@ -16,13 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="md"
     v-model:open="show"
-    :width="40"
     :title="t('pipeline.backfillJobDetailsTitle')"
     data-test="backfill-job-details-dialog"
   >
-    <div v-if="loading" class="flex justify-center p-4">
-      <OSpinner size="lg" />
+    <div v-if="loading" class="flex flex-col gap-5">
+      <OSkeleton shape="block" class="h-8" />
+      <OSkeleton shape="block" class="h-40" />
+      <OSkeleton shape="block" class="h-24" />
     </div>
 
     <div v-else-if="job" class="flex flex-col gap-5">
@@ -33,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTag>
         <OButton
           v-if="canCancelJob"
-          variant="outline-destructive"
-          size="sm-action"
+          variant="danger-ghost"
           @click="confirmCancelJob"
           data-test="cancel-job-btn"
           >{{ t("pipeline.cancelJob") }}</OButton
@@ -43,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Job Information -->
       <section class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">{{ t("pipeline.jobInformation") }}</h3>
+        <h3 class="text-sm font-semibold">{{ t("pipeline.jobInformation") }}</h3>
         <div
           class="rounded-default border-card-border bg-card-bg grid grid-cols-2 gap-x-6 gap-y-3 border p-4"
         >
@@ -70,14 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Progress -->
       <section class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">{{ t("pipeline.progressLabel") }}</h3>
+        <h3 class="text-sm font-semibold">{{ t("pipeline.progressLabel") }}</h3>
         <div class="rounded-default border-card-border bg-card-bg flex flex-col gap-4 border p-4">
           <div>
             <div class="mb-2 flex items-center justify-between">
               <div class="text-sm font-medium">{{ t("pipeline.overallProgress") }}</div>
               <div class="text-xl font-semibold">{{ job.progress_percent }}%</div>
             </div>
-            <OProgressBar :value="job.progress_percent / 100" variant="default" size="sm" />
+            <OProgressBar :value="job.progress_percent" />
           </div>
 
           <div class="grid grid-cols-2 gap-x-6 gap-y-3">
@@ -105,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Deletion Details (if applicable) -->
       <section v-if="job.delete_before_backfill || job.deletion_status" class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">{{ t("pipeline.deletionDetails") }}</h3>
+        <h3 class="text-sm font-semibold">{{ t("pipeline.deletionDetails") }}</h3>
         <div class="rounded-default border-card-border bg-card-bg flex flex-col gap-3 border p-4">
           <div class="grid grid-cols-2 gap-x-6 gap-y-3">
             <div>
@@ -138,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Error Details (if present) -->
       <section v-if="job.error" class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">{{ t("pipeline.errorDetails") }}</h3>
+        <h3 class="text-sm font-semibold">{{ t("pipeline.errorDetails") }}</h3>
         <div
           class="rounded-default border-banner-error-soft-border bg-banner-error-soft-bg flex items-start gap-3 border p-4"
         >
@@ -154,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Timeline -->
       <section class="flex flex-col gap-3">
-        <h3 class="text-base font-semibold">{{ t("pipeline.timeline") }}</h3>
+        <h3 class="text-sm font-semibold">{{ t("pipeline.timeline") }}</h3>
         <OTimeline>
           <OTimelineItem
             :title="t('pipeline.jobCreated')"
@@ -227,7 +228,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import { formatDistanceToNow } from "date-fns";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";

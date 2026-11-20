@@ -12,7 +12,7 @@
         :data-fold-key="`verdict-${value}`"
         :data-test="`svcver-count-slot-${value}`"
         ><OTag
-          clickable
+          toggle
           :data-test="`svcver-count-${value}`"
           @click="$emit('verdict', value)"
           type="versionVerdict"

@@ -796,18 +796,18 @@ describe("RcaVerdictCard", () => {
       expect(steerer.emitted("tell-agent")).toHaveLength(1);
     });
 
-    it("'Connect AI Toolset' shows only when a blind spot asks for it", () => {
+    it("'Connect AI toolset' shows only when a blind spot asks for it", () => {
       const withSpot = mountCard({
         ...PAUSED,
         summary: rcaRunSummaryLive({ blind_spots: [rcaBlindSpot()] }),
       });
-      expect(byTest(withSpot, "rca-paused-connect-btn").text()).toBe("Connect AI Toolset");
+      expect(byTest(withSpot, "rca-paused-connect-btn").text()).toBe("Connect AI toolset");
 
       const without = mountCard({ ...PAUSED, summary: rcaRunSummaryLive({ blind_spots: [] }) });
       expect(byTest(without, "rca-paused-connect-btn").exists()).toBe(false);
     });
 
-    it("'Connect AI Toolset' is disabled with a lock while ai_toolsets is license-locked", async () => {
+    it("'Connect AI toolset' is disabled with a lock while ai_toolsets is license-locked", async () => {
       storeState.zoConfig.features = { ai_toolsets: "locked" };
       try {
         // useFeatureLock is loaded by the test setup before this file's vuex mock, so it injects a real store.

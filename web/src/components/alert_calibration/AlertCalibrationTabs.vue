@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OTabs :model-value="active" align="left" data-test="alert-calibration-tabs" @change="go">
+  <OTabs :model-value="active" data-test="alert-calibration-tabs" @change="go">
     <OTab
       v-for="tab in tabs"
       :key="tab.name"

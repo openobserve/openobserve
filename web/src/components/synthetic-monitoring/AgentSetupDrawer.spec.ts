@@ -28,7 +28,7 @@ import AgentSetupDrawer from "./AgentSetupDrawer.vue";
 
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "side", "size", "title", "subTitle"],
+  props: ["open", "side", "size", "title", "subtitle"],
   template: "<div><slot /></div>",
 };
 

@@ -1,36 +1,40 @@
 import type { I18nText } from "@/types/i18n";
+import type { ButtonSize } from "../Button/OButton.types";
 
 export interface RefreshButtonProps {
-  /** Unix millisecond timestamp of the last completed query */
+  /** Unix millisecond timestamp of the last completed query; drives the data age. */
   lastRunAt?: number | null;
-  /** Mirrors the page's loading state to spin the icon and disable the button */
+  /** Swaps the glyph for a spinner and ignores clicks; the rows stay. */
   loading?: boolean;
-  /** `false` keeps the button busy but static, for a region whose ORegionStatus already spins. */
-  spinner?: boolean;
-  /** Disables the button independently of loading */
+  /** Disables the button independently of loading (e.g. while the query is invalid). */
   disabled?: boolean;
-  /** Reload icon-button style. `outline` draws a border; default is borderless `ghost`. */
-  variant?: "ghost" | "outline";
-  /** `split` (default) shows a dot and the age beside the button; `inline` drops the dot and puts the age inside it. */
-  layout?: "split" | "inline";
+  /** With `disabled`, says why in the tooltip and keeps the button focusable (B9). */
+  disabledReason?: I18nText | null;
+  /** Epoch ms of a failed refresh: a warn dot, "Failed", and the button reads Retry. */
+  failedAt?: number | null;
+  /** Auto-refresh interval in seconds, 0 for Off; omit to hide the menu segment. The page runs the timer. */
+  autoRefresh?: number;
+  /** The menu's intervals in seconds; the app's shared list when absent. */
+  intervals?: readonly number[];
+  /** Intervals shorter than this many seconds are disabled; the server's minimum when absent. */
+  minInterval?: number;
+  /** One line under the intervals, such as which time ranges auto-refresh applies to. */
+  autoRefreshNote?: I18nText;
+  /** A change waiting to be applied, such as "Apply": replaces the age as the label and makes the button primary. */
+  pendingLabel?: I18nText;
+  /** `md` in a toolbar, `sm` in a panel header. */
+  size?: Extract<ButtonSize, "sm" | "md">;
+  /** Shortcut registry id shown in the tooltip. */
+  shortcut?: string;
   /** Overrides the button's `data-test` so a page keeps its own selector. */
   dataTest?: string;
-  /** Registry id, so the tooltip shows the page's refresh shortcut. */
-  shortcutId?: string;
   /** Replaces the last-refreshed time in the tooltip, for data that carries its own as-of time. */
   tooltip?: I18nText;
-  /** `inset` sizes the split-layout button to fill a 1.5rem bordered pill; `header` gives the inline button the height of `sm` header buttons. */
-  size?: "toolbar" | "inset" | "header";
-  /** `clock` shows "Updated hh:mm" with the zone in the tooltip and name; `relative` (default) shows "12s ago". */
-  ageFormat?: "relative" | "clock";
-  /** IANA zone for clock times; the app's selected zone when absent. */
+  /** IANA zone for the failed-refresh times; the app's selected zone when absent. */
   timeZone?: string;
-  /** Epoch ms of a failed refresh; set, the age turns into the red failed-refresh sentence and the button reads Retry. */
-  failedAt?: number | null;
-  /** Epoch ms of the data still shown after a failed refresh; defaults to `lastRunAt`. */
-  dataFrom?: number | null;
 }
 
 export interface RefreshButtonEmits {
   (e: "click", event: MouseEvent): void;
+  (e: "update:autoRefresh", value: number): void;
 }

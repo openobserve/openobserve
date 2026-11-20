@@ -19,44 +19,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="border-border-default relative h-full w-full border-t"
     data-test="logs-build-query-page"
   >
-    <OBanner
+    <OInlineNotice
       v-if="incompleteFilterNotice && !isCustomQuery"
-      variant="warning"
-      icon="warning"
-      dense
+      tone="warn"
       data-test="logs-build-incomplete-filter-notice"
     >
       {{ t("search.filterNotChartableNotice", { custom: t("panel.custom") }) }}
-    </OBanner>
-    <OBanner
+    </OInlineNotice>
+    <OInlineNotice
       v-else-if="freeTextNotice && !isCustomQuery"
-      variant="info"
-      icon="info"
-      dense
+      tone="info"
       data-test="logs-build-free-text-notice"
     >
       {{ noticeText }}
-    </OBanner>
-    <OBanner
+    </OInlineNotice>
+    <OInlineNotice
       v-if="parserLoadFailed || retryingParser"
-      variant="error-soft"
-      icon="error-outline"
-      role="alert"
-      dense
+      tone="err"
       data-test="logs-build-parser-error"
     >
       {{ t("logs.buildQueryPage.parserLoadFailed") }}
       <template #actions>
         <OButton
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           data-test="logs-build-parser-retry"
           :loading="retryingParser"
           @click="retryParser"
           >{{ t("common.retry") }}</OButton
         >
       </template>
-    </OBanner>
+    </OInlineNotice>
     <PanelEditor
       ref="panelEditorRef"
       pageType="build"
@@ -92,7 +85,7 @@ import {
 } from "@/utils/query/sqlQueryParser";
 import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
 import { extractWhereClause, parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useNotifications from "@/composables/useNotifications";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -111,6 +104,8 @@ const AddToDashboard = defineAsyncComponent(() => import("@/plugins/metrics/AddT
 // ============================================================================
 // Default Builder Fields
 // ============================================================================
+
+const COUNT_FUNCTIONS = new Set(["count", "count-distinct"]);
 
 /** Default x-axis field: histogram(_timestamp) */
 const DEFAULT_X_AXIS_FIELD = () => ({
@@ -210,7 +205,10 @@ const retryingParser = ref(false);
 const needsFilterInit = () =>
   !props.isSqlMode && (!!props.whereClause?.trim() || props.freeTextFilter);
 const filterInitPending = ref(needsFilterInit());
-const holdGeneratedQuery = ref(!props.isSqlMode && props.freeTextFilter);
+// Held while a user's SQL is being parsed, so a half-built builder query never overwrites it.
+const holdsUserQuery = () =>
+  (!props.isSqlMode && props.freeTextFilter) || (props.isSqlMode && !!props.searchQuery?.trim());
+const holdGeneratedQuery = ref(holdsUserQuery());
 
 // Get dashboard panel data for build page
 const {
@@ -234,6 +232,10 @@ const runBlocked = computed(
     (freeTextNotice.value && !dashboardPanelData.data.queries[0]?.customQuery),
 );
 let initSeq = 0;
+// The builder's rewrite of the user's own SQL shows as written (count(*), no added ORDER BY); a builder edit replaces it.
+let translatedUserQuery: { generated: string; original: string } | null = null;
+const shownQuery = (generated: string) =>
+  translatedUserQuery?.generated === generated ? translatedUserQuery.original : generated;
 
 const { showErrorNotification } = useNotifications();
 const { searchObj } = searchState();
@@ -289,13 +291,27 @@ const restoreConfigFromUrl = (): {
 // Initialization
 // ============================================================================
 
+// A count is a whole number, so its ticks read 15000, not 15000.00; a saved decimals setting still wins.
+const preferWholeNumbers = (savedConfig?: { decimals?: unknown }) => {
+  if (savedConfig?.decimals !== undefined && savedConfig?.decimals !== null) return;
+  const yFields = dashboardPanelData.data.queries[0]?.fields?.y ?? [];
+  const allCounts =
+    yFields.length > 0 &&
+    yFields.every((field: { functionName?: string | null }) =>
+      COUNT_FUNCTIONS.has(String(field?.functionName ?? "").toLowerCase()),
+    );
+  if (allCounts) dashboardPanelData.data.config.decimals = 0;
+};
+
 const initializeFromQuery = async () => {
   const seq = ++initSeq;
+  const userQuery = props.searchQuery;
+  translatedUserQuery = null;
   freeTextNotice.value = false;
   incompleteFilterNotice.value = false;
   parserLoadFailed.value = false;
   filterInitPending.value = needsFilterInit();
-  holdGeneratedQuery.value = !props.isSqlMode && props.freeTextFilter;
+  holdGeneratedQuery.value = holdsUserQuery();
   // Reset panel data first
   resetDashboardPanelData();
 
@@ -372,6 +388,7 @@ const initializeFromQuery = async () => {
     }
 
     // Notify parent and run query
+    preferWholeNumbers(urlConfig.config);
     emit("initialized");
     await runQuery();
     return;
@@ -423,6 +440,7 @@ const initializeFromQuery = async () => {
     filterInitPending.value = false;
     holdGeneratedQuery.value = false;
 
+    preferWholeNumbers(urlConfig.config);
     emit("initialized");
 
     const generatedQuery = await makeAutoSQLQuery();
@@ -454,6 +472,8 @@ const initializeFromQuery = async () => {
     dashboardPanelData.data.queries[0].fields.x = [DEFAULT_X_AXIS_FIELD()];
     dashboardPanelData.data.queries[0].fields.y = [DEFAULT_Y_AXIS_FIELD()];
 
+    holdGeneratedQuery.value = false;
+    preferWholeNumbers(urlConfig.config);
     emit("initialized");
     const generatedQuery = await makeAutoSQLQuery();
     if (generatedQuery !== undefined) {
@@ -549,6 +569,9 @@ const initializeFromQuery = async () => {
         if (streamName) {
           await updateGroupedFields();
         }
+        const generated = await makeAutoSQLQuery();
+        if (seq !== initSeq) return;
+        if (generated) translatedUserQuery = { generated, original: userQuery };
       }
     } catch (error) {
       if (seq !== initSeq) return;
@@ -571,6 +594,8 @@ const initializeFromQuery = async () => {
 
   // Notify parent that initialization is complete
   // This marks the end of first toggle, so subsequent tab switches will auto-select chart type
+  holdGeneratedQuery.value = false;
+  preferWholeNumbers(urlConfig.config);
   emit("initialized");
 
   // Run the query after initialization
@@ -648,7 +673,7 @@ const onQueryGenerated = (query: string) => {
   if (holdGeneratedQuery.value || filterInitPending.value || freeTextNotice.value) return;
   if (parserLoadFailed.value) return;
   // Forward the generated query to parent (Index.vue -> SearchBar)
-  emit("queryGenerated", query);
+  emit("queryGenerated", shownQuery(query));
 };
 
 const onCustomQueryModeChanged = (isCustomMode: boolean) => {
@@ -706,7 +731,7 @@ const runQuery = async (withoutCache?: boolean, generationId?: number): Promise<
     const generatedQuery = await makeAutoSQLQuery();
     if (runBlocked.value) return abandon();
     if (generatedQuery !== undefined) {
-      emit("queryGenerated", generatedQuery);
+      emit("queryGenerated", shownQuery(generatedQuery));
     }
   }
 

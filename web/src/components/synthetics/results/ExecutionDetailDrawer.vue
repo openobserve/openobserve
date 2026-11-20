@@ -19,6 +19,7 @@ import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type {
   RunLocationResult,
   RecordedStep,
@@ -124,10 +125,10 @@ function fmtDuration(ms: number) {
                 trace.zip
               </a>
               <OButton
+                icon-only
                 :aria-label="t('common.close')"
                 variant="ghost"
-                size="icon-sm"
-                icon-left="close"
+                icon="close"
                 data-test="synthetics-execution-detail-close-btn"
                 @click="emit('close')"
               />
@@ -149,12 +150,11 @@ function fmtDuration(ms: number) {
 
           <!-- Steps -->
           <div class="flex-1 overflow-y-auto px-5 py-4">
-            <p
+            <OEmptyState
               v-if="!mergedSteps.length && !execution.startLoad"
-              class="text-text-muted text-xs italic"
-            >
-              {{ t("synthetics.executionDetail.noStepData") }}
-            </p>
+              size="compact"
+              :title="t('synthetics.executionDetail.noStepData')"
+            />
 
             <div v-else class="flex flex-col gap-3">
               <!-- Row 0: the Starting URL, above the numbered Steps and counted in none of them. -->
@@ -230,7 +230,7 @@ function fmtDuration(ms: number) {
                   :class="step.status === 'fail' ? 'bg-error-500/10' : 'bg-surface-panel'"
                 >
                   <span
-                    class="text-3xs mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-bold text-white"
+                    class="text-2xs mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-semibold text-white"
                     :class="step.status === 'fail' ? 'bg-error-500' : 'bg-success-600'"
                     >{{ i + 1 }}</span
                   >
@@ -239,7 +239,7 @@ function fmtDuration(ms: number) {
                       {{ step.name || step.stepId }}
                     </p>
                     <p
-                      class="text-3xs text-text-muted mt-0.5 truncate font-mono"
+                      class="text-2xs text-text-muted mt-0.5 truncate font-mono"
                       :title="step.stepId"
                     >
                       {{ step.stepId }}

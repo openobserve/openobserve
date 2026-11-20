@@ -71,7 +71,6 @@ const pivotField = (row: KeyValueRow) => (row.field === undefined ? row.key : ro
       v-if="searchable"
       v-model="search"
       :placeholder="t('siem.record.searchFields')"
-      size="sm"
       :data-test="`${dataTest}-search`"
     />
     <div class="border-border-default rounded-surface overflow-hidden border">
@@ -96,18 +95,18 @@ const pivotField = (row: KeyValueRow) => (row.field === undefined ? row.key : ro
         >
           <template v-if="pivotable && pivotField(row)">
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
-              icon-left="add-circle-outline"
+              icon="add-circle-outline"
               :data-test="`${dataTest}-include-${row.key}`"
               @click="emit('pivot', pivotField(row)!, row.value, '=')"
             >
               <OTooltip :content="t('siem.pivot.include')" />
             </OButton>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
-              icon-left="block"
+              icon="block"
               :data-test="`${dataTest}-exclude-${row.key}`"
               @click="emit('pivot', pivotField(row)!, row.value, '!=')"
             >
@@ -115,9 +114,9 @@ const pivotField = (row: KeyValueRow) => (row.field === undefined ? row.key : ro
             </OButton>
           </template>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs"
-            :icon-left="copied === row.key ? 'check' : 'content-copy'"
+            :icon="copied === row.key ? 'check' : 'content-copy'"
             :data-test="`${dataTest}-copy-${row.key}`"
             @click="copy(row)"
           >
@@ -127,7 +126,7 @@ const pivotField = (row: KeyValueRow) => (row.field === undefined ? row.key : ro
       </div>
       <OEmptyState
         v-if="!shown.length"
-        size="inline"
+        size="compact"
         icon="search-off"
         :title="t('siem.record.noFields')"
       />

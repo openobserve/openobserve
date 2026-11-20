@@ -92,7 +92,7 @@ vi.mock("@/components/ConfirmDialog.vue", () => ({
   default: {
     name: "ConfirmDialog",
     template: `<div data-test="confirm-dialog-mock"></div>`,
-    props: ["title", "message", "modelValue", "messageKeypath", "messageName", "okVariant"],
+    props: ["title", "message", "modelValue", "messageKeypath", "messageName", "kind"],
     emits: ["update:ok", "update:cancel", "update:modelValue"],
   },
 }));
@@ -155,7 +155,7 @@ describe("AppGroups Component", () => {
 
     it("displays the correct title", () => {
       const titleElement = wrapper.find(".app-page-header h1");
-      expect(titleElement.text()).toContain("Groups");
+      expect(titleElement.text()).toBe("User groups");
     });
 
     it("renders search input", () => {
@@ -178,15 +178,14 @@ describe("AppGroups Component", () => {
     });
 
     it("has correct table columns structure", () => {
-      // The row-index ("#") column is now the built-in OTable `show-index`
-      // gutter, not a member of `columns`, so only the real data columns remain.
+      // OTable appends the actions column itself for rowActions / rowMenu.
       expect(wrapper.vm.columns).toBeDefined();
-      expect(wrapper.vm.columns).toHaveLength(2);
+      expect(wrapper.vm.columns).toHaveLength(1);
 
       const columnNames = wrapper.vm.columns.map((col: any) => col.id);
       expect(columnNames).not.toContain("#");
       expect(columnNames).toContain("group_name");
-      expect(columnNames).toContain("actions");
+      expect(columnNames).not.toContain("actions");
     });
 
     it("displays groups data in rows", async () => {
@@ -282,7 +281,7 @@ describe("AppGroups Component", () => {
     it("renders edit and delete icons for each group", async () => {
       // OTable holds the loading skeleton for MIN_SKELETON_MS (2000ms) even after
       // props.loading flips to false, so we must advance fake timers past that hold
-      // to allow OTableBody to render and expose the cell-actions slot.
+      // to allow OTableBody to render the row actions.
       vi.useFakeTimers();
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockResolvedValue(
@@ -305,10 +304,14 @@ describe("AppGroups Component", () => {
       await flushPromises();
 
       const editIcon = localWrapper.find('[data-test="iam-groups-edit-admin-role-icon"]');
-      const deleteIcon = localWrapper.find('[data-test="iam-groups-delete-admin-role-icon"]');
-
+      const moreTriggers = localWrapper.findAll('[data-test="iam-groups-row-more-actions"]');
       expect(editIcon.exists()).toBe(true);
-      expect(deleteIcon.exists()).toBe(true);
+      expect(moreTriggers).toHaveLength(3);
+
+      // Delete is destructive, so it lives last in the row's ⋯ menu (B7).
+      const del = (localWrapper.vm as any).rowMenu.find((item: any) => item.id === "delete");
+      expect(del.destructive).toBe(true);
+      expect(del.dataTest({ group_name: "admin" }, 0)).toBe("iam-groups-delete-admin-role-icon");
 
       localWrapper.unmount();
       vi.useRealTimers();
@@ -346,7 +349,7 @@ describe("AppGroups Component", () => {
       const dialog = wrapper.findAllComponents({ name: "ConfirmDialog" })[0];
       expect(dialog.props("messageKeypath")).toBe("iam.appGroups.deleteGroupConfirm");
       expect(dialog.props("messageName")).toBe("test-group");
-      expect(dialog.props("okVariant")).toBe("destructive");
+      expect(dialog.props("kind")).toBe("destructive");
     });
   });
 
@@ -397,7 +400,7 @@ describe("AppGroups Component", () => {
         .find(
           (c: any) => c.props("title") === i18n.global.t("iam.appGroups.bulkDeleteGroupsTitle"),
         );
-      expect(dialog.props("okVariant")).toBe("destructive");
+      expect(dialog.props("kind")).toBe("destructive");
     });
 
     it("uses static copy (no fetch) when multiple groups are bulk-selected", async () => {

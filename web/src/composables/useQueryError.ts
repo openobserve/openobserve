@@ -35,8 +35,7 @@
 import DOMPurify from "dompurify";
 import { computed, ref, type ComputedRef, type Ref, type MaybeRefOrGetter, toValue } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
-import type { I18nKey } from "@/types/i18n";
-import type { IllustrationName } from "@/lib/core/EmptyState/illustrations/index";
+import type { I18nKey, I18nText } from "@/types/i18n";
 import { explainQueryError, type QueryErrorExplanation } from "@/utils/query/queryErrorExplain";
 import { useAlertCalibrationEnabled } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 
@@ -82,14 +81,12 @@ export interface QueryErrorResult {
   /** True for error codes where "Fix the query" is the right recovery action. */
   isQueryError: ComputedRef<boolean>;
   /** Default i18n title for the error code. */
-  defaultTitle: ComputedRef<string>;
+  defaultTitle: ComputedRef<I18nText>;
   /** Default i18n description for the error code. */
-  defaultDescription: ComputedRef<string>;
+  defaultDescription: ComputedRef<I18nText>;
   /** One plain sentence for a recognised error, or "" when the error is not recognised. */
-  explanation: ComputedRef<string>;
-  /** The hero illustration this code calls for, when it differs from the default. */
-  illustration: ComputedRef<IllustrationName | undefined>;
-  /** "error" when the code is a refusal, which the hero title shows in the error colour. */
+  explanation: ComputedRef<I18nText | "">;
+  /** "error" when the code is a refusal, which the hero shows as a denied state. */
   tone: ComputedRef<"error" | undefined>;
   /** Whether a protected-stream refusal may point at the Alert Calibration page. */
   calibrationEnabled: ComputedRef<boolean>;
@@ -105,10 +102,7 @@ export interface QueryErrorResult {
 export const QUERY_ERROR_CODES = new Set([20001, 20004, 20005, 20007, 20008]);
 
 /** Per-code i18n keys. Falls back to generic keys for unknown codes. */
-const ERROR_META: Record<
-  number,
-  { titleKey: I18nKey; descKey: I18nKey; illustration?: IllustrationName; tone?: "error" }
-> = {
+const ERROR_META: Record<number, { titleKey: I18nKey; descKey: I18nKey; tone?: "error" }> = {
   20001: {
     titleKey: "queryError.sqlError",
     descKey: "queryError.sqlErrorDesc",
@@ -145,7 +139,6 @@ const ERROR_META: Record<
   20014: {
     titleKey: "queryError.protectedStream",
     descKey: "queryError.protectedStreamDesc",
-    illustration: "lock",
     tone: "error",
   },
   10001: {
@@ -158,7 +151,6 @@ const ERROR_META: Record<
 const PROTECTED_INTERNAL: (typeof ERROR_META)[number] = {
   titleKey: "queryError.protectedStreamInternal",
   descKey: "queryError.protectedStreamInternalDesc",
-  illustration: "lock",
   tone: "error",
 };
 
@@ -258,12 +250,11 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
       }
     );
   });
-  const illustration = computed(() => meta.value.illustration);
   const tone = computed(() => meta.value.tone);
 
   const defaultTitle = computed(() => t(explained.value?.titleKey ?? meta.value.titleKey));
   const defaultDescription = computed(() => t(meta.value.descKey));
-  const explanation = computed<string>(() =>
+  const explanation = computed<I18nText | "">(() =>
     explained.value ? t(explained.value.messageKey, explained.value.params) : "",
   );
 
@@ -291,7 +282,6 @@ export function useQueryError(input: QueryErrorInput): QueryErrorResult {
     defaultTitle,
     defaultDescription,
     explanation,
-    illustration,
     tone,
     calibrationEnabled,
     showDetail,

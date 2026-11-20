@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <LiveNoticeState
     v-else-if="loadNotice"
     :notice="loadNotice"
-    size="block"
+    size="region"
     :busy="paging.retrying.value"
     data-test="autoobserve-live-settings-paging-notice"
     retry-test="autoobserve-live-settings-paging-retry"
@@ -31,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     aria-hidden="true"
     data-test="autoobserve-settings-paging-skeleton"
   >
-    <OSkeleton animation="none" class="h-5 w-3/4" />
-    <OSkeleton animation="none" class="h-4 w-1/2" />
+    <OSkeleton shape="block" class="h-5 w-3/4" />
+    <OSkeleton shape="block" class="h-4 w-1/2" />
   </div>
   <PagingSetting v-else data-test="autoobserve-live-settings-paging" />
 </template>

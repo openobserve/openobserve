@@ -26,7 +26,7 @@ vi.mock("@/services/backfill", () => ({
   },
 }));
 
-vi.mock("@/components/DateTime.vue", () => ({
+vi.mock("@/lib/forms/DateTimeRange/ODateTimeRange.vue", () => ({
   default: {
     template: '<div data-test="time-range-picker" />',
     props: [
@@ -73,29 +73,29 @@ const ODialogStub = {
     "open",
     "width",
     "title",
-    "subTitle",
+    "subtitle",
     "formId",
-    "primaryButtonLabel",
-    "primaryButtonLoading",
-    "primaryButtonDisabled",
-    "secondaryButtonLabel",
-    "secondaryButtonDisabled",
-    "neutralButtonLabel",
+    "primary",
+    "primary",
+    "primary",
+    "secondary",
+    "secondary",
+    "extra",
     "showClose",
     "persistent",
     "size",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test-stub="o-drawer"
       :data-test="$attrs['data-test']"
       :data-open="open"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-loading="primaryButtonLoading ? 'true' : 'false'"
-      :data-primary-disabled="primaryButtonDisabled ? 'true' : 'false'"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
+      :data-primary-loading="primary?.loading ? 'true' : 'false'"
+      :data-primary-disabled="primary?.disabled ? 'true' : 'false'"
     >
       <div data-test-stub="o-drawer-header"><slot name="header" /></div>
       <div data-test-stub="o-drawer-body"><slot /></div>
@@ -157,16 +157,16 @@ describe("EditBackfillJobDialog", () => {
       expect(wrapper.find('[data-test="edit-backfill-job-dialog"]').exists()).toBe(true);
     });
 
-    it("passes title 'Edit Backfill Job' to ODrawer", () => {
+    it("passes title 'Edit backfill job' to ODrawer", () => {
       const wrapper = createWrapper();
       const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-title")).toBe("Edit Backfill Job");
+      expect(drawer.attributes("data-title")).toBe("Edit backfill job");
     });
 
-    it("passes primary button label 'Update Job' to ODrawer", () => {
+    it("passes primary button label 'Update job' to ODrawer", () => {
       const wrapper = createWrapper();
       const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-primary-label")).toBe("Update Job");
+      expect(drawer.attributes("data-primary-label")).toBe("Update job");
     });
 
     it("passes secondary button label 'Cancel' to ODrawer", () => {
@@ -587,7 +587,7 @@ describe("EditBackfillJobDialog", () => {
 
       (wrapper.vm as any).form.handleSubmit();
       await vi.waitFor(() => expect(dialog.currentDialog.value).not.toBeNull());
-      expect(dialog.currentDialog.value?.confirmVariant).toBe("destructive");
+      expect(dialog.currentDialog.value?.kind).toBe("destructive");
       expect(backfillService.updateBackfillJob).not.toHaveBeenCalled();
 
       dialog.handleConfirm();

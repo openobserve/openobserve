@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
     :data-test="`trace-tree-span-kind-badge-${kindClass}`"
   >
     {{ abbrev }}
-    <OTooltip :content="raw(kind)" side="bottom" align="center" />
+    <OTooltip :content="raw(kind)" side="bottom" />
   </OTag>
 </template>
 

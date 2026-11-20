@@ -2226,13 +2226,10 @@ describe("MetricBreakdown", () => {
       expect(wrapper.find('[data-test="metrics-detail-progress"]').exists()).toBe(false);
       const tiles = wrapper.findAllComponents({ name: "MetricChartTile" });
       expect(tiles.length).toBeGreaterThan(0);
-      expect(wrapper.findAllComponents({ name: "LoadingProgress" })).toHaveLength(tiles.length);
+      expect(wrapper.findAllComponents({ name: "OLoadingLine" })).toHaveLength(tiles.length);
       for (const tile of tiles) {
         expect(tile.props("parentReportsFailures")).toBe(true);
-        expect(tile.findComponent({ name: "LoadingProgress" }).props()).toMatchObject({
-          loadingProgressPercentage: 0,
-          indeterminate: false,
-        });
+        expect(tile.findComponent({ name: "OLoadingLine" }).exists()).toBe(true);
       }
     });
 
@@ -2241,8 +2238,8 @@ describe("MetricBreakdown", () => {
       await flushPromises();
       expect(wrapper.find('[data-test="metrics-breakdown-chart-progress"]').exists()).toBe(false);
       const focusedTile = wrapper.findComponent({ name: "MetricChartTile" });
-      expect(wrapper.findAllComponents({ name: "LoadingProgress" })).toHaveLength(1);
-      expect(focusedTile.findComponent({ name: "LoadingProgress" }).exists()).toBe(true);
+      expect(wrapper.findAllComponents({ name: "OLoadingLine" })).toHaveLength(1);
+      expect(focusedTile.findComponent({ name: "OLoadingLine" }).exists()).toBe(true);
     });
   });
 });

@@ -19,25 +19,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       data-test="rum-analytics-event-editor"
       :title="id ? t('rum.analytics.events.editTitle') : t('rum.analytics.events.createTitle')"
-      :subtitle="app ? t('rum.analytics.events.editorApp', { app: raw(app) }) : undefined"
       :back="{ label: backLabel, onClick: goBack, dataTest: 'rum-analytics-event-editor-back-btn' }"
       bleed
     >
       <OEmptyState
         v-if="!formReady && status === 'forbidden'"
-        preset="no-access"
-        :description="t('rum.analytics.events.noAccess')"
+        kind="denied"
+        :title="t('emptyState.noAccess.title')"
+        :text="t('rum.analytics.events.noAccess')"
         data-test="rum-analytics-event-editor-no-access"
       />
       <OEmptyState
         v-else-if="!formReady && status === 'failed'"
-        preset="load-error"
-        :description="t('rum.analytics.events.loadFailed')"
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="t('rum.analytics.events.loadFailed')"
         data-test="rum-analytics-event-editor-load-error"
         @action="retry"
       />
-      <div v-else-if="!formReady" class="flex h-full items-center justify-center">
-        <OSpinner />
+      <div
+        v-else-if="!formReady"
+        class="mx-auto flex w-full max-w-4xl flex-col gap-4 px-6 py-5 max-md:px-4"
+        data-test="rum-analytics-event-editor-loading"
+      >
+        <OSkeleton v-for="row in 5" :key="row" class="h-control-md" />
       </div>
       <template v-else>
         <div class="min-h-0 flex-1 overflow-auto">
@@ -46,13 +51,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-analytics-named-events-form"
           >
             <OFormSection :title="t('rum.analytics.events.details')">
-              <div class="py-1">
+              <div class="flex flex-col gap-2 py-1">
                 <OFormInput
                   name="name"
                   :label="t('rum.analytics.events.name')"
                   required
                   data-test="rum-analytics-named-events-name"
                 />
+                <span
+                  v-if="app"
+                  class="text-text-secondary text-xs"
+                  data-test="rum-analytics-event-editor-app"
+                  >{{ t("rum.analytics.events.editorApp", { app: raw(app) }) }}</span
+                >
               </div>
             </OFormSection>
             <OFormSection :title="t('rum.analytics.events.rules')" required>
@@ -71,8 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   variant="ghost"
-                  size="sm"
-                  icon-left="add"
+                  icon="add"
                   class="self-start"
                   :disabled="ruleRows.length >= MAX_RULES"
                   data-test="rum-analytics-named-events-add-rule-btn"
@@ -92,12 +102,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip v-if="logsLock.locked.value" :content="logsLock.lockedReason.value">
                     <span class="inline-flex">
                       <OButton
-                        variant="ghost-primary"
-                        size="xs"
+                        variant="accent-ghost"
+                        size="sm"
                         disabled
                         data-test="rum-analytics-named-events-preview-logs-link"
                       >
-                        <template #icon-left>
+                        <template #icon>
                           <OIcon
                             name="lock"
                             class="text-icon-locked"
@@ -111,9 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OTooltip>
                   <OButton
                     v-else
-                    as="a"
-                    variant="ghost-primary"
-                    size="xs"
+                    variant="accent-ghost"
+                    size="sm"
                     :href="logsHref"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -130,8 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OButton
             type="button"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :disabled="submitting"
             data-test="rum-analytics-event-editor-cancel-btn"
             @click="goBack"
@@ -140,7 +148,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             type="submit"
             variant="primary"
-            size="sm-action"
             :loading="submitting"
             :disabled="!canWrite"
             data-test="rum-analytics-event-editor-save-btn"
@@ -162,10 +169,11 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
+import useSmartBack from "@/composables/useSmartBack";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
@@ -426,8 +434,9 @@ async function submit(value: NamedEventForm) {
   }
 }
 
+const { goBack: backToReturn } = useSmartBack(returnLocation);
 const goBack = async () => {
-  if (await eventDraft.confirmLeave()) void router.push(returnLocation());
+  if (await eventDraft.confirmLeave()) backToReturn();
 };
 
 const schedulePreview = () => {

@@ -16,35 +16,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCard
-    variant="outlined"
-    class="rounded-surface overflow-hidden"
+    flush
+    :title="t('rum.analytics.events.featuresTitle')"
+    :meta="t('rum.analytics.events.featuresSubtitle')"
     data-test="rum-analytics-overview-features"
   >
-    <div class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2">
-      <span class="text-text-heading text-sm font-semibold">{{
-        t("rum.analytics.events.featuresTitle")
-      }}</span>
-      <span class="text-text-secondary min-w-0 flex-1 truncate text-xs">{{
-        t("rum.analytics.events.featuresSubtitle")
-      }}</span>
-    </div>
     <OEmptyState
       v-if="permission === 'none'"
-      preset="no-access"
-      size="inline"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
+      size="compact"
       data-test="rum-analytics-overview-features-no-access"
     />
     <OEmptyState
       v-else-if="!events.length"
-      preset="no-data"
-      size="inline"
+      :text="t('emptyState.noData.description')"
+      size="compact"
       :title="t('rum.analytics.events.featuresEmpty')"
       data-test="rum-analytics-overview-features-empty"
     >
       <template #actions>
         <OButton
           v-if="permission === 'write'"
-          variant="outline"
+          variant="secondary"
           size="sm"
           data-test="rum-analytics-overview-features-create-btn"
           @click="emit('manage')"

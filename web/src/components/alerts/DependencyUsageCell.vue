@@ -28,8 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OButton
     v-else
     variant="ghost"
-    size="sm"
-    class="h-auto! gap-1! px-1.5! py-1! font-normal!"
+    class="gap-1! px-1.5! py-1! font-normal!"
     :data-test="`used-by-${key}`"
     @click.stop="open = true"
   >

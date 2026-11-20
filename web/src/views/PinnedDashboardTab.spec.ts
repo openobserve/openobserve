@@ -56,7 +56,7 @@ describe("PinnedDashboardTab", () => {
           OTooltip: { name: "OTooltip", props: ["content", "disabled"], template: "<slot />" },
           OButton: {
             name: "OButton",
-            props: ["variant", "size", "iconLeft"],
+            props: ["variant", "size", "icon"],
             template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
           },
         },
@@ -127,7 +127,7 @@ describe("PinnedDashboardTab", () => {
     await mountTab();
 
     expect(refreshButton().props("variant")).toBe("primary");
-    expect(refreshButton().props("size")).toBe("sm-toolbar");
+    expect(refreshButton().props("size")).toBeUndefined();
     expect(refreshButton().text()).toContain("Refresh");
   });
 

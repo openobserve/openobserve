@@ -56,13 +56,13 @@ limitations under the License.
             <div data-test="slack-message-body" class="slack-body">
               <div
                 data-test="slack-block-header"
-                class="slack-block-header text-brand-slack-text mb-3 text-lg font-bold"
+                class="slack-block-header text-brand-slack-text mb-3 text-lg font-semibold"
               >
                 {{ raw("🚨 High CPU Usage") }}
               </div>
               <div class="slack-fields mb-3 grid grid-cols-2 gap-2">
                 <div class="slack-field" data-test="slack-field-stream">
-                  <div class="field-label text-brand-slack-text text-sm font-bold">
+                  <div class="field-label text-brand-slack-text text-sm font-semibold">
                     {{ raw("Stream:") }}
                   </div>
                   <div class="field-value text-brand-slack-meta text-sm">
@@ -70,7 +70,7 @@ limitations under the License.
                   </div>
                 </div>
                 <div class="slack-field" data-test="slack-field-type">
-                  <div class="field-label text-brand-slack-text text-sm font-bold">
+                  <div class="field-label text-brand-slack-text text-sm font-semibold">
                     {{ raw("Type:") }}
                   </div>
                   <div
@@ -81,7 +81,7 @@ limitations under the License.
                   </div>
                 </div>
                 <div class="slack-field" data-test="slack-field-status">
-                  <div class="field-label text-brand-slack-text text-sm font-bold">
+                  <div class="field-label text-brand-slack-text text-sm font-semibold">
                     {{ raw("Status:") }}
                   </div>
                   <div class="field-value text-brand-slack-meta text-sm">
@@ -89,7 +89,7 @@ limitations under the License.
                   </div>
                 </div>
                 <div class="slack-field" data-test="slack-field-count">
-                  <div class="field-label text-brand-slack-text text-sm font-bold">
+                  <div class="field-label text-brand-slack-text text-sm font-semibold">
                     {{ raw("Count:") }}
                   </div>
                   <div class="field-value text-brand-slack-meta text-sm">
@@ -104,9 +104,11 @@ limitations under the License.
                 <strong>{{ raw("Threshold Exceeded:") }}</strong> {{ raw("greater than 80%") }}
               </div>
               <div class="slack-actions mt-4 flex justify-center">
-                <OButton data-test="slack-preview-action" variant="preview-slack">{{
-                  raw("View in OpenObserve")
-                }}</OButton>
+                <span
+                  data-test="slack-preview-action"
+                  class="rounded-chip bg-brand-slack text-brand-slack-foreground inline-flex items-center px-3 py-2 text-sm font-medium"
+                  >{{ raw("View in OpenObserve") }}</span
+                >
               </div>
             </div>
           </div>
@@ -124,7 +126,7 @@ limitations under the License.
       >
         <div data-test="msteams-card-content" class="teams-card-content">
           <div class="teams-header bg-brand-teams-hover p-4 text-white">
-            <div class="teams-title mb-1 text-lg font-bold">
+            <div class="teams-title mb-1 text-lg font-semibold">
               {{ raw("🚨 Alert: High CPU Usage") }}
             </div>
             <div class="teams-subtitle text-sm opacity-90">
@@ -133,7 +135,7 @@ limitations under the License.
           </div>
           <div class="teams-facts grid gap-2 p-4">
             <div class="teams-fact border-brand-teams-bg flex justify-between border-b py-1">
-              <div class="fact-name text-brand-teams-ink font-bold">
+              <div class="fact-name text-brand-teams-ink font-semibold">
                 {{ raw("Stream") }}
               </div>
               <div class="fact-value text-brand-teams-text">
@@ -141,7 +143,7 @@ limitations under the License.
               </div>
             </div>
             <div class="teams-fact border-brand-teams-bg flex justify-between border-b py-1">
-              <div class="fact-name text-brand-teams-ink font-bold">
+              <div class="fact-name text-brand-teams-ink font-semibold">
                 {{ raw("Type") }}
               </div>
               <div class="fact-value text-brand-teams-text">
@@ -149,7 +151,7 @@ limitations under the License.
               </div>
             </div>
             <div class="teams-fact border-brand-teams-bg flex justify-between border-b py-1">
-              <div class="fact-name text-brand-teams-ink font-bold">
+              <div class="fact-name text-brand-teams-ink font-semibold">
                 {{ raw("Status") }}
               </div>
               <div class="fact-value text-brand-teams-text">
@@ -157,13 +159,13 @@ limitations under the License.
               </div>
             </div>
             <div class="teams-fact border-brand-teams-bg flex justify-between border-b py-1">
-              <div class="fact-name text-brand-teams-ink font-bold">
+              <div class="fact-name text-brand-teams-ink font-semibold">
                 {{ raw("Count") }}
               </div>
               <div class="fact-value text-brand-teams-text">{{ raw("15") }}</div>
             </div>
             <div class="teams-fact border-brand-teams-bg flex justify-between border-b py-1">
-              <div class="fact-name text-brand-teams-ink font-bold">
+              <div class="fact-name text-brand-teams-ink font-semibold">
                 {{ raw("Threshold") }}
               </div>
               <div class="fact-value text-brand-teams-text">
@@ -171,7 +173,7 @@ limitations under the License.
               </div>
             </div>
             <div class="teams-fact border-brand-teams-bg flex justify-between border-b py-1">
-              <div class="fact-name text-brand-teams-ink font-bold">
+              <div class="fact-name text-brand-teams-ink font-semibold">
                 {{ raw("Time") }}
               </div>
               <div class="fact-value text-brand-teams-text">
@@ -180,7 +182,10 @@ limitations under the License.
             </div>
           </div>
           <div class="teams-actions flex justify-center p-4">
-            <OButton variant="preview-teams">{{ raw("View in OpenObserve") }}</OButton>
+            <span
+              class="rounded-chip bg-brand-teams text-brand-teams-foreground inline-flex items-center px-4 py-2 text-sm font-medium"
+              >{{ raw("View in OpenObserve") }}</span
+            >
           </div>
         </div>
       </div>
@@ -194,7 +199,7 @@ limitations under the License.
         <div class="email-header border-brand-msg-border bg-brand-msg-bg border-b p-4">
           <div
             data-test="email-subject"
-            class="email-subject text-brand-msg-text-strong mb-2 text-base font-bold"
+            class="email-subject text-brand-msg-text-strong mb-2 text-sm font-semibold"
           >
             {{ raw("Subject: 🚨 OpenObserve Alert Notification") }}
           </div>
@@ -211,12 +216,12 @@ limitations under the License.
         </div>
         <div data-test="email-body" class="email-body p-6">
           <div class="email-alert-header">
-            <div class="text-brand-msg-error mb-4 text-center text-2xl font-bold">
+            <div class="text-brand-msg-error mb-4 text-center text-2xl font-semibold">
               {{ raw("🚨 Alert Notification") }}
             </div>
           </div>
           <div class="email-alert-info border-brand-msg-error bg-brand-msg-bg my-4 border-s-4 p-4">
-            <div class="text-brand-msg-error m-0 mb-2 text-lg font-bold">
+            <div class="text-brand-msg-error m-0 mb-2 text-lg font-semibold">
               {{ raw("High CPU Usage") }}
             </div>
             <p class="text-brand-msg-meta m-0">
@@ -227,7 +232,7 @@ limitations under the License.
             <div
               class="email-detail-row border-brand-msg-border flex justify-between border-b py-2"
             >
-              <span class="detail-label text-brand-msg-text-strong font-bold">{{
+              <span class="detail-label text-brand-msg-text-strong font-semibold">{{
                 raw("Stream:")
               }}</span>
               <span class="detail-value text-brand-msg-meta">{{ raw("system-metrics") }}</span>
@@ -235,7 +240,7 @@ limitations under the License.
             <div
               class="email-detail-row border-brand-msg-border flex justify-between border-b py-2"
             >
-              <span class="detail-label text-brand-msg-text-strong font-bold">{{
+              <span class="detail-label text-brand-msg-text-strong font-semibold">{{
                 raw("Type:")
               }}</span>
               <span class="detail-value text-brand-msg-meta">{{ raw("metrics") }}</span>
@@ -243,7 +248,7 @@ limitations under the License.
             <div
               class="email-detail-row border-brand-msg-border flex justify-between border-b py-2"
             >
-              <span class="detail-label text-brand-msg-text-strong font-bold">{{
+              <span class="detail-label text-brand-msg-text-strong font-semibold">{{
                 raw("Status:")
               }}</span>
               <span class="detail-value text-brand-msg-meta">{{ raw("🔴 Firing") }}</span>
@@ -251,7 +256,7 @@ limitations under the License.
             <div
               class="email-detail-row border-brand-msg-border flex justify-between border-b py-2"
             >
-              <span class="detail-label text-brand-msg-text-strong font-bold">{{
+              <span class="detail-label text-brand-msg-text-strong font-semibold">{{
                 raw("Count:")
               }}</span>
               <span class="detail-value text-brand-msg-meta">{{ raw("15") }}</span>
@@ -259,7 +264,7 @@ limitations under the License.
             <div
               class="email-detail-row border-brand-msg-border flex justify-between border-b py-2"
             >
-              <span class="detail-label text-brand-msg-text-strong font-bold">{{
+              <span class="detail-label text-brand-msg-text-strong font-semibold">{{
                 raw("Threshold:")
               }}</span>
               <span class="detail-value text-brand-msg-meta">{{ raw("greater than 80%") }}</span>
@@ -267,13 +272,16 @@ limitations under the License.
             <div
               class="email-detail-row border-brand-msg-border flex justify-between border-b py-2"
             >
-              <span class="detail-label text-brand-msg-text-strong font-bold">{{
+              <span class="detail-label text-brand-msg-text-strong font-semibold">{{
                 raw("Time:")
               }}</span>
               <span class="detail-value text-brand-msg-meta">{{ getCurrentTime() }}</span>
             </div>
           </div>
-          <OButton variant="preview-email">{{ raw("View in OpenObserve") }}</OButton>
+          <span
+            class="rounded-chip bg-brand-email text-brand-email-foreground inline-flex items-center px-6 py-3 text-sm font-medium"
+            >{{ raw("View in OpenObserve") }}</span
+          >
         </div>
       </div>
 
@@ -286,15 +294,15 @@ limitations under the License.
         <div
           class="pagerduty-header bg-brand-slack-green flex items-center justify-between p-4 text-white"
         >
-          <div class="pagerduty-title text-lg font-bold">{{ raw("PagerDuty Incident") }}</div>
+          <div class="pagerduty-title text-lg font-semibold">{{ raw("PagerDuty Incident") }}</div>
           <div
-            class="pagerduty-status rounded-default bg-brand-email-accent px-2 py-1 text-xs font-bold"
+            class="pagerduty-status rounded-default bg-brand-email-accent px-2 py-1 text-xs font-semibold"
           >
             {{ raw("Triggered") }}
           </div>
         </div>
         <div class="pagerduty-content p-6">
-          <div class="text-brand-msg-text-dark m-0 mb-4 text-lg font-bold">
+          <div class="text-brand-msg-text-dark m-0 mb-4 text-lg font-semibold">
             {{ raw("OpenObserve Alert: High CPU Usage") }}
           </div>
           <div class="pagerduty-details">
@@ -312,7 +320,7 @@ limitations under the License.
             </div>
           </div>
           <div class="pagerduty-link mt-4 text-center">
-            <a href="#" class="text-brand-slack-green font-bold no-underline">{{
+            <a href="#" class="text-brand-slack-green font-semibold no-underline">{{
               raw("View in OpenObserve")
             }}</a>
           </div>
@@ -328,8 +336,8 @@ limitations under the License.
         <div
           class="servicenow-header bg-brand-slack-avatar flex items-center justify-between p-4 text-white"
         >
-          <div class="servicenow-title text-lg font-bold">{{ raw("ServiceNow Incident") }}</div>
-          <div class="servicenow-number font-mono font-bold">{{ raw("INC0000123") }}</div>
+          <div class="servicenow-title text-lg font-semibold">{{ raw("ServiceNow Incident") }}</div>
+          <div class="servicenow-number font-mono font-semibold">{{ raw("INC0000123") }}</div>
         </div>
         <div class="servicenow-content p-6">
           <div class="servicenow-field text-brand-msg-text mb-3">
@@ -370,15 +378,15 @@ limitations under the License.
         <div
           class="opsgenie-header bg-brand-email-ink flex items-center justify-between p-4 text-white"
         >
-          <div class="opsgenie-title text-lg font-bold">{{ raw("Opsgenie Alert") }}</div>
+          <div class="opsgenie-title text-lg font-semibold">{{ raw("Opsgenie Alert") }}</div>
           <div
-            class="opsgenie-priority rounded-default bg-brand-email-warning text-brand-email-ink px-2 py-1 font-bold"
+            class="opsgenie-priority rounded-default bg-brand-email-warning text-brand-email-ink px-2 py-1 font-semibold"
           >
             {{ raw("P3") }}
           </div>
         </div>
         <div class="opsgenie-content p-6">
-          <div class="text-brand-msg-text-dark m-0 mb-4 text-lg font-bold">
+          <div class="text-brand-msg-text-dark m-0 mb-4 text-lg font-semibold">
             {{ raw("OpenObserve Alert: High CPU Usage") }}
           </div>
           <div class="opsgenie-details">
@@ -396,7 +404,10 @@ limitations under the License.
             </div>
           </div>
           <div class="opsgenie-actions mt-4 flex justify-center">
-            <OButton variant="preview-opsgenie">{{ raw("View in OpenObserve") }}</OButton>
+            <span
+              class="rounded-chip bg-brand-email-ink text-brand-email-ink-foreground inline-flex items-center px-3 py-2 text-sm font-medium"
+              >{{ raw("View in OpenObserve") }}</span
+            >
           </div>
         </div>
       </div>
@@ -427,14 +438,13 @@ limitations under the License.
       <div class="flex w-full items-center justify-center gap-2">
         <OButton
           data-test="preview-copy-button"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           @click="copyTemplate"
-          icon-left="content-copy"
+          icon="content-copy"
         >
           {{ t("alerts.previewCopyTemplateBtn") }}
         </OButton>
-        <OButton variant="outline" size="sm-action" @click="isOpen = false">
+        <OButton variant="secondary" @click="isOpen = false">
           {{ t("common.close") }}
         </OButton>
       </div>

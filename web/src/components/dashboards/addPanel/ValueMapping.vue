@@ -17,8 +17,7 @@
 <template>
   <div>
     <OButton
-      variant="outline"
-      size="sm"
+      variant="secondary"
       @click="openValueMappingPopUp"
       data-test="dashboard-addpanel-config-value-mapping-add-btn"
     >

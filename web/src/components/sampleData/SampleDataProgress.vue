@@ -29,16 +29,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           done ? t("sampleData.progress.done") : t("sampleData.progress.loading")
         }}</strong>
         <span
-          class="text-text-heading text-3xl leading-none font-semibold tabular-nums"
+          class="text-text-heading text-2xl leading-none font-semibold tabular-nums"
           data-test="sample-data-progress-percent"
           >{{ percent }}</span
         >
       </div>
       <OProgressBar
-        :value="done ? 1 : session.fraction.value"
-        :variant="done ? 'success' : 'default'"
-        size="xs"
-        :aria-label="done ? t('sampleData.progress.done') : t('sampleData.progress.loading')"
+        :value="(done ? 1 : session.fraction.value) * 100"
+        :tone="done ? 'ok' : 'accent'"
+        :label="done ? t('sampleData.progress.done') : t('sampleData.progress.loading')"
       />
     </div>
 

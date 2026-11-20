@@ -21,15 +21,15 @@
            since a sample can land while the user is mid-typing somewhere
            else. -->
       <div
-        class="rounded-default ring-2 transition-colors duration-300 motion-reduce:transition-none"
+        class="rounded-default ring-2 transition-colors motion-reduce:transition-none"
         :class="flashing ? 'ring-accent' : 'ring-transparent'"
         :data-flashing="flashing || undefined"
         data-test="ai-playground-variables-trigger"
       >
         <OButton
-          variant="outline"
-          size="xs"
-          icon-left="data-array"
+          variant="secondary"
+          size="sm"
+          icon="data-array"
           data-test="ai-playground-variables-btn"
         >
           {{
@@ -39,8 +39,8 @@
           }}
           <OTag
             v-if="unseenVarNames.length"
-            variant="primary-soft"
-            size="xs"
+            tone="accent"
+            size="sm"
             class="ms-1"
             data-test="ai-playground-variables-new-tag"
           >
@@ -90,9 +90,10 @@
           <div class="grow" />
           <OButton
             v-if="!used.includes(name)"
-            variant="ghost-muted"
-            size="icon-xs-sq"
-            icon-left="close"
+            icon-only
+            variant="ghost"
+            size="sm"
+            icon="close"
             :title="t('aiObservability.playground.removeVariable')"
             :data-test="`ai-playground-var-remove-${name}`"
             @click="emit('remove-var', name)"
@@ -103,7 +104,6 @@
           :placeholder="t('aiObservability.playground.variablePlaceholder', { name })"
           :rows="1"
           :max-rows="5"
-          size="sm"
           autogrow
           :data-test="`ai-playground-var-input-${name}`"
           @update:model-value="(value: string) => emit('set-var', name, value)"
@@ -124,7 +124,6 @@
         <OInput
           v-model="newName"
           :placeholder="t('aiObservability.playground.variableNamePlaceholder')"
-          size="sm"
           data-test="ai-playground-var-new"
         />
         <OTextarea
@@ -132,13 +131,11 @@
           :placeholder="t('aiObservability.playground.variableValuePlaceholder')"
           :rows="1"
           :max-rows="5"
-          size="sm"
           autogrow
           data-test="ai-playground-var-new-value"
         />
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           type="submit"
           class="self-end"
           :disabled="!sanitized"

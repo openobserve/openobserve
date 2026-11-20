@@ -1506,7 +1506,7 @@ describe("IncidentDetailDrawer.vue", () => {
       const logsTab = wrapper
         .findAllComponents({ name: "OTab" })
         .find((tab) => tab.props("name") === "logs");
-      expect(logsTab?.props("suffixIcon")).toBe("lock");
+      expect(logsTab?.props("locked")).toBe(true);
     });
 
     it("loads correlated streams when correlation is enabled", async () => {
@@ -2060,8 +2060,8 @@ describe("IncidentDetailDrawer.vue", () => {
         .map((row, i) => `${row.text()}: ${values[i].text()}`.replace(/\s+/g, " "));
       expect(rows).toEqual([
         "Finding: Stopped sending data",
-        "Stream Name: checkout",
-        "Stream Type: logs",
+        "Stream name: checkout",
+        "Stream type: logs",
       ]);
       expect(rows.join(" ")).not.toMatch(RAW);
     });
@@ -2120,7 +2120,7 @@ describe("IncidentDetailDrawer.vue", () => {
         alerts: [],
         triggers: [createAlert({ alert_id: "a1", alert_name: "ops_quiet" })],
       });
-      expect(byTest("incident-trigger-details-header").text()).toBe("Alert Details");
+      expect(byTest("incident-trigger-details-header").text()).toBe("Alert details");
       expect(byTest("incident-trigger-details-body").text()).toBe("No alert details available");
       expect(byTest("incident-finding-details").exists()).toBe(false);
       wrapper.unmount();
@@ -2157,7 +2157,7 @@ describe("IncidentDetailDrawer.vue", () => {
             .map((chip) => chip.text()),
         );
       expect(labels).toEqual([
-        ["Finding=Stopped sending data", "Stream Name=checkout", "Stream Type=logs"],
+        ["Finding=Stopped sending data", "Stream name=checkout", "Stream type=logs"],
         ["env=prod"],
       ]);
     });

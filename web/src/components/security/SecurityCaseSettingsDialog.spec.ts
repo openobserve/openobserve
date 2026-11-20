@@ -33,7 +33,7 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
 vi.mock("@/lib/overlay/Dialog/ODialog.vue", () => ({
   default: {
     name: "ODialog",
-    props: ["open", "primaryButtonDisabled"],
+    props: ["open", "primary"],
     template: `<div v-if="open" class="o-dialog-stub"><slot /></div>`,
   },
 }));

@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OTabs
     v-if="ctx && hasTabs"
     :model-value="ctx.active.value"
-    align="left"
     data-test="ai-section-tabs"
     @change="ctx.open"
   >
@@ -29,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :name="tab.key"
       :label="tab.label"
       :icon="tab.icon"
-      :suffix-icon="tab.locked ? 'lock' : undefined"
+      :locked="tab.locked"
       :data-test="tab.locked ? `${tab.dataTest}-locked` : tab.dataTest"
     />
   </OTabs>

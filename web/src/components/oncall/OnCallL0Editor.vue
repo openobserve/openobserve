@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           :model-value="aiTriageOn"
           :aria-label="t('oncall.l0AiTriageToggle')"
-          size="sm"
           data-test="oncall-l0-ai-triage-toggle"
           @update:model-value="(v: unknown) => setAiTriage(!!v)"
         />
@@ -49,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSelect
               :model-value="draft.mode[row.field]"
               :options="optionsFor(row.field)"
-              size="sm"
               :data-test="`oncall-l0-mode-${row.testKey}`"
               @update:model-value="(v: unknown) => setMode(row.field, v)"
             >
@@ -87,7 +85,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSelect
               :model-value="draft.triage_budget_seconds"
               :options="budgetOptions"
-              size="sm"
               :error="!budgetValid"
               :error-message="t('oncall.l0BudgetRange')"
               :aria-label="t('oncall.l0WaitAtMost')"
@@ -125,8 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="row.key === 'promotion' && draft.allow_promotion"
             :model-value="draft.max_promotion_steps"
             :options="maxStepOptions"
-            size="sm"
-            width="sm"
+            width="s"
             :aria-label="t('oncall.l0RaisePriority')"
             data-test="oncall-l0-max-steps"
             @update:model-value="(v: unknown) => setMaxSteps(v)"
@@ -134,7 +130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSwitch
             :model-value="draft[row.field]"
             :aria-label="row.label"
-            size="sm"
             class="shrink-0"
             :data-test="`oncall-l0-${row.switchTest}`"
             @update:model-value="(v: unknown) => update({ [row.field]: !!v })"

@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       store.state.printMode === true ? 'printMode' : '',
       'o2-app-root',
       'w-full',
-      'transition-[width]',
-      'duration-300',
-      'ease-[ease]',
       'min-h-screen',
       'h-screen',
       'flex',
@@ -80,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @change-language="changeLanguage"
         @open-predefined-themes="openPredefinedThemes"
         @open-shortcuts="openShortcutsList"
+        @open-jump-to="jumpToOpen = true"
         @toggle-mobile-nav="mobileNavOpen = !mobileNavOpen"
         @signout="signout"
       />
@@ -98,10 +96,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Not seamless: the scrim gives tap-outside-to-close a target. -->
       <ODrawer
+        size="sm"
         v-if="!focusMode"
         v-model:open="mobileNavOpen"
         side="left"
-        :width="30"
         bleed
         :show-close="false"
         data-test="main-layout-mobile-nav-drawer"
@@ -122,10 +120,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :alt="raw('OpenObserve')"
             />
             <OButton
+              icon-only
               :aria-label="t('common.close')"
               variant="ghost"
-              size="icon"
-              icon-left="close"
+              size="xs"
+              icon="close"
               data-test="main-layout-mobile-nav-close"
               @click="mobileNavOpen = false"
             />
@@ -144,14 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="bg-surface-chrome-deeper flex min-h-0 flex-col"
-          :class="
-            store.state.kioskMode
-              ? ''
-              : focusMode
-                ? 'px-2 pb-2 max-md:px-0'
-                : 'pe-2 pb-2 max-md:pe-0'
-          "
+          class="bg-surface-chrome-deeper flex min-h-0 min-w-0 flex-col"
           :style="{
             width:
               focusMode || !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
@@ -161,14 +153,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : '75%',
           }"
         >
-          <!-- Content card — all pages render inside this. The border stays present in both
-               themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
+          <!-- The content plane meets the right and bottom window edges; only the corner under the rail rounds (L1). -->
           <div
-            class="bg-surface-base flex min-h-0 flex-1 flex-col overflow-hidden"
-            :class="[
-              store.state.kioskMode ? '' : 'rounded-surface border shadow-md',
-              isDark ? 'border-border-default' : 'border-transparent',
-            ]"
+            class="bg-surface-base border-border-subtle flex min-h-0 flex-1 flex-col overflow-hidden"
+            :class="
+              store.state.kioskMode
+                ? ''
+                : focusMode
+                  ? 'border-t'
+                  : 'rounded-ss-surface border-s border-t max-md:rounded-none max-md:border-s-0'
+            "
           >
             <div
               v-if="isLoading && fullConfigSettled && !holdForOnboarding"
@@ -204,16 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </router-view>
               </FeatureLockBoundary>
             </div>
-            <div
-              v-else
-              data-test="main-content-pending"
-              aria-busy="true"
-              class="flex h-full flex-1 flex-col gap-3 overflow-hidden p-4"
-            >
-              <OSkeleton type="text" class="h-6 w-48" />
-              <OSkeleton class="h-8 w-full" />
-              <OSkeleton v-for="n in 8" :key="n" class="h-9 w-full" />
-            </div>
+            <RoutePendingSkeleton v-else />
           </div>
         </main>
 
@@ -225,10 +210,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="[
             isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
-            // The chat is a floating card in both modes — match the main content
-            // card's right/bottom gap (+ rounded-surface corners) so they read as
-            // the same card. Expanding only widens it; it never overlays the header.
-            'pe-2 pb-2',
             isChatOverlay
               ? 'fixed inset-x-0 bottom-0 z-50 ps-2'
               : 'sticky top-[var(--navbar-height,2.25rem)] self-start',
@@ -244,11 +225,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 // same top position + height, so the main header stays visible.
                 store.state.isAiChatExpanded
                 ? { width: '50%', minWidth: '18.75rem' }
-                : { width: '25%', minWidth: '4.688rem' },
+                : { width: '25%', minWidth: '22.5rem' },
           ]"
         >
           <O2AIChat
-            :header-height="40"
+            docked
             :is-open="store.state.isAiChatEnabled"
             @close="closeChat"
             :aiChatInputContext="aiChatInputContext"
@@ -272,6 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommunitySlackInvite v-if="!focusMode" />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
+    <JumpToPalette v-if="!focusMode" v-model:open="jumpToOpen" />
     <VersionCompareDrawerHost />
     <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
     <DashboardSaveConflictDialog
@@ -355,8 +337,9 @@ import SampleDataProgressDock from "@/components/sampleData/SampleDataProgressDo
 import EditorDraftSignOutDialog from "@/components/common/drafts/EditorDraftSignOutDialog.vue";
 import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "@/utils/drafts/signOutFlow";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import { providePageNavContext } from "@/lib/core/PageHeader/pageContext";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import RoutePendingSkeleton from "@/components/common/RoutePendingSkeleton.vue";
 import { confirmLeave, releaseLeave } from "@/lib/forms/SaveBar/useLeaveGuard";
 import { switchOrganization, toOrganizationOption } from "@/utils/organizationSwitch";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -393,6 +376,7 @@ import {
   registerFullConfigLoader,
 } from "@/composables/useFullConfigLoad";
 import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import JumpToPalette from "@/components/jumpTo/JumpToPalette.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 // Back from a drill-out (Analytics to Session Viewer, Traces to a trace or its logs) must land on the same results without rerunning them.
@@ -426,6 +410,7 @@ export default defineComponent({
     O2AIChat,
     PaidOverageConsentDialog,
     ShortcutCheatsheet,
+    JumpToPalette,
     CommunitySlackInvite,
     SampleDataWelcome,
     SampleDataRemoveDialog,
@@ -433,7 +418,7 @@ export default defineComponent({
     SampleDataProgressDock,
     ODrawer,
     OButton,
-    OSkeleton,
+    RoutePendingSkeleton,
     FirstDataNotice,
     EditorDraftSignOutDialog,
     FeatureLockBoundary,
@@ -769,6 +754,10 @@ export default defineComponent({
           ? securityNavLinks.value
           : linksList.value,
     );
+    providePageNavContext({
+      links: navLinks,
+      flat: computed(() => store.state.solutionMode === "security"),
+    });
 
     const langList = [
       {
@@ -874,7 +863,7 @@ export default defineComponent({
 
     const setNavbarHeight = (barHeightPx: number) => {
       const barHeightRem = barHeightPx / 16;
-      document.documentElement.style.setProperty("--navbar-height", `${2.5 + barHeightRem}rem`);
+      document.documentElement.style.setProperty("--navbar-height", `${3 + barHeightRem}rem`);
     };
 
     // a sign-up that never reaches onboarding still sends its one attribution event: its pick, or skipped
@@ -1861,17 +1850,8 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
-    const getBtnLogo = computed(() => {
-      if (isDark.value) {
-        return getImageURL("images/common/ai_icon_dark.svg");
-      }
-
-      if (isHovered.value) {
-        return getImageURL("images/common/ai_icon_dark.svg");
-      }
-
-      return getImageURL("images/common/ai_icon_gradient.svg");
-    });
+    // The top bar's ghost hover is a neutral fill, so the gradient glyph reads on it in both themes.
+    const getBtnLogo = computed(() => getImageURL("images/common/ai_icon_gradient.svg"));
     /** `value` is a query string or `{ query, autoSend?, chipName?, newChat?, context? }`; a chip never auto-sends. */
     const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
       const wasOpen = store.state.isAiChatEnabled;
@@ -1963,6 +1943,7 @@ export default defineComponent({
     );
 
     const showShortcuts = ref(false);
+    const jumpToOpen = ref(false);
     const openShortcutsList = () => {
       showShortcuts.value = true;
     };
@@ -2036,6 +2017,7 @@ export default defineComponent({
       setRumUser,
       openPredefinedThemes,
       showShortcuts,
+      jumpToOpen,
       openShortcutsList,
       isPredefinedThemesOpen,
       handleMenuHover,

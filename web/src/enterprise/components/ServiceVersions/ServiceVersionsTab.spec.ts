@@ -453,13 +453,14 @@ describe("Versions tab at 1600 px", () => {
     const compare = wrapper.get('[data-test="svcver-compare-wrap-key-1"]');
     const link = compare.get('[data-test="svcver-compare-key-1"]');
     expect(link.text()).toBe("serviceVersions.actions.compare");
-    expect(link.attributes("variant")).toBe("ghost-primary");
-    expect(link.attributes("size")).toBe("chip");
+    expect(link.attributes("variant")).toBe("accent-ghost");
+    expect(link.attributes("size")).toBe("xs");
     expect(compare.get('[data-test="tip"]').text()).toBe("serviceVersions.panel.compareTo");
     const current = wrapper.get('[data-test="svcver-expand-key-2"]');
     expect(current.text()).toBe("");
     expect(current.attributes("aria-label")).toBe("serviceVersions.panel.deployCount");
-    expect(current.attributes("size")).toBe("icon-chip");
+    expect(current.attributes("size")).toBe("xs");
+    expect(current.attributes("icon-only")).toBeDefined();
     expect(wrapper.text()).toContain("serviceVersions.panel.current");
     expect(wrapper.text()).not.toContain("serviceVersions.panel.currentTransitions");
   });

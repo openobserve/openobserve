@@ -199,6 +199,15 @@ const click = async (el: HTMLElement | null, what = "element") => {
 
 const closeDrawer = () => click(inDialog("dashboard-settings-drawer", "o-drawer-close-btn"));
 const leave = (id: string) => click(inDialog("editor-draft-leave-dialog", id));
+const discardInFooter = () => click(inDialog("dashboard-settings-drawer", "o-drawer-discard-btn"));
+// Only a route leave reaches the shared leave dialog; the drawer asks in its own footer (O8).
+const leaveRoute = async (choice: string) => {
+  const navigation = router.push("/logs");
+  await flushPromises();
+  await leave(choice);
+  await navigation;
+  await flushPromises();
+};
 const restore = (id: string) => click(inDialog("editor-draft-restore-dialog", id));
 // Reka tab triggers activate on mousedown.
 const openTab = async (id: string) => {
@@ -247,7 +256,7 @@ describe("DashboardSettings drafts", () => {
     expect(fieldValue("dashboard-general-setting-name")).toBe("Ops night shift");
   });
 
-  it("keeps a General title edit across tab switches and through Keep and Continue, with the real time picker", async () => {
+  it("keeps a General title edit across tab switches and through an autosaved draft and Continue, with the real time picker", async () => {
     await mountSettings(true);
     expect(byTest("dashboard-general-setting-datetime-picker")).not.toBeNull();
     await fillField("dashboard-general-setting-name", "Ops night shift");
@@ -256,8 +265,7 @@ describe("DashboardSettings drafts", () => {
     await openTab("dashboard-settings-general-tab");
     expect(fieldValue("dashboard-general-setting-name")).toBe("Ops night shift");
 
-    await closeDrawer();
-    await leave("o-dialog-secondary-btn");
+    window.dispatchEvent(new Event("pagehide"));
     expect(draftData()?.general?.values.name).toBe("Ops night shift");
     await reopen();
     await click(byTest("editor-draft-continue"));
@@ -267,21 +275,22 @@ describe("DashboardSettings drafts", () => {
     expect(fieldValue("dashboard-general-setting-name")).toBe("Ops night shift");
   });
 
-  it("guards the drawer close: Discard drops the draft and closes", async () => {
+  it("guards the drawer close in its own footer: Discard drops the draft and closes", async () => {
     await mountSettings();
     await fillField("dashboard-general-setting-name", "Changed");
 
     await closeDrawer();
-    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    expect(byTest("o-drawer-discard-row")).not.toBeNull();
+    expect(byTest("editor-draft-leave-dialog")).toBeNull();
     expect(open.value).toBe(true);
 
-    await leave("o-dialog-neutral-btn");
+    await discardInFooter();
     expect(open.value).toBe(false);
     expect(readEditorDraft(scope)).toBeNull();
     expect(updateDashboard).not.toHaveBeenCalled();
   });
 
-  it("guards the General Cancel button and closes without asking once clean", async () => {
+  it("the General Cancel button closes at once and discards, never asking in a dialog over the drawer", async () => {
     await mountSettings();
     await click(byTest("dashboard-general-setting-cancel-btn"));
     expect(byTest("editor-draft-leave-dialog")).toBeNull();
@@ -290,19 +299,17 @@ describe("DashboardSettings drafts", () => {
     await reopen();
     await fillField("dashboard-general-setting-name", "Changed");
     await click(byTest("dashboard-general-setting-cancel-btn"));
-    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
-    // Escape on the leave dialog stays.
-    await leave("o-dialog-close-btn");
-    expect(open.value).toBe(true);
-    expect(fieldValue("dashboard-general-setting-name")).toBe("Changed");
+    expect(byTest("editor-draft-leave-dialog")).toBeNull();
+    expect(open.value).toBe(false);
+    expect(readEditorDraft(scope)).toBeNull();
   });
 
-  it("Keep draft stores it, closes, and the next open offers it: Continue restores it", async () => {
+  it("an autosaved draft is offered on the next open: Continue restores it", async () => {
     await mountSettings();
     await fillField("dashboard-general-setting-name", "Kept title");
-    await closeDrawer();
-    await leave("o-dialog-secondary-btn");
-    expect(open.value).toBe(false);
+    window.dispatchEvent(new Event("pagehide"));
+    open.value = false;
+    await flushPromises();
     expect(draftData()?.general?.values.name).toBe("Kept title");
 
     open.value = true;
@@ -315,7 +322,8 @@ describe("DashboardSettings drafts", () => {
     expect(fieldValue("dashboard-general-setting-name")).toBe("Kept title");
 
     await closeDrawer();
-    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    expect(byTest("o-drawer-discard-row")).not.toBeNull();
+    expect(byTest("editor-draft-leave-dialog")).toBeNull();
   });
 
   it("Start fresh deletes the draft and shows the saved settings", async () => {
@@ -354,29 +362,26 @@ describe("DashboardSettings drafts", () => {
     expect(readEditorDraft(scope)).toBeNull();
   });
 
-  it("leave Save saves the settings without navigating, then closes", async () => {
+  it("a route leave's Save saves the settings, then navigates", async () => {
     await mountSettings();
     await fillField("dashboard-general-setting-name", "Saved from the dialog");
-    await closeDrawer();
-    await leave("editor-draft-leave-save");
+    await leaveRoute("editor-draft-leave-save");
 
-    await vi.waitFor(() => expect(open.value).toBe(false));
     expect(updateDashboard).toHaveBeenCalledTimes(1);
     expect(db.server.title).toBe("Saved from the dialog");
-    expect(open.value).toBe(false);
-    expect(router.currentRoute.value.path).toBe("/dashboards/view");
+    expect(router.currentRoute.value.path).toBe("/logs");
     expect(readEditorDraft(scope)).toBeNull();
   });
 
-  it("leave Save with an invalid form stays and shows the field error", async () => {
+  it("a route leave's Save with an invalid form stays and shows the field error", async () => {
     await mountSettings();
     await fillField("dashboard-general-setting-name", " ");
-    await closeDrawer();
-    await leave("editor-draft-leave-save");
+    await leaveRoute("editor-draft-leave-save");
 
     await vi.waitFor(() => expect(byTest("editor-draft-leave-dialog")).toBeNull());
     await vi.waitFor(() => expect(document.body.textContent).toContain("Name is required"));
     expect(updateDashboard).not.toHaveBeenCalled();
+    expect(router.currentRoute.value.path).toBe("/dashboards/view");
     expect(open.value).toBe(true);
   });
 
@@ -431,8 +436,6 @@ describe("DashboardSettings drafts", () => {
       variable: { variableName: null, values: { name: "env" } },
     });
 
-    await closeDrawer();
-    await leave("o-dialog-secondary-btn");
     await reopen();
     await click(byTest("editor-draft-continue"));
 
@@ -487,14 +490,12 @@ describe("DashboardSettings drafts", () => {
       tabRename: { tabId: "t2", name: "Failures" },
     });
 
-    await closeDrawer();
-    await leave("o-dialog-secondary-btn");
     await reopen();
     await click(byTest("editor-draft-continue"));
     expect(fieldValue("dashboard-tab-settings-tab-name-edit")).toBe("Failures");
   });
 
-  it("leave Save saves every changed tab of the drawer in turn", async () => {
+  it("a route leave's Save saves every changed tab of the drawer in turn", async () => {
     await mountSettings();
     await fillField("dashboard-general-setting-name", "Both saved");
     await openTab("dashboard-settings-tab-tab");
@@ -504,18 +505,16 @@ describe("DashboardSettings drafts", () => {
     await click(editButtons[0]);
     await fillField("dashboard-tab-settings-tab-name-edit", "Home");
 
-    await closeDrawer();
-    await leave("editor-draft-leave-save");
+    await leaveRoute("editor-draft-leave-save");
 
-    await vi.waitFor(() => expect(open.value).toBe(false));
     expect(db.server.title).toBe("Both saved");
     expect(editTab).toHaveBeenCalledTimes(1);
     expect(db.server.tabs[0].name).toBe("Home");
-    expect(open.value).toBe(false);
+    expect(router.currentRoute.value.path).toBe("/logs");
     expect(readEditorDraft(scope)).toBeNull();
   });
 
-  it("leave Save opens the variable form and stays when it does not validate", async () => {
+  it("a route leave's Save opens the variable form and stays when it does not validate", async () => {
     await mountSettings();
     await openTab("dashboard-settings-variable-tab");
     await click(byTest("dashboard-add-variable-btn"));
@@ -523,15 +522,14 @@ describe("DashboardSettings drafts", () => {
     await fillField("dashboard-variable-name", "env");
     await openTab("dashboard-settings-general-tab");
 
-    await closeDrawer();
-    await leave("editor-draft-leave-save");
+    await leaveRoute("editor-draft-leave-save");
 
     expect(addVariable).not.toHaveBeenCalled();
-    expect(open.value).toBe(true);
+    expect(router.currentRoute.value.path).toBe("/dashboards/view");
     expect(fieldValue("dashboard-variable-name")).toBe("env");
   });
 
-  it("leave Save of a continued variable draft adds it to the dashboard", async () => {
+  it("a route leave's Save of a continued variable draft adds it to the dashboard", async () => {
     writeEditorDraft(scope, {
       data: {
         tab: "generalSettings",
@@ -567,13 +565,11 @@ describe("DashboardSettings drafts", () => {
     await mountSettings();
     await click(byTest("editor-draft-continue"));
 
-    await closeDrawer();
-    await leave("editor-draft-leave-save");
+    await leaveRoute("editor-draft-leave-save");
 
-    await vi.waitFor(() => expect(open.value).toBe(false));
     expect(addVariable).toHaveBeenCalledTimes(1);
     expect(db.server.variables.list.map((v) => v.name)).toContain("env");
-    expect(open.value).toBe(false);
+    expect(router.currentRoute.value.path).toBe("/logs");
     expect(readEditorDraft(scope)).toBeNull();
   });
 });

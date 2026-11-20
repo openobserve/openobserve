@@ -50,7 +50,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 // (form.handleSubmit) so the schema runs deterministically.
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "size", "title", "primaryButtonLabel", "secondaryButtonLabel", "formId"],
+  props: ["open", "size", "title", "primary", "secondary", "formId"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-form-id="formId">
@@ -58,15 +58,15 @@ const ODialogStub = {
       <div data-test-stub="o-dialog-footer">
         <slot name="footer" />
         <button
-          v-if="secondaryButtonLabel"
+          v-if="secondary?.label"
           data-test="o-dialog-secondary-btn"
           @click="$emit('click:secondary')"
-        >{{ secondaryButtonLabel }}</button>
+        >{{ secondary?.label }}</button>
         <button
-          v-if="primaryButtonLabel"
+          v-if="primary?.label"
           data-test="o-dialog-primary-btn"
           @click="$emit('click:primary')"
-        >{{ primaryButtonLabel }}</button>
+        >{{ primary?.label }}</button>
       </div>
     </div>
   `,
@@ -242,7 +242,7 @@ describe("AddGroup", () => {
       const updateOpen = wrapper.emitted("update:open");
       expect(updateOpen[updateOpen.length - 1]).toEqual([false]);
       expect(mockToast).toHaveBeenCalledWith({
-        message: 'User Group "test_group" Created Successfully!',
+        message: 'User group "test_group" created successfully!',
         variant: "success",
       });
     });

@@ -30,26 +30,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     data-test="oncall-policies-page"
     :title="t('oncall.policiesTitle')"
-    icon="arrow-upward"
     :back="{
-      label: t('oncall.backToTeams'),
+      label: t('oncall.teamsTitle'),
       to: { name: 'onCallTeams', query: { org_identifier: orgId } },
       dataTest: 'oncall-policies-back-btn',
     }"
   >
     <OTable
       ref="oTableRef"
-      :frame="false"
       :forbidden="forbidden"
       :data="rows"
       :columns="columns"
       row-key="teamId"
       :loading="loading"
       pagination="client"
-      show-index
       table-id="oncall-policies"
       :persist-columns="true"
-      :show-global-filter="false"
       :enable-column-resize="true"
       data-test="oncall-policies-table"
       :page-size="pageSize"
@@ -71,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             v-model="search"
             class="flex-1"
-            clearable
             :placeholder="t('oncall.searchTeams')"
             data-test="oncall-policies-search"
           />
@@ -87,8 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #toolbar-trailing>
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :last-run-at="lastUpdatedAt"
           :loading="loading"
           data-test="oncall-policies-refresh"
@@ -119,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-for="priority in row.silent"
             :key="priority"
-            :variant="priorityTagVariant(priority)"
+            :tone="priorityTagVariant(priority)"
             size="sm"
           >
             {{ priorityLabel(priority) }}
@@ -132,12 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            supply right now. -->
       <template #cell-unreachable="{ row }">
         <span v-if="row.unreachable.length" class="flex flex-wrap gap-1">
-          <OTag
-            v-for="priority in row.unreachable"
-            :key="priority"
-            variant="warning-soft"
-            size="sm"
-          >
+          <OTag v-for="priority in row.unreachable" :key="priority" tone="warn" size="sm">
             {{ priorityLabel(priority) }}
           </OTag>
         </span>
@@ -147,11 +135,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <OEmptyState
           v-if="!loading"
-          size="hero"
-          preset="no-oncall-teams"
-          :filtered="!!search"
+          :kind="search ? 'filtered' : 'first-run'"
+          :title="
+            search
+              ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
+              : t('emptyState.noOncallTeams.title')
+          "
+          :text="
+            search
+              ? t('emptyState.filtered.description', {
+                  noun: t('emptyState.filtered.fallbackNoun'),
+                })
+              : undefined
+          "
+          :icon="search ? undefined : 'group'"
           data-test="oncall-policies-empty"
-          @action="onEmptyAction"
+          :action-label="search ? undefined : t('emptyState.noOncallTeams.action')"
+          @action="onEmptyAction(search ? 'clear-filters' : 'create')"
         />
       </template>
     </OTable>

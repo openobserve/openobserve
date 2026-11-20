@@ -22,9 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="ps-page-edge flex items-center justify-between gap-2 py-1.5 pe-1.5 max-md:hidden">
       <OText variant="panel-title">{{ t("fleet.tabs.fleets") }}</OText>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon"
-        icon-left="add"
+        size="xs"
+        icon="add"
         :aria-label="t('fleet.fleets.newFleet')"
         data-test="fleet-rail-add"
         @click="create"
@@ -37,23 +38,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSearchInput
         v-model="search"
         class="w-full max-md:hidden"
-        clearable
         :placeholder="t('fleet.fleets.search')"
         data-test="fleet-rail-search"
       />
       <OSelect
         class="min-w-0 flex-1 md:hidden"
-        size="sm"
         :model-value="activeId"
         :options="mobileOptions"
         data-test="fleet-rail-mobile-select"
         @update:model-value="(v) => v && emit('select', String(v))"
       />
       <OButton
+        icon-only
         class="md:hidden"
-        variant="outline"
-        size="icon-toolbar"
-        icon-left="add"
+        variant="ghost"
+        icon="add"
         :aria-label="t('fleet.fleets.newFleet')"
         data-test="fleet-rail-mobile-add"
         @click="create"
@@ -63,24 +62,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-h-0 flex-1 overflow-y-auto px-1 max-md:hidden">
       <OEmptyState
         v-if="forbidden"
-        size="inline"
-        preset="no-access"
+        size="compact"
+        kind="denied"
+        :title="t('emptyState.noAccess.title')"
+        :text="t('emptyState.noAccess.description')"
         data-test="fleet-rail-forbidden"
       />
       <OEmptyState
         v-else-if="error && !rows.length"
-        size="inline"
-        preset="load-error"
+        size="compact"
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="t('emptyState.loadError.description')"
         data-test="fleet-rail-error"
         @action="emit('retry')"
       />
-      <div v-else-if="loading" class="flex justify-center py-4" data-test="fleet-rail-loading">
-        <OSpinner />
+      <div v-else-if="loading" class="flex flex-col gap-1 py-1" data-test="fleet-rail-loading">
+        <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-7" />
       </div>
       <OTabs
         v-else
         orientation="vertical"
-        dense
+        size="compact"
         :model-value="activeId"
         data-test="fleet-rail-tabs"
         @update:model-value="(v) => v && emit('select', String(v))"
@@ -89,7 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="fleet in filtered"
           :key="fleet.id"
           :name="fleet.id"
-          class="min-h-6"
           :data-test="`fleet-rail-item-${fleet.id}`"
         >
           <div class="group/row flex min-h-6 w-full items-center gap-1.5">
@@ -112,25 +114,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown side="bottom" align="start">
                   <template #trigger>
                     <OButton
-                      size="icon"
+                      icon-only
+                      size="xs"
                       variant="ghost"
-                      icon-left="more-vert"
-                      class="h-5 w-5"
+                      icon="more-vert"
                       :aria-label="t('fleet.common.actions')"
                       :data-test="`fleet-rail-menu-${fleet.id}`"
                       @click.stop
                     />
                   </template>
                   <ODropdownItem
-                    icon-left="edit"
+                    icon="edit"
                     :data-test="`fleet-rail-rename-${fleet.id}`"
                     @select="startRename(fleet)"
                   >
                     {{ t("fleet.fleets.rename") }}
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="delete"
-                    variant="destructive"
+                    icon="delete"
+                    tone="danger"
                     :data-test="`fleet-rail-delete-${fleet.id}`"
                     @select="startDelete(fleet)"
                   >
@@ -168,8 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       :confirm-text="deleting?.name"
       :ok-label="t('common.delete')"
-      ok-variant="destructive"
-      focus-cancel
+      kind="typeToConfirm"
       data-test="fleet-rail-delete-dialog"
       @update:ok="confirmDelete"
     />
@@ -190,7 +191,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useOrgId } from "@/composables/query/useOrgId";

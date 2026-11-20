@@ -33,20 +33,11 @@ const ODialogStub = defineComponent({
     persistent: Boolean,
     showClose: { type: Boolean, default: true },
     width: [String, Number],
-    primaryButtonLabel: String,
-    secondaryButtonLabel: String,
-    neutralButtonLabel: String,
-    primaryButtonVariant: String,
-    secondaryButtonVariant: String,
-    neutralButtonVariant: String,
-    primaryButtonDisabled: Boolean,
-    secondaryButtonDisabled: Boolean,
-    neutralButtonDisabled: Boolean,
-    primaryButtonLoading: Boolean,
-    secondaryButtonLoading: Boolean,
-    neutralButtonLoading: Boolean,
+    primary: { type: Object, default: undefined },
+    secondary: { type: Object, default: undefined },
+    extra: { type: Object, default: undefined },
   },
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   setup(props, { slots }) {
     return () =>
       props.open
@@ -1421,7 +1412,7 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       const dialog = wrapper.find('[data-test="o-dialog-stub"]');
       expect(dialog.exists()).toBe(true);
       // Title prop is forwarded to the in-house ODialog
-      expect(dialog.attributes("data-title")).toBe("Service Graph Settings");
+      expect(dialog.attributes("data-title")).toBe("Service graph settings");
     });
 
     it("should close the dialog when ODialog emits click:secondary (Close)", async () => {

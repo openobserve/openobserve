@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="bg-surface-base"
     :title="t('rum.uploadSourceMaps')"
-    :back="{ label: t('rum.sourceMaps'), onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
+    :back="{ label: t('rum.sourceMaps'), to: sourceMapsRoute, dataTest: 'add-alert-back-btn' }"
     bleed
   >
     <OForm
@@ -80,8 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButton
           data-test="rum-upload-source-maps-cancel-btn"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           type="button"
           @click="navigateBack"
           :disabled="isSubmitting"
@@ -90,7 +89,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="rum-upload-source-maps-upload-btn"
           variant="primary"
-          size="sm-action"
           type="submit"
           :loading="isSubmitting"
           >{{ t("rum.upload") }}</OButton
@@ -133,13 +131,12 @@ const uploadSourceMapsDefaults = computed((): UploadSourceMapsForm => ({
 }));
 
 // Navigate back to source maps list
+const sourceMapsRoute = computed(() => ({
+  name: "SourceMaps",
+  query: { org_identifier: store.state.selectedOrganization.identifier },
+}));
 const navigateBack = () => {
-  router.push({
-    name: "SourceMaps",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
+  router.push(sourceMapsRoute.value);
 };
 
 // Upload source maps. @submit fires only once the schema passes, so service /

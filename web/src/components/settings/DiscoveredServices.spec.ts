@@ -58,20 +58,11 @@ const ODrawerStub = {
     persistent: { type: Boolean, default: false },
     showClose: { type: Boolean, default: true },
     width: { type: [String, Number], default: undefined },
-    primaryButtonLabel: { type: String, default: undefined },
-    secondaryButtonLabel: { type: String, default: undefined },
-    neutralButtonLabel: { type: String, default: undefined },
-    primaryButtonVariant: { type: String, default: undefined },
-    secondaryButtonVariant: { type: String, default: undefined },
-    neutralButtonVariant: { type: String, default: undefined },
-    primaryButtonDisabled: { type: Boolean, default: false },
-    secondaryButtonDisabled: { type: Boolean, default: false },
-    neutralButtonDisabled: { type: Boolean, default: false },
-    primaryButtonLoading: { type: Boolean, default: false },
-    secondaryButtonLoading: { type: Boolean, default: false },
-    neutralButtonLoading: { type: Boolean, default: false },
+    primary: { type: Object, default: undefined },
+    secondary: { type: Object, default: undefined },
+    extra: { type: Object, default: undefined },
   },
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-drawer-stub"
@@ -97,7 +88,7 @@ const ODrawerStub = {
 // underlying ODialog so the spec stays decoupled from that component.
 const ConfirmDialogStub = {
   name: "ConfirmDialog",
-  props: ["modelValue", "title", "message", "warningMessage", "okVariant"],
+  props: ["modelValue", "title", "message", "warningMessage", "kind"],
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: `
     <div data-test="confirm-dialog-stub" :data-open="String(!!modelValue)">
@@ -848,7 +839,7 @@ describe("DiscoveredServices", () => {
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("open")).toBe(true);
       expect(drawer.props("title")).toBe("api-server");
-      expect(drawer.props("size")).toBe("lg");
+      expect(drawer.props("size")).toBe("md");
     });
 
     it("should clear selectedService when ODrawer emits update:open false", async () => {
@@ -922,9 +913,7 @@ describe("DiscoveredServices", () => {
       expect(wrapper.find('[data-test="confirm-dialog-stub"]').attributes("data-open")).toBe(
         "true",
       );
-      expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("okVariant")).toBe(
-        "destructive",
-      );
+      expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("kind")).toBe("destructive");
     });
 
     it("should call resetServices when ConfirmDialog emits update:ok", async () => {

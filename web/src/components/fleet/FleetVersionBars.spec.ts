@@ -32,7 +32,7 @@ const variantOf = (w: ReturnType<typeof mountBars>, version: string) =>
   w
     .find(`[data-test="fleet-version-bars-row-${version}"]`)
     .findComponent({ name: "OProgressBar" })
-    .props("variant");
+    .props("tone");
 
 describe("FleetVersionBars", () => {
   it("colours a version outdated exactly when the server flagged its collectors", () => {
@@ -44,9 +44,9 @@ describe("FleetVersionBars", () => {
       ],
       ["0.123.9"],
     );
-    expect(variantOf(w, "0.124.0")).toBe("success");
-    expect(variantOf(w, "0.123.9")).toBe("warning");
-    expect(variantOf(w, "0.99.1")).toBe("success");
+    expect(variantOf(w, "0.124.0")).toBe("ok");
+    expect(variantOf(w, "0.123.9")).toBe("warn");
+    expect(variantOf(w, "0.99.1")).toBe("ok");
   });
 
   it("orders versions numerically, newest first", () => {

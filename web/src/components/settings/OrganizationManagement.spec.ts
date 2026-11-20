@@ -127,24 +127,24 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       class="o-dialog-stub"
@@ -152,9 +152,9 @@ const ODialogStub = {
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-sub-title="subTitle"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-sub-title="subtitle"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
       v-if="open"
     >
       <slot name="header" />
@@ -163,11 +163,11 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -901,7 +901,7 @@ describe("OrganizationManagement.vue", () => {
         const btn = wrapper
           .findAllComponents({ name: "OButton" })
           .find((b) => b.attributes("data-test") === "org-management-storage-enable-btn")!;
-        expect(btn.props("iconLeft")).toBe(icon);
+        expect(btn.props("icon")).toBe(icon);
         expect(Boolean(btn.props("disabled"))).toBe(disabled);
         store.state.zoConfig.features = {};
       },
@@ -1037,7 +1037,7 @@ describe("OrganizationManagement.vue", () => {
       const openDialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
       // Either contract dialog may be open separately; ensure none for extendTrial
       const titles = openDialogs.map((d: any) => d.attributes("data-title"));
-      expect(titles.every((t: string) => !t || !t.startsWith("Extend Trial"))).toBe(true);
+      expect(titles.every((t: string) => !t || !t.startsWith("Extend trial"))).toBe(true);
     });
 
     it("should show loading state in table", async () => {
@@ -1065,9 +1065,9 @@ describe("OrganizationManagement.vue", () => {
 
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((d: any) => (d.attributes("data-title") || "").startsWith("Extend Trial"));
+        .find((d: any) => (d.attributes("data-title") || "").startsWith("Extend trial"));
       expect(dialog?.exists()).toBe(true);
-      expect(dialog!.attributes("data-title")).toBe("Extend Trial for Acme");
+      expect(dialog!.attributes("data-title")).toBe("Extend trial for Acme");
       expect(dialog!.attributes("data-sub-title")).toBe("Set the new trial extension period.");
       expect(dialog!.attributes("data-primary-label")).toBe("Extend trial by 2 weeks");
       expect(dialog!.attributes("data-secondary-label")).toBe("Cancel");
@@ -1082,7 +1082,7 @@ describe("OrganizationManagement.vue", () => {
 
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((d: any) => (d.attributes("data-title") || "").startsWith("Extend Trial"));
+        .find((d: any) => (d.attributes("data-title") || "").startsWith("Extend trial"));
       expect(dialog?.exists()).toBe(true);
 
       await dialog!.find('[data-test="o-dialog-stub-secondary"]').trigger("click");
@@ -1149,9 +1149,9 @@ describe("OrganizationManagement.vue", () => {
       expect(wrapper.vm.aiCreditsFormDefaults).toEqual({ creditsLimit: 5000 });
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((item: any) => (item.attributes("data-title") || "").startsWith("Set AI Credits"));
-      expect(dialog?.attributes("data-title")).toBe("Set AI Credits for Acme");
-      expect(dialog?.attributes("data-primary-label")).toBe("Save Credits");
+        .find((item: any) => (item.attributes("data-title") || "").startsWith("Set AI credits"));
+      expect(dialog?.attributes("data-title")).toBe("Set AI credits for Acme");
+      expect(dialog?.attributes("data-primary-label")).toBe("Save credits");
     });
 
     it("targets the ai_credits pool and updates the row from the response", async () => {
@@ -1226,9 +1226,9 @@ describe("OrganizationManagement.vue", () => {
       expect(wrapper.vm.syntheticsStepsFormDefaults).toEqual({ stepsLimit: 10000 });
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((item: any) => (item.attributes("data-title") || "").startsWith("Set Browser Steps"));
-      expect(dialog?.attributes("data-title")).toBe("Set Browser Steps for Acme");
-      expect(dialog?.attributes("data-primary-label")).toBe("Save Steps");
+        .find((item: any) => (item.attributes("data-title") || "").startsWith("Set browser steps"));
+      expect(dialog?.attributes("data-title")).toBe("Set browser steps for Acme");
+      expect(dialog?.attributes("data-primary-label")).toBe("Save steps");
     });
 
     it("targets the browser step pool and updates the row from the response", async () => {
@@ -1369,10 +1369,10 @@ describe("OrganizationManagement.vue", () => {
 
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((d: any) => (d.attributes("data-title") || "").includes("External Contract"));
+        .find((d: any) => (d.attributes("data-title") || "").includes("external contract"));
       expect(dialog?.exists()).toBe(true);
-      expect(dialog!.attributes("data-title")).toBe("Create External Contract for Acme");
-      expect(dialog!.attributes("data-primary-label")).toBe("Create Contract");
+      expect(dialog!.attributes("data-title")).toBe("Create external contract for Acme");
+      expect(dialog!.attributes("data-primary-label")).toBe("Create contract");
       expect(dialog!.attributes("data-secondary-label")).toBe("Cancel");
     });
 
@@ -1383,10 +1383,10 @@ describe("OrganizationManagement.vue", () => {
 
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((d: any) => (d.attributes("data-title") || "").includes("External Contract"));
+        .find((d: any) => (d.attributes("data-title") || "").includes("external contract"));
       expect(dialog?.exists()).toBe(true);
-      expect(dialog!.attributes("data-title")).toBe("Extend External Contract for Acme");
-      expect(dialog!.attributes("data-primary-label")).toBe("Extend Contract");
+      expect(dialog!.attributes("data-title")).toBe("Extend external contract for Acme");
+      expect(dialog!.attributes("data-primary-label")).toBe("Extend contract");
     });
 
     it("should close the contract dialog when secondary is clicked", async () => {
@@ -1396,7 +1396,7 @@ describe("OrganizationManagement.vue", () => {
 
       const dialog = wrapper
         .findAll('[data-test="o-dialog-stub"]')
-        .find((d: any) => (d.attributes("data-title") || "").includes("External Contract"));
+        .find((d: any) => (d.attributes("data-title") || "").includes("external contract"));
       expect(dialog?.exists()).toBe(true);
 
       await dialog!.find('[data-test="o-dialog-stub-secondary"]').trigger("click");
@@ -1605,10 +1605,10 @@ describe("OrganizationManagement.vue", () => {
       });
 
       expect(mockConfirmFn).toHaveBeenCalledWith({
-        title: "Revoke External Contract",
+        title: "Revoke external contract",
         messageKeypath: "settings.organizationManagementPage.revokeConfirmMessage",
         messageName: "TestOrg",
-        confirmVariant: "destructive",
+        kind: "destructive",
       });
     });
 

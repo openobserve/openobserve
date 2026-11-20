@@ -2,29 +2,18 @@
 
 import type { I18nText } from "@/types/i18n";
 
-export type SwitchSize = "sm" | "md" | "lg" | "xl";
+/** Read for truthiness; the switch always emits a boolean. */
 export type SwitchValue = boolean | string | number;
-/**
- * Custom value type for `checkedValue`/`uncheckedValue`. Excludes `boolean` on
- * purpose: Vue auto-coerces optional Boolean-typed props to `false` when not
- * passed, which would make `checkedValue !== undefined` always evaluate true
- * and break the default boolean toggle behaviour.
- */
-export type SwitchCustomValue = string | number;
 
 export interface SwitchProps {
   /** Current on/off state */
   modelValue?: SwitchValue;
   /** Accessible label rendered beside the switch */
   label?: I18nText;
-  /** Whether the label appears before (left) or after (right) the switch */
-  labelPosition?: "left" | "right";
-  /** Control size */
-  size?: SwitchSize;
-  /** Value to emit when checked — replaces the legacy toggle's `true-value` */
-  checkedValue?: SwitchCustomValue;
-  /** Value to emit when unchecked — replaces the legacy toggle's `false-value` */
-  uncheckedValue?: SwitchCustomValue;
+  /** Secondary line under the label */
+  description?: I18nText;
+  /** `end` puts the label after the switch (forms); `start` before it (setting rows). */
+  labelPosition?: "start" | "end";
   /** Prevents interaction */
   disabled?: boolean;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
@@ -40,8 +29,8 @@ export interface SwitchProps {
 }
 
 export interface SwitchEmits {
-  (_e: "update:modelValue", _value: SwitchValue): void;
-  (_e: "change", _value: SwitchValue): void;
+  (_e: "update:modelValue", _value: boolean): void;
+  (_e: "change", _value: boolean): void;
 }
 
 export interface SwitchSlots {

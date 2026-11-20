@@ -22,12 +22,12 @@ vi.mock("vue-i18n", async () => {
 
 import VersionCompareBanner from "./VersionCompareBanner.vue";
 
-const OBanner = {
-  props: ["variant", "dataTest"],
-  template: '<div class="o-banner" :data-variant="variant" :data-test="dataTest"><slot /></div>',
+const OInlineNotice = {
+  props: ["tone"],
+  template: '<div class="o-banner" :data-tone="tone"><slot /></div>',
 };
 
-const stubs = { OBanner };
+const stubs = { OInlineNotice };
 
 const mountBanner = (overrides: Record<string, unknown> = {}) =>
   mount(VersionCompareBanner, {
@@ -81,6 +81,6 @@ describe("VersionCompareBanner", () => {
 
   it("uses warning tone", () => {
     const wrapper = mountBanner({ overlap: "disjoint", enoughSample: true });
-    expect(wrapper.find(".o-banner").attributes("data-variant")).toBe("warning");
+    expect(wrapper.find(".o-banner").attributes("data-tone")).toBe("warn");
   });
 });

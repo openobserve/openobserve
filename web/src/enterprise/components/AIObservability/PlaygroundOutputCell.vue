@@ -25,14 +25,18 @@
 
     <!-- error -->
     <template v-else-if="cell.status === 'error'">
-      <OBanner variant="error" dense preserve-whitespace data-test="ai-playground-output-error">
+      <OInlineNotice
+        class="wrap-anywhere whitespace-pre-line"
+        tone="err"
+        data-test="ai-playground-output-error"
+      >
         {{ raw(cell.error?.message) }}
-      </OBanner>
+      </OInlineNotice>
       <div>
         <OButton
-          variant="outline"
-          size="xs"
-          icon-left="refresh"
+          variant="secondary"
+          size="sm"
+          icon="refresh"
           data-test="ai-playground-output-retry"
           @click="emit('retry')"
         >
@@ -47,7 +51,7 @@
       class="text-text-secondary flex items-center gap-2.5 py-1 text-xs italic"
       data-test="ai-playground-output-analyzing"
     >
-      <OSpinner variant="dots" size="xs" />
+      <OSpinner />
       <span>{{ analyzingMessage }}</span>
     </div>
 
@@ -58,7 +62,7 @@
       data-test="ai-playground-output-tool-call"
     >
       <div class="flex flex-wrap items-center gap-2">
-        <OTag variant="primary" size="sm" :label="t('aiObservability.playground.toolCall')" />
+        <OTag tone="accent" size="sm" :label="t('aiObservability.playground.toolCall')" />
         <span class="text-text-heading font-mono text-xs font-semibold">
           {{ cell.toolCall.name }}
         </span>
@@ -121,7 +125,7 @@
         class="flex items-start gap-1.5"
         :data-test="`ai-playground-score-${score.scorerId}`"
       >
-        <OTag :variant="scoreVariant(score)" size="sm" :label="raw(scoreLabel(score))" />
+        <OTag :tone="scoreVariant(score)" size="sm" :label="raw(scoreLabel(score))" />
         <span
           v-if="score.status !== 'scored'"
           class="text-text-secondary text-2xs min-w-0 flex-1 italic"
@@ -143,7 +147,7 @@
 <script setup lang="ts">
 import { computed, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -153,7 +157,7 @@ import type {
   PlaygroundCell,
   PlaygroundScore,
 } from "@/enterprise/views/AIObservability/playgroundDraft";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 
 const props = withDefaults(
   defineProps<{
@@ -230,10 +234,10 @@ function scoreLabel(score: PlaygroundScore): string {
 
 /** Never tinted by quality — a pass/fail colour on n ≤ 10 would read as a
  *  verdict the bench cannot support. Colour marks run state only. */
-function scoreVariant(score: PlaygroundScore): BadgeVariant {
-  if (score.status === "failed") return "error-soft";
-  if (score.status === "skipped") return "default-soft";
-  return "primary-soft";
+function scoreVariant(score: PlaygroundScore): ChipTone {
+  if (score.status === "failed") return "err";
+  if (score.status === "skipped") return "neutral";
+  return "accent";
 }
 
 // Past tense here, unlike the scorer menu: by the time this renders the score

@@ -28,7 +28,7 @@ import { displayFieldsOf } from "@/types/serviceRef";
 const stubs = {
   OEmptyState: {
     name: "OEmptyState",
-    props: ["size", "preset", "filtered", "description", "hideAction"],
+    props: ["size", "kind", "title", "text", "actionLabel"],
     emits: ["action"],
     template: "<div />",
   },
@@ -134,8 +134,8 @@ describe("OnCallOwnershipRules", () => {
     const wrapper = render({ teamId: "team_9", rules: [] });
     await flushPromises();
     const empty = wrapper.findComponent({ name: "OEmptyState" });
-    expect(empty.props("preset")).toBe("no-oncall-rules");
-    expect(empty.props("description")).toBeUndefined();
+    expect(empty.props("title")).toBe(i18n.global.t("emptyState.noOncallRules.title"));
+    expect(empty.props("text")).toBeUndefined();
   });
 
   it("reads the match as chips with sentence-case fields, and a trailing * as starts with", async () => {
@@ -203,7 +203,7 @@ describe("OnCallOwnershipRules", () => {
     const remove = wrapper
       .findAllComponents(OButton)
       .find((b) => b.attributes("data-test") === "oncall-ownership-delete-r1")!;
-    expect(remove.props("variant")).toBe("ghost-destructive");
+    expect(remove.props("variant")).toBe("danger-ghost");
     await remove.trigger("click");
     expect(wrapper.emitted("remove")?.[0]).toEqual([rule()]);
     await wrapper.find('[data-test="oncall-routing-edit-r1"]').trigger("click");
@@ -237,7 +237,7 @@ describe("OnCallOwnershipRules", () => {
     expect(own.find('[data-test="oncall-routing-catch-all"]').text()).toContain(
       "Also gets every alert no team owns",
     );
-    expect(own.find('[data-test="oncall-routing-catch-all-set"]').text()).toBe("Change in Routing");
+    expect(own.find('[data-test="oncall-routing-catch-all-set"]').text()).toBe("Change in routing");
     // The team's last rule, so it is the body's last row and never part of the pager.
     const body = own.find('[data-test="o2-table-body"]');
     const rows = body.findAll("tr");
@@ -270,13 +270,13 @@ describe("OnCallOwnershipRules", () => {
     const readOnly = render({ rules: [], editable: false });
     await flushPromises();
     const empty = readOnly.findComponent({ name: "OEmptyState" });
-    expect(empty.props("hideAction")).toBe(true);
-    empty.vm.$emit("action", "create");
+    expect(empty.props("actionLabel")).toBeUndefined();
+    empty.vm.$emit("action");
     expect(readOnly.emitted("add")).toBeUndefined();
 
     const writer = render({ rules: [] });
     await flushPromises();
-    writer.findComponent({ name: "OEmptyState" }).vm.$emit("action", "create");
+    writer.findComponent({ name: "OEmptyState" }).vm.$emit("action");
     expect(writer.emitted("add")).toHaveLength(1);
   });
 

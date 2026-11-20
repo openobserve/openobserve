@@ -5,10 +5,9 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { computed } from "vue";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { securityTime } from "@/utils/security/time";
@@ -68,31 +67,28 @@ async function onEnd(s: Suppression) {
   <div class="flex flex-col gap-3" data-test="security-suppressions">
     <span class="text-text-secondary text-xs">{{ t("siem.tuning.suppressions.about") }}</span>
 
-    <div v-if="query.isLoading.value" class="flex items-center justify-center py-6">
-      <OSpinner size="sm" />
-    </div>
-    <OBanner
+    <OSkeleton v-if="query.isLoading.value" preset="tableRows" :rows="3" />
+    <OEmptyState
       v-else-if="query.isError.value && isForbiddenError(query.error.value)"
-      variant="warning"
-      icon="lock"
-      dense
+      kind="denied"
+      size="compact"
+      :title="t('siem.tuning.suppressions.forbidden')"
       data-test="security-suppressions-forbidden"
-      >{{ t("siem.tuning.suppressions.forbidden") }}</OBanner
-    >
-    <OBanner
+    />
+    <OEmptyState
       v-else-if="query.isError.value"
-      variant="error-soft"
-      icon="error-outline"
-      dense
+      kind="error"
+      size="compact"
+      :title="t('siem.tuning.suppressions.loadError')"
       data-test="security-suppressions-error"
-      >{{ t("siem.tuning.suppressions.loadError") }}</OBanner
-    >
+      @action="query.refetch()"
+    />
     <OEmptyState
       v-else-if="!suppressions.length"
-      size="inline"
+      size="compact"
       icon="notifications-paused"
       :title="t('siem.tuning.suppressions.empty')"
-      :description="t('siem.tuning.suppressions.emptyHint')"
+      :text="t('siem.tuning.suppressions.emptyHint')"
       data-test="security-suppressions-empty"
     />
     <ul
@@ -108,7 +104,7 @@ async function onEnd(s: Suppression) {
       >
         <div class="flex min-w-0 flex-1 flex-col gap-1">
           <div class="flex flex-wrap items-center gap-1.5 text-xs">
-            <OTag variant="default-soft" size="xs">{{
+            <OTag tone="neutral" size="sm">{{
               t(`siem.tuning.suppressions.kind.${s.entity_kind}`)
             }}</OTag>
             <span class="text-text-heading font-mono">{{ s.entity_value }}</span>
@@ -133,8 +129,7 @@ async function onEnd(s: Suppression) {
         </div>
         <OButton
           v-if="canAdmin"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :data-test="`security-suppression-end-${s.id}`"
           @click="onEnd(s)"
           >{{ t("siem.tuning.suppressions.end") }}</OButton

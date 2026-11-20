@@ -21,6 +21,8 @@ import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import {
@@ -110,9 +112,9 @@ const overallDurationMs = computed(() =>
 );
 
 function statusVariant(s: RunStatus) {
-  if (s === "passed") return "success";
-  if (s === "warning") return "warning";
-  return "error";
+  if (s === "passed") return "ok";
+  if (s === "warning") return "warn";
+  return "err";
 }
 
 function statusLabel(s: RunStatus) {
@@ -149,9 +151,9 @@ function toggleSteps(executionId: string) {
   <ODrawer
     bleed
     :open="open"
-    size="lg"
+    size="md"
     :title="t('synthetics.runDetail.title')"
-    :sub-title="raw(fmtTime(scheduledTs))"
+    :subtitle="raw(fmtTime(scheduledTs))"
     @update:open="
       (v) => {
         if (!v) emit('close');
@@ -159,7 +161,7 @@ function toggleSteps(executionId: string) {
     "
   >
     <template #header-right>
-      <OBadge v-if="overallStatus" :variant="statusVariant(overallStatus)" size="md">
+      <OBadge v-if="overallStatus" :tone="statusVariant(overallStatus)" size="md">
         {{ statusLabel(overallStatus) }}
       </OBadge>
     </template>
@@ -168,46 +170,36 @@ function toggleSteps(executionId: string) {
       <!-- ── Loading skeleton ── -->
       <div v-if="loading" class="flex flex-col gap-3 p-5">
         <div class="mb-2 flex gap-6">
-          <div class="rounded-default bg-border-default h-10 w-28 animate-pulse" />
-          <div class="rounded-default bg-border-default h-10 w-20 animate-pulse" />
-          <div class="rounded-default bg-border-default h-10 w-40 animate-pulse" />
+          <OSkeleton shape="block" class="h-10 w-28" />
+          <OSkeleton shape="block" class="h-10 w-20" />
+          <OSkeleton shape="block" class="h-10 w-40" />
         </div>
         <div
           v-for="i in 2"
           :key="i"
           class="rounded-default border-border-default overflow-hidden border"
         >
-          <div class="bg-border-default h-11 w-full animate-pulse" />
+          <OSkeleton shape="block" class="h-11" />
           <div class="flex flex-col gap-2 p-4">
-            <div class="rounded-default bg-border-default h-4 w-2/3 animate-pulse" />
-            <div class="rounded-default bg-border-default h-4 w-1/2 animate-pulse" />
+            <OSkeleton class="h-4 w-2/3" />
+            <OSkeleton class="h-4 w-1/2" />
           </div>
         </div>
       </div>
 
-      <!-- ── Query error ── -->
-      <div
+      <OEmptyState
         v-else-if="queryError"
-        class="text-text-muted flex flex-col items-center gap-3 px-5 py-16"
-      >
-        <OIcon name="error_outline" size="xl" class="text-status-error-text" />
-        <p class="text-status-error-text text-sm font-medium">
-          {{ t("synthetics.runDetail.loadFailed") }}
-        </p>
-        <p class="text-text-secondary max-w-sm text-center font-mono text-xs">{{ queryError }}</p>
-      </div>
+        kind="error"
+        :title="t('synthetics.runDetail.loadFailed')"
+        :text="t('emptyState.loadError.description')"
+      />
 
-      <!-- ── No data ── -->
-      <div
+      <OEmptyState
         v-else-if="!locations.length"
-        class="text-text-muted flex flex-col items-center gap-3 px-5 py-16"
-      >
-        <OIcon name="hourglass_empty" size="xl" />
-        <p class="text-sm font-medium">{{ t("synthetics.runDetail.noExecutionData") }}</p>
-        <p class="text-text-secondary text-center text-xs">
-          {{ t("synthetics.runDetail.noExecutionDataDesc", { runId: runId }) }}
-        </p>
-      </div>
+        icon="hourglass-empty"
+        :title="t('synthetics.runDetail.noExecutionData')"
+        :text="t('synthetics.runDetail.noExecutionDataDesc', { runId: runId })"
+      />
 
       <!-- ── Data ── -->
       <template v-else>
@@ -217,7 +209,7 @@ function toggleSteps(executionId: string) {
         >
           <div>
             <p
-              class="text-3xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
+              class="text-2xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
             >
               {{ t("synthetics.runDetail.maxDuration") }}
             </p>
@@ -225,7 +217,7 @@ function toggleSteps(executionId: string) {
           </div>
           <div>
             <p
-              class="text-3xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
+              class="text-2xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
             >
               {{ t("synthetics.runDetail.locations") }}
             </p>
@@ -233,7 +225,7 @@ function toggleSteps(executionId: string) {
           </div>
           <div>
             <p
-              class="text-3xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
+              class="text-2xs text-text-muted mb-[0.2rem] font-semibold tracking-[0.06em] uppercase"
             >
               {{ t("synthetics.runDetail.runId") }}
             </p>
@@ -254,7 +246,7 @@ function toggleSteps(executionId: string) {
             <div
               class="bg-surface-panel border-border-default flex items-center gap-2.5 border-b px-4 py-3"
             >
-              <OBadge :variant="statusVariant(loc.status)" size="sm">{{
+              <OBadge :tone="statusVariant(loc.status)" size="sm">{{
                 statusLabel(loc.status)
               }}</OBadge>
               <span class="text-text-heading truncate text-sm font-semibold">{{
@@ -288,7 +280,7 @@ function toggleSteps(executionId: string) {
               <div v-if="loc.steps.length || loc.startLoad" class="px-4 py-3">
                 <OButton
                   variant="ghost"
-                  size="xs"
+                  size="sm"
                   class="text-text-body mb-2 flex items-center gap-1.5 font-semibold"
                   :data-test="`synthetics-run-detail-toggle-steps-${loc.executionId}-btn`"
                   @click="toggleSteps(loc.executionId)"
@@ -348,7 +340,7 @@ function toggleSteps(executionId: string) {
                     class="flex items-start gap-2.5 py-1.5 text-xs"
                   >
                     <span
-                      class="text-3xs mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold text-white"
+                      class="text-2xs mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-semibold text-white"
                       :class="step.status === 'ok' ? 'bg-success-600' : 'bg-error-500'"
                       >{{ idx + 1 }}</span
                     >
@@ -389,7 +381,7 @@ function toggleSteps(executionId: string) {
                         class="h-2 w-2 shrink-0 rounded-full"
                         :class="step.status === 'ok' ? 'bg-success-500' : 'bg-error-500'"
                       />
-                      <span class="text-3xs text-text-muted truncate font-mono">{{
+                      <span class="text-2xs text-text-muted truncate font-mono">{{
                         step.stepId
                       }}</span>
                     </div>

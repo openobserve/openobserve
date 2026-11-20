@@ -9,23 +9,24 @@ import type {
   CheckboxModelValue,
 } from "./OCheckbox.types";
 import { CHECKBOX_GROUP_KEY } from "./OCheckbox.types";
-import { computed, inject } from "vue";
+import { computed, inject, useSlots } from "vue";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 const props = withDefaults(defineProps<CheckboxProps>(), {
-  size: "md",
-  color: "primary",
   disabled: false,
+  indeterminate: false,
 });
 
 const emit = defineEmits<CheckboxEmits>();
 
 defineSlots<CheckboxSlots>();
+const slots = useSlots();
+const hasText = computed(() => Boolean(slots.label || props.label || props.description));
 
 // ── Group context ──────────────────────────────────────────────────────────
 const groupContext = inject(CHECKBOX_GROUP_KEY, null);
 
-const resolvedValue = computed<CheckboxPrimitive | undefined>(() => props.value ?? props.val);
+const resolvedValue = computed<CheckboxPrimitive | undefined>(() => props.value);
 
 const isGroupMember = computed(() => groupContext !== null && resolvedValue.value !== undefined);
 
@@ -39,6 +40,7 @@ const hasCustomValues = computed(
 
 /** Whether this checkbox is checked, considering the group context if present */
 const checked = computed((): boolean | "indeterminate" => {
+  if (props.indeterminate) return "indeterminate";
   if (isGroupMember.value && groupContext && resolvedValue.value !== undefined) {
     return groupContext.isChecked(resolvedValue.value);
   }
@@ -104,19 +106,12 @@ function toggle() {
   emit("update:modelValue", nextValue);
   emit("change", nextValue);
 }
-
-// ── Style ──────────────────────────────────────────────────────────────────
-const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
-  xs: "size-3",
-  sm: "size-3.5",
-  md: "size-4",
-};
 </script>
 
 <template>
   <label
     :class="[
-      'inline-flex items-center gap-2',
+      'inline-flex items-start gap-2',
       isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
     ]"
     @click.stop
@@ -132,29 +127,22 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       :data-state="dataState"
       :disabled="isDisabled"
       :class="[
-        'rounded-checkbox shrink-0 cursor-[inherit] border',
-        boxSizeClasses[size ?? 'md'],
+        'rounded-chip size-4 shrink-0 cursor-[inherit] border',
+        hasText && 'mt-0.5',
         // Base / unchecked
         'bg-checkbox-bg border-checkbox-border',
         // Hover
         'enabled:hover:border-checkbox-hover-border',
-        // Checked
-        color === 'primary' && 'data-[state=checked]:bg-checkbox-checked-bg',
-        color === 'primary' && 'data-[state=checked]:border-checkbox-checked-border',
-        color === 'negative' && 'data-[state=checked]:bg-error-500',
-        color === 'negative' && 'data-[state=checked]:border-error-500',
-        // Indeterminate
-        color === 'primary' && 'data-[state=indeterminate]:bg-checkbox-checked-bg',
-        color === 'primary' && 'data-[state=indeterminate]:border-checkbox-checked-border',
-        color === 'negative' && 'data-[state=indeterminate]:bg-error-500',
-        color === 'negative' && 'data-[state=indeterminate]:border-error-500',
+        // Checked and mixed
+        'data-[state=checked]:bg-checkbox-checked-bg data-[state=checked]:border-checkbox-checked-border',
+        'data-[state=indeterminate]:bg-checkbox-checked-bg data-[state=indeterminate]:border-checkbox-checked-border',
         // Disabled
         'disabled:bg-checkbox-disabled-bg',
         'disabled:border-checkbox-disabled-border',
         // Focus
         'ring-offset-surface-base focus-visible:ring-checkbox-focus-ring ring-offset-1 outline-none focus-visible:ring-2',
         // Transition
-        'transition-[color,background-color,border-color,box-shadow] duration-150',
+        'transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)',
         // Centering for indicator
         'flex items-center justify-center',
       ]"
@@ -198,17 +186,18 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       </span>
     </button>
 
-    <span
-      v-if="$slots.label || label"
-      :class="[
-        'o-input-label text-compact min-w-0 leading-tight select-none',
-        isDisabled
-          ? 'text-input-label-text-disabled font-normal'
-          : 'text-input-label-text font-medium',
-      ]"
-    >
-      <slot name="label">{{ label }}</slot
-      ><span v-if="required" aria-hidden="true">&nbsp;*</span>
+    <span v-if="hasText" class="flex min-w-0 flex-col">
+      <span
+        v-if="$slots.label || label"
+        :class="[
+          'o-input-label text-compact leading-5 font-normal select-none',
+          isDisabled ? 'text-input-label-text-disabled' : 'text-input-label-text',
+        ]"
+      >
+        <slot name="label">{{ label }}</slot
+        ><span v-if="required" aria-hidden="true">&nbsp;*</span>
+      </span>
+      <span v-if="description" class="text-text-muted text-xs leading-4">{{ description }}</span>
     </span>
   </label>
 </template>

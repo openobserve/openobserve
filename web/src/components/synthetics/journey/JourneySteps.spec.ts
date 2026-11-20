@@ -56,7 +56,7 @@ const OIconStub = {
 
 // OBadge stub
 const OBadgeStub = {
-  props: ["variant", "size"],
+  props: ["tone", "size"],
   template: '<span class="badge-stub"><slot /></span>',
 };
 
@@ -68,7 +68,7 @@ const OSpinnerStub = {
 
 // OProgressBar stub
 const OProgressBarStub = {
-  props: ["value", "start", "variant", "size"],
+  props: ["value", "start", "tone"],
   template: '<div class="progress-bar-stub" />',
 };
 
@@ -586,12 +586,12 @@ describe("JourneySteps", () => {
 
       const bars = wrapper.findAllComponents(OProgressBarStub);
       expect(bars.map((b) => [b.props("start"), b.props("value")])).toEqual([
-        [0, 0.2],
-        [0.2, 0.5],
-        [0.5, 1],
+        [0, 20],
+        [20, 50],
+        [50, 100],
       ]);
       // The failed step keeps its own colour on the shared scale.
-      expect(bars[2].props("variant")).toBe("danger");
+      expect(bars[2].props("tone")).toBe("err");
     });
 
     // Dividing by a zero-length run would paint every bar full width, which
@@ -1154,7 +1154,7 @@ describe("JourneySteps", () => {
           data: makeSteps(2),
           mode: "editor",
           stepBadgeFn: (row: BrowserStep) =>
-            row.id === "step-2" ? { label: "13 steps", variant: "error" } : null,
+            row.id === "step-2" ? { label: "13 steps", variant: "err" } : null,
         } as any,
         global: { stubs: STUBS },
       });
@@ -1166,12 +1166,12 @@ describe("JourneySteps", () => {
       const badgeStub = wrapper
         .findAllComponents(OBadgeStub)
         .find((b) => b.attributes("data-test") === "synthetics-journey-step-badge-1");
-      expect(badgeStub?.props("variant")).toBe("error");
+      expect(badgeStub?.props("tone")).toBe("err");
       expect(wrapper.find('[data-test="synthetics-journey-step-badge-0"]').exists()).toBe(false);
       wrapper.unmount();
 
       // Editor rows only: a preview row has no progress slot to fill.
-      wrapper = mountPreview({ stepBadgeFn: () => ({ label: "3 steps", variant: "default" }) });
+      wrapper = mountPreview({ stepBadgeFn: () => ({ label: "3 steps", variant: "neutral" }) });
       await flushPromises();
       expect(wrapper.find('[data-test="synthetics-journey-step-badge-0"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="synthetics-journey-preview-step-2.1"]').exists()).toBe(true);
@@ -1184,7 +1184,7 @@ describe("JourneySteps", () => {
           mode: "editor",
           stepProgressFn: (row: BrowserStep) =>
             row.id === "step-2" ? { done: 1, total: 3 } : null,
-          stepBadgeFn: () => ({ label: "3 steps", variant: "default" }),
+          stepBadgeFn: () => ({ label: "3 steps", variant: "neutral" }),
         } as any,
         global: { stubs: STUBS },
       });

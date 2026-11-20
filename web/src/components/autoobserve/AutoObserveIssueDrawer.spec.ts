@@ -53,9 +53,9 @@ describe("AutoObserveIssueDrawer for a live incident", () => {
         plugins: [i18n, store, router],
         stubs: {
           ODrawer: {
-            props: ["title", "subTitle"],
+            props: ["title", "subtitle"],
             template:
-              "<div><h1 data-test='t'>{{ title }}</h1><p data-test='s'>{{ subTitle }}</p><slot name='header-right' /><slot /></div>",
+              "<div><h1 data-test='t'>{{ title }}</h1><p data-test='s'>{{ subtitle }}</p><slot name='header-right' /><slot /></div>",
           },
           LiveIssueBody: {
             name: "LiveIssueBody",

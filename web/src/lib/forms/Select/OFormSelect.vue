@@ -13,13 +13,11 @@ defineOptions({ inheritAttrs: false });
 const errorText = (message: string | undefined): I18nText | undefined =>
   message ? raw(message) : undefined;
 
-// OSelect defaults `searchable` to true. Because OFormSelect re-declares it as a
-// boolean prop, an OMITTED `searchable` would be cast to `false` (Vue's
-// absent-boolean rule) and then forwarded, clobbering OSelect's default and
-// making every form select non-searchable. Mirror OSelect's default so the
-// wrapper is transparent (consumers can still pass `:searchable="false"`).
+// Re-declared boolean props are cast to false when omitted (Vue's absent-boolean rule) and would
+// clobber OSelect's defaults once forwarded, so the wrapper mirrors them.
 const props = withDefaults(defineProps<FormSelectProps>(), {
-  searchable: true,
+  searchable: "auto",
+  clearable: undefined,
 });
 
 const form = inject(FORM_CONTEXT_KEY, null);
@@ -37,7 +35,7 @@ if (import.meta.env.DEV && !form) {
         Forward the whole typed props object rather than a hand-written prop
         list. FormSelectProps re-declares every OSelect prop (except
         modelValue/error/errorMessage), so a declared-but-unforwarded prop like
-        `loading`, `optionTooltip`, `labelPosition`, etc. would be stripped from
+        `loading`, `variant`, `maxChips`, etc. would be stripped from
         `$attrs` AND missing from the manual list — silently dropped. Binding
         `props` keeps the wrapper transparent as new OSelect props are added.
         The field-driven bindings (model-value/error/error-message) come last so
@@ -66,8 +64,8 @@ if (import.meta.env.DEV && !form) {
         <template v-if="$slots.tooltip" #tooltip>
           <slot name="tooltip" />
         </template>
-        <template v-if="$slots['icon-left']" #icon-left>
-          <slot name="icon-left" />
+        <template v-if="$slots.icon" #icon>
+          <slot name="icon" />
         </template>
         <template v-if="$slots.trigger" #trigger="scope">
           <slot name="trigger" v-bind="scope" />

@@ -32,6 +32,8 @@ export interface Shortcut {
   skipInInput?: boolean;
   /** Fire a plain-key shortcut even while focus is inside a dialog or drawer, which otherwise owns those keys. */
   allowInDialog?: boolean;
+  /** Handle the key before the focused element does, so an editor that binds the same combo cannot swallow it. */
+  capture?: boolean;
 }
 
 /**

@@ -43,12 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <template #footer>
-      <OButton variant="outline" size="sm" @click="$emit('update:open', false)">
+      <OButton variant="secondary" @click="$emit('update:open', false)">
         {{ t("common.cancel") }}
       </OButton>
       <OButton
         variant="primary"
-        size="sm"
         :disabled="!name.trim() || saving"
         data-test="synthetics-duplicate-confirm"
         @click="submit"

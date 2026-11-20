@@ -328,8 +328,8 @@ describe("BrowserJourney recording", () => {
     expect(wrapper.find('[data-test="synthetics-journey-stop-btn"]').exists()).toBe(true);
     // Cancel is a labelled toolbar button, so it carries a leading icon like its siblings.
     const cancel = wrapper.find('[data-test="synthetics-journey-cancel-btn"]');
-    expect(cancel.attributes("icon-left")).toBe("close");
-    expect(cancel.attributes("variant")).toBe("outline");
+    expect(cancel.attributes("icon")).toBe("close");
+    expect(cancel.attributes("variant")).toBe("secondary");
 
     // Stream steps via the bridge
     emitStreamEvent({
@@ -1206,13 +1206,13 @@ describe("BrowserJourney add menu and step filter", () => {
     props: ["content"],
     template: '<div :data-tooltip="content" />',
   };
-  // Renders the icon-right slot, which carries the shortcut keycap.
+  // Renders the icon-end slot, which carries the shortcut keycap.
   const OInputWithIconStub = {
     props: ["modelValue"],
     emits: ["update:modelValue"],
     inheritAttrs: false,
     template:
-      '<div :data-test="$attrs[\'data-test\']"><input :value="modelValue" /><slot name="icon-right" /></div>',
+      '<div :data-test="$attrs[\'data-test\']"><input :value="modelValue" /><slot name="icon-end" /></div>',
   };
 
   const journey = [
@@ -1263,9 +1263,8 @@ describe("BrowserJourney add menu and step filter", () => {
     wrapper = mountToolbar();
 
     const add = wrapper.find(ADD_STEP);
-    expect(add.attributes("variant")).toBe("outline");
-    expect(add.attributes("size")).toBe("xs");
-    expect(add.attributes("icon-left")).toBe("add");
+    expect(add.attributes("variant")).toBe("secondary");
+    expect(add.attributes("size")).toBe("sm");
     expect(add.text()).toBe("synthetics.journey.addMenu.addStep");
 
     await add.trigger("click");
@@ -2011,7 +2010,7 @@ describe("BrowserJourney reference row preview", () => {
     expect(badge.exists()).toBe(true);
     expect(badge.text()).toBe("synthetics.journey.subtest.noAccessBadge");
     // The stub forwards unknown props as attributes, so the variant is readable here.
-    expect(badge.attributes("variant")).toBe("error");
+    expect(badge.attributes("tone")).toBe("err");
     expect(w.find('[data-test="synthetics-journey-subtest-preview"]').exists()).toBe(false);
     expect(mockSyntheticsGet).not.toHaveBeenCalled();
   });

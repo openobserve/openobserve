@@ -340,7 +340,13 @@ export class OnCallMinePage {
     const chip = this.page.locator(this.channelChip(email, 'email'));
     await expect(chip, `${email}'s email chip must be green`).toHaveClass(CHIP_GREEN, { timeout: 30000 });
     for (const channel of ['sms', 'voice']) {
-      const phoneChip = this.page.locator(`${this.channelChip(email, channel)}, ${this.channelChipLink(email, channel)}`);
+      const link = this.page.locator(this.channelChipLink(email, channel));
+      // The caller's own phone chip is a ghost "add phone" button, never red; anyone else's is dashed.
+      if (await link.count()) {
+        await expect(link, `${email}'s ${channel} chip must read as covered by email`).toHaveAttribute('data-o2-variant', 'ghost');
+        continue;
+      }
+      const phoneChip = this.page.locator(this.channelChip(email, channel));
       await expect(phoneChip, `${email}'s ${channel} chip must read as covered by email`).toHaveClass(CHIP_COVERED);
     }
     const row = this.page.locator(this.channelRow(email));

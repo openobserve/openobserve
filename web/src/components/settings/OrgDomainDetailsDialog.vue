@@ -20,9 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="dialogOpen"
     size="md"
     :title="title"
-    :secondary-button-label="t('common.close')"
-    :primary-button-label="canVerify ? t('settings.orgDomainMapping.verifyNow') : undefined"
-    :primary-button-loading="verifying"
+    :secondary="{ label: t('common.close') }"
+    :primary="{
+      label: canVerify ? t('settings.orgDomainMapping.verifyNow') : undefined,
+      loading: verifying,
+    }"
     @click:secondary="dialogOpen = false"
     @click:primary="emit('verify')"
   >

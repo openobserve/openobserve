@@ -37,7 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
     :value="badgeValue"
     :label="raw(displayValue)"
     :dot="false"
-    class="font-mono tabular-nums"
+    class="tabular-nums"
+    mono
   />
 </template>
 

@@ -5,6 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { ref } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -31,6 +32,8 @@ defineProps<{
   rows: EventRow[];
   columns: OTableColumnDef<EventRow>[];
   loading: boolean;
+  /** Epoch-ms of the last finished search, shown as the refresh age. */
+  lastRunAt?: number | null;
   error: string;
   page: number;
   pageSize: number;
@@ -103,7 +106,6 @@ function fmtTs(ms: number | null): string {
     :sort-order="sortOrder"
     :sort-disabled="sqlMode"
     :sort-disabled-reason="t('siem.events.sortSqlMode')"
-    :show-global-filter="false"
     :persist-columns="!showRaw && !resultTable && !projected"
     :table-id="showRaw || resultTable || projected ? undefined : 'security-events-normalized'"
     :enable-column-resize="true"
@@ -121,14 +123,15 @@ function fmtTs(ms: number | null): string {
         <OButton
           v-if="canShowTimeline"
           variant="ghost"
-          size="xs"
-          :icon-left="showTimeline ? 'expand-less' : 'expand-more'"
+          size="sm"
+          :icon="showTimeline ? 'expand-less' : 'expand-more'"
           data-test="security-events-toggle-timeline"
           @click="showTimeline = !showTimeline"
         >
           {{ showTimeline ? t("siem.events.hideTimeline") : t("siem.events.showTimeline") }}
         </OButton>
         <OToggleGroup
+          size="sm"
           v-if="!resultTable && !projected"
           :model-value="showRaw ? 'raw' : 'normalized'"
           data-test="security-events-view"
@@ -137,12 +140,11 @@ function fmtTs(ms: number | null): string {
           <OToggleGroupItem
             data-test="security-events-view-normalized"
             value="normalized"
-            size="xs"
             :tooltip="t('siem.events.normalizedHint')"
           >
             {{ t("siem.events.normalized") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="raw" size="xs" data-test="security-events-view-raw">{{
+          <OToggleGroupItem value="raw" data-test="security-events-view-raw">{{
             t("siem.events.raw")
           }}</OToggleGroupItem>
         </OToggleGroup>
@@ -159,7 +161,7 @@ function fmtTs(ms: number | null): string {
         type="severity"
         :value="severityTagValue(row._tone)"
         :label="t(toneLabelKey(row._tone))"
-        size="xs"
+        size="sm"
       />
     </template>
     <template #cell-className="{ row }">
@@ -168,8 +170,8 @@ function fmtTs(ms: number | null): string {
     <template #cell-statusId="{ row }">
       <OTag
         v-if="row.statusId === 1 || row.statusId === 2"
-        :variant="row.statusId === 2 ? 'error-soft' : 'success-soft'"
-        size="xs"
+        :tone="row.statusId === 2 ? 'err' : 'ok'"
+        size="sm"
         >{{ t(`siem.outcome.${row.statusId === 2 ? "failure" : "success"}`) }}</OTag
       >
       <span v-else class="text-text-secondary">—</span>
@@ -188,10 +190,10 @@ function fmtTs(ms: number | null): string {
         class="bg-surface-base border-border-default rounded-default flex items-center border"
       >
         <OButton
+          icon-only
           :data-test="`security-events-pivot-include-${column.id}`"
           variant="ghost"
-          size="icon-xs"
-          icon-left="add-circle-outline"
+          icon="add-circle-outline"
           @click.stop="
             emit(
               'add-filter',
@@ -204,10 +206,10 @@ function fmtTs(ms: number | null): string {
           <OTooltip :content="t('siem.pivot.include')" />
         </OButton>
         <OButton
+          icon-only
           :data-test="`security-events-pivot-exclude-${column.id}`"
           variant="ghost"
-          size="icon-xs"
-          icon-left="block"
+          icon="block"
           @click.stop="
             emit(
               'add-filter',
@@ -223,32 +225,26 @@ function fmtTs(ms: number | null): string {
     </template>
 
     <template #toolbar-trailing>
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
+      <ORefreshButton
+        :last-run-at="lastRunAt"
         :loading="loading"
         data-test="security-events-refresh"
         @click="emit('refresh')"
-      >
-        <OTooltip side="bottom" :content="t('siem.events.refresh')" />
-      </OButton>
+      />
     </template>
 
     <template #empty>
       <OEmptyState
         v-if="!loading"
-        size="block"
         icon="search-off"
+        :kind="filtered ? 'filtered' : 'first-run'"
         :title="t('siem.events.noEvents')"
-        :description="emptyHint"
-        :filtered="filtered"
+        :text="emptyHint"
         :action-label="
           widerPeriod ? t('siem.events.searchWider', { period: widerPeriod }) : undefined
         "
-        action-icon="history"
         data-test="security-events-empty"
-        @action="emit('empty-action', $event)"
+        @action="emit('empty-action', filtered ? 'clear-filters' : undefined)"
       />
     </template>
   </OTable>

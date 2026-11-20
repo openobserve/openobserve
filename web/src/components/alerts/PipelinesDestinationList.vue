@@ -20,14 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
       v-if="!showDestinationEditor"
       :title="t('pipeline_destinations.header')"
-      icon="person-pin-circle"
-      :subtitle="t('settings.pipelineDestinationsDesc')"
+      :about="t('settings.pipelineDestinationsDesc')"
     >
       <template #actions>
         <OButton
           data-test="pipeline-destination-list-add-btn"
           variant="primary"
-          size="sm"
           @click="editDestination(null)"
           >{{ t(`alert_destinations.add`) }}</OButton
         >
@@ -35,12 +33,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           ref="oTableRef"
-          :frame="false"
           data-test="alert-destinations-list-table"
           :data="visibleRows"
           :columns="columns"
           :row-actions="rowActions"
-          row-actions-more-data-test="alert-destination-list-row-more-actions"
+          :row-menu="rowMenu"
+          row-menu-data-test="alert-destination-list-row-more-actions"
           row-key="name"
           :loading="loading"
           :forbidden="forbidden"
@@ -61,8 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="settings-pipeline-destinations"
-          show-index
-          :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
@@ -74,23 +70,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              shortcut-id="pipelineDestinationsRefresh"
+              shortcut="pipelineDestinationsRefresh"
               data-test="pipeline-destination-list-refresh-btn"
               @click="refreshDestinations"
             />
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-pipeline-destinations"
-              :filtered="!!filterQuery"
-              @action="
-                (id) => (id === 'clear-filters' ? (filterQuery = '') : editDestination(null))
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery
+                  ? t('emptyState.filtered.title', {
+                      noun: t('emptyState.nouns.pipelineDestinations'),
+                    })
+                  : t('emptyState.noPipelineDestinations.title')
               "
+              :text="
+                filterQuery
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.nouns.pipelineDestinations'),
+                    })
+                  : t('emptyState.noPipelineDestinations.description')
+              "
+              :icon="filterQuery ? undefined : 'account-tree'"
+              :action-label="
+                filterQuery ? undefined : t('emptyState.noPipelineDestinations.action')
+              "
+              @action="filterQuery ? (filterQuery = '') : editDestination(null)"
             />
           </template>
 
@@ -111,9 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #selection-actions>
             <OButton
               data-test="pipeline-destination-list-delete-destinations-btn"
-              variant="outline-destructive"
-              size="sm"
-              icon-left="delete"
+              variant="danger-ghost"
+              icon="delete"
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
@@ -136,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alert_destinations.deleteDestinationTitle')"
       message-keypath="alert_destinations.deleteDestinationMessage"
       :message-name="confirmDelete.data?.name"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
@@ -145,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('alert_destinations.deleteDestinationsTitle')"
       :message="t('alerts.confirmDeleteDestinations', { count: selectedDestinations.length })"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -183,7 +190,11 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -271,25 +282,22 @@ export default defineComponent({
         size: 140,
         meta: { align: "left" },
       },
-      {
-        id: "actions",
-        header: t("alert_destinations.actions"),
-        isAction: true,
-        pinned: "right",
-      },
     ];
     const rowActions: OTableRowAction[] = [
       {
         id: "edit",
         label: t("alert_destinations.edit"),
         icon: "edit",
-        onSelect: (row) => editDestination(row),
+        onClick: (row) => editDestination(row),
         dataTest: (row) => `alert-destination-list-${row.name}-update-destination`,
       },
+    ];
+    const rowMenu: OTableRowMenuItem[] = [
       {
         id: "delete",
         label: t("alert_destinations.delete"),
         icon: "delete",
+        destructive: true,
         onSelect: (row) => conformDeleteDestination(row),
         dataTest: (row) => `alert-destination-list-${row.name}-delete-destination`,
       },
@@ -717,6 +725,7 @@ export default defineComponent({
       columns,
       editDestination,
       rowActions,
+      rowMenu,
       getImageURL,
       conformDeleteDestination,
       loading,

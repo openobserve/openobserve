@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="md"
     :title="t('statusPages.domains.title', { name: pageName })"
-    :secondary-button-label="t('common.close')"
+    :secondary="{ label: t('common.close') }"
     data-test="status-page-domains-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
@@ -47,12 +47,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <div v-if="loading" class="flex justify-center py-8">
-        <OSpinner />
+      <div v-if="loading" class="flex flex-col gap-2">
+        <OSkeleton v-for="row in 2" :key="row" shape="block" class="h-20" />
       </div>
-      <p v-else-if="domains.length === 0" class="text-text-secondary py-8 text-center text-sm">
-        {{ t("statusPages.domains.empty") }}
-      </p>
+      <OEmptyState
+        v-else-if="domains.length === 0"
+        size="compact"
+        :title="t('statusPages.domains.empty')"
+      />
       <div
         v-for="d in domains"
         v-else
@@ -63,16 +65,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-start justify-between gap-2">
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-sm font-medium">{{ raw(d.domain) }}</span>
-            <OBadge :variant="domainStateBadge(d.verification_state).variant" size="sm">
+            <OBadge :tone="domainStateBadge(d.verification_state).variant" size="sm">
               {{ t(domainStateBadge(d.verification_state).labelKey) }}
             </OBadge>
           </div>
           <div class="flex items-center gap-1">
             <OButton
               v-if="d.verification_state !== 1"
+              icon-only
               variant="ghost"
-              size="icon-xs"
-              icon-left="refresh"
+              icon="refresh"
               :disabled="verifyingId === d.id"
               :data-test="`status-page-domain-verify-${d.id}`"
               @click="verifyDomain(d)"
@@ -80,9 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip side="bottom" :content="t('statusPages.domains.verifyNow')" />
             </OButton>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
-              icon-left="delete"
+              icon="delete"
               :data-test="`status-page-domain-delete-${d.id}`"
               @click="confirmDelete(d)"
             >
@@ -91,25 +93,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OBanner
+        <OInlineNotice
           v-if="d.verification_state === 2 && d.verification_failure_reason !== null"
-          variant="error"
-          icon="warning"
-          dense
+          tone="err"
           :data-test="`status-page-domain-failure-${d.id}`"
         >
           {{ t(`statusPages.domains.failureReason.${d.verification_failure_reason}` as any) }}
-        </OBanner>
+        </OInlineNotice>
 
-        <OBanner
+        <OInlineNotice
           v-if="d.verification_state === 1"
-          variant="success"
-          icon="check"
-          dense
+          tone="ok"
           :data-test="`status-page-domain-serving-${d.id}`"
         >
           {{ t("statusPages.domains.serving") }}
-        </OBanner>
+        </OInlineNotice>
 
         <div
           v-if="d.verification_state !== 1 && d.txt_name && d.verification_token"
@@ -118,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex flex-col gap-2">
             <div class="flex items-center gap-2">
-              <OTag variant="primary-soft" size="sm" shape="pill">{{ raw("1") }}</OTag>
+              <OTag tone="accent" size="sm">{{ raw("1") }}</OTag>
               <span class="text-text-heading text-sm font-medium">
                 {{ t("statusPages.domains.recordInstructions") }}
               </span>
@@ -131,9 +129,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex min-w-0 items-center gap-1">
                 <OCode truncate class="min-w-0">{{ raw(d.txt_name) }}</OCode>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-xs"
-                  icon-left="content-copy"
+                  icon="content-copy"
                   :data-test="`status-page-domain-copy-txt-name-${d.id}`"
                   @click="copyTxtName(d)"
                 >
@@ -149,9 +147,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex min-w-0 items-center gap-1">
                 <OCode truncate class="min-w-0">{{ raw(d.verification_token) }}</OCode>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-xs"
-                  icon-left="content-copy"
+                  icon="content-copy"
                   :data-test="`status-page-domain-copy-txt-value-${d.id}`"
                   @click="copyTxtValue(d)"
                 >
@@ -162,14 +160,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="flex items-center gap-2">
-            <OTag variant="primary-soft" size="sm" shape="pill">{{ raw("2") }}</OTag>
+            <OTag tone="accent" size="sm">{{ raw("2") }}</OTag>
             <span class="text-text-secondary text-sm">
               {{ t("statusPages.domains.nextStepVerify", { seconds: verifyIntervalSeconds }) }}
             </span>
           </div>
 
           <div class="flex items-center gap-2">
-            <OTag variant="primary-soft" size="sm" shape="pill">{{ raw("3") }}</OTag>
+            <OTag tone="accent" size="sm">{{ raw("3") }}</OTag>
             <span class="text-text-secondary text-sm">
               {{ t("statusPages.domains.nextStepCname", { domain: d.domain }) }}
             </span>
@@ -189,8 +187,9 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -306,7 +305,7 @@ async function confirmDelete(d: StatusPageDomain) {
     title: t("statusPages.domains.deleteTitle"),
     messageKeypath: "statusPages.domains.deleteBody",
     messageName: d.domain,
-    confirmVariant: "destructive",
+    kind: "destructive",
   });
   if (!ok) return;
   const dismiss = toast({

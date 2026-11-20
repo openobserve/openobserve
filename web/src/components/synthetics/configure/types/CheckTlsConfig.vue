@@ -58,7 +58,7 @@ const verifyHostname = computed({
   <div class="rounded-default border-border-default mb-4 border">
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
       <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
-      <h3 class="text-text-heading text-base font-semibold">
+      <h3 class="text-text-heading text-sm font-semibold">
         {{ t("synthetics.protocolConfig.tls.title") }}
       </h3>
     </div>
@@ -68,14 +68,14 @@ const verifyHostname = computed({
           v-model.number="port"
           type="number"
           :label="t('synthetics.protocolConfig.port')"
-          width="xs"
+          width="s"
           data-test="synthetics-check-tls-port-input"
         />
         <OInput
           v-model.number="timeoutMs"
           type="number"
           :label="t('synthetics.protocolConfig.timeoutMs')"
-          width="sm"
+          width="s"
           data-test="synthetics-check-tls-timeout-input"
         />
       </div>
@@ -83,7 +83,7 @@ const verifyHostname = computed({
         v-model.number="minDays"
         type="number"
         :label="t('synthetics.protocolConfig.tls.minDays')"
-        width="md"
+        width="m"
         data-test="synthetics-check-tls-min-days-input"
       />
       <OSwitch

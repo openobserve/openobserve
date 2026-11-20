@@ -28,20 +28,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="min-w-0 flex-[1_1_20rem]">
           <OPopover
+            size="md"
             v-model:open="pageOpen"
             :aria-label="t('rum.heatmap.pageLabel')"
-            content-class="w-(--reka-popover-trigger-width) p-0"
+            content-class="p-0"
           >
             <template #trigger>
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 block
                 :disabled="!pageRows.length"
                 :aria-label="t('rum.heatmap.pageLabel')"
                 data-test="rum-heatmap-page-select"
               >
-                <template #icon-left><OIcon name="link" size="sm" /></template>
+                <template #icon><OIcon name="link" size="sm" /></template>
                 <span
                   class="text-compact min-w-0 flex-1 truncate text-left font-mono"
                   :title="pageUrl"
@@ -55,12 +55,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ pageCountText }}
                 </span>
-                <template #icon-right><OIcon name="unfold-more" size="sm" /></template>
+                <template #icon-end><OIcon name="unfold-more" size="sm" /></template>
               </OButton>
             </template>
             <div class="flex flex-col" data-test="rum-heatmap-page-list">
               <div class="border-border-default border-b p-2">
                 <OSearchInput
+                  size="sm"
                   v-model="pageQuery"
                   :placeholder="t('rum.heatmap.pageSearch')"
                   data-test="rum-heatmap-page-search"
@@ -73,12 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-right">{{ t("rum.heatmap.pageColClicksAll") }}</span>
                 <span class="text-right">{{ t("rum.heatmap.colSessions") }}</span>
               </div>
-              <div class="max-h-72 overflow-auto">
+              <div class="h-72 overflow-auto">
                 <OButton
                   v-for="p in visiblePages"
                   :key="p.url"
                   variant="ghost"
-                  size="sm"
                   block
                   :aria-current="p.url === pageUrl ? 'true' : undefined"
                   :data-test="`rum-heatmap-page-option-${p.url}`"
@@ -140,7 +140,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="opt.value"
             :value="opt.value"
             :icon-left="opt.icon"
-            size="sm"
             :data-test="`rum-heatmap-device-${opt.value}`"
           >
             {{ opt.label }}
@@ -148,38 +147,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OToggleGroup>
       </div>
 
-      <OBanner
+      <OInlineNotice
         v-if="deviceSplitFailed"
-        variant="warning"
-        dense
-        :content="t('rum.heatmap.deviceSplitFailed')"
+        tone="warn"
+        :message="t('rum.heatmap.deviceSplitFailed')"
         data-test="rum-heatmap-device-split-failed"
       />
 
       <OEmptyState
         v-if="!loading && !listLoading && !pageRows.length && !loadError"
-        preset="no-data"
+        :text="t('emptyState.noData.description')"
         :title="t('rum.heatmap.noPages')"
         data-test="rum-heatmap-empty"
       />
-      <div v-else-if="loadError" class="p-4">
-        <OBanner
-          variant="warning"
-          dense
-          :content="loadError ?? undefined"
-          data-test="rum-heatmap-load-error"
-        >
-          <template v-if="!loadForbidden" #actions>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="rum-heatmap-retry-btn"
-              @click="onRetry"
-              >{{ t("common.retry") }}</OButton
-            >
-          </template>
-        </OBanner>
-      </div>
+      <OEmptyState
+        v-else-if="loadError"
+        :kind="loadForbidden ? 'denied' : 'error'"
+        :text="loadError"
+        data-test="rum-heatmap-load-error"
+      >
+        <template v-if="!loadForbidden" #actions>
+          <OButton data-test="rum-heatmap-retry-btn" @click="onRetry">{{
+            t("common.retry")
+          }}</OButton>
+        </template>
+      </OEmptyState>
       <template v-else>
         <div
           class="border-border-default bg-surface-subtle flex shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2"
@@ -220,7 +212,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="opt.value"
                 :value="opt.value"
                 :icon-left="opt.icon"
-                size="sm"
                 :data-test="`rum-heatmap-mode-${opt.value}`"
               >
                 {{ opt.label }}
@@ -251,7 +242,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :min="0"
                     :max="100"
                     :step="5"
-                    size="sm"
                     data-test="rum-heatmap-opacity-slider"
                   />
                 </div>
@@ -263,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
               <span class="border-border-default h-5 border-s" aria-hidden="true" />
-              <OSwitch v-model="autoScroll" size="sm" data-test="rum-heatmap-auto-scroll">
+              <OSwitch v-model="autoScroll" data-test="rum-heatmap-auto-scroll">
                 <template #label>
                   <span class="text-text-heading text-sm font-normal">{{
                     t("rum.heatmap.autoScroll")
@@ -277,8 +267,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="ms-auto flex shrink-0 items-center gap-2" data-test="rum-heatmap-actions">
             <OButton
-              variant="outline"
-              size="icon-xs-sq"
+              icon-only
+              variant="secondary"
+              size="sm"
               :aria-label="fullscreenLabel"
               :aria-pressed="isFullscreen"
               data-test="rum-heatmap-fullscreen-toggle"
@@ -288,8 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="fullscreenLabel" side="bottom" />
             </OButton>
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               :aria-label="panelLabel"
               :aria-expanded="panelOpen"
               data-test="rum-heatmap-panel-toggle"
@@ -321,15 +311,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OEmptyState
                   v-if="snapshotError"
-                  size="block"
+                  kind="error"
                   :title="snapshotError"
                   data-test="rum-heatmap-snapshot-error"
                 />
-                <OBanner
+                <OInlineNotice
                   v-if="pageUrl && !loading && !groups.length"
-                  variant="warning"
-                  dense
-                  :content="
+                  tone="warn"
+                  :message="
                     totals.clicks > 0
                       ? t('rum.heatmap.noTargets')
                       : deviceClass === 'all'
@@ -467,11 +456,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OBadge
                   v-for="chip in chips"
                   :key="chip.key"
-                  :variant="chip.active ? 'primary-soft' : 'default-outline'"
-                  clickable
+                  toggle
+                  :pressed="chip.active"
                   :disabled="chip.disabled"
                   :title="chip.title"
-                  :aria-pressed="chip.active"
                   :data-test="`rum-heatmap-chip-${chip.key}`"
                   @click="chip.toggle"
                 >
@@ -498,8 +486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="sortOrder"
                 :aria-label="t('rum.heatmap.sortLabel')"
                 :options="sortOptions"
-                appearance="inline"
-                size="sm"
+                variant="filter"
                 class="text-accent text-xs"
                 data-test="rum-heatmap-sort-select"
               />
@@ -507,7 +494,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="min-h-0 flex-1 overflow-auto">
               <OEmptyState
                 v-if="groups.length && !visibleRows.length"
-                size="block"
+                kind="filtered"
                 :title="t('rum.heatmap.noElementMatch')"
                 :action-label="t('rum.heatmap.clearFilters')"
                 data-test="rum-heatmap-no-match"
@@ -521,8 +508,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 row-key="selector"
                 pagination="none"
                 :show-header="false"
-                :show-global-filter="false"
-                :frame="false"
                 horizontal-scroll
                 :row-class="rowClass"
                 :loading="loading"
@@ -562,8 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="rum-heatmap-row-stats"
                         >
                           <OProgressBar
-                            :value="clicksMax > 0 ? row.clicks / clicksMax : 0"
-                            size="xs"
+                            :value="clicksMax > 0 ? (row.clicks / clicksMax) * 100 : 0"
                             class="w-24 shrink-0"
                             data-test="rum-heatmap-row-bar"
                           />
@@ -581,7 +565,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </span>
                           <OBadge
                             v-if="row.missing"
-                            variant="warning-soft"
+                            tone="warn"
                             size="sm"
                             :data-test="`rum-heatmap-not-on-snapshot-${row.selector}`"
                           >
@@ -589,7 +573,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </OBadge>
                           <OBadge
                             v-if="row.frustrated"
-                            variant="error-soft"
+                            tone="err"
                             size="sm"
                             :data-test="`rum-heatmap-frustrated-${row.selector}`"
                           >
@@ -654,7 +638,7 @@ import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTable from "@/lib/core/Table/OTable.vue";

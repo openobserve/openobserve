@@ -16,10 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OEmptyState
-    size="hero"
-    preset="no-access"
+    kind="denied"
     :title="t('featureLock.toastTitle')"
-    :description="
+    :text="
       features.length
         ? t('featureLock.toastMessage', { features: raw(featureNames(features)) })
         : t('featureLock.toastMessageGeneric')

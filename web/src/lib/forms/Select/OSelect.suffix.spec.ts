@@ -63,4 +63,16 @@ describe("OSelect listLabel and suffix", () => {
     expect(suffix?.textContent).toBe("UTC+05:30");
     expect(rows[1].querySelector(".ms-auto")).toBeNull();
   });
+
+  it("renders an option count right-aligned in tabular figures", async () => {
+    wrapper = mount(OSelect, {
+      attachTo: document.body,
+      props: { options: [{ label: raw("app_logs"), value: "app", count: 48200 }] },
+    });
+    await wrapper.find("button").trigger("click");
+    await flushPromises();
+    const count = document.body.querySelector('[data-test="o-select-option-count"]')!;
+    expect(count.textContent).toBe((48200).toLocaleString());
+    expect(count.className).toContain("tabular-nums");
+  });
 });

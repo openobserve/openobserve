@@ -1,9 +1,9 @@
 ﻿<template>
   <ODropdown v-model:open="showUserGuide" side="left" align="start" :side-offset="8">
     <template #trigger>
-      <OButton variant="ghost" size="icon-sm" class="ms-2" data-test="cross-link-help-btn">
+      <OButton icon-only variant="ghost" class="ms-2" data-test="cross-link-help-btn">
         <OIcon name="help" size="sm" class="size-4" />
-        <OTooltip :content="t('crossLinks.userGuide')" side="bottom" align="center" />
+        <OTooltip :content="t('crossLinks.userGuide')" side="bottom" />
       </OButton>
     </template>
 
@@ -16,13 +16,13 @@
       <p class="mt-1 mb-2">{{ t("crossLinks.guideFieldDesc") }}</p>
       <ul class="ms-5 mt-1 mb-3 p-0">
         <li class="my-1">
-          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-xs">{{
             raw("${field.__name}")
           }}</span>
           – {{ t("crossLinks.guideFieldName") }}
         </li>
         <li class="my-1">
-          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-xs">{{
             raw("${field.__value}")
           }}</span>
           – {{ t("crossLinks.guideFieldValue") }}
@@ -33,13 +33,13 @@
       <p class="mt-1 mb-2">{{ t("crossLinks.guideTimeDesc") }}</p>
       <ul class="ms-5 mt-1 mb-3 p-0">
         <li class="my-1">
-          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-xs">{{
             raw("${start_time}")
           }}</span>
           – {{ t("crossLinks.guideStartTime") }}
         </li>
         <li class="my-1">
-          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-xs">{{
             raw("${end_time}")
           }}</span>
           – {{ t("crossLinks.guideEndTime") }}
@@ -47,7 +47,7 @@
       </ul>
       <p class="mt-1 mb-2">
         {{ t("crossLinks.guideTimeExample") }}
-        <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+        <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-xs">{{
           raw("from=${start_time}&to=${end_time}")
         }}</span>
       </p>
@@ -56,13 +56,13 @@
       <p class="mt-1 mb-2">{{ t("crossLinks.guideQueryDesc") }}</p>
       <ul class="ms-5 mt-1 mb-3 p-0">
         <li class="my-1">
-          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-xs">{{
             raw("${query}")
           }}</span>
           – {{ t("crossLinks.guideQuery") }}
         </li>
         <li class="my-1">
-          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-xs">{{
             raw("${query_encoded}")
           }}</span>
           – {{ t("crossLinks.guideQueryEncoded") }}
@@ -71,7 +71,7 @@
 
       <div class="header mt-3 mb-1 font-semibold">{{ t("crossLinks.guideExampleHeader") }}</div>
       <p class="mt-1 mb-2">
-        <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+        <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-xs">{{
           raw("https://example.com/trace/${field.__value}?from=${start_time}&to=${end_time}")
         }}</span>
       </p>

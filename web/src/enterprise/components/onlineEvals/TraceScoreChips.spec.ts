@@ -40,7 +40,7 @@ vi.mock("@/types/i18n", async (importOriginal) => {
 
 const stubs = {
   OTag: {
-    props: ["clickable"],
+    props: ["toggle"],
     template: `<span v-bind="$attrs"><slot name="icon" /><slot /></span>`,
   },
   OIcon: { template: `<i />` },

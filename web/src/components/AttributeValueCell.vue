@@ -3,8 +3,8 @@
     <ODropdown v-if="hasDropdownSlot" v-model:open="isDropdownOpen" side="bottom" align="start">
       <template #trigger>
         <OButton
+          icon-only
           data-test="attribute-value-cell-dropdown-btn"
-          size="icon-xs"
           variant="ghost"
           :aria-label="t('components.attributeValueCell.addIcon')"
         >

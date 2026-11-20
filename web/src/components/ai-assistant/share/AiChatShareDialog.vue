@@ -24,12 +24,13 @@ import { isPublicChatEnabled, publicMaxExpirySecs } from "./chatShare";
 import { useChatShareDialog } from "./useChatShareDialog";
 import AiChatShareRow from "./AiChatShareRow.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -104,34 +105,29 @@ const setRedactTools = (value: unknown) => {
     v-model:open="open"
     size="md"
     :title="t('aiChatShare.dialogTitle')"
-    :sub-title="chatTitle ? raw(chatTitle) : undefined"
-    :secondary-button-label="t('common.close')"
+    :subtitle="chatTitle ? raw(chatTitle) : undefined"
+    :secondary="{ label: t('common.close') }"
     data-test="ai-chat-share-dialog"
     @click:secondary="open = false"
   >
     <div class="flex flex-col gap-5">
-      <OBanner
+      <OInlineNotice
         v-if="historyUnavailable"
-        variant="warning"
-        icon="error"
-        dense
-        :content="t('aiChatShare.historyUnavailableWarning')"
+        tone="warn"
+        :message="t('aiChatShare.historyUnavailableWarning')"
         data-test="ai-chat-share-dialog-history-unavailable"
       />
-      <OBanner
+      <OInlineNotice
         v-if="createdShare ? !createdShare.redact_tools : !form.redactTools"
-        variant="warning"
-        icon="warning"
-        dense
-        :content="t('aiChatShare.toolDataWarning')"
+        tone="warn"
+        :message="t('aiChatShare.toolDataWarning')"
         data-test="ai-chat-share-dialog-tool-warning"
       />
-      <OBanner
+      <OInlineNotice
         v-else
-        variant="info"
+        tone="info"
         icon="visibility-off"
-        dense
-        :content="t('aiChatShare.toolDataRedacted')"
+        :message="t('aiChatShare.toolDataRedacted')"
         data-test="ai-chat-share-dialog-tool-redacted"
       />
 
@@ -146,21 +142,15 @@ const setRedactTools = (value: unknown) => {
           />
           <OButton
             variant="primary"
-            size="sm-action"
             data-test="ai-chat-share-dialog-copy"
             @click="copyLink(createdShare)"
           >
-            <template #icon-left><OIcon name="content-copy" size="sm" /></template>
+            <template #icon><OIcon name="content-copy" size="sm" /></template>
             {{ t("common.copy") }}
           </OButton>
         </div>
         <div>
-          <OButton
-            variant="ghost"
-            size="sm"
-            data-test="ai-chat-share-dialog-new-link"
-            @click="resetForm"
-          >
+          <OButton variant="ghost" data-test="ai-chat-share-dialog-new-link" @click="resetForm">
             {{ t("aiChatShare.newLink") }}
           </OButton>
         </div>
@@ -176,10 +166,10 @@ const setRedactTools = (value: unknown) => {
             data-test="ai-chat-share-dialog-mode"
             @update:model-value="setMode"
           >
-            <OToggleGroupItem value="snapshot" size="sm" data-test="ai-chat-share-mode-snapshot">
+            <OToggleGroupItem value="snapshot" data-test="ai-chat-share-mode-snapshot">
               {{ t("aiChatShare.modeSnapshot") }}
             </OToggleGroupItem>
-            <OToggleGroupItem value="live" size="sm" data-test="ai-chat-share-mode-live">
+            <OToggleGroupItem value="live" data-test="ai-chat-share-mode-live">
               {{ t("aiChatShare.modeLive") }}
             </OToggleGroupItem>
           </OToggleGroup>
@@ -203,13 +193,12 @@ const setRedactTools = (value: unknown) => {
             data-test="ai-chat-share-dialog-visibility"
             @update:model-value="setVisibility"
           >
-            <OToggleGroupItem value="org" size="sm" data-test="ai-chat-share-visibility-org">
+            <OToggleGroupItem value="org" data-test="ai-chat-share-visibility-org">
               {{ t("aiChatShare.visibilityOrg") }}
             </OToggleGroupItem>
             <OToggleGroupItem
               v-if="visibilityOptions.includes('public')"
               value="public"
-              size="sm"
               data-test="ai-chat-share-visibility-public"
             >
               {{ t("aiChatShare.visibilityPublic") }}
@@ -228,7 +217,6 @@ const setRedactTools = (value: unknown) => {
           <OSwitch
             :model-value="form.redactTools"
             :label="t('aiChatShare.redactTools')"
-            size="sm"
             data-test="ai-chat-share-dialog-redact"
             @update:model-value="setRedactTools"
           />
@@ -256,7 +244,6 @@ const setRedactTools = (value: unknown) => {
         <div>
           <OButton
             variant="primary"
-            size="sm-action"
             :loading="creating"
             :disabled="!sessionId"
             data-test="ai-chat-share-dialog-create"
@@ -271,19 +258,21 @@ const setRedactTools = (value: unknown) => {
         <span class="text-text-heading text-sm font-semibold">{{
           t("aiChatShare.existingShares")
         }}</span>
-        <div v-if="sharesLoading" class="flex justify-center py-3">
-          <OSpinner size="sm" />
-        </div>
-        <span v-else-if="sharesError" class="text-status-negative text-xs">
-          {{ t("aiChatShare.loadFailed") }}
-        </span>
-        <span
+        <OSkeleton v-if="sharesLoading" preset="tableRows" :rows="2" />
+        <OEmptyState
+          v-else-if="sharesError"
+          size="compact"
+          kind="error"
+          :title="t('aiChatShare.loadFailed')"
+          data-test="ai-chat-share-dialog-shares-error"
+        />
+        <OEmptyState
           v-else-if="shares.length === 0"
-          class="text-text-secondary text-xs"
+          size="compact"
+          icon="share"
+          :title="t('aiChatShare.noShares')"
           data-test="ai-chat-share-dialog-no-shares"
-        >
-          {{ t("aiChatShare.noShares") }}
-        </span>
+        />
         <template v-else>
           <AiChatShareRow
             v-for="share in shares"

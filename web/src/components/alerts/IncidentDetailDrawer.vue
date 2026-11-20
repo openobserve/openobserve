@@ -19,12 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       :back="{
         onClick: close,
-        label: t('alerts.incidents.goBack'),
+        label: t('alerts.incidents.title'),
         dataTest: 'incident-detail-back-btn',
       }"
-      :subtitle="t('alerts.incidents.incident')"
-      title-overflow="visible"
-      tabs-below
       bleed
     >
       <!-- Incident name — click the title to rename, Enter or blur saves,
@@ -44,17 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
 
-      <!-- Status, Severity, Alerts badges — trail immediately after the title
-           (soft dot-badge variant used in the Incident list). -->
-      <template #title-trail>
+      <template #status>
         <template v-if="incidentDetails && !isEditingTitle">
           <!-- The header chips are the only status and severity controls, so they work on every tab. -->
-          <ODropdown align="start">
+          <ODropdown v-model:open="statusMenuOpen" align="start">
             <template #trigger>
               <OTag
                 type="incidentStatus"
                 :value="incidentDetails.status"
-                clickable
+                toggle
+                :pressed="statusMenuOpen"
                 :disabled="updating"
                 :aria-label="
                   t('alerts.incidents.overview.changeStatus', {
@@ -81,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span :class="{ 'text-accent': editableStatus === option.value }">{{
                 option.label
               }}</span>
-              <template #icon-right>
+              <template #end>
                 <OIcon
                   name="check"
                   size="sm"
@@ -102,12 +98,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OUserCell :value="incidentDetails.acknowledged_by" />
           </span>
 
-          <ODropdown align="start">
+          <ODropdown v-model:open="severityMenuOpen" align="start">
             <template #trigger>
               <OTag
                 type="severity"
                 :value="incidentDetails.severity"
-                clickable
+                toggle
+                :pressed="severityMenuOpen"
                 :disabled="updating"
                 :aria-label="
                   t('alerts.incidents.overview.changeSeverity', {
@@ -134,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span :class="{ 'text-accent': editableSeverity === option.value }">{{
                 option.word
               }}</span>
-              <template #icon-right>
+              <template #end>
                 <OIcon
                   name="check"
                   size="sm"
@@ -150,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</OTag>
 
           <span v-if="externalSources.length" class="inline-flex cursor-default">
-            <OTag variant="default-outline" data-test="incident-external-source-badge">
+            <OTag tone="outline" data-test="incident-external-source-badge">
               <OIcon name="webhook" size="xs" />
               {{ externalSources.join(", ") }}
             </OTag>
@@ -164,8 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Only the security badge follows, and it waits for the chip, so the skeleton's growth moves nothing. -->
           <OSkeleton
             v-if="liveChip === 'loading'"
-            animation="none"
-            class="h-5 w-36 rounded-full"
+            shape="block"
+            class="h-5 w-36"
             :aria-label="t('common.loading')"
           />
           <span
@@ -174,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="incident-detail-live-chip"
           >
             <OTag
-              :variant="liveChip.firing ? 'warning-soft' : 'default-soft'"
+              :tone="liveChip.firing ? 'warn' : 'neutral'"
               :dot="liveChip.firing"
               size="sm"
               :label="liveChip.label"
@@ -184,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OTag
             v-if="findingBadge && liveChip !== 'loading'"
-            :variant="findingBadge.quiet ? 'error-soft' : 'default-soft'"
+            :tone="findingBadge.quiet ? 'err' : 'neutral'"
             icon="shield"
             :label="findingBadge.label"
             data-test="incident-detail-security-source"
@@ -197,53 +194,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="incidentDetails.status === 'open'"
             variant="primary"
-            size="sm"
             :loading="updating"
             :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
             @click="acknowledgeIncident"
             ><OIcon name="check-circle" size="sm" aria-hidden="true" />{{
               t("alerts.incidents.acknowledge")
-            }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')"
+            }}<OTooltip :content="t('alerts.incidents.markAsAcknowledgedTooltip')"
           /></OButton>
           <OButton
             v-if="incidentDetails.status !== 'resolved'"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :loading="updating"
             @click="resolveIncident"
             ><OIcon name="task-alt" size="sm" />{{ t("alerts.incidents.resolve")
-            }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsResolvedTooltip')"
+            }}<OTooltip :content="t('alerts.incidents.markAsResolvedTooltip')"
           /></OButton>
           <OButton
             v-if="incidentDetails.status === 'resolved'"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :loading="updating"
             @click="reopenIncident"
             ><OIcon name="refresh" size="sm" />{{ t("alerts.incidents.reopen")
-            }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')"
+            }}<OTooltip :content="t('alerts.incidents.reopenIncidentTooltip')"
           /></OButton>
         </template>
       </template>
 
       <template #header-tabs>
         <div class="flex items-center">
-          <OTabs
-            v-model="activeTab"
-            align="left"
-            class="min-w-0 flex-1"
-            mobile-arrows
-            :breakpoint="0"
-            reorderable
-            @reorder="onTabReorder"
-          >
+          <OTabs v-model="activeTab" class="min-w-0 flex-1" reorderable @reorder="onTabReorder">
             <OTab
               v-for="tab in shownTabs"
               :key="tab"
               :name="tab"
               :label="tab === 'alertTriggers' ? undefined : tabLabels[tab]"
               :data-test="TAB_TEST_IDS[tab]"
-              :suffix-icon="isCorrelationTab(tab) && correlationLocked ? 'lock' : undefined"
+              :locked="isCorrelationTab(tab) && correlationLocked"
               :tooltip="
                 isCorrelationTab(tab) && correlationLocked ? correlationLockedReason : undefined
               "
@@ -271,10 +257,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <div v-if="incidentDetails.muted_by_downtime_id" class="shrink-0 px-3 pt-2">
-          <OBanner
-            variant="warning"
-            dense
-            inline-actions
+          <OInlineNotice
+            tone="warn"
             icon="notifications-paused"
             data-test="incident-detail-muted-banner"
           >
@@ -282,14 +266,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #actions>
               <OButton
                 variant="ghost"
-                size="sm"
                 data-test="incident-detail-muted-view"
                 @click="openMutingDowntime"
               >
                 {{ t("toastMessages.downtimes.viewDowntime") }}
               </OButton>
             </template>
-          </OBanner>
+          </OInlineNotice>
         </div>
         <!-- Tab Content Container -->
         <div class="flex flex-1 overflow-hidden">
@@ -521,130 +504,129 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
 
-                    <OCard variant="glass" data-test="incident-overview-dimensions">
-                      <OCardSection role="header" dense>
-                        <h2 class="text-text-heading text-sm font-semibold">
-                          {{ t("alerts.incidents.stableDimensions") }}
-                        </h2>
-                      </OCardSection>
-                      <OCardSection role="body" dense>
-                        <dl
-                          v-if="services.length || overviewDimensions.length"
-                          class="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)]"
-                        >
-                          <template v-if="services.length">
-                            <dt
-                              class="text-text-secondary border-border-default border-b py-2 text-xs"
+                    <OCard
+                      :title="t('alerts.incidents.stableDimensions')"
+                      data-test="incident-overview-dimensions"
+                    >
+                      <dl
+                        v-if="services.length || overviewDimensions.length"
+                        class="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)]"
+                      >
+                        <template v-if="services.length">
+                          <dt
+                            class="text-text-secondary border-border-default border-b py-2 text-xs"
+                          >
+                            {{ t("alerts.incidents.overview.servicesAffected") }}
+                          </dt>
+                          <dd
+                            class="text-text-body border-border-default flex min-w-0 items-baseline gap-1.5 border-b py-2 text-sm"
+                            data-test="incident-overview-services"
+                          >
+                            <span class="text-text-heading font-semibold tabular-nums">{{
+                              services.length.toLocaleString(locale)
+                            }}</span>
+                            <span class="text-text-secondary">·</span>
+                            <span
+                              class="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5"
+                              data-test="incident-detail-dimension-service"
                             >
-                              {{ t("alerts.incidents.overview.servicesAffected") }}
-                            </dt>
-                            <dd
-                              class="text-text-body border-border-default flex min-w-0 items-baseline gap-1.5 border-b py-2 text-sm"
-                              data-test="incident-overview-services"
-                            >
-                              <span class="text-text-heading font-semibold tabular-nums">{{
-                                services.length.toLocaleString(locale)
-                              }}</span>
-                              <span class="text-text-secondary">·</span>
                               <span
-                                class="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5"
-                                data-test="incident-detail-dimension-service"
+                                v-for="(service, index) in shownServices"
+                                :key="service.key"
+                                class="min-w-0"
                               >
-                                <span
-                                  v-for="(service, index) in shownServices"
-                                  :key="service.key"
-                                  class="min-w-0"
-                                >
-                                  <router-link
-                                    v-if="!tracesLocked"
-                                    :to="serviceRoute(service.key, 'services-catalog')"
-                                    class="text-accent hover:underline"
-                                    data-test="incident-overview-service-link"
-                                    ><ServiceNameLabel
-                                      :service-key="service.key"
-                                      :display-name="service.display"
-                                  /></router-link>
-                                  <ServiceNameLabel
-                                    v-else
+                                <router-link
+                                  v-if="!tracesLocked"
+                                  :to="serviceRoute(service.key, 'services-catalog')"
+                                  class="text-accent hover:underline"
+                                  data-test="incident-overview-service-link"
+                                  ><ServiceNameLabel
                                     :service-key="service.key"
                                     :display-name="service.display"
-                                  /><template v-if="index < shownServices.length - 1">,</template>
-                                </span>
-                                <OPopover
-                                  v-if="moreServices.length"
-                                  side="bottom"
-                                  align="start"
-                                  :aria-label="t('alerts.incidents.overview.servicesAffected')"
-                                >
-                                  <template #trigger>
-                                    <OButton
-                                      variant="ghost-primary"
-                                      size="xs"
-                                      data-test="incident-overview-services-more"
-                                      >{{
-                                        t("alerts.incidents.overview.servicesMore", {
-                                          count: moreServices.length,
-                                        })
-                                      }}</OButton
-                                    >
-                                  </template>
-                                  <ul
-                                    class="flex max-h-64 max-w-80 flex-col gap-1 overflow-y-auto p-3 text-sm"
-                                    data-test="incident-overview-services-list"
+                                /></router-link>
+                                <ServiceNameLabel
+                                  v-else
+                                  :service-key="service.key"
+                                  :display-name="service.display"
+                                /><template v-if="index < shownServices.length - 1">,</template>
+                              </span>
+                              <OPopover
+                                v-if="moreServices.length"
+                                side="bottom"
+                                align="start"
+                                :aria-label="t('alerts.incidents.overview.servicesAffected')"
+                              >
+                                <template #trigger>
+                                  <OButton
+                                    variant="accent-ghost"
+                                    size="sm"
+                                    data-test="incident-overview-services-more"
+                                    >{{
+                                      t("alerts.incidents.overview.servicesMore", {
+                                        count: moreServices.length,
+                                      })
+                                    }}</OButton
                                   >
-                                    <li v-for="service in moreServices" :key="service.key">
-                                      <router-link
-                                        v-if="!tracesLocked"
-                                        :to="serviceRoute(service.key, 'services-catalog')"
-                                        class="text-accent hover:underline"
-                                        data-test="incident-overview-service-link"
-                                        ><ServiceNameLabel
-                                          :service-key="service.key"
-                                          :display-name="service.display"
-                                      /></router-link>
-                                      <ServiceNameLabel
-                                        v-else
+                                </template>
+                                <ul
+                                  class="flex max-h-64 max-w-80 flex-col gap-1 overflow-y-auto p-3 text-sm"
+                                  data-test="incident-overview-services-list"
+                                >
+                                  <li v-for="service in moreServices" :key="service.key">
+                                    <router-link
+                                      v-if="!tracesLocked"
+                                      :to="serviceRoute(service.key, 'services-catalog')"
+                                      class="text-accent hover:underline"
+                                      data-test="incident-overview-service-link"
+                                      ><ServiceNameLabel
                                         :service-key="service.key"
                                         :display-name="service.display"
-                                      />
-                                    </li>
-                                  </ul>
-                                </OPopover>
-                                <OTooltip :content="tracesLockedReason" :disabled="!tracesLocked">
-                                  <OButton
-                                    variant="ghost-primary"
-                                    size="xs"
-                                    :icon-left="tracesLocked ? 'lock' : undefined"
-                                    :aria-disabled="tracesLocked || undefined"
-                                    data-test="incident-overview-service-graph"
-                                    @click="openServiceGraph"
-                                    >{{ t("alerts.incidents.overview.serviceGraph") }}</OButton
-                                  >
-                                </OTooltip>
-                              </span>
-                            </dd>
-                          </template>
-                          <template v-for="(dim, index) in overviewDimensions" :key="dim.key">
-                            <dt
-                              class="text-text-secondary border-border-default border-b py-2 text-xs"
-                              :class="{ 'border-b-0': index === overviewDimensions.length - 1 }"
-                              data-test="incident-dimension-row"
-                            >
-                              {{ dim.label }}
-                            </dt>
-                            <dd
-                              class="text-text-body border-border-default border-b py-2 text-sm break-words"
-                              :class="{ 'border-b-0': index === overviewDimensions.length - 1 }"
-                              data-test="incident-dimension-value"
-                            >
-                              {{ dim.value }}
-                            </dd>
-                          </template>
-                        </dl>
-                        <p v-else class="text-text-secondary py-2 text-sm">
-                          {{ t("alerts.incidents.noDimensionsAvailable") }}
-                        </p>
-                      </OCardSection>
+                                    /></router-link>
+                                    <ServiceNameLabel
+                                      v-else
+                                      :service-key="service.key"
+                                      :display-name="service.display"
+                                    />
+                                  </li>
+                                </ul>
+                              </OPopover>
+                              <OTooltip :content="tracesLockedReason" :disabled="!tracesLocked">
+                                <OButton
+                                  variant="accent-ghost"
+                                  size="sm"
+                                  :icon="tracesLocked ? 'lock' : undefined"
+                                  :aria-disabled="tracesLocked || undefined"
+                                  data-test="incident-overview-service-graph"
+                                  @click="openServiceGraph"
+                                  >{{ t("alerts.incidents.overview.serviceGraph") }}</OButton
+                                >
+                              </OTooltip>
+                            </span>
+                          </dd>
+                        </template>
+                        <template v-for="(dim, index) in overviewDimensions" :key="dim.key">
+                          <dt
+                            class="text-text-secondary border-border-default border-b py-2 text-xs"
+                            :class="{ 'border-b-0': index === overviewDimensions.length - 1 }"
+                            data-test="incident-dimension-row"
+                          >
+                            {{ dim.label }}
+                          </dt>
+                          <dd
+                            class="text-text-body border-border-default border-b py-2 text-sm break-words"
+                            :class="{ 'border-b-0': index === overviewDimensions.length - 1 }"
+                            data-test="incident-dimension-value"
+                          >
+                            {{ dim.value }}
+                          </dd>
+                        </template>
+                      </dl>
+                      <OEmptyState
+                        v-else
+                        size="compact"
+                        icon="label"
+                        :title="t('alerts.incidents.noDimensionsAvailable')"
+                      />
                     </OCard>
                   </div>
                 </div>
@@ -725,23 +707,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :facts="findingFactsShown"
                       />
 
-                      <!-- No alerts available -->
-                      <div
+                      <OEmptyState
                         v-else-if="!alerts || alerts.length === 0"
-                        :class="'text-text-muted'"
-                        class="text-sm italic"
-                      >
-                        {{ t("alerts.incidents.noAlertDetailsAvailable") }}
-                      </div>
-
-                      <!-- No trigger selected -->
-                      <div
+                        size="compact"
+                        icon="notifications"
+                        :title="t('alerts.incidents.noAlertDetailsAvailable')"
+                      />
+                      <OEmptyState
                         v-else-if="selectedAlertIndex === -1"
-                        :class="'text-text-muted'"
-                        class="mt-8 text-center text-sm italic"
-                      >
-                        {{ t("alerts.incidents.clickOnTriggerToViewDetails") }}
-                      </div>
+                        size="compact"
+                        icon="touch-app"
+                        :title="t('alerts.incidents.clickOnTriggerToViewDetails')"
+                      />
 
                       <!-- Alert details -->
                       <div v-else class="flex flex-col gap-3">
@@ -749,7 +726,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="space-y-2">
                           <!-- Alert Name -->
                           <div class="flex flex-col gap-0.5">
-                            <span :class="'text-text-secondary'" class="text-3xs">
+                            <span :class="'text-text-secondary'" class="text-2xs">
                               {{ t("alerts.incidents.alertName") }}
                             </span>
                             <span :class="'text-text-body'" class="text-sm font-medium">
@@ -762,7 +739,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-if="alerts[selectedAlertIndex]?.alert_type === 'composite'"
                             class="flex flex-col gap-0.5"
                           >
-                            <span :class="'text-text-secondary'" class="text-3xs">
+                            <span :class="'text-text-secondary'" class="text-2xs">
                               {{ t("alerts.alertType") }}
                             </span>
                             <OTag type="alertType" :value="'composite'" class="w-fit" />
@@ -771,7 +748,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Stream Type & Name -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span :class="'text-text-secondary'" class="text-3xs">
+                              <span :class="'text-text-secondary'" class="text-2xs">
                                 {{ t("alerts.streamType") }}
                               </span>
                               <OTag
@@ -781,7 +758,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               />
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span :class="'text-text-secondary'" class="text-3xs">
+                              <span :class="'text-text-secondary'" class="text-2xs">
                                 {{ t("alerts.stream_name") }}
                               </span>
                               <OTruncatedText :class="'text-text-body'" class="text-sm font-medium">
@@ -793,7 +770,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Threshold & Period -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span :class="'text-text-secondary'" class="text-3xs">
+                              <span :class="'text-text-secondary'" class="text-2xs">
                                 {{ t("alerts.messages.thresholdMarkLine") }}
                               </span>
                               <span
@@ -810,7 +787,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span :class="'text-text-secondary'" class="text-3xs">
+                              <span :class="'text-text-secondary'" class="text-2xs">
                                 {{ t("alerts.incidents.period") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -826,7 +803,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Frequency & Silence -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span :class="'text-text-secondary'" class="text-3xs">
+                              <span :class="'text-text-secondary'" class="text-2xs">
                                 {{ t("alerts.incidents.frequency") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -834,7 +811,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span :class="'text-text-secondary'" class="text-3xs">
+                              <span :class="'text-text-secondary'" class="text-2xs">
                                 {{ t("alerts.incidents.silence") }}
                               </span>
                               <span
@@ -927,13 +904,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Logs Tab Content -->
               <template v-if="activeTab === 'logs' && findingLogsRoute">
-                <div
+                <OSkeleton
                   v-if="findingItemQuery.isLoading.value"
-                  class="flex flex-1 items-center justify-center p-4"
+                  preset="tableRows"
+                  :rows="4"
                   data-test="incident-finding-logs-loading"
-                >
-                  <OSpinner />
-                </div>
+                />
                 <IssueLogsLink
                   v-else
                   :route="findingLogsRoute"
@@ -950,60 +926,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else-if="activeTab === 'logs'"
                 class="flex h-full flex-1 flex-col overflow-hidden"
               >
-                <!-- Loading State -->
-                <div
+                <OSkeleton
                   v-if="correlationLoading"
-                  class="flex h-[70vh] flex-1 flex-col items-center justify-center"
-                >
-                  <OSpinner
-                    size="lg"
-                    class="mb-4"
-                    data-test="incident-telemetry-loading-indicator"
-                  />
-                </div>
+                  preset="tableRows"
+                  :rows="10"
+                  data-test="incident-telemetry-loading-indicator"
+                />
 
-                <!-- Error/No Data State -->
-                <div
-                  v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams"
-                  class="flex h-full flex-1 flex-col items-center justify-center gap-2"
-                >
-                  <OIcon
-                    :name="
-                      correlationError
-                        ? correlationError.includes('disambiguation fields')
-                          ? 'warning'
-                          : 'error-outline'
-                        : 'info-outline'
-                    "
-                    :class="[
-                      'h-16 w-16',
-                      correlationError
-                        ? correlationError.includes('disambiguation fields')
-                          ? 'text-warning'
-                          : 'text-status-negative'
-                        : 'text-text-muted',
-                    ]"
-                  />
-                  <div class="mt-3 text-xl font-semibold">
-                    {{
-                      correlationError || telemetryEmptyText(t("alerts.incidents.noCorrelatedLogs"))
-                    }}
-                  </div>
-                  <div
-                    v-if="correlationError && correlationError.includes('disambiguation fields')"
-                    class="text-text-secondary mt-2 max-w-125 text-center text-sm"
-                  >
-                    {{ t("alerts.incidents.disambiguationChangedMessage") }}
-                  </div>
-                  <OButton
-                    v-if="correlationError && !correlationError.includes('disambiguation fields')"
-                    variant="outline"
-                    size="md"
-                    @click="refreshCorrelation"
-                    class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
-                  >
-                </div>
+                <OEmptyState
+                  v-else-if="correlationError?.includes('disambiguation fields')"
+                  kind="error"
+                  :text="t('alerts.incidents.disambiguationChangedMessage')"
+                />
+                <OEmptyState
+                  v-else-if="correlationError"
+                  kind="error"
+                  @action="refreshCorrelation"
+                />
+                <OEmptyState
+                  v-else-if="!hasCorrelatedData || !hasAnyStreams"
+                  icon="info-outline"
+                  :title="telemetryEmptyText(t('alerts.incidents.noCorrelatedLogs'))"
+                />
 
                 <!-- Success State - CorrelatedLogsTable -->
                 <div
@@ -1035,62 +979,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else-if="activeTab === 'metrics'"
                 class="flex h-full flex-1 flex-col overflow-hidden"
               >
-                <!-- Loading State -->
-                <div
+                <OSkeleton
                   v-if="correlationLoading"
-                  class="flex h-full flex-1 flex-col items-center justify-center"
-                >
-                  <OSpinner
-                    size="lg"
-                    class="mb-4"
-                    data-test="incident-telemetry-loading-indicator"
-                  />
-                  <div class="text-base">{{ t("alerts.incidents.loadingCorrelatedMetrics") }}</div>
-                </div>
+                  preset="chart"
+                  class="h-60 p-4"
+                  data-test="incident-telemetry-loading-indicator"
+                />
 
-                <!-- Error/No Data State -->
-                <div
-                  v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams"
-                  class="flex h-full flex-1 flex-col items-center justify-center gap-2"
-                >
-                  <OIcon
-                    :name="
-                      correlationError
-                        ? correlationError.includes('disambiguation fields')
-                          ? 'warning'
-                          : 'error-outline'
-                        : 'info-outline'
-                    "
-                    :class="[
-                      'h-16 w-16',
-                      correlationError
-                        ? correlationError.includes('disambiguation fields')
-                          ? 'text-warning'
-                          : 'text-status-negative'
-                        : 'text-text-muted',
-                    ]"
-                  />
-                  <div class="mt-3 text-xl font-semibold">
-                    {{
-                      correlationError ||
-                      telemetryEmptyText(t("alerts.incidents.noCorrelatedMetrics"))
-                    }}
-                  </div>
-                  <div
-                    v-if="correlationError && correlationError.includes('disambiguation fields')"
-                    class="text-text-secondary mt-2 max-w-125 text-center text-sm"
-                  >
-                    {{ t("alerts.incidents.disambiguationChangedMessage") }}
-                  </div>
-                  <OButton
-                    v-if="correlationError && !correlationError.includes('disambiguation fields')"
-                    variant="outline"
-                    size="md"
-                    @click="refreshCorrelation"
-                    class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
-                  >
-                </div>
+                <OEmptyState
+                  v-else-if="correlationError?.includes('disambiguation fields')"
+                  kind="error"
+                  :text="t('alerts.incidents.disambiguationChangedMessage')"
+                />
+                <OEmptyState
+                  v-else-if="correlationError"
+                  kind="error"
+                  @action="refreshCorrelation"
+                />
+                <OEmptyState
+                  v-else-if="!hasCorrelatedData || !hasAnyStreams"
+                  icon="info-outline"
+                  :title="telemetryEmptyText(t('alerts.incidents.noCorrelatedMetrics'))"
+                />
 
                 <!-- Success State - TelemetryCorrelationDashboard -->
                 <div
@@ -1132,8 +1042,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span class="text-xs">{{ t("alerts.incidents.showingCorrelatedTraces") }}</span>
                   <OButton
+                    icon-only
                     variant="ghost"
-                    size="icon-sm"
                     :disabled="correlationLoading"
                     @click="refreshCorrelation"
                     ><OIcon name="refresh" size="sm" /><OTooltip
@@ -1141,62 +1051,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   /></OButton>
                 </div>
 
-                <!-- Loading State -->
-                <div
+                <OSkeleton
                   v-if="correlationLoading"
-                  class="flex h-full flex-1 flex-col items-center justify-center"
-                >
-                  <OSpinner
-                    size="lg"
-                    class="mb-4"
-                    data-test="incident-telemetry-loading-indicator"
-                  />
-                  <div class="text-base">{{ t("alerts.incidents.loadingCorrelatedTraces") }}</div>
-                </div>
+                  preset="chart"
+                  class="h-60 p-4"
+                  data-test="incident-telemetry-loading-indicator"
+                />
 
-                <!-- Error/No Data State -->
-                <div
-                  v-else-if="correlationError || !hasCorrelatedData || !hasAnyStreams"
-                  class="flex h-full flex-1 flex-col items-center justify-center gap-2"
-                >
-                  <OIcon
-                    :name="
-                      correlationError
-                        ? correlationError.includes('disambiguation fields')
-                          ? 'warning'
-                          : 'error-outline'
-                        : 'info-outline'
-                    "
-                    :class="[
-                      'h-16 w-16',
-                      correlationError
-                        ? correlationError.includes('disambiguation fields')
-                          ? 'text-warning'
-                          : 'text-status-negative'
-                        : 'text-text-muted',
-                    ]"
-                  />
-                  <div class="mt-3 text-xl font-semibold">
-                    {{
-                      correlationError ||
-                      telemetryEmptyText(t("alerts.incidents.noCorrelatedTraces"))
-                    }}
-                  </div>
-                  <div
-                    v-if="correlationError && correlationError.includes('disambiguation fields')"
-                    class="text-text-secondary mt-2 max-w-125 text-center text-sm"
-                  >
-                    {{ t("alerts.incidents.disambiguationChangedMessage") }}
-                  </div>
-                  <OButton
-                    v-if="correlationError && !correlationError.includes('disambiguation fields')"
-                    variant="outline"
-                    size="md"
-                    @click="refreshCorrelation"
-                    class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
-                  >
-                </div>
+                <OEmptyState
+                  v-else-if="correlationError?.includes('disambiguation fields')"
+                  kind="error"
+                  :text="t('alerts.incidents.disambiguationChangedMessage')"
+                />
+                <OEmptyState
+                  v-else-if="correlationError"
+                  kind="error"
+                  @action="refreshCorrelation"
+                />
+                <OEmptyState
+                  v-else-if="!hasCorrelatedData || !hasAnyStreams"
+                  icon="info-outline"
+                  :title="telemetryEmptyText(t('alerts.incidents.noCorrelatedTraces'))"
+                />
 
                 <!-- Success State - TelemetryCorrelationDashboard -->
                 <div
@@ -1224,9 +1100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Loading state -->
-      <div v-if="loading" class="flex flex-1 items-center justify-center">
-        <OSpinner size="md" />
+      <div v-if="loading" class="flex flex-1 flex-col gap-4 p-4">
+        <OSkeleton preset="statStrip" />
+        <OSkeleton shape="block" class="h-60" />
       </div>
       <LicenseDeniedState
         v-else-if="licenseDenied"
@@ -1239,7 +1115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import {
@@ -1255,6 +1131,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import incidentsService, {
   Incident,
   IncidentWithAlerts,
@@ -1335,7 +1212,7 @@ import {
 import { contextRegistry, createIncidentsContextProvider } from "@/composables/contextProviders";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -1343,7 +1220,6 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -1437,9 +1313,8 @@ export default defineComponent({
     OPopover,
     ODropdownItem,
     OCard,
-    OCardSection,
     OButton,
-    OSpinner,
+    OEmptyState,
     OTooltip,
     OTimeCell,
     OUserCell,
@@ -1448,7 +1323,7 @@ export default defineComponent({
     OSkeleton,
     OTruncatedText,
     OInlineEdit,
-    OBanner,
+    OInlineNotice,
     LicenseDeniedState,
   },
   emits: ["close", "status-updated", "sendToAiChat"],
@@ -1688,6 +1563,8 @@ export default defineComponent({
     // Computed property to process alerts with formatted conditions upfront
     // Editable status and severity for Overview tab
     const editableStatus = ref<"open" | "acknowledged" | "resolved">("open");
+    const statusMenuOpen = ref(false);
+    const severityMenuOpen = ref(false);
     const editableSeverity = ref<"P1" | "P2" | "P3" | "P4">("P3");
 
     // Status and Severity options
@@ -2213,7 +2090,7 @@ export default defineComponent({
     });
 
     // The three telemetry tabs say the same thing when the incident has nothing to correlate by.
-    const telemetryEmptyText = (noneFound: string) =>
+    const telemetryEmptyText = (noneFound: I18nText): I18nText =>
       correlationData.value?.emptyReason === "no_service_dimensions"
         ? t("alerts.incidents.noServiceDimensions")
         : noneFound;
@@ -2353,6 +2230,14 @@ export default defineComponent({
       contextRegistry.unregister("incidents");
     });
 
+    // A deep link has no list to pop back to, so it lands on the list with this route's query.
+    const { goBack: goBackToList } = useSmartBack(() => ({
+      name: "incidentList",
+      query: {
+        ...route.query,
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    }));
     const close = () => {
       // Clear correlation data when closing
       correlationData.value = null;
@@ -2362,15 +2247,7 @@ export default defineComponent({
       contextRegistry.setActive("");
       contextRegistry.unregister("incidents");
 
-      // Navigate back to incident list, carrying over this route's own query (e.g. page)
-      // instead of dropping it. `tab` never reaches here: the load consumes it.
-      router.push({
-        name: "incidentList",
-        query: {
-          ...route.query,
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
+      goBackToList();
     };
 
     // Esc leaves the page only when nothing else on it owns the key: no
@@ -2521,7 +2398,6 @@ export default defineComponent({
         message: t("alerts.incidents.acknowledgeConfirmMessage"),
         confirmLabel: t("alerts.incidents.acknowledgeConfirmLabel"),
         cancelLabel: t("alerts.incidents.acknowledgeConfirmCancelLabel"),
-        persistent: false,
       });
       if (!ok) return;
       // The caller's promise must cover the update, not just the confirm dialog.
@@ -2534,7 +2410,6 @@ export default defineComponent({
         message: t("alerts.incidents.resolveConfirmMessage"),
         confirmLabel: t("alerts.incidents.resolve"),
         cancelLabel: t("common.cancel"),
-        persistent: false,
       });
       if (!ok) return;
       return updateStatus("resolved");
@@ -2545,7 +2420,6 @@ export default defineComponent({
         message: t("alerts.incidents.reopenConfirmMessage"),
         confirmLabel: t("alerts.incidents.reopen"),
         cancelLabel: t("common.cancel"),
-        persistent: false,
       });
       if (!ok) return;
       return updateStatus("open");
@@ -2784,7 +2658,6 @@ export default defineComponent({
                 : t("alerts.incidents.rerunAnalysisMessage"),
               confirmLabel: t("alerts.incidents.rerunAnalysisConfirmLabel"),
               cancelLabel: t("alerts.incidents.rerunAnalysisCancelLabel"),
-              persistent: false,
             });
             if (ok) {
               await triggerRca();
@@ -2819,6 +2692,8 @@ export default defineComponent({
     };
 
     return {
+      statusMenuOpen,
+      severityMenuOpen,
       findingItem,
       findingContext,
       findingCardShown,

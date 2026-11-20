@@ -43,11 +43,12 @@ export function severityTagValue(tone: SeverityTone): string {
   return tone === "unknown" ? "info" : tone;
 }
 
+// Follows the shared severity badge scale (badgeGroups `severity`), so a tag, its rail and its chart series agree.
 export const TONE_STAT: Record<SeverityTone, StatTone> = {
-  critical: "error",
-  high: "orange",
+  critical: "purple",
+  high: "error",
   medium: "warning",
-  low: "blue",
+  low: "neutral",
   info: "neutral",
   unknown: "neutral",
 };
@@ -63,11 +64,11 @@ export const TONE_ICON: Record<SeverityTone, IconName> = {
 
 /** Solid token per tone for the row rail and ECharts series, which take a colour string, not a class. */
 export const TONE_TOKEN: Record<SeverityTone, `--color-${string}`> = {
-  critical: "--color-badge-error-solid-bg",
-  high: "--color-badge-orange-solid-bg",
-  medium: "--color-badge-amber-solid-bg",
-  low: "--color-badge-blue-solid-bg",
-  info: "--color-badge-default-solid-bg",
+  critical: "--color-badge-purple-solid-bg",
+  high: "--color-badge-error-solid-bg",
+  medium: "--color-badge-warning-solid-bg",
+  low: "--color-badge-default-solid-bg",
+  info: "--color-border-strong",
   unknown: "--color-border-default",
 };
 

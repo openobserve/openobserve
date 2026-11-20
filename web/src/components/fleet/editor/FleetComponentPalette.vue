@@ -21,9 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="fleet-component-palette-collapsed"
   >
     <OButton
+      icon-only
       variant="ghost"
-      size="icon-sm"
-      icon-left="keyboard-double-arrow-right"
+      icon="keyboard-double-arrow-right"
       data-test="fleet-component-palette-expand"
       @click="collapsed = false"
     >
@@ -38,9 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex shrink-0 items-center gap-2 px-3 pt-3">
       <OText variant="panel-title" class="flex-1">{{ t("fleet.editor.components") }}</OText>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="keyboard-double-arrow-left"
+        icon="keyboard-double-arrow-left"
         data-test="fleet-component-palette-collapse"
         @click="collapsed = true"
       >
@@ -50,8 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="shrink-0 px-3 py-2">
       <OSearchInput
         v-model="search"
-        size="sm"
-        clearable
         :placeholder="t('fleet.editor.searchComponents')"
         data-test="fleet-component-palette-search"
       />
@@ -61,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OCollapsible
         v-for="section in sections"
         :key="section.kind"
-        variant="sidebar"
         default-open
         :data-test="`fleet-component-palette-section-${section.kind}`"
       >
@@ -74,7 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="item in section.items"
             :key="item.kind + item.key"
             variant="ghost"
-            size="sm"
             block
             draggable="true"
             class="justify-start! gap-2.5"

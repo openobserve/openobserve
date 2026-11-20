@@ -12,17 +12,10 @@ import PlaygroundToolsDialog from "./PlaygroundToolsDialog.vue";
 import type { PlaygroundTool } from "@/enterprise/views/AIObservability/playgroundDraft";
 
 const ODialog = {
-  props: [
-    "open",
-    "size",
-    "title",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "primaryButtonDisabled",
-  ],
+  props: ["open", "size", "title", "primary", "secondary", "primary"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template:
-    '<div class="o-dialog" :data-primary-disabled="primaryButtonDisabled">' +
+    '<div class="o-dialog" :data-primary-disabled="primary?.disabled">' +
     '<button class="primary" @click="$emit(\'click:primary\')" /><slot /></div>',
 };
 const OButton = {

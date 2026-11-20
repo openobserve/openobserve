@@ -22,16 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #actions>
       <OButton
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         class="max-md:hidden"
         @click="goToCommunityDashboards"
         data-test="dashboard-panel-tutorial-btn"
         >{{ t("dashboard.communityDashboard") }}</OButton
       >
       <OButton
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         v-close-popup
         data-test="dashboard-import-cancel-btn"
         @click="goBack()"
@@ -39,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       <OButton
         variant="primary"
-        size="sm-action"
         type="submit"
         form="import-dashboard-form"
         :loading="!!isLoading"
@@ -70,8 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                   <OButton
-                    variant="outline"
-                    size="sm-action"
+                    variant="secondary"
                     class="md:hidden"
                     @click="goToCommunityDashboards"
                     data-test="dashboard-panel-tutorial-btn-mobile"
@@ -130,10 +126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="dashboard-import-file-control"
                           name="jsonFiles"
                           :label="t('dashboard.selectFile')"
-                          :placeholder="t('dashboard.dropFileMsg')"
                           accept=".json"
                           multiple
-                          dropZone
+                          :validate="validateJsonFile"
                           :disabled="!!isLoading"
                         />
                       </div>
@@ -297,11 +292,13 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormFile from "@/lib/forms/File/OFormFile.vue";
+import { createJsonFileValidator } from "@/lib/forms/File/validateJsonFile";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeImportDashboardSchema, importDashboardDefaults } from "./ImportDashboard.schema";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import useSmartBack from "@/composables/useSmartBack";
 import analytics from "@/services/product_analytics";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 export default defineComponent({
@@ -309,6 +306,7 @@ export default defineComponent({
   props: ["dashboardId"],
   setup() {
     const { t } = useI18nTyped();
+    const validateJsonFile = createJsonFileValidator(t);
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
@@ -773,19 +771,19 @@ export default defineComponent({
       }
     };
 
-    // back button to render dashboard List page
+    const { goBack: backToDashboards } = useSmartBack(() => ({
+      path: "/dashboards",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+        folder: route?.query?.folder || "default",
+      },
+    }));
     const goBack = () => {
       setFormField("jsonFiles", []);
       setFormField("url", "");
       jsonStr.value = "";
       filesImportResults.value = [];
-      return router.push({
-        path: "/dashboards",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          folder: route?.query?.folder || "default",
-        },
-      });
+      backToDashboards();
     };
 
     const updateActiveTab = () => {
@@ -888,6 +886,7 @@ export default defineComponent({
 
     return {
       t,
+      validateJsonFile,
       goBack,
       onSubmit,
       importFiles,

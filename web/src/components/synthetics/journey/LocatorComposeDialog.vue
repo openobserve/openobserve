@@ -175,9 +175,8 @@ function apply() {
   <ODialog
     :open="open"
     :title="t('synthetics.journey.locatorCombineTitle')"
-    :primary-button-label="t('synthetics.journey.locatorCombineApply')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-disabled="!canApply"
+    :primary="{ label: t('synthetics.journey.locatorCombineApply'), disabled: !canApply }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="synthetics-journey-step-locator-combine-dialog"
     @update:open="emit('update:open', $event)"
     @click:primary="apply"
@@ -196,7 +195,7 @@ function apply() {
           class="flex items-center gap-2"
           data-test="synthetics-journey-step-locator-combine-part"
         >
-          <OBadge variant="default" size="sm">
+          <OBadge tone="neutral" size="sm">
             {{ t(`synthetics.journey.locatorKind.${part.kind}`) }}
           </OBadge>
           <OTruncatedText class="text-text-body flex-1 font-mono text-xs">

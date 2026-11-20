@@ -38,7 +38,6 @@ const emit = defineEmits<{ select: [] }>();
 <template>
   <OButton
     variant="ghost"
-    size="md"
     block
     :class="ROW_CLASS"
     :loading="loading"

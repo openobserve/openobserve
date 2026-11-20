@@ -21,7 +21,6 @@ const props = withDefaults(defineProps<SliderProps>(), {
   min: 0,
   max: 100,
   step: 1,
-  size: "md",
   disabled: false,
   showValue: false,
 });
@@ -51,30 +50,6 @@ const fillPercent = computed(() => {
   return Math.max(0, Math.min(100, pct));
 });
 
-const trackHeight: Record<NonNullable<SliderProps["size"]>, string> = {
-  sm: "h-1",
-  md: "h-1.5",
-  lg: "h-2",
-};
-
-const thumbSize: Record<NonNullable<SliderProps["size"]>, string> = {
-  sm: "size-3",
-  md: "size-4",
-  lg: "size-5",
-};
-
-const thumbHalf: Record<NonNullable<SliderProps["size"]>, string> = {
-  sm: "0.375rem",
-  md: "0.5rem",
-  lg: "0.625rem",
-};
-
-const labelSize: Record<NonNullable<SliderProps["size"]>, string> = {
-  sm: "text-xs",
-  md: "text-xs",
-  lg: "text-sm",
-};
-
 function handleInput(event: Event) {
   const target = event.target as HTMLInputElement;
   const v = Number(target.value);
@@ -95,8 +70,6 @@ const displayValue = computed(() => {
   if (props.formatValue) return props.formatValue(currentValue.value);
   return String(currentValue.value);
 });
-
-const resolvedSize = computed(() => props.size ?? "md");
 </script>
 
 <template>
@@ -109,7 +82,7 @@ const resolvedSize = computed(() => props.size ?? "md");
         v-if="$slots.label || label || $slots.tooltip"
         :for="inputId"
         :class="[
-          labelSize[resolvedSize],
+          'text-compact',
           'text-slider-label flex items-center gap-1 leading-none font-medium',
         ]"
       >
@@ -124,10 +97,7 @@ const resolvedSize = computed(() => props.size ?? "md");
           ><slot name="tooltip"
         /></OIcon>
       </label>
-      <span
-        v-if="showValue"
-        :class="[labelSize[resolvedSize], 'text-slider-value leading-none tabular-nums']"
-      >
+      <span v-if="showValue" :class="['text-xs', 'text-slider-value leading-none tabular-nums']">
         {{ displayValue }}
       </span>
     </div>
@@ -141,7 +111,7 @@ const resolvedSize = computed(() => props.size ?? "md");
       <div
         :class="[
           'absolute right-0 left-0 rounded-full',
-          trackHeight[resolvedSize],
+          'h-1.5',
           isDisabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
         ]"
         aria-hidden="true"
@@ -149,7 +119,7 @@ const resolvedSize = computed(() => props.size ?? "md");
       <div
         :class="[
           'absolute left-0 rounded-full',
-          trackHeight[resolvedSize],
+          'h-1.5',
           isDisabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
         ]"
         :style="{ width: fillPercent + '%' }"
@@ -170,8 +140,8 @@ const resolvedSize = computed(() => props.size ?? "md");
         :class="[
           'o2-slider-input',
           'relative z-10 m-0 w-full appearance-none bg-transparent',
-          'ring-offset-surface-base focus-visible:ring-slider-focus-ring rounded-full ring-offset-1 transition-[box-shadow] duration-150 outline-none focus-visible:ring-2',
-          trackHeight[resolvedSize],
+          'ring-offset-surface-base focus-visible:ring-slider-focus-ring rounded-full ring-offset-1 transition-[box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-2',
+          'h-1.5',
           isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
         ]"
         @input="handleInput"
@@ -183,11 +153,11 @@ const resolvedSize = computed(() => props.size ?? "md");
       <span
         :class="[
           'border-slider-thumb-border pointer-events-none absolute rounded-full border-2',
-          thumbSize[resolvedSize],
+          'size-4',
           isDisabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
         ]"
         :style="{
-          left: `calc(${fillPercent}% - ${thumbHalf[resolvedSize]})`,
+          left: `calc(${fillPercent}% - 0.5rem)`,
         }"
         aria-hidden="true"
       />

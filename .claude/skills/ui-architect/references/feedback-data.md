@@ -7,34 +7,41 @@ O2 components for loading states, messaging, transient notifications, hierarchic
 - [Loading & messaging decision guide](#loading--messaging-decision-guide)
 - Feedback
   - [OBanner](#obanner)
-  - [OInnerLoading](#oinnerloading)
+  - [OInlineNotice](#oinlinenotice)
   - [OSkeleton](#oskeleton)
+  - [OLoadingLine](#oloadingline)
   - [OSpinner](#ospinner)
   - [Toast — OToastProvider + useToast](#toast--otoastprovider--usetoast)
 - Data display
+  - [OStatStrip / OStatCard](#ostatstrip--ostatcard)
   - [OProgressBar](#oprogressbar)
   - [OSegmentedBar](#osegmentedbar)
   - [OTimeline / OTimelineItem](#otimeline--otimelineitem)
   - [OTree](#otree)
 - Lists
+  - [ODescriptionList / ODescriptionItem](#odescriptionlist--odescriptionitem)
   - [OFieldList / OFieldRow / OFieldLabel](#fieldlist--ofieldlist--ofieldrow--ofieldlabel)
 
 ## Loading & messaging decision guide
 
-Pick by **persistence** and **whether the thing is data that is still loading**:
+Four channels, each with one job (K1–K5). Pick by **what the message is about**:
 
-| Situation                                                                                                  | Use                              | Why                                                                |
-| ---------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------ |
-| Persistent message that stays inline in the layout (validation summary, config hint, inline error/insight) | **OBanner**                      | Sits in the flow, does not auto-dismiss, semantic variant colors   |
-| Transient popup confirming an action or reporting a background result ("Saved", "Query failed")            | **Toast** (`useToast().toast()`) | Auto-dismisses, floats over app, replaces `q-notify`               |
-| A whole container/panel is loading and you want to dim it with a centered spinner overlay                  | **OInnerLoading**                | Absolute overlay over a `relative` parent; blocks the region       |
-| Content whose _shape_ is known but not yet loaded (rows, cards, avatars)                                   | **OSkeleton**                    | Placeholder that mimics final layout — less jarring than a spinner |
-| A small, bare inline "working…" indicator (inside a button, next to text, an AI typing state)              | **OSpinner**                     | Just the spinner, no overlay, no layout                            |
+| Situation | Use | Why |
+| --- | --- | --- |
+| The result of an action that is not otherwise visible ("Alert saved", "3 alerts deleted · Undo") | **Toast** | One line, bottom centre, 4 s (8 s with an action) (K1) |
+| A lasting condition of the PAGE (quota, partial data, read-only) | **OBanner** | One line directly under the header (K3) |
+| A condition of one SECTION (a hint, a check that failed, a field group's warning) | **OInlineNotice** | Inside the section, wraps (K2) |
+| First load of content whose shape is known | **OSkeleton** (a `preset` where it fits) | The final layout after 150 ms, never a "0" (K4) |
+| A refresh of content already on screen | **OLoadingLine** | Rows stay visible under a 2 px line (K4) |
+| A control that is busy (inside a button, beside a value) | **OSpinner** | Busy where the action happened (B10) |
+| Nothing to show | **OEmptyState** (core-display.md) | Four kinds; a failed load is `error` (K5) |
 
 Rules of thumb:
 
-- **Banner vs Toast**: does the message need to persist and stay tied to a spot in the page? Banner. Is it a fire-and-forget confirmation/error? Toast.
-- **Skeleton vs Spinner vs InnerLoading**: Skeleton for first-load of structured content; InnerLoading for re-loading an existing container in place; bare Spinner for tiny inline waits.
+- **Errors the user must fix go inline, never in a toast** (K2). A copy confirms in its button
+  (`OCopyButton`), not in a toast.
+- **No page-level spinner covering content** and no `0` or empty state while loading (C4, K5).
+- **Never raw HTTP text** in a banner, notice or empty state (K6); never a solid red fill.
 
 ---
 
@@ -43,109 +50,95 @@ Rules of thumb:
 ### OBanner
 
 **Import:** `@/lib/feedback/Banner/OBanner.vue`
-**Use when:** You need a persistent, inline message block within the page flow — a form-level error summary, an informational note, a success confirmation that stays, or a soft warning/insight.
-**Don't use for:** Transient "operation succeeded/failed" popups — use [Toast](#toast--otoastprovider--usetoast). Not for loading states.
+**Use when:** A lasting condition of the PAGE — quota, partial data, read-only, a restored
+draft — in ONE line, full width, directly under the header (K3): min 36 px, 16 px tone glyph,
+13 px text, `border-b`, the soft status triplet. What, since when, what to do.
+**Don't use for:** The result of an action (Toast, K1); a condition of one section
+([OInlineNotice](#oinlinenotice)); raw HTTP text (K6).
 **Key props:**
 
-- `variant` (`"default" | "info" | "success" | "warning" | "error" | "error-soft"` — default `"default"`). `error` is a solid hard-failure banner; `error-soft` is a tinted, left-accent-bar variant for hints/insights.
-- `content` (`string`) — message text, used only when the default slot is empty.
-- `icon` (`string`) — OIcon name shown in the leading icon area.
-- `dense` (`boolean` — default `false`) — tighter padding.
-- `inlineActions` (`boolean` — default `false`) — lays the actions slot in the same row as the content instead of below it.
-- `dataTest` (`string`) — forwarded to the root `data-test`.
+- `tone` — `neutral` | `info` (default) | `warn` | `err`. No `ok`: a page condition never
+  succeeds. Role follows the tone (`err`/`warn` are alerts).
+- `message` (I18nText; the default slot replaces it with rich text)
+- `icon` (IconName — only a glyph that names the condition, e.g. `lock`, `history`; never one
+  that restates the tone)
+- `actionLabel` + `@action` + `actionVariant` (`secondary` | `link`) + `actionDataTest` — ONE
+  action at most, sm
+- `dismissible` + `@dismiss` — only for a condition the user can safely ignore
 
-`role` is derived automatically: `alert` for `error`/`warning`, otherwise `status`.
-**Slots:** `default` (message body, overrides `content`), `icon` (custom leading icon, overrides `icon` prop), `actions` (buttons/links).
-**Slots are detected once, at setup.** `hasActionsSlot` is a `computed` over `useSlots()`, which is not reactive, so `<template v-if="cond" #actions>` that becomes true later never renders. Always pass the slot and put the `v-if` on its contents.
-**Emits:** none.
+**Slots:** `default`, `actions` (one `sm` control, in place of `actionLabel`)
+**Removed:** `variant` → `tone` (warning → warn, error and error-soft → err, default → neutral,
+success → an OInlineNotice `ok`, promo dropped), `content` → `message`, `dense`,
+`inlineActions`, `bar`, `center`, `textSize`, `colors`, `role`, `preserveWhitespace`, slots
+`#icon`/`#meta`/`#footer`. `local/o2-display-api` rejects them.
 **Example:**
 
 ```vue
-<OBanner
-  variant="error-soft"
-  icon="lightbulb"
-  data-test="alerts-add-alert-banner"
->
-  This threshold has not fired in the last 30 days. Consider lowering it.
-  <template #actions>
-    <OButton variant="ghost" @click="dismiss">Got it</OButton>
-  </template>
-</OBanner>
+<OBanner tone="warn" :message="t('usage.quotaNear', { pct: 92 })" :action-label="t('usage.view')" @action="openUsage" />
 ```
 
-**Family:** standalone (no sibling parts).
+### OInlineNotice
 
-### OInnerLoading
-
-**Import:** `@/lib/feedback/InnerLoading/OInnerLoading.vue`
-**Use when:** An existing container (panel, card, table region) is (re)loading and you want to dim it with a centered spinner + optional label. The overlay is absolutely positioned, so the parent must be `relative`.
-**Don't use for:** First-time load of content whose skeleton you can mimic — prefer [OSkeleton](#oskeleton). For a bare inline spinner with no overlay, use [OSpinner](#ospinner).
-**Key props:**
-
-- `showing` (`boolean`, required) — toggles the overlay (fades in/out over 200ms).
-- `label` (`string`) — optional text under the spinner; also becomes the `aria-label` (falls back to `"Loading"`).
-- `size` (`"xs" | "sm" | "md" | "lg" | "xl"` — default `"xs"`) — spinner size (uses the `ring` OSpinner).
-  **Slots:** none.
-  **Emits:** none.
-  **Example:**
+**Import:** `@/lib/feedback/InlineNotice/OInlineNotice.vue`
+**Use when:** A condition of one SECTION, inside it: a form group's warning, a check that
+failed, a hint ("Schema changes apply to new events only"). `rounded-default`, 1 px edge,
+`px-3 py-2`, 13 px, wraps (never cut), icon top-aligned.
+**Don't use for:** Page-wide conditions (OBanner) or field errors (under the field, V6).
+**Key props:** `tone` (`neutral` | `info` (default) | `warn` | `err` | `ok`), `message`, `icon`,
+`actionLabel` + `@action` + `actionVariant` + `actionDataTest` (one end-aligned action). For raw
+multi-line text add `class="whitespace-pre-line wrap-anywhere"`.
+**Slots:** `default`, `actions` (one `sm` control)
+**Removed:** as OBanner, plus `text` → `message`, `variant` (warning/error) → `tone`, `dataTest`
+→ a plain `data-test`.
 
 ```vue
-<div class="relative min-h-40">
-  <OInnerLoading :showing="isFetching" label="Loading results" size="sm" />
-  <ResultsTable :rows="rows" />
-</div>
+<OInlineNotice tone="ok" :message="t('destinations.connectionWorks', { ms: 12 })" />
 ```
-
-**Family:** wraps [OSpinner](#ospinner) internally.
 
 ### OSkeleton
 
 **Import:** `@/lib/feedback/Skeleton/OSkeleton.vue`
-**Use when:** Content shape is known but data hasn't arrived — render one or more skeletons matching the final layout (text lines, avatar circles, card blocks) for first load.
-**Don't use for:** Re-loading a populated container in place (use [OInnerLoading](#oinnerloading)) or a tiny inline wait (use [OSpinner](#ospinner)).
+**Use when:** First load of content whose shape is known: a skeleton of the FINAL layout,
+shown after 150 ms so a fast load never flashes one (K4). Every skeleton shimmers;
+`rounded-chip` (circles `rounded-full`).
+**Don't use for:** A refresh of rows already on screen ([OLoadingLine](#oloadingline)) or a busy
+control ([OSpinner](#ospinner)).
 **Key props:**
 
-- `type` (`"rect" | "circle" | "text"` — default `"rect"`). `rect` = full-width rounded block; `circle` = square aspect, fully rounded (avatars); `text` = full-width line at text height.
-- `animation` (`"pulse" | "wave" | "none"` — default `"wave"`; note the type's doc-comment says `pulse` but the component default is `wave`). `wave` is a GPU-composited shimmer sweep.
+- `shape` — `line` (default, 12 px) | `block` | `circle`. Width and height come from the layout
+  box it stands in for (classes on the call site); never a radius class.
+- `preset` — `tableRows` (`rows`, default 5) | `statStrip` (`count`, default 4) | `chart`:
+  whole-layout skeletons.
+- `delay` (ms, default 150) — waits `invisible`, so the box is held and nothing jumps.
 
-Sizing is done with utility classes on the element (it renders a `span`) — set width/height via Tailwind since the component only fixes shape defaults.
-**Slots:** none.
-**Emits:** none.
-**Example:**
+**Removed:** `type` (text → `line`, rect → `block`), `animation`.
 
 ```vue
-<div class="flex items-center gap-3">
-  <OSkeleton type="circle" class="size-10" />
-  <div class="flex-1 flex flex-col gap-2">
-    <OSkeleton type="text" class="w-1/2" />
-    <OSkeleton type="text" />
-  </div>
-</div>
+<OSkeleton v-if="isPending" preset="tableRows" :rows="8" />
+<OSkeleton shape="circle" class="size-6" />
 ```
 
-**Family:** standalone.
+### OLoadingLine
+
+**Import:** `@/lib/feedback/LoadingLine/OLoadingLine.vue`
+**Use when:** A refresh keeps the current rows visible: a 2 px indeterminate accent line at the
+top of the region (K4). Its 2 px strip stays when inactive, so nothing shifts.
+**Key props:** `active` (boolean, required). Replaces `OInnerLoading` (deleted) and the
+hand-made `LoadingProgress` bars.
 
 ### OSpinner
 
 **Import:** `@/lib/feedback/Spinner/OSpinner.vue`
-**Use when:** You need just a spinning indicator — inside a button, beside a line of text, or an AI "typing" state — with no overlay and no layout scaffolding.
-**Don't use for:** Dimming a whole region (use [OInnerLoading](#oinnerloading)) or placeholdering structured content (use [OSkeleton](#oskeleton)).
-**Key props:**
-
-- `variant` (`"ring" | "dots"` — default `"ring"`). `ring` for general loading; `dots` (three bouncing dots) for AI/typing contexts.
-- `size` (`"xs" | "sm" | "md" | "lg" | "xl"` — default `"md"`).
-  **Slots:** none.
-  **Emits:** none.
-  **Example:**
+**Use when:** Only inside the control that is busy, or beside a value being computed (B10):
+a 2 px ring.
+**Don't use for:** A region or page — that is a skeleton (first load) or the loading line
+(refresh). No page-level spinner covering content.
+**Key props:** `size` — `sm` 12 | `md` 16 (default) | `lg` 20.
+**Removed:** `variant` (dots), sizes `xs`/`xl`; never a size or colour class.
 
 ```vue
-<OButton :disabled="saving">
-  <OSpinner v-if="saving" variant="ring" size="xs" />
-  <span>Save</span>
-</OButton>
+<OSpinner size="sm" />
 ```
-
-**Family:** standalone; consumed by [OInnerLoading](#oinnerloading).
 
 ### Toast — OToastProvider + useToast
 
@@ -154,8 +147,14 @@ Sizing is done with utility classes on the element (it renders a `span`) — set
 - Provider: `@/lib/feedback/Toast/OToastProvider.vue`
 - Composable: `import { useToast } from "@/lib/feedback/Toast/useToast"` (also exports a bare `toast` for use outside the Vue tree — services, `main.ts`)
 
-**Use when:** You need a transient, floating notification confirming an action or reporting a background result. This is the O2 replacement for `q-notify`.
-**Don't use for:** Persistent inline messages tied to a spot in the layout — use [OBanner](#obanner).
+**Use when:** The result of an action that is not otherwise visible (K1): ONE line,
+"<Object> <past verb>" ("Alert saved", "Folder deleted"), on the inverse surface,
+`rounded-menu`, always at the bottom centre and lifted above sticky footers and the table's
+selection bar (D6; mark another sticky footer with `data-toast-avoid`). 4 s, 8 s with an
+action; hover pauses it. A reversible change (pause, disable) applies at once and offers Undo
+instead of a confirmation (V8).
+**Don't use for:** Field errors (inline, K2), copy confirmations (`OCopyButton`), progress (the
+busy control), lasting page conditions ([OBanner](#obanner)).
 
 **Setup — mount the provider once at the app root.** `OToastProvider` reads a module-level singleton store, so it must appear exactly once near the top of the app; every `toast()` call anywhere renders through it.
 
@@ -174,17 +173,19 @@ import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 
 **`toast(options)` — key options:**
 
-- `message` (`string`, required) — plain text only (no HTML). Auto-capitalized.
-- `variant` (`"success" | "error" | "warning" | "info" | "loading" | "default"` — default `"default"`).
-- `title` (`string`) — bold line above the message.
-- `titleCount` (`number`) — count badge next to the title.
-- `timeout` (`number` ms; `0` = persistent). Per-variant defaults: `success`/`info`/`default` = 5000, `error`/`warning` = 30000, `loading` = 0.
-- `position` (`"top-center" | "top-right" | "top-left" | "bottom-center" | "bottom-right" | "bottom-left"`). Default per variant is `bottom-center`.
-- `action` (`{ label, handler, successLabel? }`) — an action button inside the toast; `successLabel` temporarily replaces the label after click (e.g. "Copied!").
-- `details` (`{ label, url }[]`) — collapsible list of affected resources.
-- `onDismiss` (`() => void`) — called once when the toast closes (user or timeout).
+- `message` (I18nText, required) — one line; a longer text is cut and shown in full on hover.
+- `variant` (`"success" | "error" | "warning" | "info" | "loading" | "default"`) — `success`
+  draws the ok icon, `error` the error icon, the rest neutral.
+- `action` (`{ label, handler, successLabel? }`) — one word: Undo, View, Retry; it extends the
+  toast to 8 s.
+- `timeout` (ms) — leave it unset (4 s / 8 s); `0` only for a persistent error with an action.
+- `onDismiss` (`() => void`) — called once when the toast closes.
 
-**Return value:** `toast()` returns `DismissFn` — `(replacement?: { variant, message, title }) => void`. The `loading` variant renders no UI; the pattern is to fire it, then call the returned fn with a `replacement` when work finishes.
+**Removed:** `title`, `titleCount`, `details`, `position` (always bottom centre), `updateToast`.
+
+**Return value:** `toast()` returns `DismissFn` — `(replacement?: { variant, message }) => void`.
+The `loading` variant renders no UI; fire it, then call the returned fn with a `replacement`
+when work finishes.
 
 Duplicate identical open toasts collapse into one record with a count badge (a polling 403 won't stack). `dismissAll()` clears everything (use on org switch / logout).
 
@@ -197,25 +198,21 @@ import { useToast } from "@/lib/feedback/Toast/useToast";
 const { toast } = useToast();
 
 async function save() {
-  const done = toast({ variant: "loading", message: "Saving alert…" });
+  const done = toast({ variant: "loading", message: t("alerts.saving") });
   try {
     await api.saveAlert();
-    done({ variant: "success", message: "Alert saved" });
+    done({ variant: "success", message: t("alerts.saved") });
   } catch {
-    done({ variant: "error", message: "Failed to save alert" });
+    done({ variant: "error", message: t("alerts.saveFailed") });
   }
 }
 
-function copyLink(url: string) {
+function pause(alert: Alert) {
+  pauseAlert(alert);
   toast({
     variant: "success",
-    title: "Share link",
-    message: "Link ready",
-    action: {
-      label: "Copy",
-      successLabel: "Copied!",
-      handler: () => navigator.clipboard.writeText(url),
-    },
+    message: t("alerts.paused"),
+    action: { label: t("common.undo"), handler: () => resumeAlert(alert) },
   });
 }
 </script>
@@ -227,24 +224,85 @@ function copyLink(url: string) {
 
 ## Data display
 
+### OStatStrip / OStatCard
+
+**Import:** `@/lib/data/StatStrip/OStatStrip.vue` · `OStatCard.vue` (types in `OStatStrip.types.ts`)
+**Use when:** The ONE stat primitive, for a real distribution people act on whose numbers vary
+and are not already on screen (F7). The strip picks one of three looks by its job:
+
+- **Filter chips** (`selectable`) — 32 px chips (icon or tone dot, label, count badge) in
+  `OTable`'s `#toolbar` right after the search, with `:row="false"`. They share the search row
+  only while every chip fits (`useInlineFit`), else take their own full-width toolbar line;
+  phones always get their own line. Overflow scrolls sideways under edge fades with a chevron,
+  never wraps. The reset chip (`default-key`, "All") leads, carries the total and reads as
+  quietly selected while nothing is picked; Esc resets. Selected is an accent border plus soft
+  fill with a primary count badge; error/warning chips above 0 get a tinted badge. The tooltip
+  says what a click does ("Show only / Also show / Stop showing …"). `multiple` toggles chips
+  into `v-model:selected-keys` (empty means unfiltered). A strip whose only clickable chip would
+  be the reset chip renders as KPIs; `selectable: false` items render as KPIs ahead of the chips.
+- **Inline KPI line** (`inline`, read-only) — icon · value · label, no border, for a toolbar
+  row. `row` gives a read-only strip its own band above the table header (page-edge padding,
+  bottom hairline) — e.g. DB monitoring.
+- **Cards** (read-only, or `selectable :tray="false"` tiles that navigate) — value (24/600
+  tabular) beside the label, a tone icon chip and a proportion bar that is always drawn; they
+  wrap at `basis-52` (`compact`: `basis-36`) and grow to fill the row. `stacked` puts each label
+  under its value. Below lg they compact (label moves to the tile's `title`).
+
+**Values (C4):** a value is shown verbatim; pass "—" for unknown and a real `0` renders "0".
+Both render muted, and only a non-zero value takes the tone colour. `loading` holds a skeleton
+until the FIRST load lands; a refresh keeps the last numbers unless `resetKey` changes.
+**Key props:**
+
+- Strip: `items` (`StatItem[]`), `loading`, `selectable`, `tray` (`false` = clickable cards),
+  `inline`, `row` (default on for filter chips), `selectedKey` + `@select(key)`, `multiple` +
+  `v-model:selected-keys`, `defaultKey`, `compact`, `resetKey`, `compactValues`, `stacked`.
+- `StatItem`: `{ key, label, value, icon?, tone?, trend?, max?, sub?, subIcon?, subTooltip?,
+  compactValue?, selectable?, dataTest? }`.
+- `tone` — `success | warning | error | primary | info | orange | blue | teal | purple |
+  neutral` (default). `blue`/`teal`/`purple` mirror the OTag badge groups.
+- `trend` — `{ direction: 'up' | 'down' | 'flat', label, tone? }`.
+- `OStatCard` takes the same fields plus `variant` (`card` | `chip` | `kpi`, set by the strip),
+  `clickable`, `selected`, `quiet`, `hint`, `loading`; slots `#value`, `#icon`, `#chart`
+  (overview sparkline).
+
+Use the strip instead of `KpiCard` / `KpiCardRow` / `ProfileStatTile` for new work.
+Conventions: [calm-signal.md § Summary-strip conventions](calm-signal.md#summary-strip-conventions).
+
+```vue
+<!-- #toolbar, right after the search box -->
+<OStatStrip
+  :items="summaryStats"
+  :loading="loading"
+  selectable
+  multiple
+  :row="false"
+  :selected-keys="stateFilters"
+  default-key="total"
+  class="max-md:order-last"
+  data-test="pipeline-list-summary"
+  @update:selected-keys="stateFilters = $event"
+/>
+```
+
 ### OProgressBar
 
 **Import:** `@/lib/data/ProgressBar/OProgressBar.vue`
-**Use when:** Showing determinate progress or a proportion (0–1) — upload progress, quota usage, a percentage fill.
-**Don't use for:** Indeterminate "still working" states — use [OSpinner](#ospinner) or [OInnerLoading](#oinnerloading).
+**Use when:** Determinate or indeterminate progress, or a single share: ONE 4 px bar
+(`rounded-full`, hover-fill track).
+**Don't use for:** A busy control ([OSpinner](#ospinner)) or a refresh
+([OLoadingLine](#oloadingline)).
 **Key props:**
 
-- `value` (`number`, required) — between 0 and 1; clamped to that range internally.
-- `variant` (`"default" | "success" | "warning" | "danger"` — default `"default"`) — semantic fill color.
-- `size` (`"xs" | "sm" | "md" | "lg"` — default `"sm"`) — track height.
-  **Slots:** `default` — content rendered inside the filled bar (e.g. a percentage label).
-  **Emits:** none.
-  **Example:**
+- `value` (`number | null`, required) — percent 0–100; `null` animates an indeterminate fill.
+- `tone` — `accent` (default) | `ok` | `warn` | `err`: status only when the reading is a status.
+- `label` (I18nText — the accessible name) · `start` (0–100, left edge for a timeline segment)
+
+**Removed:** `size` (one 4 px bar), `variant` → `tone` (default/neutral → accent, success →
+ok, warning → warn, danger → err), `indeterminate` → `:value="null"`, `color`, the default
+slot, `aria-label` → `label`.
 
 ```vue
-<OProgressBar :value="usedRatio" variant="warning" size="md">
-  {{ Math.round(usedRatio * 100) }}%
-</OProgressBar>
+<OProgressBar :value="usedPct" :tone="usedPct >= 90 ? 'warn' : 'accent'" :label="t('usage.quota')" />
 ```
 
 **Family:** standalone.
@@ -350,6 +408,41 @@ function copyLink(url: string) {
 
 ## Lists
 
+### ODescriptionList / ODescriptionItem
+
+**Import:** `@/lib/lists/DescriptionList/ODescriptionList.vue` · `ODescriptionItem.vue`
+**Use when:** The properties of ONE entity in a drawer or detail page, as a real `<dl>`:
+160 px labels, values beside them, stacked when the list is under 30 rem wide.
+**Don't use for:** Comparing rows — that is a table.
+**Rules:** unknown or missing is a muted "—", never blank and never a zero (C4, D4); labels,
+not raw keys or booleans ("No", not `false`: W5); machine values are mono (T4).
+**Key props:**
+
+- List: `labels` — `text` (default: sans 13 px, secondary labels, for entity properties) |
+  `mono` (mono 12 px keys and values, for field keys); `layout` — `auto` (default) | `columns` |
+  `stacked`; `emptyLabel` (default "—"); `items` (`{ label, value, mono?, copy? }[]`) in place
+  of children.
+- Item: `label`, `value` (or the default slot for rich content), `emptyLabel`, `mono` (one
+  machine value in a text list), `copy` (an `OCopyButton` on hover, always on touch).
+
+**Slots:** list `default` (items); item `default` (value), `label`
+**Removed:** `columns` → `layout`, `dense`, `labelWidth` (one 160 px column), item `stacked` →
+`layout="stacked"` on the list. `OValue` stays for a table cell's loading / none / error value.
+
+```vue
+<ODescriptionList
+  labels="mono"
+  :items="[
+    { label: raw('k8s.pod.name'), value: pod.name, copy: true },
+    { label: raw('k8s.namespace'), value: pod.namespace },
+  ]"
+/>
+<ODescriptionList>
+  <ODescriptionItem :label="t('alerts.owner')" :value="alert.owner" />
+  <ODescriptionItem :label="t('alerts.query')" :value="alert.sql" mono copy />
+</ODescriptionList>
+```
+
 ### FieldList — OFieldList / OFieldRow / OFieldLabel
 
 **Import:**
@@ -395,7 +488,14 @@ function copyLink(url: string) {
     <OFieldRow>
       <OFieldLabel :field="row" :show-type-icon="true" />
       <template #actions>
-        <OButton variant="ghost" size="xs" @click.stop="addToChart(row)">+</OButton>
+        <OButton
+          variant="ghost"
+          icon-only
+          size="xs"
+          icon="add"
+          :label="t('metrics.addToChart')"
+          @click.stop="addToChart(row)"
+        />
       </template>
     </OFieldRow>
   </template>

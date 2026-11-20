@@ -46,9 +46,9 @@
           :model-value="pickedDate ?? selectedDate"
           :auto-apply-dashboard="true"
           ref="dateTimePickerRef"
-          class="hover:bg-interactive-hover-bg h-7.5 min-h-7.5 transition-all duration-200"
+          class="hover:bg-interactive-hover-bg transition-all duration-200"
           data-test="dashboard-viewpanel-date-time-picker"
-          :disable="disable"
+          :disabled="disable"
           calendar-presets
           @update:model-value="timeGate.onPick"
           @show="timeGate.onShow"
@@ -66,12 +66,12 @@
         <OButtonGroup class="shrink-0">
           <OTooltip v-if="isCancelShown" :content="t('panel.cancel')" :disabled="!isMobile">
             <OButton
-              variant="cancel-query"
-              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+              :icon-only="isMobile"
+              variant="secondary"
               @click="cancelViewPanelQuery"
               :aria-label="t('panel.cancel')"
               data-test="dashboard-viewpanel-cancel-btn"
-              :icon-left="isMobile ? 'cancel' : undefined"
+              :icon="isMobile ? 'cancel' : undefined"
             >
               <!-- Both labels share one grid cell: Cancel keeps the Refresh width and still fits a longer translation. -->
               <span v-if="!isMobile" class="grid items-center justify-items-center">
@@ -91,13 +91,14 @@
             :disabled="!isMobile && !isAutoRunOn && !showApplyHint"
           >
             <OButton
-              :variant="refreshVariant"
-              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+              :icon-only="isMobile"
+              variant="primary"
+              :stale="showApplyHint"
               @click="refreshData"
               :disabled="disable"
               :aria-label="t('dashboard.viewDashboard.refresh')"
               data-test="dashboard-viewpanel-refresh-data-btn"
-              :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
+              :icon="isAutoRunOn ? 'autorenew' : 'refresh'"
             >
               <template v-if="!isMobile">{{ t("dashboard.viewDashboard.refresh") }}</template>
             </OButton>
@@ -105,18 +106,17 @@
           <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
             <template #trigger>
               <OButton
+                icon-only
                 :variant="refreshOptionsVariant"
-                size="icon-toolbar"
-                class="w-5!"
                 :disabled="disable"
                 :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
                 data-test="dashboard-viewpanel-refresh-options-btn"
-                icon-left="arrow-drop-down"
+                icon="arrow-drop-down"
               />
             </template>
             <ODropdownItem
               data-test="dashboard-viewpanel-refresh-item"
-              icon-left="refresh"
+              icon="refresh"
               :disabled="disable"
               @select="refreshData"
             >
@@ -127,7 +127,7 @@
               data-test="dashboard-viewpanel-auto-run-toggle-btn"
               @select="toggleAutoRun"
             >
-              <template #icon-left>
+              <template #icon>
                 <OIcon
                   :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
                   size="sm"
@@ -152,12 +152,12 @@
           </ODropdown>
         </OButtonGroup>
         <OButton
+          icon-only
           :aria-label="t('common.close')"
-          variant="outline"
-          size="icon-toolbar"
+          variant="ghost"
           @click="goBack"
           data-test="dashboard-viewpanel-close-btn"
-          icon-left="close"
+          icon="close"
         >
         </OButton>
       </div>
@@ -723,7 +723,6 @@ export default defineComponent({
     );
 
     const { isMobile } = useBreakpoint();
-    const refreshVariant = computed(() => (showApplyHint.value ? "pending" : "primary"));
 
     const refreshTooltip = computed(() => {
       if (isAutoRunOn.value) return t("dashboard.viewDashboard.autoRunDescription");
@@ -963,9 +962,7 @@ export default defineComponent({
       () =>
         config.isEnterprise == "true" && searchRequestTraceIds.value.length > 0 && disable.value,
     );
-    const refreshOptionsVariant = computed(() =>
-      isCancelShown.value ? "cancel-query" : refreshVariant.value,
-    );
+    const refreshOptionsVariant = computed(() => (isCancelShown.value ? "secondary" : "primary"));
 
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
@@ -1037,7 +1034,6 @@ export default defineComponent({
       t,
       isMobile,
       isCancelShown,
-      refreshVariant,
       refreshOptionsVariant,
       setTimeForVariables,
       dateTimeForVariables,

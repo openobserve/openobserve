@@ -30,9 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         pagination="none"
-        :show-global-filter="false"
         :cell-overflow-tooltip="false"
-        :frame="false"
         data-test="workflow-http-credentials"
       >
         <template #cell-value="{ row }">
@@ -75,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OUserCell :value="row.created_by" />
             <OTag
               v-if="!row.creator_in_org"
-              variant="default-soft"
+              tone="neutral"
               size="sm"
               :label="t('workflow.http.creatorGone')"
               :data-test="`workflow-http-credential-${row.id}-creator-gone`"
@@ -97,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-state="{ row }">
           <OTag
             v-if="row.state === 'active'"
-            variant="success-soft"
+            tone="ok"
             size="sm"
             dot
             :label="t('workflow.http.active')"
@@ -107,18 +105,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex flex-col items-start gap-0.5"
             data-test="workflow-http-credential-retiring"
           >
-            <OTag variant="warning-soft" size="sm" dot :label="t('workflow.http.retiring')" />
+            <OTag tone="warn" size="sm" dot :label="t('workflow.http.retiring')" />
             <OText variant="meta" as="span">{{ expiresText(row) }}</OText>
           </div>
-          <OTag v-else variant="default-soft" size="sm" :label="t('workflow.http.expired')" />
+          <OTag v-else tone="neutral" size="sm" :label="t('workflow.http.expired')" />
         </template>
 
         <template #cell-actions="{ row }">
           <div class="flex items-center justify-end gap-1">
             <template v-if="canReveal && isLive(row)">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 :loading="revealing === row.id"
                 :aria-label="
                   revealed[row.id]
@@ -139,8 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OButton>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 :aria-label="copyLabel"
                 :data-test="`workflow-http-credential-${row.id}-copy`"
                 @click="emit('copy', row.id)"
@@ -150,6 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <OPopover
+              size="md"
               v-if="canEdit"
               :open="confirmId === row.id"
               side="bottom"
@@ -159,8 +160,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #trigger>
                 <OButton
-                  variant="ghost-destructive"
-                  size="xs"
+                  variant="danger-ghost"
+                  size="sm"
                   :loading="revoking === row.id"
                   :data-test="`workflow-http-credential-${row.id}-revoke`"
                 >
@@ -172,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </template>
               <div
-                class="flex w-80 max-w-[calc(100vw-1.5rem)] flex-col gap-3 p-3"
+                class="flex flex-col gap-3 p-3"
                 :data-test="`workflow-http-credential-${row.id}-revoke-popover`"
               >
                 <OText as="p">
@@ -180,16 +181,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OText>
                 <div class="flex justify-end gap-2">
                   <OButton
-                    variant="outline"
-                    size="sm-action"
+                    variant="secondary"
                     :data-test="`workflow-http-credential-${row.id}-revoke-cancel`"
                     @click="confirmId = null"
                   >
                     {{ t("common.cancel") }}
                   </OButton>
                   <OButton
-                    variant="destructive"
-                    size="sm-action"
+                    variant="danger"
                     :data-test="`workflow-http-credential-${row.id}-revoke-confirm`"
                     @click="confirmRevoke(row.id)"
                   >

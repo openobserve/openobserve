@@ -212,7 +212,7 @@ function introduced(early: boolean, views = { a: 5000, b: 5000 }) {
         VersionSummaryTiles: true,
         ServiceEnvChip: true,
         ODimensionChip: true,
-        OTag: { props: ["variant", "label"], template: '<span :data-variant="variant" />' },
+        OTag: { props: ["tone", "label"], template: '<span :data-variant="tone" />' },
       },
     },
   });

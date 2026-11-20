@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="date-time-rail-recent-group"
     >
       <div
-        class="text-input-label-text px-3 pt-3 pb-1 text-xs font-medium tracking-wide uppercase"
+        class="text-input-label-text px-3 pt-3 pb-1 text-xs font-medium"
         data-test="date-time-rail-recent-header"
       >
         {{ t("common.timeRangeRecent") }}
@@ -43,39 +43,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else role="list" data-test="date-time-rail-recent-list">
         <div
-          v-for="(item, index) in visibleRecent"
+          v-for="item in visibleRecent"
           :key="item.id"
           role="listitem"
           class="group relative px-1"
-          :class="
-            index < visibleRecent.length - 1 ? 'border-border-default border-b border-dotted' : ''
-          "
         >
-          <OTooltip
-            side="right"
-            align="center"
-            :side-offset="8"
-            max-width="18.75rem"
-            :content="item.disabled ? restrictionMsg : item.tooltip"
-          />
+          <OTooltip side="right" :content="item.disabled ? restrictionMsg : item.tooltip" />
+          <!-- An over-limit row stays focusable without native disabled, so Delete can still remove it. -->
           <OButton
             variant="ghost"
-            size="xs"
+            size="sm"
             data-date-time-rail-item
             data-date-time-rail-recent
             :tabindex="tabindexFor(`recent-${item.id}`)"
             :data-test="`date-time-rail-recent-${item.id}`"
             class="w-full justify-start! gap-2 pe-8! font-normal tabular-nums aria-disabled:opacity-35"
             :class="item.selected ? 'bg-button-primary! text-button-primary-foreground!' : ''"
-            :disabled="item.disabled"
-            focusable-unavailable
+            :aria-disabled="item.disabled ? 'true' : undefined"
             :aria-pressed="item.selected"
             :aria-label="rowName(item)"
             :aria-describedby="recentKeysHintId"
-            :description-id="recentKeysHintId"
             @mouseenter="emit('hover')"
             @focus="onItemFocus(`recent-${item.id}`)"
-            @click="emit('select-recent', item.id)"
+            @click="!item.disabled && emit('select-recent', item.id)"
             @keydown.delete.prevent="removeFocusedRecent(item.id, $event)"
             @keydown.right.prevent="focusSibling($event, '[data-test$=\'-remove\']')"
           >
@@ -99,9 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</OTruncatedText>
           </OButton>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-chip"
-            icon-left="close"
+            size="xs"
+            icon="close"
             :data-test="`date-time-rail-recent-${item.id}-remove`"
             tabindex="-1"
             :aria-label="t('common.timeRangeRemoveRecent', { range: rowName(item) })"
@@ -118,8 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OButton
         v-if="recent.length > COLLAPSED_COUNT"
-        variant="ghost-primary"
-        size="chip"
+        variant="accent-ghost"
+        size="xs"
         class="ms-1 self-start"
         data-date-time-rail-item
         data-test="date-time-rail-recent-toggle"
@@ -138,34 +129,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       role="group"
       :aria-labelledby="calendarHeadingId"
       class="flex flex-col"
-      :class="recent.length > 0 ? 'border-border-default mt-2 border-t' : ''"
+      :class="recent.length > 0 ? 'mt-2' : ''"
       data-test="date-time-rail-calendar-group"
     >
       <div
         :id="calendarHeadingId"
-        class="text-input-label-text px-3 pt-3 pb-1 text-xs font-medium tracking-wide uppercase"
+        class="text-input-label-text px-3 pt-3 pb-1 text-xs font-medium"
         data-test="date-time-rail-calendar-header"
       >
         {{ t("common.timeRangeCalendar") }}
       </div>
       <div role="list" class="flex flex-col px-1" data-test="date-time-rail-calendar-list">
-        <div
-          v-for="(item, index) in calendar"
-          :key="item.id"
-          role="listitem"
-          class="min-w-0"
-          :class="index < calendar.length - 1 ? 'border-border-default border-b' : ''"
-        >
-          <OTooltip
-            side="right"
-            align="center"
-            :side-offset="8"
-            max-width="18.75rem"
-            :content="item.disabled ? restrictionMsg : item.tooltip"
-          />
+        <div v-for="item in calendar" :key="item.id" role="listitem" class="min-w-0">
+          <OTooltip side="right" :content="item.disabled ? restrictionMsg : item.tooltip" />
           <OButton
             variant="ghost"
-            size="xs"
+            size="sm"
             data-date-time-rail-item
             data-date-time-rail-calendar
             :tabindex="tabindexFor(`calendar-${item.id}`)"

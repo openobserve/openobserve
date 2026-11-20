@@ -29,12 +29,13 @@ vi.mock("@openobserve/browser-rum", () => ({
 
 import MainLayout from "./MainLayout.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import { ROUTE_ENTER } from "@/lib/styles/motion";
 
 const StubDiv = defineComponent({ setup: () => () => h("div") });
 const view = (name: string) =>
   defineComponent({ name, setup: () => () => h("div", { "data-test": name }) });
 
-const FADE_CLASS = "motion-safe:animate-in";
+const FADE_CLASS = ROUTE_ENTER;
 const SLIDE_CLASS = "motion-safe:slide-in-from-bottom-1";
 const Parent = defineComponent({
   name: "PipelineParent",

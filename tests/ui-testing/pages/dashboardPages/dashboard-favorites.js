@@ -94,10 +94,6 @@ export default class DashboardFavorites {
     );
   }
 
-  getRowDeleteBtn(dashboardName) {
-    return this.getRow(dashboardName).locator('[data-test="dashboard-delete"]');
-  }
-
   // ── Navigation ─────────────────────────────────────────────────────────
 
   // Dashboards.vue picks its landing folder in onMounted only AFTER awaiting the
@@ -306,7 +302,8 @@ export default class DashboardFavorites {
   // ── Deletion ───────────────────────────────────────────────────────────
 
   async deleteDashboardFromRow(dashboardName) {
-    await this.getRowDeleteBtn(dashboardName).click();
+    await this.getRow(dashboardName).locator('[data-test="dashboard-row-more-actions"]').click();
+    await this.page.locator('[data-test="dashboard-delete-menu"]').click();
     await this.deleteConfirmBtn.waitFor({ state: "visible", timeout: 15000 });
     // Negative lookahead keeps this off the /dashboards/bulk endpoint.
     const [response] = await Promise.all([

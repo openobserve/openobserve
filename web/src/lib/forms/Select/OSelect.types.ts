@@ -32,22 +32,19 @@ export const SELECT_PARENT_DATA_TEST_KEY: InjectionKey<ComputedRef<string | unde
  */
 export const NULL_VALUE_SENTINEL = "__o2__null__";
 
-export type SelectSize = "xs" | "sm" | "md";
+/** Control height (S1): sm 28, md 32 (default), lg 36 for sign-in forms only. */
+export type SelectSize = "sm" | "md" | "lg";
+export const SELECT_SIZES = ["sm", "md", "lg"] as const satisfies readonly SelectSize[];
 
 /**
- * Trigger chrome.
- *
- * - `"field"` (default) — the standard bordered control with a fixed height.
- * - `"inline"` — the trigger reads as a WORD INSIDE RUNNING TEXT: no border, no
- *   background, no fixed height, sized to its own content and contributing
- *   nothing to the surrounding line box. For a value that belongs to a sentence
- *   rather than to a form row — e.g. the folder in a page header's description
- *   line ("Add Alert in KTX"). Everything else (search, keyboard, options list,
- *   `#after-options`) is identical to `"field"`.
- *
- * Single-select only; `multiple` renders chips that need the field chrome.
+ * `field` is a form select with its label above (S3). `filter` is a toolbar filter with the
+ * label inside ("Status: Any") that tints and offers ✕ once narrowed (F3, S6).
  */
-export type SelectAppearance = "field" | "inline";
+export type SelectVariant = "field" | "filter";
+export const SELECT_VARIANTS = ["field", "filter"] as const satisfies readonly SelectVariant[];
+
+/** What a narrowed filter shows after its label: the picked value, or how many are picked. */
+export type SelectFilterSummary = "value" | "count";
 
 // ── Option shape ──────────────────────────────────────────────────────────
 
@@ -75,6 +72,8 @@ export interface SelectOption {
   listLabel?: I18nText;
   /** Listbox mode: small muted detail right-aligned in the list row, such as a UTC offset. */
   suffix?: I18nText;
+  /** Listbox mode: a tabular count right-aligned in the row, such as the events a stream holds. */
+  count?: number;
   [key: string]: unknown;
 }
 
@@ -98,14 +97,10 @@ export interface SelectProps {
   options?: readonly SelectOptionInput[];
   /** Allows selecting multiple options */
   multiple?: boolean;
-  /**
-   * Maximum number of selection chips rendered in the trigger before the
-   * rest collapse into a "+N more" indicator. Defaults to 3.
-   * Only meaningful when `multiple` is true.
-   */
-  maxVisibleChips?: number;
-  /** Enables local text filtering / combobox mode */
-  searchable?: boolean;
+  /** Multi-select: chips shown in the trigger before the rest collapse into "+N" (S5). */
+  maxChips?: number;
+  /** Search box pinned above the list; `auto` shows it past eight options. */
+  searchable?: boolean | "auto";
   /** Debounce (ms) before emitting search events */
   searchDebounce?: number;
   /** Hides already selected options in multiple mode */
@@ -117,12 +112,10 @@ export interface SelectProps {
    * (search always spans every group).
    */
   collapsibleGroups?: boolean;
-  /**
-   * Multi-select with group headers: on open, float the selected options to the
-   * top of their own group, as flat lists always do. Default off, so groups
-   * that lead with a fixed entry (e.g. "Current Panel") keep their order.
-   */
+  /** Multi-select: picks float to the top of their own group on open, as a flat list's do. */
   pinSelectedInGroups?: boolean;
+  /** Multi-select: a row click picks only that option and closes; its checkbox still adds it. */
+  rowClickSingleSelect?: boolean;
   /**
    * Renders a "Select All" master row at the top of the dropdown (multi-select
    * listbox mode only). Shows an indeterminate dash when only some options are
@@ -134,10 +127,8 @@ export interface SelectProps {
    * this text in the trigger instead of listing every selected label as chips.
    */
   allSelectedLabel?: I18nText;
-  /** Allows creating new values by typing — emits @create event */
+  /** Offers an `Add "x"` row for a typed value that is not listed — emits @create */
   creatable?: boolean;
-  /** Optional dropdown content style passthrough */
-  dropdownStyle?: string | Record<string, string | number>;
   /** Placeholder text shown in the internal search input */
   searchPlaceholder?: I18nText;
   /** Key to read label from each option object */
@@ -146,7 +137,7 @@ export interface SelectProps {
   valueKey?: string;
   /** Key to read a OIcon name from each option object — when set, renders an icon before the label in the dropdown list */
   iconKey?: string;
-  /** Floating label rendered above the trigger */
+  /** Label above a field, or inside a filter ("Status: Any") */
   label?: I18nText;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
   required?: boolean;
@@ -160,45 +151,29 @@ export interface SelectProps {
   clearable?: boolean;
   /** Prevents value changes */
   disabled?: boolean;
-  /** Control size */
+  /** Control height */
   size?: SelectSize;
-  /** Trigger chrome — `field` (default) or the running-text `inline`. */
-  appearance?: SelectAppearance;
+  /** Form field (label above) or toolbar filter (label inside) */
+  variant?: SelectVariant;
+  /** Filter only: the value text while nothing is picked; defaults to "Any" */
+  anyLabel?: I18nText;
+  /**
+   * Single filter only: the value meaning "no filter", which reads untinted and is what ✕ restores.
+   * Inferred from a first option valued "", null, "all", "any" or "*", or labelled "All…"/"Any…".
+   */
+  resetValue?: SelectValue;
+  /** Filter only: show the picked value or the count once several are picked */
+  summary?: SelectFilterSummary;
   /** HTML id */
   id?: string;
   /** HTML name */
   name?: string;
   /** Helper text displayed below the field */
   helpText?: I18nText;
-  /**
-   * Semantic field width — controls how wide the component renders.
-   * Defaults to "full" (fills the container).
-   * @see FieldWidth
-   */
+  /** Width by the expected value (S7); a field defaults to `full`, a filter sizes to its text */
   width?: FieldWidth;
-  /**
-   * Controls where the label is rendered.
-   * - `"outside"` (default): label sits above the trigger as a separate element.
-   * - `"inside"`: label is rendered as a compact inline prefix inside the trigger,
-   *   saving vertical space when the label is short (e.g. in config panels).
-   *   With `appearance="inline"` it leads the value on the same line, so the whole "Label value ▾" is the trigger.
-   */
-  labelPosition?: "inside" | "outside";
-  /** When true, replaces the chevron with a spinner to indicate async loading */
+  /** Replaces the chevron with a spinner, and shows a loading row while there are no options */
   loading?: boolean;
-  /**
-   * In multi-select mode, controls what a row click does vs a checkbox click.
-   * - `false` (default): clicking anywhere on a row toggles that item (standard multi-select).
-   * - `true`: clicking the row label/text single-selects that item (replaces the whole selection
-   *   and closes the dropdown), while clicking the checkbox still toggles it.
-   */
-  rowClickSingleSelect?: boolean;
-  /**
-   * @deprecated No longer needed — the trigger and option labels now show a
-   * tooltip with the full value automatically whenever they're truncated.
-   * Kept only so existing call sites don't break; has no effect.
-   */
-  optionTooltip?: boolean;
 }
 
 export interface SelectEmits {
@@ -234,8 +209,8 @@ export interface SelectSlots {
   "before-options"?: () => unknown;
   /** Content after the options list */
   "after-options"?: () => unknown;
-  /** Icon content inside the trigger on the left — matches OButton's `#icon-left` pattern */
-  "icon-left"?: () => unknown;
+  /** Leading icon inside the trigger — matches OButton's `#icon` */
+  icon?: () => unknown;
   /**
    * Tooltip content rendered inside an info icon in the label area.
    * Provide a tooltip element as the slot content.

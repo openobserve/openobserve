@@ -18,7 +18,7 @@ import { defineComponent, h, KeepAlive, nextTick, reactive, ref } from "vue";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
 import Index from "@/plugins/traces/Index.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import i18n from "@/locales";
@@ -4384,7 +4384,7 @@ describe("Index.vue (Main Traces Page)", () => {
             return { dateTimeRef: ref<any>(null) };
           },
           render() {
-            return h(DateTime, {
+            return h(ODateTimeRange, {
               ref: "dateTimeRef",
               autoApply: true,
               defaultType,
@@ -4394,7 +4394,7 @@ describe("Index.vue (Main Traces Page)", () => {
           },
         });
 
-      const picker = () => wrapper.findComponent(DateTime).vm as any;
+      const picker = () => wrapper.findComponent(ODateTimeRange).vm as any;
 
       beforeEach(() => {
         pickerEmits = [];

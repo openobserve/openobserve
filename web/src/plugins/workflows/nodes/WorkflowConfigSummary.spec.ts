@@ -124,7 +124,7 @@ describe("WorkflowConfigSummary — destination", () => {
     await flushPromises();
     expect(mockList).not.toHaveBeenCalled();
     expect(card(wrapper).exists()).toBe(false);
-    expect(wrapper.text()).toContain("No Configuration");
+    expect(wrapper.text()).toContain("No configuration");
   });
 
   // ── The request ───────────────────────────────────────────────────────────
@@ -179,7 +179,7 @@ describe("WorkflowConfigSummary — destination", () => {
     seedDestinationNode();
     const wrapper = createWrapper();
     await flushPromises();
-    expect(card(wrapper).text()).not.toContain("TLS Verification");
+    expect(card(wrapper).text()).not.toContain("TLS verification");
   });
 
   it("shows the TLS row when verification is skipped", async () => {
@@ -188,7 +188,7 @@ describe("WorkflowConfigSummary — destination", () => {
     const wrapper = createWrapper();
     await flushPromises();
     const text = card(wrapper).text();
-    expect(text).toContain("TLS Verification");
+    expect(text).toContain("TLS verification");
     expect(text).toContain("Disabled");
   });
 
@@ -266,7 +266,7 @@ describe("WorkflowConfigSummary — destination", () => {
 
 // ── Branch ──────────────────────────────────────────────────────────────────
 // A Branch's config IS its routing table. Without it the pane fell through to the
-// trigger catch-all and rendered another node's title ("Alert Trigger").
+// trigger catch-all and rendered another node's title ("Alert trigger").
 
 const seedBranchNode = (cases: any[], else_handle = "else") => {
   workflowObj.currentSelectedNodeData = {
@@ -285,7 +285,7 @@ describe("WorkflowConfigSummary — branch", () => {
   });
   afterEach(() => vi.clearAllMocks());
 
-  // The reported bug: a Branch rendered the literal text "Alert Trigger" — the
+  // The reported bug: a Branch rendered the literal text "Alert trigger" — the
   // trigger catch-all's title, not this node's config.
   it("never renders the trigger title for a branch", async () => {
     seedBranchNode([
@@ -297,7 +297,7 @@ describe("WorkflowConfigSummary — branch", () => {
     ]);
     const wrapper = createWrapper();
     await flushPromises();
-    expect(wrapper.text()).not.toContain("Alert Trigger");
+    expect(wrapper.text()).not.toContain("Alert trigger");
     expect(wrapper.find('[data-test="workflow-config-summary-trigger"]').exists()).toBe(false);
   });
 
@@ -325,7 +325,7 @@ describe("WorkflowConfigSummary — branch", () => {
     expect(text).toContain("meta_alert_count >= '1000'");
     expect(text).toContain("Moderate (>=200)");
     expect(text).toContain("meta_alert_count >= '200'");
-    expect(text).toContain("Everything Else");
+    expect(text).toContain("Everything else");
   });
 
   // Handles are stable ids, not array positions: a deleted middle path leaves
@@ -384,13 +384,13 @@ describe("WorkflowConfigSummary — branch", () => {
     seedBranchNode([]);
     const wrapper = createWrapper();
     await flushPromises();
-    expect(wrapper.text()).toContain("No Configuration");
+    expect(wrapper.text()).toContain("No configuration");
   });
 });
 
 // ── Condition ───────────────────────────────────────────────────────────────
 // The node persists { version, conditions }; the readout must unwrap that before
-// previewing, or a fully configured rule reads as "No Configuration".
+// previewing, or a fully configured rule reads as "No configuration".
 
 describe("WorkflowConfigSummary — condition", () => {
   beforeEach(() => {
@@ -439,7 +439,7 @@ describe("WorkflowConfigSummary — condition", () => {
     } as any;
     const wrapper = createWrapper();
     await flushPromises();
-    expect(wrapper.text()).toContain("No Configuration");
+    expect(wrapper.text()).toContain("No configuration");
   });
 });
 
@@ -463,7 +463,7 @@ describe("WorkflowConfigSummary — trigger and unknown types", () => {
     const wrapper = createWrapper();
     await flushPromises();
     expect(wrapper.find('[data-test="workflow-config-summary-trigger"]').text()).toBe(
-      "Alert Trigger",
+      "Alert trigger",
     );
   });
 
@@ -471,7 +471,7 @@ describe("WorkflowConfigSummary — trigger and unknown types", () => {
     workflowObj.currentSelectedNodeData = { id: "u1", data: { node_type: "future_type" } } as any;
     const wrapper = createWrapper();
     await flushPromises();
-    expect(wrapper.text()).not.toContain("Alert Trigger");
-    expect(wrapper.text()).toContain("No Configuration");
+    expect(wrapper.text()).not.toContain("Alert trigger");
+    expect(wrapper.text()).toContain("No configuration");
   });
 });

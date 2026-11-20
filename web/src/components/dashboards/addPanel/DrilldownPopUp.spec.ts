@@ -26,33 +26,33 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-disabled="String(primaryButtonDisabled)"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
+      :data-primary-disabled="String(primary?.disabled)"
     >
       <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot name="header-right" />
@@ -60,13 +60,13 @@ const ODialogStub = {
       <slot name="footer" />
       <button
         data-test="o-dialog-stub-primary"
-        :disabled="primaryButtonDisabled"
+        :disabled="primary?.disabled"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
       <button
         data-test="o-dialog-stub-close"
         @click="$emit('update:open', false)"
@@ -273,14 +273,14 @@ describe("DrilldownPopUp", () => {
       wrapper = createWrapper();
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("Create Drilldown");
+      expect(dialog.props("title")).toBe("Create drilldown");
     });
 
     it("should forward edit-drilldown title to ODialog in edit mode", () => {
       wrapper = createWrapper({ isEditMode: true, drilldownDataIndex: 0 });
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("Edit Drilldown");
+      expect(dialog.props("title")).toBe("Edit drilldown");
     });
 
     it("should forward md size to ODialog", () => {
@@ -477,7 +477,7 @@ describe("DrilldownPopUp", () => {
     });
 
     it("should show logs mode selection", () => {
-      expect(wrapper.text()).toContain("Select Logs Mode:");
+      expect(wrapper.text()).toContain("Select logs mode:");
     });
 
     it("should default to auto logs mode", () => {
@@ -499,7 +499,7 @@ describe("DrilldownPopUp", () => {
       wrapper.vm.form.setFieldValue("data.logsMode", "custom");
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Custom SQL Query");
+      expect(wrapper.text()).toContain("Custom SQL query");
     });
 
     it("should update query value", async () => {
@@ -783,7 +783,7 @@ describe("DrilldownPopUp", () => {
 
       const dialog = wrapper.findComponent(ODialogStub);
       // Save is never disabled by validity now — the schema gates the submit.
-      expect(dialog.props("primaryButtonDisabled")).toBeFalsy();
+      expect(dialog.props("primary")?.disabled).toBeFalsy();
       // form-id (container) === OForm id makes Enter / footer Save submit.
       expect(wrapper.find("#drilldown-popup-form").exists()).toBe(true);
     });
@@ -910,7 +910,7 @@ describe("DrilldownPopUp", () => {
       wrapper = createWrapper({ isEditMode: false });
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Add");
+      expect(dialog.props("primary")?.label).toBe("Add");
     });
 
     it("should show 'Update' label on ODialog primary button in edit mode", () => {
@@ -920,14 +920,14 @@ describe("DrilldownPopUp", () => {
       });
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Update");
+      expect(dialog.props("primary")?.label).toBe("Update");
     });
 
     it("should show Cancel label on ODialog secondary button", () => {
       wrapper = createWrapper();
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(dialog.props("secondary")?.label).toBe("Cancel");
     });
   });
 

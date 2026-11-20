@@ -84,13 +84,13 @@ describe("severity tags (OSS-19)", () => {
     toRequests(gt, EAST, [suggestion({ evidence: { severity, cells: {} } })])[0].copy?.tags;
 
   it("shows High in amber and Medium in grey", () => {
-    expect(tags("high")?.[0]).toEqual({ label: "High", variant: "warning-soft" });
-    expect(tags("medium")?.[0]).toEqual({ label: "Medium", variant: "default-soft" });
+    expect(tags("high")?.[0]).toEqual({ label: "High", variant: "warn" });
+    expect(tags("medium")?.[0]).toEqual({ label: "Medium", variant: "neutral" });
   });
 
   it("never paints a coverage finding red", () => {
     for (const severity of ["high", "medium"])
-      expect(tags(severity)?.map((tag) => tag.variant)).not.toContain("error-soft");
+      expect(tags(severity)?.map((tag) => tag.variant)).not.toContain("err");
   });
 });
 
@@ -110,13 +110,13 @@ describe("toSuggestionRows (the all-suggestions drawer)", () => {
     expect(rows[0]).toMatchObject({
       where: "prod-eu / billing",
       kind: "Coverage gap",
-      kindVariant: "amber-soft",
-      severity: { label: "High", variant: "warning-soft" },
+      kindVariant: "warn",
+      severity: { label: "High", variant: "warn" },
     });
     expect(rows[1]).toMatchObject({
       where: "—",
       kind: "Notifies no one",
-      kindVariant: "amber-soft",
+      kindVariant: "warn",
       severity: null,
     });
   });
@@ -636,7 +636,7 @@ describe("silent_coverage: Notifies no one (demo bug 4)", () => {
     expect(KIND_LOOK[card(s).look].icon).toBe("notifications");
     expect(KIND_LOOK[card(s).look].badge).toContain("text-badge-amber-soft-text");
     expect(KIND_LOOK[card(s).look].accent).toBe("bg-badge-amber-soft-text");
-    expect(row(s)).toMatchObject({ kind: "Notifies no one", kindVariant: "amber-soft" });
+    expect(row(s)).toMatchObject({ kind: "Notifies no one", kindVariant: "warn" });
   });
 
   it.each([

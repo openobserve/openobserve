@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="visual in usersDisplayOptions"
               :key="visual.value"
               :value="visual.value"
-              size="sm"
               :data-test="`iam-roles-selection-show-${visual.value}-btn`"
             >
               {{ visual.label }}
@@ -41,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div data-test="iam-roles-selection-search-input" class="me-3">
         <OSearchInput
+          width="list"
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          class="h-9 w-50"
           :placeholder="t('iam.groupRoles.searchRoles')"
         />
       </div>
@@ -60,8 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
-        :show-global-filter="false"
-        dense
       >
         <template #cell-select="{ row }">
           <OCheckbox
@@ -74,38 +71,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <OEmptyState
             v-if="orgListFailed"
-            size="block"
+            kind="error"
             class="shrink-0"
-            preset="load-error"
             data-test="iam-roles-selection-load-error"
-            @action="(id) => id === 'retry' && retryOrgRoles()"
+            @action="retryOrgRoles()"
           />
           <OEmptyState
             v-else-if="showNoneSelected"
-            size="block"
             class="shrink-0"
-            preset="no-roles"
+            icon="group"
             data-test="iam-roles-selection-none-selected"
             :title="t('iam.groupRoles.noneSelectedTitle')"
-            :description="t('iam.groupRoles.noneSelectedDescription')"
-            :actions="[
-              {
-                id: 'show-all',
-                icon: 'list',
-                titleKey: 'iam.groupRoles.showAll',
-                descriptionKey: 'iam.groupRoles.showAllDesc',
-              },
-            ]"
-            @action="(id) => id === 'show-all' && updateUserTable('all')"
+            :text="t('iam.groupRoles.noneSelectedDescription')"
+            :action-label="t('iam.groupRoles.showAll')"
+            @action="updateUserTable('all')"
           />
           <OEmptyState
             v-else
-            size="block"
             class="shrink-0"
-            preset="no-roles"
-            :filtered="!!userSearchKey"
-            :hide-action="!userSearchKey"
-            @action="(id) => id === 'clear-filters' && (userSearchKey = '')"
+            :kind="userSearchKey ? 'filtered' : 'first-run'"
+            :title="
+              userSearchKey
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.roles') })
+                : t('emptyState.noRoles.title')
+            "
+            :text="
+              userSearchKey
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.roles') })
+                : t('emptyState.noRoles.description')
+            "
+            :icon="userSearchKey ? undefined : 'group'"
+            @action="userSearchKey = ''"
           />
         </template>
       </OTable>

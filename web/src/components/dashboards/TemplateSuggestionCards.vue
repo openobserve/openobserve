@@ -172,7 +172,7 @@ onMounted(() => {
   <div v-if="visible" class="flex flex-col gap-2 pt-4" data-test="template-suggestion-cards">
     <div class="flex items-center justify-between gap-2">
       <OText variant="label" class="font-semibold">{{ t("dashboard.templates.heading") }}</OText>
-      <OButton variant="ghost-primary" size="xs" data-test="template-browse-all" @click="browseAll">
+      <OButton variant="accent-ghost" size="sm" data-test="template-browse-all" @click="browseAll">
         {{ t("dashboard.templates.browseAll") }}
       </OButton>
     </div>
@@ -187,14 +187,14 @@ onMounted(() => {
         @click="onHostMetricsClick"
         @keydown.enter.prevent="onHostMetricsClick"
       >
-        <OTag variant="success-soft" icon="monitor-heart" size="sm" />
+        <OTag tone="ok" icon="monitor-heart" size="sm" />
         <OTruncatedText class="text-text-heading flex-1 text-sm font-medium">
           {{ raw(HOST_METRICS_TITLE) }}
         </OTruncatedText>
         <OTag
           v-if="hostsDetected"
-          variant="primary-soft"
-          size="xs"
+          tone="accent"
+          size="sm"
           data-test="template-card-badge-hostmetrics"
           >{{ t("dashboard.templates.detectedBadge") }}</OTag
         >
@@ -211,7 +211,7 @@ onMounted(() => {
         @keydown.enter.prevent="emit('open-drawer')"
       >
         <OTag
-          :variant="getCategoryInfo(dashboard).variant"
+          :tone="getCategoryInfo(dashboard).variant"
           :icon="getCategoryInfo(dashboard).icon"
           size="sm"
         />
@@ -220,8 +220,8 @@ onMounted(() => {
         </OTruncatedText>
         <OTag
           v-if="cardBadged(dashboard)"
-          variant="primary-soft"
-          size="xs"
+          tone="accent"
+          size="sm"
           :data-test="`template-card-badge-${dashboard.name}`"
           >{{ t("dashboard.templates.detectedBadge") }}</OTag
         >
@@ -231,7 +231,6 @@ onMounted(() => {
     <ODialog
       v-if="replaceTarget"
       :open="true"
-      persistent
       size="sm"
       :title="t('dashboard.templates.replaceTitle')"
       data-test="template-replace-confirm"
@@ -255,19 +254,13 @@ onMounted(() => {
       <template #footer>
         <div class="flex w-full justify-end gap-2">
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="template-replace-confirm-cancel"
             @click="declineReplace"
           >
             {{ t("dashboard.templates.replaceCancel") }}
           </OButton>
-          <OButton
-            variant="destructive"
-            size="sm-action"
-            data-test="template-replace-confirm-ok"
-            @click="confirmReplace"
-          >
+          <OButton variant="danger" data-test="template-replace-confirm-ok" @click="confirmReplace">
             {{ t("dashboard.templates.replaceConfirm") }}
           </OButton>
         </div>

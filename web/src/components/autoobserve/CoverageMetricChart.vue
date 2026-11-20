@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTooltip>
       <OButton
         variant="ghost"
-        size="xs"
+        size="sm"
         class="ms-auto"
         :aria-expanded="expanded"
         :aria-label="t('autoobserve.coverage.detailsFor', { metric: title })"
@@ -60,11 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`autoobserve-coverage-chart-value-${def.signal}`"
         >{{ valueText }}</span
       >
-      <OSkeleton
-        v-else-if="status === 'loading'"
-        class="h-6.25 w-16 self-center"
-        animation="pulse"
-      />
+      <OSkeleton v-else-if="status === 'loading'" shape="block" class="h-6.25 w-16 self-center" />
       <span
         v-if="delta"
         class="inline-flex items-center gap-0.5 text-xs font-medium tabular-nums"
@@ -88,8 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OSkeleton
       v-if="status === 'loading'"
+      shape="block"
       class="h-30"
-      animation="pulse"
       role="status"
       :aria-label="t('autoobserveLive.charts.loading', { metric: title })"
       :data-test="`autoobserve-coverage-chart-loading-${def.signal}`"
@@ -110,8 +106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }}</span>
       <OButton
         v-if="status === 'failed'"
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         :data-test="`autoobserve-coverage-chart-retry-${def.signal}`"
         @click="emit('retry')"
         >{{ t("autoobserveLive.retry") }}</OButton

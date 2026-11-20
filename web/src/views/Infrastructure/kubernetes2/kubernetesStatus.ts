@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
 import {
   lensPodStatus,
   membersOf,
@@ -36,6 +35,8 @@ export type WorkloadStatus =
   | "scheduled"
   | "suspended";
 
+export type StatusVariant = "default" | "success" | "warning" | "danger";
+
 export type StatusKind =
   "pod" | "deployment" | "daemonset" | "statefulset" | "replicaset" | "job" | "cronjob";
 
@@ -51,10 +52,10 @@ export interface ObjectStatus {
 
 export interface StatusCount extends ObjectStatus {
   count: number;
-  variant: ProgressBarVariant;
+  variant: StatusVariant;
 }
 
-export const STATUS_VARIANT: Record<WorkloadStatus, ProgressBarVariant> = {
+export const STATUS_VARIANT: Record<WorkloadStatus, StatusVariant> = {
   running: "success",
   scheduled: "success",
   succeeded: "success",

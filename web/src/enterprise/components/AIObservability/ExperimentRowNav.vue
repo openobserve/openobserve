@@ -9,9 +9,10 @@
 <template>
   <div class="flex items-center justify-center gap-3" :data-test="dataTest">
     <OButton
-      size="icon"
-      variant="outline"
-      icon-left="chevron-left"
+      icon-only
+      size="xs"
+      variant="secondary"
+      icon="chevron-left"
       :disabled="!hasPrevious"
       :aria-label="t('aiObservability.experiments.rowDetail.previousRow')"
       :data-test="`${dataTest}-previous`"
@@ -21,9 +22,10 @@
       {{ t("aiObservability.experiments.rowDetail.rowPosition", { index, total }) }}
     </span>
     <OButton
-      size="icon"
-      variant="outline"
-      icon-left="chevron-right"
+      icon-only
+      size="xs"
+      variant="secondary"
+      icon="chevron-right"
       :disabled="!hasNext"
       :aria-label="t('aiObservability.experiments.rowDetail.nextRow')"
       :data-test="`${dataTest}-next`"

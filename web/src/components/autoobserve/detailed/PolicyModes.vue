@@ -30,15 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-secondary text-xs leading-relaxed">{{ t(action.detail) }}</span>
         </div>
         <OToggleGroup
+          size="sm"
           model-value="suggest"
           :aria-label="t(action.title)"
           :aria-describedby="reasonId"
           disabled
         >
-          <OToggleGroupItem value="suggest" size="xs">
+          <OToggleGroupItem value="suggest">
             {{ t("autoobserve.policyLive.modes.suggest") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="auto" size="xs">
+          <OToggleGroupItem value="auto">
             {{ t("autoobserve.policyLive.modes.auto") }}
           </OToggleGroupItem>
         </OToggleGroup>

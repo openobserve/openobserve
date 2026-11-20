@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :display-source="serviceDisplay?.display_source"
       :candidates="serviceDisplay?.display_candidates"
       :qualifier="serviceDisplay?.display_qualifier"
-      primary-class="text-dialog-header-text text-base font-semibold"
+      primary-class="text-dialog-header-text text-title font-semibold"
       secondary-class="text-dialog-content-text mt-0.5 text-xs opacity-70"
     >
       <template #primary="{ label }">{{

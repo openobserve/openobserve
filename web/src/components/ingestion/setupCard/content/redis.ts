@@ -91,7 +91,7 @@ export default function redisCard(subs: CardSubstitutions, t: TranslateFn): Rich
             labelKey: "ingestion.setupCard.portLabel",
             default: "6379",
             placeholder: raw("6379"),
-            width: "sm",
+            width: "s",
           },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),

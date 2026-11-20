@@ -20,7 +20,7 @@
 import { ref } from "vue";
 import { useStore } from "vuex";
 import { gt, type I18nText } from "@/types/i18n";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 
 export interface GalleryDashboard {
   name: string;
@@ -51,7 +51,7 @@ export const CATEGORY_ORDER = [
 // Category keys resolve to translated labels at the call site; badge variants are token-backed.
 export function getCategoryInfo(dashboard: { name: string }): {
   icon: string;
-  variant: BadgeVariant;
+  variant: ChipTone;
   category: string;
 } {
   const n = dashboard.name.toLowerCase();
@@ -64,13 +64,12 @@ export function getCategoryInfo(dashboard: { name: string }): {
     n.includes("elb") ||
     n.includes("lambda")
   )
-    return { icon: "cloud", variant: "orange-soft", category: "aws" };
-  if (n.includes("cloudwatch"))
-    return { icon: "cloud", variant: "orange-soft", category: "cloudwatch" };
+    return { icon: "cloud", variant: "warn", category: "aws" };
+  if (n.includes("cloudwatch")) return { icon: "cloud", variant: "warn", category: "cloudwatch" };
   if (n.includes("gcp") || n.includes("google") || n.includes("bigquery") || n.includes("pubsub"))
-    return { icon: "cloud", variant: "blue-soft", category: "googleCloud" };
+    return { icon: "cloud", variant: "neutral", category: "googleCloud" };
   if (n.includes("azure") || n.includes("microsoft"))
-    return { icon: "cloud", variant: "cyan-soft", category: "azure" };
+    return { icon: "cloud", variant: "neutral", category: "azure" };
   if (
     n.includes("kubernetes") ||
     n.includes("k8s") ||
@@ -80,7 +79,7 @@ export function getCategoryInfo(dashboard: { name: string }): {
     n.includes("container") ||
     n.includes("docker")
   )
-    return { icon: "hub", variant: "indigo-soft", category: "kubernetes" };
+    return { icon: "hub", variant: "neutral", category: "kubernetes" };
   if (
     n.includes("postgres") ||
     n.includes("mysql") ||
@@ -91,7 +90,7 @@ export function getCategoryInfo(dashboard: { name: string }): {
     n.includes("database") ||
     n.includes("db")
   )
-    return { icon: "database", variant: "purple-soft", category: "database" };
+    return { icon: "database", variant: "neutral", category: "database" };
   if (
     n.includes("nginx") ||
     n.includes("apache") ||
@@ -100,7 +99,7 @@ export function getCategoryInfo(dashboard: { name: string }): {
     n.includes("envoy") ||
     n.includes("traefik")
   )
-    return { icon: "dns", variant: "teal-soft", category: "networking" };
+    return { icon: "dns", variant: "neutral", category: "networking" };
   if (
     n.includes("security") ||
     n.includes("audit") ||
@@ -108,7 +107,7 @@ export function getCategoryInfo(dashboard: { name: string }): {
     n.includes("waf") ||
     n.includes("firewall")
   )
-    return { icon: "shield", variant: "error-soft", category: "security" };
+    return { icon: "shield", variant: "err", category: "security" };
   if (
     n.includes("monitor") ||
     n.includes("alert") ||
@@ -117,10 +116,10 @@ export function getCategoryInfo(dashboard: { name: string }): {
     n.includes("opentelemetry") ||
     n.includes("otel")
   )
-    return { icon: "monitor-heart", variant: "success-soft", category: "observability" };
+    return { icon: "monitor-heart", variant: "ok", category: "observability" };
   if (n.includes("storage") || n.includes("disk") || n.includes("blob"))
-    return { icon: "storage", variant: "amber-soft", category: "storage" };
-  return { icon: "dashboard", variant: "primary-soft", category: "dashboard" };
+    return { icon: "storage", variant: "warn", category: "storage" };
+  return { icon: "dashboard", variant: "accent", category: "dashboard" };
 }
 
 function parseS3Folders(xmlText: string): string[] {

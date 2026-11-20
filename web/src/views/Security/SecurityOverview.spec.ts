@@ -62,6 +62,7 @@ vi.mock("@/composables/security/useSecuritySources", async () => {
         sources,
         rows: sources,
         loading: ref(false),
+        error: ref(""),
         load: vi.fn(),
         refetch: vi.fn(async () => {}),
       };
@@ -189,13 +190,30 @@ describe("SecurityOverview", () => {
     );
   });
 
-  it("re-queries a wider window when the range switches to 7 days", async () => {
+  it("re-queries a wider window when the range switches to 7 days, and a custom range keeps its own span", async () => {
     const w = await mountView();
     vi.mocked(alertsService.getHistorySummary).mockClear();
-    await w.find('[data-test="security-overview-range-7d"]').trigger("click");
+    w.findComponent({ name: "SecurityTimeRange" }).vm.$emit("change", {
+      startTime: 0,
+      endTime: 1,
+      relativeTimePeriod: "7d",
+      userChangedValue: true,
+    });
     await flushPromises();
     expect(router.currentRoute.value.query.period).toBe("7d");
     const [, query] = vi.mocked(alertsService.getHistorySummary).mock.calls[0];
     expect(query.end_time - query.start_time).toBe(7 * 24 * 3_600_000 * 1000);
+
+    vi.mocked(alertsService.getHistorySummary).mockClear();
+    w.findComponent({ name: "SecurityTimeRange" }).vm.$emit("change", {
+      startTime: 1_700_000_000_000_000,
+      endTime: 1_700_000_000_000_000 + 2 * 3_600_000_000,
+      relativeTimePeriod: null,
+      userChangedValue: true,
+    });
+    await flushPromises();
+    const [, custom] = vi.mocked(alertsService.getHistorySummary).mock.calls[0];
+    expect(custom.end_time - custom.start_time).toBe(2 * 3_600_000 * 1000);
+    expect(router.currentRoute.value.query.from).toBeDefined();
   });
 });

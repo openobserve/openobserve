@@ -61,8 +61,9 @@ const canShare = (chat: (typeof props.chats)[number]) =>
           </div>
           <OButton
             v-if="canShare(chat)"
+            icon-only
             variant="ghost"
-            size="icon-xs-circle"
+            size="xs"
             class="opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 group-data-[highlighted]:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
             :data-test="`o2-ai-chat-history-menu-share-${chat.id}`"
             :aria-label="t('aiChatShare.share')"
@@ -72,8 +73,9 @@ const canShare = (chat: (typeof props.chats)[number]) =>
             <OTooltip :content="t('aiChatShare.share')" />
           </OButton>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-circle"
+            size="xs"
             class="delete-history-btn opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 group-data-[highlighted]:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
             :aria-label="t('aiAssistant.deleteChatTooltip')"
             @click.stop="emit('delete', chat.id)"
@@ -91,11 +93,11 @@ const canShare = (chat: (typeof props.chats)[number]) =>
     <div v-if="chats.length > 0" class="clear-all-container bg-surface-base shrink-0">
       <ODropdownSeparator />
       <OButton
-        variant="ghost-destructive"
+        variant="danger-ghost"
         class="clear-all-btn text-compact w-full justify-start px-3 py-1.5"
         @click.stop="emit('clear-all')"
       >
-        <template #icon-left>
+        <template #icon>
           <OIcon name="delete-sweep" size="sm" />
         </template>
         {{ t("aiAssistant.clearAllConversations") }}

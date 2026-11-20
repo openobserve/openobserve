@@ -70,10 +70,10 @@ import LibraryDrawer from "./LibraryDrawer.vue";
 
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "title", "subTitle", "size"],
+  props: ["open", "title", "subtitle", "size"],
   emits: ["update:open"],
   template:
-    '<div data-test="o-drawer" :data-title="title" :data-subtitle="subTitle"><slot /><slot name="footer" /></div>',
+    '<div data-test="o-drawer" :data-title="title" :data-subtitle="subtitle"><slot /><slot name="footer" /></div>',
 };
 
 const stubs = {

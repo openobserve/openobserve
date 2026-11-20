@@ -1,13 +1,6 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-//
-// OAvatar — a person as a circle of initials. There is no image source: the
-// product stores none, and a silhouette placeholder says less than two letters.
-//
-// The tone is DERIVED from the identity, not passed in, so the same person is
-// the same colour on every screen without anybody threading a colour through.
-// The ramp is the soft badge palette, which is already tuned for both themes —
-// a saturated fill with white text would need a light-only text colour.
+// The tone is derived from the identity, so the same person is the same colour on every screen.
 
 import { computed } from "vue";
 
@@ -31,9 +24,9 @@ const TONES = [
 ];
 
 const SIZES: Record<NonNullable<AvatarProps["size"]>, string> = {
-  sm: "h-5 w-5 text-3xs",
-  md: "h-6 w-6 text-2xs",
-  lg: "h-8 w-8 text-xs",
+  sm: "size-5 text-2xs",
+  md: "size-6 text-2xs",
+  lg: "size-8 text-xs",
 };
 
 const identity = computed(() => String(props.value ?? "").trim());

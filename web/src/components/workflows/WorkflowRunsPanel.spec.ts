@@ -90,7 +90,7 @@ const stub = (name: string, props: string[] = []) => ({
 // the panel's FIRST fetch rides on that emit (NOT an immediate watch, which would
 // double-fetch). Mirror it so the mount-fetch fires in tests.
 const DateTimeStub = {
-  name: "DateTime",
+  name: "ODateTimeRange",
   emits: ["on:date-change"],
   template: `<div class="DateTime" />`,
   mounted() {
@@ -113,18 +113,18 @@ const globalCfg = {
   stubs: {
     OTable: OTableStub,
     OTimeCell: stub("OTimeCell", ["value", "unit", "mode", "timezone", "emptyLabel", "format"]),
-    OBadge: stub("OBadge", ["variant", "size"]),
+    OBadge: stub("OBadge", ["tone", "size"]),
     OTag: {
       name: "OTag",
-      props: ["type", "value", "size", "label", "variant", "icon"],
+      props: ["type", "value", "size", "label", "tone", "icon"],
       template: `<b class="o-tag">{{ label || value }}</b>`,
     },
     OButton: stub("OButton", ["variant", "size", "iconLeft", "loading"]),
     OTooltip: stub("OTooltip", ["side", "content"]),
-    DateTime: DateTimeStub,
+    ODateTimeRange: DateTimeStub,
     WorkflowRunsTimeline: stub("WorkflowRunsTimeline", ["runs", "start", "end", "timezone"]),
     NoData: stub("NoData"),
-    OEmptyState: stub("OEmptyState", ["preset", "filtered"]),
+    OEmptyState: stub("OEmptyState", ["kind"]),
   },
 };
 
@@ -251,7 +251,7 @@ describe("WorkflowRunsPanel", () => {
       const w = mountPanel();
       await flushPromises();
       expect(emptyState(w).exists()).toBe(true);
-      expect(emptyState(w).props("preset")).toBe("load-error");
+      expect(emptyState(w).props("kind")).toBe("error");
       expect(w.findComponent({ name: "NoData" }).exists()).toBe(false);
     });
 
@@ -394,7 +394,7 @@ describe("run error text names nodes readably", () => {
               </div>
             </div>`,
           },
-          OBadge: { name: "OBadge", props: ["variant", "size"], template: `<b><slot /></b>` },
+          OBadge: { name: "OBadge", props: ["tone", "size"], template: `<b><slot /></b>` },
         },
       },
     });
@@ -572,7 +572,7 @@ describe("WorkflowRunsPanel — test-run visibility defaults by draft state", ()
   // which carries the withheld count — would never render to assert on.
   const LabelledButtonStub = {
     name: "OButton",
-    props: ["variant", "size", "iconLeft", "loading"],
+    props: ["variant", "size", "icon", "loading"],
     template: `<button><slot /></button>`,
   };
 
@@ -830,7 +830,7 @@ describe("WorkflowRunsPanel — a failure still explains itself", () => {
               </div>
             </div>`,
           },
-          OBadge: { name: "OBadge", props: ["variant", "size"], template: `<b><slot /></b>` },
+          OBadge: { name: "OBadge", props: ["tone", "size"], template: `<b><slot /></b>` },
         },
       },
     });
@@ -934,7 +934,7 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
   };
   const EmptyStub = {
     name: "OEmptyState",
-    props: ["preset", "title", "description", "actionLabel", "icon", "size", "filtered"],
+    props: ["kind", "title", "text", "actionLabel", "icon", "size"],
     emits: ["action"],
     template: `<div class="o-empty" v-bind="$attrs">{{ title }}</div>`,
   };
@@ -1289,7 +1289,7 @@ describe("WorkflowRunsPanel — stored statuses and HTTP request runs", () => {
     const empty = w.findComponent(EmptyStub as any);
     expect(empty.attributes("data-test")).toBe("workflow-runs-filter-empty");
     expect(empty.props("title")).toBe("No alert-fired runs in this time range");
-    expect(empty.props("description")).toBe("The other runs are still on the timeline, dimmed.");
+    expect(empty.props("text")).toBe("The other runs are still on the timeline, dimmed.");
     expect(empty.props("actionLabel")).toBe("Show all triggers");
   });
 });

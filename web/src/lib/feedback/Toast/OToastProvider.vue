@@ -15,27 +15,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, shallowRef, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { ToastProvider, ToastViewport } from "reka-ui";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useToast, toastRecords } from "./useToast";
 import { copyConfirm, dismissCopyConfirm, trackActivations } from "./copyConfirm";
-import { viewportPositionClasses } from "./OToastProvider.types";
-import type { ToastPosition } from "./OToast.types";
+import { TOAST_AVOID_ATTR, TOAST_AVOID_BAND_REM } from "./OToastProvider.types";
 import OToast from "./OToast.vue";
 
 const { toasts } = useToast();
 
-// Always render these two positions. Each needs its own ToastProvider so that
-// Reka UI's single-viewport-per-provider constraint is satisfied — if all toasts
-// shared one provider with two viewports the last-mounted viewport would win and
-// all toasts would appear there regardless of their intended position.
-const positions: ToastPosition[] = ["bottom-center"];
-
-function toastsForPosition(pos: ToastPosition) {
-  return toasts.filter((t) => t.position === pos);
+// Bars docked at the viewport's bottom edge (table footer, selection bar, sticky Save) lift the toasts above them (D6).
+const coveredBottom = ref(0);
+function measureCoveredBottom(): void {
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const edge = window.innerHeight - TOAST_AVOID_BAND_REM * rem;
+  let covered = 0;
+  for (const bar of document.querySelectorAll<HTMLElement>(`[${TOAST_AVOID_ATTR}]`)) {
+    const box = bar.getBoundingClientRect();
+    if (box.width === 0 || box.height === 0 || box.bottom < edge) continue;
+    covered = Math.max(covered, window.innerHeight - box.top);
+  }
+  coveredBottom.value = Math.max(0, Math.round(covered));
 }
+// A measured length, so it travels as a runtime style value rather than a class.
+const viewportStyle = computed(() => ({
+  bottom: `calc(1rem + ${coveredBottom.value}px)`,
+}));
+watch(
+  () => toasts.length,
+  (count) => {
+    if (count > 0) measureCoveredBottom();
+  },
+  { flush: "post" },
+);
+const onResize = () => {
+  if (toasts.length > 0) measureCoveredBottom();
+};
 
 // The tooltip adopts a new anchor only after rendering, so opening in that render places the bubble top-left.
 const placedAnchor = shallowRef<HTMLElement | null>(null);
@@ -65,10 +82,14 @@ const bubbleOpen = computed(
 );
 
 let stopTracking: (() => void) | null = null;
-onMounted(() => (stopTracking = trackActivations()));
+onMounted(() => {
+  stopTracking = trackActivations();
+  window.addEventListener("resize", onResize);
+});
 // The bubble lives here, so its timers and scroll fallback must not outlive the provider.
 onBeforeUnmount(() => {
   stopTracking?.();
+  window.removeEventListener("resize", onResize);
   dismissCopyConfirm();
   cancelAnimationFrame(placeFrame);
 });
@@ -86,14 +107,24 @@ function handleOpenChange(id: string, open: boolean): void {
 </script>
 
 <template>
-  <ToastProvider v-for="pos in positions" :key="pos" swipe-direction="right" :duration="0">
+  <ToastProvider swipe-direction="down" :duration="0">
     <OToast
-      v-for="t in toastsForPosition(pos)"
+      v-for="t in toasts"
       :key="t.id"
-      v-bind="t"
+      :id="t.id"
+      :open="t.open"
+      :variant="t.variant"
+      :message="t.message"
+      :timeout="t.timeout"
+      :action="t.action"
+      :count="t.count"
       @open-change="(open) => handleOpenChange(t.id, open)"
     />
-    <ToastViewport :class="viewportPositionClasses[pos]" />
+    <ToastViewport
+      class="fixed left-1/2 z-10001 flex -translate-x-1/2 flex-col-reverse items-center gap-2"
+      :style="viewportStyle"
+      data-test="o-toast-viewport"
+    />
   </ToastProvider>
   <OTooltip
     :anchor="copyConfirm.anchor"

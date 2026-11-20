@@ -21,10 +21,54 @@ describe("OInput", () => {
     expect(wrapper.find("input").attributes("type")).toBe("text");
   });
 
-  it("renders a textarea when type is textarea", () => {
-    wrapper = mount(OInput, { props: { type: "textarea" } });
-    expect(wrapper.find("textarea").exists()).toBe(true);
-    expect(wrapper.find("input").exists()).toBe(false);
+  it.each([
+    ["xs", "h-control-xs"],
+    ["sm", "h-control-sm"],
+    ["md", "h-control-md"],
+    ["lg", "h-control-lg"],
+  ] as const)("takes its height from the %s control token", (size, expected) => {
+    wrapper = mount(OInput, { props: { size } });
+    expect(wrapper.find(".rounded-default").classes()).toContain(expected);
+  });
+
+  it("defaults to the 32 px md height and 13 px text", () => {
+    wrapper = mount(OInput);
+    const box = wrapper.find(".rounded-default");
+    expect(box.classes()).toContain("h-control-md");
+    expect(box.classes()).toContain("text-compact");
+  });
+
+  it.each([
+    ["s", "w-field-width-s"],
+    ["m", "w-field-width-m"],
+    ["l", "w-field-width-l"],
+    ["full", "w-full"],
+  ] as const)("sizes width %s by the expected value", (width, expected) => {
+    wrapper = mount(OInput, { props: { width } });
+    expect(wrapper.classes()).toContain(expected);
+  });
+
+  it("renders a leading icon from the icon prop", () => {
+    wrapper = mount(OInput, { props: { icon: "search" } });
+    expect(wrapper.findComponent({ name: "OIcon" }).props("name")).toBe("search");
+  });
+
+  it("sets the value in mono for IDs and patterns", () => {
+    wrapper = mount(OInput, { props: { mono: true } });
+    expect(wrapper.find("input").classes()).toContain("font-mono");
+  });
+
+  it("adds a copy button for a read-only value when copyable", () => {
+    wrapper = mount(OInput, {
+      props: { modelValue: "https://hooks.example", readonly: true, copyable: true },
+      attrs: { "data-test": "hook" },
+    });
+    expect(wrapper.find('[data-test="hook-copy"]').exists()).toBe(true);
+  });
+
+  it("shows the unit as a suffix inside the box", () => {
+    wrapper = mount(OInput, { props: { type: "number", suffix: "ms" } });
+    expect(wrapper.find(".rounded-default").text()).toContain("ms");
   });
 
   it("renders label when prop is provided", () => {
@@ -58,24 +102,22 @@ describe("OInput", () => {
     expect(target.text()).toContain("Required field");
   });
 
-  it.each(["text", "textarea"] as const)(
-    "preserves caller descriptions and the built-in error for %s",
-    (type) => {
-      wrapper = mount(OInput, {
-        props: { type, id: "level", error: true, errorMessage: "Required field" },
-        attrs: { "aria-describedby": "level-help level-error level-help" },
-        slots: { append: '<span id="level-help">Choose a level</span>' },
-      });
-      const input = wrapper.find(type === "textarea" ? "textarea" : "input");
-      const ids = input.attributes("aria-describedby").split(" ");
-      expect(ids).toEqual(["level-help", "level-error"]);
-      expect(ids.map((id) => wrapper.find(`#${id}`).text())).toEqual([
-        "Choose a level",
-        "Required field",
-      ]);
-      expect(wrapper.findAll("#level-error")).toHaveLength(1);
-    },
-  );
+  it("preserves caller descriptions and the built-in error", () => {
+    const host = mount({
+      components: { OInput },
+      template: `<div><span id="level-help">Choose a level</span><OInput id="level" :error="true"
+        error-message="Required field" aria-describedby="level-help level-error level-help" /></div>`,
+    });
+    const input = host.find("input");
+    const ids = input.attributes("aria-describedby")!.split(" ");
+    expect(ids).toEqual(["level-help", "level-error"]);
+    expect(ids.map((id) => host.find(`#${id}`).text())).toEqual([
+      "Choose a level",
+      "Required field",
+    ]);
+    expect(host.findAll("#level-error")).toHaveLength(1);
+    host.unmount();
+  });
 
   it("sets no aria-describedby when there is no error to describe", () => {
     wrapper = mount(OInput, { props: { errorMessage: "Required field" } });
@@ -88,17 +130,6 @@ describe("OInput", () => {
     wrapper = mount(OInput, { props: { error: true } });
     expect(wrapper.find("input").attributes("aria-describedby")).toBeUndefined();
     expect(wrapper.find("input").attributes("aria-invalid")).toBe("true");
-  });
-
-  it("describes the textarea variant too", () => {
-    wrapper = mount(OInput, {
-      props: { type: "textarea", error: true, errorMessage: "Too long" },
-    });
-    const ta = wrapper.find("textarea");
-    expect(ta.attributes("aria-invalid")).toBe("true");
-    const describedBy = ta.attributes("aria-describedby");
-    expect(describedBy).toBeTruthy();
-    expect(wrapper.find(`#${describedBy}`).text()).toContain("Too long");
   });
 
   it("shows helpText when provided", () => {
@@ -183,18 +214,18 @@ describe("OInput", () => {
 describe("OInput — password reveal", () => {
   const mountPassword = (props: Record<string, unknown> = {}) =>
     mount(OInput, {
-      props: { type: "password", modelValue: "hunter2", revealable: true, ...props },
+      props: { type: "password", modelValue: "hunter2", ...props },
       attrs: { "data-test": "secret" },
     });
 
-  it("offers no toggle unless asked for", () => {
+  it("always offers the toggle on a password field", () => {
     const wrapper = mount(OInput, { props: { type: "password", modelValue: "x" } });
-    expect(wrapper.find("[aria-pressed]").exists()).toBe(false);
+    expect(wrapper.find("[aria-pressed]").exists()).toBe(true);
   });
 
   it("offers no toggle on a field that is not masked to begin with", () => {
     const wrapper = mount(OInput, {
-      props: { type: "text", modelValue: "x", revealable: true },
+      props: { type: "text", modelValue: "x" },
     });
     expect(wrapper.find("[aria-pressed]").exists()).toBe(false);
   });
@@ -222,15 +253,13 @@ describe("OInput — password reveal", () => {
   });
 
   // A type change must never leave a value on screen that the new type masks.
-  it("re-masks when the field stops being a revealable password", async () => {
+  it("re-masks when the field stops being a password and becomes one again", async () => {
     const wrapper = mountPassword();
     await wrapper.get('[data-test="secret-reveal"]').trigger("click");
     expect(wrapper.get('[data-test="secret-field"]').attributes("type")).toBe("text");
 
-    await wrapper.setProps({ revealable: false });
-    expect(wrapper.get('[data-test="secret-field"]').attributes("type")).toBe("password");
-
-    await wrapper.setProps({ revealable: true });
+    await wrapper.setProps({ type: "text" });
+    await wrapper.setProps({ type: "password" });
     expect(wrapper.get('[data-test="secret-field"]').attributes("type")).toBe("password");
   });
 

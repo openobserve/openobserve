@@ -20,7 +20,7 @@ export class SearchJobInspectorPage {
 
     // ===== SEARCH BAR SELECTORS (SearchBar.vue) =====
     this.utilitiesMenuBtn = '[data-test="logs-search-bar-utilities-menu-btn"]';
-    this.moreOptionsMenuBtn = '[data-test="logs-search-bar-more-options-btn"]';
+    this.moreOptionsMenuBtn = '[data-test="logs-search-bar-utilities-menu-btn"]';
     this.searchHistoryItemBtn = '[data-test="search-history-item-btn"]';
     this.searchInspectBtn = '[data-test="search-inspect-btn"]';
     this.refreshBtn = '[data-test="logs-search-bar-refresh-btn"]';
@@ -295,7 +295,7 @@ export class SearchJobInspectorPage {
     const tiles = [
       { label: 'Results', key: 'results' },
       { label: 'Events', key: 'events' },
-      { label: 'Time Taken', key: 'timeTaken' },
+      { label: 'Time taken', key: 'timeTaken' },
       { label: 'Trace ID', key: 'traceId' }
     ];
 

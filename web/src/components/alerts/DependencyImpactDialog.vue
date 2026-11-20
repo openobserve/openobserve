@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="open"
     :size="isTemplateFocus ? 'lg' : 'sm'"
-    :max-height="86"
     @update:open="(v) => emit('update:open', v)"
   >
     <template #header>
@@ -39,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="depKindColor(focusNode ?? { kind: focus.kind, orphan: false, missing: false })"
         />
         <div class="min-w-0">
-          <OTruncatedText as="div" class="text-text-heading text-base font-semibold">
+          <OTruncatedText as="div" class="text-text-heading text-title font-semibold">
             {{ entityName }}
           </OTruncatedText>
           <OTruncatedText
@@ -54,31 +53,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="flex flex-col" data-test="dependency-impact-body">
-      <div
-        v-if="loading"
-        class="text-text-secondary flex h-72 items-center justify-center gap-2 text-sm"
-        data-test="dependency-impact-loading"
-      >
-        <OSpinner size="sm" />
-        {{ t("alert_dependencies.loading") }}
-      </div>
+      <OSkeleton v-if="loading" shape="block" class="h-72" data-test="dependency-impact-loading" />
 
-      <OBanner
+      <OEmptyState
         v-else-if="error"
-        variant="error"
-        icon="error"
-        :content="t('alert_dependencies.failedToLoad', { error })"
+        kind="error"
         data-test="dependency-impact-error"
+        @action="loadGraph(org())"
       />
 
-      <template v-else-if="noConsumers">
-        <div
-          class="text-text-muted flex h-72 items-center justify-center px-2 text-center text-xs"
-          data-test="dependency-impact-no-consumers"
-        >
-          {{ t("alert_dependencies.noConsumers") }}
-        </div>
-      </template>
+      <OEmptyState
+        v-else-if="noConsumers"
+        icon="account-tree"
+        :title="t('alert_dependencies.noConsumers')"
+        data-test="dependency-impact-no-consumers"
+      />
 
       <template v-else>
         <OSearchInput
@@ -109,14 +98,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="border-border-default bg-surface-panel rounded-surface h-72 space-y-1 overflow-y-auto border p-1.5"
               >
-                <div
+                <OEmptyState
                   v-if="!filteredDestinations.length"
-                  class="text-text-muted flex h-full items-center justify-center px-2 text-center text-xs"
-                >
-                  {{
-                    search ? t("alert_dependencies.noMatches") : t("alert_dependencies.laneEmpty")
-                  }}
-                </div>
+                  size="compact"
+                  :kind="search ? 'filtered' : 'first-run'"
+                  :title="
+                    search ? t('alert_dependencies.noMatches') : t('alert_dependencies.laneEmpty')
+                  "
+                  class="px-2"
+                />
                 <div
                   v-for="d in filteredDestinations"
                   :key="d.id"
@@ -168,12 +158,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="border-border-default bg-surface-panel rounded-surface overflow-y-auto border p-1.5"
               :class="isTemplateFocus ? 'h-72' : 'max-h-72 min-h-16'"
             >
-              <div
+              <OEmptyState
                 v-if="alertsEmpty"
-                class="text-text-muted flex h-full items-center justify-center px-2 text-center text-xs"
-              >
-                {{ search ? t("alert_dependencies.noMatches") : t("alert_dependencies.laneEmpty") }}
-              </div>
+                size="compact"
+                :kind="search ? 'filtered' : 'first-run'"
+                :title="
+                  search ? t('alert_dependencies.noMatches') : t('alert_dependencies.laneEmpty')
+                "
+                class="px-2"
+              />
 
               <!-- Destination focus: one destination, so a flat list — no boxes,
                    no highlighting (every alert obviously belongs to it). -->
@@ -285,8 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #footer>
       <div class="flex w-full items-center">
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           class="ms-auto"
           data-test="dependency-impact-close"
           @click="emit('update:open', false)"
@@ -302,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('alert_dependencies.deleteTitle', { name: confirm.node?.name || '' })"
     :message-keypath="deleteMessageKey"
     :message-name="confirm.node?.name"
-    ok-variant="destructive"
+    kind="destructive"
     @update:ok="performDelete"
     @update:cancel="cancelDelete"
   />
@@ -322,8 +314,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import DependencyEntityRow from "./DependencyEntityRow.vue";

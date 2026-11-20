@@ -83,9 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-profile-card
       >
         <OButton
-          variant="outline"
-          size="xs"
-          icon-left="swap-horiz"
+          variant="secondary"
+          size="sm"
+          icon="swap-horiz"
           :aria-label="t('search.queryProfile.showFolded', { op: e.chipTitle })"
           :data-test="`query-profile-chip-${e.key}`"
           @click.stop="showFolded(e)"
@@ -102,9 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-heading font-semibold">{{ s.title }}</span>
         <span>{{ s.meta }}</span>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="unfold-less"
+          icon="unfold-less"
           :aria-label="t('search.queryProfile.collapseStage', { index: s.index })"
           :data-test="`query-profile-collapse-stage-${s.stageId}`"
           @click.stop="collapseStage(s.stageId)"
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-text-body min-w-0">{{ notice.text }}</span>
       <OButton
         variant="ghost"
-        size="xs"
+        size="sm"
         data-test="query-profile-fold-notice-action"
         @click="onNotice"
         >{{ notice.action }}</OButton
@@ -155,9 +155,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-canvas-overlay
     >
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="zoom-in"
+        icon="zoom-in"
         :aria-label="t('search.queryProfile.zoomIn')"
         data-test="query-profile-zoom-in"
         @click="zoomBy(ZOOM_STEP)"
@@ -165,9 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip side="left" :content="t('search.queryProfile.zoomIn')" />
       </OButton>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="zoom-out"
+        icon="zoom-out"
         :aria-label="t('search.queryProfile.zoomOut')"
         data-test="query-profile-zoom-out"
         @click="zoomBy(1 / ZOOM_STEP)"
@@ -175,9 +175,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip side="left" :content="t('search.queryProfile.zoomOut')" />
       </OButton>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="fit-screen"
+        icon="fit-screen"
         :aria-label="t('search.queryProfile.fitView')"
         data-test="query-profile-zoom-fit"
         @click="fit"
@@ -186,9 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <div class="border-border-default mx-1 border-t" />
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="compress"
+        icon="compress"
         :aria-label="t('search.queryProfile.foldPlumbing')"
         :aria-pressed="plumbing"
         :class="plumbing ? 'text-accent' : ''"
@@ -198,9 +198,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip side="left" :content="t('search.queryProfile.foldPlumbing')" />
       </OButton>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="unfold-more"
+        icon="unfold-more"
         :aria-label="t('search.queryProfile.expandAll')"
         data-test="query-profile-expand-all"
         @click="emitFold({ type: 'expandAll' })"

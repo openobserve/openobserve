@@ -24,13 +24,11 @@ import { statusOfError } from "./chatShare";
 import { useIsOrgAdmin, useShareActions } from "./useChatShareDialog";
 import AiChatShareRow from "./AiChatShareRow.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const open = defineModel<boolean>("open", { required: true });
 
@@ -70,22 +68,17 @@ const { pendingShareId, refreshSnapshot, switchMode, toggleRedaction, revoke, co
 <template>
   <ODrawer
     v-model:open="open"
-    size="md"
+    size="sm"
     :title="showAll ? t('aiChatShare.allShares') : t('aiChatShare.sharedByMe')"
     data-test="ai-chat-shared-by-me"
   >
     <template #header-right>
-      <OButton
-        variant="ghost"
-        size="icon-sm"
+      <ORefreshButton
+        :last-run-at="sharesQuery.dataUpdatedAt.value || null"
         :loading="fetching"
         data-test="ai-chat-shared-by-me-refresh"
-        :aria-label="t('common.refresh')"
         @click="refreshShares"
-      >
-        <OIcon name="refresh" size="sm" />
-        <OTooltip :content="t('common.refresh')" />
-      </OButton>
+      />
     </template>
     <div class="flex flex-col">
       <OToggleGroup
@@ -96,35 +89,32 @@ const { pendingShareId, refreshSnapshot, switchMode, toggleRedaction, revoke, co
         data-test="ai-chat-shared-by-me-scope"
         @update:model-value="setScope"
       >
-        <OToggleGroupItem value="mine" size="sm" data-test="ai-chat-shared-by-me-scope-mine">
+        <OToggleGroupItem value="mine" data-test="ai-chat-shared-by-me-scope-mine">
           {{ t("aiChatShare.scopeMine") }}
         </OToggleGroupItem>
-        <OToggleGroupItem value="all" size="sm" data-test="ai-chat-shared-by-me-scope-all">
+        <OToggleGroupItem value="all" data-test="ai-chat-shared-by-me-scope-all">
           {{ t("aiChatShare.scopeAll") }}
         </OToggleGroupItem>
       </OToggleGroup>
-      <div v-if="loading" class="flex justify-center py-6">
-        <OSpinner size="sm" />
-      </div>
+      <OSkeleton v-if="loading" preset="tableRows" :rows="4" />
       <OEmptyState
         v-else-if="forbidden"
-        size="inline"
-        icon="lock"
+        size="compact"
+        kind="denied"
         :title="t('aiChatShare.allSharesForbidden')"
         data-test="ai-chat-shared-by-me-forbidden"
       />
       <OEmptyState
         v-else-if="failed"
-        size="inline"
-        icon="error"
+        size="compact"
+        kind="error"
         :title="t('aiChatShare.loadFailed')"
-        :action-label="t('common.retry')"
         data-test="ai-chat-shared-by-me-error"
         @action="refreshShares"
       />
       <OEmptyState
         v-else-if="shares.length === 0"
-        size="inline"
+        size="compact"
         icon="share"
         :title="showAll ? t('aiChatShare.allSharesEmpty') : t('aiChatShare.sharedByMeEmpty')"
         data-test="ai-chat-shared-by-me-empty"

@@ -146,7 +146,7 @@ describe("HomeNoDataState", () => {
     });
   });
 
-  it("marks the Profiles chip unavailable with a gold lock when continuous profiling is license-locked", async () => {
+  it("disables the Profiles link with the lock reason when continuous profiling is license-locked", async () => {
     push.mockClear();
     store.state.zoConfig = {
       ...store.state.zoConfig,
@@ -158,14 +158,13 @@ describe("HomeNoDataState", () => {
       global: { plugins: [i18n, store] },
     });
 
-    const chip = wrapper.find('[data-test="home-no-data-profiles-btn"]');
-    expect(chip.attributes("aria-disabled")).toBe("true");
-    const chipComponent = wrapper
-      .findAllComponents({ name: "EmptyStateIngestionChip" })
+    const link = wrapper.find('[data-test="home-no-data-profiles-btn"]');
+    expect(link.attributes("aria-disabled")).toBe("true");
+    const linkComponent = wrapper
+      .findAllComponents({ name: "OButton" })
       .find((c) => c.attributes("data-test") === "home-no-data-profiles-btn")!;
-    expect(chipComponent.props("unavailable")).toBe(true);
-    expect(chip.find(".lock-chip").exists()).toBe(true);
-    await chip.trigger("click");
+    expect(linkComponent.props("disabledReason")).toBeTruthy();
+    await link.trigger("click");
     expect(push).not.toHaveBeenCalled();
     store.state.zoConfig = { ...store.state.zoConfig, features: {} };
   });

@@ -58,18 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
-        :frame="false"
         :error="error"
         :forbidden="forbidden"
         sorting="server"
         :sort-by="sortBy"
         :sort-order="sortOrder"
-        :show-global-filter="false"
         :column-visibility="defaultColumnVisibility"
         :persist-columns="true"
         table-id="dbm-databases"
         :enable-column-resize="true"
-        :toolbar-bordered="false"
         :get-row-style="rowStyle"
         tree
         :get-row-warning="hasShortfall"
@@ -80,8 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #error="{ message }">
           <OEmptyState
-            preset="load-error"
-            :description="raw(message)"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             data-test="dbm-databases-error"
             @action="onRefresh()"
           />
@@ -117,20 +115,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
-            <DateTime
+          <div class="flex items-center gap-2">
+            <ODateTimeRange
               auto-apply
               menu-align="end"
               :default-type="range.type"
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-databases-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
+              class="max-md:[&_.date-time-label]:hidden"
               @on:date-change="onDateChange"
             />
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :loading="loading"
               :last-run-at="lastRunAt"
               data-test="dbm-databases-refresh"
@@ -183,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ row.name ? raw(row.name) : t("dbm.breakdown.noSchema") }}
                 </OTruncatedText>
               </template>
-              <span class="text-text-secondary text-3xs shrink-0">
+              <span class="text-text-secondary text-2xs shrink-0">
                 {{ t("dbm.breakdown.queryCount", { count: row.queryCount }, row.queryCount) }}
               </span>
             </template>
@@ -205,8 +201,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dbm.databases.unnamedInstance") }}
               <OTooltip side="bottom" :content="t('dbm.databases.unnamedInstanceHint')" />
             </span>
-            <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
-              <OTag type="dbSystem" :value="row.db_system" size="xs" />
+            <div class="text-text-secondary text-2xs flex min-w-0 items-center gap-1">
+              <OTag type="dbSystem" :value="row.db_system" size="sm" />
               <template v-if="namedSchemaCount(row) === 1">
                 <span class="opacity-45">·</span>
                 <OTruncatedText>{{ row.namedSchemas?.[0] }}</OTruncatedText>
@@ -373,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : formatPercent(attentionOf(row).ratio, 0)
               }}
             </span>
-            <span class="text-text-secondary text-3xs">{{ attentionLabel(row) }}</span>
+            <span class="text-text-secondary text-2xs">{{ attentionLabel(row) }}</span>
           </div>
         </template>
 
@@ -398,7 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
                 {{ formatNs(row.total_time_ns) }}
               </span>
-              <span class="text-text-secondary text-3xs font-mono tabular-nums">
+              <span class="text-text-secondary text-2xs font-mono tabular-nums">
                 {{ formatPercent(row.share, 0) }}
               </span>
             </span>
@@ -425,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              is the only place that gap can be read where it happens. -->
         <template #tree-warning="{ row }">
           <span
-            class="text-banner-warning-text text-3xs"
+            class="text-banner-warning-text text-2xs"
             :data-test="`dbm-databases-shortfall-${row.rowKey}`"
           >
             {{ shortfallLine(row) }}
@@ -463,7 +459,7 @@ import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
 import DbmInstanceHealthCell from "@/components/dbm/DbmInstanceHealthCell.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmRowChips, { type DbmRowChip } from "@/components/dbm/DbmRowChips.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
@@ -472,6 +468,7 @@ import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import { dbmEmptyAction, DBM_SETUP_ROUTE } from "@/utils/dbm/emptyAction";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1510,21 +1507,19 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     hideable: true,
     header: t("dbm.databases.columns.calls"),
     accessorKey: "calls",
-    // At 96 the "from your apps" sub-label ellipsised beside the sort chevron.
-    size: 124,
+    size: 104,
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: t("dbm.databases.columnSubLabels.calls"),
+      headerTooltip: t("dbm.databases.columnHints.calls"),
     },
   },
   {
     id: "qps",
     hideable: true,
     header: t("dbm.databases.columns.qps"),
-    // "Per second" plus the sort icon needs ~100; at 84 it ellipsised to
-    // "Per se…".
-    size: 100,
+    // "Per second" plus the sort icon and cell padding needs ~110.
+    size: 116,
     sortable: true,
     meta: {
       align: "right",
@@ -1548,11 +1543,10 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     // The label is prose ("Half are under"), not a token, so the width has to
     // clear the TEXT plus the sort icon plus the cell padding — at 108 the
     // label overflowed and lost its leading "H".
-    size: 124,
+    size: 136,
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p50"),
       headerTooltip: t("dbm.databases.columnHints.p50"),
     },
   },
@@ -1561,11 +1555,10 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     hideable: true,
     header: t("dbm.databases.columns.p95"),
     accessorKey: "p95_ns",
-    size: 96,
+    size: 108,
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p95"),
       headerTooltip: t("dbm.databases.columnHints.p95"),
     },
   },
@@ -1575,11 +1568,10 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     header: t("dbm.databases.columns.p99"),
     accessorKey: "p99_ns",
     // Same as p50: "Slowest 1%" plus the sort icon did not fit in 92.
-    size: 108,
+    size: 116,
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p99"),
       headerTooltip: t("dbm.databases.columnHints.p99"),
     },
   },
@@ -1617,17 +1609,16 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
   // pair must not hide. `load` is client-observed span time — what the
   // applications waited — and `attention` is the server's own saturation
   // against its own published limit. They are not two views of one measurement
-  // and must never be read as comparable, so each carries a sub-label naming
+  // and must never be read as comparable, so each header tooltip names
   // the vantage it came from.
   {
     id: "attention",
     hideable: true,
     header: t("dbm.databases.columns.attention"),
-    size: 130,
+    size: 148,
     sortable: true,
     meta: {
       align: "right" as const,
-      headerSubLabel: t("dbm.databases.columnSubLabels.attention"),
       headerTooltip: t("dbm.databases.columnHints.attention"),
     },
   },
@@ -1640,7 +1631,6 @@ const allColumns = computed<OTableColumnDef<TableRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: t("dbm.databases.columnSubLabels.load"),
       headerTooltip: t("dbm.databases.columnHints.load"),
     },
   },

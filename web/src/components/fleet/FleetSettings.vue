@@ -18,25 +18,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OContent y class="min-h-0 flex-1 overflow-auto" data-test="fleet-settings">
     <div class="flex flex-col gap-4">
       <OFormSection :title="t('fleet.settings.governance')" data-test="fleet-settings-governance">
-        <div v-if="forbidden" class="py-3" data-test="fleet-settings-no-access">
-          <OEmptyState size="inline" preset="no-access" :title="t('fleet.settings.noAccess')" />
-        </div>
-        <div v-else-if="loadFailed" class="py-3" data-test="fleet-settings-load-failed">
+        <div v-if="forbidden" data-test="fleet-settings-no-access">
           <OEmptyState
-            size="inline"
-            preset="load-error"
+            size="compact"
+            kind="denied"
+            :text="t('emptyState.noAccess.description')"
+            :title="t('fleet.settings.noAccess')"
+          />
+        </div>
+        <div v-else-if="loadFailed" data-test="fleet-settings-load-failed">
+          <OEmptyState
+            size="compact"
+            kind="error"
+            :text="t('emptyState.loadError.description')"
             :title="t('fleet.settings.loadFailed')"
-            :action-label="t('emptyState.loadError.action')"
-            action-icon="refresh"
             @action="current.refetch"
           />
         </div>
-        <div
-          v-else-if="!loaded"
-          class="flex justify-center py-4"
-          data-test="fleet-settings-loading"
-        >
-          <OSpinner />
+        <div v-else-if="!loaded" class="flex flex-col gap-3" data-test="fleet-settings-loading">
+          <OSkeleton v-for="n in 3" :key="n" shape="block" class="h-8" />
         </div>
         <template v-else>
           <OSettingRow
@@ -45,9 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OSelect
               v-model="restricted"
-              width="md"
+              width="m"
               class="max-md:w-full"
-              size="sm"
               :placeholder="t('fleet.settings.restrictedPlaceholder')"
               multiple
               creatable
@@ -63,9 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OInput
               v-model="target"
-              width="md"
+              width="m"
               class="max-md:w-full"
-              size="sm"
               :placeholder="t('fleet.settings.targetVersionPlaceholder')"
               :disabled="!editable"
               data-test="fleet-settings-target-version"
@@ -74,7 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="editable" class="pt-1">
             <OButton
               variant="primary"
-              size="sm-action"
               :disabled="!dirty"
               :loading="update.isPending.value"
               data-test="fleet-settings-save"
@@ -102,8 +99,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="fleet-settings-defaults-form"
           @save="saveDefaults"
         />
-        <div v-else-if="!forbidden && !loadFailed" class="flex justify-center py-4">
-          <OSpinner />
+        <div v-else-if="!forbidden && !loadFailed" class="flex flex-col gap-3">
+          <OSkeleton v-for="n in 3" :key="n" shape="block" class="h-8" />
         </div>
       </OFormSection>
 
@@ -121,7 +118,7 @@ import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOrgId } from "@/composables/query/useOrgId";

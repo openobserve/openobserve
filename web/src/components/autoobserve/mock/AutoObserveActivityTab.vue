@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="c in CHIPS"
           :key="c"
           :value="c"
-          size="sm"
           :disabled="!counts[c] && c !== chip"
           :data-test="`autoobserve-activity-chip-${c}`"
         >
@@ -53,10 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="autoobserve-activity-loop"
         @update:model-value="(v) => (loop = v as Loop | 'all')"
       >
-        <OToggleGroupItem value="all" size="sm">{{
-          t("autoobserve.activity.allLoops")
-        }}</OToggleGroupItem>
-        <OToggleGroupItem v-for="l in LOOPS" :key="l" :value="l" size="sm">
+        <OToggleGroupItem value="all">{{ t("autoobserve.activity.allLoops") }}</OToggleGroupItem>
+        <OToggleGroupItem v-for="l in LOOPS" :key="l" :value="l">
           {{ t(LOOP_LABEL[l]) }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -134,8 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </td>
                 <td class="px-1.5 py-2 align-middle whitespace-nowrap">
                   <OTag
-                    :variant="LOOP_VARIANT[row.entry.loop]"
-                    size="xs"
+                    :tone="LOOP_VARIANT[row.entry.loop]"
+                    size="sm"
                     :label="t(LOOP_LABEL[row.entry.loop])"
                   />
                 </td>
@@ -185,8 +182,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <td class="px-1.5 py-2 align-middle whitespace-nowrap">
                   <span :title="confidenceHint(row.entry)">
                     <OTag
-                      variant="default-soft"
-                      size="xs"
+                      tone="neutral"
+                      size="sm"
                       :label="t(CONFIDENCE_LABEL[row.entry.confidence])"
                       aria-hidden="true"
                     />
@@ -205,16 +202,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <td class="px-1.5 py-2 align-middle whitespace-nowrap">
                   <span class="inline-flex items-center gap-1.5">
                     <OTag
-                      :variant="OUTCOME_LOOK[row.outcome].variant"
+                      :tone="OUTCOME_LOOK[row.outcome].variant"
                       :icon="OUTCOME_LOOK[row.outcome].icon"
-                      size="xs"
+                      size="sm"
                       :label="outcomeLabel(row)"
                       :data-test="`autoobserve-ledger-${row.entry.id}-outcome`"
                     />
                     <OButton
                       v-if="row.incidentId"
-                      variant="ghost-primary"
-                      size="xs"
+                      variant="accent-ghost"
+                      size="sm"
                       class="font-mono"
                       :aria-label="t('autoobserve.activity.openIncident', { id: row.incidentId })"
                       :data-test="`autoobserve-ledger-${row.entry.id}-incident`"
@@ -228,8 +225,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="flex items-center justify-end gap-1">
                     <template v-if="row.entry.status === 'awaiting' && editing !== row.entry.id">
                       <OButton
-                        variant="ghost-destructive"
-                        size="xs"
+                        variant="danger-ghost"
+                        size="sm"
                         :aria-label="t('autoobserve.activity.rejectFor', actionOf(row.entry))"
                         :data-test="`autoobserve-ledger-${row.entry.id}-reject`"
                         @click="reject(row.entry)"
@@ -237,8 +234,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("autoobserve.activity.reject") }}
                       </OButton>
                       <OButton
-                        variant="outline"
-                        size="icon-xs"
+                        icon-only
+                        variant="secondary"
                         :title="t('autoobserve.activity.edit')"
                         :aria-label="t('autoobserve.activity.editFor', actionOf(row.entry))"
                         :data-test="`autoobserve-ledger-${row.entry.id}-edit`"
@@ -248,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OButton>
                       <OButton
                         variant="primary"
-                        size="xs"
+                        size="sm"
                         :aria-label="t('autoobserve.activity.approveFor', actionOf(row.entry))"
                         :data-test="`autoobserve-ledger-${row.entry.id}-approve`"
                         @click="approve(row.entry)"
@@ -257,9 +254,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OButton>
                     </template>
                     <OButton
+                      icon-only
                       :id="toggleId(row.entry.id)"
-                      variant="ghost-muted"
-                      size="icon-xs"
+                      variant="ghost"
                       :aria-expanded="!!expanded[row.entry.id]"
                       :aria-controls="detailId(row.entry.id)"
                       :aria-label="
@@ -326,7 +323,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OCodeBlock
                         :code="row.entry.before"
                         :lang="codeLang(row.entry.before)"
-                        chrome="editor"
                         :filename="t('autoobserve.activity.before')"
                         wrap
                         :copyable="false"
@@ -339,12 +335,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`autoobserve-ledger-${row.entry.id}-draft`"
                       />
                       <span class="flex justify-end gap-2">
-                        <OButton variant="outline" size="sm-action" @click="cancelEdit(row.entry)">
+                        <OButton variant="secondary" @click="cancelEdit(row.entry)">
                           {{ t("common.cancel") }}
                         </OButton>
                         <OButton
                           variant="primary"
-                          size="sm-action"
                           :data-test="`autoobserve-ledger-${row.entry.id}-save`"
                           @click="saveAndApprove(row.entry)"
                         >
@@ -415,8 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                         >
                           <OProgressBar
-                            :value="reviewProgress(row.reviewDays)"
-                            size="xs"
+                            :value="reviewProgress(row.reviewDays) * 100"
                             class="w-32"
                           />
                         </span>
@@ -442,9 +436,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OButton
                         v-if="row.entry.decided"
-                        variant="outline"
-                        size="sm"
-                        icon-left="undo"
+                        variant="secondary"
+                        icon="undo"
                         :aria-label="t('autoobserve.activity.undoFor', actionOf(row.entry))"
                         :data-test="`autoobserve-ledger-${row.entry.id}-undo-decision`"
                         @click="undoDecision(row.entry)"
@@ -453,9 +446,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OButton>
                       <OButton
                         v-else
-                        variant="outline"
-                        size="sm"
-                        icon-left="undo"
+                        variant="secondary"
+                        icon="undo"
                         :aria-label="t('autoobserve.activity.undoFor', actionOf(row.entry))"
                         :data-test="`autoobserve-ledger-${row.entry.id}-undo`"
                         @click="undo(row.entry)"
@@ -472,10 +464,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OEmptyState
         v-else
-        size="block"
-        illustration="history"
+        icon="history"
         :title="t('autoobserve.activity.emptyTitle')"
-        :description="t('autoobserve.activity.emptyDescription')"
+        :text="t('autoobserve.activity.emptyDescription')"
       />
     </OContent>
   </div>
@@ -496,7 +487,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import {
   DAY_DATE,
@@ -559,11 +550,11 @@ const { t } = useI18nTyped();
 const store = useDecisions();
 
 const LOOPS: Loop[] = ["coverage", "calibration", "investigation", "action"];
-const LOOP_VARIANT: Record<Loop, BadgeVariant> = {
-  coverage: "teal-soft",
-  calibration: "amber-soft",
-  investigation: "orange-soft",
-  action: "purple-soft",
+const LOOP_VARIANT: Record<Loop, ChipTone> = {
+  coverage: "neutral",
+  calibration: "warn",
+  investigation: "warn",
+  action: "neutral",
 };
 const LOOP_RAIL: Record<Loop, string> = {
   coverage: "border-s-ingest-accent-teal",
@@ -625,11 +616,11 @@ const CHIP_OF: Record<Outcome, ChipFilter | undefined> = {
   rejected: undefined,
 };
 
-const OUTCOME_LOOK: Record<Outcome, { variant: BadgeVariant; key: I18nKey; icon?: IconName }> = {
+const OUTCOME_LOOK: Record<Outcome, { variant: ChipTone; key: I18nKey; icon?: IconName }> = {
   ...STATE_LOOK,
-  awaiting: { variant: "warning-soft", key: "autoobserve.ledgerStatus.awaiting", icon: "schedule" },
-  kept: { variant: "success-soft", key: "autoobserve.ledgerStatus.kept", icon: "check" },
-  rejected: { variant: "default-soft", key: "autoobserve.ledgerStatus.rejected", icon: "close" },
+  awaiting: { variant: "warn", key: "autoobserve.ledgerStatus.awaiting", icon: "schedule" },
+  kept: { variant: "ok", key: "autoobserve.ledgerStatus.kept", icon: "check" },
+  rejected: { variant: "neutral", key: "autoobserve.ledgerStatus.rejected", icon: "close" },
 };
 
 const FACTS = Object.fromEntries(LEDGER.map((f) => [f.id, f]));

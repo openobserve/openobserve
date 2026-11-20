@@ -34,7 +34,7 @@ const { t } = useI18nTyped();
 
 const props = withDefaults(
   defineProps<{
-    /** Puts the label under the value, so a narrow tile keeps its full label. */
+    /** Puts the label under the value; on a `kpi` it is the R4 strip item (20 px value, no glyph). */
     stacked?: boolean;
     label?: I18nText;
     value?: string | number;
@@ -176,12 +176,13 @@ const chipGlyphClass = computed(() => {
 const chipBadgeClass = computed(() => {
   if (props.selected && !props.quiet)
     return "bg-badge-primary-soft-bg text-badge-primary-soft-text font-semibold";
-  if (isMuted.value) return "bg-surface-subtle text-table-row-text-secondary-tinted font-medium";
+  // A neutral count sits on the chip's own soft fill, so its pill takes the page surface to stay a pill.
+  if (isMuted.value) return "bg-surface-base text-table-row-text-secondary-tinted font-medium";
   if (props.tone === "error" || props.tone === "orange")
     return "bg-badge-error-soft-bg text-badge-error-soft-text font-semibold";
   if (props.tone === "warning")
     return "bg-badge-warning-soft-bg text-badge-warning-soft-text font-semibold";
-  return "bg-surface-subtle text-text-heading font-semibold";
+  return "bg-surface-base text-text-heading font-semibold";
 });
 const chipTooltip = computed(() => {
   if (props.hint) return props.hint;
@@ -217,12 +218,14 @@ const trendClass = computed(() =>
             selected && !quiet
               ? 'border-accent bg-surface-accent-hover'
               : [
-                  'border-border-default bg-surface-base',
-                  clickable ? 'hover:bg-surface-accent-hover' : '',
+                  'bg-surface-subtle border-transparent',
+                  clickable ? 'hover:bg-surface-subtle-hover' : '',
                 ],
           ]
         : variant === 'kpi'
-          ? 'h-5 shrink-0 items-center gap-1.5 whitespace-nowrap'
+          ? stacked
+            ? 'shrink-0 flex-col items-start whitespace-nowrap'
+            : 'h-5 shrink-0 items-center gap-1.5 whitespace-nowrap'
           : [
               'rounded-default bg-surface-base flex-col justify-center gap-1 overflow-hidden border px-2.5 py-1 max-lg:px-1.5',
               selected ? 'border-accent' : 'border-border-default',
@@ -273,16 +276,40 @@ const trendClass = computed(() =>
         :class="chipBadgeClass"
         data-test="o-stat-card-value"
       >
-        <OSkeleton
-          v-if="loading"
-          type="text"
-          class="block h-2.5 w-3"
-          data-test="o-stat-card-value-skeleton"
-        />
+        <OSkeleton v-if="loading" class="block h-2.5 w-3" data-test="o-stat-card-value-skeleton" />
         <slot v-else name="value">{{ displayValue }}</slot>
         <OTooltip v-if="exactTitle" :content="exactTitle" />
       </span>
       <OTooltip v-if="chipTooltip" :content="chipTooltip" />
+    </template>
+    <!-- R4 KPI strip: a 20/600 value over its 12 px label, no glyph and no box. -->
+    <template v-else-if="variant === 'kpi' && stacked">
+      <span
+        class="inline-flex h-7 items-center text-xl leading-7 font-semibold tabular-nums"
+        :class="isMuted ? 'text-text-muted' : 'text-text-heading'"
+        data-test="o-stat-card-value"
+      >
+        <OSkeleton v-if="loading" class="block h-5 w-10" data-test="o-stat-card-value-skeleton" />
+        <slot v-else name="value">{{ displayValue }}</slot>
+        <OTooltip v-if="exactTitle" :content="exactTitle" />
+      </span>
+      <span class="text-text-secondary flex min-w-0 items-center gap-1 text-xs leading-4">
+        <OTruncatedText v-if="label" data-test="o-stat-card-label">{{ label }}</OTruncatedText>
+        <OIcon
+          v-if="sub && subIcon"
+          :name="subIcon"
+          size="xs"
+          :label="sub"
+          class="text-text-label size-3.5! shrink-0"
+          data-test="o-stat-card-sub-icon"
+        >
+          <OTooltip :content="subTooltip || sub" />
+        </OIcon>
+        <OTruncatedText v-else-if="sub" class="text-text-label">{{ sub }}</OTruncatedText>
+        <span v-if="trend" class="shrink-0 font-semibold" :class="trendClass"
+          >{{ trendArrow }} {{ trend.label }}</span
+        >
+      </span>
     </template>
     <template v-else-if="variant === 'kpi'">
       <span
@@ -297,16 +324,11 @@ const trendClass = computed(() =>
         </slot>
       </span>
       <span
-        class="inline-flex h-5 items-center text-base leading-5 tabular-nums"
+        class="inline-flex h-5 items-center text-sm leading-5 tabular-nums"
         :class="isMuted ? 'text-text-muted font-medium' : 'text-text-heading font-semibold'"
         data-test="o-stat-card-value"
       >
-        <OSkeleton
-          v-if="loading"
-          type="text"
-          class="block h-4 w-8"
-          data-test="o-stat-card-value-skeleton"
-        />
+        <OSkeleton v-if="loading" class="block h-4 w-8" data-test="o-stat-card-value-skeleton" />
         <slot v-else name="value">{{ displayValue }}</slot>
         <OTooltip v-if="exactTitle" :content="exactTitle" />
       </span>
@@ -352,7 +374,6 @@ const trendClass = computed(() =>
           >
             <OSkeleton
               v-if="loading"
-              type="text"
               class="block h-6 w-12 max-lg:h-4.5 max-lg:w-6"
               data-test="o-stat-card-value-skeleton"
             />
@@ -402,7 +423,7 @@ const trendClass = computed(() =>
            only the fill width changes. -->
       <div class="bg-surface-subtle h-1 overflow-hidden rounded-full">
         <div
-          class="h-full rounded-full transition-all duration-300"
+          class="h-full rounded-full transition-[width] duration-(--duration-expand) ease-(--ease-control)"
           :class="tc.bar"
           :style="{ width: pct + '%' }"
         />

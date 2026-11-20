@@ -19,9 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="sm"
     :title="t('fleet.editor.addPipeline')"
-    :primary-button-label="t('fleet.common.create')"
-    :primary-button-disabled="taken"
-    :secondary-button-label="t('common.cancel')"
+    :primary="{ label: t('fleet.common.create'), disabled: taken }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="fleet-add-pipeline-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
@@ -35,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="fleet-add-pipeline-dialog-signal"
           @update:model-value="(v) => (signal = v as Signal)"
         >
-          <OToggleGroupItem v-for="s in SIGNALS" :key="s" :value="s" size="sm">
+          <OToggleGroupItem v-for="s in SIGNALS" :key="s" :value="s">
             {{ raw(s) }}
           </OToggleGroupItem>
         </OToggleGroup>

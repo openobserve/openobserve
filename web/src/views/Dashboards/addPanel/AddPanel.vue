@@ -17,24 +17,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <OPageLayout bleed>
-    <!-- The panel NAME is the page title (inline-edited in place) and the
-         mode is demoted to the subtitle, so the header answers "which panel"
-         first and "what am I doing to it" second. That means owning the
-         header: <OForm> has to be an ANCESTOR of OPageHeader for the title
-         field to inject the form context, and it cannot simply wrap the whole
-         page because the body renders AddSettingVariable, which owns a form of
-         its own (nested <form> elements). `contents` keeps the wrapper out of
-         the layout box model. The header's Save still submits by form id. -->
+    <!-- The inline title field needs OForm as an ancestor, and OForm cannot wrap the page:
+         the body's AddSettingVariable owns a form of its own. Save submits by form id. -->
     <template #header>
       <OForm id="add-panel-form" :form="form" class="contents">
         <OPageHeader
           :back="{
             label: currentDashboardData.data?.title || t('dashboard.header'),
-            onClick: goBack,
+            to: dashboardViewRoute(),
             dataTest: 'dashboard-back-btn',
           }"
-          :subtitle="editMode ? t('panel.editPanel') : t('panel.addPanel')"
-          title-overflow="visible"
         >
           <template #title>
             <OFormInlineEdit
@@ -55,8 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #actions>
             <template v-if="!isMobile">
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 @click="showTutorial"
                 data-test="dashboard-panel-tutorial-btn"
                 >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
@@ -67,17 +58,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.type,
                   )
                 "
-                variant="outline"
-                size="icon-sm"
+                icon-only
+                variant="ghost"
                 @click="showViewPanel = true"
                 data-test="dashboard-panel-data-view-query-inspector-btn"
-                icon-left="manage-search"
+                icon="manage-search"
               >
                 <OTooltip
                   side="left"
-                  align="center"
                   :content="t('dashboard.addPanel.queryInspector')"
-                  shortcut-id="panelEditorQueryInspector"
+                  shortcut="panelEditorQueryInspector"
                 />
               </OButton>
             </template>
@@ -85,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="selectedDate"
               v-model="selectedDate"
               ref="dateTimePickerRef"
-              :disable="disable"
+              :disabled="disable"
               :auto-apply-dashboard="true"
               calendar-presets
               class="max-md:[&_.date-time-label]:hidden"
@@ -94,16 +84,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OButton
               v-if="!isMobile"
-              variant="outline-destructive"
-              size="sm-action"
+              variant="danger-ghost"
               @click="goBackToDashboardList"
               data-test="dashboard-panel-discard"
               >{{ t("panel.discard") }}</OButton
             >
-            <OButtonGroup radius="lg">
+            <OButtonGroup>
               <OButton
-                variant="outline"
-                size="sm-action"
+                variant="secondary"
                 :class="{ 'border-e-button-group-divider': !isMobile }"
                 data-test="dashboard-panel-save"
                 type="submit"
@@ -114,13 +102,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown v-if="!isMobile" side="bottom" align="end">
                 <template #trigger>
                   <OButton
-                    variant="outline"
-                    size="icon-sm"
-                    class="h-8.5!"
+                    icon-only
+                    variant="secondary"
                     :disabled="isSavingPanel"
                     data-test="dashboard-panel-save-options-btn"
                     :aria-label="t('dashboard.moreActions')"
-                    icon-left="keyboard-arrow-down"
+                    icon="keyboard-arrow-down"
                   />
                 </template>
                 <ODropdownItem data-test="dashboard-panel-save-and-stay" @select="saveAndStay">
@@ -128,24 +115,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
               </ODropdown>
             </OButtonGroup>
-            <OButtonGroup
-              v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-              radius="lg"
-            >
+            <OButtonGroup v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
               <OButton
                 v-if="config.isEnterprise === 'false'"
                 :variant="applyVariant"
-                size="sm-action"
+                :stale="applyStale"
                 :class="{
-                  'border-e-button-group-divider': showApplyMenu && applyVariant !== 'pending',
+                  'border-e-button-group-divider': showApplyMenu && !applyStale,
                 }"
-                :aria-description="applyVariant === 'pending' ? applyTooltip : undefined"
+                :aria-description="applyStale ? applyTooltip : undefined"
                 data-test="dashboard-apply"
                 :loading="searchRequestTraceIds.length > 0"
                 :disabled="searchRequestTraceIds.length > 0"
                 @click="() => runQuery(false)"
                 >{{ t("panel.apply") }}
-                <OTooltip :content="applyTooltip" shortcut-id="panelEditorRun" />
+                <OTooltip :content="applyTooltip" shortcut="panelEditorRun" />
               </OButton>
               <OButton
                 v-else
@@ -153,29 +137,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchRequestTraceIds.length > 0 ? 'dashboard-cancel' : 'dashboard-apply'
                 "
                 :variant="applyVariant"
-                size="sm-action"
-                :class="{ 'border-e-button-group-divider': applyVariant !== 'pending' }"
-                :aria-description="applyVariant === 'pending' ? applyTooltip : undefined"
+                :stale="applyStale"
+                :class="{ 'border-e-button-group-divider': !applyStale }"
+                :aria-description="applyStale ? applyTooltip : undefined"
                 @click="onApplyBtnClick"
               >
                 {{ searchRequestTraceIds.length > 0 ? t("panel.cancel") : t("panel.apply") }}
                 <OTooltip
                   v-if="searchRequestTraceIds.length === 0"
                   :content="applyTooltip"
-                  shortcut-id="panelEditorRun"
+                  shortcut="panelEditorRun"
                 />
               </OButton>
 
               <ODropdown v-if="showApplyMenu" side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    icon-only
                     :variant="applyVariant"
-                    size="icon-sm"
-                    class="h-8.5!"
                     :disabled="searchRequestTraceIds.length > 0"
                     data-test="dashboard-apply-options-btn"
                     :aria-label="t('dashboard.moreActions')"
-                    icon-left="keyboard-arrow-down"
+                    icon="keyboard-arrow-down"
                   />
                 </template>
                 <ODropdownItem v-if="config.isEnterprise === 'true'" @select="runQuery(true)">
@@ -190,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-panel-auto-run-toggle-btn"
                     @select="toggleAutoRun"
                   >
-                    <template #icon-left>
+                    <template #icon>
                       <OIcon
                         :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
                         size="sm"
@@ -213,8 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #actions-overflow>
             <template v-if="isMobile">
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 @click="showTutorial"
                 data-test="dashboard-panel-tutorial-btn"
                 >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
@@ -225,24 +207,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.type,
                   )
                 "
-                variant="outline"
-                size="sm"
-                icon-left="manage-search"
+                variant="secondary"
+                icon="manage-search"
                 @click="showViewPanel = true"
                 data-test="dashboard-panel-data-view-query-inspector-btn"
                 >{{ t("dashboard.addPanel.queryInspector") }}</OButton
               >
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 :loading="isSavingPanel"
                 @click="saveAndStay"
                 data-test="dashboard-panel-save-and-stay"
                 >{{ t("panel.saveAndStay") }}</OButton
               >
               <OButton
-                variant="outline-destructive"
-                size="sm"
+                variant="danger-ghost"
                 @click="goBackToDashboardList"
                 data-test="dashboard-panel-discard"
                 >{{ t("panel.discard") }}</OButton
@@ -1599,17 +1578,18 @@ export default defineComponent({
     };
 
     // Session variables are cleaned up by the leave guard, since its Save option still needs them.
+    const dashboardViewRoute = () => ({
+      path: "/dashboards/view",
+      query: {
+        ...routeQueryParamsOnMount,
+        org_identifier: store.state.selectedOrganization.identifier,
+        dashboard: route.query.dashboard,
+        folder: route.query.folder,
+        tab: route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
+      },
+    });
     const goBack = async () => {
-      return router.push({
-        path: "/dashboards/view",
-        query: {
-          ...routeQueryParamsOnMount,
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          tab: route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
-        },
-      });
+      return router.push(dashboardViewRoute());
     };
 
     const beforeUnloadHandler = (e: any) => {
@@ -2330,13 +2310,12 @@ export default defineComponent({
 
     const isOutDated = computed(() => livePreview.isPending.value);
 
-    const applyVariant = computed(() => {
-      // Only enterprise can cancel a query, so only there does Apply turn into a red Cancel.
-      if (config.isEnterprise === "true" && searchRequestTraceIds.value.length > 0) {
-        return "destructive";
-      }
-      return livePreview.isPending.value ? "pending" : "primary";
-    });
+    // Only enterprise can cancel a query, so only there does Apply turn into Cancel.
+    const isCancelState = computed(
+      () => config.isEnterprise === "true" && searchRequestTraceIds.value.length > 0,
+    );
+    const applyVariant = computed(() => (isCancelState.value ? "secondary" : "primary"));
+    const applyStale = computed(() => !isCancelState.value && livePreview.isPending.value);
 
     const showApplyMenu = computed(
       () => config.isEnterprise === "true" || isAutoRunAvailable.value,
@@ -2544,6 +2523,7 @@ export default defineComponent({
       isMobile,
       updateDateTime,
       goBack,
+      dashboardViewRoute,
       savePanelChangesToDashboard,
       runQuery,
       expandedSplitterHeight,
@@ -2595,6 +2575,7 @@ export default defineComponent({
       toggleAutoRun,
       showApplyMenu,
       applyVariant,
+      applyStale,
       applyTooltip,
       shouldRefreshWithoutCache,
       maxQueryRangeWarning,

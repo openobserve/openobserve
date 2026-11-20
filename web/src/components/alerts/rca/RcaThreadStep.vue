@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <li data-test="rca-thread-step" class="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-2.5">
     <span class="flex h-5 items-center justify-center" data-test="rca-thread-step-status">
-      <OSpinner v-if="status === 'running'" size="xs" />
+      <OSpinner v-if="status === 'running'" />
       <OIcon v-else :name="statusIcon" size="sm" :class="statusClass" :label="statusLabel" />
     </span>
 
@@ -25,13 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 items-baseline gap-2">
         <span
           data-test="rca-thread-step-title"
-          class="text-text-heading text-compact min-w-0 flex-1 font-bold"
+          class="text-text-heading text-compact min-w-0 flex-1 font-semibold"
         >
           {{ step.title }}
           <span
             v-if="step.from_steering"
             data-test="rca-thread-step-from-steering"
-            class="text-accent text-2xs ms-1 font-bold"
+            class="text-accent text-2xs ms-1 font-semibold"
           >
             {{ t("alerts.incidents.rcaSteer.fromSteering") }}
           </span>
@@ -57,9 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="step.tool_calls.length > 0"
           data-test="rca-thread-step-calls-toggle"
-          variant="ghost-muted"
-          size="xs"
-          :icon-right="callsOpen ? 'expand-less' : 'expand-more'"
+          variant="ghost"
+          size="sm"
+          :icon-end="callsOpen ? 'expand-less' : 'expand-more'"
           :aria-expanded="callsOpen"
           :aria-controls="callsListId"
           @click="callsOpen = !callsOpen"
@@ -72,9 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="step.note && !conclusion"
           data-test="rca-thread-step-note-toggle"
-          variant="ghost-muted"
-          size="xs"
-          :icon-right="noteOpen ? 'expand-less' : 'expand-more'"
+          variant="ghost"
+          size="sm"
+          :icon-end="noteOpen ? 'expand-less' : 'expand-more'"
           :aria-expanded="noteOpen"
           @click="toggleNote"
         >
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex flex-col items-start gap-0.5"
         :class="{ 'border-border-strong border-s-2 ps-3': conclusion }"
       >
-        <span v-if="conclusion" class="text-text-secondary text-2xs font-bold">
+        <span v-if="conclusion" class="text-text-secondary text-2xs font-semibold">
           {{ t("alerts.incidents.rcaLight.conclusion") }}
         </span>
         <p
@@ -103,12 +103,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <code
                 v-if="segment.code"
                 class="rounded-default bg-surface-subtle text-text-code px-1 font-mono text-xs wrap-anywhere"
-                :class="{ 'font-bold': segment.bold, italic: segment.italic }"
+                :class="{ 'font-semibold': segment.bold, italic: segment.italic }"
                 >{{ segment.text }}</code
               >
               <strong
                 v-else-if="segment.bold"
-                class="font-bold"
+                class="font-semibold"
                 :class="{ italic: segment.italic }"
                 >{{ segment.text }}</strong
               >
@@ -117,9 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <OButton
               v-else-if="evidenceNumbers?.has(segment.id)"
+              icon-only
               data-test="rca-citation-chip"
-              variant="outline"
-              size="icon-xs-sq"
+              variant="secondary"
+              size="sm"
               class="mx-0.5 align-baseline font-mono"
               :aria-label="
                 t('alerts.incidents.rcaSummary.openEvidence', {
@@ -133,14 +134,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               v-else-if="evidenceNumbers"
               data-test="rca-citation-unverified"
-              class="rounded-default border-status-warning-text text-status-warning-text bg-surface-base text-3xs mx-0.5 inline-flex h-4.5 items-center border border-dashed px-1 align-baseline font-mono font-semibold"
+              class="rounded-default border-status-warning-text text-status-warning-text bg-surface-base text-2xs mx-0.5 inline-flex h-4.5 items-center border border-dashed px-1 align-baseline font-mono font-semibold"
             >
               {{ t("alerts.incidents.rcaSummary.notVerifiedId") }}
             </span>
             <span
               v-else
               data-test="rca-citation-chip"
-              class="rounded-default border-border-default text-text-heading bg-surface-base text-3xs mx-0.5 inline-flex h-4.5 min-w-5 items-center justify-center border px-1 align-baseline font-mono font-semibold"
+              class="rounded-default border-border-default text-text-heading bg-surface-base text-2xs mx-0.5 inline-flex h-4.5 min-w-5 items-center justify-center border px-1 align-baseline font-mono font-semibold"
             >
               {{ segment.id }}
             </span>
@@ -150,8 +151,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="conclusion && (noteClamped || conclusionOpen)"
           data-test="rca-thread-conclusion-toggle"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :aria-expanded="conclusionOpen"
           @click="conclusionOpen = !conclusionOpen"
         >

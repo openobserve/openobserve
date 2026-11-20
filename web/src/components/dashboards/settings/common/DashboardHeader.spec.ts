@@ -149,8 +149,8 @@ describe("DashboardHeader", () => {
 
       const backButton = wrapper.findComponent({ name: "OButton" });
 
-      expect(backButton.props("variant")).toBe("outline");
-      expect(backButton.props("size")).toBe("icon-xs");
+      expect(backButton.props("variant")).toBe("ghost");
+      expect(backButton.props("iconOnly")).toBe(true);
       // Migration replaced the legacy margin class with me-2.
       expect(backButton.classes().some((c) => c.includes("me-2"))).toBe(true);
     });
@@ -380,8 +380,8 @@ describe("DashboardHeader", () => {
 
       const titleElement = findTitle(wrapper);
       expect(titleElement?.exists()).toBe(true);
-      // The migrated heading uses text-base + font-semibold.
-      expect(titleElement?.classes().some((c) => c.includes("text-base"))).toBe(true);
+      // The migrated heading uses text-sm + font-semibold.
+      expect(titleElement?.classes().some((c) => c.includes("text-sm"))).toBe(true);
     });
 
     it("should support keyboard navigation for back button", async () => {

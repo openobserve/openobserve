@@ -16,6 +16,8 @@
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
+import { fillField } from "@/test/unit/helpers/fillField";
+import { byTest, pressEscape } from "@/test/unit/helpers/draftDom";
 
 import CreateAlertFromSourceDialog from "@/components/alerts/CreateAlertFromSourceDialog.vue";
 import { ALERT_PREFILL_VERSION, type AlertPrefill } from "@/ts/interfaces/alertPrefill";
@@ -35,7 +37,7 @@ colorizeQuery.mockImplementation(colorized);
 // this component's own logic needs.
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "primaryButtonDisabled"],
+  props: ["open", "primary"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `<div data-test="dialog-stub"><slot /></div>`,
 };
@@ -57,7 +59,7 @@ const stubs = {
   },
   OSelect: {
     name: "OSelect",
-    props: ["modelValue", "options", "dropdownStyle"],
+    props: ["modelValue", "options"],
     emits: ["update:modelValue"],
     template: `<div data-test="query-select-stub" />`,
   },
@@ -161,7 +163,7 @@ describe("CreateAlertFromSourceDialog", () => {
 
   it("disables Continue when the prefill is blocked", () => {
     wrapper = mountDialog(prefill({ warnings: [{ key: "noStream", level: "blocking" }] }));
-    expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(true);
+    expect(wrapper.findComponent(ODialogStub).props("primary")?.disabled).toBe(true);
   });
 
   describe("a source whose condition is inside its query (T2-23)", () => {
@@ -200,9 +202,57 @@ describe("CreateAlertFromSourceDialog", () => {
       expect(field.exists()).toBe(true);
       expect(wrapper.text()).toContain("errors an hour");
       expect(wrapper.text()).toContain("no usual error count for svc-a");
-      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(true);
+      expect(wrapper.findComponent(ODialogStub).props("primary")?.disabled).toBe(true);
       await wrapper.findComponent(ODialogStub).vm.$emit("click:primary");
       expect(wrapper.emitted("confirm")).toBeUndefined();
+    });
+
+    it("asks before Escape drops a typed threshold in the real dialog", async () => {
+      wrapper = mount(CreateAlertFromSourceDialog, {
+        attachTo: document.body,
+        props: { open: true, prefill: asking(null) },
+        global: { plugins: [i18n], stubs: { ...stubs, ODialog: false } },
+      });
+      await flushPromises();
+      await fillField("create-alert-threshold-value", "40");
+
+      pressEscape();
+      await flushPromises();
+
+      expect(byTest("o-dialog-discard-row")).not.toBeNull();
+      expect(wrapper.emitted("update:open")).toBeUndefined();
+    });
+
+    it("closes on Escape while the answers are as the dialog opened", async () => {
+      wrapper = mount(CreateAlertFromSourceDialog, {
+        attachTo: document.body,
+        props: { open: true, prefill: asking(null) },
+        global: { plugins: [i18n], stubs: { ...stubs, ODialog: false } },
+      });
+      await flushPromises();
+
+      pressEscape();
+      await flushPromises();
+
+      expect(byTest("o-dialog-discard-row")).toBeNull();
+      expect(wrapper.emitted("update:open")).toEqual([[false]]);
+    });
+
+    it("closes on Escape when the source refined its prefill after the dialog opened", async () => {
+      wrapper = mount(CreateAlertFromSourceDialog, {
+        attachTo: document.body,
+        props: { open: true, prefill: asking(null) },
+        global: { plugins: [i18n], stubs: { ...stubs, ODialog: false } },
+      });
+      await flushPromises();
+      await wrapper.setProps({ prefill: { ...asking(30), streamName: "k8s_logs_v2" } });
+      await flushPromises();
+
+      pressEscape();
+      await flushPromises();
+
+      expect(byTest("o-dialog-discard-row")).toBeNull();
+      expect(wrapper.emitted("update:open")).toEqual([[false]]);
     });
 
     it("asks the source to rebuild with the typed threshold", async () => {
@@ -225,7 +275,7 @@ describe("CreateAlertFromSourceDialog", () => {
           },
         }),
       );
-      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(false);
+      expect(wrapper.findComponent(ODialogStub).props("primary")?.disabled).toBeFalsy();
       expect(wrapper.text()).toContain("This alert fires on any error.");
       expect(
         (
@@ -244,7 +294,7 @@ describe("CreateAlertFromSourceDialog", () => {
 
     it("lets Continue through once the rebuilt prefill carries the threshold", () => {
       wrapper = mountDialog(asking(40));
-      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(false);
+      expect(wrapper.findComponent(ODialogStub).props("primary")?.disabled).toBeFalsy();
     });
 
     it("shows no threshold field for a source that set its own", () => {
@@ -399,7 +449,6 @@ describe("CreateAlertFromSourceDialog", () => {
       expect(String(select.props("options")[0].label)).toBe(
         `Total retries: ${long.replace(/\s+/g, " ")}`,
       );
-      expect(select.props("dropdownStyle")).toEqual({ width: "var(--reka-select-trigger-width)" });
     });
 
     it("rebuilds the prefill for the chosen query", async () => {
@@ -471,7 +520,9 @@ describe("CreateAlertFromSourceDialog", () => {
       expect(text.find("script").exists()).toBe(false);
 
       await wrapper.find('[data-test="create-alert-picked-query-copy"]').trigger("click");
-      expect(copyToClipboard).toHaveBeenCalledWith(multiLine, expect.any(Function));
+      expect(copyToClipboard).toHaveBeenCalledWith(multiLine, expect.any(Function), {
+        silent: true,
+      });
     });
 
     it("follows the pick, showing the newly chosen query", async () => {
@@ -538,7 +589,7 @@ describe("CreateAlertFromSourceDialog", () => {
 
       expect(has("create-alert-warning-unresolvedQuery")).toBe(true);
       expect(has("create-alert-warning-absoluteToRolling")).toBe(false);
-      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(true);
+      expect(wrapper.findComponent(ODialogStub).props("primary")?.disabled).toBe(true);
     });
 
     it("is minimal for a metrics-explorer chart too", () => {

@@ -28,15 +28,13 @@ const mountValue = (props: Record<string, unknown>) =>
   mount(OValue, { props: { dataTest: "traces-stats-value", ...props }, global: { stubs } });
 
 describe("OValue", () => {
-  it("shows a static skeleton bar named Loading while the value loads", () => {
+  it("shows a skeleton bar named Loading while the value loads", () => {
     const wrapper = mountValue({ state: "loading" });
     const root = wrapper.find('[data-test="traces-stats-value"]');
     expect(root.attributes("data-state")).toBe("loading");
     expect(root.attributes("aria-busy")).toBe("true");
-    const bar = root.find(".bg-skeleton-base");
+    const bar = root.findComponent({ name: "OSkeleton" });
     expect(bar.attributes("aria-hidden")).toBe("true");
-    expect(bar.classes()).not.toContain("animate-pulse");
-    expect(bar.classes()).not.toContain("skeleton-wave");
     expect(root.find(".sr-only").text()).toBe("Loading");
     expect(root.text()).not.toContain("—");
     expect(root.text()).not.toContain("0");
@@ -44,7 +42,7 @@ describe("OValue", () => {
 
   it("sizes the loading bar to the expected value", () => {
     const wrapper = mountValue({ state: "loading", skeletonClass: "w-20" });
-    expect(wrapper.find(".bg-skeleton-base").classes()).toContain("w-20");
+    expect(wrapper.findComponent({ name: "OSkeleton" }).classes()).toContain("w-20");
   });
 
   it("shows a dash named No value when there is no value", () => {

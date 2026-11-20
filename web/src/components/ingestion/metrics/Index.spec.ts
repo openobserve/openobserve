@@ -60,7 +60,7 @@ function buildMountOptions() {
           template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
         },
         OTabs: true,
-        ORouteTab: true,
+        OTab: true,
         "router-view": true,
       },
     },
@@ -138,7 +138,7 @@ describe("IngestMetrics Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -327,7 +327,7 @@ describe("IngestMetrics Component", () => {
         "prometheus config snippet",
         expect.any(Function),
         {
-          successMessage: "Content Copied Successfully!",
+          successMessage: "Content copied successfully!",
           errorMessage: "Error while copy content.",
           timeout: 5000,
         },
@@ -340,7 +340,7 @@ describe("IngestMetrics Component", () => {
       wrapper.vm.copyToClipboardFn({ innerText: "some text" });
 
       expect(copyToClipboard).toHaveBeenCalledWith("some text", expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -352,7 +352,7 @@ describe("IngestMetrics Component", () => {
       wrapper.vm.copyToClipboardFn({ innerText: "fail text" });
 
       expect(copyToClipboard).toHaveBeenCalledWith("fail text", expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -405,7 +405,7 @@ describe("IngestMetrics Component", () => {
       wrapper.vm.copyToClipboardFn({ innerText: "" });
 
       expect(copyToClipboard).toHaveBeenCalledWith("", expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -417,7 +417,7 @@ describe("IngestMetrics Component", () => {
       wrapper.vm.copyToClipboardFn({});
 
       expect(copyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -485,7 +485,7 @@ describe("IngestMetrics: Get started pick", () => {
     return mount(IngestMetrics, options);
   };
   const tabNames = (wrapper: any): string[] =>
-    wrapper.findAllComponents({ name: "ORouteTab" }).map((c: any) => c.props("name"));
+    wrapper.findAllComponents({ name: "OTab" }).map((c: any) => c.props("name"));
 
   afterEach(() => {
     localStorage.clear();

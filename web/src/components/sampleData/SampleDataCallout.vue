@@ -32,9 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }}</span>
     </div>
     <OButton
-      variant="outline"
-      size="sm"
-      icon-left="play-arrow"
+      variant="secondary"
+      icon="play-arrow"
       class="shrink-0"
       :loading="loading"
       :disabled="session.status.value === 'loading' || session.removing.value"

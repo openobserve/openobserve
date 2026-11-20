@@ -9,9 +9,9 @@ import {
   processTextBlock,
   type RenderedBlock,
 } from "@/components/O2AIChat.content";
-import { copyToClipboard } from "@/utils/clipboard";
 import O2AIChatToolCallBlock from "./O2AIChatToolCallBlock.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -98,7 +98,7 @@ const isStopped = computed(() =>
           "
           class="inline-loading text-text-secondary flex items-center gap-2.5 py-2 text-sm"
         >
-          <OSpinner variant="dots" size="sm" />
+          <OSpinner size="lg" />
           <span>{{ currentAnalyzingMessage }}</span>
         </div>
         <template v-for="(block, blockIndex) in message.contentBlocks" :key="'cb-' + blockIndex">
@@ -132,16 +132,12 @@ const isStopped = computed(() =>
               <div
                 class="log-entry-content rounded-default bg-surface-base border-border-default dark:bg-surface-panel relative overflow-hidden border shadow-sm dark:shadow-sm"
               >
-                <OButton
-                  variant="ghost"
-                  size="icon-xs-circle"
-                  class="copy-btn rounded-default absolute top-2 right-2 z-1 px-2 py-1 opacity-60 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:opacity-100 hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
-                  :aria-label="t('aiAssistant.copyContent')"
-                  @click.stop="copyToClipboard(block.content, t)"
-                >
-                  <OIcon name="content-copy" size="sm" />
-                  <OTooltip :content="t('aiAssistant.copyContent')" />
-                </OButton>
+                <OCopyButton
+                  size="xs"
+                  class="copy-btn rounded-default absolute top-2 right-2 z-1 opacity-60 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:opacity-100 hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
+                  :label="t('aiAssistant.copyContent')"
+                  :value="block.content"
+                />
                 <code
                   class="log-entry-code text-2xs bg-surface-base text-text-body dark:text-text-secondary block max-h-75 cursor-text overflow-y-auto p-3 pe-10 font-mono leading-relaxed whitespace-pre-wrap select-text [word-wrap:break-word] dark:[background:var(--color-syntax-bg)]"
                   v-html="formatLogEntryContent(block.content, readonly)"
@@ -179,12 +175,12 @@ const isStopped = computed(() =>
               <span class="ms-6 mt-2 inline-flex self-start">
                 <OButton
                   variant="primary"
-                  size="xs"
+                  size="sm"
                   class="stream-error-action text-compact"
                   disabled
                   data-test="o2-ai-chat-error-navigate-locked"
                 >
-                  <template #icon-left
+                  <template #icon
                     ><OIcon name="lock" class="text-icon-locked" size="sm"
                   /></template>
                   {{ block.navigationAction.label }}
@@ -194,7 +190,7 @@ const isStopped = computed(() =>
             <OButton
               v-else-if="block.navigationAction"
               variant="primary"
-              size="xs"
+              size="sm"
               class="stream-error-action text-compact ms-6 mt-2 self-start"
               @click="emit('navigate', block.navigationAction)"
             >
@@ -211,11 +207,11 @@ const isStopped = computed(() =>
             <OButton
               v-if="!readonly"
               variant="ghost"
-              size="xs"
+              size="sm"
               data-test="o2-ai-chat-stopped-retry"
               @click="emit('retry', message)"
             >
-              <template #icon-left><OIcon name="refresh" size="sm" /></template>
+              <template #icon><OIcon name="refresh" size="sm" /></template>
               {{ t("common.retry") }}
             </OButton>
           </div>
@@ -228,12 +224,12 @@ const isStopped = computed(() =>
             <span class="min-w-0 flex-1">{{ block.message }}</span>
             <OButton
               v-if="!readonly && block.turnStatus === 'running'"
-              variant="outline"
-              size="xs"
+              variant="secondary"
+              size="sm"
               data-test="o2-ai-chat-running-stop"
               @click="emit('stop-turn')"
             >
-              <template #icon-left><OIcon name="stop" size="sm" /></template>
+              <template #icon><OIcon name="stop" size="sm" /></template>
               {{ t("aiAssistant.stopTurn") }}
             </OButton>
           </div>
@@ -248,12 +244,12 @@ const isStopped = computed(() =>
               <span class="inline-flex">
                 <OButton
                   variant="primary"
-                  size="xs"
+                  size="sm"
                   class="navigation-block-btn text-compact"
                   disabled
                   data-test="o2-ai-chat-navigate-locked"
                 >
-                  <template #icon-left
+                  <template #icon
                     ><OIcon name="lock" class="text-icon-locked" size="sm"
                   /></template>
                   {{ block.navigationAction.label }}
@@ -263,11 +259,11 @@ const isStopped = computed(() =>
             <OButton
               v-else
               variant="primary"
-              size="xs"
+              size="sm"
               class="navigation-block-btn text-compact"
               @click="emit('navigate', block.navigationAction)"
             >
-              <template #icon-left><OIcon :name="'open-in-new'" size="sm" /></template>
+              <template #icon><OIcon :name="'open-in-new'" size="sm" /></template>
               {{ block.navigationAction.label }}
             </OButton>
           </div>
@@ -289,15 +285,12 @@ const isStopped = computed(() =>
                   >
                     {{ getLanguageDisplay(textBlock.language) }}
                   </span>
-                  <OButton
-                    variant="ghost"
-                    size="xs"
+                  <OCopyButton
+                    size="sm"
                     class="copy-button"
-                    @click="copyToClipboard(textBlock.content, t)"
-                  >
-                    <OIcon size="sm" name="content-copy" />
-                    <span class="ms-1">{{ t("common.copy") }}</span>
-                  </OButton>
+                    show-label
+                    :value="textBlock.content"
+                  />
                 </div>
                 <span class="generated-code-block">
                   <code
@@ -311,7 +304,7 @@ const isStopped = computed(() =>
                 >
                   <OButton
                     variant="ghost"
-                    size="xs"
+                    size="sm"
                     class="retry-button"
                     @click="emit('retry', message)"
                   >
@@ -361,15 +354,7 @@ const isStopped = computed(() =>
                 >
                   {{ getLanguageDisplay(block.language) }}
                 </span>
-                <OButton
-                  variant="ghost"
-                  size="xs"
-                  class="copy-button"
-                  @click="copyToClipboard(block.content, t)"
-                >
-                  <OIcon size="sm" name="content-copy" />
-                  <span class="ms-1">{{ t("common.copy") }}</span>
-                </OButton>
+                <OCopyButton size="sm" class="copy-button" show-label :value="block.content" />
               </div>
               <span class="generated-code-block">
                 <code :class="['hljs', block.language]" v-html="block.highlightedContent"></code>
@@ -394,8 +379,9 @@ const isStopped = computed(() =>
           :class="message.feedback ? '*:opacity-100' : '*:opacity-50'"
         >
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-circle"
+            size="xs"
             :disabled="message.feedback === 'thumbs_up'"
             :class="message.feedback === 'thumbs_up' ? 'text-accent opacity-100!' : ''"
             data-test="o2-ai-chat-thumbs-up-btn"
@@ -406,8 +392,9 @@ const isStopped = computed(() =>
             <OTooltip :content="t('aiAssistant.helpful')" />
           </OButton>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-circle"
+            size="xs"
             :disabled="message.feedback === 'thumbs_down'"
             :class="message.feedback === 'thumbs_down' ? 'text-accent opacity-100!' : ''"
             data-test="o2-ai-chat-thumbs-down-btn"
@@ -444,7 +431,7 @@ const isStopped = computed(() =>
   line-height: 1.3 !important;
 }
 .text-block :deep(h4) {
-  font-size: var(--text-base) !important;
+  font-size: var(--text-sm) !important;
   font-weight: 600 !important;
   margin: 0.625rem 0 0.3125rem 0 !important;
   line-height: 1.3 !important;

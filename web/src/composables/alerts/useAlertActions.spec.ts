@@ -275,7 +275,7 @@ describe("useAlertActions", () => {
     vi.mocked(alerts.ackAlert).mockRejectedValue(refused);
     vi.mocked(alerts.unackAlert).mockRejectedValue(refused);
     await mountActions()[verb](target, { groupKey: "" });
-    expect(lastToast()?.title).toBe(title);
+    expect(lastToast()?.message).toContain(title);
   });
 
   it("shows a refusal with who is on call and who can act", async () => {
@@ -292,8 +292,7 @@ describe("useAlertActions", () => {
     expect(ok).toBe(false);
     expect(lastToast()).toMatchObject({
       variant: "error",
-      title: "You can't acknowledge this.",
-      message: "On call: Dana. Can also act: root@acme.io",
+      message: "You can't acknowledge this. On call: Dana. Can also act: root@acme.io",
     });
   });
 

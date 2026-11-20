@@ -16,23 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCollapsible
-    :model-value="isExpanded"
-    @update:model-value="handleToggle"
+    :open="isExpanded"
+    @update:open="handleToggle"
     class="field-expansion-item rounded-default w-full overflow-clip [overflow-clip-margin:0.25rem]"
-    trigger-class="px-0! py-0!"
   >
     <template #trigger>
       <OFieldRow
         :data-test="`log-search-expand-${field.name}-field-btn`"
         :highlight="isFieldSelected"
       >
-        <span class="me-1 flex w-[0.55rem] shrink-0 items-center justify-center">
-          <OIcon
-            class="text-text-muted inline-flex w-4 shrink-0 items-center justify-center"
-            :name="isExpanded ? 'expand-more' : 'chevron-right'"
-            size="sm"
-          />
-        </span>
         <OFieldLabel
           :field="field"
           :show-type-icon="false"
@@ -40,16 +32,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <OButton
-          :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
           v-if="showQuickMode && isInterestingCandidate"
-          variant="ghost-neutral"
+          icon-only
+          :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
+          variant="ghost"
           class="me-1 gap-0!"
           :title="
             field.isInterestingField
               ? t('logStream.removeFromInterestingFields')
               : t('logStream.addToInterestingFields')
           "
-          size="icon"
+          size="xs"
           @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
         >
           <OIcon :name="field.isInterestingField ? 'info-filled' : 'info-outline'" size="sm" />
@@ -57,48 +50,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #actions>
           <OButton
-            :aria-label="t('common.addFilter')"
             v-if="field.isSchemaField && showFilterIcon"
+            icon-only
+            :aria-label="t('common.addFilter')"
             :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
-            variant="ghost-neutral"
-            size="icon"
+            variant="ghost"
+            size="xs"
             @click.stop="$emit('add-to-filter', `${field.name}=''`)"
           >
             <OIcon name="add" size="sm" />
           </OButton>
           <OButton
+            v-if="showVisibilityToggle && !isFieldSelected"
+            icon-only
             :aria-label="t('common.addFieldToTable')"
             :data-test="`log-search-index-list-add-${field.name}-field-btn`"
-            v-if="showVisibilityToggle && !isFieldSelected"
-            variant="ghost-neutral"
-            size="icon"
+            variant="ghost"
+            size="xs"
             class="gap-0!"
             @click.stop="$emit('toggle-field', field)"
           >
             <OIcon name="visibility" size="sm" />
           </OButton>
           <OButton
+            v-if="showVisibilityToggle && isFieldSelected"
+            icon-only
             :aria-label="t('common.removeFieldFromTable')"
             :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
-            v-if="showVisibilityToggle && isFieldSelected"
-            variant="ghost-neutral"
+            variant="ghost"
             class="gap-0!"
-            size="icon"
+            size="xs"
             @click.stop="$emit('toggle-field', field)"
           >
             <OIcon name="visibility-off" size="sm" />
           </OButton>
           <OButton
-            :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
             v-if="showQuickMode && isInterestingCandidate"
-            variant="ghost-neutral"
+            icon-only
+            :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
+            variant="ghost"
             class="gap-0!"
             :title="
               field.isInterestingField
                 ? t('logStream.removeFromInterestingFields')
                 : t('logStream.addToInterestingFields')
             "
-            size="icon"
+            size="xs"
             @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
           >
             <OIcon :name="field.isInterestingField ? 'info-filled' : 'info-outline'" size="sm" />
@@ -257,10 +254,17 @@ const { t } = useI18nTyped();
    and content wrapper; the [data-state] rule targets this component's own item. */
 .field-expansion-item :deep(button[data-state]:not([role="checkbox"])) {
   min-height: 1.5rem !important;
+  padding-inline: 0;
+  gap: 0;
 }
 
 .field-expansion-item :deep(.o-collapsible-content) {
   width: 100%;
+}
+
+/* The values list carries its own inset, so the collapsible's body indent is dropped. */
+.field-expansion-item :deep(.o-collapsible-content > div) {
+  padding-inline-start: 0;
 }
 
 .field-expansion-item[data-state="open"] {

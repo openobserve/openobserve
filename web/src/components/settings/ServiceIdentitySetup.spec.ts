@@ -133,33 +133,23 @@ const ODialogStub = {
     persistent: { type: Boolean, default: false },
     size: { type: String, default: undefined },
     title: { type: String, default: undefined },
-    subTitle: { type: String, default: undefined },
+    subtitle: { type: String, default: undefined },
     showClose: { type: Boolean, default: true },
-    width: { type: [String, Number], default: undefined },
-    primaryButtonLabel: { type: String, default: undefined },
-    secondaryButtonLabel: { type: String, default: undefined },
-    neutralButtonLabel: { type: String, default: undefined },
-    primaryButtonVariant: { type: String, default: undefined },
-    secondaryButtonVariant: { type: String, default: undefined },
-    neutralButtonVariant: { type: String, default: undefined },
-    primaryButtonDisabled: { type: Boolean, default: false },
-    secondaryButtonDisabled: { type: Boolean, default: false },
-    neutralButtonDisabled: { type: Boolean, default: false },
-    primaryButtonLoading: { type: Boolean, default: false },
-    secondaryButtonLoading: { type: Boolean, default: false },
-    neutralButtonLoading: { type: Boolean, default: false },
+    primary: { type: Object, default: undefined },
+    secondary: { type: Object, default: undefined },
+    extra: { type: Object, default: undefined },
   },
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-sub-title="subTitle"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-loading="String(primaryButtonLoading)"
+      :data-sub-title="subtitle"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
+      :data-primary-loading="String(primary?.loading)"
     >
       <slot name="header" />
       <slot />
@@ -190,28 +180,18 @@ const ODrawerStub = {
     persistent: { type: Boolean, default: false },
     size: { type: String, default: undefined },
     title: { type: String, default: undefined },
-    subTitle: { type: String, default: undefined },
+    subtitle: { type: String, default: undefined },
     showClose: { type: Boolean, default: true },
-    width: { type: [String, Number], default: undefined },
-    primaryButtonLabel: { type: String, default: undefined },
-    secondaryButtonLabel: { type: String, default: undefined },
-    neutralButtonLabel: { type: String, default: undefined },
-    primaryButtonVariant: { type: String, default: undefined },
-    secondaryButtonVariant: { type: String, default: undefined },
-    neutralButtonVariant: { type: String, default: undefined },
-    primaryButtonDisabled: { type: Boolean, default: false },
-    secondaryButtonDisabled: { type: Boolean, default: false },
-    neutralButtonDisabled: { type: Boolean, default: false },
-    primaryButtonLoading: { type: Boolean, default: false },
-    secondaryButtonLoading: { type: Boolean, default: false },
-    neutralButtonLoading: { type: Boolean, default: false },
+    primary: { type: Object, default: undefined },
+    secondary: { type: Object, default: undefined },
+    extra: { type: Object, default: undefined },
   },
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-drawer-stub"
       :data-open="String(open)"
-      :data-width="String(width)"
+      :data-size="String(size)"
     >
       <slot name="header" />
       <slot />
@@ -797,7 +777,7 @@ describe("ServiceIdentitySetup", () => {
       expect(drawer.attributes("data-open")).toBe("false");
     });
 
-    it("should open the ODrawer with the computed width when openInsightDialog() is invoked", async () => {
+    it("should open the ODrawer at the fixed lg size when openInsightDialog() is invoked", async () => {
       wrapper = mountComponent();
       await flushPromises();
 
@@ -807,8 +787,7 @@ describe("ServiceIdentitySetup", () => {
 
       const drawer = wrapper.find('[data-test="o-drawer-stub"]');
       expect(drawer.attributes("data-open")).toBe("true");
-      // Default width when there are <= 2 related dimensions → 37 (percent)
-      expect(drawer.attributes("data-width")).toBe("37");
+      expect(drawer.attributes("data-size")).toBe("lg");
     });
 
     it("names the drawer after its visible title for assistive tech", async () => {

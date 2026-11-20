@@ -170,7 +170,7 @@ describe("FullViewContainer.vue", () => {
 
     it("applies custom label class", () => {
       wrapper = createWrapper({ labelClass: "text-red-500" });
-      const label = wrapper.find(".text-sm.font-bold");
+      const label = wrapper.find(".text-sm.font-semibold");
       expect(label.classes()).toContain("text-red-500");
     });
   });
@@ -178,13 +178,13 @@ describe("FullViewContainer.vue", () => {
   describe("Theme Handling", () => {
     it("applies semantic text color for light theme", () => {
       wrapper = createWrapper({}, { theme: "light" });
-      const label = wrapper.find(".text-sm.font-bold");
+      const label = wrapper.find(".text-sm.font-semibold");
       expect(label.classes()).toContain("text-text-secondary");
     });
 
     it("applies semantic text color for dark theme", () => {
       wrapper = createWrapper({}, { theme: "dark" });
-      const label = wrapper.find(".text-sm.font-bold");
+      const label = wrapper.find(".text-sm.font-semibold");
       expect(label.classes()).toContain("text-text-secondary");
     });
 
@@ -214,7 +214,7 @@ describe("FullViewContainer.vue", () => {
 
     it("emits update:isExpanded when label is clicked and showExpandIcon is true", async () => {
       wrapper = createWrapper({ isExpanded: false, showExpandIcon: true });
-      const label = wrapper.find(".text-sm.font-bold");
+      const label = wrapper.find(".text-sm.font-semibold");
 
       await label.trigger("click");
 
@@ -224,7 +224,7 @@ describe("FullViewContainer.vue", () => {
 
     it("does not emit update:isExpanded when label is clicked and showExpandIcon is false", async () => {
       wrapper = createWrapper({ isExpanded: false, showExpandIcon: false });
-      const label = wrapper.find(".text-sm.font-bold");
+      const label = wrapper.find(".text-sm.font-semibold");
 
       await label.trigger("click");
 
@@ -464,8 +464,8 @@ describe("FullViewContainer.vue", () => {
 
     it("applies correct label styling classes", () => {
       wrapper = createWrapper();
-      const label = wrapper.find(".text-sm.font-bold");
-      expect(label.classes()).toContain("font-bold");
+      const label = wrapper.find(".text-sm.font-semibold");
+      expect(label.classes()).toContain("font-semibold");
     });
 
     it("maintains correct component structure", () => {

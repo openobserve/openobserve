@@ -196,6 +196,6 @@ describe("QueryHistoryDrawer (Metrics on the shared drawer)", () => {
     breakpoint.mobile = true;
     const wrapper = mountDrawer();
     await open(wrapper);
-    expect(wrapper.find('[data-stub="drawer"]').attributes("data-size")).toBe("full");
+    expect(wrapper.find('[data-stub="drawer"]').attributes("data-size")).toBe("xl");
   });
 });

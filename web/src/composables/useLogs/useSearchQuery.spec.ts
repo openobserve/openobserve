@@ -1359,6 +1359,31 @@ describe("useSearchQuery › free text (item 1)", () => {
     expect(mockState.searchObj.data.query).toBe("status=500 -404");
   });
 
+  it("shows the no-FTS state for a typed match_all on a stream without full-text keys", () => {
+    select(noFtsStream("nofts_b"));
+    mockState.searchObj.data.query = "match_all('timeout')";
+    const { getQueryReq } = useSearchQuery(gt);
+    expect(getQueryReq(false)).toBeNull();
+    expect((mockState.searchObj.data as any).freeTextBlocked?.streams).toEqual(["nofts_b"]);
+  });
+
+  it("sends a typed match_all as written where the stream has full-text keys", () => {
+    select(ftsStream("fts_a"));
+    mockState.searchObj.data.query = "match_all('timeout')";
+    const { getQueryReq } = useSearchQuery(gt);
+    expect(getSql(getQueryReq(false))).toBe(`select * from "fts_a"  WHERE match_all('timeout')`);
+  });
+
+  it("leaves a no-FTS stream out of a typed match_all across streams", () => {
+    select(ftsStream("fts_a"), noFtsStream("nofts_b"));
+    mockState.searchObj.data.query = "match_all('timeout')";
+    const { getQueryReq } = useSearchQuery(gt);
+    const sql = getSql(getQueryReq(false));
+    expect(sql).toContain(`from "fts_a"`);
+    expect(sql).not.toContain(`from "nofts_b"`);
+    expect((mockState.searchObj.data as any).freeTextExcluded).toEqual(["nofts_b"]);
+  });
+
   it("sends a single-stream SQL-mode statement with a trailing comment as typed", () => {
     select(ftsStream("fts_a"));
     mockState.searchObj.meta.sqlMode = true;

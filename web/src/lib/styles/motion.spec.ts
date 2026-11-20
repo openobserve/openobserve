@@ -22,6 +22,7 @@ import { mount } from "@vue/test-utils";
 import { createMemoryHistory, createRouter } from "vue-router";
 import MenuLink from "@/components/MenuLink.vue";
 import store from "@/test/unit/helpers/store";
+import { ENTER_FADE, ENTER_SLIDE, ROUTE_ENTER } from "./motion";
 
 const src = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (path: string) => readFileSync(join(src, path), "utf8");
@@ -48,10 +49,15 @@ const CONTROLS = [
   "lib/core/Button/OButton.vue",
   "lib/core/ToggleGroup/OToggleGroupItem.vue",
   "lib/navigation/Tabs/OTab.vue",
+  "lib/overlay/shared/menuItem.ts",
+  "lib/forms/Select/OSelectItem.vue",
+];
+
+// The menu rows share one class builder, so its timing reaches every item.
+const MENU_ITEMS = [
   "lib/overlay/Dropdown/ODropdownItem.vue",
   "lib/overlay/Dropdown/ODropdownSub.vue",
   "lib/overlay/ContextMenu/OContextMenuItem.vue",
-  "lib/forms/Select/OSelectItem.vue",
 ];
 
 const MENUS = [
@@ -62,15 +68,52 @@ const MENUS = [
   "lib/overlay/ContextMenu/OContextMenu.vue",
 ];
 
-const PANELS = ["lib/overlay/Dialog/ODialog.vue", "lib/overlay/Drawer/ODrawer.vue"];
+const PANELS = [
+  ["lib/overlay/Dialog/ODialog.vue", "dialog"],
+  ["lib/overlay/Drawer/ODrawer.vue", "drawer"],
+];
+
+const INDICATORS = ["lib/navigation/Tabs/OTabs.vue", "lib/core/ToggleGroup/OToggleGroup.vue"];
 
 describe("one set of motion timings (item 9)", () => {
   it("declares the shared control and panel timings as tokens", () => {
     const semantic = read("lib/styles/tokens/semantic.css");
-    expect(semantic).toMatch(/--duration-control:\s*120ms/);
+    expect(semantic).toMatch(/--duration-control:\s*100ms/);
     expect(semantic).toMatch(/--ease-control:/);
-    expect(semantic).toMatch(/--duration-dialog-in:\s*200ms/);
-    expect(semantic).toMatch(/--duration-dialog-out:\s*150ms/);
+    expect(semantic).toMatch(/--duration-indicator:\s*150ms/);
+    expect(semantic).toMatch(/--duration-page-in:\s*120ms/);
+    expect(semantic).toMatch(/--duration-dialog-in:\s*160ms/);
+    expect(semantic).toMatch(/--duration-dialog-out:\s*120ms/);
+    expect(semantic).toMatch(/--duration-drawer-in:\s*200ms/);
+    expect(semantic).toMatch(/--duration-drawer-out:\s*150ms/);
+  });
+
+  it("gives bare transition utilities the control timing", () => {
+    const semantic = read("lib/styles/tokens/semantic.css");
+    expect(semantic).toMatch(/--default-transition-duration:\s*var\(--duration-control\)/);
+    expect(semantic).toMatch(/--default-transition-timing-function:\s*var\(--ease-control\)/);
+  });
+
+  it("enters a page within the page timing and leaves no transition-duration behind", () => {
+    for (const cls of [ENTER_FADE, ENTER_SLIDE]) {
+      expect(cls).toContain("animation-duration-(--duration-page-in)");
+      expect(cls.split(" ").some((c) => /(^|:)duration-/.test(c))).toBe(false);
+    }
+    const utilities = read("styles/utilities.css");
+    expect(utilities).toContain(`@utility ${ROUTE_ENTER}`);
+    expect(utilities).toContain("[data-o2-page-shell]");
+    expect(read("lib/core/PageHeader/OPageHeader.vue")).toContain("data-o2-page-shell");
+    expect(read("lib/core/PageLayout/OPageLayout.vue")).toContain("data-o2-page-shell");
+  });
+
+  it.each(INDICATORS)("slides the %s indicator on the indicator timing", (file) => {
+    const code = read(file);
+    expect(code).toContain("duration-(--duration-indicator)");
+    expect(code).not.toMatch(/duration-[3-9]00/);
+  });
+
+  it.each(MENU_ITEMS)("draws %s with the shared menu row classes", (file) => {
+    expect(read(file)).toContain("menuItemClasses(");
   });
 
   it.each(CONTROLS)("colours %s with the shared control timing", (file) => {
@@ -88,10 +131,10 @@ describe("one set of motion timings (item 9)", () => {
     expect(code).not.toMatch(/o2-reveal-[a-z]+-(in|out)_\d+ms/);
   });
 
-  it.each(PANELS)("moves %s on the dialog timing tokens", (file) => {
+  it.each(PANELS)("moves %s on its own %s timing tokens", (file, kind) => {
     const code = read(file);
-    expect(code).toContain("duration-(--duration-dialog-in)");
-    expect(code).toContain("duration-(--duration-dialog-out)");
+    expect(code).toContain(`animation-duration-(--duration-${kind}-in)`);
+    expect(code).toContain(`animation-duration-(--duration-${kind}-out)`);
     expect(code).not.toMatch(/ease-\[cubic-bezier/);
     expect(code).not.toMatch(/data-\[state=(open|closed)\]:duration-\d/);
   });

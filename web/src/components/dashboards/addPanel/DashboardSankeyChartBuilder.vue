@@ -45,8 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButtonGroup
           class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 me-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
-          radius="sm"
-          :divided="true"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.source
@@ -62,14 +60,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
+            icon-only
             :aria-label="t('common.dragToReorder')"
             variant="ghost"
-            size="icon-chip"
-            class="!w-4 !cursor-grab"
+            size="xs"
+            class="!cursor-grab"
             @mousedown="armDrag()"
             :data-test="`dashboard-source-item-${sourceLabel}-drag`"
           >
-            <template #icon-left>
+            <template #icon>
               <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
             </template>
           </OButton>
@@ -77,12 +76,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #trigger>
               <OButton
                 variant="ghost"
-                size="chip-12"
+                size="xs"
                 class="!ps-1 !pe-1"
                 :data-test="`dashboard-source-item-${sourceLabel}`"
               >
                 <AxisFieldChipLabel :label="sourceLabel" />
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                <template #icon-end><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
@@ -121,14 +120,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
+            icon-only
             :aria-label="t('common.remove')"
             variant="ghost"
-            size="icon-chip"
-            class="!w-4"
+            size="xs"
             :data-test="`dashboard-source-item-${sourceLabel}-remove`"
             @click="removeSource()"
           >
-            <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
+            <template #icon><OIcon name="close" size="xs" class="!size-2.5" /></template>
           </OButton>
         </OButtonGroup>
         <div
@@ -173,8 +172,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButtonGroup
           class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel my-0.5 me-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
-          radius="sm"
-          :divided="true"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.target
@@ -190,14 +187,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
+            icon-only
             :aria-label="t('common.dragToReorder')"
             variant="ghost"
-            size="icon-chip"
-            class="!w-4 !cursor-grab"
+            size="xs"
+            class="!cursor-grab"
             @mousedown="armDrag()"
             :data-test="`dashboard-target-item-${targetLabel}-drag`"
           >
-            <template #icon-left>
+            <template #icon>
               <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
             </template>
           </OButton>
@@ -205,12 +203,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #trigger>
               <OButton
                 variant="ghost"
-                size="chip-12"
+                size="xs"
                 class="!ps-1 !pe-1"
                 :data-test="`dashboard-target-item-${targetLabel}`"
               >
                 <AxisFieldChipLabel :label="targetLabel" />
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                <template #icon-end><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
@@ -249,14 +247,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
+            icon-only
             :aria-label="t('common.remove')"
             variant="ghost"
-            size="icon-chip"
-            class="!w-4"
+            size="xs"
             :data-test="`dashboard-target-item-${targetLabel}-remove`"
             @click="removeTarget()"
           >
-            <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
+            <template #icon><OIcon name="close" size="xs" class="!size-2.5" /></template>
           </OButton>
         </OButtonGroup>
         <div
@@ -300,8 +298,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButtonGroup
           class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 me-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
-          radius="sm"
-          :divided="true"
           v-if="
             dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
               ?.value
@@ -317,14 +313,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
+            icon-only
             :aria-label="t('common.dragToReorder')"
             variant="ghost"
-            size="icon-chip"
-            class="!w-4 !cursor-grab"
+            size="xs"
+            class="!cursor-grab"
             @mousedown="armDrag()"
             :data-test="`dashboard-value-item-${valueLabel}-drag`"
           >
-            <template #icon-left>
+            <template #icon>
               <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
             </template>
           </OButton>
@@ -332,12 +329,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #trigger>
               <OButton
                 variant="ghost"
-                size="chip-12"
+                size="xs"
                 class="!ps-1 !pe-1"
                 :data-test="`dashboard-value-item-${valueLabel}`"
               >
                 <AxisFieldChipLabel :label="valueLabel" />
-                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                <template #icon-end><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
@@ -376,14 +373,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
+            icon-only
             :aria-label="t('common.remove')"
             variant="ghost"
-            size="icon-chip"
-            class="!w-4"
+            size="xs"
             :data-test="`dashboard-value-item-${valueLabel}-remove`"
             @click="removeValue()"
           >
-            <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
+            <template #icon><OIcon name="close" size="xs" class="!size-2.5" /></template>
           </OButton>
         </OButtonGroup>
         <div

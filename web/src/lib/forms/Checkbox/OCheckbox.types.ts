@@ -4,8 +4,6 @@ import type { I18nText } from "@/types/i18n";
 
 import type { InjectionKey } from "vue";
 
-export type CheckboxSize = "xs" | "sm" | "md";
-export type CheckboxColor = "primary" | "negative";
 /**
  * Identifier values used in group/custom-value mode. Excludes `boolean` on
  * purpose: Vue auto-coerces optional Boolean-typed props to `false` when not
@@ -25,22 +23,20 @@ export interface CheckboxProps {
    * of the group's checked-values array.
    */
   value?: CheckboxPrimitive;
-  /** Compatibility alias for `value` */
-  val?: CheckboxPrimitive;
   /** Accessible label rendered next to the checkbox */
   label?: I18nText;
+  /** Secondary line under the label */
+  description?: I18nText;
+  /** Shows the mixed state (a select-all with some rows on); a click checks it. */
+  indeterminate?: boolean;
   /** Names the control when it has no visible label — a wrapping <label> cannot. */
   ariaLabel?: I18nText;
-  /** Control size */
-  size?: CheckboxSize;
   /** Value to emit when checked in custom-value mode */
   trueValue?: CheckboxPrimitive;
   /** Value to emit when unchecked in custom-value mode */
   falseValue?: CheckboxPrimitive;
   /** Value to emit in indeterminate state in custom-value mode */
   indeterminateValue?: CheckboxPrimitive;
-  /** Colour scheme — "primary" (default blue) or "negative" (red/error) */
-  color?: CheckboxColor;
   /** Prevents interaction */
   disabled?: boolean;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */

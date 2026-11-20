@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col gap-1 py-1.5" :data-test="`bulk-review-group-${slug}`">
     <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
       <OCheckbox
-        size="sm"
         :model-value="tick"
         :disabled="disabled || group.locked || addable === 0"
         :aria-label="t('insight.bulk.tickGroup', { group: title })"
@@ -34,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OButton
         v-if="!group.locked && group.key !== NO_TEAM"
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         :disabled="disabled"
         :data-test="`bulk-review-group-change-${slug}`"
         @click="editing = !editing"
@@ -44,8 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-if="collapsible"
-        variant="ghost-muted"
-        size="xs"
+        variant="ghost"
+        size="sm"
         class="ms-auto"
         :data-test="`bulk-review-group-collapse-${slug}`"
         @click="emit('collapse')"
@@ -65,8 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t("insight.bulk.noTeamWhy") }}
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         :disabled="disabled"
         :data-test="`bulk-review-group-choose-${slug}`"
         @click="editing = !editing"
@@ -83,8 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="lock" size="xs" aria-hidden="true" />
       {{ lockedLine(t, group) }}
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         :data-test="`bulk-review-group-request-${slug}`"
         @click="copyRequest"
       >
@@ -102,8 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="disabled"
         @update:model-value="apply(false)"
         class="w-52"
-        size="sm"
-        label-position="inside"
+        variant="filter"
         :label="t('insight.bulk.changeFolder')"
         :options="folderOptions"
         :data-test="`bulk-review-group-folder-${slug}`"
@@ -113,16 +111,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="disabled"
         @update:model-value="apply(false)"
         class="w-72"
-        size="sm"
         multiple
-        label-position="inside"
+        variant="filter"
         :label="t('insight.bulk.changeDestinations')"
         :options="destinationOptions"
         :data-test="`bulk-review-group-destinations-${slug}`"
       />
       <OButton
-        variant="outline"
-        size="sm"
+        variant="secondary"
         :disabled="disabled"
         :data-test="`bulk-review-group-apply-${slug}`"
         @click="apply(true)"

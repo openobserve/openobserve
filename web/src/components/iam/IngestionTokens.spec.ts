@@ -51,15 +51,7 @@ import { queryClient } from "@/composables/query/queryClient";
 // form-id (the footer Save submits via it in the app).
 const ODialogStub = {
   name: "ODialog",
-  props: [
-    "open",
-    "title",
-    "persistent",
-    "size",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "formId",
-  ],
+  props: ["open", "title", "persistent", "size", "primary", "secondary", "formId"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `<div data-test-stub="o-dialog" :data-form-id="formId"><slot /></div>`,
   inheritAttrs: false,
@@ -250,7 +242,7 @@ describe("IngestionTokens — revoke Splunk HEC token confirm", () => {
     const wrapper = mountComp();
     const ProviderDialogStub = {
       name: "ODialog",
-      props: ["open", "title", "primaryButtonVariant"],
+      props: ["open", "title", "primary"],
       template: `<div data-test-stub="provider-dialog"><slot /></div>`,
     };
     const provider = mount(ConfirmDialogProvider, {
@@ -263,9 +255,7 @@ describe("IngestionTokens — revoke Splunk HEC token confirm", () => {
     const name = provider.find('[data-test="confirm-dialog-provider-name"]');
     expect(name.text()).toBe("edge-forwarder");
     expect(name.classes()).toContain("font-semibold");
-    expect(provider.findComponent(ProviderDialogStub).props("primaryButtonVariant")).toBe(
-      "destructive",
-    );
+    expect(provider.findComponent(ProviderDialogStub).props("primary")?.variant).toBe("danger");
 
     useConfirmDialog().handleCancel();
     await pending;
@@ -292,7 +282,7 @@ describe("IngestionTokens — analytics", () => {
 const OTableRowsStub = {
   name: "OTable",
   props: ["data", "rowActions"],
-  template: `<div><div v-for="row in data" :key="row.name" :data-test="'row-' + row.name"><slot name="cell-name" :row="row" /><slot name="cell-token" :row="row" /><template v-for="action in rowActions" :key="action.id"><i v-if="!action.visible || action.visible(row)" :data-test="action.dataTest(row)" /></template></div></div>`,
+  template: `<div><div v-for="row in data" :key="row.name" :data-test="'row-' + row.name"><slot name="cell-name" :row="row" /><slot name="cell-token" :row="row" /><template v-for="action in rowActions" :key="action.id"><i v-if="!action.hidden?.(row)" :data-test="action.dataTest(row)" /></template></div></div>`,
 };
 
 function mountRows(rows: Record<string, unknown>[], table: unknown = OTableRowsStub) {

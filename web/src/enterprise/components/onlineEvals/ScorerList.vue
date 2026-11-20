@@ -5,20 +5,18 @@
         v-model:selected-ids="selectedIds"
         selection="multiple"
         data-test="scorer-list-table"
-        :data="numberedRows"
+        :data="filteredRows"
         :columns="columns"
         row-key="id"
         :loading="loading"
         :forbidden="forbidden"
         :global-filter="search"
-        :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
         :default-columns="false"
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="scorer-list"
-        width="100%"
         class="h-full w-full"
         @row-click="(row: any) => $emit('view', row)"
       >
@@ -28,7 +26,6 @@
             class="min-w-0 flex-1 md:min-w-48"
             :placeholder="t('onlineEvals.scorer.searchPlaceholder')"
             data-test="scorer-list-search-input"
-            clearable
             @update:model-value="$emit('update:search', $event as string)"
           />
           <OStatStrip
@@ -47,64 +44,51 @@
 
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastRunAt"
             :loading="refreshing || loading"
-            shortcut-id="scorersRefresh"
+            shortcut="scorersRefresh"
             data-test="scorer-list-refresh-btn"
             @click="emit('refresh')"
           />
         </template>
 
         <template #empty>
-          <div class="flex items-center justify-center py-8">
-            <!-- Special-case empty: the org has no LLM providers yet. LLM Judge
-                 scorers (the most common type) can't be created without one, so
-                 we surface a dedicated provider-onboarding card. Rendered inside
-                 the table's #empty slot (not EvalListShell's) so the search bar
-                 and column header stay visible — consistent with the no-scorers
-                 state and the Eval Jobs / Score Configs list pages. Reuses the
-                 shared `no-llm-providers` preset with scorer-specific copy. -->
-            <OEmptyState
-              v-if="showNoProvidersState"
-              size="hero"
-              preset="no-llm-providers"
-              :title="t('onlineEvals.scorer.noProviders.title')"
-              :description="t('onlineEvals.scorer.noProviders.description')"
-              data-test="scorer-no-providers-state"
-              @action="(id) => id === 'create' && $emit('add-provider')"
-            />
-            <OEmptyState
-              v-else
-              size="hero"
-              preset="no-scorers"
-              :filtered="hasFilters"
-              :actions="[
-                {
-                  id: 'create',
-                  icon: 'add',
-                  titleKey: 'emptyState.noScorers.action',
-                  descriptionKey: 'emptyState.noScorers.actionDesc',
-                },
-                {
-                  id: 'import',
-                  icon: 'upload-file',
-                  titleKey: 'emptyState.noScorers.import',
-                  descriptionKey: 'emptyState.noScorers.importDesc',
-                },
-              ]"
-              data-test="scorer-empty-state"
-              @action="onEmptyAction"
-            />
-          </div>
+          <!-- LLM Judge scorers can't be created without a provider; inside the
+               table's #empty so the search bar and column header stay visible. -->
+          <OEmptyState
+            v-if="showNoProvidersState"
+            :title="t('onlineEvals.scorer.noProviders.title')"
+            :text="t('onlineEvals.scorer.noProviders.description')"
+            data-test="scorer-no-providers-state"
+            :action-label="t('emptyState.noLlmProviders.action')"
+            @action="$emit('add-provider')"
+          />
+          <OEmptyState
+            v-else
+            :kind="hasFilters ? 'filtered' : 'first-run'"
+            :title="
+              hasFilters
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.scorers') })
+                : t('emptyState.noScorers.title')
+            "
+            :text="
+              hasFilters
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.scorers') })
+                : t('emptyState.noScorers.description')
+            "
+            :icon="hasFilters ? undefined : 'insights'"
+            :action-label="hasFilters ? undefined : t('emptyState.noScorers.action')"
+            :secondary-action-label="hasFilters ? undefined : t('emptyState.noScorers.import')"
+            @action="onEmptyAction(hasFilters ? 'clear-filters' : 'create')"
+            @secondary-action="onEmptyAction('import')"
+            data-test="scorer-empty-state"
+          />
         </template>
 
         <template #selection-actions>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="download"
+            variant="secondary"
+            icon="download"
             data-test="scorer-bulk-export-btn"
             @click="handleBulkExport"
           >
@@ -143,48 +127,49 @@
         <template #cell-actions="{ row }">
           <div class="actions-container flex items-center">
             <OButton
+              icon-only
               :data-test="`scorer-list-${row.name}-edit-btn`"
               data-row-action="edit"
               variant="ghost"
-              size="icon-sm"
               :title="t('onlineEvals.actions.edit')"
-              icon-left="edit"
+              icon="edit"
               class="max-md:hidden"
               @click.stop="$emit('edit', row)"
             />
             <OButton
+              icon-only
               :data-test="`scorer-list-${row.name}-export-btn`"
               variant="ghost"
-              size="icon-sm"
               :title="t('onlineEvals.actions.export')"
-              icon-left="download"
+              icon="download"
               class="max-md:hidden"
               @click.stop="$emit('export', row)"
             />
             <OButton
+              icon-only
               :data-test="`scorer-list-${row.name}-delete-btn`"
               data-row-action="delete"
-              variant="ghost-destructive"
-              size="icon-sm"
+              variant="danger-ghost"
               :title="t('onlineEvals.actions.delete')"
-              icon-left="delete"
+              icon="delete"
               class="max-md:hidden"
               @click.stop="$emit('delete', row)"
             />
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  icon-only
                   :aria-label="t('common.moreActions')"
-                  icon-left="more-vert"
+                  icon="more-vert"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   data-test="scorer-list-row-more-actions"
                   @click.stop
                 />
               </template>
               <ODropdownItem
-                icon-left="edit"
+                icon="edit"
                 class="md:hidden"
                 :data-test="`scorer-list-${row.name}-edit-btn-menu`"
                 @select="$emit('edit', row)"
@@ -192,7 +177,7 @@
                 <span>{{ t("onlineEvals.actions.edit") }}</span>
               </ODropdownItem>
               <ODropdownItem
-                icon-left="download"
+                icon="download"
                 class="md:hidden"
                 :data-test="`scorer-list-${row.name}-export-btn-menu`"
                 @select="$emit('export', row)"
@@ -200,8 +185,8 @@
                 <span>{{ t("onlineEvals.actions.export") }}</span>
               </ODropdownItem>
               <ODropdownItem
-                icon-left="delete"
-                variant="destructive"
+                icon="delete"
+                tone="danger"
                 class="md:hidden"
                 :data-test="`scorer-list-${row.name}-delete-btn-menu`"
                 @select="$emit('delete', row)"
@@ -218,7 +203,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -241,7 +226,6 @@ import type {
 import { entityId, scorerTypeOf, valueOf } from "./utils/evalEntity";
 import EvalListShell from "./EvalListShell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import { useNumberedRows } from "./composables/useNumberedRows";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
@@ -291,14 +275,6 @@ function handleBulkExport() {
 
 const columns = computed(() =>
   [
-    {
-      id: "#",
-      header: raw("#"),
-      accessorKey: "#",
-      sortable: false,
-      size: 56,
-      meta: { align: "left" },
-    },
     {
       id: "name",
       header: t("onlineEvals.scorer.columns.name"),
@@ -353,7 +329,7 @@ const columns = computed(() =>
     ...c,
     // Every column except the row index, the name (row identity) and the
     // actions column is offered in OTable's "Manage columns" chooser.
-    hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
+    hideable: c.id !== "name" && !c.isAction,
   })),
 );
 
@@ -362,8 +338,6 @@ const filteredRows = computed(() =>
     matchesAnyKey(typeFilters.value, row, (r, key) => scorerTypeOf(r) === key),
   ),
 );
-
-const numberedRows = useNumberedRows(filteredRows);
 
 // Type breakdown for the summary strip (over all scorers, so the counts stay
 // stable as you filter). Tiles double as filters wired to `typeFilters`.

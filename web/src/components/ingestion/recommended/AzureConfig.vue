@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex items-start gap-3">
         <div
-          class="bg-status-info-bg text-status-info-text flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+          class="bg-status-info-bg text-status-info-text flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
         >
           {{ t("ingestion.azureSetup.step1Number") }}
         </div>
@@ -51,11 +51,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OButton
             variant="primary"
-            size="sm"
             @click="handleDeploy"
             data-test="azure-activity-logs-deploy-btn"
           >
-            <template #icon-left><OIcon name="rocket-launch" size="sm" /></template>
+            <template #icon><OIcon name="rocket-launch" size="sm" /></template>
             {{ t("ingestion.azureSetup.deployToAzure") }}
           </OButton>
         </div>
@@ -68,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex items-start gap-3">
         <div
-          class="bg-status-info-bg text-status-info-text flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+          class="bg-status-info-bg text-status-info-text flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
         >
           {{ t("ingestion.azureSetup.step2Number") }}
         </div>
@@ -137,12 +136,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="flex gap-2">
                   <OButton
-                    variant="ghost-primary"
-                    size="xs"
+                    variant="accent-ghost"
+                    size="sm"
                     @click="enabledCategories = LOG_CATEGORIES.map((c) => c.value)"
                     >{{ t("ingestion.azureSetup.selectAllCategories") }}</OButton
                   >
-                  <OButton variant="ghost-primary" size="xs" @click="enabledCategories = []">{{
+                  <OButton variant="accent-ghost" size="sm" @click="enabledCategories = []">{{
                     t("ingestion.azureSetup.clearCategories")
                   }}</OButton>
                 </div>
@@ -152,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="cat in LOG_CATEGORIES"
                   :key="cat.value"
                   v-model="enabledCategories"
-                  :val="cat.value"
+                  :value="cat.value"
                   :label="raw(cat.label)"
                 />
               </div>

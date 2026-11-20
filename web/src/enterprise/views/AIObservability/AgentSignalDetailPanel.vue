@@ -16,9 +16,9 @@
 -->
 <template>
   <ODrawer
+    size="lg"
     :open="open"
     side="right"
-    :width="55"
     :title="raw(title)"
     data-test="agent-signal-detail-panel"
     @update:open="(v: boolean) => emit('update:open', v)"
@@ -56,9 +56,8 @@
         <!-- Waits for the evidence so the question to O2 AI carries it. -->
         <OButton
           v-if="explainable"
-          variant="outline"
-          size="sm"
-          icon-left="auto-awesome"
+          variant="secondary"
+          icon="auto-awesome"
           class="shrink-0"
           :disabled="loading"
           :title="t('aiObservability.behavior.detail.explainHelp')"
@@ -90,7 +89,6 @@
           @retry="fetchDetails"
           :empty-message="t('aiObservability.behavior.detail.noErrors')"
           :default-columns="false"
-          :frame="false"
           wrap
         >
           <!-- Show the condensed one-liner; reveal the full raw error on demand
@@ -104,8 +102,8 @@
               </span>
               <OButton
                 v-if="row.full && row.full !== row.message"
-                variant="ghost-primary"
-                size="chip"
+                variant="accent-ghost"
+                size="xs"
                 class="self-start"
                 data-test="agent-signal-detail-toggle-error-btn"
                 @click.stop="toggleError(row.full)"
@@ -143,7 +141,6 @@
           @retry="fetchDetails"
           :empty-message="t('aiObservability.behavior.detail.noTraces')"
           :default-columns="false"
-          :frame="false"
           pagination="client"
           :page-size="10"
           v-on="rowClickListeners"

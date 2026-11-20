@@ -110,13 +110,13 @@ vi.mock("@/components/alerts/QueryEditorDialog.vue", () => ({
   },
 }));
 
-// Mock CustomConfirmDialog component
-vi.mock("@/components/alerts/CustomConfirmDialog.vue", () => ({
+// Mock ConfirmDialog component
+vi.mock("@/components/ConfirmDialog.vue", () => ({
   default: {
-    name: "CustomConfirmDialog",
-    template: "<div data-test='mock-custom-confirm-dialog'></div>",
-    props: ["modelValue", "title", "message"],
-    emits: ["confirm", "cancel"],
+    name: "ConfirmDialog",
+    template: "<div data-test='mock-confirm-dialog'></div>",
+    props: ["modelValue", "kind", "title", "message", "okLabel"],
+    emits: ["update:ok", "update:cancel", "update:modelValue"],
   },
 }));
 

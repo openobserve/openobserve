@@ -36,32 +36,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          teleport target. Section pages (functions/enrichment/eval) render
          nothing here — their content components have their own headers. -->
       <OPageHeader
-        :title="showPipelineActions ? t('menu.pipeline') : breadcrumbLabel"
-        :subtitle="
-          showPipelineActions
-            ? t('pipeline.subtitle')
-            : routeName === 'createPipeline'
-              ? breadcrumbLabel
-              : raw('')
-        "
-        :title-overflow="routeName === 'createPipeline' ? 'visible' : 'truncate'"
-        :icon="showPipelineActions ? 'lan' : undefined"
+        :title="showPipelineActions ? t('function.streamPipeline') : breadcrumbLabel"
+        :about="showPipelineActions ? t('pipeline.subtitle') : undefined"
         :back="detailBack"
-        :tabs-below="showPipelineActions"
-        class="border-border-default border-b"
       >
-        <!-- Section switcher tabs (Stream Pipelines / Functions / …) next to the
-           title on the list page; hidden on detail sub-pages (editor/history).
-           Always pass the slot so hasTabs tracks showPipelineActions reactively
-           via the slot function call instead of relying on slot presence tracking. -->
+        <!-- Always pass the slot: hasTabs reads the slot's content, so the row follows showPipelineActions. -->
         <template #tabs>
           <PipelineSectionTabs v-if="showPipelineActions" />
         </template>
-        <!-- Teleport target for the create-page pipeline NAME, which IS the
-           title here (the "New pipeline" label moves to the subtitle above, as
-           on the panel/alert/function editors). The control itself is owned and
-           teleported in by PipelineEditor.vue, so it sits with the save logic
-           that validates it. -->
+        <!-- PipelineEditor.vue teleports the new pipeline's name control here, beside the save logic that validates it. -->
         <template v-if="routeName === 'createPipeline'" #title>
           <span id="o2-page-title" class="contents"></span>
         </template>
@@ -70,9 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="!shouldCollapseActions">
               <OButton
                 data-test="pipeline-list-history-btn"
-                variant="outline"
-                size="sm"
-                icon-left="history"
+                variant="secondary"
+                icon="history"
                 @click="goToPipelineHistory"
               >
                 {{ t("pipeline.history") }}
@@ -80,18 +62,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="config.isEnterprise == 'true'"
                 data-test="pipeline-list-backfill-btn"
-                variant="outline"
-                size="sm"
-                icon-left="refresh"
+                variant="secondary"
+                icon="refresh"
                 @click="goToBackfillJobs"
               >
                 {{ t("pipeline.backfill") }}
               </OButton>
               <OButton
                 data-test="pipeline-list-import-pipeline-btn"
-                variant="outline"
-                size="sm"
-                icon-left="upload-file"
+                variant="secondary"
+                icon="upload-file"
                 @click="goToImportPipeline"
               >
                 {{ t("pipeline.import") }}
@@ -100,7 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="pipeline-list-add-pipeline-btn"
               variant="primary"
-              size="sm"
               :aria-label="
                 pipelineDrafts.hasNew
                   ? t('common.editorDraft.newDot', { label: t('pipeline.addPipeline') })
@@ -119,11 +98,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown v-if="shouldCollapseActions" align="end">
               <template #trigger>
                 <OButton
-                  variant="outline"
-                  size="sm"
+                  icon-only
+                  variant="ghost"
                   data-test="pipeline-list-overflow-menu-btn"
-                  :aria-label="t('dashboard.moreActions')"
-                  icon-left="menu"
+                  :label="t('common.more')"
+                  icon="more-horiz"
                 />
               </template>
               <ODropdownItem
@@ -231,16 +210,13 @@ export default defineComponent({
         return name ? raw(name) : t("pipeline.editPipeline");
       },
       createPipeline: () => t("pipeline.addPipeline"),
-      importPipeline: () => t("pipeline.import"),
+      importPipeline: () => t("pipeline.importPipelineTitle"),
       pipelineHistory: () => t("pipeline.history"),
       pipelineBackfill: () => t("pipeline.backfill"),
     };
     const isDetailView = computed(() => routeName.value in detailLabels);
     const breadcrumbLabel = computed(() => detailLabels[routeName.value]?.() ?? raw(""));
 
-    // On a detail sub-page (editor/create/history/backfill) the leading icon
-    // becomes a Back button to the pipelines list, mirroring the CRUD sub-page
-    // pattern used elsewhere. Undefined on the list page (icon stays).
     const detailBack = computed(() =>
       isDetailView.value
         ? {
@@ -312,7 +288,6 @@ export default defineComponent({
 
     return {
       t,
-      raw,
       store,
       config,
       pipelineDrafts,

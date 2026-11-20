@@ -85,6 +85,7 @@ async function onSubmit(values: { name: string; email: string }) {
     <OFormInput name="name" label="Name" required />
     <OFormInput name="email" label="Email" required />
     <OButton
+      variant="primary"
       type="submit"
       :loading="isSubmitting"
       :disabled="!canSubmit"
@@ -216,7 +217,7 @@ useLeaveGuard(() => changes.value > 0, {
 **Import:** `@/lib/forms/Color/OColor.vue`
 **Use when:** Picking a single `#RRGGBB` hex color — a swatch opens a Reka saturation/brightness + hue popover, with an always-visible hex text input.
 **Don't use for:** A choice among a fixed palette of named colors — use `OSelect`/`OOptionGroup`. Inside an `OForm`, use `OFormColor`.
-**Key props:** `modelValue` (`string` — `#RRGGBB`), `readonly` (`boolean`, default `false` — swatch-only, text input read-only), `clearable` (`boolean`, default `false`), `disabled` (`boolean`, default `false`), `required` (`boolean`), `size` (`"sm" | "md"`, default `"md"`), `label`, `placeholder` (default `#000000`), `helpText`, `errorMessage`, `error` (`boolean`), `id`, `name`.
+**Key props:** `modelValue` (`string` — `#RRGGBB`), `readonly` (`boolean`, default `false` — swatch-only, text input read-only), `clearable` (`boolean`, default `false`), `disabled` (`boolean`, default `false`), `required` (`boolean`), `size` (`"sm"` 28 | `"md"` 32 default — S1), `label`, `placeholder` (default `#000000`), `helpText`, `errorMessage`, `error` (`boolean`), `id`, `name`.
 **Slots:** `label`, `tooltip` (renders an info icon in the label row).
 **Emits:** `update:modelValue` (string), `change` (string), `clear`, `blur` (FocusEvent), `focus` (FocusEvent).
 **Example:**
@@ -285,7 +286,7 @@ The picker's value is an **icon token**, not plain text — either a Unicode emo
 **Import:** `@/lib/forms/Date/ODate.vue`
 **Use when:** Selecting a single calendar date as `YYYY-MM-DD`.
 **Don't use for:** A start/end date span — use [ODateRangeCalendar](#odaterangecalendar) or [ODateTimeRange](#odatetimerange). A date **and** time-of-day range — use [ODateTimeRange](#odatetimerange). Inside an `OForm`, use `OFormDate`.
-**Key props:** `modelValue` (`string` — `YYYY-MM-DD`), `min` / `max` (`string` — `YYYY-MM-DD`), `clearable` (`boolean`), `autoApply` (`boolean`, default `true` — apply on click; set `false` for an Apply button), `readonly` (`boolean`), `disabled` (`boolean`, default `false`), `required` (`boolean`), `size` (`"sm" | "md"`, default `"md"`), `label`, `placeholder`, `helpText`, `errorMessage`, `error` (`boolean`), `id`, `name`.
+**Key props:** `modelValue` (`string` — `YYYY-MM-DD`), `min` / `max` (`string` — `YYYY-MM-DD`), `clearable` (`boolean`), `autoApply` (`boolean`, default `true` — apply on click; set `false` for an Apply button), `readonly` (`boolean`), `disabled` (`boolean`, default `false`), `required` (`boolean`), `size` (`"sm"` 28 | `"md"` 32 default — S1), `prefix` (text inside the box before the date, for a toolbar: "Day:", S3; there is no inside label), `label`, `placeholder`, `helpText`, `errorMessage`, `error` (`boolean`), `id`, `name`.
 **Slots:** `label`, `tooltip`.
 **Emits:** `update:modelValue` (string), `change` (string), `clear`, `blur`, `focus`.
 **Example:**
@@ -317,7 +318,7 @@ The picker's value is an **icon token**, not plain text — either a Unicode emo
 **Import:** `@/lib/forms/Time/OTime.vue`
 **Use when:** Selecting a time of day as `HH:MM` (or `HH:MM:SS` with `withSeconds`).
 **Don't use for:** A full date+time — pair with `ODate` or use `ODateTimeRange`. Inside an `OForm`, use `OFormTime`.
-**Key props:** `modelValue` (`string` — `HH:MM` / `HH:MM:SS`), `withSeconds` (`boolean`, default `false`), `min` / `max` (`string` — `HH:MM`), `step` (`number` — seconds, default 60), `clearable` (`boolean`), `readonly` (`boolean`), `disabled` (`boolean`, default `false`), `required` (`boolean`), `size` (`"sm" | "md"`, default `"md"`), `label`, `placeholder`, `helpText`, `errorMessage`, `error` (`boolean`), `id`, `name`.
+**Key props:** `modelValue` (`string` — `HH:MM` / `HH:MM:SS`), `withSeconds` (`boolean`, default `false`), `min` / `max` (`string` — `HH:MM`), `step` (`number` — seconds, default 60), `clearable` (`boolean`), `readonly` (`boolean`), `disabled` (`boolean`, default `false`), `required` (`boolean`), `size` (`"sm"` 28 | `"md"` 32 default — S1), `label`, `placeholder`, `helpText`, `errorMessage`, `error` (`boolean`), `id`, `name`.
 **Slots:** `label`, `tooltip`.
 **Emits:** `update:modelValue` (string), `change` (string), `clear`, `blur`, `focus`.
 **Example:**
@@ -344,36 +345,36 @@ The picker's value is an **icon token**, not plain text — either a Unicode emo
 
 ## DateTimeRange family
 
-Three distinct components — do not confuse them:
+One picker for every time-scoped screen (F8). `components/DateTime.vue` is gone; every importer now uses `ODateTimeRange`:
 
-- **`ODateTimeRange`** — the full standalone headless picker: a popover trigger with Relative and Absolute tabs, `OTime` inputs, timezone selector, and its own Reka `RangeCalendar` (built directly, it does **not** consume `ODateRangeCalendar`). Value is exposed field-by-field via `startDate`/`startTime`/`endDate`/`endTime`/`mode`/`relativeUnit`/`relativeAmount` (each with its own `update:*`), plus a consolidated `change` payload (`DateTimeRangeValue` — a discriminated `absolute | relative` union).
-- **`ODateRangeCalendar`** — a low-level, date-only dual-month range calendar (no time, no popover, no tabs). Dates are `YYYY/MM/DD` (app convention; it converts to Reka's `YYYY-MM-DD` internally). Currently a standalone building block — not wired into `ODateTimeRange`.
-- **`OFormDateTimeRange`** — the form-bound wrapper. **It does not wrap `ODateTimeRange`;** it wraps the legacy composite `@/components/DateTime.vue` (which takes its value via once-read `default-*` props and emits `on:date-change`). The wrapper seeds those props from the field, translates each change into the form's `{ type, period, from, to }` timerange object via `field.handleChange`, and remounts the inner picker (via `:key`) only when the field value changes from an external source (form reset / async prefill).
+- **`ODateTimeRange`** — the one time-range picker: presets rail (recent and calendar ranges), Relative and Absolute panels, time zone and Apply in ONE popover. It seeds itself from once-read `default-*` props and emits `on:date-change`.
+- **`ODateRangeCalendar`** — the low-level, date-only dual-month range calendar the picker's Absolute panel uses. Dates are `YYYY/MM/DD`.
+- **`OFormDateTimeRange`** — the form-bound wrapper around `ODateTimeRange`: it seeds the `default-*` props from the field, writes each change into the form's `{ type, period, from, to }` object, and remounts the picker only when the field changes from outside (reset, prefill).
 
 ### ODateTimeRange
 
 **Import:** `@/lib/forms/DateTimeRange/ODateTimeRange.vue`
-**Use when:** A standalone date-time range picker offering both relative ("last 30 minutes") and absolute (start/end date+time) selection, outside a form.
-**Don't use for:** A single date (`ODate`) or a date-only range with no time/relative modes (`ODateRangeCalendar`). Inside an `OForm`, use `OFormDateTimeRange`.
-**Key props:** `startDate`/`endDate` (`string` — `YYYY-MM-DD`, default `""`), `startTime`/`endTime` (`string` — `HH:MM[:SS]`, default `""`), `mode` (`"relative" | "absolute"`, default `"relative"`), `relativeUnit` (`"seconds" | "minutes" | "hours" | "days" | "weeks" | "months"`, default `"minutes"`), `relativeAmount` (`number`, default 0 — 0 = no selection), `withSeconds` (`boolean`, default `false`), `autoApply` (`boolean`, default `false` — else shows Apply), `disableRelative` (`boolean`, default `false` — absolute-only), `hideTime` (`boolean`, default `false`), `showTimezone` (`boolean`, default `false`), `minDate`/`maxDate` (`string` — `YYYY-MM-DD`), `maxHours` (`number` — disables relative options exceeding it), `timezone` (`string` — IANA; `""` = browser local), `label`, `helpText`, `errorMessage`, `disabled` (`boolean`), `required` (`boolean`), `placeholder` (default `"Select date range"`).
-**Slots:** `label`, `tooltip`.
-**Emits:** `update:startDate`, `update:startTime`, `update:endDate`, `update:endTime`, `update:mode`, `update:timezone`, `update:relativeUnit`, `update:relativeAmount`, and `change` (the consolidated `DateTimeRangeValue` union). Note: no single `v-model` — bind the individual `update:*` events (or use `v-model:startDate` etc.).
+**Use when:** Any time-scoped toolbar or form: one control, just before refresh (F1, F8). Defaults: explorers and dashboards 15 minutes, overviews 24 hours.
+**Don't use for:** A single date (`ODate`) or a single time (`OTime`); a segmented control of ranges or a read-only pill (F8).
+**Look (S1, S2, O4, W4):** the trigger is `h-control-md` (32) or `h-control-sm` (28) from `size`, a fixed 216 px wide (`w-54`; it shrinks below md), so a label never reflows the toolbar. An absolute range reads short — "Nov 13 19:00 – 20:00", both dates when they differ, the year only outside this year — with the full range in the trigger tooltip. The popover is a fixed 664 px wide; Relative and Absolute share one grid cell, so switching modes never resizes or moves it. The ‹ › shift buttons are joined to the trigger at the same height. Never an `h-*` class on the picker (`local/o2-control-height`).
+**Key props:** `size` (`"sm"` | `"md"` default), `defaultType` (`"relative"` | `"absolute"`), `defaultRelativeTime` (e.g. `"15m"`), `defaultAbsoluteTime` (`{ startTime, endTime }` in µs), `autoApply`, `applyPresets`, `calendarPresets` (Today … Last year), `initialTimezone` / `pickerTimezone`, `queryRangeRestrictionInHour` + `queryRangeRestrictionMsg` (the over-the-limit state), `disableRelative`, `hideRelativeTime`, `hideRelativeTimezone`, `hideClipboard`, `hideRangeShift`, `disablePrevShift`, `minDate` / `maxDate` (`YYYY/MM/DD`), `menuAlign`, `fieldAppearance` (full-width form look), `defaultOpen`, `hideSeconds`, `triggerText`, `dataTestName`, `disabled`. `local/o2-controls-api` rejects the old `disable` and `variant`.
+**Exposed methods (via `ref`):** `setCustomDate`, `setSavedDate`, `setAbsoluteTime`, `setDateType`, `refresh`, `getConsumableDateTime` and the rest the old picker exposed.
+**Emits:** `on:date-change` (`{ startTime, endTime, relativeTimePeriod, valueType, … }`), `on:timezone-change`, `show`, `hide`.
 **Example:**
 
 ```vue
 <ODateTimeRange
-  v-model:start-date="startDate"
-  v-model:start-time="startTime"
-  v-model:end-date="endDate"
-  v-model:end-time="endTime"
-  :mode="mode"
-  @update:mode="mode = $event"
-  show-timezone
-  @change="onRangeChange"
+  ref="dateTimeRef"
+  auto-apply
+  :default-type="range.type"
+  :default-relative-time="range.relativeTimePeriod"
+  :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
+  data-test-name="alerts-history-date-time"
+  @on:date-change="onRangeChange"
 />
 ```
 
-**Family:** Standalone headless picker; date-only sibling `ODateRangeCalendar`; form-bound wrapper `OFormDateTimeRange` (wraps legacy DateTime, not this component).
+**Family:** Calendar `ODateRangeCalendar`; preset rail `components/DateTimeRail.vue`; form-bound wrapper `OFormDateTimeRange`; dashboard wrapper `DateTimePickerDashboard` (same `size`/`disabled` API).
 
 ### ODateRangeCalendar
 
@@ -398,9 +399,9 @@ Three distinct components — do not confuse them:
 ### OFormDateTimeRange
 
 **Import:** `@/lib/forms/DateTime/OFormDateTimeRange.vue`
-**Use when:** A timerange field inside `<OForm>` whose value is the app's `{ type, period, from, to }` shape (backed by the legacy `@/components/DateTime.vue` picker).
+**Use when:** A timerange field inside `<OForm>` whose value is the app's `{ type, period, from, to }` shape (it wraps `ODateTimeRange`).
 **Don't use for:** A standalone (non-form) range picker — use `ODateTimeRange`. Note the path lives under `forms/DateTime/`, not `forms/DateTimeRange/`.
-**Key props:** `name` (`string`, required — supports nested/indexed paths like `dashboards[0].timerange`), `label` (`string` — DateTime has no label of its own), `required` (`boolean` — renders the `*`), `description` (`string` — helper line under the label). All other DateTime attrs pass through via `$attrs`.
+**Key props:** `name` (`string`, required — supports nested/indexed paths like `dashboards[0].timerange`), `label` (13 px medium above the picker, S3), `required` (`boolean` — renders the `*`), `description` (`string` — helper line under the label), `size`. All other `ODateTimeRange` props pass through via `$attrs`.
 **Slots:** none. **Emits:** none (writes the timerange object through `field.handleChange`). Errors are validated cross-field in the form schema, not rendered inline.
 **Example:**
 
@@ -417,12 +418,14 @@ Both are numeric track controls with identical `min`/`max`/`step` semantics — 
 - **`OSlider`** — a **single** value (`modelValue: number`), one thumb.
 - **`ORange`** — a **pair** (`modelValue: { min: number; max: number }`), two thumbs (dual-thumb). Use when the user selects a span, not a point.
 
+Both come in one size (S1): there is no `size` prop, and `local/o2-controls-api` rejects one.
+
 ### ORange
 
 **Import:** `@/lib/forms/Range/ORange.vue`
 **Use when:** Selecting a numeric span (a low/high pair) with two draggable thumbs.
 **Don't use for:** A single value — use `OSlider`. Inside an `OForm`, use `OFormRange`.
-**Key props:** `modelValue` (`{ min: number; max: number }`), `min` (`number`, default 0), `max` (`number`, default 100), `step` (`number`, default 1), `size` (`"sm" | "md" | "lg"`, default `"md"`), `showValue` (`boolean`, default `false`), `formatValue` (`(value: number) => string`), `disabled` (`boolean`, default `false`), `required` (`boolean`), `vertical` (`boolean`, default `false`), `reverse` (`boolean`, default `false`), `labelAlways` (`boolean`, default `false` — always show value next to each thumb), `markers` (`boolean`, default `false` — tick marks), `markerLabels` (`{ value: number; label: string }[]`), `label`, `helpText`, `errorMessage`, `error` (`boolean`), `id`, `name`.
+**Key props:** `modelValue` (`{ min: number; max: number }`), `min` (`number`, default 0), `max` (`number`, default 100), `step` (`number`, default 1), `showValue` (`boolean`, default `false`), `formatValue` (`(value: number) => string`), `disabled` (`boolean`, default `false`), `required` (`boolean`), `vertical` (`boolean`, default `false`), `reverse` (`boolean`, default `false`), `labelAlways` (`boolean`, default `false` — always show value next to each thumb), `markers` (`boolean`, default `false` — tick marks), `markerLabels` (`{ value: number; label: string }[]`), `label`, `helpText`, `errorMessage`, `error` (`boolean`), `id`, `name`.
 **Slots:** `label`, `tooltip`.
 **Emits:** `update:modelValue` (`RangeValue`), `change` (`RangeValue`), `blur`, `focus`.
 **Example:**
@@ -457,7 +460,7 @@ Both are numeric track controls with identical `min`/`max`/`step` semantics — 
 **Import:** `@/lib/forms/Slider/OSlider.vue`
 **Use when:** Selecting a single numeric value on a track (one thumb).
 **Don't use for:** A low/high span — use `ORange`. Inside an `OForm`, use `OFormSlider`.
-**Key props:** `modelValue` (`number`), `min` (`number`, default 0), `max` (`number`, default 100), `step` (`number`, default 1), `size` (`"sm" | "md" | "lg"`, default `"md"`), `showValue` (`boolean`, default `false`), `formatValue` (`(value: number) => string`), `disabled` (`boolean`, default `false`), `required` (`boolean`), `label`, `helpText`, `errorMessage`, `error` (`boolean`), `id`, `name`.
+**Key props:** `modelValue` (`number`), `min` (`number`, default 0), `max` (`number`, default 100), `step` (`number`, default 1), `showValue` (`boolean`, default `false`), `formatValue` (`(value: number) => string`), `disabled` (`boolean`, default `false`), `required` (`boolean`), `label`, `helpText`, `errorMessage`, `error` (`boolean`), `id`, `name`.
 **Slots:** `label`, `tooltip`.
 **Emits:** `update:modelValue` (number), `change` (number), `blur`, `focus`.
 **Example:**
@@ -500,23 +503,28 @@ Both are numeric track controls with identical `min`/`max`/`step` semantics — 
 ### OFile
 
 **Import:** `@/lib/forms/File/OFile.vue`
-**Use when:** Selecting one or many files, optionally via a drag-and-drop drop zone, with `accept` and max-size validation.
+**Use when:** Every import and attachment (U1): pipelines, dashboards, enrichment tables, source maps, logos. One component: a drop zone that really accepts drops, with "choose a file" inside and the accepted types, size limit and count under it; each chosen file as a row (name, size, remove) with progress and errors inline. Never say "drop" where dropping does not work, and never ignore a rejected file silently (K6).
 **Don't use for:** A field inside `<OForm>` — use `OFormFile`.
-**Key props:** `modelValue` (`File | File[] | null`), `multiple` (`boolean`, default `false`), `accept` (`string` — comma-separated MIME types/extensions, e.g. `"image/*,.pdf"`), `maxFileSize` (`number` — bytes; emits `size-error` when exceeded), `dropZone` (`boolean`, default `false`), `size` (`"sm" | "md"`, default `"md"`), `disabled` (`boolean`, default `false`), `required` (`boolean`), `label`, `placeholder`, `helpText`, `errorMessage`, `error` (`boolean`), `id`, `name`.
-**Slots:** `label`, `tooltip`, `hint` (custom drop-zone hint when `dropZone` is on).
-**Emits:** `update:modelValue` (`FileValue`), `change` (`FileValue`), `clear`, `size-error` (`File[]` — files over `maxFileSize`), `type-error` (`File[]` — files rejected by `accept`).
+**Key props:** `modelValue` (`File | File[] | null`), `variant` (`"zone"` default — the dashed `rounded-surface` drop target | `"compact"` — a `h-control-md` box with the file name and a "Choose file" button for a form row), `sources` (`('file' | 'url' | 'paste')[]`, default `['file']`; two or more show an sm segmented switch above ONE fixed-height area, U2, O4) with `v-model:source`, `v-model:url`, `v-model:text`, `urlPlaceholder`, `textPlaceholder`, `multiple`, `maxFiles` (1 unless `multiple`), `accept` (e.g. `".json"`), `maxSize` (bytes), `validate` (`(file) => I18nText | null | Promise` — "Not valid JSON: …" on the row; `createJsonFileValidator(t)` ships with it), `upload` (`(file, onProgress) => Promise` — drives the row's progress and error), `disabled` + `disabledReason`, `required`, `label`, `helpText`, `errorMessage`, `error`, `id`, `name`.
+**Slots:** `label`, `tooltip`. The dead `#prepend`/`#append` slots and `dropZone`, `size`, `maxFileSize`, `counter`, `counterLabel`, `bottomSlots` are removed and rejected by `local/o2-controls-api`.
+**Emits:** `update:modelValue`, `change`, `clear`, `rejected` (`{ file, reason }[]` — every type, size, count or `validate` failure also shows as an error row), `update:source`, `update:url`, `update:text`.
 **Example:**
 
 ```vue
 <OFile
-  v-model="upload"
-  accept="image/*,.pdf"
-  :max-file-size="5 * 1024 * 1024"
-  drop-zone
-  label="Attachment"
-  @size-error="notifyTooLarge"
+  v-model="file"
+  accept=".json"
+  :max-size="5 * 1024 * 1024"
+  :validate="validateJson"
+  :sources="['file', 'url', 'paste']"
+  v-model:source="source"
+  v-model:url="url"
+  v-model:text="pasted"
+  data-test="pipeline-import-file"
 />
 ```
+
+Results of an import appear inline under one heading, "Import results", turning each error into a field to fix (U3).
 
 **Family:** Headless sibling `OFile`; form-bound wrapper `OFormFile`.
 

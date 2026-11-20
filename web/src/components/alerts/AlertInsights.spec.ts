@@ -103,7 +103,7 @@ async function mountComp(props: Record<string, any> = {}) {
           props: ["dashboardData", "currentTimeObj", "viewOnly"],
           emits: ["updated:dataZoom", "chart:contextmenu"],
         },
-        dateTime: {
+        ODateTimeRange: {
           template: '<div data-test="datetime-stub"></div>',
           props: ["defaultType", "defaultAbsoluteTime", "defaultRelativeTime"],
           emits: ["on:date-change", "on:timezone-change"],
@@ -215,19 +215,13 @@ describe("AlertInsights - fetchAlerts on mount", () => {
   });
 });
 
-describe("AlertInsights - goBack", () => {
+describe("AlertInsights - back", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("calls router.push with alertList", async () => {
-    const w = await mountComp();
-    (w.vm as any).goBack();
-    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
-  });
-
-  it("clicking back button calls goBack", async () => {
+  it("clicking back with no history lands on alertList", async () => {
     const w = await mountComp();
     await w.find('[data-test="alert-insights-back-btn"]').trigger("click");
-    expect(mockPush).toHaveBeenCalled();
+    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
   });
 });
 

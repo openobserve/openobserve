@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPopover
+    size="lg"
     v-model:open="open"
     :aria-label="t('serviceVersions.envEdit.title')"
     :side-offset="sideOffset ?? POPOVER_GAP"
-    content-class="w-[27rem]"
   >
     <template #trigger><slot /></template>
     <div
@@ -35,8 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           class="ms-auto"
           variant="ghost"
-          size="xs"
-          icon-left="close"
+          size="sm"
+          icon="close"
           :aria-label="t('common.close')"
           data-test="svcver-env-close"
           @click="open = false"
@@ -48,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dim-key="env"
           :key-label="t('serviceVersions.compare.envChip')"
           :value="identity.no_env ? t('serviceVersions.env.noEnv') : identity.env"
-          :variant="identity.no_env ? 'default-soft' : 'success-soft'"
           :muted="identity.no_env"
           :value-tooltip="false"
         />
@@ -62,19 +61,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("serviceVersions.envEdit.readonly") }}
       </div>
       <div v-else-if="loading" class="flex flex-col gap-2" data-test="svcver-env-loading">
-        <OSkeleton class="h-8 w-full" />
-        <OSkeleton class="h-24 w-full" />
+        <OSkeleton shape="block" class="h-8 w-full" />
+        <OSkeleton shape="block" class="h-24 w-full" />
       </div>
-      <div
+      <OEmptyState
         v-else-if="loadFailed"
-        class="text-text-secondary flex items-center gap-2"
+        kind="error"
+        size="compact"
+        :title="t('serviceVersions.envEdit.loadError')"
+        :action-label="t('serviceVersions.actions.retry')"
         data-test="svcver-env-load-error"
-      >
-        <span>{{ t("serviceVersions.envEdit.loadError") }}</span>
-        <OButton variant="ghost-primary" size="xs" @click="reload">{{
-          t("serviceVersions.actions.retry")
-        }}</OButton>
-      </div>
+        @action="reload"
+      />
       <div v-else class="flex min-h-0 flex-col gap-3">
         <div class="flex flex-col gap-1">
           <span class="text-text-secondary text-xs font-medium">{{
@@ -92,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span v-if="hint" class="text-text-secondary text-xs">{{ hint }}</span>
         </div>
         <div
-          class="rounded-default bg-surface-panel border-border-default border px-3 py-2 text-[0.8125rem]"
+          class="rounded-default bg-surface-panel border-border-default text-compact border px-3 py-2"
           data-test="svcver-env-impact"
         >
           <div>
@@ -145,7 +143,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dim-key="env"
                   :key-label="t('serviceVersions.compare.envChip')"
                   :value="row.env"
-                  variant="success-soft"
                   :value-tooltip="false"
                 />
                 <span class="text-text-secondary text-xs tabular-nums">{{ row.note }}</span>
@@ -161,7 +158,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OInput
                   v-model="newValue"
-                  size="sm"
                   autofocus
                   :placeholder="t('serviceVersions.envEdit.newPlaceholder')"
                   :error="Boolean(newError)"
@@ -212,16 +208,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span>{{ undo.error || undo.message }}</span>
       <OButton
         v-if="undo.canUndo && !undo.error"
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         :loading="undo.busy"
         data-test="svcver-env-undo"
         @click="runUndo"
         >{{ t("serviceVersions.envEdit.undo") }}</OButton
       >
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="svcver-env-view-overrides"
         @click="viewOverrides"
         >{{ t("serviceVersions.envEdit.viewOverrides") }}</OButton
@@ -537,6 +533,7 @@ import {
 import { serviceVersionKeys } from "@/services/service_versions.querykeys";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

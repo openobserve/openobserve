@@ -14,7 +14,7 @@ const keypath = "confirmDialogSpec.deleteNamed" as I18nKey;
 
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "title", "primaryButtonLabel", "primaryButtonVariant", "initialFocus"],
+  props: ["open", "title", "primary", "secondary", "persistent"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `<div data-test="o-dialog-stub"><slot /></div>`,
 };
@@ -40,14 +40,14 @@ describe("ConfirmDialogProvider", () => {
       title: raw("Delete alert"),
       messageKeypath: keypath,
       messageName: "cpu-high",
-      confirmVariant: "destructive",
+      kind: "destructive",
     });
     await flushPromises();
     expect(wrapper.text()).toContain("Are you sure you want to delete the cpu-high alert?");
     const name = wrapper.find('[data-test="confirm-dialog-provider-name"]');
     expect(name.text()).toBe("cpu-high");
     expect(name.classes()).toContain("font-semibold");
-    expect(wrapper.findComponent(ODialogStub).props("primaryButtonVariant")).toBe("destructive");
+    expect(wrapper.findComponent(ODialogStub).props("primary")?.variant).toBe("danger");
   });
 
   it("keeps rendering a plain message", async () => {
@@ -56,7 +56,7 @@ describe("ConfirmDialogProvider", () => {
     await flushPromises();
     expect(wrapper.text()).toContain("Plain message");
     expect(wrapper.find('[data-test="confirm-dialog-provider-name"]').exists()).toBe(false);
-    expect(wrapper.findComponent(ODialogStub).props("primaryButtonVariant")).toBe("primary");
+    expect(wrapper.findComponent(ODialogStub).props("primary")?.variant).toBe("primary");
   });
 
   it("lists lines under the message, left-aligned", async () => {

@@ -21,18 +21,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex flex-wrap items-center justify-center gap-x-1 gap-y-1">
       <OButton
-        variant="ghost-primary"
-        size="xs"
-        icon-right="arrow-forward"
+        variant="accent-ghost"
+        size="sm"
+        icon-end="arrow-forward"
         data-test="autoobserve2-footer-coverage"
         @click="emit('open-coverage')"
       >
         {{ t("autoobserve2.footer.seeAll") }}
       </OButton>
       <OButton
-        variant="ghost-primary"
-        size="xs"
-        icon-right="arrow-forward"
+        variant="accent-ghost"
+        size="sm"
+        icon-end="arrow-forward"
         data-test="autoobserve2-footer-activity"
         @click="emit('open-activity')"
       >

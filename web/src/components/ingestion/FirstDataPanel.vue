@@ -23,7 +23,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
@@ -394,22 +394,19 @@ const StatusLine = defineComponent({
 </script>
 
 <template>
-  <OBanner
+  <OInlineNotice
     v-if="arrived && flagOn"
-    variant="success"
-    dense
-    inline-actions
+    tone="ok"
     data-test="first-data-panel-arrived"
     :data-signal="arrived.streamType"
   >
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
-      <OTag :label="arrivedTitle" variant="success" icon="check-circle" size="sm" />
+      <OTag :label="arrivedTitle" tone="ok" icon="check-circle" size="sm" />
       <span data-test="first-data-panel-arrived-summary">{{ arrivedSummary }}</span>
     </div>
     <template #actions>
       <OButton
         variant="ghost"
-        size="sm-action"
         data-test="first-data-panel-arrived-dismiss-btn"
         @click="emit('dismiss')"
       >
@@ -423,8 +420,7 @@ const StatusLine = defineComponent({
         <span class="inline-flex">
           <OButton
             variant="primary"
-            size="sm-action"
-            :icon-left="arrivedLocked ? 'lock' : 'open-in-new'"
+            :icon="arrivedLocked ? 'lock' : 'open-in-new'"
             :disabled="arrivedLocked"
             data-test="first-data-panel-arrived-open-btn"
             @click="emit('open')"
@@ -434,13 +430,12 @@ const StatusLine = defineComponent({
         </span>
       </OTooltip>
     </template>
-  </OBanner>
+  </OInlineNotice>
 
   <template v-else-if="!arrived">
     <OAccessLock
       v-if="forbidden && variant === 'full'"
       :denials="streamDenials"
-      size="hero"
       covers
       data-test="first-data-panel-no-access"
     />
@@ -448,130 +443,126 @@ const StatusLine = defineComponent({
       <template v-if="active">
         <OCard
           v-if="variant === 'full' && pickMatches"
-          variant="outlined"
-          class="mx-auto mt-4 w-full max-w-180 gap-3 p-4"
+          class="mx-auto mt-4 w-full max-w-180"
           data-test="first-data-panel"
           :data-signal="signal"
           data-variant="full"
           :data-pick="pick?.id"
         >
-          <div class="flex items-start gap-3">
-            <img
-              v-if="pick?.logo"
-              :src="getImageURL(pick.logo)"
-              alt=""
-              class="mt-0.5 size-6 shrink-0"
-              :class="{ 'dark:invert': pick.logoInvertDark }"
-            />
-            <OIcon v-else-if="pick?.icon" :name="pick.icon" size="md" class="mt-0.5 shrink-0" />
-            <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-              <strong class="text-text-heading">{{ titleText }}</strong>
-              <i18n-t :keypath="bodyKey" tag="span" class="text-text-secondary text-sm">
-                <template #org
-                  ><strong class="text-text-body">{{ raw(orgName) }}</strong></template
-                >
-                <template #source>{{ sourceLabel }}</template>
-              </i18n-t>
+          <div class="flex flex-col gap-3">
+            <div class="flex items-start gap-3">
+              <img
+                v-if="pick?.logo"
+                :src="getImageURL(pick.logo)"
+                alt=""
+                class="mt-0.5 size-6 shrink-0"
+                :class="{ 'dark:invert': pick.logoInvertDark }"
+              />
+              <OIcon v-else-if="pick?.icon" :name="pick.icon" size="md" class="mt-0.5 shrink-0" />
+              <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                <strong class="text-text-heading">{{ titleText }}</strong>
+                <i18n-t :keypath="bodyKey" tag="span" class="text-text-secondary text-sm">
+                  <template #org
+                    ><strong class="text-text-body">{{ raw(orgName) }}</strong></template
+                  >
+                  <template #source>{{ sourceLabel }}</template>
+                </i18n-t>
+              </div>
+              <OButton
+                v-if="pick?.route"
+                variant="secondary"
+                data-test="first-data-panel-open-guide-btn"
+                @click="openGuide"
+              >
+                {{ t("ingestion.firstDataPanel.openFullGuide") }}
+              </OButton>
             </div>
-            <OButton
-              v-if="pick?.route"
-              variant="outline"
-              size="sm-action"
-              data-test="first-data-panel-open-guide-btn"
-              @click="openGuide"
-            >
-              {{ t("ingestion.firstDataPanel.openFullGuide") }}
-            </OButton>
-          </div>
-          <OCodeBlock
-            v-if="command"
-            :code="command.code"
-            :code-masked="command.masked"
-            :token-name="command.masked ? snippet.tokenName.value : undefined"
-            :lang="command.lang"
-            chrome="terminal"
-            wrap
-            inset
-            data-test="first-data-panel-code-block"
-            @copy="({ partial }) => trackCopy(partial)"
-            @token-click="onTokenClick"
-          />
-          <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <FirstEventStatus
-              ref="status"
-              :org="org"
-              :signal="signal === 'any' ? undefined : signal"
-              :guide-name="sourceLabel"
-              display="pill"
-              :waiting-label="waitingLabel"
-              @detected="onDetected"
+            <OCodeBlock
+              v-if="command"
+              :code="command.code"
+              :code-masked="command.masked"
+              :token-name="command.masked ? snippet.tokenName.value : undefined"
+              :lang="command.lang"
+              wrap
+              data-test="first-data-panel-code-block"
+              @copy="({ partial }) => trackCopy(partial)"
+              @token-click="onTokenClick"
             />
-            <span class="flex-1" />
-            <OButton
-              variant="ghost-primary"
-              size="sm-action"
-              data-test="first-data-panel-change-source-link"
-              @click="chooseSource"
-            >
-              {{ t("ingestion.firstDataPanel.changeSource") }}
-            </OButton>
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <FirstEventStatus
+                ref="status"
+                :org="org"
+                :signal="signal === 'any' ? undefined : signal"
+                :guide-name="sourceLabel"
+                display="pill"
+                :waiting-label="waitingLabel"
+                @detected="onDetected"
+              />
+              <span class="flex-1" />
+              <OButton
+                variant="accent-ghost"
+                data-test="first-data-panel-change-source-link"
+                @click="chooseSource"
+              >
+                {{ t("ingestion.firstDataPanel.changeSource") }}
+              </OButton>
+            </div>
           </div>
         </OCard>
 
         <OCard
           v-else-if="variant === 'compact' && pickMatches"
-          variant="outlined"
-          class="mb-3 w-full flex-row! flex-wrap items-center gap-3 px-4 py-3"
+          class="mb-3 w-full"
           :class="{ 'mt-2.5': onHome }"
           data-test="first-data-panel"
           :data-signal="signal"
           data-variant="compact"
           :data-pick="pick?.id"
         >
-          <img
-            v-if="pick?.logo"
-            :src="getImageURL(pick.logo)"
-            alt=""
-            class="size-6 shrink-0"
-            :class="{ 'dark:invert': pick.logoInvertDark }"
-          />
-          <OIcon v-else-if="pick?.icon" :name="pick.icon" size="md" class="shrink-0" />
-          <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <strong class="text-text-heading">{{
-              t("ingestion.firstDataPanel.compactTitle", { org: raw(orgName) })
-            }}</strong>
-            <span class="text-text-secondary text-sm" data-test="first-data-panel-compact-text">
-              <span :class="{ 'me-1': command }">{{ compactText }}</span>
-              <span v-if="command">{{ t("ingestion.firstDataPanel.compactCommand") }}</span>
-            </span>
+          <div class="flex flex-wrap items-center gap-3">
+            <img
+              v-if="pick?.logo"
+              :src="getImageURL(pick.logo)"
+              alt=""
+              class="size-6 shrink-0"
+              :class="{ 'dark:invert': pick.logoInvertDark }"
+            />
+            <OIcon v-else-if="pick?.icon" :name="pick.icon" size="md" class="shrink-0" />
+            <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+              <strong class="text-text-heading">{{
+                t("ingestion.firstDataPanel.compactTitle", { org: raw(orgName) })
+              }}</strong>
+              <span class="text-text-secondary text-sm" data-test="first-data-panel-compact-text">
+                <span :class="{ 'me-1': command }">{{ compactText }}</span>
+                <span v-if="command">{{ t("ingestion.firstDataPanel.compactCommand") }}</span>
+              </span>
+            </div>
+            <FirstEventStatus
+              ref="status"
+              :org="org"
+              :guide-name="sourceLabel"
+              display="pill"
+              :waiting-label="waitingLabel"
+              @detected="onDetected"
+            />
+            <OButton
+              v-if="command"
+              variant="secondary"
+              icon="content-copy"
+              data-test="first-data-panel-copy-btn"
+              @click="copyCommand"
+            >
+              {{ t("ingestion.firstDataPanel.copyCommand") }}
+            </OButton>
+            <OButton
+              v-if="pick?.route"
+              variant="secondary"
+              data-test="first-data-panel-open-guide-btn"
+              @click="openGuide"
+            >
+              {{ t("ingestion.firstDataPanel.openGuide") }}
+            </OButton>
           </div>
-          <FirstEventStatus
-            ref="status"
-            :org="org"
-            :guide-name="sourceLabel"
-            display="pill"
-            :waiting-label="waitingLabel"
-            @detected="onDetected"
-          />
-          <OButton
-            v-if="command"
-            variant="outline"
-            size="sm-action"
-            icon-left="content-copy"
-            data-test="first-data-panel-copy-btn"
-            @click="copyCommand"
-          >
-            {{ t("ingestion.firstDataPanel.copyCommand") }}
-          </OButton>
-          <OButton
-            v-if="pick?.route"
-            variant="outline"
-            size="sm-action"
-            data-test="first-data-panel-open-guide-btn"
-            @click="openGuide"
-          >
-            {{ t("ingestion.firstDataPanel.openGuide") }}
-          </OButton>
         </OCard>
 
         <StatusLine v-else-if="!statusInSlot" :class="{ 'mt-4': variant === 'full' }" />

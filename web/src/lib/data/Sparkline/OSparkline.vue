@@ -100,8 +100,7 @@ const sizeClasses: Record<NonNullable<SparklineProps["size"]>, string> = {
   md: "h-16",
 };
 
-// Matches OCoverageMeter's tone map, so a sparkline and the coverage read-out
-// beside it never disagree about what "warning" looks like.
+// Status text colours, so a sparkline and the status chip beside it agree on "warning".
 const toneClasses: Record<NonNullable<SparklineProps["tone"]>, string> = {
   default: "text-accent",
   success: "text-status-success-text",

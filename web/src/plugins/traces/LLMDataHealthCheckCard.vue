@@ -65,9 +65,9 @@ const target = computed(() => {
 });
 
 const badgeVariant = computed(() => {
-  if (props.check.status === "error") return "error-soft" as const;
-  if (props.check.status === "warning") return "warning-soft" as const;
-  return "success-soft" as const;
+  if (props.check.status === "error") return "err" as const;
+  if (props.check.status === "warning") return "warn" as const;
+  return "ok" as const;
 });
 
 function openFix() {
@@ -111,13 +111,13 @@ function shortTraceId(id: string): string {
   >
     <div class="flex items-center justify-between gap-2">
       <span class="text-text-heading text-sm font-semibold">{{ label(check.id) }}</span>
-      <OBadge :variant="badgeVariant" size="sm">{{ statusLabel(check.status) }}</OBadge>
+      <OBadge :tone="badgeVariant" size="sm">{{ statusLabel(check.status) }}</OBadge>
     </div>
     <span class="text-text-secondary text-xs" :data-test="`llm-data-health-detail-${check.id}`">{{
       detail(check)
     }}</span>
     <div v-if="check.id === 'unpriced_models' && check.models?.length" class="flex flex-wrap gap-1">
-      <OBadge v-for="m in check.models" :key="m.model ?? ''" variant="default-outline" size="sm">{{
+      <OBadge v-for="m in check.models" :key="m.model ?? ''" tone="outline" size="sm">{{
         raw(`${m.model ?? t("llmDataTrust.noModelName")} · ${formatTokens(m.tokens)}`)
       }}</OBadge>
       <span
@@ -146,18 +146,14 @@ function shortTraceId(id: string): string {
     <div v-if="check.status !== 'pass' && target" class="flex flex-wrap items-center gap-2 pt-1">
       <OButton
         variant="primary"
-        size="xs"
+        size="sm"
         :data-test="`llm-data-health-fix-${check.id}`"
         @click="openFix"
         >{{ fixLabel(check.id) }}</OButton
       >
-      <OButton
-        v-if="target.kind === 'route'"
-        variant="ghost-muted"
-        size="xs"
-        @click="copyFixLink"
-        >{{ t("llmDataTrust.health.copyLink") }}</OButton
-      >
+      <OButton v-if="target.kind === 'route'" variant="ghost" size="sm" @click="copyFixLink">{{
+        t("llmDataTrust.health.copyLink")
+      }}</OButton>
     </div>
   </div>
 </template>

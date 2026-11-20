@@ -6,7 +6,8 @@ import type { DropdownMenuContentProps, DropdownMenuRootProps } from "reka-ui";
 
 // Re-export family types so callers can import everything from one place if needed
 export type {
-  DropdownItemVariant,
+  MenuItemTone,
+  MenuItemProps,
   DropdownItemProps,
   DropdownItemEmits,
   DropdownItemSlots,
@@ -28,7 +29,7 @@ export interface DropdownProps {
   align?: DropdownAlign;
   /** Pixel offset from the trigger */
   sideOffset?: DropdownMenuContentProps["sideOffset"];
-  /** Extra class(es) for the content (menu) element — e.g. to match trigger width. */
+  /** Extra classes for the menu surface; never a width, which is fixed at 200–320 (guideline O1). */
   contentClass?: string;
   /**
    * Outside-click persistence. Controls how many outside-click events must

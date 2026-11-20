@@ -180,9 +180,9 @@ function mountComponent(routeQuery: Record<string, any> = {}, props: Record<stri
         OSpinner: { template: '<div data-test="spinner" v-bind="$attrs" />', inheritAttrs: false },
         OEmptyState: {
           name: "OEmptyState",
-          props: ["preset"],
+          props: ["kind", "title", "text"],
           template:
-            '<div :data-preset="preset"><slot name="title" /><slot name="description" /><slot name="actions" /></div>',
+            '<div :data-kind="kind">{{ title }}{{ text }}<slot name="text" /><slot name="actions" /></div>',
         },
         OButton: {
           name: "OButton",
@@ -405,7 +405,7 @@ describe("PerformanceSummary", () => {
 
     // Assert
     expect(wrapper.find('[data-test="performance-summary-loading-indicator"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain("Loading Dashboard");
+    expect(wrapper.text()).toContain("Loading dashboard");
   });
 
   it("hides loading indicator when isLoading is empty", async () => {
@@ -506,7 +506,7 @@ describe("PerformanceSummary", () => {
     wrapper = mountComponent();
     await flushPromises();
     const state = wrapper.find('[data-test="performance-summary-schema-forbidden"]');
-    expect(state.attributes("data-preset")).toBe("no-access");
+    expect(state.attributes("data-kind")).toBe("denied");
     expect(state.text()).toContain("No permission to view the performance overview");
     expect(wrapper.find('[data-test="performance-summary-schema-retry"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="performance-summary-schema-error"]').exists()).toBe(false);
@@ -1128,7 +1128,7 @@ describe("PerformanceSummary", () => {
     await nextTick();
 
     // Assert
-    expect(wrapper.text()).toContain("Loading Dashboard");
+    expect(wrapper.text()).toContain("Loading dashboard");
   });
 
   it("hides loading indicator when all loading states are cleared", async () => {

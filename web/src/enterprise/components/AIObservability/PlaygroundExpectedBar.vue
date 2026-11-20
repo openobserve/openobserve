@@ -24,7 +24,7 @@
       <span class="text-text-heading text-2xs font-semibold">
         {{ t("aiObservability.playground.expectedLabel") }}
       </span>
-      <span class="text-text-tertiary text-3xs">
+      <span class="text-text-tertiary text-2xs">
         {{ t("aiObservability.playground.expectedHint") }}
       </span>
     </div>
@@ -39,7 +39,7 @@
          present, so lighting it never reflows the row. -->
     <div
       ref="fieldRef"
-      class="rounded-default min-w-0 flex-1 ring-2 transition-colors duration-300 motion-reduce:transition-none"
+      class="rounded-default min-w-0 flex-1 ring-2 transition-colors motion-reduce:transition-none"
       :class="flashing ? 'ring-accent' : 'ring-transparent'"
       :data-flashing="flashing || undefined"
       data-test="ai-playground-expected-field"
@@ -49,7 +49,6 @@
         :placeholder="t('aiObservability.playground.expectedPlaceholder')"
         :rows="1"
         :max-rows="3"
-        size="sm"
         autogrow
         data-test="ai-playground-expected-input"
         @update:model-value="(value: string) => emit('set-expected', value)"
@@ -60,9 +59,9 @@
          would silently re-break the scoring they just fixed. -->
     <OButton
       v-if="expected && !required"
-      variant="ghost-muted"
-      size="icon-xs"
-      icon-left="close"
+      icon-only
+      variant="ghost"
+      icon="close"
       class="mt-0.5 shrink-0"
       :title="t('aiObservability.playground.removeExpected')"
       data-test="ai-playground-remove-expected"

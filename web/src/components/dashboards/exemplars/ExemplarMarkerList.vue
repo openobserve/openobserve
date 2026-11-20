@@ -100,7 +100,7 @@ const onFocus = (point: ExemplarPoint, index: number) => {
       :key="point.marker.id"
       role="listitem"
       variant="ghost"
-      size="xs"
+      size="sm"
       :tabindex="index === current ? 0 : -1"
       :aria-label="labelFor(point)"
       data-test="dashboard-panel-exemplar-point"

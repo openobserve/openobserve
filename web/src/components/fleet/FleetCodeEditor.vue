@@ -25,9 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span v-if="filename" class="font-mono text-xs font-semibold opacity-75">{{ filename }}</span>
       <div class="flex-1" />
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-xs-sq"
-        icon-left="content-copy"
+        size="sm"
+        icon="content-copy"
         :aria-label="t('common.copy')"
         :data-test="`${dataTest}-copy-btn`"
         @click="copy"

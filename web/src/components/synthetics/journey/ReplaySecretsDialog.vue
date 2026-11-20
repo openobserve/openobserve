@@ -79,21 +79,19 @@ function onForget() {
     :title="t('synthetics.journey.replaySecrets.title', { environment: environmentName })"
     :persistent="isSubmitting"
     :show-close="!isSubmitting"
-    :primary-button-label="
-      mode === 'ask'
-        ? t('synthetics.journey.replaySecrets.replayIn', { environment: environmentName })
-        : t('synthetics.journey.replaySecrets.saveAndRerun')
-    "
-    :secondary-button-label="t('common.cancel')"
-    secondary-button-variant="outline"
-    :neutral-button-label="
-      mode === 'change' ? t('synthetics.journey.replaySecrets.forget') : undefined
-    "
+    :primary="{
+      label:
+        mode === 'ask'
+          ? t('synthetics.journey.replaySecrets.replayIn', { environment: environmentName })
+          : t('synthetics.journey.replaySecrets.saveAndRerun'),
+    }"
+    :secondary="{ label: t('common.cancel'), variant: 'secondary' }"
+    :extra="{ label: mode === 'change' ? t('synthetics.journey.replaySecrets.forget') : undefined }"
     :form-id="FORM_ID"
     data-test="synthetics-journey-replay-secrets-dialog"
     @update:open="onUpdateOpen"
     @click:secondary="onUpdateOpen(false)"
-    @click:neutral="onForget"
+    @click:extra="onForget"
   >
     <OForm :id="FORM_ID" :form="form" class="flex flex-col gap-5">
       <OFormInput
@@ -101,7 +99,6 @@ function onForget() {
         :key="secret.name"
         :name="secret.name"
         type="password"
-        revealable
         required
         autocomplete="new-password"
         :label="fieldLabel(secret)"

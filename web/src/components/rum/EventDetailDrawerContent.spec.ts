@@ -119,23 +119,23 @@ const ODrawerStub = {
     "size",
     "width",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "seamless",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="event-detail-drawer-stub"
@@ -358,7 +358,7 @@ describe("EventDetailDrawerContent", () => {
       const networkTab = findByTestId(wrapper, "event-detail-network-tab");
       await networkTab.trigger("click");
       await flushPromises();
-      expect(wrapper.text()).toContain("Related Events");
+      expect(wrapper.text()).toContain("Related events");
     });
 
     it("shows attributes tab panel when Attributes tab is clicked", async () => {
@@ -444,7 +444,7 @@ describe("EventDetailDrawerContent", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.text()).toContain("Action Details");
+      expect(wrapper.text()).toContain("Action details");
     });
 
     it("displays Action Type label and value when event type is action", async () => {
@@ -456,7 +456,7 @@ describe("EventDetailDrawerContent", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.text()).toContain("Action Type:");
+      expect(wrapper.text()).toContain("Action type:");
       expect(wrapper.text()).toContain("click");
     });
 
@@ -524,7 +524,7 @@ describe("EventDetailDrawerContent", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.text()).toContain("Error Details");
+      expect(wrapper.text()).toContain("Error details");
       expect(wrapper.text()).toContain("Error Type:");
       expect(wrapper.text()).toContain("NetworkError");
       expect(wrapper.text()).toContain("Message:");
@@ -574,7 +574,7 @@ describe("EventDetailDrawerContent", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.text()).toContain("View Details");
+      expect(wrapper.text()).toContain("View details");
       expect(wrapper.text()).toContain("Loading Type:");
       expect(wrapper.text()).toContain("initial load");
       expect(wrapper.text()).toContain("URL:");
@@ -619,7 +619,7 @@ describe("EventDetailDrawerContent", () => {
       await waitForRelatedResources(wrapper);
 
       // Assert
-      expect(wrapper.text()).toContain("Related Events");
+      expect(wrapper.text()).toContain("Related events");
       expect(wrapper.text()).toContain(`(${mockRelatedResources.length})`);
     });
 
@@ -1252,7 +1252,7 @@ describe("EventDetailDrawerContent", () => {
         rawEvent: createMockRawEvent({ service: "" }),
       });
       await flushPromises();
-      expect(wrapper.text()).toContain("Unknown User");
+      expect(wrapper.text()).toContain("Unknown user");
     });
 
     it.skip("does not fetch resources when action_id is missing but action_type is present", async () => {
@@ -1284,7 +1284,7 @@ describe("EventDetailDrawerContent", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.text()).not.toContain("Related Events");
+      expect(wrapper.text()).not.toContain("Related events");
     });
 
     it("renders no related resource items when server returns empty hits", async () => {
@@ -1313,7 +1313,7 @@ describe("EventDetailDrawerContent", () => {
       await flushPromises();
 
       // Assert
-      expect(wrapper.text()).toContain("Unknown User");
+      expect(wrapper.text()).toContain("Unknown user");
     });
 
     it("does not render view-trace-btn buttons when resources have no trace_id", async () => {

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   a :tabs array, a :splitter-width, and (optionally) `searchable` +
   search-data-test. The default slot is the content pane (e.g. a router-view).
 
-  For a fully custom tab list (e.g. OTab instead of ORouteTab), use the
+  For a fully custom tab list (e.g. tabs without a route), use the
   #tabs slot — it receives { tabs, filter } so you can render/filter yourself.
 -->
 <template>
@@ -39,15 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OTabs
         :model-value="modelValue"
-        dense
+        size="compact"
         :class="tabsClass"
         @update:model-value="(v) => emit('update:modelValue', v)"
       >
         <slot name="tabs" :tabs="filteredTabs" :filter="filter">
-          <ORouteTab
-            v-for="(tab, index) in filteredTabs"
+          <OTab
+            v-for="tab in filteredTabs"
             :key="tab.name"
-            :default="index === 0"
             :name="tab.name"
             :to="tab.to"
             :icon="tab.icon"
@@ -66,11 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OButton
         variant="ghost"
-        size="sm"
         data-test="data-source-sidebar-mobile-btn"
         @click="mobileSidebarOpen = true"
       >
-        <template #icon-left><OIcon name="menu" size="sm" /></template>
+        <template #icon><OIcon name="menu" size="sm" /></template>
         {{ triggerLabel }}
       </OButton>
     </div>
@@ -95,7 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             v-model="filter"
             :data-test="searchDataTest || undefined"
-            clearable
             class="indexlist-search-input w-full"
             :placeholder="searchPlaceholder || t('common.search')"
           />
@@ -103,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabs
           :model-value="modelValue"
           orientation="vertical"
-          dense
+          size="compact"
           :class="['px-1', tabsClass]"
           @update:model-value="
             (v) => {
@@ -113,10 +110,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <slot name="tabs" :tabs="filteredTabs" :filter="filter">
-            <ORouteTab
-              v-for="(tab, index) in filteredTabs"
+            <OTab
+              v-for="tab in filteredTabs"
               :key="tab.name"
-              :default="index === 0"
               :name="tab.name"
               :to="tab.to"
               :icon="tab.icon"
@@ -143,7 +139,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 v-model="filter"
                 :data-test="searchDataTest || undefined"
-                clearable
                 class="indexlist-search-input w-full"
                 :placeholder="searchPlaceholder || t('common.search')"
               />
@@ -151,15 +146,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTabs
               :model-value="modelValue"
               orientation="vertical"
-              dense
+              size="compact"
               :class="['px-1', tabsClass]"
               @update:model-value="(v) => emit('update:modelValue', v)"
             >
               <slot name="tabs" :tabs="filteredTabs" :filter="filter">
-                <ORouteTab
-                  v-for="(tab, index) in filteredTabs"
+                <OTab
+                  v-for="tab in filteredTabs"
                   :key="tab.name"
-                  :default="index === 0"
                   :name="tab.name"
                   :to="tab.to"
                   :icon="tab.icon"
@@ -184,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
@@ -206,7 +200,7 @@ const props = withDefaults(
   defineProps<{
     /** Active tab name (v-model) — drives the highlighted tab. */
     modelValue?: string;
-    /** Tab definitions rendered as ORouteTab rows (ignored if #tabs slot used). */
+    /** Tab definitions rendered as route OTab rows (ignored if #tabs slot used). */
     tabs?: DataSourceTab[];
     /** Initial side-nav width in px. */
     splitterWidth?: number;

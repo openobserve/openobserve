@@ -90,7 +90,7 @@ export default function cassandraCard(subs: CardSubstitutions, t: TranslateFn): 
             labelKey: "ingestion.setupCard.jmxPortLabel",
             default: "9000",
             placeholder: raw("9000"),
-            width: "sm",
+            width: "s",
           },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),

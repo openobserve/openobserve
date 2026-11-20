@@ -3,6 +3,7 @@ import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import DbmLockEmptyState, { type DbmLockCheck } from "./DbmLockEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw } from "@/types/i18n";
 
 /**
@@ -46,21 +47,17 @@ describe("DbmLockEmptyState", () => {
       expect(wrapper.find("[data-test='dbm-lock-empty-state-healthy-pill']").exists()).toBe(false);
     });
 
-    // The two states MUST stay visually distinguishable — an operator who reads
-    // "no deadlocks" when collection is broken is being actively misled. That
-    // distinction now rides on the shared OEmptyState illustration rather than a
-    // bespoke icon badge, so this asserts the illustration, not the chrome.
-    it("shows a different illustration for healthy vs not-collecting", () => {
+    // Reading "no deadlocks" while collection is broken misleads an operator.
+    it("shows a different icon for healthy vs not-collecting", () => {
       const healthy = mountWith({ healthy: true });
       const broken = mountWith({ healthy: false });
-      // `check` = we looked and all is well. `data-scene` = nothing is arriving.
-      expect(healthy.findComponent({ name: "EmptyCheck" }).exists()).toBe(true);
-      expect(broken.findComponent({ name: "EmptyCheck" }).exists()).toBe(false);
+      expect(healthy.findComponent(OEmptyState).props("icon")).toBe("task-alt");
+      expect(broken.findComponent(OEmptyState).props("icon")).toBe("database");
     });
 
     it("keeps the success tone on the healthy reassurance", () => {
       const pill = mountWith({ healthy: true }).findComponent(OTag);
-      expect(pill.props("variant")).toBe("success-soft");
+      expect(pill.props("tone")).toBe("ok");
     });
   });
 
@@ -72,13 +69,13 @@ describe("DbmLockEmptyState", () => {
       }
     });
 
-    it("marks each verdict with its own glyph", () => {
+    it("marks each verdict with its own status", () => {
       const wrapper = mountWith({});
-      const glyph = (id: string) =>
-        wrapper.find(`[data-test='dbm-lock-empty-state-check-${id}'] span`).text().trim();
-      expect(glyph("reading")).toBe("✓");
-      expect(glyph("log")).toBe("✕");
-      expect(glyph("note")).toBe("!");
+      const status = (id: string) =>
+        wrapper.find(`[data-test='dbm-lock-empty-state-check-${id}']`).attributes("data-status");
+      expect(status("reading")).toBe("ok");
+      expect(status("log")).toBe("fail");
+      expect(status("note")).toBe("note");
     });
 
     it("shows each check's detail — the specific fix, not a generic link", () => {

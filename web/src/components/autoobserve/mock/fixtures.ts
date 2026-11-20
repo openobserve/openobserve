@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { AutoObserveCellState } from "@/services/autoobserve";
 import {
   AUTONOMY,
@@ -939,13 +939,13 @@ export const actionClassesFor = (modes: Partial<Record<FixKind, Autonomy>>): Act
     return mode ? { ...c, mode: MODE[mode] } : c;
   });
 
-export const LEDGER_STATUS: Record<LedgerStatus, { variant: BadgeVariant; key: I18nKey }> = {
-  auto_applied: { variant: "blue-soft", key: "autoobserve.ledgerStatus.autoApplied" },
-  kept: { variant: "success-soft", key: "autoobserve.ledgerStatus.kept" },
-  awaiting: { variant: "warning-soft", key: "autoobserve.ledgerStatus.awaiting" },
-  approved: { variant: "success-soft", key: "autoobserve.ledgerStatus.approved" },
-  rejected: { variant: "default-soft", key: "autoobserve.ledgerStatus.rejected" },
-  rolled_back: { variant: "purple-soft", key: "autoobserve.ledgerStatus.rolledBack" },
+export const LEDGER_STATUS: Record<LedgerStatus, { variant: ChipTone; key: I18nKey }> = {
+  auto_applied: { variant: "neutral", key: "autoobserve.ledgerStatus.autoApplied" },
+  kept: { variant: "ok", key: "autoobserve.ledgerStatus.kept" },
+  awaiting: { variant: "warn", key: "autoobserve.ledgerStatus.awaiting" },
+  approved: { variant: "ok", key: "autoobserve.ledgerStatus.approved" },
+  rejected: { variant: "neutral", key: "autoobserve.ledgerStatus.rejected" },
+  rolled_back: { variant: "neutral", key: "autoobserve.ledgerStatus.rolledBack" },
 };
 
 export const CONFIDENCE_LABEL: Record<ConfidenceBand, I18nKey> = {

@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="pattern-list-severity-filter"
       >
         <OToggleGroup
+          size="sm"
           type="multiple"
           :model-value="activeSeverities"
           @update:model-value="onSeverityFilterChange"
@@ -32,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="sev in severityChips"
             :key="sev.key"
             :value="sev.key"
-            size="xs"
             :data-test="`pattern-severity-chip-${sev.key}`"
           >
             <span :class="sev.colorClass">{{ sev.label }}</span>
@@ -164,22 +164,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Empty State -->
-    <div v-else class="flex flex-1 items-center justify-center">
-      <OEmptyState size="hero" preset="no-patterns" data-test="log-patterns-empty-state">
+    <div v-else class="flex flex-1 flex-col">
+      <OEmptyState
+        kind="filtered"
+        :title="t('emptyState.noPatterns.title')"
+        :text="t('emptyState.noPatterns.description')"
+        data-test="log-patterns-empty-state"
+      >
         <!-- When the selected time range has no logs but the stream has data
              elsewhere, offer a precise jump to the latest data — same as the
              logs search empty state. -->
         <template v-if="jumpTarget" #actions>
-          <EmptyStateActionCard
-            icon="schedule"
-            :label="t('logs.noEvents.jumpToData')"
-            :sublabel="raw(jumpTargetSublabel)"
+          <OButton
+            :title="jumpTargetSublabel"
             data-test="log-patterns-jump-to-data-card"
             @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
-          />
+          >
+            {{ t("logs.noEvents.jumpToData") }}
+          </OButton>
         </template>
         <template v-if="totalLogsAnalyzed" #extra>
-          <span class="text-text-secondary text-sm">
+          <span class="text-text-secondary text-compact">
             {{ t("emptyState.noPatterns.logsAnalyzed", { count: totalLogsAnalyzed }) }}
           </span>
         </template>
@@ -204,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useStore } from "vuex";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import PatternCard from "./PatternCard.vue";
 import { usePatternActions } from "./usePatternActions";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
@@ -212,7 +217,7 @@ import useWildcardHover from "./useWildcardHover";
 import analytics from "@/services/product_analytics";
 import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import {

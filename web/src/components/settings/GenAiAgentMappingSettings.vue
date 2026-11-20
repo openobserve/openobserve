@@ -1,20 +1,16 @@
 <template>
   <OPageLayout
-    overflow-first
     data-test="gen-ai-agent-mapping-settings"
-    :subtitle="t('genAiAgentMapping.subtitle')"
-    icon="account-tree"
+    :title="t('genAiAgentMapping.tabLabel')"
+    title-data-test="gen-ai-agent-mapping-page-title"
+    :about="t('genAiAgentMapping.subtitle')"
     bleed
   >
-    <template #title>
-      <span data-test="gen-ai-agent-mapping-page-title">{{ t("genAiAgentMapping.title") }}</span>
-    </template>
     <!-- Acts on the stored registry, not the form, so it lives in the header. -->
     <template #actions>
       <OButton
         data-test="gen-ai-agent-registry-clear-btn"
-        variant="outline-destructive"
-        size="sm"
+        variant="danger-ghost"
         :loading="clearingRegistry"
         :disabled="!loaded || loadingDefaults || saving"
         @click="openClearRegistryDialog"
@@ -23,27 +19,38 @@
       </OButton>
     </template>
 
-    <div v-if="loading" class="flex flex-1 items-center justify-center">
-      <OSpinner size="md" />
-    </div>
+    <ConstrainedPage
+      v-if="loading"
+      size="lg"
+      align="left"
+      :padded="false"
+      class="min-h-0 flex-1 px-4 py-3"
+    >
+      <div class="flex flex-col gap-6">
+        <OSkeleton shape="block" class="h-56" />
+        <OSkeleton shape="block" class="h-56" />
+      </div>
+    </ConstrainedPage>
 
-    <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
-      <OEmptyState size="hero" preset="no-access" data-test="gen-ai-agent-mapping-forbidden" />
-    </div>
+    <OEmptyState
+      v-else-if="forbidden"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
+      data-test="gen-ai-agent-mapping-forbidden"
+    />
 
     <!-- No form on a failed load: saving what an empty form holds would wipe the stored mapping. -->
-    <div v-else-if="loadError" class="flex flex-1 items-center justify-center">
-      <OEmptyState
-        size="hero"
-        preset="load-error"
-        data-test="gen-ai-agent-mapping-load-error"
-        @action="loadConfig()"
-      />
-    </div>
+    <OEmptyState
+      v-else-if="loadError"
+      kind="error"
+      data-test="gen-ai-agent-mapping-load-error"
+      @action="loadConfig()"
+    />
 
     <template v-else>
       <ConstrainedPage size="lg" align="left" :padded="false" class="min-h-0 flex-1 px-4 py-3">
-        <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-6">
           <!-- Standard attribute is read first, then each fallback in order. -->
           <OFormSection
             variant="plain"
@@ -75,7 +82,7 @@
                 @blur="markLeft(f.key)"
               />
             </OSettingRow>
-            <p class="text-text-secondary px-4 py-3 text-xs">
+            <p class="text-text-secondary py-3 text-xs">
               {{ t("genAiAgentMapping.fallbacksNote") }}
             </p>
           </OFormSection>
@@ -122,7 +129,7 @@
                   @blur="markLeft(d)"
                 />
               </OSettingRow>
-              <p class="text-text-secondary px-4 py-3 text-xs">
+              <p class="text-text-secondary py-3 text-xs">
                 {{ t("genAiAgentMapping.fallbacksNote") }}
                 {{ t("llmAttribution.settings.note") }}
               </p>
@@ -156,9 +163,7 @@
               :description="t('readableSessions.settings.help')"
             >
               <OButton
-                variant="outline"
-                size="sm"
-                icon-left="add"
+                variant="secondary"
                 data-test="gen-ai-harness-add-agent"
                 @click="addHarnessRule"
               >
@@ -166,14 +171,14 @@
               </OButton>
             </OSettingRow>
 
-            <div class="flex flex-col gap-3 px-4 py-3">
-              <p
+            <div class="flex flex-col gap-3 py-3">
+              <OEmptyState
                 v-if="harnessRules.length === 0"
-                class="text-text-secondary text-xs"
+                size="compact"
+                icon="smart-toy"
+                :title="t('genAiAgentMapping.sessions.noAgents')"
                 data-test="gen-ai-harness-empty"
-              >
-                {{ t("genAiAgentMapping.sessions.noAgents") }}
-              </p>
+              />
               <div
                 v-for="(rule, i) in harnessRules"
                 :key="rule.id"
@@ -191,16 +196,14 @@
                     :data-test="`gen-ai-harness-agent-${i}`"
                   />
                   <OButton
-                    variant="outline"
-                    size="sm"
+                    variant="secondary"
                     :data-test="`gen-ai-harness-defaults-${i}`"
                     @click="rule.patternsText = DEFAULT_HARNESS_PATTERNS.join('\n')"
                   >
                     {{ t("readableSessions.settings.codingAgentDefaults") }}
                   </OButton>
                   <OButton
-                    variant="outline"
-                    size="sm"
+                    variant="secondary"
                     :loading="testing === rule.id"
                     :disabled="!rule.agent.trim()"
                     :data-test="`gen-ai-harness-test-${i}`"
@@ -211,8 +214,7 @@
                   <span class="flex-1" />
                   <OButton
                     variant="ghost"
-                    size="sm"
-                    icon-left="delete"
+                    icon="delete"
                     :aria-label="t('readableSessions.settings.remove')"
                     :data-test="`gen-ai-harness-remove-${i}`"
                     @click="removeHarnessRule(rule.id)"
@@ -282,8 +284,7 @@
         <template #start>
           <OButton
             data-test="gen-ai-agent-mapping-apply-defaults-btn"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :loading="loadingDefaults"
             @click="applyDefaults"
           >
@@ -291,8 +292,7 @@
           </OButton>
           <OButton
             data-test="gen-ai-agent-mapping-reset-empty-btn"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             @click="resetToEmpty"
           >
             {{ t("genAiAgentMapping.resetToEmpty") }}
@@ -306,10 +306,12 @@
       data-test="gen-ai-agent-registry-clear-dialog"
       size="sm"
       :title="t('genAiAgentMapping.clearRegistryTitle')"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('genAiAgentMapping.clearRegistryConfirm')"
-      primary-button-variant="destructive"
-      :primary-button-loading="clearingRegistry"
+      :secondary="{ label: t('confirmDialog.cancel') }"
+      :primary="{
+        label: t('genAiAgentMapping.clearRegistryConfirm'),
+        variant: 'danger',
+        loading: clearingRegistry,
+      }"
       @click:secondary="clearRegistryDialogOpen = false"
       @click:primary="clearAgentRegistry"
     >
@@ -327,7 +329,7 @@ import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

@@ -25,7 +25,7 @@ import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
@@ -128,8 +128,7 @@ const downloadEnv = () =>
         :help-text="!streamNameError ? t('ingestion.ai.codingAgent.streamHelp') : undefined"
         :error="!!streamNameError"
         :error-message="streamNameError"
-        size="sm"
-        width="md"
+        width="m"
         data-test="ai-coding-agent-stream-input"
       />
     </div>
@@ -140,20 +139,19 @@ const downloadEnv = () =>
         :title="t('ingestion.ai.codingAgent.envTitle')"
         data-test="ai-coding-agent-env-step"
       >
-        <OBanner
+        <OInlineNotice
           v-if="passcodeForbidden"
-          variant="warning"
+          tone="warn"
           data-test="ai-coding-agent-passcode-forbidden"
-          :content="t('ingestion.passcodeForbiddenMessage')"
+          :message="t('ingestion.passcodeForbiddenMessage')"
         />
         <template v-else>
           <p class="text-text-secondary text-compact mt-0 mb-2.5 leading-[1.45]">
             {{ t("ingestion.ai.codingAgent.envHelp") }}
           </p>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="download"
+            variant="secondary"
+            icon="download"
             data-test="ai-coding-agent-env-btn"
             @click="downloadEnv"
           >
@@ -166,10 +164,8 @@ const downloadEnv = () =>
         <OCodeBlock
           :code="prompt"
           lang="text"
-          chrome="editor"
           :filename="t('ingestion.ai.codingAgent.promptLabel')"
           wrap
-          :copy-message="t('ingestion.ai.codingAgent.promptCopied')"
           data-test="ai-coding-agent-prompt"
           @copy="onPromptCopy"
         />

@@ -17,25 +17,20 @@
     <OPageLayout
       :back="{
         label: t('aiObservability.nav.experiments'),
-        onClick: goBack,
+        to: aiExperimentsRoute(orgId),
         dataTest: 'ai-experiment-form-back-btn',
       }"
-      title-overflow="visible"
+      :title="
+        cloning
+          ? t('aiObservability.experiments.form.cloneTitle')
+          : t('aiObservability.experiments.form.pageTitle')
+      "
+      title-data-test="ai-experiment-form-title"
       bleed
     >
-      <template #title>
-        <span data-test="ai-experiment-form-title">
-          {{
-            cloning
-              ? t("aiObservability.experiments.form.cloneTitle")
-              : t("aiObservability.experiments.form.pageTitle")
-          }}
-        </span>
-      </template>
-
       <div class="flex min-h-0 flex-1 gap-0 overflow-hidden max-[68.75rem]:flex-col">
         <div
-          class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto]"
+          class="px-page-edge flex min-h-0 min-w-0 flex-[6.5] flex-col gap-3 overflow-auto py-3 max-[68.75rem]:flex-[1_1_auto]"
         >
           <!-- Identity — what this run IS: its name, what it measures, and the
              dataset it is pinned to. The dataset lives here because nothing
@@ -46,17 +41,15 @@
             data-test="ai-experiment-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.experiments.form.identitySection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="flex flex-col gap-4 px-4 py-3.5">
               <OFormInput
                 name="name"
                 :label="t('aiObservability.experiments.form.nameLabel')"
                 :placeholder="t('aiObservability.experiments.form.namePlaceholder')"
-                size="sm"
                 required
                 data-test="ai-experiment-form-name-input"
               />
@@ -65,7 +58,6 @@
                 name="description"
                 :label="t('aiObservability.experiments.form.descriptionLabel')"
                 :placeholder="t('aiObservability.experiments.form.descriptionPlaceholder')"
-                size="sm"
                 :rows="3"
                 data-test="ai-experiment-form-description-input"
               />
@@ -133,7 +125,6 @@
             data-test="ai-experiment-form-task-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.experiments.form.tabTask") }}
               </span>
@@ -187,9 +178,9 @@
                       @update:model-value="onProviderChange"
                     />
                     <OButton
+                      icon-only
                       variant="ghost"
-                      size="icon-md"
-                      icon-left="refresh"
+                      icon="refresh"
                       :loading="refreshingProviders"
                       :title="t('aiObservability.experiments.form.providerRefresh')"
                       data-test="ai-experiment-form-provider-refresh-btn"
@@ -290,8 +281,8 @@
                       v-for="variable in promptVariables"
                       :key="variable.name"
                       type="button"
-                      variant="outline"
-                      size="xs"
+                      variant="secondary"
+                      size="sm"
                       :data-test="`ai-experiment-form-variable-${variable.name}`"
                       @click="insertVariable(variable.token)"
                     >
@@ -358,8 +349,7 @@
                   />
                   <OButton
                     type="button"
-                    variant="outline"
-                    size="sm"
+                    variant="secondary"
                     :loading="resolvingPrompt"
                     :disabled="!promptId"
                     @click="resolvePromptSelection"
@@ -489,7 +479,6 @@
             data-test="ai-experiment-form-scorers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.experiments.scorers") }}
               </span>
@@ -582,8 +571,7 @@
         </p>
         <OButton
           type="button"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="isSubmitting || sendingConfirmed"
           data-test="ai-experiment-form-cancel-btn"
           @click="goBack"
@@ -593,7 +581,6 @@
         <OButton
           type="submit"
           variant="primary"
-          size="sm-action"
           :loading="isSubmitting || sendingConfirmed"
           data-test="ai-experiment-form-submit-btn"
         >

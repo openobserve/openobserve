@@ -36,10 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="issue.error_handling"
         :label="raw(issue.error_handling)"
-        :variant="isUnhandled ? 'error-outline' : 'warning-outline'"
-        size="xs"
-        shape="rounded"
-        class="shrink-0 uppercase"
+        :tone="isUnhandled ? 'err' : 'warn'"
+        size="sm"
+        class="shrink-0"
         data-test="rum-error-issue-cell-handling-tag"
       />
       <OTruncatedText v-if="topFrame" as="code" data-test="rum-error-issue-cell-frame"
@@ -49,9 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="route"
         :label="raw(route)"
-        variant="default-soft"
-        size="xs"
-        shape="rounded"
+        tone="neutral"
+        size="sm"
         class="shrink-0"
         data-test="rum-error-issue-cell-route-tag"
       />

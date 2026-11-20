@@ -9,9 +9,10 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { caseSettingsQuery, saveCaseSettingsMutation } from "@/services/securityCases.queries";
 import {
@@ -86,36 +87,31 @@ async function onSubmit(value: CaseSettingsValues) {
     size="sm"
     :title="t('siem.cases.settings.title')"
     :form-id="FORM_ID"
-    :primary-button-label="t('siem.cases.settings.save')"
-    :primary-button-disabled="!defaults"
-    :secondary-button-label="t('siem.cases.close.cancel')"
+    :primary="{ label: t('siem.cases.settings.save'), disabled: !defaults }"
+    :secondary="{ label: t('siem.cases.close.cancel') }"
     data-test="security-case-settings-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
   >
     <div class="flex flex-col gap-4">
-      <OBanner
-        v-if="saveError"
-        variant="error-soft"
-        icon="error-outline"
-        dense
-        data-test="security-case-settings-save-error"
-        >{{ saveError }}</OBanner
-      >
-      <OBanner
+      <OInlineNotice v-if="saveError" tone="err" data-test="security-case-settings-save-error">{{
+        saveError
+      }}</OInlineNotice>
+      <OEmptyState
         v-if="loadError"
-        variant="error-soft"
-        icon="error-outline"
-        dense
+        kind="error"
+        size="compact"
+        :title="loadError"
         data-test="security-case-settings-load-error"
-        >{{ loadError }}</OBanner
-      >
+        @action="settings.refetch()"
+      />
       <div
         v-else-if="!defaults"
-        class="flex justify-center py-6"
+        class="flex flex-col gap-4"
         data-test="security-case-settings-loading"
       >
-        <OSpinner />
+        <OSkeleton shape="block" class="h-14" />
+        <OSkeleton shape="block" class="h-14" />
       </div>
       <OForm
         v-else-if="open"
@@ -147,16 +143,12 @@ async function onSubmit(value: CaseSettingsValues) {
           required
           data-test="security-case-settings-group-window"
         />
-        <div class="flex flex-col gap-1">
-          <OFormSwitch
-            name="roll_up_low_priority"
-            :label="t('siem.cases.settings.rollUpLowPriority')"
-            data-test="security-case-settings-roll-up"
-          />
-          <span class="text-text-secondary text-xs">{{
-            t("siem.cases.settings.rollUpLowPriorityHint")
-          }}</span>
-        </div>
+        <OFormSwitch
+          name="roll_up_low_priority"
+          :label="t('siem.cases.settings.rollUpLowPriority')"
+          :description="t('siem.cases.settings.rollUpLowPriorityHint')"
+          data-test="security-case-settings-roll-up"
+        />
       </OForm>
     </div>
   </ODialog>

@@ -16,7 +16,7 @@
 import type { RouteLocationRaw } from "vue-router";
 import config from "@/aws-exports";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { AutoObserveSuggestion } from "@/services/autoobserve";
 import { buildLogsRoute } from "@/utils/metrics/metricDrilldown";
 import type { ReviewFocus } from "@/components/alert_calibration/digests";
@@ -55,7 +55,7 @@ export type InsightTone = "failure" | "gap" | "info";
 
 export interface InsightChip {
   label: I18nText;
-  variant: BadgeVariant;
+  variant: ChipTone;
   tone: InsightTone;
 }
 
@@ -81,7 +81,7 @@ export interface InsightCta {
 
 export interface InsightFact {
   label: I18nText;
-  variant: BadgeVariant;
+  variant: ChipTone;
   hint?: I18nText;
 }
 
@@ -155,10 +155,10 @@ const NOTIFY_FAILED = "alert_notify_failed";
 
 const HOUR_US = 3_600_000_000;
 
-const TONE_VARIANT: Record<InsightTone, BadgeVariant> = {
-  failure: "error-soft",
-  gap: "amber-soft",
-  info: "default-soft",
+const TONE_VARIANT: Record<InsightTone, ChipTone> = {
+  failure: "err",
+  gap: "warn",
+  info: "neutral",
 };
 
 // An alert or monitor that cannot fire is a failure; one that tells no one, or a missing check, is a gap.

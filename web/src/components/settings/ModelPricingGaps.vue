@@ -21,12 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :back="{
-      label: t('modelPricing.header'),
-      onClick: goBack,
+      label: t('settings.llmModelPricing'),
+      to: { name: 'modelPricing', query: { org_identifier: orgIdentifier } },
       dataTest: 'model-pricing-gaps-back-btn',
     }"
     :title="t('modelPricing.unpriced.title')"
-    :subtitle="t('modelPricing.unpriced.subtitle')"
+    :about="t('modelPricing.unpriced.subtitle')"
     bleed
   >
     <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
@@ -169,10 +169,6 @@ function applyRouteStream() {
 function onStreamChange(s: string) {
   stream.value = s;
   router.replace({ query: { ...router.currentRoute.value.query, stream: s } });
-}
-
-function goBack() {
-  router.push({ name: "modelPricing", query: { org_identifier: orgIdentifier.value } });
 }
 
 onBeforeMount(() => {

@@ -45,9 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="inline-flex">
             <OButton
               variant="ghost"
-              size="sm-action"
               disabled
-              icon-left="lock"
+              icon="lock"
               data-test="correlation-view-traces-page"
               class="text-xs"
             >
@@ -58,8 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-else
           variant="ghost"
-          size="sm-action"
-          icon-left="open-in-new"
+          icon="open-in-new"
           data-test="correlation-view-traces-page"
           class="text-xs"
           @click="emit('open')"

@@ -18,34 +18,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 
 <template>
-  <OPageLayout
-    :title="t('serviceAccounts.header')"
-    icon="manage-accounts"
-    :subtitle="t('serviceAccounts.headerSubtitle')"
-    bleed
-  >
+  <OPageLayout :title="t('iam.serviceAccounts')" :about="t('serviceAccounts.headerSubtitle')" bleed>
     <template #actions>
-      <OButton
-        data-test="service-accounts-add-btn"
-        variant="primary"
-        size="sm"
-        @click="addRoutePush({})"
-      >
+      <OButton data-test="service-accounts-add-btn" variant="primary" @click="addRoutePush({})">
         {{ t("serviceAccounts.add") }}
       </OButton>
     </template>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
-          :frame="false"
           :data="serviceAccountsState.service_accounts_users"
           :columns="columns"
           row-key="email"
           :row-actions="rowActions"
+          :row-menu="rowMenu"
           :row-actions-slot="isSystemRow"
-          row-actions-more-data-test="service-accounts-row-more-actions"
+          row-menu-data-test="service-accounts-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
+          :error="loadError"
           forbidden-resource="service_accounts"
           pagination="client"
           :page-size="20"
@@ -57,14 +48,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-ids="selectedAccountEmails"
           :is-row-selectable="isRowSelectable"
           v-model:global-filter="filterQuery"
-          :show-global-filter="false"
           filter-mode="client"
           :default-columns="false"
-          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-service-accounts-list"
           @update:selected-ids="handleSelectedIdsUpdate"
+          @retry="refreshServiceAccounts"
         >
           <template #toolbar>
             <div class="flex flex-1 items-center gap-2 max-md:contents">
@@ -78,36 +68,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              shortcut-id="iamServiceAccountsRefresh"
+              shortcut="iamServiceAccountsRefresh"
               data-test="iam-service-accounts-refresh-btn"
               @click="refreshServiceAccounts"
             />
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-service-accounts"
-              :filtered="!!filterQuery"
-              @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : addRoutePush({}))"
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.serviceAccounts') })
+                  : t('emptyState.noServiceAccounts.title')
+              "
+              :text="
+                filterQuery
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.nouns.serviceAccounts'),
+                    })
+                  : t('emptyState.noServiceAccounts.description')
+              "
+              :icon="filterQuery ? undefined : 'group'"
+              :action-label="filterQuery ? undefined : t('emptyState.noServiceAccounts.action')"
+              @action="filterQuery ? (filterQuery = '') : addRoutePush({})"
             />
           </template>
 
           <template #cell-email="{ row }">
-            <template v-if="row.is_system">
-              <span data-test="service-accounts-system-account-label" class="font-medium">{{
-                row.first_name
-              }}</span>
+            <span v-if="row.is_system" class="inline-flex max-w-full min-w-0 items-center gap-2">
+              <span
+                data-test="service-accounts-system-account-label"
+                class="min-w-0 truncate font-medium"
+              >
+                {{ row.first_name }}
+                <OTooltip overflow-only />
+              </span>
               <OTag
                 data-test="service-accounts-system-badge"
                 type="serviceAccountKind"
                 value="system"
-                class="ms-2"
+                class="shrink-0"
               />
-            </template>
+            </span>
             <template v-else-if="isSyntheticSA(row.email)">
               <!-- UI-created accounts store `<name>.<org>@sa.internal`; show
                      the friendly name first, full identifier (the Basic-auth
@@ -118,7 +122,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="service-accounts-list-name-link"
                   >{{ saDisplayName(row.email) }}</ONameLinkCell
                 >
-                <span class="text-text-secondary text-xs">{{ row.email }}</span>
+                <span class="text-text-secondary truncate text-xs">
+                  {{ row.email }}
+                  <OTooltip overflow-only />
+                </span>
               </div>
             </template>
             <template v-else>
@@ -183,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-accounts-system-managed-badge"
               class="inline-flex items-center gap-1"
             >
-              <OTag type="serviceAccountKind" value="managed" />
+              <OIcon name="lock" size="sm" class="text-text-secondary cursor-help" />
               <OTooltip :content="t('serviceAccounts.row.managedByTooltip')" />
             </span>
           </template>
@@ -191,11 +198,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #selection-actions>
             <OButton
               data-test="service-accounts-list-delete-accounts-btn"
-              variant="outline-destructive"
-              size="sm"
+              variant="danger-ghost"
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
-              icon-left="delete"
+              icon="delete"
             >
               {{ t("serviceAccounts.bulkDelete") }}
             </OButton>
@@ -216,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('serviceAccounts.confirmRefreshHead')"
       :message="t('serviceAccounts.confirmRefreshMsg', { identifier: toBeRefreshed.email })"
       :ok-label="t('serviceAccounts.confirmRefreshBtn')"
-      ok-color="destructive"
+      kind="destructive"
       @update:ok="refreshServiceToken(toBeRefreshed)"
       @update:cancel="confirmRefresh = false"
     />
@@ -228,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       message-keypath="serviceAccounts.confirmDeleteMsg"
       :message-name="deleteUserEmailIdentifier"
       :ok-label="t('serviceAccounts.confirmDeleteBtn')"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="deleteUser"
       @update:cancel="confirmDelete = false"
     />
@@ -239,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('serviceAccounts.confirmBulkDeleteHead')"
       :message="t('serviceAccounts.confirmBulkDeleteMsg', { count: selectedAccounts.length })"
       :ok-label="t('serviceAccounts.confirmBulkDeleteBtn', { count: selectedAccounts.length })"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="bulkDeleteServiceAccounts"
       @update:cancel="confirmBulkDelete = false"
     />
@@ -256,17 +262,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            an access summary (creation only — rotate shows the token alone). -->
       <div data-test="service-accounts-token-wizard">
         <div data-test="service-accounts-token-step-1">
-          <OBanner
-            variant="warning"
-            icon="warning"
-            dense
-            data-test="service-accounts-token-copy-hint"
-            class="mb-3"
-          >
+          <OInlineNotice tone="warn" data-test="service-accounts-token-copy-hint" class="mb-3">
             {{ t("serviceAccounts.tokenReveal.copyHint") }}
-          </OBanner>
+          </OInlineNotice>
 
-          <OTabs v-model="tokenTab" dense align="left">
+          <OTabs v-model="tokenTab" size="compact">
             <OTab name="curl" :label="t('serviceAccounts.tokenReveal.curl')" />
             <OTab name="header" :label="t('serviceAccounts.tokenReveal.header')" />
             <OTab name="env" :label="t('serviceAccounts.tokenReveal.env')" />
@@ -279,7 +279,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :code="tokenCurlSnippet"
                 lang="bash"
                 wrap
-                :copy-message="t('serviceAccounts.toast.tokenCopied')"
               />
             </OTabPanel>
             <OTabPanel name="header">
@@ -288,7 +287,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :code="tokenHeaderSnippet"
                 lang="http"
                 wrap
-                :copy-message="t('serviceAccounts.toast.tokenCopied')"
               />
             </OTabPanel>
             <OTabPanel name="env">
@@ -297,33 +295,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :code="tokenEnvSnippet"
                 lang="bash"
                 wrap
-                :copy-message="t('serviceAccounts.toast.tokenCopied')"
               />
             </OTabPanel>
           </OTabPanels>
 
           <div class="mt-3 grid grid-cols-2 gap-2">
-            <OButton
+            <OCopyButton
               data-test="service-accounts-list-token-copy-btn"
-              variant="outline"
-              size="sm"
-              icon-left="content-copy"
-              :title="t('serviceAccounts.copyToken')"
-              @click.stop="
-                copyToClipboard(serviceToken, t, {
-                  successMessage: t('serviceAccounts.toast.tokenCopied'),
-                  timeout: 5000,
-                })
-              "
-            >
-              {{ t("serviceAccounts.copyToken") }}
-            </OButton>
+              variant="secondary"
+              size="md"
+              show-label
+              :label="t('serviceAccounts.copyToken')"
+              :value="serviceToken"
+            />
 
             <OButton
               data-test="service-accounts-list-token-download-btn"
-              variant="outline"
-              size="sm"
-              icon-left="file-download"
+              variant="secondary"
+              icon="file-download"
               :title="t('serviceAccounts.downloadToken')"
               @click.stop="downloadTokenAsFile(serviceToken)"
             >
@@ -343,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="service-accounts-token-access-pending"
             class="mt-4 flex items-center gap-2"
           >
-            <OSpinner size="xs" />
+            <OSpinner />
             <span class="text-text-secondary text-xs">{{
               t("serviceAccounts.tokenReveal.applying")
             }}</span>
@@ -362,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OBadge
                   v-for="role in tokenAccess.assigned.roles"
                   :key="role"
-                  variant="success"
+                  tone="ok"
                   icon="check"
                   size="sm"
                   >{{ role }}</OBadge
@@ -377,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OBadge
                   v-for="group in tokenAccess.assigned.groups"
                   :key="group"
-                  variant="success"
+                  tone="ok"
                   icon="check"
                   size="sm"
                   >{{ group }}</OBadge
@@ -457,7 +446,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="service-accounts-token-done-btn"
               variant="primary"
-              size="sm"
               @click="isShowToken = false"
             >
               {{ t("serviceAccounts.tokenReveal.done") }}
@@ -475,8 +463,10 @@ import { useQuery } from "@tanstack/vue-query";
 import { serviceAccountsQuery } from "@/services/service_accounts.queries";
 import { allUserRolesQuery } from "@/services/users.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { defineComponent, ref, onBeforeMount, computed, watch } from "vue";
+import { defineComponent, ref, toRef, onBeforeMount, computed, watch } from "vue";
+import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -484,7 +474,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -499,7 +489,11 @@ import {
   serviceAccountDisplayName,
 } from "./AddServiceAccount.schema";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import ONameLinkCell from "@/lib/core/Table/cells/ONameLinkCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -509,7 +503,6 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import { copyToClipboard } from "@/utils/clipboard";
 import { formatDate } from "@/utils/date";
 import { b64EncodeStandard } from "@/utils/formatters";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
@@ -522,7 +515,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { forbiddenState } from "@/utils/featureGate";
+import { forbiddenState, loadErrorText } from "@/utils/featureGate";
 export default defineComponent({
   name: "ServiceAccountsList",
   components: {
@@ -530,6 +523,7 @@ export default defineComponent({
     AddServiceAccount,
     ConfirmDialog,
     OButton,
+    OCopyButton,
     ODialog,
     OIcon,
     OPageLayout,
@@ -538,7 +532,7 @@ export default defineComponent({
     OTable,
     OTag,
     OBadge,
-    OBanner,
+    OInlineNotice,
     OCodeBlock,
     OCodeCell,
     ONameLinkCell,
@@ -566,7 +560,10 @@ export default defineComponent({
     const isCurrentUserInternal = ref(false);
     const isShowToken = ref(false);
     const confirmRefresh = ref(false);
-    const filterQuery = ref("");
+    const filterQuery = toRef(
+      useListViewState("iam-serviceAccounts", { filterQuery: "" }, { url: LIST_URL_PARAMS }),
+      "filterQuery",
+    );
     const toBeRefreshed = ref<{ email?: string }>({});
 
     const serviceToken = ref("");
@@ -766,7 +763,7 @@ export default defineComponent({
         sortable: true,
         resizable: true,
         hideable: true,
-        size: COL.description,
+        size: 220,
         minSize: 160,
         meta: { align: "left", flex: true },
       },
@@ -779,7 +776,7 @@ export default defineComponent({
         sortable: false,
         resizable: true,
         hideable: true,
-        size: 160,
+        size: 130,
         minSize: 120,
         meta: {
           align: "left",
@@ -806,14 +803,6 @@ export default defineComponent({
         size: 170,
         meta: { align: "left" },
       },
-      {
-        id: "actions",
-        header: t("user.actions"),
-        isAction: true,
-        pinned: "right",
-        // Wider than three icon buttons: a system row shows a text tag here.
-        size: 136,
-      },
     ];
     const isSystemRow = (row: any): boolean => !!row.is_system;
     const rowActions: OTableRowAction[] = [
@@ -821,22 +810,25 @@ export default defineComponent({
         id: "edit",
         label: t("serviceAccounts.update"),
         icon: "edit",
-        onSelect: (row) => addRoutePush(row),
-        dataTest: () => "service-accounts-edit",
+        onClick: (row) => addRoutePush(row),
+        dataTest: "service-accounts-edit",
       },
       {
         id: "rotate",
         label: t("serviceAccounts.rotate"),
         icon: "refresh",
-        onSelect: (row) => confirmRefreshAction(row),
-        dataTest: () => "service-accounts-refresh",
+        onClick: (row) => confirmRefreshAction(row),
+        dataTest: "service-accounts-refresh",
       },
+    ];
+    const rowMenu: OTableRowMenuItem[] = [
       {
         id: "delete",
         label: t("serviceAccounts.deleteServiceAccount"),
         icon: "delete",
+        destructive: true,
         onSelect: (row) => confirmDeleteAction(row),
-        dataTest: () => "service-accounts-delete",
+        dataTest: "service-accounts-delete",
       },
     ];
     const userEmail: any = ref("");
@@ -865,7 +857,18 @@ export default defineComponent({
       Object.assign(serviceAccountsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
     );
 
-    const loading = serviceAccountsList.isPending;
+    // A failed read with no rows on screen is the error state, never the first-run one (K5).
+    const loadError = computed(() =>
+      serviceAccountsState.service_accounts_users.length
+        ? null
+        : loadErrorText(serviceAccountsList.error.value, t("emptyState.loadError.description")),
+    );
+    // `isPending` is the cold read; a retry from the error state shows the skeleton again.
+    const loading = computed(
+      () =>
+        serviceAccountsList.isPending.value ||
+        (!!loadError.value && serviceAccountsList.isFetching.value),
+    );
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = serviceAccountsList.isFetching;
@@ -1240,8 +1243,10 @@ export default defineComponent({
       serviceAccountsState,
       columns,
       rowActions,
+      rowMenu,
       isSystemRow,
       loading,
+      loadError,
       fetching,
       lastUpdatedAt,
       forbidden,
@@ -1260,7 +1265,6 @@ export default defineComponent({
       getServiceAccountsUsers,
       selectedUser,
       refreshServiceToken,
-      copyToClipboard,
       isShowToken,
       serviceToken,
       tokenTab,

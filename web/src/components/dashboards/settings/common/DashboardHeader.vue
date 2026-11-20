@@ -19,18 +19,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div data-test="dashboard-header-row" class="mx-2 my-2 flex flex-nowrap items-center">
       <div v-if="backButton" data-test="dashboard-header-back-button-container" class="col-auto">
         <OButton
+          icon-only
           :aria-label="t('common.goBack')"
           data-test="dashboard-header-back-button"
-          variant="outline"
-          size="icon-xs"
+          variant="ghost"
           class="me-2"
           @click="onBackClicked"
-          icon-left="arrow-back-ios-new"
+          icon="arrow-back-ios-new"
         >
         </OButton>
       </div>
       <div data-test="dashboard-header-title-container" class="flex flex-1 flex-col">
-        <div data-test="dashboard-header-title" class="text-base font-semibold">
+        <div data-test="dashboard-header-title" class="text-sm font-semibold">
           {{ title }}
         </div>
       </div>

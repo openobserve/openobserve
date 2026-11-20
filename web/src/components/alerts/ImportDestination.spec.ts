@@ -232,14 +232,13 @@ describe("ImportDestination", () => {
     });
   });
 
-  // ─── arrowBackFn ─────────────────────────────────────────────────────────
-  describe("arrowBackFn", () => {
-    it("pushes to alertDestinations route with org_identifier", () => {
-      wrapper.vm.arrowBackFn();
-      expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "alertDestinations",
-        query: { org_identifier: "test-org" },
-      });
+  // ─── back ─────────────────────────────────────────────────────────────────
+  describe("back", () => {
+    it("goes to alertDestinations with org_identifier from a deep link", () => {
+      const target = { name: "alertDestinations", query: { org_identifier: "test-org" } };
+      expect(wrapper.vm.listRoute).toEqual(target);
+      wrapper.vm.goBack();
+      expect(mockRouterPush).toHaveBeenCalledWith(target);
     });
   });
 
@@ -499,14 +498,14 @@ describe("ImportDestination", () => {
       expect(wrapper.vm.destinationCreators[0].message).toContain("Already exists");
     });
 
-    it("falls back to 'Unknown Error' when response has no message", async () => {
+    it("falls back to 'Unknown error' when response has no message", async () => {
       const destService = await import("@/services/alert_destination");
       vi.mocked(destService.default.create).mockRejectedValueOnce(new Error("net error"));
 
       const result = await wrapper.vm.createDestination({ name: "d1" }, 1);
 
       expect(result).toBe(false);
-      expect(wrapper.vm.destinationCreators[0].message).toContain("Unknown Error");
+      expect(wrapper.vm.destinationCreators[0].message).toContain("Unknown error");
     });
   });
 

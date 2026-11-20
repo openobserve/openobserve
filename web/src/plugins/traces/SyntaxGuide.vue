@@ -22,10 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="menuItem"
         data-cy="syntax-guide-button"
         variant="ghost"
-        size="sm"
-        class="rounded-default! h-auto! w-full! justify-start! gap-2! px-3! py-1.5! font-normal!"
+        class="rounded-default! w-full! justify-start! gap-2! px-3! py-1.5! font-normal!"
       >
-        <template #icon-left>
+        <template #icon>
           <span
             class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
           >
@@ -37,10 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Default: compact toolbar button -->
       <OButton
         v-else
+        icon-only
         data-cy="syntax-guide-button"
         v-bind="$attrs"
-        variant="outline"
-        size="icon-xs"
+        variant="ghost"
         :class="[sqlmode ? 'sql-mode' : 'normal-mode']"
       >
         <OIcon name="help" size="sm" />
@@ -50,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div data-test="syntax-guide-menu" class="syntax-guide-menu">
       <div v-if="!sqlmode">
         <div class="w-105">
-          <div class="label text-sm font-bold">{{ t("search.syntaxGuideLabel") }}</div>
+          <div class="label text-sm font-semibold">{{ t("search.syntaxGuideLabel") }}</div>
         </div>
         <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">
@@ -102,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div v-else>
         <div class="w-105">
-          <div class="label text-sm font-bold">{{ t("search.syntaxGuide.sqlTitle") }}</div>
+          <div class="label text-sm font-semibold">{{ t("search.syntaxGuide.sqlTitle") }}</div>
         </div>
         <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">

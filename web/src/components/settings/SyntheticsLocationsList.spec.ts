@@ -78,14 +78,13 @@ const OPageLayoutStub = {
     <div
       data-test="page-layout"
       :data-title="title"
-      :data-icon="icon"
-      :data-subtitle="subtitle"
+      :data-about="about"
     >
       <div data-test="page-actions"><slot name="actions-overflow" /><slot name="actions" /></div>
       <slot />
     </div>
   `,
-  props: ["title", "icon", "subtitle", "bleed"],
+  props: ["title", "about", "bleed"],
 };
 
 const OTableStub = {
@@ -173,13 +172,12 @@ const OEmptyStateStub = {
   template: `
     <div
       data-test="empty-state"
-      :data-preset="preset"
-      :data-filtered="String(filtered)"
-      :data-actions="(actions || []).map((a) => a.id).join(',')"
-      @click="$emit('action', 'create')"
+      :data-kind="kind"
+      :data-action-label="actionLabel"
+      @click="$emit('action')"
     />
   `,
-  props: ["size", "preset", "filtered", "actions"],
+  props: ["size", "kind", "title", "text", "actionLabel"],
   emits: ["action"],
 };
 
@@ -439,8 +437,7 @@ describe("SyntheticsLocationsList", () => {
 
       const emptyState = wrapper.find('[data-test="empty-state"]');
       expect(emptyState.exists()).toBe(true);
-      expect(emptyState.attributes("data-preset")).toBe("no-search-results");
-      expect(emptyState.attributes("data-filtered")).toBe("true");
+      expect(emptyState.attributes("data-kind")).toBe("filtered");
     });
 
     it("offers to create the first location when there are no locations at all", async () => {
@@ -452,7 +449,8 @@ describe("SyntheticsLocationsList", () => {
 
       const emptyState = wrapper.find('[data-test="empty-state"]');
       expect(emptyState.exists()).toBe(true);
-      expect(emptyState.attributes("data-actions")).toBe("create");
+      expect(emptyState.attributes("data-kind")).toBe("first-run");
+      expect(emptyState.attributes("data-action-label")).toBeTruthy();
       await emptyState.trigger("click");
       expect(wrapper.vm.formDialog.show).toBe(true);
     });
@@ -671,7 +669,7 @@ describe("SyntheticsLocationsList", () => {
         title: "Delete Location",
         messageKeypath: "synthetics.locations.deleteConfirmMessage",
         messageName: row.label,
-        confirmVariant: "destructive",
+        kind: "destructive",
       });
       expect(mockDeleteLocation).toHaveBeenCalledWith("test-org", "loc-1");
       expect(analytics.track).toHaveBeenCalledWith("synthetics_location_deleted", { count: 1 });
@@ -779,7 +777,7 @@ describe("SyntheticsLocationsList", () => {
       expect(mockConfirm).toHaveBeenCalledWith({
         title: "Delete Locations",
         message: "Are you sure you want to delete 2 locations?",
-        confirmVariant: "destructive",
+        kind: "destructive",
       });
     });
   });

@@ -327,7 +327,9 @@ describe("AgentBehaviorPanel", () => {
       expect(byId[id].minSize).toBe(136);
       expect(byId[id].meta).toMatchObject({ flex: true, autoWidth: true });
     }
-    for (const id of ["ratio", "calls", "traces"]) expect(byId[id].size).toBeLessThanOrEqual(108);
+    // Compact, but wide enough that "Calls / trace" and "Traces" never cut at 1440.
+    for (const id of ["ratio", "calls", "traces"]) expect(byId[id].size).toBeLessThanOrEqual(132);
+    expect(byId.ratio.size).toBeGreaterThanOrEqual(132);
   });
 
   it("highlights and scopes the drawer to exactly the clicked row", async () => {

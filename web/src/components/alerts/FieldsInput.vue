@@ -22,17 +22,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          injected form (pushFieldValue/removeFieldValue). No v-model, no manual
          error refs — the consuming form's schema owns validation (Rule ②). -->
     <template v-if="formMode">
-      <div data-test="alert-conditions-text" class="font-bold">
+      <div data-test="alert-conditions-text" class="font-semibold">
         {{ t("alerts.filters.conditions") + " *" }} {{ t("alerts.filters.conditionsHint") }}
       </div>
       <template v-if="!formRows.length">
         <OButton
           data-test="alert-conditions-add-btn"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           class="mt-2"
           @click="addFormRow"
-          icon-left="add"
         >
           {{ t("alerts.addCondition") }}
         </OButton>
@@ -80,21 +78,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="alerts-condition-action ms-0 mb-3">
             <OButton
+              icon-only
               data-test="alert-conditions-delete-condition-btn"
               class="ms-1"
               variant="ghost"
-              size="icon-circle-sm"
+              size="sm"
               :title="t('alert_templates.edit')"
               @click="removeFormRow(index)"
             >
               <OIcon name="delete" size="sm" />
             </OButton>
             <OButton
-              data-test="alert-conditions-add-condition-btn"
               v-if="index === formRows.length - 1"
+              icon-only
+              data-test="alert-conditions-add-condition-btn"
               class="ms-1"
               variant="ghost"
-              size="icon-circle-sm"
+              size="sm"
               :title="t('alert_templates.edit')"
               @click="addFormRow()"
             >
@@ -108,17 +108,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Consumed bare by functions/logstream/pipeline forms; a legitimate
          permanent pattern (see START-HERE 🔀). Do NOT delete. -->
     <template v-else>
-      <div data-test="alert-conditions-text" class="font-bold">
+      <div data-test="alert-conditions-text" class="font-semibold">
         {{ t("alerts.filters.conditions") + " *" }} {{ t("alerts.filters.conditionsHint") }}
       </div>
       <template v-if="!fields.length">
         <OButton
           data-test="alert-conditions-add-btn"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           class="mt-2"
           @click="addApiHeader"
-          icon-left="add"
         >
           {{ t("alerts.addCondition") }}
         </OButton>
@@ -194,21 +192,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="alerts-condition-action ms-0 mb-3">
             <OButton
+              icon-only
               data-test="alert-conditions-delete-condition-btn"
               class="ms-1"
               variant="ghost"
-              size="icon-circle-sm"
+              size="sm"
               :title="t('alert_templates.edit')"
               @click="deleteApiHeader(field)"
             >
               <OIcon name="delete" size="sm" />
             </OButton>
             <OButton
-              data-test="alert-conditions-add-condition-btn"
               v-if="index === fields.length - 1"
+              icon-only
+              data-test="alert-conditions-add-condition-btn"
               class="ms-1"
               variant="ghost"
-              size="icon-circle-sm"
+              size="sm"
               :title="t('alert_templates.edit')"
               @click="addApiHeader()"
             >

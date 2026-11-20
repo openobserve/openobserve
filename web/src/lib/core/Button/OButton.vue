@@ -1,17 +1,28 @@
 <script setup lang="ts">
-import type { ButtonProps, ButtonEmits, ButtonSlots } from "./OButton.types";
-import { Primitive } from "reka-ui";
+import type {
+  ButtonProps,
+  ButtonEmits,
+  ButtonSlots,
+  ButtonSize,
+  ButtonVariant,
+  ButtonVariantLook,
+} from "./OButton.types";
+import { BUTTON_GROUP_SIZE } from "./OButton.types";
 import {
   computed,
   getCurrentInstance,
+  inject,
   ref,
   onMounted,
   onBeforeUnmount,
+  resolveComponent,
   useAttrs,
   useId,
+  type Component,
 } from "vue";
 import { UNNAMED_ICON_ONLY_DELAY_MS, warnIfUnnamedIconOnly } from "./iconOnlyName";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useFeatureLock } from "@/composables/useFeatureLock";
 import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
 import { LOADER_DELAY_MS } from "@/lib/styles/motion";
@@ -20,521 +31,201 @@ import { activates } from "./activation";
 defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(defineProps<ButtonProps>(), {
-  as: "button",
-  variant: "primary",
-  size: "md",
+  variant: undefined,
+  size: undefined,
   type: "button",
   disabled: false,
-  focusableUnavailable: false,
   loading: false,
-  spinner: true,
-  active: false,
+  iconOnly: false,
+  pressed: undefined,
+  stale: false,
   block: false,
+  as: "button",
 });
 
 const emit = defineEmits<ButtonEmits>();
+defineSlots<ButtonSlots>();
+
 const attrs = useAttrs();
 const id = useId();
 const { locked } = useFeatureLock();
+const groupSize = inject(BUTTON_GROUP_SIZE, null);
+const size = computed<ButtonSize>(() => props.size ?? groupSize?.value ?? "md");
+
 const isDisabled = computed(() => props.disabled || locked.value);
-// No native `disabled` reaches an anchor or a slotted child, so a locked one is styled and blocked by hand.
-const lockedLink = computed(() => locked.value && (props.as !== "button" || !!props.asChild));
-const unavailable = computed(() => isDisabled.value && props.focusableUnavailable);
-// A busy button stays focusable (no native disabled), so it looks and acts unavailable without losing focus.
-const inactive = computed(() => unavailable.value || props.loading);
-// The button is busy at once; the spinner waits so a fast action never flashes one.
-const showSpinner = useDelayedFlag(() => props.loading && props.spinner, LOADER_DELAY_MS);
-const reasonId = computed(() => props.descriptionId ?? `${id}-reason`);
-const rootRef = ref<{ $el?: Element } | null>(null);
-// Labels that arrive with data are not unnamed, so the dev check waits for them.
+// Resolved from the app's router plugin, not imported: many specs mock vue-router without RouterLink.
+const routerLink: Component | string | null =
+  props.to !== undefined ? resolveComponent("RouterLink") : null;
+// A blocked link renders as a bare anchor: RouterLink would navigate before a click guard runs.
+const tag = computed(() => {
+  if (routerLink && props.to !== undefined && !isDisabled.value) return routerLink;
+  if (props.href !== undefined || props.to !== undefined) return "a";
+  return props.as;
+});
+const isNativeButton = computed(() => tag.value === "button");
+// Only the attributes the rendered element owns: an undefined href would override RouterLink's own.
+const elementAttrs = computed(() => {
+  if (routerLink && tag.value === routerLink) return { to: props.to };
+  if (tag.value === "a") return isDisabled.value ? {} : { href: props.href };
+  if (isNativeButton.value) return { type: props.type, disabled: nativeDisabled.value };
+  return {};
+});
+const hasReason = computed(() => isDisabled.value && !!props.disabledReason);
+// Busy and reasoned-disabled buttons keep focus (no native disabled) so a reader reaches them.
+const inactive = computed(
+  () => props.loading || hasReason.value || (isDisabled.value && !isNativeButton.value),
+);
+const nativeDisabled = computed(() => isNativeButton.value && isDisabled.value && !hasReason.value);
+const showSpinner = useDelayedFlag(() => props.loading, LOADER_DELAY_MS);
+const reasonId = `${id}-reason`;
+
+const rootRef = ref<{ $el?: Element } | Element | null>(null);
 let nameCheckTimer: ReturnType<typeof setTimeout> | undefined;
 onMounted(() => {
   if (!import.meta.env.DEV || import.meta.env.MODE === "test") return;
-  nameCheckTimer = setTimeout(
-    () => warnIfUnnamedIconOnly(rootRef.value?.$el),
-    UNNAMED_ICON_ONLY_DELAY_MS,
-  );
+  nameCheckTimer = setTimeout(() => {
+    const root = rootRef.value;
+    warnIfUnnamedIconOnly(root instanceof Element ? root : root?.$el);
+  }, UNNAMED_ICON_ONLY_DELAY_MS);
 });
 onBeforeUnmount(() => clearTimeout(nameCheckTimer));
 
-defineSlots<ButtonSlots>();
+const BARE_DISABLED = "bg-transparent text-text-disabled border-transparent";
+// Inside a hovered table row the accent hover would match the row fill, so it steps up to the row-action fill.
+const ROW_STEP = "group-hover/row:hover:not-active:bg-table-row-action-hover-bg";
 
-// Variant class map - every entry is a full token-based class string
-// Inside a hovered table row a neutral ghost hover would match the row fill, so it steps up to the row-action fill.
-const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
-  primary: [
-    "bg-button-primary text-button-primary-foreground",
-    "enabled:hover:bg-button-primary-hover",
-    "enabled:active:bg-button-primary-active",
-    "focus-visible:ring-3 focus-visible:ring-button-primary-hover",
-    "disabled:bg-button-primary-disabled disabled:text-button-primary-foreground",
-  ].join(" "),
-  secondary: [
-    "bg-button-secondary text-button-secondary-foreground",
-    "enabled:hover:bg-button-secondary-hover",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-secondary-active",
-    "focus-visible:ring-3 focus-visible:ring-button-secondary-focus-ring",
-    "disabled:bg-button-secondary-disabled disabled:text-text-disabled",
-  ].join(" "),
-  outline: [
-    "bg-transparent text-button-outline-text border border-button-outline-border",
-    "enabled:hover:bg-button-outline-hover-bg enabled:hover:border-button-outline-hover-border",
-    "enabled:active:bg-button-outline-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-outline-hover-border",
-    "disabled:opacity-50",
-  ].join(" "),
-  ghost: [
-    "bg-transparent text-button-ghost-text border-0",
-    "enabled:hover:bg-button-ghost-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
-    "disabled:text-text-disabled",
-  ].join(" "),
-  "ghost-primary": [
-    "bg-transparent text-button-ghost-primary-text border-0",
-    "enabled:hover:text-button-ghost-primary-hover-text enabled:hover:bg-button-ghost-primary-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-primary-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
-    "disabled:text-text-disabled",
-  ].join(" "),
-  "ghost-muted": [
-    "bg-transparent text-button-ghost-muted-text border-0",
-    "enabled:hover:text-button-ghost-muted-hover-text enabled:hover:bg-button-ghost-muted-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-muted-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-muted-focus-ring",
-    "disabled:text-text-disabled",
-  ].join(" "),
-  "ghost-subtle": [
-    "bg-transparent text-button-ghost-subtle-text border-0 opacity-60",
-    "enabled:hover:opacity-100 enabled:hover:bg-button-ghost-subtle-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-subtle-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-subtle-focus-ring",
-    "disabled:text-text-disabled disabled:opacity-30",
-  ].join(" "),
-  "ghost-destructive": [
-    "bg-transparent text-button-ghost-destructive-text border-0",
-    "enabled:hover:bg-button-ghost-destructive-hover-bg",
-    "enabled:active:bg-button-ghost-destructive-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-destructive-focus-ring",
-    "disabled:opacity-60",
-  ].join(" "),
-  "ghost-success": [
-    "bg-transparent text-button-ghost-success-text border-0",
-    "enabled:hover:bg-button-ghost-success-hover-bg",
-    "enabled:active:bg-button-ghost-success-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-success-focus-ring",
-    "disabled:opacity-60",
-  ].join(" "),
-  destructive: [
-    "bg-button-destructive text-button-destructive-foreground",
-    "enabled:hover:bg-button-destructive-hover",
-    "enabled:active:bg-button-destructive-hover",
-    "focus-visible:ring-3 focus-visible:ring-button-destructive-hover",
-    "disabled:opacity-60",
-  ].join(" "),
-  "filter-exclude": [
-    "bg-error-500 text-button-destructive-foreground border-0",
-    "enabled:hover:bg-error-600",
-    "enabled:active:bg-error-600",
-    "focus-visible:ring-3 focus-visible:ring-error-600",
-    "disabled:opacity-60",
-  ].join(" "),
-  "ghost-warning": [
-    "bg-transparent text-button-ghost-warning-text border-0",
-    "enabled:hover:bg-button-ghost-warning-hover-bg",
-    "enabled:active:bg-button-ghost-warning-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-warning-focus-ring",
-    "disabled:opacity-60",
-  ].join(" "),
-  warning: [
-    "bg-button-warning text-button-warning-foreground border border-button-warning-border",
-    "enabled:hover:bg-button-warning-hover",
-    "enabled:active:bg-button-warning-active",
-    "focus-visible:ring-3 focus-visible:ring-button-warning-focus-ring",
-    "disabled:opacity-60",
-  ].join(" "),
-  // A stale result awaiting a re-run is not an alert, so it stays off the solid warning fill.
-  pending: [
-    "bg-button-pending-bg text-button-pending-text border border-button-pending-bg",
-    "enabled:hover:bg-button-pending-hover-bg enabled:hover:border-button-pending-hover-bg",
-    "enabled:active:bg-button-pending-active-bg enabled:active:border-button-pending-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-pending-focus-ring",
-    "disabled:opacity-60",
-  ].join(" "),
-  // Neutral ghost: inherits parent text color — used for compact inline action buttons
-  // where no color accent is desired (e.g. field adder buttons +X +Y +B +F)
-  "ghost-neutral": [
-    "bg-transparent text-inherit border-0",
-    "enabled:hover:bg-button-ghost-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
-    "disabled:opacity-50",
-  ].join(" "),
-  // Outline destructive: transparent bg + red border + red text — use for destructive actions
-  // that need visible affordance without the full filled destructive background
-  "outline-destructive": [
-    "bg-transparent text-button-ghost-destructive-text border border-button-ghost-destructive-text",
-    "enabled:hover:bg-button-ghost-destructive-hover-bg",
-    "enabled:active:bg-button-ghost-destructive-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-destructive-focus-ring",
-    "disabled:opacity-50",
-  ].join(" "),
-  // Stop a running operation (query/task in flight) — distinct from
-  // destructive (delete/danger). No dedicated hover/active token yet, so
-  // states are opacity-derived from the one cancel-query-bg color.
-  "cancel-query": [
-    "bg-cancel-query-bg text-button-primary-foreground",
-    "enabled:hover:opacity-90",
-    "enabled:active:opacity-80",
-    "focus-visible:ring-3 focus-visible:ring-cancel-query-bg",
-    "disabled:opacity-60",
-  ].join(" "),
-  // Panel collapse: ghost muted — for sidebar panel header collapse/expand.
-  // Transparent bg, muted icon color, subtle hover. Blends into header without visual weight.
-  "panel-collapse": [
-    "bg-transparent text-button-ghost-muted-text border-0",
-    "enabled:hover:text-button-ghost-muted-hover-text enabled:hover:bg-button-ghost-muted-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-muted-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-muted-focus-ring",
-    "disabled:opacity-50",
-  ].join(" "),
-  // Primary-colored tall-narrow vertical rectangle — for splitter collapse/expand buttons
-  "sidebar-button": [
-    "bg-button-primary text-button-primary-foreground",
-    "enabled:hover:bg-button-primary-hover",
-    "enabled:active:bg-button-primary-active",
-    "focus-visible:ring-3 focus-visible:ring-button-primary-hover",
-    "disabled:bg-button-primary-disabled disabled:text-button-primary-foreground",
-  ].join(" "),
-  // Sidebar toggle: bg-surface border shadow — for persistent panel collapse/expand buttons
-  "sidebar-toggle": [
-    "bg-surface-panel text-button-ghost-text border border-border-default",
-    "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
-    "disabled:opacity-50",
-  ].join(" "),
-  // AI-themed gradient — purple→pink gradient background, white text
-  "ai-gradient": [
-    "bg-gradient-ai text-white border-0",
-    "enabled:hover:shadow-md enabled:hover:shadow-ai-accent/40",
-    "enabled:active:opacity-90",
-    "focus-visible:ring-3 focus-visible:ring-ai-accent",
-    "disabled:opacity-40",
-  ].join(" "),
-  // On-dark primary — white background with primary color text, for use on dark gradient panels
-  "on-dark-primary": [
-    "bg-white text-button-on-dark-primary-text font-bold border-0 shadow-md",
-    "enabled:hover:shadow-lg",
-    "enabled:active:opacity-90",
-    "focus-visible:ring-3 focus-visible:ring-white/50",
-    "disabled:opacity-50",
-  ].join(" "),
-  // On-dark ghost — transparent with white border/text, for use on dark gradient panels
-  "on-dark-ghost": [
-    "bg-transparent text-white border-2 border-white/30",
-    "enabled:hover:bg-white/10 enabled:hover:border-white/50",
-    "enabled:active:opacity-90",
-    "focus-visible:ring-3 focus-visible:ring-white/50",
-    "disabled:opacity-50",
-  ].join(" "),
-  // Destination preview buttons — brand-colored CTAs inside alert destination preview cards.
-  // The cards are fixed-light brand replicas, so each label uses its fixed
-  // `text-brand-*-foreground` token, never the theme-following text-text-inverse.
-  // preview-slack: Slack green (#007a5a)
-  "preview-slack": [
-    "bg-brand-slack text-brand-slack-foreground border-0 !rounded !text-sm !h-auto !py-2 !px-3",
-    "enabled:hover:bg-brand-slack-hover",
-    "disabled:opacity-60",
-  ].join(" "),
-  // preview-teams: Microsoft Teams purple (#6264a7)
-  "preview-teams": [
-    "bg-brand-teams text-brand-teams-foreground border-0 !rounded !h-auto !py-2 !px-4",
-    "enabled:hover:bg-brand-teams-hover",
-    "disabled:opacity-60",
-  ].join(" "),
-  // preview-email: Email blue (#0069d9)
-  "preview-email": [
-    "bg-brand-email text-brand-email-foreground border-0 !rounded !h-auto !py-3 !px-6",
-    "enabled:hover:bg-brand-email-hover",
-    "disabled:opacity-60",
-  ].join(" "),
-  // preview-opsgenie: Opsgenie ink (dark neutral CTA). Was a scoped
-  // `.opsgenie-actions button` override in DestinationPreview.vue that beat this
-  // variant map from unlayered CSS; it belongs with its sibling brand variants.
-  "preview-opsgenie": [
-    "bg-brand-email-ink text-brand-email-ink-foreground border-0 !rounded !text-sm !h-auto !py-2 !px-3",
-    "enabled:hover:bg-brand-email-ink-deep",
-    "disabled:opacity-60",
-  ].join(" "),
-  // preview-action: Generic action button for destination previews with no brand color
-  "preview-action": [
-    "bg-transparent text-button-outline-text border border-button-outline-border !rounded !h-auto !py-2 !px-3 !text-sm",
-    "enabled:hover:bg-button-outline-hover-bg",
-    "disabled:opacity-60",
-  ].join(" "),
-  // webinar-dismiss: Inline text-link style for the webinar top bar banner dismiss button
-  "webinar-dismiss": [
-    "bg-transparent border-0 text-promo-webinar-link underline font-bold text-compact whitespace-nowrap",
-    "h-auto! p-0!",
-    "enabled:hover:text-promo-webinar-link-hover",
-    "disabled:opacity-60",
-  ].join(" "),
-  // banner-dismiss: Inline text-link style for the actions inside an OBanner bar.
-  // Inherits the banner's own text color so it reads correctly on every variant.
-  "banner-dismiss": [
-    "bg-transparent border-0 text-inherit underline font-bold text-compact whitespace-nowrap",
-    "h-auto! p-0!",
-    "enabled:hover:opacity-80",
-    "disabled:opacity-60",
-  ].join(" "),
-  // link: an action that reads as a link inside running copy, at the copy's own size.
-  link: [
-    "bg-transparent border-0 text-text-link underline underline-offset-2",
-    "h-auto! p-0! align-baseline",
-    "enabled:hover:opacity-80",
-    "focus-visible:ring-3 focus-visible:ring-button-outline-hover-border",
-  ].join(" "),
-  // outline-primary: Subtle primary bg + primary text + primary border — always visually highlighted.
-  // Use for edition/tier badges that must stand out without being a heavy CTA.
-  "outline-primary": [
-    "bg-button-ghost-primary-active-bg text-button-ghost-primary-hover-text border border-button-outline-hover-border",
-    "enabled:hover:bg-button-ghost-primary-active-bg enabled:hover:border-button-outline-hover-border",
-    "enabled:active:bg-button-ghost-primary-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
-    "disabled:opacity-50",
-  ].join(" "),
-  // dashed: "add tile" — transparent bg, dashed muted border + muted icon/text.
-  // For the small "+" add-affordance buttons in the query builder (add join / filter / condition).
-  dashed: [
-    "bg-transparent text-button-ghost-muted-text border border-dashed border-button-outline-border",
-    "enabled:hover:bg-button-ghost-hover-bg enabled:hover:border-button-border-hover enabled:hover:text-button-ghost-text",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
-    "disabled:opacity-50",
-  ].join(" "),
-  // cell: table-cell content that is itself the action; overrides the size box so the lines stack.
-  cell: [
-    "bg-transparent border-0 text-inherit text-left font-normal rounded-default",
-    "h-auto! w-full p-0! flex-col! items-stretch! justify-center! gap-1! whitespace-normal!",
-    "enabled:hover:opacity-80",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
-    "disabled:opacity-60",
-  ].join(" "),
-  // row: list row whose content is itself the action.
-  row: [
-    "bg-transparent text-button-ghost-text border-0 text-start rounded-default",
-    "h-auto! justify-between! gap-3! px-0! py-1.5!",
-    "enabled:hover:bg-button-ghost-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "enabled:active:bg-button-ghost-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
-    "disabled:text-text-disabled",
-  ].join(" "),
-  // locked-body: outlined prompt whose message is the action.
-  "locked-body": [
-    "bg-transparent text-button-outline-text border border-button-outline-border text-start",
-    "h-auto! justify-start! px-3! py-3! whitespace-normal!",
-    "enabled:hover:bg-button-outline-hover-bg enabled:hover:border-button-outline-hover-border",
-    "enabled:active:bg-button-outline-active-bg",
-    "focus-visible:ring-3 focus-visible:ring-button-outline-hover-border",
-    "disabled:opacity-50",
-  ].join(" "),
-  // pricing-chip: Pill-shaped toggle chip for model pricing quick-setup template selection
-  "pricing-chip": [
-    "bg-transparent text-inherit border border-border-default",
-    "!rounded-full !text-xs !font-medium !h-auto !py-1.25 !px-3.5 !gap-1.5",
-    "transition-colors duration-(--duration-control) ease-(--ease-control)",
-    "enabled:hover:border-accent enabled:hover:text-accent-on-tint enabled:hover:bg-button-ghost-hover-bg",
-    "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg",
-    "disabled:opacity-60",
-  ].join(" "),
-  "section-chip": [
-    "bg-transparent text-text-body border border-border-default whitespace-nowrap",
-    "!rounded-full !h-auto !py-1 !px-3 !text-sm",
-    "enabled:hover:bg-button-ghost-hover-bg",
-    "aria-[current=location]:bg-surface-accent-active aria-[current=location]:border-button-outline-hover-border",
-    "aria-[current=location]:text-text-heading aria-[current=location]:font-semibold",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-focus-ring",
-    "disabled:opacity-60",
-  ].join(" "),
-  // tint-*: soft categorical badge fill for tiles that identify an entity by colour, e.g. a cluster code.
-  "tint-teal": [
-    "bg-badge-teal-soft-bg text-badge-teal-soft-text border-0",
-    "enabled:hover:brightness-95",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
-    "disabled:opacity-60",
-  ].join(" "),
-  "tint-purple": [
-    "bg-badge-purple-soft-bg text-badge-purple-soft-text border-0",
-    "enabled:hover:brightness-95",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
-    "disabled:opacity-60",
-  ].join(" "),
-  "tint-blue": [
-    "bg-badge-blue-soft-bg text-badge-blue-soft-text border-0",
-    "enabled:hover:brightness-95",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
-    "disabled:opacity-60",
-  ].join(" "),
-  "tint-orange": [
-    "bg-badge-orange-soft-bg text-badge-orange-soft-text border-0",
-    "enabled:hover:brightness-95",
-    "focus-visible:ring-3 focus-visible:ring-button-ghost-primary-focus-ring",
-    "disabled:opacity-60",
-  ].join(" "),
+const looks: Record<ButtonVariant, ButtonVariantLook> = {
+  primary: {
+    base: "bg-button-primary text-button-primary-foreground border-transparent",
+    interactive: "hover:bg-button-primary-hover active:bg-button-primary-active",
+    pressed: "bg-button-primary-active text-button-primary-foreground border-transparent",
+    disabled: "bg-button-primary-disabled text-button-primary-foreground border-transparent",
+  },
+  secondary: {
+    base: "bg-surface-base text-button-outline-text border-button-outline-border",
+    interactive:
+      "hover:bg-button-outline-hover-bg hover:border-control-border-hover active:bg-button-outline-active-bg",
+    pressed: "bg-surface-accent-active text-accent-on-tint border-control-border-selected",
+    // Faded whole, so a disabled outline keeps its edge where it sits in a joined group.
+    disabled: "bg-transparent text-button-outline-text border-button-outline-border opacity-50",
+  },
+  ghost: {
+    base: "bg-transparent text-button-ghost-text border-transparent",
+    // The secondary rest ink falls under 4.5:1 on the dark accent fills, so a filled state takes heading ink.
+    interactive: `hover:bg-button-ghost-hover-bg hover:text-text-heading active:bg-button-ghost-active-bg active:text-text-heading ${ROW_STEP}`,
+    pressed: "bg-surface-accent-hover text-accent-on-tint border-transparent",
+    disabled: BARE_DISABLED,
+  },
+  "accent-ghost": {
+    base: "bg-transparent text-text-link border-transparent",
+    // Link ink drops under 4.5:1 on the accent fills, so a filled state takes the on-tint ink.
+    interactive: `hover:bg-surface-accent-hover hover:text-accent-on-tint active:bg-surface-accent-active active:text-accent-on-tint ${ROW_STEP}`,
+    pressed: "bg-surface-accent-active text-accent-on-tint border-transparent",
+    disabled: BARE_DISABLED,
+  },
+  danger: {
+    base: "bg-button-destructive text-button-destructive-foreground border-transparent",
+    interactive: "hover:bg-button-destructive-hover active:bg-button-destructive-hover",
+    pressed: "bg-button-destructive-hover text-button-destructive-foreground border-transparent",
+    disabled:
+      "bg-button-destructive text-button-destructive-foreground border-transparent opacity-60",
+  },
+  "danger-ghost": {
+    base: "bg-transparent text-button-ghost-destructive-text border-transparent",
+    interactive:
+      "hover:bg-button-ghost-destructive-hover-bg active:bg-button-ghost-destructive-active-bg",
+    pressed: "bg-button-ghost-destructive-active-bg text-button-ghost-destructive-text",
+    disabled: "bg-transparent text-button-ghost-destructive-text border-transparent opacity-60",
+  },
+  link: {
+    base: "bg-transparent text-text-link border-transparent underline underline-offset-2",
+    interactive: "hover:opacity-80",
+    pressed: "bg-transparent text-text-link-hover border-transparent underline underline-offset-2",
+    disabled:
+      "bg-transparent text-text-link border-transparent underline underline-offset-2 opacity-60",
+  },
 };
 
-const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
-  "section-chip": "opacity-60",
-  primary: "bg-button-primary-disabled text-button-primary-foreground",
-  secondary: "bg-button-secondary-disabled text-text-disabled",
-  outline: "opacity-50",
-  ghost: "text-text-disabled",
-  "ghost-primary": "text-text-disabled",
-  "ghost-muted": "text-text-disabled",
-  "ghost-subtle": "text-text-disabled opacity-30",
-  "ghost-destructive": "opacity-60",
-  "ghost-success": "opacity-60",
-  destructive: "opacity-60",
-  "filter-exclude": "opacity-60",
-  "ghost-warning": "opacity-60",
-  warning: "opacity-60",
-  pending: "opacity-60",
-  "ghost-neutral": "opacity-50",
-  "outline-destructive": "opacity-50",
-  "cancel-query": "opacity-60",
-  "panel-collapse": "opacity-50",
-  "sidebar-button": "bg-button-primary-disabled text-button-primary-foreground",
-  "sidebar-toggle": "opacity-50",
-  "ai-gradient": "opacity-40",
-  "on-dark-primary": "opacity-50",
-  "on-dark-ghost": "opacity-50",
-  "preview-slack": "opacity-60",
-  "preview-teams": "opacity-60",
-  "preview-email": "opacity-60",
-  "preview-opsgenie": "opacity-60",
-  "preview-action": "opacity-60",
-  "webinar-dismiss": "opacity-60",
-  "banner-dismiss": "opacity-60",
-  link: "opacity-60",
-  "outline-primary": "opacity-50",
-  dashed: "opacity-50",
-  "pricing-chip": "opacity-60",
-  "tint-teal": "opacity-60",
-  "tint-purple": "opacity-60",
-  "tint-blue": "opacity-60",
-  "tint-orange": "opacity-60",
-  cell: "opacity-60",
-  row: "text-text-disabled",
-  "locked-body": "opacity-50",
+const textSizes: Record<ButtonSize, string> = {
+  xs: "h-control-xs min-w-control-xs px-2 gap-1 text-xs rounded-chip",
+  sm: "h-control-sm min-w-control-sm px-2.5 gap-1.5 text-compact rounded-default",
+  md: "h-control-md min-w-control-md px-3 gap-1.5 text-compact rounded-default",
+  lg: "h-control-lg min-w-control-lg px-4 gap-1.5 text-sm rounded-default",
 };
 
-const unavailableClasses = computed(() => {
-  const disabledClasses = disabledVariantClasses[props.variant].split(" ");
-  const overriddenGroups = disabledClasses.map((value) => value.split("-")[0]);
-  return [
-    ...variantClasses[props.variant]
-      .split(" ")
-      .filter(
-        (value) =>
-          value === "text-start" ||
-          (!value.startsWith("enabled:") &&
-            !value.startsWith("disabled:") &&
-            !overriddenGroups.includes(value.split("-")[0])),
-      ),
-    ...disabledClasses,
-    "cursor-not-allowed!",
-  ].join(" ");
+// shrink-0: a tight flex row would otherwise squash the square to its glyph width.
+const iconOnlySizes: Record<ButtonSize, string> = {
+  xs: "size-control-xs shrink-0 p-0 rounded-chip",
+  sm: "size-control-sm shrink-0 p-0 rounded-default",
+  md: "size-control-md shrink-0 p-0 rounded-default",
+  lg: "size-control-lg shrink-0 p-0 rounded-default",
+};
+
+const linkSizes: Record<ButtonSize, string> = {
+  xs: "gap-1 text-xs rounded-chip",
+  sm: "gap-1 text-compact rounded-chip",
+  md: "gap-1.5 text-compact rounded-chip",
+  lg: "gap-1.5 text-sm rounded-chip",
+};
+
+// A toolbar icon carries no edge of its own; only a labelled button defaults to the bordered secondary.
+const variant = computed<ButtonVariant>(
+  () => props.variant ?? (props.iconOnly ? "ghost" : "secondary"),
+);
+
+// Untyped callers (a v-bind object, a script value) can still hand in a retired name; it renders as the default.
+const look = computed(() => looks[variant.value] ?? looks.secondary);
+
+const stateClasses = computed(() => {
+  if (isDisabled.value) return `${look.value.disabled} cursor-not-allowed`;
+  if (props.pressed) return look.value.pressed;
+  // A busy button keeps focus, so it reads unavailable by its look rather than native disabled.
+  if (props.loading) return `${look.value.disabled} cursor-not-allowed`;
+  return `${look.value.base} ${look.value.interactive} cursor-pointer`;
 });
 
-const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
-  xs: "h-7 ps-3 pe-3 max-[85.5rem]:ps-2.5 max-[85.5rem]:pe-2.5 text-xs gap-1.5 rounded-default",
-  // 34px control height — the workhorse compact button that pairs with 34px
-  // inputs in toolbars/headers. (radius 8 = rounded-default.)
-  sm: "h-[2.125rem] ps-3.5 pe-3.5 max-[85.5rem]:ps-3 max-[85.5rem]:pe-3 text-sm gap-2 rounded-default",
-  // Every toolbar control shares this box so a bar never mixes heights or padding.
-  "sm-toolbar":
-    "h-8.5 ps-3 pe-3 max-[85.5rem]:ps-2.5 max-[85.5rem]:pe-2.5 text-xs gap-1.5 rounded-default",
-  "xs-grouped":
-    "h-6.5 ps-2.5 pe-2.5 max-[85.5rem]:ps-2 max-[85.5rem]:pe-2 text-xs gap-1.5 rounded-default",
-  // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
-  // Extra-compact chip size — 24px height for axis field chips in query builder
-  chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded-default leading-none",
-  // Same as chip but with fixed 12px font — for dashboard query builder axis field chips
-  // (needed because the html font-size is 14px, making text-xs = 10.5px instead of 12px)
-  "chip-12": "h-6 ps-2 pe-1.5 !text-xs gap-1 rounded-default leading-none",
-  "sm-action":
-    "h-[2.125rem] ps-3.5 pe-3.5 max-[85.5rem]:ps-3 max-[85.5rem]:pe-3 min-w-20 text-sm gap-2 rounded-default",
-  // h-8.5 sorts before h-9 and up, so a caller's own plain height class still overrides md.
-  md: "h-8.5 ps-4 pe-4 text-sm gap-2 rounded-default",
-  cta: "h-10 ps-4 pe-4 text-sm gap-2 rounded-default",
-  lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-default",
-  // shrink-0: without it min-width:auto lets a tight flex row squash these fixed squares to icon width.
-  icon: "size-6 shrink-0 p-0 rounded-default gap-x-0",
-  "icon-xs": "h-7.5 shrink-0 px-2 text-lg rounded-default gap-x-0",
-  // 24px round circle — for small inline add/action icon buttons (e.g. + Joins, + Filters)
-  "icon-xs-circle": "size-6 shrink-0 p-0 rounded-full gap-x-0",
-  // 28px square — matches xs chip height for paired close/remove buttons
-  "icon-xs-sq": "h-7 w-7 shrink-0 p-0 rounded-default gap-x-0",
-  // 24px square — matches chip size for paired close/remove buttons
-  "icon-chip": "h-6 w-6 shrink-0 p-0 rounded-default gap-x-0",
-  "icon-sm": "h-8 w-8 shrink-0 p-0 rounded-default gap-x-0",
-  "icon-md": "h-8.5 w-8.5 shrink-0 p-0 rounded-default gap-x-0",
-  "icon-lg": "h-12 w-12 shrink-0 p-0 rounded-default gap-x-0",
-  "icon-circle": "size-8 shrink-0 p-0 rounded-full gap-x-0",
-  "icon-circle-sm": "size-7 shrink-0 p-0 rounded-full gap-x-0",
-  // Square twin of sm-toolbar for icon-only toolbar controls.
-  "icon-toolbar": "size-8.5 shrink-0 p-0 rounded-default gap-x-0",
-  // 26px rounded-default — compact modern icon button for panel header collapse/expand
-  "icon-panel": "size-6.5 shrink-0 p-0 rounded-default gap-x-0",
-  // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons
-  "sidebar-button": "h-8 w-3 shrink-0 p-0 rounded-default overflow-hidden gap-x-0",
-};
+const sizeClasses = computed(() => {
+  if (variant.value === "link") return `h-auto min-w-0 p-0 ${linkSizes[size.value]}`;
+  return props.iconOnly ? iconOnlySizes[size.value] : textSizes[size.value];
+});
 
-const activeClasses = [
-  "bg-button-primary text-button-primary-foreground",
-  "enabled:hover:bg-button-primary-hover",
-  "enabled:active:bg-button-primary-active",
-].join(" ");
-
-const classes = computed<string[]>(() => [
-  // Base - layout, typography, interaction
-  props.block
-    ? "flex w-full items-center justify-center"
-    : "inline-flex items-center justify-center",
-  // box-border so a variant's 1px border is drawn INSIDE the fixed size box
-  // (outline/secondary/etc.) — otherwise a bordered icon button renders 2px
-  // taller than a borderless ghost one of the same size.
-  "relative box-border",
-  "whitespace-nowrap",
-  // `as="a"` renders a real anchor, which base-elements.css underlines on hover.
-  "no-underline hover:no-underline",
-  // Medium (500) keeps button labels calm/simple — heavier weights read as shouty.
-  "font-medium transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-(--duration-control) ease-(--ease-control)",
-  "outline-none",
-  // A hugging ring vanishes on accent fills, so the outline sits off a gap; ring-0! mutes the per-variant rings.
-  "focus-visible:outline-2! focus-visible:outline-solid! focus-visible:outline-offset-2! focus-visible:outline-focus-ring-accent! focus-visible:ring-0!",
-  inactive.value || lockedLink.value
-    ? "cursor-not-allowed!"
-    : "disabled:cursor-not-allowed enabled:cursor-pointer",
-  // Variant + size (active overrides variant to primary appearance)
-  inactive.value || lockedLink.value
-    ? unavailableClasses.value
-    : props.active
-      ? activeClasses
-      : variantClasses[props.variant],
-  sizeClasses[props.size],
+const classes = computed(() => [
+  props.block ? "flex w-full" : "inline-flex",
+  "relative box-border items-center justify-center border whitespace-nowrap select-none",
+  "font-medium leading-none transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)",
+  variant.value === "link" ? "" : "no-underline hover:no-underline",
+  // An offset outline stays visible on accent fills, where a hugging ring would vanish.
+  "outline-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-focus-ring-accent",
+  sizeClasses.value,
+  stateClasses.value,
 ]);
+
+const iconClass = computed(() => (size.value === "xs" ? "size-3.5!" : undefined));
+const ariaLabel = computed(
+  () => (attrs["aria-label"] as string | undefined) ?? (props.iconOnly ? props.label : undefined),
+);
+const tooltipContent = computed(() => {
+  if (hasReason.value) return props.disabledReason;
+  if (props.iconOnly || props.shortcut) return props.label;
+  return undefined;
+});
+const describedBy = computed(
+  () =>
+    [attrs["aria-describedby"] as string | undefined, hasReason.value ? reasonId : undefined]
+      .filter(Boolean)
+      .join(" ") || undefined,
+);
+
+const instance = getCurrentInstance();
+const ACTION_LISTENERS = ["onClick", "onPointerdown", "onMousedown", "onPointerup"];
+
+// A plain button with no listener does nothing on click, so a child tooltip may claim the click to open.
+function isInert(): boolean {
+  if (!isNativeButton.value || props.type !== "button") return false;
+  if (attrs["aria-haspopup"] !== undefined || attrs["aria-expanded"] !== undefined) return false;
+  const vnodeProps = instance?.vnode.props ?? {};
+  return !ACTION_LISTENERS.some((name) => vnodeProps[name]);
+}
 
 function handleKeydown(event: KeyboardEvent): void {
   if (inactive.value && activates(event)) {
@@ -543,23 +234,10 @@ function handleKeydown(event: KeyboardEvent): void {
   }
 }
 
-const instance = getCurrentInstance();
-const ACTION_LISTENERS = ["onClick", "onPointerdown", "onMousedown", "onPointerup"];
-
-// A plain button with no listener does nothing on click, so a child tooltip may claim the click to open.
-function isInert(): boolean {
-  if (props.as !== "button" || props.asChild || props.type !== "button") return false;
-  if (attrs["aria-haspopup"] !== undefined || attrs["aria-expanded"] !== undefined) return false;
-  const vnodeProps = instance?.vnode.props ?? {};
-  return !ACTION_LISTENERS.some((name) => vnodeProps[name]);
-}
-
 function handleClick(event: MouseEvent): void {
   if (isDisabled.value || props.loading) {
-    if (inactive.value || lockedLink.value) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }
+    event.preventDefault();
+    event.stopImmediatePropagation();
     return;
   }
   emit("click", event);
@@ -567,56 +245,77 @@ function handleClick(event: MouseEvent): void {
 </script>
 
 <template>
-  <Primitive
+  <component
+    :is="tag"
     ref="rootRef"
-    :as="as"
-    :as-child="asChild"
     :class="classes"
-    :type="as === 'button' ? type : undefined"
-    :disabled="as === 'button' ? isDisabled && !focusableUnavailable : undefined"
     :aria-disabled="isDisabled || loading || undefined"
     :aria-busy="loading || undefined"
+    :aria-pressed="pressed === undefined ? undefined : String(pressed)"
     data-o2-btn
     :data-o2-variant="variant"
+    :data-o2-size="size"
     :data-o2-inert="isInert() || undefined"
-    v-bind="$attrs"
-    :aria-describedby="unavailable ? reasonId : (attrs['aria-describedby'] as string | undefined)"
+    :data-o2-stale="stale || undefined"
+    v-bind="{ ...elementAttrs, ...$attrs }"
+    :aria-label="ariaLabel"
+    :aria-describedby="describedBy"
     @keydown.capture="handleKeydown"
     @click="handleClick"
   >
-    <!-- Loading spinner overlay — centered, absolute, shown only when loading -->
+    <OTooltip v-if="tooltipContent" :content="tooltipContent" :shortcut="shortcut" />
     <span
       v-if="loading && showSpinner"
       class="pointer-events-none absolute inset-0 flex items-center justify-center"
       aria-hidden="true"
     >
-      <OIcon name="progress-activity" size="sm" class="o2-motion-keep animate-spin" />
+      <OIcon
+        name="progress-activity"
+        size="sm"
+        :class="['o2-motion-keep animate-spin', iconClass]"
+      />
     </span>
-
-    <!-- Keep display:contents while loading: a wrapper that later loses its box strands a child-mode OTooltip anchored to it at (0,0) -->
+    <!-- display:contents while loading too: a wrapper that loses its box strands a child OTooltip at (0,0). -->
     <span
       :class="loading && showSpinner ? 'contents text-transparent [&>*]:opacity-0' : 'contents'"
     >
-      <slot name="icon-left">
+      <slot name="icon">
         <OIcon
-          v-if="iconLeft"
-          :name="iconLeft"
+          v-if="icon"
+          :name="icon"
           size="sm"
-          :class="iconLeft === 'lock' ? 'lock-chip' : undefined"
+          :class="[iconClass, icon === 'lock' ? 'lock-chip' : undefined]"
         />
       </slot>
-      <slot />
-      <span v-if="unavailable && !descriptionId" :id="reasonId" class="sr-only" aria-hidden="true"
-        ><slot name="unavailable-reason"
-      /></span>
-      <slot name="icon-right">
+      <slot>
+        <template v-if="!iconOnly && label">{{ label }}</template>
+      </slot>
+      <span
+        v-if="count !== undefined && !iconOnly"
+        :class="[
+          'text-2xs rounded-full px-1.25 leading-4 font-semibold tabular-nums',
+          variant === 'primary'
+            ? 'text-button-primary-foreground bg-white/20'
+            : 'bg-surface-subtle text-text-secondary',
+        ]"
+        >{{ count }}</span
+      >
+      <slot name="icon-end">
         <OIcon
-          v-if="iconRight"
-          :name="iconRight"
+          v-if="iconEnd"
+          :name="iconEnd"
           size="sm"
-          :class="iconRight === 'lock' ? 'lock-chip' : undefined"
+          :class="[iconClass, iconEnd === 'lock' ? 'lock-chip' : undefined]"
         />
       </slot>
     </span>
-  </Primitive>
+    <span v-if="hasReason" :id="reasonId" class="sr-only" aria-hidden="true">{{
+      disabledReason
+    }}</span>
+    <span
+      v-if="stale"
+      class="bg-warning-500 ring-button-primary pointer-events-none absolute end-1.25 top-1.25 size-1.5 rounded-full ring-2"
+      aria-hidden="true"
+    />
+  </component>
 </template>

@@ -22,6 +22,7 @@ import type { BrowserCheck, SyntheticsEnvironment } from "@/types/synthetics";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import syntheticsService from "@/services/synthetics";
 import { MAX_CHECK_ENVIRONMENTS } from "@/constants/synthetics";
 import { namedEnvironments } from "@/components/synthetics/variables/scope";
@@ -71,19 +72,18 @@ function toggle(id: string) {
   >
     <div class="border-border-default flex items-center gap-2 border-b px-3 py-2.5">
       <div class="rounded-default bg-accent me-0.5 h-4 w-[0.1875rem] shrink-0" />
-      <h3 class="text-text-heading text-base font-semibold">
+      <h3 class="text-text-heading text-sm font-semibold">
         {{ t("synthetics.environments.cardTitle") }}
       </h3>
     </div>
 
     <div class="flex flex-col gap-3 px-3 py-3">
-      <p
+      <OEmptyState
         v-if="loaded && !environments.length && !lockedIds.length"
-        class="text-text-secondary m-0 text-sm"
+        size="compact"
+        :title="t('synthetics.environments.cardEmpty')"
         data-test="synthetics-check-environments-empty"
-      >
-        {{ t("synthetics.environments.cardEmpty") }}
-      </p>
+      />
 
       <div v-else class="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
         <div

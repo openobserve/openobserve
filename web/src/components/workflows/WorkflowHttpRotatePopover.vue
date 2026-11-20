@@ -15,39 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Wrapper mode: a child tooltip after icon-left anchors to the icon alone -->
-  <OTooltip
+  <OButton
     v-if="disabled"
-    :content="isSigned ? t('workflow.http.rotateBlockedSigned') : t('workflow.http.rotateBlocked')"
-    side="top"
-    data-test="workflow-http-rotate-blocked-tooltip"
+    variant="secondary"
+    icon="refresh"
+    disabled
+    :disabled-reason="
+      isSigned ? t('workflow.http.rotateBlockedSigned') : t('workflow.http.rotateBlocked')
+    "
+    data-test="workflow-http-rotate"
   >
-    <OButton
-      variant="outline"
-      size="sm-action"
-      icon-left="refresh"
-      disabled
-      focusable-unavailable
-      data-test="workflow-http-rotate"
-    >
-      {{ t("workflow.http.rotate") }}
-    </OButton>
-  </OTooltip>
-  <OPopover v-else v-model:open="open" side="bottom" align="end" :aria-label="title">
+    {{ t("workflow.http.rotate") }}
+  </OButton>
+  <OPopover size="md" v-else v-model:open="open" side="bottom" align="end" :aria-label="title">
     <template #trigger>
-      <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="refresh"
-        data-test="workflow-http-rotate"
-      >
+      <OButton variant="secondary" icon="refresh" data-test="workflow-http-rotate">
         {{ t("workflow.http.rotate") }}
       </OButton>
     </template>
-    <div
-      data-test="workflow-http-rotate-popover"
-      class="flex w-[min(23rem,calc(100vw-1.5rem))] flex-col gap-3 p-4"
-    >
+    <div data-test="workflow-http-rotate-popover" class="flex flex-col gap-3 p-4">
       <div class="flex flex-col gap-1">
         <OText variant="body-strong">{{ title }}</OText>
         <OText variant="meta" as="p">{{ lead }}</OText>
@@ -62,34 +48,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`workflow-http-rotate-overlap-${option.value}`"
           />
         </ORadioGroup>
-        <OBanner
-          variant="info"
-          dense
+        <OInlineNotice
+          tone="info"
           data-test="workflow-http-rotate-consequence"
-          :content="consequence"
+          :message="consequence"
         />
       </template>
       <!-- Opened upward, the popover grows from its top edge, so the error goes first to keep the options in place -->
-      <OBanner
+      <OInlineNotice
         v-if="error"
-        variant="error-soft"
-        dense
+        tone="err"
         class="[[data-side=top]_&]:order-first"
         data-test="workflow-http-rotate-error"
-        :content="t('workflow.http.rotateFailed', { reason: raw(error) })"
+        :message="t('workflow.http.rotateFailed', { reason: raw(error) })"
       />
       <div class="flex justify-end gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          data-test="workflow-http-rotate-cancel"
-          @click="cancel"
-        >
+        <OButton variant="secondary" data-test="workflow-http-rotate-cancel" @click="cancel">
           {{ t("common.cancel") }}
         </OButton>
         <OButton
           variant="primary"
-          size="sm-action"
           :loading="pending"
           data-test="workflow-http-rotate-confirm"
           @click="emit('confirm', current ? overlap : 0)"
@@ -105,13 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { formatTimestampInTimezone } from "@/utils/date";
 import type { HttpAuthMode, HttpCredential, OverlapSeconds } from "@/services/workflows";
 import { OVERLAP_OPTIONS } from "@/plugins/workflows/httpEndpointUi";

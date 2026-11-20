@@ -366,7 +366,7 @@ describe("GroupUsers Component", () => {
     });
 
     it("has correct search placeholder", () => {
-      const searchInput = wrapper.find('input[placeholder="Search User"]');
+      const searchInput = wrapper.find('input[placeholder="Search user"]');
       expect(searchInput.exists()).toBe(true);
     });
   });
@@ -592,11 +592,10 @@ describe("GroupUsers Component", () => {
 
     const expectUnclippable = (w: any) => {
       const emptyState = w.findComponent(OEmptyState);
-      expect(emptyState.props("size")).toBe("block");
       expect(emptyState.classes()).toContain("shrink-0");
     };
 
-    it("renders every empty branch at block size that cannot shrink below its content", async () => {
+    it("renders every empty branch so that it cannot shrink below its content", async () => {
       const realEmpty = await mountReal([]);
       expect(realEmpty.find('[data-test="iam-users-selection-none-selected"]').exists()).toBe(true);
       expectUnclippable(realEmpty);
@@ -1168,7 +1167,7 @@ describe("GroupUsers Component", () => {
     });
 
     it("has proper form labels and placeholders", () => {
-      const searchInput = wrapper.find('input[placeholder="Search User"]');
+      const searchInput = wrapper.find('input[placeholder="Search user"]');
       expect(searchInput.exists()).toBe(true);
     });
 

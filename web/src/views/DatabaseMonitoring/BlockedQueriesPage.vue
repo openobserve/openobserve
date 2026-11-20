@@ -44,12 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
-        :frame="false"
-        :toolbar-bordered="false"
         :error="error"
         :forbidden="forbidden"
         sorting="client"
-        :show-global-filter="false"
         table-id="dbm-blocked"
         persist-columns
         :get-row-style="rowStyle"
@@ -58,8 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #error="{ message }">
           <OEmptyState
-            preset="load-error"
-            :description="raw(message)"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             data-test="dbm-blocked-error"
             @action="onRefresh()"
           />
@@ -79,48 +77,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @clear="clearScope"
               />
             </template>
-            <!-- Which question the table answers. Defaults to "who's stuck". -->
-            <OToggleGroup
-              v-model="perspective"
-              class="shrink-0"
-              mobile-dropdown
-              data-test="dbm-blocked-perspective"
-            >
-              <OToggleGroupItem
-                value="waiting"
-                size="sm"
-                data-test="dbm-blocked-perspective-waiting"
+            <template #view>
+              <!-- Which question the table answers. Defaults to "who's stuck". -->
+              <OToggleGroup
+                v-model="perspective"
+                class="shrink-0"
+                mobile-dropdown
+                data-test="dbm-blocked-perspective"
               >
-                {{ t("dbm.blocked.perspective.waiting") }}
-                <OTooltip side="bottom" :content="t('dbm.blocked.perspective.waitingHint')" />
-              </OToggleGroupItem>
-              <OToggleGroupItem
-                value="blocking"
-                size="sm"
-                data-test="dbm-blocked-perspective-blocking"
-              >
-                {{ t("dbm.blocked.perspective.blocking") }}
-                <OTooltip side="bottom" :content="t('dbm.blocked.perspective.blockingHint')" />
-              </OToggleGroupItem>
-            </OToggleGroup>
+                <OToggleGroupItem value="waiting" data-test="dbm-blocked-perspective-waiting">
+                  {{ t("dbm.blocked.perspective.waiting") }}
+                  <OTooltip side="bottom" :content="t('dbm.blocked.perspective.waitingHint')" />
+                </OToggleGroupItem>
+                <OToggleGroupItem value="blocking" data-test="dbm-blocked-perspective-blocking">
+                  {{ t("dbm.blocked.perspective.blocking") }}
+                  <OTooltip side="bottom" :content="t('dbm.blocked.perspective.blockingHint')" />
+                </OToggleGroupItem>
+              </OToggleGroup>
+            </template>
           </DbmTableToolbar>
         </template>
 
         <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
-            <DateTime
+          <div class="flex items-center gap-2">
+            <ODateTimeRange
               auto-apply
               menu-align="end"
               :default-type="range.type"
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-blocked-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
+              class="max-md:[&_.date-time-label]:hidden"
               @on:date-change="onDateChange"
             />
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :loading="loading"
               :last-run-at="lastRunAt"
               data-test="dbm-blocked-refresh"
@@ -189,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex min-w-0 flex-1 flex-col gap-px">
               <div v-if="row.pill" class="flex min-w-0 items-center gap-1.5">
                 <span
-                  class="text-3xs shrink-0 rounded-full px-1.5 py-px font-bold"
+                  class="text-2xs shrink-0 rounded-full px-1.5 py-px font-semibold"
                   :class="row.pill.tone"
                   :data-test="`dbm-blocked-pill-${row.kind}`"
                 >
@@ -204,8 +194,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ raw(row.query ?? "—") }}
               </OTruncatedText>
 
-              <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
-                <OTag type="dbSystem" :value="row.db_system" size="xs" />
+              <div class="text-text-secondary text-2xs flex min-w-0 items-center gap-1">
+                <OTag type="dbSystem" :value="row.db_system" size="sm" />
                 <template v-if="row.application || row.db_instance || row.waitingOnPid != null">
                   <span class="opacity-45">·</span>
                   <OTruncatedText
@@ -240,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <span
                   v-if="row.longestWait"
-                  class="bg-status-error-bg text-status-error-text rounded-default text-3xs ms-0.5 shrink-0 px-1 py-px font-semibold"
+                  class="bg-status-error-bg text-status-error-text rounded-default text-2xs ms-0.5 shrink-0 px-1 py-px font-semibold"
                 >
                   {{ t("dbm.blocked.longestWait") }}
                 </span>
@@ -283,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="text-text-muted text-xs">{{ raw("—") }}</span>
             <OTruncatedText
               v-if="row.waitEventLabel && row.waitEventRaw"
-              class="text-text-secondary text-3xs max-w-full font-mono"
+              class="text-text-secondary text-2xs max-w-full font-mono"
             >
               {{ raw(row.waitEventRaw) }}
             </OTruncatedText>
@@ -296,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText class="text-text-body max-w-full text-xs">
               {{ raw(row.blockerApplication ?? "—") }}
             </OTruncatedText>
-            <span class="text-text-muted text-3xs flex items-center justify-end gap-1">
+            <span class="text-text-muted text-2xs flex items-center justify-end gap-1">
               <span v-if="row.blockerPid != null">
                 {{ t("dbm.deadlocks.detail.pid", { pid: row.blockerPid }) }}
               </span>
@@ -324,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ row.blockingCount }}
             </span>
-            <span class="text-text-secondary text-3xs">
+            <span class="text-text-secondary text-2xs">
               {{ t("dbm.blocked.sessionCount", { count: row.blockingCount }, row.blockingCount) }}
             </span>
           </div>
@@ -346,7 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div v-else class="flex flex-col items-end leading-tight">
             <span class="text-text-muted">{{ raw("—") }}</span>
-            <span class="text-text-secondary text-3xs">{{ t("dbm.blocked.notWaiting") }}</span>
+            <span class="text-text-secondary text-2xs">{{ t("dbm.blocked.notWaiting") }}</span>
           </div>
         </template>
 
@@ -359,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.kind === 'root'"
               :label="t('dbm.ai.blockingFix')"
               :tooltip="t('dbm.ai.blockingFixHint')"
-              size="xs"
+              size="sm"
               data-test="dbm-blocked-ask-ai"
               @click="askAiForFix(row)"
             />
@@ -393,8 +383,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex-1"></div>
             <OButton
               v-if="perspective === 'waiting' && rootPids.length === 1"
-              variant="ghost-muted"
-              size="sm"
+              variant="ghost"
               data-test="dbm-blocked-switch-perspective"
               @click="perspective = 'blocking'"
             >
@@ -451,7 +440,7 @@ import { useStore } from "vuex";
 import DbmLockCoverageLine from "@/components/dbm/DbmLockCoverageLine.vue";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
@@ -460,6 +449,7 @@ import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmTerminateSql from "@/components/dbm/DbmTerminateSql.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";

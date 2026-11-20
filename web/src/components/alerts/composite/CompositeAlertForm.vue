@@ -9,7 +9,7 @@ import CompositeExpressionBuilder from "./CompositeExpressionBuilder.vue";
 import alertsService from "@/services/alerts";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import type {
   CompositeAlertChild,
   CompositeAlertDraft,
@@ -179,7 +179,6 @@ watch(
     <div class="flex min-w-0 flex-col gap-4">
       <div class="bg-card-glass-bg rounded-default border-border-default border">
         <div class="border-border-default flex items-center border-b px-3 py-2.5">
-          <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
           <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
             {{ t("alerts.composite.subAlerts") }} <span class="text-text-body">*</span>
           </span>
@@ -196,13 +195,12 @@ watch(
 
       <div class="bg-card-glass-bg rounded-default border-border-default border">
         <div class="border-border-default flex items-center border-b px-3 py-2.5">
-          <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
           <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
             {{ t("alerts.composite.triggerExpression") }} <span class="text-text-body">*</span>
           </span>
         </div>
         <div class="flex flex-col gap-3 px-3 py-2">
-          <OBanner variant="info" dense :content="t('alerts.composite.banner')" />
+          <OInlineNotice tone="info" :message="t('alerts.composite.banner')" />
           <CompositeExpressionBuilder
             :model-value="draft.composite_condition.expression"
             :selected-children="selectedChildren"
@@ -213,7 +211,6 @@ watch(
 
       <div class="bg-card-glass-bg rounded-default border-border-default border">
         <div class="border-border-default flex items-center border-b px-3 py-2.5">
-          <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
           <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
             {{ t("alerts.composite.settings") }}
           </span>

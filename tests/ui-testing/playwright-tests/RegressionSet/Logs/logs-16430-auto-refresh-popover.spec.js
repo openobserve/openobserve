@@ -18,7 +18,7 @@ test.describe('Logs auto refresh popover switches refreshing on and off (OSS#164
     await pm.logsPage.applyQueryAndWaitForSearchResponse();
   });
 
-  test('picking 5s refreshes on its own, the switch turns it off and refreshing stops', {
+  test('picking 5s refreshes on its own, choosing Off turns it off and refreshing stops', {
     tag: ['@bug-16430', '@P2', '@regression', '@logsRegression'],
   }, async ({ page }) => {
     const refresh = pm.logsAutoRefreshPage;
@@ -27,15 +27,16 @@ test.describe('Logs auto refresh popover switches refreshing on and off (OSS#164
     await refresh.waitForIdleResults();
 
     await refresh.openPopover();
-    await refresh.expectSubtitle(/paused/i);
-    await refresh.expectSwitchChecked(false);
+    await refresh.expectOffChecked(true);
     await refresh.expectFooterVisible();
 
     await refresh.pickInterval(5);
-    await refresh.expectSubtitle('5');
-    await refresh.expectSwitchChecked(true);
     await expect(page).toHaveURL(/[?&]refresh=5(&|$)/);
     await refresh.expectTriggerLabel(/5/);
+    await refresh.openPopover();
+    await refresh.expectIntervalChecked(5);
+    await refresh.expectOffChecked(false);
+    await refresh.closePopover();
 
     const onAt = searches.length;
     await expect.poll(() => searches.length - onAt, {
@@ -44,11 +45,11 @@ test.describe('Logs auto refresh popover switches refreshing on and off (OSS#164
     }).toBeGreaterThanOrEqual(2);
 
     await refresh.openPopoverIfClosed();
-    await refresh.clickOffSwitch();
-    await refresh.expectSwitchChecked(false);
-    await refresh.expectSubtitle(/paused/i);
-    await refresh.closePopover();
+    await refresh.pickOff();
     await refresh.expectTriggerLabel(/off/i);
+    await refresh.openPopover();
+    await refresh.expectOffChecked(true);
+    await refresh.closePopover();
     await expect(page).not.toHaveURL(/[?&]refresh=5(&|$)/);
 
     // Proving that nothing fires needs a fixed window: let an in-flight refresh land, then watch two intervals.

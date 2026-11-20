@@ -15,21 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    bleed
-    data-test="oncall-teams-page"
-    :title="t('oncall.teamsTitle')"
-    icon="group-work"
-  >
-    <template #title-trail>
+  <OPageLayout bleed data-test="oncall-teams-page" :title="t('oncall.teamsTitle')">
+    <template #status>
       <BetaBadge class="shrink-0" />
     </template>
     <template #actions>
       <OButton
         v-if="canConfigure"
         variant="primary"
-        size="sm"
-        icon-left="add"
         data-test="oncall-teams-add-btn"
         @click="openCreate"
       >
@@ -48,16 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="oTableRef"
       :error="loadError"
       :forbidden="forbidden"
-      :frame="false"
       :data="filteredTeams"
       :columns="columns"
       row-key="id"
       :loading="loading"
       pagination="client"
-      show-index
       table-id="oncall-teams-list"
       :persist-columns="showToolbar"
-      :show-global-filter="false"
       :enable-column-resize="true"
       data-test="oncall-teams-table"
       :page-size="pageSize"
@@ -76,7 +66,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             v-model="search"
             class="flex-1"
-            clearable
             :placeholder="t('oncall.searchTeamsPeople')"
             data-test="oncall-teams-search"
           />
@@ -85,8 +74,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-if="showToolbar" #toolbar-trailing>
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :last-run-at="lastUpdatedAt"
           :loading="loading"
           data-test="oncall-teams-refresh"
@@ -107,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OTag
             v-if="row.id === defaultTeamId"
-            variant="primary-soft"
+            tone="accent"
             size="sm"
             :data-test="`oncall-team-default-badge-${row.id}`"
           >
@@ -166,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  does not name has to announce itself. -->
             <OTag
               v-if="position.rotation_name.toLowerCase() !== 'secondary'"
-              variant="default-soft"
+              tone="neutral"
               size="sm"
               :data-test="`oncall-teams-rotation-${row.id}-${position.rotation_id}`"
             >
@@ -180,9 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <div v-if="canConfigure" class="flex items-center justify-center gap-1">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="edit"
+            icon="edit"
             class="max-md:hidden"
             :aria-label="t('oncall.editTeam')"
             :data-test="`oncall-team-edit-${row.id}`"
@@ -191,30 +178,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip side="bottom" :content="t('oncall.editTeam')" />
           </OButton>
           <!-- The server refuses to delete the default team, so its Delete stays in its slot and says why it is off. -->
-          <OTooltip
+          <OButton
             v-if="row.id === defaultTeamId"
-            side="bottom"
-            :content="t('oncall.deleteDefaultTeamBlocked')"
-          >
-            <OButton
-              variant="ghost-destructive"
-              size="icon-sm"
-              icon-left="delete-outline"
-              class="max-md:hidden"
-              disabled
-              focusable-unavailable
-              :aria-label="t('oncall.deleteTeam')"
-              :data-test="`oncall-team-delete-${row.id}`"
-              @click.stop
-            >
-              <template #unavailable-reason>{{ t("oncall.deleteDefaultTeamBlocked") }}</template>
-            </OButton>
-          </OTooltip>
+            icon-only
+            :disabled-reason="t('oncall.deleteDefaultTeamBlocked')"
+            variant="danger-ghost"
+            icon="delete-outline"
+            class="max-md:hidden"
+            disabled
+            :aria-label="t('oncall.deleteTeam')"
+            :data-test="`oncall-team-delete-${row.id}`"
+            @click.stop
+          />
           <OButton
             v-else
-            variant="ghost-destructive"
-            size="icon-sm"
-            icon-left="delete-outline"
+            icon-only
+            variant="danger-ghost"
+            icon="delete-outline"
             class="max-md:hidden"
             :aria-label="t('oncall.deleteTeam')"
             :data-test="`oncall-team-delete-${row.id}`"
@@ -225,9 +205,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
-                icon-left="more-vert"
+                icon-only
+                icon="more-vert"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 class="md:hidden"
                 :aria-label="t('oncall.moreActions')"
                 :data-test="`oncall-team-more-${row.id}`"
@@ -235,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <ODropdownItem
-              icon-left="edit"
+              icon="edit"
               class="md:hidden"
               :data-test="`oncall-team-edit-${row.id}-menu`"
               @select="openEdit(row)"
@@ -243,12 +224,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("oncall.editTeam") }}</span>
             </ODropdownItem>
             <ODropdownItem
-              icon-left="delete-outline"
-              variant="destructive"
+              icon="delete-outline"
+              tone="danger"
               class="md:hidden"
               :disabled="row.id === defaultTeamId"
-              :focusable-unavailable="row.id === defaultTeamId"
-              :description="
+              :disabled-reason="
                 row.id === defaultTeamId ? t('oncall.deleteDefaultTeamBlocked') : undefined
               "
               :data-test="`oncall-team-delete-${row.id}-menu`"
@@ -262,12 +242,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #error>
         <OEmptyState
-          size="hero"
-          variant="error"
-          illustration="broken-panel"
+          kind="error"
           :title="t('oncall.loadTeamsFailed')"
-          :description="loadError ? raw(loadError) : undefined"
-          :action-label="t('oncall.retry')"
+          :text="loadError ? raw(loadError) : undefined"
           data-test="oncall-teams-error"
           @action="refreshTeams"
         />
@@ -280,30 +257,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <OEmptyState
           v-if="notAvailable"
-          size="hero"
           icon="cloud-off"
           :title="t('oncall.notAvailableTitle')"
-          :description="t('oncall.notAvailableDescription')"
+          :text="t('oncall.notAvailableDescription')"
           data-test="oncall-teams-not-available"
         />
         <OEmptyState
           v-else-if="!loading && search"
-          size="hero"
-          preset="no-oncall-teams"
-          filtered
+          kind="filtered"
+          :title="t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })"
+          :text="
+            t('emptyState.filtered.description', { noun: t('emptyState.filtered.fallbackNoun') })
+          "
           data-test="oncall-teams-empty"
-          @action="onEmptyAction"
+          @action="onEmptyAction('clear-filters')"
         />
-        <!-- The title and the card already say what to do; the preset's explainer lines are left out. -->
+        <!-- The title and the action already say what to do, so no explainer text. -->
         <OEmptyState
           v-else-if="!loading"
-          size="hero"
-          illustration="users"
-          variant="create"
+          icon="group"
           :title="t('emptyState.noOncallTeams.title')"
-          :actions="NO_TEAMS_ACTIONS"
+          :action-label="t('emptyState.noOncallTeams.action')"
           data-test="oncall-teams-empty"
-          @action="onEmptyAction"
+          @action="onEmptyAction('create')"
         />
       </template>
     </OTable>
@@ -325,8 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :message-keypath="deleteTeamKeypath"
       :message-name="teamToDelete?.name"
       :ok-label="t('oncall.deleteTeam')"
-      ok-variant="destructive"
-      focus-cancel
+      kind="destructive"
       @update:ok="deleteTeam"
       @update:cancel="teamToDelete = null"
     />
@@ -341,7 +316,6 @@ import { useStore } from "vuex";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -691,11 +665,7 @@ function openTeam(team: Pick<OnCallTeam, "id">) {
   });
 }
 
-const NO_TEAMS_ACTIONS: EmptyStateAction[] = [
-  { id: "create", icon: "add", titleKey: "emptyState.noOncallTeams.action" },
-];
-
-function onEmptyAction(id?: string) {
+function onEmptyAction(id: "clear-filters" | "create") {
   if (id === "clear-filters") {
     search.value = "";
     return;

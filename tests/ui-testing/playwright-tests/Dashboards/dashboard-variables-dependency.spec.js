@@ -976,7 +976,7 @@ test.describe("Dashboard Variables - Dependency Loading", { tag: ['@dashboards',
     // Wait for dropdown menu to appear using page object helper
     await scopedVars.waitForMenuVisible({ timeout: 5000 });
 
-    // When a variable query returns no results, it should show "No Data Found"
+    // When a variable query returns no results, it should show "No data found"
     const noDataText = scopedVars.getVariableNoDataLocator();
     await expect(noDataText).toBeVisible({ timeout: 5000 });
 

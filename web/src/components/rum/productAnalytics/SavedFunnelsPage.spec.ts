@@ -66,20 +66,13 @@ const store = createStore({
 const stubs = {
   ODialog: {
     name: "ODialog",
-    props: [
-      "open",
-      "title",
-      "primaryButtonLabel",
-      "primaryButtonDisabled",
-      "secondaryButtonLabel",
-      "formId",
-    ],
+    props: ["open", "title", "primary", "primary", "secondary", "formId"],
     emits: ["update:open", "click:primary", "click:secondary"],
     template: `<div v-if="open" class="o-dialog" v-bind="$attrs" :data-title="title">
       <slot />
-      <button class="o-dialog-secondary" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-      <button v-if="formId" class="o-dialog-primary" type="submit" :form="formId">{{ primaryButtonLabel }}</button>
-      <button v-else class="o-dialog-primary" :disabled="primaryButtonDisabled" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+      <button class="o-dialog-secondary" @click="$emit('click:secondary')">{{ secondary?.label }}</button>
+      <button v-if="formId" class="o-dialog-primary" type="submit" :form="formId">{{ primary?.label }}</button>
+      <button v-else class="o-dialog-primary" :disabled="primary?.disabled" @click="$emit('click:primary')">{{ primary?.label }}</button>
     </div>`,
   },
   ODropdown: { name: "ODropdown", template: '<div><slot name="trigger" /><slot /></div>' },
@@ -261,7 +254,6 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
     expect(rows[1].text()).toContain("Deleted event");
     expect(rows[1].text()).not.toContain(GONE);
     expect(wrapper!.findComponent(OTable).props()).toMatchObject({
-      frame: false,
       rowKey: "id",
       selection: "multiple",
       pageSize: 20,
@@ -496,7 +488,7 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
       const call = confirmMock.mock.calls.at(-1)![0];
       expect(call.messageKeypath).toBe("rum.analytics.saved.deleteMessage");
       expect(call.messageName).toBe("Alpha");
-      expect(call.confirmVariant).toBe("destructive");
+      expect(call.kind).toBe("destructive");
       expect(api.funnels.has(a.id)).toBe(false);
       expect(names()).toEqual(["Beta"]);
       expect(useProductAnalytics().openedFunnel.value).toBeNull();
@@ -546,10 +538,9 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
 
   it("the empty state's Build a funnel opens an empty builder", async () => {
     await mountPage();
-    const card = wrapper!
-      .findAll("button")
-      .find((b) => b.text().includes("Build a funnel") && b.text().includes("Pick where"));
-    await card!.trigger("click");
+    const action = wrapper!.find('[data-test="o2-empty-state-action"]');
+    expect(action.text()).toContain("Build a funnel");
+    await action.trigger("click");
     await settle();
     expect(router.currentRoute.value.name).toBe(PA_ROUTES.funnelBuilder);
     expect(useProductAnalytics().funnel.value.steps).toEqual([]);

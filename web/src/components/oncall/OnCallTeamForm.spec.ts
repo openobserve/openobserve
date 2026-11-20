@@ -45,7 +45,7 @@ const ORG_USERS = [{ email: "ana@o2.ai" }, { email: "bob@o2.ai" }];
 const stubs = {
   ODrawer: {
     name: "ODrawer",
-    props: ["open", "primaryButtonLabel"],
+    props: ["open", "primary"],
     template: "<div v-if='open'><slot /></div>",
   },
 };
@@ -592,7 +592,7 @@ describe("OnCallTeamForm", () => {
   it("names the outcome on the primary button", async () => {
     const wrapper = render();
     await flushPromises();
-    const label = () => wrapper.findComponent({ name: "ODrawer" }).props("primaryButtonLabel");
+    const label = () => wrapper.findComponent({ name: "ODrawer" }).props("primary")?.label;
 
     expect(label()).toBe("Create team");
     setValues(wrapper, { members: ["ana@o2.ai"] });
@@ -674,7 +674,7 @@ describe("OnCallTeamForm", () => {
     const wrapper = render({ id: "t1", name: "Payments", timezone: "UTC" });
     await flushPromises();
 
-    expect(wrapper.findComponent({ name: "ODrawer" }).props("primaryButtonLabel")).toBe("Save");
+    expect(wrapper.findComponent({ name: "ODrawer" }).props("primary")?.label).toBe("Save");
   });
 
   it("fills the picker with the whole org in one click", async () => {

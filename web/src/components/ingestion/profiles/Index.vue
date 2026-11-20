@@ -2,7 +2,7 @@
 <template>
   <DataSourceSidebarLayout v-model="ingestiontabs" :splitter-width="250">
     <template #tabs>
-      <ORouteTab
+      <OTab
         name="profilesOtelCollector"
         data-test="ingestion-profiles-tab-otelCollector"
         :to="{
@@ -30,7 +30,7 @@
 </template>
 
 <script lang="ts">
-import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -44,7 +44,7 @@ import { resolveTab } from "@/utils/routeTabMaps";
 export default defineComponent({
   name: "IngestProfiles",
   components: {
-    ORouteTab,
+    OTab,
     DataSourceSidebarLayout,
   },
   data() {

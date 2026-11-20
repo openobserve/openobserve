@@ -48,6 +48,14 @@ export const getFieldLabel = (field: any, config: any, customQuery = false): str
   return name ? generateLabelFromName(name) : (field?.alias ?? "");
 };
 
+/** The source column a field reads, with its aggregate, for headers whose alias is generated (x_axis_1). */
+export const getFieldSourceName = (field: any): string => {
+  if (field?.type === "raw" && field.rawQuery) return field.rawQuery;
+  const column = field?.column || fieldNameInArgs(field?.args);
+  if (!column) return "";
+  return field?.aggregationFunction ? `${field.aggregationFunction}(${column})` : column;
+};
+
 /** An axis only ever shows a label the user typed; hide drops even that. */
 export const getAxisLabel = (field: any, config: any): string => {
   const mode: AxisLabelMode | undefined = config?.axis_label_mode;

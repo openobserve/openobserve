@@ -25,16 +25,15 @@
           <div data-test="promql-operations-item">
             <OButtonGroup
               class="axis-field border-border-default border-s-badge-purple-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
-              radius="sm"
-              :divided="true"
             >
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-chip"
-                class="drag-handle !w-4 cursor-grab active:cursor-grabbing"
+                size="xs"
+                class="drag-handle cursor-grab active:cursor-grabbing"
                 :data-test="`promql-operation-drag-${index}`"
               >
-                <template #icon-left>
+                <template #icon>
                   <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
                 </template>
                 <OTooltip :content="t('metrics.operationsList.dragToReorder')" side="top" />
@@ -43,9 +42,8 @@
                 <template #trigger>
                   <OButton
                     variant="ghost"
-                    size="chip-12"
+                    size="xs"
                     class="!ps-1 !pe-1"
-                    :no-wrap="true"
                     :data-test="`promql-operation-${index}`"
                   >
                     <!-- PromQL editor colours: teal functions, plain brackets -->
@@ -55,7 +53,7 @@
                       bracket-class="text-text-body"
                       leading-fn
                     />
-                    <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                    <template #icon-end><OIcon name="arrow-drop-down" size="sm" /></template>
                   </OButton>
                 </template>
                 <div
@@ -122,7 +120,6 @@
                         v-else-if="param.type === 'boolean'"
                         v-model="element.params[paramIndex] as boolean"
                         :label="param.name"
-                        size="sm"
                         class="mb-1.5"
                         :data-test="`promql-operation-param-${paramIndex}`"
                       />
@@ -131,14 +128,14 @@
                 </div>
               </ODropdown>
               <OButton
+                icon-only
                 :aria-label="t('common.remove')"
                 variant="ghost"
-                size="icon-chip"
-                class="!w-4"
+                size="xs"
                 @click="removeOperation(index)"
                 :data-test="`promql-operation-remove-${index}`"
               >
-                <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
+                <template #icon><OIcon name="close" size="xs" class="!size-2.5" /></template>
               </OButton>
             </OButtonGroup>
           </div>
@@ -147,8 +144,9 @@
 
       <!-- Add Button -->
       <OButton
-        variant="outline"
-        size="icon-chip"
+        icon-only
+        variant="secondary"
+        size="xs"
         @click="showOperationSelector = true"
         class="add-operation-btn"
         data-test="promql-add-operation"
@@ -165,10 +163,10 @@
     v-model:open="showOperationSelector"
     size="sm"
     :title="t('metrics.operationsList.addOperationTitle')"
-    :primary-button-label="t('metrics.operationsList.close')"
+    :primary="{ label: t('metrics.operationsList.close') }"
     @click:primary="showOperationSelector = false"
   >
-    <OSearchInput v-model="searchQuery" data-test="operations-list-search-input" clearable />
+    <OSearchInput v-model="searchQuery" data-test="operations-list-search-input" />
 
     <div class="overflow-y-auto" style="max-height: 25rem">
       <div class="border-border rounded-default divide-border divide-y border">
@@ -177,7 +175,7 @@
           :key="category"
           :data-test="`operations-list-category-${category}`"
         >
-          <OCollapsible :default-open="true" :label="raw(category)">
+          <OCollapsible :default-open="true" :title="raw(category)">
             <div>
               <p
                 v-if="isRangeGroupBlocked(category)"

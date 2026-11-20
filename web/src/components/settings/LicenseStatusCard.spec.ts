@@ -139,16 +139,15 @@ describe("LicenseStatusCard", () => {
     const on = mountCard({ envKeyActive: true, envKeyInUse: true });
     expect(on.find("[data-test=license-status-env-key]").text()).toContain("O2_LICENSE_KEY");
     expect(on.find("[data-test=license-status-env-key]").text()).toContain("paste a newer key");
-    expect(on.findComponent({ name: "OBanner" }).props("variant")).toBe("warning");
-    expect(on.findComponent({ name: "OBanner" }).props("icon")).toBe("warning");
+    expect(on.findComponent({ name: "OInlineNotice" }).props("tone")).toBe("warn");
     const off = mountCard({ envKeyActive: false });
     expect(off.find("[data-test=license-status-env-key]").exists()).toBe(false);
   });
 
   it("a pasted key newer than the env key shows the info banner", () => {
     const w = mountCard({ envKeyActive: true, envKeyInUse: false });
-    const banner = w.findComponent({ name: "OBanner" });
-    expect(banner.props("variant")).toBe("info");
+    const banner = w.findComponent({ name: "OInlineNotice" });
+    expect(banner.props("tone")).toBe("info");
     expect(w.find("[data-test=license-status-env-key]").text()).toContain(
       "in use instead of O2_LICENSE_KEY",
     );

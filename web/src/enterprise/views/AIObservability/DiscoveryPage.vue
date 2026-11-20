@@ -25,8 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AiPageShell
     data-test="ai-discovery"
     :title="t('aiObservability.nav.discovery')"
-    :subtitle="t('aiObservability.subtitle.discovery')"
-    icon="saved-search"
+    :about="t('aiObservability.subtitle.discovery')"
     :date-state="dateState"
     :last-run-at="lastRunAt"
     :is-loading="loading"
@@ -70,7 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-column-resize="true"
         :persist-columns="true"
         :table-id="`ai-discovery-${scope}`"
-        width="100%"
         class="h-full w-full"
         @update:selected-ids="selectedIds = $event"
         @update:current-page="onPageChange"
@@ -86,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="min-w-0 flex-1 max-md:min-w-24"
               :placeholder="t('aiObservability.discovery.searchPlaceholder')"
               data-test="ai-discovery-search-input"
-              clearable
             />
             <OSelect
               :model-value="queueStatus"
@@ -94,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               label-key="label"
               value-key="value"
               :searchable="false"
-              width="sm"
+              width="s"
               class="shrink-0 max-md:w-36"
               data-test="ai-discovery-in-queue-filter"
               @update:model-value="onQueueStatusChange"
@@ -103,14 +100,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div class="flex items-center justify-center py-8">
-            <OEmptyState
-              size="hero"
-              preset="no-discovery-items"
-              :filtered="Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS"
-              data-test="ai-discovery-empty-state"
-            />
-          </div>
+          <OEmptyState
+            :kind="
+              Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS ? 'filtered' : 'first-run'
+            "
+            :title="
+              Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.discoveryItems') })
+                : t('emptyState.noDiscoveryItems.title')
+            "
+            :text="
+              Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS
+                ? t('emptyState.filtered.description', {
+                    noun: t('emptyState.nouns.discoveryItems'),
+                  })
+                : t('emptyState.noDiscoveryItems.description')
+            "
+            :icon="Boolean(search) || queueStatus !== DEFAULT_QUEUE_STATUS ? undefined : 'task-alt'"
+            data-test="ai-discovery-empty-state"
+          />
         </template>
 
         <template #cell-refTimestamp="{ row }">
@@ -206,8 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-genAiOperationName="{ row }">
           <OTag
             v-if="row.genAiOperationName"
-            :variant="operationVariant(row.genAiOperationName)"
-            shape="rounded"
+            :tone="operationVariant(row.genAiOperationName)"
             data-test="ai-discovery-operation-badge"
           >
             {{ raw(row.genAiOperationName) }}
@@ -258,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :busy="addingId === BULK"
             side="top"
             variant="primary"
-            size="sm"
+            size="md"
             :label="t('aiObservability.discovery.addToQueue')"
             data-test="ai-discovery-bulk-add"
             @open="loadQueues"
@@ -299,7 +306,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -592,18 +599,18 @@ function textOrDash(value: string | number | null | undefined) {
  *  view classifies spans with (`threadView.utils.ts` → `classify`): model calls,
  *  tool calls and agent calls are the three things a reviewer scans for. An
  *  unrecognised operation stays neutral rather than borrowing a family's colour. */
-const OPERATION_VARIANTS: Record<string, BadgeVariant> = {
-  chat: "blue-soft",
-  text_completion: "blue-soft",
-  generate_content: "blue-soft",
-  embeddings: "teal-soft",
-  execute_tool: "amber-soft",
-  invoke_agent: "purple-soft",
-  create_agent: "purple-soft",
+const OPERATION_VARIANTS: Record<string, ChipTone> = {
+  chat: "neutral",
+  text_completion: "neutral",
+  generate_content: "neutral",
+  embeddings: "neutral",
+  execute_tool: "warn",
+  invoke_agent: "neutral",
+  create_agent: "neutral",
 };
 
-function operationVariant(operation: string): BadgeVariant {
-  return OPERATION_VARIANTS[operation.toLowerCase()] ?? "default-soft";
+function operationVariant(operation: string): ChipTone {
+  return OPERATION_VARIANTS[operation.toLowerCase()] ?? "neutral";
 }
 
 /** Durations arrive in microseconds — same formatter the Traces views use. */

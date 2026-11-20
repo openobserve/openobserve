@@ -37,8 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OTag
           v-if="position === 0 && holder"
-          :variant="holder.now ? 'success-soft' : 'default-soft'"
-          size="xs"
+          :tone="holder.now ? 'ok' : 'neutral'"
+          size="sm"
           :data-test="`oncall-rule-people-holder-${ruleIndex}`"
         >
           {{ holder.now ? t("oncall.peopleOnNow") : t("oncall.peopleNextUp") }}
@@ -48,9 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("oncall.peopleMore", { count: hidden }) }}
       </span>
       <OButton
-        variant="outline"
-        size="xs"
-        icon-left="edit"
+        variant="secondary"
+        size="sm"
+        icon="edit"
         :data-test="`oncall-rule-people-edit-${ruleIndex}`"
         @click="expanded = true"
       >
@@ -65,9 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OText>
         <OButton
           v-if="rule.members.length"
-          variant="outline"
-          size="xs"
-          icon-left="check"
+          variant="secondary"
+          size="sm"
+          icon="check"
           class="ms-auto"
           :data-test="`oncall-rule-people-done-${ruleIndex}`"
           @click="expanded = false"
@@ -106,19 +106,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-text-body text-sm"
             :data-test="`oncall-rule-person-name-${ruleIndex}-${position}`"
           />
-          <OTag
-            v-if="holder?.email === member"
-            :variant="holder.now ? 'success-soft' : 'default-soft'"
-            size="xs"
-          >
+          <OTag v-if="holder?.email === member" :tone="holder.now ? 'ok' : 'neutral'" size="sm">
             {{ holder.now ? t("oncall.peopleOnNow") : t("oncall.peopleNextUp") }}
           </OTag>
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
-                icon-left="more-vert"
+                icon-only
+                icon="more-vert"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 class="ms-auto"
                 :aria-label="t('oncall.peopleMenu', { name: raw(nameOf(member)) })"
                 :data-test="`oncall-rule-person-menu-${ruleIndex}-${position}`"
@@ -149,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
             <ODropdownSeparator />
             <ODropdownItem
-              variant="destructive"
+              tone="danger"
               :data-test="`oncall-rule-person-remove-${ruleIndex}-${position}`"
               @select="remove(member)"
             >
@@ -171,10 +168,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="add"
         />
         <OButton
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="!addable.length"
-          icon-left="group-add"
+          icon="group-add"
           :data-test="`oncall-rule-people-add-all-${ruleIndex}`"
           @click="addEveryone"
         >

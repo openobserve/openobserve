@@ -8,7 +8,7 @@ scatter raw key combos through templates:
 | -------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | **Registry**   | `@/lib/vue-shortcut-manager` → `shortcutRegistry.ts`           | Declares every shortcut once by `id`: its key(s), platform variants, i18n description, grouped by module. |
 | **Binding**    | `useShortcut` / `useShortcuts` composables                     | Attach behavior to a registered `id` in a component's `setup()`.                                          |
-| **Display**    | `OShortcut`, and `shortcut-id` on `ODropdownItem` / `OTooltip` | Render the keycaps, resolved from the same registry (platform-aware).                                     |
+| **Display**    | `OShortcut`, and `shortcut` (a registry id) on `ODropdownItem` / `OTooltip` / `OButton` | Render the keycaps, resolved from the same registry (platform-aware).                                     |
 | **Cheatsheet** | `ShortcutCheatsheet` (mounted once in `MainLayout`)            | The global "?" overlay listing all shortcuts. New registry entries appear automatically.                  |
 
 Because all four read the one registry, a shortcut's key, its label, its keycap
@@ -73,16 +73,13 @@ and in sync:
 ```vue
 <OShortcut id="streamsListAdd" />
 <!-- resolves keys from the registry -->
-<ODropdownItem
-  shortcut-id="streamsListAdd"
-  @select="addStream"
->Add stream</ODropdownItem>
-<OTooltip content="Refresh" shortcut-id="streamsListRefresh">…</OTooltip>
+<ODropdownItem shortcut="streamsListAdd" @select="addStream">{{ t("logStream.add") }}</ODropdownItem>
+<OTooltip :content="t('common.refresh')" shortcut="streamsListRefresh">…</OTooltip>
 ```
 
-`OShortcut` also accepts explicit `keys` (`<OShortcut keys="ctrl+enter" />`) for
-one-off display not tied to a registered action, but prefer `id`/`shortcut-id`
-whenever the shortcut is real and registered.
+`OShortcut`, `ODropdownItem` and `OTooltip` also accept explicit `keys`
+(`<OShortcut keys="ctrl+enter" />`) for one-off display not tied to a registered
+action, but prefer the registry id whenever the shortcut is real and registered.
 
 ## Rules
 
@@ -94,7 +91,7 @@ whenever the shortcut is real and registered.
 - **Don't hand-roll key handling.** No ad-hoc `keydown` listeners for
   app shortcuts — use the manager so scoping, platform mapping, the cheatsheet,
   and conflict handling all work.
-- **Display resolves from the registry** — `id` / `shortcut-id`, not literal
+- **Display resolves from the registry** — `id` / `shortcut`, not literal
   keycap strings in the template.
 
 ## Public API (from `@/lib/vue-shortcut-manager`)
@@ -112,5 +109,5 @@ whenever the shortcut is real and registered.
 - Types: `ShortcutDef`, `ShortcutEntry`, `ShortcutGroup`, `ShortcutModule`, etc.
 
 For `OShortcut`'s display props see [core-display.md](core-display.md#oshortcut);
-for `shortcut-id` on menu items and tooltips see
+for `shortcut` on menu items and tooltips see
 [overlay-navigation.md](overlay-navigation.md).

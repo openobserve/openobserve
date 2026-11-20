@@ -21,9 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OEmptyState
       v-if="!details"
-      size="block"
       :title="t('billing.usageV2.noPricingTitle')"
-      :description="t('billing.usageV2.noPricingSubtitle')"
+      :text="t('billing.usageV2.noPricingSubtitle')"
       data-test="billings-usageestimator-no-pricing"
     />
 
@@ -36,19 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="billings-usageestimator-scenario"
           @update:model-value="onScenarioChange"
         >
-          <OToggleGroupItem
-            v-for="option in SCENARIOS"
-            :key="option.value"
-            :value="option.value"
-            size="sm"
-          >
+          <OToggleGroupItem v-for="option in SCENARIOS" :key="option.value" :value="option.value">
             {{ t(option.labelKey) }}
           </OToggleGroupItem>
         </OToggleGroup>
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="refresh"
+          variant="secondary"
+          icon="refresh"
           class="ms-auto"
           data-test="billings-usageestimator-reset"
           @click="applyScenario('current')"
@@ -62,10 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="relative grid items-stretch gap-3 @min-[60rem]/estimator:min-h-0 @min-[60rem]/estimator:flex-1 @min-[60rem]/estimator:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.95fr)] @min-[60rem]/estimator:grid-rows-[minmax(0,1fr)]"
       >
         <!-- Until history lands the fields hold placeholders, not this org's usage. -->
-        <OInnerLoading
-          :showing="loadingHistory"
-          size="sm"
-          :label="t('billing.usageV2.loadingHistory')"
+        <OLoadingLine
+          :active="loadingHistory"
+          class="absolute inset-x-0 top-0 z-10"
+          :aria-label="t('billing.usageV2.loadingHistory')"
         />
         <!-- ── Inputs ───────────────────────────────────────── -->
         <section
@@ -76,19 +69,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :subtitle="t('billing.usageV2.expectedUsageHint')"
           >
             <template #actions>
-              <OPopover align="end" :aria-label="t('billing.usageV2.assumptions')">
+              <OPopover size="md" align="end" :aria-label="t('billing.usageV2.assumptions')">
                 <template #trigger>
                   <OButton
-                    variant="outline"
-                    size="xs"
-                    icon-left="tune"
+                    variant="secondary"
+                    size="sm"
+                    icon="tune"
                     data-test="billings-usageestimator-assumptions"
                   >
                     {{ t("billing.usageV2.assumptions") }}
                   </OButton>
                 </template>
                 <div
-                  class="flex w-80 flex-col gap-3 p-3"
+                  class="flex flex-col gap-3 p-3"
                   data-test="billings-usageestimator-assumptions-panel"
                 >
                   <p class="text-text-heading text-sm font-semibold">
@@ -100,7 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OInput
                     :model-value="inputs.avgStreamMb"
                     type="number"
-                    size="md"
                     :label="t('billing.usageV2.avgStreamSize')"
                     :suffix="rawMb"
                     data-test="billings-usageestimator-avg-stream"
@@ -125,7 +117,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OInput
                 :model-value="inputs[field.key]"
                 type="number"
-                size="md"
                 :label="t(field.labelKey)"
                 :suffix="field.suffix"
                 :help-text="field.key === 'scanPerSearchMb' ? scanNote : field.rate"
@@ -133,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="setField(field.key, $event)"
               >
                 <template v-if="field.rateHint" #tooltip>
-                  <OTooltip :content="field.rateHint" max-width="18rem" />
+                  <OTooltip :content="field.rateHint" />
                 </template>
               </OInput>
               <OSlider
@@ -153,8 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="part.key"
                     :model-value="inputs[part.key]"
                     type="number"
-                    size="sm"
-                    width="xs"
+                    width="s"
                     :label="t(part.labelKey)"
                     :suffix="part.suffix"
                     :data-test="`billings-usageestimator-${part.key}`"
@@ -193,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <span class="ms-auto text-sm font-semibold">{{ formatCost(line.cost) }}</span>
               </div>
-              <OProgressBar :value="shareOf(line)" :color="meterColorFor(line.key)" />
+              <OProgressBar :value="shareOf(line) * 100" />
             </li>
           </ul>
 
@@ -226,7 +216,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { addCommasToNumber, formatSizeFromMB } from "@/utils/formatters";

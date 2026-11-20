@@ -292,7 +292,7 @@ describe("VariableAdHocValueSelector", () => {
       const valueInput = wrapper.find(
         '[data-test="dashboard-variable-adhoc-value-selector"] input',
       );
-      expect(valueInput.attributes("placeholder")).toBe("Enter Value");
+      expect(valueInput.attributes("placeholder")).toBe("Enter value");
     });
 
     it("should have debounce configured", () => {
@@ -336,7 +336,7 @@ describe("VariableAdHocValueSelector", () => {
       const tooltip = addButton.findComponent({ name: "OTooltip" });
 
       if (tooltip.exists()) {
-        expect(tooltip.props("content")).toBe("Add Dynamic Filter");
+        expect(tooltip.props("content")).toBe("Add dynamic filter");
       }
     });
   });

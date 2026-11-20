@@ -8,10 +8,10 @@ import AiNoAgentsEmpty from "./AiNoAgentsEmpty.vue";
 // wiring (which props it forwards, event mapping) rather than the empty
 // state's internals, which have their own spec.
 const OEmptyState = {
-  props: ["size", "illustration", "dataTest", "title", "description", "actionLabel"],
+  props: ["size", "icon", "dataTest", "title", "text", "actionLabel"],
   emits: ["action"],
   template:
-    '<div class="o-empty-state" :data-test="dataTest" :data-size="size" :data-illustration="illustration" :data-title="title" :data-description="description" :data-action-label="actionLabel" @click="$emit(\'action\', \'view\')" />',
+    '<div class="o-empty-state" :data-test="dataTest" :data-size="size" :data-icon="icon" :data-title="title" :data-text="text" :data-action-label="actionLabel" @click="$emit(\'action\', \'view\')" />',
 };
 
 const stubs = { OEmptyState };
@@ -35,20 +35,18 @@ describe("AiNoAgentsEmpty", () => {
     const empty = w.find('[data-test="sessions-empty-no-agents"]');
     expect(empty.exists()).toBe(true);
     expect(empty.attributes("data-title")).toBe("No agents discovered");
-    expect(empty.attributes("data-description")).toBe(
-      "We couldn't find any agents in this window.",
-    );
+    expect(empty.attributes("data-text")).toBe("We couldn't find any agents in this window.");
     expect(empty.attributes("data-action-label")).toBe("View by stream");
   });
 
-  it("defaults the illustration to constellation", () => {
+  it("defaults the icon to insights", () => {
     const w = mountEmpty();
-    expect(w.find(".o-empty-state").attributes("data-illustration")).toBe("constellation");
+    expect(w.find(".o-empty-state").attributes("data-icon")).toBe("insights");
   });
 
-  it("respects an overridden illustration (e.g. service-graph for Graph)", () => {
-    const w = mountEmpty({ illustration: "service-graph", actionLabel: undefined });
-    expect(w.find(".o-empty-state").attributes("data-illustration")).toBe("service-graph");
+  it("respects an overridden icon (e.g. hub for Graph)", () => {
+    const w = mountEmpty({ icon: "hub", actionLabel: undefined });
+    expect(w.find(".o-empty-state").attributes("data-icon")).toBe("hub");
   });
 
   it("emits view-by-stream when the empty state's action fires", async () => {

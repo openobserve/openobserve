@@ -57,9 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Controls on the right -->
           <div class="flex shrink-0 items-start gap-1 max-md:w-full max-md:flex-wrap">
             <OButton
-              variant="outline"
-              size="icon-toolbar"
-              icon-left="menu"
+              icon-only
+              variant="secondary"
+              icon="menu"
               class="md:hidden"
               data-test="rum-errors-mobile-fields-btn"
               @click="mobileFieldsOpen = true"
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('search.showFields')" />
             </OButton>
             <SyntaxGuide />
-            <DateTime
+            <ODateTimeRange
               auto-apply
               menu-align="end"
               :default-type="errorTrackingState.data.datetime?.valueType"
@@ -83,7 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="errors-run-query-button"
               variant="primary"
-              size="sm-toolbar"
               :loading="isLoadingIssues"
               @click="runQuery"
               class="shrink-0"
@@ -92,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip
                 side="bottom"
                 :content="t('metrics.runQuery')"
-                shortcut-id="rumErrorsRefresh"
+                shortcut="rumErrorsRefresh"
               />
             </OButton>
             <OTableColumnToggle
@@ -104,8 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="shareButtonRef"
               data-test="rum-app-errors-share-link-btn"
               :url="shareUrl"
-              variant="outline"
-              size="icon-toolbar"
+              variant="secondary"
               shortcut-id="rumErrorsCopyUrl"
               class="shrink-0"
             />
@@ -118,10 +116,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end toolbar wrapper -->
     <ODrawer
+      size="xl"
       v-if="isMobile"
       v-model:open="mobileFieldsOpen"
       side="left"
-      :width="80"
       bleed
       :title="t('search.showFields')"
       anchor='[data-drawer-anchor="rum-errors-toolbar"]'
@@ -212,9 +210,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               row-key="_rowKey"
               pagination="none"
               virtual-scroll
-              :dense="false"
-              :row-height="60"
-              :show-global-filter="false"
               class="h-full"
               data-test="rum-app-errors-table"
               row-class="cursor-pointer"
@@ -264,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #cell-status="{ row }">
                 <OTag
                   :label="row.status === 'new' ? t('rum.statusNew') : t('rum.statusOngoing')"
-                  :variant="row.status === 'new' ? 'error' : 'error-outline'"
+                  :tone="row.status === 'new' ? 'err' : 'outline'"
                   size="sm"
                   :title="row.status === 'new' ? t('rum.statusNewTooltip') : undefined"
                   data-test="rum-app-errors-status-badge"
@@ -327,7 +322,7 @@ import useErrorIssuesData from "@/composables/rum/useErrorIssuesData";
 import { issueKey, formatRelativeTime, escapeSqlString } from "@/utils/rum/errorIssueUtils";
 import { addCommasToNumber } from "@/utils/formatters";
 import { useStore } from "vuex";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";

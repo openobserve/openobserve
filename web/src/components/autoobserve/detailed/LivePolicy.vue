@@ -27,10 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-for="s in SECTIONS"
         :key="s"
-        :variant="s === section ? 'secondary' : 'ghost-muted'"
-        size="sm"
+        :variant="s === section ? 'secondary' : 'ghost'"
         class="justify-start"
-        :icon-left="SECTION_ICON[s]"
+        :icon="SECTION_ICON[s]"
         :aria-current="s === section ? 'page' : undefined"
         :data-test="`autoobserve-policy-nav-${s}`"
         @click="select(s)"
@@ -43,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`autoobserve-policy-section-${section}`"
     >
       <header class="flex flex-col gap-1">
-        <h2 class="text-text-heading text-base font-semibold">{{ t(SECTION_TITLE[section]) }}</h2>
+        <h2 class="text-text-heading text-sm font-semibold">{{ t(SECTION_TITLE[section]) }}</h2>
         <p class="text-text-secondary text-sm leading-relaxed">{{ t(SECTION_LEAD[section]) }}</p>
       </header>
       <PolicyModes v-if="section === 'coverage'" :actions="COVERAGE_ACTIONS" />
@@ -68,9 +67,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AutoObserveSettingsReach />
         </div>
         <OButton
-          variant="ghost-primary"
-          size="xs"
-          icon-right="arrow-forward"
+          variant="accent-ghost"
+          size="sm"
+          icon-end="arrow-forward"
           class="-ms-2 self-start"
           data-test="autoobserve-policy-oncall"
           @click="router.push({ name: 'onCallRouting', query: { org_identifier: org } })"

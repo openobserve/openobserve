@@ -131,7 +131,7 @@ describe("AWSQuickSetup.vue", () => {
           },
           OButton: {
             template:
-              '<button :disabled="disabled" @click="$emit(\'click\')"><slot name="icon-left" /><slot /></button>',
+              '<button :disabled="disabled" @click="$emit(\'click\')"><slot name="icon" /><slot /></button>',
             props: [
               "variant",
               "size",
@@ -187,7 +187,7 @@ describe("AWSQuickSetup.vue", () => {
 
     it("should render Complete AWS Integration title", () => {
       wrapper = createWrapper();
-      expect(wrapper.text()).toContain("Complete AWS Integration");
+      expect(wrapper.text()).toContain("Complete AWS integration");
     });
 
     it("should render deployment mode toggle", () => {

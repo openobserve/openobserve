@@ -39,7 +39,6 @@ const props = withDefaults(defineProps<ComboboxProps>(), {
   error: false,
   debounce: 0,
   valueReplaceFn: (option: ComboboxOption) => option.value,
-  labelPosition: "outside",
 });
 
 const emit = defineEmits<ComboboxEmits>();
@@ -165,13 +164,9 @@ function onSelect(optionValue: string) {
 }
 
 // ── Sizes ────────────────────────────────────────────────────────────────────
-const heightClass = computed(() => {
-  if (props.labelPosition === "inside" && (props.label || slots.label)) {
-    return "h-10 text-sm pt-4";
-  }
-  // Aligned with OInput/OSelect/OButton sm: h-[2.125rem].
-  return "h-[2.125rem] text-sm";
-});
+const heightClass = computed(() =>
+  props.size === "sm" ? "h-control-sm text-compact" : "h-control-md text-compact",
+);
 
 // ── Error ────────────────────────────────────────────────────────────────────
 const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
@@ -187,9 +182,6 @@ onMounted(() =>
     inputId.value,
   ),
 );
-const hasInsideLabel = computed(
-  () => props.labelPosition === "inside" && (Boolean(slots.label) || Boolean(props.label)),
-);
 </script>
 
 <template>
@@ -201,7 +193,7 @@ const hasInsideLabel = computed(
   >
     <!-- Label (outside) -->
     <label
-      v-if="(hasLabel || $slots.tooltip) && labelPosition !== 'inside'"
+      v-if="hasLabel || $slots.tooltip"
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
@@ -231,14 +223,6 @@ const hasInsideLabel = computed(
       @update:model-value="onSelect"
     >
       <ComboboxAnchor class="relative flex w-full items-center">
-        <!-- Inside label -->
-        <span
-          v-if="hasInsideLabel"
-          class="text-3xs text-input-placeholder pointer-events-none absolute start-3 top-1 z-10 leading-none select-none"
-        >
-          <slot name="label">{{ label }}</slot
-          ><span v-if="required" aria-hidden="true">&nbsp;*</span>
-        </span>
         <ComboboxInput
           v-bind="controlAttrs"
           :id="inputId"
@@ -251,11 +235,10 @@ const hasInsideLabel = computed(
             'rounded-default w-full border ps-3 pe-3',
             'bg-input-bg text-input-text',
             'placeholder:text-input-placeholder',
-            'transition-[border-color,box-shadow] duration-150 outline-none',
+            'transition-[border-color,box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none',
             hasError
-              ? 'border-input-border-error'
-              : 'border-input-border hover:border-input-border-hover',
-            'focus:border-input-border-focus focus:ring-input-focus-ring focus:ring-2',
+              ? 'border-input-border-error focus:ring-control-error-halo focus:ring-3'
+              : 'border-input-border hover:border-input-border-hover focus:border-control-border-focus focus:ring-control-focus-halo focus:ring-3',
             'disabled:bg-input-disabled-bg disabled:text-input-disabled-text disabled:cursor-not-allowed',
             heightClass,
           ]"
@@ -273,12 +256,9 @@ const hasInsideLabel = computed(
             'z-10001 w-(--reka-combobox-trigger-width) max-w-(--reka-combobox-trigger-width) min-w-(--reka-combobox-trigger-width)',
             'max-h-60 overflow-hidden',
             'max-lg:max-h-[var(--reka-popper-available-height,15rem)]',
-            'rounded-default shadow-overlay border border-transparent',
+            'rounded-default shadow-overlay border-border-default border',
             'bg-select-content-bg',
             'p-1',
-            // Clip-path reveal: unveiled at full size from its trigger edge (no
-            // scale/squish). Wipes down by default; top-placed wipes up. Soft
-            // ease-out-expo in, quick wipe out.
             'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
             'data-[state=closed]:animate-[o2-reveal-down-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
             'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
@@ -288,7 +268,7 @@ const hasInsideLabel = computed(
           <ComboboxViewport
             class="max-h-56 overflow-y-auto max-lg:max-h-[calc(var(--reka-popper-available-height,14rem)-0.5rem)]"
           >
-            <ComboboxEmpty class="text-select-placeholder px-3 py-2 text-center text-sm">
+            <ComboboxEmpty class="text-select-placeholder text-compact px-3 py-2 text-center">
               {{ t("components.combobox.noOptionsFound") }}
             </ComboboxEmpty>
 
@@ -300,7 +280,7 @@ const hasInsideLabel = computed(
               :data-test-label="option.label"
               :class="[
                 'relative flex w-full items-start gap-2',
-                'py-1.5 ps-3 pe-8 text-sm',
+                'text-compact py-1.5 ps-3 pe-8',
                 'text-select-item-text rounded-default',
                 'cursor-pointer outline-none select-none',
                 'transition-colors duration-100',
@@ -347,13 +327,13 @@ const hasInsideLabel = computed(
     <!-- Error message -->
     <span
       v-if="effectiveError && effectiveError.trim()"
-      class="text-input-error-text text-xs leading-snug"
+      class="text-input-error-text text-xs leading-4"
       role="alert"
     >
       {{ effectiveError }}
     </span>
     <!-- Help text -->
-    <span v-else-if="helpText" class="text-input-help-text text-xs leading-snug">
+    <span v-else-if="helpText" class="text-input-help-text text-xs leading-4">
       {{ helpText }}
     </span>
   </div>

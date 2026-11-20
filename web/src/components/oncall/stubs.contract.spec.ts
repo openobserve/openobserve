@@ -22,7 +22,7 @@
  *
  *   - `ODialog` stubbed with `modelValue`, which it does not have: three
  *     dialogs bound with `v-model` could never open at all.
- *   - `ODialog` stubbed with `primaryDisabled` (really `primaryButtonDisabled`)
+ *   - `ODialog` stubbed with `primaryDisabled` (really `primary?.disabled`)
  *     in two specs: three dialogs rendered with no Save and no Cancel, because
  *     `hasFooter` reads the real names and saw none of them.
  *   - `OTooltip` stubbed without `content`: an assertion that a truncated cell

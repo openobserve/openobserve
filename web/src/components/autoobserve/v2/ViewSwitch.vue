@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OToggleGroupItem
       value="standard"
-      size="xs"
       :tooltip="t('autoobserve2.view.standardTooltip')"
       data-test="autoobserve-view-standard"
     >
@@ -31,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OToggleGroupItem>
     <OToggleGroupItem
       value="nerd"
-      size="xs"
       :tooltip="t('autoobserve2.view.nerdTooltip')"
       data-test="autoobserve-view-nerd"
     >

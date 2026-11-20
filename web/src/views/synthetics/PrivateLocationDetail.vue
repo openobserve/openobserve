@@ -16,45 +16,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="detail?.label || t('synthetics.privateLocations.detail.title')"
-    icon="location-on"
     :back="{
       label: t('synthetics.privateLocations.detail.back'),
       to: backTo,
     }"
     bleed
   >
-    <template #title-trail>
+    <template #status>
       <!-- "unknown" is the limit of what this region can see, not a state of
            the location, so it carries the explanation with it. -->
       <OTooltip
         v-if="detail && liveStatus(detail) === 'unknown'"
         :content="t('synthetics.privateLocations.status.unknownHint')"
       >
-        <OBadge variant="default-outline" :dot="true" size="sm">
+        <OBadge tone="outline" :dot="true" size="sm">
           {{ t("synthetics.privateLocations.status.unknown") }}
         </OBadge>
       </OTooltip>
-      <OBadge v-else-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
+      <OBadge v-else-if="detail" :tone="statusVariant(detail.status)" :dot="true" size="sm">
         {{ t(`synthetics.privateLocations.status.${detail.status}`) }}
       </OBadge>
     </template>
     <template #actions>
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="content-copy"
+        variant="secondary"
+        icon="content-copy"
         :disabled="!detail"
         data-test="synthetics-private-location-detail-setup-btn"
         @click="openSetup()"
       >
         {{ t("synthetics.privateLocations.copySetupCmd") }}
       </OButton>
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
+      <ORefreshButton
+        :last-run-at="loadedAt"
         :loading="loading"
-        :title="t('common.refresh')"
         data-test="synthetics-private-location-detail-refresh-btn"
         @click="load"
       />
@@ -123,12 +118,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="id"
             pagination="client"
             :page-size="10"
-            :show-global-filter="false"
             :empty-message="agentsEmptyMessage"
             data-test="synthetics-private-location-agents-table"
           >
             <template #cell-live="{ row }">
-              <OBadge :variant="(row as any).live ? 'success' : 'error'" :dot="true" size="sm">
+              <OBadge :tone="(row as any).live ? 'ok' : 'err'" :dot="true" size="sm">
                 {{
                   (row as any).live
                     ? t("synthetics.privateLocations.status.online")
@@ -141,9 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTag
                   v-for="ty in (row as any).capabilities?.types ?? []"
                   :key="ty"
-                  size="xs"
-                  shape="rounded"
-                  variant="default-soft"
+                  size="sm"
+                  tone="neutral"
                 >
                   {{ String(ty).toUpperCase() }}
                 </OTag>
@@ -155,9 +148,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-actions="{ row }">
               <div class="flex items-center gap-1" @click.stop>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-sm"
-                  icon-left="content-copy"
+                  icon="content-copy"
                   :title="t('synthetics.privateLocations.detail.restartConfig')"
                   :data-test="`synthetics-private-location-agent-recover-btn-${(row as any).id}`"
                   @click="openSetup((row as any).name)"
@@ -178,13 +171,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="id"
             pagination="client"
             :page-size="10"
-            :show-global-filter="false"
             :empty-message="t('synthetics.privateLocations.detail.noChecks')"
             data-test="synthetics-private-location-checks-table"
             @row-click="openMonitor"
           >
             <template #cell-type="{ row }">
-              <OTag size="xs" shape="rounded" variant="default-soft">
+              <OTag size="sm" tone="neutral">
                 {{ String((row as any).type).toUpperCase() }}
               </OTag>
             </template>
@@ -193,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-lastStatus="{ row }">
               <OBadge
-                :variant="resolveBadge('serviceStatus', (row as any).last_check_status).variant"
+                :tone="resolveBadge('serviceStatus', (row as any).last_check_status).tone"
                 :dot="true"
                 size="sm"
               >
@@ -204,32 +196,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div
+      <OEmptyState
         v-else-if="!loading && loadError"
-        class="flex flex-col items-center gap-3 p-6"
+        kind="error"
+        :text="t('synthetics.privateLocations.detail.loadFailed')"
         data-test="synthetics-private-location-detail-error"
       >
-        <p class="text-status-error-text text-sm">
-          {{ t("synthetics.privateLocations.detail.loadFailed") }}
-        </p>
-        <OButton
-          variant="outline"
-          size="sm"
-          icon-left="refresh"
-          data-test="synthetics-private-location-detail-retry-btn"
-          @click="load"
-        >
-          {{ t("synthetics.privateLocations.detail.retry") }}
-        </OButton>
-      </div>
+        <template #actions>
+          <OButton data-test="synthetics-private-location-detail-retry-btn" @click="load">
+            {{ t("synthetics.privateLocations.detail.retry") }}
+          </OButton>
+        </template>
+      </OEmptyState>
 
-      <div v-else-if="!loading" class="p-6">
-        <OEmptyState
-          size="block"
-          :title="t('synthetics.privateLocations.detail.notFound')"
-          data-test="synthetics-private-location-detail-empty"
-        />
-      </div>
+      <OEmptyState
+        v-else-if="!loading"
+        :title="t('synthetics.privateLocations.detail.notFound')"
+        data-test="synthetics-private-location-detail-empty"
+      />
     </div>
 
     <AgentSetupDrawer
@@ -255,6 +239,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -288,6 +273,7 @@ const backTo = computed(() => syntheticsListRoute(navContext.value, { section: "
 
 const detail = ref<SyntheticLocationDetail | null>(null);
 const loading = ref(false);
+const loadedAt = ref<number | null>(null);
 /** True after a retryable failure (network error, timeout, 5xx). 403/404 keep
  *  the not-found/forbidden handling instead. */
 const loadError = ref(false);
@@ -318,7 +304,7 @@ async function openSetup(agentName?: string) {
 const orgIdentifier = computed(() => store.state.selectedOrganization.identifier);
 
 const statusVariant = (status: string) =>
-  status === "online" ? "success" : status === "offline" ? "error" : "default";
+  status === "online" ? "ok" : status === "offline" ? "err" : "neutral";
 
 /** "No agents registered" is only true where agents would have registered —
  *  elsewhere the table is empty because the rows live in another region. */
@@ -334,6 +320,7 @@ async function load() {
   try {
     const res = await syntheticsService.getLocation(orgIdentifier.value, String(route.params.id));
     detail.value = res.data as SyntheticLocationDetail;
+    loadedAt.value = Date.now();
   } catch (err) {
     detail.value = null;
     const status = (err as { response?: { status?: number } })?.response?.status;

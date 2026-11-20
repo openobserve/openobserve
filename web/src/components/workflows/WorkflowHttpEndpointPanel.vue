@@ -17,15 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="xl"
+    size="lg"
     :title="t('workflow.http.panelTitle')"
-    :sub-title="subtitle"
+    :subtitle="subtitle"
     data-test="workflow-http-panel"
     @update:open="emit('update:open', $event)"
   >
     <div class="flex flex-col gap-4 p-4 text-left">
       <template v-if="kind">
-        <OBanner variant="info" dense data-test="workflow-http-kind-note">
+        <OInlineNotice tone="info" data-test="workflow-http-kind-note">
           <i18n-t keypath="workflow.http.kindNote" tag="span" scope="global">
             <template #kind>{{ kindLabel }}</template>
             <template #field>
@@ -33,8 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </i18n-t>
           <OButton
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             class="ms-1"
             data-test="workflow-http-kind-note-payload"
             @click="showPayload = !showPayload"
@@ -45,12 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : t("workflow.http.kindNotePayload")
             }}
           </OButton>
-        </OBanner>
+        </OInlineNotice>
         <OCodeBlock
           v-if="showPayload"
           :code="samplePayload"
           lang="json"
-          padded
           wrap
           data-test="workflow-http-kind-note-sample"
         />
@@ -74,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OText from "@/lib/core/Typography/OText.vue";

@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButton
-    :variant="bordered ? 'outline' : 'ghost'"
-    :size="bordered ? 'icon-sm' : 'icon-toolbar'"
+    icon-only
+    :variant="bordered ? 'secondary' : 'ghost'"
     data-test="navbar-theme-toggle-btn"
     :aria-label="raw(tooltipText)"
     @click="toggleDarkMode"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="size-5!"
       />
     </Transition>
-    <OTooltip side="top" align="center" :content="raw(tooltipText)" />
+    <OTooltip side="top" :content="raw(tooltipText)" />
   </OButton>
 </template>
 

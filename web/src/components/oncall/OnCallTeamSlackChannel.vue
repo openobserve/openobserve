@@ -29,10 +29,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OText>
         <OButton
           v-if="channel.slack_native && canConfigure"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :loading="testWrite.isPending.value"
-          icon-left="send"
+          icon="send"
           data-test="oncall-team-slack-test"
           @click="sendTest"
         >
@@ -40,10 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="canConfigure"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="saving"
-          icon-left="close"
+          icon="close"
           data-test="oncall-team-slack-clear"
           @click="emit('save', { clear_slack: true })"
         >
@@ -51,13 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <OBanner
+      <OInlineNotice
         v-if="channel.slack_unavailable_reason"
-        :variant="channel.slack_connected ? 'warning' : 'default'"
+        :tone="channel.slack_connected ? 'warn' : 'neutral'"
         data-test="oncall-team-slack-unavailable"
       >
         {{ raw(channel.slack_unavailable_reason) }}
-      </OBanner>
+      </OInlineNotice>
       <div
         v-else-if="!channel.slack_channel_set"
         class="flex flex-col gap-1"
@@ -73,13 +71,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="meta">{{ t("oncall.slackChannelLinkHint") }}</OText>
       </div>
 
-      <OBanner
+      <OInlineNotice
         v-if="channel.slack_post_problem"
-        variant="error"
+        tone="err"
         data-test="oncall-team-slack-post-problem"
       >
         {{ raw(channel.slack_post_problem) }}
-      </OBanner>
+      </OInlineNotice>
 
       <span
         v-if="result"
@@ -102,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             :model-value="picked"
             :options="webhookOptions"
-            size="sm"
             :disabled="!canConfigure || saving"
             data-test="oncall-team-slack-same-room-pick"
             @update:model-value="onPick"
@@ -120,7 +117,7 @@ import { useMutation } from "@tanstack/vue-query";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

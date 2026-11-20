@@ -25,11 +25,8 @@ export class DashboardPage {
     // <input> element carries the `-field` suffix and is the fillable target.
     this.dashboardSearchInput = page.locator('[data-test="dashboard-search-field"]');
     this.dashboardTable = page.locator('[data-test="dashboard-table"]');
-    this.dashboardDelete = page.locator('[data-test="dashboard-delete"]');
     // First row of the OTable — exposed as `o2-table-row-0` by TenstackTable.
     this.firstTableRow = page.locator('[data-test="o2-table-row-0"]');
-    // Delete button scoped to the first row.
-    this.firstRowDeleteButton = this.firstTableRow.locator('[data-test="dashboard-delete"]');
     // Factory: returns the name-cell for a specific dashboard (Dashboards.vue line 202:
     // :data-test="`dashboard-name-cell-${value}`"). Used to confirm the correct row
     // is visible after search filtering completes before clicking delete.
@@ -298,7 +295,7 @@ export class DashboardPage {
     // Wait for Vue components to mount
     await this.page.waitForTimeout(2000);
 
-    // Wait for and click the "Add Panel" button
+    // Wait for and click the "Add panel" button
     await this.addPanelBtn.waitFor({ state: 'visible', timeout: 15000 });
     await this.addPanelBtn.click();
 
@@ -372,7 +369,8 @@ export class DashboardPage {
     await this.dashboardSearchInput.fill(this.dashboardName);
     await this.page.waitForTimeout(2000);
 
-    await this.dashboardDelete.click({ force: true });
+    await this.firstTableRow.locator('[data-test="dashboard-row-more-actions"]').click();
+    await this.page.locator('[data-test="dashboard-delete-menu"]').click();
     await this.page.waitForTimeout(2000);
     await this.confirmButton.click();
     // Toast appears after the dashboard is deleted — assert via data-test
@@ -399,10 +397,11 @@ export class DashboardPage {
     const dashboardRow = nameCell.locator(
       'xpath=ancestor::*[starts-with(@data-test, "o2-table-row-")][1]'
     );
-    const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
+    const deleteButton = this.page.locator('[data-test="dashboard-delete-menu"]');
 
-    // Row action buttons are CSS-hidden until hover — reveal before clicking.
+    // Delete lives in the row overflow menu.
     await dashboardRow.hover();
+    await dashboardRow.locator('[data-test="dashboard-row-more-actions"]').click();
     await deleteButton.waitFor({ state: 'visible', timeout: 10000 });
     await deleteButton.click();
 

@@ -21,13 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="audit.rows.value"
       :columns="auditColumns"
       row-key="id"
-      :frame="false"
       pagination="server"
       :current-page="page"
       :page-size="pageSize"
       :total-count="audit.total.value"
       sorting="none"
-      :show-global-filter="false"
       :loading="audit.loading.value"
       :forbidden="auditForbidden"
       :error="auditError"
@@ -40,8 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             :model-value="filters.q"
             class="min-w-0 flex-1"
-            size="sm"
-            clearable
             :debounce="300"
             :placeholder="t('fleet.audit.search')"
             data-test="fleet-audit-search"
@@ -49,8 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OSelect
             :model-value="filters.fleet"
-            width="sm"
-            size="sm"
+            width="s"
             clearable
             :options="fleetOptions"
             :placeholder="t('fleet.collectors.allFleets')"
@@ -59,8 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OSelect
             :model-value="filters.module"
-            width="sm"
-            size="sm"
+            width="s"
             clearable
             :options="moduleOptions"
             :placeholder="t('fleet.audit.allObjects')"
@@ -83,16 +77,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="option in AUDIT_RANGES"
               :key="option.value"
               :value="option.value"
-              size="sm"
               :data-test="`fleet-audit-range-${option.value}`"
             >
               {{ t(option.labelKey) }}
             </OToggleGroupItem>
-            <OToggleGroupItem value="custom" size="sm" data-test="fleet-audit-range-custom">
+            <OToggleGroupItem value="custom" data-test="fleet-audit-range-custom">
               {{ t("reports.history.rangeCustom") }}
             </OToggleGroupItem>
           </OToggleGroup>
-          <DateTime
+          <ODateTimeRange
             v-if="filters.range === 'custom'"
             auto-apply
             default-type="absolute"
@@ -104,8 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="onCustomRange"
           />
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="audit.lastUpdatedAt.value || null"
             :loading="audit.fetching.value"
             data-test="fleet-audit-refresh"
@@ -129,19 +120,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #empty>
         <OEmptyState
-          size="block"
-          preset="no-data"
-          :filtered="isFiltered"
-          :title="audit.disabled.value ? t('fleet.settings.auditDisabled') : undefined"
-          :description="
-            audit.disabled.value || isFiltered ? undefined : t('fleet.settings.auditDelayHint')
+          :kind="isFiltered ? 'filtered' : 'first-run'"
+          :title="
+            audit.disabled.value
+              ? t('fleet.settings.auditDisabled')
+              : isFiltered
+                ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
+                : t('emptyState.noData.title')
+          "
+          :text="
+            isFiltered
+              ? t('emptyState.filtered.description', {
+                  noun: t('emptyState.filtered.fallbackNoun'),
+                })
+              : audit.disabled.value
+                ? t('emptyState.noData.description')
+                : t('fleet.settings.auditDelayHint')
           "
           @action="clearFilters"
         />
       </template>
       <template #error>
         <div data-test="fleet-audit-error">
-          <OEmptyState size="block" preset="load-error" @action="audit.refetch()" />
+          <OEmptyState
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="t('emptyState.loadError.description')"
+            @action="audit.refetch()"
+          />
         </div>
       </template>
     </OTable>
@@ -150,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef, OTablePaginationParams } from "@/lib/core/Table/OTable.types";

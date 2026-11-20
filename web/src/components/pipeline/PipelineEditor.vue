@@ -22,26 +22,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            pipeline name for NEW pipelines (edit mode shows it in the breadcrumb). -->
       <Teleport defer to="#o2-page-actions">
         <OButton
-          variant="outline"
-          size="icon-sm"
+          icon-only
+          variant="ghost"
           class="hideOnPrintMode"
           data-test="pipeline-json-edit-btn"
           @click="openJsonEditor"
-          icon-left="code"
+          icon="code"
         >
           <OTooltip :content="t('pipeline.editPipelineJson')" side="top" />
         </OButton>
         <OButton
           data-test="add-pipeline-cancel-btn"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           @click="openCancelDialog"
           >{{ t("pipeline.cancel") }}</OButton
         >
         <OButton
           data-test="add-pipeline-save-btn"
           variant="primary"
-          size="sm-action"
           :loading="isPipelineSaving"
           :disabled="isPipelineSaving"
           @click="savePipeline()"
@@ -140,21 +138,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @close="closeStepPicker"
   />
   <ODrawer
+    size="xl"
     data-test="pipeline-editor-json-editor-drawer"
     bleed
     v-model:open="showJsonEditorDialog"
-    :width="70"
     :title="t('pipeline.editPipelineJSON')"
-    persistent
+    :dirty="jsonEditorDirty"
   >
     <template v-if="jsonEditorAiButtonVisible" #header-right>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-toolbar"
         @click="toggleJsonEditorAIChat"
         data-test="menu-link-ai-item"
         :aria-label="t('menu.aiAssistant')"
-        class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
+        class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_var(--duration-control)_var(--ease-control),box-shadow_var(--duration-control)_var(--ease-control),color_var(--duration-control)_var(--ease-control)] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
         @mouseenter="isJsonEditorAiHovered = true"
         @mouseleave="isJsonEditorAiHovered = false"
@@ -162,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <img
           alt=""
           :src="jsonEditorAiBtnLogo"
-          class="header-icon size-5 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
+          class="header-icon size-5 [transition:transform_var(--duration-indicator)_var(--ease-control)] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_var(--duration-control)_var(--ease-control)]"
         />
         <span
           v-if="!aiAccess.allowed"
@@ -180,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :validation-errors="validationErrors"
       @close="showJsonEditorDialog = false"
       @saveJson="savePipelineJson"
+      @update:dirty="jsonEditorDirty = $event"
     />
   </ODrawer>
   <ConfirmDialog
@@ -471,6 +470,7 @@ const { getStreams } = useStreams(t);
 
 const confirmDialogBasicPipeline = ref(false);
 const showJsonEditorDialog = ref(false);
+const jsonEditorDirty = ref(false);
 const associatedFunctions: Ref<string[]> = ref([]);
 
 // Edition check via the registry (fixes a missing-Cloud bug the old raw

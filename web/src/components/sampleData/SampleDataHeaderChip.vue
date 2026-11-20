@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- a phone header hides labelled buttons, so the menu keeps an icon-only trigger there -->
       <OButton
         v-if="isMobile"
+        icon-only
         variant="ghost"
-        size="icon-toolbar"
         class="text-ingest-accent-purple!"
         :aria-label="t('sampleData.header.label')"
         data-test="header-sample-data-btn"
@@ -30,12 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-else
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         class="bg-ingest-tint-purple! text-ingest-accent-purple! border-ingest-accent-purple/40! hover:border-ingest-accent-purple!"
         data-test="header-sample-data-btn"
       >
-        <template #icon-left>
+        <template #icon>
           <OIcon name="science" size="sm" />
         </template>
         {{ t("sampleData.header.label") }}
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ODropdownItem>
       <ODropdownSeparator />
       <ODropdownItem
-        variant="destructive"
+        tone="danger"
         :disabled="session.removing.value"
         data-test="header-sample-data-delete"
         @select="askRemove"
@@ -71,14 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OButton
     v-else-if="offerTry"
     v-bind="$attrs"
-    variant="outline"
-    size="xs"
+    variant="secondary"
+    size="sm"
     class="bg-ingest-tint-purple! text-ingest-accent-purple! border-ingest-accent-purple/40! hover:border-ingest-accent-purple! max-md:hidden"
     :disabled="session.removing.value"
     data-test="header-sample-data-try"
     @click="load"
   >
-    <template #icon-left>
+    <template #icon>
       <OIcon name="science" size="sm" />
     </template>
     {{ t("sampleData.header.try") }}
@@ -89,8 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('sampleData.removeConfirm.title')"
     :message="t('sampleData.removeConfirm.message')"
     :ok-label="t('sampleData.delete')"
-    ok-variant="destructive"
-    focus-cancel
+    kind="destructive"
     data-test="header-sample-data-delete-dialog"
     @update:ok="removeAll"
     @update:cancel="confirmRemove = false"

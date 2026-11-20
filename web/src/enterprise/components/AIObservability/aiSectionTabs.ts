@@ -28,8 +28,7 @@ export interface AiSectionTab {
 /** A tabbed rail item's own header: the same on every one of its tabs, as in Alerts. */
 export interface AiSectionHeader {
   title: I18nText;
-  subtitle: I18nText;
-  icon: IconName;
+  about: I18nText;
 }
 
 export interface AiSectionTabsContext {

@@ -20,7 +20,7 @@ import { computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -112,9 +112,8 @@ const viewTrace = (traceId: string) => {
       <OButton
         v-if="!unsupported"
         class="ms-auto"
-        variant="outline"
-        size="sm-action"
-        icon-left="refresh"
+        variant="secondary"
+        icon="refresh"
         :loading="loading"
         data-test="ai-coding-agent-health-recheck-btn"
         @click="check"
@@ -132,12 +131,11 @@ const viewTrace = (traceId: string) => {
     <OText v-else-if="!health" variant="meta" data-test="ai-coding-agent-health-loading">{{
       t("ingestion.ai.codingAgent.health.checking")
     }}</OText>
-    <OBanner
+    <OInlineNotice
       v-else-if="noGenAiSpans"
-      variant="warning"
-      dense
+      tone="warn"
       data-test="ai-coding-agent-health-no-genai"
-      :content="t('ingestion.ai.codingAgent.health.noGenAiSpans')"
+      :message="t('ingestion.ai.codingAgent.health.noGenAiSpans')"
     />
     <template v-else>
       <div class="grid gap-2 md:grid-cols-2" data-test="ai-coding-agent-health-checks">

@@ -207,8 +207,8 @@ const joinSlack = () => {
         </h2>
 
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
           class="-me-1 shrink-0"
           :aria-label="t('common.close')"
           data-test="community-slack-invite-close-btn"
@@ -272,19 +272,19 @@ const joinSlack = () => {
         <OButton
           data-test="community-slack-invite-join-btn"
           variant="primary"
-          size="cta"
+          size="lg"
           class="flex-1"
           @click="joinSlack"
         >
-          <template #icon-left>
+          <template #icon>
             <SlackIcon class="h-5 w-5" />
           </template>
           {{ t("communitySlackInvite.joinSlack") }}
         </OButton>
         <OButton
           data-test="community-slack-invite-maybe-later-btn"
-          variant="outline"
-          size="cta"
+          variant="secondary"
+          size="lg"
           @click="dismiss"
         >
           {{ t("communitySlackInvite.maybeLater") }}

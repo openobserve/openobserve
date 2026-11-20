@@ -19,6 +19,8 @@ import type { TranslateFn } from "@/types/i18n";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import { SearchRequestPayload } from "@/ts/interfaces/query";
+import { isNonTimeSeriesAggregate } from "@/utils/logs/sqlResultShape";
+import store from "@/stores";
 
 export const useSearchHistogramManager = (t: TranslateFn) => {
   const {
@@ -34,9 +36,19 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
 
   const { searchObj, searchObjDebug, resetHistogramError } = searchState();
 
+  // Grouped rows are not events over time, so the event histogram above them would mislead.
+  const isGroupedSqlResult = (parsedSQL: any) =>
+    !!searchObj.meta.sqlMode &&
+    isNonTimeSeriesAggregate(
+      parsedSQL,
+      searchObj.data.query ?? "",
+      store.state.zoConfig?.timestamp_column || "_timestamp",
+    );
+
   const shouldShowHistogram = (parsedSQL: any) => {
     // The histogram endpoint rejects an EXPLAIN statement as "not a query".
     if (searchObj.meta.sqlMode && isExplainQuery(searchObj.data.query)) return false;
+    if (isGroupedSqlResult(parsedSQL)) return false;
     return (
       ((isHistogramDataMissing(searchObj) &&
         isHistogramEnabled(searchObj) &&
@@ -120,6 +132,9 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
 
         addTraceId(payload.traceId);
       }
+    } else if (isGroupedSqlResult(parsedSQL)) {
+      resetHistogramWithError(t("search.histogramHiddenForAggregates"), -1);
+      searchObj.meta.histogramDirtyFlag = false;
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
       resetHistogramWithError(t("search.histogramUnavailableForQueries"), -1);
       searchObj.meta.histogramDirtyFlag = false;
@@ -231,6 +246,8 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
   const shouldGetPageCount = (queryReq: any, parsedSQL: any): boolean => {
     // The count request would re-run an EXPLAIN ANALYZE scan.
     if (searchObj.meta.sqlMode && isExplainQuery(searchObj.data.query)) return false;
+    // An aggregate already fetches every row, so a page count is a wasted scan.
+    if (isGroupedSqlResult(parsedSQL)) return false;
     return shouldShowHistogram(parsedSQL) || (searchObj.meta.sqlMode && isLimitQuery(parsedSQL))
       ? false
       : true;
@@ -238,6 +255,7 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
 
   return {
     shouldShowHistogram,
+    isGroupedSqlResult,
     processHistogramRequest,
     isHistogramDataMissing,
     shouldGetPageCount,

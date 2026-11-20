@@ -678,7 +678,7 @@ describe("AnalyticsPaths", () => {
     const depth = wrapper!
       .findAllComponents(OSelect)
       .find((c) => c.attributes("data-test") === "rum-analytics-paths-depth-select");
-    expect(depth?.props("width")).toBe("xs");
+    expect(depth?.props("width")).toBe("s");
   });
 
   it("a Top paths row opens the branch drawer with the exact tuple and its count (AC-26, AC-59)", async () => {
@@ -872,16 +872,16 @@ describe("PathSessionsDrawer (AC-26, AC-59)", () => {
     w.unmount();
   });
 
-  it("opens full height at lg with a scrim, and Build funnel points away with a forward arrow", async () => {
+  it("opens full height at md with a scrim, and Build funnel points away with a forward arrow", async () => {
     const w = await mountDrawer(50);
     const drawer = w.findComponent(ODrawer);
-    expect(drawer.props("size")).toBe("lg");
+    expect(drawer.props("size")).toBe("md");
     expect(drawer.props("anchor") ?? null).toBeNull();
     expect(drawer.props("seamless")).toBe(false);
     const btn = w
       .findAllComponents(OButton)
       .find((b) => b.attributes("data-test") === "rum-analytics-paths-branch-funnel-btn")!;
-    expect(btn.props("iconRight")).toBe("arrow-forward");
+    expect(btn.props("iconEnd")).toBe("arrow-forward");
     w.unmount();
   });
 

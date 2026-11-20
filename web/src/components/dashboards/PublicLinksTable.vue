@@ -16,11 +16,9 @@
 <template>
   <div class="flex h-full flex-col" data-test="dashboards-public-links">
     <OContent v-if="orgDisabled" class="pt-2">
-      <OBanner
-        variant="warning"
-        icon="warning-amber"
-        dense
-        :content="t('dashboard.publicLinks.orgDisabledBanner')"
+      <OInlineNotice
+        tone="warn"
+        :message="t('dashboard.publicLinks.orgDisabledBanner')"
         data-test="dashboards-public-links-org-disabled"
       />
     </OContent>
@@ -31,11 +29,8 @@
       row-key="id"
       :loading="loading"
       :forbidden="forbidden"
-      :frame="false"
       :default-columns="false"
-      show-index
       pagination="client"
-      :show-global-filter="false"
       :enable-column-resize="true"
       :persist-columns="true"
       table-id="public-links"
@@ -44,17 +39,13 @@
       <template #toolbar>
         <div class="contents">
           <div class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48">
-            <OInput
+            <OSearchInput
               v-model="searchQuery"
               :placeholder="t('dashboard.publicLinks.search')"
-              clearable
               class="w-full"
               data-test="dashboards-public-links-search"
             >
-              <template #icon-left>
-                <OIcon name="search" size="sm" />
-              </template>
-            </OInput>
+            </OSearchInput>
           </div>
           <OStatStrip
             :items="summaryStats"
@@ -73,8 +64,6 @@
       </template>
       <template #toolbar-trailing>
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :last-run-at="lastUpdatedAt || null"
           :loading="fetching"
           data-test="dashboards-public-links-refresh-btn"
@@ -93,7 +82,7 @@
           <!-- The server hides the URL of a link whose dashboard the viewer can't read. -->
           <span v-if="!row.slug" class="inline-flex shrink-0">
             <OBadge
-              variant="default-soft"
+              tone="neutral"
               size="sm"
               icon="lock"
               :data-test="`dashboards-public-links-${row.id}-url-hidden`"
@@ -139,7 +128,7 @@
           </span>
           <OBadge
             v-if="row.publisher_left"
-            variant="warning-soft"
+            tone="warn"
             size="sm"
             icon="person"
             class="min-w-0"
@@ -193,9 +182,10 @@
         <div class="flex items-center justify-end gap-0.5" @click.stop>
           <OButton
             v-if="row.slug"
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            icon-left="content-copy"
+            size="sm"
+            icon="content-copy"
             class="max-md:hidden"
             :aria-label="t('dashboard.publicDashboard.copyLink')"
             :data-test="`dashboards-public-links-${row.id}-copy-btn`"
@@ -205,9 +195,10 @@
           </OButton>
           <OButton
             v-if="row.slug"
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            icon-left="open-in-new"
+            size="sm"
+            icon="open-in-new"
             class="max-md:hidden"
             :aria-label="t('dashboard.publicLinks.openPublicPage')"
             :data-test="`dashboards-public-links-${row.id}-open-btn`"
@@ -223,9 +214,10 @@
               :content="t('dashboard.publicLinks.dashboardDeletedAction')"
             />
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs-sq"
-              icon-left="edit"
+              size="sm"
+              icon="edit"
               :aria-label="t('dashboard.publicLinks.editSettings')"
               :disabled="!hasDashboard(row)"
               :data-test="`dashboards-public-links-${row.id}-edit-btn`"
@@ -240,9 +232,10 @@
           </span>
           <OButton
             v-if="!noDashboardAccess(row) && takeOverReplacesResume(row, userId)"
-            variant="ghost-success"
-            size="icon-xs-sq"
-            icon-left="how-to-reg"
+            icon-only
+            variant="ghost"
+            size="sm"
+            icon="how-to-reg"
             class="max-md:hidden"
             :aria-label="t('dashboard.publicLinks.takeOver')"
             :loading="busyRows.get(row.id) === 'inline'"
@@ -256,9 +249,10 @@
           <span v-else-if="!noDashboardAccess(row)" class="inline-flex max-md:hidden">
             <OTooltip v-if="!canPause(row)" side="bottom" :content="pauseBlockedReason(row, t)" />
             <OButton
-              :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-              size="icon-xs-sq"
-              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+              icon-only
+              :variant="row.enabled ? 'danger-ghost' : 'ghost'"
+              size="sm"
+              :icon="row.enabled ? 'pause' : 'play-arrow'"
               :aria-label="
                 row.enabled ? t('dashboard.publicLinks.pause') : t('dashboard.publicLinks.resume')
               "
@@ -279,9 +273,10 @@
           <ODropdown v-if="!noDashboardAccess(row)" side="bottom" align="end">
             <template #trigger>
               <OButton
-                icon-left="more-vert"
+                icon-only
+                icon="more-vert"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 :title="t('dashboard.moreActions')"
                 :aria-label="t('dashboard.moreActions')"
                 :loading="busyRows.get(row.id) === 'menu'"
@@ -290,7 +285,7 @@
             </template>
             <ODropdownItem
               v-if="row.slug"
-              icon-left="content-copy"
+              icon="content-copy"
               class="md:hidden"
               :data-test="`dashboards-public-links-${row.id}-copy-menu`"
               @select="copyLink(row)"
@@ -299,7 +294,7 @@
             </ODropdownItem>
             <ODropdownItem
               v-if="row.slug"
-              icon-left="open-in-new"
+              icon="open-in-new"
               class="md:hidden"
               :data-test="`dashboards-public-links-${row.id}-open-menu`"
               @select="openPublicPage(row)"
@@ -308,7 +303,7 @@
             </ODropdownItem>
             <ODropdownItem
               v-if="hasDashboard(row)"
-              icon-left="dashboard"
+              icon="dashboard"
               :data-test="`dashboards-public-links-${row.id}-dashboard-menu`"
               @select="openDashboard(row)"
             >
@@ -316,7 +311,7 @@
             </ODropdownItem>
             <ODropdownItem
               v-if="hasDashboard(row)"
-              icon-left="edit"
+              icon="edit"
               class="md:hidden"
               :data-test="`dashboards-public-links-${row.id}-edit-menu`"
               @select="editLink(row)"
@@ -325,7 +320,7 @@
             </ODropdownItem>
             <ODropdownItem
               v-if="canPause(row) && !takeOverReplacesResume(row, userId)"
-              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+              :icon="row.enabled ? 'pause' : 'play-arrow'"
               class="md:hidden"
               :disabled="busyRows.has(row.id) || orgDisabled"
               :data-test="`dashboards-public-links-${row.id}-${row.enabled ? 'pause' : 'resume'}-menu`"
@@ -337,7 +332,7 @@
             </ODropdownItem>
             <ODropdownItem
               v-if="canTakeOver(row, userId)"
-              icon-left="how-to-reg"
+              icon="how-to-reg"
               :class="{ 'md:hidden': takeOverReplacesResume(row, userId) }"
               :disabled="busyRows.has(row.id)"
               :data-test="`dashboards-public-links-${row.id}-take-over-menu`"
@@ -347,7 +342,7 @@
             </ODropdownItem>
             <ODropdownItem
               v-if="canRefresh(row)"
-              icon-left="refresh"
+              icon="refresh"
               :disabled="busyRows.has(row.id)"
               :data-test="`dashboards-public-links-${row.id}-refresh-menu`"
               @select="refreshLink(row)"
@@ -355,8 +350,8 @@
               {{ t("dashboard.publicLinks.refreshOnNextView") }}
             </ODropdownItem>
             <ODropdownItem
-              icon-left="delete"
-              variant="destructive"
+              icon="delete"
+              tone="danger"
               :disabled="busyRows.has(row.id)"
               :data-test="`dashboards-public-links-${row.id}-revoke-menu`"
               @select="revokeLink(row)"
@@ -370,16 +365,26 @@
       <template #empty>
         <OEmptyState
           v-if="loadFailed"
-          size="hero"
-          preset="load-error"
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="t('emptyState.loadError.description')"
           data-test="dashboards-public-links-error"
           @action="refreshLinks"
         />
         <OEmptyState
           v-else
-          size="hero"
-          preset="no-public-links"
-          :filtered="filtered"
+          :kind="filtered ? 'filtered' : 'first-run'"
+          :title="
+            filtered
+              ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.publicLinks') })
+              : t('emptyState.noPublicLinks.title')
+          "
+          :text="
+            filtered
+              ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.publicLinks') })
+              : t('emptyState.noPublicLinks.description')
+          "
+          :icon="filtered ? undefined : 'link'"
           data-test="dashboards-public-links-empty"
           @action="onEmptyAction"
         />
@@ -413,12 +418,11 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -674,8 +678,7 @@ async function runRowAction(
   }
 }
 
-function onEmptyAction(id?: string) {
-  if (id !== "clear-filters") return;
+function onEmptyAction() {
   searchQuery.value = "";
   statusFilters.value = [];
 }
@@ -733,8 +736,7 @@ async function revokeLink(link: PublicLink) {
     message: t("dashboard.publicLinks.revokeMessage"),
     confirmLabel: t("dashboard.publicDashboard.revoke"),
     cancelLabel: t("common.cancel"),
-    confirmVariant: "destructive",
-    focusCancel: true,
+    kind: "destructive",
   });
   if (!ok) return;
   await runRowAction(

@@ -23,8 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OIcon name="warning" size="sm" class="text-status-warning-text shrink-0" />
     <OText as="span" class="min-w-0">{{ lineText }}</OText>
     <OButton
-      variant="ghost-primary"
-      size="xs"
+      variant="accent-ghost"
+      size="sm"
       data-test="workflow-http-rejections-show"
       @click="open = true"
     >
@@ -38,8 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex items-center gap-2 px-3 py-2">
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-xs-sq"
+        size="sm"
         :aria-label="t('workflow.http.rejectionsHide')"
         data-test="workflow-http-rejections-hide"
         @click="open = false"
@@ -51,8 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("workflow.http.rejectionsCaption", { count: total }, total) }}
       </OText>
       <ORefreshButton
-        layout="inline"
-        variant="ghost"
+        :last-run-at="lastRunAt"
         :loading="loading"
         data-test="workflow-http-rejections-refresh"
         @click="emit('refresh')"
@@ -63,23 +63,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton
         v-for="n in 3"
         :key="n"
+        shape="block"
         class="h-10 w-full"
         data-test="workflow-http-rejections-skeleton"
       />
     </div>
-    <div v-else-if="error" class="flex items-center gap-3 px-3 pb-3">
-      <OText variant="meta" class="text-status-negative min-w-0 flex-1">
-        {{ t("workflow.http.rejectionsLoadError") }}
-      </OText>
-      <OButton
-        variant="outline"
-        size="xs"
-        data-test="workflow-http-rejections-retry"
-        @click="emit('refresh')"
-      >
-        {{ t("common.retry") }}
-      </OButton>
-    </div>
+    <OEmptyState
+      v-else-if="error"
+      kind="error"
+      size="compact"
+      class="px-3"
+      :title="t('workflow.http.rejectionsLoadError')"
+    >
+      <template #actions>
+        <OButton
+          variant="secondary"
+          size="sm"
+          data-test="workflow-http-rejections-retry"
+          @click="emit('refresh')"
+        >
+          {{ t("common.retry") }}
+        </OButton>
+      </template>
+    </OEmptyState>
     <ul v-else class="divide-border-default flex flex-col divide-y px-3">
       <li
         v-for="row in rows"
@@ -104,8 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OButton
           v-if="canRaise && row.reason === 'rate_limited' && triggerLimit < orgBudget"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           class="shrink-0"
           data-test="workflow-http-rejection-raise-limit"
           @click="emit('raise-limit')"
@@ -114,8 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-else-if="canRotate && row.reason === 'credential_in_url'"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           class="shrink-0"
           data-test="workflow-http-rejection-rotate"
           @click="emit('rotate')"
@@ -136,7 +142,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { useLoadedAt } from "@/composables/useLoadedAt";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { httpStatusBucket } from "@/lib/core/Badge/badgeGroups";
 import { formatTimestampInTimezone } from "@/utils/date";
 import type { HookReasonCode, HttpRejection } from "@/services/workflows";
@@ -166,6 +174,8 @@ const props = defineProps<{
   canRaise: boolean;
   canRotate: boolean;
 }>();
+
+const lastRunAt = useLoadedAt(() => props.loading);
 
 const emit = defineEmits<{
   (e: "rotate"): void;

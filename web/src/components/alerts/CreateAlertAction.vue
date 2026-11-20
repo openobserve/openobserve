@@ -32,15 +32,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODropdownItem
     v-if="variant === 'menu-item'"
     :disabled="!!blockedReason"
-    focusable-unavailable
-    :description="blockedReason || note"
+    :disabled-reason="blockedReason"
+    :description="note"
     :data-test="dataTest"
     @select="onActivate"
   >
     <!-- Host menus present icons differently — the logs More menu badges them,
          the dashboards panel menu does not — so the presentation is the host's
          call while the icon NAME stays the registry's. -->
-    <template #icon-left>
+    <template #icon>
       <slot name="icon-left" :icon="icon">
         <OIcon :name="icon" size="sm" />
       </slot>
@@ -52,10 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OTooltip v-else-if="locked" :content="lockedReason">
     <span class="inline-flex">
       <OButton
-        :variant="lockedButton.variant"
-        :size="lockedButton.size"
+        :variant="lockedButton"
+        :icon-only="variant === 'icon'"
         disabled
-        icon-left="lock"
+        icon="lock"
         :aria-label="label"
         :data-test="dataTest"
       >
@@ -68,53 +68,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <OButton
     v-else-if="variant === 'button'"
+    :disabled-reason="blockedReason ?? undefined"
     :variant="buttonVariant"
-    size="sm-action"
     :disabled="!!blockedReason"
-    focusable-unavailable
-    :icon-left="icon"
+    :icon="icon"
     :data-test="dataTest"
     @click="onActivate"
   >
-    <template #unavailable-reason>{{ blockedReason }}</template>
     {{ label }}
-    <OTooltip
-      v-if="blockedReason || note"
-      :content="blockedReason || note || undefined"
-      side="top"
-    />
+    <OTooltip v-if="!blockedReason && note" :content="note" side="top" />
   </OButton>
 
   <OButton
     v-else-if="variant === 'toolbar'"
-    variant="outline"
-    size="sm-toolbar"
+    :disabled-reason="blockedReason ?? undefined"
+    variant="secondary"
     :disabled="!!blockedReason"
-    focusable-unavailable
-    :icon-left="icon"
+    :icon="icon"
     :aria-label="label"
     :data-test="dataTest"
     @click="onActivate"
   >
-    <template #unavailable-reason>{{ blockedReason }}</template>
     <span class="max-md:hidden">{{ label }}</span>
-    <OTooltip v-if="blockedReason || isMobile" :content="blockedReason || label" />
+    <OTooltip v-if="!blockedReason && isMobile" :content="label" />
   </OButton>
 
   <OButton
     v-else
+    :disabled-reason="blockedReason ?? undefined"
     variant="ghost"
-    size="sm"
+    icon-only
     :disabled="!!blockedReason"
-    focusable-unavailable
-    :icon-left="icon"
-    :aria-label="label"
+    :icon="icon"
+    :label="label"
     :data-test="dataTest"
     @click="onActivate"
-  >
-    <template #unavailable-reason>{{ blockedReason }}</template>
-    <OTooltip :content="blockedReason || label" side="top" />
-  </OButton>
+  />
 </template>
 
 <script setup lang="ts">
@@ -146,7 +135,7 @@ const props = withDefaults(
     note?: I18nText | null;
     /** Folder the alert lands in. */
     folder?: string;
-    buttonVariant?: "primary" | "secondary" | "outline" | "ghost";
+    buttonVariant?: "primary" | "secondary" | "ghost";
     dataTest?: string;
   }>(),
   {
@@ -170,9 +159,9 @@ const { locked, lockedReason } = useLicenseLock("alerts");
 const blockedReason = computed(() => (locked.value ? lockedReason.value : props.disabledReason));
 const icon = computed(() => (locked.value ? "lock" : source_.value.icon));
 const lockedButton = computed(() => {
-  if (props.variant === "toolbar") return { variant: "outline", size: "sm-toolbar" } as const;
-  if (props.variant === "icon") return { variant: "ghost", size: "sm" } as const;
-  return { variant: props.buttonVariant, size: "sm-action" } as const;
+  if (props.variant === "toolbar") return "secondary" as const;
+  if (props.variant === "icon") return "ghost" as const;
+  return props.buttonVariant;
 });
 
 const onActivate = () => {

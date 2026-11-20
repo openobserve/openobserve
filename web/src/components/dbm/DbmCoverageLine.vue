@@ -69,9 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              speaks through its sentence and wash, not through a bar. -->
         <OProgressBar
           v-if="showBar"
-          :value="coverage ?? 0"
-          variant="success"
-          size="xs"
+          :value="(coverage ?? 0) * 100"
+          tone="ok"
           class="w-12 shrink-0"
           data-test="dbm-coverage-bar"
         />

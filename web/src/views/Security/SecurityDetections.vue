@@ -11,22 +11,25 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
 import { failedRequests, viewDenial } from "@/composables/useAccessStore";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import SecurityRecordDrawer, {
@@ -64,7 +67,7 @@ import {
 } from "@/utils/security/severity";
 import { b64EncodeUnicode, formatEventCount } from "@/utils/formatters";
 import { displayOrder, positionOf, stepRow, type NavTable } from "@/utils/security/recordNav";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import { matchesAnyKey } from "@/utils/filterKeys";
 
 const { t } = useI18nTyped();
@@ -143,10 +146,12 @@ function loadFirings() {
   });
 }
 
+const lastRunAt = ref<number | null>(null);
 async function refresh() {
   // Firings are read for the listed detections, so the rule list has to be known first.
   await loadRules(orgId.value);
   await loadFirings();
+  lastRunAt.value = Date.now();
 }
 
 const search = ref("");
@@ -230,6 +235,15 @@ const filtered = computed(() => {
   });
 });
 
+// A first-run org gets the empty state alone, not a table header over nothing.
+const firstRun = computed(
+  () =>
+    !loading.value &&
+    !error.value &&
+    !denials.value.length &&
+    !scoped.value.length &&
+    !filtersActive.value,
+);
 const filtersActive = computed(() => !!search.value || !!severity.value || facets.value.length > 0);
 function clearFilters() {
   search.value = "";
@@ -237,6 +251,8 @@ function clearFilters() {
   facets.value = [];
 }
 
+// A failed rules load reads "—", never zero counts (R8).
+const failedDash = (n: number) => (error.value ? "—" : n);
 const stats = computed<StatItem[]>(() => [
   {
     key: "fired",
@@ -253,7 +269,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "erroring",
     label: t("siem.detections.stat.erroring"),
-    value: counts.value.erroring,
+    value: failedDash(counts.value.erroring),
     icon: "error-outline",
     tone: "error",
     max: scoped.value.length || undefined,
@@ -262,7 +278,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "notifyFailing",
     label: t("siem.detections.stat.notifyFailing"),
-    value: counts.value.notifyFailing,
+    value: failedDash(counts.value.notifyFailing),
     icon: "warning-amber",
     tone: "warning",
     max: scoped.value.length || undefined,
@@ -271,7 +287,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "enabled",
     label: t("siem.detections.stat.enabled"),
-    value: counts.value.enabled,
+    value: failedDash(counts.value.enabled),
     icon: "verified-user",
     tone: "success",
     max: scoped.value.length || undefined,
@@ -280,7 +296,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "disabled",
     label: t("siem.detections.stat.disabled"),
-    value: counts.value.disabled,
+    value: failedDash(counts.value.disabled),
     icon: "pause-circle-filled",
     tone: "neutral",
     max: scoped.value.length || undefined,
@@ -289,7 +305,7 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "all",
     label: t("siem.detections.stat.all"),
-    value: scoped.value.length,
+    value: failedDash(scoped.value.length),
     icon: "shield-alert-outline",
     tone: "primary",
     dataTest: "security-detections-stat-all",
@@ -735,7 +751,7 @@ function viewMatches(row: Row) {
 }
 
 const outcomeKey = (status: string): FiringStatus => firingStatus(status);
-const outcomeVariant = (status: string): BadgeVariant => STATUS_VARIANT[firingStatus(status)];
+const outcomeVariant = (status: string): ChipTone => STATUS_VARIANT[firingStatus(status)];
 
 /** Every alert name in the org — the create dialog refuses to reuse one. */
 const existingNames = computed(() => rows.value.map((r) => String(r.alert.name ?? "")));
@@ -823,16 +839,14 @@ watch(orgId, () => void refresh());
 <template>
   <OPageLayout
     :title="t('siem.detections.title')"
-    :subtitle="t('siem.detections.subtitle')"
-    icon="shield-alert-outline"
+    :about="t('siem.detections.subtitle')"
     bleed
     title-data-test="security-detections-title"
   >
     <template #actions>
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="tune"
+        variant="secondary"
+        icon="tune"
         data-test="security-detections-tuning"
         @click="showTuning = true"
       >
@@ -840,8 +854,6 @@ watch(orgId, () => void refresh());
       </OButton>
       <OButton
         variant="primary"
-        size="sm"
-        icon-left="add"
         :disabled="!canAuthor"
         data-test="security-detections-new"
         @click="openNew()"
@@ -849,6 +861,12 @@ watch(orgId, () => void refresh());
         {{ t("siem.detections.new") }}
         <OTooltip v-if="!canAuthor" :content="t('siem.access.needsAuthor')" />
       </OButton>
+      <ORefreshButton
+        :last-run-at="lastRunAt"
+        :loading="loading"
+        data-test="security-detections-refresh"
+        @click="refresh"
+      />
     </template>
 
     <div class="flex min-h-0 flex-1 flex-col">
@@ -858,7 +876,23 @@ watch(orgId, () => void refresh());
         data-test="security-detections-notices"
       />
 
+      <OEmptyState
+        v-if="firstRun"
+        icon="shield-alert-outline"
+        :title="t('siem.detections.emptyTitle')"
+        :text="t('siem.detections.emptyHint')"
+        :action-label="canAuthor ? t('siem.detections.new') : undefined"
+        data-test="security-detections-first-run"
+        @action="openNew()"
+      />
+      <SecurityLoadError
+        v-else-if="error && !rows.length"
+        :what="t('siem.detections.whatDetections')"
+        :hint="t('siem.detections.loadFailedHint')"
+        @retry="refresh"
+      />
       <OTable
+        v-else
         ref="tableRef"
         :data="filtered"
         :columns="columns"
@@ -867,7 +901,6 @@ watch(orgId, () => void refresh());
         :error="error || null"
         :page-size="50"
         :page-size-options="[50, 100, 250]"
-        :show-global-filter="false"
         :column-visibility="columnVisibility"
         :persist-columns="true"
         table-id="security-detections"
@@ -883,22 +916,21 @@ watch(orgId, () => void refresh());
       >
         <template #toolbar>
           <div class="contents">
-            <div class="w-40 shrink-0">
-              <OSelect
-                :aria-label="t('siem.aria.severityFilter')"
-                :model-value="severity"
-                :options="severityOptions"
-                :placeholder="t('siem.detections.anySeverity')"
-                clearable
-                data-test="security-detections-severity"
-                @update:model-value="(v: unknown) => (severity = v ? String(v) : null)"
-              />
-            </div>
             <OSearchInput
               v-model="search"
               class="min-w-0 flex-1 md:min-w-48"
               :placeholder="t('siem.detections.search')"
               data-test="security-detections-search"
+            />
+            <OSelect
+              variant="filter"
+              :label="t('siem.common.severity')"
+              :aria-label="t('siem.aria.severityFilter')"
+              :model-value="severity"
+              :options="severityOptions"
+              clearable
+              data-test="security-detections-severity"
+              @update:model-value="(v: unknown) => (severity = v ? String(v) : null)"
             />
             <OStatStrip
               compact-values
@@ -916,33 +948,18 @@ watch(orgId, () => void refresh());
           </div>
         </template>
 
-        <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
-            data-test="security-detections-refresh"
-            @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('siem.detections.refresh')" />
-          </OButton>
-        </template>
-
         <template #selection-actions>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="play-arrow"
+            variant="secondary"
+            icon="play-arrow"
             :loading="bulkBusy"
             data-test="security-detections-bulk-enable"
             @click="bulkToggle(true)"
             >{{ t("siem.detections.enable") }}</OButton
           >
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="pause"
+            variant="secondary"
+            icon="pause"
             :loading="bulkBusy"
             data-test="security-detections-bulk-disable"
             @click="bulkToggle(false)"
@@ -950,9 +967,8 @@ watch(orgId, () => void refresh());
           >
           <OButton
             v-if="canAdmin"
-            variant="outline-destructive"
-            size="sm"
-            icon-left="delete"
+            variant="danger-ghost"
+            icon="delete"
             :loading="bulkBusy"
             data-test="security-detections-bulk-delete"
             @click="bulkDelete"
@@ -965,9 +981,9 @@ watch(orgId, () => void refresh());
             type="severity"
             :value="severityTagValue(row.tone)"
             :label="t(toneLabelKey(row.tone))"
-            size="xs"
+            size="sm"
           />
-          <OTag v-else variant="default-soft" size="xs">{{ t("siem.detections.notSiem") }}</OTag>
+          <OTag v-else tone="neutral" size="sm">{{ t("siem.detections.notSiem") }}</OTag>
         </template>
         <template #cell-title="{ row }">
           <div class="flex min-w-0 items-center gap-1.5">
@@ -1000,14 +1016,9 @@ watch(orgId, () => void refresh());
         </template>
         <template #cell-techniques="{ row }">
           <div class="flex min-w-0 gap-1 overflow-hidden">
-            <OTag
-              v-for="tech in row.techniques.slice(0, 2)"
-              :key="tech"
-              variant="purple-soft"
-              shape="rounded"
-              size="xs"
-              >{{ tech }}</OTag
-            >
+            <OTag v-for="tech in row.techniques.slice(0, 2)" :key="tech" tone="neutral" size="sm">{{
+              tech
+            }}</OTag>
             <span v-if="row.techniques.length > 2" class="text-text-secondary text-xs">
               +{{ row.techniques.length - 2 }}
             </span>
@@ -1016,20 +1027,16 @@ watch(orgId, () => void refresh());
         </template>
         <template #cell-firings="{ row }">
           <div v-if="row.firings" class="flex min-w-0 items-center gap-2">
-            <OTag
-              variant="orange-soft"
-              icon="local-fire-department"
-              size="xs"
-              class="tabular-nums"
-              >{{ formatEventCount(row.firings) }}</OTag
-            >
+            <OTag tone="warn" icon="local-fire-department" size="sm" class="tabular-nums">{{
+              formatEventCount(row.firings)
+            }}</OTag>
             <OTimeCell :value="row.lastFiredUs" unit="us" class="text-xs" />
           </div>
           <span v-else class="text-text-secondary">{{ firingsLoading ? "…" : "—" }}</span>
         </template>
         <template #cell-lastRun="{ row }">
           <div v-if="row.lastRunUs" class="flex min-w-0 items-center gap-2">
-            <OTag :variant="outcomeVariant(row.lastOutcome)" size="xs">{{
+            <OTag :tone="outcomeVariant(row.lastOutcome)" size="sm">{{
               t(`siem.detections.outcome.${outcomeKey(row.lastOutcome)}`)
             }}</OTag>
             <OTimeCell :value="row.lastRunUs" unit="us" class="text-xs" />
@@ -1048,6 +1055,14 @@ watch(orgId, () => void refresh());
           </div>
         </template>
 
+        <template #error>
+          <SecurityLoadError
+            :what="t('siem.detections.whatDetections')"
+            :hint="t('siem.detections.loadFailedHint')"
+            @retry="refresh"
+          />
+        </template>
+
         <template #empty>
           <SecurityAccessLock
             v-if="denials.length"
@@ -1056,16 +1071,14 @@ watch(orgId, () => void refresh());
           />
           <OEmptyState
             v-else-if="!loading"
-            size="block"
             icon="shield-alert-outline"
+            :kind="filtersActive ? 'filtered' : 'first-run'"
             :title="t('siem.detections.emptyTitle')"
-            :description="t('siem.detections.emptyHint')"
+            :text="t('siem.detections.emptyHint')"
             :action-label="
               filtersActive || !canAuthor ? undefined : t('siem.detections.createFirst')
             "
-            action-icon="add"
-            :filtered="filtersActive"
-            @action="(id?: string) => (id === 'clear-filters' ? clearFilters() : openNew())"
+            @action="filtersActive ? clearFilters() : openNew()"
           />
         </template>
       </OTable>
@@ -1099,14 +1112,14 @@ watch(orgId, () => void refresh());
           size="sm"
         />
         <OTag
-          :variant="
+          :tone="
             selected.state === 'enabled'
-              ? 'success-soft'
+              ? 'ok'
               : selected.state === 'erroring'
-                ? 'error-soft'
+                ? 'err'
                 : selected.state === 'notifyFailing'
-                  ? 'warning-soft'
-                  : 'default-soft'
+                  ? 'warn'
+                  : 'neutral'
           "
           :icon="
             selected.state === 'enabled'
@@ -1120,15 +1133,10 @@ watch(orgId, () => void refresh());
           size="sm"
           >{{ t(`siem.detections.state.${selected.state}`) }}</OTag
         >
-        <OTag v-if="selected.fired" variant="orange-soft" icon="local-fire-department" size="sm">
+        <OTag v-if="selected.fired" tone="warn" icon="local-fire-department" size="sm">
           {{ t("siem.detections.firedCount", selected.firings) }}
         </OTag>
-        <OTag
-          v-if="selected.entry.meta.logsource"
-          variant="default-soft"
-          size="sm"
-          class="font-mono"
-        >
+        <OTag v-if="selected.entry.meta.logsource" tone="neutral" mono size="sm">
           {{ selected.entry.meta.logsource }}
         </OTag>
       </template>
@@ -1141,29 +1149,27 @@ watch(orgId, () => void refresh());
         >
           {{ selected.entry.alert.description }}
         </p>
-        <OBanner
+        <OInlineNotice
           v-if="selected.state === 'erroring'"
-          variant="error-soft"
-          icon="error-outline"
+          tone="err"
           data-test="security-detection-drawer-error"
         >
           {{ selected.entry.alert.last_error || t("siem.detections.erroringHint") }}
-        </OBanner>
-        <OBanner
+        </OInlineNotice>
+        <OInlineNotice
           v-else-if="selected.state === 'notifyFailing'"
-          variant="warning"
-          icon="warning-amber"
+          tone="warn"
           data-test="security-detection-drawer-notify-failing"
         >
           {{ t("siem.detections.notifyFailingHint") }}
-        </OBanner>
+        </OInlineNotice>
 
         <div v-if="selected.techniques.length || tactics.length" class="flex flex-col gap-2">
           <span class="text-text-secondary text-xs font-semibold tracking-wide uppercase">{{
             t("siem.common.mitre")
           }}</span>
           <div class="flex flex-wrap gap-1.5">
-            <OTag v-for="tac in tactics" :key="tac" variant="primary-soft" size="sm">{{
+            <OTag v-for="tac in tactics" :key="tac" tone="accent" size="sm">{{
               t(`siem.mitre.tactics.${tac}`)
             }}</OTag>
           </div>
@@ -1171,13 +1177,12 @@ watch(orgId, () => void refresh());
             <OButton
               v-for="tech in selected.techniques"
               :key="tech"
-              as="a"
               :href="techniqueUrl(tech)"
               target="_blank"
               rel="noopener"
-              variant="ghost-primary"
-              size="xs"
-              icon-right="open-in-new"
+              variant="accent-ghost"
+              size="sm"
+              icon-end="open-in-new"
               :data-test="`security-detection-drawer-technique-${tech}`"
               >{{ tech }}</OButton
             >
@@ -1192,23 +1197,24 @@ watch(orgId, () => void refresh());
       </template>
 
       <template #tab-history>
-        <div v-if="historyLoading" class="flex items-center justify-center gap-2 py-10">
-          <OSpinner size="sm" />
-          <span class="text-text-secondary text-sm">{{ t("siem.detections.historyLoading") }}</span>
+        <div v-if="historyLoading" class="flex flex-col gap-2">
+          <OSkeleton class="h-4 w-64" />
+          <OSkeleton v-for="row in 5" :key="row" class="h-8" />
         </div>
         <OEmptyState
           v-else-if="historyError"
-          size="inline"
-          icon="error-outline"
+          kind="error"
           :title="t('siem.detections.historyError')"
-          :description="raw(historyError)"
+          :text="
+            isRawHttpText(historyError) ? t('emptyState.loadError.description') : raw(historyError)
+          "
+          @action="loadHistory(String(selected.entry.alert.id))"
         />
         <OEmptyState
           v-else-if="!history.length"
-          size="inline"
           icon="history"
           :title="t('siem.detections.historyEmpty')"
-          :description="t('siem.detections.historyEmptyHint', { days: HISTORY_DAYS })"
+          :text="t('siem.detections.historyEmptyHint', { days: HISTORY_DAYS })"
         />
         <template v-else>
           <p class="text-text-secondary text-xs">
@@ -1236,7 +1242,7 @@ watch(orgId, () => void refresh());
               :key="`${h.timestamp}-${i}`"
               class="border-border-subtle flex items-center gap-3 border-b px-3 py-2 text-xs last:border-b-0"
             >
-              <OTag :variant="outcomeVariant(h.status)" size="xs" class="shrink-0">
+              <OTag :tone="outcomeVariant(h.status)" size="sm" class="shrink-0">
                 {{ t(`siem.detections.outcome.${outcomeKey(h.status)}`) }}
               </OTag>
               <span class="text-text-secondary shrink-0 tabular-nums">{{
@@ -1270,10 +1276,9 @@ watch(orgId, () => void refresh());
         />
         <OEmptyState
           v-else
-          size="inline"
           icon="info-outline"
           :title="t('siem.detections.noSigma')"
-          :description="t('siem.detections.noSigmaHint')"
+          :text="t('siem.detections.noSigmaHint')"
         />
       </template>
 
@@ -1299,9 +1304,8 @@ watch(orgId, () => void refresh());
       <template #footer>
         <OButton
           v-if="canAdmin"
-          variant="outline-destructive"
-          size="sm-action"
-          icon-left="delete"
+          variant="danger-ghost"
+          icon="delete"
           data-test="security-detection-drawer-delete"
           @click="deleteRule(selected)"
         >
@@ -1310,9 +1314,8 @@ watch(orgId, () => void refresh());
         <div class="flex-1" />
         <OButton
           v-if="canAuthor"
-          variant="outline"
-          size="sm-action"
-          icon-left="edit"
+          variant="secondary"
+          icon="edit"
           :disabled="!editTargetOf(selected)"
           data-test="security-detection-drawer-edit"
           @click="openEdit(selected)"
@@ -1320,9 +1323,8 @@ watch(orgId, () => void refresh());
           {{ t("siem.detections.edit.action") }}
         </OButton>
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="manage-search"
+          variant="secondary"
+          icon="manage-search"
           :disabled="!matchPredicate(selected)"
           data-test="security-detection-drawer-view-matches"
           @click="viewMatches(selected)"
@@ -1332,8 +1334,7 @@ watch(orgId, () => void refresh());
         <OButton
           v-if="canAuthor"
           variant="primary"
-          size="sm-action"
-          :icon-left="selected.enabled ? 'pause' : 'play-arrow'"
+          :icon="selected.enabled ? 'pause' : 'play-arrow'"
           :loading="toggling === selected.id"
           data-test="security-detection-drawer-toggle"
           @click="toggleRule(selected)"

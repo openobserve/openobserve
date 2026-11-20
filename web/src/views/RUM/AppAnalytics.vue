@@ -19,34 +19,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="layoutRef"
     :key="org"
     data-test="rum-analytics-page"
-    :subtitle="t('rum.analytics.subtitle')"
+    :title="t('menu.productAnalytics')"
     title-data-test="rum-analytics-title"
-    icon="insights"
+    :about="t('rum.analytics.sdkSampledTip', { field: raw('sessionSampleRate') })"
     bleed
   >
-    <!-- Beta tag rides inside the title line, like Workflows (see BetaBadge.vue). -->
-    <template #title>
-      <span class="inline-flex items-center gap-2">
-        {{ t("rum.analytics.title") }}
-        <BetaBadge />
-      </span>
+    <template #status>
+      <BetaBadge />
     </template>
-    <template #subtitle>
-      <span class="flex min-w-0 items-center gap-1">
-        <OTruncatedText class="leading-normal">{{ t("rum.analytics.subtitle") }}</OTruncatedText>
-        <span
-          tabindex="0"
-          role="img"
-          class="text-text-secondary flex shrink-0 items-center"
-          :aria-label="t('rum.analytics.sdkSampled')"
-          data-test="rum-analytics-sdk-sampling"
+    <template #banner>
+      <template v-if="!noRumData">
+        <OBanner
+          v-if="invalidParams.length && !invalidDismissed"
+          tone="warn"
+          :message="t('rum.analytics.invalidLink')"
+          dismissible
+          data-test="rum-analytics-invalid-link"
+          @dismiss="invalidDismissed = true"
+        />
+
+        <OBanner
+          v-if="deletedEventLink"
+          tone="info"
+          :message="t('rum.analytics.events.deletedNotice')"
+          data-test="rum-analytics-deleted-event-link"
+        />
+
+        <OBanner
+          v-if="state.includeExcluded"
+          tone="warn"
+          :message="includedBanner"
+          data-test="rum-analytics-included-banner"
         >
-          <OIcon name="info-outline" size="xs" />
-          <OTooltip
-            :content="t('rum.analytics.sdkSampledTip', { field: raw('sessionSampleRate') })"
-          />
-        </span>
-      </span>
+          <template #actions>
+            <OButton
+              v-if="appFilters.hiddenFailed.value"
+              variant="ghost"
+              data-test="rum-analytics-hidden-count-retry-btn"
+              @click="appFilters.retryHidden()"
+              >{{ t("common.retry") }}</OButton
+            >
+            <OButton
+              variant="ghost"
+              data-test="rum-analytics-hide-hidden-btn"
+              @click="appFilters.setIncludeHidden(router, false)"
+              >{{ t("rum.analytics.appFilters.hideHidden") }}</OButton
+            >
+          </template>
+        </OBanner>
+      </template>
     </template>
     <template #actions>
       <span id="rum-analytics-filters-host" class="contents" />
@@ -58,9 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onDateChange"
       />
       <OButton
-        icon-left="refresh"
-        variant="outline"
-        size="icon-toolbar"
+        icon-only
+        icon="refresh"
+        variant="secondary"
         :aria-label="t('rum.analytics.refresh')"
         data-test="rum-analytics-refresh-btn"
         @click="refresh"
@@ -73,16 +94,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
       </OButton>
-      <ShareButton
-        data-test="rum-analytics-share-btn"
-        :url="shareUrl"
-        variant="outline"
-        size="icon-toolbar"
-      />
+      <ShareButton data-test="rum-analytics-share-btn" :url="shareUrl" variant="secondary" />
       <OButton
         v-if="showNewEvent"
         variant="primary"
-        size="sm"
         :disabled="eventsFull"
         :aria-label="
           hasNewEventDraft
@@ -106,7 +121,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="showNewFunnel"
         variant="primary"
-        size="sm"
         data-test="rum-analytics-saved-funnels-new-btn"
         @click="funnelDraft.startNew()"
         >{{ t("rum.analytics.saved.newFunnel") }}</OButton
@@ -128,9 +142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="appOptions.length > 1"
             :model-value="[state.app, ...(pa.scope.value.apps ?? [])]"
             :options="appOptions"
-            size="sm"
             searchable
-            :width="narrow ? 'sm' : undefined"
+            :width="narrow ? 's' : undefined"
             multiple
             row-click-single-select
             class="w-48 max-md:w-36"
@@ -140,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-else-if="state.app"
             :label="raw(state.app)"
-            variant="default-outline"
+            tone="outline"
             size="md"
             data-test="rum-analytics-app-label"
           />
@@ -150,8 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="envSelectOptions"
             :placeholder="t('rum.analytics.allEnvs')"
             multiple
-            size="sm"
-            :width="narrow ? 'sm' : undefined"
+            :width="narrow ? 's' : undefined"
             class="w-36 max-md:hidden"
             data-test="rum-analytics-env-select"
             @update:model-value="onEnvChange"
@@ -162,18 +174,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="versionSelectOptions"
             :placeholder="t('rum.analytics.allVersions')"
             multiple
-            size="sm"
-            :width="narrow ? 'sm' : undefined"
+            :width="narrow ? 's' : undefined"
             class="w-36 max-md:hidden"
             data-test="rum-analytics-version-select"
             @update:model-value="onVersionChange"
           />
           <OPopover
+            size="md"
             v-if="identityNote"
             v-model:open="identityOpen"
             side="bottom"
             :align="narrow ? 'start' : 'end'"
-            content-class="p-3 w-80"
+            content-class="p-3"
           >
             <template #trigger>
               <OTag
@@ -186,9 +198,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         identityNote.count,
                       )
                 "
-                variant="warning-soft"
-                size="md"
-                clickable
+                tone="warn"
+                toggle
                 data-test="rum-analytics-identity-note"
               />
             </template>
@@ -197,8 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ identityHelp }}
               </p>
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 data-test="rum-analytics-identity-include-btn"
                 @click="toggleIncludeAll"
                 >{{
@@ -211,9 +221,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OPopover>
           <OButton
             v-if="exclusionCount !== null"
-            variant="outline"
-            size="sm"
-            :icon-left="likelyBot ? 'warning' : 'filter-alt'"
+            variant="secondary"
+            :icon="likelyBot ? 'warning' : 'filter-alt'"
             data-test="rum-analytics-exclusions-chip"
             @click="exclusionsOpen = true"
             >{{
@@ -224,87 +233,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <OButton
             v-if="showNewUsers"
-            variant="outline"
-            size="sm"
-            :active="state.newUsers"
-            :aria-pressed="state.newUsers"
+            variant="secondary"
+            :pressed="state.newUsers"
             :disabled="newUsersDisabled"
-            focusable-unavailable
+            :disabled-reason="t('rum.analytics.exclusions.newUsersSessionsTip')"
             data-test="rum-analytics-new-users-chip"
             @click="toggleNewUsers"
-            >{{ t("rum.analytics.exclusions.newUsersOnly")
-            }}<OTooltip
-              v-if="newUsersDisabled"
-              :content="t('rum.analytics.exclusions.newUsersSessionsTip')"
-          /></OButton>
+            >{{ t("rum.analytics.exclusions.newUsersOnly") }}</OButton
+          >
         </div>
       </Teleport>
       <div v-if="noRumData" class="flex min-h-0 flex-1 flex-col" data-test="rum-analytics-no-data">
         <RumNoDataState />
       </div>
       <div v-else class="flex min-h-0 flex-1 flex-col">
-        <OBanner
-          v-if="invalidParams.length && !invalidDismissed"
-          variant="warning"
-          dense
-          class="mx-page-edge mt-2"
-          :content="t('rum.analytics.invalidLink')"
-          data-test="rum-analytics-invalid-link"
-        >
-          <template #actions>
-            <OButton
-              variant="ghost"
-              size="sm"
-              data-test="rum-analytics-invalid-link-dismiss"
-              @click="invalidDismissed = true"
-              >{{ t("rum.analytics.dismiss") }}</OButton
-            >
-          </template>
-        </OBanner>
-
-        <OBanner
-          v-if="deletedEventLink"
-          variant="info"
-          dense
-          class="mx-page-edge mt-2"
-          :content="t('rum.analytics.events.deletedNotice')"
-          data-test="rum-analytics-deleted-event-link"
-        />
-
-        <OBanner
-          v-if="state.includeExcluded"
-          variant="warning"
-          dense
-          class="mx-page-edge mt-2"
-          :content="includedBanner"
-          data-test="rum-analytics-included-banner"
-        >
-          <template #actions>
-            <OButton
-              v-if="appFilters.hiddenFailed.value"
-              variant="ghost"
-              size="sm"
-              data-test="rum-analytics-hidden-count-retry-btn"
-              @click="appFilters.retryHidden()"
-              >{{ t("common.retry") }}</OButton
-            >
-            <OButton
-              variant="ghost"
-              size="sm"
-              data-test="rum-analytics-hide-hidden-btn"
-              @click="appFilters.setIncludeHidden(router, false)"
-              >{{ t("rum.analytics.appFilters.hideHidden") }}</OButton
-            >
-          </template>
-        </OBanner>
-
         <div class="border-border-default pe-page-edge flex shrink-0 items-center gap-2 border-b">
           <!-- Sub-tab navigation stays live on a license-locked page. -->
           <FeatureLockExempt class="contents">
             <OTabs
               :model-value="activeSubTab"
-              align="left"
-              dense
+              size="compact"
               class="min-w-0 flex-1"
               @update:model-value="onSubTabChange"
             >
@@ -328,7 +276,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OEmptyState
           v-if="scopeStatus === 'forbidden'"
-          preset="no-access"
+          kind="denied"
+          :title="t('emptyState.noAccess.title')"
+          :text="t('emptyState.noAccess.description')"
           data-test="rum-analytics-no-access"
         />
         <AnalyticsPanelState
@@ -369,8 +319,6 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";

@@ -15,34 +15,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OBanner
+  <OInlineNotice
     v-if="status === 'forbidden'"
-    variant="warning"
-    dense
-    :content="t(`rum.analytics.events.${subject}Forbidden`)"
+    tone="warn"
+    :message="t(`rum.analytics.events.${subject}Forbidden`)"
     :data-test="`${dataTest}-events-forbidden`"
   />
-  <OBanner
+  <OInlineNotice
     v-else-if="status === 'failed'"
-    variant="warning"
-    dense
-    :content="t(`rum.analytics.events.${subject}Unavailable`)"
+    tone="warn"
+    :message="t(`rum.analytics.events.${subject}Unavailable`)"
     :data-test="`${dataTest}-events-unavailable`"
   >
     <template #actions>
-      <OButton
-        variant="ghost"
-        size="sm"
-        :data-test="`${dataTest}-events-retry-btn`"
-        @click="emit('retry')"
-        >{{ t("common.retry") }}</OButton
-      >
+      <OButton variant="ghost" :data-test="`${dataTest}-events-retry-btn`" @click="emit('retry')">{{
+        t("common.retry")
+      }}</OButton>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>
 
 <script setup lang="ts">
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";

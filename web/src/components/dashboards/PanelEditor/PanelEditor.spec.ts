@@ -259,24 +259,24 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
@@ -966,7 +966,7 @@ describe("PanelEditor.vue", () => {
       mockDashboardPanelData.data.type = "custom_chart";
     });
 
-    it("renders the custom-chart-type-selector ODialog with width=95 and show-close=false", async () => {
+    it("renders the custom-chart-type-selector ODialog full-screen with show-close=false", async () => {
       wrapper = shallowMount(PanelEditor, {
         props: { pageType: "dashboard" },
         global: mountGlobal,
@@ -975,7 +975,11 @@ describe("PanelEditor.vue", () => {
       await nextTick();
 
       const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
-      const selectorDialog = dialogs.find((d: any) => d.attributes("data-width") === "95");
+      const selectorDialog = dialogs.find(
+        (d: any) =>
+          d.attributes("data-test") === "panel-editor-custom-chart-type-selector-dialog" ||
+          d.attributes("data-size") === "full",
+      );
 
       expect(selectorDialog).toBeTruthy();
       expect(selectorDialog!.attributes("data-show-close")).toBe("false");

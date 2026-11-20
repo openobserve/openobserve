@@ -35,9 +35,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #field-row="{ row }">
             <OFieldRow :data-test="`rum-analytics-funnel-exclusion-picker-step-${row.value}`">
-              <OTag :label="kindLabel(row.step)" :variant="kindVariant(row.step)" size="xs" />
+              <OTag :label="kindLabel(row.step)" :tone="kindVariant(row.step)" size="sm" />
               <OTruncatedText as="span" class="min-w-0">{{ row.name }}</OTruncatedText>
-              <OTag v-if="row.badge" :label="row.badge" variant="default-outline" size="xs" />
+              <OTag v-if="row.badge" :label="row.badge" tone="outline" size="sm" />
             </OFieldRow>
           </template>
           <template #loading>
@@ -59,8 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-text-secondary flex items-center gap-1.5 text-xs"
               >{{ t("rum.analytics.funnel.exclusionLoadFailed") }}
               <OButton
-                variant="ghost-primary"
-                size="xs"
+                variant="accent-ghost"
+                size="sm"
                 data-test="rum-analytics-funnel-exclusion-picker-retry"
                 @click="load"
                 >{{ t("common.retry") }}</OButton
@@ -80,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-text-secondary flex items-center gap-1.5 text-xs"
         >{{ t("rum.analytics.funnel.exclusionLoadFailed") }}
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           data-test="rum-analytics-funnel-exclusion-picker-retry"
           @click="load"
           >{{ t("common.retry") }}</OButton
@@ -97,15 +97,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <span class="flex min-w-0 items-center gap-1.5">
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="arrow-back"
+          icon="arrow-back"
           :aria-label="t('rum.analytics.funnel.exclusionChangeStep')"
           data-test="rum-analytics-funnel-exclusion-picker-back"
           @click="back"
           ><OTooltip :content="t('rum.analytics.funnel.exclusionChangeStep')"
         /></OButton>
-        <OTag :label="kindLabel(current.step)" :variant="kindVariant(current.step)" size="xs" />
+        <OTag :label="kindLabel(current.step)" :tone="kindVariant(current.step)" size="sm" />
         <span
           class="text-text-heading min-w-0 text-sm font-semibold break-all"
           data-test="rum-analytics-funnel-exclusion-picker-step"
@@ -113,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </span>
       <OToggleGroup
+        size="sm"
         :model-value="current.b !== undefined ? 'between' : 'within'"
         type="single"
         :label="t('rum.analytics.funnel.exclusionMode')"
@@ -120,10 +121,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-analytics-funnel-exclusion-picker-mode"
         @update:model-value="setMode"
       >
-        <OToggleGroupItem value="between" size="xs">{{
+        <OToggleGroupItem value="between">{{
           t("rum.analytics.funnel.exclusionModeBetween")
         }}</OToggleGroupItem>
-        <OToggleGroupItem value="within" size="xs">{{
+        <OToggleGroupItem value="within">{{
           t("rum.analytics.funnel.exclusionModeWithin")
         }}</OToggleGroupItem>
       </OToggleGroup>
@@ -131,7 +132,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="current.a"
         :options="stepOptions(1, current.b !== undefined ? stepCount - 1 : stepCount)"
         :label="t('rum.analytics.funnel.exclusionFrom')"
-        size="sm"
         data-test="rum-analytics-funnel-exclusion-picker-from"
         @update:model-value="(v) => setFrom(Number(v))"
       />
@@ -140,14 +140,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="current.b"
         :options="stepOptions(current.a + 1, stepCount)"
         :label="t('rum.analytics.funnel.exclusionTo')"
-        size="sm"
         data-test="rum-analytics-funnel-exclusion-picker-to"
         @update:model-value="(v) => setTo(Number(v))"
       />
       <OInput
         v-else
         type="number"
-        size="sm"
         :min="1"
         :max="MAX_STEP_MS / 1000"
         :label="t('rum.analytics.funnel.exclusionSeconds')"
@@ -174,14 +172,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButton
           variant="ghost"
-          size="sm"
           data-test="rum-analytics-funnel-exclusion-picker-cancel"
           @click="emit('cancel')"
           >{{ t("common.cancel") }}</OButton
         >
         <OButton
           variant="primary"
-          size="sm"
           :disabled="problem !== null || secondsInvalid"
           data-test="rum-analytics-funnel-exclusion-picker-apply"
           @click="apply"

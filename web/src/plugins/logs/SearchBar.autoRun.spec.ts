@@ -213,7 +213,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
 
     it("ArrowDown on unavailable Download stays in the parent menu without opening CSV or JSON", async () => {
       await setup({ liveMode: false });
-      await wrapper!.get('[data-test="logs-search-bar-more-options-btn"]').trigger("click");
+      await wrapper!.get('[data-test="logs-search-bar-utilities-menu-btn"]').trigger("click");
       await flushPromises();
       const download = document.querySelector<HTMLElement>(
         '[data-test="search-download-submenu-trigger"]',
@@ -237,7 +237,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
     it("renders the enabled Download trigger as a native button, keeps it open with a note after an edit, and closes it once disabled", async () => {
       const { searchObj } = await setup({ liveMode: false });
       markExecuted();
-      await wrapper!.get('[data-test="logs-search-bar-more-options-btn"]').trigger("click");
+      await wrapper!.get('[data-test="logs-search-bar-utilities-menu-btn"]').trigger("click");
       await flushPromises();
       const download = document.querySelector<HTMLElement>(
         '[data-test="search-download-submenu-trigger"]',
@@ -269,7 +269,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       await setup({ liveMode: false });
       store.state.zoConfig.search_inspector_enabled = true;
       markExecuted();
-      await wrapper!.get('[data-test="logs-search-bar-more-options-btn"]').trigger("click");
+      await wrapper!.get('[data-test="logs-search-bar-utilities-menu-btn"]').trigger("click");
       await flushPromises();
       const item = (id: string) => document.querySelector<HTMLElement>(`[data-test="${id}"]`)!;
       const key = (key: string) =>
@@ -333,7 +333,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
           ["logs-search-bar-saved-views-menu-create"],
         ],
         [
-          "logs-search-bar-more-options-btn",
+          "logs-search-bar-utilities-menu-btn",
           [
             "logs-create-alert-btn",
             "search-scheduler-create-new-btn",
@@ -844,13 +844,13 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         const searchObj = await loadChartThenMoveTime(mode);
         const run = () => wrapper!.find('[data-test="logs-search-bar-visualize-refresh-btn"]');
         expect(run().attributes("data-run-pending")).toBeUndefined();
-        expect(run().classes()).not.toContain("bg-button-pending-bg");
+        expect(run().attributes("data-o2-stale")).toBeUndefined();
         expect(separatorShown()).toBe(true);
 
         searchObj.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
         await flushPromises();
         expect(run().attributes("data-run-pending")).toBe("true");
-        expect(run().classes()).toContain("bg-button-pending-bg");
+        expect(run().attributes("data-o2-stale")).toBe("true");
         expect(separatorShown()).toBe(false);
 
         wrapper!.vm.autoRun.panelLoadingChanged(true, false);
@@ -898,7 +898,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         const trigger = wrapper!.find(
           '[data-test="logs-search-bar-refresh-cache-dropdown-trigger"]',
         );
-        expect(trigger.classes()).not.toContain("bg-button-pending-bg");
+        expect(trigger.classes()).not.toContain("border-s-0");
         expect(separatorShown()).toBe(true);
       },
     );

@@ -47,7 +47,7 @@ const store = {
 
 // Renders every cell slot per row; the real table virtualizes and lays out nothing in jsdom.
 const OTableStub = {
-  props: ["data", "columns", "rowActions"],
+  props: ["data", "columns", "rowActions", "rowMenu"],
   template: `<div data-test="announcement-list-table">
     <div v-for="row in data" :key="row.index">
       <template v-for="col in columns" :key="col.id">
@@ -55,9 +55,17 @@ const OTableStub = {
       </template>
       <template v-for="action in rowActions" :key="action.id">
         <button
-          v-if="!action.visible || action.visible(row)"
+          v-if="!action.hidden || !action.hidden(row)"
           :data-test="action.dataTest(row)"
-          @click="action.onSelect(row)"
+          @click="action.onClick(row)"
+        />
+      </template>
+      <template v-for="item in rowMenu" :key="item.id">
+        <button
+          v-if="!item.hidden || !item.hidden(row)"
+          :data-test="item.dataTest(row)"
+          :data-destructive="item.destructive"
+          @click="item.onSelect(row)"
         />
       </template>
     </div>
@@ -136,7 +144,9 @@ describe("AnnouncementBannerList", () => {
   it("names the banner in bold in the real confirm dialog with a red Delete button", async () => {
     await mountList();
 
-    document.querySelector<HTMLElement>('[data-test="announcement-list-delete-1"]')!.click();
+    const remove = document.querySelector<HTMLElement>('[data-test="announcement-list-delete-1"]')!;
+    expect(remove.getAttribute("data-destructive")).toBe("true");
+    remove.click();
     await flushPromises();
     const name = document.querySelector('[data-test="confirm-dialog-name"]');
     expect(name?.textContent).toBe("Later");
@@ -188,7 +198,7 @@ describe("AnnouncementBannerList", () => {
 
     expect(document.querySelector('[data-test="announcement-list-live"]')).toBeNull();
     expect(document.querySelector('[data-test="announcement-list-empty"]')).not.toBeNull();
-    document.querySelector<HTMLElement>('[data-test="o2-empty-state-action-create"]')!.click();
+    document.querySelector<HTMLElement>('[data-test="o2-empty-state-action"]')!.click();
     expect(mockPush.mock.calls[0][0]).toMatchObject({ name: "announcementBannerEditor" });
   });
 

@@ -286,6 +286,32 @@ describe("JsonEditor", () => {
     });
   });
 
+  describe("dirty state", () => {
+    it("reports an edit, then clean again when the text returns to what was loaded", async () => {
+      const data = { id: "1", name: "a" };
+      wrapper = createWrapper({ data, type: "alerts" });
+      await nextTick();
+      expect(wrapper.emitted("update:dirty")).toBeUndefined();
+
+      (wrapper.vm as any).handleEditorChange(JSON.stringify({ ...data, extra: "new" }));
+      await nextTick();
+      expect(wrapper.emitted("update:dirty")!.at(-1)).toEqual([true]);
+
+      (wrapper.vm as any).handleEditorChange(JSON.stringify(data, null, 2));
+      await nextTick();
+      expect(wrapper.emitted("update:dirty")!.at(-1)).toEqual([false]);
+    });
+
+    it("reports clean when it unmounts, so the host's guard does not outlive it", async () => {
+      wrapper = createWrapper();
+      (wrapper.vm as any).handleEditorChange(JSON.stringify({ changed: true }));
+      await nextTick();
+      expect(wrapper.emitted("update:dirty")!.at(-1)).toEqual([true]);
+      wrapper.unmount();
+      expect(wrapper.emitted("update:dirty")!.at(-1)).toEqual([false]);
+    });
+  });
+
   // ─── saveChanges ─────────────────────────────────────────────────────────────
 
   describe("saveChanges", () => {

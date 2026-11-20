@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="body-strong" truncate>{{ raw(item?.name ?? component.type) }}</OText>
         <OText variant="mono" truncate>{{ component.id }}</OText>
       </div>
-      <OTag variant="default-soft" size="xs" :label="kindLabel" />
+      <OTag tone="neutral" size="sm" :label="kindLabel" />
     </div>
 
     <div class="flex flex-col gap-3">
@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="component.settings[key]"
           @update:model-value="(v) => emit('update', key, String(v ?? ''))"
           :label="raw(key)"
-          size="sm"
           :data-test="`fleet-component-properties-field-${key}`"
         >
           <template v-if="component.settings[key].includes('${')" #tooltip>
@@ -50,9 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OInput>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="close"
+          icon="close"
           :data-test="`fleet-component-properties-remove-${key}`"
           @click="emit('removeSetting', key)"
         >
@@ -74,7 +73,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-model="newKey"
           :label="t('fleet.editor.settingKey')"
-          size="sm"
           :placeholder="raw('headers.Authorization')"
           :help-text="t('fleet.editor.settingKeyHint')"
           :error="Boolean(newKeyError)"
@@ -84,14 +82,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-model="newValue"
           :label="t('fleet.editor.settingValue')"
-          size="sm"
           data-test="fleet-component-properties-new-value"
         />
         <OButton
           type="submit"
           class="self-start"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :disabled="!newKey.trim()"
           data-test="fleet-component-properties-add-submit"
         >
@@ -106,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-for="p in pipelines"
           :key="p"
-          :variant="p === pipelineId ? 'primary-soft' : 'default-soft'"
+          :tone="p === pipelineId ? 'accent' : 'neutral'"
           :label="raw(p)"
         />
       </div>
@@ -114,9 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OButton
       class="self-start"
-      variant="outline-destructive"
-      size="sm"
-      icon-left="delete"
+      variant="danger-ghost"
+      icon="delete"
       data-test="fleet-component-properties-remove"
       @click="emit('remove')"
     >

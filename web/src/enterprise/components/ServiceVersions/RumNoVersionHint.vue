@@ -40,24 +40,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
     <div class="flex shrink-0 items-center gap-1">
       <OButton
-        variant="outline"
-        size="xs"
-        icon-left="content-copy"
+        variant="secondary"
+        size="sm"
+        icon="content-copy"
         data-test="svcver-rum-noversion-copy"
         @click="copy"
         >{{ t("serviceVersions.actions.copySnippet") }}</OButton
       >
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="svcver-rum-noversion-guide"
         @click="openGuide"
         >{{ t("serviceVersions.rum.noVersion.setupGuide") }}</OButton
       >
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-xs"
-        icon-left="close"
+        icon="close"
         :aria-label="t('serviceVersions.rum.noVersion.dismiss')"
         data-test="svcver-rum-noversion-dismiss"
         @click="emit('dismiss')"

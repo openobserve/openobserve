@@ -29,7 +29,7 @@ vi.mock("../../../utils/azureIntegrations", () => ({
     {
       id: "activity-logs",
       name: "Activity Logs",
-      displayName: "Azure Activity Logs",
+      displayName: "Azure activity logs",
       description: "Stream Azure subscription activity logs",
       armTemplate: "https://mock-s3-bucket.s3.amazonaws.com/activity-logs.json",
       hasDashboard: false,
@@ -111,7 +111,7 @@ describe("AzureConfig.vue", () => {
 
     it("should render Azure Activity Logs title", () => {
       wrapper = createWrapper();
-      expect(wrapper.text()).toContain("Azure Activity Logs");
+      expect(wrapper.text()).toContain("Azure activity logs");
     });
 
     it("should render deploy button", () => {
@@ -226,7 +226,7 @@ describe("AzureConfig.vue: ingest endpoint", () => {
     const manual = (wrapper.vm as any).manualContent as string;
     expect(manual).toContain("OpenObserve username: [EMAIL]");
     expect(manual).toContain("OpenObserve password: [PASSCODE]");
-    expect(manual).not.toContain("Access Key");
+    expect(manual).not.toContain("Access key");
     wrapper.unmount();
   });
 

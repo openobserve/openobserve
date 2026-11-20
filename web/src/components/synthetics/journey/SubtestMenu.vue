@@ -23,7 +23,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -111,16 +111,16 @@ async function onPick(c: SubtestCandidate) {
 
 <template>
   <OPopover
+    size="lg"
     v-model:open="open"
     side="bottom"
     align="start"
     :aria-label="t('synthetics.journey.addMenu.addSubtest')"
-    content-class="w-[min(24rem,calc(100vw-1.5rem))]"
   >
     <template #trigger>
       <OButton
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         :disabled="disabled"
         data-test="synthetics-journey-add-subtest-btn"
       >
@@ -147,6 +147,7 @@ async function onPick(c: SubtestCandidate) {
       </div>
       <div ref="searchRef" class="px-3 py-2">
         <OSearchInput
+          size="sm"
           v-model="query"
           :placeholder="t('synthetics.journey.subtestMenu.searchPlaceholder')"
           :aria-label="t('synthetics.journey.subtestMenu.searchPlaceholder')"
@@ -157,32 +158,29 @@ async function onPick(c: SubtestCandidate) {
       <div class="flex max-h-80 min-h-0 flex-col overflow-y-auto px-1 pb-1">
         <div
           v-if="isLoading"
-          class="text-text-secondary flex items-center justify-center gap-2 py-4 text-xs"
-          role="status"
+          class="flex flex-col gap-2 px-2 py-2"
           data-test="synthetics-subtest-menu-loading"
         >
-          <OSpinner size="sm" />
-          <span>{{ t("synthetics.journey.subtestMenu.loading") }}</span>
+          <OSkeleton v-for="n in 3" :key="n" />
         </div>
         <OEmptyState
           v-else-if="loadError"
-          size="inline"
-          icon="error"
+          size="compact"
+          kind="error"
           :title="t('synthetics.journey.subtest.pickLoadFailed')"
-          :action-label="t('common.retry')"
           data-test="synthetics-subtest-menu-load-error"
           @action="onRetry"
         />
         <OEmptyState
           v-else-if="isEmpty"
-          size="inline"
+          size="compact"
           icon="account-tree"
           :title="t('synthetics.journey.subtest.pickEmpty')"
           data-test="synthetics-subtest-menu-empty"
         />
         <OEmptyState
           v-else-if="noMatch"
-          size="inline"
+          size="compact"
           icon="search"
           :title="t('synthetics.journey.subtestMenu.noMatch', { query: query.trim() })"
           data-test="synthetics-subtest-menu-no-match"

@@ -20,7 +20,8 @@
       "close": "닫기",
       "mitre": "MITRE ATT&CK",
       "severity": "심각도",
-      "viewAll": "모두 보기"
+      "viewAll": "모두 보기",
+      "moreActions": "더 많은 작업"
     },
     "caseStatus": {
       "open": "신규",
@@ -161,7 +162,15 @@
       "explore": "탐색",
       "noSources": "아직 보안 소스가 없습니다",
       "noSourcesHint": "CloudTrail, Okta, VPC Flow 또는 syslog를 수집하세요. 이름에 security, audit, auth 또는 firewall이 포함된 스트림은 여기에 자동으로 표시됩니다.",
-      "summaryPartial": "이 기간에는 하나의 요약에 담을 수 있는 것보다 많은 알림 기록이 있어 개수와 차트는 하한값입니다. 정확한 수치는 더 짧은 기간을 선택하세요."
+      "summaryPartial": "이 기간에는 하나의 요약에 담을 수 있는 것보다 많은 알림 기록이 있어 개수와 차트는 하한값입니다. 정확한 수치는 더 짧은 기간을 선택하세요.",
+      "autoRefresh": "1분마다 자동 새로고침",
+      "whatDetections": "탐지",
+      "rulesFailedHint": "탐지를 읽지 못해 발생 횟수를 집계할 수 없습니다. 다시 시도하거나 탐지 페이지를 확인하세요.",
+      "historyFailedHint": "발생 기록을 사용할 수 없어 발생 횟수를 집계하지 않습니다. 다시 시도하거나 알림 페이지를 확인하세요.",
+      "whatFirings": "발생",
+      "emptyTitle": "활성화된 탐지가 아직 없습니다",
+      "emptyHint": "Sigma 카탈로그에서 탐지를 활성화해 모니터링을 시작하세요. 소스에서 보안 데이터가 들어오는지 확인하세요.",
+      "openSources": "소스 열기"
     },
     "events": {
       "title": "보안 이벤트",
@@ -279,7 +288,8 @@
           "outcome": "결과",
           "message": "메시지"
         }
-      }
+      },
+      "openSources": "소스 열기"
     },
     "drawer": {
       "event": "보안 이벤트",
@@ -459,7 +469,9 @@
         "action": "작업",
         "object": "객체",
         "host": "호스트"
-      }
+      },
+      "whatAlerts": "알림",
+      "loadFailedHint": "발생 기록을 읽지 못했습니다. 다시 시도하거나 탐지에서 활성화된 탐지가 있는지 확인하세요."
     },
     "cases": {
       "title": "케이스",
@@ -708,7 +720,9 @@
         "showAll": "모든 행 표시",
         "onlyEntity": "이 케이스의 엔터티만",
         "noneForEntity": "이 발생에는 이 케이스의 엔터티를 가리키는 행이 없습니다"
-      }
+      },
+      "whatCases": "케이스",
+      "loadFailedHint": "케이스를 읽지 못했습니다. 다시 시도하거나 이 조직에서 케이스 관리가 활성화되어 있는지 확인하세요."
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -771,7 +785,9 @@
       "manageDetections": "탐지 관리",
       "historyNarrowed": "알림 기록의 최대 쿼리 범위로 인해 {from} 이후 발생만 집계됩니다. 이 기간의 더 이전 발생은 계산되지 않습니다.",
       "cellNone": "규칙 없음",
-      "coverageError": "ATT&CK 커버리지를 불러오지 못했습니다: {reason}"
+      "coverageError": "ATT&CK 커버리지를 불러오지 못했습니다: {reason}",
+      "whatCoverage": "ATT&CK 커버리지",
+      "loadFailedHint": "커버리지를 계산하지 못해 수치를 표시하지 않습니다. 다시 시도하거나 탐지 페이지를 확인하세요."
     },
     "detections": {
       "title": "탐지",
@@ -998,7 +1014,9 @@
           "in_cidr": "범위에 포함 (CIDR)",
           "in_list": "허용 목록에 포함"
         }
-      }
+      },
+      "whatDetections": "탐지",
+      "loadFailedHint": "탐지를 읽지 못했습니다. 다시 시도하거나 이 조직에서 알림을 볼 수 있는지 확인하세요."
     },
     "tuning": {
       "open": "튜닝",
@@ -1215,7 +1233,9 @@
         "openAllowlists": "허용 목록 열기"
       },
       "otherSourceOnly": "다른 소스만",
-      "otherSourceOnlyHint": "{logsource}용으로 작성되었습니다. 공유 필드 이름으로만 스트림에서 컴파일되므로 설치 준비 완료로 집계하지 않습니다."
+      "otherSourceOnlyHint": "{logsource}용으로 작성되었습니다. 공유 필드 이름으로만 스트림에서 컴파일되므로 설치 준비 완료로 집계하지 않습니다.",
+      "whatRules": "탐지 카탈로그",
+      "loadFailedHint": "Sigma 카탈로그를 불러오지 못해 규칙 및 소스 수를 알 수 없습니다. 잠시 후 다시 시도하세요."
     },
     "entities": {
       "title": "엔터티",
@@ -1335,7 +1355,9 @@
       "loadError": "보안 소스를 로드할 수 없습니다",
       "detailFailed": "이 엔터티의 일부 데이터를 읽을 수 없습니다: {streams}.",
       "aliasCount": "+표기 {n}개 | +표기 {n}개",
-      "aliasHint": "이 표기로 기록되었으며 동일한 ID입니다."
+      "aliasHint": "이 표기로 기록되었으며 동일한 ID입니다.",
+      "whatEntities": "엔터티",
+      "loadFailedHint": "보안 소스에 연결할 수 없습니다. 소스에서 연결된 소스가 있는지 확인한 뒤 다시 시도하세요."
     },
     "ueba": {
       "title": "사용자 행동 분석",
@@ -1434,7 +1456,9 @@
       "volumeNotJudged": "이 사용자의 볼륨은 판정되지 않습니다. 하루 미만의 기간은 기준선의 동일한 시간대와 비교되는데, 이를 위해서는 최소 하루의 이력이 필요합니다.",
       "baselineBuilding": "기준선 구축 중",
       "baselineBuildingHint": "지금까지 기록은 {span}입니다. 이 사용자 자신의 과거와의 비교는 {baseline} 분량의 기록이 쌓이면 시작되며, 그 전까지는 다른 사용자와 비교해 뚜렷한 이상값만 표시됩니다.",
-      "buildingNotice": "사용자 {n}명의 기준선을 아직 구축 중입니다. {baseline} 분량의 기록이 쌓이기 전에는 다른 사용자와 비교해 뚜렷한 이상값만 표시됩니다. | 사용자 {n}명의 기준선을 아직 구축 중입니다. {baseline} 분량의 기록이 쌓이기 전에는 다른 사용자와 비교해 뚜렷한 이상값만 표시됩니다."
+      "buildingNotice": "사용자 {n}명의 기준선을 아직 구축 중입니다. {baseline} 분량의 기록이 쌓이기 전에는 다른 사용자와 비교해 뚜렷한 이상값만 표시됩니다. | 사용자 {n}명의 기준선을 아직 구축 중입니다. {baseline} 분량의 기록이 쌓이기 전에는 다른 사용자와 비교해 뚜렷한 이상값만 표시됩니다.",
+      "whatUsers": "사용자 행동",
+      "loadFailedHint": "보안 소스에 연결할 수 없습니다. 소스에서 연결된 소스가 있는지 확인한 뒤 다시 시도하세요."
     },
     "intel": {
       "title": "위협 인텔",
@@ -1602,7 +1626,11 @@
       },
       "partialChecked": "부분 결과: 지표 {total}개 중 {checked}개를 확인했습니다. 나머지 건수는 실제보다 적을 수 있습니다.",
       "partialCapped": "부분 결과: 지표 {total}개 중 {checked}개를 확인했습니다. 스윕이 쿼리 {n}개에서 중단되어 심각도가 낮은 지표는 확인되지 않았습니다.",
-      "inText": "{column}(텍스트 내)"
+      "inText": "{column}(텍스트 내)",
+      "runSweepDisabled": "스윕을 실행하려면 지표를 하나 이상 추가하세요.",
+      "whatIndicators": "위협 인텔리전스",
+      "loadFailedHint": "지표 목록을 읽지 못했습니다. 다시 시도하거나 이 조직에서 조회 테이블을 읽을 수 있는지 확인하세요.",
+      "filterType": "유형"
     },
     "sources": {
       "title": "데이터 소스",
@@ -1667,7 +1695,9 @@
         "pipeline_missing": "더 이상 존재하지 않습니다",
         "other_stream": "현재 다른 스트림을 읽고 있습니다",
         "other_pack": "현재 다른 팩을 실행 중입니다"
-      }
+      },
+      "whatSources": "보안 소스",
+      "loadFailedHint": "보안 소스에 연결할 수 없습니다. 연결 또는 권한을 확인한 뒤 다시 시도하세요."
     },
     "nav": {
       "overview": "개요",
@@ -1735,6 +1765,10 @@
       "indicatorType": "지표 유형",
       "severityFilter": "심각도 필터",
       "stream": "스트림"
+    },
+    "loadError": {
+      "title": "{what}을(를) 불러오지 못했습니다",
+      "hint": "{what}에 대해 서버가 응답하지 않았습니다. 연결 또는 권한을 확인한 뒤 다시 시도하세요."
     }
   }
 }

@@ -17,18 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col gap-[1.125rem] pb-[1.125rem]" data-test="eval-job-workload">
     <div v-if="stopped" class="px-5">
-      <OBanner
-        variant="warning"
-        icon="warning-amber"
-        inline-actions
-        dense
-        data-test="eval-job-workload-scores-stopped"
-      >
+      <OInlineNotice tone="warn" data-test="eval-job-workload-scores-stopped">
         {{ stoppedText }}
         <template #actions>
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             data-test="eval-job-workload-fix-provider"
             @click="fixProvider"
           >
@@ -36,14 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             variant="ghost"
-            size="sm"
             data-test="eval-job-workload-view-failures"
             @click="$emit('view-failures')"
           >
             {{ t("evalWorkload.stopped.viewFailures") }}
           </OButton>
         </template>
-      </OBanner>
+      </OInlineNotice>
     </div>
 
     <section class="grid grid-cols-2 gap-2.5 px-5 max-[68.75rem]:grid-cols-1">
@@ -100,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <CreateAlertAction
           variant="button"
-          button-variant="outline"
+          button-variant="secondary"
           source="ai"
           :build="alert.build"
           :data-test="`eval-job-workload-alert-${alert.kind}`"
@@ -115,7 +107,7 @@ import { computed, defineAsyncComponent, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { chartColor } from "@/utils/chartTheme";

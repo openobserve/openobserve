@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="modelValue"
     :title="raw(card.name)"
-    size="xl"
+    size="lg"
     data-test="metrics-fn-config"
     @update:open="$emit('update:modelValue', $event)"
   >
@@ -92,7 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="select(variant.id)"
       >
         <ORadio
-          size="xs"
           :value="variant.id"
           :label="variantLabel(variant)"
           :data-test="`metrics-fn-radio-${variant.id}`"
@@ -100,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OTruncatedText
           as="div"
-          class="text-3xs text-text-secondary font-mono"
+          class="text-2xs text-text-secondary font-mono"
           :data-test="`metrics-fn-expr-${variant.id}`"
         >
           {{ exprOf(variant) }}
@@ -116,8 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="error" size="sm" class="text-error-600" />
             <span>{{ t("metrics.explorer.queryFailed") }}</span>
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :data-test="`metrics-fn-retry-${variant.id}`"
               @click.stop="load(variant)"
             >
@@ -125,21 +124,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
 
-          <div
+          <OEmptyState
             v-else-if="previewOf(variant).status === 'unavailable'"
-            class="text-text-secondary flex h-full items-center justify-center text-xs"
+            size="compact"
+            icon="show-chart"
+            class="h-full"
+            :title="t('metrics.explorer.fn.noPreview')"
             :data-test="`metrics-fn-nopreview-${variant.id}`"
-          >
-            {{ t("metrics.explorer.fn.noPreview") }}
-          </div>
+          />
 
-          <div
+          <OEmptyState
             v-else-if="previewOf(variant).status === 'done' && isEmpty(variant)"
-            class="rounded-default text-text-secondary flex h-full items-center justify-center text-xs"
+            size="compact"
+            icon="bar-chart"
+            class="h-full"
+            :title="t('metrics.explorer.noData')"
             :data-test="`metrics-fn-nodata-${variant.id}`"
-          >
-            {{ t("metrics.explorer.noData") }}
-          </div>
+          />
 
           <!-- @error: a conversion throw lands the tile in the SAME error state
                a failed query does — without it the tile is a blank region with
@@ -160,8 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OSkeleton
             v-else
+            shape="block"
             class="h-full"
-            animation="wave"
             :data-test="`metrics-fn-loading-${variant.id}`"
           />
         </div>
@@ -177,7 +178,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCheckbox
             v-for="p in variant.availablePercentiles || []"
             :key="p"
-            size="xs"
             :model-value="isChecked(variant, p)"
             :label="raw(`p${p}`)"
             :disabled="isOnlyChecked(variant, p)"
@@ -190,22 +190,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #footer>
       <div class="flex items-center justify-between gap-2">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          data-test="metrics-fn-restore"
-          @click="onRestore"
-        >
+        <OButton variant="secondary" data-test="metrics-fn-restore" @click="onRestore">
           {{ t("metrics.explorer.fn.resetToDefault") }}
         </OButton>
 
         <div class="flex items-center gap-2">
-          <OButton variant="outline" size="sm-action" data-test="metrics-fn-cancel" @click="close">
+          <OButton variant="secondary" data-test="metrics-fn-cancel" @click="close">
             {{ t("metrics.explorer.fn.cancel") }}
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             :disabled="!isDirty"
             data-test="metrics-fn-apply"
             @click="onApply"
@@ -226,6 +220,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -266,6 +261,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OSkeleton,
+    OEmptyState,
     ORadioGroup,
     ORadio,
     OCheckbox,

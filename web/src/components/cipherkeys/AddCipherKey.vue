@@ -17,21 +17,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="min-h-[inherit]"
     :back="{
-      label: t('cipherKey.header'),
+      label: t('settings.cipherKeys'),
       onClick: closeEditor,
     }"
+    :title="isUpdatingCipherKey ? t('cipherKey.update') : t('cipherKey.add')"
+    title-data-test="add-template-title"
     bleed
   >
-    <template #title>
-      <span data-test="add-template-title">
-        {{ isUpdatingCipherKey ? t("cipherKey.update") : t("cipherKey.add") }}
-      </span>
-    </template>
     <div class="create-cipher-form flex min-h-0 flex-1 flex-col">
       <!-- One OForm owns every field across the stepper; the pinned bar's Save submits it. -->
       <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 flex-1 flex-col">
         <div class="min-h-0 flex-1 overflow-auto px-4 py-3">
-          <div class="flex w-full max-w-5xl flex-col gap-4">
+          <div class="flex w-full max-w-5xl flex-col gap-6">
             <OFormSection variant="plain" :title="t('cipherKey.sectionKey')">
               <OFormInput
                 data-test="add-cipher-key-name-input"
@@ -81,8 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mt-4 flex gap-2">
                       <OButton
                         data-test="add-report-step1-continue-btn"
-                        variant="outline"
-                        size="sm-action"
+                        variant="secondary"
                         :disabled="isSubmitting"
                         @click="continueToStep2"
                       >
@@ -103,8 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="mt-4 flex gap-2">
                     <OButton
                       data-test="add-cipher-key-step2-back-btn"
-                      variant="outline"
-                      size="sm-action"
+                      variant="secondary"
                       :disabled="isSubmitting"
                       @click="step = 1"
                     >

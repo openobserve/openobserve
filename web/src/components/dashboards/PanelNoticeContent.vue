@@ -67,8 +67,8 @@ const copyError = () => {
     >
       <OButton
         v-if="notice.action"
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         :data-test="`panel-notice-action-${notice.action.id}`"
         @click="emit('action', notice.action.id)"
       >
@@ -77,8 +77,8 @@ const copyError = () => {
       <OButton
         v-if="notice.copyText"
         variant="ghost"
-        size="xs"
-        icon-left="content-copy"
+        size="sm"
+        icon="content-copy"
         data-test="panel-notice-action-copy-error"
         @click="copyError"
       >
@@ -86,8 +86,8 @@ const copyError = () => {
       </OButton>
       <OButton
         v-if="showInspect"
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="panel-notice-action-open-inspector"
         @click="emit('open-inspector')"
       >

@@ -28,9 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("oncall.scheduleNeedsMembers") }}
       </span>
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="person-add"
+        variant="secondary"
+        icon="person-add"
         data-test="oncall-rotation-open-members"
         @click="$emit('open-members')"
       >
@@ -77,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OSelect
         v-model="rule.shift_micros"
-        width="sm"
+        width="s"
         :aria-label="t('oncall.shiftLength')"
         :options="shiftOptions"
         :data-test="`oncall-schedule-handover-${ruleIndex}-length`"
@@ -86,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="body" as="span">{{ t("oncall.handoverOn") }}</OText>
         <OSelect
           :model-value="handover.weekday"
-          width="xs"
+          width="s"
           :aria-label="t('oncall.handoverWeekday')"
           :options="dayOptions"
           :data-test="`oncall-schedule-handover-${ruleIndex}-weekday`"
@@ -96,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OText variant="body" as="span">{{ t("oncall.handoverAt") }}</OText>
       <OSelect
         :model-value="handover.minute"
-        width="xs"
+        width="s"
         :aria-label="t('oncall.handoverTime')"
         :options="timeOptions"
         :data-test="`oncall-schedule-handover-${ruleIndex}-time`"
@@ -112,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="flex flex-wrap items-center gap-2">
         <OSelect
           :model-value="covers"
-          width="md"
+          width="m"
           :aria-label="t('oncall.ruleCovers')"
           :options="coversOptions"
           :data-test="`oncall-schedule-covers-${ruleIndex}`"
@@ -142,20 +141,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :model-value="window.start_minute"
             :label="t('oncall.rotationRestrictionFrom')"
             :options="fromMinuteOptions"
-            width="xs"
+            width="s"
             @update:model-value="(v: unknown) => (window.start_minute = Number(v))"
           />
           <OSelect
             :model-value="window.end_minute"
             :label="t('oncall.rotationRestrictionTo')"
             :options="minuteOptions"
-            width="xs"
+            width="s"
             @update:model-value="(v: unknown) => (window.end_minute = Number(v))"
           />
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="delete-outline"
+            icon="delete-outline"
             :aria-label="t('oncall.rotationRestrictionRemove')"
             :data-test="`oncall-schedule-restriction-remove-${ruleIndex}-${index}`"
             @click="removeRestriction(rule, index)"
@@ -182,9 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="flex">
           <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="add"
+            variant="secondary"
             :data-test="`oncall-schedule-restriction-add-${ruleIndex}`"
             @click="addRestriction(rule)"
           >
@@ -203,18 +200,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="overlapChoice"
           @update:model-value="(v: unknown) => setOverlapWinner(v === 'wins')"
         >
-          <OToggleGroupItem
-            value="wins"
-            size="sm"
-            :data-test="`oncall-schedule-overlap-${ruleIndex}-wins`"
-          >
+          <OToggleGroupItem value="wins" :data-test="`oncall-schedule-overlap-${ruleIndex}-wins`">
             {{ t("oncall.ruleOverlapThisWins") }}
           </OToggleGroupItem>
-          <OToggleGroupItem
-            value="loses"
-            size="sm"
-            :data-test="`oncall-schedule-overlap-${ruleIndex}-loses`"
-          >
+          <OToggleGroupItem value="loses" :data-test="`oncall-schedule-overlap-${ruleIndex}-loses`">
             {{ t("oncall.ruleOverlapOthersWin", { names: raw(overlapNames) }) }}
           </OToggleGroupItem>
         </OToggleGroup>

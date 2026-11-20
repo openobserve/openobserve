@@ -33,43 +33,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   DbmEmptyState so all three read as one system.
 -->
 <template>
-  <!-- Built ON OEmptyState so these two states share the app's illustration,
-       heading scale, backdrop and spacing with Traces/Metrics. The illustration
-       carries the healthy-vs-broken distinction that the old icon badge did:
-       `check` for "we looked and all is well", `data-scene` for "the pipeline
-       is not delivering". The checklist and the healthy pill — the parts that
-       are genuinely DBM's — ride in #extra and #actions. -->
+  <!-- The icon keeps "we looked and all is well" apart from "nothing is arriving". -->
   <OEmptyState
     :size="size"
-    :illustration="healthy ? 'check' : 'data-scene'"
+    :icon="healthy ? 'task-alt' : 'database'"
     :title="title"
-    :description="description"
+    :text="description"
     :data-test="dataTest"
   >
     <template #actions>
       <!-- Healthy leads with the reassurance, not with a call to action: there
            is nothing for the reader to fix. -->
-      <OTag
-        v-if="healthy"
-        variant="success-soft"
-        class="self-center"
-        :data-test="`${dataTest}-healthy-pill`"
-      >
+      <OTag v-if="healthy" tone="ok" class="self-center" :data-test="`${dataTest}-healthy-pill`">
         <template #icon><OIcon name="check-circle" size="xs" /></template>
         {{ collectionHealthyLabel }}
       </OTag>
-      <EmptyStateActionCard
-        v-for="action in actions"
+      <OButton
+        v-for="(action, i) in actions.slice(0, size === 'compact' ? 1 : 2)"
         :key="action.id"
-        :icon="action.icon ?? 'arrow-forward'"
-        :label="action.label"
+        :variant="i === 0 && action.primary ? 'primary' : 'secondary'"
+        :size="size === 'compact' ? 'sm' : undefined"
         :data-test="`${dataTest}-action-${action.id}`"
         @click="emit('action', action.id)"
-      />
+      >
+        {{ action.label }}
+      </OButton>
     </template>
 
-    <!-- The checklist grammar is shared with DbmEmptyState via DbmCheckList, so
-         all of DBM's empty states read as one system. -->
     <template #extra>
       <DbmCheckList
         :title="checklistTitle"
@@ -84,8 +74,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import DbmCheckList, { type DbmCheckRow } from "./DbmCheckList.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import type { EmptyStateSize } from "@/lib/core/EmptyState/OEmptyState.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { raw, type I18nText } from "@/types/i18n";
@@ -115,14 +106,13 @@ withDefaults(
     actions?: DbmLockEmptyAction[];
     collectionHealthyLabel?: I18nText;
     dataTest?: string;
-    /** Passed through to OEmptyState; these tabs fill a page, so "hero". */
-    size?: "hero" | "block" | "inline";
+    size?: EmptyStateSize;
   }>(),
   {
     actions: () => [],
     collectionHealthyLabel: () => raw(""),
     dataTest: "dbm-lock-empty-state",
-    size: "hero",
+    size: "region",
   },
 );
 

@@ -20,7 +20,8 @@
       "close": "Close",
       "mitre": "MITRE ATT&CK",
       "severity": "Severity",
-      "viewAll": "View all"
+      "viewAll": "View all",
+      "moreActions": "More actions"
     },
     "caseStatus": {
       "open": "New",
@@ -161,7 +162,15 @@
       "explore": "Explore",
       "noSources": "No security sources yet",
       "noSourcesHint": "Ingest CloudTrail, Okta, VPC Flow or syslog. Streams with security, audit, auth or firewall in the name appear here automatically.",
-      "summaryPartial": "This window has more alert history than one summary can hold, so counts and charts are a lower bound; pick a shorter window for complete numbers."
+      "summaryPartial": "This window has more alert history than one summary can hold, so counts and charts are a lower bound; pick a shorter window for complete numbers.",
+      "autoRefresh": "Auto-refresh every minute",
+      "whatDetections": "detections",
+      "rulesFailedHint": "Detections couldn't be read, so firings can't be counted. Retry, or check the Detections page.",
+      "historyFailedHint": "Firing history is unavailable, so firings aren't counted. Retry, or check the Alerts page.",
+      "whatFirings": "firings",
+      "emptyTitle": "No detections are enabled yet",
+      "emptyHint": "Enable detections from the Sigma catalog to start monitoring. Check Sources to confirm your security data is arriving.",
+      "openSources": "Open sources"
     },
     "events": {
       "title": "Security Events",
@@ -279,7 +288,8 @@
           "outcome": "Outcome",
           "message": "Message"
         }
-      }
+      },
+      "openSources": "Open sources"
     },
     "drawer": {
       "event": "Security event",
@@ -302,7 +312,7 @@
       "source": "Source",
       "matchedRules": "{n} detection matched | {n} detections matched",
       "openCase": "Open case",
-      "openCaseHint": "Open a case on this event, with its title, priority and entities filled in",
+      "openCaseHint": "Open a case on this event, with its title, severity and entities filled in",
       "addToCase": "Add to case",
       "pickCase": "Add to an open case",
       "caseOpened": "Case opened: {title}",
@@ -311,7 +321,7 @@
       "openCaseDialog": {
         "title": "Open a case from this event",
         "caseTitle": "Title",
-        "priority": "Priority",
+        "priority": "Severity",
         "priorityP1": "P1: critical",
         "priorityP2": "P2: high",
         "priorityP3": "P3: medium",
@@ -459,7 +469,9 @@
         "action": "Action",
         "object": "Object",
         "host": "Host"
-      }
+      },
+      "whatAlerts": "alerts",
+      "loadFailedHint": "Firing history couldn't be read. Retry, or check that detections are enabled under Detections."
     },
     "cases": {
       "title": "Cases",
@@ -478,7 +490,7 @@
       "emptyHint": "Cases open automatically when related detections fire together.",
       "unassigned": "Unassigned",
       "column": {
-        "priority": "Priority",
+        "priority": "Severity",
         "title": "Case",
         "entity": "Entity",
         "status": "Status",
@@ -520,8 +532,8 @@
       "event": {
         "created": "Case opened",
         "alert": "{name} fired ({n})",
-        "severityUpgrade": "Priority raised {from} → {to}: {reason}",
-        "severityOverride": "Priority set {from} → {to}",
+        "severityUpgrade": "Severity raised {from} → {to}: {reason}",
+        "severityOverride": "Severity set {from} → {to}",
         "acknowledged": "Marked investigating",
         "resolved": "Closed",
         "autoResolved": "Closed automatically",
@@ -545,14 +557,14 @@
         "alertsAttached": "Firings added by hand: {names}",
         "eventAttached": "Event from {stream} at {at} added",
         "detectionJoined": "New detection: {rule} ({level})",
-        "detectionJoinedRaised": "New detection: {rule} ({level}), priority {from} → {to}"
+        "detectionJoinedRaised": "New detection: {rule} ({level}), severity {from} → {to}"
       },
       "analysisHint": "An AI summary of what connects the firings in this case.",
       "runAnalysis": "Analyze",
       "rerunAnalysis": "Re-analyze",
       "noAnalysis": "No analysis yet",
       "priorityOption": "{p} · {level}",
-      "priorityChanged": "Priority set to {p}",
+      "priorityChanged": "Severity set to {p}",
       "statusChanged": "Case marked {status}",
       "viewFirings": "View firings",
       "transition": {
@@ -590,11 +602,11 @@
         "suppressFor_1440": "For 24 hours",
         "suppressFor_4320": "For 3 days",
         "suppressFor_10080": "For 7 days",
-        "highWarning": "{n} high-priority case (P1/P2) is in the selection and stays open unless you include it: | {n} high-priority cases (P1/P2) are in the selection and stay open unless you include them:",
-        "includeHigh": "Close the high-priority case too | Close the {n} high-priority cases too",
+        "highWarning": "{n} high-severity case (P1/P2) is in the selection and stays open unless you include it: | {n} high-severity cases (P1/P2) are in the selection and stay open unless you include them:",
+        "includeHigh": "Close the high-severity case too | Close the {n} high-severity cases too",
         "andMore": "and {n} more",
         "resultsSummary": "{updated} closed, {skipped} left open, {failed} failed",
-        "outcomeSkipped": "Left open: high priority",
+        "outcomeSkipped": "Left open: high severity",
         "outcomeFailed": "Couldn't close",
         "outcomeClosed": "Closed",
         "outcomeClosedNoSuppress": "Closed, not suppressed: {error}",
@@ -625,8 +637,8 @@
       "searchAll": "Search title, detection, entity, id or assignee",
       "entityDetection": "Detection",
       "filter": {
-        "priority": "Priority filter",
-        "anyPriority": "Any priority",
+        "priority": "Severity filter",
+        "anyPriority": "Any severity",
         "detection": "Detection filter",
         "anyDetection": "Any detection",
         "assignee": "Assignee filter",
@@ -651,7 +663,7 @@
         "close": "Close",
         "closeSuppress": "Close and suppress",
         "assign": "Assign",
-        "priority": "Priority",
+        "priority": "Severity",
         "merge": "Merge",
         "mergeLimit": "Select 2 to {max} cases to merge",
         "updated": "{n} case updated | {n} cases updated",
@@ -708,7 +720,9 @@
         "showAll": "Show all rows",
         "onlyEntity": "Only this case's entities",
         "noneForEntity": "No rows in this firing name this case's entities"
-      }
+      },
+      "whatCases": "cases",
+      "loadFailedHint": "Cases couldn't be read. Retry, or check that case management is enabled for this organization."
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -764,14 +778,16 @@
       "disabled": "Off",
       "inCatalog": "Available in the catalog",
       "enable": "Enable",
-      "noFirings": "Nothing fired for this technique in the last {range}",
+      "noFirings": "Nothing fired for this technique over {range}",
       "referenceHint": "Technique names, procedures and mitigations are maintained by MITRE. This page shows the id your rules carry and links to the authoritative entry.",
       "openTechnique": "Open {id} on attack.mitre.org",
       "viewOnAttack": "View on ATT&CK",
       "manageDetections": "Manage detections",
       "historyNarrowed": "The alert history's maximum query range limits firings to those since {from}; earlier firings in this window are not counted.",
       "cellNone": "No rule",
-      "coverageError": "Could not load ATT&CK coverage: {reason}"
+      "coverageError": "Could not load ATT&CK coverage: {reason}",
+      "whatCoverage": "ATT&CK coverage",
+      "loadFailedHint": "Coverage couldn't be calculated, so no counts are shown. Retry, or check the Detections page."
     },
     "detections": {
       "title": "Detections",
@@ -998,7 +1014,9 @@
           "in_cidr": "is in range (CIDR)",
           "in_list": "is in allowlist"
         }
-      }
+      },
+      "whatDetections": "detections",
+      "loadFailedHint": "Detections couldn't be read. Retry, or check that you can view alerts in this organization."
     },
     "tuning": {
       "open": "Tuning",
@@ -1087,7 +1105,7 @@
       },
       "logsources": "Logsources",
       "allLogsources": "All rules",
-      "anyLevel": "Any level",
+      "anyLevel": "Any severity",
       "searchRules": "Search rules by title, technique or logsource",
       "searchSources": "Search sources by name, vendor or logsource",
       "stat": {
@@ -1215,7 +1233,9 @@
         "openAllowlists": "Open allowlists"
       },
       "otherSourceOnly": "Other sources only",
-      "otherSourceOnlyHint": "Written for {logsource}. It compiles on your streams only through shared field names, so it is not counted as ready to install."
+      "otherSourceOnlyHint": "Written for {logsource}. It compiles on your streams only through shared field names, so it is not counted as ready to install.",
+      "whatRules": "the detection catalog",
+      "loadFailedHint": "The Sigma catalog didn't load, so rule and source counts are unknown. Retry in a moment."
     },
     "entities": {
       "title": "Entities",
@@ -1302,7 +1322,7 @@
       "empty": "No entities in this window",
       "emptyHint": "Widen the time range, or check that your sources carry user, IP or host fields.",
       "refresh": "Refresh",
-      "drawerSubtitle": "Activity over the last {window}",
+      "drawerSubtitle": "Activity over {window}",
       "tab": {
         "activity": "Activity",
         "related": "Related",
@@ -1335,13 +1355,15 @@
       "loadError": "Could not load security sources",
       "detailFailed": "Some of this entity’s data could not be read: {streams}.",
       "aliasCount": "+{n} spelling | +{n} spellings",
-      "aliasHint": "Logged with this spelling; it is the same identity."
+      "aliasHint": "Logged with this spelling; it is the same identity.",
+      "whatEntities": "entities",
+      "loadFailedHint": "Security sources are unreachable. Check that a source is connected under Sources, then retry."
     },
     "ueba": {
       "title": "User Behavior Analytics",
       "subtitle": "Each user compared with their own recent past",
       "windowHint": "Last {current}, compared with the {baseline} before it",
-      "method": "Risk scores are heuristics: each user's last {current} is compared with their own {baseline} before it. Every flag shows the numbers that raised it.",
+      "method": "Risk scores are heuristics: each user's activity over {current} is compared with their own {baseline} before it. Every flag shows the numbers that raised it.",
       "noSources": "No source names a user",
       "noSourcesHint": "UEBA needs a security source with a user field (CloudTrail, Okta, an auth log with a user column).",
       "search": "Search users",
@@ -1434,10 +1456,12 @@
       "volumeNotJudged": "Volume is not judged for this user: windows under a day are compared with the same hours of day in the baseline, which needs at least a day of history.",
       "baselineBuilding": "Baseline building",
       "baselineBuildingHint": "{span} of history so far. Comparison with this user's own past starts once a full {baseline} exists; clear outliers against other users are flagged meanwhile.",
-      "buildingNotice": "The baseline is still building for {n} user: until a full {baseline} of history exists, only clear outliers against other users are flagged. | Baselines are still building for {n} users: until a full {baseline} of history exists, only clear outliers against other users are flagged."
+      "buildingNotice": "The baseline is still building for {n} user: until a full {baseline} of history exists, only clear outliers against other users are flagged. | Baselines are still building for {n} users: until a full {baseline} of history exists, only clear outliers against other users are flagged.",
+      "whatUsers": "user behavior",
+      "loadFailedHint": "Security sources are unreachable. Check that a source is connected under Sources, then retry."
     },
     "intel": {
-      "title": "Threat Intel",
+      "title": "Threat intel",
       "subtitle": "Known-bad indicators, and every place they showed up in your security data",
       "loadFailed": "Could not load indicator lists",
       "add": "Add indicators",
@@ -1602,7 +1626,11 @@
       },
       "partialChecked": "Partial result: {checked} of {total} indicators checked. Counts for the rest may be low.",
       "partialCapped": "Partial result: {checked} of {total} indicators checked. The sweep stops at {n} queries; the least severe indicators were not checked.",
-      "inText": "{column} (in text)"
+      "inText": "{column} (in text)",
+      "runSweepDisabled": "Add at least one indicator to run a sweep.",
+      "whatIndicators": "threat intel",
+      "loadFailedHint": "Indicator lists couldn't be read. Retry, or check that you can read lookup tables in this organization.",
+      "filterType": "Type"
     },
     "sources": {
       "title": "Data Sources",
@@ -1667,7 +1695,9 @@
         "pipeline_missing": "it no longer exists",
         "other_stream": "it now reads another stream",
         "other_pack": "it now runs a different pack"
-      }
+      },
+      "whatSources": "security sources",
+      "loadFailedHint": "Security sources are unreachable. Check your connection or permissions, then retry."
     },
     "nav": {
       "overview": "Overview",
@@ -1676,7 +1706,7 @@
       "alerts": "Alerts",
       "cases": "Cases",
       "entities": "Entities",
-      "intel": "Threat Intel",
+      "intel": "Threat intel",
       "ueba": "UEBA",
       "mitre": "MITRE ATT&CK",
       "content": "Content",
@@ -1727,7 +1757,7 @@
       "addSource": "Add a source",
       "addToCase": "Add to case",
       "caseAssignee": "Case assignee",
-      "casePriority": "Case priority",
+      "casePriority": "Case severity",
       "filterField": "Filter field",
       "filterOperator": "Filter operator",
       "filterValue": "Filter value",
@@ -1735,6 +1765,10 @@
       "indicatorType": "Indicator type",
       "severityFilter": "Severity filter",
       "stream": "Stream"
+    },
+    "loadError": {
+      "title": "Couldn't load {what}",
+      "hint": "The server didn't answer for {what}. Check your connection or permissions, then retry."
     }
   }
 }

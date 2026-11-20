@@ -264,13 +264,13 @@ describe("DiscoveryPage fetching", () => {
     const wrapper = await mountPage();
     const { operationVariant } = (wrapper.vm as any).$.setupState;
 
-    expect(operationVariant("chat")).toBe("blue-soft");
-    expect(operationVariant("text_completion")).toBe("blue-soft");
-    expect(operationVariant("execute_tool")).toBe("amber-soft");
-    expect(operationVariant("invoke_agent")).toBe("purple-soft");
-    expect(operationVariant("embeddings")).toBe("teal-soft");
+    expect(operationVariant("chat")).toBe("neutral");
+    expect(operationVariant("text_completion")).toBe("neutral");
+    expect(operationVariant("execute_tool")).toBe("warn");
+    expect(operationVariant("invoke_agent")).toBe("neutral");
+    expect(operationVariant("embeddings")).toBe("neutral");
     // An operation the vocabulary has not seen must not borrow a family colour.
-    expect(operationVariant("rerank")).toBe("default-soft");
+    expect(operationVariant("rerank")).toBe("neutral");
   });
 
   it("pages server-side without resetting to page one", async () => {

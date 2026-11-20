@@ -37,16 +37,21 @@
         >{{ t("serviceVersions.names.qualifier", { qualifier: raw(qualifier) }) }}</span
       ><OTooltip v-if="hasDisplay" side="top"
         ><template #content><ServiceNameHover v-bind="hoverProps" /></template></OTooltip
-      ><OPopover v-if="ambiguous" v-model:open="candidatesOpen" side="bottom" align="start"
+      ><OPopover
+        size="md"
+        v-if="ambiguous"
+        v-model:open="candidatesOpen"
+        side="bottom"
+        align="start"
         ><template #trigger
-          ><button type="button" class="shrink-0 cursor-pointer" @click.stop>
-            <OTag
-              variant="default-soft"
-              size="xs"
-              :label="t('serviceVersions.names.ambiguity', { count }, count)"
-              data-test="svcver-service-name-ambiguity"
-            /></button
-        ></template>
+          ><OTag
+            toggle
+            :pressed="candidatesOpen"
+            class="shrink-0"
+            :label="t('serviceVersions.names.ambiguity', { count }, count)"
+            data-test="svcver-service-name-ambiguity"
+            @click.stop
+        /></template>
         <div
           class="flex max-w-80 flex-col gap-1 p-2 text-xs"
           data-test="svcver-service-name-candidates"
@@ -63,7 +68,6 @@
           <OButton
             v-if="canReview"
             variant="ghost"
-            size="sm-action"
             class="self-start"
             data-test="svcver-service-name-review-link"
             @click="openReview"

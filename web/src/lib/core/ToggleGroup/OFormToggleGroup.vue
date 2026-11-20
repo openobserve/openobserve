@@ -35,6 +35,7 @@ if (import.meta.env.DEV && !form) {
         <OToggleGroup
           v-bind="$attrs"
           :type="props.type"
+          :size="props.size"
           :disabled="props.disabled"
           :orientation="props.orientation"
           :variant="props.variant"

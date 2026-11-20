@@ -74,10 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
             <span class="flex shrink-0 items-center gap-1">
-              <OBadge v-if="isTestRun(run)" variant="default-soft" size="xs">
+              <OBadge v-if="isTestRun(run)" tone="neutral" size="sm">
                 {{ t("workflow.history.testRun") }}
               </OBadge>
-              <OTag type="hookRunStatus" :value="run.status" size="xs" />
+              <OTag type="hookRunStatus" :value="run.status" size="sm" />
             </span>
           </div>
           <!-- Hover a failed run to read WHY it failed without leaving the menu. -->
@@ -85,23 +85,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="run.status === 'failed' && run.error"
             :content="raw(String(run.error))"
             side="left"
-            max-width="22rem"
           />
         </ODropdownItem>
-        <div
+        <OEmptyState
           v-if="!sortedRuns.length"
+          size="compact"
+          class="px-3"
+          icon="history"
+          :title="t('workflow.ndv.noRunsList')"
           data-test="workflow-run-switcher-empty"
-          class="text-text-secondary px-3 py-4 text-center text-xs italic"
-        >
-          {{ t("workflow.ndv.noRunsList") }}
-        </div>
+        />
       </div>
       <!-- Rows are only ever withheld as a CLASS (test runs), so the menu says so
            and offers them back rather than shrinking silently. -->
       <div v-if="testRunCount > 0" class="border-border-default border-t px-2 py-1.5">
         <OButton
           variant="ghost"
-          size="sm"
           class="w-full"
           data-test="workflow-run-switcher-show-test"
           @click="showTestRuns = !showTestRuns"
@@ -127,6 +126,7 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";

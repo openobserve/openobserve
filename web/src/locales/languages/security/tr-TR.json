@@ -20,7 +20,8 @@
       "close": "Kapat",
       "mitre": "MITRE ATT&CK",
       "severity": "Önem düzeyi",
-      "viewAll": "Tümünü görüntüle"
+      "viewAll": "Tümünü görüntüle",
+      "moreActions": "Diğer eylemler"
     },
     "caseStatus": {
       "open": "Yeni",
@@ -161,7 +162,15 @@
       "explore": "Keşfet",
       "noSources": "Henüz güvenlik kaynağı yok",
       "noSourcesHint": "CloudTrail, Okta, VPC Flow veya syslog verisi alın. Adında security, audit, auth veya firewall geçen akışlar burada otomatik olarak görünür.",
-      "summaryPartial": "Bu pencerede bir özete sığmayacak kadar çok uyarı geçmişi var; bu nedenle sayımlar ve grafikler alt sınırdır. Tam sayılar için daha kısa bir pencere seçin."
+      "summaryPartial": "Bu pencerede bir özete sığmayacak kadar çok uyarı geçmişi var; bu nedenle sayımlar ve grafikler alt sınırdır. Tam sayılar için daha kısa bir pencere seçin.",
+      "autoRefresh": "Her dakika otomatik yenile",
+      "whatDetections": "tespitler",
+      "rulesFailedHint": "Tespitler okunamadı, bu yüzden tetiklenmeler sayılamıyor. Yeniden deneyin veya Tespitler sayfasını kontrol edin.",
+      "historyFailedHint": "Tetiklenme geçmişi kullanılamıyor, bu yüzden tetiklenmeler sayılmıyor. Yeniden deneyin veya Uyarılar sayfasını kontrol edin.",
+      "whatFirings": "tetiklenmeler",
+      "emptyTitle": "Henüz etkin bir tespit yok",
+      "emptyHint": "İzlemeye başlamak için Sigma kataloğundan tespitleri etkinleştirin. Güvenlik verilerinizin geldiğini Kaynaklar'dan doğrulayın.",
+      "openSources": "Kaynakları aç"
     },
     "events": {
       "title": "Güvenlik Olayları",
@@ -279,7 +288,8 @@
           "outcome": "Sonuç",
           "message": "Mesaj"
         }
-      }
+      },
+      "openSources": "Kaynakları aç"
     },
     "drawer": {
       "event": "Güvenlik olayı",
@@ -459,7 +469,9 @@
         "action": "Eylem",
         "object": "Nesne",
         "host": "Ana bilgisayar"
-      }
+      },
+      "whatAlerts": "uyarılar",
+      "loadFailedHint": "Tetiklenme geçmişi okunamadı. Yeniden deneyin veya Tespitler'de tespitlerin etkin olduğunu kontrol edin."
     },
     "cases": {
       "title": "Vakalar",
@@ -708,7 +720,9 @@
         "showAll": "Tüm satırları göster",
         "onlyEntity": "Yalnızca bu vakanın varlıkları",
         "noneForEntity": "Bu tetiklemedeki hiçbir satır bu vakanın varlıklarını belirtmiyor"
-      }
+      },
+      "whatCases": "vakalar",
+      "loadFailedHint": "Vakalar okunamadı. Yeniden deneyin veya bu kuruluş için vaka yönetiminin etkin olduğunu kontrol edin."
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -771,7 +785,9 @@
       "manageDetections": "Algılamaları yönet",
       "historyNarrowed": "Uyarı geçmişinin maksimum sorgu aralığı, tetiklenmeleri {from} tarihinden itibaren olanlarla sınırlar; bu penceredeki daha erken tetiklenmeler sayılmaz.",
       "cellNone": "Kural yok",
-      "coverageError": "ATT&CK kapsamı yüklenemedi: {reason}"
+      "coverageError": "ATT&CK kapsamı yüklenemedi: {reason}",
+      "whatCoverage": "ATT&CK kapsamı",
+      "loadFailedHint": "Kapsam hesaplanamadı, bu yüzden sayılar gösterilmiyor. Yeniden deneyin veya Tespitler sayfasını kontrol edin."
     },
     "detections": {
       "title": "Algılamalar",
@@ -998,7 +1014,9 @@
           "in_cidr": "aralıkta (CIDR)",
           "in_list": "izin listesinde"
         }
-      }
+      },
+      "whatDetections": "tespitler",
+      "loadFailedHint": "Tespitler okunamadı. Yeniden deneyin veya bu kuruluşta uyarıları görüntüleyebildiğinizi kontrol edin."
     },
     "tuning": {
       "open": "İnce ayar",
@@ -1215,7 +1233,9 @@
         "openAllowlists": "İzin listelerini aç"
       },
       "otherSourceOnly": "Yalnızca diğer kaynaklar",
-      "otherSourceOnlyHint": "{logsource} için yazıldı. Akışlarınızda yalnızca ortak alan adları sayesinde derleniyor, bu yüzden yüklemeye hazır sayılmaz."
+      "otherSourceOnlyHint": "{logsource} için yazıldı. Akışlarınızda yalnızca ortak alan adları sayesinde derleniyor, bu yüzden yüklemeye hazır sayılmaz.",
+      "whatRules": "tespit kataloğu",
+      "loadFailedHint": "Sigma kataloğu yüklenmedi, bu yüzden kural ve kaynak sayıları bilinmiyor. Biraz sonra yeniden deneyin."
     },
     "entities": {
       "title": "Varlıklar",
@@ -1335,7 +1355,9 @@
       "loadError": "Güvenlik kaynakları yüklenemedi",
       "detailFailed": "Bu varlığın bazı verileri okunamadı: {streams}.",
       "aliasCount": "+{n} yazım | +{n} yazım",
-      "aliasHint": "Bu yazımla günlüğe kaydedildi; aynı kimliktir."
+      "aliasHint": "Bu yazımla günlüğe kaydedildi; aynı kimliktir.",
+      "whatEntities": "varlıklar",
+      "loadFailedHint": "Güvenlik kaynaklarına ulaşılamıyor. Kaynaklar'da bir kaynağın bağlı olduğunu kontrol edip yeniden deneyin."
     },
     "ueba": {
       "title": "Kullanıcı Davranışı Analizi",
@@ -1434,7 +1456,9 @@
       "volumeNotJudged": "Bu kullanıcı için hacim değerlendirilmez: bir günden kısa pencereler temeldeki aynı gün saatleriyle karşılaştırılır; bu da en az bir günlük geçmiş gerektirir.",
       "baselineBuilding": "Temel çizgi oluşturuluyor",
       "baselineBuildingHint": "Şimdiye kadar {span} geçmiş var. Bu kullanıcının kendi geçmişiyle karşılaştırma, {baseline} tam geçmiş oluştuğunda başlar; bu arada yalnızca diğer kullanıcılara göre belirgin aykırı değerler işaretlenir.",
-      "buildingNotice": "{n} kullanıcı için temel çizgi hâlâ oluşturuluyor: {baseline} tam geçmiş oluşana kadar yalnızca diğer kullanıcılara göre belirgin aykırı değerler işaretlenir. | {n} kullanıcı için temel çizgiler hâlâ oluşturuluyor: {baseline} tam geçmiş oluşana kadar yalnızca diğer kullanıcılara göre belirgin aykırı değerler işaretlenir."
+      "buildingNotice": "{n} kullanıcı için temel çizgi hâlâ oluşturuluyor: {baseline} tam geçmiş oluşana kadar yalnızca diğer kullanıcılara göre belirgin aykırı değerler işaretlenir. | {n} kullanıcı için temel çizgiler hâlâ oluşturuluyor: {baseline} tam geçmiş oluşana kadar yalnızca diğer kullanıcılara göre belirgin aykırı değerler işaretlenir.",
+      "whatUsers": "kullanıcı davranışı",
+      "loadFailedHint": "Güvenlik kaynaklarına ulaşılamıyor. Kaynaklar'da bir kaynağın bağlı olduğunu kontrol edip yeniden deneyin."
     },
     "intel": {
       "title": "Tehdit İstihbaratı",
@@ -1602,7 +1626,11 @@
       },
       "partialChecked": "Kısmi sonuç: {total} göstergeden {checked} tanesi kontrol edildi. Kalanların sayıları düşük olabilir.",
       "partialCapped": "Kısmi sonuç: {total} göstergeden {checked} tanesi kontrol edildi. Tarama {n} sorguda durur; en az ciddi göstergeler kontrol edilmedi.",
-      "inText": "{column} (metin içinde)"
+      "inText": "{column} (metin içinde)",
+      "runSweepDisabled": "Tarama çalıştırmak için en az bir gösterge ekleyin.",
+      "whatIndicators": "tehdit istihbaratı",
+      "loadFailedHint": "Gösterge listeleri okunamadı. Yeniden deneyin veya bu kuruluşta arama tablolarını okuyabildiğinizi kontrol edin.",
+      "filterType": "Tür"
     },
     "sources": {
       "title": "Veri kaynakları",
@@ -1667,7 +1695,9 @@
         "pipeline_missing": "artık mevcut değil",
         "other_stream": "artık başka bir akışı okuyor",
         "other_pack": "artık farklı bir paket çalıştırıyor"
-      }
+      },
+      "whatSources": "güvenlik kaynakları",
+      "loadFailedHint": "Güvenlik kaynaklarına ulaşılamıyor. Bağlantınızı veya izinlerinizi kontrol edip yeniden deneyin."
     },
     "nav": {
       "overview": "Genel Bakış",
@@ -1735,6 +1765,10 @@
       "indicatorType": "Gösterge türü",
       "severityFilter": "Önem derecesi filtresi",
       "stream": "Akış"
+    },
+    "loadError": {
+      "title": "{what} yüklenemedi",
+      "hint": "Sunucu {what} için yanıt vermedi. Bağlantınızı veya izinlerinizi kontrol edip yeniden deneyin."
     }
   }
 }

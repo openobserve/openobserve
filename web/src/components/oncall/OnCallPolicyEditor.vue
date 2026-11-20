@@ -5,12 +5,13 @@
        gives it the width and leaves the dry run visible underneath. -->
   <ODrawer
     :open="props.open"
-    size="xxl"
+    size="xl"
     :title="t('oncall.escalationEditing')"
     bleed
     data-test="oncall-policy-editor"
-    :close-guard="guardClose"
+    :dirty="policyDirty"
     @update:open="(v: boolean) => emit('update:open', v)"
+    @discard="discardEdits"
   >
     <template #header-left>
       <OIcon
@@ -38,8 +39,9 @@
       <OButton
         v-for="rung in draft"
         :key="rung.priority"
-        :variant="rung.priority === selected ? 'outline-primary' : 'outline'"
-        size="xs"
+        :pressed="rung.priority === selected"
+        variant="secondary"
+        size="sm"
         :data-test="`oncall-policy-priority-${rung.priority}`"
         @click="selected = rung.priority"
       >
@@ -47,7 +49,7 @@
           type="alertPriority"
           :value="`p${rung.priority}`"
           :label="raw(priorityLabel(rung.priority))"
-          size="xs"
+          size="sm"
         />
         <span class="text-2xs text-text-secondary ms-1.5">
           {{
@@ -62,27 +64,24 @@
     <div class="px-dialog-content-px py-dialog-content-py flex flex-col gap-4">
       <!-- The webhook channel being on with nowhere to post looks identical to
            working, so this has to say so regardless of which tab is open. -->
-      <OBanner
+      <OInlineNotice
         v-if="webhookEnabled && !destinations.length"
-        variant="error-soft"
-        icon="warning"
-        dense
-        inline-actions
+        tone="err"
         data-test="oncall-policy-destinations-warning"
       >
         {{ t("oncall.policyNoDestinationWarning") }}
         <template #actions>
           <OButton
-            variant="outline"
-            size="xs"
-            icon-left="build"
+            variant="secondary"
+            size="sm"
+            icon="build"
             data-test="oncall-policy-destinations-fix"
             @click="policyTab = 'delivery'"
           >
             {{ t("oncall.policyFix") }}
           </OButton>
         </template>
-      </OBanner>
+      </OInlineNotice>
 
       <div class="flex flex-col">
         <OTabs v-model="policyTab" bordered data-test="oncall-policy-tabs">
@@ -93,8 +92,8 @@
             {{ t("oncall.policyDeliveryTitle") }}
             <OTag
               v-if="deliveryProblems"
-              variant="error-soft"
-              size="xs"
+              tone="err"
+              size="sm"
               data-test="oncall-policy-delivery-problems"
             >
               {{ t("oncall.policyProblemCount", { count: deliveryProblems }, deliveryProblems) }}
@@ -142,7 +141,6 @@
                         <OSelect
                           :model-value="gapBefore(current, stepIndex)"
                           :options="gapOptions"
-                          size="sm"
                           :data-test="`oncall-policy-step-delay-${current.priority}-${stepIndex}`"
                           @update:model-value="(v: any) => setGap(current!, stepIndex, Number(v))"
                         />
@@ -164,8 +162,7 @@
                           v-if="stepIndex === 0"
                           :model-value="step.after_micros"
                           :options="leadGapOptions"
-                          appearance="inline"
-                          size="sm"
+                          variant="filter"
                           :data-test="`oncall-policy-step-delay-${current.priority}-0`"
                           @update:model-value="(v: any) => setGap(current!, 0, Number(v))"
                         />
@@ -179,7 +176,7 @@
                       <OTag
                         v-for="(target, ti) in step.targets"
                         :key="ti"
-                        variant="default-soft"
+                        tone="neutral"
                         size="sm"
                         :data-test="`oncall-policy-target-${current.priority}-${stepIndex}-${ti}`"
                       >
@@ -199,7 +196,6 @@
                         <OSelect
                           :model-value="''"
                           :options="targetOptions"
-                          size="sm"
                           :placeholder="t('oncall.addTarget')"
                           :data-test="`oncall-policy-add-target-${current.priority}-${stepIndex}`"
                           @update:model-value="(v: any) => addTarget(step, String(v))"
@@ -212,7 +208,6 @@
                         <OSelect
                           :model-value="''"
                           :options="memberOptions"
-                          size="sm"
                           :placeholder="t('oncall.targetPickPerson')"
                           :data-test="`oncall-policy-pick-person-${current.priority}-${stepIndex}`"
                           @update:model-value="(v: any) => addUser(String(v))"
@@ -229,7 +224,6 @@
                           <OSelect
                             :model-value="''"
                             :options="rotationOptions"
-                            size="sm"
                             :placeholder="t('oncall.targetPickRotation')"
                             :data-test="`oncall-policy-pick-rotation-${current.priority}-${stepIndex}`"
                             @update:model-value="(v: any) => addRotation(String(v))"
@@ -237,7 +231,6 @@
                         </span>
                         <OCheckbox
                           v-model="applyToAllPriorities"
-                          size="sm"
                           :label="t('oncall.targetAllPriorities')"
                           data-test="oncall-policy-rotation-all-priorities"
                         />
@@ -326,9 +319,9 @@
                       </template>
 
                       <OButton
+                        icon-only
                         variant="ghost"
-                        size="icon-sm"
-                        icon-left="delete-outline"
+                        icon="delete-outline"
                         class="ms-auto"
                         :aria-label="t('oncall.removeRung')"
                         :data-test="`oncall-policy-remove-rung-${current.priority}-${stepIndex}`"
@@ -348,9 +341,7 @@
 
                 <div class="flex flex-wrap items-center gap-2">
                   <OButton
-                    variant="outline"
-                    size="sm-action"
-                    icon-left="add"
+                    variant="secondary"
                     :data-test="`oncall-policy-add-step-${current.priority}`"
                     @click="addStep(current)"
                   >
@@ -392,18 +383,22 @@
                     {{ t("oncall.policyPhoneWithoutEmail") }}
                   </span>
                   <!-- Info, not a block: the ticks stay right for the day a provider is connected. -->
-                  <OBanner v-if="noProvider" variant="info" data-test="oncall-policy-no-provider">
+                  <OInlineNotice
+                    v-if="noProvider"
+                    tone="info"
+                    data-test="oncall-policy-no-provider"
+                  >
                     {{ t("oncall.policyNoProvider") }}
                     <OButton
-                      variant="ghost-primary"
-                      size="xs"
-                      icon-left="open-in-new"
+                      variant="accent-ghost"
+                      size="sm"
+                      icon="open-in-new"
                       data-test="oncall-policy-telephony-link"
                       @click="openTelephony"
                     >
                       {{ t("oncall.policyNoProviderLink") }}
                     </OButton>
-                  </OBanner>
+                  </OInlineNotice>
                 </div>
               </div>
 
@@ -419,15 +414,14 @@
                     v-model="destinations"
                     :options="destinationOptions"
                     multiple
-                    size="sm"
                     :placeholder="t('oncall.policyDestinationsPlaceholder')"
                     data-test="oncall-policy-destinations"
                   />
                 </span>
                 <OTag
                   v-if="!destinations.length"
-                  variant="error-soft"
-                  size="xs"
+                  tone="err"
+                  size="sm"
                   data-test="oncall-policy-destinations-empty"
                 >
                   {{ t("oncall.policyReachesNobody") }}
@@ -446,7 +440,6 @@
                 }}</span>
                 <OButton
                   variant="ghost"
-                  size="sm"
                   data-test="oncall-policy-mail-banner-dismiss"
                   @click="dismissMailBanner"
                   >{{ t("common.dismiss") }}</OButton
@@ -494,7 +487,6 @@
                     v-model="teamChannelDraft"
                     :options="destinationOptions"
                     multiple
-                    size="sm"
                     :placeholder="t('oncall.teamChannelPlaceholder')"
                     data-test="oncall-team-channel-select"
                   />
@@ -502,8 +494,8 @@
                 <!-- A team's own list says so through the button that reverts it; only the inherited one needs a label. -->
                 <OTag
                   v-if="teamChannel && !channelFromTeam"
-                  variant="default-soft"
-                  size="xs"
+                  tone="neutral"
+                  size="sm"
                   data-test="oncall-team-channel-source"
                 >
                   {{ t("oncall.teamChannelFromPolicy") }}
@@ -512,9 +504,8 @@
                        facts on the wire: back-to-policy versus silence-on-purpose. -->
                 <OButton
                   v-if="channelFromTeam"
-                  variant="outline"
-                  size="sm-action"
-                  icon-left="close"
+                  variant="secondary"
+                  icon="close"
                   data-test="oncall-team-channel-clear"
                   @click="usePolicyChannel"
                 >
@@ -567,12 +558,11 @@
           {{ t("oncall.policyAppliesToNewPages") }}
         </OText>
         <span class="flex gap-2">
-          <OButton variant="outline" size="sm-action" @click="cancel">
+          <OButton variant="secondary" @click="cancel">
             {{ t("oncall.cancel") }}
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             :loading="saving"
             :disabled="!l0Valid || !canConfigure"
             data-test="oncall-policy-save"
@@ -604,7 +594,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -1115,10 +1105,14 @@ const policyContent = (): PolicyDraftData => ({
 });
 
 /// What the drawer opened on, so switching priority or tab is never an unsaved change.
-let contentAtOpen = "";
+const contentAtOpen = ref("");
 const markOpened = () => {
-  contentAtOpen = stableStringify(policyContent());
+  contentAtOpen.value = stableStringify(policyContent());
 };
+// ✕, Escape and the backdrop ask "Discard changes?" in the drawer's own footer instead of a dialog over it (O8).
+const policyDirty = computed(
+  () => !!props.open && stableStringify(policyContent()) !== contentAtOpen.value,
+);
 
 function applyPolicyDraft(data: PolicyDraftData) {
   draft.value = data.rungs;
@@ -1146,7 +1140,7 @@ const policyDraft = useEditorDraft<PolicyDraftData>({
     l0: props.policy?.l0 ?? null,
     template: props.policy?.template ?? null,
   }),
-  hasChanges: () => !!props.open && stableStringify(policyContent()) !== contentAtOpen,
+  hasChanges: () => policyDirty.value,
   save: () => save(),
 });
 
@@ -1196,11 +1190,9 @@ async function cancel() {
   emit("update:open", false);
 }
 
-/// ✕, Escape and the backdrop ask through the leave dialog instead of closing over unsaved edits.
-function guardClose(): boolean {
-  if (!policyDraft.hasUnsavedChanges()) return true;
-  void cancel();
-  return false;
+function discardEdits() {
+  policyDraft.discard();
+  reset();
 }
 
 /// Steps into the Members tab. The drawer closes first — left open, it would
@@ -1299,8 +1291,9 @@ async function save(): Promise<boolean> {
   if (!canConfigure.value || !l0Valid.value) {
     toast({
       variant: "error",
-      title: t("oncall.savePolicyFailed"),
-      message: canConfigure.value ? t("oncall.l0BudgetInvalidNotSaved") : t("oncall.configDenied"),
+      message: t("oncall.savePolicyFailedReason", {
+        reason: canConfigure.value ? t("oncall.l0BudgetInvalidNotSaved") : t("oncall.configDenied"),
+      }),
     });
     return false;
   }

@@ -130,7 +130,7 @@ describe("AiToolsets delete confirm", () => {
     const dialog = w.findComponent({ name: "ConfirmDialog" });
     expect(dialog.props("messageKeypath")).toBe("aiToolset.deleteMessage");
     expect(dialog.props("messageName")).toBe("github-tools");
-    expect(dialog.props("okVariant")).toBe("destructive");
+    expect(dialog.props("kind")).toBe("destructive");
     w.unmount();
   });
 });

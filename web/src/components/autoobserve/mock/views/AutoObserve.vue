@@ -18,16 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="autoobserve-page" class="flex h-full flex-col">
     <OPageLayout
       bleed
-      tabs-below
       :title="t('autoobserve.title')"
-      icon="navigation"
-      :subtitle="t('autoobserve.subtitle')"
+      :about="t('autoobserve.subtitle')"
       title-data-test="autoobserve-title"
     >
-      <template #title-trail>
+      <template #status>
         <OTag
-          variant="purple-soft"
-          size="xs"
+          tone="neutral"
+          size="sm"
           :label="t('autoobserve2.demoTag')"
           data-test="autoobserve-sample-tag"
         />
@@ -39,14 +37,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #header-tabs>
-        <OTabs v-model="tab" align="left" data-test="autoobserve-tabs">
+        <OTabs v-model="tab" data-test="autoobserve-tabs">
           <OTab name="issues" data-test="autoobserve-tab-issues">
             <OIcon name="notifications-active" size="sm" />
             <span>{{ t("autoobserve.tabs.issues") }}</span>
             <OTag
               v-if="badge"
-              variant="error-soft"
-              size="xs"
+              tone="err"
+              size="sm"
               :label="badge"
               data-test="autoobserve-tab-issues-badge"
             />
@@ -58,12 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTab name="activity" data-test="autoobserve-tab-activity">
             <OIcon name="history" size="sm" />
             <span>{{ t("autoobserve.tabs.activity") }}</span>
-            <OTag
-              v-if="awaitingCount"
-              variant="warning-soft"
-              size="xs"
-              :label="raw(String(awaitingCount))"
-            />
+            <OTag v-if="awaitingCount" tone="warn" size="sm" :label="raw(String(awaitingCount))" />
           </OTab>
           <OTab name="policy" data-test="autoobserve-tab-policy">
             <OIcon name="tune" size="sm" />

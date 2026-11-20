@@ -52,7 +52,20 @@ describe("dashboard panel stream memory", () => {
     expect(
       pickDashboardPanelStream("org1", "logs", [{ name: "_internal" }, { name: "plain" }]),
     ).toBe("plain");
-    expect(pickDashboardPanelStream("org1", "logs", [{ name: "_internal" }])).toBe("_internal");
+    expect(pickDashboardPanelStream("org1", "logs", [{ name: "_internal" }])).toBe("");
+    expect(
+      pickDashboardPanelStream("org1", "logs", [
+        { name: "triggers", is_internal: true, stats: { doc_num: 9, doc_time_max: 999 } },
+        { name: "app", stats: { doc_num: 1, doc_time_max: 1 } },
+      ]),
+    ).toBe("app");
+    expect(
+      pickDashboardPanelStream("org1", "logs", [
+        { name: "triggers", stats: { doc_num: 9, doc_time_max: 999 } },
+        { name: "slo_slices", stats: { doc_num: 9, doc_time_max: 998 } },
+        { name: "nginx", stats: { doc_num: 1, doc_time_max: 1 } },
+      ]),
+    ).toBe("nginx");
   });
 
   it("skips a remembered stream that no longer exists", () => {

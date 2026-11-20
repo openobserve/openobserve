@@ -112,7 +112,7 @@ describe("DbmScopeFilters", () => {
       const insight = wrapper
         .findAllComponents(ODimensionChip)
         .find((chip) => chip.attributes("data-test") === "dbm-queries-scope-chip-insight");
-      expect(insight?.props("variant")).toBe("warning-soft");
+      expect(insight?.props("tone")).toBe("warn");
       expect(insight?.html()).toContain("bg-badge-warning-soft-bg");
       expect(insight?.text()).toContain("Newly expensive");
     });

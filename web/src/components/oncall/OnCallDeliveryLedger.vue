@@ -15,14 +15,12 @@
 -->
 <template>
   <div class="flex flex-col gap-2" data-test="oncall-delivery-ledger">
-    <OInnerLoading v-if="loading" showing />
+    <OSkeleton v-if="loading" preset="tableRows" :rows="3" />
 
     <OEmptyState
       v-else-if="!records.length"
-      size="inline"
-      variant="no-results"
+      size="compact"
       :title="t('oncall.deliveriesNone')"
-      hide-action
       data-test="oncall-deliveries-empty"
     />
 
@@ -44,11 +42,7 @@
           class="border-border-subtle flex flex-wrap items-center gap-2 border-b py-1.5 last:border-b-0"
           :data-test="`oncall-delivery-row-${group.run}-${index}`"
         >
-          <OTag
-            :variant="row.delivered ? 'success-soft' : 'error-soft'"
-            size="sm"
-            data-test="oncall-delivery-status"
-          >
+          <OTag :tone="row.delivered ? 'ok' : 'err'" size="sm" data-test="oncall-delivery-status">
             {{ row.delivered ? t("oncall.deliveryLanded") : t("oncall.deliveryFailed") }}
           </OTag>
           <OnCallPersonName
@@ -58,12 +52,7 @@
             :data-test="`oncall-delivery-recipient-${group.run}-${index}`"
             :data-test-email="row.recipient"
           />
-          <OTag
-            v-if="row.channel"
-            variant="default-soft"
-            size="sm"
-            data-test="oncall-delivery-channel"
-          >
+          <OTag v-if="row.channel" tone="neutral" size="sm" data-test="oncall-delivery-channel">
             {{ t(`oncall.channel_${row.channel}`) }}
           </OTag>
           <span
@@ -102,12 +91,12 @@
             class="border-border-subtle flex flex-wrap items-center gap-2 border-b py-1.5 last:border-b-0"
             :data-test="`oncall-delivery-post-${group.run}-${index}`"
           >
-            <OTag :variant="row.delivered ? 'success-soft' : 'warning-soft'" size="sm">
+            <OTag :tone="row.delivered ? 'ok' : 'warn'" size="sm">
               {{ row.delivered ? t("oncall.roomPosted") : t("oncall.roomPostFailed") }}
             </OTag>
             <!-- A room, not a person — a user cell would imply an inbox. -->
             <span class="text-text-body text-sm">{{ raw(row.recipient ?? "") }}</span>
-            <OTag v-if="row.channel" variant="default-soft" size="sm">
+            <OTag v-if="row.channel" tone="neutral" size="sm">
               {{ t(`oncall.channel_${row.channel}`) }}
             </OTag>
             <span
@@ -141,7 +130,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import type { Channel, DeliveryRecord } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";

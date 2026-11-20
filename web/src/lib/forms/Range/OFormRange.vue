@@ -41,7 +41,6 @@ if (import.meta.env.DEV && !form) {
           :help-text="props.helpText"
           :disabled="props.disabled"
           :required="props.required"
-          :size="props.size"
           :id="props.id"
           :name="props.name"
           :vertical="props.vertical"

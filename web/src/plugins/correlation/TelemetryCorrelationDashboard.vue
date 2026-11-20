@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Dialog Mode -->
   <ODrawer
+    size="xl"
     data-test="telemetry-correlation-dashboard-drawer"
     bleed
     v-if="props.mode === 'dialog'"
     v-model:open="isOpen"
     side="right"
-    :width="90"
     :title="t('correlation.correlatedStreamsFor', { service: titleName })"
-    :sub-title="formatTimeRange(timeRange)"
+    :subtitle="formatTimeRange(timeRange)"
     @update:open="(v) => !v && onClose()"
   >
     <template #header>
@@ -76,8 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Apply Button -->
         <OButton
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="!hasPendingChanges"
           @click="applyDimensionChanges"
           class="ms-2"
@@ -101,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Tabs (only in dialog mode, hidden in embedded-tabs mode) -->
     <div class="px-page-edge">
-      <OTabs v-if="!isEmbeddedTabs" v-model="activeTab" dense bordered align="left">
+      <OTabs v-if="!isEmbeddedTabs" v-model="activeTab" size="compact" bordered>
         <OTab name="logs" :label="t('common.logs')" />
         <OTab name="metrics" :label="t('search.metrics')" />
         <OTab name="traces" :label="t('menu.traces')" />
@@ -116,18 +115,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="logsDashboardData"
             class="border-card-glass-border flex justify-end border-b border-solid p-2"
           >
-            <OButton variant="ghost" size="sm-action" @click="loadDashboard" :loading="loading">
-              <OIcon name="refresh" size="xs" class="me-1" />
-              {{ t("common.refresh") }}
-            </OButton>
+            <ORefreshButton
+              :last-run-at="logsLoadedAt"
+              :loading="loading"
+              data-test="correlation-logs-refresh"
+              @click="loadDashboard"
+            />
           </div>
 
-          <!-- Loading State -->
-          <div v-if="loading" class="flex h-full flex-col items-center justify-center gap-3 py-20">
-            <OSpinner size="sm" />
-            <div class="text-sm opacity-70">
-              {{ t("correlation.loadingLogs") }}
-            </div>
+          <div v-if="loading" class="grid grid-cols-2 gap-3 p-3 max-md:grid-cols-1">
+            <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-48" />
           </div>
 
           <!-- Logs Dashboard -->
@@ -141,15 +138,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchType="dashboards"
           />
 
-          <!-- No Logs State -->
-          <div v-else class="flex h-full flex-col items-center justify-center py-20">
-            <div class="mb-2 text-base font-medium opacity-90">
-              {{ t("correlation.noLogsFound") }}
-            </div>
-            <div class="text-sm opacity-70">
-              {{ t("correlation.noLogsDescription") }}
-            </div>
-          </div>
+          <OEmptyState
+            v-else
+            :title="t('correlation.noLogsFound')"
+            :text="t('correlation.noLogsDescription')"
+          />
         </OTabPanel>
 
         <!-- Metrics Tab Panel -->
@@ -166,11 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="dimension-sidebar-search-container border-card-glass-border border-b border-solid px-1.5 py-2"
                 >
-                  <OSearchInput
-                    v-model="metricSearchText"
-                    :placeholder="t('search.searchField')"
-                    clearable
-                  />
+                  <OSearchInput v-model="metricSearchText" :placeholder="t('search.searchField')" />
                 </div>
 
                 <!-- Grouped metric list -->
@@ -190,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @click="toggleGroupCollapse(group.id)"
                         >
                           <div
-                            class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
+                            class="text-2xs flex items-center gap-1.5 font-semibold tracking-[0.05em] uppercase opacity-75"
                           >
                             <OIcon
                               :name="
@@ -212,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <div class="flex gap-1">
                             <OButton
                               variant="ghost"
-                              size="chip"
+                              size="xs"
                               @click.stop="selectAllInGroup(group.id)"
                               :disabled="getGroupSelectionState(group.id) === 'all'"
                             >
@@ -220,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </OButton>
                             <OButton
                               variant="ghost"
-                              size="chip"
+                              size="xs"
                               @click.stop="deselectAllInGroup(group.id)"
                               :disabled="getGroupSelectionState(group.id) === 'none'"
                             >
@@ -243,7 +232,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   (s) => s.stream_name === stream.stream_name,
                                 )
                               "
-                              size="xs"
                               @update:model-value="toggleMetricStream(stream)"
                             />
                           </div>
@@ -256,10 +244,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </template>
                   </template>
-                  <div v-else class="px-2 pt-3 text-center">
-                    <OIcon name="info" size="sm" class="me-1 align-middle" />
-                    {{ t("search.noResult") }}
-                  </div>
+                  <OEmptyState
+                    v-else
+                    size="compact"
+                    kind="filtered"
+                    class="px-2"
+                    :title="t('search.noResult')"
+                  />
                 </div>
 
                 <!-- Footer: selected count -->
@@ -288,8 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTabs
                   v-if="isNestedGroupMode"
                   v-model="activeOuterTab"
-                  dense
-                  align="left"
+                  size="compact"
                   class="px-page-edge border-card-glass-border shrink-0 border-b border-solid"
                 >
                   <OTab v-for="outerGroup in groupDefs" :key="outerGroup.id" :name="outerGroup.id">
@@ -316,8 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTabs
                   v-if="nonEmptyGroupTabs.length > 0"
                   v-model="activeMetricGroupTab"
-                  dense
-                  align="left"
+                  size="compact"
                   class="px-page-edge bg-surface-panel border-card-glass-border shrink-0 border-b border-solid"
                 >
                   <OTab
@@ -347,34 +336,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Dashboard content -->
                 <div class="min-h-0 flex-1 overflow-auto">
-                  <div
-                    v-if="loading"
-                    class="flex h-full flex-col items-center justify-center gap-3 py-20"
-                  >
-                    <OSpinner size="sm" />
-                    <div class="text-sm opacity-70">
-                      {{
-                        t("correlation.loadingMetrics", {
-                          count: selectedMetricStreams.length,
-                        })
-                      }}
-                    </div>
+                  <div v-if="loading" class="grid grid-cols-2 gap-3 p-3 max-md:grid-cols-1">
+                    <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-48" />
                   </div>
-                  <div
+                  <OEmptyState
                     v-else-if="error"
-                    class="flex h-full flex-col items-center justify-center py-20"
-                  >
-                    <div class="mb-2 text-base font-medium opacity-90">
-                      {{ t("correlation.metricsError") }}
-                    </div>
-                    <div class="mb-4 text-sm opacity-70">
-                      {{ error || t("correlation.metricsErrorDetails") }}
-                    </div>
-                    <OButton variant="ghost" size="sm-action" @click="loadDashboard">
-                      <OIcon name="refresh" size="xs" class="me-1" />
-                      {{ t("correlation.retryButton") }}
-                    </OButton>
-                  </div>
+                    kind="error"
+                    :title="t('correlation.metricsError')"
+                    :text="t('correlation.metricsErrorDetails')"
+                    :action-label="t('correlation.retryButton')"
+                    @action="loadDashboard"
+                  />
                   <RenderDashboardCharts
                     v-else-if="activeDashboardForGroup"
                     ref="dashboardChartsRef"
@@ -385,29 +357,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :allowAlertCreation="false"
                     searchType="dashboards"
                   />
-                  <div
+                  <OEmptyState
                     v-else-if="hasNoMetricStreams"
                     data-test="correlation-no-metric-streams"
-                    class="flex h-[calc(100vh-7.5rem)] flex-col items-center justify-center py-20"
-                  >
-                    <div class="mb-2 text-base font-medium opacity-90">
-                      {{ t("correlation.noMetricStreamsForService", { service: titleName }) }}
-                    </div>
-                    <div class="text-sm opacity-70">
-                      {{ t("correlation.noMetricStreamsForServiceDescription") }}
-                    </div>
-                  </div>
-                  <div
+                    :title="t('correlation.noMetricStreamsForService', { service: titleName })"
+                    :text="t('correlation.noMetricStreamsForServiceDescription')"
+                  />
+                  <OEmptyState
                     v-else
-                    class="flex h-[calc(100vh-7.5rem)] flex-col items-center justify-center py-20"
-                  >
-                    <div class="mb-2 text-base font-medium opacity-90">
-                      {{ t("correlation.noMetrics") }}
-                    </div>
-                    <div class="text-sm opacity-70">
-                      {{ t("correlation.noMetricsDescription") }}
-                    </div>
-                  </div>
+                    :title="t('correlation.noMetrics')"
+                    :text="t('correlation.noMetricsDescription')"
+                  />
                 </div>
               </div>
             </template>
@@ -428,33 +388,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @open="openTracesPage"
             />
             <div class="min-h-0 flex-1">
-              <!-- Loading State -->
-              <div
-                v-if="tracesLoading"
-                class="flex h-full flex-col items-center justify-center gap-3 py-20"
-              >
-                <OSpinner size="sm" />
-                <div class="text-sm opacity-70">
-                  {{ t("correlation.loadingTraces") }}
-                </div>
+              <div v-if="tracesLoading" class="p-3">
+                <OSkeleton preset="tableRows" :rows="8" />
               </div>
 
-              <!-- Error State -->
-              <div
+              <OEmptyState
                 v-else-if="tracesError"
-                class="flex h-full flex-col items-center justify-center py-20"
-              >
-                <div class="mb-2 text-base font-medium opacity-90">
-                  {{ t("correlation.tracesError") }}
-                </div>
-                <div class="mb-4 text-sm opacity-70">
-                  {{ tracesError || t("correlation.tracesErrorDetails") }}
-                </div>
-                <OButton variant="ghost" size="sm-action" @click="loadCorrelatedTraces">
-                  <OIcon name="refresh" size="xs" class="me-1" />
-                  {{ t("correlation.retryButton") }}
-                </OButton>
-              </div>
+                kind="error"
+                :title="t('correlation.tracesError')"
+                :text="t('correlation.tracesErrorDetails')"
+                :action-label="t('correlation.retryButton')"
+                @action="loadCorrelatedTraces"
+              />
 
               <!-- Direct Trace Correlation - Full Span List -->
               <div
@@ -496,7 +441,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OEmptyState
                   v-else
-                  illustration="trace"
+                  kind="filtered"
+                  icon="timeline"
                   :title="t('correlation.noTracesFound')"
                   data-test="correlation-no-traces-for-version"
                 />
@@ -505,17 +451,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- No Traces Found State -->
               <div v-else-if="traceCorrelationMode !== null" class="min-h-80">
                 <OEmptyState
-                  size="hero"
-                  illustration="trace"
+                  icon="timeline"
                   :title="t('correlation.noTracesFound')"
-                  :description="t('correlation.noTracesDescription')"
+                  :text="t('correlation.noTracesDescription')"
                   data-test="correlation-no-traces-state-drawer"
                 />
               </div>
 
               <!-- Initial State (waiting for tab to be shown) -->
               <div v-else class="flex h-full flex-col items-center justify-center py-20">
-                <div class="mb-2 text-base font-medium opacity-90">
+                <div class="mb-2 text-sm font-medium opacity-90">
                   {{ t("correlation.correlatedTraces") }}
                 </div>
                 <div class="text-sm opacity-70">
@@ -556,415 +501,368 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
-    <OCard
-      :class="[
-        'flex min-h-0 flex-1 flex-col',
-        activeTab === 'metrics' ? 'overflow-hidden' : 'overflow-auto',
-      ]"
-    >
-      <div v-if="activeTab == 'logs'" class="flex min-h-0 flex-1 flex-col">
-        <!-- Refresh Button (embedded mode) -->
-        <div
-          v-if="logsDashboardData"
-          class="border-card-glass-border flex justify-end border-b border-solid p-2"
-        >
-          <OButton variant="ghost" size="sm-action" @click="loadDashboard" :loading="loading">
-            <OIcon name="refresh" size="xs" class="me-1" />
-            {{ t("common.refresh") }}
-          </OButton>
-        </div>
-
-        <!-- Loading State -->
-        <div
-          v-if="loading"
-          class="flex flex-1 flex-col items-center justify-center gap-3"
-          style="min-height: 18.75rem"
-        >
-          <OSpinner size="sm" />
-          <div class="text-sm opacity-70">
-            {{ t("correlation.loadingLogs") }}
-          </div>
-        </div>
-
-        <!-- Logs Dashboard -->
-        <RenderDashboardCharts
-          v-else-if="logsDashboardData"
-          :key="logsDashboardRenderKey"
-          :dashboardData="logsDashboardData"
-          :currentTimeObj="currentTimeObj"
-          :viewOnly="true"
-          :allowAlertCreation="false"
-          searchType="dashboards"
-        />
-
-        <!-- No Logs State -->
-        <div v-else class="flex h-full flex-col items-center justify-center py-20">
-          <div class="mb-2 text-base font-medium opacity-90">
-            {{ t("correlation.noLogsFound") }}
-          </div>
-          <div class="text-sm opacity-70">
-            {{ t("correlation.noLogsDescription") }}
-          </div>
-        </div>
-      </div>
-
+    <OCard flush class="min-h-0 flex-1">
       <div
-        v-if="activeTab == 'metrics'"
-        class="metrics-correlation-dashboard flex h-full min-h-0 flex-col overflow-hidden"
+        class="flex h-full min-h-0 flex-col"
+        :class="activeTab === 'metrics' ? 'overflow-hidden' : 'overflow-auto'"
       >
-        <!-- Two-column body: sidebar + charts (splitter matching TracesAnalysisDashboard style) -->
-        <OSplitter
-          v-model="splitterModel"
-          class="h-full max-h-full min-h-0 w-full flex-1 overflow-hidden"
-        >
-          <!-- -- Left sidebar -- -->
-          <template #before>
-            <div class="bg-surface-overlay flex h-full min-h-0 flex-col">
-              <div
-                class="dimension-sidebar-search-container border-card-glass-border border-b border-solid p-2.5"
-              >
-                <OSearchInput
-                  v-model="metricSearchText"
-                  :placeholder="t('search.searchField')"
-                  clearable
-                />
-              </div>
+        <div v-if="activeTab == 'logs'" class="flex min-h-0 flex-1 flex-col">
+          <!-- Refresh Button (embedded mode) -->
+          <div
+            v-if="logsDashboardData"
+            class="border-card-glass-border flex justify-end border-b border-solid p-2"
+          >
+            <ORefreshButton
+              :last-run-at="logsLoadedAt"
+              :loading="loading"
+              data-test="correlation-logs-refresh"
+              @click="loadDashboard"
+            />
+          </div>
 
-              <!-- Grouped metric list -->
-              <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
-              <div
-                class="dimension-list-container min-h-0 flex-1 overflow-y-auto"
-                style="max-height: calc(100vh - 210px)"
-              >
-                <!-- eslint-enable local/no-hardcoded-px -->
-                <template
-                  v-if="groupedFilteredMetricStreams.groups.some((g) => g.streams.length > 0)"
+          <div v-if="loading" class="grid grid-cols-2 gap-3 p-3 max-md:grid-cols-1">
+            <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-48" />
+          </div>
+
+          <!-- Logs Dashboard -->
+          <RenderDashboardCharts
+            v-else-if="logsDashboardData"
+            :key="logsDashboardRenderKey"
+            :dashboardData="logsDashboardData"
+            :currentTimeObj="currentTimeObj"
+            :viewOnly="true"
+            :allowAlertCreation="false"
+            searchType="dashboards"
+          />
+
+          <OEmptyState
+            v-else
+            :title="t('correlation.noLogsFound')"
+            :text="t('correlation.noLogsDescription')"
+          />
+        </div>
+
+        <div
+          v-if="activeTab == 'metrics'"
+          class="metrics-correlation-dashboard flex h-full min-h-0 flex-col overflow-hidden"
+        >
+          <!-- Two-column body: sidebar + charts (splitter matching TracesAnalysisDashboard style) -->
+          <OSplitter
+            v-model="splitterModel"
+            class="h-full max-h-full min-h-0 w-full flex-1 overflow-hidden"
+          >
+            <!-- -- Left sidebar -- -->
+            <template #before>
+              <div class="bg-surface-overlay flex h-full min-h-0 flex-col">
+                <div
+                  class="dimension-sidebar-search-container border-card-glass-border border-b border-solid p-2.5"
                 >
-                  <template v-for="group in groupedFilteredMetricStreams.groups" :key="group.id">
-                    <template v-if="group.streams.length > 0">
-                      <div
-                        class="bg-section-header-bg border-border-default sticky top-0 z-10 flex cursor-pointer items-center justify-between border-b border-solid px-2 py-1.5"
-                        @click="toggleGroupCollapse(group.id)"
-                      >
+                  <OSearchInput v-model="metricSearchText" :placeholder="t('search.searchField')" />
+                </div>
+
+                <!-- Grouped metric list -->
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+                <div
+                  class="dimension-list-container min-h-0 flex-1 overflow-y-auto"
+                  style="max-height: calc(100vh - 210px)"
+                >
+                  <!-- eslint-enable local/no-hardcoded-px -->
+                  <template
+                    v-if="groupedFilteredMetricStreams.groups.some((g) => g.streams.length > 0)"
+                  >
+                    <template v-for="group in groupedFilteredMetricStreams.groups" :key="group.id">
+                      <template v-if="group.streams.length > 0">
                         <div
-                          class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
+                          class="bg-section-header-bg border-border-default sticky top-0 z-10 flex cursor-pointer items-center justify-between border-b border-solid px-2 py-1.5"
+                          @click="toggleGroupCollapse(group.id)"
                         >
-                          <OIcon
-                            :name="collapsedGroups.has(group.id) ? 'chevron-right' : 'expand-more'"
-                            size="sm"
-                            class="me-0.5"
-                          />
-                          <OIcon
-                            v-if="typeof group.icon === 'string'"
-                            :name="group.icon"
-                            size="xs"
-                            class="me-0.5"
-                          />
-                          <component v-else :is="group.icon" />
-                          <span>{{ t(group.labelKey) }}</span>
-                          <OTag type="fieldTag" class="ms-1">{{ group.streams.length }}</OTag>
-                        </div>
-                        <div class="flex gap-1">
-                          <OButton
-                            variant="ghost"
-                            size="chip"
-                            @click.stop="selectAllInGroup(group.id)"
-                            :disabled="getGroupSelectionState(group.id) === 'all'"
+                          <div
+                            class="text-2xs flex items-center gap-1.5 font-semibold tracking-[0.05em] uppercase opacity-75"
                           >
-                            {{ t("correlation.all") }}
-                          </OButton>
-                          <OButton
-                            variant="ghost"
-                            size="chip"
-                            @click.stop="deselectAllInGroup(group.id)"
-                            :disabled="getGroupSelectionState(group.id) === 'none'"
-                          >
-                            {{ t("common.none") }}
-                          </OButton>
+                            <OIcon
+                              :name="
+                                collapsedGroups.has(group.id) ? 'chevron-right' : 'expand-more'
+                              "
+                              size="sm"
+                              class="me-0.5"
+                            />
+                            <OIcon
+                              v-if="typeof group.icon === 'string'"
+                              :name="group.icon"
+                              size="xs"
+                              class="me-0.5"
+                            />
+                            <component v-else :is="group.icon" />
+                            <span>{{ t(group.labelKey) }}</span>
+                            <OTag type="fieldTag" class="ms-1">{{ group.streams.length }}</OTag>
+                          </div>
+                          <div class="flex gap-1">
+                            <OButton
+                              variant="ghost"
+                              size="xs"
+                              @click.stop="selectAllInGroup(group.id)"
+                              :disabled="getGroupSelectionState(group.id) === 'all'"
+                            >
+                              {{ t("correlation.all") }}
+                            </OButton>
+                            <OButton
+                              variant="ghost"
+                              size="xs"
+                              @click.stop="deselectAllInGroup(group.id)"
+                              :disabled="getGroupSelectionState(group.id) === 'none'"
+                            >
+                              {{ t("common.none") }}
+                            </OButton>
+                          </div>
                         </div>
-                      </div>
-                      <div
-                        v-for="stream in group.streams"
-                        v-show="!collapsedGroups.has(group.id)"
-                        :key="stream.stream_name"
-                        data-test="telemetry-correlation-metric-stream-item"
-                        class="flex cursor-pointer items-center gap-2 border-none! px-2 py-1 hover:bg-[rgba(0,0,0,0.04)] dark:hover:bg-[rgba(255,255,255,0.05)]"
-                        @click="toggleMetricStream(stream)"
-                      >
-                        <div class="flex shrink-0 items-center">
-                          <OCheckbox
-                            :model-value="
-                              selectedMetricStreams.some(
-                                (s) => s.stream_name === stream.stream_name,
-                              )
-                            "
-                            size="xs"
-                            @update:model-value="toggleMetricStream(stream)"
-                          />
+                        <div
+                          v-for="stream in group.streams"
+                          v-show="!collapsedGroups.has(group.id)"
+                          :key="stream.stream_name"
+                          data-test="telemetry-correlation-metric-stream-item"
+                          class="flex cursor-pointer items-center gap-2 border-none! px-2 py-1 hover:bg-[rgba(0,0,0,0.04)] dark:hover:bg-[rgba(255,255,255,0.05)]"
+                          @click="toggleMetricStream(stream)"
+                        >
+                          <div class="flex shrink-0 items-center">
+                            <OCheckbox
+                              :model-value="
+                                selectedMetricStreams.some(
+                                  (s) => s.stream_name === stream.stream_name,
+                                )
+                              "
+                              @update:model-value="toggleMetricStream(stream)"
+                            />
+                          </div>
+                          <div class="flex min-w-0 flex-1 flex-col">
+                            <OTruncatedText class="text-text-secondary! cursor-pointer text-sm">{{
+                              stream.stream_name
+                            }}</OTruncatedText>
+                          </div>
                         </div>
-                        <div class="flex min-w-0 flex-1 flex-col">
-                          <OTruncatedText class="text-text-secondary! cursor-pointer text-sm">{{
-                            stream.stream_name
-                          }}</OTruncatedText>
-                        </div>
-                      </div>
+                      </template>
                     </template>
                   </template>
-                </template>
-                <div v-else class="px-2 pt-3 text-center">
-                  <OIcon name="info" size="sm" class="me-1 align-middle" />
-                  {{ t("search.noResult") }}
+                  <OEmptyState
+                    v-else
+                    size="compact"
+                    kind="filtered"
+                    class="px-2"
+                    :title="t('search.noResult')"
+                  />
+                </div>
+
+                <!-- Footer: selected count -->
+                <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
+                  {{
+                    t("correlation.streamsSelectedCount", {
+                      selected: selectedMetricStreams.length,
+                      total: uniqueMetricStreams.length,
+                    })
+                  }}
                 </div>
               </div>
+            </template>
 
-              <!-- Footer: selected count -->
-              <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
-                {{
-                  t("correlation.streamsSelectedCount", {
-                    selected: selectedMetricStreams.length,
-                    total: uniqueMetricStreams.length,
-                  })
-                }}
-              </div>
-            </div>
-          </template>
+            <!-- -- Separator -- -->
+            <template #separator>
+              <div
+                class="bg-border-default h-full w-px cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]"
+              />
+            </template>
 
-          <!-- -- Separator -- -->
-          <template #separator>
-            <div
-              class="bg-border-default h-full w-px cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]"
-            />
-          </template>
-
-          <!-- -- Right area: group tabs + dashboard -- -->
-          <template #after>
-            <div class="flex h-full flex-col overflow-hidden">
-              <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
-              <OTabs
-                v-if="isNestedGroupMode"
-                v-model="activeOuterTab"
-                dense
-                align="left"
-                class="border-card-glass-border shrink-0 border-b border-solid"
-              >
-                <OTab v-for="outerGroup in groupDefs" :key="outerGroup.id" :name="outerGroup.id">
-                  <div class="flex min-w-0 flex-col items-start">
-                    <div class="flex items-center gap-1">
-                      <OIcon
-                        v-if="typeof outerGroup.icon === 'string'"
-                        :name="outerGroup.icon"
-                        size="xs"
-                      />
-                      <component v-else :is="outerGroup.icon" />
-                      <span class="text-xs whitespace-nowrap">{{ t(outerGroup.labelKey) }}</span>
+            <!-- -- Right area: group tabs + dashboard -- -->
+            <template #after>
+              <div class="flex h-full flex-col overflow-hidden">
+                <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
+                <OTabs
+                  v-if="isNestedGroupMode"
+                  v-model="activeOuterTab"
+                  size="compact"
+                  class="border-card-glass-border shrink-0 border-b border-solid"
+                >
+                  <OTab v-for="outerGroup in groupDefs" :key="outerGroup.id" :name="outerGroup.id">
+                    <div class="flex min-w-0 flex-col items-start">
+                      <div class="flex items-center gap-1">
+                        <OIcon
+                          v-if="typeof outerGroup.icon === 'string'"
+                          :name="outerGroup.icon"
+                          size="xs"
+                        />
+                        <component v-else :is="outerGroup.icon" />
+                        <span class="text-xs whitespace-nowrap">{{ t(outerGroup.labelKey) }}</span>
+                      </div>
+                      <OTruncatedText
+                        v-if="outerTabResourceName[outerGroup.id]"
+                        class="max-w-40 text-xs leading-tight opacity-75"
+                        >{{ outerTabResourceName[outerGroup.id] }}</OTruncatedText
+                      >
                     </div>
-                    <OTruncatedText
-                      v-if="outerTabResourceName[outerGroup.id]"
-                      class="max-w-40 text-xs leading-tight opacity-75"
-                      >{{ outerTabResourceName[outerGroup.id] }}</OTruncatedText
-                    >
-                  </div>
-                </OTab>
-              </OTabs>
+                  </OTab>
+                </OTabs>
 
-              <!-- Group tabs -->
-              <OTabs
-                v-if="nonEmptyGroupTabs.length > 0"
-                v-model="activeMetricGroupTab"
-                dense
-                align="left"
-                class="bg-surface-panel border-card-glass-border shrink-0 border-b border-solid"
-              >
-                <OTab
-                  v-for="group in groupedUniqueMetricStreams.groups.filter((g) =>
-                    nonEmptyGroupTabs.includes(g.id),
-                  )"
-                  :key="group.id"
-                  :name="group.id"
+                <!-- Group tabs -->
+                <OTabs
+                  v-if="nonEmptyGroupTabs.length > 0"
+                  v-model="activeMetricGroupTab"
+                  size="compact"
+                  class="bg-surface-panel border-card-glass-border shrink-0 border-b border-solid"
                 >
-                  <div class="flex items-center gap-1">
-                    <component v-if="typeof group.icon !== 'string'" :is="group.icon" />
-                    <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
-                    <span>{{ t(group.labelKey) }}</span>
-                    <OTag
-                      type="tabChip"
-                      :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
-                      class="ms-1"
-                      :class="{
-                        'opacity-40':
-                          (groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0) === 0,
-                      }"
-                      >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag
-                    >
-                  </div>
-                </OTab>
-              </OTabs>
+                  <OTab
+                    v-for="group in groupedUniqueMetricStreams.groups.filter((g) =>
+                      nonEmptyGroupTabs.includes(g.id),
+                    )"
+                    :key="group.id"
+                    :name="group.id"
+                  >
+                    <div class="flex items-center gap-1">
+                      <component v-if="typeof group.icon !== 'string'" :is="group.icon" />
+                      <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
+                      <span>{{ t(group.labelKey) }}</span>
+                      <OTag
+                        type="tabChip"
+                        :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
+                        class="ms-1"
+                        :class="{
+                          'opacity-40':
+                            (groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0) === 0,
+                        }"
+                        >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag
+                      >
+                    </div>
+                  </OTab>
+                </OTabs>
 
-              <!-- Dashboard content -->
-              <div class="min-h-0 flex-1 overflow-auto">
-                <div
-                  v-if="loading"
-                  class="flex h-full flex-col items-center justify-center gap-3 py-20"
-                >
-                  <OSpinner size="sm" />
-                  <div class="text-sm opacity-70">
-                    {{
-                      t("correlation.loadingMetrics", {
-                        count: selectedMetricStreams.length,
-                      })
-                    }}
+                <!-- Dashboard content -->
+                <div class="min-h-0 flex-1 overflow-auto">
+                  <div v-if="loading" class="grid grid-cols-2 gap-3 p-3 max-md:grid-cols-1">
+                    <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-48" />
                   </div>
-                </div>
-                <div
-                  v-else-if="error"
-                  class="flex h-full flex-col items-center justify-center py-20"
-                >
-                  <div class="mb-2 text-base font-medium opacity-90">
-                    {{ t("correlation.metricsError") }}
-                  </div>
-                  <div class="mb-4 text-sm opacity-70">
-                    {{ error || t("correlation.metricsErrorDetails") }}
-                  </div>
-                  <OButton variant="ghost" size="sm-action" @click="loadDashboard">
-                    <OIcon name="refresh" size="xs" class="me-1" />
-                    {{ t("correlation.retryButton") }}
-                  </OButton>
-                </div>
-                <RenderDashboardCharts
-                  v-else-if="activeDashboardForGroup"
-                  :key="activeMetricGroupTab + '_' + groupedDashboardRenderKey"
-                  :dashboardData="activeDashboardForGroup"
-                  :currentTimeObj="currentTimeObj"
-                  :viewOnly="true"
-                  :allowAlertCreation="false"
-                  searchType="dashboards"
-                  class="border-none"
-                />
-                <div
-                  v-else-if="hasNoMetricStreams"
-                  data-test="correlation-no-metric-streams"
-                  class="flex h-full flex-col items-center justify-center py-20"
-                >
-                  <div class="mb-2 text-base font-medium opacity-90">
-                    {{ t("correlation.noMetricStreamsForService", { service: titleName }) }}
-                  </div>
-                  <div class="text-sm opacity-70">
-                    {{ t("correlation.noMetricStreamsForServiceDescription") }}
-                  </div>
-                </div>
-                <div v-else class="flex h-full flex-col items-center justify-center py-20">
-                  <div class="mb-2 text-base font-medium opacity-90">
-                    {{ t("correlation.noMetrics") }}
-                  </div>
-                  <div class="text-sm opacity-70">
-                    {{ t("correlation.noMetricsDescription") }}
-                  </div>
+                  <OEmptyState
+                    v-else-if="error"
+                    kind="error"
+                    :title="t('correlation.metricsError')"
+                    :text="t('correlation.metricsErrorDetails')"
+                    :action-label="t('correlation.retryButton')"
+                    @action="loadDashboard"
+                  />
+                  <RenderDashboardCharts
+                    v-else-if="activeDashboardForGroup"
+                    :key="activeMetricGroupTab + '_' + groupedDashboardRenderKey"
+                    :dashboardData="activeDashboardForGroup"
+                    :currentTimeObj="currentTimeObj"
+                    :viewOnly="true"
+                    :allowAlertCreation="false"
+                    searchType="dashboards"
+                    class="border-none"
+                  />
+                  <OEmptyState
+                    v-else-if="hasNoMetricStreams"
+                    data-test="correlation-no-metric-streams"
+                    :title="t('correlation.noMetricStreamsForService', { service: titleName })"
+                    :text="t('correlation.noMetricStreamsForServiceDescription')"
+                  />
+                  <OEmptyState
+                    v-else
+                    :title="t('correlation.noMetrics')"
+                    :text="t('correlation.noMetricsDescription')"
+                  />
                 </div>
               </div>
+            </template>
+          </OSplitter>
+        </div>
+
+        <div v-if="activeTab == 'traces'" class="flex h-full flex-col">
+          <CorrelationTracesListHeader
+            v-if="showTracesHeader"
+            v-model:version="versionFilter"
+            :service="titleName"
+            :count="tracesLoading || tracesError ? null : tracesForDimensions.length"
+            :version-options="versionOptions"
+            :locked="tracesLocked"
+            :locked-reason="tracesLockedReason"
+            @open="openTracesPage"
+          />
+          <div class="min-h-0 flex-1">
+            <div v-if="tracesLoading" class="p-3">
+              <OSkeleton preset="tableRows" :rows="8" />
             </div>
-          </template>
-        </OSplitter>
-      </div>
 
-      <div v-if="activeTab == 'traces'" class="flex h-full flex-col">
-        <CorrelationTracesListHeader
-          v-if="showTracesHeader"
-          v-model:version="versionFilter"
-          :service="titleName"
-          :count="tracesLoading || tracesError ? null : tracesForDimensions.length"
-          :version-options="versionOptions"
-          :locked="tracesLocked"
-          :locked-reason="tracesLockedReason"
-          @open="openTracesPage"
-        />
-        <div class="min-h-0 flex-1">
-          <!-- Loading State -->
-          <div v-if="tracesLoading" class="flex h-full flex-col items-center justify-center py-20">
-            <OSpinner size="xl" class="mb-4" />
-            <div class="text-base">{{ t("correlation.loadingTraces") }}</div>
-          </div>
-
-          <!-- Error State -->
-          <div
-            v-else-if="tracesError"
-            class="flex h-full flex-col items-center justify-center py-20"
-          >
-            <OIcon name="error-outline" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
-            <div class="mb-2 text-base">
-              {{ t("correlation.tracesError") }}
-            </div>
-            <div class="text-text-secondary text-sm">{{ tracesError }}</div>
-            <OButton variant="outline" size="sm-action" class="mt-4" @click="loadCorrelatedTraces">
-              <OIcon name="refresh" size="xs" class="me-1" />
-              {{ t("correlation.retryButton") }}
-            </OButton>
-          </div>
-
-          <!-- Direct Trace Correlation - Full Span List -->
-          <div
-            v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0"
-            class="telemetry-correlation-traces h-full overflow-auto"
-          >
-            <TraceDetails
-              mode="embedded"
-              :shortcuts-active="shortcutsActive"
-              :trace-id-prop="extractedTraceId || ''"
-              :stream-name-prop="sortedTraceStreams[0] ? sortedTraceStreams[0].stream_name : ''"
-              :span-list-prop="traceSpanList"
-              :start-time-prop="computedTraceStartTime"
-              :end-time-prop="computedTraceEndTime"
-              :correlated-log-stream="sortedLogStreams[0] ? sortedLogStreams[0].stream_name : ''"
-              :show-back-button="false"
-              :show-timeline="false"
-              :show-log-stream-selector="false"
-              :show-share-button="false"
-              :show-close-button="false"
-              :show-expand-button="true"
-              :enable-correlation-links="true"
-              :initial-timeline-expanded="false"
-            />
-          </div>
-
-          <!-- Dimension-based Correlation - Traces List -->
-          <div v-else-if="showTracesList" class="flex h-full flex-col">
-            <div class="flex-1">
-              <TracesSearchResultList
-                v-if="tracesForDimensions.length > 0"
-                :hits="tracesForDimensions"
-                :loading="false"
-                :show-header="false"
-                :show-cell-actions="false"
-                :version-column="true"
-                @row-click="openTraceInNewWindow"
-              />
-              <OEmptyState
-                v-else
-                illustration="trace"
-                :title="t('correlation.noTracesFound')"
-                data-test="correlation-no-traces-for-version"
-              />
-            </div>
-          </div>
-
-          <!-- No Traces Found State -->
-          <div v-else-if="traceCorrelationMode !== null" class="h-full">
             <OEmptyState
-              size="hero"
-              illustration="trace"
-              :title="t('correlation.noTracesFound')"
-              :description="t('correlation.noTracesDescription')"
-              data-test="correlation-no-traces-state"
+              v-else-if="tracesError"
+              kind="error"
+              :title="t('correlation.tracesError')"
+              :text="t('correlation.tracesErrorDetails')"
+              :action-label="t('correlation.retryButton')"
+              @action="loadCorrelatedTraces"
             />
-          </div>
 
-          <!-- Initial State (waiting for tab to be shown) -->
-          <div v-else class="flex h-full flex-col items-center justify-center py-20">
-            <OIcon name="account-tree" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
-            <div class="text-base">
-              {{ t("correlation.correlatedTraces") }}
+            <!-- Direct Trace Correlation - Full Span List -->
+            <div
+              v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0"
+              class="telemetry-correlation-traces h-full overflow-auto"
+            >
+              <TraceDetails
+                mode="embedded"
+                :shortcuts-active="shortcutsActive"
+                :trace-id-prop="extractedTraceId || ''"
+                :stream-name-prop="sortedTraceStreams[0] ? sortedTraceStreams[0].stream_name : ''"
+                :span-list-prop="traceSpanList"
+                :start-time-prop="computedTraceStartTime"
+                :end-time-prop="computedTraceEndTime"
+                :correlated-log-stream="sortedLogStreams[0] ? sortedLogStreams[0].stream_name : ''"
+                :show-back-button="false"
+                :show-timeline="false"
+                :show-log-stream-selector="false"
+                :show-share-button="false"
+                :show-close-button="false"
+                :show-expand-button="true"
+                :enable-correlation-links="true"
+                :initial-timeline-expanded="false"
+              />
             </div>
-            <div class="text-text-secondary mt-2 text-sm">
-              {{ t("correlation.correlatedTracesFor", { service: titleName }) }}
+
+            <!-- Dimension-based Correlation - Traces List -->
+            <div v-else-if="showTracesList" class="flex h-full flex-col">
+              <div class="flex-1">
+                <TracesSearchResultList
+                  v-if="tracesForDimensions.length > 0"
+                  :hits="tracesForDimensions"
+                  :loading="false"
+                  :show-header="false"
+                  :show-cell-actions="false"
+                  :version-column="true"
+                  @row-click="openTraceInNewWindow"
+                />
+                <OEmptyState
+                  v-else
+                  kind="filtered"
+                  icon="timeline"
+                  :title="t('correlation.noTracesFound')"
+                  data-test="correlation-no-traces-for-version"
+                />
+              </div>
+            </div>
+
+            <!-- No Traces Found State -->
+            <div v-else-if="traceCorrelationMode !== null" class="h-full">
+              <OEmptyState
+                icon="timeline"
+                :title="t('correlation.noTracesFound')"
+                :text="t('correlation.noTracesDescription')"
+                data-test="correlation-no-traces-state"
+              />
+            </div>
+
+            <!-- Initial State (waiting for tab to be shown) -->
+            <div v-else class="flex h-full flex-col items-center justify-center py-20">
+              <OIcon name="account-tree" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
+              <div class="text-sm">
+                {{ t("correlation.correlatedTraces") }}
+              </div>
+              <div class="text-text-secondary mt-2 text-sm">
+                {{ t("correlation.correlatedTracesFor", { service: titleName }) }}
+              </div>
             </div>
           </div>
         </div>
@@ -983,7 +881,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSearchInput
       v-model="metricSearchText"
       :placeholder="t('search.searchField')"
-      clearable
       class="mb-3 w-full"
     />
 
@@ -997,7 +894,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="bg-section-header-bg border-border-default sticky top-0 z-10 flex items-center justify-between border-b border-solid px-2 py-1.5"
             >
               <div
-                class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
+                class="text-2xs flex items-center gap-1.5 font-semibold tracking-[0.05em] uppercase opacity-75"
               >
                 <OIcon
                   v-if="typeof group.icon === 'string'"
@@ -1012,7 +909,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex gap-1">
                 <OButton
                   variant="ghost"
-                  size="chip"
+                  size="xs"
                   @click="selectAllInGroup(group.id)"
                   :disabled="getGroupSelectionState(group.id) === 'all'"
                 >
@@ -1020,7 +917,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <OButton
                   variant="ghost"
-                  size="chip"
+                  size="xs"
                   @click="deselectAllInGroup(group.id)"
                   :disabled="getGroupSelectionState(group.id) === 'none'"
                 >
@@ -1041,7 +938,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     selectedMetricStreams.some((s) => s.stream_name === stream.stream_name)
                   "
                   @update:model-value="toggleMetricStream(stream)"
-                  size="xs"
                 />
               </div>
               <div class="flex min-w-0 flex-1 flex-col">
@@ -1052,11 +948,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </template>
 
-      <!-- No results message -->
-      <div v-else class="px-2 pt-3 text-center">
-        <OIcon name="info" size="sm" class="me-1 align-middle" />
-        {{ t("search.noResult") }}
-      </div>
+      <OEmptyState
+        v-else
+        size="compact"
+        kind="filtered"
+        class="px-2"
+        :title="t('search.noResult')"
+      />
     </div>
   </ODialog>
 </template>
@@ -1114,6 +1012,7 @@ import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -1125,7 +1024,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import CorrelationServiceHeader from "./CorrelationServiceHeader.vue";
 import CorrelationTracesListHeader from "./CorrelationTracesListHeader.vue";
@@ -1330,6 +1229,7 @@ provide("selectedTabId", selectedTabId);
 
 const isOpen = ref(true);
 const loading = ref(false);
+const logsLoadedAt = ref<number | null>(null);
 const error = ref<string | null>(null);
 const dashboardData = ref<any>(null);
 const logsDashboardData = ref<any>(null);
@@ -2384,6 +2284,7 @@ const loadDashboard = async () => {
       );
       logsDashboardData.value = logsDashboard;
       logsDashboardRenderKey.value++;
+      logsLoadedAt.value = Date.now();
     } else {
       // console.log("[TelemetryCorrelationDashboard] No log streams and not from logs page");
     }

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col gap-3" data-test="fleet-config-variables">
-    <OBanner variant="info" dense :content="t('fleet.configs.variablesHint')" />
+    <OInlineNotice tone="info" :message="t('fleet.configs.variablesHint')" />
     <div
       v-for="name in names"
       :key="name"
@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center justify-between gap-2">
         <OText variant="mono" truncate>{{ name }}</OText>
         <OTag
-          size="xs"
-          :variant="SOURCE[sourceOf(name)].variant"
+          size="sm"
+          :tone="SOURCE[sourceOf(name)].variant"
           :label="t(SOURCE[sourceOf(name)].label)"
           :data-test="`fleet-config-variables-source-${name}`"
         />
@@ -40,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import { HELM_ENV, INSTALL_ENV } from "../fleetInstall";
 
@@ -51,19 +51,19 @@ const { t } = useI18nTyped();
 
 type Source = "install" | "helm" | "missing";
 
-const SOURCE: Record<Source, { variant: BadgeVariant; label: I18nKey; hint: I18nKey }> = {
+const SOURCE: Record<Source, { variant: ChipTone; label: I18nKey; hint: I18nKey }> = {
   install: {
-    variant: "default-soft",
+    variant: "neutral",
     label: "fleet.configs.sourceInstall",
     hint: "fleet.configs.sourceInstallHint",
   },
   helm: {
-    variant: "default-soft",
+    variant: "neutral",
     label: "fleet.configs.sourceHelm",
     hint: "fleet.configs.sourceHelmHint",
   },
   missing: {
-    variant: "warning-soft",
+    variant: "warn",
     label: "fleet.configs.sourceMissing",
     hint: "fleet.configs.sourceMissingHint",
   },

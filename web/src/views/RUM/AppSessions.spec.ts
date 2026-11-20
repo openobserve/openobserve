@@ -215,7 +215,7 @@ describe("AppSessions.vue", () => {
               '<div data-test="app-table" v-bind="$attrs"><slot name="empty" /><slot name="cell-frustration_count" :row="{ frustration_count: 0 }" /><slot name="cell-location" :row="{ geo_info_country: \'\', geo_info_city: \'\' }" /></div>',
             props: ["data", "columns", "loading", "rowKey"],
           },
-          DateTime: {
+          ODateTimeRange: {
             template:
               '<div data-test="date-time" v-bind="$attrs" @on:date-change="$emit(\'on:date-change\', $event)"></div>',
             props: ["autoApply", "defaultType", "defaultAbsoluteTime", "defaultRelativeTime"],
@@ -807,7 +807,7 @@ describe("AppSessions.vue", () => {
             },
             OIcon: { template: "<span></span>" },
             OTable: { template: "<div></div>" },
-            DateTime: { template: "<div></div>" },
+            ODateTimeRange: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },
             SearchFieldList: { template: "<div></div>" },
@@ -961,7 +961,7 @@ describe("AppSessions.vue", () => {
             },
             OIcon: { template: "<span></span>" },
             OTable: { template: "<div></div>" },
-            DateTime: { template: "<div></div>" },
+            ODateTimeRange: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },
             SearchFieldList: { template: "<div></div>" },
@@ -987,7 +987,7 @@ describe("AppSessions.vue", () => {
             },
             OIcon: { template: "<span></span>" },
             OTable: { template: "<div></div>" },
-            DateTime: { template: "<div></div>" },
+            ODateTimeRange: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },
             SearchFieldList: { template: "<div></div>" },
@@ -1157,7 +1157,7 @@ describe("AppSessions.vue", () => {
           '<div data-test="rum-sessions-table" v-bind="$attrs"><div v-for="row in data" :key="row.session_id"><slot name="cell-platform" :row="row" /></div></div>',
         props: ["data", "columns", "loading", "rowKey", "columnVisibility", "getRowStatusColor"],
       },
-      DateTime: {
+      ODateTimeRange: {
         template:
           '<div data-test="date-time" v-bind="$attrs" @on:date-change="$emit(\'on:date-change\', $event)"></div>',
         props: ["autoApply", "defaultType", "defaultAbsoluteTime", "defaultRelativeTime"],
@@ -1715,7 +1715,7 @@ describe("AppSessions.vue — re-applies a changed URL filter on activation (D-4
         stubs: {
           OSplitter: { template: "<div><slot name='before' /><slot name='after' /></div>" },
           OTable: { template: "<div />" },
-          DateTime: { template: "<div />" },
+          ODateTimeRange: { template: "<div />" },
           SyntaxGuide: { template: "<div />" },
           QueryEditor: { template: "<div />" },
           SearchFieldList: { template: "<div />" },

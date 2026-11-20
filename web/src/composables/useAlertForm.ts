@@ -49,7 +49,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import useStreams from "@/composables/useStreams";
 import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 
 import {
   getUUID,
@@ -731,16 +731,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     },
   );
 
-  const anomalyStatusVariant = computed<BadgeVariant>(() => {
+  const anomalyStatusVariant = computed<ChipTone>(() => {
     switch (anomalyConfig.value.status) {
       case "active":
-        return "success";
+        return "ok";
       case "training":
-        return "primary";
+        return "accent";
       case "failed":
-        return "error";
+        return "err";
       default:
-        return "default";
+        return "neutral";
     }
   });
 

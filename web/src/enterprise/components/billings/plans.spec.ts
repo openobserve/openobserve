@@ -788,9 +788,9 @@ describe("Plans Component", () => {
   it("keeps a full bar neutral while paid usage carries on, and red only when blocked", async () => {
     const usage = { credits_used: 5, credits_limit: 5, credits_remaining: 0 };
     wrapper.vm.aiUsage = { ...usage, mode: "pay_as_you_go", requires_additional_credits: false };
-    expect(wrapper.vm.aiUsageVariant).toBe("default");
+    expect(wrapper.vm.aiUsageVariant).toBe("accent");
     wrapper.vm.aiUsage = { ...usage, mode: "exhausted", requires_additional_credits: false };
-    expect(wrapper.vm.aiUsageVariant).toBe("danger");
+    expect(wrapper.vm.aiUsageVariant).toBe("err");
   });
 
   it("offers Contact Sales when a contract org runs out", async () => {

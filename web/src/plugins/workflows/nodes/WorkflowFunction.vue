@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="workflow-function-flatten-info"
       >
         <OIcon name="info" size="sm" />
-        <OTooltip side="right" align="start" :side-offset="8" max-width="22rem">
+        <OTooltip side="right">
           <template #content>
             <div class="flex flex-col gap-1.5 p-1 text-left">
               <div class="text-xs font-semibold">

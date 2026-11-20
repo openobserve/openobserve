@@ -43,8 +43,8 @@ const titleId = `${hostId}-title`;
   <span class="inline-flex items-center">
     <OButton
       v-if="showTrigger"
-      variant="ghost-primary"
-      size="xs"
+      variant="accent-ghost"
+      size="sm"
       data-test="alerts-composite-reference-chip"
       :aria-label="t('alerts.composite.openReferences', { count: referenceCount })"
       @click="emit('update:open', true)"
@@ -54,7 +54,7 @@ const titleId = `${hostId}-title`;
     <ODrawer
       :open="open"
       inline
-      size="md"
+      size="sm"
       :title="t('alerts.composite.referencesTitle')"
       :title-data-test="titleId"
       :show-close="false"
@@ -64,9 +64,9 @@ const titleId = `${hostId}-title`;
     >
       <template #header-right>
         <OButton
-          variant="ghost-muted"
-          size="icon-sm"
-          icon-left="close"
+          icon-only
+          variant="ghost"
+          icon="close"
           autofocus
           data-test="alerts-composite-reference-close"
           :aria-label="t('alerts.composite.closeReferences')"
@@ -79,14 +79,13 @@ const titleId = `${hostId}-title`;
           v-if="conflictCode === 'child_referenced'"
           data-test="alerts-composite-reference-conflict"
         >
-          <OBadge variant="warning-soft">{{ t("alerts.composite.deleteBlocked") }}</OBadge>
+          <OBadge tone="warn">{{ t("alerts.composite.deleteBlocked") }}</OBadge>
         </div>
 
         <OButton
           v-for="reference in references"
           :key="reference.alert_id"
           variant="ghost"
-          size="sm"
           class="justify-start!"
           :aria-label="t('alerts.composite.openParent', { name: reference.name })"
           :data-test="`alerts-composite-reference-parent-${reference.alert_id}`"

@@ -202,7 +202,7 @@ describe("SearchBar — saved views submenu", () => {
     expect(confirm.props()).toMatchObject({
       messageKeypath: "search.overwriteSavedViewConfirm",
       messageName: "slow requests",
-      focusCancel: true,
+      kind: "destructive",
     });
 
     confirm.vm.$emit("update:ok");
@@ -305,7 +305,7 @@ describe("SearchBar — saved views submenu", () => {
     expect(confirm.props()).toMatchObject({
       messageKeypath: "search.deleteSavedViewConfirm",
       messageName: "error logs",
-      okVariant: "destructive",
+      kind: "destructive",
     });
     expect(mockSavedViewsDelete).not.toHaveBeenCalled();
 

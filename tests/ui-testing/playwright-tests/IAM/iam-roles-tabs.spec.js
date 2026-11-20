@@ -306,13 +306,13 @@ test.describe('IAM · Roles list · member counts', { tag: '@enterprise' }, () =
         // Service accounts share the member map with users, so Users must read 1 here, not 3.
         await expect(pm.rolesPage.roleMemberCount(ROLE_MIXED, 'users')).toHaveText('1');
         await expect(mixedSa).toHaveAttribute('aria-label', `${ROLE_MIXED}: 2 Service Accounts`);
-        await expect(mixedSa).toHaveAttribute('data-o2-variant', 'ghost-primary');
+        await expect(mixedSa).toHaveAttribute('data-o2-variant', 'accent-ghost');
 
         await pm.rolesPage.filterRoleList(ROLE_NO_SA);
         const noSa = pm.rolesPage.roleMemberCount(ROLE_NO_SA, 'service-accounts');
         await expect(noSa).toHaveText('0', { timeout: 30000 });
         await expect(noSa).toHaveAttribute('aria-label', `${ROLE_NO_SA}: 0 Service Accounts`);
-        await expect(noSa).toHaveAttribute('data-o2-variant', 'ghost-muted');
+        await expect(noSa).toHaveAttribute('data-o2-variant', 'ghost');
         await expect(pm.rolesPage.roleMemberCount(ROLE_NO_SA, 'users')).toHaveText('1');
     });
 

@@ -2,7 +2,7 @@ import { expect } from '@playwright/test';
 import { SELECTORS, clickDashboardMenuItem } from './dashboard-selectors.js';
 
 /**
- * Page object for the "Scheduled Dashboards" drawer opened from a dashboard's
+ * Page object for the "Scheduled dashboards" drawer opened from a dashboard's
  * view toolbar (web/src/views/Dashboards/ScheduledDashboards.vue, opened by
  * ViewDashboard.vue's `view-dashboard-scheduled-reports` More-menu item).
  *

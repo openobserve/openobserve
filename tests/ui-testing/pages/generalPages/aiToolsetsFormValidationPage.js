@@ -134,7 +134,7 @@ export class AiToolsetsFormValidationPage {
 
     async selectKind(label) {
         testLogger.debug('Selecting toolset kind', { label });
-        const labelToValue = { 'MCP Server': 'mcp', 'CLI Tool': 'cli', 'Skill': 'skill' };
+        const labelToValue = { 'MCP server': 'mcp', 'CLI tool': 'cli', 'Skill': 'skill' };
         const value = labelToValue[label] || label;
         await this.page.locator(this.kindSelect).click();
         await this.page.locator(this.kindSelectPopover).waitFor({ state: 'visible', timeout: 8000 });

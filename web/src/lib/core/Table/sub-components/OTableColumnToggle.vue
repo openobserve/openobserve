@@ -74,9 +74,10 @@ function resetToDefault(): void {
   <ODropdown align="end" side="bottom" :side-offset="4">
     <template #trigger>
       <div class="relative inline-flex">
+        <!-- Bordered: it sits beside refresh in a toolbar where only More is borderless. -->
         <OButton
-          variant="outline"
-          size="icon-toolbar"
+          icon-only
+          variant="secondary"
           :aria-label="
             hiddenCount > 0
               ? t('common.manageColumnsHidden', { count: hiddenCount })
@@ -84,7 +85,7 @@ function resetToDefault(): void {
           "
           data-test="o2-table-column-toggle-btn"
         >
-          <template #icon-left>
+          <template #icon>
             <OIcon name="view-column" size="sm" />
           </template>
           <OTooltip
@@ -126,7 +127,6 @@ function resetToDefault(): void {
         >
           <OCheckbox
             :model-value="isVisible(col.id)"
-            size="sm"
             :aria-label="
               t('common.toggleColumn', {
                 name: typeof col.header === 'string' ? col.header : col.id,

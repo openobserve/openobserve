@@ -20,8 +20,12 @@ import OnCallEscalationSkeleton from "@/components/oncall/OnCallEscalationSkelet
 import i18n from "@/locales";
 
 const stubs = {
-  OCard: { name: "OCard", template: "<div><slot /></div>" },
-  OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
+  OCard: {
+    name: "OCard",
+    props: ["title"],
+    template:
+      '<div><h3>{{ title }}</h3><slot name="header" /><slot name="actions" /><slot /></div>',
+  },
 };
 
 function render() {
@@ -44,6 +48,6 @@ describe("OnCallEscalationSkeleton", () => {
   it("reserves a few timeline-row-shaped placeholders", () => {
     const wrapper = render();
 
-    expect(wrapper.findAll(".animate-pulse, .skeleton-wave").length).toBeGreaterThan(0);
+    expect(wrapper.findAllComponents({ name: "OSkeleton" }).length).toBeGreaterThan(0);
   });
 });

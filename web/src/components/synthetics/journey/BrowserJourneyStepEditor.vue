@@ -49,7 +49,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { unboundPlaceholders } from "@/components/synthetics/variables/placeholders";
 import type { VariableSuggestion } from "@/components/synthetics/variables/suggestions";
 import VariableSuggestionRow from "@/components/synthetics/variables/VariableSuggestionRow.vue";
@@ -539,9 +539,9 @@ const hasAdvancedChanges = computed(
           <VariableSuggestionRow :suggestion="suggestion" :active="active" />
         </template>
       </OTemplateInput>
-      <OBanner
+      <OInlineNotice
         v-if="unboundNames.length"
-        variant="warning"
+        tone="warn"
         data-test="synthetics-journey-step-unbound-warning"
       >
         {{
@@ -551,7 +551,7 @@ const hasAdvancedChanges = computed(
             unboundNames.length,
           )
         }}
-      </OBanner>
+      </OInlineNotice>
 
       <!-- Typed assertion — what this step actually verifies -->
       <BrowserJourneyAssertion
@@ -590,10 +590,8 @@ const hasAdvancedChanges = computed(
     <OCollapsible
       v-if="props.step.action !== 'subtest'"
       :default-open="hasAdvancedChanges"
-      variant="sidebar"
       class="rounded-default bg-surface-panel mt-2 w-full max-w-200 border"
       data-test="synthetics-journey-step-group-advanced"
-      trigger-class="border-b"
     >
       <!-- Label and caption on one line. The `caption` prop stacks them, which
            made `Advanced` twice as tall as the row it sits in and read as a
@@ -691,7 +689,6 @@ const hasAdvancedChanges = computed(
                 >
                   <OCheckbox
                     :model-value="!!response.required"
-                    size="xs"
                     :label="t('synthetics.journey.settleRequiredLabel')"
                     :data-test="`synthetics-journey-step-settle-required-${i}`"
                     @update:model-value="setResponseRequired(i, $event)"

@@ -73,15 +73,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTruncatedText>
         <OButton
           v-if="showInlineDescription"
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="info-outline"
+          icon="info-outline"
           class="shrink-0"
           :class="titleMeta ? 'me-2' : 'me-5'"
           :aria-label="t('dashboard.description')"
           data-test="dashboard-panel-title-description-info"
         >
-          <OTooltip side="bottom" align="start" max-width="13.75rem">
+          <OTooltip side="bottom">
             <template #content
               ><div class="whitespace-pre-wrap">{{ props.data.description }}</div></template
             >
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
-          variant="amber-soft"
+          tone="warn"
           size="sm"
           class="shrink-0 @max-[8rem]/panelbar:hidden"
           data-test="dashboard-panel-curated-badge"
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- A note the injected result carries about itself, such as the public view's retained or truncated data. -->
         <OTag
           v-if="injectedNotice"
-          variant="default-soft"
+          tone="neutral"
           size="sm"
           class="shrink-0 @max-[8rem]/panelbar:hidden"
           data-test="dashboard-panel-injected-notice"
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             exemplarsOn &&
             PanleSchemaRendererRef?.exemplarsStatus === 'empty'
           "
-          variant="default-soft"
+          tone="neutral"
           size="sm"
           class="shrink-0"
           data-test="dashboard-panel-exemplars-empty"
@@ -151,7 +151,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              hidden controls stay unreachable. -->
         <!-- Show Legends button (hidden when the chart has no data) -->
         <OButton
-          :class="hoverRevealClass"
           v-if="
             props.showLegendsButton &&
             !isDataView &&
@@ -177,22 +176,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               'logs',
             ].includes(props.data.type)
           "
+          icon-only
+          :class="hoverRevealClass"
           variant="ghost"
-          size="icon"
+          size="xs"
           @click="showLegendsDialog = true"
-          icon-left="format-list-bulleted"
+          icon="format-list-bulleted"
           data-test="dashboard-show-legends-btn"
         >
-          <OTooltip
-            :content="t('dashboard.panelContainer.showLegends')"
-            side="bottom"
-            align="end"
-          />
+          <OTooltip :content="t('dashboard.panelContainer.showLegends')" side="bottom" />
         </OButton>
 
         <!-- Add Annotations button -->
         <OButton
-          :class="hoverRevealClass"
           v-if="
             !isDataView &&
             !viewOnly &&
@@ -208,8 +204,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].includes(props.data.type) &&
             PanleSchemaRendererRef?.checkIfPanelIsTimeSeries === true
           "
+          icon-only
+          :class="hoverRevealClass"
           variant="ghost"
-          size="icon"
+          size="xs"
           @click="PanleSchemaRendererRef?.toggleAddAnnotationMode()"
           data-test="panel-schema-renderer-annotation-button"
         >
@@ -224,7 +222,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : t('dashboard.panelContainer.addAnnotations')
             "
             side="bottom"
-            align="end"
           />
         </OButton>
 
@@ -239,33 +236,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OButton
           v-if="!viewOnly && !simplifiedPanelView && props.data.description != ''"
+          icon-only
           :class="hoverRevealClass"
           variant="ghost"
-          size="icon"
-          icon-left="info-outline"
+          size="xs"
+          icon="info-outline"
           :aria-label="t('dashboard.description')"
           data-test="dashboard-panel-description-info"
         >
-          <OTooltip side="bottom" align="end" max-width="13.75rem">
+          <OTooltip side="bottom">
             <template #content
               ><div class="whitespace-pre-wrap">{{ props.data.description }}</div></template
             >
           </OTooltip>
         </OButton>
         <OButton
-          :class="hoverRevealClass"
           v-if="!viewOnly && !simplifiedPanelView"
+          icon-only
+          :class="hoverRevealClass"
           variant="ghost"
-          size="icon"
+          size="xs"
           @click="onPanelModifyClick('ViewPanel')"
           data-test="dashboard-panel-fullscreen-btn"
-          icon-left="fullscreen"
+          icon="fullscreen"
         >
-          <OTooltip side="bottom" :content="t('panel.fullScreen')" shortcut-id="panelView" />
+          <OTooltip side="bottom" :content="t('panel.fullScreen')" shortcut="panelView" />
         </OButton>
         <OBadge
           v-if="kioskStale"
-          variant="error-soft"
+          tone="err"
           size="sm"
           icon="cloud-off"
           class="shrink-0"
@@ -274,50 +273,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OButton
           v-if="dependentAdHocVariable && !kiosk"
-          variant="ghost-warning"
-          size="icon"
+          icon-only
+          variant="ghost"
+          size="xs"
           @click="showViewPanel = true"
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
-          icon-left="warning"
+          icon="warning"
         >
           <OTooltip
             side="bottom"
-            align="end"
-            max-width="13.75rem"
             :content="t('dashboard.panelContainer.dependentAdhocVariableWarning')"
           />
         </OButton>
         <OButton
           v-if="PanleSchemaRendererRef?.failedAnnotationSources?.length"
+          icon-only
           variant="ghost"
-          size="icon"
-          icon-left="error-outline"
+          size="xs"
+          icon="error-outline"
           class="shrink-0"
           data-test="dashboard-panel-annotation-source-error"
           :aria-label="failedAnnotationSourcesLabel"
         >
-          <OTooltip
-            side="bottom"
-            align="end"
-            max-width="15rem"
-            :content="failedAnnotationSourcesLabel"
-          />
+          <OTooltip side="bottom" :content="failedAnnotationSourcesLabel" />
         </OButton>
         <OButton
           v-if="PanleSchemaRendererRef?.truncatedAnnotationSources?.length"
+          icon-only
           variant="ghost"
-          size="icon"
-          icon-left="info-outline"
+          size="xs"
+          icon="info-outline"
           class="shrink-0"
           data-test="dashboard-panel-annotation-source-truncated"
           :aria-label="truncatedAnnotationSourcesLabel"
         >
-          <OTooltip
-            side="bottom"
-            align="end"
-            max-width="15rem"
-            :content="truncatedAnnotationSourcesLabel"
-          />
+          <OTooltip side="bottom" :content="truncatedAnnotationSourcesLabel" />
         </OButton>
         <!-- show error here -->
         <!-- The title gives way first; this clips only past the title's floor, so refresh and the menu always stay in the panel. -->
@@ -333,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
           :isPanelLoading="isPanelLoading"
-          :lastTriggeredAt="lastTriggeredAt"
+          :lastTriggeredAt="panelIsEmpty ? null : lastTriggeredAt"
           :viewOnly="viewOnly"
           :exemplarError="exemplarErrorMessage"
           :canEdit="canEditFromNotice"
@@ -346,25 +336,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OButton
           v-if="!viewOnly && !simplifiedPanelView && !isLayoutEditing"
-          :variant="variablesDataUpdated || isTimeRangeWaiting ? 'ghost-warning' : 'ghost'"
-          size="icon"
+          icon-only
+          :stale="variablesDataUpdated || isTimeRangeWaiting"
+          variant="ghost"
+          size="xs"
+          :class="restActionClass"
           @click="() => onRefreshPanel(false)"
           :aria-label="t('panel.refreshPanel')"
           data-test="dashboard-panel-refresh-panel-btn"
           :disabled="isPanelLoading"
-          icon-left="refresh"
+          icon="refresh"
         >
           <OTooltip :content="refreshTooltip" />
         </OButton>
         <!-- simplifiedPanelView panels are ephemeral (Insights / Drill down): delete without a confirm -->
         <OButton
           v-if="!viewOnly && simplifiedPanelView"
+          icon-only
           variant="ghost"
-          size="icon"
+          size="xs"
           @click="deletePanelDialog"
           :aria-label="t('panel.deletePanel')"
           :data-test="`dashboard-delete-panel-${props.data.title}-btn`"
-          icon-left="close"
+          icon="close"
         >
           <OTooltip side="bottom" :content="t('panel.deletePanel')" />
         </OButton>
@@ -373,9 +367,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdown v-if="viewOnly && exploreActions" side="bottom" align="end">
           <template #trigger>
             <OButton
+              icon-only
               :aria-label="t('dashboard.moreActions')"
               variant="ghost"
-              size="icon"
+              size="xs"
               data-test="panel-explore-actions-btn"
             >
               <OIcon name="more-vert" size="sm" />
@@ -383,14 +378,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <ODropdownItem
             data-test="panel-explore-create-alert"
-            icon-left="shield-alert-outline"
+            icon="shield-alert-outline"
             @select="$emit('exploreCreateAlert', props.data)"
           >
             {{ t("dashboard.panelContainer.exploreCreateAlert") }}
           </ODropdownItem>
           <ODropdownItem
             data-test="panel-explore-add-to-dashboard"
-            icon-left="dashboard"
+            icon="dashboard"
             @select="$emit('exploreAddToDashboard', props.data)"
           >
             {{ t("dashboard.panelContainer.exploreAddToDashboard") }}
@@ -400,13 +395,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdown side="bottom" align="end" v-if="!viewOnly && !simplifiedPanelView">
           <template #trigger>
             <OButton
+              icon-only
               :aria-label="
                 showDraftDot
                   ? t('dashboard.panelDraft.panelActionsDot')
                   : t('dashboard.moreActions')
               "
               variant="ghost"
-              size="icon"
+              size="xs"
+              :class="restActionClass"
               :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
             >
               <OIcon name="more-vert" size="sm" />
@@ -419,14 +416,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <ODropdownItem
+            icon="edit"
             v-if="!simplifiedPanelView && !isLayoutEditing"
             data-test="dashboard-edit-panel"
             @select="onPanelModifyClick('EditPanel')"
-            shortcut-id="panelEdit"
+            shortcut="panelEdit"
           >
-            <template #icon-left><OIcon name="edit" size="sm" /></template>
             {{ t("panel.editPanel") }}
-            <template v-if="showDraftDot" #icon-right>
+            <template v-if="showDraftDot" #end>
               <OTooltip :content="t('dashboard.panelDraft.panelDot')" side="right">
                 <span
                   role="img"
@@ -438,67 +435,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </ODropdownItem>
           <ODropdownItem
+            :icon="isDataView ? 'show-chart' : 'table-chart'"
             v-if="showDataViewToggle && !isLayoutEditing"
             data-test="dashboard-panel-data-view-toggle"
             @select="previewView = isDataView ? 'chart' : 'data'"
           >
-            <template #icon-left
-              ><OIcon :name="isDataView ? 'show-chart' : 'table-chart'" size="sm"
-            /></template>
             {{ isDataView ? t("panel.showChart") : t("panel.showRawData") }}
           </ODropdownItem>
           <ODropdownItem
+            icon="dashboard-customize"
             v-if="!simplifiedPanelView && layoutMode !== 'view'"
             data-test="dashboard-edit-layout"
             @select="onPanelModifyClick('EditLayout')"
           >
-            <template #icon-left><OIcon name="dashboard-customize" size="sm" /></template>
             {{ t("panel.editLayout") }}
           </ODropdownItem>
           <!-- Only the layout dialog belongs to layout edit mode; every other action saves on its own. -->
           <template v-if="!isLayoutEditing">
             <ODropdownItem
+              icon="content-copy"
               v-if="!simplifiedPanelView"
               data-test="dashboard-duplicate-panel"
               @select="onPanelModifyClick('DuplicatePanel')"
-              shortcut-id="panelDuplicate"
+              shortcut="panelDuplicate"
             >
-              <template #icon-left><OIcon name="content-copy" size="sm" /></template>
               {{ t("panel.duplicate") }}
             </ODropdownItem>
             <ODropdownItem
-              data-test="dashboard-delete-panel"
-              @select="onPanelModifyClick('DeletePanel')"
-              shortcut-id="panelDelete"
-            >
-              <template #icon-left
-                ><OIcon name="delete-outline" size="sm" class="text-current!"
-              /></template>
-              {{ t("panel.deletePanel") }}
-            </ODropdownItem>
-            <ODropdownItem
+              icon="manage-search"
               v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               data-test="dashboard-query-inspector-panel"
               @select="showViewPanel = true"
-              shortcut-id="panelQueryInspector"
+              shortcut="panelQueryInspector"
             >
-              <template #icon-left><OIcon name="manage-search" size="sm" /></template>
               {{ t("panel.queryInspector") }}
             </ODropdownItem>
             <ODropdownItem
+              icon="file-download"
               v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               data-test="dashboard-panel-download-as-csv-btn"
               @select="PanleSchemaRendererRef?.downloadDataAsCSV(panelFileName)"
             >
-              <template #icon-left><OIcon name="file-download" size="sm" /></template>
               {{ t("panel.downloadAsCSV") }}
             </ODropdownItem>
             <ODropdownItem
+              icon="data-object"
               v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
               data-test="dashboard-panel-download-as-json-btn"
               @select="PanleSchemaRendererRef?.downloadDataAsJSON(panelFileName)"
             >
-              <template #icon-left><OIcon name="data-object" size="sm" /></template>
               {{ t("panel.downloadAsJSON") }}
             </ODropdownItem>
             <ODropdownItem
@@ -506,9 +491,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 !simplifiedPanelView && metaData && metaData.queries?.length > 0 && goToLogsLocked
               "
               disabled
-              focusable-unavailable
-              icon-left="lock"
-              :description="goToLogsLockedReason"
+              icon="lock"
+              :disabled-reason="goToLogsLockedReason"
               data-test="dashboard-move-to-logs-module"
             >
               {{ t("panel.goToLogs") }}
@@ -518,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="props.data.queryType != 'sql'"
               data-test="dashboard-move-to-logs-module"
               @select="onLogPanel"
-              icon-left="search"
+              icon="search"
             >
               {{ t("panel.goToLogs") }}
             </ODropdownItem>
@@ -526,16 +510,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!simplifiedPanelView"
               data-test="dashboard-refresh-without-cache"
               @select="onPanelModifyClick('Refresh')"
-              icon-left="cached"
+              icon="cached"
             >
               {{ t("dashboard.panelContainer.refreshCacheReload") }}
             </ODropdownItem>
             <ODropdownItem
+              icon="drive-file-move"
               v-if="!simplifiedPanelView"
               data-test="dashboard-move-to-another-panel"
               @select="onPanelModifyClick('MovePanel')"
             >
-              <template #icon-left><OIcon name="drive-file-move" size="sm" /></template>
               {{ t("panel.moveToAnotherTab") }}
             </ODropdownItem>
             <!-- Alert creation is shared platform machinery: this contributes the
@@ -549,6 +533,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled-reason="alertDisabledReason"
               data-test="dashboard-create-alert-from-panel"
             />
+            <ODropdownSeparator />
+            <ODropdownItem
+              icon="delete-outline"
+              tone="danger"
+              data-test="dashboard-delete-panel"
+              shortcut="panelDelete"
+              @select="onPanelModifyClick('DeletePanel')"
+            >
+              {{ t("panel.deletePanel") }}
+            </ODropdownItem>
           </template>
         </ODropdown>
       </PanelBar>
@@ -635,8 +629,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-surface-base absolute inset-0 z-10 flex flex-col gap-2 p-3"
         data-test="dashboard-panel-kiosk-loading"
       >
-        <OSkeleton type="text" class="w-1/3" />
-        <OSkeleton class="min-h-0 flex-1" />
+        <OSkeleton class="w-1/3" />
+        <OSkeleton shape="block" class="min-h-0 flex-1" />
       </div>
 
       <!-- On a wall screen a tooltip-only error is invisible, and fallback data would look healthy. -->
@@ -655,7 +649,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTruncatedText :lines="3" :tooltip="false">{{
             t("dashboard.kiosk.queryError", { detail: kioskErrorSummary })
           }}</OTruncatedText>
-          <OTooltip :content="kioskErrorFull" max-width="30rem" />
+          <OTooltip :content="kioskErrorFull" />
         </span>
       </div>
 
@@ -698,7 +692,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('panel.deletePanelTitle')"
       message-keypath="panel.deletePanelMessage"
       :message-name="data.title"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="deletePanelDialog"
       @update:cancel="confirmDeletePanelDialog = false"
       v-model="confirmDeletePanelDialog"
@@ -729,6 +723,10 @@ import {
   inject,
 } from "vue";
 import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh";
+import {
+  PANEL_EMPTY_REGISTRY_KEY,
+  type PanelDataState,
+} from "@/composables/dashboard/usePanelEmptyRegistry";
 import { summarizePanelError } from "@/utils/dashboard/kiosk";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
@@ -750,6 +748,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
@@ -859,6 +858,7 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
+    ODropdownSeparator,
     OTooltip,
     OTruncatedText,
     CreateAlertAction,
@@ -990,7 +990,7 @@ export default defineComponent({
       // Read AFTER the renderer's own conversion settled — the emit is that signal.
       const verdict = PanleSchemaRendererRef.value?.noData;
       if (verdict === undefined) return;
-      curatedSeriesEmpty.value = verdict === "No Data";
+      curatedSeriesEmpty.value = verdict === "No data";
     };
     /** Only ever claimed after a load actually settled — never while pending. */
     /**
@@ -1046,6 +1046,10 @@ export default defineComponent({
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
+    // An empty panel has no data to age, so it carries no freshness badge.
+    const panelIsEmpty = computed(
+      () => !!PanleSchemaRendererRef.value?.noData || !!PanleSchemaRendererRef.value?.statHasNoData,
+    );
     const handleLastTriggeredAtUpdate = (data: any) => {
       lastTriggeredAt.value = data;
     };
@@ -1145,6 +1149,19 @@ export default defineComponent({
       if (isCurrentlyHoveredPanel.value || isMobile.value) return narrowHide;
       return `invisible pointer-events-none ${narrowHide}`.trim();
     });
+
+    // Opacity, not visibility, so a keyboard user can still tab to them; errors, warnings and pending changes keep them shown.
+    const restActionClass = computed(() =>
+      isCurrentlyHoveredPanel.value ||
+      isMobile.value ||
+      hasNoticeChips.value ||
+      !!errorData.value ||
+      variablesDataUpdated.value ||
+      props.isTimeRangeWaiting ||
+      showDraftDot.value
+        ? ""
+        : "opacity-0 focus-visible:opacity-100 data-[state=open]:opacity-100",
+    );
 
     //for edit panel
     const onEditPanel = (data: any, focus?: PanelEditorFocusTarget) => {
@@ -1512,6 +1529,32 @@ export default defineComponent({
       if (props.data?.id) kioskHealth?.unregister(props.data.id);
     });
 
+    const emptyRegistry = inject(PANEL_EMPTY_REGISTRY_KEY, null);
+    // Text panels never hold data, so they stay out of the "every panel is empty" verdict.
+    const reportsData = () => !["html", "markdown", "alert-list"].includes(props.data?.type);
+    const panelDataState = (): PanelDataState => {
+      if (errorData.value) return "error";
+      if (isPanelLoading.value) return "pending";
+      const renderer = PanleSchemaRendererRef.value;
+      return renderer?.noData === "No data" || renderer?.statHasNoData ? "empty" : "data";
+    };
+    watch(
+      () => [
+        props.data?.id,
+        errorData.value,
+        isPanelLoading.value,
+        PanleSchemaRendererRef.value?.noData,
+        PanleSchemaRendererRef.value?.statHasNoData,
+      ],
+      () => {
+        if (props.data?.id && reportsData()) emptyRegistry?.report(props.data.id, panelDataState());
+      },
+      { immediate: true },
+    );
+    onBeforeUnmount(() => {
+      if (props.data?.id) emptyRegistry?.unregister(props.data.id);
+    });
+
     const isPartialData = ref(false);
 
     const handleIsPartialDataUpdate = (isPartial: boolean) => {
@@ -1654,6 +1697,7 @@ export default defineComponent({
       isCurrentlyHoveredPanel,
       isLayoutEditing,
       hoverRevealClass,
+      restActionClass,
       previewView,
       showDataViewToggle,
       isDataView,
@@ -1699,6 +1743,7 @@ export default defineComponent({
       isCachedDataDifferWithCurrentTimeRange,
       handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
       lastTriggeredAt,
+      panelIsEmpty,
       maxQueryRangeWarning,
       metaData,
       panelDiagnostics,

@@ -3,143 +3,23 @@
     bleed
     data-test="oncall-response-detail-page"
     :title="title"
-    title-min-width
-    icon="notifications-active"
-    tabs-below
     :back="{
-      label: t('oncall.backToResponses'),
+      label: t('oncall.responsesTitle'),
       to: { name: 'onCallResponses', query: { org_identifier: orgId } },
     }"
   >
-    <!-- Team, which firing this is, and when it opened — the tagline reads as
-         one short line rather than a metadata grid below the fold. Team is a
-         real link because "whose rotation is this" is the next click a
-         responder makes; the firing count carries its history as a tooltip
-         instead of a trailing clause, which is enough for "not the first
-         time" without spelling out how many. -->
-    <template v-if="response" #subtitle>
-      <span class="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap">
-        <i18n-t
-          keypath="oncall.responseSubtitle"
-          tag="span"
-          scope="global"
-          class="flex min-w-0 items-center gap-1 truncate"
-          data-test="oncall-response-subtitle"
-        >
-          <template #team>
-            <span
-              v-if="!response.team_id"
-              class="text-status-error-text shrink-0"
-              data-test="oncall-response-team-none"
-              >{{ t("oncall.statUnrouted") }}</span
-            >
-            <OTag
-              v-else-if="teamDeleted"
-              variant="default-soft"
-              size="sm"
-              data-test="oncall-response-team-deleted"
-            >
-              {{ t("oncall.deletedTeam") }}
-            </OTag>
-            <OSkeleton
-              v-else-if="!teamName"
-              class="h-3.5 w-20"
-              data-test="oncall-response-team-pending"
-            />
-            <router-link
-              v-else
-              class="text-accent min-w-0 hover:underline"
-              :to="teamRoute"
-              data-test="oncall-response-team-link"
-            >
-              <OTruncatedText class="block">{{ raw(teamName) }}</OTruncatedText>
-            </router-link>
-          </template>
-          <template #opened>
-            <span class="shrink-0" data-test="oncall-response-opened">{{ openedAtClock }}</span>
-          </template>
-        </i18n-t>
-        <OTruncatedText
-          v-if="response.state === 'acknowledged' && response.acked_by"
-          class="shrink-[100]"
-          :tooltip="t('oncall.escalationAckedBy', { who: tooltipOf(response.acked_by) })"
-          data-test="oncall-response-acked-by"
-        >
-          {{ raw("·") }}
-          <i18n-t keypath="oncall.escalationAckedBy" tag="span" scope="global">
-            <template #who>
-              <OnCallPersonName
-                :email="response.acked_by"
-                data-test="oncall-response-acked-by-name"
-              />
-            </template>
-          </i18n-t>
-        </OTruncatedText>
-        <!-- A closed page's state tag already says it, and an acknowledged one names its holder just before. -->
-        <span
-          v-if="lgUp && isOpenState && response.state !== 'acknowledged'"
-          class="flex min-w-0 shrink-[100] items-center gap-1"
-          data-test="oncall-response-phrase"
-        >
-          <span v-if="headerPhraseKind !== 'unknown'" class="shrink-0">{{ raw("·") }}</span>
-          <!-- Words, not the list's chip: the title row keeps only state and priority. -->
-          <OTruncatedText
-            v-if="headerPhraseKind === 'nobodyAnswered'"
-            class="text-status-error-text min-w-0"
-            :tooltip="t('oncall.ladderExhausted')"
-            data-test="oncall-response-phrase-exhausted"
-          >
-            {{ t("oncall.state_exhausted") }}
-          </OTruncatedText>
-          <OnCallEscalationCell
-            v-else
-            class="min-w-0"
-            :response-id="response.id"
-            :record="response"
-            :progress="escalation"
-            :total-rungs="totalRungs"
-            :progress-loaded="escalationLoaded"
-            :reached-step="headerReachedStep"
-            :team-deleted="teamDeleted"
-          />
-        </span>
-        <!-- Why this team is looking at somebody else's outage, said with the page's other facts. -->
-        <span
-          v-if="lgUp && isImpacted"
-          class="text-status-info-text inline-flex shrink-[100] items-center gap-1 truncate"
-          data-test="oncall-response-liaison-tag"
-        >
-          {{ raw("·") }} {{ t("oncall.liaisonTag") }}
-          <OTooltip side="bottom" :content="t('oncall.ladderLiaisonNote')" />
-        </span>
-      </span>
-    </template>
-
-    <template #title-trail>
+    <template #status>
       <template v-if="response && lgUp">
-        <!-- The title ellipsises first; clipping here means the chips can never paint under the actions. -->
-        <span
-          class="flex min-w-0 shrink-[0.01] items-center gap-3.25 overflow-hidden"
-          data-test="oncall-response-title-trail"
-        >
-          <span class="inline-flex shrink-0" data-test="oncall-response-state-tag">
-            <OTag type="oncallResponseState" :value="response.state" size="sm" />
-            <OTooltip v-if="closedAfter" :content="closedAfter" />
-          </span>
-          <OTag class="shrink-0" type="alertPriority" :value="`p${response.priority}`" size="sm" />
+        <span class="inline-flex" data-test="oncall-response-state-tag">
+          <OTag type="oncallResponseState" :value="response.state" size="sm" />
+          <OTooltip v-if="closedAfter" :content="closedAfter" />
         </span>
+        <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
       </template>
     </template>
 
     <template v-if="response" #header-tabs>
-      <OTabs
-        v-model="activeDetailTab"
-        align="left"
-        class="flex-1"
-        mobile-arrows
-        :breakpoint="0"
-        data-test="oncall-response-tabs-strip"
-      >
+      <OTabs v-model="activeDetailTab" class="flex-1" data-test="oncall-response-tabs-strip">
         <OTab
           name="activity"
           icon="forum"
@@ -172,9 +52,6 @@
     <template #actions>
       <ORefreshButton
         v-if="response"
-        layout="inline"
-        size="header"
-        variant="outline"
         :last-run-at="lastFetchedAt"
         :loading="refreshing"
         data-test="oncall-response-refresh"
@@ -186,7 +63,6 @@
         <OButton
           v-if="canAcknowledge"
           variant="primary"
-          size="sm"
           :loading="acking"
           data-test="oncall-response-ack-btn"
           @click="acknowledgeRecord"
@@ -197,8 +73,7 @@
         <template v-if="response.state === 'acknowledged'">
           <OButton
             v-if="response.acked_by !== me"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :loading="acking"
             data-test="oncall-response-take-over-btn"
             @click="takeOverRecord"
@@ -207,28 +82,22 @@
             <OIcon name="how-to-reg" size="sm" />{{ t("oncall.takeOver") }}
           </OButton>
           <OButton
-            variant="outline"
-            size="sm"
+            :disabled-reason="unackBlockedReason ?? undefined"
+            variant="secondary"
             :loading="acking"
             :disabled="!!unackBlockedReason"
-            :focusable-unavailable="!!unackBlockedReason"
             data-test="oncall-response-unack-btn"
             @click="unacknowledgeRecord"
           >
-            <!-- First child, so it anchors to the whole button: a disabled one must say why on hover. -->
-            <OTooltip :content="unackBlockedReason ?? ackWords.unackHint" />
+            <OTooltip v-if="!unackBlockedReason" :content="ackWords.unackHint" />
             <OIcon name="undo" size="sm" />{{ t("oncall.unacknowledge") }}
-            <template v-if="unackBlockedReason" #unavailable-reason>{{
-              unackBlockedReason
-            }}</template>
           </OButton>
         </template>
 
         <!-- A menu of durations, not a panel that pushes the page down. -->
         <OButton
           v-if="canUnsnooze && inlineVerbs"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :loading="snoozing"
           data-test="oncall-response-unsnooze-btn"
           @click="unsnoozeRecord"
@@ -239,10 +108,9 @@
         <ODropdown v-else-if="canSnooze && inlineVerbs">
           <template #trigger>
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               :loading="snoozing"
-              icon-right="expand-more"
+              icon-end="expand-more"
               data-test="oncall-response-snooze-btn"
             >
               <OIcon name="alarm" size="sm" />{{ t("oncall.snooze") }}
@@ -251,7 +119,7 @@
           <ODropdownItem
             v-for="opt in snoozeOptions"
             :key="opt.minutes"
-            icon-left="alarm"
+            icon="alarm"
             :data-test="`oncall-response-snooze-${opt.minutes}`"
             @select="snoozeRecord(opt.minutes)"
           >
@@ -262,26 +130,20 @@
         <!-- Not on an unrouted page: the server refuses it there, and Hand off is the next step. -->
         <span v-if="inlineVerbs && canEscalate" class="inline-flex">
           <OButton
-            variant="outline"
-            size="sm"
+            :disabled-reason="t('oncall.ladderExhausted')"
+            variant="secondary"
             :loading="escalatingNow"
             :disabled="escalation?.exhausted"
-            :focusable-unavailable="escalation?.exhausted"
             data-test="oncall-response-escalate-btn"
             @click="escalateNow"
           >
             <OIcon name="trending-up" size="sm" />{{ t("oncall.escalate") }}
-            <template v-if="escalation?.exhausted" #unavailable-reason>{{
-              t("oncall.ladderExhausted")
-            }}</template>
           </OButton>
-          <OTooltip v-if="escalation?.exhausted" :content="t('oncall.ladderExhausted')" />
         </span>
 
         <OButton
           v-if="inlineVerbs"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="oncall-response-handoff-btn"
           @click="showHandoff = true"
         >
@@ -297,8 +159,7 @@
            an incident exists, because the rail links to it from then on. -->
       <OButton
         v-if="response && !response.incident_id && inlineVerbs"
-        variant="outline"
-        size="sm"
+        variant="secondary"
         data-test="oncall-response-promote-btn"
         @click="promoteOpen = true"
       >
@@ -312,8 +173,7 @@
              no longer arrive. -->
         <OButton
           v-if="isImpacted"
-          :variant="canAcknowledge ? 'outline' : 'primary'"
-          size="sm"
+          :variant="canAcknowledge ? 'secondary' : 'primary'"
           :loading="confirmingRecovery"
           data-test="oncall-response-confirm-recovery-btn"
           @click="confirmRecoveryOpen = true"
@@ -322,8 +182,7 @@
         </OButton>
         <OButton
           v-else
-          :variant="canAcknowledge ? 'outline' : 'primary'"
-          size="sm"
+          :variant="canAcknowledge ? 'secondary' : 'primary'"
           :loading="resolving"
           data-test="oncall-response-resolve-btn"
           @click="confirmResolve = true"
@@ -335,9 +194,9 @@
       <ODropdown v-if="response && !inlineVerbs && hasMoreActions" side="bottom" align="end">
         <template #trigger>
           <OButton
-            variant="outline"
-            size="icon-md"
-            icon-left="more-vert"
+            icon-only
+            variant="ghost"
+            icon="more-vert"
             :loading="snoozing || escalatingNow"
             :aria-label="t('oncall.moreActions')"
             data-test="oncall-response-more-btn"
@@ -345,7 +204,7 @@
         </template>
         <ODropdownItem
           v-if="canUnsnooze"
-          icon-left="notifications-active"
+          icon="notifications-active"
           data-test="oncall-response-unsnooze-btn-menu"
           @select="unsnoozeRecord"
         >
@@ -355,7 +214,7 @@
           <ODropdownItem
             v-for="opt in snoozeOptions"
             :key="opt.minutes"
-            icon-left="alarm"
+            icon="alarm"
             :data-test="`oncall-response-snooze-${opt.minutes}-menu`"
             @select="snoozeRecord(opt.minutes)"
           >
@@ -365,7 +224,7 @@
         <ODropdownSeparator v-if="canSnooze" />
         <ODropdownItem
           v-if="isOpenState && canEscalate"
-          icon-left="trending-up"
+          icon="trending-up"
           :disabled="escalation?.exhausted"
           data-test="oncall-response-escalate-btn-menu"
           @select="escalateNow"
@@ -375,7 +234,7 @@
         </ODropdownItem>
         <ODropdownItem
           v-if="isOpenState"
-          icon-left="swap-horiz"
+          icon="swap-horiz"
           data-test="oncall-response-handoff-btn-menu"
           @select="showHandoff = true"
         >
@@ -383,7 +242,7 @@
         </ODropdownItem>
         <ODropdownItem
           v-if="!response.incident_id"
-          icon-left="local-fire-department"
+          icon="local-fire-department"
           data-test="oncall-response-promote-btn-menu"
           @select="promoteOpen = true"
         >
@@ -395,16 +254,19 @@
     <template v-if="response">
       <!-- This page is a document, so the body is the scroller; the note box sticks to its foot. -->
       <OContent y class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <!-- Wide screens carry state and priority beside the title; the ladder phrase reads here on every width. -->
         <div
-          v-if="!lgUp"
+          v-if="!lgUp || isOpenState || isImpacted"
           class="mb-3 flex flex-wrap items-center gap-2"
           data-test="oncall-response-meta"
         >
-          <span class="inline-flex" data-test="oncall-response-state-tag">
-            <OTag type="oncallResponseState" :value="response.state" size="sm" />
-            <OTooltip v-if="closedAfter" :content="closedAfter" />
-          </span>
-          <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
+          <template v-if="!lgUp">
+            <span class="inline-flex" data-test="oncall-response-state-tag">
+              <OTag type="oncallResponseState" :value="response.state" size="sm" />
+              <OTooltip v-if="closedAfter" :content="closedAfter" />
+            </span>
+            <OTag type="alertPriority" :value="`p${response.priority}`" size="sm" />
+          </template>
           <span
             v-if="isOpenState"
             class="flex min-w-32 shrink-[1000] truncate"
@@ -420,14 +282,10 @@
               :team-deleted="teamDeleted"
             />
           </span>
-          <OTag
-            v-if="isImpacted"
-            variant="info-outline"
-            size="sm"
-            data-test="oncall-response-liaison-tag"
-          >
-            {{ t("oncall.liaisonTag") }}
-          </OTag>
+          <span v-if="isImpacted" class="inline-flex" data-test="oncall-response-liaison-tag">
+            <OTag tone="outline" size="sm">{{ t("oncall.liaisonTag") }}</OTag>
+            <OTooltip side="bottom" :content="t('oncall.ladderLiaisonNote')" />
+          </span>
         </div>
 
         <!-- The one sentence this screen exists to say when it is true:
@@ -445,28 +303,27 @@
           @open-reachability="openReachability"
         />
 
-        <OBanner
+        <OInlineNotice
           v-if="exhaustedAtClock"
-          variant="error"
+          tone="err"
           class="mb-3"
           data-test="oncall-response-exhausted-banner"
         >
           {{ t("oncall.exhaustedBanner", { time: exhaustedAtClock }) }}
-        </OBanner>
+        </OInlineNotice>
 
         <!-- Snoozing does not assign the page, and the banner has to keep
              saying so — a quiet page that looks owned is how one gets dropped. -->
-        <OBanner
+        <OInlineNotice
           v-if="snoozedUntilLabel"
-          variant="warning"
+          tone="warn"
           class="mb-3"
           data-test="oncall-response-snoozed-banner"
         >
           {{ t("oncall.snoozedUntil", { time: snoozedUntilLabel }) }}
           <template v-if="canUnsnooze" #actions>
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               :loading="snoozing"
               data-test="oncall-response-snoozed-banner-unsnooze"
               @click="unsnoozeRecord"
@@ -474,15 +331,15 @@
               <OIcon name="notifications-active" size="sm" />{{ t("oncall.unsnooze") }}
             </OButton>
           </template>
-        </OBanner>
+        </OInlineNotice>
 
         <!-- D-21. This record exists because somebody else's failure reaches
              this team's service. Without saying so, a two-rung ladder that
              stops reads as a broken one, and the team reads its own page as
              an outage it is supposed to fix. -->
-        <OBanner
+        <OInlineNotice
           v-if="isImpacted"
-          variant="info"
+          tone="info"
           class="mb-3"
           data-test="oncall-response-liaison-banner"
         >
@@ -499,12 +356,12 @@
           >
             {{ t("oncall.liaisonOpenOrigin") }}
           </router-link>
-        </OBanner>
+        </OInlineNotice>
 
         <!-- Acknowledge would take the page; Page now wakes rung 1 without waiting for triage. -->
-        <OBanner
+        <OInlineNotice
           v-if="holdSecondsLeft > 0"
-          variant="info"
+          tone="info"
           class="mb-3"
           data-test="oncall-response-hold-banner"
         >
@@ -512,8 +369,7 @@
           <template #actions>
             <OButton
               v-if="canEscalate"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               :loading="escalatingNow"
               data-test="oncall-response-hold-page-now"
               @click="escalateNow"
@@ -521,7 +377,7 @@
               {{ t("oncall.pageNow") }}
             </OButton>
           </template>
-        </OBanner>
+        </OInlineNotice>
 
         <OStatStrip
           v-if="topStats.length"
@@ -538,12 +394,8 @@
             <OnCallVerdictCard :events="events" />
 
             <!-- Not clipped, or the note box could not stick to the scrolling body's foot. -->
-            <OCard
-              variant="glass"
-              class="overflow-visible lg:flex-1"
-              data-test="oncall-response-tabs"
-            >
-              <OCardSection role="body" dense class="lg:flex lg:flex-col">
+            <OCard class="overflow-visible lg:flex-1" data-test="oncall-response-tabs">
+              <div class="lg:flex lg:min-h-full lg:flex-col">
                 <!-- Unclipped, or it becomes the note box's sticky container instead of the page. -->
                 <OTabPanels
                   v-model="activeDetailTab"
@@ -554,8 +406,7 @@
                       <div v-if="systemActivityCount" class="flex justify-end pt-2">
                         <OButton
                           variant="ghost"
-                          size="sm"
-                          :icon-left="showAllActivity ? 'visibility-off' : 'visibility'"
+                          :icon="showAllActivity ? 'visibility-off' : 'visibility'"
                           data-test="oncall-response-activity-toggle-all"
                           @click="showAllActivity = !showAllActivity"
                         >
@@ -572,7 +423,7 @@
                         class="flex flex-col gap-4 py-3"
                         data-test="oncall-response-activity-pending"
                       >
-                        <OSkeleton v-for="n in 4" :key="n" class="h-4 w-3/4" />
+                        <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-4 w-3/4" />
                       </div>
                       <OnCallActivityTimeline
                         v-else
@@ -624,7 +475,7 @@
                     </div>
                   </OTabPanel>
                 </OTabPanels>
-              </OCardSection>
+              </div>
             </OCard>
           </div>
 
@@ -676,23 +527,19 @@
 
     <OnCallResponseDetailSkeleton v-else-if="loading" />
 
-    <OContent v-else-if="loadError !== null" y>
+    <OContent v-else-if="loadError !== null">
       <OEmptyState
-        size="hero"
-        variant="error"
-        illustration="broken-panel"
+        kind="error"
         :title="t('oncall.loadResponseFailed')"
-        :description="raw(loadError)"
-        :action-label="t('oncall.retry')"
+        :text="isRawHttpText(loadError) ? t('emptyState.loadError.description') : raw(loadError)"
         data-test="oncall-response-detail-error"
         @action="refreshPage"
       />
     </OContent>
 
     <!-- Reads return 404 for a deleted page, and "nothing here yet" would suggest it is still coming. -->
-    <OContent v-else y>
+    <OContent v-else>
       <OEmptyState
-        size="hero"
         :title="t('oncall.responseNotFoundTitle')"
         :action-label="t('oncall.openPagesList')"
         data-test="oncall-response-detail-not-found"
@@ -703,16 +550,17 @@
     <!-- Handing a page to another team clears the ack and re-arms the ladder,
          so it gets room to say so rather than a menu. -->
     <ODrawer
+      size="sm"
       v-model:open="showHandoff"
       :title="t('oncall.handoffTitle')"
       data-test="oncall-handoff-drawer"
     >
       <div class="flex flex-col gap-4">
         <OToggleGroup v-model="handoffMode">
-          <OToggleGroupItem value="person" size="sm" data-test="oncall-handoff-mode-person">
+          <OToggleGroupItem value="person" data-test="oncall-handoff-mode-person">
             {{ t("oncall.handoffToPerson") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="team" size="sm" data-test="oncall-handoff-mode-team">
+          <OToggleGroupItem value="team" data-test="oncall-handoff-mode-team">
             {{ t("oncall.handoffToTeam") }}
           </OToggleGroupItem>
         </OToggleGroup>
@@ -747,12 +595,11 @@
 
       <template #footer>
         <div class="flex justify-end gap-2">
-          <OButton variant="outline" size="sm-action" @click="showHandoff = false">
+          <OButton variant="secondary" @click="showHandoff = false">
             {{ t("oncall.cancel") }}
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             :loading="handingOff"
             :disabled="!handoffTarget"
             data-test="oncall-handoff-submit"
@@ -781,12 +628,11 @@
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <OButton variant="outline" size="sm-action" @click="confirmRecoveryOpen = false">
+          <OButton variant="secondary" @click="confirmRecoveryOpen = false">
             {{ t("oncall.cancel") }}
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             :loading="confirmingRecovery"
             data-test="oncall-confirm-recovery-confirm"
             @click="confirmRecovery"
@@ -831,12 +677,11 @@
 
       <template #footer>
         <div class="flex justify-end gap-2">
-          <OButton variant="outline" size="sm-action" @click="promoteOpen = false">
+          <OButton variant="secondary" @click="promoteOpen = false">
             {{ t("oncall.cancel") }}
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             :loading="promoting"
             data-test="oncall-promote-confirm"
             @click="promoteRecord"
@@ -864,12 +709,11 @@
 
       <template #footer>
         <div class="flex justify-end gap-2">
-          <OButton variant="outline" size="sm-action" @click="confirmResolve = false">
+          <OButton variant="secondary" @click="confirmResolve = false">
             {{ t("oncall.cancel") }}
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             :loading="resolving"
             data-test="oncall-resolve-confirm"
             @click="resolveRecord"
@@ -892,6 +736,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
@@ -899,13 +744,11 @@ import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import OnCallAboutPage from "@/components/oncall/OnCallAboutPage.vue";
 import OnCallDeliveryLedger from "@/components/oncall/OnCallDeliveryLedger.vue";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
-import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OnCallReachAlarm from "@/components/oncall/OnCallReachAlarm.vue";
 import OnCallWhatFired from "@/components/oncall/OnCallWhatFired.vue";
 import OnCallWhoIsOn from "@/components/oncall/OnCallWhoIsOn.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -930,10 +773,9 @@ import OnCallVerdictCard from "@/components/oncall/OnCallVerdictCard.vue";
 import OnCallResponseDetailSkeleton from "./OnCallResponseDetailSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
@@ -1000,7 +842,6 @@ import {
   isEscalating,
   isSnoozed,
   isUnresolved,
-  pagePhrase,
   pageState,
   promoteSeverityFloor,
   promoteSeverityOptions,
@@ -1008,7 +849,6 @@ import {
   routingReasonOf,
 } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
-import { formatTimestampInTimezone } from "@/utils/date";
 
 const HOLD_RECHECK_MS = 10_000;
 /// Re-reads of a lapsed rung before giving up: a minute at HOLD_RECHECK_MS.
@@ -1264,24 +1104,6 @@ const hasMoreActions = computed(() => isOpenState.value || !response.value?.inci
 const canEscalate = computed(() => !!response.value?.team_id && !teamDeleted.value);
 const canSnooze = computed(() => canAcknowledge.value && !!response.value?.team_id);
 
-/// Where the team-name link in the subtitle goes — same target and tab
-/// OnCallAboutPage's own team row links to, so the two agree on what
-/// clicking the team means.
-const teamRoute = computed(() => ({
-  name: "onCallTeamDetail",
-  params: { teamId: response.value?.team_id ?? "", tab: "overview" },
-  query: { org_identifier: orgId.value },
-}));
-
-/// Clock time, not "N ago" — the elapsed duration is already said once, beside
-/// the title tags, and repeating it here as "opened 2 hours ago" would just be
-/// the same fact twice in two words.
-const openedAtClock = computed(() => {
-  const r = response.value;
-  if (!r) return "";
-  return formatTimestampInTimezone(r.opened_at, "HH:mm", store.state.timezone);
-});
-
 /// Rungs the team's policy defines for this priority, `null` when the policy could not be read.
 const totalRungs = computed(
   () =>
@@ -1289,26 +1111,12 @@ const totalRungs = computed(
     null,
 );
 
-/// The record's own step, so the header says something true before the ladder's progress has answered.
+/// The record's own step, so the phrase says something true before the ladder's progress has answered.
 const headerReachedStep = computed(() =>
   reachedStepOf(
     policy.value?.rungs.find((rung) => rung.priority === response.value?.priority)?.steps,
     response.value?.reached_rung_micros,
   ),
-);
-
-/// The subtitle's separator waits for a phrase, so an unanswered ladder leaves no dangling dot.
-const headerPhraseKind = computed(() =>
-  response.value
-    ? pagePhrase({
-        record: response.value,
-        progress: escalation.value,
-        progressLoaded: escalationLoaded.value,
-        totalRungs: totalRungs.value,
-        reachedStep: headerReachedStep.value,
-        nowMicros: nowMicros.value,
-      }).kind
-    : "unknown",
 );
 
 // The same progress decides the header tag; the time is the last step's, which the record's flag lags.

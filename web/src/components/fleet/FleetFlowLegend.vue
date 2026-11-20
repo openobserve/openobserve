@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="item in items"
       :key="item.key"
       variant="ghost"
-      size="xs"
+      size="sm"
       :class="shown(item.key) && counts[item.key] ? '' : 'text-text-muted'"
       :aria-pressed="shown(item.key)"
       :title="t('fleet.flowIssues.legendToggle')"

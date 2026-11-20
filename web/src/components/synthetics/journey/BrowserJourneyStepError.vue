@@ -158,9 +158,9 @@ const fidelityNotes = computed(() => props.result.fidelity?.notes ?? []);
 
     <div class="flex items-center gap-2 px-3 pb-3">
       <OButton
-        variant="outline"
-        size="xs"
-        icon-left="replay"
+        variant="secondary"
+        size="sm"
+        icon="replay"
         data-test="synthetics-journey-error-retry-btn"
         @click="emit('retry-replay')"
       >
@@ -172,9 +172,9 @@ const fidelityNotes = computed(() => props.result.fidelity?.notes ?? []);
       </OButton>
       <OButton
         v-if="childName"
-        variant="outline"
-        size="xs"
-        icon-left="open-in-new"
+        variant="secondary"
+        size="sm"
+        icon="open-in-new"
         data-test="synthetics-journey-error-open-child-btn"
         @click="emit('open-child')"
       >

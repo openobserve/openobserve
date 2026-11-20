@@ -369,7 +369,6 @@ const COLOR_ALLOWLIST = [
   "web/src/components/slos/SloTimeSlicePreview.vue",
   "web/src/components/traces/FlameGraphView.vue",
   "web/src/enterprise/components/billings/usage.vue",
-  "web/src/lib/core/EmptyState/OEmptyState.vue",
   "web/src/lib/forms/Color/OColor.vue",
   "web/src/lib/overlay/Tooltip/OTooltip.vue",
   "web/src/plugins/logs/BuildQueryPage.vue",
@@ -446,6 +445,1234 @@ const noHardcodedColor = {
           return services.defineTemplateBodyVisitor({}, scriptVisitor);
         }
         return scriptVisitor;
+      },
+    },
+  },
+};
+
+// A control's height comes from its `size` prop (the --spacing-control-* tokens), so a
+// height class on an O* control or button splits one size name into many (guideline S1, S2).
+const CONTROL_HEIGHT_TAGS = new Set(
+  [
+    "OButton",
+    "OButtonGroup",
+    "ORefreshButton",
+    "OCopyButton",
+    "OInput",
+    "OFormInput",
+    "OSelect",
+    "OFormSelect",
+    "OSearchInput",
+    "OToggleGroup",
+    "ODate",
+    "OTime",
+    "OFormDateTimeRange",
+    "OCombobox",
+    "OFormCombobox",
+    "OToggleGroupItem",
+    "OFormToggleGroup",
+    "OFormDate",
+    "OFormTime",
+    "OCheckbox",
+    "OFormCheckbox",
+    "ORadio",
+    "OSwitch",
+    "OFormSwitch",
+    "OColor",
+    "OFormColor",
+    "OTemplateInput",
+    "OFormTemplateInput",
+    "OInlineEdit",
+    "OFormInlineEdit",
+    "OChipInput",
+    "OTagInput",
+    "OFormTagInput",
+    "OTabs",
+    "OTab",
+    "ORouteTab",
+  ].map((tag) => tag.toLowerCase()),
+);
+const CONTROL_HEIGHT_CLASS_ATTRS = new Set(["class", "classname"]);
+const CONTROL_HEIGHT_UTILITY = /^-?(h|min-h|size)-(.+)$/;
+// Relative keywords follow the parent rather than pick a height of their own.
+const CONTROL_HEIGHT_RELATIVE = /^(full|auto|fit|min|max|screen|svh|lvh|dvh|lh)$/;
+const isControlHeightTag = (rawName) => {
+  const tag = typeof rawName === "string" ? rawName.replace(/-/g, "").toLowerCase() : "";
+  return CONTROL_HEIGHT_TAGS.has(tag) || tag.startsWith("odatetime");
+};
+// Splits "max-md:[&_.x]:!h-8" into its variant chain and utility, ignoring ":" inside brackets.
+const splitVariants = (token) => {
+  let depth = 0;
+  let cut = -1;
+  for (let i = 0; i < token.length; i++) {
+    if (token[i] === "[") depth++;
+    else if (token[i] === "]") depth--;
+    else if (token[i] === ":" && depth === 0) cut = i;
+  }
+  return { variants: token.slice(0, cut + 1), utility: token.slice(cut + 1) };
+};
+const controlHeightOverride = (token) => {
+  const { variants, utility } = splitVariants(token);
+  const match = CONTROL_HEIGHT_UTILITY.exec(utility.replace(/^!|!$/g, ""));
+  if (!match || (match[1] === "min-h" && match[2] === "0")) return false;
+  const reachesInside = variants.includes("[&");
+  if (reachesInside && match[1] !== "size") return true;
+  return !CONTROL_HEIGHT_RELATIVE.test(match[2]);
+};
+const o2ControlHeight = {
+  rules: {
+    "o2-control-height": {
+      meta: {
+        type: "problem",
+        docs: { description: "No height overrides on O* form controls and buttons" },
+      },
+      create(context) {
+        const sourceCode = context.sourceCode ?? context.getSourceCode();
+        const services = sourceCode.parserServices ?? context.parserServices;
+        if (!services?.defineTemplateBodyVisitor) return {};
+        const reportTokens = (node, text, tag) => {
+          for (const token of text.split(/\s+/)) {
+            if (!token || !controlHeightOverride(token)) continue;
+            context.report({
+              node,
+              message: `"${token}" overrides the height of <${tag}>. Heights come from the size prop (24/28/32/36 control tokens); pick the size that matches the row instead (ui-architect guidelines S1, S2).`,
+            });
+          }
+        };
+        const collectStrings = (expr, out) => {
+          if (!expr || typeof expr !== "object") return out;
+          if (expr.type === "Literal" && typeof expr.value === "string") out.push(expr.value);
+          else if (expr.type === "TemplateElement") out.push(expr.value.cooked ?? "");
+          for (const key of Object.keys(expr)) {
+            if (key === "parent" || key === "loc" || key === "range") continue;
+            const child = expr[key];
+            if (Array.isArray(child)) child.forEach((c) => collectStrings(c, out));
+            else if (child && typeof child.type === "string") collectStrings(child, out);
+          }
+          return out;
+        };
+        return services.defineTemplateBodyVisitor({
+          VAttribute(node) {
+            const tag = node.parent?.parent?.rawName;
+            if (!isControlHeightTag(tag)) return;
+            if (!node.directive) {
+              const name = node.key?.name?.toLowerCase?.();
+              if (CONTROL_HEIGHT_CLASS_ATTRS.has(name) && node.value) {
+                reportTokens(node, node.value.value ?? "", tag);
+              }
+              return;
+            }
+            const arg = node.key?.argument?.name;
+            if (node.key?.name?.name !== "bind" || typeof arg !== "string") return;
+            if (!CONTROL_HEIGHT_CLASS_ATTRS.has(arg.replace(/-/g, "").toLowerCase())) return;
+            for (const text of collectStrings(node.value?.expression, [])) {
+              reportTokens(node, text, tag);
+            }
+          },
+        });
+      },
+    },
+  },
+};
+
+// OButton and its family accept only the v2 API: seven variants by job, four control heights,
+// and the renamed props (guidelines B2, S1). Values come from OButton.types.ts.
+const BUTTON_API = {
+  OButton: {
+    values: {
+      variant: ["primary", "secondary", "ghost", "accent-ghost", "danger", "danger-ghost", "link"],
+      size: ["xs", "sm", "md", "lg"],
+      as: ["button", "div"],
+    },
+    removed: {
+      disable: "disabled",
+      "icon-left": "icon",
+      "icon-right": "icon-end",
+      active: "pressed",
+      "focusable-unavailable": "disabled-reason",
+      "description-id": "disabled-reason",
+      spinner: null,
+      round: null,
+      ripple: null,
+      tooltip: "disabled-reason, or a child OTooltip",
+    },
+    slots: {
+      "icon-left": "#icon",
+      "icon-right": "#icon-end",
+      "unavailable-reason": "disabled-reason",
+    },
+  },
+  OButtonGroup: {
+    values: { size: ["xs", "sm", "md", "lg"] },
+    removed: { radius: null, divided: null, orientation: null, align: null },
+  },
+  OSplitButton: {
+    values: { variant: ["primary", "secondary"], size: ["sm", "md"] },
+  },
+  ORefreshButton: {
+    values: { size: ["sm", "md"] },
+    removed: {
+      layout: null,
+      variant: null,
+      "age-format": null,
+      spinner: null,
+      "data-from": null,
+      "shortcut-id": "shortcut",
+    },
+  },
+  OCopyButton: {
+    values: { variant: ["ghost", "secondary"], size: ["xs", "sm", "md"] },
+  },
+};
+const BUTTON_VARIANT_ATTR = /^(primary|secondary|neutral)-button-variant$|^(ok|confirm)-variant$/;
+const kebab = (name) => name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+const pascalTag = (rawName) =>
+  typeof rawName === "string" && rawName.includes("-")
+    ? rawName.replace(/(^|-)([a-z])/g, (_, __, c) => c.toUpperCase())
+    : rawName;
+const stringLiterals = (expr, out = []) => {
+  if (!expr || typeof expr !== "object") return out;
+  if (expr.type === "Literal" && typeof expr.value === "string") out.push(expr.value);
+  // Keys of a lookup object name the cases, not the values that reach the prop.
+  if (expr.type === "Property") return stringLiterals(expr.value, out);
+  if (expr.type === "MemberExpression") return stringLiterals(expr.object, out);
+  if (expr.type === "BinaryExpression" || expr.type === "CallExpression") return out;
+  if (expr.type === "ConditionalExpression") {
+    stringLiterals(expr.consequent, out);
+    return stringLiterals(expr.alternate, out);
+  }
+  if (expr.type === "LogicalExpression") return stringLiterals(expr.right, out);
+  return out;
+};
+const o2ButtonApi = {
+  rules: {
+    "o2-button-api": {
+      meta: {
+        type: "problem",
+        docs: { description: "OButton family: v2 variants, sizes and props only" },
+      },
+      create(context) {
+        const sourceCode = context.sourceCode ?? context.getSourceCode();
+        const services = sourceCode.parserServices ?? context.parserServices;
+        if (!services?.defineTemplateBodyVisitor) return {};
+        // RUM pages are owned by another team; their B4 cleanup lands there.
+        const rumOwned = /[\\/](views[\\/]RUM|components[\\/]rum)[\\/]/.test(
+          context.filename ?? "",
+        );
+        const check = (node, tag, prop, value, shown = `<${tag}> ${prop}`) => {
+          const allowed = BUTTON_API[tag]?.values?.[prop];
+          if (!allowed || allowed.includes(value)) return;
+          context.report({
+            node,
+            message: `${shown}="${value}" is not part of the button API. Use one of: ${allowed.join(", ")} (see OButton.types.ts; guidelines B2, S1).`,
+          });
+        };
+        return services.defineTemplateBodyVisitor({
+          VAttribute(node) {
+            const element = node.parent?.parent;
+            const tag = pascalTag(element?.rawName);
+            const isBind = node.directive && node.key?.name?.name === "bind";
+            if (node.directive && !isBind) {
+              const slot = node.key?.name?.name === "slot" ? node.key.argument?.name : null;
+              const owner = pascalTag(element?.parent?.rawName);
+              const replacement = slot && BUTTON_API[owner]?.slots?.[slot];
+              if (replacement) {
+                context.report({
+                  node,
+                  message: `<${owner}> has no #${slot} slot; use ${replacement}.`,
+                });
+              }
+              return;
+            }
+            // rawName keeps the camelCase spelling (`:iconLeft`); `name` is lowercased by the parser.
+            const key = isBind ? node.key.argument : node.key;
+            const raw = key?.rawName ?? key?.name;
+            if (typeof raw !== "string") return;
+            const prop = kebab(raw);
+            const values = isBind
+              ? stringLiterals(node.value?.expression)
+              : [node.value?.value ?? ""];
+            if (BUTTON_VARIANT_ATTR.test(prop)) {
+              for (const value of values)
+                check(node, "OButton", "variant", value, `<${tag}> ${prop}`);
+              return;
+            }
+            const api = BUTTON_API[tag];
+            if (!api) return;
+            if (api.removed && prop in api.removed) {
+              const to = api.removed[prop];
+              context.report({
+                node,
+                message: `<${tag}> no longer takes "${prop}"${to ? `; use ${to}` : ""} (see ${tag}.types.ts).`,
+              });
+              return;
+            }
+            if (api.values?.[prop]) for (const value of values) check(node, tag, prop, value);
+            if (!rumOwned && tag === "OButton" && (prop === "icon" || prop === "icon-end")) {
+              const attrs = element?.startTag?.attributes ?? [];
+              const iconOnly = attrs.some((attr) => {
+                const attrKey = attr.directive ? attr.key?.argument : attr.key;
+                return kebab(attrKey?.rawName ?? attrKey?.name ?? "") === "icon-only";
+              });
+              if (!iconOnly && values.includes("add")) {
+                context.report({
+                  node,
+                  message: `A text <OButton> carries no "+" icon; drop ${prop}="add" and keep the label (guidelines B4, H6).`,
+                });
+              }
+            }
+          },
+        });
+      },
+    },
+  },
+};
+
+// Form controls, the segmented control and tabs accept only the v2 API: control-token sizes and
+// declared props (guidelines S1, S9, B9). Each family keeps its own table; values mirror *.types.ts.
+// Segmented control and choice controls: the group carries the size; checkbox, radio, switch,
+// slider and range come in one size (guidelines S1, S2, S9).
+const CHOICE_ONE_SIZE = { removed: { size: null } };
+const CHECKBOX_API = { removed: { size: null, color: null, val: "value", type: null } };
+const SWITCH_API = {
+  values: { "label-position": ["start", "end"] },
+  removed: { size: null, "checked-value": null, "unchecked-value": null },
+};
+const CONTROLS_API_SELECTION = {
+  OToggleGroup: { values: { size: ["sm", "md"], variant: ["default", "primary"] } },
+  OFormToggleGroup: { values: { size: ["sm", "md"], variant: ["default", "primary"] } },
+  OToggleGroupItem: { removed: { size: "the size of its OToggleGroup" } },
+  OCheckbox: CHECKBOX_API,
+  OFormCheckbox: CHECKBOX_API,
+  ORadio: { values: { variant: ["default", "card"] }, removed: { size: null, val: "value" } },
+  OSwitch: SWITCH_API,
+  OFormSwitch: SWITCH_API,
+  OOptionGroup: CHOICE_ONE_SIZE,
+  OFormOptionGroup: CHOICE_ONE_SIZE,
+  OSlider: CHOICE_ONE_SIZE,
+  OFormSlider: CHOICE_ONE_SIZE,
+  ORange: CHOICE_ONE_SIZE,
+  OFormRange: CHOICE_ONE_SIZE,
+};
+// Text entry, search, select and date fields: control-token sizes, S7 widths, no inside labels.
+const FIELD_WIDTHS = ["s", "m", "l", "full"];
+const INPUT_API = {
+  values: { size: ["xs", "sm", "md", "lg"], width: FIELD_WIDTHS },
+  removed: {
+    "label-position": 'a label above, or variant="filter" on OSelect',
+    revealable: 'type="password" (it always has the toggle)',
+    "field-width": "width",
+    disable: "disabled",
+    hint: "help-text",
+    flat: null,
+    color: null,
+    outlined: null,
+    autogrow: "OTextarea",
+    rows: "OTextarea",
+    "icon-left": "icon",
+  },
+  slots: {
+    "icon-left": "#icon",
+    "icon-right": "#icon-end",
+    prefix: "the prefix prop",
+    suffix: "the suffix prop",
+    append: null,
+  },
+};
+const TEXTAREA_API = {
+  values: { width: FIELD_WIDTHS },
+  removed: { size: null, disable: "disabled", "label-position": null },
+};
+const SELECT_API = {
+  values: {
+    size: ["sm", "md", "lg"],
+    width: FIELD_WIDTHS,
+    variant: ["field", "filter"],
+    summary: ["value", "count"],
+  },
+  removed: {
+    "label-position": 'variant="filter"',
+    appearance: 'variant="filter"',
+    "max-visible-chips": "max-chips",
+    "dropdown-style": null,
+    "option-tooltip": null,
+    disable: "disabled",
+    hint: "help-text",
+    color: null,
+  },
+  slots: { "icon-left": "#icon", "selected-item": "#trigger" },
+};
+const SMALL_FIELD_API = {
+  values: { size: ["sm", "md"] },
+  removed: { "label-position": "a label above", disable: "disabled" },
+};
+const CONTROLS_API_FIELDS = {
+  OInput: INPUT_API,
+  OFormInput: INPUT_API,
+  OTemplateInput: INPUT_API,
+  OFormTemplateInput: INPUT_API,
+  OTextarea: TEXTAREA_API,
+  OFormTextarea: TEXTAREA_API,
+  OTemplateTextarea: TEXTAREA_API,
+  OSearchInput: {
+    values: { size: ["sm", "md"], width: ["list", "scope", "full"] },
+    removed: { clearable: null, autofocus: "shortcut", "label-position": null },
+    slots: { "icon-right": "scope-options", "icon-left": null },
+  },
+  OSelect: SELECT_API,
+  OFormSelect: SELECT_API,
+  OCombobox: SMALL_FIELD_API,
+  OFormCombobox: SMALL_FIELD_API,
+  ODate: SMALL_FIELD_API,
+  OFormDate: SMALL_FIELD_API,
+  OTime: SMALL_FIELD_API,
+  OFormTime: SMALL_FIELD_API,
+  OColor: SMALL_FIELD_API,
+  OFormColor: SMALL_FIELD_API,
+  OChipInput: SMALL_FIELD_API,
+};
+const DATETIME_API = {
+  values: { size: ["sm", "md"] },
+  removed: { disable: "disabled", variant: null },
+};
+const CONTROLS_API_DATETIME = {
+  ODateTimeRange: DATETIME_API,
+  DateTimePickerDashboard: DATETIME_API,
+  OFormDateTimeRange: DATETIME_API,
+};
+const CONTROLS_API_TABS = {
+  OTabs: {
+    values: { size: ["page", "compact"], orientation: ["horizontal", "vertical"] },
+    removed: {
+      dense: 'size="compact"',
+      align: null,
+      "mobile-arrows": null,
+      breakpoint: null,
+    },
+  },
+  OTab: {
+    removed: {
+      disable: "disabled",
+      "suffix-icon": "locked",
+      "suffix-label": "locked-label",
+      exact: null,
+      default: null,
+    },
+  },
+  OStepper: { values: { orientation: ["horizontal", "vertical"] } },
+};
+const FILE_API = {
+  values: { variant: ["zone", "compact"] },
+  removed: {
+    "drop-zone": null,
+    size: "variant",
+    "max-file-size": "max-size",
+    counter: "max-files",
+    "counter-label": null,
+    "bottom-slots": null,
+  },
+  slots: { prepend: null, append: null },
+};
+const CONTROLS_API_FILE = { OFile: FILE_API, OFormFile: FILE_API };
+const CONTROLS_API = {
+  ...CONTROLS_API_SELECTION,
+  ...CONTROLS_API_FIELDS,
+  ...CONTROLS_API_DATETIME,
+  ...CONTROLS_API_TABS,
+  ...CONTROLS_API_FILE,
+};
+const controlsApiEntry = (rawName) => {
+  if (typeof rawName !== "string") return null;
+  const pascal = rawName.includes("-")
+    ? rawName.replace(/(^|-)([a-z])/g, (_, __, c) => c.toUpperCase())
+    : rawName;
+  return CONTROLS_API[pascal] ? { tag: pascal, api: CONTROLS_API[pascal] } : null;
+};
+const o2ControlsApi = {
+  rules: {
+    "o2-controls-api": {
+      meta: {
+        type: "problem",
+        docs: { description: "Form controls, segmented control and tabs: v2 sizes and props only" },
+      },
+      create(context) {
+        const sourceCode = context.sourceCode ?? context.getSourceCode();
+        const services = sourceCode.parserServices ?? context.parserServices;
+        if (!services?.defineTemplateBodyVisitor) return {};
+        return services.defineTemplateBodyVisitor({
+          VAttribute(node) {
+            const element = node.parent?.parent;
+            const isBind = node.directive && node.key?.name?.name === "bind";
+            if (node.directive && !isBind) {
+              const slot = node.key?.name?.name === "slot" ? node.key.argument?.name : null;
+              const owner = controlsApiEntry(element?.parent?.rawName);
+              if (!slot || !owner?.api.slots || !(slot in owner.api.slots)) return;
+              const to = owner.api.slots[slot];
+              context.report({
+                node,
+                message: `<${owner.tag}> has no #${slot} slot${to ? `; use ${to}` : ""} (see ${owner.tag}.types.ts).`,
+              });
+              return;
+            }
+            const entry = controlsApiEntry(element?.rawName);
+            if (!entry) return;
+            // rawName keeps the camelCase spelling (`:labelPosition`); `name` is lowercased by the parser.
+            const key = isBind ? node.key.argument : node.key;
+            const raw = key?.rawName ?? key?.name;
+            if (typeof raw !== "string") return;
+            const prop = kebab(raw);
+            const { tag, api } = entry;
+            if (api.removed && prop in api.removed) {
+              const to = api.removed[prop];
+              context.report({
+                node,
+                message: `<${tag}> does not take "${prop}"${to ? `; use ${to}` : ""} (see ${tag}.types.ts; guidelines S1, B9).`,
+              });
+              return;
+            }
+            const allowed = api.values?.[prop];
+            if (!allowed) return;
+            const values = isBind
+              ? stringLiterals(node.value?.expression)
+              : [node.value?.value ?? ""];
+            for (const value of values) {
+              if (allowed.includes(value)) continue;
+              context.report({
+                node,
+                message: `<${tag}> ${prop}="${value}" is not part of its API. Use one of: ${allowed.join(", ")} (see ${tag}.types.ts; guideline S1).`,
+              });
+            }
+          },
+        });
+      },
+    },
+  },
+};
+
+// Display components accept only the v2 API: tones by meaning, the fixed sizes, and no
+// appearance overrides (guidelines C2-C6, K1-K6, F7, D4, S1). Values come from each *.types.ts.
+const CHIP_TONES = ["neutral", "outline", "accent", "ok", "warn", "err", "crit", "info"];
+const STAT_TONES = [
+  "success",
+  "warning",
+  "error",
+  "primary",
+  "info",
+  "orange",
+  "blue",
+  "teal",
+  "purple",
+  "neutral",
+];
+const CHIP_CLASS_BAN =
+  /^(uppercase|tracking-\S+|(min-)?h-\S+|p[xy]?-\S+|leading-\S+|rounded(-\S+)?|text-(3xs|2xs|xs|compact|sm|base))$/;
+const CHIP_REMOVED = {
+  variant: "tone",
+  shape: null,
+  clickable: "toggle (+ pressed), removable, or an OButton",
+  count: "the #trailing slot or OCountBadge",
+  "hide-zero-count": "the #trailing slot or OCountBadge",
+};
+const NOTICE_REMOVED = {
+  variant: "tone",
+  content: "message",
+  text: "message",
+  dense: null,
+  "inline-actions": null,
+  bar: null,
+  center: null,
+  "text-size": null,
+  colors: null,
+  role: null,
+  "data-variant": null,
+  "preserve-whitespace": 'class="whitespace-pre-line wrap-anywhere"',
+};
+const DISPLAY_API = {
+  OTag: {
+    values: { tone: CHIP_TONES, size: ["sm", "md"] },
+    removed: CHIP_REMOVED,
+    classBan: CHIP_CLASS_BAN,
+  },
+  OBadge: {
+    values: { tone: CHIP_TONES, size: ["sm", "md"] },
+    removed: CHIP_REMOVED,
+    classBan: CHIP_CLASS_BAN,
+  },
+  ODimensionChip: { values: { tone: CHIP_TONES }, removed: { variant: "tone" } },
+  OSeverity: { values: { level: ["fatal", "error", "warn", "info", "debug"] } },
+  OCountBadge: { values: { tone: ["err", "neutral", "accent"] } },
+  OStatCard: { values: { tone: STAT_TONES } },
+  OCard: {
+    removed: { variant: null },
+    classBan: /^(rounded(-\S+)?|shadow(-\S+)?|card-container|p[xy]?-\S+)$/,
+  },
+  OBanner: {
+    values: { tone: ["neutral", "info", "warn", "err"], "action-variant": ["secondary", "link"] },
+    removed: NOTICE_REMOVED,
+    slots: { meta: "the default slot", footer: "the default slot", icon: "the icon prop" },
+  },
+  OInlineNotice: {
+    values: {
+      tone: ["neutral", "info", "warn", "err", "ok"],
+      "action-variant": ["secondary", "link"],
+    },
+    removed: NOTICE_REMOVED,
+    slots: { meta: "the default slot", footer: "the default slot", icon: "the icon prop" },
+  },
+  OEmptyState: {
+    values: { kind: ["first-run", "filtered", "denied", "error"], size: ["region", "compact"] },
+    removed: {
+      preset: "kind with title and text",
+      illustration: "icon",
+      backdrop: null,
+      "tone-icon": null,
+      variant: "kind",
+      filtered: "kind",
+      "hide-action": "omitting the action label or listener",
+      actions: "action-label and secondary-action-label",
+      "action-icon": null,
+      "action-id": null,
+      "secondary-action-id": null,
+      columns: null,
+      description: "text",
+    },
+    slots: { title: "the title prop", description: "#text", illustration: "the icon prop" },
+    // R3: the component owns its position (region 64 px from the top, compact at the inset).
+    classBan: /^(p[ytb]?-\S+|m[ytb]?-auto|justify-\S+|items-\S+|place-\S+)$/,
+  },
+  OSpinner: { values: { size: ["sm", "md", "lg"] }, removed: { variant: null } },
+  OSkeleton: {
+    values: { shape: ["line", "block", "circle"], preset: ["tableRows", "statStrip", "chart"] },
+    removed: { type: "shape", animation: null, variant: null, "custom-radius": null },
+    classBan: /^rounded(-\S+)?$/,
+  },
+  OProgressBar: {
+    values: { tone: ["accent", "ok", "warn", "err"] },
+    removed: {
+      size: null,
+      variant: "tone",
+      indeterminate: ':value="null"',
+      color: null,
+      "aria-label": "label",
+    },
+  },
+  OCollapsible: {
+    removed: {
+      label: "title",
+      caption: "summary",
+      icon: null,
+      variant: null,
+      "trigger-class": null,
+      "model-value": "v-model:open",
+    },
+    vModel: "v-model:open",
+  },
+  OShortcut: { removed: { size: null } },
+  OCode: { removed: { block: "OCodeBlock" } },
+  OCodeBlock: {
+    removed: {
+      chrome: null,
+      padded: null,
+      inset: null,
+      "copy-message": null,
+      "reveal-tooltip": null,
+      "hide-tooltip": null,
+    },
+  },
+  ODescriptionList: {
+    values: { labels: ["text", "mono"], layout: ["columns", "stacked", "auto"] },
+    removed: { dense: null, "label-width": null, columns: "layout" },
+  },
+  ODescriptionItem: { removed: { stacked: 'layout="stacked" on the list' } },
+};
+
+// ── local/o2-table-api ───────────────────────────────────────────
+// OTable v2 (guidelines L7, D1–D7): one frame, density instead of row heights, no
+// row-number column, no built-in search box, and one pager (OPagination) for every list.
+const OTABLE_REMOVED = {
+  "show-index": "nothing; tables have no row-number column (D2)",
+  "show-global-filter": "an OSearchInput in #toolbar bound to :global-filter",
+  "global-filter-placeholder": "an OSearchInput in #toolbar",
+  frame: "nothing; OTable draws one frame (D8)",
+  bordered: "nothing; rows always have dividers",
+  "toolbar-bordered": "nothing; the toolbar always has its divider",
+  "pagination-bordered": "nothing; the footer always has its divider",
+  width: "nothing; the table fills its container",
+  dense: 'density="default" | "compact" (L7)',
+  compact: 'density="compact" (L7)',
+  "row-height": 'density="default" | "compact" (L7)',
+  "virtual-scroll-item-size": "density; the virtualizer measures a rendered row",
+  "row-tone": 'row-state ("paused")',
+  "show-footer": "nothing; the footer shows whenever there is a page or a selection",
+  "global-filter-active": "nothing",
+};
+const OTABLE_DENSITIES = ["default", "compact"];
+const OPAGINATION_REMOVED = {
+  max: "page-count, or total with page-size",
+  "max-pages": "nothing; the pager has previous and next only",
+  disable: "loading",
+  "model-value": "v-model:page",
+};
+// Pagers are OPagination; the table's own footer renders it as OTablePagination.
+const PAGER_TAGS = new Set(["OPagination", "OTablePagination"]);
+const o2TableApi = {
+  rules: {
+    "o2-table-api": {
+      meta: {
+        type: "problem",
+        docs: {
+          description: "OTable and OPagination: v2 API only, one pager, no row-number column",
+        },
+      },
+      create(context) {
+        const sourceCode = context.sourceCode ?? context.getSourceCode();
+        const services = sourceCode.parserServices ?? context.parserServices;
+        const isPagerFile = /[\\/]lib[\\/](core[\\/]Table|navigation[\\/]Pagination)[\\/]/.test(
+          context.filename ?? context.getFilename(),
+        );
+        const scriptVisitor = {
+          ImportDeclaration(node) {
+            const source = String(node.source.value);
+            if (!/Pagination[A-Za-z]*\.vue$/.test(source) || isPagerFile) return;
+            if (/\/lib\/navigation\/Pagination\/OPagination\.vue$/.test(source)) return;
+            context.report({
+              node,
+              message: `Custom pager "${source}": use OPagination (D5, S8).`,
+            });
+          },
+          ObjectExpression(node) {
+            const props = node.properties.filter((p) => p.type === "Property" && !p.computed);
+            const keyOf = (p) => p.key?.name ?? p.key?.value;
+            const id = props.find((p) => keyOf(p) === "id");
+            if (!id || id.value?.type !== "Literal" || id.value.value !== "#") return;
+            if (!props.some((p) => keyOf(p) === "header")) return;
+            context.report({
+              node: id,
+              message: "A row-number column is not a table column (D2); drop it.",
+            });
+          },
+        };
+        if (!services?.defineTemplateBodyVisitor) return scriptVisitor;
+        return services.defineTemplateBodyVisitor(
+          {
+            VElement(node) {
+              const tag = node.rawName;
+              if (!/Pagination/.test(tag) || PAGER_TAGS.has(tag)) return;
+              context.report({
+                node,
+                message: `<${tag}> is a custom pager: use OPagination (D5, S8).`,
+              });
+            },
+            VAttribute(node) {
+              const element = node.parent?.parent;
+              const tag = element?.rawName;
+              const isBind = node.directive && node.key?.name?.name === "bind";
+              if (node.directive && !isBind) {
+                const directive = node.key?.name?.name;
+                if (directive === "slot" && element?.parent?.rawName === "OTable") {
+                  if (node.key.argument?.type === "VExpressionContainer") {
+                    const value = node.key.argument.expression?.quasis?.[0]?.value?.cooked;
+                    if (value === "cell-#")
+                      context.report({
+                        node,
+                        message: "A row-number column is not a table column (D2); drop it.",
+                      });
+                  }
+                } else if (directive === "model" && tag === "OPagination" && !node.key.argument) {
+                  context.report({ node, message: "<OPagination> binds with v-model:page." });
+                }
+                return;
+              }
+              const removed =
+                tag === "OTable"
+                  ? OTABLE_REMOVED
+                  : tag === "OPagination"
+                    ? OPAGINATION_REMOVED
+                    : null;
+              if (!removed) return;
+              const raw = isBind ? node.key.argument?.name : node.key?.name;
+              if (typeof raw !== "string") return;
+              const prop = kebab(raw);
+              if (prop in removed) {
+                context.report({
+                  node,
+                  message: `<${tag}> no longer takes "${prop}"; use ${removed[prop]}.`,
+                });
+                return;
+              }
+              if (tag !== "OTable") return;
+              if (prop === "density") {
+                const values = isBind
+                  ? stringLiterals(node.value?.expression)
+                  : [node.value?.value ?? ""];
+                for (const value of values) {
+                  if (OTABLE_DENSITIES.includes(value)) continue;
+                  context.report({
+                    node,
+                    message: `<OTable> density="${value}" is not a density. Use: default, compact (L7).`,
+                  });
+                }
+              } else if (prop === "row-actions" && isBind) {
+                const expr = node.value?.expression;
+                if (expr?.type === "ArrayExpression" && expr.elements.length > 2) {
+                  context.report({
+                    node,
+                    message: "rowActions shows two inline actions; move the rest to row-menu (B7).",
+                  });
+                }
+              }
+            },
+          },
+          scriptVisitor,
+        );
+      },
+    },
+  },
+};
+
+const o2DisplayApi = {
+  rules: {
+    "o2-display-api": {
+      meta: {
+        type: "problem",
+        docs: {
+          description: "Chips, notices, empty states, loaders, stats, panels and code: v2 API only",
+        },
+      },
+      create(context) {
+        const sourceCode = context.sourceCode ?? context.getSourceCode();
+        const services = sourceCode.parserServices ?? context.parserServices;
+        if (!services?.defineTemplateBodyVisitor) return {};
+        const classTokens = (node, isBind) =>
+          isBind
+            ? stringLiterals(node.value?.expression).flatMap((v) => v.split(/\s+/))
+            : (node.value?.value ?? "").split(/\s+/);
+        return services.defineTemplateBodyVisitor({
+          VAttribute(node) {
+            const element = node.parent?.parent;
+            const tag = element?.rawName;
+            const isBind = node.directive && node.key?.name?.name === "bind";
+            if (node.directive && !isBind) {
+              const directive = node.key?.name?.name;
+              if (directive === "slot") {
+                const slot = node.key.argument?.name;
+                const owner = element?.parent?.rawName;
+                const replacement = slot && DISPLAY_API[owner]?.slots?.[slot];
+                if (replacement)
+                  context.report({
+                    node,
+                    message: `<${owner}> has no #${slot} slot; use ${replacement}.`,
+                  });
+              } else if (directive === "model" && !node.key.argument && DISPLAY_API[tag]?.vModel) {
+                context.report({
+                  node,
+                  message: `<${tag}> binds with ${DISPLAY_API[tag].vModel}.`,
+                });
+              }
+              return;
+            }
+            const api = DISPLAY_API[tag];
+            if (!api) return;
+            const raw = isBind ? node.key.argument?.name : node.key?.name;
+            if (typeof raw !== "string") return;
+            const prop = kebab(raw);
+            if (api.removed && prop in api.removed) {
+              const to = api.removed[prop];
+              context.report({
+                node,
+                message: `<${tag}> no longer takes "${prop}"${to ? `; use ${to}` : ""} (see ${tag}.types.ts).`,
+              });
+              return;
+            }
+            if (prop === "class" && api.classBan) {
+              for (const token of classTokens(node, isBind)) {
+                const utility = token.replace(/^!|!$/g, "").split(":").pop();
+                if (!utility || !api.classBan.test(utility)) continue;
+                context.report({
+                  node,
+                  message: `"${token}" restyles <${tag}>; its size, radius, text and frame are fixed by the component (guidelines S1, T1, T5).`,
+                });
+              }
+              return;
+            }
+            const allowed = api.values?.[prop];
+            if (!allowed) return;
+            const values = isBind
+              ? stringLiterals(node.value?.expression)
+              : [node.value?.value ?? ""];
+            for (const value of values) {
+              if (allowed.includes(value)) continue;
+              context.report({
+                node,
+                message: `<${tag}> ${prop}="${value}" is not part of the display API. Use one of: ${allowed.join(", ")} (see ${tag}.types.ts).`,
+              });
+            }
+          },
+        });
+      },
+    },
+  },
+};
+
+// ── local/o2-overlays-api ────────────────────────────────────────
+// Dialogs, drawers, popovers, menus and tooltips: fixed sizes, no width overrides, the v2 props
+// (guidelines O1, O3, O4, O7, O8, V5, V8, B6). Values mirror lib/overlay/**/*.types.ts.
+const OVERLAY_ACTION_PROPS = Object.fromEntries(
+  ["primary", "secondary", "neutral"].flatMap((group) =>
+    ["label", "variant", "disabled", "loading", "data-test", "color"].map((field) => [
+      `${group}-button-${field}`,
+      `:${group === "neutral" ? "extra" : group}="{ ${field === "data-test" ? "dataTest" : field}: … }"`,
+    ]),
+  ),
+);
+const OVERLAY_SHELL_REMOVED = {
+  ...OVERLAY_ACTION_PROPS,
+  width: "size",
+  "max-height": null,
+  "sub-title": "subtitle",
+  "sub-title-data-test": "subtitle-data-test",
+  "initial-focus": null,
+  "close-guard": "dirty (asks in the footer) or persistent",
+};
+const OVERLAY_WIDTH_CLASS = /^!?-?(w|min-w|max-w)-\S+$|vw/;
+const MENU_ITEM_API = {
+  values: { tone: ["default", "danger"] },
+  removed: {
+    "icon-left": "icon",
+    variant: 'tone="danger"',
+    "focusable-unavailable": "disabled-reason",
+    "description-id": null,
+    "shortcut-id": "shortcut",
+  },
+  slots: { "icon-left": "the icon prop, or #icon", "icon-right": "#end" },
+};
+const OVERLAYS_API = {
+  ODialog: {
+    values: { size: ["sm", "md", "lg", "full"] },
+    removed: OVERLAY_SHELL_REMOVED,
+    events: { "click:neutral": "@click:extra" },
+    noWidthClass: true,
+  },
+  ODrawer: {
+    values: { size: ["sm", "md", "lg", "xl"], side: ["right", "left"] },
+    removed: OVERLAY_SHELL_REMOVED,
+    events: { "click:neutral": "@click:extra" },
+    noWidthClass: true,
+  },
+  OPopover: {
+    values: { size: ["sm", "md", "lg", "auto"] },
+    contentClass: true,
+    libOnly: { size: ["auto"] },
+  },
+  ODropdown: { contentClass: true },
+  OContextMenu: { contentClass: true },
+  OTooltip: {
+    removed: {
+      "max-width": null,
+      delay: null,
+      "side-offset": null,
+      align: null,
+      "align-offset": null,
+      "shortcut-id": "shortcut",
+    },
+    contentClass: true,
+  },
+  ODropdownItem: MENU_ITEM_API,
+  OContextMenuItem: MENU_ITEM_API,
+  ODropdownSub: {
+    removed: { "text-value": "label", "description-id": null },
+    slots: { trigger: "the label prop", "icon-left": "the icon prop", "icon-right": "#end" },
+  },
+  ConfirmDialog: {
+    values: { kind: ["confirm", "destructive", "typeToConfirm", "discard"] },
+    removed: { "ok-variant": "kind", "ok-color": null, "focus-cancel": null },
+  },
+};
+const hasAncestorTag = (element, tag) => {
+  for (let node = element?.parent; node; node = node.parent) {
+    if (node.type === "VElement" && pascalTag(node.rawName) === tag) return true;
+  }
+  return false;
+};
+const o2OverlaysApi = {
+  rules: {
+    "o2-overlays-api": {
+      meta: {
+        type: "problem",
+        docs: { description: "Dialogs, drawers, popovers, menus and tooltips: v2 API only" },
+      },
+      create(context) {
+        const sourceCode = context.sourceCode ?? context.getSourceCode();
+        const services = sourceCode.parserServices ?? context.parserServices;
+        if (!services?.defineTemplateBodyVisitor) return {};
+        const filename = (context.filename ?? context.getFilename()).replace(/\\/g, "/");
+        const inLib = filename.includes("/src/lib/");
+        const report = (node, message) => context.report({ node, message });
+        const classTokens = (node, isBind) =>
+          isBind
+            ? stringLiterals(node.value?.expression).flatMap((v) => v.split(/\s+/))
+            : (node.value?.value ?? "").split(/\s+/);
+        const checkWidthClasses = (node, isBind, tag, prop) => {
+          for (const token of classTokens(node, isBind)) {
+            const utility = token.split(":").pop();
+            if (!utility || !OVERLAY_WIDTH_CLASS.test(utility)) continue;
+            report(
+              node,
+              `"${token}" sets the width of <${tag}> through ${prop}; its width comes from \`size\` (guidelines O3, O4).`,
+            );
+          }
+        };
+        const checkDirective = (node, element, tag) => {
+          const name = node.key?.name?.name;
+          if (name === "slot") {
+            const slot = node.key.argument?.name;
+            const owner = pascalTag(element?.parent?.rawName);
+            const replacement = slot && OVERLAYS_API[owner]?.slots?.[slot];
+            if (replacement) report(node, `<${owner}> has no #${slot} slot; use ${replacement}.`);
+            return;
+          }
+          if (name !== "on") return;
+          const event = node.key.argument?.name;
+          const to = OVERLAYS_API[tag]?.events?.[event];
+          if (to) report(node, `<${tag}> no longer emits "${event}"; use ${to}.`);
+        };
+        return services.defineTemplateBodyVisitor({
+          VElement(node) {
+            if (
+              pascalTag(node.rawName) === "ODropdownSub" &&
+              hasAncestorTag(node, "ODropdownSub")
+            ) {
+              report(
+                node.startTag,
+                "A submenu inside a submenu breaks guideline O1; keep one level.",
+              );
+            }
+          },
+          VAttribute(node) {
+            const element = node.parent?.parent;
+            const tag = pascalTag(element?.rawName);
+            const isBind = node.directive && node.key?.name?.name === "bind";
+            if (node.directive && !isBind) {
+              checkDirective(node, element, tag);
+              return;
+            }
+            const api = OVERLAYS_API[tag];
+            if (!api) return;
+            const key = isBind ? node.key.argument : node.key;
+            const raw = key?.rawName ?? key?.name;
+            if (typeof raw !== "string") return;
+            const prop = kebab(raw);
+            if (api.removed && prop in api.removed) {
+              const to = api.removed[prop];
+              report(
+                node,
+                `<${tag}> no longer takes "${prop}"${to ? `; use ${to}` : ""} (see ${tag}.types.ts).`,
+              );
+              return;
+            }
+            if (api.noWidthClass && (prop === "class" || prop === "style")) {
+              checkWidthClasses(node, isBind, tag, prop);
+              return;
+            }
+            if (api.contentClass && prop === "content-class") {
+              checkWidthClasses(node, isBind, tag, prop);
+              return;
+            }
+            const allowed = api.values?.[prop];
+            if (!allowed) return;
+            const values = isBind
+              ? stringLiterals(node.value?.expression)
+              : [node.value?.value ?? ""];
+            for (const value of values) {
+              if (!allowed.includes(value)) {
+                report(
+                  node,
+                  `<${tag}> ${prop}="${value}" is not part of the overlay API. Use one of: ${allowed.join(", ")} (see ${tag}.types.ts).`,
+                );
+              } else if (!inLib && api.libOnly?.[prop]?.includes(value)) {
+                report(
+                  node,
+                  `<${tag}> ${prop}="${value}" is for library composites only; pick a fixed size.`,
+                );
+              }
+            }
+          },
+        });
+      },
+    },
+  },
+};
+
+// ── local/o2-page-header-api ─────────────────────────────────────
+// The stacked page header (guidelines H1–H8, N3, L3): no icon tile, no subtitle, tabs on their
+// own row, Back as the context link on useSmartBack, and one <h1> per page owned by the header.
+const PAGE_HEADER_TAGS = new Set(["OPageHeader", "OPageLayout"]);
+const PAGE_HEADER_REMOVED = {
+  icon: "nothing; the rail shows the area (H2)",
+  subtitle: "about, the ⓘ popover beside the title, or nothing (H2)",
+  "tabs-below": "nothing; tabs always sit on their own row (H8)",
+  "title-overflow": "nothing; a text title truncates, a #title slot owns its overflow",
+  "overflow-first": "nothing; #actions-overflow always precedes #actions (H3)",
+  "title-min-width": "nothing; the band never wraps (H1)",
+};
+const PAGE_HEADER_REMOVED_SLOTS = {
+  subtitle: "the about prop (H2)",
+  "title-trail": "#status (H5)",
+  "title-prefix": "nothing; the title starts at the content edge (H1)",
+  back: "the back prop (H4)",
+};
+// Header slots a hand-built back button could sit in.
+const PAGE_HEADER_SLOTS = new Set([
+  "actions",
+  "actions-overflow",
+  "title",
+  "status",
+  "header-tabs",
+  "tabs",
+]);
+const BACK_ICONS = new Set(["arrow-back", "arrow_back", "arrow-left", "keyboard-backspace"]);
+const BACK_TEXT = /\bback\b/i;
+const isBackCall = (node) => {
+  const callee = node.callee;
+  if (callee?.type !== "MemberExpression") return false;
+  const method = callee.property?.name;
+  const object = callee.object;
+  const owner =
+    object?.type === "Identifier"
+      ? object.name
+      : object?.type === "MemberExpression"
+        ? object.property?.name
+        : object?.type === "CallExpression"
+          ? object.callee?.name
+          : null;
+  if (method === "back") return ["router", "$router", "history", "useRouter"].includes(owner);
+  if (method !== "go") return false;
+  const arg = node.arguments[0];
+  return (
+    ["router", "$router", "history", "useRouter"].includes(owner) &&
+    arg?.type === "UnaryExpression" &&
+    arg.operator === "-"
+  );
+};
+const attrValue = (element, name) => {
+  for (const attr of element.startTag?.attributes ?? []) {
+    const isBind = attr.directive && attr.key?.name?.name === "bind";
+    const key = isBind ? attr.key.argument?.name : attr.directive ? null : attr.key?.name;
+    if (key !== name) continue;
+    return isBind ? stringLiterals(attr.value?.expression).join(" ") : (attr.value?.value ?? "");
+  }
+  return null;
+};
+const isBackButton = (element) => {
+  const tag = pascalTag(element.rawName);
+  if (!["OButton", "button", "a", "RouterLink", "router-link"].includes(tag)) return false;
+  if (BACK_ICONS.has(attrValue(element, "icon") ?? "")) return true;
+  const glyph = (element.children ?? []).some(
+    (child) =>
+      child.type === "VElement" &&
+      pascalTag(child.rawName) === "OIcon" &&
+      BACK_ICONS.has(attrValue(child, "name") ?? ""),
+  );
+  if (glyph) return true;
+  const named = [attrValue(element, "data-test"), attrValue(element, "aria-label")];
+  return named.some((v) => v && /(^|-)back(-|$)/.test(v)) && BACK_TEXT.test(named.join(" "));
+};
+const headerSlotOf = (element) => {
+  for (let node = element?.parent; node; node = node.parent) {
+    if (node.type !== "VElement") continue;
+    if (node.rawName === "template" && PAGE_HEADER_TAGS.has(pascalTag(node.parent?.rawName))) {
+      const slot = node.startTag.attributes.find(
+        (a) => a.directive && a.key?.name?.name === "slot",
+      );
+      return slot?.key?.argument?.name ?? "default";
+    }
+    if (PAGE_HEADER_TAGS.has(pascalTag(node.rawName))) return "default";
+  }
+  return null;
+};
+const o2PageHeaderApi = {
+  rules: {
+    "o2-page-header-api": {
+      meta: {
+        type: "problem",
+        docs: {
+          description:
+            "OPageHeader / OPageLayout: the stacked v2 header, smart Back, one page title",
+        },
+      },
+      create(context) {
+        const sourceCode = context.sourceCode ?? context.getSourceCode();
+        const services = sourceCode.parserServices ?? context.parserServices;
+        const filename = (context.filename ?? context.getFilename()).replace(/\\/g, "/");
+        const inHeaderLib = /\/src\/lib\/core\/Page(Header|Layout)\//.test(filename);
+        const rendersHeader = /<OPage(Header|Layout)\b/.test(sourceCode.text);
+        const inViews = /\/src\/(enterprise\/)?views\//.test(filename);
+        const report = (node, message) => context.report({ node, message });
+        const scriptVisitor = {
+          CallExpression(node) {
+            if (rendersHeader && !inHeaderLib && isBackCall(node)) {
+              report(
+                node,
+                "A page with OPageHeader goes back through useSmartBack, never router.back() (N3).",
+              );
+            }
+          },
+        };
+        if (!services?.defineTemplateBodyVisitor) return scriptVisitor;
+        return services.defineTemplateBodyVisitor(
+          {
+            CallExpression: scriptVisitor.CallExpression,
+            VElement(node) {
+              const tag = pascalTag(node.rawName);
+              if (inViews && !inHeaderLib && (tag === "h1" || attrValue(node, "as") === "h1")) {
+                report(
+                  node.startTag,
+                  "The page title is OPageHeader's <h1>; a view has no other (H1, T2).",
+                );
+              }
+              if (!rendersHeader || !isBackButton(node)) return;
+              const slot = headerSlotOf(node);
+              const besideHeader = (node.parent?.children ?? []).some(
+                (sibling) =>
+                  sibling.type === "VElement" && PAGE_HEADER_TAGS.has(pascalTag(sibling.rawName)),
+              );
+              if ((slot && PAGE_HEADER_SLOTS.has(slot)) || besideHeader) {
+                report(
+                  node.startTag,
+                  'Back is the header\'s context link: pass :back="{ label, to }" instead of a hand-built button (H4, N3).',
+                );
+              }
+            },
+            VAttribute(node) {
+              const element = node.parent?.parent;
+              const isBind = node.directive && node.key?.name?.name === "bind";
+              if (node.directive && !isBind) {
+                if (node.key?.name?.name !== "slot") return;
+                const owner = pascalTag(element?.parent?.rawName);
+                const slot = node.key.argument?.name;
+                if (!PAGE_HEADER_TAGS.has(owner) || !(slot in PAGE_HEADER_REMOVED_SLOTS)) return;
+                report(
+                  node,
+                  `<${owner}> has no #${slot} slot; use ${PAGE_HEADER_REMOVED_SLOTS[slot]}.`,
+                );
+                return;
+              }
+              const tag = pascalTag(element?.rawName);
+              if (!PAGE_HEADER_TAGS.has(tag)) return;
+              const key = isBind ? node.key.argument : node.key;
+              const raw = key?.rawName ?? key?.name;
+              if (typeof raw !== "string") return;
+              const prop = kebab(raw);
+              if (prop in PAGE_HEADER_REMOVED) {
+                report(
+                  node,
+                  `<${tag}> no longer takes "${prop}"; use ${PAGE_HEADER_REMOVED[prop]}.`,
+                );
+              }
+            },
+          },
+          scriptVisitor,
+        );
       },
     },
   },
@@ -723,6 +1950,13 @@ export default [
           ...noHardcodedPx.rules,
           ...noPhysicalDirectionUtilities.rules,
           ...noHardcodedColor.rules,
+          ...o2ControlHeight.rules,
+          ...o2ButtonApi.rules,
+          ...o2ControlsApi.rules,
+          ...o2DisplayApi.rules,
+          ...o2TableApi.rules,
+          ...o2OverlaysApi.rules,
+          ...o2PageHeaderApi.rules,
         },
       },
       "@intlify/vue-i18n": vueI18n,
@@ -744,6 +1978,13 @@ export default [
       "local/no-hardcoded-px": ["error"],
       "local/no-physical-direction-utilities": ["error"],
       "local/no-hardcoded-color": ["error"],
+      "local/o2-control-height": ["error"],
+      "local/o2-button-api": ["error"],
+      "local/o2-controls-api": ["error"],
+      "local/o2-display-api": ["error"],
+      "local/o2-table-api": ["error"],
+      "local/o2-overlays-api": ["error"],
+      "local/o2-page-header-api": ["error"],
 
       // A missing key is invisible at build time — vue-i18n renders the raw key to
       // the user. Dynamic keys are skipped by the rule; specs are exempted below.

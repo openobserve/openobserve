@@ -16,56 +16,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="md"
     :open="internalOpen"
     @update:open="handleDrawerClose"
     :title="t('pipeline.conditionTitle')"
-    :width="45"
-    :show-close="false"
+    :dirty="isRuleChanged"
     data-test="add-condition-drawer"
-    :primary-button-label="t('common.save')"
-    :secondary-button-label="t('common.cancel')"
-    secondary-button-variant="outline"
-    :neutral-button-label="pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
-    neutral-button-variant="outline-destructive"
+    :primary="{ label: t('common.save') }"
+    :secondary="{ label: t('common.cancel'), variant: 'secondary' }"
+    :extra="{
+      label: pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined,
+      variant: 'danger-ghost',
+    }"
     @click:primary="saveCondition"
     @click:secondary="openCancelDialog"
-    @click:neutral="openDeleteDialog"
+    @click:extra="openDeleteDialog"
     @keydown.stop
-    :persistent="true"
   >
-    <template #header-right>
-      <button
-        type="button"
-        :aria-label="t('pipeline.closeDrawer')"
-        data-test="o-drawer-close-btn"
-        @mousedown.prevent
-        @click="openCancelDialog"
-        class="rounded-default text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg focus-visible:ring-dialog-focus-ring flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
-    </template>
     <div
       data-test="add-condition-section"
       class="stream-routing-section bg-surface-base min-h-full w-full"
     >
       <div class="rounded-default stream-routing-container w-full">
         <div>
-          <div class="showLabelOnTop text-h7 font-bold" data-test="add-condition-query-input-title">
+          <div
+            class="showLabelOnTop text-h7 font-semibold"
+            data-test="add-condition-query-input-title"
+          >
             <div></div>
             <ConditionBuilder
               ref="builder"
@@ -97,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <span>
                         {{ t("pipeline.customColumnGuideline") }}
-                        <span class="highlight text-text-link font-bold">{{
+                        <span class="highlight text-text-link font-semibold">{{
                           t("pipeline.enterKey")
                         }}</span
                         >.
@@ -141,6 +118,7 @@ import { computed, onMounted, ref, type Ref, onBeforeMount, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
+import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import { streamValuesLoader } from "@/components/filterBar/streamValues";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -166,13 +144,10 @@ watch(
   },
 );
 
+// The drawer has already asked about an edited rule (`dirty`) before it reports a close.
 function handleDrawerClose(v: boolean) {
-  if (!v) {
-    // Intercept any programmatic close (e.g. Escape key) with confirmation too
-    openCancelDialog();
-    return;
-  }
-  internalOpen.value = v;
+  if (v) internalOpen.value = true;
+  else closeDialog();
 }
 
 const filteredColumns: any = ref([]);
@@ -241,11 +216,11 @@ const importSqlParser = async () => {
 // Held for submit() and the cancel dirty-check.
 const builder = ref<any>(null);
 
-// Snapshot of the rule as first rendered, for the "discard changes?" prompt.
-const originalConditionGroup = ref<any>(null);
-onMounted(() => {
-  originalConditionGroup.value = JSON.parse(JSON.stringify(builder.value?.conditionGroup ?? null));
-});
+// The rule as the user first sees it, after the builder in the drawer's portal has mounted and settled.
+const { dirty: isRuleChanged, rebase: rebaseRule } = useUnsavedChanges(
+  () => builder.value?.conditionGroup ?? null,
+  () => internalOpen.value,
+);
 
 const updateStreamFields = async (streamName: any, streamType: any) => {
   let streamCols: any = [];
@@ -360,26 +335,14 @@ const closeDialog = () => {
 };
 
 const openCancelDialog = () => {
-  try {
-    try {
-      if (
-        JSON.stringify(originalConditionGroup.value) ===
-        JSON.stringify(builder.value?.conditionGroup)
-      ) {
-        closeDialog();
-        return;
-      }
-    } catch (e) {
-      // If comparison fails, just show the dialog
-    }
-
-    dialog.value.show = true;
-    dialog.value.title = t("common.discardChanges");
-    dialog.value.message = t("pipeline.cancelConditionChangesConfirm");
-    dialog.value.okCallback = closeDialog;
-  } catch (e) {
+  if (!isRuleChanged.value) {
     closeDialog();
+    return;
   }
+  dialog.value.show = true;
+  dialog.value.title = t("common.discardChanges");
+  dialog.value.message = t("pipeline.cancelConditionChangesConfirm");
+  dialog.value.okCallback = closeDialog;
 };
 
 const saveCondition = async () => {
@@ -410,7 +373,7 @@ const saveCondition = async () => {
 
     addNode(conditionData);
     // Snapshot the newly saved state for the discard-changes comparison.
-    originalConditionGroup.value = JSON.parse(JSON.stringify(payload.conditions));
+    rebaseRule();
     emit("cancel:hideform");
   } catch (error) {
     console.error("Error saving condition:", error);

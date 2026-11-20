@@ -25,34 +25,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OCard
-    variant="glass"
+    :title="t('oncall.escalation')"
     role="status"
     :aria-label="t('oncall.escalationLoading')"
     aria-live="polite"
     data-test="oncall-escalation-skeleton"
   >
-    <OCardSection role="header" dense>
-      <OText variant="card-title">{{ t("oncall.escalation") }}</OText>
-    </OCardSection>
-
-    <OCardSection role="body" dense>
-      <div class="flex flex-col gap-4">
-        <div v-for="row in 3" :key="row" class="flex items-start gap-3">
-          <OSkeleton type="circle" class="mt-0.5 h-4 w-4 shrink-0" />
-          <div class="flex min-w-0 flex-1 flex-col gap-1.5">
-            <OSkeleton type="text" class="h-3 w-16" />
-            <OSkeleton type="text" class="h-4 w-3/4" />
-          </div>
+    <div class="flex flex-col gap-4">
+      <div v-for="row in 3" :key="row" class="flex items-start gap-3">
+        <OSkeleton shape="circle" class="mt-0.5 h-4 w-4 shrink-0" />
+        <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+          <OSkeleton class="h-3 w-16" />
+          <OSkeleton class="h-4 w-3/4" />
         </div>
       </div>
-    </OCardSection>
+    </div>
   </OCard>
 </template>
 
 <script setup lang="ts">
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { useI18nTyped } from "@/types/i18n";
 

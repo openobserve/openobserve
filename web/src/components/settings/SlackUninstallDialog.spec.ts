@@ -199,7 +199,7 @@ describe("SlackUninstallDialog: Uninstall from workspace (row 19)", () => {
     await body().find('[data-test="o2-table-select-1"] button').trigger("click");
     await flushPromises();
     expect(body().find('[data-test="slack-remove-destinations"]').exists()).toBe(true);
-    expect(body().find('[data-test="slack-selected-count"]').text()).toBe("2 of 2 selected");
+    expect(body().find('[data-test="o2-table-selected-count"]').text()).toBe("2 selected");
     await body().find('[data-test="slack-remove-destinations"]').trigger("click");
     await flushPromises();
     expect(destinationService.bulkDelete).toHaveBeenCalledWith("acme", {
@@ -258,7 +258,7 @@ describe("SlackUninstallDialog: instance workspace uninstalled from _meta (R-79)
     await uninstallMixed();
     await body().find('[data-test="o2-table-select-all"] button').trigger("click");
     await flushPromises();
-    expect(body().find('[data-test="slack-selected-count"]').text()).toBe("2 of 2 selected");
+    expect(body().find('[data-test="o2-table-selected-count"]').text()).toBe("2 selected");
     await body().find('[data-test="slack-remove-destinations"]').trigger("click");
     await flushPromises();
     expect(destinationService.bulkDelete).toHaveBeenCalledTimes(1);

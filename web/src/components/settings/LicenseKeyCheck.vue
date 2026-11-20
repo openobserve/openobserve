@@ -1,11 +1,8 @@
 <template>
   <div v-if="result || refusal" class="my-3" data-test="license-key-check">
-    <OBanner
-      :variant="accepted ? 'info' : 'error-soft'"
-      :icon="accepted ? 'info' : 'cancel'"
-      data-test="license-key-check-banner"
-      >{{ message }}</OBanner
-    >
+    <OInlineNotice :tone="accepted ? 'info' : 'err'" data-test="license-key-check-banner">{{
+      message
+    }}</OInlineNotice>
     <template v-if="accepted">
       <div v-for="group in groups" :key="group.id" class="mt-3">
         <div class="text-text-secondary mb-1 text-xs">{{ group.label }}</div>
@@ -15,8 +12,6 @@
           row-key="id"
           pagination="none"
           sorting="none"
-          :frame="false"
-          :show-global-filter="false"
           :table-id="`license-key-check-${group.id}`"
           :data-test="`license-key-check-${group.id}`"
         >
@@ -36,7 +31,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onBeforeUnmount } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";

@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="e in EXPORTERS"
           :key="e.id"
           :value="e.id"
-          size="sm"
           :data-test="`gpu-setup-exporter-${e.id}`"
         >
           <img :src="e.icon" alt="" class="me-1.5 size-3.5" />

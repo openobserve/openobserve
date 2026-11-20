@@ -34,14 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="absolute inset-y-0 start-0 w-1" :class="TUNING_LOOK.accent" aria-hidden="true" />
       <div class="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
         <h3
-          class="text-text-heading min-w-0 text-base leading-snug font-semibold text-pretty"
+          class="text-text-heading min-w-0 text-sm leading-5 font-semibold text-pretty"
           :data-test="`autoobserve2-change-${change.id}-headline`"
         >
           {{ headline }}
         </h3>
         <span class="flex shrink-0 items-center gap-2.5">
           <OTag
-            :variant="STATE_LOOK[change.state].variant"
+            :tone="STATE_LOOK[change.state].variant"
             size="sm"
             :label="t(STATE_LOOK[change.state].key)"
             :data-test="`autoobserve2-change-${change.id}-status`"
@@ -65,9 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
       <div class="-ms-2 mt-1.5 flex flex-wrap items-center gap-x-1 gap-y-2">
         <OButton
-          variant="ghost-muted"
-          size="xs"
-          :icon-right="open ? 'expand-less' : 'expand-more'"
+          variant="ghost"
+          size="sm"
+          :icon-end="open ? 'expand-less' : 'expand-more'"
           :aria-expanded="open"
           :aria-controls="detailsId"
           :data-test="`autoobserve2-change-${change.id}-details-toggle`"
@@ -81,9 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="change.state === 'done'"
-          variant="ghost-muted"
-          size="xs"
-          icon-left="undo"
+          variant="ghost"
+          size="sm"
+          icon="undo"
           :loading="undoing"
           :data-test="`autoobserve2-change-${change.id}-undo`"
           @click="onUndo"

@@ -21,7 +21,7 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -400,8 +400,8 @@ async function save(value: InsightsFormValues): Promise<void> {
   <div data-test="slack-insights">
     <OEmptyState
       v-if="!data && settings.isError.value"
+      kind="error"
       size="compact"
-      preset="load-error"
       data-test="slack-insights-load-error"
       @action="settings.refetch()"
     />
@@ -441,10 +441,9 @@ async function save(value: InsightsFormValues): Promise<void> {
                   </template>
                   <OButton
                     v-if="line.action === 'digest' && digestUrl"
-                    as="a"
-                    variant="ghost-primary"
-                    size="xs"
-                    icon-right="open-in-new"
+                    variant="accent-ghost"
+                    size="sm"
+                    icon-end="open-in-new"
                     :href="digestUrl"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -454,8 +453,8 @@ async function save(value: InsightsFormValues): Promise<void> {
                   </OButton>
                   <OButton
                     v-else-if="line.action === 'pick'"
-                    variant="ghost-primary"
-                    size="xs"
+                    variant="accent-ghost"
+                    size="sm"
                     data-test="slack-insights-pick-channel"
                     @click="openPicker"
                   >
@@ -463,8 +462,8 @@ async function save(value: InsightsFormValues): Promise<void> {
                   </OButton>
                   <OButton
                     v-else-if="line.action === 'reinstall'"
-                    variant="ghost-primary"
-                    size="xs"
+                    variant="accent-ghost"
+                    size="sm"
                     data-test="slack-insights-go-reinstall"
                     @click="emit('reinstall', savedInstallation?.id ?? '')"
                   >
@@ -485,6 +484,7 @@ async function save(value: InsightsFormValues): Promise<void> {
           />
           <div ref="channelField" class="w-full">
             <OFormSelect
+              searchable
               name="channel_id"
               :label="t('slackApp.insights.channel')"
               :placeholder="t('slackApp.channels.channelPlaceholder')"
@@ -515,8 +515,8 @@ async function save(value: InsightsFormValues): Promise<void> {
               <template v-if="channels.hasNextPage.value" #after-options>
                 <div class="border-border-default border-t px-2 py-1.5">
                   <OButton
-                    variant="ghost-primary"
-                    size="xs"
+                    variant="accent-ghost"
+                    size="sm"
                     :loading="channels.isFetchingNextPage.value"
                     data-test="slack-insights-channel-more"
                     @click="channels.fetchNextPage()"
@@ -599,13 +599,9 @@ async function save(value: InsightsFormValues): Promise<void> {
             aria-live="polite"
             data-test="slack-insights-status"
           >
-            <OBanner
+            <OInlineNotice
               v-if="failure"
-              variant="error-soft"
-              dense
-              inline-actions
-              icon="error-outline"
-              role="alert"
+              tone="err"
               class="w-full"
               data-test="slack-insights-save-error"
             >
@@ -616,23 +612,17 @@ async function save(value: InsightsFormValues): Promise<void> {
                 >{{ " " }}{{ t("slackApp.insights.failed.refreshFailed") }}</template
               >
               <template v-if="failure.kind === 'stale'" #actions>
-                <OButton
-                  variant="outline-destructive"
-                  size="sm"
-                  data-test="slack-insights-refresh"
-                  @click="refresh"
-                >
+                <OButton variant="danger-ghost" data-test="slack-insights-refresh" @click="refresh">
                   {{ t("slackApp.insights.failed.refresh") }}
                 </OButton>
               </template>
-            </OBanner>
+            </OInlineNotice>
             <template v-else-if="removed">{{ t("slackApp.insights.removedFooter") }}</template>
             <template v-else-if="dirty">{{ t("slackApp.insights.unsaved") }}</template>
           </div>
           <OButton
             type="submit"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :disabled="!dirty || removed"
             :loading="put.isPending.value"
             class="max-md:ms-auto"

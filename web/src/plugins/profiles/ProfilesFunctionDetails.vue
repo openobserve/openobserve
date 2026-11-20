@@ -22,9 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name
       }}</OTruncatedText>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-chip"
-        icon-left="content-copy"
+        size="xs"
+        icon="content-copy"
         :aria-label="t('profiles.copyFunctionName')"
         data-test="profiles-function-details-copy"
         @click="emit('copy', name)"
@@ -32,9 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('profiles.copyFunctionName')" />
       </OButton>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-chip"
-        icon-left="close"
+        size="xs"
+        icon="close"
         :aria-label="t('common.close')"
         data-test="profiles-function-details-close"
         @click="emit('close')"
@@ -101,17 +103,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex flex-wrap gap-2">
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="swap-vert"
+          variant="secondary"
+          icon="swap-vert"
           data-test="profiles-function-details-sandwich"
           @click="emit('sandwich', name)"
           >{{ t("profiles.showCallersAndCallees") }}</OButton
         >
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="flame"
+          variant="secondary"
+          icon="flame"
           data-test="profiles-function-details-show"
           @click="emit('show', name)"
           >{{ t("profiles.showInFlameGraph") }}</OButton

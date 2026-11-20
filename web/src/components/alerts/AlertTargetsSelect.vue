@@ -54,10 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OSelect>
 
     <OButton
+      icon-only
       data-test="alert-settings-refresh-destinations-btn"
-      class="ms-1"
+      class="ms-1 shrink-0"
       variant="ghost"
-      size="icon-circle-sm"
       :title="t('alerts.alertSettings.refreshDestinations')"
       @click="emit('refresh')"
     >
@@ -65,9 +65,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
     <OButton
       data-test="create-destination-btn"
-      variant="outline"
-      size="sm"
-      class="ms-2 max-md:ms-0"
+      variant="secondary"
+      class="ms-2 shrink-0 max-md:ms-0"
       @click="emit('create-destination')"
     >
       {{ t("alerts.alertSettings.addNewDestination") }}
@@ -75,9 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       v-if="workflowsEnabled"
       data-test="create-workflow-btn"
-      variant="outline"
-      size="sm"
-      class="ms-2"
+      variant="secondary"
+      class="ms-2 shrink-0"
       @click="emit('create-workflow')"
     >
       {{ t("workflow.create") }}
@@ -86,14 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          edition doesn't unlock it — kept as the discovery point since the
          dropdown's own "Workflows" header has no icon/tooltip slot to attach. -->
     <OTooltip v-else-if="workflowsLicenseLocked" :content="workflowsLockMessage">
-      <span class="ms-2 inline-flex">
-        <OButton
-          data-test="create-workflow-btn"
-          variant="outline"
-          size="sm"
-          icon-left="lock"
-          disabled
-        >
+      <span class="ms-2 inline-flex shrink-0">
+        <OButton data-test="create-workflow-btn" variant="secondary" icon="lock" disabled>
           {{ t("workflow.create") }}
         </OButton>
       </span>
@@ -101,12 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else-if="workflowsLocked">
       <OButton
         data-test="create-workflow-btn"
-        variant="outline"
-        size="sm"
-        class="ms-2"
+        variant="secondary"
+        class="ms-2 shrink-0"
         @click="openUpgradeDialog"
       >
-        <template #icon-left><OIcon name="lock" size="sm" class="lock-chip" /></template>
+        <template #icon><OIcon name="lock" size="sm" class="lock-chip" /></template>
         {{ t("workflow.create") }}
       </OButton>
     </template>

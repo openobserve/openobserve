@@ -94,12 +94,11 @@ describe("K8sListView", () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => wrapper?.unmount());
 
-  it("renders dense 2rem virtual rows with no pager, in controlled client sorting from the URL", async () => {
+  it("renders default-density virtual rows with no pager, in controlled client sorting from the URL", async () => {
     await mountList({}, { sort: "cpu", desc: "true" });
     const props = table().props();
     expect(props).toMatchObject({
-      dense: true,
-      rowHeight: 32,
+      density: "default",
       virtualScroll: true,
       overscan: 10,
       pagination: "none",
@@ -107,8 +106,6 @@ describe("K8sListView", () => {
       sortBy: "cpu",
       sortOrder: "desc",
       stickyHeader: true,
-      frame: false,
-      showGlobalFilter: false,
       persistColumns: true,
       tableId: "k8s2-pods",
     });
@@ -195,7 +192,7 @@ describe("K8sListView", () => {
   it("ignores the namespace selection on Nodes: no Filtered count, and clearing keeps it", async () => {
     await mountList({ view: "nodes", rows: [] }, { namespace: "shop" });
     expect(wrapper.find('[data-test="k8s2-list-count"]').text()).toBe("0 items");
-    expect(wrapper.findComponent({ name: "OEmptyState" }).props("filtered")).toBe(false);
+    expect(wrapper.findComponent({ name: "OEmptyState" }).props("kind")).not.toBe("filtered");
     wrapper.unmount();
     await mountList({ view: "nodes", rows: [] }, { namespace: "shop", search: "x" });
     await wrapper.find('[data-test="k8s2-list-filtered-clear"]').trigger("click");
@@ -277,7 +274,7 @@ describe("K8sListView", () => {
     expect(wrapper.find('[data-test="k8s2-empty"]').text()).toContain("No Pods found");
     wrapper.unmount();
     await mountList({}, { search: "zzz" });
-    expect(wrapper.findComponent({ name: "OEmptyState" }).props("filtered")).toBe(true);
+    expect(wrapper.findComponent({ name: "OEmptyState" }).props("kind")).toBe("filtered");
     wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "clear-filters");
     expect(wrapper.emitted("update")).toContainEqual([
       { search: "", namespaces: [], status: "all" },
@@ -423,8 +420,8 @@ describe("K8sListView", () => {
     expect(pills).toHaveLength(3);
     for (const pill of pills) expect(pill.find("svg").exists()).toBe(true);
     const pending = wrapper.find('[data-test="k8s2-cell-status-prod/data/db"]');
-    const soft = TONE_PILL.warning.variant.replace("-soft", "");
-    expect(pending.classes()).toContain(`bg-badge-${soft}-soft-bg`);
+    expect(TONE_PILL.warning.variant).toBe("warn");
+    expect(pending.classes()).toContain("bg-badge-warning-soft-bg");
   });
 
   it("shows a no-request state in the CPU cell of a pod that sets no CPU request", async () => {

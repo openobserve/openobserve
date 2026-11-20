@@ -29,6 +29,7 @@ export class SyntheticsSettingsPage {
     return {
       locationsTab: '[data-test="synthetics-locations-tab"]',
       addButton: '[data-test="synthetics-locations-add-btn"]',
+      locationRowMenu: '[data-test="synthetics-locations-row-more-actions"]',
       formDrawer: '[data-test="synthetics-location-form-drawer"]',
       labelField: '[data-test="synthetics-location-label-input-field"]',
       providerSelect: '[data-test="synthetics-location-provider-select"]',
@@ -98,7 +99,11 @@ export class SyntheticsSettingsPage {
     await this.page.locator(this.locationButton(id, action)).click();
   }
 
+  // Delete renders in the row's ⋯ menu (a portal), so open the menu before clicking it.
   async deleteLocation(id) {
+    const row = this.page.locator('tr').filter({ has: this.page.locator(this.locationButton(id, 'edit')) });
+    await row.hover();
+    await row.locator(this.locators.locationRowMenu).click();
     await this.page.locator(this.locationButton(id, 'delete')).click();
     await this.page.locator(this.locators.confirmDialogPrimary).click();
   }

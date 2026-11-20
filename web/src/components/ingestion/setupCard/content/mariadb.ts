@@ -161,7 +161,7 @@ export default function mariadbCard(subs: CardSubstitutions, t: TranslateFn): Ri
             labelKey: "ingestion.setupCard.portLabel",
             default: "3306",
             placeholder: raw("3306"),
-            width: "sm",
+            width: "s",
           },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),

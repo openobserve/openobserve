@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full min-h-0 flex-col" data-test="workflow-runs-panel">
     <!-- Compact header: title + datetime range picker + refresh -->
     <div
-      class="border-border-default flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2"
+      class="border-border-default px-page-edge flex shrink-0 items-center justify-between gap-2 border-b py-2"
     >
       <div class="min-w-0">
         <div class="text-text-body text-sm leading-tight font-semibold">
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTruncatedText>
       </div>
       <div class="flex shrink-0 items-center gap-2">
-        <DateTime
+        <ODateTimeRange
           ref="dateTimeRef"
           auto-apply
           :default-type="dateTimeType"
@@ -57,8 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OButton
           v-if="testRunCount > 0"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="workflow-runs-show-test"
           @click="showTestRuns = !showTestRuns"
         >
@@ -69,8 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </OButton>
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :last-run-at="workflowObj.runsHistory.fetchedAt || null"
           :loading="loading"
           data-test="workflow-runs-refresh"
@@ -79,9 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <div class="flex min-h-0 flex-1 flex-col gap-2 p-2">
+    <!-- The gutter goes on the rows above the table, so the table keeps its own edge inset (L3). -->
+    <div class="flex min-h-0 flex-1 flex-col gap-2 py-2">
       <!-- Offered only once the workflow has or had an endpoint; every other workflow keeps today's list. -->
-      <div v-if="showTriggerFilter" class="flex shrink-0 flex-wrap items-center gap-2">
+      <div v-if="showTriggerFilter" class="px-page-edge flex shrink-0 flex-wrap items-center gap-2">
         <OToggleGroup
           :model-value="activeFilter"
           mobile-dropdown
@@ -92,7 +90,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="opt in filterOptions"
             :key="opt.value"
             :value="opt.value"
-            size="sm"
             class="w-28 shrink-0"
             :data-test="`workflow-runs-trigger-filter-${opt.value}`"
           >
@@ -102,20 +99,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="min-w-0 flex-1 max-md:min-w-40">
           <OSearchInput
             v-model="search"
-            size="sm"
-            clearable
             :placeholder="t('workflow.history.searchRuns')"
             data-test="workflow-runs-search"
           />
         </div>
       </div>
 
-      <WorkflowRunsTimeline
-        :runs="timelineRuns"
-        :start="dateTimeValues.startTime"
-        :end="dateTimeValues.endTime"
-        :timezone="store.state.timezone"
-      />
+      <!-- The timeline insets its own label by 0.5rem; this tops it up to the page edge. -->
+      <div class="px-2">
+        <WorkflowRunsTimeline
+          :runs="timelineRuns"
+          :start="dateTimeValues.startTime"
+          :end="dateTimeValues.endTime"
+          :timezone="store.state.timezone"
+        />
+      </div>
 
       <div class="alert-history-table min-h-0 flex-1">
         <OTable
@@ -128,48 +126,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :page-size-options="[20, 50, 100]"
           :loading="loading"
           :loading-reset-key="workflowId"
-          :show-global-filter="false"
           :default-columns="false"
           :enable-column-resize="true"
           sort-by="start_time"
           sort-order="desc"
-          width="100%"
           class="h-full w-full [&_[data-test=o2-table-scroll-container]]:[scrollbar-gutter:stable]"
           @row-click="openRun"
         >
           <template #empty>
-            <div class="py-10">
-              <OEmptyState
-                v-if="loadError"
-                preset="load-error"
-                data-test="workflow-runs-load-error"
-                @action="fetchHistory(true)"
-              />
-              <OEmptyState
-                v-else-if="!search.trim() && activeFilter !== 'all'"
-                size="inline"
-                :icon="filterEmpty.icon"
-                :title="filterEmpty.title"
-                :description="filterEmpty.description"
-                :action-label="t('workflow.http.runsEmptyAction')"
-                :data-test="
-                  activeFilter === 'http_request'
-                    ? 'workflow-runs-http-empty'
-                    : 'workflow-runs-filter-empty'
-                "
-                @action="onFilterChange('all')"
-              />
-              <OEmptyState
-                v-else-if="search.trim()"
-                size="inline"
-                icon="search"
-                :title="t('workflow.history.searchEmptyTitle')"
-                :action-label="t('workflow.history.searchEmptyAction')"
-                data-test="workflow-runs-search-empty"
-                @action="search = ''"
-              />
-              <NoData v-else />
-            </div>
+            <OEmptyState
+              v-if="loadError"
+              kind="error"
+              data-test="workflow-runs-load-error"
+              @action="fetchHistory(true)"
+            />
+            <OEmptyState
+              v-else-if="!search.trim() && activeFilter !== 'all'"
+              kind="filtered"
+              :icon="filterEmpty.icon"
+              :title="filterEmpty.title"
+              :text="filterEmpty.description"
+              :action-label="t('workflow.http.runsEmptyAction')"
+              :data-test="
+                activeFilter === 'http_request'
+                  ? 'workflow-runs-http-empty'
+                  : 'workflow-runs-filter-empty'
+              "
+              @action="onFilterChange('all')"
+            />
+            <OEmptyState
+              v-else-if="search.trim()"
+              kind="filtered"
+              :title="t('workflow.history.searchEmptyTitle')"
+              :action-label="t('workflow.history.searchEmptyAction')"
+              data-test="workflow-runs-search-empty"
+              @action="search = ''"
+            />
+            <NoData v-else />
           </template>
 
           <template #cell-start_time="{ value }">
@@ -194,7 +187,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip
                   v-if="row.status === 'failed' && row.error && !runReasonOf(row)"
                   side="left"
-                  max-width="22rem"
                   :content="raw(String(humanizeNodeIds(row.error, t)))"
                 />
               </span>
@@ -218,8 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-trigger="{ row }">
             <span class="inline-flex max-w-full min-w-0">
               <OTag
-                variant="default-soft"
-                shape="rounded"
+                tone="neutral"
                 size="sm"
                 :icon="sourceIcon(row)"
                 :label="sourceLabel(row)"
@@ -255,9 +246,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <div class="flex items-center gap-1">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="open-in-new"
+                icon="open-in-new"
                 :aria-label="t('workflow.history.openRun')"
                 :data-test="`workflow-run-open-${row.run_id}`"
                 @click.stop="openRun(row)"
@@ -266,9 +257,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="isRetryableRun(row)"
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="refresh"
+                icon="refresh"
                 :aria-label="t('workflow.history.retryTooltip')"
                 :loading="retryingRunId === row.run_id"
                 :data-test="`workflow-run-retry-${row.run_id}`"
@@ -315,7 +306,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";

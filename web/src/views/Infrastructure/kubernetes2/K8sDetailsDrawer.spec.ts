@@ -215,18 +215,18 @@ beforeEach(() => {
 });
 
 describe("K8sDetailsDrawer frame", () => {
-  it("is a large, seamless, non-modal right drawer anchored to the page body", () => {
+  it("is a 640 (md), seamless, non-modal right drawer anchored to the page body", () => {
     const drawer = mountDrawer(refOf("pod", "web-abc-1")).findComponent(ODrawer);
     expect(drawer.props()).toMatchObject({
       open: true,
       side: "right",
-      size: "lg",
+      size: "md",
       seamless: true,
       modal: false,
       anchor: "#k8s2-body",
     });
     expect(drawer.props("title")).toBe("Pod: web-abc-1");
-    expect(drawer.props("subTitle")).toBe("shop · prod");
+    expect(drawer.props("subtitle")).toBe("shop · prod");
   });
 
   it("keeps the same ODrawer mounted when details changes, swapping its content", async () => {
@@ -287,7 +287,7 @@ describe("K8sDetailsDrawer header", () => {
     const wrapper = mountDrawer(refOf("pod", "web-abc-1"));
     await wrapper.find('[data-test="k8s2-drawer-copy"]').trigger("click");
     expect(copyToClipboard).toHaveBeenCalledWith("web-abc-1", expect.any(Function), {
-      successMessage: "Copied to clipboard",
+      silent: true,
     });
   });
 
@@ -297,15 +297,13 @@ describe("K8sDetailsDrawer header", () => {
   });
 
   it.each([
-    ["Pending", "warning"],
-    ["Lost", "error"],
-  ])("raises a %s insight banner with the %s variant", (phase, variant) => {
+    ["Pending", "warn"],
+    ["Lost", "err"],
+  ])("raises a %s insight banner with the %s tone", (phase, tone) => {
     const wrapper = pvcDrawer(phase);
     const banner = wrapper.find('[data-test="k8s2-drawer-insight"]');
     expect(banner.text()).toContain(`Phase is ${phase}`);
-    expect(wrapper.findComponent('[data-test="k8s2-drawer-insight"]').props("variant")).toBe(
-      variant,
-    );
+    expect(wrapper.findComponent('[data-test="k8s2-drawer-insight"]').props("tone")).toBe(tone);
   });
 });
 
@@ -670,7 +668,7 @@ describe("K8sDetailsDrawer events", () => {
 });
 
 describe("K8sDetailsDrawer loading", () => {
-  it("shows a spinner while pending, then not found when the row is still missing", async () => {
+  it("shows a skeleton while pending, then not found when the row is still missing", async () => {
     const ref = refOf("node", "missing");
     const wrapper = mountDrawer(ref, { pending: true });
     expect(wrapper.find('[data-test="k8s2-drawer-pending"]').exists()).toBe(true);

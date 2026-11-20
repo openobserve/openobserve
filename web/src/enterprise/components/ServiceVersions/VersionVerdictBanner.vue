@@ -43,7 +43,7 @@
           }}
         </p>
         <div v-if="progress" class="mt-1 flex items-center gap-2" data-test="svcver-progress">
-          <OProgressBar variant="neutral" class="flex-1" :value="progress.value" />
+          <OProgressBar class="flex-1" :value="progress.value" />
           <span class="text-text-secondary text-xs" data-test="svcver-progress-detail">{{
             t("serviceVersions.compare.progressLine", progress.label)
           }}</span>
@@ -65,15 +65,19 @@
             :data-test="`svcver-region-${region.cluster}`"
           /></div></template
     ></template>
-    <p v-else data-test="svcver-verdict-empty" class="text-text-secondary text-compact">
-      {{ t("serviceVersions.compare.empty") }}
-    </p>
+    <OEmptyState
+      v-else
+      size="compact"
+      :title="t('serviceVersions.compare.empty')"
+      data-test="svcver-verdict-empty"
+    />
   </section>
 </template>
 <script setup lang="ts">
 import { computed } from "vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import type {
   CompareArm,
@@ -417,7 +421,7 @@ const progress = computed(() => {
   const have = value.needs?.have ?? value.sample?.n_new ?? 0;
   if (!need) return undefined;
   return {
-    value: Math.min(1, Math.max(0, have / need)),
+    value: Math.min(100, Math.max(0, (have * 100) / need)),
     label: { have: formatCount(have), need: formatCount(need) },
   };
 });

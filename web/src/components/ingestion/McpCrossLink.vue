@@ -69,24 +69,12 @@ const goToMcp = () => {
       </p>
       <OTooltip v-if="mcpLocked" :content="mcpLockedReason">
         <span class="inline-flex">
-          <OButton
-            variant="primary"
-            size="sm-action"
-            icon-left="lock"
-            disabled
-            data-test="mcp-cross-link-btn"
-          >
+          <OButton variant="primary" icon="lock" disabled data-test="mcp-cross-link-btn">
             {{ t("ingestion.mcp.crossLinkCta") }}
           </OButton>
         </span>
       </OTooltip>
-      <OButton
-        v-else
-        variant="primary"
-        size="sm-action"
-        data-test="mcp-cross-link-btn"
-        @click="goToMcp"
-      >
+      <OButton v-else variant="primary" data-test="mcp-cross-link-btn" @click="goToMcp">
         {{ t("ingestion.mcp.crossLinkCta") }}
         <OIcon name="arrow-forward" size="sm" />
       </OButton>

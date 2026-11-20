@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import type { BadgeProps, BadgeEmits, BadgeSlots } from "./OBadge.types";
+import type { BadgeProps, BadgeEmits, BadgeSlots, ChipTone, ChipSize } from "./OBadge.types";
+import { CHIP_STATUS_TONES } from "./OBadge.types";
+import { CHIP_TONE_CLASSES } from "./chipClasses";
 import { computed, useSlots } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OIcon from "../Icon/OIcon.vue";
@@ -8,11 +10,12 @@ import { iconRegistry } from "../Icon/OIcon.icons";
 defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(defineProps<BadgeProps>(), {
-  variant: "default",
-  size: "md",
-  shape: "pill",
-  dot: false,
-  clickable: false,
+  tone: "neutral",
+  size: "sm",
+  dot: undefined,
+  mono: false,
+  toggle: false,
+  pressed: false,
   disabled: false,
   removable: false,
 });
@@ -24,236 +27,61 @@ defineSlots<BadgeSlots>();
 const slots = useSlots();
 const { t } = useI18nTyped();
 
-/** True when the left icon area should render (slot OR icon prop). */
 const hasIcon = computed(() => !!slots.icon || !!props.icon);
 
-/** True when the icon name is registered in the OIcon SVG registry (kebab-case) */
 const isOIcon = computed<boolean>(() =>
   Boolean(props.icon && (props.icon as keyof typeof iconRegistry) in iconRegistry),
 );
 
-/** True when the right trailing area should render (slot OR count prop).
- *  When hideZeroCount is set and count is 0, the trailing area is suppressed
- *  (matches the previous badge behavior). */
-const hasTrailing = computed(() => {
-  if (slots.trailing) return true;
-  if (props.count === undefined) return false;
-  if (props.hideZeroCount && props.count === 0) return false;
-  return true;
+const showDot = computed(() => {
+  if (props.dot !== undefined) return props.dot;
+  if (props.toggle || hasIcon.value) return false;
+  return (CHIP_STATUS_TONES as readonly ChipTone[]).includes(props.tone);
 });
 
-/** Render as <button> when interactive so keyboard + disabled work natively.
- *  A removable chip stays a <span> even when clickable — the ✕ is a nested
- *  button, and a button inside a button is invalid markup that browsers repair
- *  by hoisting the inner one out of the chip. */
-const tag = computed(() => (props.clickable && !props.removable ? "button" : "span"));
+// A removable toggle stays a <span>: the ✕ is a nested button, and buttons cannot nest.
+const tag = computed(() => (props.toggle && !props.removable ? "button" : "span"));
 
-// ── Variant class map ─────────────────────────────────────────────────────
-// Each entry is a complete token-based class string. No inline colours.
-const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
-  // Solid
-  default:
-    "bg-badge-default-soft-bg text-badge-default-soft-text ring-1 ring-inset ring-badge-default-ol-border/30",
-  primary:
-    "bg-badge-primary-soft-bg text-badge-primary-soft-text ring-1 ring-inset ring-badge-primary-ol-border/30",
-  success:
-    "bg-badge-success-soft-bg text-badge-success-soft-text ring-1 ring-inset ring-badge-success-ol-border/30",
-  warning:
-    "bg-badge-warning-soft-bg text-badge-warning-soft-text ring-1 ring-inset ring-badge-warning-ol-border/30",
-  error:
-    "bg-badge-error-soft-bg text-badge-error-soft-text ring-1 ring-inset ring-badge-error-ol-border/30",
-  // Outline (transparent bg + inset ring)
-  "default-outline": [
-    "bg-transparent",
-    "text-badge-default-ol-text",
-    "ring-1 ring-inset ring-badge-default-ol-border",
-  ].join(" "),
-  "primary-outline": [
-    "bg-transparent",
-    "text-badge-primary-ol-text",
-    "ring-1 ring-inset ring-badge-primary-ol-border",
-  ].join(" "),
-  "success-outline": [
-    "bg-transparent",
-    "text-badge-success-ol-text",
-    "ring-1 ring-inset ring-badge-success-ol-border",
-  ].join(" "),
-  "warning-outline": [
-    "bg-transparent",
-    "text-badge-warning-ol-text",
-    "ring-1 ring-inset ring-badge-warning-ol-border",
-  ].join(" "),
-  "error-outline": [
-    "bg-transparent",
-    "text-badge-error-ol-text",
-    "ring-1 ring-inset ring-badge-error-ol-border",
-  ].join(" "),
-  "info-outline": [
-    "bg-transparent",
-    "text-badge-info-ol-text",
-    "ring-1 ring-inset ring-badge-info-ol-border",
-  ].join(" "),
-  "purple-outline": [
-    "bg-transparent",
-    "text-badge-purple-ol-text",
-    "ring-1 ring-inset ring-badge-purple-ol-border",
-  ].join(" "),
-  // Soft (light tinted bg, dark text, subtle matching inset border)
-  "default-soft":
-    "bg-badge-default-soft-bg text-badge-default-soft-text ring-1 ring-inset ring-badge-default-ol-border/30",
-  "primary-soft":
-    "bg-badge-primary-soft-bg text-badge-primary-soft-text ring-1 ring-inset ring-badge-primary-ol-border/30",
-  "success-soft":
-    "bg-badge-success-soft-bg text-badge-success-soft-text ring-1 ring-inset ring-badge-success-ol-border/30",
-  "warning-soft":
-    "bg-badge-warning-soft-bg text-badge-warning-soft-text ring-1 ring-inset ring-badge-warning-ol-border/30",
-  // Theme-dependent by design — see the type's comment.
-  "warning-quiet":
-    "bg-badge-warning-quiet-bg text-badge-warning-quiet-text ring-1 ring-inset ring-badge-warning-quiet-border/30",
-  "error-soft":
-    "bg-badge-error-soft-bg text-badge-error-soft-text ring-1 ring-inset ring-badge-error-ol-border/30",
-
-  // NEW: Extended color families for correlation dimensions
-  // Teal
-  teal: "bg-badge-teal-soft-bg text-badge-teal-soft-text ring-1 ring-inset ring-badge-teal-ol-border/30",
-  "teal-outline": [
-    "bg-transparent",
-    "text-badge-teal-ol-text",
-    "ring-1 ring-inset ring-badge-teal-ol-border",
-  ].join(" "),
-  "teal-soft":
-    "bg-badge-teal-soft-bg text-badge-teal-soft-text ring-1 ring-inset ring-badge-teal-ol-border/30",
-
-  // Orange
-  orange:
-    "bg-badge-orange-soft-bg text-badge-orange-soft-text ring-1 ring-inset ring-badge-orange-ol-border/30",
-  "orange-outline": [
-    "bg-transparent",
-    "text-badge-orange-ol-text",
-    "ring-1 ring-inset ring-badge-orange-ol-border",
-  ].join(" "),
-  "orange-soft":
-    "bg-badge-orange-soft-bg text-badge-orange-soft-text ring-1 ring-inset ring-badge-orange-ol-border/30",
-
-  // Lime
-  lime: "bg-badge-lime-soft-bg text-badge-lime-soft-text ring-1 ring-inset ring-badge-lime-ol-border/30",
-  "lime-outline": [
-    "bg-transparent",
-    "text-badge-lime-ol-text",
-    "ring-1 ring-inset ring-badge-lime-ol-border",
-  ].join(" "),
-  "lime-soft":
-    "bg-badge-lime-soft-bg text-badge-lime-soft-text ring-1 ring-inset ring-badge-lime-ol-border/30",
-
-  // Amber
-  amber:
-    "bg-badge-amber-soft-bg text-badge-amber-soft-text ring-1 ring-inset ring-badge-amber-ol-border/30",
-  "amber-outline": [
-    "bg-transparent",
-    "text-badge-amber-ol-text",
-    "ring-1 ring-inset ring-badge-amber-ol-border",
-  ].join(" "),
-  "amber-soft":
-    "bg-badge-amber-soft-bg text-badge-amber-soft-text ring-1 ring-inset ring-badge-amber-ol-border/30",
-
-  // Cyan
-  cyan: "bg-badge-cyan-soft-bg text-badge-cyan-soft-text ring-1 ring-inset ring-badge-cyan-ol-border/30",
-  "cyan-outline": [
-    "bg-transparent",
-    "text-badge-cyan-ol-text",
-    "ring-1 ring-inset ring-badge-cyan-ol-border",
-  ].join(" "),
-  "cyan-soft":
-    "bg-badge-cyan-soft-bg text-badge-cyan-soft-text ring-1 ring-inset ring-badge-cyan-ol-border/30",
-
-  // Blue
-  blue: "bg-badge-blue-soft-bg text-badge-blue-soft-text ring-1 ring-inset ring-badge-blue-ol-border/30",
-  "blue-outline": [
-    "bg-transparent",
-    "text-badge-blue-ol-text",
-    "ring-1 ring-inset ring-badge-blue-ol-border",
-  ].join(" "),
-  "blue-soft":
-    "bg-badge-blue-soft-bg text-badge-blue-soft-text ring-1 ring-inset ring-badge-blue-ol-border/30",
-
-  // Purple (solid/soft variants for correlation)
-  purple:
-    "bg-badge-purple-soft-bg text-badge-purple-soft-text ring-1 ring-inset ring-badge-purple-ol-border/30",
-  "purple-soft":
-    "bg-badge-purple-soft-bg text-badge-purple-soft-text ring-1 ring-inset ring-badge-purple-ol-border/30",
-
-  // Indigo
-  indigo:
-    "bg-badge-indigo-soft-bg text-badge-indigo-soft-text ring-1 ring-inset ring-badge-indigo-ol-border/30",
-  "indigo-outline": [
-    "bg-transparent",
-    "text-badge-indigo-ol-text",
-    "ring-1 ring-inset ring-badge-indigo-ol-border",
-  ].join(" "),
-  "indigo-soft":
-    "bg-badge-indigo-soft-bg text-badge-indigo-soft-text ring-1 ring-inset ring-badge-indigo-ol-border/30",
+const sizeClasses: Record<ChipSize, string> = {
+  sm: "h-5 px-1.5",
+  md: "h-control-xs px-2",
 };
 
-// ── Size class map ────────────────────────────────────────────────────────
-const sizeClasses: Record<NonNullable<BadgeProps["size"]>, string> = {
-  xs: "px-1.5 py-0.5 text-3xs gap-0.5",
-  sm: "px-2.5 py-1.5 text-2xs gap-1",
-  md: "px-2.5 py-1.5 text-xs gap-1.5",
-  lg: "px-3 py-1.5 text-sm gap-2",
-};
-
-// ── Shape (corner radius) class map ───────────────────────────────────────
-const shapeClasses: Record<NonNullable<BadgeProps["shape"]>, string> = {
-  pill: "rounded-full",
-  rounded: "rounded-default",
-  square: "rounded-none",
-};
-
-// ── Trailing segment padding per size ────────────────────────────────────
-const trailingSizeClasses = computed(() =>
-  props.size === "md" || props.size === "lg" ? "ps-1.5 ms-1" : "ps-1 ms-0.5",
-);
-
-// ── Root element classes ──────────────────────────────────────────────────
-const classes = computed(() => [
-  // Base — layout + typography + shape.
-  "inline-flex items-center whitespace-nowrap",
-  "font-medium leading-none",
-  "transition-colors duration-150",
-  // Variant + size + shape
-  variantClasses[props.variant],
-  sizeClasses[props.size],
-  shapeClasses[props.shape],
-  // Clickable — interaction states (button element handles :disabled natively)
-  props.clickable &&
-    [
-      "cursor-pointer",
-      "enabled:hover:opacity-80",
-      "focus-visible:outline-none",
-      "focus-visible:ring-2",
-      "focus-visible:ring-badge-focus-ring",
-      "focus-visible:ring-offset-1",
-    ].join(" "),
-  // Disabled — always mutes regardless of clickable
-  props.disabled && "opacity-40 pointer-events-none",
+// An unpressed toggle keeps a non-neutral tone, so a status chip that opens its details stays readable.
+const toggleClasses = computed(() => [
+  "h-control-xs px-2 cursor-pointer",
+  "focus-visible:ring-badge-focus-ring focus-visible:ring-2 focus-visible:outline-none",
+  props.pressed
+    ? "border-badge-primary-ol-border bg-badge-primary-soft-bg text-badge-primary-soft-text"
+    : props.tone === "neutral"
+      ? "border-border-default bg-surface-base text-text-secondary hover:border-border-strong hover:text-text-heading"
+      : [CHIP_TONE_CLASSES[props.tone], "hover:border-current/50"],
 ]);
 
-// ── Event handlers ────────────────────────────────────────────────────────
+// A removable toggle is a span, so it takes the button role and keys itself.
+const spanToggle = computed(() => props.toggle && props.removable);
+
+const classes = computed(() => [
+  "rounded-chip inline-flex max-w-full items-center gap-1 border whitespace-nowrap",
+  "text-xs leading-none font-medium transition-colors duration-(--duration-control) ease-(--ease-control)",
+  props.mono && "font-mono",
+  props.toggle ? toggleClasses.value : [CHIP_TONE_CLASSES[props.tone], sizeClasses[props.size]],
+  props.disabled && "pointer-events-none opacity-40",
+]);
+
 function handleClick(e: MouseEvent): void {
-  if (!props.clickable || props.disabled) return;
+  if (!props.toggle || props.disabled) return;
   emit("click", e);
 }
 
 function handleKeydown(e: KeyboardEvent): void {
-  if (!props.clickable || props.disabled) return;
-  if (e.key === "Enter" || e.key === " ") {
-    e.preventDefault();
-    emit("click", e);
-  }
+  if (!spanToggle.value || props.disabled || e.target !== e.currentTarget) return;
+  if (e.key !== "Enter" && e.key !== " ") return;
+  e.preventDefault();
+  (e.currentTarget as HTMLElement).click();
 }
 
-// The ✕ lives inside a `clickable` badge, so its click must not also read as a
-// click on the badge itself.
+// Inside a toggle chip, the ✕ must not also toggle it.
 function handleRemove(e: MouseEvent): void {
   if (props.disabled) return;
   e.stopPropagation();
@@ -264,78 +92,55 @@ function handleRemove(e: MouseEvent): void {
 <template>
   <component
     :is="tag"
-    :type="clickable ? 'button' : undefined"
-    :disabled="clickable && disabled ? true : undefined"
+    :type="tag === 'button' ? 'button' : undefined"
+    :aria-pressed="toggle ? pressed : undefined"
+    :role="spanToggle ? 'button' : undefined"
+    :tabindex="spanToggle && !disabled ? 0 : undefined"
+    :disabled="tag === 'button' && disabled ? true : undefined"
     :aria-disabled="disabled || undefined"
-    :tabindex="clickable && !disabled && tag !== 'button' ? 0 : undefined"
     :class="classes"
     v-bind="$attrs"
     @click="handleClick"
     @keydown="handleKeydown"
   >
-    <!-- Leading status dot (7px solid, inherits the badge's foreground colour). -->
-    <span
-      v-if="dot"
-      :class="[
-        'inline-block shrink-0 rounded-full bg-current',
-        size === 'lg' ? 'size-2.5' : 'size-1.75',
-      ]"
-      aria-hidden="true"
-    />
+    <span v-if="showDot" class="size-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />
 
-    <!--
-      Left icon area — rendered when either the #icon slot or icon prop is set.
-      The slot takes priority; the prop renders a Material Icon as fallback.
-    -->
     <template v-if="hasIcon">
       <slot name="icon">
-        <!-- OIcon registry name (kebab-case SVG icon) -->
         <OIcon v-if="icon && isOIcon" :name="icon as any" size="xs" class="shrink-0" />
-        <!-- Fallback: Material icon font glyph (legacy underscore names) -->
         <span
           v-else
-          class="material-icons-outlined shrink-0 text-[1em] leading-none"
+          class="material-icons-outlined shrink-0 text-xs leading-none"
           aria-hidden="true"
           >{{ icon }}</span
         >
       </slot>
     </template>
 
-    <!-- Badge label -->
     <slot />
 
-    <!--
-      Trailing segment — rendered when either the #trailing slot or count prop is set.
-      Separated from the label by a thin currentColor divider.
-    -->
     <span
-      v-if="hasTrailing"
-      :class="['shrink-0 border-s border-current/25 leading-none opacity-75', trailingSizeClasses]"
+      v-if="slots.trailing"
+      class="shrink-0 border-s border-current/25 ps-1 leading-none tabular-nums opacity-75"
     >
-      <slot name="trailing">{{ count }}</slot>
+      <slot name="trailing" />
     </span>
 
-    <!--
-      Remove affordance — a real focusable control, no divider (a chip's ✕ is
-      part of the chip, not a second segment). `type=button` matters: a chip
-      inside an OForm must not submit it.
-    -->
     <button
       v-if="removable"
       type="button"
       :disabled="disabled || undefined"
       :aria-label="removeLabel ?? t('common.remove')"
       :class="[
-        'ms-0.5 -me-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center',
-        'rounded-full p-0.5 opacity-70',
-        'hover:bg-current/15 hover:opacity-100',
+        'rounded-chip -me-0.5 inline-grid size-3.5 shrink-0 cursor-pointer place-items-center opacity-70',
+        'hover:bg-current/12 hover:opacity-100',
         'focus-visible:ring-badge-focus-ring focus-visible:ring-2 focus-visible:outline-none',
         'disabled:pointer-events-none disabled:opacity-40',
       ]"
       data-test="o2-badge-remove"
       @click="handleRemove"
     >
-      <OIcon name="close" size="xs" />
+      <OIcon name="close" size="xs" class="size-2.5!" />
     </button>
   </component>
 </template>

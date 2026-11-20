@@ -28,20 +28,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`rum-errors-kpi-${card.key}-card`"
     >
       <span
-        class="text-text-label max-md:text-3xs flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase max-md:block max-md:w-full max-md:truncate max-md:tracking-normal max-md:normal-case"
+        class="text-text-label max-md:text-2xs flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase max-md:block max-md:w-full max-md:truncate max-md:tracking-normal max-md:normal-case"
       >
         {{ card.label }}
         <OTag
           v-if="card.badge"
           :label="card.badge.label"
-          :variant="card.badge.variant"
-          size="xs"
+          :tone="card.badge.variant"
+          size="sm"
           class="max-md:hidden"
           data-test="rum-errors-kpi-crash-free-badge"
         />
       </span>
 
-      <OSkeleton v-if="loading" variant="title" class="w-16" />
+      <OSkeleton v-if="loading" shape="block" class="w-16" />
       <span
         v-else
         class="text-xl font-semibold tabular-nums max-md:text-base"
@@ -98,12 +98,12 @@ const crashFreeBadge = computed(() => {
   const pct = props.kpis.crashFreePct;
   if (pct === null) return null;
   if (pct < CRASH_FREE_FAIR_MIN) {
-    return { label: t("rum.ratingPoor"), variant: "error-soft" as const };
+    return { label: t("rum.ratingPoor"), variant: "err" as const };
   }
   if (pct < CRASH_FREE_GOOD_MIN) {
-    return { label: t("rum.ratingFair"), variant: "warning-soft" as const };
+    return { label: t("rum.ratingFair"), variant: "warn" as const };
   }
-  return { label: t("rum.ratingGood"), variant: "success-soft" as const };
+  return { label: t("rum.ratingGood"), variant: "ok" as const };
 });
 
 const cards = computed(() => {

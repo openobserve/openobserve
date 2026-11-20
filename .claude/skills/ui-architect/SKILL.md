@@ -19,6 +19,39 @@ reference that carries the full rationale, examples, and per-component detail.
 Open the linked reference before you implement that specific thing — don't guess a
 prop, a class string, or a path.
 
+## Binding: the v2 UI guidelines
+
+**[references/guidelines.md](references/guidelines.md) is binding** for every change under
+`web/`: 117 rules with stable ids (L, T, C, H, F, B, S, O, V, D, N, K, U, KB, R, W) under
+seven principles (P1–P7). Where an older rule in this skill or its references disagrees with
+a guideline, the guideline wins.
+
+- **Cite the ids.** Every UI change names the guideline ids it applies: in the PR
+  description ("Applies H1, H8, S1, S2") and in your report of the change.
+- **Nothing is built outside the system.** No new component, variant, size, height or radius
+  outside `web/src/lib` and the token files. The `local/o2-*-api` ESLint rules in `lint:ci`
+  hold each component's API at zero violations, and `local/o2-control-height` flags height
+  overrides on controls. Where an example in a reference disagrees with one of those rules,
+  the rule wins.
+- Read the guidelines once, then run the [pre-flight checklist](#pre-flight-checklist) on
+  every change. The page header has its own spec: [header-spec.md](references/header-spec.md).
+  Why each rule exists (the survey register and bug list):
+  [ui-audit-2026-11.md](references/ui-audit-2026-11.md).
+- **Verify by looking, not by counting.** Before a UI change is done, take 2x close-ups of
+  the header, tabs, toolbar and first rows of every screen it touches, on `main` and on the
+  branch, and check each pair against the guideline ids. In particular:
+  - indicators sit on their dividers;
+  - every control in a row shares one height and one border language;
+  - grouped controls share one border;
+  - text is sentence case (T5);
+  - the header has at most two secondary actions (H3).
+
+  Lint, type-check and metrics (heights, radii, error counts) are necessary but never prove
+  how a screen looks.
+- **Recent polish on `main` is the baseline.** Before changing a shared component, read
+  `git log origin/main -- <component>`. Keep what recent polish commits decided unless a
+  guideline says otherwise, and name that guideline in the change.
+
 ---
 
 ## The seven house rules
@@ -28,12 +61,21 @@ code** for rules 1–6 is in [references/house-rules.md](references/house-rules.
 rule 7 has its own [references/responsive.md](references/responsive.md) —
 read it once, it is the backbone of everything below.
 
-1. **Every page/module header is `OPageHeader`** — never a hand-rolled
-   `<div class="header">…<h1>` or a `q-toolbar`. One header contract keeps the
-   title in the same place across list → detail → edit. Peer/section tabs need
-   **`tabs-below`** (the slot alone renders them inline beside the title), and the
-   header `icon` must be the SAME `IconName` the page's nav entry declares. The
-   header's **create CTA is label-only — never `icon-left="add"`**.
+1. **Every page header is `OPageHeader`, the stacked v2 header** — never a
+   hand-rolled `<div class="header">…<h1>` or a `q-toolbar`
+   ([header-spec](references/header-spec.md), guidelines H1–H8). One 56 px band: a
+   context line above an 18 px title, actions on the right. The context line is
+   derived from the route (the rail group, else an empty slot, never the org); a detail, editor or import
+   page passes **`:back="{ label, to }"`** and it becomes a real "‹ Parent" link on
+   `useSmartBack` (H4, N3). The title sits at the same x and y on every page and
+   never changes on a tab click. Peer tabs (`#header-tabs`) always sit on their own
+   40 px row, never after the title (H8). **No single-line breadcrumb trail and no
+   boxed back button** (H4). **No icon tile and no subtitle paragraph** (H2): there
+   is no `icon` or `subtitle` prop; real help goes in `:about`, an ⓘ popover beside
+   the title. Status chips go in `#status` (H5). Actions: `#actions-overflow`
+   (secondaries, folded into ⋯ More under 640 px) then `#actions` (the primary)
+   (H3, R2). The create CTA is "New <object>", **label only, never a `+` icon**
+   (H6, B4). `local/o2-page-header-api` holds this API at zero violations.
 2. **Build from O2 components in `web/src/lib`** — never a bare HTML control
    (`<button>`, `<input>`) or a third-party UI primitive when an `O*` equivalent
    exists. Drive them by **intent**
@@ -134,23 +176,22 @@ read it once, it is the backbone of everything below.
      review item, not a CI gate. Both are equally banned — an arbitrary text size
      bypasses the scale whichever unit it uses.
 
-     | Utility | px | Use for |
+     | Utility | px | Use for (guideline T1) |
      |---|---|---|
-     | `text-3xs` | 10 | chart axis micro-labels, dense table sub-text (charts only) |
-     | `text-2xs` | 11 | tiny labels, chips, badge text |
-     | `text-xs` | 12 | captions, metadata, timestamps |
-     | `text-compact` | 13 | dense body / data tables |
-     | `text-sm` | 14 | **default body text** (start here) |
-     | `text-base` | 16 | comfortable body, form inputs |
-     | `text-lg` | 18 | card / panel titles |
-     | `text-xl` | 20 | section headings on long-form content pages (not settings forms: those use `OFormSection variant="plain"`) |
-     | `text-2xl` | 24 | page / modal titles |
-     | `text-3xl` | 30 | hero numbers / large display |
-     | `text-4xl` | 36 | display |
+     | `text-2xs` | 11 | key chips, chart axes, micro captions |
+     | `text-xs` | 12 | meta, helper text, chips, badges, column headers |
+     | `text-compact` | 13 | **all UI text** (start here): controls, menus, table cells, labels |
+     | `text-sm` | 14 | **reading text only**: descriptions, dialog bodies, empty-state text, notices; semibold, the section, card and panel titles (owned by `OFormSection` / `OCard`) |
+     | `text-title` | 15 | dialog and drawer titles: owned by `ODialog` / `ODrawer` |
+     | `text-lg` | 18 | the page title, 600 on a 24 px line (owned by `OPageHeader`), never larger |
+     | `text-xl` · `text-2xl` | 20 · 24 | KPI values only |
 
-     Default to `text-sm` for body. Go smaller only for genuinely dense/secondary UI,
-     larger only for titles. If a design needs a size not on the scale, snap to the
-     nearest step — do **not** reintroduce an arbitrary `text-[..]`.
+     `text-compact` is the UI default: every O* control, menu, table cell and label
+     sets it itself, so a call site does not. Reach for `text-sm` only for prose a
+     person reads. `text-3xs`, `text-base`, `text-3xl` and `text-4xl` sit outside T1:
+     no new uses. A settings form's section heading comes from
+     `OFormSection variant="plain"`, never a hand-set size; it must never outweigh the page title (T2). If a design needs a size not on the scale, snap to the nearest
+     step — do **not** reintroduce an arbitrary `text-[..]`.
    - **Casing — never uppercase anywhere in the app, except an established short
      form.** This is app-wide and strict. No shouting: don't bake caps into a string
      (`"FIRST APPEARED AT {time}"`, `"NEW TO THIS LIST"`) and don't force it with the
@@ -168,14 +209,24 @@ read it once, it is the backbone of everything below.
      legibility cost — caps runs slow the reader and break at small sizes — and a
      baked-in caps string also can't be sentence-cased per locale.) `capitalize` is
      acceptable only for a single data token that must render title-cased.
-   - **Corner radius — exactly two tiers + circle, never an arbitrary value:**
-     `rounded-default` (**4px** — controls: buttons, inputs, chips, small icon
-     buttons), `rounded-surface` (**12px** — surfaces: dialogs, drawers, cards,
-     panels, the app-shell content area), `rounded-full` (pills / avatars / dots).
-     Per-corner variants use the same names (`rounded-t-surface`, `rounded-s-default`).
-     **Banned:** bare `rounded`, arbitrary `rounded-[10px]`, and the retired
-     `rounded-{sm,md,lg,xl}` / `var(--radius-{sm,md,lg,xl})` (deleted — they were
-     five names for one value). Pick the tier by role, not by eye.
+   - **Corner radius — four tiers by role + circle, never an arbitrary value:**
+     `rounded-chip` (**4** — chips, badges, kbd, checkbox), `rounded-default`
+     (**6** — buttons, inputs, selects, segmented, every control), `rounded-menu`
+     (**8** — menus, popovers, tooltips), `rounded-surface` (**10** — dialogs,
+     drawers, cards, panels, the content frame), `rounded-full` (pills / avatars /
+     dots). Per-corner variants use the same names (`rounded-t-surface`,
+     `rounded-s-default`). **Banned:** bare `rounded`, arbitrary `rounded-[10px]`,
+     and the retired `rounded-{sm,md,lg,xl}` / `var(--radius-{sm,md,lg,xl})`. Pick
+     the tier by role, not by eye; an O* component already carries its own.
+   - **Control height — four tokens, set by the component's `size`, never at the
+     call site** (S1, S2): `h-control-xs` 24 (chips, in-row icon buttons),
+     `h-control-sm` 28 (compact density, panel headers, table footer),
+     `h-control-md` 32 (**the default** for every input, select, button, toggle and
+     date picker), `h-control-lg` 36 (sign-in and empty-state CTA only). Controls
+     that share a row share one size. Never put `h-*`, `!h-*`, `size-*` or
+     `[&_…]:h-*` on an O* control or button to make it fit: pick its `size`
+     (`local/o2-control-height` flags it). A bespoke element that must line up with
+     a control uses the same `h-control-*` utility.
    - **Shadow — one scale, and colour is a SEPARATE axis.** Elevation is
      `shadow-xs / sm / md / lg`; the directional roles are `--shadow-sticky-*`,
      `--shadow-rail`, `--shadow-ring-hairline`, `--shadow-scroll-*`, `--shadow-glow-*`.
@@ -209,9 +260,9 @@ read it once, it is the backbone of everything below.
         is invisible there — black at 8% on a `#101215` canvas paints nothing.
 4. **No `<style scoped>` and no inline `style=""`** — style with **bare** Tailwind
    utilities (no `tw:` prefix — it was removed). Form-field spacing is
-   `class="flex flex-col gap-5"` on `<OForm>`;
-   omit it and fields render cramped with no spacing (the #1 "dialog looks broken"
-   bug).
+   `class="flex flex-col gap-4"` on `<OForm>` (16 between fields, 24 between
+   sections: L4, V1); omit it and fields render cramped with no spacing (the #1
+   "dialog looks broken" bug).
    - **No CSS preprocessor in an SFC** — `vue/block-lang` errors on
      `<style lang="scss|sass|less">`; `lang="css"` or no `lang` only. This is not
      taste: `postcss-scss` is not installed, so stylelint silently **skips** a scss
@@ -419,7 +470,7 @@ read it once, it is the backbone of everything below.
    > **When you declare a new interface, prop type, or `*.types.ts` that carries UI
    > text or an i18n key, type that field as `I18nText` / `I18nKey` — never bare
    > `string`.** This is the same pattern the library already uses for icons
-   > (`iconLeft?: IconName`): a constrained type derived from a source of truth.
+   > (`icon?: IconName`): a constrained type derived from a source of truth.
    > `I18nKey` is derived from en-US.json at compile time, so there is no list to
    > maintain — add a key and it is instantly valid.
    >
@@ -474,9 +525,9 @@ read it once, it is the backbone of everything below.
      `useBreakpoint()`'s `isMobile` / `!lgUp`. An unprefixed class change or a bare
      `md:`/`lg:` class that alters ≥1024 px is a blocker. JS is only for structure
      (rail → drawer, toggle strip → dropdown, splitter locked shut).
-   - **One row of chrome.** Header: primaries in `#actions`, secondaries in
-     `#actions-overflow` (inline on desktop, one ⋮ below md; `overflow-first` when
-     they precede the CTA). Toolbar: wrapper `max-md:contents`, filter
+   - **One row of chrome.** Header: the fixed 56 px band never wraps (H1); primaries
+     in `#actions`, secondaries in `#actions-overflow` (before the primary, folded
+     into one ⋯ More under 640 px, R2). Toolbar: wrapper `max-md:contents`, filter
      `OToggleGroup mobile-dropdown`, search `min-w-0 flex-1 max-md:min-w-40`.
      Stat tiles: `OStatStrip` / `KpiCard` (compact to icon + value below lg).
    - **Side panels open from their own row.** `OPageLayout #sidebar` and
@@ -484,15 +535,15 @@ read it once, it is the backbone of everything below.
      `ODrawer` with `anchor` set to its trigger's row. Only the main nav opens from
      the top.
    - **Tables keep every column** and scroll within the frame (OTable does it);
-     row actions go through `OTable` `row-actions` (three buttons at most, fixed
-     order, one kebab below md); a hand-written `#cell-actions` keeps the
+     row actions go through `OTable` `row-actions` + `row-menu` (two inline at
+     most, the rest and every destructive one in ⋯, one kebab below md); a hand-written `#cell-actions` keeps the
      `max-md:hidden` + `md:hidden` kebab mirror with `<data-test>-menu` items.
    - **The table footer is never hand-built.** `OTable` draws the one bar every
      list shares: the pager on the end edge and, on the start edge, nothing —
-     unless rows are selected (the "N of M selected" count plus the page's bulk
-     actions from `#selection-actions`) or the page has something the pager cannot
-     say (`#footer-note`). There is no total label; the pager's "x – y of z" is the
-     count. Below md the count and actions take a row above the pager and a note
+     unless rows are selected (it turns into the selection bar: "3 selected", the
+     page's bulk actions from `#selection-actions`, Clear — D6) or the page has
+     something the pager cannot say (`#footer-note`). There is no total label; the
+     pager's "1–20 of 143" is the count, and an empty table has no pager (D5). Below md the count and actions take a row above the pager and a note
      takes its own row; a note whose root is `max-md:hidden` leaves no row.
    - **Nothing clipped, nothing hover-only.** Popups use library components and
      `min(<w>, calc(100vw - 1.5rem))` widths; an `h-full` pane beside a stacked
@@ -515,16 +566,18 @@ and each domain has its own reference below.
 | **Tabular data** | `OTable` + `OTableColumnDef[]`; client-side pagination unless the backend paginates a set too large to fetch whole | [core-controls-table](references/core-controls-table.md) |
 | **Cut text ("…")** | **`<OTruncatedText>` wherever you'd write `truncate` / `line-clamp-*`** — it shows the full text in a tooltip only while the text is actually cut. **`:tooltip="false"`** for secrets (tokens, keys, webhook/signed URLs) and for text the user can already read in full another way (printed below, expand, a side panel). In `OTable` cells plain text needs nothing — the table's shared tooltip handles it; turn it off per column (`meta.cellOverflowTooltip: false`) for secrets or per table (`:cell-overflow-tooltip="false"`) where Wrap / row expansion is the reveal. **Never repeat the visible text in a `title` or `OTooltip`.** | [core-display](references/core-display.md#otruncatedtext) · [core-controls-table](references/core-controls-table.md#cut-cell-text--the-shared-tooltip) |
 | **Charts / graphs** | **Every data chart renders through the shared dashboard engine — never mount a charting lib in a feature page.** Time-series, category, scatter, geo/map, gauge, pie → **`PanelSchemaRenderer`** (`web/src/components/dashboards/PanelSchemaRenderer.vue`) with a panel schema: it runs the query, applies the app's unit/theme/annotation formatting, and owns the loading/error ladder. **Banned in feature code:** `echarts.init` / a raw `<v-chart>` / ApexCharts / D3 / Chart.js / a hand-rolled `<canvas>` or `<svg>` plot. The low-level **`panels/ChartRenderer.vue`** (raw ECharts option) is the ONLY sanctioned escape hatch, and ONLY in two cases: chart-`@click` forwarding `PanelSchemaRenderer` doesn't re-emit (convert once the schema renderer forwards clicks), or a chart needing a fixed grid that keeps empty rows/columns, or box-selection mapping from category indices back to values, which the dashboard converters cannot express (e.g. `TracesLatencyHeatmap.vue`). Annotate the site with a one-line why. **Not charts** (do NOT force these through the renderer): in-row trend lines are **`OSparkline`**, single-value share bars are **`OProgressBar`**, in-cell data bars are the table's **`ODataBarCell`**, and a decorative topology/diagram is bespoke SVG. | [core-display](references/core-display.md) |
-| **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`, the latter needing **`tabs-below`** to land in row 2 instead of inline), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a reading column (forms): centered by default; `content-align="start"` pins it to the start edge, which Settings forms use at the existing `lg` size (1024). Lists stay full width. The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
+| **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the stacked header (from `:title`/`:back`/`:context`/`:about` props + `#status`/`#actions`/`#actions-overflow`/`#header-tabs`, the tabs always on their own 40 px row; no icon or subtitle, H1–H8), a `#banner` for a lasting page condition (K3), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the one 16 px gutter by default (L3) — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a reading column (forms): centered by default; `content-align="start"` pins it to the start edge, which Settings forms use at `lg` (1024). Lists stay full width. The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
 | **Content inset** | `OPageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `OPageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
-| **Tab strips** | an `OTabs` strip needs **no** horizontal wrapper padding — the first tab's label self-aligns to the `px-page-edge` grid, so it lines up with the `OContent` body below it. Put the strip's bottom divider on the strip (`border-b`) and give it no `px-*`; wrapping a tab strip in `px-page-edge` double-insets the labels. | [conventions](references/conventions.md) |
-| **Listing toolbar** | every list carries three affordances — search + filters (`#toolbar`), refresh (`#toolbar-trailing`), and the auto-injected column-visibility toggle; empty state is one `OEmptyState` with `:filtered`, in the `#empty` slot only, plus `:forbidden` on the table so a 403 shows "You don't have access" instead of "create your first…" | [page-recipes](references/page-recipes.md) |
+| **Tab strips** | page tabs go in `#header-tabs`: the header's 40 px tab row draws the divider and starts the first label at the content edge (H8, N2). Any other `OTabs` strip needs **no** horizontal wrapper padding; put its bottom divider on the strip (`border-b`) and give it no `px-*`, since wrapping it in `px-page-edge` double-insets the labels. | [conventions](references/conventions.md) |
+| **Pick the recipe by the job** | before laying out a screen, choose its recipe from the "Which recipe?" table: listing, explore, overview, investigation detail, dashboard, row drawer, builder, settings form or detail/editor. Each recipe fixes the bands, the toolbar, the states and the links out (N8); every region gets the shared state matrix (loading, first run, filtered, no data in range, denied, locked, error, partial). A screen that fits no recipe is a design question for the user, not a new local layout | [page-recipes](references/page-recipes.md#which-recipe) |
+| **Listing toolbar** | every list carries three affordances — search + filters (`#toolbar`), refresh (`#toolbar-trailing`), and the auto-injected column-visibility toggle; empty state is one `OEmptyState` of the right `kind` (`filtered` while a search or filter is on), in the `#empty` slot only, plus `:forbidden` on the table so a 403 shows "You don't have access" instead of "create your first…" | [page-recipes](references/page-recipes.md) |
 | **Form container** | confirm → `ConfirmDialog`; short form → `ODialog`; tall or contextual form → `ODrawer`; primary multi-section flow → a full in-page view. Use `ODialog` / `ODrawer` for these | [conventions](references/conventions.md) |
 | **Form validation** | `OForm` + a colocated Zod `<Form>.schema.ts`; fields are `OForm*` bound **only by `name=`** (no `v-model`/`ref` mirror, no `formData`); submit + loading automatic; payload built with explicit keys; field arrays use `:key="index"` | [forms-validation](references/forms-validation.md) |
 | **New page in nav** | a route **+ exactly one** surface (rail item / flyout child / Settings / IAM sub-page) **+** an env/role gate — the route condition, the nav-entry gate, and the SectionRail `visible` all express the same rule | [navigation-menus](references/navigation-menus.md) |
 | **Keyboard shortcuts** | registry-driven — declare in `shortcutRegistry.ts`, bind with `useShortcuts([{ id, handler }])`; never an ad-hoc `keydown` listener or a hardcoded `⌘N` in a template | [keyboard-shortcuts](references/keyboard-shortcuts.md) |
 | **Product analytics events** | a new feature or primary action (create/save/run/import/share) fires **one** `productAnalytics.track("<object>_<action>", { … })` **after it succeeds**; a new feature page fires `<feature>_opened`. Past-tense snake_case, never a generic name like `Button Click`, never rename an existing event, no personal data or free text in properties. Fixes, refactors and styling changes add **no** events — RUM already captures clicks | [product-analytics](references/product-analytics.md) |
-| **Cancel / Save row** | cancel = `variant="outline"`, save = `variant="primary"`, both `size="sm-action"`, spaced with `gap-2` on the parent | [conventions](references/conventions.md) |
+| **Cancel / Save row** | right-aligned, Cancel first then the primary; extra actions (Test, Delete) at the left (O7). Cancel = `secondary` (OButton's default variant), Save = `variant="primary"`, both the default `md` size, spaced with `gap-2` on the parent. Save sits where the eye ends, once per page (V2) | [conventions](references/conventions.md) |
+| **Buttons** | `OButton` takes one of seven variants by job (B2): one `primary` per region (B1), `secondary` (default) for alternatives and Cancel, `ghost` in toolbars/rows, `accent-ghost` for an inline next step, `danger` only inside a confirmation, `danger-ghost` for Delete in bulk bars, `link` in text; sizes `xs`/`sm`/`md`/`lg` = 24/28/32/36, matching the field beside it (S1, S2). Icon-only buttons take `icon-only` + a `label` (name and tooltip, B5); a disabled action that will become available takes `disabled-reason` (B9); toggles take `pressed`. **Every copy action is `OCopyButton`**, refresh is `ORefreshButton`, a default action with variants is `OSplitButton`. `local/o2-button-api` rejects anything else | [core-controls-table](references/core-controls-table.md#obutton) |
 | **Responsive** | `max-md:`/`max-lg:` variants + `useBreakpoint()` for structure; desktop unchanged; one row of header/toolbar/stat chrome; rails → anchored drawers; row actions → kebab; popups ≤ viewport | [responsive](references/responsive.md) |
 | **Nothing fits** | build a reusable component — generic primitive → a new `O*` in `web/src/lib`; app-specific composition → a named component in `web/src/components`. Never hand-assemble `<div>` + utility classes to fake a component | [creating-components](references/creating-components.md) |
 
@@ -627,20 +680,64 @@ don't guess a name.
 
 ## Pre-flight checklist
 
-Run this in your head before writing template markup, and again before
-considering the UI done:
+The guidelines' own checklist, by id. Run it before writing template markup and
+again before calling the UI done; list the ids you applied in the PR description.
+Each line is the short form of the rule in
+[references/guidelines.md](references/guidelines.md).
 
-- [ ] Page/module header is `OPageHeader` (not a hand-built header bar).
-- [ ] The header's **create CTA is label-only** — no `icon-left="add"`. The `+`
-      stays on in-section adders, icon-only buttons, and never applies to
-      utility actions (Import/Refresh/Edit keep their semantic icons).
-- [ ] Peer/section tabs pass **`tabs-below`** so the strip is the full-width
-      row-2 band — the bare `#header-tabs`/`#tabs` slot renders them inline
-      beside the title, where they shift as the title's width changes.
-- [ ] The header **`icon` matches the page's nav entry** verbatim
-      (`navGroups.ts` / `linksList` / `settingsItems` / SectionRail). A module
-      showing one glyph in the rail and another in its header reads as two
-      places — see [navigation-menus](references/navigation-menus.md#icon-parity).
+- [ ] **L2** Bands in order: header, tabs, toolbar, strip, chips, content, footer.
+- [ ] **H1** Header is a context line above an 18 px title, actions right.
+- [ ] **H8** Nothing in the header moves on tab switch or navigation.
+- [ ] **H3** At most two secondary, one primary, then ⋯ More.
+- [ ] **H6** Create button: "New <object>", label only.
+- [ ] **F1** Toolbar order: search, filters, spacer, view, time, refresh.
+- [ ] **F2** Search first, 280 px on lists.
+- [ ] **F3** Filter selects carry their label inside.
+- [ ] **F5** Applied filters show as chips with Clear all.
+- [ ] **F6** No segmented control or tab used as a state filter.
+- [ ] **F10** Toolbar never wraps; overflow folds into More.
+- [ ] **F11** Filters, sort, page and time range are in the URL.
+- [ ] **S1** Heights only 24, 28, 32, 36.
+- [ ] **S2** Every control in a row shares one height token.
+- [ ] **S4** Buttons beside labelled fields align to the field.
+- [ ] **B1** One primary per region.
+- [ ] **B3** Verb + noun labels, never "OK".
+- [ ] **B4** Icons on text buttons only for ▾ ↗ download upload copy run.
+- [ ] **B5** Icon-only buttons have a tooltip and aria-label.
+- [ ] **B7** Row actions: two inline, the rest in ⋯, destructive last.
+- [ ] **O1** Overlay chosen by the job table.
+- [ ] **O3** Overlay width from the fixed sizes.
+- [ ] **O4** Overlay never resizes or moves while open.
+- [ ] **O8** No dialog opens from a dialog.
+- [ ] **V2** Save where the eye ends, once per page.
+- [ ] **V4** Editors use the shared leave dialog.
+- [ ] **V5** Dirty dialogs and settings ask before discarding.
+- [ ] **V6** Validate on blur; focus the first error on submit.
+- [ ] **V7** Enter never saves a multi-field form.
+- [ ] **V8** Destructive confirm names the object.
+- [ ] **N3** Back via useSmartBack; never raw router.back().
+- [ ] **K5** Empty state of the right kind; never first-run on error.
+- [ ] **K6** No raw HTTP errors in the UI.
+- [ ] **C3** Colour the exception, not the norm.
+- [ ] **C4** Unknown is "—", zero is a muted 0.
+- [ ] **T5** Sentence case, no uppercase labels.
+- [ ] **W4** One time format: relative with absolute tooltip.
+
+## Code checklist
+
+How this repo implements those rules. Run it alongside the pre-flight checklist:
+
+- [ ] Page header is `OPageHeader` / `OPageLayout` (not a hand-built header bar or
+      an `<h1>`), with **no icon and no subtitle** (H2) — real help goes in
+      `:about`, an ⓘ popover beside the title.
+- [ ] A detail, editor or import page passes `:back="{ label: <parent's name>, to }"`
+      — the context link on smart back (H4, N3); no hand-built back button and no
+      `router.back()`.
+- [ ] Peer/section tabs go in `#header-tabs` (their own row, H8); a status chip in
+      `#status` (H5); a lasting page condition in `#banner` (K3).
+- [ ] The page has **one name** in the rail entry, the context line, the header
+      and the browser tab (H7) — see
+      [navigation-menus](references/navigation-menus.md#name-parity).
 - [ ] Any data the page reads is a `queryOptions()` in
       `services/<domain>.queries.ts`, consumed with `useQuery` — not a service
       call with a hand-rolled `loading` ref. Durations come from
@@ -675,19 +772,18 @@ considering the UI done:
       column has a real sort key in the handler (an unknown key falls back
       silently and orders by something else), and any page-relative device
       (`ODataBarCell` bars, a `#subheader` count strip) is on a **client**-paginated
-      table only. No hand-rolled `#` index column (`show-index`), no positional
+      table only. No row-number column at all (D2), no positional
       `columns.splice`, and column `size` fits the header + sort chevron.
       See [core-controls-table](references/core-controls-table.md).
 - [ ] A figure/label that already exists on another screen reuses **that screen's
       formatter and i18n key** (promote a component-local formatter into
       `utils/formatters.ts` rather than copying it).
-- [ ] Listing page uses the **full-height flush skeleton** (root
-      `flex flex-col h-full p-0`, header `shrink-0 border-b` — OPageHeader bakes
-      in its own `px-page-edge`, never add a `px-*`, table wrapper
-      `card-container flex-1 min-h-0 overflow-hidden`, `OTable :frame="false"`) —
-      not a `p-6` padded container; table runs flush.
+- [ ] Listing page uses the **flush skeleton**, `OPageLayout bleed` (the header
+      owns the one 16 px gutter and its divider, L3: never a `px-*` or `border-b`
+      on it; `OTable` has one frame) — not a `p-6` padded container; table runs
+      flush.
 - [ ] Listing page has all three toolbar affordances: **search + filters**
-      (`#toolbar`, `:show-global-filter="false"`), **refresh**
+      (`#toolbar`, an `OSearchInput` bound to `:global-filter`), **refresh**
       (`#toolbar-trailing`, wired to fetch), and the **column show/hide toggle**
       (`:persist-columns` + `table-id` + a `hideable` column). Non-essential
       columns hidden by default via `:column-visibility`.
@@ -700,11 +796,11 @@ considering the UI done:
       it says more; nothing restates the row total. See
       [core-controls-table § Footer](references/core-controls-table.md).
 - [ ] Every empty/zero state is a single `OEmptyState` (never a hand-rolled
-      `<div>` + centered text + button). Use a `preset` + **`:filtered`**
-      (search/filter active) + `@action` resetting on `clear-filters`; `#error` if
-      fetch can fail. Its actions use the standard layout — an `EmptyStateActionCard`
-      (`actions` prop / `#actions` slot) for a primary CTA, or `actionLabel`, never
-      a custom button row.
+      `<div>` + centered text + button) of the right `kind` (K5): `first-run` with the
+      header's create words, `filtered` (search/filter active; its default action
+      clears them), `denied`, or `error` with Retry in `#error` when the fetch can
+      fail — a failed load is never `first-run`. One `actionLabel` (+ an optional
+      `secondaryActionLabel`), never a custom button row.
 - [ ] Page is **registered in navigation** (route + one of rail item / Settings
       sub-page / flyout child) and **gated** for env/role
       (`config.isEnterprise` / `config.isCloud` / `zoConfig.*`), with the route,
@@ -739,9 +835,13 @@ considering the UI done:
       panels uses the full-height split (`flex-1 min-h-0` cards + fill-height
       tables) so the page itself never scrolls — see
       [conventions § Cards & stacked-panel pages](references/conventions.md).
-- [ ] Corner radius is `rounded-default` / `rounded-surface` / `rounded-full`
-      only — no bare `rounded`, no `rounded-[..]`, no retired
-      `rounded-{sm,md,lg,xl}`.
+- [ ] Corner radius is a role tier — `rounded-chip` (4) / `rounded-default` (6) /
+      `rounded-menu` (8) / `rounded-surface` (10) / `rounded-full` — no bare
+      `rounded`, no `rounded-[..]`, no retired `rounded-{sm,md,lg,xl}`.
+- [ ] **Heights come from `size`, not classes** (S1, S2) — no `h-*` / `!h-*` /
+      `size-*` / `[&_…]:h-*` on an O* control or button, and every control in a
+      row has the same `size`. UI text is `text-compact`; `text-sm` is for reading
+      text only (T1).
 - [ ] **No uppercase anywhere except established short forms** — no caps baked
       into a string and no `uppercase` utility on labels/headers/chips/badges/
       buttons/tooltips. Copy is sentence case; the only caps allowed are acronyms/
@@ -755,11 +855,12 @@ considering the UI done:
       keyframes, `color-mix`, `calc`, SVG `fill`/`stroke`, `v-html`). No raw
       Tailwind palette (`bg-gray-*`) and no raw `grey-*`/`primary-*` ramp — use a
       semantic token.
-- [ ] **Text colour matches its semantic role** — `heading` (titles/emphasis),
-      `body` (main content), `secondary` (labels, captions, metadata, units),
-      `muted` ONLY for disabled/absent content (disabled control, em-dash /
-      "none" / "not measured" placeholder). Never `muted` on a live value or a
-      label; make text quieter by dropping one tier + size/weight, not opacity.
+- [ ] **Text colour matches its role** (T3) — strong = `text-text-heading`
+      (titles, values), default = `text-text-body` (body), secondary =
+      `text-text-secondary` (labels, column headers, metadata), tertiary =
+      `text-text-muted` (timestamps, hints, placeholders, the "—" for unknown),
+      plus `text-text-disabled`. Never `muted` on a live value or a label; make
+      text quieter by dropping one tier + size/weight, never opacity.
       See [design-tokens § text colour](references/design-tokens.md).
 - [ ] **Calm Signal** — the screen's *primary signal* is coloured (state /
       category / role / progress) via the shared toolkit (`OStatStrip`/`OStatCard`,
@@ -826,7 +927,7 @@ considering the UI done:
       its info control beside it, not a full-width bar; the primary table column has
       an explicit `size`; a status screen fits 1366×768 and 375 collapsed; tiles that
       sit six to a row wrap and keep two title lines so their values line up.
-- [ ] **Same job, same component** — refresh is `ORefreshButton`, an explainer is
+- [ ] **Same job, same component** — refresh is `ORefreshButton`, copy is `OCopyButton`, an explainer is
       the `OPopover` info recipe, an expandable row is `OCollapsible`, a toolbar view
       toggle is `OToggleGroup mobile-dropdown`; never a hand-built `<button>`. See
       [conventions § The same affordance](references/conventions.md).
@@ -858,8 +959,11 @@ not the call site":
   substitute a bare `<div>`. See
   [references/creating-components.md](references/creating-components.md) and the
   "No component fits?" section of [references/conventions.md](references/conventions.md).
-- Missing O2 variant → add the variant to the component source, then use it.
-- Missing token → register it in the token CSS (rule 5), then use it.
+- Missing O2 variant, size, height or radius → it is a design-system change, not a
+  call-site one. The sets are fixed by the guidelines (B2, S1 and the radius tiers);
+  propose the addition against them, and land it in `web/src/lib` together with its
+  `local/o2-*-api` rule. Never fake it with classes at the call site.
+- Missing colour token → register it in the token CSS (rule 5), then use it.
 - `OPageHeader` can't express the header → change `OPageHeader`, not the page.
 
 If you genuinely believe a rule shouldn't apply to a specific case, say so

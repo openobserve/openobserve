@@ -5,7 +5,7 @@
     <OPageLayout
       :back="{
         label: t('aiObservability.nav.prompts'),
-        onClick: goBack,
+        to: promptsListRoute,
         dataTest: 'prompt-editor-back-btn',
       }"
       :title="
@@ -20,7 +20,7 @@
     >
       <div class="flex min-h-0 flex-1 gap-0 overflow-hidden max-[68.75rem]:flex-col">
         <div
-          class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto]"
+          class="px-page-edge flex min-h-0 min-w-0 flex-[6.5] flex-col gap-3 overflow-auto py-3 max-[68.75rem]:flex-[1_1_auto]"
         >
           <div
             v-if="prompt && baseVersion"
@@ -38,12 +38,11 @@
             data-test="prompt-editor-details-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.promptManagement.form.detailsSection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="flex flex-col gap-4 px-4 py-3.5">
               <div class="grid grid-cols-2 gap-3 max-md:grid-cols-1">
                 <OFormInput
                   name="name"
@@ -86,12 +85,11 @@
             data-test="prompt-editor-configuration-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.promptManagement.configuration") }}
               </span>
             </div>
-            <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="flex flex-col gap-4 px-4 py-3.5">
               <div class="flex flex-col gap-1">
                 <span
                   class="text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium"
@@ -236,13 +234,9 @@
               <dt>{{ t("aiObservability.promptManagement.form.variables") }}</dt>
               <dd>
                 <div v-if="variables.length" class="flex flex-wrap gap-1">
-                  <OTag
-                    v-for="variable in variables"
-                    :key="variable"
-                    variant="default-soft"
-                    shape="rounded"
-                    >{{ variable }}</OTag
-                  >
+                  <OTag v-for="variable in variables" :key="variable" tone="neutral">{{
+                    variable
+                  }}</OTag>
                 </div>
                 <template v-else>{{ t("aiObservability.promptManagement.form.notSet") }}</template>
               </dd>
@@ -260,8 +254,7 @@
         <OButton
           v-if="playgroundAvailable"
           type="button"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="Boolean(testDisabledReason)"
           data-test="prompt-editor-test-btn"
           @click="openPlayground"
@@ -271,8 +264,7 @@
         </OButton>
         <OButton
           type="button"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="saving"
           data-test="prompt-editor-cancel-btn"
           @click="goBack"
@@ -282,7 +274,6 @@
         <OButton
           type="submit"
           variant="primary"
-          size="sm-action"
           :loading="saving"
           data-test="prompt-editor-submit-btn"
         >
@@ -555,13 +546,15 @@ function reset() {
   confirmedMatchFingerprint.value = "";
 }
 
+const promptsListRoute = computed(() =>
+  aiPromptsRoute(orgId.value, {
+    entityId: prompt.value?.entityId,
+    query: { folder: folderId.value },
+  }),
+);
+
 function goBack() {
-  router.push(
-    aiPromptsRoute(orgId.value, {
-      entityId: prompt.value?.entityId,
-      query: { folder: folderId.value },
-    }),
-  );
+  router.push(promptsListRoute.value);
 }
 
 async function openPlayground() {

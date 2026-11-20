@@ -52,7 +52,6 @@ export const CATALOG_COLUMN_SIZES = {
   version_deployed: 100,
 } as const;
 const CATALOG_ENV_PICKED_SIZE = 157;
-export const CATALOG_ROW_HEIGHT = 54;
 
 /** The Env column header names the dimension under All envs, so its chips drop their env word. */
 export function catalogEnvColumn(env: string) {

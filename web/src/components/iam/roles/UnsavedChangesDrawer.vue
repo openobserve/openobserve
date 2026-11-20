@@ -17,15 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     data-test="edit-role-unsaved-drawer"
-    size="lg"
+    size="md"
     bleed
     :open="open"
     :title="t('iam.editRole.summaryPendingTitle')"
-    :sub-title="t('iam.editRole.summaryPendingHint')"
-    :secondary-button-label="t('iam.editRole.undoAllChanges')"
-    :secondary-button-disabled="!changeCount || saving"
-    :primary-button-label="t('alerts.save')"
-    primary-button-data-test="edit-role-unsaved-save"
+    :subtitle="t('iam.editRole.summaryPendingHint')"
+    :secondary="{ label: t('iam.editRole.undoAllChanges'), disabled: !changeCount || saving }"
+    :primary="{ label: t('alerts.save'), dataTest: 'edit-role-unsaved-save' }"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('undo', allKeys)"
     @click:primary="emit('save')"
@@ -85,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OBadge
                 v-for="action in change.actions"
                 :key="action.action"
-                :variant="change.state === 'added' ? 'primary-soft' : 'default-soft'"
+                :tone="change.state === 'added' ? 'accent' : 'neutral'"
                 size="sm"
               >
                 {{ action.label }}
@@ -118,8 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OButton
             variant="ghost"
-            size="sm"
-            icon-left="undo"
+            icon="undo"
             :disabled="saving"
             :data-test="`edit-role-unsaved-undo-${change.id}`"
             @click="emit('undo', change.keys)"
@@ -158,8 +155,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </span>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs"
                 :aria-expanded="calloutOpen"
                 aria-controls="edit-role-companions-list"
                 :aria-label="calloutTitle"
@@ -172,8 +169,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="gapRows.length > 1"
               variant="ghost"
-              size="sm"
-              icon-left="add"
               class="mt-2 shrink-0"
               :disabled="saving"
               data-test="edit-role-companions-add-all"
@@ -215,8 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :content="t('iam.editRole.companionOpenStreamsTooltip')"
               >
                 <OButton
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
                   :disabled="saving"
                   :data-test="`edit-role-companion-open-${gap.module}`"
                   @click="emit('open-module', gap.module)"
@@ -226,9 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTooltip>
               <OButton
                 v-if="gap.keys.length"
-                variant="outline"
-                size="sm"
-                icon-left="add"
+                variant="secondary"
                 :aria-label="t('iam.editRole.companionAddItem', { item: gap.label })"
                 :disabled="saving"
                 :data-test="`edit-role-companion-add-${gap.module}`"

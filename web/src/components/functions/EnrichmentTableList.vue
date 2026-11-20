@@ -20,9 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="enrichment-tables-list-page" class="flex h-full min-h-0 flex-col">
     <OPageLayout
       :title="t('function.enrichmentTables')"
-      icon="dataset"
-      :subtitle="t('function.enrichmentTablesSubtitle')"
-      tabs-below
+      :about="t('function.enrichmentTablesSubtitle')"
       bleed
     >
       <template #header-tabs>
@@ -32,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="enrichment-tables-add-btn"
           variant="primary"
-          size="sm"
           @click="showAddUpdateFn(null)"
         >
           {{ t(`function.addEnrichmentTable`) }}
@@ -42,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="bg-card-glass-bg h-full">
           <OTable
             ref="oTableRef"
-            :frame="false"
             data-test="enrichment-tables-list-table"
             :data="visibleRows"
             :columns="columns"
@@ -61,8 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:sort-by="sortBy = $event"
             @update:sort-order="sortOrder = $event"
             filter-mode="client"
-            show-index
-            :show-global-filter="false"
             :default-columns="false"
             :enable-column-resize="true"
             :persist-columns="true"
@@ -70,7 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             selection="multiple"
             :selected-ids="selectedEnrichmentTableIds"
             @update:selected-ids="handleSelectedIdsUpdate"
-            width="100%"
             class="h-full w-full"
           >
             <!-- Toolbar: type filter + search -->
@@ -87,46 +80,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   data-test="enrichment-tables-list-tabs"
                 >
-                  <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+                  <OToggleGroupItem value="all" data-test="tab-all">
                     <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
                     {{ t("function.filterAll") }}
                   </OToggleGroupItem>
-                  <OToggleGroupItem value="uploaded" size="sm" data-test="tab-uploaded">
+                  <OToggleGroupItem value="uploaded" data-test="tab-uploaded">
                     <template #icon-left><OIcon name="upload" size="sm" /></template>
                     {{ t("function.filterFile") }}
                   </OToggleGroupItem>
-                  <OToggleGroupItem value="file_url" size="sm" data-test="tab-file-url">
+                  <OToggleGroupItem value="file_url" data-test="tab-file-url">
                     <template #icon-left><OIcon name="link" size="sm" /></template>
                     {{ t("function.filterUrl") }}
                   </OToggleGroupItem>
                 </OToggleGroup>
                 <OSearchInput
+                  width="list"
                   data-test="enrichment-tables-search-input"
                   v-model="filterQuery"
-                  class="ms-auto w-64 max-md:ms-0 max-md:w-auto max-md:min-w-40 max-md:flex-1"
+                  class="ms-auto max-md:ms-0 max-md:w-auto max-md:min-w-40 max-md:flex-1"
                   :placeholder="t('function.searchEnrichmentTable')"
                 />
               </div>
             </template>
             <template #toolbar-trailing>
               <ORefreshButton
-                layout="inline"
-                variant="outline"
                 :last-run-at="lastUpdatedAt"
                 :loading="fetching"
-                shortcut-id="enrichmentTablesRefresh"
+                shortcut="enrichmentTablesRefresh"
                 data-test="enrichment-tables-list-refresh-btn"
                 @click="refreshList"
               />
             </template>
             <template #empty>
               <OEmptyState
-                size="hero"
-                preset="no-enrichment-tables"
-                :filtered="!!filterQuery"
-                @action="
-                  (id) => (id === 'clear-filters' ? (filterQuery = '') : showAddUpdateFn(null))
+                :kind="filterQuery ? 'filtered' : 'first-run'"
+                :title="
+                  filterQuery
+                    ? t('emptyState.filtered.title', {
+                        noun: t('emptyState.nouns.enrichmentTables'),
+                      })
+                    : t('emptyState.noEnrichmentTables.title')
                 "
+                :text="
+                  filterQuery
+                    ? t('emptyState.filtered.description', {
+                        noun: t('emptyState.nouns.enrichmentTables'),
+                      })
+                    : t('emptyState.noEnrichmentTables.description')
+                "
+                :action-label="filterQuery ? undefined : t('emptyState.noEnrichmentTables.action')"
+                @action="filterQuery ? (filterQuery = '') : showAddUpdateFn(null)"
               />
             </template>
             <template #cell-type="{ row }">
@@ -158,9 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ t("function.urlJobsCompleted", { count: row.urlJobs.length })
                             }}<br />
                             <br />
-                            <em style="font-size: 0.85em">{{
-                              t("function.clickUrlToSeeDetails")
-                            }}</em>
+                            <em class="text-xs">{{ t("function.clickUrlToSeeDetails") }}</em>
                           </div>
                         </template>
                       </OTooltip>
@@ -175,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ><br />
                             {{ t("function.jobsCurrentlyProcessing") }}<br />
                             <br />
-                            <em style="font-size: 0.85em"
+                            <em class="text-xs"
                               >{{ t("function.progressNotRealTimeNote") }}<br />{{
                                 t("function.clickUrlForDetails")
                               }}</em
@@ -214,9 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ><br />
                             {{ t("function.jobsWaitingToBeProcessed") }}<br />
                             <br />
-                            <em style="font-size: 0.85em">{{
-                              t("function.clickUrlForDetails")
-                            }}</em>
+                            <em class="text-xs">{{ t("function.clickUrlForDetails") }}</em>
                           </div>
                         </template>
                       </OTooltip>
@@ -231,13 +230,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="
                     !row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'
                   "
+                  icon-only
                   :data-test="`${row.name}-explore-btn`"
                   :title="t('logStream.explore')"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="max-md:hidden"
                   @click="exploreEnrichmentTable(row)"
-                  icon-left="search"
+                  icon="search"
                   data-row-action="view"
                 />
 
@@ -246,13 +246,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="
                     !row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'
                   "
+                  icon-only
                   :data-test="`${row.name}-schema-btn`"
                   :title="t('logStream.schemaHeader')"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="max-md:hidden"
                   @click="listSchema(row)"
-                  icon-left="format-list-bulleted"
+                  icon="format-list-bulleted"
                   data-row-action="view"
                 />
 
@@ -264,34 +265,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     row.aggregateStatus === 'completed' ||
                     row.aggregateStatus === 'failed'
                   "
+                  icon-only
                   :data-test="`${row.name}-edit-btn`"
                   :title="t('function.enrichmentTables')"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="max-md:hidden"
                   @click="showAddUpdateFn(row)"
-                  icon-left="edit"
+                  icon="edit"
                   data-row-action="edit"
                 />
 
                 <!-- Delete button - always visible -->
                 <OButton
+                  icon-only
                   :data-test="`${row.name}-delete-btn`"
                   :title="t('function.delete')"
-                  variant="ghost-destructive"
-                  size="icon-xs-sq"
+                  variant="danger-ghost"
+                  size="sm"
                   class="max-md:hidden"
                   @click="showDeleteDialogFn(row)"
-                  icon-left="delete"
+                  icon="delete"
                   data-row-action="delete"
                 />
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
+                      icon-only
                       :aria-label="t('common.moreActions')"
-                      icon-left="more-vert"
+                      icon="more-vert"
                       variant="ghost"
-                      size="icon-xs-sq"
+                      size="sm"
                       class="md:hidden"
                       data-test="enrichment-table-row-more-actions"
                       @click.stop
@@ -303,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       row.urlJobs.length === 0 ||
                       row.aggregateStatus === 'completed'
                     "
-                    icon-left="search"
+                    icon="search"
                     class="md:hidden"
                     :data-test="`${row.name}-explore-btn-menu`"
                     @select="exploreEnrichmentTable(row)"
@@ -316,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       row.urlJobs.length === 0 ||
                       row.aggregateStatus === 'completed'
                     "
-                    icon-left="format-list-bulleted"
+                    icon="format-list-bulleted"
                     class="md:hidden"
                     :data-test="`${row.name}-schema-btn-menu`"
                     @select="listSchema(row)"
@@ -330,7 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       row.aggregateStatus === 'completed' ||
                       row.aggregateStatus === 'failed'
                     "
-                    icon-left="edit"
+                    icon="edit"
                     class="md:hidden"
                     :data-test="`${row.name}-edit-btn-menu`"
                     @select="showAddUpdateFn(row)"
@@ -338,8 +342,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("function.enrichmentTables") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="delete"
-                    variant="destructive"
+                    icon="delete"
+                    tone="danger"
                     class="md:hidden"
                     :data-test="`${row.name}-delete-btn-menu`"
                     @select="showDeleteDialogFn(row)"
@@ -368,9 +372,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #selection-actions>
               <OButton
                 data-test="enrichment-tables-bulk-delete-btn"
-                variant="outline-destructive"
-                size="sm"
-                icon-left="delete"
+                variant="danger-ghost"
+                icon="delete"
                 :loading="bulkDeleteLoading"
                 @click="openBulkDeleteDialog"
               >
@@ -394,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('function.deleteEnrichmentTableTitle')"
       message-keypath="function.deleteEnrichmentTableConfirm"
       :message-name="selectedDelete?.name"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="deleteLookupTable"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
@@ -404,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :message="
         t('functions.confirmDeleteEnrichmentTables', { count: selectedEnrichmentTables.length })
       "
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="bulkDeleteEnrichmentTables"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -419,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="enrichment-table-list-url-jobs-drawer"
       bleed
       v-model:open="showUrlJobsDialogState"
-      size="lg"
+      size="md"
     >
       <div class="p-4">
         <div class="mb-4 flex items-center justify-between">
@@ -436,7 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center gap-2 p-4"
             >
               <div class="flex min-w-0 flex-1 flex-col">
-                <span class="text-sm font-bold"
+                <span class="text-sm font-semibold"
                   >{{ t("function.jobLabelPrefix") }} {{ (index as number) + 1 }}</span
                 >
                 <span class="text-muted-foreground block text-xs">{{ job.url }}</span>
@@ -472,9 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </li>
           </ul>
         </div>
-        <div v-else class="text-text-muted p-3 text-center">
-          {{ t("function.noUrlJobsFound") }}
-        </div>
+        <OEmptyState v-else size="compact" :title="t('function.noUrlJobsFound')" />
       </div>
     </ODrawer>
   </div>
@@ -487,7 +488,7 @@ import { enrichmentTableStatusesQuery } from "@/services/jstransform.queries";
 import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useListViewState } from "@/composables/useListViewState";
+import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
@@ -561,14 +562,18 @@ export default defineComponent({
     const showEnrichmentSchema = ref<boolean>(false);
     const showUrlJobsDialogState = ref<boolean>(false);
     const selectedTableForUrlJobs = ref<any>(null);
-    const viewState = useListViewState("enrichmentTables", {
-      filterQuery: "",
-      filter: "all",
-      pageSize: 20,
-      currentPage: 1,
-      sortBy: "",
-      sortOrder: "asc" as "asc" | "desc",
-    });
+    const viewState = useListViewState(
+      "enrichmentTables",
+      {
+        filterQuery: "",
+        filter: "all",
+        pageSize: 20,
+        currentPage: 1,
+        sortBy: "",
+        sortOrder: "asc" as "asc" | "desc",
+      },
+      { url: { ...LIST_URL_PARAMS, filter: "filter" } },
+    );
     const filterQuery = ref(viewState.filterQuery);
     const loading = ref(false);
     // Request in flight with rows still on screen — the refresh button's

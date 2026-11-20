@@ -19,9 +19,6 @@ import {
   LIMIT_OVER_PERCENT,
   SIGNAL_VARIANT,
   elapsedParts,
-  firingTotal,
-  hasKnownSince,
-  levelCount,
   limitBarVariant,
   limitStatus,
   mergeTopStreams,
@@ -33,7 +30,6 @@ import {
   signalTotalMb,
   topStreamShares,
 } from "./overviewFormat";
-import { buildOverview } from "./overviewFixtures";
 import type { OverviewStreamTypeSummary } from "@/ts/interfaces/overview";
 
 const summary = (stream_type: string, top: Array<[string, number]>): OverviewStreamTypeSummary => ({
@@ -78,9 +74,9 @@ describe("limit helpers", () => {
   });
 
   it("picks the bar colour from the same thresholds", () => {
-    expect(limitBarVariant(10)).toBe("default");
-    expect(limitBarVariant(75)).toBe("warning");
-    expect(limitBarVariant(100)).toBe("danger");
+    expect(limitBarVariant(10)).toBe("accent");
+    expect(limitBarVariant(75)).toBe("warn");
+    expect(limitBarVariant(100)).toBe("err");
   });
 
   it("clamps the bar fraction", () => {
@@ -228,26 +224,5 @@ describe("elapsedParts", () => {
 
   it("never goes negative", () => {
     expect(elapsedParts(-120_000)).toEqual({ days: 0, hours: 0, minutes: 0 });
-  });
-});
-
-describe("firing totals", () => {
-  const alerts = buildOverview().alerts.data!;
-
-  it("reads the per-level counts", () => {
-    expect(levelCount(alerts, "critical")).toBe(2);
-    expect(levelCount(undefined, "critical")).toBe(0);
-  });
-
-  it("totals every firing level, or falls back to the state counts without levels", () => {
-    expect(firingTotal(alerts)).toBe(3);
-    const noLevels = { ...alerts, firing_by_level: undefined } as never;
-    expect(firingTotal(noLevels)).toBe(3);
-  });
-
-  it("treats a zero or negative since as unknown", () => {
-    expect(hasKnownSince(0)).toBe(false);
-    expect(hasKnownSince(-5)).toBe(false);
-    expect(hasKnownSince(1_699_996_400_000_000)).toBe(true);
   });
 });

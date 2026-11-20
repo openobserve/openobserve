@@ -143,7 +143,7 @@ test.describe("PromQL Table Chart - Column Order Feature", () => {
 
     // Verify button has correct label
     const buttonText = await columnOrderButton.textContent();
-    expect(buttonText).toContain('Configure Column Order');
+    expect(buttonText).toContain('Configure column order');
     testLogger.info('Column Order button has correct label');
   });
 

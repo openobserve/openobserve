@@ -1,29 +1,55 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+
 import type { OCardProps, OCardSlots } from "./OCard.types";
 
-const props = withDefaults(defineProps<OCardProps>(), { variant: "panel" });
-defineSlots<OCardSlots>();
+const props = withDefaults(defineProps<OCardProps>(), { flush: false, loading: false });
+const slots = defineSlots<OCardSlots>();
 
-const variantClasses: Record<NonNullable<OCardProps["variant"]>, string> = {
-  // The filled panel keeps the 4px tier it shipped with, so no existing screen
-  // shifts under it.
-  panel: "bg-card-bg rounded-default",
-  // A standalone surface takes the 12px tier.
-  outlined: "card-container rounded-surface bg-surface-base border-border-default border",
-  // Tiled section panes inside a dense detail page — the chrome the incident
-  // detail page draws its panels with. Stays on the 4px tier on purpose: at
-  // 12px a column of six of these reads as six separate cards floating apart
-  // rather than one page divided into panes.
-  glass: "rounded-default bg-card-glass-bg border-card-glass-border overflow-hidden border",
-};
-
-const classes = computed(() => ["text-card-text flex flex-col", variantClasses[props.variant]]);
+const hasHeader = computed(() => !!props.title || !!slots.header);
 </script>
 
 <template>
-  <div :class="classes" v-bind="$attrs">
-    <slot />
+  <div
+    class="bg-surface-base border-border-default rounded-surface text-text-body flex min-w-0 flex-col overflow-hidden border"
+    :aria-busy="loading || undefined"
+  >
+    <div
+      v-if="hasHeader"
+      class="border-border-subtle flex h-10 shrink-0 items-center gap-2 border-b ps-3 pe-1.5"
+      data-test="o-card-header"
+    >
+      <slot name="header">
+        <h3 class="text-text-heading min-w-0 truncate text-sm font-semibold">{{ title }}</h3>
+        <span v-if="meta" class="text-text-muted shrink-0 text-xs whitespace-nowrap">{{
+          meta
+        }}</span>
+      </slot>
+      <div v-if="slots.actions" class="ms-auto flex shrink-0 items-center gap-1.5">
+        <slot name="actions" />
+      </div>
+    </div>
+    <div class="text-compact min-h-0 flex-1" :class="{ 'p-3': !flush }" data-test="o-card-body">
+      <div
+        v-if="loading"
+        class="flex flex-col gap-2"
+        :class="{ 'p-3': flush }"
+        data-test="o-card-skeleton"
+      >
+        <OSkeleton class="w-2/5" />
+        <OSkeleton />
+        <OSkeleton class="w-4/5" />
+      </div>
+      <slot v-else />
+    </div>
+    <div
+      v-if="slots.footer"
+      class="border-border-subtle text-text-secondary flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2 text-xs"
+      data-test="o-card-footer"
+    >
+      <slot name="footer" />
+    </div>
   </div>
 </template>

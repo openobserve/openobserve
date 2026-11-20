@@ -19,25 +19,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       bleed
       :title="isNew ? t('announcements.editor.addTitle') : t('announcements.editor.editTitle')"
-      :subtitle="storedStatusLabel"
       :back="{
         label: t('announcements.settings.label'),
-        onClick: goBack,
+        to: listRoute,
         dataTest: 'announcement-editor-back',
       }"
-      :title-overflow="isMobile ? 'visible' : 'truncate'"
     >
+      <template v-if="storedStatus" #status>
+        <OBadge :tone="STATUS_TONES[storedStatus]" size="sm" data-test="announcement-editor-status">
+          {{ t(STATUS_LABEL_KEYS[storedStatus]) }}
+        </OBadge>
+      </template>
       <template #actions>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          data-test="announcement-editor-cancel"
-          @click="goBack"
-          >{{ t("common.cancel") }}</OButton
-        >
+        <OButton variant="secondary" data-test="announcement-editor-cancel" @click="goBack">{{
+          t("common.cancel")
+        }}</OButton>
         <OButton
           variant="primary"
-          size="sm-action"
           type="submit"
           :form="FORM_ID"
           :loading="isPending"
@@ -55,25 +53,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         separator-class="field-list-separator"
       >
         <template #before>
-          <div class="flex h-full min-h-0 flex-col gap-4 overflow-y-auto px-6 py-5 max-md:px-4">
-            <OBanner
-              v-if="saveError"
-              variant="error-soft"
-              icon="error"
-              inline-actions
-              data-test="announcement-editor-error"
-            >
+          <div class="flex h-full min-h-0 flex-col gap-6 overflow-y-auto px-6 py-5 max-md:px-4">
+            <OInlineNotice v-if="saveError" tone="err" data-test="announcement-editor-error">
               {{ saveError }}
               <template v-if="conflict" #actions>
                 <OButton
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
                   data-test="announcement-editor-reload"
                   @click="reload"
                   >{{ t("announcements.editor.reload") }}</OButton
                 >
               </template>
-            </OBanner>
+            </OInlineNotice>
 
             <OFormSection variant="plain" :title="t('announcements.editor.sections.message')">
               <div class="flex flex-col gap-4">
@@ -85,20 +76,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-for="action in formatActions"
                       :key="action.format"
+                      icon-only
                       variant="ghost"
-                      size="icon-sm"
-                      :icon-left="action.icon"
+                      :icon="action.icon"
                       :aria-label="action.label"
                       :title="action.label"
                       :data-test="`announcement-editor-toolbar-${action.format}`"
                       @click="applyFormat(action.format)"
                     />
-                    <OPopover side="bottom" align="start" content-class="p-1.5">
+                    <OPopover size="md" side="bottom" align="start" content-class="p-1.5">
                       <template #trigger>
                         <OButton
+                          icon-only
                           variant="ghost"
-                          size="icon-sm"
-                          icon-left="add-reaction"
+                          icon="add-reaction"
                           :aria-label="t('announcements.editor.toolbar.emoji')"
                           :title="t('announcements.editor.toolbar.emoji')"
                           data-test="announcement-editor-toolbar-emoji"
@@ -111,8 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OButton
                           v-for="emoji in EMOJIS"
                           :key="emoji.name"
+                          icon-only
                           variant="ghost"
-                          size="icon-sm"
                           :aria-label="t(`announcements.editor.emoji.${emoji.name}`)"
                           :title="t(`announcements.editor.emoji.${emoji.name}`)"
                           :data-test="`announcement-editor-emoji-${emoji.name}`"
@@ -123,9 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OPopover>
                   </div>
                   <div ref="messageFieldRef">
-                    <OFormInput
+                    <OFormTextarea
                       name="message"
-                      type="textarea"
                       :rows="3"
                       :label="t('announcements.form.message')"
                       :placeholder="t('announcements.form.messagePlaceholder')"
@@ -176,9 +166,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`announcement-editor-link-${position}-url`"
                     />
                     <OButton
-                      variant="ghost-destructive"
-                      size="icon-sm"
-                      icon-left="delete"
+                      icon-only
+                      variant="danger-ghost"
+                      icon="delete"
                       class="max-md:col-start-2 max-md:row-start-1"
                       :aria-label="t('announcements.form.removeLink')"
                       :title="t('announcements.form.removeLink')"
@@ -188,9 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <OButton
                     v-if="values.links.length < MAX_LINKS"
-                    variant="dashed"
-                    size="sm-action"
-                    icon-left="add"
+                    variant="ghost"
                     class="self-start"
                     data-test="announcement-editor-add-link"
                     @click="addLink"
@@ -213,11 +201,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="(option, position) in styleOptions"
                     :key="option.value"
                     :ref="(el) => styleRadio.setOption(position, el)"
-                    variant="outline"
-                    size="sm"
+                    variant="secondary"
                     role="radio"
-                    :icon-left="option.icon"
-                    :active="styleChoice === option.value"
+                    :icon="option.icon"
+                    :pressed="styleChoice === option.value"
                     :aria-checked="styleChoice === option.value"
                     :tabindex="styleRadio.tabStop(option.value)"
                     :data-test="`announcement-editor-style-${option.testId}`"
@@ -236,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSwitch
                     :model-value="values.variant === 'critical'"
                     :label="t('announcements.styles.critical')"
-                    label-position="left"
+                    label-position="start"
                     off-tone="neutral"
                     state-text
                     class="w-full justify-between"
@@ -262,7 +249,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="option in textSizeOptions"
                       :key="option.value"
                       :value="option.value"
-                      size="sm"
                       :data-test="`announcement-editor-text-size-${option.value}`"
                     >
                       {{ option.label }}
@@ -283,12 +269,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         v-for="(icon, position) in BANNER_ICONS"
                         :key="icon"
+                        icon-only
                         :ref="(el) => iconRadio.setOption(position, el)"
-                        variant="outline"
-                        size="icon-sm"
+                        variant="secondary"
                         role="radio"
-                        :icon-left="icon"
-                        :active="shownIcon === icon"
+                        :icon="icon"
+                        :pressed="shownIcon === icon"
                         :aria-checked="shownIcon === icon"
                         :tabindex="iconRadio.tabStop(icon)"
                         :aria-label="iconLabel(icon)"
@@ -332,9 +318,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <OButton
-                    variant="outline"
-                    size="sm"
-                    icon-left="bookmark-add"
+                    variant="secondary"
+                    icon="bookmark-add"
                     class="self-start"
                     data-test="announcement-editor-save-style"
                     @click="openSaveStyle"
@@ -344,9 +329,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <OButton
                   v-if="selectedStyle"
-                  variant="ghost-destructive"
-                  size="sm"
-                  icon-left="delete"
+                  variant="danger-ghost"
+                  icon="delete"
                   class="self-start"
                   data-test="announcement-editor-delete-style"
                   @click="openDeleteStyle"
@@ -387,7 +371,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="option in startOptions"
                       :key="option.value"
                       :value="option.value"
-                      size="sm"
                       :data-test="`announcement-editor-start-${option.value}`"
                     >
                       {{ option.label }}
@@ -397,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="values.start === 'at'"
                     name="startsAt"
                     type="datetime-local"
-                    width="md"
+                    width="m"
                     :aria-label="t('announcements.form.starts')"
                     data-test="announcement-editor-starts-at"
                   />
@@ -411,7 +394,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="option in endOptions"
                       :key="option.value"
                       :value="option.value"
-                      size="sm"
                       :data-test="`announcement-editor-end-${option.value}`"
                     >
                       {{ option.label }}
@@ -421,16 +403,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-for="span in DURATION_PICKS"
                       :key="span.value"
-                      variant="outline"
-                      size="sm"
-                      :active="values.duration === span.value"
+                      variant="secondary"
+                      :pressed="values.duration === span.value"
                       :data-test="`announcement-editor-duration-${span.value}`"
                       @click="form.setFieldValue('duration', span.value)"
                       >{{ span.label }}</OButton
                     >
                     <OFormInput
                       name="duration"
-                      width="xs"
+                      width="s"
                       :placeholder="t('announcements.form.durationPlaceholder')"
                       :aria-label="t('announcements.form.durationCustom')"
                       data-test="announcement-editor-duration"
@@ -440,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="values.end === 'at'"
                     name="endsAt"
                     type="datetime-local"
-                    width="md"
+                    width="m"
                     :aria-label="t('announcements.form.ends')"
                     data-test="announcement-editor-ends-at"
                   />
@@ -456,7 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormSwitch
                     name="dismissible"
                     :label="t('announcements.form.dismissible')"
-                    label-position="left"
+                    label-position="start"
                     off-tone="neutral"
                     state-text
                     class="w-full justify-between"
@@ -466,7 +447,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!isNew && values.dismissible"
                     v-model="resetDismissals"
                     :label="t('announcements.editor.resetDismissals')"
-                    label-position="left"
+                    label-position="start"
                     off-tone="neutral"
                     state-text
                     class="w-full justify-between"
@@ -495,11 +476,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="saveStyleOpen"
     size="sm"
     :title="t('announcements.styles.saveTitle')"
-    :sub-title="t('announcements.styles.saveHint')"
-    :primary-button-label="t('announcements.styles.saveConfirm')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-disabled="!styleName.trim()"
-    :primary-button-loading="isPending"
+    :subtitle="t('announcements.styles.saveHint')"
+    :primary="{
+      label: t('announcements.styles.saveConfirm'),
+      disabled: !styleName.trim(),
+      loading: isPending,
+    }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="announcement-editor-save-style-dialog"
     @click:secondary="saveStyleOpen = false"
     @click:primary="saveStyle"
@@ -517,11 +500,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="deleteStyleOpen"
     size="sm"
     :title="t('announcements.styles.deleteTitle')"
-    :sub-title="t('announcements.styles.deleteHint')"
-    :primary-button-label="t('common.delete')"
-    primary-button-variant="destructive"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-loading="isPending"
+    :subtitle="t('announcements.styles.deleteHint')"
+    :primary="{ label: t('common.delete'), variant: 'danger', loading: isPending }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="announcement-editor-delete-style-dialog"
     @click:secondary="deleteStyleOpen = false"
     @click:primary="deleteStyle"
@@ -569,6 +550,8 @@ import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vu
 import EditorDraftLeaveDialog from "@/components/common/drafts/EditorDraftLeaveDialog.vue";
 import { useEditorDraft, type EditorDraftLeaveChoice } from "@/composables/useEditorDraft";
 import useBreakpoint from "@/composables/useBreakpoint";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
@@ -576,13 +559,14 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OFormColor from "@/lib/forms/Color/OFormColor.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import analytics from "@/services/product_analytics";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OOptionGroup from "@/lib/forms/OptionGroup/OOptionGroup.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
@@ -829,9 +813,13 @@ const STATUS_LABEL_KEYS = {
   ended: "announcements.editor.statusEnded",
 } as const;
 
-const storedStatusLabel = computed(() =>
-  isNew.value ? undefined : t(STATUS_LABEL_KEYS[bannerStatus(props.draft)]),
-);
+const STATUS_TONES: Record<keyof typeof STATUS_LABEL_KEYS, ChipTone> = {
+  live: "ok",
+  scheduled: "accent",
+  ended: "neutral",
+};
+
+const storedStatus = computed(() => (isNew.value ? undefined : bannerStatus(props.draft)));
 
 const pendingStatus = computed(() => bannerStatus(draftFromValues(values.value)));
 
@@ -1274,11 +1262,13 @@ const reload = () => {
   emit("reload");
 };
 
+const listRoute = computed(() => ({
+  name: "announcementBanners",
+  query: { org_identifier: store.state.selectedOrganization?.identifier },
+}));
+
 const goBack = () => {
-  void router.push({
-    name: "announcementBanners",
-    query: { org_identifier: store.state.selectedOrganization?.identifier },
-  });
+  void router.push(listRoute.value);
 };
 
 // Exposed so a test can drive the real submit and the toolbar without a browser selection.

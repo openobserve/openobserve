@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard variant="glass" data-test="incident-overview-timeline">
-    <OCardSection role="header" dense class="justify-between gap-3">
-      <h2 class="text-text-heading text-sm font-semibold">
+  <OCard data-test="incident-overview-timeline">
+    <template #header>
+      <h3 class="text-text-heading min-w-0 truncate text-sm font-semibold">
         {{ t("alerts.incidents.overview.timeline") }}
-      </h2>
-      <span class="flex min-w-0 items-center gap-2 text-xs">
+      </h3>
+      <span class="ms-auto flex min-w-0 items-center gap-2 text-xs">
         <span class="text-text-secondary shrink-0">{{ t("alerts.incidents.incidentId") }}</span>
         <OTruncatedText
           class="text-text-body font-mono"
@@ -29,17 +29,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ incident.id }}</OTruncatedText
         >
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs-sq"
-          icon-left="content-copy"
+          size="sm"
+          icon="content-copy"
           :aria-label="t('alerts.incidents.overview.copyId')"
           data-test="incident-overview-copy-id"
           @click="copyToClipboard(incident.id, t)"
           ><OTooltip :content="t('alerts.incidents.overview.copyId')"
         /></OButton>
       </span>
-    </OCardSection>
-    <OCardSection role="body" dense class="flex flex-col gap-4">
+    </template>
+    <div class="flex flex-col gap-4">
       <ol class="relative grid gap-x-6" :class="steps.length === 3 ? 'grid-cols-3' : 'grid-cols-2'">
         <span
           class="border-border-default absolute inset-x-0 top-1.25 border-t"
@@ -65,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </dd>
         </div>
       </dl>
-    </OCardSection>
+    </div>
   </OCard>
 </template>
 
@@ -73,7 +74,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";

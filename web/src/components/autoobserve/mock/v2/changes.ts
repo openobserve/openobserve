@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nKey } from "@/types/i18n";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import {
   AUTONOMY,
@@ -95,33 +95,31 @@ export const FILTER_DOT: Record<ChangeFilter, string | undefined> = {
   tuning: KIND_LOOK.tuning.accent,
 };
 
-export const STATE_LOOK: Record<
-  ChangeState,
-  { variant: BadgeVariant; key: I18nKey; icon?: IconName }
-> = {
-  applying: {
-    variant: "primary-soft",
-    key: "autoobserve2.activityPage.status.applying",
-    icon: "schedule",
-  },
-  worked: {
-    variant: "success-soft",
-    key: "autoobserve2.activityPage.status.worked",
-    icon: "check",
-  },
-  done: { variant: "blue-soft", key: "autoobserve2.activityPage.status.done", icon: "check" },
-  review: {
-    variant: "indigo-soft",
-    key: "autoobserve2.activityPage.status.review",
-    icon: "schedule",
-  },
-  didntHelp: {
-    variant: "orange-soft",
-    key: "autoobserve2.activityPage.status.didntHelp",
-    icon: "warning",
-  },
-  undone: { variant: "purple-soft", key: "autoobserve2.activityPage.status.undone", icon: "undo" },
-};
+export const STATE_LOOK: Record<ChangeState, { variant: ChipTone; key: I18nKey; icon?: IconName }> =
+  {
+    applying: {
+      variant: "accent",
+      key: "autoobserve2.activityPage.status.applying",
+      icon: "schedule",
+    },
+    worked: {
+      variant: "ok",
+      key: "autoobserve2.activityPage.status.worked",
+      icon: "check",
+    },
+    done: { variant: "neutral", key: "autoobserve2.activityPage.status.done", icon: "check" },
+    review: {
+      variant: "neutral",
+      key: "autoobserve2.activityPage.status.review",
+      icon: "schedule",
+    },
+    didntHelp: {
+      variant: "warn",
+      key: "autoobserve2.activityPage.status.didntHelp",
+      icon: "warning",
+    },
+    undone: { variant: "neutral", key: "autoobserve2.activityPage.status.undone", icon: "undo" },
+  };
 
 // Read on use, since the sample ledger loads after this module; every entry comes from it.
 const factOf = (id: string): LedgerFact => LEDGER.find((f) => f.id === id) as LedgerFact;

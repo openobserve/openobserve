@@ -32,9 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The nav's heading names the source, so Back needs no breadcrumb beside it. -->
           <div class="flex min-w-0 max-md:order-first max-md:px-4 max-md:pt-4">
             <OButton
-              variant="ghost-muted"
-              size="sm"
-              icon-left="arrow-back"
+              variant="ghost"
+              icon="arrow-back"
               class="-ms-2"
               data-test="onboarding-step-guide-back"
               @click="emit('back')"
@@ -78,9 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Two equal halves, so both actions stay on one line in the narrow rail. -->
                 <div class="mt-2 grid grid-cols-2 gap-2">
                   <OButton
-                    variant="outline"
-                    size="sm"
-                    icon-left="content-copy"
+                    variant="secondary"
+                    icon="content-copy"
                     class="w-full"
                     data-test="onboarding-step-guide-agent-copy"
                     @click="copyPrompt"
@@ -88,9 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("onboarding.guide.copyPrompt") }}
                   </OButton>
                   <OButton
-                    variant="outline"
-                    size="sm"
-                    icon-left="download"
+                    variant="secondary"
+                    icon="download"
                     class="w-full"
                     data-test="onboarding-step-guide-agent-download"
                     @click="downloadSetup"
@@ -118,8 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("onboarding.guide.inviteText") }}
                 </p>
                 <OButton
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
                   class="mt-2"
                   data-test="onboarding-step-guide-invite"
                   @click="emit('invite')"
@@ -152,8 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="selectedTokenName"
             :options="tokenOptions"
             :label="t('ingestion.mcp.auth.token')"
-            label-position="inside"
-            size="sm"
+            variant="filter"
             data-test="onboarding-step-guide-token"
           />
         </div>
@@ -186,13 +181,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </p>
               <OButton
-                as="a"
                 :href="`https://opentelemetry.io/docs/languages/${guide.otelDocs.slug}/getting-started/`"
                 target="_blank"
                 rel="noopener noreferrer"
-                variant="ghost-primary"
-                size="sm"
-                icon-right="open-in-new"
+                variant="accent-ghost"
+                icon-end="open-in-new"
                 class="-ms-3 mt-1"
                 data-test="onboarding-step-guide-language-docs"
               >

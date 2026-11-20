@@ -9,7 +9,14 @@ import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OTableExpandButton from "./OTableExpandButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
+import {
+  ROW_STATE_FILL_CLASS,
+  ROW_STATE_RAIL_CLASS,
+  TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH,
+  TABLE_EXPAND_COL_SIZE,
+  TABLE_EXPAND_COL_STYLE,
+  type OTableRowState,
+} from "../OTable.types";
 
 const props = defineProps<{
   row: Row<any>;
@@ -29,11 +36,11 @@ const props = defineProps<{
   shouldHighlightColumn?: (columnId: string) => boolean;
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
   wrap?: boolean;
-  dense?: boolean;
-  compact?: boolean;
-  bordered?: boolean;
   striped?: boolean;
   rowClassFn?: string | ((row: any) => string);
+  rowStateFn?: (row: any) => OTableRowState | null;
+  /** The page draws its own rail, so a row state adds only its fill. */
+  hasOwnRail?: boolean;
   isActive?: boolean;
   rowStyleFn?: (row: any) => Record<string, any>;
   /** Virtual scroll: callback for measuring row DOM element height */
@@ -143,6 +150,16 @@ const isStriped = computed(() => {
   return props.striped && props.row.index % 2 === 1;
 });
 
+const rowState = computed(() => props.rowStateFn?.(props.row.original) ?? null);
+// Selection and the active row paint over the state's fill; the rail stays (C3).
+const rowStateClass = computed(() => {
+  const state = rowState.value;
+  if (!state) return "";
+  const rail = props.hasOwnRail ? "" : (ROW_STATE_RAIL_CLASS[state] ?? "");
+  const fill = props.isRowSelected || props.isActive ? "" : ROW_STATE_FILL_CLASS[state];
+  return [rail, fill].filter(Boolean).join(" ");
+});
+
 // A row with no detected level gets "transparent", which paints no spine.
 const hasVisibleSpine = computed(
   () => !!props.statusBarColor && props.statusBarColor !== "transparent",
@@ -172,10 +189,10 @@ const showTreeWarning = computed(
  * Used to align the warning row's content + connector line under the chevron.
  */
 const treeConnectorX = computed(() => {
-  const expansionWidth = props.expansionEnabled ? 32 : 0; // w-8
+  const expansionWidth = props.expansionEnabled ? TABLE_EXPAND_COL_SIZE : 0;
   const selectionWidth = props.selectionEnabled ? TABLE_CHECKBOX_COL_WIDTH : 0;
   const dragWidth = props.enableRowReorder ? 16 : 0; // w-4
-  const cellPaddingLeft = 8; // px-2
+  const cellPaddingLeft = 12; // px-3
   const halfChevron = 9; // 18px / 2
   const parentDepth = treeMeta.value?.depth ?? 0;
   return (
@@ -246,8 +263,10 @@ function onRowMouseleave() {
       (isRowSelected || isActive) && !hasVisibleSpine ? 'o2-table-row-selected-bar' : '',
       !isRowSelected && !isActive && isStriped ? 'bg-table-row-striped-bg' : '',
       statusBarColor ? 'o2-table-row-with-status' : '',
+      rowStateClass,
       rowClass,
     ]"
+    :data-row-state="rowState ?? undefined"
     :style="{
       height: 'var(--table-row-height, 2.25rem)',
       ...(statusBarColor ? { '--row-status-color': statusBarColor } : {}),
@@ -263,10 +282,8 @@ function onRowMouseleave() {
     <!-- Expand button cell -->
     <td
       v-if="expansionEnabled"
-      :class="[
-        'w-6 max-w-6 min-w-6 px-0 text-center align-middle',
-        bordered ? 'border-table-row-divider border-b' : '',
-      ]"
+      class="border-table-row-divider border-b pe-0 text-left align-middle"
+      :style="TABLE_EXPAND_COL_STYLE"
       data-test="o2-table-expand-cell"
     >
       <OTableExpandButton
@@ -281,8 +298,7 @@ function onRowMouseleave() {
     <td
       v-if="selectionEnabled"
       :class="[
-        'text-left align-middle',
-        bordered ? 'border-table-row-divider border-b' : '',
+        'border-table-row-divider border-b text-left align-middle',
         isRowSelectable && !isRowSelectable(row.original) ? 'cursor-not-allowed' : 'cursor-pointer',
       ]"
       :style="{
@@ -308,10 +324,7 @@ function onRowMouseleave() {
     <!-- Drag handle cell -->
     <td
       v-if="enableRowReorder"
-      :class="[
-        'w-4 min-w-4 px-0 text-center align-middle',
-        bordered ? 'border-table-row-divider border-b' : '',
-      ]"
+      :class="['border-table-row-divider w-4 min-w-4 border-b px-0 text-center align-middle']"
       class="o2-table-drag-handle"
       data-test="o2-table-row-drag-handle"
     >
@@ -337,9 +350,6 @@ function onRowMouseleave() {
       :should-highlight="shouldHighlightColumn?.(cell.column.id) ?? false"
       :get-highlighted-html="getHighlightedHtml"
       :wrap="wrap"
-      :dense="dense"
-      :compact="compact"
-      :bordered="bordered"
       :enable-cell-copy="enableCellCopy"
       :get-cell-style="getCellStyle"
       :pivot-merge="getPivotMerge ? getPivotMerge(row.original, cell.column.id) : null"
@@ -379,10 +389,7 @@ function onRowMouseleave() {
         (selectionEnabled ? 1 : 0) +
         (enableRowReorder ? 1 : 0)
       "
-      :class="[
-        'o2-table-tree-warning-cell relative',
-        bordered ? 'border-table-row-divider border-b' : '',
-      ]"
+      :class="['o2-table-tree-warning-cell border-table-row-divider relative border-b']"
       :style="{ '--tree-connector-x': treeConnectorX + 'px' }"
     >
       <div class="relative z-1 flex items-center justify-center">
@@ -406,7 +413,7 @@ function onRowMouseleave() {
         (selectionEnabled ? 1 : 0) +
         (enableRowReorder ? 1 : 0)
       "
-      :class="bordered ? 'border-table-row-divider border-b' : ''"
+      class="border-table-row-divider border-b"
     >
       <slot name="expansion" :row="row.original" />
     </td>

@@ -38,10 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCard
       v-for="metric in result.metrics"
       :key="metric.key"
-      class="rounded-surface! border-border-default bg-surface-panel border"
       :data-test="`version-delta-strip-cell-${metric.key}`"
     >
-      <OCardSection role="body" class="flex flex-col gap-1 p-3!">
+      <div class="flex flex-col gap-1">
         <span class="text-text-secondary text-xs">{{ metricLabel(metric.key) }}</span>
 
         <span
@@ -78,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("aiObservability.deltaStrip.insufficientLabel") }}
           </span>
         </span>
-      </OCardSection>
+      </div>
     </OCard>
   </div>
 </template>
@@ -87,7 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import type {
   CompareResult,
   MetricKey,

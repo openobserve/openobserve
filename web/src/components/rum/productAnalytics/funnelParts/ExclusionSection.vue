@@ -33,9 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }}</span>
       <OTag
         :label="chipLabel(x)"
-        variant="primary-outline"
-        size="sm"
-        clickable
+        toggle
         removable
         class="max-w-full min-w-0"
         :remove-label="t('rum.analytics.funnel.removeExclusion')"
@@ -43,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="edit(j)"
         @remove="remove(j)"
       >
-        <OTag :label="kindLabel(x.step)" :variant="kindVariant(x.step)" size="xs" />
+        <OTag :label="kindLabel(x.step)" :tone="kindVariant(x.step)" size="sm" />
         <OTruncatedText as="span" class="min-w-0">{{ chipLabel(x) }}</OTruncatedText>
       </OTag>
       <span
@@ -60,20 +58,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
     <template #action>
       <OPopover
+        size="lg"
         :open="open"
         :side="stacked ? 'right' : 'bottom'"
         align="start"
-        content-class="p-3 w-96 max-w-[calc(100vw-1.5rem)]"
+        content-class="p-3"
         @update:open="setOpen"
       >
         <template #trigger>
           <span>
             <OButton
               v-if="stacked"
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="add"
-              :active="open"
+              icon="add"
+              :pressed="open"
               :disabled="!!blocked"
               :aria-label="t('rum.analytics.funnel.addExclusionStep')"
               data-test="rum-analytics-funnel-add-exclusion-btn"
@@ -85,10 +84,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <template v-else>
               <OButton
-                variant="ghost-primary"
-                size="sm"
-                icon-left="add"
-                :active="open"
+                variant="accent-ghost"
+                icon="add"
+                :pressed="open"
                 :disabled="!!blocked"
                 data-test="rum-analytics-funnel-add-exclusion-btn"
                 @click="editing = null"

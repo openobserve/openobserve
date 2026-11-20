@@ -84,7 +84,7 @@ export class OnCallTeamDetailPage {
       timeline: '[data-test="oncall-schedule-timeline"]',
       timelineChart: '[data-test="oncall-timeline-chart"]',
       timelineEmpty: '[data-test="oncall-timeline-empty"]',
-      timelineEmptyTemplate: '[data-test="oncall-timeline-empty"] [data-test="o2-empty-state-action-presets"]',
+      timelineEmptyTemplate: '[data-test="oncall-timeline-empty"] [data-test="o2-empty-state-action"]',
       timelineAdd: '[data-test="oncall-timeline-add"]',
       // Add rotation is a menu: a template or from scratch, with or without rotations.
       timelineAddScratch: '[data-test="oncall-timeline-add-scratch"]',

@@ -59,14 +59,10 @@ const { t } = useI18nTyped();
       :class="summary.isSecurity ? 'text-icon-chip-primary-text' : 'text-text-secondary'"
     />
     <span class="text-text-heading font-semibold">{{ summary.label }}</span>
-    <OTag
-      v-if="summary.product"
-      variant="default-soft"
-      size="xs"
-      data-test="security-events-product"
-      >{{ t("siem.events.product", { name: summary.product }) }}</OTag
-    >
-    <OTag variant="primary-soft" size="xs">
+    <OTag v-if="summary.product" tone="neutral" size="sm" data-test="security-events-product">{{
+      t("siem.events.product", { name: summary.product })
+    }}</OTag>
+    <OTag tone="accent" size="sm">
       {{ t("siem.events.confidence", { n: summary.confidence }) }}
       <OTooltip
         v-if="summary.missing"
@@ -75,16 +71,12 @@ const { t } = useI18nTyped();
     </OTag>
     <OTag
       v-if="summary.category"
-      variant="default-soft"
-      size="xs"
+      tone="neutral"
+      size="sm"
       data-test="security-events-ocsf-category"
       >{{ t("siem.events.ocsfCategory", { name: summary.category }) }}</OTag
     >
-    <OTag
-      v-if="summary.className"
-      variant="default-soft"
-      size="xs"
-      data-test="security-events-ocsf-class"
+    <OTag v-if="summary.className" tone="neutral" size="sm" data-test="security-events-ocsf-class"
       >{{ t("siem.events.ocsfClass", { name: summary.className, uid: summary.classUid })
       }}<OTooltip
         v-if="summary.classMix"
@@ -92,23 +84,23 @@ const { t } = useI18nTyped();
     /></OTag>
     <OTag
       v-if="summary.objects.length"
-      variant="default-soft"
-      size="xs"
+      tone="neutral"
+      size="sm"
       data-test="security-events-ocsf-objects"
       >{{ t("siem.events.objects") }} · {{ summary.objects.length
       }}<OTooltip :content="raw(summary.objects.join(', '))"
     /></OTag>
     <OTag
       v-if="summary.sigma"
-      variant="purple-soft"
-      size="xs"
-      class="font-mono"
+      tone="neutral"
+      mono
+      size="sm"
       data-test="security-events-sigma-logsource"
     >
       {{ t("siem.events.rulesMatch", { logsource: summary.sigma }) }}
       <OTooltip :content="t('siem.events.rulesMatchHint')" />
     </OTag>
-    <OTag v-if="!summary.isSecurity" variant="default-soft" size="xs">
+    <OTag v-if="!summary.isSecurity" tone="neutral" size="sm">
       {{ t("siem.events.telemetryOnly") }}
     </OTag>
     <span class="text-text-secondary max-w-md truncate">
@@ -118,10 +110,10 @@ const { t } = useI18nTyped();
     <div class="flex-1" />
     <OButton
       v-if="rules.length"
-      :variant="firingCount ? 'outline-destructive' : 'outline'"
-      size="xs"
-      icon-left="shield-alert-outline"
-      :icon-right="showRules ? 'expand-less' : 'expand-more'"
+      :variant="firingCount ? 'danger-ghost' : 'secondary'"
+      size="sm"
+      icon="shield-alert-outline"
+      :icon-end="showRules ? 'expand-less' : 'expand-more'"
       data-test="security-events-rules-toggle"
       @click="showRules = !showRules"
     >
@@ -140,7 +132,7 @@ const { t } = useI18nTyped();
       <span class="font-semibold">{{
         t("siem.events.rulesFor", { source: summary.sigma || "" })
       }}</span>
-      <OSpinner v-if="counting" size="xs" />
+      <OSpinner v-if="counting" />
       <span v-else-if="error" class="text-status-error-text">{{ error }}</span>
     </div>
     <div
@@ -153,7 +145,7 @@ const { t } = useI18nTyped();
         type="severity"
         :value="severityTagValue(toneOfSigmaLevel(entry.rule.level))"
         :label="t(toneLabelKey(toneOfSigmaLevel(entry.rule.level)))"
-        size="xs"
+        size="sm"
       />
       <span class="text-text-heading truncate font-medium">
         {{ entry.rule.title }}
@@ -162,9 +154,8 @@ const { t } = useI18nTyped();
       <OTag
         v-for="tech in entry.rule.techniques.slice(0, 3)"
         :key="tech"
-        variant="purple-soft"
-        shape="rounded"
-        size="xs"
+        tone="neutral"
+        size="sm"
         >{{ tech }}</OTag
       >
       <div class="flex-1" />
@@ -183,8 +174,8 @@ const { t } = useI18nTyped();
         </OIcon>
         <OTag
           v-if="entry.count !== null"
-          :variant="entry.count > 0 ? 'error-soft' : 'default-soft'"
-          size="xs"
+          :tone="entry.count > 0 ? 'err' : 'neutral'"
+          size="sm"
           class="tabular-nums"
         >
           {{ t("siem.events.hits", { n: formatEventCount(entry.count) }, entry.count) }}
@@ -193,7 +184,7 @@ const { t } = useI18nTyped();
           v-if="entry.count"
           :data-test="`security-events-rule-view-${entry.rule.id}`"
           variant="ghost"
-          size="xs"
+          size="sm"
           @click="emit('filter-by-rule', entry.compiled.where)"
         >
           {{ t("siem.events.viewHits") }}
@@ -201,8 +192,8 @@ const { t } = useI18nTyped();
         <OButton
           v-if="canCreate"
           :data-test="`security-events-rule-create-${entry.rule.id}`"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           @click="emit('create-detection', entry.rule.key)"
         >
           {{ t("siem.events.createDetection") }}

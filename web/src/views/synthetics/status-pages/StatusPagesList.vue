@@ -25,42 +25,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size="20"
       :page-size-options="[20, 50, 100]"
       row-key="id"
-      :show-global-filter="false"
       :persist-columns="true"
       table-id="status-pages-table"
       :enable-column-resize="true"
       :column-visibility="defaultColumnVisibility"
       data-test="status-pages-table"
       :horizontal-scroll="true"
-      show-index
       @row-click="(row: any) => emit('edit', row)"
     >
       <template #toolbar>
         <div class="flex min-w-0 flex-1 items-center gap-2">
-          <OInput
+          <OSearchInput
             v-model="search"
             class="w-full min-w-0"
             :placeholder="t('statusPages.searchPlaceholder')"
             data-test="status-pages-search-input"
           >
-            <template #icon-left>
-              <OIcon name="search" size="sm" />
-            </template>
-          </OInput>
+          </OSearchInput>
         </div>
       </template>
 
       <template #toolbar-trailing>
-        <OButton
-          variant="outline"
-          size="icon-toolbar"
-          icon-left="refresh"
+        <ORefreshButton
+          :last-run-at="lastRunAt"
           :loading="loading"
           data-test="status-pages-refresh-btn"
           @click="emit('refresh')"
-        >
-          <OTooltip side="bottom" :content="t('common.refresh')" />
-        </OButton>
+        />
       </template>
 
       <!-- Name -->
@@ -80,14 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Health -->
       <template #cell-health="{ row }">
-        <OBadge :variant="healthBadge((row as any).health).variant" :dot="true" size="sm">
+        <OBadge :tone="healthBadge((row as any).health).variant" :dot="true" size="sm">
           {{ t(healthBadge((row as any).health).labelKey) }}
         </OBadge>
       </template>
 
       <!-- Visibility -->
       <template #cell-visibility="{ row }">
-        <OBadge :variant="visibilityBadge((row as any).visibility).variant" size="sm">
+        <OBadge :tone="visibilityBadge((row as any).visibility).variant" size="sm">
           {{ t(visibilityBadge((row as any).visibility).labelKey) }}
         </OBadge>
       </template>
@@ -102,16 +93,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex min-w-0 items-center gap-1">
           <OTooltip
             :content="raw(publicStatusPageUrl((row as any).slug))"
-            content-class="max-w-[25rem] break-all text-xs"
+            content-class="break-all text-xs"
           >
             <span class="text-text-secondary truncate font-mono text-xs">{{
               raw(`/status/${(row as any).slug}`)
             }}</span>
           </OTooltip>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs"
-            icon-left="content-copy"
+            icon="content-copy"
             :data-test="`status-pages-copy-url-${(row as any).id}`"
             @click.stop="copyUrl((row as any).slug)"
           >
@@ -134,9 +125,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <div class="flex items-center gap-0.5" @click.stop>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            icon-left="edit"
+            size="sm"
+            icon="edit"
             class="max-md:hidden"
             :data-test="`status-pages-edit-btn-${(row as any).id}`"
             @click.stop="emit('edit', row)"
@@ -147,9 +139,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown>
             <template #trigger>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs-sq"
-                icon-left="more-vert"
+                size="sm"
+                icon="more-vert"
                 :data-test="`status-pages-more-btn-${(row as any).id}`"
                 @click.stop
               >
@@ -158,29 +151,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <ODropdownItem
+              icon="edit"
               class="md:hidden"
               :data-test="`status-pages-edit-btn-${(row as any).id}-menu`"
               @select="emit('edit', row)"
             >
-              <template #icon-left>
-                <OIcon name="edit" size="sm" />
-              </template>
               {{ t("common.edit") }}
             </ODropdownItem>
 
             <ODropdownItem
+              icon="campaign"
               :disabled="!advancedEnabled"
               :data-test="`status-pages-post-update-item-${(row as any).id}`"
               @select="emit('post-update', row)"
             >
-              <template #icon-left>
-                <OIcon name="campaign" size="sm" />
-              </template>
               {{ t("statusPages.postUpdate.action") }}
               <!-- Decorative: the tooltip carries the sentence, and
                    DropdownMenuItem already exposes aria-disabled. Same
                    shape as DbmSectionTabs' locked-tab lock icon. -->
-              <template v-if="!advancedEnabled" #icon-right>
+              <template v-if="!advancedEnabled" #end>
                 <OIcon
                   name="lock"
                   size="xs"
@@ -193,15 +182,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
 
             <ODropdownItem
+              icon="history-toggle-off"
               :disabled="!advancedEnabled"
               :data-test="`status-pages-view-updates-item-${(row as any).id}`"
               @select="emit('view-updates', row)"
             >
-              <template #icon-left>
-                <OIcon name="history-toggle-off" size="sm" />
-              </template>
               {{ t("statusPages.notices.action") }}
-              <template v-if="!advancedEnabled" #icon-right>
+              <template v-if="!advancedEnabled" #end>
                 <OIcon
                   name="lock"
                   size="xs"
@@ -214,25 +201,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
 
             <ODropdownItem
+              icon="content-copy"
               :data-test="`status-pages-copy-url-item-${(row as any).id}`"
               @select="copyUrl((row as any).slug)"
             >
-              <template #icon-left>
-                <OIcon name="content-copy" size="sm" />
-              </template>
               {{ t("statusPages.copyUrl") }}
             </ODropdownItem>
 
             <ODropdownItem
+              icon="dns"
               :disabled="!advancedEnabled"
               :data-test="`status-pages-domains-item-${(row as any).id}`"
               @select="emit('manage-domains', row)"
             >
-              <template #icon-left>
-                <OIcon name="dns" size="sm" />
-              </template>
               {{ t("statusPages.domains.action") }}
-              <template v-if="!advancedEnabled" #icon-right>
+              <template v-if="!advancedEnabled" #end>
                 <OIcon
                   name="lock"
                   size="xs"
@@ -247,13 +230,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownSeparator />
 
             <ODropdownItem
-              variant="destructive"
+              icon="delete"
+              tone="danger"
               :data-test="`status-pages-delete-item-${(row as any).id}`"
               @select="emit('delete', row)"
             >
-              <template #icon-left>
-                <OIcon name="delete" size="sm" />
-              </template>
               {{ t("common.delete") }}
             </ODropdownItem>
           </ODropdown>
@@ -264,15 +245,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <OEmptyState
           v-if="!loading"
-          size="block"
-          icon="monitor-heart"
-          :filtered="!!search"
+          :icon="search ? undefined : 'monitor-heart'"
+          :kind="search ? 'filtered' : 'first-run'"
           :title="t('statusPages.empty.title')"
-          :description="t('statusPages.empty.description')"
-          :action-label="t('statusPages.newPage')"
-          action-icon="add"
+          :text="t('statusPages.empty.description')"
+          :action-label="search ? undefined : t('statusPages.newPage')"
           data-test="status-pages-empty-state"
-          @action="onEmptyAction"
+          @action="onEmptyAction(search ? 'clear-filters' : 'create')"
         />
       </template>
     </OTable>
@@ -287,8 +266,9 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { ForbiddenState } from "@/utils/featureGate";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -308,10 +288,12 @@ const props = withDefaults(
   defineProps<{
     pages: StatusPageListItem[];
     loading?: boolean;
+    /** Epoch-ms of the last successful load, shown as the refresh age. */
+    lastRunAt?: number | null;
     forbidden?: ForbiddenState;
     timezone?: string;
   }>(),
-  { loading: false, forbidden: false, timezone: "UTC" },
+  { loading: false, lastRunAt: null, forbidden: false, timezone: "UTC" },
 );
 
 const emit = defineEmits<{

@@ -3,170 +3,73 @@
  */
 
 import type { I18nText } from "@/types/i18n";
+import type { OverlayAction } from "@/lib/overlay/shared/overlayFooter.types";
 
-import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
+export type { OverlayAction } from "@/lib/overlay/shared/overlayFooter.types";
 
-export type DialogSize = "xs" | "sm" | "md" | "lg" | "xl" | "full";
+/** sm 400 · md 560 · lg 720 (guideline O3); `full` only for content that needs the whole window. */
+export type DialogSize = "sm" | "md" | "lg" | "full";
 
-export type DialogInitialFocus = "primary" | "secondary";
+export const DIALOG_SIZES = ["sm", "md", "lg", "full"] as const satisfies readonly DialogSize[];
 
 export interface DialogProps {
   /** Controlled open state — use with v-model:open */
   open?: boolean;
 
-  /**
-   * Prevents the dialog from closing when the user clicks the overlay
-   * or presses Escape. Equivalent to a persistent dialog.
-   * @default false
-   */
+  /** Unsaved edits: Escape, ✕ and an outside click ask "Discard changes?" in the footer (V5). A nested OForm reports its own. */
+  dirty?: boolean;
+
+  /** A forced flow that cannot be dismissed: no ✕, and Escape and outside clicks do nothing. */
   persistent?: boolean;
 
-  /**
-   * Controls dialog panel width.
-   * xs=320px | sm=480px | md=640px (default) | lg=800px | xl=1024px | full=screen
-   * @default "md"
-   */
+  /** @default "md" */
   size?: DialogSize;
 
-  /**
-   * Convenience prop: plain-text title rendered inside the header section.
-   * Ignored when the `header` slot is provided.
-   */
-  title?: I18nText;
-
-  /**
-   * Accessible name used for the hidden dialog title when `title` is not set.
-   * Draws nothing.
-   */
-  ariaTitle?: I18nText;
-
-  /**
-   * Whether to render a built-in × close button in the top-right corner.
-   * Only applies when `persistent` is false.
-   * @default true
-   */
+  /** The header ✕; turn it off only when the header slot draws its own close. @default true */
   showClose?: boolean;
 
-  /**
-   * Dialog panel width as a percentage of the viewport width (1–100).
-   * Translates directly to a `vw` unit, e.g. `width={60}` → `60vw`.
-   * When provided, overrides the `size` preset width entirely.
-   */
-  width?: number;
+  /** Header title, 15 px semibold. Ignored when the `header` slot is provided. */
+  title?: I18nText;
 
-  /**
-   * Dialog panel max-height as a percentage of the viewport height (1–100).
-   * Translates directly to a `vh` unit, e.g. `maxHeight={60}` → `60vh`.
-   * When omitted, defaults to 90vh.
-   */
-  maxHeight?: number;
+  /** Accessible name when there is no visible `title`. */
+  ariaTitle?: I18nText;
 
-  // ── Header subtitle ────────────────────────────────────────────────────
+  /** One line under the title. */
+  subtitle?: I18nText;
 
-  /**
-   * Optional subtitle rendered below the title in the header, left-aligned.
-   * Ignored when the `header` slot is provided.
-   */
-  subTitle?: I18nText;
-
-  // ── Inbuilt footer buttons ──────────────────────────────────────────────
-
-  /**
-   * When provided, the built-in primary button becomes type="submit" associated
-   * with this form id. Enables Enter-key submission for forms in the dialog body.
-   */
+  /** Makes the primary a submit button of this form, so the form's own submit runs it. */
   formId?: string;
 
-  /** Label for the primary action button (right side). Omit to hide. */
-  primaryButtonLabel?: I18nText;
-  /** data-test for the primary button. @default "o-dialog-primary-btn" */
-  primaryButtonDataTest?: string;
-  /** Label for the secondary action button (right of neutral, left of primary). Omit to hide. */
-  secondaryButtonLabel?: I18nText;
-  /** Label for the neutral action button (left side). Omit to hide. */
-  neutralButtonLabel?: I18nText;
-
-  /** OButton variant for the primary button. @default "primary" */
-  primaryButtonVariant?: ButtonVariant;
-  /** OButton variant for the secondary button. @default "secondary" */
-  secondaryButtonVariant?: ButtonVariant;
-  /** OButton variant for the neutral button. @default "ghost" */
-  neutralButtonVariant?: ButtonVariant;
-
-  /** Explicitly disables the primary button. Auto-disabled when any button is loading. */
-  primaryButtonDisabled?: boolean;
-  /** Explicitly disables the secondary button. Auto-disabled when any button is loading. */
-  secondaryButtonDisabled?: boolean;
-  /** Explicitly disables the neutral button. Auto-disabled when any button is loading. */
-  neutralButtonDisabled?: boolean;
-
-  /** Shows loading spinner on primary button (also disables all buttons). */
-  primaryButtonLoading?: boolean;
-  /** Shows loading spinner on secondary button (also disables all buttons). */
-  secondaryButtonLoading?: boolean;
-  /** Shows loading spinner on neutral button (also disables all buttons). */
-  neutralButtonLoading?: boolean;
-
-  /** The footer button focused on open when the body has no field; `secondary` keeps Enter off a destructive primary. @default "primary" */
-  initialFocus?: DialogInitialFocus;
+  /** Footer primary, right-most (guideline O7). */
+  primary?: OverlayAction;
+  /** Footer Cancel, left of the primary. */
+  secondary?: OverlayAction;
+  /** An extra action at the left of the footer (Test, Delete). */
+  extra?: OverlayAction;
 }
 
 export interface DialogEmits {
-  /** Fires whenever the open state changes — use with v-model:open */
   (e: "update:open", value: boolean): void;
-  /** Fires when the primary inbuilt button is clicked. */
   (e: "click:primary"): void;
-  /** Fires when the secondary inbuilt button is clicked. */
   (e: "click:secondary"): void;
-  /** Fires when the neutral inbuilt button is clicked. */
-  (e: "click:neutral"): void;
+  (e: "click:extra"): void;
+  /** The user chose Discard in the "Discard changes?" footer; the dialog then closes. */
+  (e: "discard"): void;
 }
 
 export interface DialogSlots {
-  /**
-   * The element that opens the dialog.
-   * Rendered as-child into Reka's DialogTrigger.
-   * Omit when controlling open state exclusively via v-model:open.
-   */
+  /** The element that opens the dialog; omit when controlling it with v-model:open. */
   trigger?: () => unknown;
-
-  /**
-   * Header section — title row at the top of the dialog panel.
-   * When provided, the `title` prop is ignored and sub-slots are also ignored.
-   * When omitted, no header section is rendered (useful for custom layouts).
-   */
+  /** Replaces the whole title block; `header-left` and `header-right` are then ignored. */
   header?: () => unknown;
-
-  /**
-   * Optional left sub-slot in the header row.
-   * Rendered between the title/subtitle block and `#header-right`.
-   * Ignored when the `#header` full-override slot is provided.
-   */
+  /** Content after the title, growing to fill the row. */
   "header-left"?: () => unknown;
-
-  /**
-   * Optional right sub-slot in the header row.
-   * Rendered between `#header-left` (or the title block) and the close button.
-   * Ignored when the `#header` full-override slot is provided.
-   */
+  /** Content just before the close button. */
   "header-right"?: () => unknown;
-
-  /**
-   * Body / content section — the main scrollable area.
-   * Always rendered.
-   */
+  /** The body; the only part that scrolls (guideline O6). */
   default?: () => unknown;
-
-  /**
-   * Footer section — action buttons row at the bottom.
-   * When omitted, no footer section is rendered.
-   */
+  /** Replaces the built-in footer actions. */
   footer?: () => unknown;
-
-  /**
-   * Optional left sub-slot in the built-in footer row.
-   * Rendered before the neutral button, left-aligned.
-   * Ignored when the `#footer` full-override slot is provided.
-   */
+  /** Content at the left of the built-in footer, before `extra`. */
   "footer-left"?: () => unknown;
 }

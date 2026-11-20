@@ -160,7 +160,7 @@ describe("Profiles page", () => {
     },
     OPageLayout: {
       template:
-        "<div><slot name='title' /><slot name='actions' /><slot name='subnav' /><slot /></div>",
+        "<div><slot name='status' /><slot name='actions' /><slot name='subnav' /><slot /></div>",
     },
     OIcon: true,
     OTag: {
@@ -168,12 +168,12 @@ describe("Profiles page", () => {
     },
     // Renders its slot: OTable wraps the sortable header button in a tooltip.
     OTooltip: { template: "<span><slot /></span>" },
-    // Shows the preset and description, and emits the first action like a click on its card.
+    // Shows the kind and text, and emits the primary action like a click on its button.
     OEmptyState: {
-      props: ["preset", "title", "description", "actions"],
+      props: ["kind", "title", "text", "actionLabel"],
       emits: ["action"],
       template:
-        '<div :data-preset="preset"><span>{{ description }}</span><button data-test="empty-state-action" @click="$emit(\'action\', actions?.[0]?.id ?? \'retry\')" /></div>',
+        '<div :data-kind="kind"><span>{{ text }}</span><button data-test="empty-state-action" @click="$emit(\'action\')" /></div>',
     },
     OSpinner: true,
     OSearchInput: {
@@ -290,7 +290,7 @@ describe("Profiles page", () => {
     await nextTick();
     await flushPromises();
 
-    expect(wrapper.findComponent({ name: "DateTime" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "ODateTimeRange" }).exists()).toBe(true);
     expect(mocks.meta).toHaveBeenCalledTimes(2);
     expect(mocks.merge).toHaveBeenCalledTimes(1);
     expect(mocks.series).toHaveBeenCalledTimes(1);
@@ -302,8 +302,8 @@ describe("Profiles page", () => {
     await settle();
 
     const error = wrapper.find('[data-test="profiles-error"]');
-    expect(error.attributes("data-preset")).toBe("load-error");
-    expect(error.text()).toContain("stream list down");
+    expect(error.attributes("data-kind")).toBe("error");
+    expect(error.text()).not.toContain("stream list down");
     expect(wrapper.find('[data-test="profiles-no-stream"]').exists()).toBe(false);
 
     await error.find('[data-test="empty-state-action"]').trigger("click");
@@ -324,7 +324,7 @@ describe("Profiles page", () => {
     expect(wrapper.find('[data-test="profiles-run-options"]').attributes("disabled")).toBeDefined();
 
     const empty = wrapper.find('[data-test="profiles-no-stream"]');
-    expect(empty.attributes("data-preset")).toBe("no-streams");
+    expect(empty.attributes("data-kind")).toBeUndefined();
     await empty.find('[data-test="empty-state-action"]').trigger("click");
     expect(router.push).toHaveBeenCalledWith({
       name: "ingestProfiles",

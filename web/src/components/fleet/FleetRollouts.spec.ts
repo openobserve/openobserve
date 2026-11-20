@@ -107,9 +107,9 @@ const other = apiRollout({ id: "r2", config: "gateway", fleet: { id: "f2", name:
 const items: FleetRollout[] = [done, other, halted, newer];
 
 const DrawerStub = {
-  props: ["open", "title", "subTitle"],
+  props: ["open", "title", "subtitle"],
   template:
-    '<div v-if="open" data-test="fleet-rollouts-drawer"><h2>{{ title }}</h2><span>{{ subTitle }}</span><slot /></div>',
+    '<div v-if="open" data-test="fleet-rollouts-drawer"><h2>{{ title }}</h2><span>{{ subtitle }}</span><slot /></div>',
 };
 
 // OTable holds its skeleton for a minimum time after loading ends.
@@ -237,7 +237,7 @@ describe("FleetRollouts", () => {
     await wrapper.find('[data-test="fleet-rollout-outcome-rollback"]').trigger("click");
     await settle();
     expect(confirmMock.mock.calls[0][0].message).toContain("edge v1");
-    expect(confirmMock.mock.calls[0][0].confirmVariant).toBe("destructive");
+    expect(confirmMock.mock.calls[0][0].kind).toBe("destructive");
     expect(fleet.rollbackRollout).toHaveBeenCalledWith(org(), "r3");
   });
 

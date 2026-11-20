@@ -45,10 +45,10 @@ const TransitionStub = {
 const STUBS = {
   OIcon: OIconStub,
   OButton: {
-    props: ["iconLeft", "variant", "size", "disabled"],
+    props: ["icon", "variant", "size", "disabled"],
     emits: ["click"],
     template:
-      '<button v-bind="$attrs" @click="$emit(\'click\')"><i v-if="iconLeft" :data-icon="iconLeft" /></button>',
+      '<button v-bind="$attrs" @click="$emit(\'click\')"><i v-if="icon" :data-icon="icon" /></button>',
   },
   Teleport: TeleportStub,
   Transition: TransitionStub,

@@ -17,7 +17,7 @@ export class TelephonySettingsPage {
       readOnly: '[data-test="telephony-settings-read-only"]',
       forbidden: '[data-test="telephony-settings-forbidden"]',
       hero: '[data-test="telephony-settings-hero"]',
-      connectAction: '[data-test="o2-empty-state-action-connect"]',
+      connectAction: '[data-test="o2-empty-state-action"]',
       deployment: '[data-test="telephony-settings-deployment"]',
       useOwn: '[data-test="telephony-settings-use-own"]',
       connected: '[data-test="telephony-settings-connected"]',

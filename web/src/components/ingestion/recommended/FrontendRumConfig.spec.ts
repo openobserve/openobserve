@@ -548,7 +548,7 @@ describe("FrontendRumConfig", () => {
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
       const content = card.props("content");
 
-      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.provider.name).toBe("Real user monitoring");
       expect(content.steps).toHaveLength(3);
     });
 
@@ -559,8 +559,8 @@ describe("FrontendRumConfig", () => {
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
       const content = card.props("content");
-      // Title deliberately stays "Real User Monitoring" on both platforms.
-      expect(content.provider.name).toBe("Real User Monitoring");
+      // Title deliberately stays "Real user monitoring" on both platforms.
+      expect(content.provider.name).toBe("Real user monitoring");
       expect(content.steps.map((s: any) => s.id)).toEqual([
         "install",
         "init",
@@ -586,7 +586,7 @@ describe("FrontendRumConfig", () => {
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
       const content = card.props("content");
-      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.provider.name).toBe("Real user monitoring");
       expect(content.steps.map((s: any) => s.id)).toEqual(["install", "init", "verify"]);
     });
 
@@ -595,7 +595,7 @@ describe("FrontendRumConfig", () => {
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
       const content = card.props("content");
-      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.provider.name).toBe("Real user monitoring");
       expect(content.provider.runtime).toBe("Android");
       expect(content.steps.map((s: any) => s.id)).toEqual([
         "install",
@@ -611,7 +611,7 @@ describe("FrontendRumConfig", () => {
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
       const content = card.props("content");
-      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.provider.name).toBe("Real user monitoring");
       expect(content.provider.runtime).toBe("iOS");
       expect(content.steps.map((s: any) => s.id)).toEqual([
         "install",

@@ -22,19 +22,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex flex-col"
   >
     <div class="mb-1 flex items-baseline gap-2">
-      <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
+      <h3 :id="headingId" class="text-text-heading m-0 text-sm font-semibold">
         {{ t("alerts.incidents.rcaSummary.hypotheses") }}
       </h3>
       <span class="text-text-secondary text-xs">{{ hypotheses.length }}</span>
     </div>
 
-    <p
+    <OEmptyState
       v-if="hypotheses.length === 0"
+      size="compact"
+      icon="lightbulb-outline"
+      :title="t('alerts.incidents.rcaSummary.noHypotheses')"
       data-test="rca-hypotheses-empty"
-      class="text-text-secondary text-compact m-0 mt-2"
-    >
-      {{ t("alerts.incidents.rcaSummary.noHypotheses") }}
-    </p>
+    />
 
     <ul
       v-if="rows.length > 0"
@@ -83,8 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="action in rcaHypothesisActions(hypothesis.status)"
                 :key="action"
                 :data-test="`rca-hypothesis-action-${action}`"
-                variant="outline"
-                size="xs"
+                variant="secondary"
+                size="sm"
                 :disabled="sending || pending.has(hypothesis.id)"
                 :aria-label="actionAriaLabel(action, hypothesis.statement)"
                 @click="$emit('steer-action', { hypothesisId: hypothesis.id, action })"
@@ -116,9 +116,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-for="number in hypothesis.evidence_numbers"
               :key="number"
+              icon-only
               data-test="rca-hypothesis-chip"
-              :variant="isOpen(hypothesis.id, number) ? 'primary' : 'outline'"
-              size="icon-xs-sq"
+              :variant="isOpen(hypothesis.id, number) ? 'primary' : 'secondary'"
+              size="sm"
               class="font-mono"
               :aria-expanded="isOpen(hypothesis.id, number)"
               :aria-controls="isOpen(hypothesis.id, number) ? cardId(hypothesis.id) : undefined"
@@ -131,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="id in hypothesis.unverified_ids"
               :key="id"
               data-test="rca-hypothesis-unverified"
-              class="rounded-default border-status-warning-text text-status-warning-text text-3xs inline-flex h-5 items-center border border-dashed px-1.5 font-mono font-semibold"
+              class="rounded-default border-status-warning-text text-status-warning-text text-2xs inline-flex h-5 items-center border border-dashed px-1.5 font-mono font-semibold"
             >
               {{ t("alerts.incidents.rcaSummary.notVerifiedId") }}
             </span>
@@ -146,10 +147,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="hypothesis.history.length > 0"
               data-test="rca-hypothesis-history-toggle"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               class="ms-2"
-              :icon-left="historyOpen.has(hypothesis.id) ? 'expand-less' : 'expand-more'"
+              :icon="historyOpen.has(hypothesis.id) ? 'expand-less' : 'expand-more'"
               :aria-expanded="historyOpen.has(hypothesis.id)"
               :aria-controls="historyId(hypothesis.id)"
               @click="toggleHistory(hypothesis.id)"
@@ -190,6 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, useId } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
   RcaEvidenceEntry,

@@ -60,8 +60,6 @@
         :data="loopRows"
         :columns="loopColumns"
         :default-columns="false"
-        :frame="false"
-        :show-global-filter="false"
         :fill-height="false"
         pagination="client"
         :page-size="5"
@@ -80,8 +78,6 @@
         :data="failureRows"
         :columns="failureColumns"
         :default-columns="false"
-        :frame="false"
-        :show-global-filter="false"
         :fill-height="false"
         pagination="client"
         :page-size="5"
@@ -89,7 +85,7 @@
         @row-click="(r: any) => openDetail('failure', r)"
       >
         <template #cell-failClass="{ row }">
-          <OTag variant="warning-soft" size="sm">{{ row.failClass }}</OTag>
+          <OTag tone="warn" size="sm">{{ row.failClass }}</OTag>
         </template>
       </OTable>
     </div>

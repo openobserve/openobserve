@@ -15,19 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col p-4" data-test="autoobserve-issue-logs">
+  <div class="flex min-h-0 flex-1 flex-col" data-test="autoobserve-issue-logs">
     <OEmptyState
-      size="block"
-      illustration="logs"
+      icon="article"
       :title="title"
-      :description="
+      :text="
         ended ? t('autoobserve.issueLive.logs.descEnded') : t('autoobserve.issueLive.logs.descOpen')
       "
     >
       <template #actions>
         <OButton
-          variant="outline"
-          icon-left="open-in-new"
+          variant="secondary"
           data-test="autoobserve-issue-logs-open"
           @click="router.push(route)"
         >

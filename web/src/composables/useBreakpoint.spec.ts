@@ -63,6 +63,14 @@ describe("useBreakpoint", () => {
     expect(bp.isDesktop.value).toBe(true);
   });
 
+  it("should expose xlUp only at or above the xl breakpoint (>= 1280px)", async () => {
+    mockMatchMedia(1279);
+    expect((await load())().xlUp.value).toBe(false);
+    vi.resetModules();
+    mockMatchMedia(1280);
+    expect((await load())().xlUp.value).toBe(true);
+  });
+
   it("should expose mdUp and lgUp booleans matching the tier", async () => {
     mockMatchMedia(768);
     const bp = (await load())();

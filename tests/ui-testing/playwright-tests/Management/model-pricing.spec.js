@@ -452,10 +452,10 @@ test.describe("Model Pricing — Bulk Actions", () => {
 
 // ============================================================
 // Journey 6 — Enable/disable toggle
-// Covers: model starts enabled (ghost-destructive variant),
-// toggle off flips to ghost variant, toggle on restores
-// ghost-destructive. Model stays in list throughout.
-// OButton exposes current variant via data-o2-variant attr.
+// Covers: model starts enabled (action reads "Disable"),
+// toggle off flips it to "Enable", toggle on restores
+// "Disable". Model stays in list throughout.
+// Row actions carry no tone (B7), so the label is the state.
 // ============================================================
 
 test.describe("Model Pricing — Toggle", () => {
@@ -479,19 +479,19 @@ test.describe("Model Pricing — Toggle", () => {
 
             // Starts enabled
             await expect(pm.modelPricingPage.toggleBtnForModel(name))
-                .toHaveAttribute('data-o2-variant', 'ghost-destructive', { timeout: 5000 });
+                .toHaveAttribute('aria-label', 'Disable', { timeout: 5000 });
 
-            // Toggle off → disabled state (Enable action shows green play, ghost-success)
+            // Toggle off → disabled state (the action now offers Enable)
             await pm.modelPricingPage.toggleBtnForModel(name).click();
             await pm.modelPricingPage.verifyModelInList(name);
             await expect(pm.modelPricingPage.toggleBtnForModel(name))
-                .toHaveAttribute('data-o2-variant', 'ghost-success', { timeout: 5000 });
+                .toHaveAttribute('aria-label', 'Enable', { timeout: 5000 });
 
             // Toggle on → enabled state restored
             await pm.modelPricingPage.toggleBtnForModel(name).click();
             await pm.modelPricingPage.verifyModelInList(name);
             await expect(pm.modelPricingPage.toggleBtnForModel(name))
-                .toHaveAttribute('data-o2-variant', 'ghost-destructive', { timeout: 5000 });
+                .toHaveAttribute('aria-label', 'Disable', { timeout: 5000 });
         } finally {
             if (createdId) await apiDeleteModel(createdId);
         }

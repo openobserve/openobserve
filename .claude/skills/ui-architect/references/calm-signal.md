@@ -59,24 +59,38 @@ All token-backed and dark-mode-safe. Reuse these before inventing anything.
   back to a generic chip) — and don't set `size` on the group: a group-level size
   silently overrides the call sites, so its chips end up a different size from the
   Status chip beside them. Pass `size` at the call site, matching its siblings.
+  Chip tones are `neutral | outline | accent | ok | warn | err | crit | info`;
+  categories are `neutral` or `outline`, never a decorative hue (C1), and a status
+  tone always carries a dot or an icon (C2). Priorities use `OPriority` (weight, not
+  hue) and log levels `OSeverity`.
 - **Row state signal** — an extreme-left colour **rail** via `OTable`'s
-  per-row `getRowStyle` (inset box-shadow, rem width, token colour) + a **light
-  exception highlight** via `row-class`. The rail and the wash are two different
-  strengths of the same signal, and the rail is the default:
+  `rowRailTone` (token tone per state) or per-row `getRowStyle` (inset box-shadow,
+  rem width, token colour) + a **light exception highlight** via `rowState` (C3).
+  The rail and the wash are two different strengths of the same signal, and the
+  rail is the default:
 
-  |         | Rail (`getRowStyle`)     | Wash (`row-class`)       |
-  | ------- | ------------------------ | ------------------------ |
-  | Cost    | a few px at the row edge | ~the whole row           |
-  | Use for | **every** state, always  | only the two cases below |
+  |         | Rail (`rowRailTone` / `getRowStyle`) | Wash (`rowState`)        |
+  | ------- | ------------------------------------ | ------------------------ |
+  | Cost    | a few px at the row edge             | ~the whole row           |
+  | Use for | **every** state, always              | only the two cases below |
+
+  `rowState` returns `"exception"` (error rail + error wash), `"warn"` (warning
+  rail, no wash), `"paused"` (recedes), `"recent"` (a soft tint for what just
+  arrived) or `null`. A page that draws its own rail keeps it, and the state adds
+  only its fill; selection paints over the fill. No `!important` row class.
 
   A full-row wash is the loudest thing on a list, so it earns its place only when
   **all three** hold: the state means **act now** (not merely "not green"), it is
   **rare in a healthy system**, and **the row is the unit of action**. In practice
   that leaves exactly two washes:
-  - `!bg-status-error-bg` — failing/errored/offline. _Alerts_ failed, _Pipelines_
-    errored, _Nodes_ offline, _Synthetics_ failed.
-  - `!bg-surface-panel` — paused/disabled. This one is **de-emphasis, not alarm**:
-    the row is deliberately inert, so it recedes rather than shouts.
+  - `rowState` `"exception"` (the error wash) — failing/errored/offline. _Alerts_
+    failed, _Pipelines_ errored, _Nodes_ offline, _Synthetics_ failed.
+  - `rowState` `"paused"` (the panel fill) — paused/disabled. This one is
+    **de-emphasis, not alarm**: the row is deliberately inert, so it recedes
+    rather than shouts.
+
+  Lists that still pass `!bg-status-error-bg` / `!bg-surface-panel` through
+  `row-class` predate `rowState`; move them when you next touch the page.
 
   Everything else keeps a clean row and reads from the rail — including states
   that are "bad but not urgent": **degraded/warning** (worth noticing, not worth
@@ -231,7 +245,7 @@ Colour only earns attention if most of the screen stays quiet:
     tile is a label with a number stuck to it;
   - _almost always zero_ — "New this week" on a list that gains an item a quarter;
   - _derivable from its neighbours_ — "In use" beside "Unused" and "Total";
-  - _already in the footer_ — the pager prints "x – y of N" under every table,
+  - _already in the footer_ — the pager prints "1–20 of 143" under every table,
     so a Total tile alone is not a reason to have a strip.
     A page whose only candidates fail these gets **no strip** — keep the per-row
     signals (relative recency, a state rail, a count column) and stop. Dashboards,

@@ -28,14 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   people learn to scroll past.
 -->
 <template>
-  <OBanner
-    v-if="visible"
-    variant="error"
-    inline-actions
-    icon="warning-amber"
-    class="mb-3"
-    data-test="oncall-reach-alarm"
-  >
+  <OInlineNotice v-if="visible" tone="err" class="mb-3" data-test="oncall-reach-alarm">
     <span class="flex flex-wrap items-baseline gap-x-1.5">
       <span class="font-medium" data-test="oncall-reach-alarm-headline">
         {{ t("oncall.reachAlarmHeadline") }}
@@ -60,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="canEscalate"
           variant="primary"
-          size="sm-action"
           :loading="escalating"
           data-test="oncall-reach-alarm-escalate"
           @click="emit('escalate')"
@@ -69,8 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="!noTeam"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           data-test="oncall-reach-alarm-reachability"
           @click="emit('open-reachability')"
         >
@@ -78,14 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </span>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import type { DeliveryRecord, EscalationProgress, ResponseState } from "@/ts/interfaces/oncall";
 import { useI18nTyped } from "@/types/i18n";
 import { useOnCallClock } from "@/composables/useOnCallClock";

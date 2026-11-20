@@ -11,7 +11,11 @@
     "bannerMessage": "Esta función está bloqueada. Necesita la función {feature} en tu licencia.",
     "bannerMessageGeneric": "Esta página necesita una función que no está en tu licencia.",
     "headerLocked": "Bloqueada: necesita {feature}",
-    "availableInEnterprise": "Disponible en OpenObserve Enterprise: {feature}"
+    "availableInEnterprise": "Disponible en OpenObserve Enterprise: {feature}",
+    "turnedOffTitle": "Desactivado para esta organización",
+    "enterpriseTitle": "Disponible en Enterprise",
+    "readDocs": "Leer la documentación",
+    "rbacOff": "RBAC está desactivado para esta organización. Un administrador lo activa estableciendo {env} en true en la configuración del servidor."
   },
   "emptyState": {
     "illustrations": {
@@ -52,6 +56,7 @@
         "ariaLabel": "Esperando datos"
       }
     },
+    "requestId": "Solicitud {id}",
     "createFirstItem": "Crea tu primer elemento",
     "newBrowserCheck": "Nueva comprobación de navegador",
     "allCaughtUp": "Estás al día",
@@ -79,10 +84,6 @@
       "title": "No se ha encontrado ningún patrón",
       "description": "Intente aumentar el intervalo de tiempo o seleccionar un stream diferente con más datos de logs. La extracción de patrones funciona mejor con al menos 1000 logs.",
       "logsAnalyzed": "Solo se analizaron {count} logs."
-    },
-    "noStreamSelected": {
-      "title": "Selecciona un stream para empezar",
-      "description": "Elige un stream y, a continuación, ejecuta la consulta para explorar sus datos. Refina los resultados con filtros y un intervalo de tiempo personalizado."
     },
     "noQueryApplied": {
       "title": "Ejecute una consulta para ver los resultados",
@@ -329,7 +330,6 @@
     "noStreams": {
       "title": "Conecta una fuente para crear tu primer stream",
       "description": "Los streams se crean automáticamente en el momento en que llegan los datos. Configura la ingesta desde tu aplicación, agente o colector para empezar.",
-      "action": "Configurar la ingesta",
       "actionDesc": "Conectar una fuente de datos",
       "createAction": "Nuevo stream",
       "createActionDesc": "Definir manualmente un esquema de stream"
@@ -392,6 +392,10 @@
       "description": "No hemos podido cargar estos datos. Por lo general, es temporal; inténtelo de nuevo en un momento.",
       "action": "Reintentar",
       "actionDesc": "Intente cargar los datos de nuevo"
+    },
+    "pageError": {
+      "title": "No se pudo cargar esta página",
+      "description": "No se cargó ningún dato de esta página. Reintenta ahora o inténtalo de nuevo en un minuto."
     },
     "noData": {
       "title": "Aún no hay nada aquí",
@@ -469,7 +473,9 @@
       "description": "No hay {noun} que coincidan con sus filtros o búsqueda actual. Intente ajustarlos o eliminarlos.",
       "action": "Borrar filtros",
       "actionDesc": "Restablecer todos los filtros y la búsqueda",
-      "fallbackNoun": "resultados"
+      "fallbackNoun": "resultados",
+      "noMatches": "Sin coincidencias",
+      "noMatchesText": "Nada coincide con la búsqueda o los filtros actuales."
     },
     "nouns": {
       "logs": "logs",
@@ -792,6 +798,9 @@
       "popoverLabel": "Partes ocultas de esta página"
     }
   },
+  "pageHeader": {
+    "about": "Acerca de esta página"
+  },
   "common": {
     "loadingNoun": "Cargando {noun}…",
     "loadingNouns": {
@@ -801,6 +810,7 @@
       "charts": "gráficos"
     },
     "dismiss": "Descartar",
+    "undo": "Deshacer",
     "exitFullscreen": "Salir de pantalla completa",
     "moreActions": "Más acciones",
     "moreOptions": "Más opciones",
@@ -1276,7 +1286,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "configuración del colector"
+        "fleet_config": "configuración del colector",
+        "workflow": "flujo de trabajo"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1312,8 +1323,8 @@
     "toggleConnector": "Alternar entre AND y OR",
     "selectedCount": "Ningún valor seleccionado | {count} valor seleccionado | {count} valores seleccionados",
     "query": "Consulta",
-    "builderTooltip": "Crea filtros eligiendo campos, condiciones y valores",
-    "queryTooltip": "Escribe la consulta tú mismo",
+    "builderTooltip": "Editar el filtro con el generador",
+    "queryTooltip": "Editar el filtro como texto",
     "queryNotParsableShort": "El generador no puede mostrar esta consulta:",
     "clearAndBuild": "Borrar y crear",
     "clearQueryTitle": "¿Borrar la consulta?",
@@ -1380,7 +1391,10 @@
       "isEmpty": "está vacío o no tiene valor",
       "isNotEmpty": "tiene un valor no vacío",
       "matchAll": "coincide con el texto"
-    }
+    },
+    "editorModeLabel": "Editor de filtros",
+    "modeBuilder": "Constructor",
+    "modeText": "Texto"
   },
   "flow": {
     "stepPicker": {
@@ -1489,11 +1503,9 @@
     "patternNavPrevious": "Anterior",
     "patternNavNext": "Próxima",
     "patternNoValuesAvailable": "No hay valores disponibles",
-    "sqlModeLabel": "Modo SQL",
     "nlpModeLabel": "Modo de lenguaje natural",
     "quickModeLabel": "Modo rápido",
     "menuMore": "Más",
-    "menuGroupSetOnce": "Establecer una vez",
     "menuGroupHistory": "Historia",
     "menuGroupDownloads": "Descargas",
     "menuGroupSchedule": "Programar",
@@ -1867,7 +1879,6 @@
     "viewDeletedSuccessfully": "La vista se ha eliminado correctamente.",
     "viewCreatedSuccessfully": "La vista se creó correctamente.",
     "viewUpdatedSuccessfully": "La vista se actualizó correctamente.",
-    "linkCopiedSuccessfully": "¡El enlace se copió correctamente!",
     "errorCopyingLink": "Error al copiar el enlace.",
     "errorShorteningLink": "Error al acortar el enlace.",
     "webUrlNotConfigured": "La URL compartida está deshabilitada hasta que el administrador configure ZO_WEB_URL.",
@@ -2069,7 +2080,24 @@
     "freeTextNoTextFields": "Este stream no tiene campos de texto que buscar.",
     "freeTextNoTextFieldsNamed": "No se buscó en: {streams} (sin campos de texto).",
     "freeTextBuildNotice": "Este filtro tiene búsqueda de texto; edítalo en SQL.",
-    "filterNotChartableNotice": "Este filtro no se puede representar en un gráfico con el generador. Tu filtro de búsqueda no ha cambiado; cambia a {custom} para graficarlo."
+    "filterNotChartableNotice": "Este filtro no se puede representar en un gráfico con el generador. Tu filtro de búsqueda no ha cambiado; cambia a {custom} para graficarlo.",
+    "queryModeLabel": "Lenguaje de consulta",
+    "queryModeFilter": "Filtro",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "Acota los registros por campo y valor",
+    "queryModeSqlTooltip": "Escribe una consulta SQL completa, con agregaciones y uniones",
+    "sqlModeNeedsOneStream": "SQL en esta vista admite un solo flujo",
+    "menuGroupViewOptions": "Opciones de vista",
+    "histogramHiddenForAggregates": "Esta consulta devuelve grupos, no eventos en el tiempo, así que no hay histograma. Visualizar grafica el resultado.",
+    "linkCopied": "Enlace copiado",
+    "linkCopiedFixedTime": "Enlace copiado · hora fija {from} – {to}",
+    "linkCopiedRelativeTime": "Enlace copiado · {period}, contado desde que se abre",
+    "recordsChipRows": "{total} fila | {total} filas",
+    "histogramTitleRows": "Mostrando {total} fila en {took} ms. | Mostrando {total} filas en {took} ms.",
+    "histogramTitleRowsWithScan": "Mostrando {total} fila en {took} ms. ({scanLabel}: {scanSize}) | Mostrando {total} filas en {took} ms. ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "Elige primero un flujo",
+    "autoRefreshPausedInVisualize": "La actualización automática actualiza los resultados de búsqueda. Se pausa mientras visualizas.",
+    "histogramNoTimeAxis": "Los resultados agrupados no tienen eje de tiempo"
   },
   "menu": {
     "alertCalibration": "Calibración de alertas",
@@ -2103,6 +2131,14 @@
     "workflows": "Flujos de trabajo",
     "language": "Idioma",
     "keyboardShortcuts": "Métodos abreviados de teclado",
+    "searchOrJumpTo": "Buscar o ir a…",
+    "jumpToTitle": "Ir a",
+    "addData": "Añadir datos",
+    "jumpToPlaceholder": "Buscar páginas, alertas, paneles y flujos",
+    "jumpToPlaceholderPages": "Buscar páginas y acciones",
+    "jumpToPages": "Páginas",
+    "jumpToShowAll": "Ver todo en {page}",
+    "jumpToSearchLogs": "Buscar \"{text}\" en los registros",
     "synthetic": "Sintéticos",
     "experience": "Experiencia",
     "slos": "SLOs",
@@ -4183,7 +4219,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "No está autorizado a administrar la licencia."
-      }
+      },
+      "usageTitle": "Ingesta diaria"
     },
     "value_sso_requires_ha": "✅ Requiere el modo HA",
     "value_rbac_requires_ha": "✅ Requiere el modo HA",
@@ -4352,7 +4389,9 @@
     "revokeInvitationMsg": "¿Estás seguro de que quieres revocar la invitación de {email}?",
     "deleteUsersTitle": "Eliminar usuarios",
     "deleteUsersMsg": "¿Estás seguro de que deseas eliminar {count} usuario? | ¿Estás seguro de que deseas eliminar {count} usuarios?",
-    "deleteUsersBlockNote": "{count} de ellos se unieron a través de tu dominio verificado y se bloquearán en lugar de eliminarse."
+    "deleteUsersBlockNote": "{count} de ellos se unieron a través de tu dominio verificado y se bloquearán en lugar de eliminarse.",
+    "roleHint": "Admin gestiona la organización, Editor cambia datos y ajustes, Viewer solo puede leer.",
+    "customRolesNeedRbac": "Los roles personalizados requieren RBAC, que está desactivado para esta organización."
   },
   "invitation": {
     "pendingInvitations": "Invitaciones pendientes",
@@ -5205,6 +5244,7 @@
   },
   "organization": {
     "searchByNameOrId": "Buscar por nombre o ID",
+    "currentLabel": "Organización: {name}",
     "noOrganizationsFound": "No se encontraron organizaciones",
     "header": "Organizaciones",
     "orgBeingDeletedSwitching": "Esta organización está siendo eliminada. Cambiándolo a otra organización.",
@@ -5313,6 +5353,7 @@
     "timezone": "Zona horaria",
     "deleteActionMessage": "¿Seguro que quieres eliminar {count} campo? Esta acción no se puede deshacer. | ¿Seguro que quieres eliminar {count} campos? Esta acción no se puede deshacer.",
     "deleteDatesMessage": "¿Seguro que quieres eliminar {count} rango de fechas? Esta acción no se puede deshacer. | ¿Seguro que quieres eliminar {count} rangos de fechas? Esta acción no se puede deshacer.",
+    "summaryAllTypes": "Streams (todos los tipos)",
     "labelLogs": "Logs",
     "labelMetrics": "Métricas",
     "labelTraces": "Trazas",
@@ -7924,7 +7965,17 @@
       "metricsSketch": "Las distribuciones se almacenan como buckets de histograma y los percentiles se estiman a partir de esos buckets. Un valor mayor de ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA proporciona buckets más finos y percentiles más precisos, a costa de almacenar más filas."
     },
     "gpu": "GPU",
-    "gpuExporter": "Exportador de GPU"
+    "gpuExporter": "Exportador de GPU",
+    "rotationNote": "Los tokens no se rotan en su sitio. Para rotar, cree un token nuevo, cambie sus fuentes a él y desactive el anterior.",
+    "rotateAction": "Rotar…",
+    "rotateTitle": "Rotar {name}",
+    "rotateStep1": "Cree un token nuevo.",
+    "rotateStep2": "Cambie sus fuentes al token nuevo.",
+    "rotateStep3": "Cuando nada use {name}, desactívelo desde el menú de su fila.",
+    "rotateNever": "No se desactiva nada automáticamente. El token anterior sigue funcionando hasta que lo desactive.",
+    "rotateCreateNew": "Crear token nuevo",
+    "rotateNewName": "{name}-nuevo",
+    "rotateDescription": "Sustituye a {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -8654,6 +8705,12 @@
     "dateFormatEpochms": "Milisegundos epoch (epochms)",
     "dateFormatEpochus": "Microsegundos epoch (epochus)",
     "newFolder": "Nueva carpeta",
+    "inlineCreate": {
+      "folderName": "Nombre de la carpeta nueva",
+      "createFolder": "Crear carpeta",
+      "tabName": "Nombre de la pestaña nueva",
+      "createTab": "Crear pestaña"
+    },
     "updateFolder": "Actualizar carpeta",
     "newReport": "Nuevo informe",
     "scheduledDashboards": "Dashboards programados",
@@ -9558,6 +9615,9 @@
       "addClause": "Agregar cláusula"
     },
     "viewDashboard": {
+      "apply": "Aplicar",
+      "lastDataSeen": "Últimos datos {when}",
+      "jumpToLatest": "Ir a lo más reciente",
       "refreshToApplyVariables": "Actualizar para aplicar los últimos cambios de variables",
       "refresh": "Actualizar",
       "refreshCacheReload": "Actualizar caché y recargar",
@@ -10306,6 +10366,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "Sin datos en el rango",
     "saveAndStay": "Guardar y seguir editando",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10586,12 +10647,32 @@
     "hoursAgo": "Hace {count} h",
     "daysAgo": "Hace {count} d",
     "cards": {
-      "openIncidents": "Incidentes abiertos"
+      "firingAlerts": "Alertas disparadas",
+      "failingRules": "Reglas con errores",
+      "openIncidents": "Incidentes abiertos",
+      "pipelineErrors": "Errores de pipeline",
+      "pipelinesOf": "de {enabled} habilitados",
+      "quietStreams": "Streams sin actividad",
+      "firingNone": "Ninguna disparada",
+      "noAlertRules": "Sin reglas de alerta",
+      "noEnabledRules": "Sin reglas habilitadas",
+      "failingNone": "Ninguna con errores",
+      "failingNote": "La última evaluación falló",
+      "incidentsNone": "Ninguno abierto",
+      "noPipelines": "Sin pipelines",
+      "noStreams": "Sin streams",
+      "quietNote": "Dejaron de recibir datos en los últimos 7 días",
+      "criticalUnit": "{count} en nivel crítico",
+      "deliveryFailures": "Fallos de entrega de alertas",
+      "deliveryCount": "{count} entrega de alerta fallida | {count} entregas de alertas fallidas",
+      "deliveryNote": "Alertas que se dispararon pero no pudieron notificar",
+      "oldestFiring": "La más antigua disparada desde hace {age}"
     },
     "state": {
       "tileForbidden": "Sin acceso",
       "tileLocked": "Bloqueado",
       "tileError": "No se pudo cargar",
+      "tileUnavailable": "No disponible",
       "sectionLocked": "Disponible con una licencia enterprise",
       "sectionForbidden": "Tu rol no puede ver estos datos. Solicita acceso a un administrador de la organización."
     },
@@ -10715,6 +10796,39 @@
     "dataAsOf": "Datos a fecha de {time}",
     "timeRange": {
       "heading": "En el rango de tiempo seleccionado"
+    },
+    "firingNow": {
+      "title": "Disparando ahora",
+      "byLevel": "{critical} críticas · {warning} de advertencia",
+      "allQuiet": "Todo tranquilo",
+      "watching": "{count} regla de alerta activa, ninguna disparada | {count} reglas de alerta activas, ninguna disparada",
+      "noRules": "Aún no hay reglas de alerta",
+      "browseLibrary": "Ver biblioteca de alertas",
+      "notifyFailed": "Notificación fallida",
+      "loadError": "No se pudieron cargar las alertas disparadas",
+      "unavailable": "Ahora no se pueden leer los estados de las alertas"
+    },
+    "health": {
+      "subtitle": "Últimos datos recibidos, por tipo",
+      "lastData": "Últimos datos hace {age}",
+      "justNow": "Últimos datos ahora mismo",
+      "noDataIn": "Sin datos en las últimas {range}",
+      "noRecords": "Aún no hay registros",
+      "loadError": "No se pudieron leer tus streams"
+    },
+    "start": {
+      "text": "Aún no han llegado datos. Envía datos, revisa lo que tienes o configura una alerta.",
+      "addData": "Añadir datos",
+      "createAlert": "Crear alerta"
+    },
+    "summary": {
+      "loadError": "No se pudo cargar el resumen de la organización",
+      "loadErrorRest": "No se pudo cargar el resto del resumen",
+      "denied": "Sin acceso al resumen de la organización. Pídelo a un administrador."
+    },
+    "events": {
+      "runFailed": "Ejecución fallida",
+      "timesInRange": "{count} vez en el rango seleccionado | {count} veces en el rango seleccionado"
     }
   },
   "chatHistory": {
@@ -10895,7 +11009,8 @@
       "taglineAnd": "y te guiará a través de tus logs, trazas, métricas e incidentes.",
       "signedInAs": "Iniciado sesión como",
       "role": "Rol",
-      "tryOneOfThese": "O prueba uno de estos"
+      "tryOneOfThese": "O prueba uno de estos",
+      "panelText": "Pregunta sobre tus logs, trazas, métricas e incidentes, u obtén ayuda para escribir una consulta."
     },
     "capabilities": {
       "query": {
@@ -12005,12 +12120,29 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "Abrir en logs",
+      "openInTraces": "Abrir en trazas",
+      "openInMetrics": "Abrir en métricas",
+      "evidenceFiringTip": "Abre {stream} con el filtro de esta alerta, desde el inicio de este disparo hasta ahora",
+      "evidenceWindowTip": "Abre {stream} con el filtro de esta alerta en los últimos {window}",
+      "threshold": "Umbral",
+      "noIncident": "Aún no hay incidente",
+      "conditionLabel": "Condición de la alerta",
+      "allRows": "Todas las filas",
+      "viewIncidents": "Ver incidentes"
+    },
+    "summaryTrainingFailed": "Entrenamiento fallido",
+    "columnState": "Estado",
+    "startFromTemplate": "Comenzar desde una plantilla",
     "rowAction": {
       "leftFilter": "Ya no coincide con el filtro",
       "pausedLeftFilter": "{name} en pausa. Ya no coincide con el filtro | {count} alertas en pausa. Ya no coinciden con el filtro",
       "resumedLeftFilter": "{name} reanudada. Ya no coincide con el filtro | {count} alertas reanudadas. Ya no coinciden con el filtro",
       "bulkPauseFailed": "No se pudo pausar {failed} de {total} alerta | No se pudo pausar {failed} de {total} alertas",
-      "bulkResumeFailed": "No se pudo reanudar {failed} de {total} alerta | No se pudo reanudar {failed} de {total} alertas"
+      "bulkResumeFailed": "No se pudo reanudar {failed} de {total} alerta | No se pudo reanudar {failed} de {total} alertas",
+      "paused": "{name} en pausa | {count} alertas en pausa",
+      "resumed": "{name} reanudada | {count} alertas reanudadas"
     },
     "moreActions": "Más acciones",
     "promRuleMode": "Modo de regla",
@@ -13445,7 +13577,8 @@
       "condition": "Condición",
       "result": "Resultado",
       "anomalies": "Anomalías",
-      "forGroup": "para {group}"
+      "forGroup": "para {group}",
+      "errorFrom": "{status} desde {destination}"
     },
     "continue": "Continuar",
     "wouldTrigger": "DESENCADENARÍA",
@@ -15009,7 +15142,8 @@
         "mute": "No puedes silenciar esto.",
         "onCall": "De guardia: {people}",
         "canAct": "También pueden actuar: {people}",
-        "people": "De guardia: {onCall}. También pueden actuar: {canAct}"
+        "people": "De guardia: {onCall}. También pueden actuar: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "Esta alerta no está disparada, así que no hay nada que confirmar.",
@@ -15067,7 +15201,9 @@
     "siemDetection": {
       "notice": "Esta alerta es una detección de Seguridad. Su consulta se compila a partir de su regla Sigma, por lo que la regla, el stream y la programación se editan en Seguridad, que mantiene sincronizadas la regla y la consulta.",
       "open": "Editar en Seguridad"
-    }
+    },
+    "newAlertTitle": "Nueva alerta",
+    "newAnomalyTitle": "Nueva detección de anomalías"
   },
   "alert_dependencies": {
     "actionOpen": "Abrir",
@@ -17937,7 +18073,13 @@
       "partial": "No se pudieron leer algunos spans de esta traza. Es posible que la cascada esté incompleta.",
       "truncated": "Mostrando el primer span de esta traza, en orden de hora de inicio. Los spans posteriores aún no se han cargado. | Mostrando los primeros {count} spans de esta traza, en orden de hora de inicio. Los spans posteriores aún no se han cargado.",
       "loadMore": "Cargar el siguiente span | Cargar los siguientes {size} spans",
-      "loadMoreFailed": "No se pudieron cargar más spans de esta traza"
+      "loadMoreFailed": "No se pudieron cargar más spans de esta traza",
+      "notFoundTitle": "Ninguna traza con este ID entre {from} y {to}",
+      "notFoundText": "La traza {traceId} no tiene spans en el stream {stream} en este rango. Puede ser más antigua o más reciente, estar en otro stream o no haberse recopilado.",
+      "searchWiderRange": "Buscar en un rango más amplio",
+      "searchSpansInRange": "Buscar spans en este rango",
+      "loadFailedTitle": "No se pudo cargar esta traza",
+      "loadFailedText": "No se pudo leer la traza {traceId}. Reintenta en un momento."
     },
     "traceTree": {
       "clickToExpand": "Haz clic para expandir",
@@ -19865,7 +20007,7 @@
       "streamHint": "Esta versión del agente envía trazas a {count} streams. Se muestra el que lleva más tiempo usando, a menos que elijas otro.",
       "agentIdHint": "ID de agente: {ids}",
       "noAgentIdentity": "No se encontró ninguna identidad de agente",
-      "noAgentIdentityDescription": "Estos spans de LLM no llevan nombre de agente, por lo que se muestran por stream. Asigna el atributo que da nombre a tu agente para verlos por agente.",
+      "noAgentIdentityDescription": "Estos spans de LLM no llevan nombre de agente, por lo que se muestran por stream.",
       "noAgentIdentityAction": "Abrir asignación de agentes"
     },
     "agentGraph": {
@@ -21539,7 +21681,6 @@
     },
     "noStream": {
       "title": "Elige un stream para empezar a explorar",
-      "description": "Elige un stream y, a continuación, pulsa <strong>Ejecutar consulta</strong>. Puedes refinarla con filtros, una función de VRL y un intervalo de tiempo personalizado una vez que recibas los resultados.",
       "selectStream": "Selecciona un stream",
       "selectStreamDesc": "Explora streams de logs, trazas, métricas y RUM",
       "queryGuide": "Lea la guía de consultas",
@@ -21591,7 +21732,18 @@
     "detailTable": {
       "noDataAvailable": "No hay datos disponibles.",
       "addIcon": "Agregar icono",
-      "sendToAiChat": "Enviar al chat de IA"
+      "sendToAiChat": "Enviar al chat de IA",
+      "openTrace": "Abrir traza",
+      "noTraceTitle": "Ninguna traza vinculada a este registro",
+      "noRelatedLogsTitle": "No se encontraron registros relacionados",
+      "noRelatedMetricsTitle": "No se encontraron métricas relacionadas",
+      "noServiceText": "No se pudo asociar ningún servicio a este registro, por lo que no se pueden encontrar datos relacionados automáticamente.",
+      "searchTracesAround": "Buscar trazas en torno a este momento",
+      "searchAroundTip": "Carga los eventos registrados justo antes y después de este.",
+      "noOfEventsTip": "Cuántos eventos cargar en torno a este.",
+      "severityTip": "Nivel de registro detectado. Selecciónalo para ver cómo se detectó.",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "La consulta SELECT * no es compatible con la visualización.",
@@ -21883,6 +22035,7 @@
     "showDetail": "Mostrar detalles",
     "hideDetail": "Ocultar detalles",
     "runAs": "Ejecutar como",
+    "runSuggestion": "Ejecutar {query}",
     "searchTextFor": "Buscar el texto \"{text}\"",
     "searchTextDesc": "Buscar toda la entrada como una sola frase",
     "explain": {
@@ -21942,12 +22095,29 @@
     "minutesAgo": "Hace {min} m",
     "hoursAgo": "Hace {h} h",
     "notYetRefreshed": "Aún no se ha actualizado",
-    "dataFresh": "Los datos están actualizados",
-    "dataGettingStale": "Los datos se están volviendo obsoletos",
-    "dataStale": "Los datos están obsoletos",
     "lastRefreshed": "Última actualización: {time}",
     "refresh": "Actualizar",
-    "refreshWithAge": "Actualizar, última actualización {age}"
+    "refreshWithAge": "Actualizar, última actualización {age}",
+    "refreshing": "Actualizando",
+    "failed": "Error",
+    "autoRefresh": "Actualización automática",
+    "autoOn": "Auto · {interval}",
+    "every": "Cada {interval}",
+    "interval": {
+      "10s": "10 s",
+      "30s": "30 s",
+      "1m": "1 min",
+      "5m": "5 min",
+      "15m": "15 min"
+    },
+    "dataFresh": "Los datos están actualizados",
+    "dataGettingStale": "Los datos se están volviendo obsoletos",
+    "dataStale": "Los datos están obsoletos"
+  },
+  "copyButton": {
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "failed": "Copia bloqueada · pulsa Ctrl C"
   },
   "synthetics": {
     "variables": {
@@ -23845,6 +24015,7 @@
     },
     "actions": {
       "openCheatsheet": "Abrir hoja de referencia de atajos de teclado",
+      "searchOrJumpTo": "Buscar o ir a una página",
       "closeDialog": "Cierre cualquier cuadro de diálogo, cajón o modal",
       "focusSearch": "Barra de búsqueda de enfoque",
       "focusQuery": "Editor de consultas de enfoque",
@@ -23994,7 +24165,17 @@
       "tokenLinkTooltip": "Elige qué token de ingesta usan los fragmentos de código",
       "copiedWithToken": "Copiado con el token de la organización {name}",
       "tokenIncludedHint": "Copiar incluye el token de ingesta de la organización, que permanece oculto aquí.",
-      "maskedSelectionWarning": "El token oculto se copió como puntos. Usa Copiar o Revélalo primero."
+      "maskedSelectionWarning": "El token oculto se copió como puntos. Usa Copiar o Revélalo primero.",
+      "wrapLines": "Ajustar líneas",
+      "showAll": "Mostrar {count} línea | Mostrar las {count} líneas",
+      "showLess": "Mostrar menos"
+    },
+    "jsonViewer": {
+      "include": "Filtrar por este valor",
+      "exclude": "Excluir este valor",
+      "copyValue": "Copiar valor",
+      "fieldCount": "{count} campo | {count} campos",
+      "itemCount": "{count} elemento | {count} elementos"
     },
     "spinner": {
       "loading": "Cargando"
@@ -24003,6 +24184,11 @@
       "steps": "Pasos",
       "stepOf": "Paso {current} de {total}",
       "swipeHint": "desliza para ver el resto"
+    },
+    "tabs": {
+      "more": "Más",
+      "unsaved": "Cambios sin guardar",
+      "locked": "Bloqueado"
     },
     "statStrip": {
       "filters": "Filtros",
@@ -24049,7 +24235,10 @@
       "moreInfo": "Más información"
     },
     "dialog": {
-      "closeDialog": "Cerrar diálogo"
+      "closeDialog": "Cerrar diálogo",
+      "discardChanges": "¿Descartar los cambios?",
+      "keepEditing": "Seguir editando",
+      "discard": "Descartar"
     },
     "drawer": {
       "closeDrawer": "Cerrar panel"
@@ -24072,6 +24261,32 @@
       "clear": "Limpiar"
     },
     "file": {
+      "removeNamed": "Quitar {name}",
+      "sourceLabel": "Importar desde",
+      "sourceFile": "Archivo",
+      "sourceUrl": "URL",
+      "sourcePaste": "Pegar",
+      "dropPrompt": "Suelta un archivo aquí o {choose}",
+      "dropPromptMultiple": "Suelta archivos aquí o {choose}",
+      "chooseAFile": "elige un archivo",
+      "chooseFiles": "elige archivos",
+      "chooseFileButton": "Elegir archivo",
+      "chooseFilesButton": "Elegir archivos",
+      "noFileChosen": "Ningún archivo elegido",
+      "dropToUpload": "Suelta para subir",
+      "upToSize": "hasta {size}",
+      "upToSizeEach": "hasta {size} cada uno",
+      "oneFile": "un archivo",
+      "upToFiles": "hasta {count} archivos",
+      "typeRejected": "Solo se aceptan archivos {allowed}",
+      "sizeRejected": "{size} supera el límite de {max}",
+      "countRejected": "Solo {count} archivo a la vez | Solo {count} archivos a la vez",
+      "uploadFailed": "Error al subir",
+      "uploaded": "Subido",
+      "urlPlaceholder": "URL del archivo",
+      "urlHelp": "Lo obtenemos una vez al importar.",
+      "textPlaceholder": "Pega el contenido aquí",
+      "invalidJson": "JSON no válido: {detail}",
       "removeFile": "Eliminar archivo",
       "clearAll": "Limpiar todo"
     },
@@ -24086,7 +24301,14 @@
     "pagination": {
       "pagination": "Paginación",
       "previousPage": "Página anterior",
-      "nextPage": "Página siguiente"
+      "nextPage": "Página siguiente",
+      "onFirstPage": "Ya estás en la primera página",
+      "onLastPage": "Ya estás en la última página",
+      "range": "{from}–{to} de {total}",
+      "rangeOfMany": "{from}–{to} de muchos",
+      "pageOf": "Página {page} de {pages}",
+      "perPage": "{size} por página",
+      "pageSize": "Filas por página"
     },
     "select": {
       "more": "más",
@@ -24096,6 +24318,10 @@
       "noOptionsFound": "No se encontraron opciones",
       "multiSelect": "Selección múltiple",
       "singleSelect": "Selección única",
+      "any": "Cualquiera",
+      "noMatches": "Sin coincidencias para \"{term}\"",
+      "clearSearch": "Borrar búsqueda",
+      "addOption": "Añadir \"{value}\"",
       "moreInfoAbout": "Más información sobre {field}",
       "moreInfo": "Más información"
     },
@@ -24138,7 +24364,10 @@
       "removeColumnAria": "Eliminar columna",
       "formatColumnAria": "Formatear columna",
       "selectedOfTotal": "{selected} de {total} seleccionados",
-      "selectedCount": "{selected} seleccionados"
+      "selectedCount": "{selected} seleccionados",
+      "clearSelection": "Borrar",
+      "rowActions": "Acciones de fila",
+      "moreRowActions": "Más acciones"
     },
     "predefinedThemes": {
       "title": "Tema",
@@ -24289,7 +24518,7 @@
         "ok": "OK",
         "normal": "Normal",
         "firing": "Disparada",
-        "notifyfailed": "Notificación fallida",
+        "notifyfailed": "Entrega fallida",
         "flapping": "Inestable",
         "anomaly": "Anomalía",
         "succeeded": "Exitoso",
@@ -25824,6 +26053,7 @@
       "packUnavailableHint": "El contenido curado para esta carga de trabajo todavía no está disponible. Mientras tanto, crea un dashboard para graficarlo.",
       "partialTelemetryKubernetes": "Encontramos streams de Kubernetes, pero no las métricas que necesita esta página (kubeletstats o receptor de clúster). Revisa los receptores de tu colector.",
       "partialTelemetryHosts": "Encontramos streams de hosts, pero no las métricas que necesita esta página. Revisa el receptor hostmetrics de tu colector.",
+      "hostMetricsMissingTitle": "No se encontraron métricas de host",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first} y {count} más",
       "hiddenFootnote": "Aquí también aparecen las fuentes de datos a las que no tienes acceso.",
@@ -26608,7 +26838,8 @@
         "p95": "La cola lenta: 1 de cada 20 llamadas tardó al menos este tiempo. Medido a partir de las llamadas completadas en las trazas de tu aplicación.",
         "p99": "El 1 % de llamadas más lento tardó al menos este tiempo. Medido a partir de las llamadas completadas en las trazas de tu aplicación.",
         "load": "Tiempo total que tus aplicaciones dedicaron a llamadas a esta base de datos, medido a partir de las trazas de tu aplicación. Muestra cuánto tráfico atendió esta base de datos para tus aplicaciones.",
-        "attention": "Qué tan cerca está esta instancia de un límite que publica su propio motor — hoy, conexiones frente a max_connections. La peor proporción, no una puntuación combinada. Ordenado de mayor a menor, con las instancias cuya salud no se puede leer al principio, porque una que no se puede ver no es una que se sepa saludable. Medido en el servidor de la base de datos, por lo que no es comparable con el Tiempo de base de datos que está al lado."
+        "attention": "Qué tan cerca está esta instancia de un límite que publica su propio motor — hoy, conexiones frente a max_connections. La peor proporción, no una puntuación combinada. Ordenado de mayor a menor, con las instancias cuya salud no se puede leer al principio, porque una que no se puede ver no es una que se sepa saludable. Medido en el servidor de la base de datos, por lo que no es comparable con el Tiempo de base de datos que está al lado.",
+        "calls": "Cuántas veces tus aplicaciones llamaron a esta base de datos, medido a partir de las trazas de tu aplicación."
       },
       "failedChip": "{count} fallidas",
       "columnSubLabels": {
@@ -27049,7 +27280,8 @@
         "tableHealthHint": "Tamaño de la tabla, estado de bloat y vacío. El bloat y el vacío son solo de PostgreSQL.",
         "deadlocksLocked": "Los interbloqueos son una función Enterprise. Actualice para ver qué consultas se interbloquearon entre sí y por qué. Las demás pestañas de base de datos funcionan en todos los planes.",
         "blockedLocked": "Las consultas bloqueadas son una función Enterprise. Actualice para ver qué sesiones están esperando un bloqueo y qué lo está reteniendo. Las demás pestañas de base de datos funcionan en todos los planes.",
-        "tableHealthLocked": "La salud de la tabla es una función Enterprise. Actualice para rastrear el tamaño de la tabla, el bloat y el estado de vacío. Las demás pestañas de base de datos funcionan en todos los planes."
+        "tableHealthLocked": "La salud de la tabla es una función Enterprise. Actualice para rastrear el tamaño de la tabla, el bloat y el estado de vacío. Las demás pestañas de base de datos funcionan en todos los planes.",
+        "queriesHintServer": "Tipos de consulta que tus bases de datos informaron en este periodo, contados dentro de la base de datos."
       }
     },
     "metrics": {
@@ -28274,6 +28506,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Suprimir el aviso",
     "savePolicyFailed": "No se pudo guardar la política",
+    "savePolicyFailedReason": "No se guardó la política. {reason}",
     "state_triggered": "Activado",
     "state_triaged": "Clasificado",
     "state_acknowledged": "Reconocido",

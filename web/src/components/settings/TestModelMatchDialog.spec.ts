@@ -45,36 +45,36 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-sub-title="subTitle"
+      :data-sub-title="subtitle"
       :data-persistent="String(persistent)"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-disabled="String(primaryButtonDisabled)"
-      :data-primary-loading="String(primaryButtonLoading)"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
+      :data-primary-disabled="String(primary?.disabled)"
+      :data-primary-loading="String(primary?.loading)"
     >
       <slot name="header" />
       <slot />
@@ -82,11 +82,11 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -99,8 +99,8 @@ const OIconStub = {
 
 const OBadgeStub = {
   name: "OBadge",
-  props: ["variant"],
-  template: `<span data-test="o-badge" :data-variant="variant"><slot /></span>`,
+  props: ["tone"],
+  template: `<span data-test="o-badge" :data-variant="tone"><slot /></span>`,
 };
 
 const OButtonStub = {
@@ -224,31 +224,28 @@ describe("TestModelMatchDialog", () => {
       wrapper = mountDialog({ modelValue: true });
       const dialog = wrapper.findComponent(ODialogStub);
       expect(dialog.props("title")).toBe("Test model match");
-      expect(dialog.props("subTitle")).toBe(
+      expect(dialog.props("subtitle")).toBe(
         "Simulate how a model name from your spans would match against pricing rules.",
       );
     });
 
-    it("uses width 50 on ODialog", () => {
+    it("opens at the fixed lg (720) size", () => {
       wrapper = mountDialog({ modelValue: true });
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("width")).toBe(50);
+      expect(dialog.props("size")).toBe("lg");
     });
 
-    it("marks the dialog as persistent", () => {
+    it("can be dismissed, since it holds no edits to lose", () => {
       wrapper = mountDialog({ modelValue: true });
       const dialog = wrapper.findComponent(ODialogStub);
-      // Vue serializes the bare `persistent` attribute as the empty string
-      // when the stub declares it as an untyped prop; either value indicates
-      // the attribute is present.
-      expect([true, ""]).toContain(dialog.props("persistent"));
+      expect(dialog.props("persistent")).toBeFalsy();
     });
 
     it("forwards the i18n labels to ODialog buttons", () => {
       wrapper = mountDialog({ modelValue: true });
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Test match");
-      expect(dialog.props("secondaryButtonLabel")).toBe("Close");
+      expect(dialog.props("primary")?.label).toBe("Test match");
+      expect(dialog.props("secondary")?.label).toBe("Close");
     });
 
     it("forwards modelValue=true to ODialog open", () => {
@@ -285,7 +282,7 @@ describe("TestModelMatchDialog", () => {
     it("disables the primary button when testModelName is empty", () => {
       wrapper = mountDialog({ modelValue: true });
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonDisabled")).toBe(true);
+      expect(dialog.props("primary")?.disabled).toBe(true);
     });
 
     it("enables the primary button once a model name is typed", async () => {
@@ -293,7 +290,7 @@ describe("TestModelMatchDialog", () => {
       (wrapper.vm as any).testModelName = "gpt-4";
       await nextTick();
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonDisabled")).toBe(false);
+      expect(dialog.props("primary")?.disabled).toBeFalsy();
     });
 
     it("disables the primary button while the typed time is unreadable (V-N3)", async () => {
@@ -301,19 +298,19 @@ describe("TestModelMatchDialog", () => {
       (wrapper.vm as any).testModelName = "gpt-4";
       wrapper.findComponent(OTimeStub).vm.$emit("invalid", true);
       await nextTick();
-      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(true);
+      expect(wrapper.findComponent(ODialogStub).props("primary")?.disabled).toBe(true);
       wrapper.findComponent(OTimeStub).vm.$emit("invalid", false);
       await nextTick();
-      expect(wrapper.findComponent(ODialogStub).props("primaryButtonDisabled")).toBe(false);
+      expect(wrapper.findComponent(ODialogStub).props("primary")?.disabled).toBeFalsy();
     });
 
-    it("reflects the testing state in primaryButtonLoading", async () => {
+    it("reflects the testing state in primary?.loading", async () => {
       wrapper = mountDialog({ modelValue: true });
       (wrapper.vm as any).testModelName = "gpt-4";
       (wrapper.vm as any).testing = true;
       await nextTick();
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLoading")).toBe(true);
+      expect(dialog.props("primary")?.loading).toBe(true);
     });
   });
 
@@ -1139,7 +1136,7 @@ describe("TestModelMatchDialog", () => {
       const badge = wrapper.find('[data-test="o-badge"]');
       expect(badge.exists()).toBe(true);
       expect(badge.text()).toBe("Global");
-      expect(badge.attributes("data-variant")).toBe("default-outline");
+      expect(badge.attributes("data-variant")).toBe("outline");
     });
 
     it("renders the matched tier's active UTC hours when it has time windows", async () => {

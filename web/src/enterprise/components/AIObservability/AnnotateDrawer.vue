@@ -25,12 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="open"
     side="right"
-    size="lg"
+    size="md"
     :title="t('aiObservability.annotate.title', { scope: scopeLabel })"
-    :primary-button-label="t('aiObservability.annotate.save')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-disabled="!filledCount"
-    :primary-button-loading="saving"
+    :primary="{
+      label: t('aiObservability.annotate.save'),
+      disabled: !filledCount,
+      loading: saving,
+    }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="annotate-drawer"
     @update:open="(value: boolean) => emit('update:open', value)"
     @click:primary="save"
@@ -41,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTruncatedText class="text-text-heading text-sm font-semibold">
           {{ targetLabel }}
         </OTruncatedText>
-        <OTag variant="default-soft" shape="rounded" class="ms-auto shrink-0">
+        <OTag tone="neutral" class="ms-auto shrink-0">
           {{ t("aiObservability.annotate.viaAnnotation") }}
         </OTag>
       </div>
@@ -79,15 +81,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </span>
 
-        <div
+        <OEmptyState
           v-if="!picked.length"
-          class="text-text-secondary flex flex-col items-center gap-1 py-10 text-center"
+          size="compact"
+          icon="fact-check"
+          :title="t('aiObservability.annotate.emptyTitle')"
+          :text="t('aiObservability.annotate.emptyBody')"
           data-test="annotate-drawer-empty"
-        >
-          <OIcon name="fact-check" class="text-text-disabled h-8 w-8" />
-          <span class="text-sm">{{ t("aiObservability.annotate.emptyTitle") }}</span>
-          <span class="text-xs">{{ t("aiObservability.annotate.emptyBody") }}</span>
-        </div>
+        />
 
         <div
           v-for="dimension in picked"
@@ -99,15 +100,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText class="text-text-heading font-mono text-sm font-semibold">
               {{ raw(dimension.name) }}
             </OTruncatedText>
-            <OTag variant="default-soft" shape="rounded" class="shrink-0">
+            <OTag tone="neutral" class="shrink-0">
               {{ raw(dimension.dataType) }}
             </OTag>
-            <OTag variant="default-outline" shape="rounded" class="shrink-0">
+            <OTag tone="outline" class="shrink-0">
               {{ t("aiObservability.annotate.version", { version: dimension.version }) }}
             </OTag>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
               class="ms-auto"
               :aria-label="t('common.remove')"
               :data-test="`annotate-drawer-remove-${dimension.id}`"
@@ -121,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="dimension.dataType === 'numeric'">
             <div class="flex items-baseline gap-2">
               <span
-                class="font-mono text-lg font-bold"
+                class="font-mono text-lg font-semibold"
                 :class="isHealthy(dimension) ? 'text-text-heading' : 'text-status-warning-text'"
               >
                 {{ numericDisplay(dimension) }}
@@ -198,6 +199,7 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmQueuesService, { type LlmScoreConfigOption } from "@/services/llm-queues.service";
 import llmAnnotationsService, { type AnnotationScope } from "@/services/llm-annotations.service";

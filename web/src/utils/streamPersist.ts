@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { PLATFORM_STREAM_NAMES } from "@/utils/internalStreams";
+
 const STORAGE_KEYS = {
   logs: (orgId: string) => `oo_selected_stream_logs_${orgId}`,
   traces: (orgId: string) => `oo_selected_stream_traces_${orgId}`,
@@ -115,8 +117,14 @@ const lastStreamsOfType = (orgId: string, streamType: string): string[] => {
 
 export interface DashboardStreamOption {
   name: string;
+  is_internal?: boolean;
   stats?: { doc_num?: number; doc_time_max?: number };
 }
+
+const isInternalStream = (stream: DashboardStreamOption) =>
+  stream.name.startsWith("_") ||
+  stream.is_internal === true ||
+  PLATFORM_STREAM_NAMES.has(stream.name);
 
 const hasData = (stream: DashboardStreamOption) =>
   (stream.stats?.doc_num ?? 0) > 0 || (stream.stats?.doc_time_max ?? 0) > 0;
@@ -136,10 +144,10 @@ export function pickDashboardPanelStream(
   const names = streams.map((stream) => stream.name);
   const remembered = lastStreamsOfType(orgId, streamType).find((name) => names.includes(name));
   if (remembered) return remembered;
-  // Underscore-prefixed streams are internal (e.g. _agent_signals) and usually empty for the user.
-  const userStreams = streams.filter((stream) => !stream.name.startsWith("_"));
+  // A default must be the user's own data, so server-written and underscore streams are skipped.
+  const userStreams = streams.filter((stream) => !isInternalStream(stream));
   const freshest = userStreams
     .filter(hasData)
     .sort((a, b) => (b.stats?.doc_time_max ?? 0) - (a.stats?.doc_time_max ?? 0))[0];
-  return freshest?.name ?? userStreams[0]?.name ?? names[0] ?? "";
+  return freshest?.name ?? userStreams[0]?.name ?? "";
 }

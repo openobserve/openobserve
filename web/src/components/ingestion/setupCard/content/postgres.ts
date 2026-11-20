@@ -169,7 +169,7 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
             labelKey: "ingestion.setupCard.portLabel",
             default: "5432",
             placeholder: raw("5432"),
-            width: "sm",
+            width: "s",
           },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),

@@ -223,7 +223,7 @@ describe("MetricChartTile", () => {
     await flushPromises();
     const chart = () => wrapper.findComponent({ name: "MetricCardChart" });
     expect(chart().props("results")).toEqual([SERIES]);
-    expect(wrapper.findComponent({ name: "LoadingProgress" }).props("loading")).toBe(true);
+    expect(wrapper.findComponent({ name: "OLoadingLine" }).props("active")).toBe(true);
 
     // The kept samples stay on the axis they were queried for.
     expect(chart().props("timeRange")).toEqual({ start_time: 1, end_time: 2 });
@@ -232,7 +232,7 @@ describe("MetricChartTile", () => {
     await flushPromises();
     expect(chart().props("results")).toEqual([NEXT]);
     expect(chart().props("timeRange")).toEqual({ start_time: 1, end_time: 3 });
-    expect(wrapper.findComponent({ name: "LoadingProgress" }).props("loading")).toBe(false);
+    expect(wrapper.findComponent({ name: "OLoadingLine" }).props("active")).toBe(false);
   });
 
   it("draws the dashboard panel line on its header edge, not a corner spinner, on first load and refresh", async () => {
@@ -240,32 +240,28 @@ describe("MetricChartTile", () => {
     runQuery.mockImplementationOnce(() => new Promise((resolve) => (first = resolve)));
     wrapper = mountTile();
     await flushPromises();
-    const line = () => wrapper.findComponent({ name: "LoadingProgress" });
-    expect(line().props()).toMatchObject({
-      loading: true,
-      loadingProgressPercentage: 0,
-      indeterminate: false,
-    });
+    const line = () => wrapper.findComponent({ name: "OLoadingLine" });
+    expect(line().props("active")).toBe(true);
     expect(line().element.nextElementSibling?.getAttribute("data-test")).toBe("tile-loading");
     expect(wrapper.findComponent({ name: "OSpinner" }).exists()).toBe(false);
     expect(wrapper.emitted("busy")!.at(-1)).toEqual([true]);
 
     first(SERIES);
     await flushPromises();
-    expect(line().props("loading")).toBe(false);
+    expect(line().props("active")).toBe(false);
     expect(wrapper.emitted("busy")!.at(-1)).toEqual([false]);
 
     let answer!: (value: any) => void;
     runQuery.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
     await wrapper.setProps({ timeRange: { start_time: 1, end_time: 3 } });
     await flushPromises();
-    expect(line().props("loading")).toBe(true);
+    expect(line().props("active")).toBe(true);
     expect(wrapper.find('[data-test="tile-refreshing"]').exists()).toBe(false);
     expect(wrapper.emitted("busy")!.at(-1)).toEqual([true]);
 
     answer(SERIES);
     await flushPromises();
-    expect(line().props("loading")).toBe(false);
+    expect(line().props("active")).toBe(false);
     expect(wrapper.emitted("busy")!.at(-1)).toEqual([false]);
   });
 

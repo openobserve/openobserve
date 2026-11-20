@@ -5,20 +5,18 @@
         v-model:selected-ids="selectedIds"
         selection="multiple"
         data-test="score-config-list-table"
-        :data="numberedRows"
+        :data="filteredRows"
         :columns="columns"
         row-key="id"
         :loading="loading"
         :forbidden="forbidden"
         :global-filter="search"
-        :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
         :default-columns="false"
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="score-config-list"
-        width="100%"
         class="h-full w-full"
         @row-click="(row: any) => $emit('view', row)"
       >
@@ -28,7 +26,6 @@
             class="min-w-0 flex-1 md:min-w-48"
             :placeholder="t('onlineEvals.scoreConfig.searchPlaceholder')"
             data-test="score-config-list-search-input"
-            clearable
             @update:model-value="$emit('update:search', $event as string)"
           />
           <OStatStrip
@@ -47,40 +44,36 @@
 
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastRunAt"
             :loading="refreshing || loading"
-            shortcut-id="scoreConfigsRefresh"
+            shortcut="scoreConfigsRefresh"
             data-test="score-config-list-refresh-btn"
             @click="emit('refresh')"
           />
         </template>
 
         <template #empty>
-          <div class="flex items-center justify-center py-8">
-            <OEmptyState
-              size="hero"
-              preset="no-score-configs"
-              :filtered="hasFilters"
-              :actions="[
-                {
-                  id: 'create',
-                  icon: 'add',
-                  titleKey: 'emptyState.noScoreConfigs.action',
-                  descriptionKey: 'emptyState.noScoreConfigs.actionDesc',
-                },
-                {
-                  id: 'import',
-                  icon: 'upload-file',
-                  titleKey: 'emptyState.noScoreConfigs.import',
-                  descriptionKey: 'emptyState.noScoreConfigs.importDesc',
-                },
-              ]"
-              data-test="score-config-empty-state"
-              @action="onEmptyAction"
-            />
-          </div>
+          <OEmptyState
+            :kind="hasFilters ? 'filtered' : 'first-run'"
+            :title="
+              hasFilters
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.scoreConfigs') })
+                : t('emptyState.noScoreConfigs.title')
+            "
+            :text="
+              hasFilters
+                ? t('emptyState.filtered.description', {
+                    noun: t('emptyState.nouns.scoreConfigs'),
+                  })
+                : t('emptyState.noScoreConfigs.description')
+            "
+            :icon="hasFilters ? undefined : 'dashboard'"
+            :action-label="hasFilters ? undefined : t('emptyState.noScoreConfigs.action')"
+            :secondary-action-label="hasFilters ? undefined : t('emptyState.noScoreConfigs.import')"
+            @action="onEmptyAction(hasFilters ? 'clear-filters' : 'create')"
+            @secondary-action="onEmptyAction('import')"
+            data-test="score-config-empty-state"
+          />
         </template>
 
         <template #cell-type="{ row }">
@@ -109,9 +102,8 @@
 
         <template #selection-actions>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="download"
+            variant="secondary"
+            icon="download"
             data-test="score-config-bulk-export-btn"
             @click="handleBulkExport"
           >
@@ -122,48 +114,49 @@
         <template #cell-actions="{ row }">
           <div class="actions-container flex items-center">
             <OButton
+              icon-only
               :data-test="`score-config-list-${row.name}-edit-btn`"
               data-row-action="edit"
               variant="ghost"
-              size="icon-sm"
               :title="t('onlineEvals.actions.edit')"
-              icon-left="edit"
+              icon="edit"
               class="max-md:hidden"
               @click.stop="$emit('edit', row)"
             />
             <OButton
+              icon-only
               :data-test="`score-config-list-${row.name}-export-btn`"
               variant="ghost"
-              size="icon-sm"
               :title="t('onlineEvals.actions.export')"
-              icon-left="download"
+              icon="download"
               class="max-md:hidden"
               @click.stop="$emit('export', row)"
             />
             <OButton
+              icon-only
               :data-test="`score-config-list-${row.name}-delete-btn`"
               data-row-action="delete"
-              variant="ghost-destructive"
-              size="icon-sm"
+              variant="danger-ghost"
               :title="t('onlineEvals.actions.delete')"
-              icon-left="delete"
+              icon="delete"
               class="max-md:hidden"
               @click.stop="$emit('delete', row)"
             />
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  icon-only
                   :aria-label="t('common.moreActions')"
-                  icon-left="more-vert"
+                  icon="more-vert"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   data-test="score-config-list-row-more-actions"
                   @click.stop
                 />
               </template>
               <ODropdownItem
-                icon-left="edit"
+                icon="edit"
                 class="md:hidden"
                 :data-test="`score-config-list-${row.name}-edit-btn-menu`"
                 @select="$emit('edit', row)"
@@ -171,7 +164,7 @@
                 <span>{{ t("onlineEvals.actions.edit") }}</span>
               </ODropdownItem>
               <ODropdownItem
-                icon-left="download"
+                icon="download"
                 class="md:hidden"
                 :data-test="`score-config-list-${row.name}-export-btn-menu`"
                 @select="$emit('export', row)"
@@ -179,8 +172,8 @@
                 <span>{{ t("onlineEvals.actions.export") }}</span>
               </ODropdownItem>
               <ODropdownItem
-                icon-left="delete"
-                variant="destructive"
+                icon="delete"
+                tone="danger"
                 class="md:hidden"
                 :data-test="`score-config-list-${row.name}-delete-btn-menu`"
                 @select="$emit('delete', row)"
@@ -215,7 +208,6 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
 import { dataTypeOf, entityId, valueOf } from "./utils/evalEntity";
 import EvalListShell from "./EvalListShell.vue";
-import { useNumberedRows } from "./composables/useNumberedRows";
 import type { ForbiddenState } from "@/utils/featureGate";
 import { matchesAnyKey } from "@/utils/filterKeys";
 
@@ -262,14 +254,6 @@ function handleBulkExport() {
 
 const columns = computed(() =>
   [
-    {
-      id: "#",
-      header: raw("#"),
-      accessorKey: "#",
-      sortable: false,
-      size: 56,
-      meta: { align: "left" },
-    },
     {
       id: "name",
       header: t("onlineEvals.scoreConfig.columns.name"),
@@ -348,7 +332,7 @@ const columns = computed(() =>
     ...c,
     // Every column except the row index, the name (row identity) and the
     // actions column is offered in OTable's "Manage columns" chooser.
-    hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
+    hideable: c.id !== "name" && !c.isAction,
   })),
 );
 
@@ -357,8 +341,6 @@ const filteredRows = computed(() =>
     matchesAnyKey(typeFilters.value, row, (r, key) => dataTypeOf(r) === key),
   ),
 );
-
-const numberedRows = useNumberedRows(filteredRows);
 
 // Data-type breakdown for the summary strip (over all configs, so the counts
 // stay stable as you filter). Tiles double as filters wired to `typeFilters`.

@@ -51,20 +51,13 @@ const store = createStore({
 const stubs = {
   ODialog: {
     name: "ODialog",
-    props: [
-      "open",
-      "title",
-      "primaryButtonLabel",
-      "primaryButtonDisabled",
-      "secondaryButtonLabel",
-      "formId",
-    ],
+    props: ["open", "title", "primary", "primary", "secondary", "formId"],
     emits: ["update:open", "click:primary", "click:secondary"],
     template: `<div v-if="open" class="o-dialog" v-bind="$attrs" :data-title="title">
       <slot />
-      <button class="o-dialog-secondary" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-      <button v-if="formId" class="o-dialog-primary" type="submit" :form="formId">{{ primaryButtonLabel }}</button>
-      <button v-else class="o-dialog-primary" :disabled="primaryButtonDisabled" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+      <button class="o-dialog-secondary" @click="$emit('click:secondary')">{{ secondary?.label }}</button>
+      <button v-if="formId" class="o-dialog-primary" type="submit" :form="formId">{{ primary?.label }}</button>
+      <button v-else class="o-dialog-primary" :disabled="primary?.disabled" @click="$emit('click:primary')">{{ primary?.label }}</button>
     </div>`,
   },
   ODropdown: { name: "ODropdown", template: '<div><slot name="trigger" /><slot /></div>' },
@@ -569,7 +562,7 @@ describe("SavedFunnelBar, the builder header (AC-67, AC-68, AC-70)", () => {
     const call = confirmMock.mock.calls.at(-1)![0];
     expect(call.messageKeypath).toBe("rum.analytics.saved.deleteMessage");
     expect(call.messageName).toBe("Signup");
-    expect(call.confirmVariant).toBe("destructive");
+    expect(call.kind).toBe("destructive");
     expect(api.funnels.has(row.id)).toBe(false);
     const pa = useProductAnalytics();
     expect(pa.openedFunnel.value).toBeNull();

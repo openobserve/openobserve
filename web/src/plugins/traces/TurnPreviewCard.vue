@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        (the slotted chip). Wrapper is `display:contents` so it adds no box. -->
   <span class="contents">
     <slot />
-    <OTooltip :side="side" :delay="delay" max-width="16.25rem" content-class="p-0!">
+    <OTooltip :side="side" content-class="p-0!">
       <template #content>
         <div
           class="text-text-body w-63 px-3 py-2.75 text-xs"
@@ -38,15 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Header: Turn N · time · status -->
           <div class="mb-2 flex items-center gap-2">
-            <span class="text-compact font-bold">
+            <span class="text-compact font-semibold">
               {{ t("traces.sessionDetail.turnLabel") }} {{ index + 1 }}
             </span>
-            <span class="text-3xs text-text-muted">{{ timeLabel }}</span>
-            <OBadge
-              size="sm"
-              class="ms-auto"
-              :variant="turn.status === 'error' ? 'error-soft' : 'success-soft'"
-            >
+            <span class="text-2xs text-text-muted">{{ timeLabel }}</span>
+            <OBadge size="sm" class="ms-auto" :tone="turn.status === 'error' ? 'err' : 'ok'">
               {{
                 turn.status === "error"
                   ? t("traces.sessionDetail.statusError")
@@ -58,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- User message preview -->
           <div class="mb-2.25 leading-[1.5]">
             <span
-              class="text-3xs text-text-muted mb-0.5 block font-bold tracking-[0.05em] uppercase"
+              class="text-2xs text-text-muted mb-0.5 block font-semibold tracking-[0.05em] uppercase"
             >
               {{ t("traces.sessionDetail.roles.user") }}
             </span>

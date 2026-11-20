@@ -19,8 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="show"
     size="sm"
     :title="t('pipeline.editBackfillJobTitle')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="t('pipeline.updateJob')"
+    :secondary="{ label: t('common.cancel') }"
+    :primary="{ label: t('pipeline.updateJob') }"
     form-id="edit-backfill-form"
     @click:secondary="onCancel"
     data-test="edit-backfill-job-dialog"
@@ -52,9 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Advanced Options -->
         <OCollapsible
           class="mt-2"
-          v-model="showAdvanced"
-          icon="settings"
-          :label="t('pipeline.advancedOptions')"
+          v-model:open="showAdvanced"
+          :title="t('pipeline.advancedOptions')"
           data-test="advanced-options-expansion"
         >
           <div class="mt-2 space-y-2 p-3">
@@ -266,7 +265,7 @@ const onSubmit = async (value: BackfillForm) => {
       title: t("pipeline.confirmDataDeletion"),
       message: t("pipeline.editBackfillDeleteConfirmMessage"),
       confirmLabel: t("pipeline.yesDeleteAndBackfill"),
-      confirmVariant: "destructive",
+      kind: "destructive",
     });
     if (ok) {
       await updateBackfillJobRequest(value);

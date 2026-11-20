@@ -18,10 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODropdown align="end">
     <template #trigger>
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="bookmark"
-        icon-right="arrow-drop-down"
+        variant="secondary"
+        icon="bookmark"
+        icon-end="arrow-drop-down"
         data-test="metrics-explorer-views-btn"
       >
         {{ buttonLabel }}
@@ -41,26 +40,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODropdownItem>
     <ODropdownSeparator />
     <ODropdownItem
-      icon-left="bookmark-add"
+      icon="bookmark-add"
       data-test="metrics-explorer-views-save-as"
       @select="saveDialogOpen = true"
     >
       {{ t("metrics.explorer.views.saveAs") }}
     </ODropdownItem>
     <template v-if="activeView">
-      <ODropdownItem icon-left="close" data-test="metrics-explorer-views-clear" @select="clearView">
+      <ODropdownItem icon="close" data-test="metrics-explorer-views-clear" @select="clearView">
         {{ t("metrics.explorer.views.clear") }}
       </ODropdownItem>
-      <ODropdownItem
-        icon-left="save"
-        data-test="metrics-explorer-views-update"
-        @select="updateActive"
-      >
+      <ODropdownItem icon="save" data-test="metrics-explorer-views-update" @select="updateActive">
         {{ t("metrics.explorer.views.update", { name: activeView.view_name }) }}
       </ODropdownItem>
       <ODropdownItem
-        variant="destructive"
-        icon-left="delete"
+        tone="danger"
+        icon="delete"
         data-test="metrics-explorer-views-delete"
         @select="deleteDialogOpen = true"
       >
@@ -74,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     form-id="metrics-explorer-view-form"
     :title="t('metrics.explorer.views.saveTitle')"
-    :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('common.save')"
+    :secondary="{ label: t('confirmDialog.cancel') }"
+    :primary="{ label: t('common.save') }"
     data-test="metrics-explorer-views-save-dialog"
     @click:secondary="saveDialogOpen = false"
   >
@@ -99,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('metrics.explorer.views.deleteTitle')"
     message-keypath="metrics.explorer.views.deleteMessage"
     :message-name="activeView?.view_name"
-    ok-variant="destructive"
+    kind="destructive"
     @update:ok="deleteActive"
     @update:cancel="deleteDialogOpen = false"
   />

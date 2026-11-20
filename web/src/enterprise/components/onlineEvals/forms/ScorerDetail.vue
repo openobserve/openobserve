@@ -1,12 +1,12 @@
 <template>
   <ODrawer
+    size="xl"
     bleed
     :open="open"
     side="right"
-    :width="70"
     :title="raw(row?.name)"
     :title-data-test="'scorer-detail-name-badge'"
-    :sub-title="t('onlineEvals.scorer.detail.eyebrow')"
+    :subtitle="t('onlineEvals.scorer.detail.eyebrow')"
     data-test="scorer-detail"
     @update:open="handleOpenChange"
   >
@@ -26,12 +26,9 @@
           class="flex-none"
           data-test="scorer-detail-runs-window"
         />
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+        <ORefreshButton
+          :last-run-at="lastRunAt"
           :loading="isLoadingRuns"
-          :title="t('onlineEvals.scorer.detail.refresh')"
           data-test="scorer-detail-runs-refresh"
           @click="refreshRuns"
         />
@@ -58,7 +55,7 @@
             {{ card.label }}
           </div>
           <div class="flex items-baseline gap-0.75">
-            <span class="text-text-secondary text-2xl leading-none font-bold">
+            <span class="text-text-secondary text-2xl leading-none font-semibold">
               {{ card.value }}
             </span>
             <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
@@ -176,7 +173,7 @@
             </div>
             <OEmptyState
               v-else
-              size="inline"
+              size="compact"
               :title="t('onlineEvals.scorer.detail.producesEmpty')"
               data-test="scorer-detail-produces-empty"
             />
@@ -259,13 +256,9 @@
             row-key="id"
             :loading="isLoadingRuns"
             :loading-reset-key="scorerIdRef"
-            :show-global-filter="false"
-            :show-footer="false"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.scorer.detail.runs.empty')"
-            show-index
-            width="100%"
             class="w-full"
           >
             <template #cell-timestampMs="{ row }">
@@ -302,7 +295,7 @@
             </p>
             <OEmptyState
               v-if="usedByCount === 0 && !experimentsLoading"
-              size="inline"
+              size="compact"
               :title="t('onlineEvals.scorer.detail.usedByEmpty')"
               data-test="scorer-detail-used-by-empty"
             />
@@ -358,6 +351,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { useLoadedAt } from "@/composables/useLoadedAt";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -648,6 +643,8 @@ const {
   refresh: refreshRunsData,
 } = useScorerRuns(scorerIdRef, dateWindow, runsEnabled, selectedAgent);
 
+const lastRunAt = useLoadedAt(isLoadingRuns);
+
 async function refreshRuns() {
   syncDateWindow();
   // The window watcher's own read is not forced, and does not run at all when the window is unchanged.
@@ -853,7 +850,7 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-produces__name {
-  font-weight: 700;
+  font-weight: var(--font-semibold);
 }
 
 .sd-produces__version,
@@ -917,7 +914,7 @@ function relativeTime(timestampMs: number): string {
 
 .sd-used-list__meta {
   margin-left: auto;
-  font-size: var(--text-3xs);
+  font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }

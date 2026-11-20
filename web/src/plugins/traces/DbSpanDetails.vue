@@ -8,7 +8,6 @@ import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -140,13 +139,8 @@ const metadataRows = computed(() =>
     <div v-if="dbmLocked && fingerprint" class="flex justify-end">
       <OTooltip :content="dbmLockedReason">
         <span class="inline-flex">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            disabled
-            data-test="traces-db-span-details-view-trend"
-          >
-            <template #icon-left>
+          <OButton variant="secondary" disabled data-test="traces-db-span-details-view-trend">
+            <template #icon>
               <OIcon name="lock" class="lock-chip" size="sm" />
             </template>
             {{ t("traces.dbSpanDetails.viewQueryTrend") }}
@@ -156,9 +150,8 @@ const metadataRows = computed(() =>
     </div>
     <div v-else-if="canViewTrend" class="flex justify-end">
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="trending-up"
+        variant="secondary"
+        icon="trending-up"
         data-test="traces-db-span-details-view-trend"
         @click="openQueryTrend"
       >
@@ -167,23 +160,21 @@ const metadataRows = computed(() =>
     </div>
 
     <OCard data-test="traces-db-span-details-metadata-grid">
-      <OCardSection class="px-0! py-0!">
-        <div class="flex flex-wrap gap-2">
-          <span
-            v-for="row in metadataRows"
-            :key="row.key"
-            :data-test="`traces-db-span-details-tag-${row.key}`"
-            class="rounded-default bg-surface-base border-border-default text-text-heading inline-flex items-center gap-1 border px-2 py-1 text-sm"
-          >
-            <span class="text-text-secondary">{{ row.label }}:</span>
-            <span class="break-all">{{ row.value }}</span>
-          </span>
-        </div>
-      </OCardSection>
+      <div class="flex flex-wrap gap-2">
+        <span
+          v-for="row in metadataRows"
+          :key="row.key"
+          :data-test="`traces-db-span-details-tag-${row.key}`"
+          class="rounded-default bg-surface-base border-border-default text-text-heading inline-flex items-center gap-1 border px-2 py-1 text-sm"
+        >
+          <span class="text-text-secondary">{{ row.label }}:</span>
+          <span class="break-all">{{ row.value }}</span>
+        </span>
+      </div>
     </OCard>
 
-    <OCard class="flex flex-1 flex-col" data-test="traces-db-span-details-query-editor">
-      <OCardSection class="flex min-h-[18.75rem] flex-1 flex-col p-0 p-1.5!">
+    <OCard flush class="flex-1" data-test="traces-db-span-details-query-editor">
+      <div class="flex h-full min-h-[18.75rem] flex-col p-1.5">
         <CodeQueryEditor
           v-if="queryText"
           :query="queryText"
@@ -201,13 +192,13 @@ const metadataRows = computed(() =>
         >
           {{ t("traces.dbSpanDetails.noQueryText") }}
         </div>
-      </OCardSection>
+      </div>
     </OCard>
 
     <OCollapsible
       v-if="hasPerformanceData"
-      v-model="performanceOpen"
-      :label="t('traces.dbSpanDetails.performance')"
+      v-model:open="performanceOpen"
+      :title="t('traces.dbSpanDetails.performance')"
       data-test="traces-db-span-details-performance"
     >
       <div class="px-3 py-2">

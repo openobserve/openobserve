@@ -41,7 +41,7 @@ vi.mock("@/lib/core/Button/OButton.vue", () => ({
     name: "OButton",
     template:
       '<button :data-test="$attrs[\'data-test\']" :disabled="disabled" @click="!disabled && $emit(\'click\')"><slot /></button>',
-    props: ["variant", "size", "iconLeft", "title", "disabled"],
+    props: ["variant", "size", "icon", "title", "disabled"],
     emits: ["click"],
     inheritAttrs: false,
   },
@@ -107,7 +107,7 @@ describe("ErrorSessionReplay", () => {
 
     it("renders a heading with Session Replay text", () => {
       // Assert
-      expect(wrapper.find("h4").text()).toContain("Session Replay");
+      expect(wrapper.find("h4").text()).toContain("Session replay");
     });
 
     it("renders the hint small element", () => {

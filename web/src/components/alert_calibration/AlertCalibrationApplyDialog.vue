@@ -19,37 +19,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="md"
     :title="copy.title(alertName)"
-    :primary-button-label="primary?.label"
-    :primary-button-data-test="primary?.dataTest"
-    :primary-button-loading="opening"
-    :secondary-button-label="copy.cancel()"
-    secondary-button-variant="outline"
+    :primary="{ label: primary?.label, loading: opening, dataTest: primary?.dataTest }"
+    :secondary="{ label: copy.cancel(), variant: 'secondary' }"
     data-test="alert-calibration-apply-dialog"
     @update:open="emit('update:open', $event)"
     @click:primary="primary?.run()"
     @click:secondary="emit('update:open', false)"
   >
     <div class="flex flex-col gap-4">
-      <OBanner
+      <OInlineNotice
         v-if="notice"
-        dense
-        inline-actions
-        :variant="notice.variant"
-        :data-severity="notice.variant"
+        :tone="notice.tone"
+        :data-severity="notice.tone"
         :data-test="`alert-calibration-apply-${state}`"
       >
         {{ notice.text }}
         <template v-if="state === 'failed'" #actions>
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             data-test="alert-calibration-apply-retry"
             @click="alertQuery.refetch()"
           >
             {{ copy.retry() }}
           </OButton>
         </template>
-      </OBanner>
+      </OInlineNotice>
 
       <div
         class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-6 gap-y-1.5"
@@ -67,7 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTruncatedText class="text-text-body min-w-0 text-sm">{{ row.label }}</OTruncatedText>
           <OSkeleton
             v-if="state === 'loading'"
-            type="text"
             class="h-5 w-16"
             data-test="alert-calibration-apply-current-loading"
           />
@@ -107,7 +100,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -182,19 +175,19 @@ const rows = computed(() =>
 );
 
 /** Red for a refusal or a failure, amber for a moved value, neutral for a gone or unsupported alert. */
-const notice = computed<{ variant: "error" | "warning" | "default"; text: I18nText } | null>(() => {
+const notice = computed<{ tone: "err" | "warn" | "neutral"; text: I18nText } | null>(() => {
   const stale = fields.value.find(isStaleField);
   switch (state.value) {
     case "stale":
-      return stale ? { variant: "warning", text: copy.value.stale(stale) } : null;
+      return stale ? { tone: "warn", text: copy.value.stale(stale) } : null;
     case "denied":
-      return { variant: "error", text: copy.value.denied() };
+      return { tone: "err", text: copy.value.denied() };
     case "failed":
-      return { variant: "error", text: copy.value.failed() };
+      return { tone: "err", text: copy.value.failed() };
     case "deleted":
-      return { variant: "default", text: copy.value.deleted() };
+      return { tone: "neutral", text: copy.value.deleted() };
     case "unsupported":
-      return { variant: "default", text: copy.value.unsupported() };
+      return { tone: "neutral", text: copy.value.unsupported() };
     default:
       return null;
   }

@@ -23,34 +23,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          bottom divider reaches the card edges (like Data Sources / Pipelines) —
          a padded root insets the header and makes it read as a floating bar.
          Padding is reintroduced on the body wrapper below the header instead. -->
-    <OPageLayout
-      :title="t('menu.home')"
-      :subtitle="t('home.subtitle')"
-      icon="home"
-      :tabs-below="tabOrder.length > 1"
-      bleed
-    >
+    <OPageLayout :title="t('menu.home')" bleed>
       <template v-if="isMobile && activeHomeTab === 'ai' && !aiLocked" #actions>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="home-mobile-chats-toggle"
           @click="mobileChatsOpen = true"
         >
-          <template #icon-left><OIcon name="menu" size="sm" /></template>
+          <template #icon><OIcon name="menu" size="sm" /></template>
           {{ t("chatHistory.title") }}
         </OButton>
       </template>
-      <!-- Top-level page header: module icon + "Home" title, with the home tabs
-           rendered as a full-width strip below (tabsBelow). The header owns its
-           own bottom divider when tabs are present; when only a single tab
-           exists we hand-draw the border so the header still reads as a header.
-           The tab bar keeps its drag-to-reorder behavior (OTabs `reorderable`);
-           OTabs draws the active underline flush with the header's divider. -->
+      <!-- Overview teleports its range and refresh here, so the page needs no band for them (R1, R5) -->
+      <template v-else-if="activeHomeTab === 'overview'" #actions>
+        <div id="home-overview-actions" class="contents" data-test="home-overview-actions" />
+      </template>
       <template v-if="tabOrder.length > 1" #header-tabs>
         <OTabs
           v-model="activeHomeTab"
-          align="left"
           reorderable
           data-test="home-tab-bar"
           @change="onTabChange"
@@ -187,8 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OEmptyState
               v-if="layout === 'forbidden'"
-              preset="no-access"
-              size="block"
+              kind="denied"
+              :title="t('emptyState.noAccess.title')"
+              :text="t('emptyState.noAccess.description')"
               data-test="home-no-access-empty-state"
             />
             <HomeNoDataState
@@ -207,7 +198,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
-            <OverviewTab @send-to-ai-chat="onSendToAiChat" />
+            <OverviewTab
+              actions-target="#home-overview-actions"
+              @send-to-ai-chat="onSendToAiChat"
+            />
           </div>
           <div v-else class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
             <UsageTab />
@@ -222,7 +216,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
-            <OverviewTab @send-to-ai-chat="onSendToAiChat" />
+            <OverviewTab
+              actions-target="#home-overview-actions"
+              @send-to-ai-chat="onSendToAiChat"
+            />
           </div>
 
           <!-- Usage tab -->

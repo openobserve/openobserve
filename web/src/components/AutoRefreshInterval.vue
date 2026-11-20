@@ -16,20 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex items-center">
-    <OPopover
-      v-model:open="btnRefreshInterval"
-      side="bottom"
-      align="center"
-      content-class="w-80"
-      :aria-label="t('search.autoRefreshTitle')"
-    >
+    <ODropdown v-model:open="btnRefreshInterval" side="bottom" align="center">
       <template #trigger>
         <OButton
           v-if="isCompact"
+          icon-only
           data-test="logs-search-bar-refresh-interval-btn"
-          size="icon-toolbar"
           :variant="variant"
-          :active="isAnimating"
+          :pressed="isAnimating"
           :aria-label="triggerAriaLabel"
         >
           <OIcon
@@ -42,8 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-else
           data-test="logs-search-bar-refresh-interval-btn-dropdown"
-          :variant="isOn ? 'outline-primary' : variant"
-          size="sm-toolbar"
+          :variant="variant"
+          :pressed="isOn"
           :aria-label="triggerAriaLabel"
         >
           <div class="flex flex-nowrap items-center">
@@ -56,69 +50,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.autoRefreshTitle')" />
         </OButton>
       </template>
-      <div data-test="auto-refresh-panel">
-        <div class="flex items-center justify-between gap-3 px-4 py-3">
-          <div class="min-w-0">
-            <h4 class="text-text-heading text-sm font-semibold">
-              {{ t("search.autoRefreshTitle") }}
-            </h4>
-            <p class="text-text-secondary text-xs italic" data-test="auto-refresh-subtitle">
-              {{
-                isOn
-                  ? t("search.autoRefreshEvery", { value: triggerLabel })
-                  : t("search.autoRefreshPaused")
-              }}
-            </p>
-          </div>
-          <OSwitch
-            data-test="logs-search-off-refresh-interval"
-            :model-value="isOn"
-            :disabled="switchDisabled"
-            :aria-label="t('search.autoRefreshTitle')"
-            @update:model-value="onSwitch"
-          />
-        </div>
-        <hr class="border-border-default my-0 border-0 border-t border-solid" />
-        <div class="flex flex-col gap-3 px-4 py-3">
-          <section v-for="section in refreshSections" :key="section.key">
-            <h5 class="text-text-secondary mb-2 text-xs font-semibold tracking-wider uppercase">
-              {{ section.label }}
-            </h5>
-            <div class="grid grid-cols-4 gap-2">
-              <OButton
-                v-for="item in section.items"
-                :key="item.value"
-                :data-test="`logs-search-bar-refresh-time-${item.value}`"
-                :variant="Number(modelValue) === item.value ? 'primary' : 'outline'"
-                size="sm"
-                :block="true"
-                :disabled="item.disabled"
-                :aria-pressed="Number(modelValue) === item.value"
-                :aria-label="item.label"
-                @click="onPick(item)"
-              >
-                <OTooltip
-                  v-if="item.disabled"
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                  :content="raw(minRangeRestrictionMessageVal)"
-                />
-                {{ item.shortLabel }}
-              </OButton>
-            </div>
-          </section>
-        </div>
+      <ODropdownItem
+        data-test="logs-search-off-refresh-interval"
+        :checked="!isOn"
+        @select="onSwitch(false)"
+      >
+        {{ t("common.off") }}
+      </ODropdownItem>
+      <template v-for="section in refreshSections" :key="section.key">
+        <ODropdownSeparator />
+        <ODropdownGroup :label="section.label">
+          <ODropdownItem
+            v-for="item in section.items"
+            :key="item.value"
+            :data-test="`logs-search-bar-refresh-time-${item.value}`"
+            :checked="Number(modelValue) === item.value"
+            :disabled="item.disabled"
+            @select="onPick(item)"
+          >
+            {{ item.label }}
+          </ODropdownItem>
+        </ODropdownGroup>
+      </template>
+      <template v-if="hasDisabled || !hideRelativeNote">
+        <ODropdownSeparator />
         <div
-          v-if="!hideRelativeNote"
-          class="bg-surface-subtle border-border-default text-text-secondary flex items-center gap-2 border-0 border-t border-solid px-4 py-2 text-xs italic"
+          class="text-text-muted text-2xs flex flex-col gap-0.5 px-2 py-1.5"
           data-test="auto-refresh-footer"
         >
-          <OIcon name="info" size="sm" />
-          {{ t("search.autoRefreshRelativeOnly") }}
+          <span v-if="hasDisabled" data-test="auto-refresh-minimum">{{
+            minRangeRestrictionMessageVal
+          }}</span>
+          <span v-if="!hideRelativeNote">{{ t("search.autoRefreshRelativeOnly") }}</span>
         </div>
-      </div>
-    </OPopover>
+      </template>
+    </ODropdown>
   </div>
 </template>
 
@@ -145,12 +111,22 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 
 export default defineComponent({
   name: "AutoRefreshInterval",
-  components: { OButton, OPopover, OSwitch, OTooltip, OIcon },
+  components: {
+    OButton,
+    ODropdown,
+    ODropdownItem,
+    ODropdownGroup,
+    ODropdownSeparator,
+    OTooltip,
+    OIcon,
+  },
   props: {
     modelValue: {
       type: Number,
@@ -174,7 +150,7 @@ export default defineComponent({
     },
     variant: {
       type: String as PropType<ButtonVariant>,
-      default: "outline",
+      default: undefined,
     },
     hideRelativeNote: {
       type: Boolean,
@@ -260,33 +236,14 @@ export default defineComponent({
         : t("search.autoRefreshAriaOff"),
     );
 
-    let lastSelectedInterval = 0;
-    const DEFAULT_INTERVAL = 30;
-
-    // The remembered interval may fall below a minimum raised since it was picked.
-    const resumeInterval = () => {
-      if (lastSelectedInterval && !isDisabled(lastSelectedInterval)) return lastSelectedInterval;
-      if (!isDisabled(DEFAULT_INTERVAL)) return DEFAULT_INTERVAL;
-      return refreshTimes.value.flat().find((it) => !it.disabled)?.value ?? 0;
-    };
-
     const onSwitch = (on: unknown) => {
-      if (!on) {
-        lastSelectedInterval = selectedValue.value || lastSelectedInterval;
-        selectedValue.value = 0;
-        return;
-      }
-      selectedValue.value = resumeInterval();
+      if (!on) selectedValue.value = 0;
     };
 
-    // Switching on is impossible when no interval satisfies the minimum.
-    const switchDisabled = computed(() => !isOn.value && resumeInterval() === 0);
+    const hasDisabled = computed(() => refreshTimes.value.flat().some((it) => it.disabled));
 
     const onItemClick = (item: { value: number }) => {
       selectedValue.value = item.value;
-      if (item.value > 0) {
-        lastSelectedInterval = item.value;
-      }
     };
 
     const onPick = (item: { value: number }) => {
@@ -339,7 +296,7 @@ export default defineComponent({
       selectedLabel,
       triggerLabel,
       isOn,
-      switchDisabled,
+      hasDisabled,
       triggerAriaLabel,
       refreshTimes,
       refreshSections,

@@ -1,12 +1,16 @@
 // Copyright 2026 OpenObserve Inc.
 
-import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import type { I18nKey, I18nText } from "@/types/i18n";
 
 import { ref } from "vue";
 
+/** confirm · destructive (names the object, red verb) · typeToConfirm (irreversible bulk) · discard (unsaved edits). */
+export type ConfirmKind = "confirm" | "destructive" | "typeToConfirm" | "discard";
+
 export interface ConfirmDialogOptions {
   title: I18nText;
+  /** @default "confirm" */
+  kind?: ConfirmKind;
   message?: I18nText;
   // Takes precedence over `message`; the key must contain a {name} placeholder.
   messageKeypath?: I18nKey;
@@ -14,12 +18,9 @@ export interface ConfirmDialogOptions {
   /** A bulleted list under `message`, which then reads left-aligned with it. */
   lines?: I18nText[];
   linesDataTest?: string;
+  /** The verb on the primary button; a destructive confirm defaults to "Delete" (B3, V8). */
   confirmLabel?: I18nText;
   cancelLabel?: I18nText;
-  persistent?: boolean;
-  confirmVariant?: ButtonVariant;
-  // A destructive confirm starts on Cancel so Enter cannot confirm by accident.
-  focusCancel?: boolean;
   /** Offers only the confirm button and cannot be dismissed, for a choice the user cannot refuse. */
   confirmOnly?: boolean;
 }

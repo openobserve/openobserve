@@ -2,6 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { TextareaProps, TextareaEmits, TextareaSlots } from "./OTextarea.types";
+import type { FieldWidth } from "./OInput.types";
 import { computed, nextTick, onMounted, ref, useAttrs, useId, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
@@ -22,7 +23,8 @@ const controlAttrs = computed(() => split.value.controlAttrs);
 
 const props = withDefaults(defineProps<TextareaProps>(), {
   rows: 3,
-  size: "md",
+  width: "full",
+  mono: false,
   disabled: false,
   readonly: false,
   autofocus: false,
@@ -92,21 +94,13 @@ watch(
   },
 );
 
-// ── Width ──────────────────────────────────────────────────────────────────
-const fieldWidthClass = computed(() => {
-  switch (props.width) {
-    case "xs":
-      return "w-field-width-xs";
-    case "sm":
-      return "w-field-width-sm";
-    case "md":
-      return "w-field-width-md";
-    case "lg":
-      return "w-field-width-lg";
-    default:
-      return "w-full";
-  }
-});
+const WIDTH_CLASSES: Record<FieldWidth, string> = {
+  s: "w-field-width-s",
+  m: "w-field-width-m",
+  l: "w-field-width-l",
+  full: "w-full",
+};
+const fieldWidthClass = computed(() => WIDTH_CLASSES[props.width ?? "full"]);
 
 const charCount = computed(() => {
   if (!props.maxlength) return 0;
@@ -114,14 +108,12 @@ const charCount = computed(() => {
 });
 
 const wrapperClasses = computed(() => [
-  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
-  "ring-offset-1 ring-offset-surface-base",
+  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)",
   "bg-input-bg",
-  /* Keep the red error border on focus (don't let the focus color override it);
-     focus border color applies only when there's no error. See OInput.vue. */
+  // The red edge stays on focus; the accent edge applies only without an error. See OInput.vue.
   hasError.value
-    ? "border-input-border-error"
-    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus",
+    ? "border-input-border-error focus-within:ring-3 focus-within:ring-control-error-halo"
+    : "border-input-border hover:not-focus-within:border-input-border-hover focus-within:border-control-border-focus focus-within:ring-3 focus-within:ring-control-focus-halo",
   /* Same opacity+dashed treatment as OInput so disabled textareas are
      visually obvious vs enabled ones. */
   isDisabled.value
@@ -179,7 +171,8 @@ const wrapperClasses = computed(() => [
           'min-w-0 flex-1 bg-transparent outline-none',
           'text-input-text placeholder:text-input-placeholder',
           'disabled:cursor-not-allowed',
-          'px-3 py-2 text-sm',
+          'text-compact px-3 py-2',
+          mono && 'font-mono',
           fill ? 'h-full min-h-0 resize-none' : autogrow && maxRows ? 'min-h-0' : 'min-h-20',
           !fill && (autogrow ? 'resize-none' : 'resize-y'),
         ]"

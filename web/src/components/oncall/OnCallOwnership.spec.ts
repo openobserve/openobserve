@@ -60,11 +60,11 @@ const correlation = vi.mocked(serviceStreamsService);
 const stubs = {
   ODialog: {
     name: "ODialog",
-    props: ["open", "primaryButtonDisabled"],
+    props: ["open", "primary"],
     emits: ["update:open", "click:primary", "click:secondary"],
     template: "<div v-if='open'><slot /></div>",
   },
-  ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue", "okVariant"], template: "<div />" },
+  ConfirmDialog: { name: "ConfirmDialog", props: ["modelValue", "kind"], template: "<div />" },
 };
 
 const TEAMS = [

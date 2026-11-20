@@ -25,17 +25,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <OButton
         data-test="predefined-themes-reset-btn"
-        variant="ghost-destructive"
-        size="xs"
+        variant="danger-ghost"
+        size="sm"
         @click="resetToDefaultTheme"
       >
-        <template #icon-left><OIcon name="refresh" size="xs" /></template>
+        <template #icon><OIcon name="refresh" size="xs" /></template>
         {{ t("common.reset") }}
       </OButton>
     </template>
 
     <!-- Light / Dark segmented mode toggle -->
-    <OCardSection class="px-2 pt-2">
+    <div class="px-2 pt-2">
       <OToggleGroup
         :model-value="activeTab"
         type="single"
@@ -57,12 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t("components.predefinedThemes.dark") }}</OToggleGroupItem
         >
       </OToggleGroup>
-    </OCardSection>
+    </div>
 
     <!-- Theme list for the active mode. Selecting a row applies it immediately;
          the applied row is highlighted rather than carrying an Apply button. -->
     <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
-    <OCardSection class="max-h-[calc(100vh-100px)] overflow-y-auto px-2 py-2">
+    <div class="max-h-[calc(100vh-100px)] overflow-y-auto px-2 py-2">
       <ul class="m-0 flex list-none flex-col gap-2 p-0">
         <li v-for="theme in predefinedThemes" :key="theme.id">
           <button
@@ -148,16 +148,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
         </li>
       </ul>
-    </OCardSection>
+    </div>
 
     <!-- Note at the bottom -->
-    <OCardSection class="px-2 pt-0 pb-2">
+    <div class="px-2 pt-0 pb-2">
       <OSeparator class="mb-2" />
       <div class="text-text-secondary flex items-start gap-1 text-xs italic">
         <OIcon name="info-outline" size="xs" class="mt-0.5" />
         <span>{{ t("components.predefinedThemes.themeSyncNote") }}</span>
       </div>
-    </OCardSection>
+    </div>
 
     <!-- Color Picker Dialog -->
     <ODialog
@@ -165,10 +165,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showColorPicker"
       size="sm"
       :title="t('components.predefinedThemes.pickCustomColorTitle')"
-      :primary-button-label="t('common.apply')"
-      :neutral-button-label="t('common.cancel')"
+      :primary="{ label: t('common.apply') }"
+      :extra="{ label: t('common.cancel') }"
       @click:primary="confirmCustomColor"
-      @click:neutral="showColorPicker = false"
+      @click:extra="showColorPicker = false"
     >
       <OColor v-model="tempColor" @update:model-value="updateCustomColor" />
     </ODialog>
@@ -176,7 +176,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";

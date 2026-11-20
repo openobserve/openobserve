@@ -41,18 +41,18 @@ export default class DashboardSetting {
     );
     this.fullScreen = page.locator('[data-test="dashboard-fullscreen-btn"]');
     this.tabName = page.locator('[data-test="dashboard-add-tab-name-field"]');
-    this.saveTab = page.locator(
-      '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-dialog-primary-btn"]'
+    // Settings adds a tab in an inline row, not a dialog over the drawer.
+    this.addTabInline = page.locator(
+      '[data-test="dashboard-tab-settings-add-tab-inline"]'
     );
+    this.saveTab = page.locator('[data-test="dashboard-add-tab-create"]');
     this.closeSetting = page.locator(
       '[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]'
     );
     this.timeBtn = page.locator('[data-test="date-time-btn"]');
     this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
 
-    this.addTabCancel = page.locator(
-      '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-dialog-secondary-btn"]'
-    );
+    this.addTabCancel = page.locator('[data-test="dashboard-add-tab-cancel"]');
     this.EditSave = page.locator(
       '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
     );
@@ -151,14 +151,21 @@ export default class DashboardSetting {
     await this.discardSettingsDraftIfAsked();
   }
 
-  // Closing with unsaved settings opens the leave dialog; Discard keeps the old close-and-forget behaviour.
+  // Closing with unsaved settings asks "Discard changes?" in the drawer's own footer; Discard
+  // keeps the old close-and-forget behaviour. The leave dialog is still handled if it appears.
   async discardSettingsDraftIfAsked() {
     const dialog = this.page.locator('[data-test="editor-draft-leave-dialog"]');
     const drawer = this.page.locator('[data-test="dashboard-settings-drawer"]');
+    const discardRow = drawer.locator('[data-test="o-drawer-discard-row"]');
     const asked = await Promise.race([
-      dialog.waitFor({ state: "visible", timeout: 5000 }).then(() => true),
-      drawer.waitFor({ state: "hidden", timeout: 5000 }).then(() => false),
-    ]).catch(() => false);
+      dialog.waitFor({ state: "visible", timeout: 5000 }).then(() => "dialog"),
+      discardRow.waitFor({ state: "visible", timeout: 5000 }).then(() => "row"),
+      drawer.waitFor({ state: "hidden", timeout: 5000 }).then(() => null),
+    ]).catch(() => null);
+    if (asked === "row") {
+      await discardRow.locator('[data-test="o-drawer-discard-btn"]').click();
+      return;
+    }
     if (!asked) return;
     await dialog.locator('[data-test="o-dialog-neutral-btn"]').click();
     await dialog.waitFor({ state: "hidden", timeout: 10000 });
@@ -214,7 +221,7 @@ export default class DashboardSetting {
     await this.tab.waitFor({ state: "visible" });
     await this.tab.click();
     // TabsSettings loads dashboard data async on mount; wait for the first
-    // tab row (the default tab) to appear before clicking "Add Tab",
+    // tab row (the default tab) to appear before clicking "Add tab",
     // otherwise dashboardId is still undefined and the API call fails.
     await this.tabNameCells
       .first()
@@ -227,11 +234,10 @@ export default class DashboardSetting {
   //save new tab setting//
   async saveTabSetting() {
     await this.saveTab.click();
-    // The dialog closes only once the tab has actually been created, so this is
+    // The inline row closes only once the tab has actually been created, so this is
     // the signal that the save landed — without it a caller can close the
     // settings drawer out from under an in-flight request and lose the tab.
-    await this.page
-      .locator('[data-test="dashboard-tab-settings-add-tab-dialog"]')
+    await this.addTabInline
       .waitFor({ state: "hidden", timeout: 15000 })
       .catch(() => {});
   }
@@ -266,6 +272,10 @@ export default class DashboardSetting {
 
   //Full screen//
   async fullScreenSettings() {
+    // Full screen lives in the More menu; the exit button shows alone once in full screen.
+    if (!(await this.fullScreen.isVisible().catch(() => false))) {
+      await this.page.locator('[data-test="dashboard-more-options-btn"]').click();
+    }
     await this.fullScreen.waitFor({ state: "visible" });
     await this.fullScreen.click();
   }
@@ -274,8 +284,7 @@ export default class DashboardSetting {
   async cancelTabwithoutSave() {
     await this.addTabCancel.waitFor({ state: "visible", timeout: 10000 });
     await this.addTabCancel.click();
-    await this.page
-      .locator('[data-test="dashboard-tab-settings-add-tab-dialog"]')
+    await this.addTabInline
       .waitFor({ state: "hidden", timeout: 10000 })
       .catch(() => {});
   }
@@ -478,7 +487,7 @@ export default class DashboardSetting {
     await this.page.locator(`[data-test="dashboard-variable-type-select-option"][data-test-value="${type.toLowerCase()}"]`).click();
     await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(variableName);
     // Selecting "Custom" type auto-creates the first option row (index 0).
-    // Do NOT click "Add Option" — that would add a second empty row and fail validation.
+    // Do NOT click "Add option" — that would add a second empty row and fail validation.
     await this.page
       .locator('[data-test="dashboard-custom-variable-0-label"]')
       .waitFor({ state: "visible", timeout: 10000 });

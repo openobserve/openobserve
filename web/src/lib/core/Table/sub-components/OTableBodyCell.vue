@@ -21,11 +21,18 @@ import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
-import { OTableCellActionsKey, OTableOverflowTooltipKey, OTableStaleKey } from "../OTable.types";
+import {
+  OTableCellActionsKey,
+  OTableNumericColumnsKey,
+  OTableOverflowTooltipKey,
+  OTableStaleKey,
+  ROW_ACTIONS_COLUMN_ID,
+} from "../OTable.types";
+import OTableRowActions from "./OTableRowActions.vue";
 import { injectContextMenuRootContext } from "reka-ui";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 const slots = useSlots();
 
@@ -60,9 +67,6 @@ const props = defineProps<{
   shouldHighlight?: boolean;
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
   wrap?: boolean;
-  dense?: boolean;
-  compact?: boolean;
-  bordered?: boolean;
   enableCellCopy?: boolean;
   getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
   /** Pivot row-field cell merge: hide the cell's content / inner border so a
@@ -76,7 +80,14 @@ const emit = defineEmits<{
 }>();
 
 const meta = computed(() => props.cell.column.columnDef.meta as any);
-const align = computed(() => meta.value?.align ?? "left");
+const numericColumns = inject(OTableNumericColumnsKey, null);
+// A column of plain numbers right-aligns unless it names an alignment (D3).
+const align = computed(() => {
+  const named = meta.value?.align;
+  if (named && named !== "left") return named;
+  return numericColumns?.value.has(props.cell.column.id) ? "right" : (named ?? "left");
+});
+const isRowActionsCell = computed(() => props.cell.column.id === ROW_ACTIONS_COLUMN_ID);
 
 // Record-name column weight. Only the default-rendered text path uses this;
 const defaultTextClass = computed(() => ["text-inherit"]);
@@ -134,6 +145,22 @@ const displayValue = computed(() => {
   // into the configured `no_value_replacement`.
   if (!formatFn) return rawValue.value;
   return formatFn(rawValue.value, props.row.original);
+});
+
+// Unknown reads "—" in tertiary text (C4, D4); a `format` fn keeps the say over its own blanks.
+const isUnknown = computed(() => {
+  if (meta.value?.format) return false;
+  const value = rawValue.value;
+  return value === null || value === undefined || (typeof value === "string" && !value.trim());
+});
+
+// A long id keeps both ends readable: the head is cut, the last characters stay (D3).
+const ID_TAIL = 6;
+const idParts = computed(() => {
+  if (!meta.value?.identifier || isUnknown.value) return null;
+  const text = String(displayValue.value);
+  if (text.length <= ID_TAIL * 2) return { head: text, tail: "" };
+  return { head: text.slice(0, -ID_TAIL), tail: text.slice(-ID_TAIL) };
 });
 
 // ── Cell copy ─────────────────────────────────────────────────────
@@ -280,13 +307,13 @@ const treeIndentPx = computed(() => (treeMeta.value?.depth ?? 0) * 16);
 /**
  * X-offset of the chevron centre, relative to this td's left edge.
  * Used to position connector pseudo-elements at the correct depth.
- *   td padding-left (8px) + depth indent + half chevron (9px)
+ *   td padding-left (12px) + depth indent + half chevron (9px)
  * For child rows we want the horizontal stub to start at the *parent's*
  * chevron x, which is `depth - 1` indents in.
  */
-const treeChevronX = computed(() => 8 + (treeMeta.value?.depth ?? 0) * 16 + 9);
+const treeChevronX = computed(() => 12 + (treeMeta.value?.depth ?? 0) * 16 + 9);
 const treeParentChevronX = computed(
-  () => 8 + Math.max((treeMeta.value?.depth ?? 0) - 1, 0) * 16 + 9,
+  () => 12 + Math.max((treeMeta.value?.depth ?? 0) - 1, 0) * 16 + 9,
 );
 
 function onTreeToggle(event: MouseEvent) {
@@ -304,6 +331,7 @@ function handleClick() {
 }
 
 const { t } = useI18nTyped();
+const UNKNOWN = raw("—");
 
 const stale = inject(OTableStaleKey, null);
 const rowContextMenu = injectContextMenuRootContext(null);
@@ -471,12 +499,12 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
       // instead of falling back to a grey inherited value in dark mode. Inner
       // links/badges override this with their own color.
       'text-text-body',
-      meta?.spacer || compact
+      meta?.spacer
         ? 'px-0 align-middle'
         : meta?.compactPadding
           ? 'px-1 align-middle'
-          : 'px-2 align-middle',
-      bordered && !pivotMerge?.hideBorder ? 'border-table-row-divider border-b' : '',
+          : 'px-3 align-middle',
+      !pivotMerge?.hideBorder ? 'border-table-row-divider border-b' : '',
       alignClass,
       isAction ? 'w-0 whitespace-nowrap' : '',
       isPinned ? pinnedBgClass : '',
@@ -551,6 +579,9 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
           :props="cell.getContext()"
         />
         <span v-else-if="highlightedHtml" :class="defaultTextClass" v-html="highlightedHtml" />
+        <span v-else-if="isUnknown" class="text-text-muted" data-test="o2-table-cell-unknown">{{
+          UNKNOWN
+        }}</span>
         <span v-else :class="defaultTextClass">
           {{ displayValue }}
         </span>
@@ -559,7 +590,12 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
 
     <!-- Pivot-merged cells hide their content (the group's first row shows it). -->
     <template v-else-if="!pivotMerge?.hideContent">
-      <div v-if="$slots.default" :class="slotAlignClass">
+      <OTableRowActions
+        v-if="isRowActionsCell && !$slots.default"
+        :row="row.original"
+        :index="row.index"
+      />
+      <div v-else-if="$slots.default" :class="slotAlignClass">
         <!-- Non-action slot content truncates with an ellipsis by default. -->
         <div v-if="!isAction" :class="slotContentClass" data-o2-cell-clip><slot /></div>
         <slot v-else />
@@ -586,11 +622,12 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
           {{ displayValue }}
         </span>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs-sq"
+          size="sm"
           :data-test="`o2-table-cell-copy-${cell.column.id}`"
           :data-copied="copied ? 'true' : undefined"
-          class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+          class="shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
           :class="align === 'right' ? 'order-first me-1' : 'ms-1'"
           :title="copied ? t('common.copiedExclaim') : t('common.copy')"
           @click="handleCopy"
@@ -613,6 +650,18 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
       />
       <!-- Highlighted HTML (safe: composable escapes user content before wrapping) -->
       <span v-else-if="highlightedHtml" :class="defaultTextClass" v-html="highlightedHtml" />
+      <span v-else-if="isUnknown" class="text-text-muted" data-test="o2-table-cell-unknown">{{
+        UNKNOWN
+      }}</span>
+      <span
+        v-else-if="idParts"
+        class="flex min-w-0 font-mono text-xs"
+        :class="align === 'right' ? 'justify-end' : ''"
+        data-o2-cell-clip
+        data-test="o2-table-cell-identifier"
+        ><span class="min-w-0 truncate">{{ idParts.head }}</span
+        ><span class="shrink-0">{{ idParts.tail }}</span></span
+      >
       <!-- Default: plain text -->
       <span v-else :class="defaultTextClass">
         {{ displayValue }}

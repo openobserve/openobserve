@@ -35,7 +35,6 @@ const NET_EXCL = `device!~"lo|veth.*|docker.*|br-.*|cni.*|flannel.*|tunl.*"`;
 export const hostsPage: CuratedPageManifest = {
   id: "hosts",
   titleKey: "menu.hosts",
-  icon: "dns",
   contentVersion: 1,
   defaultRelativePeriod: "3h",
   stalenessThresholdUs: STALENESS_24H_US,

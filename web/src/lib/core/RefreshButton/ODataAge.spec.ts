@@ -50,7 +50,7 @@ describe("ODataAge", () => {
     const notice = wrapper.find('[data-test="metrics-detail-refresh-failed"]');
     expect(notice.attributes("data-state")).toBe("failed");
     expect(notice.classes()).toEqual(
-      expect.arrayContaining(["bg-status-error-bg", "text-status-error-text"]),
+      expect.arrayContaining(["bg-banner-error-soft-bg", "text-banner-error-soft-text"]),
     );
     expect(notice.text()).toContain("Refresh failed at 10:47 · showing data from 10:42");
     expect(notice.text()).not.toContain("Updated");
@@ -129,7 +129,7 @@ describe("ODataAge", () => {
   it("keeps Retry in a compact failed pill and moves the sentence to its tooltip (N1)", async () => {
     const wrapper = mountAge({ at, failedAt, failedCount: 3, failedTotal: 8, compact: true });
     const pill = wrapper.find('[data-test="data-age"]');
-    expect(pill.classes()).toContain("bg-status-error-bg");
+    expect(pill.classes()).toContain("bg-banner-error-soft-bg");
     const words = pill
       .findAll('[aria-hidden="true"]')
       .map((el) => el.text())

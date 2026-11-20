@@ -141,7 +141,7 @@ class SchemaPage {
         // =========================================================
         this.schemaLocators = {
             menuStreamItem: '[data-test="menu-link-\\/streams-item"]',
-            streamSearchPlaceholder: 'Search Stream',
+            streamSearchPlaceholder: 'Search stream',
             streamDetailButton: 'Stream Detail',
             streamDeleteKubernetesCheckbox: '[data-test="schema-stream-delete-kubernetes_annotations_kubectl_kubernetes_io_default_container-field-fts-key-checkbox"]',
             streamDeleteKubernetesPspCheckbox: '[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]',
@@ -180,7 +180,7 @@ class SchemaPage {
             // Schema field management locators
             schemaAddFieldsTitle: '[data-test="schema-add-fields-title"]',
             namePlaceholder: 'Name *',
-            dataTypePlaceholder: 'Data Type *',
+            dataTypePlaceholder: 'Data type *',
             schemaFieldSearchInput: '[data-test="schema-field-search-input"]',
             schemaDeleteButton: '[data-test="schema-delete-button"]',
             // ConfirmDialog migrated to ODialog — primary footer button

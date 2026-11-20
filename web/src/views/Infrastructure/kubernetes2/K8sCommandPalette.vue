@@ -118,7 +118,6 @@ const onKeydown = (event: KeyboardEvent) => {
     <div class="flex flex-col gap-2" @keydown="onKeydown">
       <OSearchInput
         v-model="query"
-        size="md"
         :placeholder="t('infra.k8s2.palettePlaceholder')"
         role="combobox"
         aria-haspopup="listbox"

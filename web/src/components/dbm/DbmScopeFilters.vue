@@ -25,13 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   short list it usually is.
 -->
 <template>
-  <div class="flex min-w-0 items-center gap-1.5" data-test="dbm-queries-scope">
-    <OPopover v-model:open="open">
+  <div class="flex min-w-0 items-center gap-2" data-test="dbm-queries-scope">
+    <OPopover size="sm" v-model:open="open">
       <template #trigger>
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="filter-list"
+          variant="secondary"
+          icon="filter-list"
           class="shrink-0"
           data-test="dbm-queries-scope-trigger"
         >
@@ -39,14 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="activeCount"
             :label="raw(String(activeCount))"
-            size="xs"
+            size="sm"
             class="ms-1"
             data-test="dbm-queries-scope-count"
           />
         </OButton>
       </template>
 
-      <div class="flex w-72 flex-col">
+      <div class="flex flex-col">
         <div class="flex flex-col gap-2.5 p-3">
           <p class="text-text-heading text-sm font-semibold" data-test="dbm-queries-scope-title">
             {{ t("dbm.filters.popoverTitle") }}
@@ -57,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="filter.dimension"
             :model-value="filter.value"
             :options="filter.options"
-            size="md"
             :searchable="false"
             clearable
             :placeholder="filter.placeholder"
@@ -68,8 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="border-border-default flex items-center border-t px-3 py-2.5">
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :disabled="!activeCount"
             data-test="dbm-queries-scope-clear"
             @click="emit('clear')"
@@ -83,7 +80,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The chips scroll rather than push: five set dimensions are wider than
          the toolbar, and a chip strip that grows must not shove the refresh and
          column controls off the right edge. -->
-    <div class="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+    <!-- Rendered only with chips: an empty flex item still costs the row a gap. -->
+    <div
+      v-if="activeFilters.length || insightChip || activeCount"
+      class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto"
+    >
       <!-- The wrapper keeps each chip at full width so a crowded strip scrolls instead of truncating it. -->
       <span v-for="filter in activeFilters" :key="filter.key" class="inline-flex shrink-0">
         <ODimensionChip
@@ -104,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dim-key="insight"
           :key-label="insightChip.dimension"
           :value="insightChip.label"
-          variant="warning-soft"
+          tone="warn"
           removable
           :remove-label="t('dbm.filters.removeScope')"
           remove-data-test="dbm-queries-scope-chip-insight-remove"
@@ -122,8 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            quiet on an unfiltered page. -->
       <OButton
         v-if="activeCount"
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         class="shrink-0"
         data-test="dbm-queries-scope-clear-inline"
         @click="emit('clear')"

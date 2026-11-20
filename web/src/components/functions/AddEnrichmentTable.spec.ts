@@ -71,7 +71,7 @@ describe("AddEnrichmentTable.vue", () => {
     name: "OButton",
     template:
       '<button :data-test="$attrs[\'data-test\']" :type="type" :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
-    props: ["label", "type", "variant", "size", "iconLeft", "disabled", "loading"],
+    props: ["label", "type", "variant", "size", "icon", "disabled", "loading"],
     emits: ["click"],
     inheritAttrs: false,
   };
@@ -81,7 +81,7 @@ describe("AddEnrichmentTable.vue", () => {
   const ODialogStub = {
     name: "ODialog",
     template: '<div :data-test="$attrs[\'data-test\']" :data-open="open"><slot /></div>',
-    props: ["open", "size", "title", "formId", "primaryButtonLabel", "secondaryButtonLabel"],
+    props: ["open", "size", "title", "formId", "primary", "secondary"],
     emits: ["update:open", "click:secondary"],
   };
 
@@ -392,8 +392,8 @@ describe("AddEnrichmentTable.vue", () => {
     it("links the dialog's Save button to the form", () => {
       wrapper = createWrapper();
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Save");
-      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(dialog.props("primary")?.label).toBe("Save");
+      expect(dialog.props("secondary")?.label).toBe("Cancel");
       expect(dialog.props("formId")).toBe("add-enrichment-table-form");
       expect(wrapper.find("form#add-enrichment-table-form").exists()).toBe(true);
     });
@@ -424,15 +424,16 @@ describe("AddEnrichmentTable.vue", () => {
         '[data-test="add-enrichment-table-source-option"][data-test-value="url"]',
       );
 
+      // The panel sits at a fixed 12vh top (O5), so growing content never moves it.
       await urlOption.trigger("pointerdown");
-      const openedTop = panel().style.top;
-      expect(openedTop).toBe(`${(window.innerHeight - 300) / 2}px`);
+      expect(panel().className).toContain("top-[12vh]");
 
       height.value = 322;
       await urlOption.trigger("click");
       await flushPromises();
       expect(wrapper.find('[data-test="add-enrichment-table-url"]').exists()).toBe(true);
-      expect(panel().style.top).toBe(openedTop);
+      expect(panel().className).toContain("top-[12vh]");
+      expect(panel().style.top).toBe("");
       rectSpy.mockRestore();
     });
   });

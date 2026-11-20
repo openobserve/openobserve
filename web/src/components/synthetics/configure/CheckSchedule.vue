@@ -216,7 +216,7 @@ const startTime = computed({
   <div class="rounded-default border-border-default mb-4 border">
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
       <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
-      <h3 class="text-text-heading text-base font-semibold">
+      <h3 class="text-text-heading text-sm font-semibold">
         {{ t("synthetics.scheduleAlert.schedule") }}
       </h3>
     </div>
@@ -237,7 +237,6 @@ const startTime = computed({
               v-for="opt in frequencyOptions"
               :key="opt.value"
               :value="opt.value"
-              size="sm"
               :data-test="`synthetics-check-schedule-frequency-${opt.value}-item`"
             >
               {{ opt.label }}
@@ -252,23 +251,15 @@ const startTime = computed({
             type="single"
             data-test="synthetics-check-schedule-start-type-toggle"
           >
-            <OToggleGroupItem
-              value="now"
-              size="sm"
-              data-test="synthetics-check-schedule-start-now-item"
-            >
+            <OToggleGroupItem value="now" data-test="synthetics-check-schedule-start-now-item">
               {{ t("synthetics.scheduleAlert.scheduleNow") }}
             </OToggleGroupItem>
-            <OToggleGroupItem
-              value="later"
-              size="sm"
-              data-test="synthetics-check-schedule-start-later-item"
-            >
+            <OToggleGroupItem value="later" data-test="synthetics-check-schedule-start-later-item">
               {{ t("synthetics.scheduleAlert.scheduleLater") }}
             </OToggleGroupItem>
           </OToggleGroup>
           <OIcon name="info-outline" size="sm" class="text-text-muted cursor-pointer">
-            <OTooltip side="right" align="center">
+            <OTooltip side="right">
               <template #content>
                 {{ t("synthetics.scheduleAlert.scheduleNowTooltip") }}<br />
                 {{ t("synthetics.scheduleAlert.scheduleLaterTooltip") }}
@@ -281,10 +272,10 @@ const startTime = computed({
       <!-- Cron inputs -->
       <div v-if="check.schedule.type === 'cron'" class="flex flex-wrap items-start gap-3">
         <div>
-          <div class="text-text-secondary mb-1 font-bold">
+          <div class="text-text-secondary mb-1 font-semibold">
             {{ t("synthetics.scheduleAlert.cronExpression") }}
             <OIcon name="info" size="sm" class="text-text-muted ms-1 cursor-pointer">
-              <OTooltip side="right" align="center">
+              <OTooltip side="right">
                 <template #content>
                   <span style="font-size: var(--text-sm); white-space: pre-line">
                     {{ t("reports.cronFormatTooltip") }}

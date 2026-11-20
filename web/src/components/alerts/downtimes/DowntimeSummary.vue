@@ -43,12 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </dl>
 
-    <OBanner
+    <OInlineNotice
       v-if="largeModules.length"
-      variant="warning"
-      dense
+      tone="warn"
       data-test="downtime-summary-large-match"
-      :content="t('alerts.downtimes.summaryPane.largeMatch', { modules: largeModuleNames })"
+      :message="t('alerts.downtimes.summaryPane.largeMatch', { modules: largeModuleNames })"
     />
 
     <p class="text-text-body text-xs" data-test="downtime-summary-notify">{{ notifyText }}</p>
@@ -77,7 +76,7 @@ import {
   type FolderNameFn,
   type ValueLabelFn,
 } from "@/utils/downtimes/targetSummary";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 
 const props = withDefaults(
   defineProps<{

@@ -44,7 +44,7 @@ vi.mock("@/types/i18n", async (importOriginal) => {
 vi.mock("@/lib/overlay/Drawer/ODrawer.vue", () => ({
   default: {
     name: "ODrawer",
-    props: ["open", "title", "subTitle"],
+    props: ["open", "title", "subtitle"],
     emits: ["update:open"],
     template: `<div class="o-drawer" :data-open="open" :data-title="title">
       <slot /><slot name="footer" /></div>`,

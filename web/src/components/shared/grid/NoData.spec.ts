@@ -13,9 +13,8 @@ vi.mock("vue-i18n", () => ({
 vi.mock("@/lib/core/EmptyState/OEmptyState.vue", () => ({
   default: {
     name: "OEmptyState",
-    props: ["size", "preset", "illustration", "title"],
-    template:
-      '<div class="o-empty-state" :data-preset="preset" :data-title="title">{{ title }}</div>',
+    props: ["kind", "title"],
+    template: '<div class="o-empty-state" :data-kind="kind" :data-title="title">{{ title }}</div>',
   },
 }));
 
@@ -70,18 +69,18 @@ describe("NoData.vue", () => {
   });
 
   describe("filtered state", () => {
-    it("should show no-search-results preset when filtered is true", () => {
+    it("should show the filtered kind when filtered is true", () => {
       wrapper = createWrapper({ filtered: true });
       const emptyState = wrapper.find(".o-empty-state");
       expect(emptyState.exists()).toBe(true);
-      expect(emptyState.attributes("data-preset")).toBe("no-search-results");
+      expect(emptyState.attributes("data-kind")).toBe("filtered");
     });
 
     it("should show default empty state when filtered is false", () => {
       wrapper = createWrapper({ filtered: false });
       const emptyState = wrapper.find(".o-empty-state");
       expect(emptyState.exists()).toBe(true);
-      expect(emptyState.attributes("data-preset")).toBeUndefined();
+      expect(emptyState.attributes("data-kind")).toBeUndefined();
     });
   });
 

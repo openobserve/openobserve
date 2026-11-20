@@ -1108,20 +1108,11 @@ describe("RegexPatternList.vue - ODrawer Migration", () => {
       persistent: { type: Boolean, default: false },
       title: { type: String, default: "" },
       subTitle: { type: String, default: "" },
-      primaryButtonLabel: { type: String, default: "" },
-      secondaryButtonLabel: { type: String, default: "" },
-      neutralButtonLabel: { type: String, default: "" },
-      primaryButtonVariant: { type: String, default: "primary" },
-      secondaryButtonVariant: { type: String, default: "outline" },
-      neutralButtonVariant: { type: String, default: "ghost" },
-      primaryButtonDisabled: { type: Boolean, default: false },
-      secondaryButtonDisabled: { type: Boolean, default: false },
-      neutralButtonDisabled: { type: Boolean, default: false },
-      primaryButtonLoading: { type: Boolean, default: false },
-      secondaryButtonLoading: { type: Boolean, default: false },
-      neutralButtonLoading: { type: Boolean, default: false },
+      primary: { type: Object, default: undefined },
+      secondary: { type: Object, default: undefined },
+      extra: { type: Object, default: undefined },
     },
-    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+    emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
     template: `
       <div
         data-test="o-drawer-stub"
@@ -1301,10 +1292,8 @@ describe("RegexPatternList.vue - ODrawer Migration", () => {
     const dialog = w.findAllComponents({ name: "ConfirmDialog" })[0];
     expect(dialog.props("messageKeypath")).toBe("settings.regexPatternList.deleteMessage");
     expect(dialog.props("messageName")).toBe("email-mask");
-    expect(dialog.props("okVariant")).toBe("destructive");
-    expect(w.findAllComponents({ name: "ConfirmDialog" })[1].props("okVariant")).toBe(
-      "destructive",
-    );
+    expect(dialog.props("kind")).toBe("destructive");
+    expect(w.findAllComponents({ name: "ConfirmDialog" })[1].props("kind")).toBe("destructive");
 
     w.vm.confirmDeleteRegexPattern({ id: "p2", name: "ip-mask" });
     await nextTick();

@@ -43,6 +43,10 @@ const { t } = useI18nTyped();
 
 const viewId = props.view.view_id;
 
+// Row actions stay out of sight until the row is hovered or reached by keyboard (B7, R9).
+const ON_ROW_INTENT =
+  "opacity-0 group-hover/item:opacity-100 group-data-[highlighted]/item:opacity-100 group-focus-within/item:opacity-100 max-md:opacity-100";
+
 // Arrow keys walk the row's inline actions, so star, edit and delete stay reachable without a mouse.
 const onRowKeydown = (event: KeyboardEvent) => {
   const step = horizontalStep(event.key);
@@ -67,11 +71,11 @@ const onRowKeydown = (event: KeyboardEvent) => {
     @select="emit('apply')"
     @keydown="onRowKeydown"
   >
-    <template #icon-left>
+    <template #icon>
       <OIcon name="saved-search" size="sm" class="text-text-secondary" />
     </template>
     <OTruncatedText class="min-w-0 flex-1">{{ props.view.view_name }}</OTruncatedText>
-    <template #icon-right>
+    <template #end>
       <span class="ms-auto flex shrink-0 items-center gap-0.5">
         <OIcon
           v-if="props.applied"
@@ -83,9 +87,11 @@ const onRowKeydown = (event: KeyboardEvent) => {
           :data-test="`${props.dataTestPrefix}-applied-${viewId}`"
         />
         <OButton
-          variant="ghost-neutral"
-          size="icon-xs-sq"
+          icon-only
+          variant="ghost"
+          size="sm"
           :aria-pressed="props.favorite"
+          :class="props.favorite ? undefined : ON_ROW_INTENT"
           :aria-label="t('search.favoriteViewNamed', { name: raw(props.view.view_name) })"
           :data-test="`${props.dataTestPrefix}-favorite-${viewId}`"
           @click.stop.prevent="emit('toggle-favorite')"
@@ -100,26 +106,30 @@ const onRowKeydown = (event: KeyboardEvent) => {
           <OTooltip :content="t('search.favoriteViewNamed', { name: raw(props.view.view_name) })" />
         </OButton>
         <OButton
-          variant="ghost-neutral"
-          size="icon-xs-sq"
-          icon-left="edit"
+          icon-only
+          :disabled-reason="props.updateReason ?? undefined"
+          variant="ghost"
+          size="sm"
+          icon="edit"
+          :class="ON_ROW_INTENT"
           :aria-label="t('search.overwriteSavedViewNamed', { name: raw(props.view.view_name) })"
           :disabled="!!props.updateReason"
-          focusable-unavailable
           :data-test="`${props.dataTestPrefix}-update-${viewId}`"
           @click.stop.prevent="emit('update')"
           @keydown.enter.stop.prevent="emit('update')"
           @keydown.space.stop
         >
           <OTooltip
+            v-if="!props.updateReason"
             :content="t('search.overwriteSavedViewNamed', { name: raw(props.view.view_name) })"
           />
-          <template #unavailable-reason>{{ props.updateReason }}</template>
         </OButton>
         <OButton
-          variant="ghost-neutral"
-          size="icon-xs-sq"
-          icon-left="delete"
+          icon-only
+          variant="ghost"
+          size="sm"
+          icon="delete"
+          :class="ON_ROW_INTENT"
           :aria-label="t('search.deleteViewNamed', { name: raw(props.view.view_name) })"
           :data-test="`${props.dataTestPrefix}-delete-${viewId}`"
           @click.stop.prevent="emit('delete')"

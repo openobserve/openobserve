@@ -1,6 +1,6 @@
 // Dashboard Series Color Multi-Window Test
 // Verifies that user-configured series colors are correctly applied
-// when using "Comparison Against" (time shift / multi-window) feature.
+// when using "Comparison against" (time shift / multi-window) feature.
 //
 // Bug: When a time shift is added, series names get suffixed (e.g., "(15m ago)").
 // The color-by-series mappings were not re-applied after this renaming,

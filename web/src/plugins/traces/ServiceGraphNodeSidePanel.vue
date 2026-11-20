@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="lg"
     bleed
     :open="visible"
-    :width="60"
     :seamless="true"
     :modal="false"
     :portal-target="containerEl"
@@ -56,20 +56,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <ODropdown side="bottom" align="start">
           <template #trigger>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="service-graph-node-panel-view-related-btn"
-            >
+            <OButton variant="secondary" data-test="service-graph-node-panel-view-related-btn">
               {{ t("traces.serviceGraphNodeSidePanel.viewRelated") }}
               <OIcon name="arrow-drop-down" size="sm" />
             </OButton>
           </template>
           <ODropdownItem
             :disabled="logsLocked || correlationLocked"
-            :focusable-unavailable="logsLocked || correlationLocked"
-            :icon-left="logsLocked || correlationLocked ? 'lock' : undefined"
-            :description="
+            :icon="logsLocked || correlationLocked ? 'lock' : undefined"
+            :disabled-reason="
               logsLocked ? logsLockedReason : correlationLocked ? correlationLockedReason : null
             "
             @select="viewRelatedLogs"
@@ -78,9 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <ODropdownItem
             :disabled="tracesLocked"
-            :focusable-unavailable="tracesLocked"
-            :icon-left="tracesLocked ? 'lock' : undefined"
-            :description="tracesLocked ? tracesLockedReason : null"
+            :icon="tracesLocked ? 'lock' : undefined"
+            :disabled-reason="tracesLocked ? tracesLockedReason : null"
             @select="viewRelatedTraces"
             data-test="service-graph-node-panel-view-related-traces-btn"
             >{{ t("traces.serviceGraphNodeSidePanel.traces") }}</ODropdownItem
@@ -91,9 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownItem
             v-if="dbmEnabled || dbmLocked"
             :disabled="dbmLocked"
-            :focusable-unavailable="dbmLocked"
-            :icon-left="dbmLocked ? 'lock' : undefined"
-            :description="dbmLocked ? dbmLockedReason : null"
+            :icon="dbmLocked ? 'lock' : undefined"
+            :disabled-reason="dbmLocked ? dbmLockedReason : null"
             @select="viewRelatedDatabases"
             data-test="service-graph-node-panel-view-related-databases-btn"
             >{{ t("traces.serviceGraphNodeSidePanel.databases") }}</ODropdownItem
@@ -147,7 +140,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <OSkeleton
           v-else-if="panelVersions.isLoading.value"
-          type="text"
           class="h-3.5 w-64!"
           data-test="svcver-panel-identity-loading"
         />
@@ -191,9 +183,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ chip.label }}</span
             >
             <OButton
+              icon-only
               :aria-label="t('common.remove')"
               variant="ghost"
-              size="icon-chip"
+              size="xs"
               class="ms-0.5"
               :data-test="`service-graph-filter-chip-remove-${chip.key}`"
               @click="removeLocalRangeFilter(chip.key)"
@@ -209,12 +202,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip v-if="tracesLocked" :content="tracesLockedReason">
             <span class="inline-flex">
               <OButton
-                variant="ghost-primary"
-                size="sm"
+                variant="accent-ghost"
                 disabled
                 data-test="service-graph-side-panel-view-in-traces-btn"
               >
-                <template #icon-left>
+                <template #icon>
                   <OIcon name="lock" class="text-icon-locked" size="xs" />
                 </template>
                 {{ t("traces.serviceGraphNodeSidePanel.viewTraces") }}
@@ -223,24 +215,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTooltip>
           <OButton
             v-else
-            variant="ghost-primary"
-            size="sm"
+            variant="accent-ghost"
             data-test="service-graph-side-panel-view-in-traces-btn"
             @click="viewInTraces"
           >
-            <template #icon-left>
+            <template #icon>
               <OIcon name="search" size="xs" />
             </template>
             {{ t("traces.serviceGraphNodeSidePanel.viewTraces") }}
           </OButton>
         </div>
-        <OBanner
+        <OInlineNotice
           v-if="whereUnscopedNotice"
-          variant="warning"
-          dense
+          tone="warn"
           class="mx-page-edge"
           data-test="svcver-panel-where-unscoped"
-          >{{ whereUnscopedNotice }}</OBanner
+          >{{ whereUnscopedNotice }}</OInlineNotice
         >
         <!-- Holds the grid's final height (10 rows of 17px plus padding) until the dashboard is built; an empty one shows add-panel copy. -->
         <div class="charts-wrapper min-h-[11.75rem] w-full py-0!">
@@ -250,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             aria-busy="true"
             data-test="service-graph-side-panel-red-charts-loading"
           >
-            <OSkeleton v-for="n in 3" :key="n" type="rect" class="h-full w-full!" />
+            <OSkeleton v-for="n in 3" :key="n" shape="block" class="h-full w-full!" />
           </div>
           <div v-else class="charts-container w-full">
             <RenderDashboardCharts
@@ -276,8 +266,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="markerQuery.isError.value"
           variant="ghost"
-          size="chip"
-          icon-left="refresh"
+          size="xs"
+          icon="refresh"
           class="text-text-secondary"
           data-test="svcver-marker-retry"
           @click="markerQuery.refetch()"
@@ -303,7 +293,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="marker in markerQuery.isError.value ? [] : markerQuery.data.value?.deploys || []"
           :key="marker.deploy_key"
           variant="ghost"
-          size="chip"
+          size="xs"
           :data-test="`svcver-marker-${marker.deploy_key}`"
           @click="
             compareDrawer.open({
@@ -336,7 +326,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSkeleton
               v-for="width in ['w-20!', 'w-16!', 'w-18!']"
               :key="width"
-              type="text"
               :class="['h-3.5', width]"
             />
           </div>
@@ -344,9 +333,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else
             :model-value="activeTab"
             @update:model-value="onTabChange"
-            dense
-            align="left"
-            class="w-[calc(100%-2rem)]! flex-1 font-bold"
+            size="compact"
+            class="w-[calc(100%-2rem)]! flex-1"
             data-test="service-graph-node-panel-tabs"
           >
             <OTab
@@ -362,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isAgentBehaviorContext"
               name="behavior"
               :label="t('aiObservability.behavior.node.tabLabel')"
-              :suffix-icon="behaviorLocked ? 'lock' : undefined"
+              :locked="behaviorLocked"
               :tooltip="aiObsLocked ? aiObsLockedReason : undefined"
               class="capitalize"
               data-test="service-graph-node-panel-tab-behavior"
@@ -379,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isInferred"
               name="metrics"
               :label="t('traces.serviceGraphNodeSidePanel.metrics')"
-              :suffix-icon="correlationLocked ? 'lock' : undefined"
+              :locked="correlationLocked"
               :tooltip="correlationLocked ? correlationLockedReason : undefined"
               class="capitalize"
               data-test="service-graph-node-panel-tab-metrics"
@@ -387,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTab
               v-if="!isInferred"
               name="versions"
-              :suffix-icon="!versionsEnabled ? 'lock' : undefined"
+              :locked="!versionsEnabled"
               data-test="svcver-versions-tab"
               ><span>{{ t("serviceVersions.panel.versions") }}</span
               ><OTag
@@ -410,8 +398,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #trigger>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-sm"
                   data-test="service-graph-node-panel-workload-fields-btn"
                 >
                   <OIcon name="tune" size="sm" />
@@ -439,11 +427,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       }
                     "
                   >
-                    <template #icon-left>
+                    <template #icon>
                       <span @click.stop>
                         <OCheckbox
                           :model-value="selectedWorkloadFields.includes(cfg.id)"
-                          size="xs"
                           @update:model-value="toggleWorkloadField(cfg.id)"
                         />
                       </span>
@@ -472,12 +459,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="panel-section mb-0! p-0!"
             data-test="service-graph-side-panel-recent-operations"
           >
-            <div
+            <OEmptyState
               v-if="recentOperations.length === 0 && !loadingOperations"
-              class="text-text-secondary flex flex-col items-center justify-center py-16 text-center text-sm"
-            >
-              {{ t("traces.serviceGraphNodeSidePanel.noOperationsFound") }}
-            </div>
+              :title="t('traces.serviceGraphNodeSidePanel.noOperationsFound')"
+            />
             <div
               v-else-if="recentOperations.length > 0 || loadingOperations"
               class="svc-panel-table overflow-hidden"
@@ -492,8 +477,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="loadingOperations"
                 :loading-reset-key="selectedNode?.id"
                 :default-columns="false"
-                :row-height="38"
-                :show-global-filter="false"
                 :fill-height="false"
                 pagination="none"
                 @sort-change="(p: any) => handleSortChange(p.column)"
@@ -519,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :value="row.p99"
                     :max="rowMaxes(sortedOperationsTableRows, ['p99']).p99"
                     :label="raw(formatOperationLatency(row.p99))"
-                    variant="warning"
+                    tone="warn"
                     align="right"
                     inline
                   />
@@ -545,8 +528,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #cell-hover-actions="{ row, column, active }">
                   <span v-if="active && tracesLocked" class="inline-flex" @click.stop>
                     <OButton
+                      icon-only
                       variant="ghost"
-                      size="icon"
+                      size="xs"
                       disabled
                       :aria-label="t('traces.serviceGraphNodeSidePanel.viewInTraces')"
                       data-test="service-graph-side-panel-view-traces-btn"
@@ -557,8 +541,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <OButton
                     v-else-if="active"
+                    icon-only
                     variant="ghost"
-                    size="icon"
+                    size="xs"
                     data-test="service-graph-side-panel-view-traces-btn"
                     @click.stop="
                       navigateToTraces({
@@ -576,11 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </template>
                 <template #empty>
-                  <div
-                    class="text-text-secondary flex flex-col items-center justify-center py-16 text-center text-sm"
-                  >
-                    {{ t("traces.serviceGraphNodeSidePanel.noOperationsFound") }}
-                  </div>
+                  <OEmptyState :title="t('traces.serviceGraphNodeSidePanel.noOperationsFound')" />
                 </template>
               </OTable>
             </div>
@@ -625,8 +606,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <span>{{ resourceTabError[cfg.id] }}</span>
               <OButton
-                variant="ghost-primary"
-                size="sm"
+                variant="accent-ghost"
                 :data-test="`service-graph-side-panel-${cfg.id}-retry-btn`"
                 @click="fetchResourceData(cfg)"
                 >{{ t("traces.serviceGraphNodeSidePanel.retry") }}</OButton
@@ -651,8 +631,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :sort-order="sortBy ? sortOrderProp : 'desc'"
                 :loading="resourceTabPending(cfg.id)"
                 :default-columns="false"
-                :row-height="38"
-                :show-global-filter="false"
                 :fill-height="false"
                 pagination="none"
                 @sort-change="(p: any) => handleSortChange(p.column)"
@@ -672,8 +650,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #cell-hover-actions="{ row, column, active }">
                   <span v-if="active && tracesLocked" class="inline-flex" @click.stop>
                     <OButton
+                      icon-only
                       variant="ghost"
-                      size="icon"
+                      size="xs"
                       disabled
                       :aria-label="t('traces.serviceGraphNodeSidePanel.viewInTraces')"
                       :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
@@ -684,8 +663,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <OButton
                     v-else-if="active"
+                    icon-only
                     variant="ghost"
-                    size="icon"
+                    size="xs"
                     :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                     @click.stop="
                       navigateToTraces({
@@ -711,7 +691,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :value="row.p99"
                     :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p99']).p99"
                     :label="raw(formatOperationLatency(row.p99))"
-                    variant="warning"
+                    tone="warn"
                     align="right"
                     inline
                   />
@@ -763,27 +743,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="px-page-edge flex flex-col gap-3 py-4"
               data-test="service-graph-side-panel-metrics-loading"
             >
-              <OSkeleton type="text" class="h-4 w-40!" />
-              <OSkeleton type="rect" class="h-40 w-full!" />
-              <OSkeleton type="rect" class="h-40 w-full!" />
+              <OSkeleton class="h-4 w-40!" />
+              <OSkeleton shape="block" class="h-40 w-full!" />
+              <OSkeleton shape="block" class="h-40 w-full!" />
             </div>
 
             <!-- Error state -->
-            <div
+            <OEmptyState
               v-else-if="metricsCorrelationError"
+              kind="error"
               role="alert"
-              class="text-status-error-text flex flex-col items-center gap-3 py-6 text-center text-sm"
+              :text="
+                isRawHttpText(metricsCorrelationError)
+                  ? t('emptyState.loadError.description')
+                  : raw(metricsCorrelationError)
+              "
               data-test="service-graph-side-panel-metrics-error"
             >
-              <span>{{ metricsCorrelationError }}</span>
-              <OButton
-                variant="ghost-primary"
-                size="sm"
-                data-test="service-graph-side-panel-metrics-retry-btn"
-                @click="fetchMetricsCorrelation(true)"
-                >{{ t("traces.serviceGraphNodeSidePanel.retry") }}</OButton
-              >
-            </div>
+              <template #actions>
+                <OButton
+                  data-test="service-graph-side-panel-metrics-retry-btn"
+                  @click="fetchMetricsCorrelation(true)"
+                >
+                  {{ t("traces.serviceGraphNodeSidePanel.retry") }}
+                </OButton>
+              </template>
+            </OEmptyState>
 
             <!-- Metrics dashboard -->
             <TelemetryCorrelationDashboard
@@ -809,14 +794,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-graph-side-panel-metrics-dashboard"
             />
 
-            <!-- Empty state — standard OEmptyState -->
             <OEmptyState
               v-else-if="metricsCorrelationLoaded"
-              size="inline"
               icon="insights"
               :title="t('traces.serviceGraphNodeSidePanel.noMetricsAvailable')"
-              hide-action
-              class="py-16"
               data-test="service-graph-side-panel-metrics-empty"
             />
           </OTabPanel>
@@ -856,7 +837,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -922,6 +903,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
 
@@ -1213,7 +1195,7 @@ export default defineComponent({
     OTabPanels,
     OTabPanel,
     OButton,
-    OBanner,
+    OInlineNotice,
     ODropdown,
     ODropdownItem,
     ODrawer,
@@ -3280,6 +3262,7 @@ export default defineComponent({
       // Metrics Tab
       metricsCorrelationLoading,
       metricsCorrelationError,
+      isRawHttpText,
       metricsCorrelationData,
       metricsCorrelationLoaded,
       fetchMetricsCorrelation,

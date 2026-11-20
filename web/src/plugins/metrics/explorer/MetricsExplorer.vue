@@ -23,16 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex h-full min-h-0 w-full flex-col" data-test="metrics-explorer">
+    <OPageHeader :title="t('menu.metrics')" title-data-test="metrics-explorer-title" />
     <AnomalyOriginBanner class="mx-1.5 mt-1.5 shrink-0" data-test="metrics-anomaly-origin-banner" />
-    <!-- No page title: Metrics is an EXPLORE surface like Logs and Traces, so the
-         first row is the toolbar — scope on the left, time on the right, like the
-         Logs toolbar. -->
     <!-- items-center: LabelFilterBar wraps its own chips internally (flex-wrap),
          so the row keeps every control on one centred line rather than items-start. -->
-    <!-- `p-1.5`, the SAME padding the Logs and Traces toolbars use
-         (SearchBar.vue:23 / traces SearchBar.vue:19), so the toolbars share geometry. -->
     <div
-      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5 max-md:flex-wrap max-md:gap-x-1 max-md:gap-y-1"
+      class="border-border-default px-page-edge flex shrink-0 items-center gap-2 border-b py-2 max-md:flex-wrap max-md:gap-x-1 max-md:gap-y-1"
       data-test="metrics-explorer-filter-bar"
     >
       <!-- Page mode toggle at the start of the toolbar — Explore (browse grid)
@@ -43,21 +39,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #trigger>
           <OButton
             data-test="metrics-explorer-mode-dropdown-btn"
-            size="sm-toolbar"
-            variant="outline"
-            icon-right="arrow-drop-down"
+            variant="secondary"
+            icon-end="arrow-drop-down"
           >
             <OIcon :name="currentModeOption.icon" size="sm" class="shrink-0" />
             {{ currentModeOption.label }}
           </OButton>
         </template>
         <ODropdownItem
+          :icon="opt.icon"
           v-for="opt in modeOptions"
           :key="opt.value"
           :data-test="`metrics-explorer-mode-${opt.value}-item`"
           @select="setMode(opt.value)"
         >
-          <template #icon-left><OIcon :name="opt.icon" size="sm" /></template>
           {{ opt.label }}
         </ODropdownItem>
       </ODropdown>
@@ -69,13 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="metrics-explorer-mode"
         @update:model-value="setMode"
       >
-        <OToggleGroupItem value="explore" size="sm" data-test="metrics-explorer-mode-explore">
+        <OToggleGroupItem value="explore" data-test="metrics-explorer-mode-explore">
           <template #icon-left>
             <OIcon name="search" size="sm" class="shrink-0" />
           </template>
           {{ t("metrics.explorer.modeExplore") }}
         </OToggleGroupItem>
-        <OToggleGroupItem value="visualize" size="sm" data-test="metrics-explorer-mode-visualize">
+        <OToggleGroupItem value="visualize" data-test="metrics-explorer-mode-visualize">
           <!-- The wrench (`build`), matching the Logs toolbar's Visualize —
                Visualize is where you BUILD a chart, and the two pages must not
                name the same job with different glyphs. -->
@@ -84,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           {{ t("metrics.explorer.modeVisualize") }}
         </OToggleGroupItem>
-        <OToggleGroupItem value="workspace" size="sm" data-test="metrics-explorer-mode-workspace">
+        <OToggleGroupItem value="workspace" data-test="metrics-explorer-mode-workspace">
           <!-- `star-outline` (outline), not the filled `star`: a filled star is
                the card's ON state and on a tab would read as "already
                favourited" rather than "your favourites live here". -->
@@ -139,17 +134,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimePickerRef"
           v-model="selectedDate"
           data-test="metrics-date-picker"
-          class="h-8.5!"
           :auto-apply-dashboard="mode === 'visualize'"
           calendar-presets
           @on:date-change="onDateChange"
-        />
-        <AutoRefreshInterval
-          v-model="refreshInterval"
-          trigger
-          data-test="metrics-auto-refresh"
-          :is-compact="isMobile"
-          @trigger="onRefreshTick"
         />
         <!-- Only an explicit Run writes query history; Refresh does not. -->
         <template v-if="mode === 'visualize'">
@@ -163,14 +150,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @load="(entry, when) => historyDrawerRef?.restore(entry, when, false)"
             @view-all="(status) => historyDrawerRef?.show(status)"
           />
-          <RecentSearchesButton
-            data-test="metrics-history-btn"
-            @view-all="(status) => historyDrawerRef?.show(status)"
-          />
           <OButtonGroup>
             <OButton
-              :variant="isVisualizePending ? 'pending' : 'primary'"
-              size="sm-toolbar"
+              :stale="isVisualizePending"
+              variant="primary"
               class="min-w-[5.875rem]"
               data-test="metrics-explorer-run"
               :data-run-pending="isVisualizePending ? 'true' : undefined"
@@ -178,20 +161,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="onVisualizeRun"
             >
               {{ t("metrics.runQuery") }}
-              <OTooltip :content="visualizeRunTooltip" shortcut-id="metricsRunQuery" />
+              <OTooltip :content="visualizeRunTooltip" shortcut="metricsRunQuery" />
             </OButton>
             <ODropdown align="end" side="bottom">
               <template #trigger>
                 <OButton
-                  :variant="isVisualizePending ? 'pending' : 'primary'"
-                  size="icon-toolbar"
-                  icon-left="arrow-drop-down"
+                  icon-only
+                  :stale="isVisualizePending"
+                  variant="primary"
+                  icon="arrow-drop-down"
                   :aria-label="t('metrics.runQueryOptions')"
                   data-test="metrics-explorer-run-options"
                 />
               </template>
               <ODropdownItem
-                icon-left="refresh"
+                icon="refresh"
                 data-test="metrics-explorer-refresh-cache-run"
                 @select="onVisualizeRunWithoutCache"
               >
@@ -200,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-if="isAutoRunAvailable">
                 <ODropdownSeparator />
                 <ODropdownItem data-test="metrics-explorer-auto-run-toggle" @select="toggleAutoRun">
-                  <template #icon-left>
+                  <template #icon>
                     <OIcon
                       :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
                       size="sm"
@@ -220,28 +204,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdown>
           </OButtonGroup>
         </template>
-        <!-- Visualize's Run query already re-runs the chart; the r shortcut and auto-refresh still refresh there. -->
-        <OButton
-          v-if="mode !== 'visualize'"
-          variant="primary"
-          size="sm-toolbar"
-          icon-left="refresh"
+        <!-- Auto-refresh lives in its menu, so Visualize keeps it too; there it re-runs the chart. -->
+        <ORefreshButton
+          :last-run-at="refreshDataFrom"
+          :loading="refreshLoading"
           :disabled="isGridMode && (refreshing || grid.loading.value)"
-          :loading="isGridMode && refreshing"
+          :auto-refresh="refreshInterval"
+          :auto-refresh-note="t('search.autoRefreshRelativeOnly')"
+          shortcut="metricsRefresh"
           data-test="metrics-explorer-refresh"
           @click="() => onRefresh()"
-        >
-          <span class="max-md:hidden">{{ t("metrics.explorer.refresh") }}</span>
-          <OTooltip :content="t('metrics.explorer.refresh')" shortcut-id="metricsRefresh" />
-        </OButton>
-        <ShareButton
-          v-if="shareUrl"
-          :url="shareUrl"
-          variant="outline"
-          size="icon-md"
-          data-test="metrics-explorer-share-btn"
-          shortcut-id="metricsCopyUrl"
+          @update:auto-refresh="(seconds: number) => (refreshInterval = seconds)"
         />
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              icon-only
+              icon="more-horiz"
+              variant="ghost"
+              :label="t('search.moreActions')"
+              data-test="metrics-explorer-more-btn"
+            />
+          </template>
+          <ODropdownItem
+            v-if="mode === 'visualize' && recentSearchesEnabled"
+            icon="manage-search"
+            data-test="metrics-history-btn"
+            @select="historyDrawerRef?.show(null)"
+          >
+            {{ t("recentSearches.title") }}
+          </ODropdownItem>
+          <ODropdownItem
+            icon="share"
+            shortcut="metricsCopyUrl"
+            data-test="metrics-explorer-share-btn"
+            :disabled="!shareUrl || shareLink.isWebUrlNotConfigured.value"
+            :disabled-reason="
+              shareLink.isWebUrlNotConfigured.value ? t('search.webUrlNotConfigured') : null
+            "
+            @select="shareLink.share()"
+          >
+            {{ t("search.shareLink") }}
+          </ODropdownItem>
+        </ODropdown>
       </div>
     </div>
 
@@ -311,7 +316,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="rail in rails"
               :key="rail.id"
               :value="rail.id"
-              size="sm"
               :data-test="`metrics-explorer-rail-${rail.id}`"
             >
               <span class="flex items-center gap-1">
@@ -361,7 +365,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="px-2 pb-2">
             <OInput
               v-model="typeSearch"
-              size="sm"
               clearable
               :placeholder="t('metrics.explorer.facets.searchTypes')"
               :aria-label="t('metrics.explorer.facets.searchTypesAria')"
@@ -378,8 +381,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}
             </span>
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :disabled="!railHasSelection"
               data-test="metrics-explorer-type-clear"
               @click="clearActiveRail"
@@ -400,7 +403,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OCheckbox
               v-for="facet in visibleTypeFacets"
               :key="facet.id"
-              size="xs"
               :value="facet.id"
               :label="
                 t('metrics.badge.facetWithCount', {
@@ -413,7 +415,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OCheckboxGroup>
           <OEmptyState
             v-else-if="!firstLoadPending"
-            size="inline"
+            size="compact"
             icon="search-off"
             :title="t('metrics.explorer.facets.noTypeMatch')"
             data-test="metrics-explorer-type-empty"
@@ -434,40 +436,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                metrics you are looking through — not another control beside it. -->
           <OSearchInput
             v-model="grid.searchTerm.value"
-            size="sm"
-            clearable
             :debounce="200"
             :placeholder="t('metrics.explorer.searchPlaceholder')"
             data-test="metrics-explorer-search"
+            data-primary-query
             class="min-w-0 flex-1 max-md:basis-full"
-          >
-            <template #icon-right>
-              <OToggleGroup
-                :model-value="grid.hideEmptyPanels.value ? 'with-data' : 'all'"
-                type="single"
-                class="self-center"
-                data-test="metrics-explorer-data-scope"
-                @update:model-value="onDataScope"
-              >
-                <OToggleGroupItem
-                  value="with-data"
-                  size="xs"
-                  icon-left="show-chart"
-                  :title="t('metrics.explorer.withDataTitle')"
-                  data-test="metrics-explorer-hide-empty"
-                  >{{ t("metrics.explorer.withData") }}</OToggleGroupItem
-                >
-                <OToggleGroupItem
-                  value="all"
-                  size="xs"
-                  icon-left="all-inclusive"
-                  :title="t('metrics.explorer.allTitle')"
-                  data-test="metrics-explorer-show-all"
-                  >{{ t("metrics.explorer.all") }}</OToggleGroupItem
-                >
-              </OToggleGroup>
-            </template>
-          </OSearchInput>
+            :scope="grid.hideEmptyPanels.value ? 'with-data' : 'all'"
+            :scope-options="dataScopeOptions"
+            @update:scope="onDataScope"
+          />
 
           <!-- Announced, so a screen reader hears the count change as the user
                types. `shrink-0` + `nowrap` so the growing search field does not
@@ -480,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aria-busy="settledCount.state.value.loading ? 'true' : undefined"
           >
             <template v-if="settledCount.state.value.loading">
-              <OSkeleton type="text" animation="none" class="inline-block h-3 w-10 align-middle" />
+              <OSkeleton class="inline-block h-3 w-10 align-middle" />
             </template>
             <template v-else>{{ settledCount.state.value.value }}</template>
           </span>
@@ -495,22 +472,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="opt in usageFilterOptions"
               :key="opt.value"
               :value="opt.value"
-              size="sm"
               :data-test="`metrics-explorer-usage-${opt.value}`"
               >{{ opt.label }}</OToggleGroupItem
             >
           </OToggleGroup>
           <OSpinner
             v-if="grid.usageLoading.value"
-            size="xs"
             :title="t('metrics.explorer.usageLoading')"
             data-test="metrics-explorer-usage-loading"
           />
           <OButton
             v-else-if="grid.usageError.value"
-            variant="ghost-destructive"
-            size="xs"
-            icon-left="refresh"
+            variant="danger-ghost"
+            size="sm"
+            icon="refresh"
             data-test="metrics-explorer-usage-retry"
             @click="grid.retryUsage"
           >
@@ -522,7 +497,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="opt in sortOptions"
               :key="opt.value"
               :value="opt.value"
-              size="sm"
               :tooltip="opt.tooltip"
               :data-test="`metrics-explorer-sort-${opt.value}`"
               >{{ opt.label }}</OToggleGroupItem
@@ -534,7 +508,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="opt in viewOptions"
               :key="opt.value"
               :value="opt.value"
-              size="sm"
               :icon-left="opt.icon"
               :tooltip="opt.label"
               :data-test="`metrics-explorer-view-${opt.value}`"
@@ -557,13 +530,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :content="dashboardsLockedReason"
           >
             <span class="inline-flex">
-              <OButton
-                variant="outline"
-                size="sm-action"
-                disabled
-                data-test="metrics-explorer-convert-dashboard"
-              >
-                <template #icon-left>
+              <OButton variant="secondary" disabled data-test="metrics-explorer-convert-dashboard">
+                <template #icon>
                   <OIcon
                     name="lock"
                     class="lock-chip"
@@ -577,9 +545,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTooltip>
           <OButton
             v-else-if="isWorkspace && grid.favorites.value.length"
-            variant="outline"
-            size="sm-action"
-            icon-left="dashboard-customize"
+            variant="secondary"
+            icon="dashboard-customize"
             data-test="metrics-explorer-convert-dashboard"
             @click="openConvertToDashboard"
           >
@@ -590,7 +557,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   count: grid.favorites.value.length,
                 })
               "
-              shortcut-id="metricsAddToDashboard"
+              shortcut="metricsAddToDashboard"
             />
           </OButton>
         </div>
@@ -598,22 +565,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <section
           ref="scrollRef"
           class="min-w-0 flex-1 overflow-y-auto p-3"
-          :class="gridVisible ? '' : 'flex flex-col items-center justify-center'"
+          :class="gridVisible ? '' : 'flex flex-col'"
           data-test="metrics-explorer-scroll"
         >
           <div
             v-if="showLoading"
-            class="flex h-3/5 flex-col items-center justify-center gap-2.5 opacity-80"
+            class="grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-md:grid-cols-1"
+            data-test="metrics-explorer-loading"
           >
-            <OSpinner size="lg" />
-            <span>{{ t("metrics.explorer.loading") }}</span>
+            <OSkeleton v-for="n in 6" :key="n" shape="block" class="h-56" />
           </div>
 
           <OEmptyState
             v-else-if="grid.loadError.value"
-            size="block"
-            preset="load-error"
-            :description="raw(grid.loadError.value)"
+            kind="error"
             data-test="metrics-explorer-load-error"
             @action="grid.loadStreams(true)"
           />
@@ -631,10 +596,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @detected="grid.loadStreams(true)"
           >
             <OEmptyState
-              size="block"
-              preset="no-streams"
+              :text="t('emptyState.noStreams.description')"
+              icon="link"
               :title="t('metrics.explorer.noMetrics')"
-              :actions="noMetricsActions"
+              :action-label="t('metrics.explorer.setupIngestion')"
               data-test="metrics-explorer-no-metrics"
               @action="openMetricsIngestion"
             />
@@ -645,37 +610,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              filter-clearing action. -->
           <OEmptyState
             v-else-if="isWorkspace && !grid.favorites.value.length"
-            size="block"
-            variant="create"
-            illustration="board"
+            icon="dashboard"
             :title="t('metrics.explorer.workspace.emptyScratchpadTitle')"
-            :description="t('metrics.explorer.workspace.emptyScratchpadDesc')"
+            :text="t('metrics.explorer.workspace.emptyScratchpadDesc')"
             data-test="metrics-workspace-empty-grid"
           />
 
           <!-- Every card checked so far is empty but candidates remain: not a verdict, so no remedies, just Show more below. -->
           <OEmptyState
             v-else-if="!visibleCards.length && grid.hasMore.value"
-            size="block"
-            variant="no-results"
-            illustration="no-results"
+            kind="filtered"
             :title="t('metrics.explorer.noMatchYet')"
-            :description="t('metrics.explorer.noMatchYetHint')"
+            :text="t('metrics.explorer.noMatchYetHint')"
             data-test="metrics-explorer-no-match-yet"
           />
 
-          <!-- Every remedy the hint names, as an action card — but only the ones
-             that would actually change anything right now: each card is gated
-             on its own cause being active. "Clear all filters" is always last. -->
+          <!-- The most specific active remedy leads; Clear all filters stays reachable beside it. -->
           <OEmptyState
             v-else-if="!gridItems.length"
-            size="block"
-            preset="no-search-results"
+            kind="filtered"
             :title="t('metrics.explorer.noMatch')"
-            :description="raw(noMatchDescription)"
-            :actions="noMatchActions"
+            :text="raw(noMatchDescription)"
+            :action-label="t(noMatchActions[0].titleKey)"
+            :secondary-action-label="
+              noMatchActions.length > 1 ? t('metrics.explorer.clearAllFilters') : undefined
+            "
             data-test="metrics-explorer-no-match"
-            @action="onEmptyStateAction"
+            @action="onEmptyStateAction(noMatchActions[0].id)"
+            @secondary-action="onEmptyStateAction('clear-all')"
           />
 
           <!-- Virtualized by ROW: only visible rows exist in the DOM, so ECharts
@@ -712,11 +674,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="metrics-explorer-card-placeholder"
                 >
                   <PanelBar class="gap-2">
-                    <OSkeleton type="text" animation="none" class="h-3 w-40" aria-hidden="true" />
+                    <OSkeleton class="h-3 w-40" aria-hidden="true" />
                   </PanelBar>
                   <!-- A slot is only drawn while the grid's emptiness sweep is still running. -->
                   <div class="relative min-h-0 flex-1">
-                    <LoadingProgress :loading="true" :loading-progress-percentage="0" />
+                    <OLoadingLine active class="absolute inset-x-0 top-0 z-10" />
                     <PanelChartPlaceholder />
                   </div>
                 </div>
@@ -748,8 +710,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex justify-center py-4"
           >
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               :loading="grid.showingMore.value"
               :disabled="grid.showingMore.value"
               data-test="metrics-explorer-show-more"
@@ -860,9 +821,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import type { SearchScopeOption } from "@/lib/forms/SearchInput/OSearchInput.types";
 import type { AcceptableValue } from "reka-ui";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
+import { useAutoRefreshTimer } from "@/composables/useAutoRefreshTimer";
 import { MAX_FILTER_BRANCHES } from "@/components/promql/labelBoolean";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -871,8 +834,8 @@ import { useVirtualizer } from "@tanstack/vue-virtual";
 import { isEqual, debounce } from "lodash-es";
 
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -886,7 +849,7 @@ import ODataAge from "@/lib/core/RefreshButton/ODataAge.vue";
 import ORegionStatus from "@/lib/feedback/RegionStatus/ORegionStatus.vue";
 import { useRegionLoading } from "@/lib/feedback/RegionStatus/useRegionLoading";
 import PanelBar from "@/components/common/PanelBar.vue";
-import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
 import { useSettledValue } from "@/composables/useSettledValue";
 import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
@@ -895,7 +858,6 @@ import { formatRangeLength, formatRefreshFailed } from "@/utils/formatters";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import AnomalyOriginBanner from "@/components/alerts/AnomalyOriginBanner.vue";
-import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -906,7 +868,8 @@ import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import useBreakpoint from "@/composables/useBreakpoint";
 
-import ShareButton from "@/components/common/ShareButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { useShareLink } from "@/composables/useShareLink";
 import MetricCard from "./MetricCard.vue";
 import MetricsVisualize from "./MetricsVisualize.vue";
 import AddToDashboard from "../AddToDashboard.vue";
@@ -916,9 +879,9 @@ import FunctionConfigDialog from "./FunctionConfigDialog.vue";
 import MetricDetailView, { type DetailStatus } from "./MetricDetailView.vue";
 import ExplorerSavedViews from "./ExplorerSavedViews.vue";
 import QueryHistoryDrawer from "../QueryHistoryDrawer.vue";
-import RecentSearchesButton from "@/components/queryHistory/RecentSearchesButton.vue";
 import RecentSearchesFocusDropdown from "@/components/queryHistory/RecentSearchesFocusDropdown.vue";
 import { useRecentSearchesEditorHost } from "@/composables/queryHistory/useRecentSearchesEditorHost";
+import { useRecentSearches } from "@/composables/queryHistory/useRecentSearches";
 import { metricsEditorIsEmpty, metricsEditorIsEmptyWith } from "@/utils/queryHistory/metrics";
 
 import useMetricsExplorerGrid, {
@@ -956,6 +919,7 @@ import type { ExplorerViewState } from "@/utils/metrics/explorerSavedView";
 import { operandStreamsOf, type MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { usePrimaryQueryFocus } from "@/composables/usePrimaryQueryFocus";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 /**
@@ -981,17 +945,17 @@ const ROW_HEIGHT = CARD_HEIGHT + ROW_GAP;
 export default defineComponent({
   name: "MetricsExplorer",
   components: {
+    OPageHeader,
     OPageHeaderStatus,
     OSkeleton,
     ODataAge,
     ORegionStatus,
     PanelBar,
-    LoadingProgress,
+    OLoadingLine,
     PanelChartPlaceholder,
     FirstDataPanel,
     AnomalyOriginBanner,
     DateTimePickerDashboard,
-    AutoRefreshInterval,
     OButton,
     OIcon,
     OCheckbox,
@@ -1007,7 +971,7 @@ export default defineComponent({
     ODropdownItem,
     ODropdownSeparator,
     OButtonGroup,
-    ShareButton,
+    ORefreshButton,
     MetricCard,
     MetricsVisualize,
     AddToDashboard,
@@ -1017,7 +981,6 @@ export default defineComponent({
     MetricDetailView,
     ExplorerSavedViews,
     QueryHistoryDrawer,
-    RecentSearchesButton,
     RecentSearchesFocusDropdown,
   },
   setup() {
@@ -1161,6 +1124,22 @@ export default defineComponent({
      * filtered to what has data or it is not), so an undefined is ignored and the
      * current choice stands.
      */
+    const dataScopeOptions = computed<SearchScopeOption[]>(() => [
+      {
+        value: "with-data",
+        label: t("metrics.explorer.withData"),
+        icon: "show-chart",
+        tooltip: t("metrics.explorer.withDataTitle"),
+        dataTest: "metrics-explorer-hide-empty",
+      },
+      {
+        value: "all",
+        label: t("metrics.explorer.all"),
+        icon: "all-inclusive",
+        tooltip: t("metrics.explorer.allTitle"),
+        dataTest: "metrics-explorer-show-all",
+      },
+    ]);
     const onDataScope = (value: any) => {
       if (value) grid.hideEmptyPanels.value = value === "with-data";
     };
@@ -1453,27 +1432,19 @@ export default defineComponent({
       return grid.emptyHiddenCount.value ? `${noDataHiddenLabel.value} ${hint}` : hint;
     });
 
-    /**
-     * One card per remedy the hint names — gated on its cause, so a card is
-     * never an offer to clear something that is not set. Keys, not strings:
-     * OEmptyState's action cards run titleKey/descriptionKey through t().
-     */
+    /** Remedies the hint names, each gated on its cause; "Clear all filters" is always last. */
     const noMatchActions = computed(() => {
-      const actions: EmptyStateAction[] = [];
+      const actions: { id: string; titleKey: I18nKey }[] = [];
       if (grid.searchTerm.value) {
         actions.push({
           id: "clear-search",
-          icon: "search",
           titleKey: "metrics.explorer.emptyActions.clearSearch",
-          descriptionKey: "metrics.explorer.emptyActions.clearSearchDesc",
         });
       }
       if (grid.labelFilters.value.length) {
         actions.push({
           id: "clear-labels",
-          icon: "label",
           titleKey: "metrics.explorer.emptyActions.clearLabels",
-          descriptionKey: "metrics.explorer.emptyActions.clearLabelsDesc",
         });
       }
       // Favorites ignores prefix/suffix/type (their panel is Explore-only), so
@@ -1486,45 +1457,27 @@ export default defineComponent({
       ) {
         actions.push({
           id: "clear-facets",
-          icon: "filter-list",
           titleKey: "metrics.explorer.emptyActions.clearFacets",
-          descriptionKey: "metrics.explorer.emptyActions.clearFacetsDesc",
         });
       }
       if (grid.showFavoritesOnly.value) {
         actions.push({
           id: "clear-favorites",
-          icon: "star",
           titleKey: "metrics.explorer.emptyActions.clearFavorites",
-          descriptionKey: "metrics.explorer.emptyActions.clearFavoritesDesc",
         });
       }
       if (grid.hideEmptyPanels.value) {
         actions.push({
           id: "show-all",
-          icon: "all-inclusive",
           titleKey: "metrics.explorer.emptyActions.showAll",
-          descriptionKey: "metrics.explorer.emptyActions.showAllDesc",
         });
       }
       actions.push({
         id: "clear-all",
-        icon: "restart-alt",
         titleKey: "metrics.explorer.clearAllFilters",
-        descriptionKey: "metrics.explorer.emptyActions.clearAllDesc",
       });
       return actions;
     });
-
-    /** The zero-metrics action card — same shape as the preset's, metrics-specific copy. */
-    const noMetricsActions: EmptyStateAction[] = [
-      {
-        id: "setup-ingestion",
-        icon: "cloud-upload",
-        titleKey: "metrics.explorer.setupIngestion",
-        descriptionKey: "metrics.explorer.setupIngestionDesc",
-      },
-    ];
 
     /** The zero-metrics remedy: the in-app Data Sources metrics page. */
     const openMetricsIngestion = () => {
@@ -1747,6 +1700,24 @@ export default defineComponent({
       }
       return url.href;
     });
+    const shareLink = useShareLink({ url: () => shareUrl.value });
+    const { enabled: recentSearchesEnabled } = useRecentSearches();
+
+    // The page is as fresh as its oldest on-screen chart.
+    const gridDataFrom = computed(() => {
+      const times = visibleCards.value
+        .map((card) => grid.previews.value[card.name]?.lastTriggeredAt)
+        .filter((at): at is number => typeof at === "number");
+      return times.length ? Math.min(...times) : null;
+    });
+    const refreshDataFrom = computed<number | null>(() =>
+      mode.value === "visualize" ? (visualizeRef.value?.lastRunAt ?? null) : gridDataFrom.value,
+    );
+    const refreshLoading = computed(() =>
+      mode.value === "visualize"
+        ? !!visualizeRef.value?.isLoading
+        : isGridMode.value && refreshing.value,
+    );
 
     /** The rate window a panel built from `name`'s card rates over: see `onSelect` for why widened cards keep theirs. */
     const panelRateWindowFor = (name: string) =>
@@ -2489,6 +2460,7 @@ export default defineComponent({
 
     /** The auto-refresh timer. Keeps the no-data set; see onRefresh. */
     const onRefreshTick = () => onRefresh({ manual: false });
+    useAutoRefreshTimer(() => refreshInterval.value, onRefreshTick);
 
     /** An explicit Run in Visualize — the only Visualize run that writes history. */
     const onVisualizeRun = () => visualizeRef.value?.onUserRun?.(selectedDate.value);
@@ -2609,6 +2581,8 @@ export default defineComponent({
     );
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
+    // Grid modes focus the metric search; Visualize, the PromQL editor.
+    usePrimaryQueryFocus("metricsFocusQuery", ['[data-test="dashboard-panel-query-editor"]']);
     // Keys and scope come from the "metrics" group in shortcutRegistry.ts.
     useShortcuts([
       {
@@ -2622,16 +2596,6 @@ export default defineComponent({
         handler: () => {
           if (isInputFocused()) return;
           onRefresh({ manual: true });
-        },
-      },
-      {
-        id: "metricsFocusQuery",
-        handler: () => {
-          // Grid modes: the metric search box. Visualize: the PromQL editor.
-          const el = document.querySelector<HTMLElement>(
-            '[data-test="metrics-explorer-search"] input, [data-test="metrics-explorer-search"] textarea, [data-test="dashboard-panel-query-editor"] textarea, [data-test="dashboard-panel-query-editor"] .monaco-editor textarea',
-          );
-          el?.focus();
         },
       },
       {
@@ -2654,13 +2618,13 @@ export default defineComponent({
         id: "metricsCopyUrl",
         handler: () => {
           if (isInputFocused()) return;
-          // Reuse ShareButton's short-URL + clipboard + toast flow.
-          document.querySelector<HTMLElement>('[data-test="metrics-explorer-share-btn"]')?.click();
+          shareLink.share();
         },
       },
     ]);
 
     return {
+      dataScopeOptions,
       raw,
       t,
       store,
@@ -2724,7 +2688,6 @@ export default defineComponent({
       noMatchDescription,
       noMatchActions,
       onEmptyStateAction,
-      noMetricsActions,
       openMetricsIngestion,
       showMoreLabel,
       badgeLabel: (id: string) => t(BADGE_LABEL_KEYS[id] ?? "metrics.badge.other"),
@@ -2779,6 +2742,11 @@ export default defineComponent({
       toggleAutoRun,
       visualizeDateTime,
       shareUrl,
+      shareLink,
+      gridDataFrom,
+      refreshDataFrom,
+      refreshLoading,
+      recentSearchesEnabled,
       onDateChange,
       onRefreshTick,
       onCardVisible,

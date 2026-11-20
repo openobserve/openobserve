@@ -25,8 +25,7 @@ describe("ODropdownItem focusable unavailable opt-in", () => {
             ODropdownItem,
             {
               disabled: true,
-              focusableUnavailable: true,
-              description: raw("Run first"),
+              disabledReason: raw("Run first"),
               "data-test": "blocked",
               onSelect: select,
             },
@@ -66,15 +65,15 @@ describe("ODropdownItem focusable unavailable opt-in", () => {
     );
   });
 
-  it("paints a lock icon-left with the locked-icon token", async () => {
+  it("paints a lock icon with the locked-icon token", async () => {
     wrapper = mount(ODropdown, {
       attachTo: document.body,
       props: { open: true },
       slots: {
         trigger: () => h("button", "Menu"),
         default: () => [
-          h(ODropdownItem, { iconLeft: "lock", "data-test": "locked" }, () => "Locked"),
-          h(ODropdownItem, { iconLeft: "add", "data-test": "plain" }, () => "Plain"),
+          h(ODropdownItem, { icon: "lock", "data-test": "locked" }, () => "Locked"),
+          h(ODropdownItem, { icon: "add", "data-test": "plain" }, () => "Plain"),
         ],
       },
     });

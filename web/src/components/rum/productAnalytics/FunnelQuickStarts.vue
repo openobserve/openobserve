@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="text-text-heading text-sm font-semibold"
       >{{ t("rum.analytics.funnel.startFromEntry") }}</span
     >
-    <OSkeleton v-if="entriesLoading" type="text" class="h-8 w-full" />
+    <OSkeleton v-if="entriesLoading" class="h-8 w-full" />
     <span
       v-else-if="entriesFailed"
       class="text-text-secondary flex items-center gap-2 text-xs"
@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >{{ t("rum.analytics.funnel.entriesFailed") }}
       <OButton
         variant="ghost"
-        size="sm"
         data-test="rum-analytics-funnel-entries-retry-btn"
         @click="emit('retry')"
         >{{ t("common.retry") }}</OButton
@@ -41,14 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       v-for="(e, i) in entries"
       :key="e.key"
-      variant="outline"
-      size="md"
+      variant="secondary"
       class="justify-start"
       :data-test="`rum-analytics-funnel-entry-start-${i}`"
       @click="emit('start', [{ kind: 'p', key: e.key }])"
     >
       <span class="flex min-w-0 items-center gap-2">
-        <OTag :label="t('rum.analytics.kind.page')" variant="blue-soft" size="xs" />
+        <OTag :label="t('rum.analytics.kind.page')" tone="neutral" size="sm" />
         <span class="truncate font-mono text-xs">{{ e.key }}</span>
         <span class="text-text-secondary text-xs">{{
           t(
@@ -67,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="(r, i) in recent"
         :key="i"
         variant="ghost"
-        size="sm"
         class="justify-start"
         :data-test="`rum-analytics-funnel-recent-${i}`"
         @click="emit('open', r)"

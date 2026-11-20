@@ -10,14 +10,21 @@ import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
 import OTableSelectCheckbox from "./OTableSelectCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isElementTruncated, readElementText } from "@/lib/overlay/Tooltip/useIsTruncated";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
-import type { OTableColumnMeta } from "../OTable.types";
-import { TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH } from "../OTable.types";
+import {
+  OTableNumericColumnsKey,
+  type OTableColumnMeta,
+  type OTableDensity,
+} from "../OTable.types";
+import {
+  TABLE_CHECKBOX_COL_SIZE as TABLE_CHECKBOX_COL_WIDTH,
+  TABLE_EXPAND_COL_STYLE,
+} from "../OTable.types";
 
 const { t } = useI18nTyped();
 const props = defineProps<{
@@ -48,12 +55,10 @@ const props = defineProps<{
   sortDisabled?: boolean;
   sortDisabledReason?: I18nText;
   stickyHeader?: boolean;
-  bordered?: boolean;
   pivotHeaderLevels?: any[];
   pivotRowColumns?: any[];
   stickyColTotals?: boolean;
-  dense?: boolean;
-  compact?: boolean;
+  density?: OTableDensity;
   /** Show the per-column value-filter dropdown on filterable columns. */
   enableColumnFilter?: boolean;
   /** Show the per-column "format this column" icon on formattable columns. */
@@ -245,8 +250,16 @@ function autoWidthHeaderStyle(header: any): Record<string, string> {
   return style;
 }
 
-function headerAlignClass(header: any): string {
+const numericColumns = inject(OTableNumericColumnsKey, null);
+// A column of plain numbers right-aligns with its cells unless it names an alignment (D3).
+function columnAlign(header: any): string | undefined {
   const align = (header.column.columnDef.meta as any)?.align;
+  if (align && align !== "left") return align;
+  return numericColumns?.value.has(header.column.id) ? "right" : align;
+}
+
+function headerAlignClass(header: any): string {
+  const align = columnAlign(header);
   if (align === "center") return "text-center justify-center";
   if (align === "right") return "text-right justify-end";
   return "";
@@ -277,7 +290,13 @@ function headerAriaSort(header: any): "ascending" | "descending" | "none" | unde
 function headerPaddingClass(header: any): string {
   const m = header.column.columnDef.meta as any;
   if (m?.spacer) return "px-0"; // the invisible spacer must be able to reach 0 width
-  return m?.compactPadding ? "px-1" : "px-2";
+  return m?.compactPadding ? "px-1" : "px-3";
+}
+
+// The actions header names its column for screen readers only; it stays opaque like its cells,
+// or a label scrolled under the pinned column would show through above the row icons (D7).
+function isActionHeader(header: any): boolean {
+  return !!(header.column.columnDef.meta as any)?.isAction;
 }
 
 function headerSizeVar(header: any): string {
@@ -327,7 +346,7 @@ function noteCutHeaderName(header: any, event: MouseEvent) {
 // `justify-*` has to be restated on the cross axis as `items-*`, or a
 // right-aligned numeric header would stack flush left.
 function headerStackAlignClass(header: any): string {
-  const align = (header.column.columnDef.meta as any)?.align;
+  const align = columnAlign(header);
   if (align === "center") return "text-center items-center";
   if (align === "right") return "text-right items-end";
   return "items-start";
@@ -502,7 +521,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
     v-for="headerGroup in headerGroups"
     :key="headerGroup.id"
     :class="[
-      'bg-table-header-bg',
+      'group/thead bg-table-header-bg',
       'border-table-header-border border-b',
       stickyHeader ? 'sticky top-0 z-10' : '',
     ]"
@@ -526,10 +545,11 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
       @end="handleDragEnd"
       @update:model-value="handleDraggableUpdate"
     >
-      <!-- Expand placeholder -->
+      <!-- Expand placeholder: the chevron sits on the table edge line, as the selection checkbox does. -->
       <th
         v-if="expansionEnabled"
-        class="border-table-header-border w-6 max-w-6 min-w-6 border-b px-0"
+        class="border-table-header-border border-b pe-0"
+        :style="TABLE_EXPAND_COL_STYLE"
         data-test="o2-table-th-expand"
       />
 
@@ -580,7 +600,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         :class="[
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
           'table-head',
-          compact ? 'h-6' : dense ? 'h-8' : 'h-9',
+          density === 'compact' ? 'h-control-sm' : 'h-control-md',
           'border-table-header-border border-b',
           'group',
           // Sortable's `filter` selector — this header can't start a drag, so it
@@ -668,7 +688,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             <button
               type="button"
               :class="[
-                'rounded-default focus-visible:ring-focus-ring-accent flex min-w-0 items-center gap-1 text-start focus-visible:ring-2 focus-visible:outline-none',
+                'rounded-default focus-visible:ring-focus-ring-accent flex min-w-0 items-center gap-1 text-start transition-shadow focus-visible:ring-2 focus-visible:outline-none',
                 sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
                 headerAlignClass(header),
@@ -775,7 +795,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :class="[
-                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center focus-visible:ring-2 focus-visible:outline-none',
+                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center transition-shadow focus-visible:ring-2 focus-visible:outline-none',
                   sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 ]"
                 data-test="o2-table-th-sort-trigger"
@@ -824,6 +844,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-else
             :class="[
               'flex min-w-0 flex-col justify-center',
+              isActionHeader(header) ? 'sr-only' : '',
               isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
               headerSubLabel(header)
                 ? ['gap-px', headerStackAlignClass(header)]
@@ -894,18 +915,13 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               @click.stop
             >
               <div class="border-table-row-divider border-b px-2 pb-1">
-                <OInput
+                <OSearchInput
                   v-model="colFilterSearch[header.column.id]"
-                  size="sm"
-                  clearable
                   :placeholder="t('common.search')"
                   @click.stop
                   @keydown.stop
                 >
-                  <template #icon-left>
-                    <OIcon name="search" size="xs" />
-                  </template>
-                </OInput>
+                </OSearchInput>
               </div>
               <ul role="listbox" aria-multiselectable="true" class="max-h-60 overflow-y-auto">
                 <li
@@ -916,7 +932,6 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 >
                   <OCheckbox
                     :model-value="colFilterValues(header.column.id).includes(rawVal)"
-                    size="sm"
                     :aria-label="raw(filterDisplayValue(header.column.id, rawVal))"
                     @update:model-value="toggleColFilterValue(header.column.id, rawVal)"
                     @click.stop
@@ -968,10 +983,10 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                default, the accent (full-height) while hovering it or resizing. -->
           <div
             :class="[
-              'rounded-full transition-all duration-150',
+              'rounded-full transition-[background-color,height,width] duration-(--duration-control) ease-(--ease-control)',
               header.column.getIsResizing()
                 ? 'bg-table-resize-handle h-full w-0.5'
-                : 'bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px group-hover/resizer:h-full group-hover/resizer:w-0.5',
+                : 'group-hover/thead:bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px bg-transparent group-hover/resizer:h-full group-hover/resizer:w-0.5',
             ]"
           />
         </div>
@@ -990,7 +1005,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
            checkbox gutter had its header columns offset from its body. -->
       <th
         v-if="expansionEnabled"
-        class="border-table-header-border w-6 max-w-6 min-w-6 border-b px-0"
+        class="border-table-header-border border-b pe-0"
+        :style="TABLE_EXPAND_COL_STYLE"
         data-test="o2-table-th-expand"
       />
 
@@ -1035,7 +1051,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         :aria-sort="headerAriaSort(header)"
         :class="[
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
-          compact ? 'group h-6' : dense ? 'group h-8' : 'group h-9',
+          density === 'compact' ? 'group h-control-sm' : 'group h-control-md',
           'border-table-header-border border-b',
           headerPin(header) ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
@@ -1117,7 +1133,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             <button
               type="button"
               :class="[
-                'rounded-default focus-visible:ring-focus-ring-accent flex items-center gap-1 overflow-hidden text-start whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none',
+                'rounded-default focus-visible:ring-focus-ring-accent flex items-center gap-1 overflow-hidden text-start whitespace-nowrap transition-shadow focus-visible:ring-2 focus-visible:outline-none',
                 sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
                 headerAlignClass(header),
@@ -1204,7 +1220,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :class="[
-                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center focus-visible:ring-2 focus-visible:outline-none',
+                  'rounded-default focus-visible:ring-focus-ring-accent flex shrink-0 items-center transition-shadow focus-visible:ring-2 focus-visible:outline-none',
                   sortDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 ]"
                 data-test="o2-table-th-sort-trigger"
@@ -1251,6 +1267,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-else
             as="div"
             :class="[
+              isActionHeader(header) ? 'sr-only' : '',
               isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
               headerAlignClass(header),
             ]"
@@ -1310,18 +1327,13 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               @click.stop
             >
               <div class="border-table-row-divider border-b px-2 pb-1">
-                <OInput
+                <OSearchInput
                   v-model="colFilterSearch[header.column.id]"
-                  size="sm"
-                  clearable
                   :placeholder="t('common.search')"
                   @click.stop
                   @keydown.stop
                 >
-                  <template #icon-left>
-                    <OIcon name="search" size="xs" />
-                  </template>
-                </OInput>
+                </OSearchInput>
               </div>
               <ul role="listbox" aria-multiselectable="true" class="max-h-60 overflow-y-auto">
                 <li
@@ -1332,7 +1344,6 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                 >
                   <OCheckbox
                     :model-value="colFilterValues(header.column.id).includes(rawVal)"
-                    size="sm"
                     :aria-label="raw(filterDisplayValue(header.column.id, rawVal))"
                     @update:model-value="toggleColFilterValue(header.column.id, rawVal)"
                     @click.stop
@@ -1382,10 +1393,10 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                default, the accent (full-height) while hovering it or resizing. -->
           <div
             :class="[
-              'rounded-full transition-all duration-150',
+              'rounded-full transition-[background-color,height,width] duration-(--duration-control) ease-(--ease-control)',
               header.column.getIsResizing()
                 ? 'bg-table-resize-handle h-full w-0.5'
-                : 'bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px group-hover/resizer:h-full group-hover/resizer:w-0.5',
+                : 'group-hover/thead:bg-border-default group-hover/resizer:bg-table-resize-handle h-4 w-px bg-transparent group-hover/resizer:h-full group-hover/resizer:w-0.5',
             ]"
           />
         </div>

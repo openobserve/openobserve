@@ -134,7 +134,7 @@ describe("SortByBtnGrp", () => {
       wrapper = createWrapper({ fieldObj: fieldObjNoSort });
 
       const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
-      expect(clearBtn.classes()).toContain("bg-button-primary");
+      expect(clearBtn.attributes("aria-pressed")).toBe("true");
     });
 
     it("should highlight ascending button when ASC sort is applied", () => {
@@ -142,7 +142,7 @@ describe("SortByBtnGrp", () => {
       wrapper = createWrapper({ fieldObj: fieldObjAsc });
 
       const ascBtn = wrapper.find('[data-test="dashboard-sort-by-item-asc"]');
-      expect(ascBtn.classes()).toContain("bg-button-primary");
+      expect(ascBtn.attributes("aria-pressed")).toBe("true");
     });
 
     it("should highlight descending button when DESC sort is applied", () => {
@@ -150,7 +150,7 @@ describe("SortByBtnGrp", () => {
       wrapper = createWrapper({ fieldObj: fieldObjDesc });
 
       const descBtn = wrapper.find('[data-test="dashboard-sort-by-item-desc"]');
-      expect(descBtn.classes()).toContain("bg-button-primary");
+      expect(descBtn.attributes("aria-pressed")).toBe("true");
     });
 
     it("should only highlight one button at a time", () => {
@@ -161,9 +161,9 @@ describe("SortByBtnGrp", () => {
       const ascBtn = wrapper.find('[data-test="dashboard-sort-by-item-asc"]');
       const descBtn = wrapper.find('[data-test="dashboard-sort-by-item-desc"]');
 
-      expect(clearBtn.classes()).not.toContain("bg-button-primary");
-      expect(ascBtn.classes()).toContain("bg-button-primary");
-      expect(descBtn.classes()).not.toContain("bg-button-primary");
+      expect(clearBtn.attributes("aria-pressed")).toBe("false");
+      expect(ascBtn.attributes("aria-pressed")).toBe("true");
+      expect(descBtn.attributes("aria-pressed")).toBe("false");
     });
   });
 
@@ -278,7 +278,7 @@ describe("SortByBtnGrp", () => {
       wrapper = createWrapper({ fieldObj: fieldObjAsc });
 
       const ascBtn = wrapper.find('[data-test="dashboard-sort-by-item-asc"]');
-      expect(ascBtn.classes()).toContain("bg-button-primary");
+      expect(ascBtn.attributes("aria-pressed")).toBe("true");
     });
 
     it("should not apply selected class to non-active buttons", () => {
@@ -288,8 +288,8 @@ describe("SortByBtnGrp", () => {
       const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
       const descBtn = wrapper.find('[data-test="dashboard-sort-by-item-desc"]');
 
-      expect(clearBtn.classes()).not.toContain("bg-button-primary");
-      expect(descBtn.classes()).not.toContain("bg-button-primary");
+      expect(clearBtn.attributes("aria-pressed")).toBe("false");
+      expect(descBtn.attributes("aria-pressed")).toBe("false");
     });
   });
 
@@ -334,7 +334,7 @@ describe("SortByBtnGrp", () => {
 
       // Should treat undefined as falsy and highlight clear button
       const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
-      expect(clearBtn.classes()).toContain("bg-button-primary");
+      expect(clearBtn.attributes("aria-pressed")).toBe("true");
     });
 
     it("should handle empty field object gracefully", () => {
@@ -362,7 +362,7 @@ describe("SortByBtnGrp", () => {
       wrapper = createWrapper({ fieldObj: fieldObjNoSort });
 
       const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
-      expect(clearBtn.classes()).toContain("bg-button-primary");
+      expect(clearBtn.attributes("aria-pressed")).toBe("true");
 
       // Update the field object
       await wrapper.setProps({
@@ -370,7 +370,7 @@ describe("SortByBtnGrp", () => {
       });
 
       const ascBtn = wrapper.find('[data-test="dashboard-sort-by-item-asc"]');
-      expect(ascBtn.classes()).toContain("bg-button-primary");
+      expect(ascBtn.attributes("aria-pressed")).toBe("true");
     });
 
     it("should maintain state consistency during rapid changes", async () => {
@@ -390,11 +390,11 @@ describe("SortByBtnGrp", () => {
         const descBtn = wrapper.find('[data-test="dashboard-sort-by-item-desc"]');
 
         if (sortOption === null) {
-          expect(clearBtn.classes()).toContain("bg-button-primary");
+          expect(clearBtn.attributes("aria-pressed")).toBe("true");
         } else if (sortOption === "ASC") {
-          expect(ascBtn.classes()).toContain("bg-button-primary");
+          expect(ascBtn.attributes("aria-pressed")).toBe("true");
         } else if (sortOption === "DESC") {
-          expect(descBtn.classes()).toContain("bg-button-primary");
+          expect(descBtn.attributes("aria-pressed")).toBe("true");
         }
       }
     });

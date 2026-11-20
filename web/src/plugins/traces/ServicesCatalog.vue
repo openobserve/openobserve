@@ -78,7 +78,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             v-model="filterText"
             :placeholder="t('traces.servicesCatalog.filterPlaceholder')"
-            clearable
             :debounce="300"
             class="w-full!"
             data-test="services-catalog-filter-input"
@@ -146,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OTag type="countChip" value="neutral" class="whitespace-nowrap">
               {{ t("serviceVersions.catalog.moreChips", { count: moreCount }, moreCount) }}
-              <OTooltip :delay="300" max-width="28rem">
+              <OTooltip>
                 <template #content>
                   <div class="space-y-1" data-test="services-catalog-chips-more-list">
                     <div v-for="chip in foldedList" :key="chip.key">{{ chip.label }}</div>
@@ -163,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="services-catalog-status-legend"
       >
         <span
-          class="text-2xs font-bold text-text-heading whitespace-nowrap"
+          class="text-2xs font-semibold text-text-heading whitespace-nowrap"
         >
           {{ t("traces.servicesCatalog.legend.title") }}
         </span>
@@ -178,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.healthy") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-label"
+              class="text-2xs opacity-55 text-text-label"
               >&lt;&nbsp;1%</span
             >
           </div>
@@ -192,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.degraded") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-label"
+              class="text-2xs opacity-55 text-text-label"
               >1&nbsp;–&nbsp;5%</span
             >
           </div>
@@ -206,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.warning") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-label"
+              class="text-2xs opacity-55 text-text-label"
               >5&nbsp;–&nbsp;10%</span
             >
           </div>
@@ -220,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ t("traces.servicesCatalog.status.critical") }}</span
             >
             <span
-              class="text-3xs opacity-55 text-text-label"
+              class="text-2xs opacity-55 text-text-label"
               >&gt;&nbsp;10%</span
             >
           </div>
@@ -240,9 +239,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #trigger>
               <OButton
-                variant="ghost-warning"
-                size="xs"
-                icon-left="warning"
+                variant="ghost"
+                size="sm"
+                icon="warning"
                 :aria-label="insightsHint"
                 data-test="services-catalog-insights"
               >
@@ -275,8 +274,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   })
                 }}</span>
                 <OButton
-                  variant="ghost-primary"
-                  size="xs"
+                  variant="accent-ghost"
+                  size="sm"
                   class="ms-auto"
                   :data-test="`services-catalog-insight-traces-${i}`"
                   @click="openInsightTraces(entry)"
@@ -286,10 +285,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip v-if="entry.folder && alertsLocked" :content="alertsLockedReason">
                   <span class="inline-flex">
                     <OButton
-                      variant="ghost-primary"
-                      size="xs"
+                      variant="accent-ghost"
+                      size="sm"
                       disabled
-                      icon-left="lock"
+                      icon="lock"
                       :data-test="`services-catalog-insight-charts-${i}`"
                     >
                       {{ t("traces.servicesCatalog.insights.viewCharts") }}
@@ -298,8 +297,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
                 <OButton
                   v-else-if="entry.folder"
-                  variant="ghost-primary"
-                  size="xs"
+                  variant="accent-ghost"
+                  size="sm"
                   :data-test="`services-catalog-insight-charts-${i}`"
                   @click="openInsightCharts(entry)"
                 >
@@ -322,9 +321,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:column-visibility="setColumnVisibility"
         />
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          icon-only
+          variant="ghost"
+          icon="refresh"
           :loading="isLoading || isSearching"
           data-test="services-catalog-refresh-btn"
           @click="refreshCatalog"
@@ -357,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTabs
             :orientation="isMobile ? 'horizontal' : 'vertical'"
-            dense
+            size="compact"
             :model-value="typeFilter"
             data-test="services-catalog-type-filter"
             @update:model-value="(v) => onTypeFilterChange(v as string)"
@@ -366,7 +365,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="cat in visibleTypeFilters"
               :key="cat"
               :name="cat"
-              class="min-h-7"
               :data-test="`services-catalog-type-${cat}`"
             >
               <div class="flex w-full flex-nowrap items-center justify-between gap-2">
@@ -380,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        plain total to its left. Hover explains it. -->
                   <span
                     v-if="categoryUnhealthyCounts[cat] > 0"
-                    class="text-3xs inline-flex h-[1.05rem] min-w-[1.05rem] items-center justify-center rounded-full px-1 leading-none font-semibold text-white"
+                    class="text-2xs inline-flex h-[1.05rem] min-w-[1.05rem] items-center justify-center rounded-full px-1 leading-none font-semibold text-white"
                     :style="{ backgroundColor: tabStatusColorVar(cat) }"
                     :data-test="`services-catalog-type-unhealthy-${cat}`"
                   >
@@ -403,13 +401,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="!isLoading && loadError !== null"
-        class="flex flex-1 items-center justify-center"
+        class="flex flex-1 flex-col"
         data-test="services-catalog-error"
       >
         <OEmptyState
-          size="hero"
-          preset="load-error"
-          :description="loadError"
+          kind="error"
+          :title="t('emptyState.loadError.title')"
+          :text="isRawHttpText(loadError) ? t('emptyState.loadError.description') : loadError"
           @action="loadServicesCatalog"
         />
       </div>
@@ -420,11 +418,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="services-catalog-filter-empty"
       >
         <OEmptyState
-          preset="no-services-catalog"
-          size="hero"
-          filtered
+          kind="filtered"
           :title="t('serviceVersions.catalog.filterEmpty.title')"
-          :description="filterEmptyText"
+          :text="filterEmptyText"
           @action="clearVersionFilters"
         />
       </div>
@@ -432,7 +428,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty state (shown when not loading and no data) -->
       <div
         v-else-if="!isLoading && services.length === 0"
-        class="flex flex-1 flex-col items-center justify-center"
+        class="flex flex-1 flex-col"
         data-test="services-catalog-empty"
       >
         <ServicesCatalogNoDataState
@@ -460,10 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="id"
             :loading="isLoading || isSearching"
             :loading-reset-key="streamFilter"
-            :row-height="versionsEnabled ? CATALOG_ROW_HEIGHT : undefined"
-            :frame="false"
             :default-columns="false"
-            :show-global-filter="false"
             :sort-by="sortBy"
             :sort-order="sortOrder"
             sorting="server"
@@ -634,9 +627,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :value="row.error_rate"
                 :max="columnMaxes.error_rate"
                 :label="raw(errorRateLabel(row.error_rate, row.error_count))"
-                :variant="
-                  row.error_rate > 10 ? 'danger' : row.error_rate > 5 ? 'warning' : 'default'
-                "
+                :tone="row.error_rate > 10 ? 'err' : row.error_rate > 5 ? 'warn' : 'accent'"
                 :data-test="`services-catalog-error-rate-${row.service_name}`"
               />
             </template>
@@ -687,7 +678,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :max="columnMaxes.p99_latency_ns"
                 :label="raw(formatLat(row.p99_latency_ns))"
                 :tooltip="raw(row.p99_latency_ns.toLocaleString() + ' µs')"
-                :variant="row.p99_latency_ns > P99_WARN_US ? 'warning' : 'default'"
+                :tone="row.p99_latency_ns > P99_WARN_US ? 'warn' : 'accent'"
               />
             </template>
 
@@ -787,7 +778,6 @@ import {
   errorRateLabel,
   catalogRangeQuery,
   CATALOG_COLUMN_SIZES,
-  CATALOG_ROW_HEIGHT,
   type VersionTraffic,
 } from "./servicesCatalogVersions";
 import { whereOutsideReason } from "@/utils/serviceVersionsCopy";
@@ -826,6 +816,7 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";

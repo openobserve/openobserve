@@ -16,28 +16,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="bg-card-glass-bg discovered-services flex h-full w-full flex-col">
-    <!-- Loading State -->
-    <div v-if="loading" class="flex flex-1 items-center justify-center">
-      <OSpinner size="sm" data-test="discovered-services-loading-indicator" />
+    <div v-if="loading" class="px-page-edge pt-3" data-test="discovered-services-loading-indicator">
+      <OSkeleton preset="tableRows" :rows="8" />
     </div>
 
-    <div v-else-if="error" class="flex flex-1 items-center justify-center">
-      <OEmptyState size="hero" preset="load-error" :description="raw(error)" hide-action>
-        <template #actions>
-          <OButton
-            data-test="retry-discovered-services-btn"
-            variant="outline"
-            size="sm-action"
-            icon-left="refresh"
-            @click="() => loadServices()"
-          >
-            {{ t("settings.correlation.retry") }}
-          </OButton>
-        </template>
-      </OEmptyState>
-    </div>
+    <OEmptyState v-else-if="error" kind="error">
+      <template #actions>
+        <OButton
+          data-test="retry-discovered-services-btn"
+          variant="secondary"
+          @click="() => loadServices()"
+        >
+          {{ t("settings.correlation.retry") }}
+        </OButton>
+      </template>
+    </OEmptyState>
 
-    <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
+    <template v-else-if="forbidden">
       <LicenseDeniedState
         v-if="Array.isArray(forbidden)"
         :features="forbidden"
@@ -45,11 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OEmptyState
         v-else
-        size="hero"
-        preset="no-access"
+        kind="denied"
+        :title="t('emptyState.noAccess.title')"
+        :text="t('emptyState.noAccess.description')"
         data-test="discovered-services-forbidden"
       />
-    </div>
+    </template>
 
     <div v-else class="flex min-h-0 flex-1 flex-col">
       <div
@@ -72,8 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
             <OButton
               v-if="tile.id === 'overrides' && tile.linked"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="svcver-tile-overrides-view"
               @click="$emit('navigate-to-env-versions')"
               ><span data-test="svcver-overrides-link">{{
@@ -82,8 +78,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
             <OButton
               v-else-if="tile.id === 'names' && tile.linked"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="svcver-tile-names-review"
               @click="setView('name-review')"
               >{{ t("serviceVersions.discovered.tiles.review") }}</OButton
@@ -112,16 +108,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="svcver-discovered-view"
           @update:model-value="setView"
         >
-          <OToggleGroupItem value="services" size="sm" data-test="svcver-discovered-view-services"
+          <OToggleGroupItem value="services" data-test="svcver-discovered-view-services"
             >{{ t("serviceVersions.discovered.view.services") }}
             <span class="text-text-secondary ms-1.5 text-xs tabular-nums">{{
               raw(serviceCount)
             }}</span></OToggleGroupItem
           >
-          <OToggleGroupItem
-            value="name-review"
-            size="sm"
-            data-test="svcver-discovered-view-name-review"
+          <OToggleGroupItem value="name-review" data-test="svcver-discovered-view-name-review"
             >{{ t("serviceVersions.discovered.view.nameReview") }}
             <span class="text-text-secondary ms-1.5 text-xs tabular-nums">{{
               raw(namesTotal ?? "–")
@@ -144,8 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="activeView === 'services'"
             data-test="reset-discovered-services-btn"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :loading="resetting"
             @click="confirmResetServices"
           >
@@ -153,8 +145,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('settings.correlation.resetServicesTooltip')" side="top" />
           </OButton>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastLoadedAt"
             :loading="refreshing"
             data-test="refresh-discovered-services-btn"
@@ -172,28 +162,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :can-edit="canEdit"
         @changed="loadServices(true)"
       />
-      <div v-else-if="services.length === 0" class="flex flex-1 items-center justify-center">
-        <OEmptyState
-          size="hero"
-          preset="no-discovered-services"
-          :title="t('settings.correlation.noServicesYet')"
-          :description="t('settings.correlation.noServicesDescription')"
-          data-test="discovered-services-empty-state"
-        />
-      </div>
+      <OEmptyState
+        v-else-if="services.length === 0"
+        icon="timeline"
+        :title="t('settings.correlation.noServicesYet')"
+        :text="t('settings.correlation.noServicesDescription')"
+        data-test="discovered-services-empty-state"
+      />
       <template v-else>
         <OBanner
           v-if="!versionsEnabled"
-          variant="info"
-          icon="info"
-          inline-actions
+          tone="info"
           class="mx-page-edge mt-3 shrink-0"
-          :content="t('settings.correlation.discoveredServicesDescription')"
+          :message="t('settings.correlation.discoveredServicesDescription')"
         >
           <template #actions>
             <OButton
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               data-test="discovered-services-go-to-configuration"
               @click="$emit('navigate-to-configuration')"
             >
@@ -203,7 +188,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OBanner>
         <div class="min-h-0 flex-1 overflow-hidden">
           <OTable
-            :frame="false"
             :data="refreshing ? [] : flatRows"
             :columns="columns"
             :loading="refreshing"
@@ -221,7 +205,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :enable-column-resize="true"
             :persist-columns="true"
             table-id="settings-discovered-services-v2"
-            :show-global-filter="false"
             :pivot-row-columns="[{ name: '__group' }, { name: 'service_name' }]"
             :current-page="shownPage"
             wrap
@@ -240,7 +223,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : t('settings.correlation.searchServiceName')
                 "
                 data-test="service-search-input"
-                clearable
               />
               <div class="w-44 shrink-0">
                 <OSelect
@@ -277,8 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="activeView === 'services'"
                 data-test="reset-discovered-services-btn"
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 :loading="resetting"
                 @click="confirmResetServices"
               >
@@ -286,8 +267,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTooltip :content="t('settings.correlation.resetServicesTooltip')" side="top" />
               </OButton>
               <ORefreshButton
-                layout="inline"
-                variant="outline"
                 :last-run-at="lastLoadedAt"
                 :loading="refreshing"
                 data-test="refresh-discovered-services-btn"
@@ -296,11 +275,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #empty>
               <OEmptyState
-                size="hero"
-                preset="no-discovered-services"
-                :filtered="!!searchQuery"
-                :hide-action="!searchQuery"
-                @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+                :kind="searchQuery ? 'filtered' : 'first-run'"
+                :title="
+                  searchQuery
+                    ? t('emptyState.filtered.title', {
+                        noun: t('emptyState.filtered.fallbackNoun'),
+                      })
+                    : t('emptyState.noDiscoveredServices.title')
+                "
+                :text="
+                  searchQuery
+                    ? t('emptyState.filtered.description', {
+                        noun: t('emptyState.filtered.fallbackNoun'),
+                      })
+                    : t('emptyState.noDiscoveredServices.description')
+                "
+                :icon="searchQuery ? undefined : 'timeline'"
+                @action="searchQuery = ''"
               />
             </template>
             <template #cell-service_name="{ row }">
@@ -341,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : t("settings.correlation.instancePlural")
                 }}
               </OTag>
-              <OTag v-else variant="default-outline" size="sm" class="max-w-full min-w-0"
+              <OTag v-else tone="outline" size="sm" class="max-w-full min-w-0"
                 ><OTruncatedText>{{ row.set_id }}</OTruncatedText></OTag
               >
             </template>
@@ -384,7 +375,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :dim-key="item.key"
                     :key-label="dimensionLabel(item.key, t, true)"
                     :value="item.value"
-                    :variant="IDENTITY_CHIP_VARIANT"
                   />
                 </template>
               </OnCallFitChips>
@@ -466,12 +456,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           if (!val) selectedService = null;
         }
       "
-      size="lg"
+      size="md"
       :title="raw(selectedService ? displayOf(selectedService) : undefined)"
       data-test="service-side-panel"
     >
       <template #header-right>
-        <OTag variant="default-outline" size="sm">{{ selectedService?.set_id }}</OTag>
+        <OTag tone="outline" size="sm">{{ selectedService?.set_id }}</OTag>
       </template>
 
       <!-- Default set warning banner -->
@@ -509,7 +499,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :dim-key="key"
               :key-label="dimensionLabel(key, t)"
               :value="value"
-              :variant="IDENTITY_CHIP_VARIANT"
             />
           </div>
           <div v-else class="panel-empty-text text-compact text-text-muted italic">
@@ -607,8 +596,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('settings.correlation.resetServicesConfirmTitle')"
       :message="t('settings.correlation.resetServicesConfirmBody')"
+      kind="destructive"
       :ok-label="t('settings.correlation.resetServices')"
-      ok-variant="destructive"
       @update:ok="doResetServices"
       @update:cancel="confirmResetOpen = false"
       v-model="confirmResetOpen"
@@ -749,14 +738,13 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import { dimensionLabel } from "@/utils/dimensionLabels";
 import { serviceIdentityOf, serviceNameCount } from "@/utils/serviceCount";
 import { shortList } from "@/utils/shortList";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -779,9 +767,6 @@ interface ServiceGroup {
   instances: ServiceRecord[];
   lastSeen: number;
 }
-// Identity values are plain facts here; the shared dimension palette puts some keys in warning hues.
-const IDENTITY_CHIP_VARIANT: BadgeVariant = "default-soft";
-
 const store = useStore();
 const org = computed(() => String(store.state.selectedOrganization?.identifier || ""));
 const user = computed(() => String(store.state.userInfo?.email || ""));

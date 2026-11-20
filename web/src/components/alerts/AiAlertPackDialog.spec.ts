@@ -60,10 +60,10 @@ import AiAlertPackDialog from "./AiAlertPackDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const ODialogStub = {
-  props: ["open", "primaryButtonLabel", "primaryButtonDisabled"],
+  props: ["open", "primary", "primary"],
   emits: ["click:primary"],
-  template: `<div><slot /><button data-test="primary" :disabled="primaryButtonDisabled"
-    @click="$emit('click:primary')">{{ primaryButtonLabel }}</button></div>`,
+  template: `<div><slot /><button data-test="primary" :disabled="primary?.disabled"
+    @click="$emit('click:primary')">{{ primary?.label }}</button></div>`,
 };
 
 async function mountDialog() {

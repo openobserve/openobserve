@@ -278,7 +278,7 @@ function createWrapper(props = {}) {
 }
 
 describe("BuildQueryPage parser recovery", () => {
-  it("renders a soft error with a readable outline Retry action", async () => {
+  it("renders a soft error with a readable secondary Retry action", async () => {
     const parser = vi
       .spyOn(await import("@/utils/query/sqlUtils"), "parseWhereClauseToFilterChecked")
       .mockRejectedValueOnce(new Error("parser unavailable"));
@@ -289,7 +289,7 @@ describe("BuildQueryPage parser recovery", () => {
     expect(banner.classes()).toContain("bg-banner-error-soft-bg");
     expect(banner.classes()).toContain("text-banner-error-soft-text");
     expect(banner.get('[data-test="logs-build-parser-retry"]').attributes("data-o2-variant")).toBe(
-      "outline",
+      "secondary",
     );
     expect(parser).toHaveBeenCalled();
     wrapper.unmount();
@@ -516,6 +516,40 @@ describe("BuildQueryPage Component", () => {
       await flushPromises();
 
       expect(mockDashboardPanelData.data.queries[0].customQuery).toBe(true);
+    });
+  });
+
+  describe("Keeps the user's SQL", () => {
+    const userSql = 'SELECT service, count(*) FROM "app_logs" GROUP BY service';
+    const translated =
+      'SELECT service as "service", count(_timestamp) as "count" FROM "app_logs" GROUP BY service ORDER BY service ASC';
+
+    it("shows the user's SQL while the builder only translates it", async () => {
+      mockMakeAutoSQLQuery.mockResolvedValue(translated);
+      wrapper = createWrapper({ searchQuery: userSql, selectedStream: "app_logs" });
+      await flushPromises();
+
+      wrapper.vm.onQueryGenerated("");
+      wrapper.vm.onQueryGenerated(translated);
+      await flushPromises();
+
+      const emitted = (wrapper.emitted("queryGenerated") ?? []).map((args: string[]) => args[0]);
+      expect(emitted).toContain(userSql);
+      expect(emitted).not.toContain(translated);
+      mockMakeAutoSQLQuery.mockReset();
+    });
+
+    it("forwards the builder's SQL once the user changes the chart's fields", async () => {
+      mockMakeAutoSQLQuery.mockResolvedValue(translated);
+      wrapper = createWrapper({ searchQuery: userSql, selectedStream: "app_logs" });
+      await flushPromises();
+
+      const edited = 'SELECT level as "level", count(_timestamp) as "count" FROM "app_logs"';
+      wrapper.vm.onQueryGenerated(edited);
+      await flushPromises();
+
+      expect(wrapper.emitted("queryGenerated")?.at(-1)).toEqual([edited]);
+      mockMakeAutoSQLQuery.mockReset();
     });
   });
 

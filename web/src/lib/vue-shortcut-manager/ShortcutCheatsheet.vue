@@ -1,12 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 <template>
-  <ODialog
-    v-model:open="open"
-    size="xl"
-    :show-close="false"
-    :max-height="85"
-    data-test="shortcut-cheatsheet-dialog"
-  >
+  <ODialog v-model:open="open" size="lg" :show-close="false" data-test="shortcut-cheatsheet-dialog">
     <!-- ── Sticky header ── -->
     <template #header>
       <div class="flex w-full flex-col gap-2.5">
@@ -39,9 +33,10 @@
           </div>
 
           <OButton
+            icon-only
             variant="ghost"
-            icon-left="close"
-            size="icon"
+            icon="close"
+            size="xs"
             class="shrink-0"
             :aria-label="t('common.close')"
             data-test="shortcut-cheatsheet-close-btn"
@@ -58,8 +53,8 @@
           <OButton
             v-for="m in filteredModules"
             :key="m.title"
-            variant="outline"
-            size="chip"
+            variant="secondary"
+            size="xs"
             class="shrink-0"
             :data-test="`shortcut-cheatsheet-chip-${m.title.toLowerCase().replace(/[\s()—/]+/g, '-')}`"
             @click="onModuleClick(m.title)"
@@ -105,7 +100,7 @@
             <template v-for="sec in m.sections" :key="sec.title">
               <div
                 v-if="m.sections.length > 1"
-                class="text-3xs text-accent px-1 pt-2 pb-1 font-semibold tracking-wider uppercase"
+                class="text-2xs text-accent px-1 pt-2 pb-1 font-semibold"
                 data-test="shortcut-cheatsheet-category"
               >
                 {{ sec.title }}
@@ -117,12 +112,12 @@
                   class="rounded-default hover:bg-surface-base flex items-center justify-between px-2 py-1.5 transition-colors duration-100"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
-                  <OTruncatedText class="text-compact text-text-body leading-snug">{{
+                  <OTruncatedText class="text-compact text-text-body leading-5">{{
                     entry.label
                   }}</OTruncatedText>
                   <div class="ms-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
-                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
+                      <span v-if="part === 'then'" class="text-2xs text-text-secondary mx-0.5">{{
                         t("shortcuts.then")
                       }}</span>
                       <kbd
@@ -162,7 +157,7 @@
             <template v-for="sec in m.sections" :key="sec.title">
               <div
                 v-if="m.sections.length > 1"
-                class="text-3xs text-accent px-1 pt-2 pb-1 font-semibold tracking-wider uppercase"
+                class="text-2xs text-accent px-1 pt-2 pb-1 font-semibold"
                 data-test="shortcut-cheatsheet-category"
               >
                 {{ sec.title }}
@@ -174,12 +169,12 @@
                   class="rounded-default hover:bg-surface-base flex items-center justify-between px-2 py-1.5 transition-colors duration-100"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
-                  <OTruncatedText class="text-compact text-text-body leading-snug">{{
+                  <OTruncatedText class="text-compact text-text-body leading-5">{{
                     entry.label
                   }}</OTruncatedText>
                   <div class="ms-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
-                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
+                      <span v-if="part === 'then'" class="text-2xs text-text-secondary mx-0.5">{{
                         t("shortcuts.then")
                       }}</span>
                       <kbd
@@ -387,7 +382,7 @@ function registerModuleRef(title: string, el: unknown) {
 const FADE_DELAY = 1600; // how long a module stays lit before fading out
 const CLICK_SCROLL_MS = 280; // wait for the click-scroll to land before fading in
 const HIGHLIGHT_BG = "bg-shortcut-highlight-bg"; // light tint / dark reversed
-const FADE_IN = "duration-700"; // quick, visible fade-in
+const FADE_IN = "duration-200"; // quick, visible fade-in
 const FADE_OUT = "duration-[1600ms]"; // slow, gradual fade-out
 
 function fadeOutModule(title: string) {

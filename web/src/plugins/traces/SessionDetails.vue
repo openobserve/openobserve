@@ -19,16 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       class="session-details bg-card-glass-bg"
       data-test="session-detail-header"
-      :title="t('traces.sessionDetail.pageTitle')"
+      :title="t('routeTitles.sessionDetails')"
       :back="{
         label: t('rum.sessions'),
-        onClick: goBack,
+        to: sessionsListRoute,
         dataTest: 'session-detail-back-btn',
       }"
       bleed
     >
       <!-- Session id pill (primary-tinted, copyable) — shows the full id -->
-      <template #title-trail>
+      <template #status>
         <span
           v-if="detail"
           class="rounded-default text-status-info-text bg-status-info-bg inline-flex flex-shrink-0 items-center gap-1.5 px-2 py-1 font-semibold"
@@ -57,10 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip v-if="aiObsLock.locked.value" :content="aiObsLock.lockedReason.value">
             <span class="inline-flex">
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 disabled
-                icon-left="lock"
+                icon="lock"
                 data-test="session-detail-annotate-btn"
               >
                 {{ t("aiObservability.traceActions.annotate.button") }}
@@ -81,13 +80,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                dialog instead. -->
           <OButton
             v-else
-            variant="outline"
-            size="sm"
+            variant="secondary"
             data-test="session-detail-annotate-btn"
             @click="openUpgradeDialog"
           >
             {{ t("aiObservability.traceActions.annotate.button") }}
-            <template #icon-right><OIcon name="lock" size="sm" class="lock-chip" /></template>
+            <template #icon-end><OIcon name="lock" size="sm" class="lock-chip" /></template>
           </OButton>
         </template>
         <OTooltip
@@ -96,10 +94,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="inline-flex">
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               disabled
-              icon-left="lock"
+              icon="lock"
               data-test="session-detail-evaluate-btn"
             >
               {{ t("onlineEvals.manualEvaluation.titles.session") }}
@@ -108,8 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTooltip>
         <OButton
           v-else-if="canManualEvaluate"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="session-detail-evaluate-btn"
           @click="manualEvaluationOpen = true"
         >
@@ -132,34 +128,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="mb-2.5 grid flex-shrink-0 grid-cols-1 gap-2.5 lg:grid-cols-2">
             <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
               <div v-for="n in 6" :key="n" :class="kpiCardClass()">
-                <OSkeleton type="rect" animation="wave" class="rounded-default h-[0.7rem] w-12" />
-                <OSkeleton
-                  type="rect"
-                  animation="wave"
-                  class="rounded-default mt-[0.3rem] h-[1.3rem] w-[4.5rem]"
-                />
-                <OSkeleton
-                  type="rect"
-                  animation="wave"
-                  class="rounded-default mt-[0.4rem] h-[0.6rem] w-[6.5rem]"
-                />
+                <OSkeleton shape="block" class="h-[0.7rem] w-12" />
+                <OSkeleton shape="block" class="mt-[0.3rem] h-[1.3rem] w-[4.5rem]" />
+                <OSkeleton shape="block" class="mt-[0.4rem] h-[0.6rem] w-[6.5rem]" />
               </div>
             </div>
             <div
               class="bg-card-glass-bg rounded-default border-border-default flex flex-col border px-4 pt-4 pb-2.5"
             >
-              <OSkeleton
-                type="rect"
-                animation="wave"
-                class="rounded-default h-[0.85rem] w-32 flex-shrink-0"
-              />
+              <OSkeleton shape="block" class="h-[0.85rem] w-32 flex-shrink-0" />
               <!-- Fill the panel height (it stretches to the 6-tile block on the left)
                so the skeleton matches the real ribbon and leaves no gap below. -->
-              <OSkeleton
-                type="rect"
-                animation="wave"
-                class="rounded-default mt-3 min-h-0 w-full flex-1"
-              />
+              <OSkeleton shape="block" class="mt-3 min-h-0 w-full flex-1" />
             </div>
           </div>
 
@@ -168,14 +148,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Conversation column: toolbar + panel -->
             <div class="flex min-h-0 min-w-0 flex-col">
               <div class="mb-2.5 flex flex-shrink-0 items-center gap-2">
-                <OSkeleton type="rect" animation="wave" class="rounded-default h-9 flex-1" />
-                <OSkeleton
-                  v-for="n in 3"
-                  :key="n"
-                  type="rect"
-                  animation="wave"
-                  class="rounded-default h-9 w-32"
-                />
+                <OSkeleton shape="block" class="h-9 flex-1" />
+                <OSkeleton v-for="n in 3" :key="n" shape="block" class="h-9 w-32" />
               </div>
               <div
                 class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"
@@ -183,15 +157,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="border-border-default flex flex-shrink-0 items-center gap-2.5 border-b px-4 py-3"
                 >
-                  <OSkeleton type="rect" animation="wave" class="rounded-default h-4 w-28" />
+                  <OSkeleton shape="block" class="h-4 w-28" />
                 </div>
                 <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2">
                   <OSkeleton
                     v-for="n in 14"
                     :key="n"
-                    type="rect"
-                    animation="wave"
-                    class="rounded-default h-12 w-full flex-shrink-0"
+                    shape="block"
+                    class="h-12 w-full flex-shrink-0"
                   />
                 </div>
               </div>
@@ -205,15 +178,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"
               >
                 <div class="border-border-default flex-shrink-0 border-b px-3 py-2">
-                  <OSkeleton type="rect" animation="wave" class="rounded-default h-[0.8rem] w-24" />
+                  <OSkeleton shape="block" class="h-[0.8rem] w-24" />
                 </div>
                 <div class="flex min-h-0 flex-1 flex-col gap-[0.4rem] overflow-hidden p-2">
                   <OSkeleton
                     v-for="r in 8"
                     :key="r"
-                    type="rect"
-                    animation="wave"
-                    class="rounded-default h-5 w-full flex-shrink-0"
+                    shape="block"
+                    class="h-5 w-full flex-shrink-0"
                   />
                 </div>
               </div>
@@ -222,32 +194,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Error -->
-        <div v-else-if="error" class="flex flex-1 flex-col items-center justify-center text-center">
-          <OIcon name="error-outline" size="xl" class="text-error-600 mb-3" />
-          <div class="text-text-heading mb-2 text-base">
-            {{ t("traces.sessionDetail.failedToLoad") }}
-          </div>
-          <div class="text-text-muted mb-3 max-w-[30rem] text-sm">
-            {{ error }}
-          </div>
-          <OButton variant="outline" size="sm" @click="load">{{
-            t("traces.sessionDetail.retry")
-          }}</OButton>
-        </div>
+        <OEmptyState
+          v-else-if="error"
+          kind="error"
+          :title="t('traces.sessionDetail.failedToLoad')"
+          :text="isRawHttpText(error) ? t('emptyState.loadError.description') : raw(error)"
+          data-test="session-detail-error"
+        >
+          <template #actions>
+            <OButton @click="load">{{ t("traces.sessionDetail.retry") }}</OButton>
+          </template>
+        </OEmptyState>
 
         <!-- Not found -->
-        <div
+        <OEmptyState
           v-else-if="!detail"
-          class="flex flex-1 flex-col items-center justify-center text-center"
-        >
-          <OIcon name="search-off" size="xl" class="text-text-muted mb-3" />
-          <div class="text-text-heading mb-2 text-base">
-            {{ t("traces.sessionDetail.sessionNotFound") }}
-          </div>
-          <div class="text-text-muted max-w-[30rem] text-sm">
-            {{ t("traces.sessionDetail.noSpansFound", { id: sessionId }) }}
-          </div>
-        </div>
+          icon="search-off"
+          :title="t('traces.sessionDetail.sessionNotFound')"
+          :text="t('traces.sessionDetail.noSpansFound', { id: sessionId })"
+          data-test="session-detail-not-found"
+        />
 
         <!-- Content -->
         <template v-else>
@@ -288,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-baseline gap-[0.2rem]">
                   <span
                     :class="[
-                      'text-2xl leading-none font-bold tabular-nums',
+                      'text-2xl leading-none font-semibold tabular-nums',
                       kpiAccentClass(card.variant) || 'text-text-secondary',
                     ]"
                   >
@@ -303,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="xs"
                       class="text-text-muted ms-[0.15rem] cursor-default"
                     />
-                    <OTooltip max-width="17.5rem">
+                    <OTooltip>
                       <template #content>
                         <div class="flex min-w-57.5 flex-col gap-2">
                           <div class="text-text-heading text-xs font-semibold">
@@ -330,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </div>
                 <div
-                  class="text-3xs text-text-secondary flex flex-wrap items-center gap-1 leading-normal font-medium"
+                  class="text-2xs text-text-secondary flex flex-wrap items-center gap-1 leading-normal font-medium"
                 >
                   <span v-if="card.subLead">{{ card.subLead }}</span>
                   <template v-for="chip in card.subTurns" :key="chip.n">
@@ -342,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :user-text="turnPreviewText(turnAt(chip.n))"
                     >
                       <span
-                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs hover:border-border-tint-neutral hover:bg-surface-tint-neutral inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-bold transition-colors"
+                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs hover:border-border-tint-neutral hover:bg-surface-tint-neutral inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-semibold transition-colors"
                         @click="jumpToTurn(chip.n)"
                         >{{ chip.label }}</span
                       >
@@ -350,8 +316,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <OButton
                     v-if="card.filterErrors && !errorsFiltered"
-                    variant="outline-destructive"
-                    size="xs"
+                    variant="danger-ghost"
+                    size="sm"
                     data-test="session-detail-filter-errors"
                     @click="filterToErrors"
                   >
@@ -359,8 +325,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     v-else-if="card.filterErrors && errorsFiltered"
-                    variant="outline"
-                    size="xs"
+                    variant="secondary"
+                    size="sm"
                     data-test="session-detail-reset-errors"
                     @click="resetErrorFilter"
                   >
@@ -394,16 +360,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSearchInput
                   v-model="searchText"
                   :placeholder="t('traces.sessionDetail.searchPlaceholder')"
-                  clearable
                   :debounce="200"
-                  size="xs"
-                  class="no-border h-9 min-w-48 flex-1!"
+                  size="sm"
+                  class="no-border min-w-48 flex-1!"
                 />
                 <div class="w-36 flex-shrink-0">
                   <OSelect
                     v-model="statusFilter"
                     :label="t('traces.sessionDetail.filters.status')"
-                    label-position="inside"
+                    variant="filter"
                     :options="statusOptions"
                   />
                 </div>
@@ -411,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSelect
                     v-model="modelFilter"
                     :label="t('traces.sessionDetail.filters.model')"
-                    label-position="inside"
+                    variant="filter"
                     :options="modelOptions"
                   />
                 </div>
@@ -426,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="border-border-default flex flex-shrink-0 items-center gap-2.5 border-b px-4 py-3"
                 >
-                  <span class="text-text-heading text-base font-semibold">
+                  <span class="text-text-heading text-sm font-semibold">
                     {{ t("traces.sessionDetail.conversation") }}
                   </span>
                   <OTag type="countChip" value="neutral">
@@ -441,10 +406,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                   </OTag>
                   <OToggleGroup :model-value="viewMode" @update:model-value="setViewMode">
-                    <OToggleGroupItem value="collapsed" size="sm">
+                    <OToggleGroupItem value="collapsed">
                       {{ t("traces.sessionDetail.viewCollapsed") }}
                     </OToggleGroupItem>
-                    <OToggleGroupItem value="pretty" size="sm">
+                    <OToggleGroupItem value="pretty">
                       {{ t("traces.sessionDetail.viewPretty") }}
                     </OToggleGroupItem>
                   </OToggleGroup>
@@ -453,11 +418,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Conversation body — natural height; the page scrolls, not this. -->
                 <div>
                   <!-- Long session: the newest page of turns is loaded; older ones page in. -->
-                  <OBanner
+                  <OInlineNotice
                     v-if="detail && traces.length < detail.turns"
-                    variant="info"
-                    dense
-                    inline-actions
+                    tone="info"
                     class="mx-2 mt-2"
                     data-test="session-older-turns-banner"
                   >
@@ -470,15 +433,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="hasOlderTurns" #actions>
                       <OButton
                         data-test="session-load-older-turns-btn"
-                        variant="outline"
-                        size="sm"
+                        variant="secondary"
                         :loading="loadingOlderTurns"
                         @click="loadOlderTurns"
                       >
                         {{ t("traces.sessionDetail.loadOlderTurns") }}
                       </OButton>
                     </template>
-                  </OBanner>
+                  </OInlineNotice>
                   <!-- turn list (Collapsed view) -->
                   <div v-show="viewMode === 'collapsed'" class="flex flex-col gap-2 p-2">
                     <!-- column headers — clickable sort controls for the three metric bars
@@ -531,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="text-text-muted flex-shrink-0"
                         />
                         <span
-                          class="text-2xs inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-bold tabular-nums"
+                          class="text-2xs inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-semibold tabular-nums"
                           :class="
                             trace.status === 'error'
                               ? 'text-error-500 bg-error-500/15'
@@ -566,9 +528,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ formatDuration(trace.durationNanos) }}
                           </span>
                           <OProgressBar
-                            :value="ratio(trace.durationNanos, maxTurnLat)"
-                            :variant="trace.durationNanos >= 5e9 ? 'warning' : 'default'"
-                            size="xs"
+                            :value="ratio(trace.durationNanos, maxTurnLat) * 100"
+                            :tone="trace.durationNanos >= 5e9 ? 'warn' : 'accent'"
                           />
                         </div>
                         <div class="flex min-w-0 flex-col gap-[0.2rem]">
@@ -592,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               "
                             />
                           </span>
-                          <OProgressBar :value="ratio(trace.cost, maxTurnCost)" size="xs" />
+                          <OProgressBar :value="ratio(trace.cost, maxTurnCost) * 100" />
                         </div>
                         <div class="flex min-w-0 flex-col gap-[0.2rem]">
                           <span
@@ -600,7 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             {{ formatTokens(trace.tokens) }}
                           </span>
-                          <OProgressBar :value="ratio(trace.tokens, maxTurnTokens)" size="xs" />
+                          <OProgressBar :value="ratio(trace.tokens, maxTurnTokens) * 100" />
                         </div>
                       </div>
 
@@ -612,26 +573,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <!-- loading skeleton -->
                         <div v-if="sessionSpansLoading" class="flex flex-col gap-[0.4rem]">
-                          <OSkeleton
-                            type="rect"
-                            animation="wave"
-                            class="rounded-default h-[0.7rem] w-[40%]"
-                          />
-                          <OSkeleton
-                            type="rect"
-                            animation="wave"
-                            class="rounded-default h-[0.65rem] w-[90%]"
-                          />
-                          <OSkeleton
-                            type="rect"
-                            animation="wave"
-                            class="rounded-default h-[0.65rem] w-[80%]"
-                          />
-                          <OSkeleton
-                            type="rect"
-                            animation="wave"
-                            class="rounded-default h-[0.65rem] w-[60%]"
-                          />
+                          <OSkeleton shape="block" class="h-[0.7rem] w-[40%]" />
+                          <OSkeleton shape="block" class="h-[0.65rem] w-[90%]" />
+                          <OSkeleton shape="block" class="h-[0.65rem] w-[80%]" />
+                          <OSkeleton shape="block" class="h-[0.65rem] w-[60%]" />
                         </div>
 
                         <!-- The span fetch failed: show Retry, not an empty turn. -->
@@ -645,8 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ t("traces.sessionDetail.spansFailed") }}
                           </span>
                           <OButton
-                            variant="outline"
-                            size="sm"
+                            variant="secondary"
                             :data-test="`session-turn-spans-retry-${trace.traceId}`"
                             @click="loadSessionSpans"
                           >
@@ -662,7 +606,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <div
                               class="border-border-default flex items-center justify-between border-b px-2.5 py-1.5"
                             >
-                              <span class="text-text-heading text-xs font-bold">
+                              <span class="text-text-heading text-xs font-semibold">
                                 {{ t("traces.sessionDetail.roles.user") }}
                               </span>
                               <!-- Harness text hidden by the agent's patterns; Show puts it back. -->
@@ -716,12 +660,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="border-border-default flex items-center justify-between border-b px-2.5 py-1.5"
                             >
                               <span
-                                class="text-text-heading flex items-center gap-1.5 text-xs font-bold"
+                                class="text-text-heading flex items-center gap-1.5 text-xs font-semibold"
                               >
                                 {{ t("traces.sessionDetail.roles.assistant") }}
                                 <OTag
                                   v-if="turnDetail(trace.traceId)?.model"
-                                  variant="purple-soft"
+                                  tone="neutral"
                                   size="sm"
                                 >
                                   {{ turnDetail(trace.traceId)?.model }}
@@ -773,7 +717,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{ t("traces.sessionDetail.stats.toolCalls") }}
                             </span>
                             <div class="flex-1"></div>
-                            <OButton variant="outline" size="sm" @click="openTrace(trace.traceId)">
+                            <OButton variant="secondary" @click="openTrace(trace.traceId)">
                               <OIcon name="open-in-new" size="xs" class="me-1" />
                               {{ t("traces.sessionDetail.openInTraceExplorer") }}
                             </OButton>
@@ -783,13 +727,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
 
                     <!-- empty state -->
-                    <div
+                    <OEmptyState
                       v-if="filteredTraces.length === 0"
-                      class="text-text-muted flex flex-col items-center justify-center gap-2 py-12"
-                    >
-                      <OIcon name="search-off" size="lg" />
-                      <span class="text-compact">{{ t("traces.sessionDetail.noTurnsMatch") }}</span>
-                    </div>
+                      kind="filtered"
+                      :title="t('traces.sessionDetail.noTurnsMatch')"
+                    />
                   </div>
 
                   <!-- Pretty (transcript) view — reuses ThreadView, rendered from the
@@ -801,17 +743,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex flex-col gap-2 p-3"
                       data-test="session-pretty-skeleton"
                     >
-                      <OSkeleton type="rect" animation="wave" class="rounded-default h-6 w-[30%]" />
-                      <OSkeleton
-                        type="rect"
-                        animation="wave"
-                        class="rounded-default mt-2 h-12 w-[70%]"
-                      />
-                      <OSkeleton
-                        type="rect"
-                        animation="wave"
-                        class="rounded-default h-16 w-[85%]"
-                      />
+                      <OSkeleton shape="block" class="h-6 w-[30%]" />
+                      <OSkeleton shape="block" class="mt-2 h-12 w-[70%]" />
+                      <OSkeleton shape="block" class="h-16 w-[85%]" />
                     </div>
                     <ThreadView
                       v-else
@@ -865,18 +799,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       )
                     }}
                   </span>
-                  <OButton variant="outline" size="xs" @click="loadSessionSpans">
+                  <OButton variant="secondary" size="sm" @click="loadSessionSpans">
                     {{ t("traces.sessionDetail.retry") }}
                   </OButton>
                 </div>
                 <div v-if="sessionSpansLoading" class="flex flex-col gap-[0.4rem] p-2.5">
-                  <OSkeleton
-                    v-for="n in 3"
-                    :key="n"
-                    type="rect"
-                    animation="wave"
-                    class="rounded-default h-[1.1rem] w-full"
-                  />
+                  <OSkeleton v-for="n in 3" :key="n" shape="block" class="h-[1.1rem] w-full" />
                 </div>
                 <div
                   v-else-if="toolHotspots.length"
@@ -888,7 +816,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="jumpToTurn(turnNumberOf(row.topTraceId))"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
+                        class="rounded-default text-2xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-semibold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -911,15 +839,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Hover: which turns this (deduped) tool actually ran in. side="left"
                    (like the Cost/Slowest hovers) so it opens to the side instead of
                    covering the rows above it. -->
-                    <OTooltip side="left" :delay="120" max-width="13.75rem" content-class="p-0!">
+                    <OTooltip side="left" content-class="p-0!">
                       <template #content>
                         <div class="text-text-body w-50 px-3 py-2.25 text-xs">
-                          <div class="mb-0.5 font-bold break-words">{{ row.name }}</div>
-                          <div class="text-3xs text-text-muted mb-1.75">
+                          <div class="mb-0.5 font-semibold break-words">{{ row.name }}</div>
+                          <div class="text-2xs text-text-muted mb-1.75">
                             {{ t("traces.sessionDetail.rail.call", { n: row.calls }) }}
                           </div>
                           <div
-                            class="text-3xs text-text-secondary mb-1 font-bold tracking-[0.05em]"
+                            class="text-2xs text-text-secondary mb-1 font-semibold tracking-[0.05em]"
                           >
                             {{ t("traces.sessionDetail.rail.usedIn") }}
                           </div>
@@ -927,7 +855,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <span
                               v-for="tn in row.turns"
                               :key="tn"
-                              class="rounded-default border-border-default bg-surface-base text-3xs inline-flex h-[1.05rem] items-center border px-[0.35rem] font-semibold tabular-nums"
+                              class="rounded-default border-border-default bg-surface-base text-2xs inline-flex h-[1.05rem] items-center border px-[0.35rem] font-semibold tabular-nums"
                               >{{ t("traces.sessionDetail.turnLabel") }} {{ tn }}</span
                             >
                           </div>
@@ -936,12 +864,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OTooltip>
                   </span>
                 </div>
-                <div
+                <OEmptyState
                   v-else-if="!spansFailed.size"
-                  class="text-text-muted px-3 py-5 text-center text-xs"
-                >
-                  {{ t("traces.sessionDetail.rail.noTools") }}
-                </div>
+                  size="compact"
+                  class="px-3"
+                  :title="t('traces.sessionDetail.rail.noTools')"
+                />
               </div>
 
               <!-- Cost Hotspots -->
@@ -971,7 +899,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
+                        class="rounded-default text-2xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-semibold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -979,7 +907,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("traces.sessionDetail.turnLabel") }} {{ row.n }}
                       </span>
                       <span class="min-w-0 flex-1">
-                        <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="sm" />
+                        <OProgressBar :value="ratio(row.cost, maxTurnCost) * 100" />
                       </span>
                       <span class="flex min-w-[3.25rem] flex-col items-end">
                         <span class="text-2xs text-text-secondary font-semibold tabular-nums">
@@ -987,7 +915,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                         <span
                           v-if="detail && detail.cost > 0"
-                          class="text-3xs text-text-muted tabular-nums"
+                          class="text-2xs text-text-muted tabular-nums"
                         >
                           {{ ((row.cost / detail.cost) * 100).toFixed(1) }}%
                         </span>
@@ -1024,7 +952,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="jumpToTurn(row.n)"
                     >
                       <span
-                        class="rounded-default text-3xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-bold tabular-nums"
+                        class="rounded-default text-2xs text-text-secondary bg-text-heading/8 grid h-5 w-5 flex-shrink-0 place-items-center font-semibold tabular-nums"
                       >
                         {{ i + 1 }}
                       </span>
@@ -1033,9 +961,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <span class="min-w-0 flex-1">
                         <OProgressBar
-                          :value="ratio(row.lat, maxTurnLat)"
-                          :variant="row.status === 'error' ? 'danger' : 'warning'"
-                          size="sm"
+                          :value="ratio(row.lat, maxTurnLat) * 100"
+                          :tone="row.status === 'error' ? 'err' : 'warn'"
                         />
                       </span>
                       <span
@@ -1069,7 +996,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, reactive, onMounted, nextTick, computed, defineAsyncComponent, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import useSmartBack from "@/composables/useSmartBack";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatDate } from "@/utils/date";
@@ -1090,12 +1016,14 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import TurnPreviewCard from "./TurnPreviewCard.vue";
 import SessionRibbon from "./SessionRibbon.vue";
@@ -2042,13 +1970,8 @@ async function load() {
   }
 }
 
-// Real history back, when there is one, instead of a hand-built push: the
-// list's own URL (filters, page, stream/agent mode) round-trips exactly as
-// the user left it, whichever of the several pages that open a session
-// (AI Sessions, Discovery, Queue Workbench) it actually was. The fallback
-// below only fires with no history to pop (direct link / reload), so it only
-// needs to be a SANE landing spot, not an exact one.
-const { goBack } = useSmartBack(() => {
+// The header's back pops history when it can, so this only fires on a direct link and need not be exact.
+const sessionsListRoute = computed(() => {
   // When opened from the AI/LLM Sessions page, return there (stays in
   // the AI menu) instead of dropping into the Traces sessions tab.
   if (route.name === "aiSessionDetails") {
@@ -2129,10 +2052,10 @@ onMounted(load);
     line-height: 1.3;
   }
   :deep(h1) {
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
   }
   :deep(h2) {
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
   }
   :deep(h3) {
     font-size: var(--text-sm);

@@ -88,7 +88,7 @@ describe("TrialPeriod.vue", () => {
       store = storeWith(expiryInDays(3.5));
       await mountStrip({ currentPage: "usage" });
 
-      expect(strip().attributes("data-tone")).toBe("warning");
+      expect(strip().attributes("data-tone")).toBe("warn");
       expect(strip().text()).toContain("3 days left");
     });
 
@@ -103,7 +103,7 @@ describe("TrialPeriod.vue", () => {
       store = storeWith(expiryInDays(-2));
       await mountStrip({ currentPage: "billing" });
 
-      expect(strip().attributes("data-tone")).toBe("warning");
+      expect(strip().attributes("data-tone")).toBe("warn");
       expect(strip().text()).toContain(`ended ${shortDate(NOW - 2 * DAY_MS)}`);
       expect(strip().text()).toContain("keep using acme-prod");
       expect(strip().text()).not.toContain("days left");
@@ -113,7 +113,7 @@ describe("TrialPeriod.vue", () => {
       store = storeWith(expiryInDays(0.5));
       await mountStrip({ currentPage: "usage" });
 
-      expect(strip().attributes("data-tone")).toBe("warning");
+      expect(strip().attributes("data-tone")).toBe("warn");
       expect(strip().text()).toContain("less than a day left");
       expect(strip().text()).toContain(`ends ${shortDate(NOW + 0.5 * DAY_MS)}`);
       expect(strip().text()).not.toContain("ended");
@@ -130,7 +130,7 @@ describe("TrialPeriod.vue", () => {
       vi.advanceTimersByTime(60_001);
       await flushPromises();
 
-      expect(strip().attributes("data-tone")).toBe("warning");
+      expect(strip().attributes("data-tone")).toBe("warn");
       expect(strip().text()).toContain("3 days left");
     });
 

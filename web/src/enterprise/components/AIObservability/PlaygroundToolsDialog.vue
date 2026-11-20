@@ -14,9 +14,8 @@
     :open="open"
     size="md"
     :title="title"
-    :primary-button-label="t('common.apply')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-disabled="invalid"
+    :primary="{ label: t('common.apply'), disabled: invalid }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="ai-playground-tools-dialog"
     @update:open="emit('update:open', $event)"
     @click:primary="apply"
@@ -31,7 +30,6 @@
         :model-value="current.name"
         :label="t('aiObservability.playground.toolName')"
         :placeholder="t('aiObservability.playground.toolNamePlaceholder')"
-        size="sm"
         data-test="ai-playground-tool-name"
         @update:model-value="(value: string | number) => set({ name: String(value) })"
       />
@@ -39,7 +37,6 @@
         :model-value="current.description"
         :label="t('aiObservability.playground.toolDescription')"
         :placeholder="t('aiObservability.playground.toolDescriptionPlaceholder')"
-        size="sm"
         data-test="ai-playground-tool-description"
         @update:model-value="(value: string | number) => set({ description: String(value) })"
       />
@@ -49,7 +46,6 @@
         :help-text="t('aiObservability.playground.toolParametersHelp')"
         :placeholder="parametersPlaceholder"
         :rows="4"
-        size="sm"
         :error="invalid"
         :error-message="t('aiObservability.playground.toolInvalidJson')"
         data-test="ai-playground-tool-parameters"
@@ -58,9 +54,8 @@
 
       <OButton
         v-if="index !== null"
-        variant="ghost-destructive"
-        size="sm"
-        icon-left="delete"
+        variant="danger-ghost"
+        icon="delete"
         class="self-start"
         data-test="ai-playground-tool-remove"
         @click="remove"

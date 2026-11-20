@@ -22,9 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OEmptyState
       v-if="streamMissing"
-      size="inline"
       :title="t('billing.usageTrends.waitingTitle')"
-      :description="t('billing.usageTrends.waitingForData')"
+      :text="t('billing.usageTrends.waitingForData')"
       data-test="billings-usagemeterbreakdown-stream-missing"
     />
 
@@ -35,13 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="name"
         pagination="none"
         sorting="none"
-        :show-global-filter="false"
         class="min-h-0 flex-1"
         :loading="loading && !rows.length"
         :loading-reset-key="activeSection?.id"
         :streaming="loading && rows.length > 0"
         :error="error"
-        show-index
         :default-columns="false"
         :column-visibility="columnVisibility"
         data-test="billings-usagemeterbreakdown-table"
@@ -50,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="grid w-full min-w-32 grid-cols-[minmax(2.5rem,1fr)_2.75rem] items-center gap-2.5"
           >
-            <OProgressBar :value="row.share / 100" :color="meterColorFor(meterKey)" />
+            <OProgressBar :value="row.share" />
             <span>{{ formatShare(row.share) }}</span>
           </div>
         </template>
@@ -65,22 +62,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-text-secondary grid italic"
               :style="{ gridTemplateColumns: gridTemplate }"
             >
-              <span />
-              <span class="px-2">{{ t("billing.usageV2.everythingElse") }}</span>
-              <span v-if="!isMobile" class="px-2">{{ formatQuantity(rest) }}</span>
-              <span v-if="!volumeOnly" class="px-2">{{
+              <span class="ps-table-edge pe-3">{{ t("billing.usageV2.everythingElse") }}</span>
+              <span v-if="!isMobile" class="px-3">{{ formatQuantity(rest) }}</span>
+              <span v-if="!volumeOnly" class="px-3">{{
                 isRetention ? EM_DASH : formatCost(rest * rate)
               }}</span>
-              <span class="grid grid-cols-[minmax(2.5rem,1fr)_2.75rem] items-center gap-2.5 px-2">
-                <OProgressBar :value="restShare / 100" />
+              <span
+                class="pe-table-edge grid grid-cols-[minmax(2.5rem,1fr)_2.75rem] items-center gap-2.5 ps-3"
+              >
+                <OProgressBar :value="restShare" />
                 <span>{{ formatShare(restShare) }}</span>
               </span>
             </div>
             <div class="grid font-semibold" :style="{ gridTemplateColumns: gridTemplate }">
-              <span />
-              <span class="px-2">{{ t("billing.usageV2.colTotal") }}</span>
-              <span v-if="!isMobile" class="px-2">{{ formatQuantity(total) }}</span>
-              <span v-if="!volumeOnly" class="px-2">{{
+              <span class="ps-table-edge pe-3">{{ t("billing.usageV2.colTotal") }}</span>
+              <span v-if="!isMobile" class="px-3">{{ formatQuantity(total) }}</span>
+              <span v-if="!volumeOnly" class="px-3">{{
                 isRetention ? EM_DASH : formatCost(total * rate)
               }}</span>
               <span />
@@ -88,19 +85,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #error>
-          <div class="flex flex-col items-center gap-2 p-4">
-            <span class="text-text-secondary text-sm">
-              {{ t("billing.usageV2.drilldownFailed") }}
-            </span>
-            <OButton
-              variant="outline"
-              size="sm-action"
-              data-test="billings-usagemeterbreakdown-retry"
-              @click="retry"
-            >
-              {{ t("billing.usageV2.retry") }}
-            </OButton>
-          </div>
+          <OEmptyState kind="error" data-test="billings-usagemeterbreakdown-error">
+            <template #actions>
+              <OButton data-test="billings-usagemeterbreakdown-retry" @click="retry">
+                {{ t("billing.usageV2.retry") }}
+              </OButton>
+            </template>
+          </OEmptyState>
         </template>
       </OTable>
     </div>
@@ -138,7 +129,7 @@ import {
   USAGE_STREAM_NAME,
   type DrilldownSection,
 } from "./usageQueries";
-import { CHART_TOP, meterColorFor } from "./usageCharts";
+import { CHART_TOP } from "./usageCharts";
 import { useUsageSearch } from "./useUsageSearch";
 import { totalsGridTemplate } from "./totalsBar";
 
@@ -314,9 +305,7 @@ const columns = computed<OTableColumnDef<BreakdownRow>[]>(() => {
 });
 
 /** OTable drops the index column on a phone, so the bar drops it too. */
-const gridTemplate = computed(() =>
-  totalsGridTemplate(columns.value, columnVisibility.value, !isMobile.value),
-);
+const gridTemplate = computed(() => totalsGridTemplate(columns.value, columnVisibility.value));
 
 const toRows = (raws: RawRow[], sum: number): BreakdownRow[] => {
   const shown = raws.reduce((acc, entry) => acc + entry.volume, 0);

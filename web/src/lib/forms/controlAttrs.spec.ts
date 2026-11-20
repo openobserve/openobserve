@@ -40,8 +40,8 @@ describe("aria attribute forwarding", () => {
     expect(wrapper.attributes("aria-label")).toBeUndefined();
   });
 
-  it("OInput inside label is a real label for the input", () => {
-    wrapper = mount(OInput, { props: { label: "Name", labelPosition: "inside" } });
+  it("OInput label is a real label for the input", () => {
+    wrapper = mount(OInput, { props: { label: "Name" } });
     const label = wrapper.find("label");
     expect(label.attributes("for")).toBe(wrapper.find("input").attributes("id"));
   });

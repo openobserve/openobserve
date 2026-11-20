@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -51,7 +51,7 @@ import {
 
 interface Badge {
   text: string;
-  variant: BadgeVariant;
+  variant: ChipTone;
   tip?: string;
 }
 
@@ -82,10 +82,10 @@ const PHASE_TONE: Record<string, Tone> = {
   Lost: "error",
 };
 
-const HPA_VARIANT: Record<string, BadgeVariant> = {
-  AbleToScale: "success-soft",
-  ScalingActive: "blue-soft",
-  ScalingLimited: "error-soft",
+const HPA_VARIANT: Record<string, ChipTone> = {
+  AbleToScale: "ok",
+  ScalingActive: "info",
+  ScalingLimited: "err",
 };
 
 const n = (value: number | null | undefined) => (value == null ? "—" : String(value));
@@ -165,11 +165,11 @@ const podStatus = computed(() => {
 
 const jobConditions = (job: JobRow): Badge[] => {
   const out: Badge[] = [];
-  if (job.complete) out.push({ text: t("infra.k8s2.conditionComplete"), variant: "success-soft" });
+  if (job.complete) out.push({ text: t("infra.k8s2.conditionComplete"), variant: "ok" });
   if ((job.failed ?? 0) > 0) {
     out.push({
       text: t("infra.k8s2.conditionFailed"),
-      variant: "error-soft",
+      variant: "err",
       tip: job.failedReasons.join(", "),
     });
   }
@@ -185,7 +185,7 @@ const conditions = computed<Badge[]>(() => {
   if (r.kind === "hpa") {
     return r.conditions.map((c) => ({
       text: c.condition,
-      variant: HPA_VARIANT[c.condition] ?? "default-soft",
+      variant: HPA_VARIANT[c.condition] ?? "neutral",
     }));
   }
   return [];
@@ -345,7 +345,7 @@ const phase = computed(() =>
 
 <template>
   <div class="flex flex-col gap-4">
-    <ODescriptionList dense>
+    <ODescriptionList>
       <template v-if="row.kind === 'cronjob'">
         <ODescriptionItem :label="t('infra.k8s2.drawerSchedule')" data-test="k8s2-wl-schedule">
           <template v-if="row.schedule">{{ raw(row.schedule) }}</template>
@@ -384,8 +384,8 @@ const phase = computed(() =>
             {{ raw(row.target.kind) }}
             <OButton
               v-if="hpaTargetKind"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               @click="open(hpaTargetKind, row.target.name)"
               >{{ raw(row.target.name) }}</OButton
             >
@@ -434,18 +434,14 @@ const phase = computed(() =>
       <template v-if="WITH_PODS.has(row.kind) || row.kind === 'pvc'">
         <ODescriptionItem :label="t('infra.k8s2.drawerSelector')" data-test="k8s2-wl-selector">
           <div v-if="selector.length" class="flex flex-col items-start gap-1">
-            <OTag v-for="s in selector" :key="s" size="sm" variant="default-soft">{{
-              raw(s)
-            }}</OTag>
+            <OTag v-for="s in selector" :key="s" size="sm" tone="neutral">{{ raw(s) }}</OTag>
           </div>
         </ODescriptionItem>
       </template>
       <template v-if="WITH_PODS.has(row.kind)">
         <ODescriptionItem :label="t('infra.k8s2.drawerNodeSelector')">
           <div v-if="nodeSelector.length" class="flex flex-col items-start gap-1">
-            <OTag v-for="s in nodeSelector" :key="s" size="sm" variant="default-soft">{{
-              raw(s)
-            }}</OTag>
+            <OTag v-for="s in nodeSelector" :key="s" size="sm" tone="neutral">{{ raw(s) }}</OTag>
           </div>
         </ODescriptionItem>
       </template>
@@ -465,7 +461,7 @@ const phase = computed(() =>
         :data-test="row.kind === 'hpa' ? 'k8s2-wl-status' : 'k8s2-wl-conditions'"
       >
         <div v-if="conditions.length" class="flex flex-wrap gap-1">
-          <OTag v-for="c in conditions" :key="c.text" size="sm" :variant="c.variant">
+          <OTag v-for="c in conditions" :key="c.text" size="sm" :tone="c.variant">
             {{ raw(c.text) }}
             <OTooltip v-if="c.tip" :content="raw(c.tip)" />
           </OTag>
@@ -499,8 +495,8 @@ const phase = computed(() =>
           <OButton
             v-for="p in row.pods"
             :key="p"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             @click="open('pod', p)"
             >{{ raw(p) }}</OButton
           >
@@ -518,16 +514,13 @@ const phase = computed(() =>
         :data="revisions"
         :columns="revisionColumns"
         row-key="key"
-        dense
         pagination="none"
         sorting="client"
         enable-column-resize
         :max-height="TABLE_MAX_HEIGHT"
-        :frame="false"
-        :show-global-filter="false"
       >
         <template #cell-name="{ row: rs }">
-          <OButton variant="ghost-primary" size="xs" @click.stop="open('replicaset', rs.name)">{{
+          <OButton variant="accent-ghost" size="sm" @click.stop="open('replicaset', rs.name)">{{
             raw(rs.name)
           }}</OButton>
         </template>
@@ -564,16 +557,13 @@ const phase = computed(() =>
         :data="jobs"
         :columns="jobColumns"
         row-key="name"
-        dense
         pagination="none"
         sorting="client"
         enable-column-resize
         :max-height="TABLE_MAX_HEIGHT"
-        :frame="false"
-        :show-global-filter="false"
       >
         <template #cell-name="{ row: j }">
-          <OButton variant="ghost-primary" size="xs" @click.stop="open('job', j.name)">{{
+          <OButton variant="accent-ghost" size="sm" @click.stop="open('job', j.name)">{{
             raw(j.name)
           }}</OButton>
         </template>

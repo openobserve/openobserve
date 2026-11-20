@@ -9,17 +9,16 @@
         <OTooltip :content="t('aiObservability.promptManagement.scoreEvidenceHelp')" />
       </OIcon>
     </h4>
-    <p v-if="error" role="alert" class="text-status-error-text m-0 text-xs">{{ error }}</p>
-    <p
+    <OEmptyState v-if="error" size="compact" kind="error" :text="error" @action="load" />
+    <OEmptyState
       v-else-if="!loading && !hasScores"
-      class="text-text-secondary m-0 text-xs"
+      size="compact"
+      :title="t('aiObservability.promptManagement.form.noExperimentScores')"
       data-test="prompt-version-score-empty"
-    >
-      {{ t("aiObservability.promptManagement.form.noExperimentScores") }}
-    </p>
-    <p v-else-if="loading" class="text-text-secondary m-0 text-xs">
-      {{ t("aiObservability.promptManagement.form.loadingScores") }}
-    </p>
+    />
+    <div v-else-if="loading" class="flex flex-col gap-2">
+      <OSkeleton v-for="row in 3" :key="row" class="h-4 w-full" />
+    </div>
     <PromptCompareList v-else :rows="rows" data-test="prompt-version-score" />
   </section>
 </template>
@@ -29,6 +28,9 @@ import { computed, ref, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import PromptCompareList from "./PromptCompareList.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   loadPromptVersionScoreComparison,
@@ -83,7 +85,7 @@ async function load() {
     left.value = null;
     right.value = null;
     error.value =
-      caught instanceof Error
+      caught instanceof Error && !isRawHttpText(caught.message)
         ? raw(caught.message)
         : t("aiObservability.promptManagement.form.scoreLoadError");
   } finally {

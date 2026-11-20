@@ -62,15 +62,6 @@ vi.mock("@/components/cipherkeys/AddCipherKey.vue", () => ({
   },
 }));
 
-vi.mock("@/components/shared/grid/Pagination.vue", () => ({
-  default: {
-    name: "Pagination",
-    template: "<div data-test='table-pagination'></div>",
-    props: ["scope", "pageTitle", "resultTotal", "perPageOptions", "position"],
-    emits: ["update:changeRecordPerPage"],
-  },
-}));
-
 vi.mock("@/components/shared/grid/NoData.vue", () => ({
   default: {
     name: "NoData",
@@ -152,11 +143,6 @@ const createWrapper = (props = {}, options = {}) => {
         AddCipherKey: {
           template: "<div data-test-stub='add-cipher-key'></div>",
           emits: ["cancel:hideform"],
-        },
-        Pagination: {
-          template: "<div data-test-stub='table-pagination'></div>",
-          props: ["scope", "pageTitle", "resultTotal", "perPageOptions", "position"],
-          emits: ["update:changeRecordPerPage"],
         },
         NoData: {
           template: "<div data-test-stub='no-data'>No Data Available</div>",
@@ -422,7 +408,7 @@ describe("CipherKeys", () => {
     it("names the key in bold in the real ConfirmDialog with a destructive OK", async () => {
       const ODialogStub = {
         name: "ODialog",
-        props: ["open", "title", "primaryButtonVariant"],
+        props: ["open", "title", "primary"],
         template: "<div data-test='o-dialog-stub'><slot /></div>",
       };
       const wrapper = mount(CipherKeys, {
@@ -437,7 +423,7 @@ describe("CipherKeys", () => {
       await nextTick();
 
       const dialog = wrapper.findAllComponents({ name: "ConfirmDialog" })[0];
-      expect(dialog.props("okVariant")).toBe("destructive");
+      expect(dialog.props("kind")).toBe("destructive");
       const name = dialog.find('[data-test="confirm-dialog-name"]');
       expect(name.text()).toBe("test-key-1");
       expect(name.classes()).toContain("font-semibold");
@@ -448,7 +434,7 @@ describe("CipherKeys", () => {
           (c: any) =>
             c.props("title") === i18n.global.t("settings.cipherKeysPage.deleteCipherKeysTitle"),
         );
-      expect(bulkDialog!.props("okVariant")).toBe("destructive");
+      expect(bulkDialog!.props("kind")).toBe("destructive");
       wrapper.unmount();
     });
 
@@ -574,7 +560,7 @@ describe("CipherKeys", () => {
     it("should have correct table columns configuration", () => {
       const wrapper = createWrapper();
 
-      expect(wrapper.vm.columns).toHaveLength(4);
+      expect(wrapper.vm.columns).toHaveLength(3);
 
       // Row numbering moved to OTable's built-in show-index (no '#' column).
 
@@ -598,10 +584,9 @@ describe("CipherKeys", () => {
       expect(wrapper.vm.columns[2].size).toBe(180);
       expect(wrapper.vm.columns[2].meta.align).toBe("left");
 
-      // Column 3: actions
-      expect(wrapper.vm.columns[3].id).toBe("actions");
-      expect(wrapper.vm.columns[3].isAction).toBe(true);
-      expect(wrapper.vm.columns[3].pinned).toBe("right");
+      // OTable appends the actions column: Edit inline, Delete last in the row menu (B7).
+      expect(wrapper.vm.rowActions.map((a: any) => a.id)).toEqual(["edit"]);
+      expect(wrapper.vm.rowMenu.map((a: any) => [a.id, a.destructive])).toEqual([["delete", true]]);
     });
   });
 
@@ -639,16 +624,15 @@ describe("CipherKeys", () => {
     });
 
     it("should render action buttons with proper data-test attributes", async () => {
-      createWrapper();
+      const wrapper = createWrapper();
       await nextTick();
 
-      // These would be rendered in the actual table slots
       const testRow = { name: "test-key-1" };
-      const editTestAttr = `cipherkey-list-${testRow.name}-update`;
-      const deleteTestAttr = `cipherkey-list-${testRow.name}-delete`;
+      const [edit] = wrapper.vm.rowActions;
+      const [remove] = wrapper.vm.rowMenu;
 
-      expect(editTestAttr).toBe("cipherkey-list-test-key-1-update");
-      expect(deleteTestAttr).toBe("cipherkey-list-test-key-1-delete");
+      expect(edit.dataTest(testRow, 0)).toBe("cipherkey-list-test-key-1-update");
+      expect(remove.dataTest(testRow, 0)).toBe("cipherkey-list-test-key-1-delete");
     });
   });
 

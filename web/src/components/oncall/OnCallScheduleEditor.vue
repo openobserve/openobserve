@@ -28,9 +28,7 @@
         :data="draft"
         :columns="columns"
         row-key="id"
-        :frame="false"
         pagination="client"
-        :show-global-filter="false"
         table-id="oncall-team-rotations"
         data-test="oncall-rotations-table"
         @row-click="editRotation"
@@ -39,9 +37,7 @@
           <div class="flex flex-1 items-center justify-between gap-2">
             <span class="text-text-secondary text-sm">{{ t("oncall.scheduleHint") }}</span>
             <OButton
-              variant="outline"
-              size="sm-action"
-              icon-left="add"
+              variant="secondary"
               data-test="oncall-schedule-add-rotation"
               @click="addRotation"
             >
@@ -58,8 +54,8 @@
             {{ raw(row.name) }}
             <OTag
               v-if="row.source === 'default'"
-              variant="default-soft"
-              size="xs"
+              tone="neutral"
+              size="sm"
               :data-test="`oncall-schedule-default-${row.id}`"
             >
               {{ t("oncall.rotationSourceDefault") }}
@@ -85,9 +81,9 @@
 
         <template #cell-actions="{ row }">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="delete-outline"
+            icon="delete-outline"
             :aria-label="t('oncall.laneDelete')"
             :data-test="`oncall-schedule-remove-${row.id}`"
             @click.stop="removeRotation(row)"
@@ -96,21 +92,19 @@
 
         <template #empty>
           <OEmptyState
-            size="inline"
-            preset="no-data"
-            :description="t('oncall.noRotations')"
+            :title="t('emptyState.noData.title')"
+            :text="t('oncall.noRotations')"
             data-test="oncall-schedule-empty"
           />
         </template>
       </OTable>
 
       <div class="flex justify-end gap-2">
-        <OButton variant="outline" size="sm-action" @click="reset">
+        <OButton variant="secondary" @click="reset">
           {{ t("oncall.cancel") }}
         </OButton>
         <OButton
           variant="primary"
-          size="sm-action"
           :loading="saving"
           :disabled="!dirty"
           data-test="oncall-schedule-save"
@@ -125,42 +119,14 @@
          wide panel is what lets a shift rule read as one row of decisions
          instead of a column of wrapped paragraphs. -->
     <ODrawer
+      size="lg"
       :open="editing"
-      :width="60"
       :title="drawerTitle"
-      :persistent="!draftsActive && wouldDiscardEdits"
-      :close-guard="draftsActive ? guardDrawerClose : undefined"
-      :show-close="false"
+      :dirty="wouldDiscardEdits"
       data-test="oncall-rotation-drawer"
-      @update:open="cancelDrawer()"
+      @update:open="(open: boolean) => !open && (editing = false)"
+      @discard="discardEdits"
     >
-      <!-- ODrawer closes itself before it emits, so its own ✕ could not be held back for the confirm. -->
-      <template #header-right>
-        <button
-          type="button"
-          :aria-label="t('components.drawer.closeDrawer')"
-          data-test="o-drawer-close-btn"
-          @mousedown.prevent
-          @click="cancelDrawer"
-          class="rounded-default text-dialog-close-text hover:bg-dialog-close-hover-bg active:bg-dialog-close-active-bg focus-visible:ring-dialog-focus-ring flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </template>
       <div v-if="active" class="flex flex-col gap-6">
         <div class="flex flex-col gap-1.5">
           <OInput
@@ -185,7 +151,7 @@
              read rather than a plain form that turns into tabs the moment a
              second rule shows up. -->
         <section class="border-border-default flex flex-col gap-4 border-t pt-6">
-          <h3 class="text-base font-semibold">{{ t("oncall.rotationSectionRules") }}</h3>
+          <h3 class="text-sm font-semibold">{{ t("oncall.rotationSectionRules") }}</h3>
           <p
             v-if="!active.shift_rules.length"
             class="text-status-warning-text text-xs"
@@ -250,10 +216,11 @@
               </OTab>
             </OTabs>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon"
+              size="xs"
               class="ms-1 self-center"
-              icon-left="add"
+              icon="add"
               :aria-label="t('oncall.addShiftRule')"
               data-test="oncall-schedule-rule-add"
               @click="addRule"
@@ -344,20 +311,18 @@
           <OButton
             v-if="!isNew"
             variant="ghost"
-            size="sm-action"
-            icon-left="delete-outline"
+            icon="delete-outline"
             :loading="saving"
             data-test="oncall-rotation-delete"
             @click="confirmRemove = true"
           >
             {{ t("oncall.laneDelete") }}
           </OButton>
-          <OButton variant="outline" size="sm-action" class="ms-auto" @click="cancelDrawer">
+          <OButton variant="secondary" class="ms-auto" @click="cancelDrawer">
             {{ t("oncall.cancel") }}
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             :loading="saving"
             :disabled="!activeIsSavable"
             data-test="oncall-rotation-done"
@@ -377,7 +342,6 @@
       :message="t('oncall.rotationDiscardMessage', { name: raw(active?.name ?? '') })"
       :ok-label="t('common.discardChanges')"
       :cancel-label="t('dashboard.layoutEdit.keepEditing')"
-      focus-cancel
       @update:ok="discardAndClose"
     />
     <OnCallRemoveRotationDialog
@@ -1068,22 +1032,20 @@ function duplicateRotation(id: string) {
   editRotation(copy);
 }
 
-/// Every way out but Save and Remove comes here; the watcher below discards.
+/// Cancel is an explicit choice, so only drafts mode asks (it can still keep or save the work); the watcher below discards.
 async function cancelDrawer() {
   if (draftsActive) {
     if (await scheduleDraft.confirmLeave()) editing.value = false;
     return;
   }
   membersAfterDiscard.value = false;
-  if (wouldDiscardEdits.value) confirmDiscard.value = true;
-  else editing.value = false;
+  editing.value = false;
 }
 
-/// ✕, Escape and the backdrop ask through the leave dialog instead of closing over unsaved edits.
-function guardDrawerClose(): boolean {
-  if (!scheduleDraft.hasUnsavedChanges()) return true;
-  void cancelDrawer();
-  return false;
+/// ✕, Escape and the backdrop asked "Discard changes?" in the drawer's footer; Discard drops the work.
+function discardEdits() {
+  if (draftsActive) scheduleDraft.discard();
+  membersAfterDiscard.value = false;
 }
 
 function discardAndClose() {

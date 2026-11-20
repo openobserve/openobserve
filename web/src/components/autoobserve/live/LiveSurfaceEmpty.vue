@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <LiveNoticeState
     :notice="view.notice"
-    size="block"
+    size="region"
     :action="view.action"
     :data-test="`autoobserve-live-empty-${surface}`"
     @action="emit('action')"

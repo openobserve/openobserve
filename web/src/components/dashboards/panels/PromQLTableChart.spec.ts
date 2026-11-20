@@ -447,12 +447,13 @@ describe("PromQLTableChart", () => {
       wrapper = mountPaginated();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="dashboard-table-row-count"]').text()).toBe("1-10 of 12");
+      expect(wrapper.find('[data-test="dashboard-table-row-count"]').text()).toBe("1–10 of 12");
       expect(wrapper.find('[data-test="dashboard-table-pagination-next-page"]').exists()).toBe(
         true,
       );
+      // First and last appear only past ten pages.
       expect(wrapper.find('[data-test="dashboard-table-pagination-last-page"]').exists()).toBe(
-        true,
+        false,
       );
       expect(wrapper.find('[data-test="dashboard-table-rows-per-page-select"]').text()).toContain(
         "10",
@@ -466,7 +467,7 @@ describe("PromQLTableChart", () => {
       await wrapper.find('[data-test="dashboard-table-pagination-next-page"]').trigger("click");
       await flushPromises();
 
-      expect(wrapper.find('[data-test="dashboard-table-row-count"]').text()).toBe("11-12 of 12");
+      expect(wrapper.find('[data-test="dashboard-table-row-count"]').text()).toBe("11–12 of 12");
       expect(wrapper.findAll('tbody tr[data-test^="o2-table-row-"]').length).toBe(2);
     });
   });
@@ -621,7 +622,7 @@ describe("PromQLTableChart", () => {
       expect(allClear.findComponent({ name: "OIcon" }).props("name")).toBe("check");
     });
 
-    it("a healthy-empty triage table drops the row count; a plain empty table keeps it", async () => {
+    it("draws no row count under an empty table, healthy or not (D5)", async () => {
       wrapper = createWrapper({
         data: { columns: mockTableData.columns, rows: [] },
         config: { ...mockConfig, promql_table_mode: "all", curated_empty_means_healthy: true },
@@ -635,7 +636,7 @@ describe("PromQLTableChart", () => {
         config: { ...mockConfig, promql_table_mode: "all" },
       });
       await flushPromises();
-      expect(wrapper.find('[data-test="dashboard-table-pagination"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-table-pagination"]').exists()).toBe(false);
     });
 
     it("should handle completely empty data", () => {

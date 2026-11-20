@@ -2,18 +2,40 @@
 import type { SkeletonProps } from "./OSkeleton.types";
 import { computed, useAttrs } from "vue";
 import { useI18nTyped } from "@/types/i18n";
+import { useDelayedFlag } from "@/composables/shared/useDelayedFlag";
 
 const { t } = useI18nTyped();
 
 const props = withDefaults(defineProps<SkeletonProps>(), {
-  type: "rect",
-  animation: "wave",
+  shape: "line",
+  preset: undefined,
+  rows: 5,
+  count: 4,
+  delay: 150,
 });
 
 const attrs = useAttrs();
 
-/* The caller's `class`, flattened. Vue hands `class` through as a string, an
-   array, or an object depending on how it was bound. */
+const SHIMMER =
+  "from-skeleton-base via-skeleton-highlight to-skeleton-base bg-linear-to-r bg-size-[200%_100%] [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite]";
+
+const ROW_WIDTHS = ["w-2/5", "w-1/3", "w-1/2"];
+const BAR_HEIGHTS = [
+  "h-1/2",
+  "h-2/3",
+  "h-2/5",
+  "h-3/4",
+  "h-1/2",
+  "h-1/3",
+  "h-3/5",
+  "h-2/5",
+  "h-4/5",
+  "h-1/2",
+];
+
+const delayed = useDelayedFlag(() => props.delay > 0, props.delay);
+const shown = computed(() => props.delay <= 0 || delayed.value);
+
 const callerClass = computed(() => {
   const c = attrs.class as unknown;
   if (typeof c === "string") return c;
@@ -26,82 +48,92 @@ const callerClass = computed(() => {
   return "";
 });
 
-/* Tailwind resolves same-property conflicts by CSS source order, NOT by the
-   order classes appear on the element. So a baked-in `w-full` beats a caller's
-   `w-3/4` / `w-3.5` / `flex-1` every time, and the caller silently gets a
-   full-width block. That made every sized OSkeleton render full-bleed and is why
-   a rival SkeletonBox primitive (with real width/height props) grew alongside it.
-   Rather than ship a class-merge dependency, stand the default down whenever the
-   caller expresses the same axis themselves. */
+// Utilities win by stylesheet order, not class order, so a default size stands down when the caller sets that axis.
 const setsWidth = computed(() =>
   /(?:^|\s)-?(?:w-|size-|flex-1|flex-auto|grow|basis-)/.test(callerClass.value),
 );
 const setsHeight = computed(() => /(?:^|\s)-?(?:h-|size-)/.test(callerClass.value));
 
 const shapeClasses = computed<string[]>(() => {
-  switch (props.type ?? "rect") {
+  switch (props.shape) {
     case "circle":
-      // aspect-square derives height from width; never impose either axis.
-      return ["rounded-full", "aspect-square"];
-    case "text":
-      return [
-        "rounded-default",
-        ...(setsWidth.value ? [] : ["w-full"]),
-        ...(setsHeight.value ? [] : ["h-4"]),
-      ];
+      return ["rounded-full aspect-square", SHIMMER, setsWidth.value ? "" : "size-4"];
+    case "block":
+      return ["rounded-chip", SHIMMER, setsWidth.value ? "" : "w-full"];
     default:
-      return ["rounded-default", ...(setsWidth.value ? [] : ["w-full"])];
+      return [
+        "rounded-chip",
+        SHIMMER,
+        setsWidth.value ? "" : "w-full",
+        setsHeight.value ? "" : "h-3",
+      ];
   }
 });
 
-const animationClasses: Record<NonNullable<SkeletonProps["animation"]>, string> = {
-  pulse: "animate-pulse",
-  wave: "skeleton-wave relative overflow-hidden",
-  none: "",
-};
-
-const classes = computed(() => [
-  "block bg-skeleton-base",
-  ...shapeClasses.value,
-  animationClasses[props.animation ?? "pulse"],
-]);
+const presetClasses = computed<string[]>(() => {
+  switch (props.preset) {
+    case "statStrip":
+      return ["flex gap-2", setsWidth.value ? "" : "w-full"];
+    case "chart":
+      return [
+        "flex items-end gap-2",
+        setsWidth.value ? "" : "w-full",
+        setsHeight.value ? "" : "h-20",
+      ];
+    default:
+      return ["flex flex-col", setsWidth.value ? "" : "w-full"];
+  }
+});
 </script>
 
 <template>
+  <div
+    v-if="preset"
+    :class="[presetClasses, shown ? '' : 'invisible']"
+    role="status"
+    :aria-label="t('components.skeleton.loading')"
+    aria-live="polite"
+    aria-busy="true"
+    :data-preset="preset"
+  >
+    <template v-if="preset === 'tableRows'">
+      <div
+        v-for="r in rows"
+        :key="r"
+        class="border-table-row-divider flex h-9 items-center gap-4 border-b px-3"
+        aria-hidden="true"
+      >
+        <span :class="['rounded-chip h-3', SHIMMER, ROW_WIDTHS[(r - 1) % ROW_WIDTHS.length]]" />
+        <span :class="['rounded-chip h-3 w-1/6', SHIMMER]" />
+        <span :class="['rounded-chip ms-auto h-3 w-12', SHIMMER]" />
+      </div>
+    </template>
+    <template v-else-if="preset === 'statStrip'">
+      <div
+        v-for="n in count"
+        :key="n"
+        class="rounded-default bg-surface-base border-border-default flex min-w-0 flex-1 flex-col gap-2 border px-2.5 py-2"
+        aria-hidden="true"
+      >
+        <span :class="['rounded-chip h-6 w-12', SHIMMER]" />
+        <span :class="['rounded-chip h-3 w-16 max-w-full', SHIMMER]" />
+      </div>
+    </template>
+    <template v-else>
+      <span
+        v-for="(bar, i) in BAR_HEIGHTS"
+        :key="i"
+        :class="['rounded-chip flex-1', SHIMMER, bar]"
+        aria-hidden="true"
+      />
+    </template>
+  </div>
   <span
-    :class="classes"
+    v-else
+    :class="['block', shapeClasses, shown ? '' : 'invisible']"
     role="status"
     :aria-label="t('components.skeleton.loading')"
     aria-live="polite"
     aria-busy="true"
   />
 </template>
-
-<style scoped>
-/* keep(generated-content): translateX shimmer overlay (::after) + its keyframes.
-   A GPU-composited beam physically slides across the flat base — no moving
-   background-position — which reads as a natural gloss catch. */
-.skeleton-wave::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    transparent 30%,
-    var(--color-skeleton-shimmer) 50%,
-    transparent 70%,
-    transparent 100%
-  );
-  animation: skeleton-shimmer 1.8s ease-in-out infinite;
-}
-
-@keyframes skeleton-shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-</style>

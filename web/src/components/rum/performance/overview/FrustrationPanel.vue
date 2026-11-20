@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <h2 class="text-text-heading text-base font-bold">
+    <h2 class="text-text-heading text-sm font-semibold">
       {{ t("rum.overviewPage.frustrationTitle") }}
     </h2>
     <p class="text-text-secondary mt-1 text-sm">{{ t("rum.overviewPage.frustrationHint") }}</p>
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`rum-overview-frustration-${tile.key}`"
       >
         <template #value>
-          <span class="text-text-heading text-xl font-bold">{{ formatCount(tile.value) }}</span>
+          <span class="text-text-heading text-xl font-semibold">{{ formatCount(tile.value) }}</span>
           <span class="text-text-secondary text-xs lg:hidden">
             {{ tile.label }} ·
             <span :class="TONE[tile.delta?.tone ?? 'flat']">{{ tile.deltaText }}</span>
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <router-link
       v-if="(cur?.rage ?? 0) + (cur?.dead ?? 0) > 0"
       :to="replaysLink"
-      class="text-text-link mt-3 inline-block text-sm font-bold"
+      class="text-text-link mt-3 inline-block text-sm font-semibold"
       data-test="rum-overview-frustration-replays"
     >
       {{ t("rum.overviewPage.frustrationReplayLink") }} →

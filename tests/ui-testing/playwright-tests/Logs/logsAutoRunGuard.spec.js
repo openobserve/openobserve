@@ -62,8 +62,8 @@ async function settlePageWork(page) {
 }
 
 async function setInterval5s(page) {
-  await page.locator('[data-test="logs-search-bar-refresh-interval-btn"]').click();
-  await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click();
+  await page.locator('[data-test="logs-search-bar-data-age-refresh-auto-menu"]').click();
+  await page.locator('[data-test="logs-search-bar-data-age-refresh-auto-5"]').click();
   await page.keyboard.press('Escape');
 }
 
@@ -151,8 +151,8 @@ test.describe('Logs Auto Run cost guard', () => {
       .poll(() => searches.hits().length - before, { timeout: 30000 })
       .toBeGreaterThanOrEqual(3);
     await expect(page.locator(banner)).toHaveCount(0);
-    await page.locator('[data-test="logs-search-bar-refresh-interval-btn"]').click();
-    await page.locator('[data-test="logs-search-off-refresh-interval"]').first().click();
+    await page.locator('[data-test="logs-search-bar-data-age-refresh-auto-menu"]').click();
+    await page.locator('[data-test="logs-search-bar-data-age-refresh-auto-0"]').first().click();
     await page.keyboard.press('Escape');
 
     testLogger.info('A facet narrows the consented scope: it runs with no banner');

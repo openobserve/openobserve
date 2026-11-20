@@ -84,6 +84,16 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "SC 1.4.11 decorative: the hairline of a tinted chip whose state is already carried by its fill and text, so the border is not the sole state indicator",
   },
   {
+    fg: "--color-control-border",
+    category: "exempt",
+    why: "SC 1.4.11: the approved light resting edge (1.6:1 light, 2:1 dark, accepted on review) is not the only cue; every control carries its label, value or placeholder at 4.5:1, hover lifts the edge to 3:1 and focus adds the accent edge",
+  },
+  {
+    fg: "--color-control-border-selected",
+    category: "exempt",
+    why: "SC 1.4.11 decorative: the edge of a selected control whose state is already carried by its accent fill and ink, so the border is not the sole state indicator",
+  },
+  {
     fg: "--color-border-default",
     category: "exempt",
     why: "SC 1.4.11 decorative: a container hairline, not information required to identify a component or its state",
@@ -600,20 +610,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["light"],
   },
   {
-    fg: "--color-datepicker-focus-border",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["light"],
-  },
-  {
-    fg: "--color-datepicker-hover-border",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["light"],
-  },
-  {
     fg: "--color-datepicker-segment-focus-text",
     bg: "--color-datepicker-segment-focus-bg",
     category: "pending",
@@ -894,13 +890,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["light"],
   },
   {
-    fg: "--color-toggle-border",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["dark"],
-  },
-  {
     fg: "--color-badge-blue-solid-text",
     bg: "--color-badge-blue-solid-bg",
     category: "text",
@@ -1044,6 +1033,36 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     bg: "--color-copy-confirm-bg",
     category: "text",
     why: "the copy bubble's label is painted on the bubble's own inverse fill",
+  },
+  {
+    fg: "--color-toast-inverse-text",
+    bg: "--color-toast-inverse-bg",
+    category: "text",
+    why: "a toast's message is painted on the toast's own inverse fill",
+  },
+  {
+    fg: "--color-toast-inverse-text-secondary",
+    bg: "--color-toast-inverse-bg",
+    category: "text",
+    why: "a toast's count and dismiss glyph sit on the toast's inverse fill",
+  },
+  {
+    fg: "--color-toast-inverse-icon",
+    bg: "--color-toast-inverse-bg",
+    category: "non-text",
+    why: "a neutral toast's kind icon sits on the toast's inverse fill",
+  },
+  {
+    fg: "--color-toast-inverse-icon-ok",
+    bg: "--color-toast-inverse-bg",
+    category: "non-text",
+    why: "a success toast's kind icon sits on the toast's inverse fill",
+  },
+  {
+    fg: "--color-toast-inverse-icon-err",
+    bg: "--color-toast-inverse-bg",
+    category: "non-text",
+    why: "an error toast's kind icon sits on the toast's inverse fill",
   },
   {
     fg: "--color-dag-node-agent-text",

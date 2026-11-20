@@ -15,13 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    bleed
-    data-test="oncall-responses-page"
-    :title="t('oncall.responsesTitle')"
-    icon="notifications-active"
-  >
-    <template #title-trail>
+  <OPageLayout bleed data-test="oncall-responses-page" :title="t('oncall.responsesTitle')">
+    <template #status>
       <BetaBadge class="shrink-0" />
     </template>
     <template #actions>
@@ -43,10 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          no hint of which of the two it was. -->
     <OEmptyState
       v-if="unavailable"
-      size="hero"
       icon="cloud-off"
       :title="t('oncall.notAvailableTitle')"
-      :description="t('oncall.notAvailableDescription')"
+      :text="t('oncall.notAvailableDescription')"
       data-test="oncall-responses-unavailable"
     />
 
@@ -90,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTable
       v-if="!unavailable && !setupOnly"
       ref="oTableRef"
-      :frame="false"
       :data="visibleRows"
       :columns="columns"
       row-key="rowKey"
@@ -109,10 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       table-id="oncall-responses-list-v3"
       :persist-columns="true"
-      :show-global-filter="false"
       :enable-column-resize="true"
       data-test="oncall-responses-table"
-      :row-tone="rowTone"
+      :row-state="rowState"
       :row-rail-tone="rowRailTone"
       :row-section="rowSection"
       :section-order="SECTION_ORDER"
@@ -141,7 +133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OToggleGroupItem
               value="mine"
-              size="sm"
               icon-left="person"
               data-test="oncall-responses-scope-mine"
             >
@@ -149,7 +140,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
             <OToggleGroupItem
               value="everyone"
-              size="sm"
               icon-left="group"
               data-test="oncall-responses-scope-everyone"
             >
@@ -162,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :searchable="false"
             icon-key="icon"
             :aria-label="t('oncall.statusFilterLabel')"
-            width="sm"
+            width="s"
             data-test="oncall-responses-filter-tabs"
             @update:model-value="(v) => selectFilterTab(v as FilterTab)"
           >
@@ -181,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="!teamsAvailable"
             :placeholder="teamsAvailable ? undefined : t('oncall.teamFilterUnavailable')"
             :aria-label="t('oncall.teamFilterLabel')"
-            width="sm"
+            width="s"
             data-test="oncall-responses-team-filter"
             @update:model-value="() => fetchResponses()"
           />
@@ -190,23 +180,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="priorityFilter"
             :options="priorityOptions"
             :aria-label="t('oncall.priorityFilterLabel')"
-            width="sm"
+            width="s"
             data-test="oncall-responses-priority-filter"
           />
           <OSearchInput
             v-model="search"
             class="min-w-40 flex-1 basis-40 max-md:min-w-24 max-md:basis-24"
-            clearable
             :placeholder="t('oncall.searchResponses')"
             data-test="oncall-responses-search"
           />
-          <OPopover align="end" content-class="w-72" :aria-label="t('oncall.filters')">
+          <OPopover size="sm" align="end" :aria-label="t('oncall.filters')">
             <template #trigger>
               <OButton
-                variant="outline"
-                size="icon-sm"
-                icon-left="filter-list"
-                :active="narrowed"
+                icon-only
+                variant="ghost"
+                icon="filter-list"
+                :pressed="narrowed"
                 :aria-label="t('oncall.filters')"
                 data-test="oncall-responses-filters-btn"
               />
@@ -250,8 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #selection-actions>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :loading="bulkBusy"
           data-test="oncall-bulk-ack"
           @click="bulkAcknowledge"
@@ -261,9 +249,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdown>
           <template #trigger>
             <OButton
-              variant="outline"
-              size="sm"
-              icon-right="expand-more"
+              variant="secondary"
+              icon-end="expand-more"
               :loading="bulkBusy"
               data-test="oncall-bulk-snooze"
             >
@@ -280,8 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODropdownItem>
         </ODropdown>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :loading="bulkBusy"
           data-test="oncall-bulk-resolve"
           @click="confirmBulkResolve = true"
@@ -300,11 +286,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #toolbar-trailing>
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :last-run-at="lastUpdatedAt"
           :loading="loading"
-          shortcut-id="oncallRefresh"
+          shortcut="oncallRefresh"
           data-test="oncall-responses-refresh"
           @click="refreshAll"
         />
@@ -325,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-2xs font-semibold" :class="sectionTone(sectionKey)">
             {{ t(`oncall.section_${sectionKey}`) }}
           </span>
-          <OTag variant="default-soft" size="sm" :data-test="`oncall-section-count-${sectionKey}`">
+          <OTag tone="neutral" size="sm" :data-test="`oncall-section-count-${sectionKey}`">
             {{ raw(String(sectionCounts[sectionKey] ?? 0)) }}
           </OTag>
           <template v-if="sectionKey === 'ringing' && unroutedRinging + stoppedRinging > 0">
@@ -367,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- "95 firings" is the number that matters; a single firing's number
            only means something on its own record. -->
       <template #cell-firings="{ row }">
-        <OTag v-if="row.firings.length > 1" variant="default-soft" size="sm">
+        <OTag v-if="row.firings.length > 1" tone="neutral" size="sm">
           {{ t("oncall.firingCount", { count: row.firings.length }) }}
         </OTag>
         <OText variant="body" as="span" v-else>
@@ -378,12 +362,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- No team means nothing claimed it, which is a routing bug rather than
            a blank cell. -->
       <template #cell-team="{ row }">
-        <OTag v-if="!row.latest.team_id" variant="error-soft" size="sm">
+        <OTag v-if="!row.latest.team_id" tone="err" size="sm">
           {{ t("oncall.statUnrouted") }}
         </OTag>
         <OTag
           v-else-if="teamIsDeleted(row.latest.team_id)"
-          variant="default-soft"
+          tone="neutral"
           size="sm"
           data-test="oncall-row-team-deleted"
         >
@@ -440,7 +424,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText class="text-text-body">
               {{ raw(row.latest.title || row.latest.subject.source_id) }}
             </OTruncatedText>
-            <OTag v-if="row.firings.length > 1" variant="default-soft" size="sm">
+            <OTag v-if="row.firings.length > 1" tone="neutral" size="sm">
               {{ raw(`×${row.firings.length}`) }}
             </OTag>
           </span>
@@ -454,7 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  recovery on. `origin_response_id` is already on every row, so
                  the two were indistinguishable in a list only because nothing
                  read it. -->
-            <OTag variant="info-outline" size="sm" :data-test="`oncall-impacted-${row.latest.id}`">
+            <OTag tone="outline" size="sm" :data-test="`oncall-impacted-${row.latest.id}`">
               {{ t("oncall.liaisonTag") }}
             </OTag>
           </span>
@@ -565,7 +549,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-for="channel in channelsFor(row.latest)"
             :key="channel"
-            :variant="isDeliverableChannel(channel) ? 'success-soft' : 'default-soft'"
+            :tone="isDeliverableChannel(channel) ? 'ok' : 'neutral'"
             size="sm"
             :data-test="`oncall-channel-${row.rowKey}-${channel}`"
           >
@@ -588,13 +572,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="px-page-edge py-3 max-md:sticky max-md:left-0 max-md:w-[100cqw]"
           :data-test="`oncall-expansion-${row.rowKey}`"
         >
-          <OInnerLoading v-if="expandedLoading" showing />
+          <OSkeleton v-if="expandedLoading" preset="tableRows" :rows="3" />
           <template v-else>
             <div class="mb-2 flex justify-end">
               <OButton
                 variant="ghost"
-                size="sm"
-                :icon-left="expandedShowAllActivity ? 'visibility-off' : 'visibility'"
+                :icon="expandedShowAllActivity ? 'visibility-off' : 'visibility'"
                 data-test="oncall-expansion-activity-toggle-all"
                 @click="expandedShowAllActivity = !expandedShowAllActivity"
               >
@@ -623,8 +606,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown>
               <template #trigger>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-sm"
                   :loading="busyId === row.rowKey"
                   :aria-label="t('oncall.assignTeamShort')"
                   :data-test="`oncall-row-assign-${row.rowKey}`"
@@ -637,7 +620,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownItem
                 v-for="team in teams"
                 :key="team.id"
-                icon-left="group"
+                icon="group"
                 :data-test="`oncall-row-assign-${row.rowKey}-${team.id}`"
                 @select="assignTeamToRow(row, team.id, team.name)"
               >
@@ -652,8 +635,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <OButton
               v-if="canAcknowledge(row)"
-              variant="ghost-warning"
-              size="icon-sm"
+              icon-only
+              variant="ghost"
               class="max-md:hidden"
               :loading="busyId === row.rowKey"
               :aria-label="t('oncall.acknowledge')"
@@ -670,8 +653,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OButton
               v-if="hasUnresolved(row)"
-              variant="ghost-primary"
-              size="icon-sm"
+              icon-only
+              variant="accent-ghost"
               class="max-md:hidden"
               :loading="busyId === row.rowKey"
               :aria-label="t('oncall.resolve')"
@@ -695,9 +678,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #trigger>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="more-vert"
+                icon="more-vert"
                 :loading="busyId === row.rowKey"
                 :aria-label="t('oncall.moreActions')"
                 :data-test="`oncall-row-more-${row.rowKey}`"
@@ -712,7 +695,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <ODropdownItem
               v-if="row.latest.team_id && canAcknowledge(row)"
-              icon-left="check-circle"
+              icon="check-circle"
               class="md:hidden"
               :data-test="`oncall-row-ack-${row.rowKey}-menu`"
               @select="acknowledgeRow(row)"
@@ -721,7 +704,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
             <ODropdownItem
               v-if="row.latest.team_id && hasUnresolved(row)"
-              icon-left="task-alt"
+              icon="task-alt"
               class="md:hidden"
               :data-test="`oncall-row-resolve-${row.rowKey}-menu`"
               @select="resolveRow(row)"
@@ -729,7 +712,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("oncall.resolve") }}
             </ODropdownItem>
             <ODropdownItem
-              icon-left="timeline"
+              icon="timeline"
               :data-test="`oncall-row-show-timeline-${row.rowKey}`"
               @select="toggleTimeline(row)"
             >
@@ -740,7 +723,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}
             </ODropdownItem>
             <ODropdownItem
-              icon-left="link"
+              icon="link"
               :data-test="`oncall-row-copy-link-${row.rowKey}`"
               @select="copyRowLink(row)"
             >
@@ -748,7 +731,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
             <ODropdownItem
               v-if="row.latest.team_id && canAcknowledge(row) && snoozedFirings(row).length"
-              icon-left="notifications-active"
+              icon="notifications-active"
               :data-test="`oncall-row-unsnooze-${row.rowKey}`"
               @select="unsnoozeRow(row)"
             >
@@ -765,7 +748,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownItem
                 v-for="option in snoozeOptions"
                 :key="option.minutes"
-                icon-left="alarm"
+                icon="alarm"
                 :data-test="`oncall-row-snooze-${row.rowKey}-${option.minutes}`"
                 @select="snoozeRow(row, option.minutes)"
               >
@@ -780,11 +763,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            way back rather than a dead end. -->
       <template #error>
         <OEmptyState
-          size="hero"
-          preset="load-error"
+          kind="error"
           :title="t('oncall.loadResponsesFailed')"
-          :description="loadError ? raw(loadError) : undefined"
-          :action-label="t('oncall.retry')"
+          :text="loadError ? raw(loadError) : t('emptyState.loadError.description')"
           data-test="oncall-responses-error"
           @action="refreshAll"
         />
@@ -793,9 +774,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <OEmptyState
           v-if="!loading"
-          size="hero"
-          preset="no-oncall-responses"
-          :filtered="isFiltered"
+          :kind="isFiltered ? 'filtered' : 'first-run'"
+          :title="
+            isFiltered
+              ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
+              : t('emptyState.noOncallResponses.title')
+          "
+          :text="
+            isFiltered
+              ? t('emptyState.filtered.description', {
+                  noun: t('emptyState.filtered.fallbackNoun'),
+                })
+              : t('emptyState.noOncallResponses.description')
+          "
+          :icon="isFiltered ? undefined : 'task-alt'"
           data-test="oncall-responses-empty"
           @action="onEmptyAction"
         />
@@ -822,12 +814,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #footer>
         <div class="flex justify-end gap-2">
-          <OButton variant="outline" size="sm-action" @click="closeBulkResolveDialog">
+          <OButton variant="secondary" @click="closeBulkResolveDialog">
             {{ t("oncall.cancel") }}
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             :loading="bulkBusy"
             data-test="oncall-bulk-resolve-confirm"
             @click="bulkResolve"
@@ -862,7 +853,7 @@ import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import { copyToClipboard } from "@/utils/clipboard";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -901,7 +892,7 @@ import {
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import type { OTableColumnDef, RowRailTone, RowTone } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableRowState, RowRailTone } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -1847,8 +1838,8 @@ function ladderStarted(record: OnCallResponse): I18nText | "" {
 
 // Snoozed rows are deliberately inert, so they recede. This is the only wash
 // on the list — the loud one is reserved for something you must act on now.
-function rowTone(row: PageRow): RowTone | null {
-  return isSnoozed(row.latest) ? "muted" : null;
+function rowState(row: PageRow): OTableRowState | null {
+  return isSnoozed(row.latest) ? "paused" : null;
 }
 
 function rowRailTone(row: PageRow): RowRailTone | null {
@@ -2162,18 +2153,16 @@ async function copyRowLink(row: PageRow) {
   await copyToClipboard(new URL(href, window.location.origin).toString(), t);
 }
 
-function onEmptyAction(id?: string) {
-  if (id === "clear-filters") {
-    const refetch = serverFiltered.value;
-    search.value = "";
-    teamFilter.value = "all";
-    priorityFilter.value = "all";
-    causeFilter.value = "";
-    setMineOnly(false);
-    selectFilterTab("all");
-    // The loaded rows are the filtered server answer, so clearing team or cause must ask again.
-    if (refetch) void fetchResponses();
-  }
+function onEmptyAction() {
+  const refetch = serverFiltered.value;
+  search.value = "";
+  teamFilter.value = "all";
+  priorityFilter.value = "all";
+  causeFilter.value = "";
+  setMineOnly(false);
+  selectFilterTab("all");
+  // The loaded rows are the filtered server answer, so clearing team or cause must ask again.
+  if (refetch) void fetchResponses();
 }
 
 watch([search, teamFilter, priorityFilter, mineOnly, grouped, activeFilter, causeFilter], () => {

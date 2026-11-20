@@ -12,7 +12,7 @@
 <template>
   <section class="flex flex-col gap-3" data-test="ai-remote-task-test-run-panel">
     <div class="flex flex-col gap-1">
-      <h3 class="text-text-heading m-0 text-sm font-bold">
+      <h3 class="text-text-heading m-0 text-sm font-semibold">
         {{ t("aiObservability.remoteTasks.testRun.title") }}
       </h3>
       <p class="text-text-secondary m-0 text-xs leading-relaxed">
@@ -39,15 +39,14 @@
               :model-value="samples[index]"
               :placeholder="t('aiObservability.remoteTasks.testRun.samplePlaceholder')"
               :rows="2"
-              size="sm"
               :data-test="`ai-remote-task-test-run-sample-${index}`"
               @update:model-value="updateSample(index, String($event ?? ''))"
             />
           </div>
           <OButton
-            variant="ghost-destructive"
-            size="icon-sm"
-            icon-left="delete"
+            icon-only
+            variant="danger-ghost"
+            icon="delete"
             :disabled="samples.length === 1"
             :aria-label="t('aiObservability.remoteTasks.testRun.removeSample')"
             :data-test="`ai-remote-task-test-run-remove-${index}`"
@@ -56,9 +55,7 @@
         </div>
         <div class="flex items-center gap-2">
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="add"
+            variant="secondary"
             :disabled="samples.length >= MAX_SAMPLES"
             data-test="ai-remote-task-test-run-add"
             @click="addSample"
@@ -67,8 +64,7 @@
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
-            icon-left="play-arrow"
+            icon="play-arrow"
             :loading="running"
             :disabled="running || !hasSample"
             data-test="ai-remote-task-test-run-btn"
@@ -87,14 +83,11 @@
           :data="results"
           :columns="columns"
           row-key="rowId"
-          :frame="false"
-          :show-global-filter="false"
           :page-size="10"
-          width="100%"
           data-test="ai-remote-task-test-run-results"
         >
           <template #cell-status="{ row }">
-            <OTag :variant="statusVariant(row.status)" dot>{{ statusLabel(row.status) }}</OTag>
+            <OTag :tone="statusVariant(row.status)" dot>{{ statusLabel(row.status) }}</OTag>
           </template>
           <template #cell-parsedOutput="{ row }">
             <span v-if="row.parsedOutput !== undefined" class="text-text-body font-mono text-xs">
@@ -125,7 +118,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import remoteTasksService, { type RemoteTaskTestRunRow } from "@/services/remote-tasks.service";
@@ -203,10 +196,10 @@ const attemptsLabel = (attempts: number) =>
     max: props.maxAttempts,
   });
 
-function statusVariant(status: string): BadgeVariant {
-  if (status === "ok") return "success-soft";
-  if (status === "skipped") return "default-soft";
-  return "error-soft";
+function statusVariant(status: string): ChipTone {
+  if (status === "ok") return "ok";
+  if (status === "skipped") return "neutral";
+  return "err";
 }
 
 function statusLabel(status: string): I18nText {

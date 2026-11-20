@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <OForm id="general-settings-form" :form="form">
-      <div class="flex flex-col gap-4">
+      <div class="flex flex-col gap-6">
         <template v-if="!trialExpired">
           <OFormSection
             variant="plain"
@@ -34,14 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="flex items-center gap-1.5 max-md:flex-wrap">
                 <OButton
-                  variant="outline"
-                  size="xs"
+                  variant="secondary"
+                  size="sm"
                   :aria-label="t('settings.general.lightColorLabel', { color: customLightColor })"
                   type="button"
                   data-test="theme-light-chip"
                   @click="handleThemeChipClick('light')"
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <span
                       class="border-border-default size-4 shrink-0 rounded-full border"
                       :style="{ backgroundColor: customLightColor }"
@@ -51,14 +51,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-text-secondary font-mono">{{ customLightColor }}</span>
                 </OButton>
                 <OButton
-                  variant="outline"
-                  size="xs"
+                  variant="secondary"
+                  size="sm"
                   :aria-label="t('settings.general.darkColorLabel', { color: customDarkColor })"
                   type="button"
                   data-test="theme-dark-chip"
                   @click="handleThemeChipClick('dark')"
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <span
                       class="border-border-default size-4 shrink-0 rounded-full border"
                       :style="{ backgroundColor: customDarkColor }"
@@ -68,16 +68,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-text-secondary font-mono">{{ customDarkColor }}</span>
                 </OButton>
                 <OButton
-                  variant="ghost-muted"
-                  size="icon-sm"
-                  icon-left="refresh"
-                  :aria-label="t('settings.resetToDefaultColors')"
+                  icon-only
+                  variant="ghost"
+                  size="sm"
+                  icon="refresh"
+                  :label="t('settings.resetToDefaultColors')"
                   type="button"
                   data-test="reset-theme-colors-btn"
                   @click="resetThemeColors"
-                >
-                  <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
-                </OButton>
+                />
               </div>
             </OSettingRow>
           </OFormSection>
@@ -89,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="general-settings-query-defaults-section"
           >
             <OSettingRow
-              control-at="end"
+              control-at="below"
               name="scrape_interval"
               error-data-test="general-settings-scrape-interval-error"
               :label="t('settings.general.scrapeIntervalLabel')"
@@ -108,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OSettingRow>
 
             <OSettingRow
-              control-at="end"
+              control-at="below"
               name="max_series_per_query"
               :label="t('settings.general.maxSeriesLabel')"
               :description="t('settings.general.maxSeriesHelp', { n: defaultMaxSeries })"
@@ -142,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="general-settings-branding-section"
         >
           <OSettingRow
-            control-at="end"
+            control-at="below"
             name="custom_logo_text"
             error-data-test="settings_ent_logo_custom_text_error"
             :label="t('settings.customLogoText')"
@@ -160,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('settings.customLogoText')"
                 data-test="settings_ent_logo_custom_text_locked"
               >
-                <template v-slot:icon-right>
+                <template v-slot:icon-end>
                   <OIcon name="lock" size="sm" class="lock-chip" />
                 </template>
               </OInput>
@@ -186,12 +185,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFile
                 data-test="setting_ent_custom_logo_img_file_upload_locked"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-                class="o2-file-input mx-0 min-w-0 flex-1"
-              >
-                <template v-slot:prepend>
-                  <OIcon name="lock" size="sm" class="lock-chip" />
-                </template>
-              </OFile>
+                variant="compact"
+                class="min-w-0 flex-1"
+              />
             </div>
             <div
               v-else-if="
@@ -207,13 +203,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="max-h-7.75 max-w-37.5"
               />
               <OButton
+                icon-only
                 :aria-label="t('common.delete')"
                 data-test="setting_ent_custom_logo_img_delete_btn"
-                variant="ghost-destructive"
-                size="icon-xs-sq"
+                variant="danger-ghost"
+                size="sm"
                 type="button"
                 @click="confirmDeleteLogo('light')"
-                icon-left="delete"
+                icon="delete"
               />
             </div>
             <div v-else class="flex w-full items-center gap-2">
@@ -223,12 +220,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('settings.general.logoLightLabel')"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
                 @rejected="onRejected"
-                class="o2-file-input mx-0 min-w-0 flex-1"
-              >
-                <template v-slot:prepend>
-                  <OIcon name="attach-file" size="sm" />
-                </template>
-              </OFile>
+                variant="compact"
+                class="min-w-0 flex-1"
+              />
             </div>
           </OSettingRow>
 
@@ -245,12 +239,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFile
                 data-test="setting_ent_custom_logo_dark_img_file_upload_locked"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-                class="o2-file-input mx-0 min-w-0 flex-1"
-              >
-                <template v-slot:prepend>
-                  <OIcon name="lock" size="sm" class="lock-chip" />
-                </template>
-              </OFile>
+                variant="compact"
+                class="min-w-0 flex-1"
+              />
             </div>
             <div
               v-else-if="
@@ -266,13 +257,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="max-h-7.75 max-w-37.5"
               />
               <OButton
+                icon-only
                 :aria-label="t('common.delete')"
                 data-test="setting_ent_custom_logo_dark_img_delete_btn"
-                variant="ghost-destructive"
-                size="icon-xs-sq"
+                variant="danger-ghost"
+                size="sm"
                 type="button"
                 @click="confirmDeleteLogo('dark')"
-                icon-left="delete"
+                icon="delete"
               />
             </div>
             <div v-else class="flex w-full items-center gap-2">
@@ -282,12 +274,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('settings.general.logoDarkLabel')"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
                 @rejected="onRejected"
-                class="o2-file-input mx-0 min-w-0 flex-1"
-              >
-                <template v-slot:prepend>
-                  <OIcon name="attach-file" size="sm" />
-                </template>
-              </OFile>
+                variant="compact"
+                class="min-w-0 flex-1"
+              />
             </div>
           </OSettingRow>
         </OFormSection>
@@ -311,9 +300,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <OButton
               data-test="general-settings-delete-org-btn"
-              variant="outline-destructive"
-              size="sm-action"
-              icon-left="delete"
+              variant="danger-ghost"
+              icon="delete"
               type="button"
               :loading="deleting"
               @click="openDeleteOrgDialog"
@@ -324,17 +312,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             data-test="general-settings-delete-org-facts"
-            class="divide-border-default grid grid-cols-4 divide-x max-md:grid-cols-1 max-md:divide-x-0"
+            class="divide-border-subtle grid grid-cols-4 divide-x max-md:grid-cols-1 max-md:divide-x-0"
           >
             <div
               v-for="fact in deleteOrgFacts"
               :key="fact.key"
               :data-test="`general-settings-delete-org-fact-${fact.key}`"
-              class="flex flex-col gap-1 px-4 py-3"
+              class="flex flex-col gap-1 px-4 py-3 first:ps-0 max-md:px-0"
             >
               <div class="flex items-center gap-2">
                 <OIcon :name="fact.icon" size="sm" class="text-text-muted shrink-0" />
-                <span class="text-text-heading text-sm font-semibold">{{ fact.title }}</span>
+                <span class="text-text-heading text-compact font-medium">{{ fact.title }}</span>
               </div>
               <span class="text-text-secondary text-xs">{{ fact.detail }}</span>
             </div>
@@ -357,37 +345,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <OSpinner
     v-if="loadingState"
-    size="md"
+    size="lg"
     class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
     data-test="general-settings-loading-indicator"
   />
-  <ODialog
+  <ConfirmDialog
+    v-model="confirmDeleteImage"
+    kind="destructive"
     data-test="general-delete-image-dialog"
-    v-model:open="confirmDeleteImage"
-    size="sm"
     :title="t('settings.deleteLogoTitle')"
-    :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('confirmDialog.ok')"
-    primary-button-variant="destructive"
-    @click:secondary="cancelConfirmDialog"
-    @click:primary="confirmDialogOK"
-  >
-    <i18n-t keypath="settings.deleteLogoMessage" tag="p" data-test="general-delete-image-message">
-      <template #name
-        ><span class="text-text-heading font-semibold break-all">{{
-          logoThemeToDelete === "dark" ? t("settings.darkMode") : t("settings.lightMode")
-        }}</span></template
-      >
-    </i18n-t>
-  </ODialog>
+    message-keypath="settings.deleteLogoMessage"
+    :message-name="logoThemeToDelete === 'dark' ? t('settings.darkMode') : t('settings.lightMode')"
+    @update:ok="confirmDialogOK"
+    @update:cancel="cancelConfirmDialog"
+  />
 
   <ODialog
     data-test="general-color-picker-dialog"
     v-model:open="showColorPicker"
     @update:open="(v) => !v && onColorPickerClose()"
-    size="xs"
+    size="sm"
     :title="t('settings.pickCustomColor')"
-    :primary-button-label="t('settings.general.close')"
+    :primary="{ label: t('settings.general.close') }"
     @click:primary="showColorPicker = false"
   >
     <OColor v-model="tempColor" @update:model-value="updateCustomColor" />
@@ -398,10 +377,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="confirmDeleteOrg"
     size="sm"
     :title="t('settings.deleteOrganization')"
-    :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('settings.deleteOrganization')"
-    primary-button-variant="destructive"
-    :primary-button-disabled="!deleteConfirmMatches"
+    :secondary="{ label: t('confirmDialog.cancel') }"
+    :primary="{
+      label: t('settings.deleteOrganization'),
+      variant: 'danger',
+      disabled: !deleteConfirmMatches,
+    }"
     @update:open="(v) => !v && (deleteConfirmInput = '')"
     @click:secondary="confirmDeleteOrg = false"
     @click:primary="deleteOrg"
@@ -459,7 +440,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="general-delete-org-confirm-input"
           v-model="deleteConfirmInput"
           :placeholder="deleteOrgName"
-          size="sm"
           autocomplete="off"
           @keyup.enter="deleteConfirmMatches && deleteOrg()"
         />
@@ -500,9 +480,9 @@ import { isTrialExpired, useLocalOrganization } from "@/utils/zincutils";
 import { formatSizeFromMB } from "@/utils/formatters";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -545,9 +525,9 @@ export default defineComponent({
   components: {
     OButton,
     ODialog,
+    ConfirmDialog,
     OSpinner,
     OIcon,
-    OTooltip,
     OInput,
     OFile,
     OForm,

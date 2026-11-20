@@ -307,7 +307,7 @@ describe("FirstDataPanel — full panel on Logs, Traces and Metrics", () => {
     expect(code.text()).toContain(`/api/${ORG}/default/_json`);
     expect(code.text()).not.toContain(" -k ");
     expect(code.text()).not.toContain(PASSCODE);
-    expect(q("first-data-panel-code-block-pre").attributes("style")).toContain("padding: 0.75rem");
+    expect(q("first-data-panel-code-block-pre").classes()).toContain("p-3");
   });
 
   it("restarts the fast cadence and records the copy when the block is copied", async () => {
@@ -748,7 +748,7 @@ describe("FirstDataPanel — first data arrived strip (e5)", () => {
     });
     expect(q("first-data-panel-arrived-summary").text()).toBe("1,204 records in stream default");
     const open = q("first-data-panel-arrived-open-btn");
-    expect(open.text()).toBe("Open in Logs");
+    expect(open.text()).toBe("Open in logs");
     await open.trigger("click");
     expect(wrapper.emitted("open")).toHaveLength(1);
   });

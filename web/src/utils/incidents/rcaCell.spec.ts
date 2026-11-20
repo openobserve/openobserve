@@ -549,11 +549,11 @@ describe("isLiveRca (RR-34)", () => {
 describe("RCA_BADGE_VARIANT (D9-web)", () => {
   it("the moved badge map keeps the cell's colours", () => {
     expect(RCA_BADGE_VARIANT).toEqual({
-      muted: "default",
-      warn: "warning",
-      "warn-strong": "orange-outline",
-      ok: "success",
-      err: "error",
+      muted: "neutral",
+      warn: "warn",
+      "warn-strong": "warn",
+      ok: "ok",
+      err: "err",
     });
   });
 });

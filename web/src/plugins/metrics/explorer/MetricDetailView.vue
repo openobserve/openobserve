@@ -16,21 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div ref="root" class="flex min-h-0 flex-1 flex-col" data-test="metrics-detail">
-    <div
-      v-if="loading"
-      class="flex flex-1 flex-col items-center justify-center gap-2.5 opacity-80"
-      data-test="metrics-detail-loading"
-    >
-      <OSpinner size="lg" />
-      <span>{{ t("metrics.explorer.detail.loading") }}</span>
+    <div v-if="loading" class="flex flex-col gap-3 p-3" data-test="metrics-detail-loading">
+      <OSkeleton class="h-6 w-64" />
+      <OSkeleton shape="block" class="h-72" />
+      <OSkeleton preset="tableRows" :rows="4" />
     </div>
 
     <OEmptyState
       v-else-if="!card"
-      size="block"
       icon="search-off"
       :title="t('metrics.explorer.detail.notFound')"
-      :description="t('metrics.explorer.detail.notFoundDesc', { name: metricName })"
+      :text="t('metrics.explorer.detail.notFoundDesc', { name: metricName })"
       :action-label="t('metrics.explorer.detail.close')"
       data-test="metrics-detail-not-found"
       @action="$emit('close')"
@@ -39,15 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <OPageHeader
         :title="raw(card.name)"
-        :subtitle="card.help ? raw(card.help) : undefined"
+        :about="card.help ? raw(card.help) : undefined"
         title-data-test="metrics-detail-title"
         :back="{
-          label: t('metrics.explorer.detail.backTo'),
+          label: t('menu.metrics'),
           onClick: () => $emit('close'),
           dataTest: 'metrics-detail-close',
         }"
       >
-        <template #title-trail>
+        <template #status>
           <OTag
             type="metricType"
             :value="card.typeFilterBucket"
@@ -67,22 +63,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-detail-unit"
             >{{ unitLabel }}</span
           >
-          <!-- The subtitle truncates and hides on a phone; this always holds the whole sentence. -->
-          <OButton
-            v-if="card.help"
-            variant="ghost"
-            size="icon"
-            icon-left="info-outline"
-            class="shrink-0"
-            :aria-label="t('metrics.explorer.card.helpAria', { name: card.name, help: card.help })"
-            :data-test="`metrics-explorer-card-help-${card.name}`"
-          >
-            <OTooltip side="bottom" max-width="22.5rem">
-              <template #content
-                ><div class="whitespace-pre-wrap">{{ card.help }}</div></template
-              >
-            </OTooltip>
-          </OButton>
           <!-- The page sentence scrolls away with the overview; this header never does. -->
           <span
             class="inline-grid shrink-0 items-center justify-items-start"
@@ -106,25 +86,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="exemplarsEligible">
             <OSpinner
               v-if="exemplarsOn && exemplars?.status === 'loading'"
-              size="xs"
               :data-test="`metrics-explorer-card-exemplars-loading-${card.name}`"
             />
             <OTag
               v-if="exemplarsOn && exemplars?.status === 'empty'"
-              variant="default-soft"
+              tone="neutral"
               size="sm"
               :data-test="`metrics-explorer-card-exemplars-empty-${card.name}`"
               >{{ t("dashboard.exemplars.empty") }}</OTag
             >
             <OButton
               v-if="exemplarsOn && exemplars?.status === 'error'"
-              variant="ghost-warning"
-              size="icon-toolbar"
-              icon-left="warning"
+              icon-only
+              variant="ghost"
+              icon="warning"
               :aria-label="t('dashboard.exemplars.loadFailed')"
               :data-test="`metrics-explorer-card-exemplars-error-${card.name}`"
             >
-              <OTooltip side="bottom" align="end" max-width="22.5rem" hoverable>
+              <OTooltip side="bottom" hoverable>
                 <template #content>
                   <div class="flex flex-col gap-1.5">
                     <div class="font-medium">{{ t("dashboard.exemplars.loadFailed") }}</div>
@@ -136,9 +115,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div>
                       <OButton
-                        variant="outline"
-                        size="xs"
-                        icon-left="replay"
+                        variant="secondary"
+                        size="sm"
+                        icon="replay"
                         data-test="dashboard-panel-exemplars-retry"
                         @click="$emit('retry-exemplars')"
                       >
@@ -150,10 +129,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTooltip>
             </OButton>
             <OButton
-              variant="outline"
-              size="sm-toolbar"
-              icon-left="account-tree"
-              :active="exemplarsOn"
+              variant="secondary"
+              icon="account-tree"
+              :pressed="exemplarsOn"
               :aria-pressed="String(exemplarsOn)"
               :aria-label="exemplarsTooltip"
               :data-swaps-variant="exemplarsSwapsVariant ? 'percentiles' : undefined"
@@ -166,9 +144,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <OButton
             v-if="card.configurable"
-            variant="outline"
-            size="sm-toolbar"
-            icon-left="settings"
+            variant="secondary"
+            icon="settings"
             :aria-label="t('metrics.explorer.card.configureAria', { name: card.name })"
             :data-test="`metrics-explorer-card-fn-${card.name}`"
             @click="$emit('configure')"
@@ -177,9 +154,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('metrics.explorer.card.configureTooltip')" />
           </OButton>
           <OButton
-            variant="outline"
-            size="sm-toolbar"
-            icon-left="edit"
+            variant="secondary"
+            icon="edit"
             :aria-label="t('metrics.explorer.detail.openInVisualize')"
             data-test="metrics-detail-open-visualize"
             @click="$emit('open-visualize')"
@@ -194,20 +170,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #trigger>
               <OButton
-                variant="outline"
-                size="sm-toolbar"
-                icon-left="manage-search"
-                icon-right="expand-more"
+                variant="secondary"
+                icon="manage-search"
+                icon-end="expand-more"
                 :aria-label="t('metrics.explorer.detail.drilldown.button')"
                 data-test="metrics-detail-drilldown"
               >
                 <span class="max-md:hidden">{{
                   t("metrics.explorer.detail.drilldown.button")
                 }}</span>
-                <OTooltip
-                  :content="t('metrics.explorer.detail.drilldown.help')"
-                  max-width="22.5rem"
-                />
+                <OTooltip :content="t('metrics.explorer.detail.drilldown.help')" />
               </OButton>
             </template>
             <div data-test="metrics-detail-drilldown-menu">
@@ -223,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="replay"
+                  icon="replay"
                   data-test="metrics-detail-drilldown-retry"
                   @select="onDrilldownRetry"
                 >
@@ -278,9 +250,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="item in drilldownMenu[signal]"
                     :key="item.name"
                     :disabled="!item.openable || isSignalLocked(signal)"
-                    focusable-unavailable
-                    :icon-left="isSignalLocked(signal) ? 'lock' : undefined"
-                    :description="
+                    :icon="isSignalLocked(signal) ? 'lock' : undefined"
+                    :disabled-reason="
                       isSignalLocked(signal)
                         ? signalLockedReason(signal)
                         : item.openable
@@ -311,11 +282,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <!-- A disabled button fires no pointer events, so the span is the tooltip's hover target. -->
-          <OTooltip v-else :content="drilldownBlockedReason" max-width="22.5rem">
+          <OTooltip v-else :content="drilldownBlockedReason">
             <span class="inline-flex">
               <OButton
-                variant="outline"
-                size="sm-toolbar"
+                variant="secondary"
                 disabled
                 :aria-label="t('metrics.explorer.detail.drilldown.button')"
                 data-test="metrics-detail-drilldown"
@@ -325,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     drilldown.availability.value === 'oss' ||
                     drilldown.availability.value === 'licenseLocked'
                   "
-                  #icon-left
+                  #icon
                 >
                   <OIcon
                     name="lock"
@@ -350,9 +320,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="metrics-detail-create-alert"
           />
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-toolbar"
-            :icon-left="isFavorite ? 'star' : 'star-outline'"
+            :icon="isFavorite ? 'star' : 'star-outline'"
             :class="isFavorite ? 'text-favorite' : ''"
             :aria-label="
               isFavorite
@@ -377,12 +347,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="min-h-0 flex-1 overflow-y-auto">
         <OContent class="flex flex-col gap-3 py-3">
           <!-- The engine ignores matchers on labels the metric lacks, so the chart is unfiltered by these. -->
-          <OBanner
+          <OInlineNotice
             v-if="inapplicableFilters.length"
-            variant="info"
-            icon="info"
-            dense
-            :content="
+            tone="info"
+            :message="
               t(
                 'metrics.explorer.detail.filtersNotApplied',
                 { filters: inapplicableFiltersText },
@@ -403,9 +371,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :model-value="compare ?? 'off'"
               :options="compareOptions"
               :label="t('metrics.explorer.detail.compare.label')"
-              label-position="inside"
-              appearance="inline"
-              size="sm"
+              variant="filter"
+              reset-value="off"
               :searchable="false"
               data-test="metrics-detail-compare"
               @update:model-value="onCompareChange"
@@ -417,21 +384,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :model-value="forecast ?? 'off'"
                   :options="forecastOptions"
                   :label="t('metrics.explorer.detail.forecast.label')"
-                  label-position="inside"
-                  appearance="inline"
-                  size="sm"
+                  variant="filter"
+                  reset-value="off"
                   :searchable="false"
                   data-test="metrics-detail-forecast"
                   @update:model-value="onForecastChange"
                 />
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon"
-                  icon-left="info-outline"
+                  size="xs"
+                  icon="info-outline"
                   :aria-label="forecastMethodsHelp"
                   data-test="metrics-detail-forecast-help"
                 >
-                  <OTooltip side="bottom" max-width="22.5rem">
+                  <OTooltip side="bottom">
                     <template #content>
                       <div class="flex flex-col gap-1.5">
                         <div>{{ t("metrics.explorer.detail.forecast.linearHelp") }}</div>
@@ -448,9 +415,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :model-value="forecastHorizonChoice"
                   :options="forecastHorizonOptions"
                   :label="t('metrics.explorer.detail.forecast.horizon')"
-                  label-position="inside"
-                  appearance="inline"
-                  size="sm"
+                  variant="filter"
+                  reset-value="auto"
                   :searchable="false"
                   data-test="metrics-detail-forecast-horizon"
                   @update:model-value="onForecastHorizonChange"
@@ -511,9 +477,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-border-default rounded-surface relative h-60 border"
             data-test="metrics-detail-overview"
           >
-            <LoadingProgress
-              :loading="overviewState.status === 'loading' || overviewRefreshing"
-              :loading-progress-percentage="0"
+            <OLoadingLine
+              :active="overviewState.status === 'loading' || overviewRefreshing"
+              class="absolute inset-x-0 top-0 z-10"
             />
             <div
               v-if="overviewState.status === 'error'"
@@ -522,22 +488,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="error" size="sm" class="text-error-600" />
               <span>{{ t("metrics.explorer.queryFailed") }}</span>
-              <OButton variant="ghost-primary" size="xs" @click="loadOverview()">
+              <OButton variant="accent-ghost" size="sm" @click="loadOverview()">
                 {{ t("metrics.explorer.retry") }}
               </OButton>
             </div>
-            <div
+            <OEmptyState
               v-else-if="!overview.queries.length"
-              class="text-text-secondary flex h-full items-center justify-center text-xs"
-            >
-              {{ t("metrics.explorer.detail.noPreview") }}
-            </div>
-            <div
+              size="compact"
+              icon="show-chart"
+              class="h-full"
+              :title="t('metrics.explorer.detail.noPreview')"
+            />
+            <OEmptyState
               v-else-if="overviewState.status === 'done' && !overviewHasSamples"
-              class="text-text-secondary flex h-full items-center justify-center text-xs"
-            >
-              {{ t("metrics.explorer.noData") }}
-            </div>
+              size="compact"
+              icon="bar-chart"
+              class="h-full"
+              :title="t('metrics.explorer.noData')"
+            />
             <MetricCardChart
               v-else-if="overviewState.status === 'done'"
               :results="overviewState.results"
@@ -627,7 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else data-test="metrics-detail-related">
             <OEmptyState
               v-if="!related.length"
-              size="inline"
+              size="compact"
               icon="search-off"
               :title="t('metrics.explorer.detail.related.empty')"
               data-test="metrics-detail-related-empty"
@@ -656,7 +624,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex min-w-0 items-center gap-1.5">
                       <OButton
                         variant="ghost"
-                        size="chip"
+                        size="xs"
                         class="min-w-0"
                         :aria-label="t('metrics.explorer.card.detailsAria', { name: row.name })"
                         :data-test="`metrics-detail-related-open-${row.name}`"
@@ -725,9 +693,10 @@ import { STALE_DIM } from "@/lib/styles/motion";
 import { announceAlert } from "@/lib/feedback/RegionStatus/announcer";
 import { formatRefreshFailed } from "@/utils/formatters";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -824,6 +793,7 @@ export interface DetailStatus {
 export default defineComponent({
   name: "MetricDetailView",
   components: {
+    OSkeleton,
     ODataAge,
     ODataAgeFailedReserve,
     PanelChartPlaceholder,
@@ -841,9 +811,9 @@ export default defineComponent({
     OTab,
     OEmptyState,
     OSpinner,
-    LoadingProgress,
+    OLoadingLine,
     OTooltip,
-    OBanner,
+    OInlineNotice,
     ODropdown,
     ODropdownItem,
     ODropdownGroup,

@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- Apply Button -->
-          <OButton variant="outline" size="sm-action" @click="applyFilters" :loading="isLoading">{{
+          <OButton variant="secondary" @click="applyFilters" :loading="isLoading">{{
             t("rum.applyFilters")
           }}</OButton>
         </div>
@@ -71,20 +71,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:column-visibility="setColumnVisibility"
           />
           <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+            icon-only
+            variant="secondary"
+            icon="refresh"
             :loading="isLoading"
             data-test="source-maps-refresh-btn"
             @click="fetchSourceMaps"
           >
-            <OTooltip
-              side="bottom"
-              :content="t('common.refresh')"
-              shortcut-id="sourceMapsRefresh"
-            />
+            <OTooltip side="bottom" :content="t('common.refresh')" shortcut="sourceMapsRefresh" />
           </OButton>
-          <OButton variant="outline" size="sm-action" @click="navigateToUpload">{{
+          <OButton variant="secondary" @click="navigateToUpload">{{
             t("rum.uploadSourceMaps")
           }}</OButton>
         </div>
@@ -114,7 +110,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :sort-order="sortOrder"
         @update:sort-by="sortBy = $event"
         @update:sort-order="sortOrder = $event"
-        :show-global-filter="false"
         expansion="single"
         expand-on-row-click
         v-model:expanded-ids="expandedIds"
@@ -158,9 +153,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #cell-actions="{ row }">
           <OButton
+            icon-only
             :data-test="`source-maps-${row.service}-delete`"
-            variant="ghost-destructive"
-            size="icon-sm"
+            variant="danger-ghost"
             :title="t('common.delete')"
             @click="confirmDeleteSourceMap(row)"
           >
@@ -170,10 +165,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #empty>
           <OEmptyState
-            size="hero"
-            preset="no-source-maps"
-            :filtered="!!(filters.version || filters.service || filters.environment)"
-            @action="(id) => id === 'upload' && navigateToUpload()"
+            :kind="
+              filters.version || filters.service || filters.environment ? 'filtered' : 'first-run'
+            "
+            :title="
+              filters.version || filters.service || filters.environment
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.sourceMaps') })
+                : t('emptyState.noSourceMaps.title')
+            "
+            :text="
+              filters.version || filters.service || filters.environment
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.sourceMaps') })
+                : t('emptyState.noSourceMaps.description')
+            "
+            :action-label="
+              filters.version || filters.service || filters.environment
+                ? undefined
+                : t('emptyState.noSourceMaps.action')
+            "
+            @action="
+              filters.version || filters.service || filters.environment
+                ? ((filters = {}), applyFilters())
+                : navigateToUpload()
+            "
           />
         </template>
       </OTable>
@@ -182,12 +196,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Delete Confirmation Dialog -->
     <ODialog
       v-model:open="deleteDialog.show"
-      size="xs"
+      size="sm"
       :title="raw(deleteDialog.title)"
       data-test="delete-source-maps-dialog"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-label="t('common.ok')"
-      primary-button-variant="destructive"
+      :secondary="{ label: t('common.cancel') }"
+      :primary="{ label: t('common.ok'), variant: 'danger' }"
       @click:secondary="deleteDialog.show = false"
       @click:primary="
         deleteSourceMap();

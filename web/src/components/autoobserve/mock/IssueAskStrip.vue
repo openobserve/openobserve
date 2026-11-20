@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ doneText }}
       </span>
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         class="shrink-0"
         :data-test="`autoobserve-issue-ask-undo-${request.id}`"
         @click="onUndo"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="ms-auto flex flex-wrap items-center gap-1">
         <OButton
           variant="primary"
-          size="xs"
+          size="sm"
           :aria-describedby="detailsId"
           :data-test="`autoobserve-issue-ask-yes-${request.id}`"
           @click="onDecide('yes')"
@@ -74,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(request.yes) }}
         </OButton>
         <OButton
-          variant="ghost-muted"
-          size="xs"
+          variant="ghost"
+          size="sm"
           :aria-describedby="detailsId"
           :data-test="`autoobserve-issue-ask-no-${request.id}`"
           @click="onDecide('no')"

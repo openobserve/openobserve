@@ -19,32 +19,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="add-dashboard-from-github-drawer"
     v-model:open="show"
     side="right"
-    size="xl"
+    size="lg"
     :title="t('dashboard.addDashboardFromGitHub.title')"
-    :secondary-button-label="t('dashboard.addDashboardFromGitHub.cancel')"
-    :primary-button-label="primaryButtonLabel"
-    :primary-button-disabled="selectedDashboards.length === 0"
-    :primary-button-loading="preparing"
+    :secondary="{ label: t('dashboard.addDashboardFromGitHub.cancel') }"
+    :primary="{
+      label: primaryButtonLabel,
+      disabled: selectedDashboards.length === 0,
+      loading: preparing,
+    }"
     bleed
     @click:secondary="show = false"
     @click:primary="handleNext"
   >
-    <!-- Loading -->
-    <div
-      v-if="loading"
-      class="px-page-edge flex min-h-80 flex-col items-center justify-center gap-3"
-    >
-      <OSpinner size="lg" />
-      <OText variant="meta">{{ t("dashboard.addDashboardFromGitHub.loading") }}</OText>
+    <div v-if="loading" class="px-page-edge grid grid-cols-2 gap-1.5 pt-3">
+      <OSkeleton v-for="n in 10" :key="n" shape="block" class="h-11" />
     </div>
 
-    <!-- Error -->
     <OEmptyState
       v-else-if="error"
-      preset="load-error"
-      size="hero"
-      :description="raw(error)"
-      :action-label="t('dashboard.addDashboardFromGitHub.retry')"
+      kind="error"
+      :text="isRawHttpText(error) ? undefined : raw(error)"
       @action="loadDashboards"
     />
 
@@ -59,14 +53,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSearchInput
           v-model="searchQuery"
           :placeholder="t('dashboard.addDashboardFromGitHub.searchPlaceholder')"
-          clearable
           data-test="add-dashboard-github-search"
           class="w-full"
         />
         <!-- Fixed-height meta row: 'available' pinned right, 'selected' badge
              appears to its left so neither the search nor the count ever shifts. -->
         <div class="flex min-h-6 items-center justify-end gap-2 whitespace-nowrap">
-          <OTag v-if="selectedDashboards.length" variant="primary-soft" size="xs">
+          <OTag v-if="selectedDashboards.length" tone="accent" size="sm">
             {{
               t("dashboard.addDashboardFromGitHub.selectedCount", {
                 count: selectedDashboards.length,
@@ -84,9 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Empty search -->
       <OEmptyState
         v-if="!filteredDashboards.length"
-        preset="no-search-results"
-        size="hero"
-        filtered
+        kind="filtered"
+        :title="t('emptyState.noSearchResults.title')"
+        :text="t('emptyState.noSearchResults.description')"
         class="px-page-edge"
         @action="searchQuery = ''"
       />
@@ -104,12 +97,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="bg-dialog-bg border-border-default sticky top-21 z-10 flex items-center gap-2 border-b pt-0.5 pb-1.5"
           >
             <OTag
-              :variant="getCategoryInfo(items[0]).variant"
+              :tone="getCategoryInfo(items[0]).variant"
               :icon="getCategoryInfo(items[0]).icon"
               size="sm"
             />
             <OText variant="label" class="font-semibold">{{ categoryLabel(category) }}</OText>
-            <OTag variant="default-soft" size="xs">{{ items.length }}</OTag>
+            <OTag tone="neutral" size="sm">{{ items.length }}</OTag>
           </div>
 
           <!-- 2-column card grid for this group -->
@@ -136,7 +129,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</OTruncatedText>
               <OCheckbox
                 :model-value="isSelected(dashboard)"
-                size="sm"
                 class="pointer-events-none shrink-0"
               />
             </div>
@@ -149,13 +141,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       data-test="add-dashboard-from-github-folder-selection-dialog"
       v-model:open="showFolderSelection"
-      persistent
       size="sm"
       :title="t('dashboard.addDashboardFromGitHub.selectFolderTitle')"
-      :secondary-button-label="t('dashboard.addDashboardFromGitHub.back')"
-      :primary-button-label="t('dashboard.addDashboardFromGitHub.addDashboard')"
-      :primary-button-disabled="!selectedFolderObj"
-      :primary-button-loading="importing"
+      :secondary="{ label: t('dashboard.addDashboardFromGitHub.back') }"
+      :primary="{
+        label: t('dashboard.addDashboardFromGitHub.addDashboard'),
+        disabled: !selectedFolderObj,
+        loading: importing,
+      }"
       @click:secondary="showFolderSelection = false"
       @click:primary="confirmAdd"
     >
@@ -169,9 +162,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="mb-0.5 w-10">
           <OButton
-            variant="outline"
-            size="icon-xs"
-            icon-left="add"
+            icon-only
+            variant="secondary"
+            icon="add"
             @click="showAddFolderDialog = true"
             data-test="add-dashboard-github-add-folder"
             :title="t('dashboard.addDashboardFromGitHub.addNewFolder')"
@@ -184,12 +177,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       data-test="add-dashboard-github-replace-confirm"
       :open="!!replaceConfirm"
-      persistent
       size="sm"
       :title="t('dashboard.addDashboardFromGitHub.replaceTitle')"
-      :primary-button-label="t('dashboard.addDashboardFromGitHub.replaceConfirm')"
-      :secondary-button-label="t('dashboard.addDashboardFromGitHub.replaceSkip')"
-      primary-button-variant="destructive"
+      :primary="{ label: t('dashboard.addDashboardFromGitHub.replaceConfirm'), variant: 'danger' }"
+      :secondary="{ label: t('dashboard.addDashboardFromGitHub.replaceSkip') }"
       @update:open="(open: boolean) => !open && resolveReplaceConfirm(false)"
       @click:primary="resolveReplaceConfirm(true)"
       @click:secondary="resolveReplaceConfirm(false)"
@@ -216,8 +207,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showAddFolderDialog"
       size="sm"
       :title="t('dashboard.addDashboardFromGitHub.addNewFolder')"
-      :primary-button-label="t('dashboard.addDashboardFromGitHub.save')"
-      :secondary-button-label="t('dashboard.addDashboardFromGitHub.cancel')"
+      :primary="{ label: t('dashboard.addDashboardFromGitHub.save') }"
+      :secondary="{ label: t('dashboard.addDashboardFromGitHub.cancel') }"
       form-id="add-folder-dashboards-form"
       @click:secondary="showAddFolderDialog = false"
       data-test="add-dashboard-github-add-folder-dialog"
@@ -252,12 +243,13 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
@@ -277,7 +269,7 @@ export default defineComponent({
     OSearchInput,
     OSelect,
     OCheckbox,
-    OSpinner,
+    OSkeleton,
   },
   props: {
     modelValue: {
@@ -651,6 +643,7 @@ export default defineComponent({
 
     return {
       raw,
+      isRawHttpText,
       t,
       show,
       loading,

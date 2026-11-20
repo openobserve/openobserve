@@ -242,14 +242,13 @@ describe("ImportTemplate", () => {
     });
   });
 
-  // ─── arrowBackFn ─────────────────────────────────────────────────────────
-  describe("arrowBackFn", () => {
-    it("pushes to alertTemplates route with org_identifier", () => {
-      wrapper.vm.arrowBackFn();
-      expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "alertTemplates",
-        query: { org_identifier: "test-org" },
-      });
+  // ─── back ─────────────────────────────────────────────────────────────────
+  describe("back", () => {
+    it("goes to alertTemplates with org_identifier from a deep link", () => {
+      const target = { name: "alertTemplates", query: { org_identifier: "test-org" } };
+      expect(wrapper.vm.listRoute).toEqual(target);
+      wrapper.vm.goBack();
+      expect(mockRouterPush).toHaveBeenCalledWith(target);
     });
   });
 
@@ -497,7 +496,7 @@ describe("ImportTemplate", () => {
       expect(wrapper.vm.tempalteCreators[0].message).toContain("Conflict");
     });
 
-    it("falls back to 'Unknown Error' when response has no message", async () => {
+    it("falls back to 'Unknown error' when response has no message", async () => {
       const templateService = await import("@/services/alert_templates");
       vi.mocked(templateService.default.create).mockRejectedValueOnce(new Error("net"));
 
@@ -507,7 +506,7 @@ describe("ImportTemplate", () => {
       );
 
       expect(result).toBe(false);
-      expect(wrapper.vm.tempalteCreators[0].message).toContain("Unknown Error");
+      expect(wrapper.vm.tempalteCreators[0].message).toContain("Unknown error");
     });
 
     it("includes title in the service payload for email templates", async () => {

@@ -15,13 +15,17 @@
 
 import { computed, ref } from "vue";
 
-// Must mirror Tailwind's default `md`/`lg` screens so JS-driven layout switches with the CSS variants.
+// Must mirror Tailwind's default `sm`/`md`/`lg`/`xl` screens so JS-driven layout switches with the CSS variants.
+const SM_QUERY = "(min-width: 40rem)";
 const MD_QUERY = "(min-width: 48rem)";
 const LG_QUERY = "(min-width: 64rem)";
+const XL_QUERY = "(min-width: 80rem)";
 
 // Module-level singletons: one pair of app-lifetime matchMedia listeners shared by every consumer.
+const smUp = ref(true);
 const mdUp = ref(true);
 const lgUp = ref(true);
+const xlUp = ref(true);
 let initialized = false;
 
 const track = (query: string, target: typeof mdUp) => {
@@ -44,8 +48,10 @@ const ensureInit = () => {
   if (initialized || typeof window === "undefined" || typeof window.matchMedia !== "function")
     return;
   initialized = true;
+  track(SM_QUERY, smUp);
   track(MD_QUERY, mdUp);
   track(LG_QUERY, lgUp);
+  track(XL_QUERY, xlUp);
 };
 
 /** Reactive viewport breakpoints for JS-driven layout only; pure styling belongs in Tailwind variants. */
@@ -55,8 +61,10 @@ const useBreakpoint = () => {
     isMobile: computed(() => !mdUp.value),
     isTablet: computed(() => mdUp.value && !lgUp.value),
     isDesktop: computed(() => lgUp.value),
+    smUp: computed(() => smUp.value),
     mdUp: computed(() => mdUp.value),
     lgUp: computed(() => lgUp.value),
+    xlUp: computed(() => xlUp.value),
   };
 };
 

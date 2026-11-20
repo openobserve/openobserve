@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     v-model:open="open"
-    :size="isMobile ? 'full' : 'md'"
+    :size="isMobile ? 'xl' : 'sm'"
     :title="t('recentSearches.title')"
     bleed
     data-test="recent-searches-drawer"
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-left>
       <OBadge
         v-if="totalCount !== undefined"
-        variant="default-soft"
+        tone="neutral"
         size="sm"
         data-test="recent-searches-count"
       >
@@ -34,9 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #header-right>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-sm"
-        icon-left="info-outline"
+        icon="info-outline"
         :aria-label="aboutText"
         data-test="recent-searches-about"
       >
@@ -47,7 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="border-border-default flex shrink-0 flex-col gap-3 border-b px-4 py-3">
         <OSearchInput
           v-model="search"
-          clearable
           :debounce="300"
           :placeholder="t('recentSearches.searchPlaceholder')"
           class="w-full"
@@ -56,17 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-wrap items-center gap-2">
           <span
             class="flex flex-wrap items-center gap-2"
-            role="radiogroup"
+            role="group"
             :aria-label="t('recentSearches.scopeGroup')"
             data-test="recent-searches-scope"
           >
             <OBadge
               v-for="option in scopeOptions"
               :key="option.value"
-              clickable
-              :variant="scope === option.value ? 'primary-soft' : 'default-outline'"
-              role="radio"
-              :aria-checked="scope === option.value"
+              toggle
+              :pressed="scope === option.value"
               :data-test="`recent-searches-scope-${option.value}`"
               @click="scope = option.value"
             >
@@ -76,17 +73,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="bg-border-default mx-1 h-5 w-px" aria-hidden="true" />
           <span
             class="flex flex-wrap items-center gap-2"
-            role="radiogroup"
+            role="group"
             :aria-label="t('recentSearches.statusGroup')"
             data-test="recent-searches-status"
           >
             <OBadge
               v-for="option in statusOptions"
               :key="option.value"
-              clickable
-              :variant="status === option.value ? 'primary-soft' : 'default-outline'"
-              role="radio"
-              :aria-checked="status === option.value"
+              toggle
+              :pressed="status === option.value"
               :data-test="`recent-searches-status-${option.value}`"
               @click="status = option.value"
             >
@@ -95,10 +90,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <span class="bg-border-default mx-1 h-5 w-px" aria-hidden="true" />
           <OBadge
-            clickable
-            :variant="starredOnly ? 'primary-soft' : 'default-outline'"
+            toggle
+            :pressed="starredOnly"
             icon="star-outline"
-            :aria-pressed="starredOnly"
             data-test="recent-searches-status-starred"
             @click="starredOnly = !starredOnly"
           >
@@ -106,9 +100,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OBadge>
           <OButton
             v-if="differsFromDefault"
-            variant="ghost-primary"
-            size="xs"
-            icon-left="restart-alt"
+            variant="accent-ghost"
+            size="sm"
+            icon="restart-alt"
             class="ms-auto"
             data-test="recent-searches-reset-filters"
             @click="resetFilters"
@@ -121,24 +115,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="min-h-0 flex-1 overflow-auto" data-test="recent-searches-drawer-list">
         <div v-if="(history.isPending.value || scanning) && open" class="flex flex-col gap-3 p-4">
-          <OSkeleton v-for="n in 5" :key="n" type="text" />
+          <OSkeleton v-for="n in 5" :key="n" />
         </div>
         <OEmptyState
           v-else-if="history.isError.value"
-          size="inline"
-          icon="error"
+          size="compact"
+          kind="error"
+          class="px-4"
           :title="t('recentSearches.loadError')"
-          :action-label="t('recentSearches.retry')"
-          action-icon="refresh"
           @action="history.refetch()"
         />
         <OEmptyState
           v-else-if="!rows.length"
-          size="inline"
+          size="compact"
           icon="history"
+          class="px-4"
           :title="filtered ? t('recentSearches.noMatch') : t('recentSearches.emptyTitle')"
           :action-label="filtered ? t('recentSearches.resetFilters') : undefined"
-          action-icon="restart-alt"
           data-test="recent-searches-drawer-empty"
           @action="resetFilters"
         />
@@ -188,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="scope === 'all'"
                   :label="t(`recentSearches.page.${entry.source}`)"
                   size="sm"
-                  variant="primary-outline"
+                  tone="outline"
                   class="shrink-0"
                 />
                 <OTag
@@ -225,9 +218,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <span class="flex shrink-0 items-center gap-0.5">
               <OButton
-                variant="ghost-primary"
-                size="icon-sm"
-                icon-left="play-arrow"
+                icon-only
+                variant="accent-ghost"
+                icon="play-arrow"
                 :aria-label="t('recentSearches.rerunNow')"
                 :data-test="`recent-searches-rerun-now-${entry.id}`"
                 @click.stop="restore(entry, 'now', true)"
@@ -236,9 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="entry.context.time || entry.context.time_range"
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="history"
+                icon="history"
                 :aria-label="t('recentSearches.rerunOriginal')"
                 :data-test="`recent-searches-rerun-original-${entry.id}`"
                 @click.stop="restore(entry, 'original', true)"
@@ -247,9 +240,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <span v-else class="inline-block size-8 shrink-0" aria-hidden="true" />
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                :icon-left="entry.starred ? 'star' : 'star-outline'"
+                :icon="entry.starred ? 'star' : 'star-outline'"
                 :class="entry.starred ? 'text-favorite' : ''"
                 :aria-label="entry.starred ? t('recentSearches.unstar') : t('recentSearches.star')"
                 :data-test="`recent-searches-star-${entry.id}`"
@@ -262,30 +255,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    icon-only
                     variant="ghost"
-                    size="icon-sm"
-                    icon-left="more-vert"
+                    icon="more-vert"
                     :aria-label="t('common.more')"
                     :data-test="`recent-searches-more-${entry.id}`"
                     @click.stop
                   />
                 </template>
                 <ODropdownItem
-                  icon-left="edit-note"
+                  icon="edit-note"
                   :data-test="`recent-searches-load-${entry.id}`"
                   @select="restore(entry, restoreTimeOf(entry), false)"
                 >
                   <span>{{ t("recentSearches.loadOnly") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="link"
+                  icon="link"
                   :data-test="`recent-searches-copy-link-${entry.id}`"
                   @select="copyLink(entry)"
                 >
                   <span>{{ t("recentSearches.copyLink") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="content-copy"
+                  icon="content-copy"
                   :data-test="`recent-searches-copy-query-${entry.id}`"
                   @select="copyQuery(entry)"
                 >
@@ -293,15 +286,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
                 <ODropdownItem
                   v-if="functionOf(entry)"
-                  icon-left="content-copy"
+                  icon="content-copy"
                   :data-test="`recent-searches-copy-function-${entry.id}`"
                   @select="copyFunction(entry)"
                 >
                   <span>{{ t("recentSearches.copyFunction") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  variant="destructive"
-                  icon-left="delete"
+                  tone="danger"
+                  icon="delete"
                   :data-test="`recent-searches-delete-${entry.id}`"
                   @select="removeWithUndo(entry)"
                 >
@@ -313,8 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </section>
         <div v-if="history.hasNextPage.value && !scanning" class="flex justify-center p-3">
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :loading="history.isFetchingNextPage.value"
             data-test="recent-searches-load-more"
             @click="history.fetchNextPage()"
@@ -336,9 +328,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <OButton
           class="ms-auto"
-          variant="ghost-destructive"
-          size="sm"
-          icon-left="delete"
+          variant="danger-ghost"
+          icon="delete"
           data-test="recent-searches-clear-btn"
           @click="clearOpen = true"
         >
@@ -352,11 +343,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="clearOpen"
     size="sm"
     :title="t('recentSearches.clear')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="t('recentSearches.confirmClear')"
-    primary-button-variant="destructive"
-    :primary-button-loading="clearing"
-    primary-button-data-test="recent-searches-clear-confirm"
+    :secondary="{ label: t('common.cancel') }"
+    :primary="{
+      label: t('recentSearches.confirmClear'),
+      variant: 'danger',
+      loading: clearing,
+      dataTest: 'recent-searches-clear-confirm',
+    }"
     data-test="recent-searches-clear-dialog"
     @click:secondary="clearOpen = false"
     @click:primary="confirmClear"

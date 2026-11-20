@@ -306,8 +306,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="autoobserve-unfold-later"
       >
         <OButton
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           class="pointer-events-auto"
           data-test="autoobserve-unfold-later-btn"
           @click="scrollLater"
@@ -318,17 +318,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OCard
       v-if="selected && !panelKinds?.includes(selected.kind)"
-      variant="glass"
       class="shrink-0"
       data-test="autoobserve-unfold-detail"
     >
-      <OCardSection role="header" dense>
+      <template #header>
         <OIcon :name="iconOf(selected)" size="sm" :class="TONE[selected.tone].ink" />
-        <OText variant="panel-title">{{ selected.title }}</OText>
-        <OTag v-if="selected.tag" variant="primary-soft" size="sm" :label="t(selected.tag)" />
+        <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+          {{ selected.title }}
+        </h3>
+        <OTag v-if="selected.tag" tone="accent" size="sm" :label="t(selected.tag)" />
         <span class="text-text-secondary ms-auto text-xs">{{ laneName(selected.lane) }}</span>
-      </OCardSection>
-      <OCardSection role="body" dense class="flex items-start gap-6 max-md:flex-col">
+      </template>
+      <div class="flex items-start gap-6 max-md:flex-col">
         <div class="flex min-w-0 flex-1 flex-col gap-3">
           <p
             v-if="!selected.count && !selected.facts && selected.detail"
@@ -349,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               v-for="(at, i) in selected.times"
               :key="i"
-              variant="default-soft"
+              tone="neutral"
               size="sm"
               :label="raw(at)"
             />
@@ -377,8 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ul>
             <OButton
               v-if="selected.lane !== null"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               data-test="autoobserve-unfold-expand-lane"
               @click="emit('expand-lane', selected.expandKey ?? selected.lane)"
             >
@@ -399,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <span class="text-text-secondary text-xs">{{ t("autoobserve.unfold.chartNote") }}</span>
         </div>
-      </OCardSection>
+      </div>
     </OCard>
   </div>
 </template>
@@ -409,10 +409,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, useSlots, watch } 
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { getIntlLocale } from "@/locales";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

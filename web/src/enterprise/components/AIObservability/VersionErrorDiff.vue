@@ -31,31 +31,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OCard
-    class="rounded-surface! border-border-default bg-surface-panel border"
+    :title="t('aiObservability.errorDiff.title')"
+    :meta="
+      showEmpty ? undefined : t('aiObservability.errorDiff.subtitle', { a: labelA, b: labelB })
+    "
     data-test="version-error-diff"
   >
-    <OCardSection role="header" class="flex flex-col gap-0.5 p-3!">
-      <span class="text-text-body text-sm font-semibold">{{
-        t("aiObservability.errorDiff.title")
-      }}</span>
-      <span v-if="!showEmpty" class="text-text-muted text-xs">
-        {{ t("aiObservability.errorDiff.subtitle", { a: labelA, b: labelB }) }}
-      </span>
-    </OCardSection>
-
-    <OCardSection v-if="showEmpty" role="body" class="p-3! pt-0!">
-      <span class="text-text-muted text-xs" data-test="version-error-diff-empty">
-        {{ t("aiObservability.errorDiff.noData") }}
-      </span>
-    </OCardSection>
+    <OEmptyState
+      v-if="showEmpty"
+      size="compact"
+      :title="t('aiObservability.errorDiff.noData')"
+      data-test="version-error-diff-empty"
+    />
 
     <!-- Three parallel groups side-by-side (not stacked) and the body height is
          capped + scrollable, so a version with many failure classes never grows
          the panel tall enough to push the trend chart below the fold. -->
-    <OCardSection
+    <div
       v-else
-      role="body"
-      class="grid max-h-64 grid-cols-1 gap-x-6 gap-y-4 overflow-y-auto p-3! pt-0! sm:grid-cols-2 lg:grid-cols-3"
+      class="grid max-h-64 grid-cols-1 gap-x-6 gap-y-4 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3"
     >
       <div v-if="errorDiff!.introduced.length" data-test="version-error-diff-group-introduced">
         <div class="border-border-default flex items-baseline gap-1.5 border-b pb-1">
@@ -139,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </li>
         </ul>
       </div>
-    </OCardSection>
+    </div>
   </OCard>
 </template>
 
@@ -147,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { ErrorDiff } from "@/services/gen-ai-agent-mapping.service";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 

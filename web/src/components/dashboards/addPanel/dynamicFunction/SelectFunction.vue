@@ -5,13 +5,14 @@
     <!-- Function selector -->
     <div class="w-60 flex-none">
       <OSelect
+        searchable
         v-model="fields.functionName"
         :options="filteredFunctions"
         data-test="dashboard-function-dropdown"
         class="w-full"
         @search="onFunctionSearch"
       >
-        <template #icon-left>
+        <template #icon>
           <OIcon name="function" size="sm" />
         </template>
       </OSelect>
@@ -58,12 +59,12 @@
                     getSupportedTypeBasedOnFunctionNameAndIndex(fields.functionName, argIndex)
                   "
                   icon-key="icon"
-                  label-position="inside"
+                  variant="filter"
                   class="o2-custom-select-dashboard arg-type-select me-0.5 w-fit! flex-none!"
                   :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <OIcon :name="getIconBasedOnArgType(fields.args[argIndex].type)" size="sm" />
                   </template>
                   <!-- empty slot keeps the trigger icon-only -->
@@ -104,7 +105,7 @@
                     v-model="fields.args[argIndex].value"
                     :options="castTypeOptions"
                     :label="t('dashboard.selectFunction.selectCastType')"
-                    label-position="inside"
+                    variant="filter"
                     class="o2-custom-select-dashboard"
                     :data-test="`dashboard-function-dropdown-arg-cast-type-select-${argIndex}`"
                   />
@@ -138,23 +139,22 @@
 
                 <!-- Remove argument button -->
                 <OButton
-                  :aria-label="t('common.remove')"
                   v-if="canRemoveArgument(fields.functionName, argIndex)"
+                  icon-only
+                  :aria-label="t('common.remove')"
                   variant="ghost"
-                  size="icon"
+                  size="xs"
                   class="shrink-0"
                   @click="removeArgument(argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
-                  icon-left="close"
+                  icon="close"
                 >
                 </OButton>
               </div>
 
-              <OBanner
+              <OInlineNotice
                 v-if="castSuggestions[argIndex]"
-                variant="warning"
-                icon="warning"
-                dense
+                tone="warn"
                 class="mt-2"
                 :data-test="`dashboard-function-dropdown-arg-cast-suggestion-${argIndex}`"
               >
@@ -162,8 +162,7 @@
                 <template #actions>
                   <div class="flex items-center gap-2">
                     <OButton
-                      variant="outline"
-                      size="sm"
+                      variant="secondary"
                       @click="applyCast(argIndex, suggestedCastType)"
                       :data-test="`dashboard-function-dropdown-arg-cast-apply-${argIndex}`"
                     >
@@ -175,7 +174,6 @@
                     </OButton>
                     <OButton
                       variant="ghost"
-                      size="sm"
                       @click="dismissCastSuggestion(argIndex)"
                       :data-test="`dashboard-function-dropdown-arg-cast-dismiss-${argIndex}`"
                     >
@@ -183,7 +181,7 @@
                     </OButton>
                   </div>
                 </template>
-              </OBanner>
+              </OInlineNotice>
             </div>
           </div>
         </div>
@@ -193,11 +191,9 @@
     <!-- Add more arguments if allowed -->
     <OButton
       v-if="canAddArgument(fields.functionName)"
-      variant="outline"
-      size="sm"
+      variant="secondary"
       @click="addArgument()"
       class="mt-3 w-fit border-dashed"
-      icon-left="add"
       :data-test="`dashboard-function-dropdown-add-argument-button`"
     >
       {{ t("dashboard.selectFunction.add") }}
@@ -219,7 +215,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import {
   CAST_TARGET_TYPES,
   DEFAULT_CAST_TARGET_TYPE,
@@ -245,7 +241,7 @@ export default {
     OSelect,
     OInput,
     OIcon,
-    OBanner,
+    OInlineNotice,
   },
   props: {
     modelValue: {

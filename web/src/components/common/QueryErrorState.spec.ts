@@ -57,7 +57,6 @@ describe("QueryErrorState free-text cards", () => {
       const card = wrapper.find(SEARCH_CARD);
       expect(card.exists()).toBe(true);
       expect(card.text()).toContain('Search text for "status ="');
-      expect(card.text()).toContain("Search the whole input as one phrase");
       expect(wrapper.find(FIX_CARD).exists()).toBe(true);
       expect(wrapper.find(RUN_CARD).exists()).toBe(false);
     },
@@ -71,7 +70,7 @@ describe("QueryErrorState free-text cards", () => {
       freeTextCandidate: "service_name='api' timeout",
     });
     const card = wrapper.find(RUN_CARD);
-    expect(card.text()).toContain("Run as");
+    expect(card.text()).toContain("Run ");
     expect(card.text()).toContain(suggestion);
     expect(wrapper.find(SEARCH_CARD).exists()).toBe(false);
     expect(wrapper.find(FIX_CARD).exists()).toBe(true);
@@ -285,7 +284,7 @@ describe("QueryErrorState plain-language errors", () => {
 describe("QueryErrorState block icon", () => {
   it("the block error icon uses the error text token", () => {
     const wrapper = mountState({ size: "block", errorMsg: "Search stream not found: nosuch" });
-    const classes = wrapper.find('[data-test="query-error-block-icon"]').classes();
+    const classes = wrapper.find('[data-test="o2-empty-state-icon"]').classes();
     expect(classes).toContain("text-status-error-text");
     expect(classes).not.toContain("text-status-error");
   });
@@ -332,19 +331,17 @@ describe("QueryErrorState protected-stream refusal", () => {
       },
       global: { plugins: [store, router] },
     });
-    const title = wrapper.get('[data-test="query-error-title"]');
+    const title = wrapper.get('[data-test="o2-empty-state-title"]');
     expect(title.text()).toBe("Alert calibration records can't be searched here");
-    expect(title.classes()).toContain("text-status-error-text");
+    expect(wrapper.findComponent(OEmptyState).props("kind")).toBe("denied");
     expect(wrapper.text()).toContain(
       "They are shown on the Alert calibration page, filtered to the alerts you can access.",
     );
-    expect(wrapper.findComponent(OEmptyState).props("illustration")).toBe("lock");
     expect(wrapper.find(FIX_CARD).exists()).toBe(false);
     expect(wrapper.find('[data-test="query-error-ask-ai-btn"]').exists()).toBe(false);
 
     const card = wrapper.get('[data-test="query-error-open-calibration-card"]');
     expect(card.text()).toContain("Open Alert calibration");
-    expect(card.text()).toContain("See the runs and findings you have access to");
     await card.trigger("click");
     await flushPromises();
     expect(push).toHaveBeenCalledWith({
@@ -353,12 +350,9 @@ describe("QueryErrorState protected-stream refusal", () => {
     });
   });
 
-  it("keeps the default title colour and illustration for every other code", () => {
+  it("shows every other code as a failed load", () => {
     const wrapper = mountState({ errorCode: 20002 });
-    expect(wrapper.get('[data-test="query-error-title"]').classes()).not.toContain(
-      "text-status-error-text",
-    );
-    expect(wrapper.findComponent(OEmptyState).props("illustration")).toBe("broken-panel");
+    expect(wrapper.findComponent(OEmptyState).props("kind")).toBe("error");
     expect(wrapper.find('[data-test="query-error-open-calibration-card"]').exists()).toBe(false);
   });
 });
@@ -366,12 +360,11 @@ describe("QueryErrorState protected-stream refusal", () => {
 describe("QueryErrorState protected-stream refusal without Alert Calibration (OSS build)", () => {
   withCalibration(false);
 
-  it("shows a neutral red refusal with no card to a page the build lacks", () => {
+  it("shows a neutral refusal with no card to a page the build lacks", () => {
     const wrapper = mountState({ errorCode: 20014, errorMsg: PROTECTED_MSG, aiEnabled: true });
-    const title = wrapper.get('[data-test="query-error-title"]');
+    const title = wrapper.get('[data-test="o2-empty-state-title"]');
     expect(title.text()).toBe("Internal records can't be searched here");
-    expect(title.classes()).toContain("text-status-error-text");
-    expect(wrapper.findComponent(OEmptyState).props("illustration")).toBe("lock");
+    expect(wrapper.findComponent(OEmptyState).props("kind")).toBe("denied");
     expect(wrapper.find('[data-test="query-error-open-calibration-card"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain("Alert Calibration");
   });
@@ -379,7 +372,7 @@ describe("QueryErrorState protected-stream refusal without Alert Calibration (OS
   it("stays neutral on an enterprise build with calibration turned off", () => {
     config.isEnterprise = "true";
     const wrapper = mountState({ errorCode: 20014, errorMsg: PROTECTED_MSG });
-    expect(wrapper.get('[data-test="query-error-title"]').text()).toBe(
+    expect(wrapper.get('[data-test="o2-empty-state-title"]').text()).toBe(
       "Internal records can't be searched here",
     );
     expect(wrapper.find('[data-test="query-error-open-calibration-card"]').exists()).toBe(false);

@@ -145,7 +145,7 @@ describe("GroupRoles Component", () => {
     });
 
     it("has correct search placeholder", () => {
-      const searchInput = wrapper.find('input[placeholder="Search Roles"]');
+      const searchInput = wrapper.find('input[placeholder="Search roles"]');
       expect(searchInput.exists()).toBe(true);
     });
 
@@ -664,11 +664,10 @@ describe("GroupRoles Component", () => {
 
     const expectUnclippable = (emptyGroup: any) => {
       const emptyState = emptyGroup.findComponent(OEmptyState);
-      expect(emptyState.props("size")).toBe("block");
       expect(emptyState.classes()).toContain("shrink-0");
     };
 
-    it("renders the none-selected state at block size that cannot shrink below its content", async () => {
+    it("renders the none-selected state so that it cannot shrink below its content", async () => {
       const emptyGroup = await mountWithGroupRoles([]);
 
       expect(emptyGroup.find('[data-test="iam-roles-selection-none-selected"]').exists()).toBe(
@@ -757,7 +756,7 @@ describe("GroupRoles Component", () => {
     });
 
     it("has proper form labels and placeholders", () => {
-      const searchInput = wrapper.find('input[placeholder="Search Roles"]');
+      const searchInput = wrapper.find('input[placeholder="Search roles"]');
       expect(searchInput.exists()).toBe(true);
     });
 

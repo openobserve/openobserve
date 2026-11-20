@@ -4,12 +4,12 @@
   <ODrawer
     :open="open"
     side="right"
-    size="xl"
+    size="lg"
     bleed
     :title="
       raw(row?.logicalId) || t('aiObservability.experiments.comparePage.rowDrawer.fallbackTitle')
     "
-    :sub-title="bucketLabel"
+    :subtitle="bucketLabel"
     data-test="ai-experiment-comparison-row"
     @update:open="$emit('update:open', $event)"
   >
@@ -47,12 +47,7 @@
             type="single"
             data-test="ai-experiment-comparison-trials"
           >
-            <OToggleGroupItem
-              v-for="index in trialCount"
-              :key="index - 1"
-              :value="index - 1"
-              size="sm"
-            >
+            <OToggleGroupItem v-for="index in trialCount" :key="index - 1" :value="index - 1">
               {{ t("aiObservability.experiments.comparePage.rowDrawer.trial", { index }) }}
             </OToggleGroupItem>
           </OToggleGroup>
@@ -84,7 +79,6 @@
           pagination="none"
           sorting="none"
           :default-columns="false"
-          :show-global-filter="false"
           :fill-height="false"
           data-test="ai-experiment-comparison-scores"
         >
@@ -98,7 +92,7 @@
                 class="shrink-0"
                 size="sm"
                 icon=""
-                variant="default-soft"
+                tone="neutral"
                 :label="score.dataType"
               />
             </div>
@@ -109,7 +103,7 @@
               v-if="score.delta !== null"
               size="sm"
               icon=""
-              :variant="score.variant"
+              :tone="score.variant"
               :label="score.deltaLabel"
             />
             <span v-else class="text-text-secondary">{{ raw("—") }}</span>
@@ -138,7 +132,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useFullscreenBox } from "@/composables/useFullscreenBox";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -271,10 +265,10 @@ const scoreRows = computed(() =>
     // Colour follows orientedDelta: a latency rising by +31 is a positive
     // NUMBER but a worse RESULT.
     variant: (dimension.orientedDelta === null || dimension.orientedDelta === 0
-      ? "default-soft"
+      ? "neutral"
       : dimension.orientedDelta > 0
-        ? "success-soft"
-        : "error-soft") as BadgeVariant,
+        ? "ok"
+        : "err") as ChipTone,
   })),
 );
 </script>

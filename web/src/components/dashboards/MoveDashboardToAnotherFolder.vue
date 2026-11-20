@@ -18,12 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     data-test="move-dashboard-to-another-folder-dialog"
     :open="open"
+    :dirty="folderChanged"
     size="md"
     :title="t('dashboard.moveDashboardToAnotherFolder.moveDashboard')"
-    :secondary-button-label="t('dashboard.cancel')"
-    :primary-button-label="t('common.move')"
-    :primary-button-loading="onSubmit.isLoading.value"
-    :primary-button-disabled="isSameFolder"
+    :secondary="{ label: t('dashboard.cancel') }"
+    :primary="{
+      label: t('common.move'),
+      disabled: isSameFolder,
+      loading: onSubmit.isLoading.value,
+    }"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
     @click:primary="onSubmit.execute()"
@@ -63,6 +66,7 @@ import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 
 export default defineComponent({
   name: "MoveDashboardToAnotherFolder",
@@ -111,6 +115,12 @@ export default defineComponent({
       },
     );
 
+    // The picker settles on a folder once its list loads; only a pick after that is the user's (V5).
+    const { dirty: folderChanged } = useUnsavedChanges(
+      () => selectedFolder.value?.value,
+      () => props.open,
+    );
+
     // Disable Move when the selected folder is the same as the current one.
     const isSameFolder = computed(() => props.activeFolderId === selectedFolder.value?.value);
 
@@ -147,6 +157,7 @@ export default defineComponent({
       store,
       getImageURL,
       selectedFolder,
+      folderChanged,
       isSameFolder,
       onSubmit,
     };

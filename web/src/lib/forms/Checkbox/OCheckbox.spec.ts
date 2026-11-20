@@ -68,31 +68,39 @@ describe("OCheckbox", () => {
     expect(root.attributes("disabled")).toBeDefined();
   });
 
-  it("applies sm size classes", () => {
-    wrapper = mount(OCheckbox, { props: { size: "sm" } });
-    expect(wrapper.find("button").classes()).toContain("size-3.5");
-  });
-
-  it("applies xs size classes", () => {
-    wrapper = mount(OCheckbox, { props: { size: "xs" } });
-    expect(wrapper.find("button").classes()).toContain("size-3");
-  });
-
-  it("applies md size classes by default", () => {
+  it("has one 16 px box with the chip radius", () => {
     wrapper = mount(OCheckbox);
-    expect(wrapper.find("button").classes()).toContain("size-4");
+    const classes = wrapper.find("button").classes();
+    expect(classes).toContain("size-4");
+    expect(classes).toContain("rounded-chip");
   });
 
-  it("supports val alias with array model", async () => {
+  it("toggles a value in an array model", async () => {
     wrapper = mount(OCheckbox, {
       props: {
         modelValue: ["a"],
-        val: "b",
+        value: "b",
       },
     });
 
     await wrapper.find("button").trigger("click");
     expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toEqual(["a", "b"]);
+  });
+
+  it("shows the mixed state from the indeterminate prop and checks on click", async () => {
+    wrapper = mount(OCheckbox, { props: { modelValue: false, indeterminate: true } });
+    const box = wrapper.find("button");
+    expect(box.attributes("aria-checked")).toBe("mixed");
+    expect(box.attributes("data-state")).toBe("indeterminate");
+    await box.trigger("click");
+    expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe(true);
+  });
+
+  it("renders a description under the label", () => {
+    wrapper = mount(OCheckbox, {
+      props: { label: "Notify on resolve", description: "Send a message when it clears" },
+    });
+    expect(wrapper.text()).toContain("Send a message when it clears");
   });
 
   it("supports custom true/false values", async () => {

@@ -212,7 +212,7 @@ describe("ConfigPanel Unit select (real OSelect)", { timeout: 30_000 }, () => {
     await search("other");
     expect(optionValues()).toEqual([]);
     expect(popoverText()).not.toContain("Number");
-    expect(popoverText()).toContain("No options found");
+    expect(popoverText()).toContain("No matches");
   });
 
   it("saves a new unit picked from the search results", async () => {

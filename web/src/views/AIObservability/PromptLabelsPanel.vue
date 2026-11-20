@@ -8,26 +8,19 @@
       pagination="none"
       :fill-height="false"
       :default-columns="false"
-      :show-global-filter="false"
-      :show-footer="false"
-      :frame="false"
       data-test="prompt-label-table"
     >
       <template #toolbar>
         <div class="flex min-w-0 flex-1 items-center justify-between gap-3">
-          <OBanner
-            variant="info"
-            icon="info-outline"
-            dense
+          <OInlineNotice
+            tone="info"
             class="min-w-0 flex-1"
-            :content="t('aiObservability.promptManagement.labelsHelp')"
+            :message="t('aiObservability.promptManagement.labelsHelp')"
             data-test="prompt-labels-help"
           />
           <OButton
             v-if="!editing && !readOnly"
-            variant="outline"
-            size="sm"
-            icon-left="add"
+            variant="secondary"
             class="shrink-0"
             data-test="prompt-label-add"
             @click="openForm(null)"
@@ -68,8 +61,7 @@
             </div>
             <div class="flex justify-end gap-2">
               <OButton
-                variant="outline"
-                size="sm-action"
+                variant="secondary"
                 :disabled="isSubmitting"
                 data-test="prompt-label-cancel"
                 @click="closeForm"
@@ -78,7 +70,6 @@
               <OButton
                 type="submit"
                 variant="primary"
-                size="sm-action"
                 :loading="isSubmitting"
                 data-test="prompt-label-create"
                 >{{
@@ -93,10 +84,7 @@
       </template>
       <template #cell-name="{ row }">
         <div class="flex items-center gap-1.5">
-          <OTag
-            :variant="protectedLabels.includes(row.name) ? 'amber-soft' : 'default-soft'"
-            shape="rounded"
-          >
+          <OTag :tone="protectedLabels.includes(row.name) ? 'warn' : 'neutral'">
             <OIcon v-if="protectedLabels.includes(row.name)" name="lock" size="xs" />
             {{ row.name }}
           </OTag>
@@ -125,9 +113,9 @@
       <template #cell-actions="{ row }">
         <div v-if="row.name !== 'latest' && !readOnly" class="flex items-center">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="swap-horiz"
+            icon="swap-horiz"
             :disabled="busy"
             :data-test="`prompt-label-move-${row.name}`"
             @click="openForm(row)"
@@ -135,9 +123,9 @@
             <OTooltip :content="t('aiObservability.promptManagement.moveToVersion')" />
           </OButton>
           <OButton
-            variant="ghost-destructive"
-            size="icon-sm"
-            icon-left="delete"
+            icon-only
+            variant="danger-ghost"
+            icon="delete"
             :disabled="busy"
             :data-test="`prompt-label-remove-${row.name}`"
             @click="emit('remove', row)"
@@ -160,7 +148,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

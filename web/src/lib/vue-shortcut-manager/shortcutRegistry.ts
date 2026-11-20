@@ -46,6 +46,8 @@ export interface ShortcutEntry {
   skipInInput?: boolean;
   /** Fire even while focus is inside a dialog or drawer (see `Shortcut.allowInDialog`). */
   allowInDialog?: boolean;
+  /** Handle the key before the focused element does (see `Shortcut.capture`). */
+  capture?: boolean;
   /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
   visible?: (caps: ShortcutCapabilities) => boolean;
 }
@@ -241,6 +243,14 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     pageKey: "shortcuts.pages.global",
     shortcuts: [
       { id: "openCheatsheet", key: "shift+?", descriptionKey: "shortcuts.actions.openCheatsheet" },
+      // Global from any focus, so it wins over Monaco's Ctrl K chords in the query editors.
+      {
+        id: "searchOrJumpTo",
+        keyForWindows: "ctrl+k",
+        keyForMac: "meta+k",
+        descriptionKey: "shortcuts.actions.searchOrJumpTo",
+        capture: true,
+      },
       { id: "closeDialog", key: "escape", descriptionKey: "shortcuts.actions.closeDialog" },
       {
         id: "aiChatToggle",
@@ -1298,6 +1308,7 @@ export interface ShortcutDef {
   allowInInput?: boolean;
   skipInInput?: boolean;
   allowInDialog?: boolean;
+  capture?: boolean;
 }
 
 function isRegisterable(e: ShortcutEntry): boolean {
@@ -1323,6 +1334,7 @@ const DEFS: Map<string, ShortcutDef> = (() => {
         allowInInput: e.allowInInput,
         skipInInput: e.skipInInput,
         allowInDialog: e.allowInDialog,
+        capture: e.capture,
       });
     }
   }

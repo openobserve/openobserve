@@ -26,13 +26,9 @@ const passthroughProps = computed(() => {
   const out: Record<string, unknown> = {};
   if (props.label !== undefined) out.label = props.label;
   if (props.labelPosition !== undefined) out.labelPosition = props.labelPosition;
-  if (props.size !== undefined) out.size = props.size;
+  if (props.description !== undefined) out.description = props.description;
   if (props.disabled !== undefined) out.disabled = props.disabled;
   if (props.required !== undefined) out.required = props.required;
-  if (props.checkedValue !== undefined) out.checkedValue = props.checkedValue;
-  if (props.uncheckedValue !== undefined) {
-    out.uncheckedValue = props.uncheckedValue;
-  }
   if (props.offTone !== undefined) out.offTone = props.offTone;
   if (props.stateText !== undefined) out.stateText = props.stateText;
   if (props.id !== undefined) out.id = props.id;

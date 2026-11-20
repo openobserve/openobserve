@@ -35,8 +35,6 @@
     :total-count="totalCount"
     :loading="loading"
     :loading-reset-key="alertId"
-    :frame="false"
-    :show-global-filter="false"
     :persist-columns="true"
     table-id="alert-evaluation-history"
     :enable-column-resize="true"
@@ -44,18 +42,13 @@
     data-test="alerts-alertevaluationhistory-table"
     @pagination-change="onPaginationChange"
   >
-    <template #toolbar>
+    <template v-if="!sharedRange" #toolbar>
       <OToggleGroup
         :model-value="range"
         data-test="alerts-alertevaluationhistory-range"
         @update:model-value="onRangeChange"
       >
-        <OToggleGroupItem
-          v-for="option in rangeOptions"
-          :key="option.value"
-          :value="option.value"
-          size="sm"
-        >
+        <OToggleGroupItem v-for="option in rangeOptions" :key="option.value" :value="option.value">
           {{ option.label }}
         </OToggleGroupItem>
       </OToggleGroup>
@@ -63,8 +56,6 @@
 
     <template #toolbar-trailing>
       <ORefreshButton
-        layout="inline"
-        variant="outline"
         :last-run-at="lastUpdatedAt"
         :loading="loading"
         data-test="alerts-alertevaluationhistory-refresh"
@@ -89,7 +80,7 @@
           size="sm"
           data-test="alerts-alertevaluationhistory-status"
         />
-        <OTooltip v-if="row.error" :content="row.error" />
+        <OTooltip v-if="row.error" :content="raw(plainAlertError(row.error))" />
       </span>
     </template>
 
@@ -137,16 +128,17 @@
     </template>
 
     <template #cell-error="{ row }">
-      <span v-if="row.error" class="text-compact">{{ row.error }}</span>
-      <span v-else class="text-compact">—</span>
+      <span class="text-compact">
+        {{ summarizeAlertError(row.error, t) }}
+        <OTooltip v-if="row.error" :content="raw(plainAlertError(row.error))" />
+      </span>
     </template>
 
     <template #empty>
       <OEmptyState
         v-if="!loading"
-        size="hero"
         :title="t('alerts.groups.noEvaluationsTitle')"
-        :description="t('alerts.groups.noEvaluationsDescription')"
+        :text="t('alerts.groups.noEvaluationsDescription')"
         data-test="alerts-alertevaluationhistory-empty"
       />
     </template>
@@ -157,7 +149,7 @@
 import { alertHistoryQuery } from "@/services/alerts.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -171,10 +163,17 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { conditionSummary } from "@/utils/alerts/runOutcome";
 import { historyStatusOf } from "@/utils/alerts/ackState";
+import { summarizeAlertError, plainAlertError } from "@/utils/alerts/alertError";
 
 const props = withDefaults(
-  defineProps<{ alertId: string; isComposite?: boolean; isAnomaly?: boolean }>(),
-  { isComposite: false, isAnomaly: false },
+  defineProps<{
+    alertId: string;
+    isComposite?: boolean;
+    isAnomaly?: boolean;
+    /** The page owns the range, so this table draws no range tray of its own. */
+    sharedRange?: boolean;
+  }>(),
+  { isComposite: false, isAnomaly: false, sharedRange: false },
 );
 
 const { t } = useI18nTyped();
@@ -187,9 +186,7 @@ const totalCount = ref(0);
 const currentPage = ref(1);
 const pageSize = ref(25);
 
-// Same range vocabulary as the evaluation chart above this table, so the two
-// answer for the same window by default.
-const range = ref<string>("1h");
+const range = defineModel<string>("range", { default: "1h" });
 const rangeOptions = computed(() => [
   { value: "1h", label: t("alerts.groups.range1h") },
   { value: "6h", label: t("alerts.groups.range6h") },
@@ -265,9 +262,12 @@ const fetchHistory = async (force = false) => {
 const onRangeChange = (value: unknown) => {
   if (!value) return;
   range.value = String(value);
+};
+
+watch(range, () => {
   currentPage.value = 1;
   fetchHistory();
-};
+});
 
 const onPaginationChange = (params: { page: number; size: number }) => {
   currentPage.value = params.page;

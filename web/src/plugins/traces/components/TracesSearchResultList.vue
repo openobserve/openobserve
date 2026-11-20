@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :sort-by="props.sortBy"
                 :sort-order="props.sortOrder"
                 :sort-field-map="sortFieldMap"
-                :row-height="28"
+                density="compact"
                 virtual-scroll
                 :fill-height="false"
                 :scroll-el="scrollEl"
@@ -67,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :enable-column-resize="true"
                 :pinned-first-column="timestampCol"
                 :default-columns="false"
-                :show-global-filter="false"
                 pagination="none"
                 @row-click="onRowClick"
                 @row-auxclick="onRowAuxclick"
@@ -125,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="trace-row-operation-name"
                     >
                       {{ row.operation_name }}
-                      <OTooltip :content="row.operation_name" side="bottom" align="center" />
+                      <OTooltip :content="row.operation_name" side="bottom" />
                     </span>
                   </component>
                 </template>
@@ -221,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OContextMenuItem
               v-if="rowHref"
-              icon-left="open-in-new"
+              icon="open-in-new"
               data-test="trace-context-menu-open-new-tab"
               @select="emit('open-in-new-tab', contextCell.row)"
             >
@@ -229,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OContextMenuItem>
 
             <OContextMenuItem
-              icon-left="content-copy"
+              icon="content-copy"
               data-test="trace-context-menu-copy-value"
               @select="copyToClipboard(contextCell.columnId, contextCell.value)"
             >
@@ -251,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- size="sm" matches the registry icons on the other items so the
                   labels line up; the glyph is inset because it fills its viewBox
                   edge-to-edge, unlike Material Symbols. -->
-                <template #icon-left>
+                <template #icon>
                   <OIcon name="" size="sm">
                     <EqualIcon class="size-3" />
                   </OIcon>
@@ -270,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   )
                 "
               >
-                <template #icon-left>
+                <template #icon>
                   <OIcon name="" size="sm">
                     <NotEqualIcon class="size-3" />
                   </OIcon>

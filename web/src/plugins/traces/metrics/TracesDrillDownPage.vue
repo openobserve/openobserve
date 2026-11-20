@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageHeader
       :title="title"
       :back="{
-        label: t('traces.drillDownBackTarget'),
+        label: t('menu.traces'),
         onClick: close,
         dataTest: 'traces-drill-down-back-btn',
       }"

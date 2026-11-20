@@ -26,7 +26,7 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
 const ODrawerStub = {
   name: "ODrawer",
   inheritAttrs: false,
-  props: ["open", "title", "size", "formId", "primaryButtonLabel", "secondaryButtonLabel"],
+  props: ["open", "title", "size", "formId", "primary", "secondary"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `<div data-test="o-drawer-stub" :data-open="String(open)"><slot /></div>`,
 };

@@ -144,7 +144,7 @@ describe("IngestTraces (Index.vue)", () => {
       await flushPromises();
 
       expect(copyToClipboard).toHaveBeenCalledWith("some text to copy", expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });

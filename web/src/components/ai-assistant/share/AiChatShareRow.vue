@@ -94,8 +94,8 @@ const confirmPending = () => {
       </div>
       <div class="flex flex-wrap items-center gap-1.5">
         <OBadge
-          size="xs"
-          :variant="share.visibility === 'public' ? 'warning-soft' : 'default-soft'"
+          size="sm"
+          :tone="share.visibility === 'public' ? 'warn' : 'neutral'"
           :icon="share.visibility === 'public' ? 'public' : 'corporate-fare'"
           data-test="ai-chat-share-row-visibility"
         >
@@ -106,16 +106,16 @@ const confirmPending = () => {
           }}
         </OBadge>
         <OBadge
-          size="xs"
-          :variant="share.mode === 'live' ? 'success-soft' : 'primary-soft'"
+          size="sm"
+          :tone="share.mode === 'live' ? 'ok' : 'accent'"
           data-test="ai-chat-share-row-mode"
         >
           {{ share.mode === "live" ? t("aiChatShare.modeLive") : t("aiChatShare.modeSnapshot") }}
         </OBadge>
         <OBadge
           v-if="share.redact_tools"
-          size="xs"
-          variant="default-soft"
+          size="sm"
+          tone="neutral"
           icon="visibility-off"
           data-test="ai-chat-share-row-redacted"
         >
@@ -123,8 +123,8 @@ const confirmPending = () => {
         </OBadge>
         <OBadge
           v-else-if="share.visibility === 'public'"
-          size="xs"
-          variant="warning-soft"
+          size="sm"
+          tone="warn"
           icon="visibility"
           data-test="ai-chat-share-row-tools-visible"
         >
@@ -155,16 +155,14 @@ const confirmPending = () => {
         confirming === "revoke" ? t("aiChatShare.revokeConfirm") : t("aiChatShare.showToolsConfirm")
       }}</span>
       <OButton
-        variant="outline"
-        size="sm"
+        variant="secondary"
         data-test="ai-chat-share-row-revoke-cancel"
         @click="confirming = null"
       >
         {{ t("common.cancel") }}
       </OButton>
       <OButton
-        :variant="confirming === 'revoke' ? 'destructive' : 'primary'"
-        size="sm"
+        :variant="confirming === 'revoke' ? 'danger' : 'primary'"
         :disabled="busy"
         :data-test="
           confirming === 'revoke'
@@ -179,8 +177,8 @@ const confirmPending = () => {
     <div v-else class="flex shrink-0 items-center gap-0.5">
       <OButton
         v-if="share.url_path"
+        icon-only
         variant="ghost"
-        size="icon-sm"
         data-test="ai-chat-share-row-copy"
         :aria-label="t('aiChatShare.copyLink')"
         @click="emit('copy')"
@@ -191,8 +189,8 @@ const confirmPending = () => {
       <template v-if="!readOnlySettings">
         <OButton
           v-if="share.mode === 'snapshot'"
+          icon-only
           variant="ghost"
-          size="icon-sm"
           :disabled="busy"
           data-test="ai-chat-share-row-refresh"
           :aria-label="t('aiChatShare.refreshSnapshot')"
@@ -202,8 +200,8 @@ const confirmPending = () => {
           <OTooltip :content="t('aiChatShare.refreshSnapshot')" />
         </OButton>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
           :disabled="busy"
           data-test="ai-chat-share-row-switch-mode"
           :aria-label="
@@ -223,8 +221,8 @@ const confirmPending = () => {
           />
         </OButton>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
           :disabled="busy"
           data-test="ai-chat-share-row-toggle-redaction"
           :aria-label="share.redact_tools ? t('aiChatShare.showTools') : t('aiChatShare.hideTools')"
@@ -237,8 +235,8 @@ const confirmPending = () => {
         </OButton>
       </template>
       <OButton
-        variant="ghost-destructive"
-        size="icon-sm"
+        icon-only
+        variant="danger-ghost"
         :disabled="busy"
         data-test="ai-chat-share-row-revoke"
         :aria-label="t('aiChatShare.revoke')"

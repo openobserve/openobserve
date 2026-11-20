@@ -31,9 +31,8 @@
     >
       <template #trigger>
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-right="expand-more"
+          variant="secondary"
+          icon-end="expand-more"
           data-test="svcver-correlation-open-service"
         >
           <OIcon name="account-tree" size="xs" class="me-1" />
@@ -54,13 +53,12 @@
         @select="showAllCandidates"
       >
         {{ t("serviceVersions.correlation.moreServices", { count: menu.more }) }}
-        <template #icon-right><OIcon name="expand-more" size="xs" class="ms-auto" /></template>
+        <template #end><OIcon name="expand-more" size="xs" /></template>
       </ODropdownItem>
     </ODropdown>
     <OButton
       v-else
-      variant="outline"
-      size="sm-action"
+      variant="secondary"
       data-test="svcver-correlation-open-service"
       @click="openService(scope?.service || service)"
     >

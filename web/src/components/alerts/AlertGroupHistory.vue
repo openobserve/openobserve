@@ -42,14 +42,13 @@
         {{ t("alerts.groups.filteredBy") }}
       </span>
       <OTag
-        variant="primary-soft"
+        tone="accent"
         size="sm"
         :label="raw(groupFilter.group_labels || groupFilter.group_key)"
       />
       <OButton
         variant="ghost"
-        size="sm"
-        icon-left="close"
+        icon="close"
         data-test="alerts-alertgrouphistory-clear-filter"
         @click="emit('clear-filter')"
       >
@@ -62,10 +61,8 @@
       :columns="columns"
       row-key="rowKey"
       :loading="loading"
-      :frame="false"
       :page-size="25"
       :page-size-options="[25, 50, 100]"
-      :show-global-filter="false"
       :persist-columns="true"
       table-id="alert-group-history"
       :enable-column-resize="true"
@@ -73,16 +70,12 @@
       data-test="alerts-alertgrouphistory-table"
     >
       <template #toolbar-trailing>
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+        <ORefreshButton
+          :last-run-at="lastRunAt"
           :loading="loading"
           data-test="alerts-alertgrouphistory-refresh"
           @click="emit('refresh')"
-        >
-          <OTooltip side="bottom" :content="t('alerts.groups.refresh')" />
-        </OButton>
+        />
       </template>
 
       <template #cell-at="{ row }">
@@ -118,9 +111,8 @@
       <template #empty>
         <OEmptyState
           v-if="!loading"
-          size="hero"
           :title="t('alerts.groups.noHistoryTitle')"
-          :description="emptyDescription"
+          :text="emptyDescription"
           data-test="alerts-alertgrouphistory-empty"
         />
       </template>
@@ -134,12 +126,12 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { AlertGroup, AlertGroupTransition } from "@/ts/interfaces/alert";
 import { levelChangesEmptyText } from "@/utils/alerts/levelChanges";
@@ -150,12 +142,14 @@ const props = withDefaults(
   defineProps<{
     transitions: AlertGroupTransition[];
     loading?: boolean;
+    /** Epoch-ms of the last successful load, shown as the refresh age. */
+    lastRunAt?: number | null;
     groupFilter?: AlertGroup | null;
     /** Off for simple alerts: every transition belongs to the rollup row, so
      *  a Group column would repeat the same non-answer on every line. */
     showGroupColumn?: boolean;
   }>(),
-  { loading: false, groupFilter: null, showGroupColumn: true },
+  { loading: false, lastRunAt: null, groupFilter: null, showGroupColumn: true },
 );
 
 const emit = defineEmits<{

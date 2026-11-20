@@ -3110,8 +3110,8 @@ describe("VariablesValueSelector", () => {
         "2026-01-01",
       );
       expect(wrapper.findAllComponents(ODate)).toHaveLength(2);
-      // label inside the border, like the textbox and select variables next to it
-      expect(wrapper.findAllComponents(ODate)[0].props("labelPosition")).toBe("inside");
+      // label inside the box as a prefix, like the textbox and filter-select variables next to it
+      expect(wrapper.findAllComponents(ODate)[0].props("prefix")).toMatch(/:$/);
       expect(wrapper.find('[data-test="variable-selector-from_date"]').exists()).toBe(true);
     });
 

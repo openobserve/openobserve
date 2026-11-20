@@ -710,12 +710,12 @@ describe("a short-blips noise finding", () => {
 describe("the colours a run's words take", () => {
   it("never paints full coverage green when no alert was in scope", () => {
     expect(coverageBadge(run({ alerts_in_scope: 0 })).tone).toBe("neutral");
-    expect(coverageBadge(run({ alerts_in_scope: 0 })).variant).toBe("default-soft");
+    expect(coverageBadge(run({ alerts_in_scope: 0 })).variant).toBe("neutral");
     expect(coverageBadge(run({ alerts_in_scope: 4 })).tone).toBe("success");
   });
 
   it("shows High severity in the same orange Incidents uses for High", () => {
-    expect(SEVERITY_BADGE.High).toBe("orange-soft");
+    expect(SEVERITY_BADGE.High).toBe("warn");
   });
 });
 

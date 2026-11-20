@@ -28,8 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @cta="(cta) => emit('cta', cta)"
       @secondary="(cta) => emit('cta', cta)"
     />
-    <ODescriptionList dense>
-      <ODescriptionItem v-if="cell.detector" stacked :label="t('autoobserve.coverage.detector')">
+    <ODescriptionList layout="stacked">
+      <ODescriptionItem v-if="cell.detector" :label="t('autoobserve.coverage.detector')">
         <OText variant="mono" class="block">{{ cell.detector }}</OText>
         <span class="text-text-secondary block text-xs">
           {{
@@ -42,15 +42,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ODescriptionItem>
       <ODescriptionItem
         v-if="cell.detector && lastFired"
-        stacked
         :label="t('autoobserve.coverage.lastFired')"
       >
         <span data-test="autoobserve-coverage-detail-last-fired">{{ lastFired }}</span>
       </ODescriptionItem>
-      <ODescriptionItem v-if="cell.library" stacked :label="t('autoobserve.coverage.libraryEntry')">
+      <ODescriptionItem v-if="cell.library" :label="t('autoobserve.coverage.libraryEntry')">
         <OText variant="mono">{{ cell.library }}</OText>
       </ODescriptionItem>
-      <ODescriptionItem v-if="cell.predicate" stacked :label="t('autoobserve.coverage.predicate')">
+      <ODescriptionItem v-if="cell.predicate" :label="t('autoobserve.coverage.predicate')">
         {{
           cell.stream
             ? t("autoobserve.coverage.predicateMatched", {
@@ -62,14 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ODescriptionItem>
       <ODescriptionItem
         v-if="!insight && cell.reason && (cell.state !== 'gap' || cell.engine)"
-        stacked
         :label="t('autoobserve.coverage.reason')"
       >
         {{ cell.reason }}
       </ODescriptionItem>
       <ODescriptionItem
         v-if="cell.engine && !(added && !cell.engine.monitors.length)"
-        stacked
         :label="t('autoobserveLive.drawer.monitors')"
         data-test="autoobserve-coverage-detail-monitors"
       >
@@ -97,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ODescriptionItem>
     </ODescriptionList>
     <div v-if="cell.progress" class="flex flex-col gap-1">
-      <OProgressBar :value="cell.progress[0] / cell.progress[1]" size="xs" />
+      <OProgressBar :value="(cell.progress[0] / cell.progress[1]) * 100" />
       <span class="text-text-secondary text-xs">{{
         t("autoobserve.coverage.history", { days: cell.progress[0], total: cell.progress[1] })
       }}</span>

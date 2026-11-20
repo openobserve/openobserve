@@ -19,10 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col gap-2.5" data-test="billings-usagetrends-root">
     <OEmptyState
       v-if="!usageStreamEnabled"
-      size="hero"
-      illustration="wave-bars"
+      icon="bar-chart"
       :title="t('billing.usageTrends.enableTitle')"
-      :description="t('billing.usageTrends.enableSubtitle')"
+      :text="t('billing.usageTrends.enableSubtitle')"
       :action-label="t('billing.usageTrends.enableButton')"
       data-test="billings-usagetrends-enable"
       @action="showEnableConfirm = true"
@@ -39,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="option in presetOptions"
             :key="option.value"
             :value="option.value"
-            size="sm"
           >
             {{ t(option.labelKey) }}
           </OToggleGroupItem>
@@ -51,7 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="orgOptions"
             label-key="label"
             value-key="value"
-            size="sm"
             searchable
             :aria-label="t('billing.usageV2.orgFilter')"
             data-test="billings-usagetrends-org"
@@ -59,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <!-- The logs search bar's picker, absolute only, so `min-date` keeps it from reaching before the data; ‹ stops there too. -->
-        <DateTime
+        <ODateTimeRange
           ref="picker"
           auto-apply
           disable-relative
@@ -82,18 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <KpiCardRow :columns="4" class="shrink-0" data-test="billings-usagetrends-kpis">
-        <UsageKpiCard
-          v-for="card in kpiCards"
-          :key="card.key"
-          :label="card.label"
-          :icon="card.icon"
-          :value="card.value"
-          :hint="card.hint"
-          :loading="loading"
-          :data-test="`billings-usagetrends-kpi-${card.key}`"
-        />
-      </KpiCardRow>
+      <OStatStrip
+        :items="kpiStats"
+        :loading="loading"
+        stacked
+        class="shrink-0"
+        data-test="billings-usagetrends-kpis"
+      />
 
       <section
         class="border-border-default rounded-surface @container/usage-trends overflow-hidden border"
@@ -107,7 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSwitch
                   v-if="canForecast && measure === 'cost'"
                   v-model="showForecast"
-                  size="sm"
                   :label="t('billing.usageV2.forecast')"
                   data-test="billings-usagetrends-forecast-toggle"
                 />
@@ -117,10 +108,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="billings-usagetrends-measure"
                   @update:model-value="onMeasureChange"
                 >
-                  <OToggleGroupItem value="cost" size="sm">
+                  <OToggleGroupItem value="cost">
                     {{ t("billing.usageV2.measureCost") }}
                   </OToggleGroupItem>
-                  <OToggleGroupItem value="volume" size="sm">
+                  <OToggleGroupItem value="volume">
                     {{ t("billing.usageV2.measureVolume") }}
                   </OToggleGroupItem>
                 </OToggleGroup>
@@ -128,9 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </UsagePaneHeader>
             <OEmptyState
               v-if="streamMissing"
-              size="inline"
               :title="t('billing.usageTrends.waitingTitle')"
-              :description="t('billing.usageTrends.waitingForData')"
+              :text="t('billing.usageTrends.waitingForData')"
               data-test="billings-usagetrends-empty"
             />
             <div v-else class="relative h-90 w-full p-2">
@@ -158,7 +148,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               row-key="key"
               pagination="none"
               sorting="none"
-              :show-global-filter="false"
               :loading="waitingForFirstChunk"
               :streaming="loading && rows.length > 0"
               :error="loadError ? t('billing.usageV2.trendsLoadFailed') : null"
@@ -179,13 +168,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #cell-cost="{ row }">
                 <div class="flex w-full min-w-28 flex-col gap-1">
                   <span class="font-semibold">{{ formatCost(row.cost, precise) }}</span>
-                  <OProgressBar :value="row.share" :color="meterColorFor(row.key)" />
+                  <OProgressBar :value="row.share * 100" />
                 </div>
               </template>
               <template #error>
-                <span class="text-text-secondary p-4 text-sm">
-                  {{ t("billing.usageV2.trendsLoadFailed") }}
-                </span>
+                <OEmptyState
+                  kind="error"
+                  :text="t('billing.usageV2.trendsLoadFailed')"
+                  data-test="billings-usagetrends-meters-error"
+                  @action="loadCosts"
+                />
               </template>
             </OTable>
           </aside>
@@ -219,13 +211,13 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { formatSizeFromMB } from "@/utils/formatters";
-import UsageKpiCard from "./UsageKpiCard.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import { usageKpiStats } from "./usageKpiStats";
 import UsagePaneHeader from "./UsagePaneHeader.vue";
 import UsageChartSkeleton from "./UsageChartSkeleton.vue";
 import {
@@ -661,6 +653,8 @@ const kpiCards = computed(() => {
     ];
   return cards;
 });
+
+const kpiStats = computed(() => usageKpiStats(kpiCards.value, "billings-usagetrends-kpi"));
 
 // ── Chart ────────────────────────────────────────────────────────
 

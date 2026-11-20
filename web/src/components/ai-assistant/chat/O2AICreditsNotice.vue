@@ -46,7 +46,7 @@
     <OButton
       v-if="!usage!.requires_additional_credits"
       :variant="exhausted ? 'primary' : 'ghost'"
-      size="xs"
+      size="sm"
       data-test="o2-ai-credits-plans"
       @click="openPlans"
     >
@@ -55,7 +55,7 @@
     <OButton
       v-if="exhausted && usage!.requires_additional_credits"
       variant="primary"
-      size="xs"
+      size="sm"
       data-test="o2-ai-credits-contact"
       @click="contactSales"
     >
@@ -63,8 +63,8 @@
     </OButton>
     <OButton
       v-if="exhausted"
-      variant="outline"
-      size="xs"
+      variant="secondary"
+      size="sm"
       data-test="o2-ai-credits-recheck"
       @click="refresh"
     >

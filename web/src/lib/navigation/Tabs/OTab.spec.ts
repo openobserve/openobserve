@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { defineComponent, provide, computed } from "vue";
+import { defineComponent, provide, computed, reactive } from "vue";
+import { routeLocationKey, routerKey } from "vue-router";
 import { TabsRoot, TabsList } from "reka-ui";
 import OTab from "./OTab.vue";
 import { TABS_CONTEXT_KEY } from "./OTabs.types";
@@ -11,7 +12,7 @@ import type { TabsContext } from "./OTabs.types";
 /**
  * Mount OTab inside the required TabsRoot > TabsList ancestor chain that
  * TabsTrigger (used internally) needs for its context injection.
- * The TABS_CONTEXT_KEY context is also provided so OTab's isDense /
+ * The TABS_CONTEXT_KEY context is also provided so OTab's isCompact /
  * isVertical / isActive computed properties work correctly.
  */
 function mountTab(
@@ -19,14 +20,17 @@ function mountTab(
     name?: string | number;
     label?: string;
     icon?: string;
-    disable?: boolean;
+    disabled?: boolean;
     activeTab?: string | number;
     isVertical?: boolean;
-    dense?: boolean;
+    size?: "page" | "compact";
     reorderable?: boolean;
     disableDrag?: boolean;
-    suffixIcon?: string;
-    suffixLabel?: string;
+    locked?: boolean;
+    lockedLabel?: string;
+    count?: number | null;
+    countTone?: "default" | "error";
+    dirty?: boolean;
     tooltip?: string;
     slots?: Record<string, string>;
   } = {},
@@ -35,14 +39,17 @@ function mountTab(
     name = "tab1",
     label,
     icon,
-    disable = false,
+    disabled = false,
     activeTab = "tab1",
     isVertical = false,
-    dense = false,
+    size = "page",
     reorderable = false,
     disableDrag = false,
-    suffixIcon,
-    suffixLabel,
+    locked,
+    lockedLabel,
+    count,
+    countTone,
+    dirty,
     tooltip,
     slots = {},
   } = options;
@@ -56,8 +63,9 @@ function mountTab(
         computed<TabsContext>(() => ({
           modelValue: activeTab,
           isVertical,
-          dense,
+          size,
           reorderable,
+          collapseLabels: false,
           draggingName: null,
           dropTargetName: null,
           dropBefore: true,
@@ -65,7 +73,19 @@ function mountTab(
         })),
       );
       return {
-        tabProps: { name, label, icon, disable, disableDrag, suffixIcon, suffixLabel, tooltip },
+        tabProps: {
+          name,
+          label,
+          icon,
+          disabled,
+          disableDrag,
+          locked,
+          lockedLabel,
+          count,
+          countTone,
+          dirty,
+          tooltip,
+        },
         modelValue: activeTab,
         orientation: isVertical ? "vertical" : "horizontal",
       };
@@ -119,15 +139,15 @@ describe("OTab", () => {
   });
 
   it("keeps the active styling on a disabled active tab, and the disabled one elsewhere", () => {
-    const active = mountTab({ name: "tab1", activeTab: "tab1", disable: true });
-    expect(active.find('[role="tab"]').classes()).toContain("text-tabs-active-text");
+    const active = mountTab({ name: "tab1", activeTab: "tab1", disabled: true });
+    expect(active.find('[role="tab"]').classes()).toContain("text-text-heading");
     expect(active.find('[role="tab"]').classes()).not.toContain("text-tabs-disabled-text");
-    const inactive = mountTab({ name: "tab2", activeTab: "tab1", disable: true });
+    const inactive = mountTab({ name: "tab2", activeTab: "tab1", disabled: true });
     expect(inactive.find('[role="tab"]').classes()).toContain("text-tabs-disabled-text");
   });
 
-  it("sets aria-disabled when disable is true", () => {
-    const wrapper = mountTab({ disable: true });
+  it("sets aria-disabled when disabled is true", () => {
+    const wrapper = mountTab({ disabled: true });
     expect(wrapper.find('[role="tab"]').attributes("aria-disabled")).toBe("true");
   });
 
@@ -154,26 +174,99 @@ describe("OTab", () => {
 
   // --- Lock suffix ---
 
-  it("paints a lock suffix with the locked-icon token", () => {
-    const wrapper = mountTab({ label: "Alerts", suffixIcon: "lock" });
+  it("paints a lock glyph with the locked-icon token when locked", () => {
+    const wrapper = mountTab({ label: "Alerts", locked: true });
     expect(wrapper.find(".lock-chip").exists()).toBe(true);
   });
 
-  it("does not paint other suffix icons", () => {
-    const wrapper = mountTab({ label: "Alerts", suffixIcon: "add" });
+  it("paints no lock glyph by default", () => {
+    const wrapper = mountTab({ label: "Alerts" });
     expect(wrapper.find(".lock-chip").exists()).toBe(false);
   });
 
-  it("gives a lock suffix screen-reader text from suffixLabel, else the tooltip", () => {
+  it("gives the lock screen-reader text from lockedLabel, else the tooltip", () => {
     const explicit = mountTab({
       label: "Alerts",
-      suffixIcon: "lock",
-      suffixLabel: "Locked: needs Alerts",
+      locked: true,
+      lockedLabel: "Locked: needs Alerts",
       tooltip: "tip",
     });
     expect(explicit.get(".sr-only").text()).toBe("Locked: needs Alerts");
-    const fallback = mountTab({ label: "Alerts", suffixIcon: "lock", tooltip: "Locked: needs X" });
+    const fallback = mountTab({ label: "Alerts", locked: true, tooltip: "Locked: needs X" });
     expect(fallback.get(".sr-only").text()).toBe("Locked: needs X");
+  });
+
+  // --- One weight, sizes ---
+
+  it("uses one font weight whether active or not, horizontal and vertical", () => {
+    for (const isVertical of [false, true]) {
+      const active = mountTab({ name: "tab1", activeTab: "tab1", isVertical, label: "A" });
+      const idle = mountTab({ name: "tab2", activeTab: "tab1", isVertical, label: "B" });
+      for (const w of [active, idle]) {
+        const classes = w.find('[role="tab"]').classes();
+        expect(classes).toContain("font-medium");
+        expect(classes).toContain("text-compact");
+        expect(classes).not.toContain("font-normal");
+      }
+    }
+  });
+
+  it("is 40 high on a page strip and 32 high on a compact one", () => {
+    expect(mountTab({ size: "page" }).find('[role="tab"]').classes()).toContain("h-tabs-height");
+    expect(mountTab({ size: "compact" }).find('[role="tab"]').classes()).toContain("h-control-md");
+  });
+
+  it("sizes a vertical tab from the control tokens", () => {
+    const page = mountTab({ isVertical: true });
+    expect(page.find('[role="tab"]').classes()).toContain("min-h-control-md");
+    const compact = mountTab({ isVertical: true, size: "compact" });
+    expect(compact.find('[role="tab"]').classes()).toContain("min-h-control-sm");
+  });
+
+  // --- Count, dirty ---
+
+  it("renders a centred tabular count that reserves two digits", () => {
+    const wrapper = mountTab({ label: "Runs", count: 3 });
+    const chip = wrapper.get('[data-test="o-tab-count"]');
+    expect(chip.text()).toBe("3");
+    expect(chip.classes()).toEqual(
+      expect.arrayContaining(["tabular-nums", "justify-center", "min-w-[calc(2ch+0.5rem)]"]),
+    );
+  });
+
+  it("keeps the count neutral unless the caller passes a tone", () => {
+    const chip = mountTab({ label: "Runs", count: 3 }).get('[data-test="o-tab-count"]');
+    expect(chip.classes()).toContain("bg-surface-subtle");
+    expect(chip.classes()).not.toContain("bg-badge-error-soft-bg");
+  });
+
+  it("caps the count at 999+", () => {
+    const wrapper = mountTab({ label: "Runs", count: 12345 });
+    expect(wrapper.get('[data-test="o-tab-count"]').text()).toBe("999+");
+  });
+
+  it("reserves the count's place while it loads (null)", () => {
+    const wrapper = mountTab({ label: "Runs", count: null });
+    const chip = wrapper.get('[data-test="o-tab-count"]');
+    expect(chip.text()).toBe("");
+    expect(chip.classes()).toContain("invisible");
+  });
+
+  it("renders no count chip when count is not set", () => {
+    const wrapper = mountTab({ label: "Runs" });
+    expect(wrapper.find('[data-test="o-tab-count"]').exists()).toBe(false);
+  });
+
+  it("tints the count for an error tone", () => {
+    const wrapper = mountTab({ label: "Firing", count: 2, countTone: "error" });
+    expect(wrapper.get('[data-test="o-tab-count"]').classes()).toContain("bg-badge-error-soft-bg");
+  });
+
+  it("shows the unsaved dot when dirty", () => {
+    const dirty = mountTab({ label: "Settings", dirty: true });
+    expect(dirty.find('[data-test="o-tab-dirty"]').exists()).toBe(true);
+    const clean = mountTab({ label: "Settings" });
+    expect(clean.find('[data-test="o-tab-dirty"]').exists()).toBe(false);
   });
 
   // --- Default slot (custom content) ---
@@ -223,8 +316,8 @@ describe("OTab", () => {
     expect(wrapper.find('[role="tab"]').element.tagName).toBe("BUTTON");
   });
 
-  it("is disabled when disable is true", () => {
-    const wrapper = mountTab({ disable: true });
+  it("is disabled when disabled is true", () => {
+    const wrapper = mountTab({ disabled: true });
     expect(wrapper.find('[role="tab"]').attributes("disabled")).toBeDefined();
   });
 
@@ -270,7 +363,7 @@ describe("OTab", () => {
   });
 
   it("keeps the focus outline classes on disabled and active tabs", () => {
-    for (const opts of [{ disable: true }, { name: "tab1", activeTab: "tab1" }]) {
+    for (const opts of [{ disabled: true }, { name: "tab1", activeTab: "tab1" }]) {
       const classes = mountTab(opts).find('[role="tab"]').classes();
       expect(classes).toContain("focus-visible:outline-2");
       expect(classes).toContain("focus-visible:outline-focus-ring-accent");
@@ -285,12 +378,13 @@ describe("OTab", () => {
       expect(wrapper.find("[data-otab-grip]").exists()).toBe(false);
     });
 
-    it("should render a hover-revealed grip inside the left gutter when reorderable", () => {
+    it("should render a grip, hidden at rest, that hover or keyboard focus reveals", () => {
       const wrapper = mountTab({ reorderable: true });
       const grip = wrapper.find("[data-otab-grip]");
       expect(grip.exists()).toBe(true);
       expect(grip.classes()).toContain("opacity-0");
       expect(grip.classes()).toContain("group-hover/otab:opacity-50");
+      expect(grip.classes()).toContain("group-focus-visible/otab:opacity-50");
       // The gutter is padding on the tab, not flow width from the grip.
       expect(wrapper.find('[role="tab"]').classes()).toContain("ps-3");
       expect(grip.classes()).toContain("absolute");
@@ -336,8 +430,57 @@ describe("OTab", () => {
     });
 
     it("should not render a grip on a disabled tab", () => {
-      const wrapper = mountTab({ reorderable: true, disable: true });
+      const wrapper = mountTab({ reorderable: true, disabled: true });
       expect(wrapper.find("[data-otab-grip]").exists()).toBe(false);
+    });
+  });
+
+  // --- Route tab ---
+
+  describe("route tab (to)", () => {
+    function mountRouteTab(routeName: string, onTabClick = vi.fn()) {
+      const push = vi.fn();
+      const route = reactive({ name: routeName });
+      const Wrapper = defineComponent({
+        components: { TabsRoot, TabsList, OTab },
+        setup() {
+          provide(
+            TABS_CONTEXT_KEY,
+            computed<TabsContext>(() => ({
+              modelValue: "other",
+              isVertical: false,
+              size: "page",
+              reorderable: false,
+              collapseLabels: false,
+              draggingName: null,
+              dropTargetName: null,
+              dropBefore: true,
+              onTabClick,
+            })),
+          );
+          provide(routerKey, { push } as never);
+          provide(routeLocationKey, route as never);
+        },
+        template: `
+          <TabsRoot model-value="other">
+            <TabsList>
+              <OTab name="alerts" label="Alerts" :to="{ name: 'alerts' }" data-test="route-tab" />
+            </TabsList>
+          </TabsRoot>
+        `,
+      });
+      return { wrapper: mount(Wrapper, { attachTo: document.body }), push, onTabClick, route };
+    }
+
+    it("navigates to its route on click", async () => {
+      const { wrapper, push } = mountRouteTab("home");
+      await wrapper.get('[data-test="route-tab"]').trigger("click");
+      expect(push).toHaveBeenCalledWith({ name: "alerts" });
+    });
+
+    it("selects itself while the route name equals its name", () => {
+      const { onTabClick } = mountRouteTab("alerts");
+      expect(onTabClick).toHaveBeenCalledWith("alerts");
     });
   });
 });

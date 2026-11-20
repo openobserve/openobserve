@@ -3,14 +3,14 @@
   <div>
     <LicensePeriod @renew="redirectToGetLicense()"></LicensePeriod>
 
-    <div v-if="loading" class="flex flex-col items-center justify-center p-3">
-      <OSpinner size="md" />
-      <div class="mt-3">{{ t("about.loading_license_info") }}</div>
+    <div v-if="loading" class="flex flex-col gap-4 pb-4">
+      <OSkeleton shape="block" class="h-36" />
+      <OSkeleton shape="block" class="h-48" />
     </div>
     <div v-else class="grid grid-cols-1 items-start gap-4 pb-4">
       <div class="col-span-1 min-h-0">
         <div v-if="licenseData.license === null || !licenseData.license">
-          <OFormSection variant="plain" class="mb-4" :title="t('about.no_license_found')">
+          <OFormSection variant="plain" class="mb-6" :title="t('about.no_license_found')">
             <div class="pb-2">
               <div class="text-sm">
                 {{ t("about.installation_id") }}:
@@ -22,8 +22,7 @@
               ></div>
               <OButton
                 data-test="no-license-get-license-btn"
-                variant="outline"
-                size="sm-action"
+                variant="secondary"
                 class="mt-3"
                 @click="redirectToGetLicense()"
               >
@@ -43,26 +42,23 @@
                   :placeholder="t('about.paste_license_placeholder')"
                   class="min-h-50"
                 />
-                <OBanner
+                <OInlineNotice
                   v-if="isLicenseKeyAutoFilled"
-                  variant="success"
-                  icon="check-circle"
+                  tone="ok"
                   class="mt-2 mb-3"
-                  :content="t('about.license_auto_filled')"
+                  :message="t('about.license_auto_filled')"
                 />
                 <LicenseKeyCheck :result="result" :refusal="refusal" />
-                <OBanner
+                <OInlineNotice
                   v-if="checkError"
-                  variant="error-soft"
-                  icon="cancel"
+                  tone="err"
                   class="my-3"
                   data-test="license-key-check-error"
-                  >{{ t("about.key_check_failed", { message: checkError }) }}</OBanner
+                  >{{ t("about.key_check_failed", { message: checkError }) }}</OInlineNotice
                 >
                 <OButton
                   data-test="check-no-license-btn"
-                  variant="outline"
-                  size="sm-action"
+                  variant="secondary"
                   class="me-2 mt-2"
                   :loading="checking"
                   :disabled="isSubmitting || updating"
@@ -71,8 +67,7 @@
                 >
                 <OButton
                   data-test="no-license-update-btn"
-                  :variant="noLicenseKey.trim() ? 'primary' : 'outline'"
-                  size="sm-action"
+                  :variant="noLicenseKey.trim() ? 'primary' : 'secondary'"
                   class="mt-2"
                   type="submit"
                   :loading="isSubmitting"
@@ -109,11 +104,10 @@
             @add-license-key="showUpdateFormAndFocus"
             @refreshed="reloadLicenseData"
           />
-          <OFormSection variant="plain" class="mb-4" :title="t('about.license_info')">
+          <OFormSection variant="plain" class="mb-6" :title="t('about.license_info')">
             <template v-if="licenseData.can_update_license" #actions>
               <OButton
-                variant="outline"
-                size="sm-action"
+                variant="secondary"
                 @click="redirectToGetLicense()"
                 data-test="request-new-license-btn"
               >
@@ -122,8 +116,7 @@
               <OButton
                 v-if="!licenseData.refresh && licenseData.can_update_license === true"
                 data-test="refresh-license-limits-btn"
-                variant="outline"
-                size="sm-action"
+                variant="secondary"
                 :loading="refreshingLimits"
                 @click="refreshLimitsOnOldNode"
               >
@@ -131,8 +124,7 @@
               </OButton>
               <OButton
                 data-test="add-license-key-btn"
-                :variant="showUpdateForm ? 'outline' : 'primary'"
-                size="sm-action"
+                :variant="showUpdateForm ? 'secondary' : 'primary'"
                 @click="showUpdateFormAndFocus"
               >
                 {{ t("about.add_new_license_key") }}
@@ -145,7 +137,7 @@
               <span class="text-sm break-all">{{ licenseData.license.license_id }}</span>
             </OSettingRow>
             <OSettingRow control-at="end" :label="t('about.status_lbl')">
-              <OBadge :variant="licenseData?.expired ? 'error' : 'success'">
+              <OBadge :tone="licenseData?.expired ? 'err' : 'ok'">
                 {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
               </OBadge>
             </OSettingRow>
@@ -162,9 +154,10 @@
               <div class="flex min-w-0 flex-wrap items-center gap-2">
                 <span class="min-w-0 text-sm break-all">{{ getMaskedLicenseKey() }}</span>
                 <OButton
+                  icon-only
                   :aria-label="t('common.reveal')"
                   variant="ghost"
-                  size="icon"
+                  size="xs"
                   class="shrink-0"
                   data-test="show-license-key-btn"
                   @click="showLicenseKeyModal = true"
@@ -218,7 +211,7 @@
           <OFormSection
             v-show="showUpdateForm"
             variant="plain"
-            class="mt-4"
+            class="mt-6"
             :title="t('about.update_license_key')"
           >
             <div class="pt-2 pb-2">
@@ -231,27 +224,24 @@
                   :placeholder="t('about.paste_new_license_placeholder')"
                   class="min-h-37.5"
                 />
-                <OBanner
+                <OInlineNotice
                   v-if="isLicenseKeyAutoFilled"
-                  variant="success"
-                  icon="check-circle"
+                  tone="ok"
                   class="mt-2 mb-3"
-                  :content="t('about.license_auto_filled')"
+                  :message="t('about.license_auto_filled')"
                 />
                 <LicenseKeyCheck :result="result" :refusal="refusal" />
-                <OBanner
+                <OInlineNotice
                   v-if="checkError"
-                  variant="error-soft"
-                  icon="cancel"
+                  tone="err"
                   class="my-3"
                   data-test="license-key-check-error"
-                  >{{ t("about.key_check_failed", { message: checkError }) }}</OBanner
+                  >{{ t("about.key_check_failed", { message: checkError }) }}</OInlineNotice
                 >
                 <div class="flex flex-wrap gap-2">
                   <OButton
                     data-test="cancel-update-license-btn"
-                    variant="outline"
-                    size="sm-action"
+                    variant="secondary"
                     type="button"
                     :disabled="isSubmitting"
                     @click="
@@ -263,8 +253,7 @@
                   </OButton>
                   <OButton
                     data-test="check-update-license-btn"
-                    variant="outline"
-                    size="sm-action"
+                    variant="secondary"
                     :loading="checking"
                     :disabled="isSubmitting || updating"
                     @click="checkLicense(true)"
@@ -272,8 +261,7 @@
                   >
                   <OButton
                     data-test="confirm-update-license-btn"
-                    :variant="updateLicenseKey.trim() ? 'primary' : 'outline'"
-                    size="sm-action"
+                    :variant="updateLicenseKey.trim() ? 'primary' : 'secondary'"
                     type="submit"
                     :loading="isSubmitting"
                     :disabled="checking || updating"
@@ -417,7 +405,7 @@
                 <div
                   v-if="isIngestionUnlimited"
                   class="text-text-secondary mt-1 text-center text-xs"
-                  style="font-size: var(--text-3xs)"
+                  style="font-size: var(--text-2xs)"
                 >
                   {{ t("about.usage_shows_zero_unlimited") }}
                 </div>
@@ -432,12 +420,10 @@
     <ODialog
       data-test="license-key-modal-dialog"
       v-model:open="showLicenseKeyModal"
-      persistent
       size="md"
       :title="t('about.license_key')"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-label="t('about.copy_key')"
-      :primary-button-disabled="!licenseData.key"
+      :secondary="{ label: t('common.cancel') }"
+      :primary="{ label: t('about.copy_key'), disabled: !licenseData.key }"
       @click:secondary="showLicenseKeyModal = false"
       @click:primary="copyLicenseKey"
     >
@@ -467,7 +453,7 @@ import {
   type KeyCheckResult,
   type RevRefusal,
 } from "@/utils/licenseWaivers";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import LicenseKeyCheck from "./LicenseKeyCheck.vue";
 import {
   licenseQuery,
@@ -495,7 +481,7 @@ import LicenseFeatures from "./LicenseFeatures.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -531,11 +517,11 @@ export default defineComponent({
     LicenseWaiversCard,
     LicenseFeatures,
     LicenseKeyCheck,
-    OBanner,
+    OInlineNotice,
     RenderDashboardCharts,
     OButton,
     ODialog,
-    OSpinner,
+    OSkeleton,
     OIcon,
     OBadge,
     OTextarea,
@@ -783,8 +769,7 @@ export default defineComponent({
             linesDataTest: "license-key-losses",
             confirmLabel: t("about.yes_update_license"),
             cancelLabel: t("about.no_keep_current"),
-            confirmVariant: "destructive",
-            focusCancel: true,
+            kind: "destructive",
           }))
         ) {
           return;

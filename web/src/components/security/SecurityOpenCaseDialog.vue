@@ -106,10 +106,10 @@ async function onSubmit(value: OpenCaseValues) {
     size="md"
     :title="t('siem.drawer.openCaseDialog.title')"
     :form-id="FORM_ID"
-    :primary-button-label="
-      joining ? t('siem.drawer.openCaseDialog.addToExisting') : t('siem.drawer.openCase')
-    "
-    :secondary-button-label="t('siem.detections.cancel')"
+    :primary="{
+      label: joining ? t('siem.drawer.openCaseDialog.addToExisting') : t('siem.drawer.openCase'),
+    }"
+    :secondary="{ label: t('siem.detections.cancel') }"
     data-test="security-open-case-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
@@ -136,7 +136,7 @@ async function onSubmit(value: OpenCaseValues) {
           <template #label>
             <span class="flex min-w-0 flex-col gap-1">
               <span class="flex min-w-0 items-center gap-2">
-                <OTag type="severity" :value="c.severity.toLowerCase()" size="xs" />
+                <OTag type="severity" :value="c.severity.toLowerCase()" size="sm" />
                 <span class="text-text-heading min-w-0 font-medium break-words">{{
                   t("siem.drawer.openCaseDialog.addTo", {
                     title: raw(c.title || t("siem.overview.untitledCase")),

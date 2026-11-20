@@ -23,16 +23,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         : t('telephony.updateTitle', { provider: PROVIDER })
     "
     :form-id="FORM_ID"
-    :primary-button-label="primaryLabel"
-    :secondary-button-label="t('common.cancel')"
+    :primary="{ label: primaryLabel }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="telephony-account-dialog"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
   >
     <OForm :id="FORM_ID" :form="form" class="flex flex-col gap-5">
-      <OBanner v-if="refusal" variant="error" data-test="telephony-account-dialog-refusal">
+      <OInlineNotice v-if="refusal" tone="err" data-test="telephony-account-dialog-refusal">
         {{ refusal }}
-      </OBanner>
+      </OInlineNotice>
       <OFormInput
         name="account_sid"
         :label="t('telephony.accountSid')"
@@ -69,7 +69,7 @@ import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useMutation } from "@tanstack/vue-query";
 
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";

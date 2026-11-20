@@ -16,38 +16,33 @@
   <OForm :form="form" class="h-full w-full" v-slot="{ isSubmitting }">
     <OPageLayout
       :back="{
-        label: t('aiObservability.remoteTasks.form.backTo'),
+        label: t('aiObservability.nav.experiments'),
         onClick: cancel,
         dataTest: 'ai-remote-task-form-back-btn',
       }"
-      title-overflow="visible"
+      :title="pageTitle"
+      title-data-test="ai-remote-task-form-title"
       bleed
     >
-      <template #title>
-        <span data-test="ai-remote-task-form-title">{{ pageTitle }}</span>
-      </template>
-
       <div
         class="grid min-h-0 flex-1 grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.9fr)] gap-0 overflow-hidden max-[68.75rem]:grid-cols-1"
       >
-        <div class="flex min-h-0 min-w-0 flex-col gap-2 overflow-auto p-2">
+        <div class="px-page-edge flex min-h-0 min-w-0 flex-col gap-3 overflow-auto py-3">
           <!-- Identity -->
           <section
             class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
             data-test="ai-remote-task-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.identitySection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="flex flex-col gap-4 px-4 py-3.5">
               <OFormInput
                 name="name"
                 :label="t('aiObservability.remoteTasks.form.nameLabel')"
                 :placeholder="t('aiObservability.remoteTasks.form.namePlaceholder')"
-                size="sm"
                 required
                 data-test="ai-remote-task-form-name-input"
               />
@@ -55,7 +50,6 @@
                 name="description"
                 :label="t('aiObservability.remoteTasks.form.descriptionLabel')"
                 :placeholder="t('aiObservability.remoteTasks.form.descriptionPlaceholder')"
-                size="sm"
                 :rows="2"
                 data-test="ai-remote-task-form-description-input"
               />
@@ -68,7 +62,6 @@
             data-test="ai-remote-task-form-endpoint-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.endpointSection") }}
               </span>
@@ -92,7 +85,6 @@
                   :label="t('aiObservability.remoteTasks.form.endpointLabel')"
                   :placeholder="t('aiObservability.remoteTasks.form.endpointPlaceholder')"
                   :help-text="endpointHelp"
-                  size="sm"
                   required
                   data-test="ai-remote-task-form-endpoint-input"
                 />
@@ -106,12 +98,11 @@
             data-test="ai-remote-task-form-auth-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.authSection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="flex flex-col gap-4 px-4 py-3.5">
               <OFormSelect
                 name="authType"
                 :label="t('aiObservability.remoteTasks.form.authTypeLabel')"
@@ -126,7 +117,6 @@
                 name="authHeaderName"
                 :label="t('aiObservability.remoteTasks.form.headerNameLabel')"
                 :placeholder="t('aiObservability.remoteTasks.form.headerNamePlaceholder')"
-                size="sm"
                 :disabled="mode === 'edit'"
                 :required="mode === 'create'"
                 data-test="ai-remote-task-form-auth-header-input"
@@ -136,10 +126,8 @@
                 v-if="authType === 'bearer' || authType === 'api_key_header'"
                 name="token"
                 type="password"
-                revealable
                 :label="t('aiObservability.remoteTasks.form.tokenLabel')"
                 :placeholder="t('aiObservability.remoteTasks.form.tokenPlaceholder')"
-                size="sm"
                 :disabled="mode === 'edit'"
                 :required="mode === 'create'"
                 data-test="ai-remote-task-form-token-input"
@@ -152,7 +140,6 @@
                   <OFormInput
                     name="username"
                     :label="t('aiObservability.remoteTasks.form.usernameLabel')"
-                    size="sm"
                     :disabled="mode === 'edit'"
                     :required="mode === 'create'"
                     data-test="ai-remote-task-form-username-input"
@@ -162,9 +149,7 @@
                   <OFormInput
                     name="password"
                     type="password"
-                    revealable
                     :label="t('aiObservability.remoteTasks.form.passwordLabel')"
-                    size="sm"
                     :disabled="mode === 'edit'"
                     :required="mode === 'create'"
                     data-test="ai-remote-task-form-password-input"
@@ -180,7 +165,6 @@
             data-test="ai-remote-task-form-contract-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.contractSection") }}
               </span>
@@ -200,7 +184,6 @@
                     <OFormInput
                       :name="`headers[${index}].key`"
                       :placeholder="t('aiObservability.remoteTasks.form.headerKeyPlaceholder')"
-                      size="sm"
                       :disabled="Boolean(header.usesSecret)"
                       :data-test="`ai-remote-task-form-header-key-${index}`"
                     />
@@ -213,15 +196,14 @@
                           ? raw('••••••••')
                           : t('aiObservability.remoteTasks.form.headerValuePlaceholder')
                       "
-                      size="sm"
                       :disabled="Boolean(header.usesSecret)"
                       :data-test="`ai-remote-task-form-header-value-${index}`"
                     />
                   </div>
                   <OButton
-                    variant="ghost-destructive"
-                    size="icon-sm"
-                    icon-left="delete"
+                    icon-only
+                    variant="danger-ghost"
+                    icon="delete"
                     :aria-label="t('aiObservability.remoteTasks.form.removeHeader')"
                     :disabled="Boolean(header.usesSecret)"
                     :data-test="`ai-remote-task-form-header-remove-${index}`"
@@ -229,9 +211,7 @@
                   />
                 </div>
                 <OButton
-                  variant="outline"
-                  size="sm"
-                  icon-left="add"
+                  variant="secondary"
                   class="self-start"
                   data-test="ai-remote-task-form-header-add"
                   @click="addHeader"
@@ -247,7 +227,6 @@
                     :label="t('aiObservability.remoteTasks.form.templateLabel')"
                     :placeholder="raw(DEFAULT_REQUEST_TEMPLATE)"
                     :help-text="t('aiObservability.remoteTasks.form.templateHelp')"
-                    size="sm"
                     :rows="4"
                     data-test="ai-remote-task-form-template-input"
                   />
@@ -259,8 +238,8 @@
                   <OButton
                     v-for="placeholder in TEMPLATE_PLACEHOLDERS"
                     :key="placeholder"
-                    variant="outline"
-                    size="xs"
+                    variant="secondary"
+                    size="sm"
                     class="font-mono"
                     :data-test="`ai-remote-task-form-placeholder-${placeholder}`"
                     @click="appendPlaceholder(placeholder)"
@@ -274,7 +253,6 @@
                 name="responseSchema"
                 :label="t('aiObservability.remoteTasks.form.responsePathLabel')"
                 :help-text="t('aiObservability.remoteTasks.form.responsePathHelp')"
-                size="sm"
                 required
                 data-test="ai-remote-task-form-response-path-input"
               />
@@ -290,7 +268,6 @@
               class="border-border-default flex items-center justify-between border-b px-3 py-2.5"
             >
               <div class="flex items-center">
-                <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
                 <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                   {{ t("aiObservability.remoteTasks.form.limitsSection") }}
                 </span>
@@ -307,7 +284,6 @@
                   :label="t('aiObservability.remoteTasks.form.timeoutLabel')"
                   :min="TIMEOUT_SECONDS_MIN"
                   :max="TIMEOUT_SECONDS_MAX"
-                  size="sm"
                   data-test="ai-remote-task-form-timeout-input"
                 />
               </div>
@@ -318,7 +294,6 @@
                   :label="t('aiObservability.remoteTasks.form.attemptsLabel')"
                   :min="ATTEMPTS_MIN"
                   :max="ATTEMPTS_MAX"
-                  size="sm"
                   data-test="ai-remote-task-form-attempts-input"
                 />
               </div>
@@ -329,7 +304,6 @@
                   :label="t('aiObservability.remoteTasks.form.concurrencyLabel')"
                   :min="CONCURRENCY_MIN"
                   :max="CONCURRENCY_MAX"
-                  size="sm"
                   data-test="ai-remote-task-form-concurrency-input"
                 />
               </div>
@@ -342,12 +316,11 @@
             data-test="ai-remote-task-form-signing-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.signingSection") }}
               </span>
             </div>
-            <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="flex flex-col gap-4 px-4 py-3.5">
               <OFormSwitch
                 name="signingEnabled"
                 :label="t('aiObservability.remoteTasks.form.signingToggle')"
@@ -371,9 +344,9 @@
                       >{{ signingKey }}</code
                     >
                     <OButton
-                      variant="outline"
-                      size="icon-sm"
-                      :icon-left="signingKeyCopied ? 'check' : 'content-copy'"
+                      icon-only
+                      variant="secondary"
+                      :icon="signingKeyCopied ? 'check' : 'content-copy'"
                       :aria-label="t('aiObservability.remoteTasks.generatedSigning.copy')"
                       data-test="ai-remote-task-form-signing-key-copy"
                       @click="copySigningKey"
@@ -388,9 +361,9 @@
                       />
                     </OButton>
                     <OButton
-                      variant="outline"
-                      size="icon-sm"
-                      icon-left="autorenew"
+                      icon-only
+                      variant="secondary"
+                      icon="autorenew"
                       :aria-label="t('aiObservability.remoteTasks.form.regenerateKey')"
                       data-test="ai-remote-task-form-signing-key-regenerate"
                       @click="regenerateSigningKey"
@@ -405,15 +378,14 @@
                     {{ t("aiObservability.remoteTasks.form.signingKeyOnce") }}
                     <code class="text-text-body font-mono">{{ headerShape }}</code>
                   </span>
-                  <OBanner
+                  <OInlineNotice
                     v-if="signingKeyRegenerated"
-                    variant="warning"
-                    dense
+                    tone="warn"
                     icon="key"
                     data-test="ai-remote-task-form-signing-key-regenerated"
                   >
                     {{ t("aiObservability.remoteTasks.form.signingKeyRegenerated") }}
-                  </OBanner>
+                  </OInlineNotice>
                 </div>
               </template>
             </div>
@@ -444,8 +416,7 @@
       >
         <OButton
           type="button"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="isSubmitting"
           data-test="ai-remote-task-form-cancel-btn"
           @click="cancel"
@@ -455,8 +426,7 @@
         <OButton
           v-if="mode === 'create'"
           type="submit"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :loading="isSubmitting && submitIntent === 'draft'"
           :disabled="!canSaveDraft"
           data-test="ai-remote-task-form-draft-btn"
@@ -472,7 +442,6 @@
         <OButton
           type="submit"
           variant="primary"
-          size="sm-action"
           :loading="isSubmitting && submitIntent === 'publish'"
           data-test="ai-remote-task-form-submit-btn"
           @click="submitIntent = 'publish'"
@@ -494,7 +463,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -518,6 +487,7 @@ import remoteTasksService, {
 import RemoteTaskTestPanel from "./RemoteTaskTestPanel.vue";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
 import { useEditorDraft, useEditorDraftIds } from "@/composables/useEditorDraft";
+import useSmartBack from "@/composables/useSmartBack";
 import {
   ATTEMPTS_MAX,
   ATTEMPTS_MIN,
@@ -752,8 +722,10 @@ function goBack() {
   void router.push(aiRemoteTasksRoute(orgId.value));
 }
 
+const { goBack: leaveForm } = useSmartBack(() => aiRemoteTasksRoute(orgId.value));
+
 async function cancel() {
-  if (await taskDraft.confirmLeave()) goBack();
+  if (await taskDraft.confirmLeave()) leaveForm();
 }
 
 /**

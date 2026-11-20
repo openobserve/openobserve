@@ -335,7 +335,7 @@ describe("QualityConfigDetail", () => {
     await flushPromises();
     const bar = real.find('[data-test="o2-table-pagination-bottom"]');
     expect(bar.find('[data-test="o2-table-page-size-select"]').exists()).toBe(false);
-    expect(bar.find('[data-test="o2-table-pagination-info"]').text()).toMatch(/1 - 10 .* 114/);
+    expect(bar.find('[data-test="o2-table-pagination-info"]').text()).toBe("1–10 of 114");
     expect(bar.find('[data-test="o2-table-next-page-btn"]').exists()).toBe(true);
   });
 

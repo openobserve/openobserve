@@ -21,8 +21,8 @@
       <OSelect
         :model-value="groupBy"
         :label="t('experimentsAtScale.groupBy')"
-        label-position="inside"
-        width="md"
+        variant="filter"
+        width="m"
         :options="groupByOptions"
         data-test="ai-experiment-group-by"
         @update:model-value="(value: unknown) => (groupBy = parseGroupBy(value))"
@@ -30,8 +30,8 @@
       <OSelect
         :model-value="groupSort"
         :label="t('experimentsAtScale.sort')"
-        label-position="inside"
-        width="md"
+        variant="filter"
+        width="m"
         :options="sortOptions"
         data-test="ai-experiment-sort"
         @update:model-value="(value: unknown) => (groupSort = parseGroupSort(value))"
@@ -48,8 +48,7 @@
         </span>
         <OTooltip :content="comparisonReason" :disabled="comparison.eligible">
           <OButton
-            size="sm"
-            variant="outline"
+            variant="secondary"
             :disabled="!comparison.eligible"
             :aria-description="comparisonReason"
             data-test="ai-experiment-compare"
@@ -59,8 +58,6 @@
           </OButton>
         </OTooltip>
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :last-run-at="lastUpdatedAt"
           :loading="loading"
           data-test="ai-experiment-refresh"
@@ -75,30 +72,26 @@
       data-test="ai-experiment-group-loading"
     >
       <header class="px-table-edge flex items-center gap-2 py-2">
-        <OSkeleton type="text" class="h-4 w-40" />
+        <OSkeleton class="h-4 w-40" />
       </header>
       <OTable
         :data="[]"
         :columns="buildColumns([])"
         loading
         row-key="id"
-        show-index
-        :show-global-filter="false"
         :fill-height="false"
-        :frame="false"
         pagination="none"
         :default-columns="false"
-        width="100%"
         class="w-full"
       />
     </section>
 
-    <div
+    <OEmptyState
       v-else-if="!groups.length"
-      class="border-border-default text-text-secondary rounded-default border border-dashed p-6 text-center"
-    >
-      {{ t("aiObservability.experiments.emptyFiltered") }}
-    </div>
+      kind="filtered"
+      :text="t('aiObservability.experiments.emptyFiltered')"
+      data-test="ai-experiment-empty-filtered"
+    />
 
     <section
       v-for="group in datasetRows"
@@ -108,9 +101,10 @@
     >
       <header class="px-table-edge flex items-center gap-2 py-2">
         <OButton
-          size="icon"
+          icon-only
+          size="xs"
           variant="ghost"
-          :icon-left="isGroupExpanded(group.id) ? 'expand-more' : 'chevron-right'"
+          :icon="isGroupExpanded(group.id) ? 'expand-more' : 'chevron-right'"
           :aria-label="t('aiObservability.experiments.toggleGroup')"
           :data-test="`ai-experiment-group-toggle-${group.datasetId}`"
           @click="toggleGroup(group.id)"
@@ -122,8 +116,7 @@
         <div class="ms-auto flex items-center gap-2">
           <OButton
             v-if="!compact"
-            size="sm"
-            variant="outline"
+            variant="secondary"
             :data-test="`ai-experiment-group-add-${group.datasetId}`"
             @click="$emit('new', group.datasetId)"
           >
@@ -131,8 +124,7 @@
           </OButton>
           <OButton
             v-if="compact"
-            size="sm"
-            variant="outline"
+            variant="secondary"
             @click="$emit('open-filtered', group.datasetId)"
           >
             {{ t("aiObservability.experiments.viewAll") }}
@@ -154,12 +146,9 @@
         :data="group.rows"
         :columns="buildColumns(group.children)"
         :loading="loading"
-        max-height="calc(2.25rem + 5 * var(--table-row-height-normal, 2.75rem))"
+        max-height="calc(2rem + 5 * var(--table-row-height-default, 2.25rem))"
         row-key="id"
-        show-index
-        :show-global-filter="false"
         :fill-height="false"
-        :frame="false"
         pagination="none"
         sorting="client"
         :default-columns="false"
@@ -177,7 +166,6 @@
           groupBy === 'none' ? undefined : (row: LlmExperiment) => ciGroupKey(row, groupBy)
         "
         :section-order="group.sections.map((section) => section.key)"
-        width="100%"
         class="w-full"
         :data-test="`ai-experiment-table-${group.datasetId}`"
         @update:selected-ids="(ids: string[]) => onSelectionChange(ids, group.children)"
@@ -192,10 +180,10 @@
           >
             <span class="text-text-heading font-medium">{{ ciGroupLabel(section) }}</span>
             <span class="text-text-secondary">{{ ciGroupDetail(section) }}</span>
-            <OTag v-if="section.regressed" size="sm" variant="error-soft">
+            <OTag v-if="section.regressed" size="sm" tone="err">
               {{ t("experimentsAtScale.regressedCount", { count: section.regressed }) }}
             </OTag>
-            <OTag v-if="section.improved" size="sm" variant="success-soft">
+            <OTag v-if="section.improved" size="sm" tone="ok">
               {{ t("experimentsAtScale.improvedCount", { count: section.improved }) }}
             </OTag>
           </div>
@@ -209,13 +197,13 @@
             <OTruncatedText class="text-text-heading font-medium">{{
               experiment.name
             }}</OTruncatedText>
-            <OTag v-if="isBaseline(experiment)" size="sm" variant="blue-soft">
+            <OTag v-if="isBaseline(experiment)" size="sm" tone="neutral">
               {{ t("aiObservability.experiments.baseline") }}
             </OTag>
             <OTag
               v-if="earlierRuns.has(experiment.id)"
               size="sm"
-              variant="default-soft"
+              tone="neutral"
               :data-test="`ai-experiment-fold-${experiment.id}`"
             >
               {{ t("experimentsAtScale.foldCount", { count: foldTally(experiment).settled }) }}
@@ -231,7 +219,7 @@
             :data-test="`ai-experiment-outcome-${row.id}`"
           >
             <div class="flex min-w-0 items-center gap-2">
-              <OTag size="sm" :variant="OUTCOME_BADGES[outcomeOf(row)!.outcome]">
+              <OTag size="sm" :tone="OUTCOME_BADGES[outcomeOf(row)!.outcome]">
                 {{ t(`experimentsAtScale.outcome.${outcomeOf(row)!.outcome}`) }}
               </OTag>
               <OTruncatedText
@@ -274,7 +262,7 @@
               <OTag
                 v-if="deltaOf(row, column.key)"
                 size="sm"
-                :variant="OUTCOME_BADGES[deltaOf(row, column.key)!.outcome]"
+                :tone="OUTCOME_BADGES[deltaOf(row, column.key)!.outcome]"
                 :data-test="`ai-experiment-delta-${row.id}-${column.key}`"
               >
                 {{ raw(signedDelta(deltaOf(row, column.key)!)) }}
@@ -322,9 +310,8 @@
           <div class="flex min-w-0 flex-col" :data-test="`ai-experiment-status-${row.id}`">
             <div v-if="row.status === 'running'" class="flex min-w-0 items-center gap-2">
               <OProgressBar
-                size="sm"
                 class="min-w-0 flex-1"
-                :value="progressFraction(row)"
+                :value="progressFraction(row) * 100"
                 :data-test="`ai-experiment-progress-${row.id}`"
               />
               <span class="text-text-secondary shrink-0 text-xs tabular-nums">
@@ -335,7 +322,7 @@
               <div class="flex min-w-0 items-center gap-2">
                 <OTag
                   size="sm"
-                  :variant="statusVariant(row.status, 'eval').variant"
+                  :tone="statusVariant(row.status, 'eval').variant"
                   :data-test="`ai-experiment-status-chip-${row.id}`"
                 >
                   {{ statusVariant(row.status, "eval").label }}
@@ -387,9 +374,9 @@
           <div class="flex items-center">
             <OTooltip :content="baselineBlockedReason(row)" :disabled="canSetBaseline(row)">
               <OButton
-                size="icon-sm"
+                icon-only
                 variant="ghost"
-                :icon-left="isBaseline(row) ? 'keep' : 'keep-outline'"
+                :icon="isBaseline(row) ? 'keep' : 'keep-outline'"
                 :title="
                   isBaseline(row)
                     ? t('aiObservability.experiments.clearBaseline')
@@ -408,9 +395,9 @@
             </OTooltip>
             <!-- A clone draft is keyed by its source run, so its dot sits on the action that reopens it. -->
             <OButton
-              size="icon-sm"
+              icon-only
               variant="ghost"
-              icon-left="content-copy"
+              icon="content-copy"
               :disabled="cloningId === row.id"
               :aria-label="draftActionLabel(row.id, t('aiObservability.experiments.clone'))"
               class="max-md:hidden"
@@ -431,10 +418,11 @@
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  icon-only
                   :aria-label="draftActionLabel(row.id, t('common.moreActions'))"
-                  icon-left="more-vert"
+                  icon="more-vert"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   data-test="ai-experiment-actions-menu-btn"
                   @click.stop
@@ -448,7 +436,7 @@
                 </OButton>
               </template>
               <ODropdownItem
-                :icon-left="isBaseline(row) ? 'keep' : 'keep-outline'"
+                :icon="isBaseline(row) ? 'keep' : 'keep-outline'"
                 class="md:hidden"
                 :disabled="baselineChangingId === row.id || !canSetBaseline(row)"
                 :data-test="`ai-experiment-baseline-${row.id}-menu`"
@@ -461,7 +449,7 @@
                 }}</span>
               </ODropdownItem>
               <ODropdownItem
-                icon-left="content-copy"
+                icon="content-copy"
                 class="md:hidden"
                 :disabled="cloningId === row.id"
                 :data-test="`ai-experiment-clone-${row.id}-menu`"
@@ -493,6 +481,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -526,7 +515,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useDraftLabel } from "@/components/common/drafts/useDraftLabel";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import ExperimentTrendChart from "./ExperimentTrendChart.vue";
 import { experimentScoreSummaryValue } from "@/enterprise/views/AIObservability/experimentResults";
 import {
@@ -615,10 +604,10 @@ const sortOptions = (["recent", "regressions"] as const).map((value) => ({
   label: t(`experimentsAtScale.sortOption.${value}`),
 }));
 
-const OUTCOME_BADGES: Record<BaselineOutcome, BadgeVariant> = {
-  regressed: "error-soft",
-  improved: "success-soft",
-  unchanged: "default-soft",
+const OUTCOME_BADGES: Record<BaselineOutcome, ChipTone> = {
+  regressed: "err",
+  improved: "ok",
+  unchanged: "neutral",
 };
 
 // Without Score Config health policies nothing can vote, so the list shows values but no deltas.

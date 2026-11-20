@@ -473,3 +473,18 @@ export async function sourceQueriesModule() {
     detachPackMutation: () => ({ mutationFn: async () => ({}) }),
   };
 }
+
+/** Opens a page's ⋯ menu; the spec mocks reka's dropdown portal so the items render inline. */
+export const openMoreMenu = async (
+  w: { find: (selector: string) => { trigger: (event: string) => Promise<void> } },
+  dataTest: string,
+) => {
+  await w.find(`[data-test="${dataTest}"]`).trigger("click");
+  await settle();
+};
+
+/** Renders reka's dropdown content inline, for specs that open a ⋯ menu. */
+export const inlineDropdownPortal = async (importOriginal: <T>() => Promise<T>) => {
+  const actual = await importOriginal<typeof import("reka-ui")>();
+  return { ...actual, DropdownMenuPortal: actual.DropdownMenuContent };
+};

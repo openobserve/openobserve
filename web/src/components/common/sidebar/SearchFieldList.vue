@@ -29,12 +29,13 @@
               {{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})
             </OTruncatedText>
             <OButton
+              v-if="(groupFieldCount[row.group] ?? 0) > 0"
+              icon-only
               :aria-label="groupName"
               :aria-expanded="expandGroupRows[row.group] !== false"
-              v-if="(groupFieldCount[row.group] ?? 0) > 0"
               variant="ghost"
-              size="icon"
-              class="size-5! flex-shrink-0"
+              size="xs"
+              class="flex-shrink-0"
             >
               <OIcon
                 :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
@@ -59,20 +60,22 @@
             <OFieldLabel :field="row" />
             <template #actions>
               <OButton
-                :aria-label="t('common.addFilter')"
                 v-if="!hideAddSearchTerm"
-                variant="ghost-neutral"
-                size="icon"
+                icon-only
+                :aria-label="t('common.addFilter')"
+                variant="ghost"
+                size="xs"
                 :data-test="`log-search-index-list-filter-${row.name}-field-btn`"
                 @click.stop="addSearchTerm(`${row.name}=''`)"
               >
                 <OIcon name="add" size="sm" />
               </OButton>
               <OButton
-                :aria-label="t('common.copyToClipboard')"
                 v-if="!hideCopyValue && isExpandable(row)"
-                variant="ghost-neutral"
-                size="icon"
+                icon-only
+                :aria-label="t('common.copyToClipboard')"
+                variant="ghost"
+                size="xs"
                 :data-test="`log-search-index-list-filter-${row.name}-copy-btn`"
                 @click.stop="copyContentValue(row.name)"
               >
@@ -107,53 +110,53 @@
           <div data-test="search-fieldlist-loading-skeleton" class="flex w-full flex-col">
             <!-- Group 1 header -->
             <div class="flex h-7 items-center justify-between px-2">
-              <OSkeleton type="rect" class="rounded-default h-3 w-24" />
-              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
+              <OSkeleton shape="block" class="h-3 w-24" />
+              <OSkeleton shape="block" class="h-3 w-3" />
             </div>
             <!-- Group 1 fields -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="flex-1" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="w-3/4" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="w-3/4" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="flex-1" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="flex-1" />
             </div>
             <!-- Group 2 header -->
             <div class="mt-2 flex h-7 items-center justify-between px-2">
-              <OSkeleton type="rect" class="rounded-default h-3 w-16" />
-              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
+              <OSkeleton shape="block" class="h-3 w-16" />
+              <OSkeleton shape="block" class="h-3 w-3" />
             </div>
             <!-- Group 2 fields -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="w-4/5" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="w-4/5" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="w-2/3" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="w-2/3" />
             </div>
             <!-- Group 3 header -->
             <div class="mt-2 flex h-7 items-center justify-between px-2">
-              <OSkeleton type="rect" class="rounded-default h-3 w-32" />
-              <OSkeleton type="rect" class="rounded-default h-3 w-3" />
+              <OSkeleton shape="block" class="h-3 w-32" />
+              <OSkeleton shape="block" class="h-3 w-3" />
             </div>
             <!-- Group 3 fields -->
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="flex-1" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="flex-1" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="w-3/4" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="w-3/4" />
             </div>
             <div class="flex items-center gap-2 px-3 py-1.5">
-              <OSkeleton type="rect" class="rounded-default h-3.5 w-3.5 shrink-0" />
-              <OSkeleton type="text" class="flex-1" />
+              <OSkeleton shape="block" class="h-3.5 w-3.5 shrink-0" />
+              <OSkeleton class="flex-1" />
             </div>
           </div>
         </template>
@@ -163,36 +166,37 @@
           <div v-if="bottomProps.totalPages > 1" class="ms-auto flex items-center gap-1">
             <OTooltip
               side="left"
-              align="center"
-              max-width="18.75rem"
               :content="t('common.totalFields', { count: bottomProps.totalRows })"
             />
             <OButton
+              icon-only
               :aria-label="t('search.firstPage')"
-              variant="ghost-primary"
-              size="icon-panel"
+              variant="accent-ghost"
+              size="xs"
               :disabled="bottomProps.isFirstPage"
               @click="bottomProps.firstPage"
-              class="rounded-default! m-0! h-5.5! min-h-5.5! w-6! min-w-6! overflow-visible! px-1! py-1.5"
+              class="rounded-default! m-0! overflow-visible!"
             >
               <OIcon name="fast-rewind" size="sm" />
             </OButton>
             <template v-for="page in visiblePagesForTotal(bottomProps)" :key="page">
               <OButton
+                icon-only
                 :variant="bottomProps.currentPage === page ? 'primary' : 'ghost'"
-                size="icon-panel"
-                class="text-text-body! rounded-default! m-0! h-5.5! min-h-5.5! w-6! min-w-6! overflow-visible! px-1! py-1.5 text-xs! leading-none font-medium"
+                size="xs"
+                class="text-text-body! rounded-default! m-0! overflow-visible! text-xs! leading-none font-medium"
                 @click="setPage(page)"
                 >{{ page }}</OButton
               >
             </template>
             <OButton
+              icon-only
               :aria-label="t('search.lastPage')"
-              variant="ghost-primary"
-              size="icon-panel"
+              variant="accent-ghost"
+              size="xs"
               :disabled="bottomProps.isLastPage"
               @click="bottomProps.lastPage"
-              class="rounded-default! m-0! h-5.5! min-h-5.5! w-6! min-w-6! overflow-visible! px-1! py-1.5"
+              class="rounded-default! m-0! overflow-visible!"
             >
               <OIcon name="fast-forward" size="sm" />
             </OButton>

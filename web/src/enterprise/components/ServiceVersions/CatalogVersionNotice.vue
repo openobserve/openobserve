@@ -21,7 +21,7 @@
     </span>
     <OPopover v-else-if="info" align="start" :aria-label="info.message">
       <template #trigger>
-        <OButton variant="ghost" size="icon-sm" :aria-label="info.message" :data-test="info.test">
+        <OButton icon-only variant="ghost" :aria-label="info.message" :data-test="info.test">
           <OIcon name="info" size="sm" class="text-text-secondary" />
         </OButton>
       </template>
@@ -29,8 +29,8 @@
         <span>{{ info.message }}</span>
         <OButton
           v-if="info.action"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :data-test="info.action.test"
           @click="info.action.run"
           >{{ info.action.label }}</OButton

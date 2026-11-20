@@ -20,7 +20,7 @@ import {
   applyTableOptions,
   computeFooterCalc,
   parseSparklineValue,
-  tableRowHeight,
+  tableDensity,
 } from "./tableOptions";
 import { resolveIsNumber } from "./tableConfigUtils";
 
@@ -88,12 +88,12 @@ describe("absent keys render exactly as today", () => {
     );
   });
 
-  it("keeps today's row height without a density", () => {
-    expect(tableRowHeight(undefined)).toBe(22);
-    expect(tableRowHeight("compact")).toBe(22);
-    expect(tableRowHeight("standard")).toBe(28);
-    expect(tableRowHeight("comfortable")).toBe(36);
-    expect(tableRowHeight("bogus")).toBe(22);
+  it("maps a panel's table density onto the two OTable densities", () => {
+    expect(tableDensity(undefined)).toBe("compact");
+    expect(tableDensity("compact")).toBe("compact");
+    expect(tableDensity("standard")).toBe("compact");
+    expect(tableDensity("comfortable")).toBe("default");
+    expect(tableDensity("bogus")).toBe("compact");
   });
 });
 

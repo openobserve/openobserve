@@ -33,21 +33,21 @@ describe("ODropdownItem", () => {
     expect(wrapper.text()).toContain("Delete");
   });
 
-  it("renders icon-left slot", () => {
+  it("renders the icon slot", () => {
     const wrapper = mountItemInDropdown(
       {},
       {
-        "icon-left": () => h("span", { "data-testid": "icon-left" }, "←"),
+        icon: () => h("span", { "data-testid": "icon-left" }, "←"),
       },
     );
     expect(wrapper.find('[data-testid="icon-left"]').exists()).toBe(true);
   });
 
-  it("renders icon-right slot", () => {
+  it("renders the end slot", () => {
     const wrapper = mountItemInDropdown(
       {},
       {
-        "icon-right": () => h("span", { "data-testid": "icon-right" }, "→"),
+        end: () => h("span", { "data-testid": "icon-right" }, "→"),
       },
     );
     expect(wrapper.find('[data-testid="icon-right"]').exists()).toBe(true);
@@ -70,12 +70,28 @@ describe("ODropdownItem", () => {
     expect(wrapper.html()).toContain("text-dropdown-item-text");
   });
 
-  it('applies destructive variant classes when variant="destructive"', () => {
-    const wrapper = mountItemInDropdown(
-      { variant: "destructive" },
-      { default: () => h("span", "Delete") },
-    );
+  it('applies danger classes when tone="danger"', () => {
+    const wrapper = mountItemInDropdown({ tone: "danger" }, { default: () => h("span", "Delete") });
     expect(wrapper.html()).toContain("text-dropdown-item-destructive-text");
     expect(wrapper.html()).toContain("data-[highlighted]:bg-dropdown-item-destructive-hover-bg");
+  });
+  it("marks the chosen item of a single-choice group with a check", () => {
+    const wrapper = mountItemInDropdown({ checked: true }, { default: () => h("span", "Name") });
+    expect(wrapper.find('[role="menuitemradio"]').attributes("aria-checked")).toBe("true");
+  });
+
+  it("shows why a disabled item is unavailable under its label", () => {
+    const wrapper = mountItemInDropdown(
+      { disabled: true, disabledReason: "You can view, not edit", "data-test": "pause" },
+      { default: () => h("span", "Pause") },
+    );
+    expect(wrapper.find('[data-test="pause-reason"]').text()).toBe("You can view, not edit");
+  });
+
+  it("draws a 32 px row in UI text", () => {
+    const wrapper = mountItemInDropdown({}, { default: () => h("span", "Edit") });
+    const row = wrapper.find(".min-h-control-md");
+    expect(row.exists()).toBe(true);
+    expect(row.classes()).toContain("text-compact");
   });
 });

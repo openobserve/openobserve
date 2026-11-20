@@ -47,17 +47,17 @@
        base    = editor / main content canvas
        well    = recessed / segmented track
        overlay = menus, dropdowns, tooltips */
-  --d-chrome: #0e0f11; /* title bar + left activity-bar strip             */
-  --d-base: #111111; /* MAIN: content card + table canvas               */
-  --d-well: #2d2d2d; /* recessed wells, segmented-control track         */
-  --d-panel: #181818; /* folder sidebar, sub rails, cards, dialogs (DM)  */
-  --d-overlay: #202020; /* menus, dropdowns, tooltips, table-header (top tier,
+  --d-chrome: #0f1117; /* title bar + left activity-bar strip             */
+  --d-base: #14161e; /* MAIN: content card + table canvas               */
+  --d-well: #282c3b; /* recessed wells, segmented-control track         */
+  --d-panel: #181b24; /* folder sidebar, sub rails, cards, dialogs (DM)  */
+  --d-overlay: #1c1f28; /* menus, dropdowns, tooltips, table-header (top tier,
                                 lifts above panel #181818 via border + shadow)   */
 
   /* Borders & dividers — VS Code widget / panel borders */
-  --d-divider: #3c3c3c; /* subtle: row & section separators            */
-  --d-border: #454545; /* default: card / input / table / rail edges  */
-  --d-border-strong: #6b6b6b; /* strong: checkbox / radio / file outlines    */
+  --d-divider: #3a3f51; /* subtle: row & section separators            */
+  --d-border: #43485a; /* default: card / input / table / rail edges  */
+  --d-border-strong: #656b7f; /* strong: checkbox / radio / file outlines    */
 
   /* Text — mapped straight to the registered --color-grey-* palette in the
        block below (mirrors light mode, where each tier = a grey step). No
@@ -69,7 +69,7 @@
   /* Both mix into the panel so selected stays >=1.2:1 above hover and severity spines keep 3:1 even on bright custom-theme palettes. */
   --d-hover: color-mix(in srgb, var(--color-primary-900) 50%, var(--d-panel));
   --d-selected: color-mix(in srgb, var(--color-primary-500) 24%, var(--d-panel));
-  --d-zebra: #252526; /* striped-row bg — VS Code list alternating row    */
+  --d-zebra: #252935; /* striped-row bg — VS Code list alternating row    */
 
   /* --- Text — grey palette steps, one per tier (light half of the ramp) --- */
   --color-text-heading: var(--color-grey-200); /* h1-h6, modal titles — brightest */
@@ -80,7 +80,7 @@
   --color-text-muted: var(--color-grey-400); /* de-emphasized */
   --color-text-disabled: var(--color-grey-600); /* dimmer than labels so disabled reads disabled */
   /* Between grey-500 and grey-400: the lowest grey that clears 4.5:1 on the dark canvas without matching secondary text. */
-  --color-text-placeholder: #7c7c7c;
+  --color-text-placeholder: #838999;
   --color-text-link: var(--color-primary-400); /* clickable links (teal) */
   --color-text-link-hover: var(--color-primary-300); /* link hover state (teal) */
   --color-text-code: var(--color-grey-300); /* inline code, monospace */
@@ -144,7 +144,7 @@
   --color-surface-panel: var(--d-panel); /* folder rails, cards, table-header base */
   --color-surface-overlay: var(--d-overlay); /* dropdowns, dialogs, selects, popovers */
   --color-surface-subtle: var(--d-well); /* recessed fills, segmented track */
-  --color-surface-subtle-hover: #383838;
+  --color-surface-subtle-hover: #363b4d;
   /* Floating chip on a dark panel — a lighter grey so it lifts off the surface. */
   --color-surface-chip: var(--color-grey-700);
   --color-surface-chip-hover: var(--color-grey-600);
@@ -161,6 +161,8 @@
      the dark surfaces, so dark mode reuses it rather than inventing a value —
      the light theme needs its own only because grey-400 falls short there. */
   --color-border-control: var(--d-border-strong);
+  --color-control-border: var(--d-border);
+  --color-control-border-selected: var(--color-primary-700);
   /* Soft divider — one step quieter than border-default so row/section
        splits don't read as hard structural lines (but still visible). */
   --color-border-subtle: var(--d-divider);
@@ -187,15 +189,15 @@
 
   /* outline */
   --color-button-outline-text: var(--color-text-heading);
-  --color-button-outline-border: var(--color-border-control);
-  --color-button-outline-hover-bg: var(--color-primary-900);
+  --color-button-outline-border: var(--color-control-border);
+  --color-button-outline-hover-bg: var(--color-surface-subtle);
   --color-button-outline-hover-border: var(--color-border-strong);
-  --color-button-outline-active-bg: var(--color-surface-accent-active);
+  --color-button-outline-active-bg: var(--color-surface-subtle-hover);
 
   /* ghost */
-  --color-button-ghost-text: var(--color-text-heading);
-  --color-button-ghost-hover-bg: var(--color-surface-accent-hover);
-  --color-button-ghost-active-bg: var(--color-surface-accent-active);
+  --color-button-ghost-text: var(--color-text-secondary);
+  --color-button-ghost-hover-bg: var(--color-surface-subtle);
+  --color-button-ghost-active-bg: var(--color-surface-subtle-hover);
 
   /* ghost-primary */
   --color-button-ghost-primary-text: var(--color-primary-400);
@@ -238,9 +240,6 @@
 
   /* ToggleGroup */
   --color-toggle-item-hover-bg: var(--d-divider);
-  --color-toggle-item-active-bg: var(--color-primary-900);
-  --color-toggle-item-active-text: var(--color-white);
-  --color-toggle-item-active-border: var(--color-primary-400);
   /* The item also dims to 60%, which makes --color-text-disabled vanish on the dark track. */
   --color-toggle-item-disabled: var(--color-grey-500);
   /* Accent lightens on dark so the insertion line stays visible on the track */
@@ -288,11 +287,12 @@
 
   /* success: solid unchanged; outline text brightened (700 too dark on dark bg) */
   --color-badge-success-ol-text: var(--color-success-500);
-  --color-badge-success-soft-bg: color-mix(in srgb, var(--color-success-500) 15%, transparent);
-  --color-badge-success-soft-text: var(--color-success-500);
+  --color-badge-success-ol-border: #5fc27e;
+  --color-badge-success-soft-bg: #12261b;
+  --color-badge-success-soft-text: #5fc27e;
 
   /* warning: solid unchanged (yellow + dark text works on any bg); outline brightened */
-  --color-badge-warning-ol-border: var(--color-warning-400);
+  --color-badge-warning-ol-border: #f0b04c;
   --color-badge-warning-ol-text: var(--color-warning-400);
   /* warning-quiet in DARK is the NEUTRAL chip: warning-400 is full-chroma on
      near-black, and this variant exists for states common enough to tile the
@@ -300,21 +300,21 @@
   --color-badge-warning-quiet-bg: var(--color-grey-800);
   --color-badge-warning-quiet-text: var(--color-grey-300);
   --color-badge-warning-quiet-border: var(--color-grey-700);
-  --color-badge-warning-soft-bg: color-mix(in srgb, var(--color-warning-400) 15%, transparent);
-  --color-badge-warning-soft-text: var(--color-warning-400);
+  --color-badge-warning-soft-bg: #2a1f0e;
+  --color-badge-warning-soft-text: #f0b04c;
 
   /* error: solid unchanged; outline brightened */
-  --color-badge-error-ol-border: var(--color-error-400);
+  --color-badge-error-ol-border: #f2767b;
   --color-badge-error-ol-text: var(--color-error-400);
-  --color-badge-error-soft-bg: color-mix(in srgb, var(--color-error-400) 15%, transparent);
-  --color-badge-error-soft-text: var(--color-error-400);
+  --color-badge-error-soft-bg: #2d1416;
+  --color-badge-error-soft-text: #f2767b;
 
   /* info (blue): brighten for dark bg */
   --color-badge-info-ol-border: var(--color-blue-200);
   --color-badge-info-ol-text: var(--color-blue-200);
 
   /* purple: brighten for dark bg */
-  --color-badge-purple-ol-border: var(--color-purple-400);
+  --color-badge-purple-ol-border: #c995ea;
   --color-badge-purple-ol-text: var(--color-purple-400);
 
   /* magenta: match the query editor's dark function colour */
@@ -359,8 +359,9 @@
   /* blue: brighten solid bg and outline for dark mode */
   --color-badge-blue-solid-bg: var(--color-blue-400);
   --color-badge-blue-ol-text: var(--color-blue-300);
-  --color-badge-blue-soft-bg: color-mix(in srgb, var(--color-blue-400) 15%, transparent);
-  --color-badge-blue-soft-text: var(--color-blue-400);
+  --color-badge-blue-ol-border: #79a9f2;
+  --color-badge-blue-soft-bg: #13213a;
+  --color-badge-blue-soft-text: #79a9f2;
 
   /* Editor bracket-pair colorization — Monaco vs-dark defaults */
   --color-bracket-1: #ffd700;
@@ -369,8 +370,8 @@
 
   /* purple (solid/soft variants): brighten for dark mode */
   --color-badge-purple-solid-bg: var(--color-purple-400);
-  --color-badge-purple-soft-bg: color-mix(in srgb, var(--color-purple-400) 15%, transparent);
-  --color-badge-purple-soft-text: var(--color-purple-400);
+  --color-badge-purple-soft-bg: #241431;
+  --color-badge-purple-soft-text: #c995ea;
 
   /* indigo: brighten solid bg and outline for dark mode */
   --color-badge-indigo-solid-bg: var(--color-indigo-400);
@@ -402,10 +403,7 @@
        a distinct lighter gray; disabled-bg uses --d-well so disabled fields
        still read as a clearly different, inert surface. */
   --color-input-bg: var(--color-surface-base);
-  /* Matched to the outline button's border (--color-border-control) so a text
-     field and a button side by side share one border weight — now the
-     already-passing control-border value instead of border-default. */
-  --color-input-border: var(--color-border-control);
+  --color-input-border: var(--color-control-border);
   --color-input-disabled-bg: var(--d-well);
   --color-input-disabled-text: var(--color-text-secondary);
   --color-input-placeholder: var(--color-text-placeholder);
@@ -414,8 +412,7 @@
 
   /* Select (OSelect) — same surface-matching bg + disabled strategy as input. */
   --color-select-bg: var(--color-surface-base);
-  /* See --color-input-border above: this override had the same effect. */
-  --color-select-border: var(--color-border-control);
+  --color-select-border: var(--color-control-border);
   --color-select-disabled-bg: var(--d-well);
   --color-select-disabled-text: var(--color-text-secondary);
   --color-select-placeholder: var(--color-text-placeholder);
@@ -488,7 +485,7 @@
 
   /* Date / Time / Color (ODate, OTime, OColor) */
   --color-datepicker-bg: var(--color-surface-panel);
-  --color-datepicker-border: var(--color-border-strong);
+  --color-datepicker-border: var(--color-control-border);
   --color-datepicker-disabled-bg: var(--color-surface-subtle);
   --color-datepicker-disabled-border: var(--color-border-default);
   --color-datepicker-error-text: var(--color-error-400);
@@ -501,7 +498,7 @@
   --color-datepicker-day-hover-bg: var(--color-surface-accent-hover);
   --color-datepicker-day-selected-bg: var(--color-button-primary);
   --color-datepicker-day-selected-text: var(--color-button-primary-foreground);
-  --color-datepicker-accent-text: var(--color-primary-500);
+  --color-datepicker-accent-text: var(--color-primary-400);
   --color-datepicker-day-today-border: var(--color-primary-400);
   --color-datepicker-day-outside-text: var(--color-text-disabled);
   --color-datepicker-nav-hover-bg: var(--color-surface-accent-hover);
@@ -523,18 +520,17 @@
 
   /* Dialog */
   --color-dialog-overlay: color-mix(in srgb, var(--d-chrome) 80%, transparent);
-  /* Body matches the normal content canvas (so inputs sit flush like on a
-       page); header + footer take the folder-rail surface so they read as a
-       slightly lifted frame around the content. Shared by ODialog + ODrawer. */
-  --color-dialog-bg: var(--color-surface-base);
+  /* One overlay surface, a step above the page, so a dialog or drawer lifts off what it covers.
+     Shared by ODialog + ODrawer. */
+  --color-dialog-bg: var(--color-surface-overlay);
   --color-dialog-border: var(--d-border);
   --shadow-dialog:
     0 1.5rem 3rem -0.75rem var(--shadow-lg-c1), 0 0.5rem 1rem -0.25rem var(--shadow-lg-c2);
-  --color-dialog-header-bg: var(--color-surface-panel);
+  --color-dialog-header-bg: var(--color-surface-overlay);
   --color-dialog-header-text: var(--color-text-heading);
   --color-dialog-header-border: var(--d-border);
   --color-dialog-content-text: var(--color-text-heading);
-  --color-dialog-footer-bg: var(--color-surface-panel);
+  --color-dialog-footer-bg: var(--color-surface-overlay);
   --color-dialog-footer-border: var(--d-border);
   --color-dialog-close-text: var(--color-text-muted);
   --color-dialog-close-hover-bg: var(--d-divider);
@@ -796,7 +792,6 @@
 /* ToggleGroup — primary variant dark overrides */
 .dark [data-variant="primary"] {
   --color-toggle-track-bg: var(--color-primary-900);
-  --color-toggle-border: var(--color-primary-700);
   --color-toggle-item-hover-bg: var(--color-primary-950);
   --color-toggle-item-active-bg: var(--color-surface-accent-active);
   --color-toggle-item-active-text: var(--color-primary-200);
@@ -824,9 +819,13 @@
   --color-toast-loading-border: var(--color-border-default);
   --color-toast-action-text: var(--color-primary-400);
   --color-toast-action-hover: var(--color-primary-300);
+  /* A raised grey rather than a white flip, so the toast does not glare on a dark page. */
+  --color-toast-inverse-bg: var(--color-grey-700);
+  --color-toast-inverse-text: var(--color-grey-100);
+  --color-toast-inverse-text-secondary: var(--color-grey-300);
 
   /* OTable (dark) */
-  --color-table-header-bg: var(--d-overlay); /* header band lifts off rows */
+  --color-table-header-bg: var(--color-table-cell-bg); /* no header band (D1) */
   --color-table-row-hover-bg: var(--d-hover); /* neutral hover (not teal-washed) */
   --color-table-row-action-hover-bg: var(--color-surface-accent-hover);
   --color-table-row-selected-bg: var(--d-selected); /* teal-tinted selection */

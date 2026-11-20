@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="isVictim ? 'bg-status-error-bg' : 'bg-status-success-bg'"
     :data-test="dataTest"
   >
-    <div class="text-2xs flex items-center gap-1.5 font-bold">
+    <div class="text-2xs flex items-center gap-1.5 font-semibold">
       <OIcon
         :name="isVictim ? 'error-outline' : 'check-circle'"
         class="size-3.5 shrink-0"
@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          DBA rather than thrown away. -->
     <p v-if="waitSentence" class="text-text-secondary text-2xs leading-relaxed">
       {{ waitSentence }}
-      <OTag v-if="rawLock" variant="default-soft" size="xs" shape="rounded" class="mt-1 font-mono">
+      <OTag v-if="rawLock" tone="neutral" mono size="sm" class="mt-1">
         {{ rawLock }}
       </OTag>
     </p>
@@ -98,9 +98,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-for="action in actions"
         :key="action.id"
-        variant="outline"
-        :size="action.iconOnly ? 'icon-sm' : 'sm'"
-        :icon-left="action.icon"
+        :icon-only="action.iconOnly"
+        variant="secondary"
+        :icon="action.icon"
         :data-test="`${dataTest}-${action.id}`"
         @click="emit('action', action.id)"
       >

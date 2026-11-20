@@ -68,17 +68,18 @@
             <div class="grow" />
             <template v-if="cell?.status === 'done'">
               <OButton
-                variant="ghost-muted"
-                size="icon-xs"
-                icon-left="content-copy"
+                icon-only
+                variant="ghost"
+                icon="content-copy"
                 :title="t('aiObservability.playground.copyOutput')"
                 :data-test="`ai-playground-output-copy-${label}`"
                 @click="emit('copy')"
               />
               <OButton
-                variant="ghost-muted"
-                :size="cell.toolCall ? 'xs' : 'icon-xs'"
-                icon-left="chat"
+                :icon-only="!cell.toolCall"
+                variant="ghost"
+                :size="cell.toolCall ? 'sm' : 'md'"
+                icon="chat"
                 :title="
                   cell.toolCall
                     ? t('aiObservability.playground.toolCallContinueTooltip')
@@ -92,9 +93,9 @@
                 </span>
               </OButton>
               <OButton
-                variant="ghost-muted"
-                size="icon-xs"
-                icon-left="science"
+                icon-only
+                variant="ghost"
+                icon="science"
                 :title="t('aiObservability.playground.createExperiment')"
                 :data-test="`ai-playground-output-create-experiment-${label}`"
                 @click="emit('create-experiment')"
@@ -126,8 +127,7 @@
       </p>
       <OButton
         v-if="running"
-        variant="cancel-query"
-        size="sm-action"
+        variant="secondary"
         class="w-full"
         :data-test="`ai-playground-variant-cancel-${label}`"
         @click="emit('cancel')"
@@ -137,7 +137,6 @@
       <OButton
         v-else
         variant="primary"
-        size="sm-action"
         class="w-full"
         :disabled="runDisabled"
         :data-test="`ai-playground-variant-submit-${label}`"

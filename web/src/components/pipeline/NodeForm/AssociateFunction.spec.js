@@ -57,22 +57,14 @@ const FunctionPickerStub = {
 
 const ODrawerStub = {
   name: "ODrawer",
-  props: [
-    "open",
-    "title",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "neutralButtonVariant",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  props: ["open", "title", "size", "bleed", "primary", "secondary", "extra"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
-    <div class="o-drawer-stub" :data-width="width">
+    <div class="o-drawer-stub" :data-size="size">
       <slot />
-      <button v-if="primaryButtonLabel" data-test="save-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
-      <button v-if="secondaryButtonLabel" data-test="cancel-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-      <button v-if="neutralButtonLabel" data-test="delete-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
+      <button v-if="primary?.label" data-test="save-btn" @click="$emit('click:primary')">{{ primary.label }}</button>
+      <button v-if="secondary?.label" data-test="cancel-btn" @click="$emit('click:secondary')">{{ secondary.label }}</button>
+      <button v-if="extra?.label" data-test="delete-btn" @click="$emit('click:extra')">{{ extra.label }}</button>
     </div>
   `,
 };
@@ -167,12 +159,12 @@ describe("AssociateFunction.vue (drawer chrome)", () => {
   // ── Inline editor (expand) ──────────────────────────────────────────────
   it("widens the drawer and hides the footer while the inline editor is open", async () => {
     const wrapper = createWrapper();
-    expect(wrapper.find(".o-drawer-stub").attributes("data-width")).toBe("30");
+    expect(wrapper.find(".o-drawer-stub").attributes("data-size")).toBe("sm");
     expect(wrapper.find('[data-test="save-btn"]').exists()).toBe(true);
 
     await wrapper.find(".function-picker-stub").trigger("click"); // expand(true)
 
-    expect(wrapper.find(".o-drawer-stub").attributes("data-width")).toBe("97");
+    expect(wrapper.find(".o-drawer-stub").attributes("data-size")).toBe("xl");
     expect(wrapper.find('[data-test="save-btn"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="cancel-btn"]').exists()).toBe(false);
   });
@@ -206,7 +198,7 @@ describe("AssociateFunction.vue (drawer chrome)", () => {
     const wrapper = createWrapper({ isEditNode: true });
     await wrapper.find('[data-test="delete-btn"]').trigger("click");
     expect(wrapper.vm.dialog.show).toBe(true);
-    expect(wrapper.vm.dialog.title).toBe("Delete Node");
+    expect(wrapper.vm.dialog.title).toBe("Delete node");
     expect(typeof wrapper.vm.dialog.okCallback).toBe("function");
   });
 

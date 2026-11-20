@@ -15,11 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OBanner
+  <OInlineNotice
+    class="wrap-anywhere whitespace-pre-line"
     v-if="outcome"
-    :variant="outcome.variant"
-    dense
-    preserve-whitespace
+    :tone="outcome.tone"
     data-test="fleet-rollout-outcome"
   >
     <div class="flex flex-col gap-0.5">
@@ -30,9 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="exits.length" #actions>
       <span v-for="exit in exits" :key="exit" class="inline-flex">
         <OButton
-          :variant="exit === 'rollback' ? 'outline-destructive' : 'outline'"
-          size="sm"
-          :icon-left="EXIT_ICON[exit]"
+          :variant="exit === 'rollback' ? 'danger-ghost' : 'secondary'"
+          :icon="EXIT_ICON[exit]"
           :disabled="!offered(exit) || busy"
           :data-test="`fleet-rollout-outcome-${exit}`"
           @click="emit('exit', exit)"
@@ -43,12 +41,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip v-if="!offered(exit)" :content="unavailableText(exit)" />
       </span>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -93,7 +91,7 @@ function unavailableText(exit: FleetHaltExit): I18nText {
 const at = (ms: number | null | undefined) => (ms ? raw(new Date(ms).toLocaleString()) : undefined);
 
 const outcome = computed<{
-  variant: "success" | "warning" | "error" | "info";
+  tone: "ok" | "warn" | "err" | "info";
   title: I18nText;
   body: I18nText;
   at?: I18nText;
@@ -101,7 +99,7 @@ const outcome = computed<{
   const r = props.rollout;
   if (r.status === "halted" && r.halt) {
     return {
-      variant: "error",
+      tone: "err",
       title: t("fleet.rollouts.haltedTitle", { class: haltClassText(r.halt.class) }),
       body: raw(r.halt.reason),
       at: at(r.halt.at),
@@ -109,7 +107,7 @@ const outcome = computed<{
   }
   if (r.status === "rolled_back") {
     return {
-      variant: "warning",
+      tone: "warn",
       title: r.autoRollback ? t("fleet.rollouts.autoRolledBack") : t("fleet.badge.rolledBack"),
       body: t("fleet.rollouts.outcomeRolledBack"),
       at: at(r.endedAt),
@@ -117,7 +115,7 @@ const outcome = computed<{
   }
   if (r.status === "superseded") {
     return {
-      variant: "info",
+      tone: "info",
       title: t("fleet.badge.superseded"),
       body: t("fleet.rollouts.outcomeSuperseded"),
       at: at(r.endedAt),
@@ -125,7 +123,7 @@ const outcome = computed<{
   }
   if (r.status === "completed" && r.total === 0) {
     return {
-      variant: "info",
+      tone: "info",
       title: t("fleet.rollouts.noneTargeted"),
       body: t("fleet.rollouts.outcomeNoneTargeted", { to: r.toVersion }),
       at: at(r.endedAt),
@@ -134,7 +132,7 @@ const outcome = computed<{
   if (r.status === "completed") {
     const count = rolloutConfirmed(r);
     return {
-      variant: "success",
+      tone: "ok",
       title: t("fleet.badge.completed"),
       body: t("fleet.rollouts.outcomeCompleted", { count, to: r.toVersion }, count),
       at: at(r.endedAt),
@@ -142,16 +140,16 @@ const outcome = computed<{
   }
   if (r.status === "waiting") {
     return {
-      variant: "warning",
+      tone: "warn",
       title: t("fleet.badge.waiting"),
       body: t("fleet.rollouts.outcomeWaiting", { to: r.toVersion }),
     };
   }
   if (r.status === "scheduled" && r.start.kind === "at") {
-    return { variant: "info", title: t("fleet.badge.scheduled"), body: startsText(r.start.at) };
+    return { tone: "info", title: t("fleet.badge.scheduled"), body: startsText(r.start.at) };
   }
   if (r.status === "in_progress") {
-    return { variant: "info", title: t("fleet.badge.inProgress"), body: progressText(r) };
+    return { tone: "info", title: t("fleet.badge.inProgress"), body: progressText(r) };
   }
   return null;
 });

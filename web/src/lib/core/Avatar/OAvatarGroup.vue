@@ -6,7 +6,7 @@
 import { computed } from "vue";
 
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeSize } from "@/lib/core/Badge/OBadge.types";
+import type { ChipSize } from "@/lib/core/Badge/OBadge.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 
@@ -19,14 +19,14 @@ const shown = computed(() => props.people.slice(0, props.max));
 const hidden = computed(() => props.people.slice(props.max));
 
 const CHIP_SIZES: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
-  sm: "h-5 min-w-5 justify-center",
-  md: "h-6 min-w-6 justify-center",
-  lg: "h-8 min-w-8 justify-center",
+  sm: "min-w-5 justify-center",
+  md: "min-w-6 justify-center",
+  lg: "min-w-8 justify-center",
 };
-const CHIP_BADGE_SIZE: Record<NonNullable<AvatarGroupProps["size"]>, BadgeSize> = {
-  sm: "xs",
-  md: "xs",
-  lg: "sm",
+const CHIP_BADGE_SIZE: Record<NonNullable<AvatarGroupProps["size"]>, ChipSize> = {
+  sm: "sm",
+  md: "md",
+  lg: "md",
 };
 const OVERLAP: Record<NonNullable<AvatarGroupProps["size"]>, string> = {
   sm: "-ms-0.5",
@@ -60,9 +60,8 @@ const hiddenLabel = computed(() =>
     />
     <OBadge
       v-if="hidden.length"
-      variant="default-soft"
+      tone="neutral"
       :size="CHIP_BADGE_SIZE[props.size]"
-      shape="pill"
       :class="[CHIP_SIZES[props.size], OVERLAP[props.size]]"
       tabindex="0"
       :aria-label="hiddenLabel"

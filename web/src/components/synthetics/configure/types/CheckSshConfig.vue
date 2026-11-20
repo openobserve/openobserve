@@ -19,6 +19,7 @@ import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { ProtocolCheck, SshCheckConfig } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 
@@ -60,7 +61,7 @@ const timeoutMs = computed({
   <div class="rounded-default border-border-default mb-4 border">
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
       <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
-      <h3 class="text-text-heading text-base font-semibold">
+      <h3 class="text-text-heading text-sm font-semibold">
         {{ t("synthetics.protocolConfig.ssh.title") }}
       </h3>
     </div>
@@ -70,14 +71,14 @@ const timeoutMs = computed({
           v-model.number="port"
           type="number"
           :label="t('synthetics.protocolConfig.port')"
-          width="xs"
+          width="s"
           data-test="synthetics-check-ssh-port-input"
         />
         <OInput
           v-model.number="timeoutMs"
           type="number"
           :label="t('synthetics.protocolConfig.timeoutMs')"
-          width="sm"
+          width="s"
           data-test="synthetics-check-ssh-timeout-input"
         />
       </div>
@@ -85,7 +86,7 @@ const timeoutMs = computed({
         v-model="username"
         required
         :label="t('synthetics.protocolConfig.ssh.username')"
-        width="md"
+        width="m"
         data-test="synthetics-check-ssh-username-input"
       />
       <div>
@@ -110,10 +111,9 @@ const timeoutMs = computed({
         :label="t('synthetics.protocolConfig.ssh.password')"
         data-test="synthetics-check-ssh-secret-input"
       />
-      <OInput
+      <OTextarea
         v-else
         v-model="secret"
-        type="textarea"
         :rows="5"
         required
         :label="t('synthetics.protocolConfig.ssh.privateKey')"

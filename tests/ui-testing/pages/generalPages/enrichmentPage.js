@@ -129,7 +129,7 @@ class EnrichmentPage {
         this.startTimeCell = 'Start time';
         this.showingText = '1 to 2 out of 2';
         this.csvRequiredError = 'CSV File is required!';
-        this.enrichmentTablesButton = 'Enrichment Tables';
+        this.enrichmentTablesButton = 'Enrichment tables';
         this.appendDataToggle = 'Append data to existing';
         this.tableRows = 'tbody tr';
         this.tableCellLeft = 'td.text-left';
@@ -313,7 +313,7 @@ class EnrichmentPage {
     }
 
     /**
-     * Click the "Upload File" option in the data source selector
+     * Click the "Upload file" option in the data source selector
      */
     async clickUploadFileOption() {
         testLogger.debug('Clicking Upload File option');
@@ -323,7 +323,7 @@ class EnrichmentPage {
     }
 
     /**
-     * Check if "Upload File" option is visible
+     * Check if "Upload file" option is visible
      * @returns {Promise<boolean>} True if visible
      */
     async isUploadFileOptionVisible() {
@@ -1136,7 +1136,7 @@ abc, err = get_enrichment_table_record("${fileName}", {
     async fillNewUrlInput(url) {
         testLogger.debug(`Filling new URL input: ${url}`);
 
-        // In edit/append mode, the field is labeled "New CSV File URL"
+        // In edit/append mode, the field is labeled "New CSV file URL"
         await this.newUrlField.waitFor({ state: 'visible', timeout: 10000 });
         await this.newUrlField.fill(url);
 

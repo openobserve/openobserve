@@ -220,12 +220,11 @@ const stubs = {
   },
   ODialog: {
     name: "ODialog",
-    props: ["open", "title", "primaryButtonLabel"],
+    props: ["open", "title", "primary"],
     emits: ["click:primary"],
     template:
-      "<div v-if='open' data-test='confirm-stub'><h3>{{ title }}</h3><slot /><button data-test='confirm-ok' @click=\"$emit('click:primary')\">{{ primaryButtonLabel }}</button></div>",
+      "<div v-if='open' data-test='confirm-stub'><h3>{{ title }}</h3><slot /><button data-test='confirm-ok' @click=\"$emit('click:primary')\">{{ primary?.label }}</button></div>",
   },
-  OInnerLoading: { name: "OInnerLoading", template: "<div />" },
   OText: { name: "OText", template: "<span><slot /></span>" },
   OIcon: { name: "OIcon", template: "<i />" },
   OButton: {
@@ -613,7 +612,7 @@ describe("OnCallSchedulePresets", () => {
     expect(service.applySchedulePreset).not.toHaveBeenCalled();
     const confirm = wrapper.findComponent({ name: "ODialog" });
     expect(confirm.props("title")).toBe("Replace Secondary's shift rules?");
-    expect(confirm.props("primaryButtonLabel")).toBe("Replace");
+    expect(confirm.props("primary")?.label).toBe("Replace");
 
     await wrapper.find('[data-test="confirm-ok"]').trigger("click");
     await flushPromises();

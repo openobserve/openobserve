@@ -180,7 +180,9 @@ class WorkflowsPage {
     this.editorDraftTag = '[data-test="workflow-editor-draft-tag"]';
     this.saveDraftBtn = '[data-test="workflow-editor-save-draft"]';
     this.historyBtn = '[data-test="workflow-editor-history"]';
-    this.unsavedDialog = '[data-test="workflows-editor-unsaved-dialog"]';
+    this.unsavedDialog = '[data-test="editor-draft-leave-dialog"]';
+    // The shared leave dialog puts Discard on the footer's extra (neutral) button; its primary saves.
+    this.unsavedDiscardBtn = '[data-test="editor-draft-leave-dialog"] [data-test="o-dialog-neutral-btn"]';
     // Per-node hover actions. The rail only renders while the node is hovered, so
     // every one of these needs a hover on the node first.
     this.nodeActionsFor = (t) => `[data-test="workflow-node-${t}-actions"]`;
@@ -583,7 +585,7 @@ class WorkflowsPage {
   async cancelAndDiscard() {
     await this.page.locator(this.cancelBtn).click({ timeout: DRAWER_TIMEOUT_MS });
     await this.page.locator(this.unsavedDialog).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator(this.drawerPrimary).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.unsavedDiscardBtn).click({ timeout: DRAWER_TIMEOUT_MS });
     await this.page.locator(this.listTable).first().waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
   }
 
@@ -796,8 +798,12 @@ class WorkflowsPage {
   /** Choose an already-saved destination by name (the picker's list is searchable). */
   async pickExistingDestination(name) {
     await this.page.locator(this.destPickerSelectTrigger).click({ timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator(this.destPickerSelectSearch).fill(name);
-    const option = this.page.locator(this.destPickerSelectOption).first();
+    // OSelect renders its search box only past eight options; a short list shows every row.
+    await this.page.locator(`${this.destPickerSelectPopover} [data-test-value]`).first()
+      .waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
+    const search = this.page.locator(this.destPickerSelectSearch);
+    if (await search.count()) await search.fill(name);
+    const option = this.page.locator(this.destPickerSelectOption).filter({ hasText: name }).first();
     await option.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
     await option.click({ timeout: DRAWER_TIMEOUT_MS });
   }
@@ -1320,18 +1326,18 @@ class WorkflowsPage {
 
   // ---------- list pause/resume control variant ----------
   // The pause/resume row action is a single OButton whose `:variant` flips between
-  // ghost-destructive (enabled -> pause) and ghost-success (paused -> resume). Both the
-  // `data-row-action` state and the variant class land on the same <button> root.
+  // danger-ghost (enabled -> pause) and ghost (paused -> resume). Both the
+  // `data-row-action` state and `data-o2-variant` land on the same <button> root.
   async listActionRowState(name) {
     const btn = this.page.locator(this.listRowActionFor(name, 'pause-start-action')).first();
     await btn.waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
     return (await btn.getAttribute('data-row-action')) || '';
   }
 
-  async listActionClasses(name) {
+  async listActionVariant(name) {
     const btn = this.page.locator(this.listRowActionFor(name, 'pause-start-action')).first();
     await btn.waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
-    return ((await btn.getAttribute('class')) || '').split(/\s+/);
+    return (await btn.getAttribute('data-o2-variant')) || '';
   }
 
   // ---------- branch-arm connector geometry ----------

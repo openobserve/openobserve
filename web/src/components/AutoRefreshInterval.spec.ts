@@ -43,20 +43,24 @@ describe("AutoRefreshInterval", () => {
           },
           OButton: {
             template:
-              '<button :data-test="$attrs[\'data-test\']" :data-variant="variant" :disabled="disabled" @click="$emit(\'click\')"><slot /><slot name="label" /></button>',
-            props: ["variant", "size", "disabled", "loading", "active", "block"],
+              '<button :data-test="$attrs[\'data-test\']" :data-variant="variant" :aria-pressed="pressed === undefined ? undefined : String(pressed)" :disabled="disabled" @click="$emit(\'click\')"><slot /><slot name="label" /></button>',
+            props: ["variant", "size", "disabled", "loading", "pressed", "block", "iconOnly"],
             emits: ["click"],
           },
-          OPopover: {
-            template: '<div class="o-popover"><slot name="trigger" /><slot /></div>',
-            props: ["open", "side", "align", "sideOffset", "modal", "contentClass", "ariaLabel"],
+          ODropdown: {
+            template: '<div class="o-dropdown"><slot name="trigger" /><slot /></div>',
+            props: ["open", "side", "align"],
             emits: ["update:open"],
           },
-          OSwitch: {
-            template:
-              '<button class="o-switch" :data-test="$attrs[\'data-test\']" :data-on="modelValue" :disabled="disabled" @click="$emit(\'update:modelValue\', !modelValue)" />',
-            props: ["modelValue", "disabled"],
-            emits: ["update:modelValue"],
+          ODropdownGroup: {
+            template: '<div class="o-dropdown-group" :data-label="label"><slot /></div>',
+            props: ["label"],
+          },
+          ODropdownSeparator: { template: "<hr />" },
+          ODropdownItem: {
+            template: `<button :data-test="$attrs['data-test']" :aria-checked="checked === undefined ? undefined : String(checked)" :disabled="disabled" @click="$emit('select')"><slot /></button>`,
+            props: ["checked", "disabled", "disabledReason"],
+            emits: ["select"],
           },
         },
       },
@@ -293,7 +297,7 @@ describe("AutoRefreshInterval", () => {
       expect(wrapper.vm.selectedLabel).toBe("45 seconds");
     });
 
-    it("should turn off via the switch", async () => {
+    it("should turn off via the Off item", async () => {
       wrapper = createWrapper({ modelValue: 60 });
 
       const offButton = wrapper.find('[data-test="logs-search-off-refresh-interval"]');
@@ -318,25 +322,25 @@ describe("AutoRefreshInterval", () => {
     });
   });
 
-  describe("Redesigned panel", () => {
-    it("shows the compact interval and refreshing subtitle when on", () => {
+  describe("Interval menu", () => {
+    it("shows the compact interval on the trigger and checks it when on", () => {
       wrapper = createWrapper({ modelValue: 30 });
       expect(
         wrapper.find('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]').text(),
       ).toContain("Auto: 30s");
-      expect(wrapper.find('[data-test="auto-refresh-subtitle"]').text()).toBe(
-        "Refreshing every 30s",
-      );
+      expect(
+        wrapper.find('[data-test="logs-search-off-refresh-interval"]').attributes("aria-checked"),
+      ).toBe("false");
     });
 
-    it("shows Off and the paused subtitle when off", () => {
+    it("shows Off on the trigger and checks the Off item when off", () => {
       wrapper = createWrapper({ modelValue: 0 });
       expect(
         wrapper.find('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]').text(),
       ).toContain("Auto: Off");
-      expect(wrapper.find('[data-test="auto-refresh-subtitle"]').text()).toBe(
-        "Paused. Pick an interval to start.",
-      );
+      expect(
+        wrapper.find('[data-test="logs-search-off-refresh-interval"]').attributes("aria-checked"),
+      ).toBe("true");
     });
 
     it("groups the intervals into seconds, minutes and hours", () => {
@@ -348,53 +352,19 @@ describe("AutoRefreshInterval", () => {
         ["1m", "5m", "15m", "30m"],
         ["1h", "2h", "1d"],
       ]);
+      expect(
+        wrapper.findAll(".o-dropdown-group").map((g: any) => g.attributes("data-label")),
+      ).toEqual(["Seconds", "Minutes", "Hours"]);
     });
 
-    it("sets aria-pressed on the interval buttons", () => {
+    it("checks the selected interval only", () => {
       wrapper = createWrapper({ modelValue: 30 });
       expect(
-        wrapper.find('[data-test="logs-search-bar-refresh-time-30"]').attributes("aria-pressed"),
+        wrapper.find('[data-test="logs-search-bar-refresh-time-30"]').attributes("aria-checked"),
       ).toBe("true");
       expect(
-        wrapper.find('[data-test="logs-search-bar-refresh-time-10"]').attributes("aria-pressed"),
+        wrapper.find('[data-test="logs-search-bar-refresh-time-10"]').attributes("aria-checked"),
       ).toBe("false");
-    });
-
-    it("marks the selected interval with the primary variant", () => {
-      wrapper = createWrapper({ modelValue: 30 });
-      expect(
-        wrapper.find('[data-test="logs-search-bar-refresh-time-30"]').attributes("data-variant"),
-      ).toBe("primary");
-      expect(
-        wrapper.find('[data-test="logs-search-bar-refresh-time-10"]').attributes("data-variant"),
-      ).toBe("outline");
-    });
-
-    it("turning the switch on resumes the last used interval", async () => {
-      wrapper = createWrapper({ modelValue: 300 });
-      const sw = wrapper.find('[data-test="logs-search-off-refresh-interval"]');
-      await sw.trigger("click");
-      await wrapper.setProps({ modelValue: 0 });
-      await sw.trigger("click");
-      const emitted = wrapper.emitted("update:modelValue") as any[][];
-      expect(emitted[emitted.length - 1][0]).toBe(300);
-    });
-
-    it("turning the switch on with no history picks the smallest allowed interval", async () => {
-      wrapper = createWrapper({ modelValue: 0, minRefreshInterval: 31 });
-      await wrapper.find('[data-test="logs-search-off-refresh-interval"]').trigger("click");
-      const emitted = wrapper.emitted("update:modelValue") as any[][];
-      expect(emitted[emitted.length - 1][0]).toBe(60);
-    });
-
-    it("does not resume a remembered interval below a raised minimum", async () => {
-      wrapper = createWrapper({ modelValue: 10 });
-      const sw = wrapper.find('[data-test="logs-search-off-refresh-interval"]');
-      await sw.trigger("click");
-      await wrapper.setProps({ modelValue: 0, minRefreshInterval: 60 });
-      await sw.trigger("click");
-      const emitted = wrapper.emitted("update:modelValue") as any[][];
-      expect(emitted[emitted.length - 1][0]).toBe(60);
     });
 
     it("keeps the icon-only trigger in compact mode", () => {
@@ -407,24 +377,12 @@ describe("AutoRefreshInterval", () => {
       ).toBe(false);
     });
 
-    it("defaults to 30s when switched on with nothing remembered", async () => {
+    it("says the minimum interval once, in the footer, when some intervals are disabled", () => {
+      wrapper = createWrapper({ modelValue: 0, minRefreshInterval: 30 });
+      expect(wrapper.find('[data-test="auto-refresh-minimum"]').text()).toContain("30");
+      wrapper.unmount();
       wrapper = createWrapper({ modelValue: 0 });
-      await wrapper.find('[data-test="logs-search-off-refresh-interval"]').trigger("click");
-      const emitted = wrapper.emitted("update:modelValue") as any[][];
-      expect(emitted[emitted.length - 1][0]).toBe(30);
-    });
-
-    it("defaults to the smallest allowed interval when 30s is below the minimum", async () => {
-      wrapper = createWrapper({ modelValue: 0, minRefreshInterval: 100 });
-      await wrapper.find('[data-test="logs-search-off-refresh-interval"]').trigger("click");
-      const emitted = wrapper.emitted("update:modelValue") as any[][];
-      expect(emitted[emitted.length - 1][0]).toBe(300);
-    });
-
-    it("disables the switch when every interval is below the minimum", async () => {
-      wrapper = createWrapper({ modelValue: 0, minRefreshInterval: 999999 });
-      const sw = () => wrapper.find('[data-test="logs-search-off-refresh-interval"]');
-      expect(sw().attributes("disabled")).toBeDefined();
+      expect(wrapper.find('[data-test="auto-refresh-minimum"]').exists()).toBe(false);
     });
 
     it.each([
@@ -432,8 +390,9 @@ describe("AutoRefreshInterval", () => {
       [5400, "90m"],
     ])("treats a non-listed model value %i as on", (value, label) => {
       wrapper = createWrapper({ modelValue: value });
-      const sw = wrapper.find('[data-test="logs-search-off-refresh-interval"]');
-      expect(sw.attributes("data-on")).toBe("true");
+      expect(
+        wrapper.find('[data-test="logs-search-off-refresh-interval"]').attributes("aria-checked"),
+      ).toBe("false");
       expect(
         wrapper.find('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]').text(),
       ).toContain(label);
@@ -471,14 +430,12 @@ describe("AutoRefreshInterval", () => {
       expect(btn().attributes("aria-label")).toBe("Auto refresh on, every 5m");
     });
 
-    it("gives each interval button the long label while showing the short one", () => {
+    it("names each interval item with its long label", () => {
       wrapper = createWrapper();
-      const btn = wrapper.find('[data-test="logs-search-bar-refresh-time-30"]');
-      expect(btn.attributes("aria-label")).toBe("30 sec");
-      expect(btn.text()).toBe("30s");
+      expect(wrapper.find('[data-test="logs-search-bar-refresh-time-30"]').text()).toBe("30 sec");
     });
 
-    it("closes the popover after picking an interval", async () => {
+    it("closes the menu after picking an interval", async () => {
       wrapper = createWrapper();
       wrapper.vm.btnRefreshInterval = true;
       await wrapper.vm.$nextTick();

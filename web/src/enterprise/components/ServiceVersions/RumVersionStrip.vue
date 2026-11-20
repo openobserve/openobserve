@@ -17,14 +17,14 @@
     />
     <OIcon v-else name="flag" size="sm" class="text-text-secondary" />
     <template v-if="state === 'loading'">
-      <OSkeleton class="h-5 w-96" data-test="svcver-rum-strip-loading" />
+      <OSkeleton shape="block" class="h-5 w-96" data-test="svcver-rum-strip-loading" />
     </template>
     <template v-else-if="state === 'unavailable'">
       <span class="text-text-body" data-test="svcver-rum-strip-unavailable">{{
         t("serviceVersions.rum.strip.unavailable")
       }}</span
       ><span class="text-text-muted">·</span
-      ><OButton variant="ghost" size="xs" data-test="svcver-rum-strip-retry" @click="retry">{{
+      ><OButton variant="ghost" size="sm" data-test="svcver-rum-strip-retry" @click="retry">{{
         t("serviceVersions.actions.retry")
       }}</OButton>
     </template>
@@ -32,9 +32,9 @@
       <ODropdown v-if="others.length" side="bottom" align="start">
         <template #trigger>
           <OButton
-            variant="outline"
-            size="xs"
-            icon-right="arrow-drop-down"
+            variant="secondary"
+            size="sm"
+            icon-end="arrow-drop-down"
             :aria-label="t('serviceVersions.rum.strip.switchApp')"
             data-test="svcver-rum-strip-app"
             ><b class="text-text-heading font-semibold">{{ scope.service }}</b
@@ -76,7 +76,7 @@
           t("serviceVersions.rum.strip.unavailable")
         }}</span
         ><span class="text-text-muted">·</span
-        ><OButton variant="ghost" size="xs" data-test="svcver-rum-strip-retry" @click="retry">{{
+        ><OButton variant="ghost" size="sm" data-test="svcver-rum-strip-retry" @click="retry">{{
           t("serviceVersions.actions.retry")
         }}</OButton>
       </template>
@@ -87,8 +87,8 @@
         }}</span>
       </template>
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="svcver-rum-strip-compare"
         @click="compare"
         >{{ t("serviceVersions.actions.compare") }}</OButton

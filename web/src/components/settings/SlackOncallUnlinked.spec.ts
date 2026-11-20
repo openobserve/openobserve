@@ -163,8 +163,8 @@ describe("on-call members not linked to Slack (Q7, MK-15's admin side)", () => {
     const chip = w.find('[data-test="slack-oncall-unlinked-now-zed@acme.io"]');
     expect(chip.classes().join(" ")).not.toMatch(/error/);
     expect(
-      w.findComponent('[data-test="slack-oncall-unlinked-now-zed@acme.io"]').props("variant"),
-    ).toBe("success-soft");
+      w.findComponent('[data-test="slack-oncall-unlinked-now-zed@acme.io"]').props("tone"),
+    ).toBe("ok");
   });
 
   /// One row of chips per person: the ones that fit, then "+N" naming them all.

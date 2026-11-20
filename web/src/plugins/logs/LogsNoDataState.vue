@@ -16,119 +16,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   LogsNoDataState — shown when the selected organization has no log streams yet.
-  Each card routes to a distinct, real ingestion path in OpenObserve.
+  Each action routes to a distinct, real ingestion path in OpenObserve.
 -->
 <template>
-  <OEmptyState v-bind="shell" :hide-action="true">
-    <template #title>
-      <span
-        v-if="alternativesOnly"
-        class="text-text-secondary text-sm font-normal"
-        data-test="logs-no-data-another-way"
-        >{{ t("ingestion.firstDataPanel.anotherWay") }}</span
-      >
-      <template v-else>{{ t("logs.noData.title", { product: raw("OpenObserve") }) }}</template>
-    </template>
-
-    <template v-if="!alternativesOnly" #description>
+  <OEmptyState v-bind="shell">
+    <template v-if="!alternativesOnly" #text>
       <span v-html="description" />
     </template>
 
-    <template #actions>
+    <template v-if="!alternativesOnly" #actions>
       <div v-if="$slots.status" class="flex basis-full justify-center">
         <slot name="status" />
       </div>
-
-      <!-- Curl / HTTP API — simplest quick-start -->
-      <EmptyStateIngestionCard
-        icon="code"
-        :label="t('logs.noData.curl')"
-        :sublabel="t('logs.noData.curlDesc')"
-        data-test="logs-no-data-curl-card"
-        @click="go('curl')"
-      />
-
-      <!-- Log shippers — Filebeat, Fluentbit, Fluentd, Vector, SyslogNg -->
-      <EmptyStateIngestionCard
-        icon="alt-route"
-        :label="t('logs.noData.shippers')"
-        :sublabel="
-          t('logs.noData.shippersDesc', {
-            product1: raw('Filebeat'),
-            product2: raw('Fluentbit'),
-            product3: raw('Fluentd'),
-            product4: raw('Vector'),
-            product5: raw('SyslogNg'),
-          })
-        "
-        icon-variant="teal"
-        data-test="logs-no-data-shippers-card"
-        @click="go('ingestLogs')"
-      />
-
-      <!-- OpenTelemetry -->
-      <EmptyStateIngestionCard
-        :image="getImageURL('images/ingestion/otlp.svg')"
-        :label="raw('OpenTelemetry')"
-        :sublabel="t('logs.noData.otelDesc')"
-        icon-variant="amber"
-        data-test="logs-no-data-otel-card"
-        @click="go('ingestLogsFromOtel')"
-      />
+      <OButton variant="primary" data-test="logs-no-data-curl-card" @click="go('curl')">
+        {{ t("logs.noData.curl") }}
+      </OButton>
+      <OButton data-test="logs-no-data-otel-card" @click="go('ingestLogsFromOtel')">
+        {{ raw("OpenTelemetry") }}
+      </OButton>
     </template>
 
     <template #extra>
-      <div class="flex flex-wrap items-center justify-center gap-2">
-        <span class="text-text-secondary me-1 text-sm font-semibold">
-          {{ t("logs.noData.or") }}
-        </span>
-        <EmptyStateIngestionChip
+      <div
+        :class="[
+          'flex flex-wrap items-center gap-x-4 gap-y-1',
+          alternativesOnly ? 'justify-start' : 'justify-center',
+        ]"
+      >
+        <span class="text-text-secondary text-compact">{{ t("logs.noData.or") }}</span>
+        <template v-if="alternativesOnly">
+          <OButton variant="link" data-test="logs-no-data-curl-card" @click="go('curl')">
+            {{ t("logs.noData.curl") }}
+          </OButton>
+          <OButton
+            variant="link"
+            data-test="logs-no-data-otel-card"
+            @click="go('ingestLogsFromOtel')"
+          >
+            {{ raw("OpenTelemetry") }}
+          </OButton>
+        </template>
+        <OButton variant="link" data-test="logs-no-data-shippers-card" @click="go('ingestLogs')">
+          {{ t("logs.noData.shippers") }}
+        </OButton>
+        <OButton
+          variant="link"
           data-test="logs-no-data-kubernetes-btn"
           @click="go('ingestFromKubernetes')"
         >
-          <img
-            :src="getImageURL('images/common/kubernetes.svg')"
-            class="h-3.5 w-3.5 shrink-0 object-contain"
-            alt=""
-          />
           {{ raw("Kubernetes") }}
-        </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip data-test="logs-no-data-aws-btn" @click="go('AWSConfig')">
-          <img
-            :src="getImageURL('images/ingestion/aws.svg')"
-            class="h-3.5 w-3.5 shrink-0 object-contain"
-            alt=""
-          />
+        </OButton>
+        <OButton variant="link" data-test="logs-no-data-aws-btn" @click="go('AWSConfig')">
           {{ t("logs.noData.aws") }}
-        </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip data-test="logs-no-data-linux-btn" @click="go('ingestFromLinux')">
-          <img
-            :src="getImageURL('images/common/linux.svg')"
-            class="h-3.5 w-3.5 shrink-0 object-contain"
-            alt=""
-          />
+        </OButton>
+        <OButton variant="link" data-test="logs-no-data-linux-btn" @click="go('ingestFromLinux')">
           {{ raw("Linux") }}
-        </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip
+        </OButton>
+        <OButton
+          variant="link"
           data-test="logs-no-data-windows-btn"
           @click="go('ingestFromWindows')"
         >
-          <img
-            :src="getImageURL('images/common/windows.svg')"
-            class="h-3.5 w-3.5 shrink-0 object-contain"
-            alt=""
-          />
           {{ raw("Windows") }}
-        </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip
+        </OButton>
+        <OButton
           v-if="aiEnabled"
-          variant="ai"
+          variant="link"
           data-test="logs-no-data-ask-ai-btn"
           @click="emit('ask-ai')"
         >
-          <img :src="aiIconSrc" class="h-3.5 w-3.5 shrink-0" alt="" />
           {{ t("logs.noData.askAi") }}
-        </EmptyStateIngestionChip>
+        </OButton>
       </div>
     </template>
   </OEmptyState>
@@ -140,10 +98,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
-import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
-import { useAiIcon } from "@/composables/useAiIcon";
-import { getImageURL } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const props = defineProps<{
   aiEnabled: boolean;
@@ -163,17 +118,16 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
-const { aiIconSrc } = useAiIcon();
 
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization.identifier,
 }));
 
-// v-bind keeps the hero's own defaults untouched; the caption form drops the illustration and backdrop.
+// Under FirstDataPanel the caption names the alternatives instead of the first-run title.
 const shell = computed(() =>
   props.alternativesOnly
-    ? { size: "block" as const, backdrop: false }
-    : { size: "hero" as const, illustration: "connect" as const },
+    ? { size: "compact" as const, title: t("ingestion.firstDataPanel.anotherWay") }
+    : { icon: "link" as const, title: t("logs.noData.title", { product: raw("OpenObserve") }) },
 );
 
 // Uses v-html — fully i18n-controlled, no user input.

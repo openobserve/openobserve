@@ -274,7 +274,10 @@ export class PipelinesEP {
         const trigger = field.nth(index).locator(`[data-test="${dataTest}-trigger"]`);
         await trigger.click();
         const search = this.page.locator(`[data-test="${dataTest}-search"]`);
-        await search.fill(value);
+        const popover = this.page.locator(`[data-test="${dataTest}-popover"]`);
+        // OSelect renders its search box only past eight options; a short list shows every row.
+        await popover.locator('[data-test-value]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        if (await search.count()) await search.fill(value);
         await this.page.locator(`[data-test="${dataTest}-option"][data-test-value="${value}"]`).click();
         await expect(search).toBeHidden();
         await expect(trigger).toHaveAttribute('data-test-selected-value', value);
@@ -351,7 +354,7 @@ export class PipelinesEP {
         await this.selectImportOrgIdIfAsked();
         await this.selectImportOption(this.destinationFunctionNameDataTest, functionName);
         // This data-test is shared by the stream-type, remote-destination and timezone pickers, so pick by label.
-        await this.selectImportOption(this.remoteDestinationDataTest, remoteDestination, 0, 'Remote Destination');
+        await this.selectImportOption(this.remoteDestinationDataTest, remoteDestination, 0, 'Remote destination');
     }
 
     async waitForImportEditorToContain(text, timeout = 15000) {

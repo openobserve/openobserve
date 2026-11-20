@@ -39,6 +39,7 @@ import {
   setActiveOverlay,
   clearActiveOverlay,
 } from "./ODropdown.context";
+import { MENU_SURFACE } from "@/lib/overlay/shared/menuItem";
 
 const { lgUp } = useBreakpoint();
 
@@ -328,15 +329,11 @@ onBeforeUnmount(() => {
         @close-auto-focus="(event: Event) => emit('close-auto-focus', event)"
         :style="{ zIndex: contentZIndex }"
         :class="[
-          'min-w-40 p-1 max-lg:max-w-[calc(100vw-1rem)]',
+          MENU_SURFACE,
+          'max-lg:max-w-[calc(100vw-1rem)]',
           'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
-          // Surface
-          'bg-dropdown-bg rounded-default shadow-overlay border border-transparent',
-          // Typography
-          'text-dropdown-item-text text-sm',
-          // Animation — clip-path reveal: the menu is unveiled at full size from
-          // its trigger edge (no scale/squish). Wipes down by default; top-placed
-          // menus wipe up. Soft ease-out-expo in, quick wipe out.
+          // A long menu scrolls inside the window instead of running past its bottom edge (R11).
+          'lg:max-h-[min(calc(var(--reka-popper-available-height,100vh)_-_0.5rem),calc(100vh_-_4rem))] lg:overflow-y-auto',
           'data-[state=open]:animate-[o2-reveal-down-in_var(--duration-overlay-in)_var(--ease-out-expo)]',
           'data-[state=closed]:animate-[o2-reveal-down-out_var(--duration-overlay-out)_var(--ease-overlay-out)]',
           'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_var(--duration-overlay-in)_var(--ease-out-expo)]',

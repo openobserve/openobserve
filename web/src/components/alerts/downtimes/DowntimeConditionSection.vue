@@ -25,8 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         class="ms-auto"
         variant="ghost"
-        size="sm"
-        icon-left="add"
         data-test="downtime-condition-add"
         @click="openSection"
       >
@@ -42,10 +40,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <OTag type="exampleChip" value="dim" :label="t('alerts.downtimes.condition.onePer')" />
         <OButton
+          icon-only
           class="ms-auto"
           variant="ghost"
-          size="icon-sm"
-          icon-left="close"
+          icon="close"
           :aria-label="t('alerts.downtimes.condition.remove')"
           data-test="downtime-condition-remove"
           @click="closeSection"

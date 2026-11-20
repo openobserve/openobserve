@@ -10,7 +10,6 @@
       :model-value="displayEnabled"
       :disabled="saving || !status.organization.can_manage"
       :label="t('paidUsage.switchLabel')"
-      size="sm"
       data-test="billing-paid-ai-usage-toggle"
       @update:model-value="updateEnabled"
     />

@@ -30,6 +30,8 @@ export interface QueryDiagnostics {
   rowsReturned?: number;
   seriesReturned?: number;
   cacheRatio?: number;
+  /** Any partition was served wholly or partly from a result cache, which reports no scanned records. */
+  fromCache?: boolean;
   serverPartial: boolean;
   /** The server stopped at its row limit, so counts derived from the rows are lower bounds. */
   rowsCapped: boolean;
@@ -132,6 +134,9 @@ export const summarizeQueryDiagnostics = (
     scanSizeMb: sumOf(partitions, "scan_size"),
     scanRecords: sumOf(partitions, "scan_records"),
     ...countReturned(options.rows, options.queryType),
+    fromCache: partitions.some(
+      (p) => Number(p.cached_ratio) > 0 || Number(p.result_cache_ratio) > 0,
+    ),
     cacheRatio: ratios.length
       ? Math.round(ratios.reduce((total, v) => total + v, 0) / ratios.length)
       : undefined,
@@ -186,3 +191,7 @@ export const omitFunctionErrorMessages = (resultMetaData: unknown, messages: str
   };
   return resultMetaData.map((entry) => (Array.isArray(entry) ? entry.map(strip) : strip(entry)));
 };
+
+/** True only when the server scanned no records and did not answer from a cache. */
+export const scannedNoRecords = (query: QueryDiagnostics): boolean =>
+  query.scanRecords === 0 && !query.fromCache;

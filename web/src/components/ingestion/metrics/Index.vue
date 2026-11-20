@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :tab="otelCollectorTab"
         :rest-label="t('ingestion.metricsLabel')"
       />
-      <ORouteTab
+      <OTab
         name="prometheus"
         data-test="ingestion-metrics-tab-prometheus"
         :to="{
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/prometheus.svg')"
         :label="t('ingestion.metrics.prometheus')"
       />
-      <ORouteTab
+      <OTab
         name="vmagent"
         data-test="ingestion-metrics-tab-vmagent"
         :to="{
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/vmagent.svg')"
         :label="t('ingestion.metrics.vmagent')"
       />
-      <ORouteTab
+      <OTab
         name="nightingale"
         data-test="ingestion-metrics-tab-nightingale"
         :to="{
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/nightingale.svg')"
         :label="t('ingestion.metrics.nightingale')"
       />
-      <ORouteTab
+      <OTab
         name="categraf"
         data-test="ingestion-metrics-tab-categraf"
         :to="{
@@ -72,8 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/categraf.png')"
         :label="t('ingestion.metrics.categraf')"
       />
-      <ORouteTab v-if="pickRoute !== otelCollectorTab.name" v-bind="otelCollectorTab" />
-      <ORouteTab
+      <OTab v-if="pickRoute !== otelCollectorTab.name" v-bind="otelCollectorTab" />
+      <OTab
         name="telegraf"
         :to="{
           name: 'telegraf',
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/telegraf.png')"
         :label="t('ingestion.metrics.telegraf')"
       />
-      <ORouteTab
+      <OTab
         name="cloudwatchMetrics"
         :to="{
           name: 'cloudwatchMetrics',
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/cloud_watch.svg')"
         :label="t('ingestion.metrics.awsCloudwatchMetrics')"
       />
-      <ORouteTab
+      <OTab
         name="datadogAgentMetrics"
         data-test="ingestion-metrics-tab-datadogagent"
         :to="{
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 import FirstSourcePickGroup from "@/components/ingestion/FirstSourcePickGroup.vue";
 // @ts-ignore
@@ -142,7 +142,7 @@ import { firstSourcePickRoute } from "@/components/login/firstSourceOptions";
 export default defineComponent({
   name: "IngestMetrics",
   components: {
-    ORouteTab,
+    OTab,
     DataSourceSidebarLayout,
     FirstSourcePickGroup,
   },

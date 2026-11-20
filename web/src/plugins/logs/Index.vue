@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="logPage"
     data-test="logs-page-container"
   >
+    <OPageHeader :title="t('menu.search')" title-data-test="logs-page-title" />
     <FirstDataPanel
       v-if="firstDataArrival"
       signal="logs"
@@ -182,7 +183,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <LogsNoStreamState
                         :org-id="store.state.selectedOrganization.identifier"
                         :stream-type="searchObj.data.stream.streamType"
-                        :auto-run="isAutoRunOn"
                         data-test="logs-search-no-stream-selected-text"
                         @select-stream="onSelectStream"
                         @pick-stream="onPickStream"
@@ -292,9 +292,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @go-to-page="onSharedPageGo"
                       />
                       <OEmptyState
-                        preset="search-cancelled"
-                        size="hero"
+                        kind="filtered"
+                        :title="t('emptyState.searchCancelled.title')"
+                        :text="t('emptyState.searchCancelled.description')"
                         class="min-h-0 flex-1"
+                        :action-label="t('emptyState.searchCancelled.action')"
                         @action="() => searchBarRef?.handleRunQueryFn?.()"
                       />
                     </div>
@@ -365,9 +367,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @go-to-page="onSharedPageGo"
                       />
                       <OEmptyState
-                        preset="no-query-applied"
-                        size="hero"
+                        kind="filtered"
+                        :title="t('emptyState.noQueryApplied.title')"
+                        :text="t('emptyState.noQueryApplied.description')"
                         data-test="logs-search-apply-search-text"
+                        :action-label="t('emptyState.noQueryApplied.action')"
                         @action="() => searchBarRef?.handleRunQueryFn?.()"
                       />
                     </div>
@@ -380,9 +384,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     >
                       <OEmptyState
-                        preset="no-query-applied"
-                        size="hero"
+                        kind="filtered"
+                        :title="t('emptyState.noQueryApplied.title')"
+                        :text="t('emptyState.noQueryApplied.description')"
                         data-test="logs-search-patterns-apply-search-text"
+                        :action-label="t('emptyState.noQueryApplied.action')"
                         @action="() => searchBarRef?.handleRunQueryFn?.()"
                       />
                     </div>
@@ -404,7 +410,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <div v-if="showSearchCancelledNotice" class="flex items-center px-2.5 pt-2">
                         <OBadge
-                          variant="default-soft"
+                          tone="neutral"
                           size="sm"
                           icon="cancel"
                           data-test="logs-search-cancelled-notice"
@@ -509,7 +515,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Same no-stream / error / no-events states as the results pane. -->
               <OEmptyState
                 v-if="searchObj.meta.sqlMode"
-                size="hero"
                 :title="t('search.drillDownUnavailableInSqlMode')"
                 data-test="logs-drill-down-sql-mode-text"
               />
@@ -531,7 +536,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 :org-id="store.state.selectedOrganization.identifier"
                 :stream-type="searchObj.data.stream.streamType"
-                :auto-run="isAutoRunOn"
                 data-test="logs-drill-down-no-stream-selected-text"
                 @select-stream="onSelectStream"
                 @pick-stream="onPickStream"
@@ -619,11 +623,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OEmptyState
                 v-else
-                preset="no-query-applied"
-                size="hero"
+                kind="filtered"
                 :title="t('search.drillDownRunTitle')"
-                :description="t('search.drillDownRunDescription')"
+                :text="t('search.drillDownRunDescription')"
                 data-test="logs-drill-down-apply-search-text"
+                :action-label="t('emptyState.noQueryApplied.action')"
                 @action="() => searchBarRef?.handleRunQueryFn?.()"
               />
             </div>
@@ -773,9 +777,11 @@ import { useLogsHistoryRestore } from "@/composables/useLogs/useLogsHistoryResto
 import { takeRecentLanding } from "@/utils/queryHistory/routes";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import AnomalyOriginBanner from "@/components/alerts/AnomalyOriginBanner.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import LogsNoStreamState from "@/plugins/logs/LogsNoStreamState.vue";
+import { isNonTimeSeriesAggregate } from "@/utils/logs/sqlResultShape";
 import LogsErrorState from "@/plugins/logs/LogsErrorState.vue";
 import LogsNoFtsPanel from "@/plugins/logs/LogsNoFtsPanel.vue";
 import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
@@ -839,6 +845,7 @@ import {
 } from "@/composables/useLogs/freeTextSearch";
 import { isAutoRunActive, type RunContext } from "@/composables/useLogs/useAutoRun";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { usePrimaryQueryFocus } from "@/composables/usePrimaryQueryFocus";
 import {
   logsRowNavAnnouncement,
   nextJobRequestId,
@@ -876,6 +883,7 @@ export default defineComponent({
     LogsNoEventsState,
     LogsNoDataState,
     FirstDataPanel,
+    OPageHeader,
     AnomalyOriginBanner,
     LogsNoStreamState,
     LogsDrillDownStreamSelect,
@@ -2169,9 +2177,10 @@ export default defineComponent({
     });
 
     const onDrillDownStreamChange = (stream: string) => {
+      const fromEmptyPage = !searchObj.data.stream.selectedStream.length;
       searchObj.data.stream.selectedStream = [stream];
       searchObj.data.filterErrMsg = "";
-      onStreamChange("", { origin: "selector" });
+      onStreamChange("", { origin: "selector", runNow: fromEmptyPage });
     };
 
     const onSelectStream = () => {
@@ -2199,7 +2208,7 @@ export default defineComponent({
 
     const onPickStream = (stream: string) => {
       searchObj.data.stream.selectedStream = [stream];
-      onStreamChange("", { origin: "selector" });
+      onStreamChange("", { origin: "selector", runNow: true });
     };
 
     const firstDataArrival = ref<FirstEventResult | null>(null);
@@ -2266,7 +2275,7 @@ export default defineComponent({
     const onJumpToStreamData = (fromUs: number, toUs: number) => {
       // We fire the search directly via runQuery below. setAbsoluteTime is only
       // needed to sync the picker UI, but it also mutates the picker's selectedDate/
-      // selectedTime, which fires DateTime.vue's deep auto-apply watcher → on:date-change
+      // selectedTime, which fires ODateTimeRange's deep auto-apply watcher → on:date-change
       // → updateDateTime. In live mode that path schedules a SECOND search via a 2.5s
       // debounce. The programmatic-change flag that would normally mark that emit as
       // userChangedValue=false is defeated here because runQuery kicks off an async
@@ -4229,6 +4238,7 @@ export default defineComponent({
     };
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
+    usePrimaryQueryFocus("logsFocusQuery");
     useShortcuts([
       {
         id: "logsRunQuery",
@@ -4239,16 +4249,6 @@ export default defineComponent({
       {
         id: "logsSearchHistory",
         handler: () => showSearchHistoryfn(),
-      },
-      {
-        id: "logsFocusQuery",
-        handler: () => {
-          // The logs query editor is Monaco — focus its inner textarea.
-          const el = document.querySelector<HTMLElement>(
-            '[data-test="logs-search-bar-query-editor"] textarea, [data-test="logs-search-bar"] .monaco-editor textarea',
-          );
-          el?.focus();
-        },
       },
       {
         id: "logsRefresh",
@@ -4514,7 +4514,17 @@ export default defineComponent({
         // The page total is summed from aggs, so drop them only when a refetch replaces them.
         if (this.searchObj.meta.histogramDirtyFlag) this.searchObj.data.queryResults.aggs = [];
 
-        if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
+        if (
+          this.searchObj.meta.sqlMode &&
+          isNonTimeSeriesAggregate(
+            parsedSQL,
+            this.searchObj.data.query ?? "",
+            this.store.state.zoConfig.timestamp_column || "_timestamp",
+          )
+        ) {
+          this.resetHistogramWithError(this.t("search.histogramHiddenForAggregates"), -1);
+          this.searchObj.meta.histogramDirtyFlag = false;
+        } else if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(this.t("search.histogramUnavailableForQueries"), -1);
           this.searchObj.meta.histogramDirtyFlag = false;
         } else if (

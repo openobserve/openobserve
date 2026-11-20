@@ -26,10 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #trigger>
           <OButton
             data-test="settings-data-retention-add"
-            variant="outline"
-            size="sm-action"
-            icon-left="add"
-            icon-right="keyboard-arrow-down"
+            variant="secondary"
+            icon-end="keyboard-arrow-down"
             type="button"
             >{{ t("settings.dataRetentionDefaults.addType") }}</OButton
           >
@@ -43,27 +41,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span>{{ typeLabels[type] }}</span>
         </ODropdownItem>
       </ODropdown>
-      <span v-else class="flex">
-        <OButton
-          data-test="settings-data-retention-add"
-          variant="outline"
-          size="sm-action"
-          icon-left="add"
-          type="button"
-          disabled
-          focusable-unavailable
-        >
-          {{ t("settings.dataRetentionDefaults.addType") }}
-          <template #unavailable-reason>{{
-            t("settings.dataRetentionDefaults.allTypesAdded")
-          }}</template>
-        </OButton>
-        <OTooltip side="bottom" :content="t('settings.dataRetentionDefaults.allTypesAdded')" />
-      </span>
+      <OButton
+        v-else
+        data-test="settings-data-retention-add"
+        variant="secondary"
+        type="button"
+        disabled
+        :disabled-reason="t('settings.dataRetentionDefaults.allTypesAdded')"
+        :label="t('settings.dataRetentionDefaults.addType')"
+      />
     </template>
 
     <OSettingRow
-      control-at="end"
+      control-at="below"
       name="default"
       error-data-test="settings-data-retention-default-error"
       :label="t('settings.dataRetentionDefaults.defaultLabel')"
@@ -85,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSettingRow
       v-for="(row, index) in rows"
       :key="index"
-      control-at="end"
+      control-at="below"
       :name="`types[${index}].days`"
       :error-data-test="`settings-data-retention-days-${index}-error`"
       :label="typeLabels[row.type]"
@@ -105,16 +95,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <OButton
+          icon-only
           :data-test="`settings-data-retention-remove-${index}`"
-          variant="ghost-muted"
-          size="icon-xs-sq"
-          icon-left="close"
+          variant="ghost"
+          size="sm"
+          icon="close"
           type="button"
-          :aria-label="removeLabel(row.type)"
+          :label="removeLabel(row.type)"
           @click="removeRow(index)"
-        >
-          <OTooltip :content="removeLabel(row.type)" side="top" align="end" />
-        </OButton>
+        />
       </div>
     </OSettingRow>
   </OFormSection>
@@ -131,7 +120,6 @@ import type { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import {
   RETENTION_STREAM_TYPES,
   type ResolvedDataRetention,

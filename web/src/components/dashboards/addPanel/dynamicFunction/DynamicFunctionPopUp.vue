@@ -22,7 +22,6 @@
           </div>
           <OInput
             v-model="fields.label"
-            size="sm"
             class="w-full"
             data-test="dynamic-function-popup-label-input"
           />
@@ -34,12 +33,11 @@
           </div>
           <OInput
             v-model="fields.alias"
-            size="sm"
             disabled
             class="w-full"
             data-test="dynamic-function-popup-alias-input"
           >
-            <template #icon-right>
+            <template #icon-end>
               <OIcon name="lock" size="xs" class="text-text-secondary" />
             </template>
           </OInput>
@@ -67,18 +65,16 @@
             </div>
             <OButtonGroup data-test="dynamic-function-popup-tabs" class="ms-auto shrink-0">
               <OButton
-                :active="fields.type === 'build'"
-                variant="outline"
-                size="sm"
+                :pressed="fields.type === 'build'"
+                variant="secondary"
                 data-test="dynamic-function-popup-tab-build"
                 @click="setFieldType('build')"
               >
                 {{ t("dashboard.dynamicFunctionPopUp.build") }}
               </OButton>
               <OButton
-                :active="fields.type === 'raw'"
-                variant="outline"
-                size="sm"
+                :pressed="fields.type === 'raw'"
+                variant="secondary"
                 data-test="dynamic-function-popup-tab-raw"
                 @click="setFieldType('raw')"
               >
@@ -113,11 +109,9 @@
 
               <OButton
                 v-if="!isHavingFilterVisible()"
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 class="ms-auto"
                 data-test="dynamic-function-popup-having-add-btn"
-                icon-left="add"
                 @click="toggleHavingFilter"
               >
                 {{ t("dashboard.dynamicFunctionPopUp.add") }}
@@ -143,12 +137,13 @@
               </div>
 
               <OButton
+                icon-only
                 :aria-label="t('common.cancel')"
-                variant="outline"
-                size="icon"
+                variant="secondary"
+                size="xs"
                 class="shrink-0"
                 data-test="dynamic-function-popup-having-cancel-btn"
-                icon-left="close"
+                icon="close"
                 @click="cancelHavingFilter"
               >
               </OButton>

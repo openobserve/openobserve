@@ -14,34 +14,38 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  ServiceGraphNoDataState — empty state for the service graph panel.
-
-  Uses the hero size so the illustration and copy match the other traces empty
-  states. No widen-range action (the panel aggregates across the window, so
-  widening wouldn't reliably surface data), but when the stream has data outside
-  the current window we offer a precise "jump to latest data" action, consistent
-  with the traces search "no events" state.
--->
+<!-- No widen-range action: the panel aggregates across the window, so only a precise
+     jump to the stream's latest data can help. -->
 <template>
-  <OEmptyState v-if="jumpTarget" preset="no-service-graph" size="hero">
+  <OEmptyState
+    v-if="jumpTarget"
+    kind="filtered"
+    :title="t('emptyState.noServiceGraph.title')"
+    :text="t('emptyState.noServiceGraph.description')"
+  >
     <template #actions>
-      <EmptyStateActionCard
-        icon="schedule"
-        :label="t('traces.noEvents.jumpToData')"
-        :sublabel="raw(jumpTargetSublabel)"
+      <OButton
+        variant="primary"
+        :title="jumpTargetSublabel"
         data-test="service-graph-no-data-jump-to-data-card"
         @click="emit('jump-to-stream-data', jumpTarget.from, jumpTarget.to)"
-      />
+      >
+        {{ t("traces.noEvents.jumpToData") }}
+      </OButton>
     </template>
   </OEmptyState>
-  <OEmptyState v-else preset="no-service-graph" size="hero" :hide-action="true" />
+  <OEmptyState
+    v-else
+    kind="filtered"
+    :title="t('emptyState.noServiceGraph.title')"
+    :text="t('emptyState.noServiceGraph.description')"
+  />
 </template>
 
 <script setup lang="ts">
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import useJumpToLatestData from "@/composables/useJumpToLatestData";
 
 const { t } = useI18nTyped();

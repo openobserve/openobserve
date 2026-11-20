@@ -96,8 +96,8 @@ function onSelect(card: CheckTypeCard) {
     >
       <OTag
         v-if="isComingSoon(card) && !isDisabled(card)"
-        variant="primary-soft"
-        size="xs"
+        tone="accent"
+        size="sm"
         class="absolute top-2 right-2 z-10"
         data-test="check-type-picker-coming-soon-badge"
       >

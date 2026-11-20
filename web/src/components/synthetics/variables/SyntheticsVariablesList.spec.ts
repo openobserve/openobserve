@@ -27,14 +27,14 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 import SyntheticsVariablesList from "./SyntheticsVariablesList.vue";
 
 const ODialogStub = {
-  props: ["open", "title", "primaryButtonLabel", "primaryButtonVariant"],
+  props: ["open", "title", "primary", "primary"],
   emits: ["click:primary", "click:secondary", "update:open"],
   template: '<div v-if="open" v-bind="$attrs"><slot /></div>',
 };
 
 const OBadgeStub = {
-  props: ["variant", "size"],
-  template: '<span v-bind="$attrs" :data-variant="variant"><slot /></span>',
+  props: ["tone", "size"],
+  template: '<span v-bind="$attrs" :data-variant="tone"><slot /></span>',
 };
 
 function variable(over: Partial<SyntheticsVariable> = {}): SyntheticsVariable {
@@ -113,7 +113,7 @@ describe("SyntheticsVariablesList — value cell", () => {
     const badge = wrapper.find(emptyBadge);
     expect(badge.exists()).toBe(true);
     expect(badge.text()).toBe(SENTINEL);
-    expect(badge.attributes("data-variant")).toBe("warning");
+    expect(badge.attributes("data-variant")).toBe("warn");
     expect(wrapper.find(plainValue).exists()).toBe(false);
   });
 
@@ -138,7 +138,7 @@ describe("SyntheticsVariablesList — value cell", () => {
     const badge = wrapper.find(emptyBadge);
     expect(badge.exists()).toBe(true);
     expect(badge.text()).toBe("Not set");
-    expect(badge.attributes("data-variant")).toBe("warning");
+    expect(badge.attributes("data-variant")).toBe("warn");
     expect(wrapper.find(secretValue).exists()).toBe(false);
   });
 });
@@ -214,7 +214,7 @@ describe("SyntheticsVariablesList — delete dialog", () => {
     await wrapper.find(deleteBtn).trigger("click");
 
     expect(dialog().props("open")).toBe(true);
-    expect(dialog().props("primaryButtonVariant")).toBe("destructive");
+    expect(dialog().props("primary")?.variant).toBe("danger");
     const name = wrapper.find('[data-test="synthetics-variable-delete-name"]');
     expect(name.text()).toBe("BASE_URL");
     expect(name.classes()).toContain("font-semibold");

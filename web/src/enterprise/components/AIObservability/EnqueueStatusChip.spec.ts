@@ -30,8 +30,8 @@ vi.mock("@/types/i18n", async (importOriginal) => {
 vi.mock("@/lib/core/Badge/OTag.vue", () => ({
   default: {
     name: "OTag",
-    props: ["variant", "shape"],
-    template: `<span class="o-tag" :data-variant="variant"><slot /></span>`,
+    props: ["tone"],
+    template: `<span class="o-tag" :data-variant="tone"><slot /></span>`,
   },
 }));
 
@@ -87,6 +87,6 @@ describe("EnqueueStatusChip", () => {
 
     const chip = wrapper.find('[data-test="enqueue-chip-reviewed"]');
     expect(chip.exists()).toBe(true);
-    expect(chip.attributes("data-variant")).toBe("success-soft");
+    expect(chip.attributes("data-variant")).toBe("ok");
   });
 });

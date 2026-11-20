@@ -21,8 +21,12 @@ import i18n from "@/locales";
 import type { SubjectType } from "@/ts/interfaces/oncall";
 
 const stubs = {
-  OCard: { name: "OCard", template: "<div><slot /></div>" },
-  OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
+  OCard: {
+    name: "OCard",
+    props: ["title"],
+    template:
+      '<div><h3>{{ title }}</h3><slot name="header" /><slot name="actions" /><slot /></div>',
+  },
   OButton: { name: "OButton", template: "<button><slot /></button>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
   ODescriptionList: { name: "ODescriptionList", template: "<dl><slot /></dl>" },

@@ -26,15 +26,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #actions>
       <OButton
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         @click="handleBack"
         data-test="synthetics-locations-import-cancel-btn"
         >{{ t("function.cancel") }}</OButton
       >
       <OButton
         variant="primary"
-        size="sm-action"
         type="submit"
         @click="handleImport"
         :loading="isImporting"
@@ -59,8 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="mt-2">
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             @click="triggerFileUpload"
             data-test="synthetics-locations-import-file-btn"
           >

@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
             store.state.zoConfig?.custom_logo_text != ''
           "
-          class="me-2 w-full cursor-pointer p-0 text-xl font-bold font-semibold"
+          class="me-2 w-full cursor-pointer p-0 text-xl font-semibold"
           >{{ store.state.zoConfig.custom_logo_text }}</span
         >
         <span class="flex w-full justify-center">
@@ -106,7 +106,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             data-test="sso-login-btn"
             variant="primary"
-            size="sm-action"
             style="width: 25rem"
             @click="loginWithSSo"
           >
@@ -124,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div v-if="showSSO && showInternalLogin" class="py-3 text-center">
           <OButton
-            variant="ghost-primary"
+            variant="accent-ghost"
             type="button"
             data-test="login-as-internal-user"
             :aria-expanded="loginAsInternalUser"
@@ -141,13 +140,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="login-inputs"
         >
           <!-- Only retry_after is shown, never the attempt counters or the thresholds behind them. -->
-          <OBanner
+          <OInlineNotice
             v-if="lockoutSecondsLeft > 0"
-            variant="error"
-            icon="error"
-            dense
+            tone="err"
             class="mb-3"
-            :content="
+            :message="
               t('login.lockedOut', { duration: raw(durationFormatter(lockoutSecondsLeft)) })
             "
             data-test="login-lockout-banner"
@@ -193,7 +190,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-cy="login-sign-in"
               data-test="login-sign-in"
               variant="primary"
-              size="sm-action"
               block
               type="submit"
               :loading="submitting"
@@ -231,7 +227,7 @@ import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { openobserveRum } from "@openobserve/browser-rum";
@@ -241,7 +237,7 @@ import { makeLoginSchema, loginDefaults, type LoginForm } from "./Login.schema";
 
 export default defineComponent({
   name: "PageLogin",
-  components: { OButton, OBanner, OForm, OFormInput },
+  components: { OButton, OInlineNotice, OForm, OFormInput },
 
   setup() {
     const store = useStore();

@@ -25,13 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="downtime-schedule-repeat"
       @update:model-value="onRepeatChange"
     >
-      <OToggleGroupItem value="none" size="sm" data-test="downtime-schedule-repeat-none">
+      <OToggleGroupItem value="none" data-test="downtime-schedule-repeat-none">
         {{ t("alerts.downtimes.scheduleForm.once") }}
       </OToggleGroupItem>
-      <OToggleGroupItem value="daily" size="sm" data-test="downtime-schedule-repeat-daily">
+      <OToggleGroupItem value="daily" data-test="downtime-schedule-repeat-daily">
         {{ t("alerts.downtimes.scheduleForm.daily") }}
       </OToggleGroupItem>
-      <OToggleGroupItem value="weekly" size="sm" data-test="downtime-schedule-repeat-weekly">
+      <OToggleGroupItem value="weekly" data-test="downtime-schedule-repeat-weekly">
         {{ t("alerts.downtimes.scheduleForm.weekly") }}
       </OToggleGroupItem>
     </OFormToggleGroup>
@@ -92,7 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="day in weekdays"
           :key="day.value"
           :value="day.value"
-          size="sm"
           :data-test="`downtime-schedule-weekday-${day.value}`"
         >
           {{ day.label }}
@@ -118,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('alerts.downtimes.scheduleForm.duration')"
           :placeholder="t('alerts.downtimes.scheduleForm.durationPlaceholder')"
           :help-text="t('alerts.downtimes.scheduleForm.durationHelp')"
-          width="sm"
+          width="s"
           required
           :disabled="locked"
           data-test="downtime-schedule-duration"
@@ -139,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="timezoneOptions"
       searchable
       required
-      width="md"
+      width="m"
       :disabled="locked"
       data-test="downtime-schedule-timezone"
     />

@@ -23,16 +23,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ t("rum.analytics.funnel.breakdownBy", { field: dimLabel }) }}</span
       >
       <OPopover
+        size="lg"
         v-if="about"
         align="start"
-        content-class="p-3 w-96 max-w-[calc(100vw-1.5rem)]"
+        content-class="p-3"
         :aria-label="t('rum.analytics.funnel.breakdownAbout')"
       >
         <template #trigger>
           <OButton
-            variant="ghost-primary"
-            size="xs"
-            icon-left="info-outline"
+            variant="accent-ghost"
+            size="sm"
+            icon="info-outline"
             data-test="rum-analytics-funnel-breakdown-about"
             >{{ t("rum.analytics.funnel.breakdownAbout") }}</OButton
           >
@@ -56,8 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       pagination="none"
       sorting="none"
-      :show-global-filter="false"
-      :frame="false"
     >
       <template #cell-value="{ row, index }">
         <span
@@ -68,20 +67,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="row.atLeast"
             :label="t('rum.analytics.funnel.atLeast')"
-            variant="default-soft"
-            size="xs"
+            tone="neutral"
+            size="sm"
           />
           <OTag
             v-if="row.builtinOnly"
             :label="t('rum.analytics.funnel.builtinOnly')"
-            variant="default-outline"
-            size="xs"
+            tone="outline"
+            size="sm"
           />
           <OTag
             v-if="row.lowVolume"
             :label="t('rum.analytics.funnel.lowVolumeTag')"
-            variant="default-soft"
-            size="xs"
+            tone="neutral"
+            size="sm"
             :data-test="`rum-analytics-funnel-breakdown-row-${index}-low-volume`"
           />
         </span>

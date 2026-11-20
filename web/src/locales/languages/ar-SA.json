@@ -11,7 +11,11 @@
     "bannerMessage": "هذه الميزة مقفلة. تحتاج إلى ميزة {feature} في ترخيصك.",
     "bannerMessageGeneric": "تحتاج هذه الصفحة إلى ميزة غير مشمولة في ترخيصك.",
     "headerLocked": "مقفل: يتطلب {feature}",
-    "availableInEnterprise": "متاح في OpenObserve Enterprise: {feature}"
+    "availableInEnterprise": "متاح في OpenObserve Enterprise: {feature}",
+    "turnedOffTitle": "معطّل لهذه المؤسسة",
+    "enterpriseTitle": "متاح في Enterprise",
+    "readDocs": "اقرأ الوثائق",
+    "rbacOff": "RBAC معطّل لهذه المؤسسة. يقوم المسؤول بتفعيله عبر ضبط {env} على true في إعدادات الخادم."
   },
   "emptyState": {
     "illustrations": {
@@ -52,6 +56,7 @@
         "ariaLabel": "في انتظار البيانات"
       }
     },
+    "requestId": "الطلب {id}",
     "createFirstItem": "أنشئ أول عنصر لك",
     "newBrowserCheck": "فحص متصفح جديد",
     "allCaughtUp": "لقد تم الاطلاع على كل شيء",
@@ -79,10 +84,6 @@
       "title": "لم يتم العثور على أنماط",
       "description": "حاول زيادة نطاق الوقت أو اختيار تدفق مختلف يحتوي على بيانات سجل أكثر. تعمل عملية استخراج الأنماط بشكل أفضل مع 1,000 سجل على الأقل.",
       "logsAnalyzed": "عدد السجلات التي تم تحليلها {count} فقط."
-    },
-    "noStreamSelected": {
-      "title": "اختر تدفقًا للبدء",
-      "description": "اختر تدفقًا، ثم نفذ استعلامك لاستكشاف بياناته. قم بتحسين النتائج باستخدام الفلاتر ونطاق وقت مخصص."
     },
     "noQueryApplied": {
       "title": "نفذ استعلامًا لرؤية النتائج",
@@ -329,7 +330,6 @@
     "noStreams": {
       "title": "ربط مصدر لإنشاء أول تدفق لك",
       "description": "يتم إنشاء التدفقات تلقائيًا عند وصول البيانات. قم بإعداد الاستيعاب من تطبيقك، وكيلك، أو جامعك للبدء.",
-      "action": "إعداد الاستيعاب",
       "actionDesc": "ربط مصدر للبيانات",
       "createAction": "تدفق جديد",
       "createActionDesc": "تحديد مخطط تدفق يدويًا"
@@ -392,6 +392,10 @@
       "description": "لم نتمكن من تحميل هذه البيانات. عادة ما تكون مؤقتة — جربها مرة أخرى بعد قليل.",
       "action": "إعادة المحاولة",
       "actionDesc": "حاول تحميل البيانات مرة أخرى"
+    },
+    "pageError": {
+      "title": "تعذّر تحميل هذه الصفحة",
+      "description": "لم يتم تحميل أي من بيانات هذه الصفحة. أعد المحاولة الآن أو حاول مجددًا بعد دقيقة."
     },
     "noData": {
       "title": "لا شيء هنا حتى الآن",
@@ -469,7 +473,9 @@
       "description": "لا {noun} تطابق الفلاتر أو البحث الحالي. حاول تعديلها أو إزالتها.",
       "action": "مسح الفلاتر",
       "actionDesc": "إعادة ضبط جميع الفلاتر والبحث",
-      "fallbackNoun": "النتائج"
+      "fallbackNoun": "النتائج",
+      "noMatches": "لا توجد نتائج مطابقة",
+      "noMatchesText": "لا شيء يطابق البحث أو عوامل التصفية الحالية."
     },
     "nouns": {
       "logs": "السجلات",
@@ -792,6 +798,9 @@
       "popoverLabel": "الأجزاء المخفية من هذه الصفحة"
     }
   },
+  "pageHeader": {
+    "about": "حول هذه الصفحة"
+  },
   "common": {
     "loadingNoun": "جارٍ تحميل {noun}…",
     "loadingNouns": {
@@ -801,6 +810,7 @@
       "charts": "المخططات"
     },
     "dismiss": "تجاهل",
+    "undo": "تراجع",
     "exitFullscreen": "إنهاء ملء الشاشة",
     "moreActions": "المزيد من الإجراءات",
     "moreOptions": "المزيد من الخيارات",
@@ -1276,7 +1286,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "إعدادات المجمّع"
+        "fleet_config": "إعدادات المجمّع",
+        "workflow": "سير العمل"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1312,8 +1323,8 @@
     "toggleConnector": "التبديل بين AND و OR",
     "selectedCount": "No values selected | {count} value selected | {count} values selected",
     "query": "الاستعلام",
-    "builderTooltip": "أنشئ الفلاتر باختيار الحقول والشروط والقيم",
-    "queryTooltip": "اكتب الاستعلام بنفسك",
+    "builderTooltip": "تحرير عامل التصفية بالمنشئ",
+    "queryTooltip": "تحرير عامل التصفية كنص",
     "queryNotParsableShort": "لا يمكن لمنشئ الفلاتر عرض هذا الاستعلام:",
     "clearAndBuild": "المسح والبناء",
     "clearQueryTitle": "مسح الاستعلام؟",
@@ -1380,7 +1391,10 @@
       "isEmpty": "فارغ أو لا يحتوي على قيمة",
       "isNotEmpty": "يحتوي على قيمة غير فارغة",
       "matchAll": "يطابق النص"
-    }
+    },
+    "editorModeLabel": "محرر عوامل التصفية",
+    "modeBuilder": "المنشئ",
+    "modeText": "نص"
   },
   "flow": {
     "stepPicker": {
@@ -1489,11 +1503,9 @@
     "patternNavPrevious": "السابق",
     "patternNavNext": "التالي",
     "patternNoValuesAvailable": "لا توجد قيم متاحة",
-    "sqlModeLabel": "وضع SQL",
     "nlpModeLabel": "وضع اللغة الطبيعية",
     "quickModeLabel": "وضع السرعة",
     "menuMore": "المزيد",
-    "menuGroupSetOnce": "اضبط مرة واحدة",
     "menuGroupHistory": "التاريخ",
     "menuGroupDownloads": "التنزيلات",
     "menuGroupSchedule": "الجدول الزمني",
@@ -1867,7 +1879,6 @@
     "viewDeletedSuccessfully": "عرض تم الحذف بنجاح.",
     "viewCreatedSuccessfully": "تم إنشاء العرض بنجاح.",
     "viewUpdatedSuccessfully": "تم تحديث العرض بنجاح.",
-    "linkCopiedSuccessfully": "تم نسخ الرابط بنجاح!",
     "errorCopyingLink": "خطأ أثناء نسخ الرابط.",
     "errorShorteningLink": "خطأ أثناء تقصير الرابط.",
     "webUrlNotConfigured": "يتم تعطيل رابط المشاركة حتى يتم إعداد ZO_WEB_URL من قبل المسؤول الخاص بك.",
@@ -2069,7 +2080,24 @@
     "freeTextNoTextFields": "لا يحتوي هذا التدفق على حقول نصية للبحث.",
     "freeTextNoTextFieldsNamed": "لم يتم البحث: {streams} (لا توجد حقول نصية).",
     "freeTextBuildNotice": "يحتوي هذا المُرشِّح على بحث نصي؛ حرّره في SQL.",
-    "filterNotChartableNotice": "لا يمكن رسم هذا الفلتر في المنشئ. فلتر البحث لديك لم يتغير؛ انتقل إلى {custom} لرسمه."
+    "filterNotChartableNotice": "لا يمكن رسم هذا الفلتر في المنشئ. فلتر البحث لديك لم يتغير؛ انتقل إلى {custom} لرسمه.",
+    "queryModeLabel": "لغة الاستعلام",
+    "queryModeFilter": "تصفية",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "تضييق السجلات حسب الحقل والقيمة",
+    "queryModeSqlTooltip": "اكتب استعلام SQL كاملاً مع التجميعات والربط",
+    "sqlModeNeedsOneStream": "يتطلب SQL في هذا العرض تدفقاً واحداً",
+    "menuGroupViewOptions": "خيارات العرض",
+    "histogramHiddenForAggregates": "يعيد هذا الاستعلام مجموعات وليس أحداثاً عبر الزمن، لذا لا يوجد مدرج تكراري. استخدم التصور لعرض النتيجة في مخطط.",
+    "linkCopied": "تم نسخ الرابط",
+    "linkCopiedFixedTime": "تم نسخ الرابط · وقت ثابت {from} – {to}",
+    "linkCopiedRelativeTime": "تم نسخ الرابط · {period}، محسوبة من وقت فتحه",
+    "recordsChipRows": "{total} صف | {total} صفوف",
+    "histogramTitleRows": "عرض {total} صف في {took} مللي ثانية. | عرض {total} صفوف في {took} مللي ثانية.",
+    "histogramTitleRowsWithScan": "عرض {total} صف في {took} مللي ثانية. ({scanLabel}: {scanSize}) | عرض {total} صفوف في {took} مللي ثانية. ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "اختر تدفقاً أولاً",
+    "autoRefreshPausedInVisualize": "يحدّث التحديث التلقائي نتائج البحث. يتوقف مؤقتًا أثناء التصوير المرئي.",
+    "histogramNoTimeAxis": "النتائج المجمّعة ليس لها محور زمني"
   },
   "menu": {
     "alertCalibration": "معايرة التنبيهات",
@@ -2103,6 +2131,14 @@
     "workflows": "سير العمل",
     "language": "اللغة",
     "keyboardShortcuts": "اختصارات لوحة المفاتيح",
+    "searchOrJumpTo": "ابحث أو انتقل إلى…",
+    "jumpToTitle": "انتقل إلى",
+    "addData": "إضافة بيانات",
+    "jumpToPlaceholder": "ابحث في الصفحات والتنبيهات ولوحات المعلومات والتدفقات",
+    "jumpToPlaceholderPages": "ابحث في الصفحات والإجراءات",
+    "jumpToPages": "الصفحات",
+    "jumpToShowAll": "عرض الكل في {page}",
+    "jumpToSearchLogs": "البحث في السجلات عن \"{text}\"",
     "synthetic": "المراقبة الاصطناعية",
     "experience": "الخبرة",
     "slos": "SLOs",
@@ -4183,7 +4219,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "أنت غير مخول بإدارة الرخصة."
-      }
+      },
+      "usageTitle": "الاستيعاب اليومي"
     },
     "value_sso_requires_ha": "✅ يتطلب وضع HA",
     "value_rbac_requires_ha": "✅ يتطلب وضع HA",
@@ -4352,7 +4389,9 @@
     "revokeInvitationMsg": "هل أنت متأكد أنك تريد إلغاء الدعوة لـ {email}؟",
     "deleteUsersTitle": "حذف المستخدمين",
     "deleteUsersMsg": "هل أنت متأكد أنك تريد حذف {count} مستخدم؟ | هل أنت متأكد أنك تريد حذف {count} من المستخدمين؟",
-    "deleteUsersBlockNote": "{count} منهم انضموا عبر نطاقك الموثّق وسيتم حظرهم بدلًا من حذفهم."
+    "deleteUsersBlockNote": "{count} منهم انضموا عبر نطاقك الموثّق وسيتم حظرهم بدلًا من حذفهم.",
+    "roleHint": "Admin يدير المؤسسة، وEditor يغيّر البيانات والإعدادات، وViewer يقرأ فقط.",
+    "customRolesNeedRbac": "تتطلب الأدوار المخصصة تفعيل RBAC، وهو معطّل لهذه المؤسسة."
   },
   "invitation": {
     "pendingInvitations": "الدعوات المعلقة",
@@ -5205,6 +5244,7 @@
   },
   "organization": {
     "searchByNameOrId": "ابحث بالاسم أو المعرف",
+    "currentLabel": "المؤسسة: {name}",
     "noOrganizationsFound": "لم يتم العثور على أي مؤسسات",
     "header": "المؤسسات",
     "orgBeingDeletedSwitching": "هذه المؤسسة يتم حذفها. يتم تحويلك إلى مؤسسة أخرى.",
@@ -5313,6 +5353,7 @@
     "timezone": "المنطقة الزمنية",
     "deleteActionMessage": "هل أنت متأكد من أنك تريد حذف {count} حقل؟ لا يمكن التراجع عن هذا الإجراء. | هل أنت متأكد من أنك تريد حذف {count} حقول؟ لا يمكن التراجع عن هذا الإجراء.",
     "deleteDatesMessage": "هل أنت متأكد من أنك تريد حذف {count} نطاق تاريخ؟ لا يمكن التراجع عن هذا الإجراء. | هل أنت متأكد من أنك تريد حذف {count} نطاقات تاريخ؟ لا يمكن التراجع عن هذا الإجراء.",
+    "summaryAllTypes": "التدفقات (جميع الأنواع)",
     "labelLogs": "السجلات",
     "labelMetrics": "المقاييس",
     "labelTraces": "التتبعات",
@@ -7924,7 +7965,17 @@
       "metricsSketch": "تُخزَّن التوزيعات على شكل دلاء للمدرج التكراري، وتُقدَّر المئينات من تلك الدلاء. تؤدي قيمة أعلى لـ ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA إلى دلاء أدق ومئينات أكثر دقة، على حساب صفوف مخزّنة أكثر."
     },
     "gpu": "GPU",
-    "gpuExporter": "مصدِّر GPU"
+    "gpuExporter": "مصدِّر GPU",
+    "rotationNote": "لا يتم تدوير الرموز في مكانها. للتدوير، أنشئ رمزًا جديدًا، وحوّل مصادرك إليه، ثم عطّل الرمز القديم.",
+    "rotateAction": "تدوير…",
+    "rotateTitle": "تدوير {name}",
+    "rotateStep1": "أنشئ رمزًا جديدًا.",
+    "rotateStep2": "حوّل مصادرك إلى الرمز الجديد.",
+    "rotateStep3": "عندما لا يستخدم أي شيء {name}، عطّله من قائمة صفّه.",
+    "rotateNever": "لا يتم تعطيل أي شيء تلقائيًا. يستمر الرمز القديم بالعمل حتى تعطّله.",
+    "rotateCreateNew": "إنشاء رمز جديد",
+    "rotateNewName": "{name}-جديد",
+    "rotateDescription": "يحل محل {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -8654,6 +8705,12 @@
     "dateFormatEpochms": "مللي ثانية من الحقبة (epochms)",
     "dateFormatEpochus": "ميكروثانية من الحقبة (epochus)",
     "newFolder": "مجلد جديد",
+    "inlineCreate": {
+      "folderName": "اسم المجلد الجديد",
+      "createFolder": "إنشاء مجلد",
+      "tabName": "اسم التبويب الجديد",
+      "createTab": "إنشاء تبويب"
+    },
     "updateFolder": "تحديث المجلد",
     "newReport": "تقرير جديد",
     "scheduledDashboards": "لوحات المعلومات المجدولة",
@@ -9558,6 +9615,9 @@
       "addClause": "إضافة شرط"
     },
     "viewDashboard": {
+      "apply": "تطبيق",
+      "lastDataSeen": "آخر بيانات {when}",
+      "jumpToLatest": "الانتقال إلى الأحدث",
       "refreshToApplyVariables": "تحديث لتطبيق أحدث تغييرات المتغيرات",
       "refresh": "تحديث",
       "refreshCacheReload": "تحديث ذاكرة التخزين المؤقت وإعادة التحميل",
@@ -10306,6 +10366,7 @@
     }
   },
   "panel": {
+    "noDataInRange": "لا توجد بيانات في النطاق",
     "saveAndStay": "حفظ ومتابعة التحرير",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10586,12 +10647,32 @@
     "hoursAgo": "منذ {count}h",
     "daysAgo": "منذ {count}d",
     "cards": {
-      "openIncidents": "الحوادث المفتوحة"
+      "firingAlerts": "التنبيهات قيد الإطلاق",
+      "failingRules": "القواعد الفاشلة",
+      "openIncidents": "الحوادث المفتوحة",
+      "pipelineErrors": "أخطاء مسار المعالجة",
+      "pipelinesOf": "من {enabled} مفعّل",
+      "quietStreams": "التدفقات الهادئة",
+      "firingNone": "لا شيء قيد الإطلاق",
+      "noAlertRules": "لا توجد قواعد تنبيه",
+      "noEnabledRules": "لا توجد قواعد مفعّلة",
+      "failingNone": "لا شيء فاشل",
+      "failingNote": "حدث خطأ في آخر تقييم",
+      "incidentsNone": "لا شيء مفتوح",
+      "noPipelines": "لا توجد مسارات معالجة",
+      "noStreams": "لا توجد تدفقات",
+      "quietNote": "توقفت عن الكتابة خلال آخر 7 أيام",
+      "criticalUnit": "{count} في المستوى الحرج",
+      "deliveryFailures": "إخفاقات تسليم التنبيهات",
+      "deliveryCount": "فشل تسليم {count} تنبيه | فشل تسليم {count} تنبيهات",
+      "deliveryNote": "تنبيهات أُطلقت لكن تعذّر إشعارها",
+      "oldestFiring": "أقدم تنبيه قيد الإطلاق منذ {age}"
     },
     "state": {
       "tileForbidden": "لا يوجد وصول",
       "tileLocked": "مقفل",
       "tileError": "تعذّر التحميل",
+      "tileUnavailable": "غير متاح",
       "sectionLocked": "متاح بترخيص المؤسسات",
       "sectionForbidden": "لا يمكن لدورك رؤية هذه البيانات. اطلب من مسؤول المؤسسة منحك الوصول."
     },
@@ -10715,6 +10796,39 @@
     "dataAsOf": "البيانات حتى {time}",
     "timeRange": {
       "heading": "في النطاق الزمني المحدد"
+    },
+    "firingNow": {
+      "title": "قيد الإطلاق الآن",
+      "byLevel": "{critical} حرجة · {warning} تحذير",
+      "allQuiet": "كل شيء هادئ",
+      "watching": "{count} قاعدة تنبيه مفعّلة، لا شيء قيد الإطلاق | {count} قواعد تنبيه مفعّلة، لا شيء قيد الإطلاق",
+      "noRules": "لا توجد قواعد تنبيه بعد",
+      "browseLibrary": "تصفح مكتبة التنبيهات",
+      "notifyFailed": "فشل الإشعار",
+      "loadError": "تعذر تحميل التنبيهات قيد الإطلاق",
+      "unavailable": "لا يمكن قراءة حالات التنبيهات الآن"
+    },
+    "health": {
+      "subtitle": "آخر البيانات المستلمة حسب النوع",
+      "lastData": "آخر بيانات قبل {age}",
+      "justNow": "آخر بيانات الآن",
+      "noDataIn": "لا توجد بيانات خلال آخر {range}",
+      "noRecords": "لا توجد سجلات بعد",
+      "loadError": "تعذرت قراءة تدفقاتك"
+    },
+    "start": {
+      "text": "لم تصل أي بيانات بعد. أرسل بيانات، أو راجع ما لديك، أو أعد تنبيهًا.",
+      "addData": "إضافة بيانات",
+      "createAlert": "إنشاء تنبيه"
+    },
+    "summary": {
+      "loadError": "تعذر تحميل ملخص المؤسسة",
+      "loadErrorRest": "تعذر تحميل بقية الملخص",
+      "denied": "لا يوجد وصول إلى ملخص المؤسسة. اطلب ذلك من مسؤول المؤسسة."
+    },
+    "events": {
+      "runFailed": "فشل التشغيل",
+      "timesInRange": "{count} مرة في النطاق المحدد | {count} مرات في النطاق المحدد"
     }
   },
   "chatHistory": {
@@ -10895,7 +11009,8 @@
       "taglineAnd": "وأشرح لك سجلاتك، وتتبعاتك، ومقاييسك، والحوادث.",
       "signedInAs": "تم تسجيل الدخول ك",
       "role": "الدور",
-      "tryOneOfThese": "أو جرب واحدة من هذه"
+      "tryOneOfThese": "أو جرب واحدة من هذه",
+      "panelText": "اسأل عن السجلات والتتبعات والمقاييس والحوادث، أو احصل على مساعدة في كتابة استعلام."
     },
     "capabilities": {
       "query": {
@@ -12005,12 +12120,29 @@
     }
   },
   "alerts": {
+    "detail": {
+      "openInLogs": "فتح في السجلات",
+      "openInTraces": "فتح في التتبعات",
+      "openInMetrics": "فتح في المقاييس",
+      "evidenceFiringTip": "يفتح {stream} بمرشح هذا التنبيه، من بداية هذا الإطلاق حتى الآن",
+      "evidenceWindowTip": "يفتح {stream} بمرشح هذا التنبيه خلال آخر {window}",
+      "threshold": "العتبة",
+      "noIncident": "لا يوجد حادث بعد",
+      "conditionLabel": "شرط التنبيه",
+      "allRows": "كل الصفوف",
+      "viewIncidents": "عرض الحوادث"
+    },
+    "summaryTrainingFailed": "فشل التدريب",
+    "columnState": "الحالة",
+    "startFromTemplate": "ابدأ من قالب",
     "rowAction": {
       "leftFilter": "لم يعد يطابق الفلتر",
       "pausedLeftFilter": "تم إيقاف {name} مؤقتًا. لم يعد يطابق الفلتر | تم إيقاف {count} تنبيهات مؤقتًا. لم تعد تطابق الفلتر",
       "resumedLeftFilter": "تم استئناف {name}. لم يعد يطابق الفلتر | تم استئناف {count} تنبيهات. لم تعد تطابق الفلتر",
       "bulkPauseFailed": "تعذر إيقاف {failed} من أصل {total} تنبيه مؤقتًا | تعذر إيقاف {failed} من أصل {total} تنبيهات مؤقتًا",
-      "bulkResumeFailed": "تعذر استئناف {failed} من أصل {total} تنبيه | تعذر استئناف {failed} من أصل {total} تنبيهات"
+      "bulkResumeFailed": "تعذر استئناف {failed} من أصل {total} تنبيه | تعذر استئناف {failed} من أصل {total} تنبيهات",
+      "paused": "تم إيقاف {name} مؤقتًا | تم إيقاف {count} تنبيهات مؤقتًا",
+      "resumed": "تم استئناف {name} | تم استئناف {count} تنبيهات"
     },
     "moreActions": "مزيد من الإجراءات",
     "promRuleMode": "وضع القاعدة",
@@ -13445,7 +13577,8 @@
       "condition": "الشرط",
       "result": "النتيجة",
       "anomalies": "الشذوذات",
-      "forGroup": "من أجل {group}"
+      "forGroup": "من أجل {group}",
+      "errorFrom": "{status} من {destination}"
     },
     "continue": "تابع",
     "wouldTrigger": "سيُطلَق",
@@ -15009,7 +15142,8 @@
         "mute": "لا يمكنك كتم هذا.",
         "onCall": "المناوبة: {people}",
         "canAct": "يمكنهم التصرف أيضًا: {people}",
-        "people": "المناوبة: {onCall}. يمكنهم التصرف أيضًا: {canAct}"
+        "people": "المناوبة: {onCall}. يمكنهم التصرف أيضًا: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "هذا التنبيه ليس قيد الإطلاق، لذا لا يوجد ما يمكن الإقرار به.",
@@ -15067,7 +15201,9 @@
     "siemDetection": {
       "notice": "هذا التنبيه اكتشاف من Security. يُترجَم استعلامه من قاعدة Sigma الخاصة به، لذا تُحرَّر القاعدة والتدفق والجدولة في Security، مما يُبقي القاعدة والاستعلام متطابقين.",
       "open": "التحرير في Security"
-    }
+    },
+    "newAlertTitle": "تنبيه جديد",
+    "newAnomalyTitle": "اكتشاف شذوذ جديد"
   },
   "alert_dependencies": {
     "actionOpen": "فتح",
@@ -17937,7 +18073,13 @@
       "partial": "تعذّر قراءة بعض الـ Spans من هذا التتبع. قد يكون مخطط الشلال غير مكتمل.",
       "truncated": "يُعرض أول Span من هذا التتبع، حسب ترتيب وقت البدء. لم يتم تحميل الـ Spans اللاحقة بعد. | يُعرض أول {count} من الـ Spans لهذا التتبع، حسب ترتيب وقت البدء. لم يتم تحميل الـ Spans اللاحقة بعد.",
       "loadMore": "تحميل الـ Span التالي | تحميل {size} من الـ Spans التالية",
-      "loadMoreFailed": "تعذّر تحميل المزيد من الـ Spans لهذا التتبع"
+      "loadMoreFailed": "تعذّر تحميل المزيد من الـ Spans لهذا التتبع",
+      "notFoundTitle": "لا يوجد تتبع بهذا المعرّف بين {from} و{to}",
+      "notFoundText": "التتبع {traceId} ليس له مقاطع في تدفق {stream} ضمن هذا النطاق. قد يكون أقدم أو أحدث، أو في تدفق آخر، أو لم يُجمع.",
+      "searchWiderRange": "البحث في نطاق أوسع",
+      "searchSpansInRange": "البحث عن المقاطع في هذا النطاق",
+      "loadFailedTitle": "تعذّر تحميل هذا التتبع",
+      "loadFailedText": "تعذّرت قراءة التتبع {traceId}. أعد المحاولة بعد قليل."
     },
     "traceTree": {
       "clickToExpand": "انقر للتوسع",
@@ -19865,7 +20007,7 @@
       "streamHint": "يرسل إصدار الوكيل هذا التتبعات إلى {count} تدفق. يُعرض التدفق الأطول استخدامًا ما لم تختر غيره.",
       "agentIdHint": "معرّف الوكيل: {ids}",
       "noAgentIdentity": "لم يتم العثور على هوية وكيل",
-      "noAgentIdentityDescription": "لا تحمل امتدادات LLM هذه اسم وكيل، لذا تُعرض حسب التدفق. عيّن السمة التي تسمّي وكيلك لعرضها حسب الوكيل.",
+      "noAgentIdentityDescription": "لا تحمل امتدادات LLM هذه اسم وكيل، لذا تُعرض حسب التدفق.",
       "noAgentIdentityAction": "فتح تعيين الوكيل"
     },
     "agentGraph": {
@@ -21539,7 +21681,6 @@
     },
     "noStream": {
       "title": "اختر تدفقًا لبدء الاستكشاف",
-      "description": "اختر تدفقا ثم اضغط <strong>Run query</strong>. يمكنك التنقية باستخدام الفلاتر، ودالة VRL، ونطاق زمني مخصص بمجرد صدور النتائج.",
       "selectStream": "اختر تدفقًا",
       "selectStreamDesc": "تصفح السجلات، التتبعات، المقاييس والتدفقات RUM",
       "queryGuide": "اقرأ دليل الاستعلامات",
@@ -21591,7 +21732,18 @@
     "detailTable": {
       "noDataAvailable": "لا توجد بيانات متوفرة.",
       "addIcon": "إضافة أيقونة",
-      "sendToAiChat": "أرسل إلى دردشة الذكاء الاصطناعي"
+      "sendToAiChat": "أرسل إلى دردشة الذكاء الاصطناعي",
+      "openTrace": "فتح التتبع",
+      "noTraceTitle": "لا يوجد تتبع مرتبط بهذا السجل",
+      "noRelatedLogsTitle": "لم يتم العثور على سجلات ذات صلة",
+      "noRelatedMetricsTitle": "لم يتم العثور على مقاييس ذات صلة",
+      "noServiceText": "تعذّر مطابقة أي خدمة لهذا السجل، لذا لا يمكن العثور على البيانات ذات الصلة تلقائيًا.",
+      "searchTracesAround": "البحث عن التتبعات حول هذا الوقت",
+      "searchAroundTip": "تحميل الأحداث المسجلة قبل هذا الحدث وبعده مباشرة.",
+      "noOfEventsTip": "عدد الأحداث المراد تحميلها حول هذا الحدث.",
+      "severityTip": "مستوى السجل المكتشف. حدده لمعرفة كيف تم اكتشافه.",
+      "traceId": "Trace ID",
+      "spanId": "Span ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "اختيار * استعلام غير مدعوم للتصور.",
@@ -21883,6 +22035,7 @@
     "showDetail": "عرض التفاصيل",
     "hideDetail": "إخفاء التفاصيل",
     "runAs": "التشغيل باسم",
+    "runSuggestion": "تشغيل {query}",
     "searchTextFor": "البحث عن النص \"{text}\"",
     "searchTextDesc": "البحث في المدخل بأكمله كعبارة واحدة",
     "explain": {
@@ -21942,12 +22095,29 @@
     "minutesAgo": "منذ {min}m",
     "hoursAgo": "منذ {h}h",
     "notYetRefreshed": "لم يتم تجديد نشاطه بعد",
-    "dataFresh": "البيانات جديدة",
-    "dataGettingStale": "البيانات أصبحت قديمة",
-    "dataStale": "البيانات قديمة",
     "lastRefreshed": "آخر تحديث: {time}",
     "refresh": "تحديث",
-    "refreshWithAge": "تحديث، آخر تحديث {age}"
+    "refreshWithAge": "تحديث، آخر تحديث {age}",
+    "refreshing": "جارٍ التحديث",
+    "failed": "فشل",
+    "autoRefresh": "تحديث تلقائي",
+    "autoOn": "تلقائي · {interval}",
+    "every": "كل {interval}",
+    "interval": {
+      "10s": "10 ث",
+      "30s": "30 ث",
+      "1m": "1 د",
+      "5m": "5 د",
+      "15m": "15 د"
+    },
+    "dataFresh": "البيانات جديدة",
+    "dataGettingStale": "البيانات أصبحت قديمة",
+    "dataStale": "البيانات قديمة"
+  },
+  "copyButton": {
+    "copy": "نسخ",
+    "copied": "تم النسخ",
+    "failed": "تم حظر النسخ · اضغط Ctrl C"
   },
   "synthetics": {
     "variables": {
@@ -23845,6 +24015,7 @@
     },
     "actions": {
       "openCheatsheet": "فتح ورقة مرجعية لاختصارات لوحة المفاتيح",
+      "searchOrJumpTo": "ابحث أو انتقل إلى صفحة",
       "closeDialog": "إغلاق أي حوار أو درج أو نمط",
       "focusSearch": "شريط البحث في مركز التركيز",
       "focusQuery": "محرر استعلامات التركيز",
@@ -23994,7 +24165,17 @@
       "tokenLinkTooltip": "اختر رمز الاستيعاب الذي تستخدمه المقتطفات",
       "copiedWithToken": "تم النسخ باستخدام رمز المؤسسة {name}",
       "tokenIncludedHint": "يتضمن النسخ رمز الاستيعاب الخاص بالمؤسسة، والذي يبقى مخفيًا هنا.",
-      "maskedSelectionWarning": "تم نسخ الرمز المخفي على شكل نقاط. استخدم نسخ، أو اكشفه أولًا."
+      "maskedSelectionWarning": "تم نسخ الرمز المخفي على شكل نقاط. استخدم نسخ، أو اكشفه أولًا.",
+      "wrapLines": "التفاف الأسطر",
+      "showAll": "عرض السطر {count} بالكامل | عرض كل {count} أسطر",
+      "showLess": "عرض أقل"
+    },
+    "jsonViewer": {
+      "include": "تصفية بهذه القيمة",
+      "exclude": "استبعاد هذه القيمة",
+      "copyValue": "نسخ القيمة",
+      "fieldCount": "{count} حقل | {count} حقول",
+      "itemCount": "{count} عنصر | {count} عناصر"
     },
     "spinner": {
       "loading": "التحميل"
@@ -24003,6 +24184,11 @@
       "steps": "الخطوات",
       "stepOf": "الخطوة {current} من {total}",
       "swipeHint": "اسحب لرؤية الباقي"
+    },
+    "tabs": {
+      "more": "المزيد",
+      "unsaved": "تغييرات غير محفوظة",
+      "locked": "مقفل"
     },
     "statStrip": {
       "filters": "الفلاتر",
@@ -24049,7 +24235,10 @@
       "moreInfo": "مزيد من المعلومات"
     },
     "dialog": {
-      "closeDialog": "إغلاق الحوار"
+      "closeDialog": "إغلاق الحوار",
+      "discardChanges": "تجاهل التغييرات؟",
+      "keepEditing": "متابعة التعديل",
+      "discard": "تجاهل"
     },
     "drawer": {
       "closeDrawer": "أغلق الدرج"
@@ -24072,6 +24261,32 @@
       "clear": "مسح"
     },
     "file": {
+      "removeNamed": "إزالة {name}",
+      "sourceLabel": "استيراد من",
+      "sourceFile": "ملف",
+      "sourceUrl": "URL",
+      "sourcePaste": "لصق",
+      "dropPrompt": "أفلت ملفًا هنا أو {choose}",
+      "dropPromptMultiple": "أفلت الملفات هنا أو {choose}",
+      "chooseAFile": "اختر ملفًا",
+      "chooseFiles": "اختر ملفات",
+      "chooseFileButton": "اختيار ملف",
+      "chooseFilesButton": "اختيار ملفات",
+      "noFileChosen": "لم يتم اختيار ملف",
+      "dropToUpload": "أفلت للرفع",
+      "upToSize": "حتى {size}",
+      "upToSizeEach": "حتى {size} لكل ملف",
+      "oneFile": "ملف واحد",
+      "upToFiles": "حتى {count} ملفات",
+      "typeRejected": "يُقبل فقط الملفات من نوع {allowed}",
+      "sizeRejected": "{size} يتجاوز الحد {max}",
+      "countRejected": "ملف واحد فقط في كل مرة | {count} ملفات فقط في كل مرة",
+      "uploadFailed": "فشل الرفع",
+      "uploaded": "تم الرفع",
+      "urlPlaceholder": "عنوان URL للملف",
+      "urlHelp": "نجلبه مرة واحدة عند الاستيراد.",
+      "textPlaceholder": "الصق المحتوى هنا",
+      "invalidJson": "JSON غير صالح: {detail}",
       "removeFile": "إزالة الملف",
       "clearAll": "مسح الكل"
     },
@@ -24086,7 +24301,14 @@
     "pagination": {
       "pagination": "تقسيم الصفحات",
       "previousPage": "الصفحة السابقة",
-      "nextPage": "الصفحة التالية"
+      "nextPage": "الصفحة التالية",
+      "onFirstPage": "أنت في الصفحة الأولى بالفعل",
+      "onLastPage": "أنت في الصفحة الأخيرة بالفعل",
+      "range": "{from}–{to} من {total}",
+      "rangeOfMany": "{from}–{to} من أكثر من ذلك",
+      "pageOf": "الصفحة {page} من {pages}",
+      "perPage": "{size} لكل صفحة",
+      "pageSize": "الصفوف لكل صفحة"
     },
     "select": {
       "more": "المزيد",
@@ -24096,6 +24318,10 @@
       "noOptionsFound": "لم يتم العثور على خيارات",
       "multiSelect": "الاختيار المتعدد",
       "singleSelect": "اختيار فردي",
+      "any": "أي",
+      "noMatches": "لا نتائج مطابقة لـ \"{term}\"",
+      "clearSearch": "مسح البحث",
+      "addOption": "إضافة \"{value}\"",
       "moreInfoAbout": "مزيد من المعلومات حول {field}",
       "moreInfo": "مزيد من المعلومات"
     },
@@ -24138,7 +24364,10 @@
       "removeColumnAria": "إزالة العمود",
       "formatColumnAria": "عمود التنسيق",
       "selectedOfTotal": "تم تحديد {selected} من {total}",
-      "selectedCount": "تم تحديد {selected}"
+      "selectedCount": "تم تحديد {selected}",
+      "clearSelection": "مسح",
+      "rowActions": "إجراءات الصف",
+      "moreRowActions": "المزيد من الإجراءات"
     },
     "predefinedThemes": {
       "title": "الموضوع",
@@ -24289,7 +24518,7 @@
         "ok": "حسنا",
         "normal": "عادي",
         "firing": "قيد الإطلاق",
-        "notifyfailed": "فشل الإشعار",
+        "notifyfailed": "فشل التسليم",
         "flapping": "الرفرفة",
         "anomaly": "شذوذ",
         "succeeded": "نجح",
@@ -25824,6 +26053,7 @@
       "packUnavailableHint": "لم يتم إصدار المحتوى المنسّق لهذا الحمل العملي بعد. أنشئ لوحة معلومات لرسمه في الأثناء.",
       "partialTelemetryKubernetes": "وجدنا تدفقات Kubernetes، لكن ليس المقاييس التي تحتاجها هذه الصفحة (kubeletstats أو cluster receiver). تحقق من مستقبلات المجمّع لديك.",
       "partialTelemetryHosts": "وجدنا تدفقات المضيفين، لكن ليس المقاييس التي تحتاجها هذه الصفحة. تحقق من مستقبل hostmetrics في المجمّع لديك.",
+      "hostMetricsMissingTitle": "لم يتم العثور على مقاييس المضيف",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}، و{count} أخرى",
       "hiddenFootnote": "تظهر هنا أيضًا مصادر البيانات التي لا تملك صلاحية الوصول إليها.",
@@ -26608,7 +26838,8 @@
         "p95": "الذيل البطيء — استدعاء واحد من كل 20 استغرق على الأقل هذه المدة. مُقاس من الاستدعاءات المكتملة في تتبعات تطبيقك.",
         "p99": "أسوأ 1% من الاستدعاءات استغرقت على الأقل هذه المدة. مُقاس من الاستدعاءات المكتملة في تتبعات تطبيقك.",
         "load": "إجمالي الوقت الذي قضته تطبيقاتك في الاستدعاءات إلى قاعدة البيانات هذه، مُقاس من تتبعات تطبيقك. يوضح مقدار حركة المرور التي خدمتها قاعدة البيانات هذه لتطبيقاتك.",
-        "attention": "مدى اقتراب هذه الحالة من الحد الذي ينشره محركها الخاص — اليوم، الاتصالات مقابل max_connections. أسوأ نسبة من هذا النوع، ليست درجة مركبة. مرتبة من الأعلى أولاً، مع الحالات التي لا يمكن قراءة صحتها في الأعلى، لأنه لا يمكن رؤية الحالة التي لا تعرف أنها صحية. تم القياس على خادم قاعدة البيانات، لذا لا يمكن مقارنتها بوقت قاعدة البيانات بجانبه."
+        "attention": "مدى اقتراب هذه الحالة من الحد الذي ينشره محركها الخاص — اليوم، الاتصالات مقابل max_connections. أسوأ نسبة من هذا النوع، ليست درجة مركبة. مرتبة من الأعلى أولاً، مع الحالات التي لا يمكن قراءة صحتها في الأعلى، لأنه لا يمكن رؤية الحالة التي لا تعرف أنها صحية. تم القياس على خادم قاعدة البيانات، لذا لا يمكن مقارنتها بوقت قاعدة البيانات بجانبه.",
+        "calls": "عدد المرات التي استدعت فيها تطبيقاتك قاعدة البيانات هذه، مقيسًا من تتبعات تطبيقك."
       },
       "failedChip": "فشل {count}",
       "columnSubLabels": {
@@ -27049,7 +27280,8 @@
         "tableHealthHint": "حجم الطاولة، الانتفاخ، وحالة التفريغ. الانتفاخ والفراغ هما PostgreSQL فقط.",
         "deadlocksLocked": "ميزة Deadlocks هي ميزة في المؤسسات. قم بالترقية لترى أي الاستعلامات تتقاطع مع بعضها البعض، ولماذا. تبويبات قواعد البيانات الأخرى تعمل على كل خطة.",
         "blockedLocked": "الاستعلامات المحظورة هي ميزة في المؤسسات. قم بالترقية لترى أي الجلسات تنتظر القفل وما الذي يحتجزه. تبويبات قواعد البيانات الأخرى تعمل على كل خطة.",
-        "tableHealthLocked": "صحة الطاولة هي ميزة في المؤسسات. قم بالترقية إلى تتبع حجم الجدول، الانتفاخ، وحالة الفراغ. تبويبات قواعد البيانات الأخرى تعمل على كل خطة."
+        "tableHealthLocked": "صحة الطاولة هي ميزة في المؤسسات. قم بالترقية إلى تتبع حجم الجدول، الانتفاخ، وحالة الفراغ. تبويبات قواعد البيانات الأخرى تعمل على كل خطة.",
+        "queriesHintServer": "أنواع الاستعلامات التي أبلغت عنها قواعد بياناتك في هذه النافذة، محسوبة داخل قاعدة البيانات."
       }
     },
     "metrics": {
@@ -28274,6 +28506,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "كتم الاستدعاء",
     "savePolicyFailed": "تعذّر حفظ السياسة",
+    "savePolicyFailedReason": "لم يتم حفظ السياسة. {reason}",
     "state_triggered": "مُطلق",
     "state_triaged": "مُفرَز",
     "state_acknowledged": "تم الإقرار",

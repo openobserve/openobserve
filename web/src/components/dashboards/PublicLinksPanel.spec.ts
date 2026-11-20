@@ -66,19 +66,10 @@ import PublicLinksPanel from "./PublicLinksPanel.vue";
 
 const ODrawerStub = {
   name: "ODrawer",
-  props: [
-    "open",
-    "title",
-    "size",
-    "formId",
-    "primaryButtonLabel",
-    "primaryButtonDisabled",
-    "secondaryButtonLabel",
-    "closeGuard",
-  ],
+  props: ["open", "title", "size", "formId", "primary", "secondary", "dirty"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template:
-    '<div><slot name="header" /><span class="drawer-primary-label">{{ primaryButtonLabel }}</span><button class="drawer-primary" @click="$emit(\'click:primary\')" /><slot /></div>',
+    '<div><slot name="header" /><span class="drawer-primary-label">{{ primary?.label }}</span><button class="drawer-primary" @click="$emit(\'click:primary\')" /><slot /></div>',
 };
 const ODropdownStub = { name: "ODropdown", template: '<div><slot name="trigger" /><slot /></div>' };
 const ODropdownItemStub = {
@@ -94,7 +85,7 @@ const OTableStub = {
     '<div><slot name="toolbar" /><slot name="toolbar-trailing" /><div v-for="row in data" :key="row.id"><div v-for="col in columns" :key="col.id"><slot :name="\'cell-\' + col.id" :row="row" /></div></div></div>',
 };
 const DateTimeStub = {
-  name: "DateTime",
+  name: "ODateTimeRange",
   props: ["defaultType", "defaultRelativeTime", "defaultAbsoluteTime", "defaultOpen"],
   emits: ["on:date-change"],
   template: "<div />",
@@ -161,7 +152,7 @@ const build = (props: Record<string, unknown> = {}, stubs: Record<string, unknow
         ODropdownItem: ODropdownItemStub,
         OTable: OTableStub,
         VariablesValueSelector: VVSStub,
-        DateTime: DateTimeStub,
+        ODateTimeRange: DateTimeStub,
         ...stubs,
       },
     },
@@ -280,12 +271,12 @@ describe("PublicLinksPanel", () => {
     await flushPromises();
     expect(has(w, "dashboards-public-links-panel-form")).toBe(true);
 
-    const guard = w.findComponent({ name: "ODrawer" }).props("closeGuard") as () => boolean;
-    expect(guard()).toBe(false);
+    const drawer = w.findComponent({ name: "ODrawer" });
+    expect(drawer.props("dirty")).toBe(false);
+    drawer.vm.$emit("click:secondary");
     await flushPromises();
     expect(has(w, "dashboards-public-links-panel-list")).toBe(true);
-
-    expect(guard()).toBe(true);
+    expect(drawer.props("dirty")).toBe(false);
   });
 
   it("shows the globe on the list and a back button on the form that returns to it", async () => {
@@ -307,8 +298,7 @@ describe("PublicLinksPanel", () => {
     vi.mocked(admin.update).mockResolvedValue({ data: link() } as never);
     const w = build({ editLinkId: "l1", variablesConfig: undefined });
     await flushPromises();
-    const guard = w.findComponent({ name: "ODrawer" }).props("closeGuard") as () => boolean;
-    expect(guard()).toBe(true);
+    expect(w.findComponent({ name: "ODrawer" }).props("dirty")).toBe(false);
 
     await submit(w);
     expect(w.emitted("update:modelValue")?.at(-1)).toEqual([false]);
@@ -363,7 +353,7 @@ describe("PublicLinksPanel", () => {
     expect(confirm).toHaveBeenLastCalledWith(
       expect.objectContaining({
         title: 'Revoke and delete "NOC wall"?',
-        confirmVariant: "destructive",
+        kind: "destructive",
       }),
     );
     expect(admin.revoke).toHaveBeenCalledWith("default", "dash-1", "l1");
@@ -494,7 +484,7 @@ describe("PublicLinksPanel", () => {
     vi.mocked(admin.update).mockResolvedValue({ data: link() } as never);
     const w = build({ editLinkId: "l1" });
     await flushPromises();
-    const pickers = () => w.findAllComponents({ name: "DateTime" });
+    const pickers = () => w.findAllComponents({ name: "ODateTimeRange" });
     const pick = async (index: number, value: Record<string, unknown>) => {
       pickers()[index].vm.$emit("on:date-change", { userChangedValue: true, ...value });
       await flushPromises();
@@ -691,7 +681,7 @@ describe("PublicLinksPanel", () => {
       };
     };
     vm.form.setFieldValue("name", "NOC wall");
-    expect(drawer().props("primaryButtonDisabled")).toBe(true);
+    expect(drawer().props("primary")?.disabled).toBe(true);
     await submit(w);
     expect(admin.create).not.toHaveBeenCalled();
 
@@ -701,7 +691,7 @@ describe("PublicLinksPanel", () => {
       isVariablePartialLoaded: true,
     });
     await flushPromises();
-    expect(drawer().props("primaryButtonDisabled")).toBe(false);
+    expect(drawer().props("primary")?.disabled).toBeFalsy();
     await submit(w);
     expect(admin.create).toHaveBeenCalledTimes(1);
   });
@@ -956,7 +946,7 @@ describe("PublicLinksPanel", () => {
         dashboardVariables: { getUrlParams: () => ({ "var-qns": "ingress-nginx" }) },
       });
       await flushPromises();
-      expect(w.findComponent({ name: "ODrawer" }).props("primaryButtonDisabled")).toBe(false);
+      expect(w.findComponent({ name: "ODrawer" }).props("primary")?.disabled).toBeFalsy();
       expect(await create(w)).toEqual({ qns: "ingress-nginx" });
     });
 
@@ -964,7 +954,7 @@ describe("PublicLinksPanel", () => {
       const w = realPickers({ currentValues: { values: [{ name: "qns", value: null }] } });
       await flushPromises();
       expect(stream.fetch).toHaveBeenCalledTimes(1);
-      expect(w.findComponent({ name: "ODrawer" }).props("primaryButtonDisabled")).toBe(true);
+      expect(w.findComponent({ name: "ODrawer" }).props("primary")?.disabled).toBe(true);
 
       const [payload, handlers] = stream.fetch.mock.calls[0] as [unknown, StreamHandlers];
       handlers.data(payload, {
@@ -973,7 +963,7 @@ describe("PublicLinksPanel", () => {
       });
       handlers.data(payload, { type: "end" });
       await flushPromises();
-      expect(w.findComponent({ name: "ODrawer" }).props("primaryButtonDisabled")).toBe(false);
+      expect(w.findComponent({ name: "ODrawer" }).props("primary")?.disabled).toBeFalsy();
       expect(await create(w)).toEqual({ qns: "ingress-nginx" });
     });
 
@@ -1061,12 +1051,12 @@ describe("PublicLinksPanel", () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
     const w = build();
     await flushPromises();
-    const pickers = w.findAllComponents({ name: "DateTime" });
+    const pickers = w.findAllComponents({ name: "ODateTimeRange" });
     expect(pickers).toHaveLength(2);
     expect(pickers.every((p) => "hide-seconds" in p.attributes())).toBe(true);
   });
 
-  it("asks before discarding a changed form, and leaves an untouched one without asking", async () => {
+  it("marks a changed form dirty for the drawer's own discard question, and never opens a dialog over it", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
     const w = build();
     await flushPromises();
@@ -1090,24 +1080,18 @@ describe("PublicLinksPanel", () => {
     expect(has(w, "dashboards-public-links-panel-list")).toBe(true);
 
     await openNew();
+    expect(w.findComponent({ name: "ODrawer" }).props("dirty")).toBe(false);
     (
       w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
     ).form.setFieldValue("name", "Draft");
     await flushPromises();
-    confirm.mockResolvedValueOnce(false);
-    await back();
-    expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Unsaved changes", confirmLabel: "Discard changes" }),
-    );
-    expect(has(w, "dashboards-public-links-panel-form")).toBe(true);
     expect(nameValue()).toBe("Draft");
+    expect(w.findComponent({ name: "ODrawer" }).props("dirty")).toBe(true);
 
-    confirm.mockResolvedValueOnce(true);
-    const guard = w.findComponent({ name: "ODrawer" }).props("closeGuard") as () => boolean;
-    expect(guard()).toBe(false);
-    await flushPromises();
-    expect(confirm).toHaveBeenCalledTimes(2);
+    await back();
+    expect(confirm).not.toHaveBeenCalled();
     expect(has(w, "dashboards-public-links-panel-list")).toBe(true);
+    expect(w.findComponent({ name: "ODrawer" }).props("dirty")).toBe(false);
   });
 
   it("reloads the list on every opening and after a refused create", async () => {

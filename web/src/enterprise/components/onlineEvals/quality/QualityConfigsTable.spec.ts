@@ -303,7 +303,7 @@ describe("QualityConfigsTable", () => {
     expect(open).not.toHaveBeenCalled();
   });
 
-  it("hides the tiles when a load failed or there are no configs, but shows them while loading", () => {
+  it("hides the tiles when there are no configs, but keeps them while loading and after a failed load", () => {
     const none = {
       ...TILES,
       total: 0,
@@ -312,24 +312,26 @@ describe("QualityConfigsTable", () => {
       noScores: 0,
       noThreshold: 0,
     };
-    for (const props of [{ loadError: true }, { forbidden: true }, {}]) {
+    for (const props of [{ forbidden: true }, {}]) {
       const table = mountTable({ rows: [], tiles: none, ...props });
       expect(table.find('[data-test="quality-tiles"]').exists()).toBe(false);
       expect(table.text()).not.toContain("Every config gives a result");
     }
-    const loading = mountTable({ rows: [], tiles: none, loading: true });
-    expect(loading.find('[data-test="quality-tiles"]').exists()).toBe(true);
-    // No rows yet is not "every config gives a result".
-    expect(loading.find('[data-test="quality-tile-without-result-note"]').exists()).toBe(false);
-    expect(loading.text()).not.toContain("Every config gives a result");
+    // A failed load keeps the row, so the table under it does not jump up; its counts are unknown.
+    for (const props of [{ loading: true }, { loadError: true }]) {
+      const table = mountTable({ rows: [], tiles: none, ...props });
+      expect(table.find('[data-test="quality-tiles"]').exists()).toBe(true);
+      expect(table.get('[data-test="quality-tile-attention-value"]').text()).toBe("—");
+      expect(table.find('[data-test="quality-tile-without-result-note"]').exists()).toBe(false);
+      expect(table.text()).not.toContain("Every config gives a result");
+    }
   });
 
   it("names the filtered agent in the empty state's one-click action and asks the page to open it", () => {
     const empty = mountTable({ rows: [], agent: "support-bot" });
     const state = empty.findComponent({ name: "OEmptyState" });
-    const action = state.props("actions").find((a: { id: string }) => a.id === "one-click");
-    expect(action.titleParams).toEqual({ agent: "support-bot" });
-    state.vm.$emit("action", "one-click");
+    expect(state.props("actionLabel")).toContain("support-bot");
+    state.vm.$emit("action");
     expect(empty.emitted("one-click")).toHaveLength(1);
   });
 

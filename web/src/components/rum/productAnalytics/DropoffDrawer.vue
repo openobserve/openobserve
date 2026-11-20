@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="lg"
+    size="md"
     :title="title"
-    :sub-title="subtitle"
+    :subtitle="subtitle"
     data-test="rum-analytics-dropoff-drawer"
     @update:open="(v) => emit('update:open', v)"
   >
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="users && pa.usersUnit.value.partial"
         :label="pa.usersUnit.value.label"
-        variant="teal-soft"
+        tone="neutral"
         icon="person"
         size="sm"
         class="self-start"
@@ -36,28 +36,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="ratio > 1"
         :label="t('rum.analytics.sampled', { ratio })"
-        variant="info-outline"
+        tone="outline"
         icon="filter-alt"
         size="sm"
         class="self-start"
       />
-      <OBanner
+      <OInlineNotice
         v-if="incomplete"
-        variant="warning"
-        dense
-        :content="t('rum.analytics.dropoff.incomplete')"
+        tone="warn"
+        :message="t('rum.analytics.dropoff.incomplete')"
         data-test="rum-analytics-dropoff-incomplete"
       >
         <template #actions>
           <OButton
             variant="ghost"
-            size="sm"
             data-test="rum-analytics-dropoff-incomplete-retry-btn"
             @click="load(true)"
             >{{ t("common.retry") }}</OButton
           >
         </template>
-      </OBanner>
+      </OInlineNotice>
 
       <section class="flex flex-col gap-2" data-test="rum-analytics-dropoff-next-events">
         <div class="flex items-baseline gap-2">
@@ -81,8 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OTag
               :label="row.tag"
-              :variant="row.variant"
-              size="xs"
+              :tone="row.variant"
+              size="sm"
               :icon="row.exit ? 'exit-to-app' : ''"
             />
             <span class="text-text-body truncate font-mono text-xs"
@@ -91,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-end tabular-nums">{{ formatCount(row.units, ratio) }}</span>
             <span class="flex items-center gap-2">
               <span class="w-12 text-end text-xs tabular-nums">{{ pct(row.share) }}</span>
-              <OProgressBar :value="row.share" size="sm" class="flex-1" />
+              <OProgressBar :value="row.share * 100" class="flex-1" />
             </span>
           </div>
         </AnalyticsPanelState>
@@ -118,11 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`rum-analytics-dropoff-${bar.id}`"
           >
             <span class="text-text-secondary">{{ bar.label }}</span>
-            <OProgressBar
-              :value="bar.value"
-              size="sm"
-              :variant="bar.dropped ? 'warning' : 'success'"
-            />
+            <OProgressBar :value="bar.value * 100" :tone="bar.dropped ? 'warn' : 'ok'" />
             <span class="text-end font-semibold tabular-nums">{{ pct(bar.value) }}</span>
           </div>
           <span v-if="noDifference" class="text-text-secondary text-xs">{{
@@ -163,17 +157,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #footer>
       <div class="flex w-full items-center justify-between gap-2">
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="account-tree"
-          icon-right="arrow-forward"
+          variant="secondary"
+          icon="account-tree"
+          icon-end="arrow-forward"
           data-test="rum-analytics-dropoff-paths-btn"
           @click="emit('paths', cohort)"
           >{{ t("rum.analytics.dropoff.seePaths") }}</OButton
         >
         <OButton
           variant="ghost"
-          size="sm-action"
           data-test="rum-analytics-dropoff-close-btn"
           @click="emit('update:open', false)"
           >{{ t("rum.analytics.dropoff.close") }}</OButton
@@ -189,10 +181,10 @@ import { useRouter } from "vue-router";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import AnalyticsSessionsTable, {
   type SessionRow,
@@ -214,7 +206,7 @@ import { stepLabel } from "@/utils/rum/productAnalyticsPanels";
 
 interface NextRow {
   tag: I18nText;
-  variant: BadgeVariant;
+  variant: ChipTone;
   label: string;
   units: number;
   share: number;
@@ -303,10 +295,10 @@ const subtitle = computed(() =>
   t("rum.analytics.dropoff.subtitle", { step: raw(stepKey.value), next: raw(nextKey.value) }),
 );
 
-const kindTag = (kind: string | null): { tag: I18nText; variant: BadgeVariant } =>
+const kindTag = (kind: string | null): { tag: I18nText; variant: ChipTone } =>
   kind === "c"
-    ? { tag: t("rum.analytics.kind.click"), variant: "teal-soft" }
-    : { tag: t("rum.analytics.kind.page"), variant: "blue-soft" };
+    ? { tag: t("rum.analytics.kind.click"), variant: "neutral" }
+    : { tag: t("rum.analytics.kind.page"), variant: "neutral" };
 
 const nextRows = computed<NextRow[]>(() => {
   const total = droppedUnits.value;
@@ -317,7 +309,7 @@ const nextRows = computed<NextRow[]>(() => {
     return exit
       ? {
           tag: t("rum.analytics.dropoff.exit"),
-          variant: "default-outline",
+          variant: "outline",
           label: t("rum.analytics.dropoff.leftApp"),
           units,
           share: share(units),
@@ -329,7 +321,7 @@ const nextRows = computed<NextRow[]>(() => {
   if (nextPanel.value.status === "ok" && total - listed > 0) {
     rows.push({
       tag: t("rum.analytics.funnel.other"),
-      variant: "default-soft",
+      variant: "neutral",
       label: t("rum.analytics.funnel.other"),
       units: total - listed,
       share: share(total - listed),

@@ -126,7 +126,7 @@ describe("HomeChatHistory", () => {
     );
     const ok = q("o-dialog-primary-btn");
     expect(ok?.textContent?.trim()).toBe("Delete");
-    expect(ok?.getAttribute("data-o2-variant")).toBe("destructive");
+    expect(ok?.getAttribute("data-o2-variant")).toBe("danger");
     q("o-dialog-secondary-btn")!.click();
     await flushPromises();
     expect(q("home-chat-history-delete-name")).toBeNull();
@@ -146,7 +146,7 @@ describe("HomeChatHistory", () => {
 
     const clearAll = wrapper.findAll("button").find((b) => b.text().includes("Clear"));
     await clearAll!.trigger("click");
-    expect(dialog.currentDialog.value?.confirmVariant).toBe("destructive");
+    expect(dialog.currentDialog.value?.kind).toBe("destructive");
     dialog.handleCancel();
     await flushPromises();
     expect(history.clearAllHistory).not.toHaveBeenCalled();

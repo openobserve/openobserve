@@ -18,22 +18,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section class="flex flex-col gap-4" data-test="oncall-draft-preview">
     <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <h3 class="text-base font-semibold">{{ t("oncall.previewHeading") }}</h3>
+      <h3 class="text-sm font-semibold">{{ t("oncall.previewHeading") }}</h3>
       <OText variant="meta" data-test="oncall-draft-preview-zone">{{ rangeLine }}</OText>
       <span class="ms-auto flex items-center gap-2">
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="chevron-left"
+          icon-only
+          variant="secondary"
+          icon="chevron-left"
           :disabled="page === 0"
           :aria-label="t('oncall.calendarPrev')"
           data-test="oncall-draft-preview-prev"
           @click="page -= 1"
         />
         <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="chevron-right"
+          icon-only
+          variant="secondary"
+          icon="chevron-right"
           :aria-label="t('oncall.calendarNext')"
           data-test="oncall-draft-preview-next"
           @click="page += 1"
@@ -44,10 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="oncall-draft-preview-view"
           @update:model-value="onViewChange"
         >
-          <OToggleGroupItem value="picture" size="sm" data-test="oncall-draft-preview-picture">
+          <OToggleGroupItem value="picture" data-test="oncall-draft-preview-picture">
             {{ t("oncall.previewPicture") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="list" size="sm" data-test="oncall-draft-preview-list">
+          <OToggleGroupItem value="list" data-test="oncall-draft-preview-list">
             {{ t("oncall.previewList") }}
           </OToggleGroupItem>
         </OToggleGroup>

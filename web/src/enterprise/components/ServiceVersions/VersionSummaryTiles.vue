@@ -23,7 +23,6 @@
           v-for="item in signals"
           :key="item"
           :value="item"
-          size="sm"
           :data-test="`svcver-signal-${item}`"
           >{{ t(`serviceVersions.compare.${item}`) }}</OToggleGroupItem
         ></OToggleGroup

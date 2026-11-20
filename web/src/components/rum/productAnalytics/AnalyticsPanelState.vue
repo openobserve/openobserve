@@ -18,22 +18,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex min-h-0 flex-col">
     <OEmptyState
       v-if="state.status === 'forbidden'"
-      preset="no-access"
-      size="inline"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
+      size="compact"
       :data-test="`${dataTest}-no-access`"
     />
     <OEmptyState
       v-else-if="state.status === 'error'"
-      preset="load-error"
-      size="inline"
-      :description="errorText"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      size="compact"
+      :text="errorText"
       :data-test="`${dataTest}-error`"
     >
       <template #actions>
         <OButton
-          variant="outline"
+          variant="secondary"
           size="sm"
-          icon-left="refresh"
           :data-test="`${dataTest}-retry-btn`"
           @click="emit('retry')"
           >{{ t("rum.analytics.retry") }}</OButton
@@ -47,15 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col gap-2 py-2"
       :data-test="`${dataTest}-loading`"
     >
-      <OSkeleton v-for="n in skeletonRows" :key="n" type="text" class="h-6 w-full" />
+      <OSkeleton v-for="n in skeletonRows" :key="n" class="h-6 w-full" />
     </div>
     <template v-else>
-      <OBanner
+      <OInlineNotice
         v-if="state.partial"
-        variant="warning"
-        dense
+        tone="warn"
         class="mb-2"
-        :content="t('rum.analytics.partial')"
+        :message="t('rum.analytics.partial')"
         :data-test="`${dataTest}-partial`"
       />
       <slot />
@@ -67,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { PanelState } from "@/composables/rum/useAnalyticsSearch";

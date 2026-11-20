@@ -156,11 +156,11 @@ describe("alert_not_working cards", () => {
     expect(String(first?.label)).toBe("Not working");
     expect(String(first?.why)).toBe("From the calibration run 2 hours ago");
     expect(first?.tags.map((tag) => [String(tag.label), tag.variant])).toEqual([
-      ["Confirmed condition", "default-soft"],
+      ["Confirmed condition", "neutral"],
     ]);
     const medium = rail(ITEMS).requests[2].copy;
     expect(medium?.tags.map((tag) => [String(tag.label), tag.variant])).toEqual([
-      ["Investigate", "default-soft"],
+      ["Investigate", "neutral"],
     ]);
     for (const toggle of wrapper.findAll('[data-test$="-details-toggle"]')) {
       await toggle.trigger("click");
@@ -185,7 +185,7 @@ describe("alert_not_working cards", () => {
     const [row] = toSuggestionRows(gt, ZONE, [ITEMS[0]]);
     expect(String(row.headline)).toBe("checkout-errors reads logs/checkout, which doesn't exist");
     expect(String(row.kind)).toBe("Not working");
-    expect(row.kindVariant).toBe("error-soft");
+    expect(row.kindVariant).toBe("err");
     expect(row.severity).toBeNull();
   });
 });

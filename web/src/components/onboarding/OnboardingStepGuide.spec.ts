@@ -290,11 +290,11 @@ describe("OnboardingStepGuide", () => {
 
     it("lists the default steps when the guide reports none, with Explore last", async () => {
       const w = await mountGuide();
-      expect(w.find('[data-test="onboarding-guide-rail"] h2').text()).toBe("Set Up Linux");
+      expect(w.find('[data-test="onboarding-guide-rail"] h2').text()).toBe("Set up Linux");
       expect(navTitles(w)).toEqual([
-        "Run the Setup Command",
-        "Check Your Data",
-        "Explore Your Data",
+        "Run the setup command",
+        "Check your data",
+        "Explore your data",
       ]);
       expect(navStatus(w, "check").text()).toBe("Waiting for data");
     });
@@ -302,10 +302,10 @@ describe("OnboardingStepGuide", () => {
     it("mirrors the card's own steps, with the data check last and Explore after it", async () => {
       cardSteps.value = [
         { id: "install", title: "Quick install", done: false, active: true },
-        { id: "verify", title: "Check Your Data", done: false, active: false },
+        { id: "verify", title: "Check your data", done: false, active: false },
       ];
       const w = await mountGuide();
-      expect(navTitles(w)).toEqual(["Quick install", "Check Your Data", "Explore Your Data"]);
+      expect(navTitles(w)).toEqual(["Quick install", "Check your data", "Explore your data"]);
       expect(navStatus(w, "verify").text()).toBe("Waiting for data");
     });
 
@@ -348,7 +348,7 @@ describe("OnboardingStepGuide", () => {
       expect(explore.text()).toContain("Your data is arriving");
       expect(explore.text()).toContain("42 records arrived in system_cpu_time");
       expect(w.find('[data-test="onboarding-first-data-open"]').text()).toBe(
-        "Explore Your Metrics",
+        "Explore your metrics",
       );
     });
 
@@ -390,7 +390,7 @@ describe("OnboardingStepGuide", () => {
           active: false,
           notProvenByDetect: true,
         },
-        { id: "verify", title: "Check Your Data", done: false, active: false },
+        { id: "verify", title: "Check your data", done: false, active: false },
       ];
       const w = await mountGuide();
       card(w).vm.$emit("received", { ...metrics, streamName: "default", streamType: "logs" });
@@ -462,7 +462,7 @@ describe("OnboardingStepGuide", () => {
     it("marks only Explore current once data arrives, not the card's own active step too", async () => {
       cardSteps.value = [
         { id: "install", title: "Quick install", done: false, active: true },
-        { id: "verify", title: "Check Your Data", done: false, active: false },
+        { id: "verify", title: "Check your data", done: false, active: false },
       ];
       const w = await mountGuide();
       card(w).vm.$emit("received", metrics);

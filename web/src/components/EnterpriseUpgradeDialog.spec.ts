@@ -150,7 +150,7 @@ const createWrapper = (props: Record<string, any> = {}) =>
         OButton: {
           name: "OButton",
           template:
-            '<button data-test-stub="o-button" :data-variant="variant" @click="$emit(\'click\')"><slot /><slot name="icon-right" /></button>',
+            '<button data-test-stub="o-button" :data-variant="variant" @click="$emit(\'click\')"><slot /><slot name="icon-end" /></button>',
           props: ["variant", "size", "disabled", "loading"],
           emits: ["click"],
         },
@@ -227,13 +227,13 @@ describe("EnterpriseUpgradeDialog", () => {
       expect(cfg.showLicenseNote).toBeFalsy();
     });
 
-    it("shows the hero panel for non-Cloud layouts", () => {
+    it("uses the standard dialog layout, with no hero panel", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find(".hero-panel").exists()).toBe(true);
+      expect(wrapper.find(".hero-panel").exists()).toBe(false);
       expect(wrapper.find(".cloud-layout").exists()).toBe(false);
     });
 
-    it("shows the standard 2-column features list (not cloud 3-column)", () => {
+    it("shows the standard features list (not the cloud one)", () => {
       const wrapper = createWrapper();
       expect(wrapper.find('[data-test="enterprise-upgrade-features-list-cloud"]').exists()).toBe(
         false,
@@ -259,7 +259,7 @@ describe("EnterpriseUpgradeDialog", () => {
       expect(cfg.showPrimaryButton).toBe(true);
     });
 
-    it("hides the hero panel and shows the cloud 3-column layout", () => {
+    it("shows the cloud catalog, core features included", () => {
       const wrapper = createWrapper();
       expect(wrapper.find(".hero-panel").exists()).toBe(false);
       expect(wrapper.find(".cloud-layout").exists()).toBe(true);
@@ -444,11 +444,11 @@ describe("EnterpriseUpgradeDialog", () => {
       expect(vm.enterpriseFeatures.length).toBe(17);
     });
 
-    it("renders one feature-list-item per enterprise feature in Open Source layout", () => {
+    it("renders one feature-list-item per self-hosted enterprise feature in Open Source layout", () => {
       const wrapper = createWrapper();
       const items = wrapper.findAll('[data-test="enterprise-upgrade-feature-item"]');
-      // Open Source variant renders only enterprise features (17).
-      expect(items.length).toBe(17);
+      // Open Source renders the enterprise features minus the one that exists only in Cloud.
+      expect(items.length).toBe(16);
     });
 
     it("renders core + enterprise features for the Cloud layout", () => {

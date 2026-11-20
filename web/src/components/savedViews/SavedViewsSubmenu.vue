@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, useSlots } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import SavedViewsMenu from "./SavedViewsMenu.vue";
 import { horizontalStep } from "./savedViewsKeys";
@@ -84,23 +83,14 @@ const summary = computed(() => {
   <div ref="root" class="relative" @keydown="onRootKeydown">
     <ODropdownSub
       :data-test="props.triggerTestId"
-      :text-value="t('search.savedViewsRowLabel')"
+      :label="t('search.savedViewsRowLabel')"
+      icon="saved-search"
       :description="summary"
       @update:open="(open: boolean) => open && emit('open')"
     >
-      <template #icon-left>
-        <span
-          class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
-        >
-          <OIcon name="saved-search" size="sm" />
-        </span>
-      </template>
-      <template #trigger>{{ t("search.savedViewsRowLabel") }}</template>
-      <template #icon-right>
-        <span class="ms-auto flex items-center gap-1">
-          <OIcon name="chevron-right" size="sm" />
-          <span v-if="slots.actions" class="w-8 shrink-0" aria-hidden="true" />
-        </span>
+      <template v-if="slots.icon" #icon><slot name="icon" /></template>
+      <template v-if="slots.actions" #end>
+        <span class="w-8 shrink-0" aria-hidden="true" />
       </template>
       <SavedViewsMenu
         v-bind="$attrs"

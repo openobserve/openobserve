@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       v-if="overflows || expanded"
       variant="ghost"
-      size="xs"
-      :icon-left="expanded ? 'expand-less' : 'expand-more'"
+      size="sm"
+      :icon="expanded ? 'expand-less' : 'expand-more'"
       data-test="oncall-clamped-text-toggle"
       @click="expanded = !expanded"
     >

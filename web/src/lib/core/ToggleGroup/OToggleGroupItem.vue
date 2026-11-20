@@ -7,6 +7,7 @@ import type {
 import {
   ToggleGroupAnimatedKey,
   ToggleGroupMenuKey,
+  ToggleGroupSizeKey,
   TOGGLE_GROUP_CONTEXT_KEY,
 } from "./OToggleGroup.types";
 import { ToggleGroupItem } from "reka-ui";
@@ -25,10 +26,15 @@ const isAnimated = computed(() => Boolean(animatedSelection?.value));
 const props = withDefaults(defineProps<ToggleGroupItemProps>(), {
   disabled: false,
   focusableUnavailable: false,
-  size: "md",
 });
 
 const slots = defineSlots<ToggleGroupItemSlots>();
+
+// Size is set once on the group; a standalone item renders at the default.
+const groupSize = inject(ToggleGroupSizeKey, undefined);
+const size = computed(() => groupSize?.value ?? "md");
+const hasIcon = computed(() => Boolean(slots["icon-left"] || props.iconLeft));
+const iconOnly = computed(() => hasIcon.value && !slots.default);
 
 // Set when the parent group has collapsed into a dropdown (phones): render as its trigger label or a menu row.
 const menu = inject(ToggleGroupMenuKey, null);
@@ -75,24 +81,24 @@ const dropIndicatorClass = computed<string>(() => {
   return before ? "left-0 top-1 bottom-1 w-0.5" : "right-0 top-1 bottom-1 w-0.5";
 });
 
-const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
-  md: "h-9 gap-2 px-3 text-sm max-md:px-2",
-  sm: "h-7 gap-1.5 px-2.5 text-xs max-md:px-1.5",
-  toolbar: "h-7 gap-1.5 px-3 text-xs max-[85.5rem]:px-2.5 max-md:px-1.5",
-  xs: "h-5 gap-2 px-1.5 text-xs max-md:px-1",
-};
+const sizeClasses = computed(() => {
+  if (size.value === "sm") {
+    return iconOnly.value ? "h-control-xs w-control-xs gap-1" : "h-control-xs gap-1 px-2 text-xs";
+  }
+  return iconOnly.value
+    ? "h-control-sm w-control-sm gap-1.5"
+    : "h-control-sm gap-1.5 px-2.5 text-compact max-md:px-1.5";
+});
 
 function lockClass(icon: string): string | undefined {
   return icon === "lock" ? "lock-chip" : undefined;
 }
 
-// Icon size mirrors the toggle size
-const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | "md"> = {
-  md: "md",
-  sm: "sm",
-  toolbar: "sm",
-  xs: "xs",
-};
+const iconSize = computed(() => (size.value === "sm" ? "xs" : "sm"));
+// An icon-only segment is named by its tooltip unless the caller set an aria-label (B5).
+const itemAriaLabel = computed(
+  () => (attrs["aria-label"] as string | undefined) ?? (iconOnly.value ? props.tooltip : undefined),
+);
 </script>
 
 <template>
@@ -111,12 +117,11 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
   <ODropdownItem
     v-else-if="menu"
     :disabled="isDisabled"
-    :focusable-unavailable="props.focusableUnavailable"
-    :description="unavailable ? props.tooltip : undefined"
+    :disabled-reason="unavailable ? props.tooltip : undefined"
     :data-test="menuItemTestId"
     @select="menu.select(props.value)"
   >
-    <template v-if="slots['icon-left'] || props.iconLeft" #icon-left>
+    <template v-if="slots['icon-left'] || props.iconLeft" #icon>
       <slot v-if="slots['icon-left']" name="icon-left" />
       <OIcon
         v-else-if="props.iconLeft"
@@ -126,7 +131,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
       />
     </template>
     <slot />
-    <template #icon-right>
+    <template #end>
       <OIcon v-if="menu.isActive(props.value)" name="check" size="sm" class="ms-auto" />
     </template>
   </ODropdownItem>
@@ -157,7 +162,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
       :class="[
         // Layout
         'inline-flex items-center justify-center',
-        sizeClasses[props.size],
+        sizeClasses,
         // Base state - inactive (transparent on track)
         'bg-toggle-item-bg text-toggle-item-text font-medium whitespace-nowrap',
         'rounded-default',
@@ -173,7 +178,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
         'data-[state=on]:text-toggle-item-active-text',
         // Gated off while focused so the focus ring keeps its own width and colour.
         !isAnimated &&
-          'data-[state=on]:not-focus-visible:ring-toggle-item-active-border data-[state=on]:not-focus-visible:ring-1 data-[state=on]:not-focus-visible:ring-inset',
+          'data-[state=on]:not-focus-visible:ring-toggle-item-active-border data-[state=on]:not-focus-visible:ring-1',
         // Sit above the sliding indicator so the icon/label stay readable.
         isAnimated && 'relative z-10',
         // Focus ring
@@ -185,6 +190,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
         isReorderable ? 'relative cursor-grab active:cursor-grabbing' : '',
         isDragging ? 'opacity-40' : '',
       ]"
+      :aria-label="itemAriaLabel"
       :draggable="isReorderable || undefined"
       :data-otoggle-value="dragKey"
     >
@@ -201,7 +207,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
       <OIcon
         v-if="isReorderable"
         name="drag-indicator"
-        :size="iconSize[props.size]"
+        :size="iconSize"
         class="-ms-0.5 shrink-0 opacity-40"
         aria-hidden="true"
       />
@@ -210,7 +216,7 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
       <OIcon
         v-else-if="props.iconLeft"
         :name="props.iconLeft"
-        :size="iconSize[props.size]"
+        :size="iconSize"
         :class="lockClass(props.iconLeft)"
       />
       <span v-if="unavailable" :id="labelId" class="contents"><slot /></span>
@@ -219,9 +225,15 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
       <OIcon
         v-else-if="props.iconRight"
         :name="props.iconRight"
-        :size="iconSize[props.size]"
+        :size="iconSize"
         :class="lockClass(props.iconRight)"
       />
+      <span
+        v-if="props.count !== undefined"
+        class="text-2xs bg-surface-subtle-hover text-text-secondary rounded-full px-1.5 leading-4 font-medium tabular-nums"
+        :data-test="attrs['data-test'] ? `${attrs['data-test']}-count` : undefined"
+        >{{ props.count }}</span
+      >
     </ToggleGroupItem>
     <span v-if="unavailable && props.tooltip" :id="reasonId" aria-hidden="true" class="sr-only">{{
       props.tooltip

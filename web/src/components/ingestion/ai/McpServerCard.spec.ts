@@ -53,7 +53,7 @@ import { MCP_READONLY_ROLE } from "@/composables/useMcpCredential";
 const CODE_BLOCK_STUB = {
   name: "OCodeBlock",
   template: '<div data-test="mcp-code">{{ codeMasked ?? code }}</div>',
-  props: ["code", "codeMasked", "lang", "chrome", "filename"],
+  props: ["code", "codeMasked", "lang", "filename"],
 };
 
 const CREDENTIAL: McpCredential = {
@@ -185,7 +185,7 @@ describe("McpServerCard", () => {
         .findAllComponents({ name: "OButton" })
         .find((b) => b.attributes("data-test") === "ai-integrations-mcp-generate-btn")!;
       expect(btn.props("disabled")).toBe(true);
-      expect(btn.props("iconLeft")).toBe("lock");
+      expect(btn.props("icon")).toBe("lock");
       await btn.trigger("click");
       expect(mcp.generate).not.toHaveBeenCalled();
     });
@@ -198,7 +198,7 @@ describe("McpServerCard", () => {
         .findAllComponents({ name: "OButton" })
         .find((b) => b.attributes("data-test") === "ai-integrations-mcp-manage-btn")!;
       expect(btn.props("disabled")).toBe(true);
-      expect(btn.props("iconLeft")).toBe("lock");
+      expect(btn.props("icon")).toBe("lock");
     });
 
     it("keeps Generate live when mcp is enabled", () => {
@@ -208,7 +208,7 @@ describe("McpServerCard", () => {
         .findAllComponents({ name: "OButton" })
         .find((b) => b.attributes("data-test") === "ai-integrations-mcp-generate-btn")!;
       expect(btn.props("disabled")).toBeFalsy();
-      expect(btn.props("iconLeft")).toBeUndefined();
+      expect(btn.props("icon")).toBeUndefined();
     });
 
     it("mints once per click", async () => {
@@ -287,7 +287,6 @@ describe("McpServerCard", () => {
       const block = configBlock(wrapper);
       expect(block.props("lang")).toBe("json");
       expect(block.props("filename")).toBe("~/.cursor/mcp.json");
-      expect(block.props("chrome")).toBe("editor");
     });
   });
 

@@ -108,12 +108,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      draw, so the eye appears from the second query onwards. -->
                 <OButton
                   v-if="promqlMode || dashboardPanelData.data.queries.length > 1"
+                  icon-only
                   variant="ghost"
-                  size="icon-xs-circle"
+                  size="xs"
                   :class="{
                     'max-md:hidden': index !== dashboardPanelData.layout.currentQueryIndex,
                   }"
-                  :icon-left="tab.config?.hide ? 'visibility-off' : 'visibility'"
+                  :icon="tab.config?.hide ? 'visibility-off' : 'visibility'"
                   :aria-label="
                     tab.config?.hide
                       ? t('dashboard.showQueryResults')
@@ -154,22 +155,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OButton
           v-if="dashboardPanelData.data.type !== 'treemap'"
+          icon-only
           :aria-label="t('dashboard.newTab')"
           variant="ghost"
-          size="icon"
+          size="xs"
           @click.stop="addTab"
           data-test="dashboard-panel-query-tab-add"
-          icon-left="add"
+          icon="add"
         >
         </OButton>
         <OButton
           v-if="promqlMode"
           variant="ghost"
-          size="sm"
           :aria-label="t('dashboard.addFormula')"
           @click.stop="addFormulaTab"
           data-test="dashboard-panel-query-tab-add-formula"
-          icon-left="functions"
+          icon="functions"
         >
           <span class="max-md:hidden">{{ t("dashboard.addFormula") }}</span>
         </OButton>
@@ -180,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-if="multiQueryWarning"
           type="warningNote"
-          class="dashboard-multi-query-warning me-2 h-8"
+          class="dashboard-multi-query-warning me-2"
         >
           {{ multiQueryWarning }}
         </OTag>
@@ -193,7 +194,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('dashboard.toggleFunctionEditor')"
           @update:model-value="onFunctionToggle"
           :disabled="promqlMode"
-          size="lg"
         >
           <template #label>
             <img
@@ -218,32 +218,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex shrink-0 flex-col gap-1 px-2 pt-1"
         data-test="dashboard-panel-query-messages"
       >
-        <OBanner
-          v-if="queryErrorText"
-          variant="error-soft"
-          role="alert"
-          dense
-          data-test="dashboard-panel-query-errors"
-        >
+        <OInlineNotice v-if="queryErrorText" tone="err" data-test="dashboard-panel-query-errors">
           {{ queryErrorText }}
-        </OBanner>
-        <OBanner
-          v-if="formulaError"
-          variant="error-soft"
-          role="alert"
-          dense
-          data-test="dashboard-panel-formula-error"
-        >
+        </OInlineNotice>
+        <OInlineNotice v-if="formulaError" tone="err" data-test="dashboard-panel-formula-error">
           {{ formulaError }}
-        </OBanner>
-        <OBanner
+        </OInlineNotice>
+        <OInlineNotice
           v-else-if="isFormulaInput"
-          variant="info"
-          dense
+          tone="info"
           data-test="dashboard-panel-formula-input-note"
         >
           {{ t("dashboard.formulaInputNote") }}
-        </OBanner>
+        </OInlineNotice>
       </div>
       <div class="flex min-h-0 w-full flex-1 flex-col">
         <div class="flex h-full">
@@ -331,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 pb-0 select-none"
                   >
                     <span
-                      class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
+                      class="text-text-placeholder text-compact overflow-hidden font-mono leading-5 text-ellipsis whitespace-nowrap"
                       >{{ vrlPlaceholder }}</span
                     >
                   </div>
@@ -341,10 +328,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-vrl-function-toolbar"
                 >
                   <OSelect
+                    searchable
                     v-model="selectedFunction"
                     :label="t('dashboard.useSavedFunction')"
                     :options="functionSelectOptions"
-                    label-position="inside"
+                    variant="filter"
                     data-test="dashboard-use-saved-vrl-function"
                     labelKey="name"
                     valueKey="function"
@@ -353,15 +341,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="min-w-0 flex-1"
                   />
                   <OButton
+                    icon-only
                     variant="ghost"
-                    size="icon-sm"
                     data-test="dashboard-addpanel-config-drilldown-info"
                   >
-                    <template #icon-left><OIcon name="info-outline" size="sm" /></template>
-                    <OTooltip
-                      :content="t('dashboard.vrlExtractionTooltip')"
-                      max-width="15.625rem"
-                    />
+                    <template #icon><OIcon name="info-outline" size="sm" /></template>
+                    <OTooltip :content="t('dashboard.vrlExtractionTooltip')" />
                   </OButton>
                 </div>
               </div>
@@ -418,7 +403,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { RECENT_SEARCHES_EDITOR_HOST } from "@/composables/queryHistory/useRecentSearchesEditorHost";
 import {
@@ -458,7 +443,7 @@ export default defineComponent({
     OIcon,
     OSplitter,
     OTag,
-    OBanner,
+    OInlineNotice,
   },
   emits: ["searchdata", "run-query"],
   methods: {

@@ -26,9 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               variant="ghost"
-              size="sm"
-              icon-left="history"
-              icon-right="arrow-drop-down"
+              icon="history"
+              icon-end="arrow-drop-down"
               data-test="rum-analytics-funnel-recent-btn"
               >{{ t("rum.analytics.funnel.recent") }}</OButton
             >
@@ -49,9 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <span>
           <OButton
-            variant="outline"
-            size="sm"
-            :icon-left="alertsLocked ? 'lock' : 'shield-alert-outline'"
+            variant="secondary"
+            :icon="alertsLocked ? 'lock' : 'shield-alert-outline'"
             :disabled="alertsLocked || !alertReady"
             data-test="rum-analytics-funnel-alert-btn"
             @click="openAlert"
@@ -61,9 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <span>
           <OButton
-            variant="outline"
-            size="sm"
-            :icon-left="dashboardsLocked ? 'lock' : 'dashboard-customize'"
+            variant="secondary"
+            :icon="dashboardsLocked ? 'lock' : 'dashboard-customize'"
             :disabled="dashboardsLocked || !dashboardReady"
             data-test="rum-analytics-funnel-add-dashboard-btn"
             @click="dashboardOpen = true"
@@ -75,7 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-if="def.steps.length" #menu>
         <ODropdownItem
-          icon-left="delete-sweep"
+          icon="delete-sweep"
+          tone="danger"
           data-test="rum-analytics-funnel-clear-btn"
           @select="clear"
           >{{ t("rum.analytics.funnel.clearSteps") }}</ODropdownItem
@@ -83,85 +81,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </SavedFunnelBar>
     <div class="px-page-edge flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3">
-      <OBanner
+      <OInlineNotice
         v-if="usersFallback"
-        variant="info"
-        dense
-        :content="t('rum.analytics.funnel.usersFallback')"
+        tone="info"
+        :message="t('rum.analytics.funnel.usersFallback')"
         data-test="rum-analytics-funnel-users-fallback"
       />
-      <OBanner
+      <OInlineNotice
         v-if="pa.savedFunnelMissing.value"
-        variant="warning"
-        dense
-        :content="t('rum.analytics.saved.missing')"
+        tone="warn"
+        :message="t('rum.analytics.saved.missing')"
         data-test="rum-analytics-funnel-saved-missing"
       />
-      <OBanner
+      <OInlineNotice
         v-if="needsNewer"
-        variant="warning"
-        dense
-        :content="t('rum.analytics.funnel.needsNewer')"
+        tone="warn"
+        :message="t('rum.analytics.funnel.needsNewer')"
         data-test="rum-analytics-funnel-needs-newer"
       />
-      <OBanner
+      <OInlineNotice
         v-if="stale"
-        variant="info"
-        dense
-        :content="t('rum.analytics.saved.stale')"
+        tone="info"
+        :message="t('rum.analytics.saved.stale')"
         data-test="rum-analytics-funnel-saved-stale"
       />
-      <OBanner
+      <OInlineNotice
         v-if="linkProblem === 'forbidden'"
-        variant="warning"
-        dense
-        :content="t('rum.analytics.saved.noAccess')"
+        tone="warn"
+        :message="t('rum.analytics.saved.noAccess')"
         data-test="rum-analytics-funnel-saved-link-forbidden"
       />
-      <OBanner
+      <OInlineNotice
         v-else-if="linkProblem === 'failed'"
-        variant="warning"
-        dense
-        :content="t('rum.analytics.saved.linkFailed')"
+        tone="warn"
+        :message="t('rum.analytics.saved.linkFailed')"
         data-test="rum-analytics-funnel-saved-link-failed"
       >
         <template #actions>
           <OButton
             variant="ghost"
-            size="sm"
             data-test="rum-analytics-funnel-saved-link-retry-btn"
             @click="resolveSavedLink(true)"
             >{{ t("common.retry") }}</OButton
           >
         </template>
-      </OBanner>
+      </OInlineNotice>
 
-      <OCard
+      <OEmptyState
         v-if="!def.steps.length"
-        variant="outlined"
-        class="rounded-surface p-4"
+        :title="t('rum.analytics.funnel.coldTitle')"
+        :text="t('rum.analytics.funnel.coldDescription')"
         data-test="rum-analytics-funnel-cold"
       >
-        <OEmptyState
-          preset="no-search-results"
-          size="block"
-          :title="t('rum.analytics.funnel.coldTitle')"
-          :description="t('rum.analytics.funnel.coldDescription')"
-        >
-          <template #actions>
-            <FunnelQuickStarts
-              :entries="entries"
-              :entries-loading="entriesLoading"
-              :entries-failed="entriesFailed"
-              :recent="recent"
-              :events="events"
-              @start="setSteps"
-              @open="(r) => funnelDraft.startNew(r)"
-              @retry="loadEntries"
-            />
-          </template>
-        </OEmptyState>
-      </OCard>
+        <template #extra>
+          <FunnelQuickStarts
+            :entries="entries"
+            :entries-loading="entriesLoading"
+            :entries-failed="entriesFailed"
+            :recent="recent"
+            :events="events"
+            @start="setSteps"
+            @open="(r) => funnelDraft.startNew(r)"
+            @retry="loadEntries"
+          />
+        </template>
+      </OEmptyState>
 
       <FunnelLayoutRail
         v-else
@@ -229,56 +213,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-heading text-xl font-semibold tabular-nums">{{
                 pct(overallRate)
               }}</span>
-              <OBadge
-                variant="default-soft"
-                size="sm"
-                data-test="rum-analytics-funnel-overall-count"
-                >{{
-                  t("rum.analytics.funnel.overallOf", {
-                    last: formatCount(lastUnits, 1),
-                    first: formatCount(firstUnits, 1),
-                    unit: unitNoun,
-                  })
-                }}</OBadge
-              >
+              <OBadge tone="neutral" size="sm" data-test="rum-analytics-funnel-overall-count">{{
+                t("rum.analytics.funnel.overallOf", {
+                  last: formatCount(lastUnits, 1),
+                  first: formatCount(firstUnits, 1),
+                  unit: unitNoun,
+                })
+              }}</OBadge>
               <OBadge
                 v-if="windowBadge"
-                variant="default-soft"
+                tone="neutral"
                 size="sm"
                 data-test="rum-analytics-funnel-overall-window"
                 >{{ windowBadge }}</OBadge
               >
               <OBadge
                 v-if="def.breakdown"
-                variant="primary-soft"
-                size="sm"
-                clickable
+                toggle
+                :pressed="!railCollapsed"
                 :aria-expanded="!railCollapsed"
                 data-test="rum-analytics-funnel-overall-breakdown"
                 @click="showBreakdownSection"
                 >{{ t("rum.analytics.funnel.headlineBreakdown", { field: dimLabel }) }}</OBadge
               >
               <template v-if="!def.breakdown && def.steps.length > 1 && lastUnits > 0">
-                <OBadge
-                  variant="default-soft"
-                  size="sm"
-                  data-test="rum-analytics-funnel-overall-median"
-                  >{{
-                    t("rum.analytics.funnel.headlineMedian", {
-                      value: raw(formatDuration(result.steps[result.steps.length - 1].medianMs)),
-                    })
-                  }}</OBadge
-                >
-                <OBadge
-                  variant="default-soft"
-                  size="sm"
-                  data-test="rum-analytics-funnel-overall-p90"
-                  >{{
-                    t("rum.analytics.funnel.p90", {
-                      value: raw(formatDuration(result.steps[result.steps.length - 1].p90Ms)),
-                    })
-                  }}</OBadge
-                >
+                <OBadge tone="neutral" size="sm" data-test="rum-analytics-funnel-overall-median">{{
+                  t("rum.analytics.funnel.headlineMedian", {
+                    value: raw(formatDuration(result.steps[result.steps.length - 1].medianMs)),
+                  })
+                }}</OBadge>
+                <OBadge tone="neutral" size="sm" data-test="rum-analytics-funnel-overall-p90">{{
+                  t("rum.analytics.funnel.p90", {
+                    value: raw(formatDuration(result.steps[result.steps.length - 1].p90Ms)),
+                  })
+                }}</OBadge>
               </template>
               <span
                 v-if="compareView || (!usersMode && def.steps.length > 1)"
@@ -298,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                   <OBadge
                     v-else-if="compareView.data?.overall && compareView.data.prevOverall !== null"
-                    :variant="changeTone(compareView.data.overall)"
+                    :tone="changeTone(compareView.data.overall)"
                     size="sm"
                     data-test="rum-analytics-funnel-overall-change"
                   >
@@ -337,6 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #actions>
           <OToggleGroup
+            size="sm"
             :model-value="trend.shown.value ? 'trend' : 'steps'"
             type="single"
             :label="t('rum.analytics.funnel.viewAs')"
@@ -345,12 +314,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-analytics-funnel-view"
             @update:model-value="setView"
           >
-            <OToggleGroupItem value="steps" size="xs" data-test="rum-analytics-funnel-view-steps">{{
+            <OToggleGroupItem value="steps" data-test="rum-analytics-funnel-view-steps">{{
               t("rum.analytics.funnel.viewSteps")
             }}</OToggleGroupItem>
             <OToggleGroupItem
               value="trend"
-              size="xs"
               :disabled="def.steps.length < 2"
               data-test="rum-analytics-funnel-view-trend"
               >{{ t("rum.analytics.funnel.viewTrend") }}</OToggleGroupItem
@@ -358,6 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
           <span class="border-border-default h-5 border-s max-md:hidden" aria-hidden="true" />
           <OToggleGroup
+            size="sm"
             :model-value="def.unit"
             type="single"
             :label="t('rum.analytics.funnel.countBy')"
@@ -365,15 +334,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rum-analytics-funnel-count-by"
             @update:model-value="onUnit"
           >
-            <OToggleGroupItem
-              value="sessions"
-              size="xs"
-              data-test="rum-analytics-funnel-count-by-sessions"
-              >{{ t("rum.analytics.funnel.sessions") }}</OToggleGroupItem
-            >
+            <OToggleGroupItem value="sessions" data-test="rum-analytics-funnel-count-by-sessions">{{
+              t("rum.analytics.funnel.sessions")
+            }}</OToggleGroupItem>
             <OToggleGroupItem
               value="users"
-              size="xs"
               :disabled="!identitySql"
               :tooltip="usersTooltip"
               data-test="rum-analytics-funnel-count-by-users"
@@ -391,8 +356,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :model-value="def.window"
               :options="windowOptions"
               :searchable="false"
-              size="xs"
-              width="sm"
+              size="sm"
+              width="s"
               data-test="rum-analytics-funnel-window-select"
               @update:model-value="(v) => update({ window: v as FunnelWindow })"
             >
@@ -416,8 +381,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="compareOptions"
                 :disabled="compareTooLong"
                 :searchable="false"
-                size="xs"
-                width="sm"
+                size="sm"
+                width="s"
                 data-test="rum-analytics-funnel-compare-select"
                 @update:model-value="setCompare"
               >
@@ -445,8 +410,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="trend.fromOptions.value"
                 :disabled="def.steps.length < 3"
                 :searchable="false"
-                size="xs"
-                width="md"
+                size="sm"
+                width="m"
                 data-test="rum-analytics-funnel-trend-from-select"
                 @update:model-value="trend.setFrom"
               />
@@ -463,8 +428,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="trend.toOptions.value"
                 :disabled="def.steps.length < 3"
                 :searchable="false"
-                size="xs"
-                width="md"
+                size="sm"
+                width="m"
                 data-test="rum-analytics-funnel-trend-to-select"
                 @update:model-value="trend.setTo"
               />
@@ -481,14 +446,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :model-value="trend.selectedInterval.value"
                 :options="trend.intervalOptions.value"
                 :searchable="false"
-                size="xs"
-                width="xs"
+                size="sm"
+                width="s"
                 data-test="rum-analytics-funnel-trend-interval-select"
                 @update:model-value="trend.setInterval"
               />
             </span>
             <span v-if="compareView && trend.breakdown.value" class="ms-auto">
               <OPopover
+                size="lg"
                 v-model:open="compareNoLineOpen"
                 side="bottom"
                 align="end"
@@ -496,14 +462,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #trigger>
                   <OButton
-                    variant="ghost-warning"
-                    size="xs"
-                    icon-left="warning-amber"
+                    variant="ghost"
+                    size="sm"
+                    icon="warning-amber"
                     :aria-label="t('rum.analytics.funnel.compareNoLineAbout')"
                     data-test="rum-analytics-funnel-trend-compare-warning"
                   />
                 </template>
-                <div class="flex w-96 max-w-[calc(100vw-1.5rem)] flex-col gap-3 p-3">
+                <div class="flex flex-col gap-3 p-3">
                   <p class="leading-5" data-test="rum-analytics-funnel-trend-compare-warning-text">
                     <OText variant="meta">{{
                       t("rum.analytics.funnel.compareNoLineBreakdown", {
@@ -514,8 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </p>
                   <span class="flex justify-end">
                     <OButton
-                      variant="outline"
-                      size="sm-action"
+                      variant="secondary"
                       data-test="rum-analytics-funnel-trend-compare-remove-breakdown"
                       @click="removeBreakdownForCompare"
                       >{{ t("rum.analytics.funnel.breakdownRemove") }}</OButton
@@ -538,12 +503,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               })
             }}</span
           >
-          <OBanner
+          <OInlineNotice
             v-if="!identitySql"
-            variant="info"
-            dense
+            tone="info"
             class="mx-4"
-            :content="
+            :message="
               pa.identityGapText.value
                 ? t('rum.analytics.funnel.identityHintReason', { reason: pa.identityGapText.value })
                 : t('rum.analytics.funnel.identityHint')
@@ -553,25 +517,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #actions>
               <OButton
                 variant="ghost"
-                size="sm"
                 data-test="rum-analytics-funnel-identity-hint-link"
                 @click="openUnlock"
                 >{{ t("rum.analytics.funnel.identityHintLink") }}</OButton
               >
             </template>
-          </OBanner>
+          </OInlineNotice>
           <NamedEventsNotice
             :status="eventsStatus"
             class="mx-4"
             data-test="rum-analytics-funnel"
             @retry="pa.retryEvents()"
           />
-          <OBanner
+          <OInlineNotice
             v-if="usersMode && pa.sampleRatio.value > 1"
-            variant="default"
-            dense
+            tone="neutral"
             class="mx-4"
-            :content="t('rum.analytics.funnel.usersExact')"
+            :message="t('rum.analytics.funnel.usersExact')"
             data-test="rum-analytics-funnel-users-exact"
           />
 
@@ -582,30 +544,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @retry="compute(true)"
           />
           <template v-else>
-            <OBanner
+            <OInlineNotice
               v-if="partial"
-              variant="warning"
-              dense
+              tone="warn"
               class="mx-4"
-              :content="t('rum.analytics.partial')"
+              :message="t('rum.analytics.partial')"
               data-test="rum-analytics-funnel-partial"
             />
             <OEmptyState
               v-if="step1Empty"
-              preset="no-search-results"
-              size="block"
+              kind="filtered"
               :title="t('rum.analytics.funnel.step1EmptyTitle', { unit: unitNoun })"
-              :description="
-                t('rum.analytics.funnel.step1EmptyDescription', { step: raw(firstLabel) })
-              "
+              :text="t('rum.analytics.funnel.step1EmptyDescription', { step: raw(firstLabel) })"
               data-test="rum-analytics-funnel-step1-empty"
             >
               <template #actions>
                 <OButton
                   v-if="pa.canWidenRange.value"
-                  variant="outline"
-                  size="md"
-                  icon-left="schedule"
+                  variant="secondary"
                   data-test="rum-analytics-funnel-widen-range-btn"
                   @click="widenRange"
                   >{{ t("rum.analytics.overview.widenRange") }}</OButton
@@ -706,14 +662,13 @@ import {
 } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import OCard from "@/lib/core/Card/OCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -914,11 +869,11 @@ const windowBadge = computed<I18nText | null>(() => {
 });
 
 // Same rules as FunnelChangeCell: low volume outranks the direction.
-const changeTone = (c: RateChange): BadgeVariant => {
-  if (c.lowVolume) return "default-soft";
+const changeTone = (c: RateChange): ChipTone => {
+  if (c.lowVolume) return "neutral";
   const d = changeDirection(c);
-  if (d === "up") return "success-soft";
-  return d === "down" ? "error-soft" : "default-soft";
+  if (d === "up") return "ok";
+  return d === "down" ? "err" : "neutral";
 };
 
 const dimLabels = computed<Record<BreakdownDim, I18nText>>(() => ({

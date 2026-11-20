@@ -6,19 +6,14 @@
   >
     <OPageLayout
       :back="{
-        label: t('onlineEvals.job.backTo'),
+        label: t('aiObservability.nav.evaluations'),
         onClick: cancel,
         dataTest: 'job-form-back-btn',
       }"
+      :title="mode === 'create' ? t('onlineEvals.job.createTitle') : t('onlineEvals.job.editTitle')"
+      title-data-test="job-form-title"
       bleed
     >
-      <template #title>
-        <span data-test="job-form-title">
-          {{
-            mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle")
-          }}
-        </span>
-      </template>
       <div class="flex min-h-0 flex-1 gap-0 overflow-hidden max-[68.75rem]:flex-col">
         <div
           class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 overflow-auto p-2 max-[68.75rem]:flex-[1_1_auto] [&_textarea]:max-h-50 [&_textarea]:overflow-y-auto"
@@ -31,7 +26,6 @@
             data-test="job-form-details-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.detailsSection")
               }}</span>
@@ -42,7 +36,6 @@
                   name="name"
                   :label="t('onlineEvals.job.nameLabel')"
                   :placeholder="t('onlineEvals.job.namePlaceholder')"
-                  size="sm"
                   required
                   :disabled="mode === 'edit'"
                   data-test="job-form-name-input"
@@ -54,7 +47,6 @@
                   name="description"
                   :label="t('onlineEvals.job.descriptionLabel')"
                   :placeholder="t('onlineEvals.job.descriptionPlaceholder')"
-                  size="sm"
                   :rows="3"
                   data-test="job-form-description-input"
                 />
@@ -68,7 +60,6 @@
             data-test="job-form-target-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.targetSection")
               }}</span>
@@ -80,7 +71,6 @@
                   :label="t('onlineEvals.job.targetScopeLabel')"
                   :options="targetScopeOptions"
                   :help-text="t(`onlineEvals.job.targetScopeHelp.${formValues.targetScope}`)"
-                  size="md"
                   required
                   data-test="job-form-target-scope-select"
                 />
@@ -92,7 +82,6 @@
                   :label="t('onlineEvals.job.streamLabel')"
                   :options="streamOptions"
                   :placeholder="t('onlineEvals.job.streamPlaceholder')"
-                  size="md"
                   required
                   :disabled="mode === 'edit'"
                   data-test="job-form-stream-select"
@@ -109,7 +98,6 @@
             data-test="job-form-filtering-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.filteringSection")
               }}</span>
@@ -131,7 +119,6 @@
             data-test="job-form-sampling-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.stepper.sampling")
               }}</span>
@@ -144,7 +131,6 @@
                     :label="t('onlineEvals.job.samplingModeLabel')"
                     :options="samplingModeOptions"
                     :help-text="t('onlineEvals.job.samplingHelp')"
-                    size="md"
                     data-test="job-form-sampling-mode-select"
                   />
                 </div>
@@ -157,7 +143,6 @@
                     min="0"
                     max="1"
                     step="0.01"
-                    size="sm"
                     :required="formValues.samplingMode !== 'all'"
                     :disabled="formValues.samplingMode === 'all'"
                     :help-text="raw(samplingValueHelp)"
@@ -174,7 +159,6 @@
             data-test="job-form-scorers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.scorersSection")
               }}</span>
@@ -219,7 +203,6 @@
             data-test="job-form-completion-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.completionSection")
               }}</span>
@@ -236,7 +219,6 @@
                     type="number"
                     :min="MIN_COMPLETION_IDLE_WINDOW_SECS"
                     :max="completionLimits?.maxIdleWindowSecs"
-                    size="sm"
                     :help-text="raw(idleWindowHelp)"
                     data-test="job-form-idle-window-input"
                   />
@@ -248,7 +230,6 @@
                     type="number"
                     min="1"
                     :max="completionLimits?.maxAgeSecs"
-                    size="sm"
                     :help-text="raw(maxAgeHelp)"
                     data-test="job-form-max-age-input"
                   />
@@ -287,8 +268,7 @@
         <OButton
           data-test="job-form-cancel-btn"
           type="button"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="isSubmitting"
           @click="cancel"
         >
@@ -302,8 +282,7 @@
           <OButton
             data-test="job-form-save-draft-btn"
             type="submit"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :loading="isSubmitting && !activateOnSave"
             :disabled="isSubmitting && activateOnSave"
             @click="activateOnSave = false"
@@ -314,7 +293,6 @@
             data-test="job-form-save-activate-btn"
             type="submit"
             variant="primary"
-            size="sm-action"
             :loading="isSubmitting && activateOnSave"
             :disabled="isSubmitting && !activateOnSave"
             @click="activateOnSave = true"
@@ -327,7 +305,6 @@
           data-test="job-form-save-btn"
           type="submit"
           variant="primary"
-          size="sm-action"
           :loading="isSubmitting"
         >
           {{ t("onlineEvals.buttons.save") }}

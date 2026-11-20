@@ -5,12 +5,17 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 import { securityTime } from "@/utils/security/time";
 import { computed, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import SecurityTimeRange from "@/components/security/SecurityTimeRange.vue";
+import { useSecurityRange } from "@/composables/security/useSecurityRange";
+import type { DateTimeRangeChange } from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
+import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -66,21 +71,12 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "")
 // Enabling a rule creates a detection, which is authoring.
 const { canAuthor } = useSecurityAccess();
 
-const RANGES = [
-  { value: "1h", minutes: 60 },
-  { value: "24h", minutes: 1440 },
-  { value: "7d", minutes: 10080 },
-  { value: "30d", minutes: 43200 },
-] as const;
-type RangeKey = (typeof RANGES)[number]["value"];
-const range = ref<RangeKey>(
-  RANGES.some((r) => r.value === route.query.period) ? (route.query.period as RangeKey) : "7d",
-);
-function onRangeChange(value: unknown) {
-  if (!value || value === range.value) return;
-  range.value = value as RangeKey;
-  analytics.track("security_time_range_changed", { view: "mitre", range: range.value });
-  router.replace({ query: { ...route.query, period: range.value } });
+const range = useSecurityRange(route.query);
+function onRangeChange(change: DateTimeRangeChange) {
+  if (!range.apply(change)) return;
+  analytics.track("security_time_range_changed", { view: "mitre", range: range.text.value });
+  const { period: _p, from: _f, to: _t, ...rest } = route.query;
+  router.replace({ query: { ...rest, ...range.linkQuery.value } });
   void loadHistory();
 }
 
@@ -95,13 +91,19 @@ const history = useAlertHistorySummary();
 const lastRunAt = ref<number | null>(null);
 let detectionsReady: Promise<void> = Promise.resolve();
 
+// Axios status text is not a reason a reader can act on (K6).
+const errorReason = (message: string) =>
+  isRawHttpText(message) ? t("emptyState.loadError.description") : message;
+
 const notices = computed<SecurityNotice[]>(() => {
   const out: SecurityNotice[] = [];
   if (coverageQuery.error.value) {
     out.push({
       key: "coverage-error",
       tone: "error",
-      text: t("siem.mitrePage.coverageError", { reason: coverageQuery.error.value.message }),
+      text: t("siem.mitrePage.coverageError", {
+        reason: errorReason(coverageQuery.error.value.message),
+      }),
       dataTest: "security-mitre-coverage-error",
     });
   }
@@ -109,7 +111,7 @@ const notices = computed<SecurityNotice[]>(() => {
     out.push({
       key: "rules-error",
       tone: "error",
-      text: t("siem.overview.rulesError", { reason: rulesError.value }),
+      text: t("siem.overview.rulesError", { reason: errorReason(rulesError.value) }),
       dataTest: "security-mitre-rules-error",
     });
   }
@@ -145,12 +147,13 @@ const notices = computed<SecurityNotice[]>(() => {
 async function loadHistory() {
   // The summary is scoped to SIEM alert ids, which are only known once detections land.
   await detectionsReady;
-  const end = Date.now();
-  const minutes = RANGES.find((r) => r.value === range.value)!.minutes;
+  range.touch();
+  const end = range.endMs.value;
+  const minutes = range.windowMs.value / 60_000;
   const alertIds = siemRows.value.map((row) => String(row.alert.id ?? "")).filter(Boolean);
   // Fine buckets keep each technique's "last fired" within minutes of the real firing.
   const bucketMs = Math.max(60_000, Math.ceil((minutes * 60_000) / 400));
-  await history.load(orgId.value, end - minutes * 60_000, end, { alertIds, bucketMs });
+  await history.load(orgId.value, range.startMs.value, end, { alertIds, bucketMs });
   lastRunAt.value = Date.now();
 }
 const coverageQuery = useQuery(() => ({
@@ -300,11 +303,17 @@ const order = computed(() => {
   return out;
 });
 
+// A failed coverage or rules load is one page error, never "0 of 0" (R8).
+const pageFailed = computed(
+  () => !!coverageQuery.error.value || (!!rulesError.value && !siemRows.value.length),
+);
+const firingDash = (n: number) => (history.error.value ? "—" : n);
+
 const stats = computed<StatItem[]>(() => [
   {
     key: "firing",
     label: t("siem.mitrePage.stat.firing"),
-    value: summary.value.techniquesFiring,
+    value: firingDash(summary.value.techniquesFiring),
     icon: "local-fire-department",
     tone: "error",
     dataTest: "security-mitre-stat-firing",
@@ -416,7 +425,7 @@ const drawerFacts = computed<RecordFact[]>(() => {
     { label: t("siem.mitrePage.fact.enabled"), value: cell.enabledCount },
     { label: t("siem.mitrePage.fact.catalog"), value: cell.catalogRules.length },
     {
-      label: t("siem.mitrePage.fact.firings", { range: t(`siem.range.${range.value}`) }),
+      label: t("siem.mitrePage.fact.firings", { range: range.text.value }),
       value: formatEventCount(cell.firings),
     },
   ];
@@ -453,29 +462,18 @@ function openDetections() {
 <template>
   <OPageLayout
     :title="t('siem.mitrePage.title')"
-    :subtitle="t('siem.mitrePage.subtitle')"
-    icon="grid-on"
+    :about="t('siem.mitrePage.subtitle')"
     scroll
     pad-y
     title-data-test="security-mitre-title"
   >
     <template #actions>
       <div class="flex items-center gap-2">
-        <OToggleGroup
-          :model-value="range"
+        <SecurityTimeRange
+          :picker-props="range.pickerProps.value"
           data-test="security-mitre-range"
-          @update:model-value="onRangeChange"
-        >
-          <OToggleGroupItem
-            v-for="r in RANGES"
-            :key="r.value"
-            :value="r.value"
-            size="sm"
-            :data-test="`security-mitre-range-${r.value}`"
-          >
-            {{ t(`siem.range.${r.value}`) }}
-          </OToggleGroupItem>
-        </OToggleGroup>
+          @change="onRangeChange"
+        />
         <ORefreshButton
           :last-run-at="lastRunAt"
           :loading="loading"
@@ -485,7 +483,14 @@ function openDetections() {
       </div>
     </template>
 
-    <div class="flex flex-col gap-4 pb-4">
+    <SecurityLoadError
+      v-if="pageFailed"
+      :what="t('siem.mitrePage.whatCoverage')"
+      :hint="t('siem.mitrePage.loadFailedHint')"
+      data-test="security-mitre-load-error"
+      @retry="refresh"
+    />
+    <div v-else class="flex flex-col gap-4 pb-4">
       <SecurityNotices :notices="notices" data-test="security-mitre-notices" />
 
       <OStatStrip
@@ -505,16 +510,16 @@ function openDetections() {
           data-test="security-mitre-view"
           @update:model-value="(v: unknown) => (view = (v as View) || 'all')"
         >
-          <OToggleGroupItem value="all" size="sm" data-test="security-mitre-view-all">{{
+          <OToggleGroupItem value="all" data-test="security-mitre-view-all">{{
             t("siem.mitrePage.view.all")
           }}</OToggleGroupItem>
-          <OToggleGroupItem value="covered" size="sm" data-test="security-mitre-view-covered">{{
+          <OToggleGroupItem value="covered" data-test="security-mitre-view-covered">{{
             t("siem.mitrePage.view.covered")
           }}</OToggleGroupItem>
-          <OToggleGroupItem value="gaps" size="sm" data-test="security-mitre-view-gaps">{{
+          <OToggleGroupItem value="gaps" data-test="security-mitre-view-gaps">{{
             t("siem.mitrePage.view.gaps")
           }}</OToggleGroupItem>
-          <OToggleGroupItem value="firing" size="sm" data-test="security-mitre-view-firing">{{
+          <OToggleGroupItem value="firing" data-test="security-mitre-view-firing">{{
             t("siem.mitrePage.view.firing")
           }}</OToggleGroupItem>
         </OToggleGroup>
@@ -522,7 +527,6 @@ function openDetections() {
           <OSearchInput
             v-model="search"
             :placeholder="t('siem.mitrePage.search')"
-            size="sm"
             data-test="security-mitre-search"
           />
         </div>
@@ -576,7 +580,7 @@ function openDetections() {
             </div>
             <div class="flex flex-col gap-1.5 p-1.5">
               <template v-if="rulesLoading && !siemRows.length">
-                <OSkeleton v-for="n in 3" :key="n" class="h-12" />
+                <OSkeleton v-for="n in 3" :key="n" shape="block" class="h-12" />
               </template>
               <template v-else>
                 <div
@@ -621,10 +625,12 @@ function openDetections() {
 
       <OEmptyState
         v-if="filtered && !order.length && !rulesLoading"
-        size="block"
         icon="search-off"
+        kind="filtered"
         :title="t('siem.mitrePage.noMatch')"
-        filtered
+        :text="
+          t('emptyState.filtered.description', { noun: t('emptyState.filtered.fallbackNoun') })
+        "
         data-test="security-mitre-empty"
         @action="
           () => {
@@ -639,17 +645,15 @@ function openDetections() {
           t("siem.mitrePage.unmapped")
         }}</span>
         <div class="flex flex-wrap gap-1.5">
-          <OTag
+          <OButton
             v-for="cell in unmapped"
             :key="cell.id"
-            clickable
-            variant="default-soft"
-            shape="rounded"
-            size="sm"
+            variant="secondary"
+            size="xs"
+            :label="raw(cell.id)"
             :data-test="`security-mitre-unmapped-${cell.id}`"
             @click="openCell(cell)"
-            >{{ cell.id }}</OTag
-          >
+          />
         </div>
       </div>
 
@@ -684,26 +688,18 @@ function openDetections() {
     >
       <template #chips>
         <OTag
-          :variant="
-            selected.state === 'firing'
-              ? 'error-soft'
-              : selected.state === 'covered'
-                ? 'success-soft'
-                : 'default-soft'
+          :tone="
+            selected.state === 'firing' ? 'err' : selected.state === 'covered' ? 'ok' : 'neutral'
           "
           size="sm"
           >{{ t(`siem.mitrePage.state.${selected.state}`) }}</OTag
         >
-        <OTag v-for="tactic in selected.tactics" :key="tactic" variant="primary-soft" size="sm">{{
+        <OTag v-for="tactic in selected.tactics" :key="tactic" tone="accent" size="sm">{{
           t(`siem.mitre.tactics.${tactic}`)
         }}</OTag>
-        <OTag
-          v-if="parentTechnique(selected.id) !== selected.id"
-          variant="default-soft"
-          size="sm"
-          class="font-mono"
-          >{{ t("siem.mitrePage.subOf", { id: parentTechnique(selected.id) }) }}</OTag
-        >
+        <OTag v-if="parentTechnique(selected.id) !== selected.id" tone="neutral" mono size="sm">{{
+          t("siem.mitrePage.subOf", { id: parentTechnique(selected.id) })
+        }}</OTag>
       </template>
 
       <template #tab-detections>
@@ -721,18 +717,18 @@ function openDetections() {
               type="severity"
               :value="severityTagValue(toneOfSigmaLevel(det.level))"
               :label="t(toneLabelKey(toneOfSigmaLevel(det.level)))"
-              size="xs"
+              size="sm"
             />
             <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium">{{
               det.name
             }}</span>
-            <OTag :variant="det.enabled ? 'success-soft' : 'default-soft'" size="xs">
+            <OTag :tone="det.enabled ? 'ok' : 'neutral'" size="sm">
               {{ det.enabled ? t("siem.mitrePage.enabled") : t("siem.mitrePage.disabled") }}
             </OTag>
           </div>
           <OEmptyState
             v-if="!selected.detections.length"
-            size="inline"
+            size="compact"
             icon="shield-alert-outline"
             :title="t('siem.mitrePage.noDetections')"
           />
@@ -754,7 +750,7 @@ function openDetections() {
                   type="severity"
                   :value="severityTagValue(toneOfSigmaLevel(rule.level))"
                   :label="t(toneLabelKey(toneOfSigmaLevel(rule.level)))"
-                  size="xs"
+                  size="sm"
                 />
                 <span class="text-text-heading min-w-0 truncate text-sm font-medium">{{
                   rule.title
@@ -767,9 +763,7 @@ function openDetections() {
             </div>
             <OButton
               v-if="canAuthor"
-              variant="outline"
-              size="sm"
-              icon-left="add"
+              variant="secondary"
               :data-test="`security-mitre-enable-${rule.id}`"
               @click="enableRule(rule.key)"
             >
@@ -782,9 +776,8 @@ function openDetections() {
       <template #tab-firings>
         <OEmptyState
           v-if="!recentFirings.length"
-          size="inline"
           icon="task-alt"
-          :title="t('siem.mitrePage.noFirings', { range: t(`siem.range.${range}`) })"
+          :title="t('siem.mitrePage.noFirings', { range: range.text.value })"
         />
         <div v-else class="border-border-default rounded-surface overflow-hidden border">
           <div
@@ -810,25 +803,21 @@ function openDetections() {
           </p>
           <div class="flex flex-wrap gap-2">
             <OButton
-              as="a"
               :href="techniqueUrl(selected.id)"
               target="_blank"
               rel="noopener"
-              variant="outline"
-              size="sm"
-              icon-right="open-in-new"
+              variant="secondary"
+              icon-end="open-in-new"
               data-test="security-mitre-reference-link"
               >{{ t("siem.mitrePage.openTechnique", { id: selected.id }) }}</OButton
             >
             <OButton
               v-if="parentTechnique(selected.id) !== selected.id"
-              as="a"
               :href="techniqueUrl(parentTechnique(selected.id))"
               target="_blank"
               rel="noopener"
               variant="ghost"
-              size="sm"
-              icon-right="open-in-new"
+              icon-end="open-in-new"
               data-test="security-mitre-reference-parent"
               >{{
                 t("siem.mitrePage.openTechnique", { id: parentTechnique(selected.id) })
@@ -840,19 +829,16 @@ function openDetections() {
 
       <template #footer>
         <OButton
-          as="a"
           :href="techniqueUrl(selected.id)"
           target="_blank"
           rel="noopener"
-          variant="outline"
-          size="sm-action"
-          icon-right="open-in-new"
+          variant="secondary"
+          icon-end="open-in-new"
           data-test="security-mitre-drawer-attack"
           >{{ t("siem.mitrePage.viewOnAttack") }}</OButton
         >
         <OButton
           variant="primary"
-          size="sm-action"
           data-test="security-mitre-drawer-detections"
           @click="openDetections"
           >{{ t("siem.mitrePage.manageDetections") }}</OButton

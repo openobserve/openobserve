@@ -46,8 +46,8 @@ describe("RoleTable member count columns", () => {
     await flushPromises();
     const variant = (id: string) =>
       wrapper.find(`[data-test="iam-roles-bots-${id}-link"]`).attributes("data-o2-variant");
-    expect(variant("users")).toBe("ghost-muted");
-    expect(variant("service-accounts")).toBe("ghost-primary");
+    expect(variant("users")).toBe("ghost");
+    expect(variant("service-accounts")).toBe("accent-ghost");
     wrapper.unmount();
   });
 
@@ -102,6 +102,19 @@ describe("RoleTable member count columns", () => {
     expect(wrapper.find('[data-test="iam-roles-ops-users-link"]').exists()).toBe(false);
     expect(wrapper.text()).not.toContain(i18n.global.t("iam.roleUsers"));
     expect(wrapper.text()).not.toContain(i18n.global.t("iam.serviceAccounts"));
+    wrapper.unmount();
+  });
+});
+
+describe("RoleTable failed load", () => {
+  it("shows the error state with Retry instead of the first-run one, and re-emits retry", async () => {
+    const wrapper = mountTable([], { error: "OpenFGA store not initialized yet" });
+    await flushPromises();
+    expect(wrapper.find('[data-test="o2-table-error"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain("No roles yet");
+
+    await wrapper.find('[data-test="o2-table-error-retry-btn"]').trigger("click");
+    expect(wrapper.emitted("retry")).toHaveLength(1);
     wrapper.unmount();
   });
 });

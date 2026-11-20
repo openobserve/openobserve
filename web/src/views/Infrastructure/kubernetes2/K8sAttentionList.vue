@@ -22,7 +22,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { formatAge } from "./kubernetesModel";
 import { KIND_INFO } from "./kubernetesQueries";
 import type { DetailsRef, K8sUrlState } from "./kubernetesUrlState";
@@ -90,8 +89,8 @@ function reasonLine(item: AttentionItem): I18nText {
           t("infra.k8s2.overviewAttentionShowing", { shown: items.length })
         }}</OText>
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           data-test="k8s2-overview-attention-all"
           @click="emit('navigate', { view: 'pods', status: 'failing' })"
           >{{ raw(String(total)) }}</OButton
@@ -99,14 +98,14 @@ function reasonLine(item: AttentionItem): I18nText {
       </span>
     </div>
     <div v-if="loading" class="flex flex-col gap-3 p-3" data-test="k8s2-overview-attention-loading">
-      <OSkeleton v-for="n in 3" :key="n" type="text" class="h-9" />
+      <OSkeleton v-for="n in 3" :key="n" class="h-9" />
     </div>
     <OEmptyState
       v-else-if="!items.length"
-      size="inline"
-      preset="no-data"
+      size="compact"
+      class="px-3"
       :title="t('infra.k8s2.overviewAttentionEmptyTitle')"
-      :description="t('infra.k8s2.overviewAttentionEmptyDesc')"
+      :text="t('infra.k8s2.overviewAttentionEmptyDesc')"
       data-test="k8s2-overview-attention-empty"
     />
     <ul v-else class="m-0 flex list-none flex-col p-0">
@@ -125,8 +124,8 @@ function reasonLine(item: AttentionItem): I18nText {
         <div class="flex min-w-0 flex-1 flex-col gap-0.5">
           <div class="flex min-w-0 items-baseline gap-2">
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               class="min-w-0 font-medium"
               :data-test="`k8s2-overview-attention-open-${row.item.key}`"
               @click.stop="emit('open', row.item.ref)"
@@ -145,24 +144,21 @@ function reasonLine(item: AttentionItem): I18nText {
         <div class="flex shrink-0 items-center gap-2">
           <OButton
             v-if="row.item.canLogs"
-            variant="outline"
-            size="sm"
-            icon-left="article"
+            variant="secondary"
+            icon="article"
             :data-test="`k8s2-overview-attention-logs-${row.item.key}`"
             @click.stop="emit('action', 'logs', row.item.ref)"
           >
             {{ t("infra.k8s2.overviewAttentionLogs") }}
           </OButton>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="auto-awesome"
+            variant="secondary"
+            icon="auto-awesome"
             disabled
-            focusable-unavailable
+            :disabled-reason="t('infra.k8s2.overviewAttentionExplainUnavailable')"
             :data-test="`k8s2-overview-attention-explain-${row.item.key}`"
           >
             {{ t("infra.k8s2.overviewAttentionExplain") }}
-            <OTooltip :content="t('infra.k8s2.overviewAttentionExplainUnavailable')" />
           </OButton>
         </div>
       </li>

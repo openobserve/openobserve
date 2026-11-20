@@ -16,17 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="incident-list" class="incident-list h-full">
-    <OPageLayout
-      bleed
-      :title="t('alerts.incidents.title')"
-      icon="notifications-active"
-      :subtitle="t('alerts.incidents.subtitle')"
-    >
+    <OPageLayout bleed :title="t('alerts.incidents.title')">
       <OTable
         ref="qTableRef"
         :data="visibleIncidents"
         :columns="columns"
-        :frame="false"
         :loading="loading"
         :forbidden="forbidden"
         row-key="id"
@@ -44,10 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:sort-order="sortOrder = $event"
         filter-mode="client"
         :default-columns="false"
-        show-index
         virtual-scroll
         :overscan="20"
-        :show-global-filter="false"
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="alerts-incident-list"
@@ -65,23 +57,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="(v) => filterByStatus(v as string)"
               data-test="incident-status-filter-group"
             >
-              <OToggleGroupItem value="active" size="sm" data-test="incident-status-filter-active">
+              <OToggleGroupItem value="active" data-test="incident-status-filter-active">
                 <template #icon-left><OIcon name="radio-button-unchecked" size="sm" /></template>
                 {{ t("alerts.incidents.filterActive") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="open" size="sm" data-test="incident-status-filter-open">
+              <OToggleGroupItem value="open" data-test="incident-status-filter-open">
                 <template #icon-left><OIcon name="error-outline" size="sm" /></template>
                 {{ t("alerts.incidents.statusOpen") }}
               </OToggleGroupItem>
-              <OToggleGroupItem
-                value="resolved"
-                size="sm"
-                data-test="incident-status-filter-resolved"
-              >
+              <OToggleGroupItem value="resolved" data-test="incident-status-filter-resolved">
                 <template #icon-left><OIcon name="task-alt" size="sm" /></template>
                 {{ t("alerts.incidents.statusResolved") }}
               </OToggleGroupItem>
-              <OToggleGroupItem value="all" size="sm" data-test="incident-status-filter-all">
+              <OToggleGroupItem value="all" data-test="incident-status-filter-all">
                 <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
                 {{ t("alerts.incidents.filterAll") }}
               </OToggleGroupItem>
@@ -91,7 +79,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="min-w-0 flex-1 max-md:min-w-40 md:min-w-48"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
-              clearable
             />
             <OStatStrip
               :items="severityStats"
@@ -109,11 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastUpdatedAt"
             :loading="fetching"
-            shortcut-id="alertIncidentsRefresh"
+            shortcut="alertIncidentsRefresh"
             data-test="incident-list-refresh-btn"
             @click="refreshIncidents"
           />
@@ -194,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   count: getSortedDimensions(row.group_values).length - 2,
                 })
               }}
-              <OTooltip :max-width="'28rem'">
+              <OTooltip>
                 <template #content>
                   <div class="space-y-1">
                     <div v-for="dim in displayDimensions(row.group_values).slice(2)" :key="dim.key">
@@ -246,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="incident-alert-group-more"
             >
               {{ t("alerts.incidents.moreAlertGroups", { count: row.alert_groups.length - 2 }) }}
-              <OTooltip :max-width="'28rem'">
+              <OTooltip>
                 <template #content>
                   <div
                     class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1"
@@ -276,8 +261,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center justify-end">
             <OButton
               v-if="row.status === 'open'"
-              variant="ghost-warning"
-              size="icon-xs-sq"
+              icon-only
+              variant="ghost"
+              size="sm"
               :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
               class="max-md:hidden"
               @click.stop="acknowledgeIncident(row)"
@@ -287,8 +273,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /></OButton>
             <OButton
               v-if="row.status !== 'resolved'"
-              variant="ghost-primary"
-              size="icon-xs-sq"
+              icon-only
+              variant="accent-ghost"
+              size="sm"
               class="max-md:hidden"
               @click.stop="resolveIncident(row)"
               data-test="incident-resolve-btn"
@@ -297,8 +284,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             /></OButton>
             <OButton
               v-if="row.status === 'resolved'"
-              variant="ghost-warning"
-              size="icon-xs-sq"
+              icon-only
+              variant="ghost"
+              size="sm"
               class="max-md:hidden"
               @click.stop="reopenIncident(row)"
               data-test="incident-reopen-btn"
@@ -308,10 +296,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
-                  icon-left="more-vert"
+                  icon-only
+                  icon="more-vert"
                   :title="t('dashboard.moreActions')"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   data-test="incident-row-more-actions"
                   @click.stop
@@ -319,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <ODropdownItem
                 v-if="row.status === 'open'"
-                icon-left="visibility"
+                icon="visibility"
                 class="md:hidden"
                 data-test="incident-ack-btn-menu"
                 @select="acknowledgeIncident(row)"
@@ -328,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
               <ODropdownItem
                 v-if="row.status !== 'resolved'"
-                icon-left="task-alt"
+                icon="task-alt"
                 class="md:hidden"
                 data-test="incident-resolve-btn-menu"
                 @select="resolveIncident(row)"
@@ -337,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
               <ODropdownItem
                 v-if="row.status === 'resolved'"
-                icon-left="restart-alt"
+                icon="restart-alt"
                 class="md:hidden"
                 data-test="incident-reopen-btn-menu"
                 @select="reopenIncident(row)"
@@ -348,17 +337,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <!-- Empty state -->
         <template #empty>
-          <div v-if="!loading" class="flex h-full w-full items-center justify-center">
-            <OEmptyState
-              size="hero"
-              preset="no-incidents"
-              :filtered="!!searchQuery || statusFilter !== 'all'"
-              :hide-action="!searchQuery && statusFilter === 'all'"
-              @action="(id) => (id === 'clear-filters' ? clearFilters() : null)"
-            />
-          </div>
+          <OEmptyState
+            v-if="!loading"
+            :kind="isNarrowed ? 'filtered' : 'first-run'"
+            :title="
+              isNarrowed
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.incidents') })
+                : t('emptyState.noIncidents.title')
+            "
+            :text="
+              isNarrowed
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.incidents') })
+                : t('emptyState.noIncidents.description')
+            "
+            :icon="isNarrowed ? undefined : 'task-alt'"
+            @action="clearFilters()"
+          />
         </template>
       </OTable>
     </OPageLayout>
@@ -516,15 +511,16 @@ export default defineComponent({
       notLoaded(id)
         ? t("alerts.downtimes.incident.notLoadedTooltip", { id })
         : t("alerts.downtimes.incident.mutedBy", { name: nameOf(id) });
-    const searchQuery = ref("");
+    const searchQuery = ref(typeof route.query.search === "string" ? route.query.search : "");
     // Active covers open and acknowledged; Open is open only, matching the Overview count.
     const validStatuses = ["all", "active", "open", "resolved"];
     // Default to "active"; a valid ?status= query wins over the saved state.
     const urlStatus = validStatuses.includes(route.query.status as string)
       ? (route.query.status as string)
       : null;
-    if (route.query.status !== undefined) {
-      const { status: _status, ...rest } = route.query;
+    const hasUrlSearch = searchQuery.value !== "";
+    if (route.query.status !== undefined || route.query.search !== undefined) {
+      const { status: _status, search: _search, ...rest } = route.query;
       router.replace({ query: rest });
     }
     const statusFilter = ref(urlStatus ?? "active");
@@ -659,6 +655,8 @@ export default defineComponent({
         )
           return true;
         if (incident.severity.toLowerCase().includes(searchLower)) return true;
+        if (incident.alert_groups?.some((g) => g.alert_name.toLowerCase().includes(searchLower)))
+          return true;
         if (incident.group_values) {
           const dimensionsStr = Object.entries(incident.group_values)
             .map(([k, v]) => `${k}=${v}`)
@@ -895,6 +893,11 @@ export default defineComponent({
       savePageState();
     };
 
+    const isNarrowed = computed(
+      () =>
+        !!searchQuery.value || severityFilters.value.length > 0 || statusFilter.value !== "active",
+    );
+
     const clearFilters = () => {
       searchQuery.value = "";
       severityFilters.value = [];
@@ -946,7 +949,6 @@ export default defineComponent({
         message: t("alerts.incidents.acknowledgeConfirmMessage"),
         confirmLabel: t("alerts.incidents.acknowledgeConfirmLabel"),
         cancelLabel: t("alerts.incidents.acknowledgeConfirmCancelLabel"),
-        persistent: false,
       });
       if (!ok) return;
       updateStatus(incident, "acknowledged");
@@ -958,7 +960,6 @@ export default defineComponent({
         message: t("alerts.incidents.resolveConfirmMessage"),
         confirmLabel: t("alerts.incidents.resolve"),
         cancelLabel: t("common.cancel"),
-        persistent: false,
       });
       if (!ok) return;
       updateStatus(incident, "resolved");
@@ -970,7 +971,6 @@ export default defineComponent({
         message: t("alerts.incidents.reopenConfirmMessage"),
         confirmLabel: t("alerts.incidents.reopen"),
         cancelLabel: t("common.cancel"),
-        persistent: false,
       });
       if (!ok) return;
       updateStatus(incident, "open");
@@ -1092,7 +1092,7 @@ export default defineComponent({
         if (cachedData && cachedData.length > 0) {
           allIncidents.value = cachedData;
         }
-        if (savedState.searchQuery !== undefined && !urlStatus) {
+        if (savedState.searchQuery !== undefined && !urlStatus && !hasUrlSearch) {
           searchQuery.value = savedState.searchQuery;
         }
         if (savedState.statusFilter !== undefined && !urlStatus) {
@@ -1185,6 +1185,7 @@ export default defineComponent({
       statusFilter,
       filterByStatus,
       clearFilters,
+      isNarrowed,
       columns,
       pageSize,
       sortBy,

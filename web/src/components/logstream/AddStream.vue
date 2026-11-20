@@ -21,8 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="md"
     :title="t('logStream.add')"
-    :secondary-button-label="t('logStream.cancel')"
-    :primary-button-label="t('common.save')"
+    :secondary="{ label: t('logStream.cancel') }"
+    :primary="{ label: t('common.save') }"
     form-id="add-stream-form"
     @update:open="emits('update:open', $event)"
     @click:secondary="emits('update:open', false)"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </ODialog>
 
-  <!-- Inline form for pipeline usage: rendered inside <ODrawer> in Stream.vue.
+  <!-- Inline form for pipeline usage: rendered inside <ODrawer size="sm"> in Stream.vue.
        The drawer owns the footer Cancel/Save (built-in ODrawer footer); its Save
        submits this form via `form-id="add-stream-node-form"`, so no inline
        buttons here. -->

@@ -77,10 +77,10 @@ const tokens = [
 
 const DrawerStub = {
   name: "ODrawer",
-  props: ["open", "title", "subTitle"],
+  props: ["open", "title", "subtitle"],
   emits: ["update:open"],
   template:
-    '<div v-if="open" data-test="fleet-tokens-drawer"><h2>{{ title }}</h2><span>{{ subTitle }}</span><slot /></div>',
+    '<div v-if="open" data-test="fleet-tokens-drawer"><h2>{{ title }}</h2><span>{{ subtitle }}</span><slot /></div>',
 };
 
 const router = createRouter({
@@ -585,7 +585,6 @@ describe("FleetTokens", () => {
     wrapper = await mountTokens();
     await fillAndSubmit(wrapper, { name: "edge" });
     const block = wrapper.findComponent({ name: "OCodeBlock" });
-    expect(block.props("chrome")).toBe("editor");
     expect(block.props("filename")).toBe("Enrollment token");
     expect(block.text()).not.toMatch(/plaintext/i);
   });
@@ -602,12 +601,12 @@ describe("FleetTokens", () => {
     wrapper = await mountTokens();
     await startRevoke();
     const dialog = revokeDialog().findComponent({ name: "ODialog" });
-    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
-    expect(dialog.props("primaryButtonDisabled")).toBe(true);
+    expect(dialog.props("primary")?.variant).toBe("danger");
+    expect(dialog.props("primary")?.disabled).toBe(true);
     await revokeDialog()
       .findComponent({ name: "OInput" })
       .vm.$emit("update:modelValue", "k8s-helm");
     await flushPromises();
-    expect(dialog.props("primaryButtonDisabled")).toBe(false);
+    expect(dialog.props("primary")?.disabled).toBeFalsy();
   });
 });

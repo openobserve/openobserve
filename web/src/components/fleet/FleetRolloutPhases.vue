@@ -22,23 +22,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OText variant="meta" class="ms-auto tabular-nums">{{ progressText(rollout) }}</OText>
       </div>
       <OProgressBar
-        :value="rollout.total ? rollout.running / rollout.total : 0"
-        :variant="
-          rollout.status === 'halted'
-            ? 'danger'
-            : rollout.status === 'completed'
-              ? 'success'
-              : 'default'
+        :value="rollout.total ? (rollout.running / rollout.total) * 100 : 0"
+        :tone="
+          rollout.status === 'halted' ? 'err' : rollout.status === 'completed' ? 'ok' : 'accent'
         "
-        size="sm"
       />
       <OTable
         :data="rollout.phases"
         :columns="phaseColumns"
         row-key="index"
-        :frame="false"
         pagination="none"
-        :show-global-filter="false"
         :row-rail-tone="(p: FleetRolloutPhase) => PHASE_RAIL[p.status] ?? null"
         data-test="fleet-rollout-phases-table"
       >
@@ -47,8 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-status="{ row }">
           <OTag
-            :variant="PHASE_VARIANT[row.status] ?? 'default-soft'"
-            size="xs"
+            :tone="PHASE_VARIANT[row.status] ?? 'neutral'"
+            size="sm"
             :label="phaseLabel(row.status)"
             :data-test="`fleet-rollout-phases-status-${row.index}`"
           />
@@ -86,11 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="memberRows"
         :columns="memberColumns"
         row-key="collectorId"
-        :frame="false"
         pagination="client"
         :page-size="10"
-        :show-global-filter="false"
-        :row-tone="(m: MemberRow) => (m.excluded ? 'muted' : null)"
+        :row-state="(m: MemberRow) => (m.excluded ? 'paused' : null)"
         data-test="fleet-rollout-members-table"
       >
         <template #cell-name="{ row }">
@@ -98,8 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="truncate font-medium">{{ row.name }}</span>
             <OTag
               v-if="row.excluded"
-              variant="warning-soft"
-              size="xs"
+              tone="warn"
+              size="sm"
               :label="t('fleet.rollouts.excluded')"
               :data-test="`fleet-rollout-members-excluded-${row.collectorId}`"
             />
@@ -113,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="DELIVERY.includes(row.state)"
             type="fleetDelivery"
             :value="row.state"
-            size="xs"
+            size="sm"
           />
           <span v-else class="text-text-secondary">{{ memberState(row.state) }}</span>
         </template>
@@ -152,7 +143,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef, RowRailTone } from "@/lib/core/Table/OTable.types";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import type { FleetDeliveryEvidence, FleetPhaseStatus, FleetRolloutPhase } from "@/services/fleet";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -174,16 +165,16 @@ const props = defineProps<{ rollout: RolloutRow }>();
 const DASH = raw("—");
 const DELIVERY = ["assigned", "sent", "accepted", "running", "rejected"];
 
-const PHASE_VARIANT: Partial<Record<FleetPhaseStatus, BadgeVariant>> = {
-  pending: "default-soft",
-  deploying: "primary-soft",
-  converging: "primary-soft",
-  observing: "purple-soft",
-  verifying: "purple-soft",
-  done: "success-soft",
-  failed: "error-soft",
-  stopped: "warning-soft",
-  timed_out: "error-soft",
+const PHASE_VARIANT: Partial<Record<FleetPhaseStatus, ChipTone>> = {
+  pending: "neutral",
+  deploying: "accent",
+  converging: "accent",
+  observing: "neutral",
+  verifying: "neutral",
+  done: "ok",
+  failed: "err",
+  stopped: "warn",
+  timed_out: "err",
 };
 
 const PHASE_RAIL: Partial<Record<FleetPhaseStatus, RowRailTone>> = {

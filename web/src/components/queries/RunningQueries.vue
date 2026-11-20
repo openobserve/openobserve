@@ -18,8 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     v-if="isMetaOrg"
     :title="t('settings.queryManagement')"
-    icon="query-stats"
-    :subtitle="t('settings.queryManagementDesc')"
+    :about="t('settings.queryManagementDesc')"
     bleed
   >
     <!-- One toolbar row needs desktop width; below lg the filters keep their own row. -->
@@ -92,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODrawer
       bleed
       v-model:open="showListSchemaDialog"
-      size="xl"
+      size="lg"
       :show-close="false"
       data-test="list-schema-dialog"
       @close="showListSchemaDialog = false"

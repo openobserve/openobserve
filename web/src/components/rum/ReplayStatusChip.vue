@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButton
     v-if="loadState === 'failed'"
-    variant="ghost-destructive"
-    size="xs"
+    variant="danger-ghost"
+    size="sm"
     data-test="replay-status-chip-failed"
     @click="emit('retry')"
   >

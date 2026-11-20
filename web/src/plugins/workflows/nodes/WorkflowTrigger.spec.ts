@@ -160,9 +160,9 @@ describe("WorkflowTrigger", () => {
     it("labels each event_type with a human-readable name, not the raw value", () => {
       asIncident();
       const options = select(createWrapper()).props("options");
-      expect(options.find((o: any) => o.value === "created").label).toBe("Incident Created");
+      expect(options.find((o: any) => o.value === "created").label).toBe("Incident created");
       expect(options.find((o: any) => o.value === "ai_analysis_failed").label).toBe(
-        "AI Analysis Failed",
+        "AI analysis failed",
       );
     });
 
@@ -245,7 +245,7 @@ describe("WorkflowTrigger HTTP endpoint", () => {
     const labels = select(w)
       .props("options")
       .map((o: any) => o.label);
-    expect(labels).toEqual(["Alert Fired", i18n.global.t("workflow.http.payloadHttp")]);
+    expect(labels).toEqual(["Alert fired", i18n.global.t("workflow.http.payloadHttp")]);
     const http = select(w).props("options")[1].value;
     await select(w).vm.$emit("update:modelValue", http);
     expect(httpEditorState.payloadFrom).toBe("http");

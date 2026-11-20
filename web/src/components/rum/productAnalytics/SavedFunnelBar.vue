@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="rum-analytics-funnel-saved-bar"
   >
     <OButton
+      icon-only
       variant="ghost"
-      size="icon-toolbar"
-      icon-left="chevron-left"
+      icon="chevron-left"
       :aria-label="t('rum.analytics.saved.back')"
       data-test="rum-analytics-funnel-back-btn"
       @click="draft.toList()"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTag
       v-if="draft.dirty.value"
       :label="t('rum.analytics.saved.edited')"
-      variant="warning-soft"
+      tone="warn"
       size="sm"
       data-test="rum-analytics-funnel-dirty-tag"
     />
@@ -51,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span v-if="canWrite">
         <OButton
           variant="primary"
-          size="sm"
           :disabled="!!saveDisabled"
           data-test="rum-analytics-funnel-save-btn"
           @click="dialogs?.save()"
@@ -62,9 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODropdown v-if="canWrite || opened || $slots.menu" side="bottom" align="end">
         <template #trigger>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="more-vert"
+            icon="more-vert"
             :aria-label="t('rum.analytics.saved.more')"
             data-test="rum-analytics-funnel-saved-menu-btn"
             ><OTooltip :content="t('rum.analytics.saved.more')"
@@ -73,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <slot name="menu" />
         <ODropdownItem
           v-if="canWrite"
-          icon-left="bookmark-add"
+          icon="bookmark-add"
           :disabled="!!copyDisabled"
           data-test="rum-analytics-funnel-saved-menu-save-as"
           @select="dialogs?.saveAs()"
@@ -82,13 +81,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="opened">
           <template v-if="canWrite">
             <ODropdownItem
-              icon-left="edit"
+              icon="edit"
               data-test="rum-analytics-funnel-saved-menu-rename"
               @select="dialogs?.rename(opened)"
               >{{ t("rum.analytics.saved.rename") }}</ODropdownItem
             >
             <ODropdownItem
-              icon-left="content-copy"
+              icon="content-copy"
               :disabled="!!copyDisabled"
               data-test="rum-analytics-funnel-saved-menu-duplicate"
               @select="dialogs?.duplicate(opened, false)"
@@ -96,15 +95,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
           </template>
           <ODropdownItem
-            icon-left="link"
+            icon="link"
             data-test="rum-analytics-funnel-saved-menu-copy-link"
             @select="copyLink"
             >{{ t("rum.analytics.saved.copyLink") }}</ODropdownItem
           >
           <ODropdownItem
             v-if="canWrite"
-            variant="destructive"
-            icon-left="delete"
+            tone="danger"
+            icon="delete"
             data-test="rum-analytics-funnel-saved-menu-delete"
             @select="removeOpened"
             >{{ t("rum.analytics.saved.delete") }}</ODropdownItem

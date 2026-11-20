@@ -323,11 +323,8 @@ describe("SearchSchedulersList Component", () => {
       });
     });
 
-    it("navigates back to logs on closeSearchHistory", async () => {
-      // Standalone route: close now navigates to the Logs route (no history to pop
-      // in jsdom) instead of emitting to a parent overlay.
-      await wrapper.vm.closeSearchHistory();
-      expect(routerPushMock).toHaveBeenCalledWith({ name: "logs" });
+    it("links back to the logs page from the header", () => {
+      expect(wrapper.vm.logsRoute.name).toBe("logs");
     });
   });
 

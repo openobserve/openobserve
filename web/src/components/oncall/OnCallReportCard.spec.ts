@@ -22,7 +22,6 @@ import type { OnCallResponseReport } from "@/ts/interfaces/oncall";
 
 const stubs = {
   OCard: { name: "OCard", template: "<div><slot /></div>" },
-  OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
   OSkeleton: { name: "OSkeleton", template: "<div class='skeleton' />" },
   OTimeCell: { name: "OTimeCell", props: ["value", "unit"], template: "<time>{{ value }}</time>" },

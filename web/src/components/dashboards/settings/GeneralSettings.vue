@@ -49,7 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
             :key="dateTimePickerKey"
-            class="h-7.5"
             size="sm"
             :initialTimezone="initialTimezone"
             v-model="dateTimeValue"
@@ -93,7 +92,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="showDynamicFilters"
             :label="t('dashboard.showDynamicFilters')"
             data-test="dashboard-general-setting-dynamic-filter"
-            size="lg"
           />
           <p class="text-text-secondary text-xs">
             {{ t("dashboard.generalSettingsPage.dynamicFiltersHelp") }}
@@ -112,15 +110,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex gap-2">
           <OButton
             @click="$emit('close')"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :disabled="isSubmitting"
             data-test="dashboard-general-setting-cancel-btn"
             >{{ t("dashboard.cancel") }}</OButton
           >
           <OButton
             variant="primary"
-            size="sm-action"
             type="submit"
             :loading="isSubmitting"
             data-test="dashboard-general-setting-save-btn"
@@ -395,6 +391,8 @@ export default defineComponent({
         showPositiveNotification(t("dashboard.generalSettingsPage.updatedSuccessfully"));
 
         lastSaveSucceeded = true;
+        // The drawer stays open after a save, so the saved values become the form's own baseline (V5).
+        form.reset({ ...value });
         if (loadedSection !== null) {
           loadedSection = generalSnapshot();
           syncDraftSection();

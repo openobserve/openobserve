@@ -16,21 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="report-list-page" class="h-full">
-    <OPageLayout
-      bleed
-      :title="t('reports.header')"
-      title-data-test="report-list-title"
-      icon="description"
-      :subtitle="t('reports.subtitle')"
-      tabs-below
-    >
+    <OPageLayout bleed :title="t('reports.header')" title-data-test="report-list-title">
       <template #header-tabs>
-        <OTabs
-          :model-value="activeTab"
-          align="left"
-          data-test="report-list-tabs"
-          @change="onTabChange"
-        >
+        <OTabs :model-value="activeTab" data-test="report-list-tabs" @change="onTabChange">
           <OTab
             name="shared"
             data-test="tab-shared"
@@ -51,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="report-list-add-report-btn"
           variant="primary"
-          size="sm"
           :aria-label="
             reportDrafts.hasNew
               ? t('common.editorDraft.newDot', { label: t('reports.add') })
@@ -95,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data="visibleRows"
               :columns="columns"
               row-key="report_id"
-              :frame="false"
               :loading="isLoadingReports"
               :loading-reset-key="activeFolderId"
               :forbidden="forbidden"
@@ -103,7 +89,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               selection="multiple"
               v-model:selected-ids="selectedReportIds"
               class="h-full w-full"
-              :show-global-filter="false"
               :enable-column-resize="true"
               :persist-columns="true"
               :default-columns="false"
@@ -115,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:current-page="currentPage = $event"
               @update:sort-by="sortBy = $event"
               @update:sort-order="sortOrder = $event"
-              show-index
               table-id="reports-report-list"
               :column-visibility="{ next_run_at: false }"
               @row-click="openReport"
@@ -127,73 +111,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <!-- flex-1 is basis-0, so below lg the full-width basis is what wraps the input before its scope chips spill. -->
                   <div class="min-w-0 flex-1 max-lg:basis-full max-md:order-last">
-                    <OInput
+                    <OSearchInput
                       v-model="dynamicQueryModel"
                       :placeholder="
                         searchAcrossFolders ? t('dashboard.searchAcross') : t('reports.search')
                       "
-                      :clearable="searchAcrossFolders"
                       @clear="clearSearch"
                       data-test="report-list-search-input"
                       class="w-full"
-                    >
-                      <template #icon-left>
-                        <OIcon name="search" size="sm" />
-                      </template>
-                      <template #icon-right>
-                        <OToggleGroup
-                          :model-value="searchAcrossFolders ? 'all' : 'this'"
-                          type="single"
-                          class="me-1 self-center"
-                          @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
-                        >
-                          <OToggleGroupItem
-                            value="this"
-                            size="xs"
-                            icon-left="folder-outline"
-                            data-test="report-list-search-scope-current"
-                            :title="t('reports.searchThisFolderTitle')"
-                            ><span class="max-md:hidden @max-[34rem]/report-toolbar:hidden">{{
-                              t("reports.searchThisFolder")
-                            }}</span></OToggleGroupItem
-                          >
-                          <OToggleGroupItem
-                            value="all"
-                            size="xs"
-                            icon-left="search"
-                            data-test="report-list-search-across-folders-toggle"
-                            :title="t('reports.searchAllFoldersTitle')"
-                            ><span class="max-md:hidden @max-[34rem]/report-toolbar:hidden">{{
-                              t("reports.searchAllFolders")
-                            }}</span></OToggleGroupItem
-                          >
-                        </OToggleGroup>
-                      </template>
-                    </OInput>
+                      :scope="searchAcrossFolders ? 'all' : 'this'"
+                      :scope-options="[
+                        {
+                          value: 'this',
+                          label: t('reports.searchThisFolder'),
+                          icon: 'folder-outline',
+                          tooltip: t('reports.searchThisFolderTitle'),
+                          dataTest: 'report-list-search-scope-current',
+                        },
+                        {
+                          value: 'all',
+                          label: t('reports.searchAllFolders'),
+                          icon: 'search',
+                          tooltip: t('reports.searchAllFoldersTitle'),
+                          dataTest: 'report-list-search-across-folders-toggle',
+                        },
+                      ]"
+                      @update:scope="(v) => (searchAcrossFolders = v === 'all')"
+                    />
                   </div>
                 </div>
               </template>
               <template #toolbar-trailing>
                 <ORefreshButton
-                  layout="inline"
-                  variant="outline"
                   :last-run-at="lastUpdatedAt"
                   :loading="fetching"
-                  shortcut-id="reportsRefresh"
+                  shortcut="reportsRefresh"
                   data-test="report-list-refresh-btn"
                   @click="refreshReports"
                 />
               </template>
               <template #empty>
                 <OEmptyState
-                  size="hero"
-                  preset="no-reports"
-                  :filtered="!!(filterQuery || searchQuery)"
+                  :kind="filterQuery || searchQuery ? 'filtered' : 'first-run'"
+                  :title="
+                    filterQuery || searchQuery
+                      ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.reports') })
+                      : t('emptyState.noReports.title')
+                  "
+                  :text="
+                    filterQuery || searchQuery
+                      ? t('emptyState.filtered.description', {
+                          noun: t('emptyState.nouns.reports'),
+                        })
+                      : t('emptyState.noReports.description')
+                  "
+                  :icon="filterQuery || searchQuery ? undefined : 'assessment'"
+                  :action-label="
+                    filterQuery || searchQuery ? undefined : t('emptyState.noReports.action')
+                  "
                   @action="
-                    (id) =>
-                      id === 'clear-filters'
-                        ? ((filterQuery = ''), (searchQuery = ''))
-                        : createNewReport()
+                    filterQuery || searchQuery
+                      ? ((filterQuery = ''), (searchQuery = ''))
+                      : createNewReport()
                   "
                 />
               </template>
@@ -271,15 +250,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="display: inline-block; width: 2.07125rem"
                   class="flex h-auto items-center justify-center"
                 >
-                  <OSpinner size="xs" />
+                  <OSpinner />
                 </div>
                 <OButton
                   v-else
+                  icon-only
                   :data-test="`report-list-${row.name}-pause-start-report`"
                   :data-row-action="row.enabled ? 'pause' : 'resume'"
-                  :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
-                  size="icon-xs-sq"
-                  :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                  :variant="row.enabled ? 'danger-ghost' : 'ghost'"
+                  size="sm"
+                  :icon="row.enabled ? 'pause' : 'play-arrow'"
                   :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
                   class="max-md:hidden"
                   @click.stop="toggleReportState(row)"
@@ -287,11 +267,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Run now: send, never play — Resume already uses the triangle -->
                 <OButton
+                  icon-only
                   :data-test="`report-list-${row.name}-run-now`"
                   data-row-action="run-now"
-                  icon-left="send"
+                  icon="send"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   :loading="runningReportId === row.report_id"
                   :disabled="!!runningReportId"
                   :title="t('reports.history.runNow')"
@@ -301,11 +282,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Edit -->
                 <OButton
+                  icon-only
                   :data-test="`report-list-${row.name}-edit-report`"
                   data-row-action="edit"
-                  icon-left="edit"
+                  icon="edit"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   :title="t('alerts.edit')"
                   class="max-md:hidden"
                   @click.stop="editReport(row)"
@@ -313,10 +295,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Move to folder -->
                 <OButton
+                  icon-only
                   :data-test="`report-list-${row.name}-move-report`"
-                  icon-left="drive-file-move"
+                  icon="drive-file-move"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   :title="t('reports.moveToFolder')"
                   class="max-md:hidden"
                   @click.stop="openMoveDialog(row)"
@@ -324,11 +307,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Delete -->
                 <OButton
+                  icon-only
                   :data-test="`report-list-${row.name}-delete-report`"
                   data-row-action="delete"
-                  icon-left="delete"
-                  variant="ghost-destructive"
-                  size="icon-xs-sq"
+                  icon="delete"
+                  variant="danger-ghost"
+                  size="sm"
                   :title="t('alerts.delete')"
                   class="max-md:hidden"
                   @click.stop="confirmDeleteReport(row)"
@@ -337,10 +321,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
-                      icon-left="more-vert"
+                      icon-only
+                      icon="more-vert"
                       :title="t('dashboard.moreActions')"
                       variant="ghost"
-                      size="icon-xs-sq"
+                      size="sm"
                       class="md:hidden"
                       data-test="report-list-row-more-actions"
                       @click.stop
@@ -348,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <ODropdownItem
                     v-if="!reportsStateLoadingMap[row.report_id]"
-                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    :icon="row.enabled ? 'pause' : 'play-arrow'"
                     class="md:hidden"
                     :data-test="`report-list-${row.name}-pause-start-report-menu`"
                     @select="toggleReportState(row)"
@@ -356,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ row.enabled ? t("alerts.pause") : t("alerts.start") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="send"
+                    icon="send"
                     class="md:hidden"
                     :data-test="`report-list-${row.name}-run-now-menu`"
                     :disabled="!!runningReportId"
@@ -365,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("reports.history.runNow") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="edit"
+                    icon="edit"
                     class="md:hidden"
                     :data-test="`report-list-${row.name}-edit-report-menu`"
                     @select="editReport(row)"
@@ -373,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("alerts.edit") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="drive-file-move"
+                    icon="drive-file-move"
                     class="md:hidden"
                     :data-test="`report-list-${row.name}-move-report-menu`"
                     @select="openMoveDialog(row)"
@@ -381,8 +366,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("reports.moveToFolder") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="delete"
-                    variant="destructive"
+                    icon="delete"
+                    tone="danger"
                     class="md:hidden"
                     :data-test="`report-list-${row.name}-delete-report-menu`"
                     @select="confirmDeleteReport(row)"
@@ -395,18 +380,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #selection-actions>
                 <OButton
                   data-test="report-list-move-reports-btn"
-                  icon-left="drive-file-move"
-                  variant="outline"
-                  size="sm"
+                  icon="drive-file-move"
+                  variant="secondary"
                   @click="moveMultipleReports"
                 >
                   {{ t("common.move") }}
                 </OButton>
                 <OButton
                   data-test="report-list-delete-reports-btn"
-                  icon-left="delete"
-                  variant="outline-destructive"
-                  size="sm"
+                  icon="delete"
+                  variant="danger-ghost"
                   :loading="bulkDeleteLoading"
                   @click="openBulkDeleteDialog"
                 >
@@ -425,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="deleteDialog.title"
       message-keypath="reports.deleteReportNamedMessage"
       :message-name="deleteDialog.data?.name"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="deleteReport"
       @update:cancel="deleteDialog.show = false"
     />
@@ -435,7 +418,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="confirmBulkDelete"
       :title="t('reports.deleteReportsTitle')"
       :message="t('reports.deleteReportsMsg', { count: selectedReports.length })"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="bulkDeleteReports"
       @update:cancel="confirmBulkDelete = false"
     />
@@ -502,13 +485,10 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

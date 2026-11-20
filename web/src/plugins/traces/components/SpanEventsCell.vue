@@ -20,15 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   }}</span>
   <span v-else class="inline-flex min-w-0">
     <OBadge
-      size="xs"
-      shape="rounded"
-      :variant="events.hasException ? 'error-outline' : 'default-outline'"
+      size="sm"
+      :tone="events.hasException ? 'err' : 'outline'"
       icon="event-note"
       data-test="span-events-cell"
     >
       {{ countLabel }}
     </OBadge>
-    <OTooltip side="left" max-width="23.75rem">
+    <OTooltip side="left">
       <template #content>
         <div class="flex w-87.5 flex-col gap-1 py-1 text-xs" data-test="span-events-cell-hover">
           <div class="text-text-heading flex items-center gap-1.5 font-semibold">
@@ -46,9 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="span-events-cell-hover-row"
           >
             <OBadge
-              size="xs"
-              shape="rounded"
-              :variant="item.kind === 'exception' ? 'error-outline' : 'default-outline'"
+              size="sm"
+              :tone="item.kind === 'exception' ? 'err' : 'outline'"
               class="shrink-0"
             >
               {{

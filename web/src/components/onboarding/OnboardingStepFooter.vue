@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="bg-surface-base sticky bottom-0 mt-auto flex justify-end pt-6 pb-5">
     <OButton
-      :variant="quiet ? 'outline' : 'primary'"
-      icon-right="arrow-forward"
+      :variant="quiet ? 'secondary' : 'primary'"
+      icon-end="arrow-forward"
       :loading="skipping"
       data-test="onboarding-view-skip"
       @click="onSkip"

@@ -67,7 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       createNewFunction ? 'h-full min-h-0 gap-0' : createButton ? 'h-full min-h-0 gap-2' : 'gap-4'
     "
   >
-    <OSpinner v-if="loading" size="md" class="mx-auto my-8" />
+    <div v-if="loading" class="flex flex-col gap-2">
+      <OSkeleton shape="block" class="h-8" />
+      <OSkeleton shape="block" class="h-40" />
+    </div>
 
     <template v-else>
       <!-- create / pick MODE SWITCH (pipelines). Single-screen hosts (workflows) use a
@@ -123,9 +126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <OButton
             v-if="createButton"
-            variant="outline"
+            variant="secondary"
             type="button"
-            size="sm"
             class="shrink-0"
             :loading="savingFn"
             :title="t('function.save')"
@@ -143,31 +145,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="associate-function-definition-section"
           class="mt-4 mb-4"
         >
-          <!-- No `isDark` branching: every colour below is a --color-* token,
-               which already resolves per theme. (The old comment here claimed
-               `dark:` follows the OS prefers-color-scheme — that is stale;
-               tailwind.css binds it to the app's `.dark` class via
-               `@custom-variant dark`.) The header's two-stop gradient is now a
-               flat token surface — a gradient can't be expressed in tokens, and
-               the flat fill matches the rest of the app's card headers. -->
-          <OCard
-            class="function-definition-card border-border-default bg-surface-base rounded-default overflow-hidden border shadow-xs"
-          >
-            <OCardSection role="header" class="border-b-border-default bg-surface-subtle border-b">
-              <div class="text-text-heading text-base font-semibold">
-                {{ t("function.function_definition") }}
-              </div>
-            </OCardSection>
-            <OSeparator />
-            <OCardSection class="p-0">
-              <div
-                class="function-code-container bg-surface-subtle border-border-default relative max-h-[15.625rem] overflow-y-auto border"
-              >
-                <pre
-                  class="text-compact text-text-code m-0 cursor-default border-0 bg-transparent p-4 font-mono leading-normal font-normal break-words whitespace-pre-wrap select-text"
-                  >{{ selectedDefinition }}</pre>
-              </div>
-            </OCardSection>
+          <OCard :title="t('function.function_definition')" flush class="function-definition-card">
+            <div
+              class="function-code-container bg-surface-subtle relative max-h-[15.625rem] overflow-y-auto"
+            >
+              <pre
+                class="text-compact text-text-code m-0 cursor-default border-0 bg-transparent p-4 font-mono leading-normal font-normal break-words whitespace-pre-wrap select-text"
+                >{{ selectedDefinition }}</pre>
+            </div>
           </OCard>
         </div>
 
@@ -195,14 +180,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-start gap-2">
                 <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                 <span>
-                  <span class="text-text-link font-bold">{{ t("flow.function.rbf") }}</span>
+                  <span class="text-text-link font-semibold">{{ t("flow.function.rbf") }}</span>
                   {{ t("flow.function.rbfDesc") }}
                 </span>
               </div>
               <div class="flex items-start gap-2">
                 <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                 <span>
-                  <span class="text-text-link font-bold">{{ t("flow.function.raf") }}</span>
+                  <span class="text-text-link font-semibold">{{ t("flow.function.raf") }}</span>
                   {{ t("flow.function.rafDesc") }}
                 </span>
               </div>
@@ -279,9 +264,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="md"
       form-id="wf-saved-function-form"
       :title="t('search.functionPlaceholder')"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('confirmDialog.ok')"
-      :primary-button-loading="savingFn"
+      :secondary="{ label: t('confirmDialog.cancel') }"
+      :primary="{ label: t('confirmDialog.ok'), loading: savingFn }"
       @click:secondary="savedDialog = false"
     >
       <OForm id="wf-saved-function-form" :form="savedForm">
@@ -291,8 +275,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="functionOptions.length === 0"
           class="mb-3"
         >
-          <OToggleGroupItem value="update" size="sm">{{ t("common.update") }}</OToggleGroupItem>
-          <OToggleGroupItem value="create" size="sm">{{ t("common.create") }}</OToggleGroupItem>
+          <OToggleGroupItem value="update">{{ t("common.update") }}</OToggleGroupItem>
+          <OToggleGroupItem value="create">{{ t("common.create") }}</OToggleGroupItem>
         </OFormToggleGroup>
         <OFormInput
           v-if="savedMode === 'create'"
@@ -348,10 +332,8 @@ import {
   type SavedFunctionForm,
 } from "@/plugins/logs/SearchBar.SavedFunction.schema";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

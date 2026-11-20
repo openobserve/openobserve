@@ -28,8 +28,7 @@ const openGroupKey = moduleRef<string | null>(null);
  *
  *  • Link + subnav (`parentItem` provided) — the tile IS a navigating MenuLink
  *    (e.g. Data → /streams). Hovering reveals its sub-pages; clicking lands on
- *    the main page while the flyout stays open under the pointer (it closes on
- *    mouse-leave / outside click / Escape). No pinning.
+ *    the main page and closes the flyout until the pointer leaves the tile. No pinning.
  *
  *  • Pure group (no `parentItem`) — the tile is a non-navigating MenuLink
  *    trigger. Hover opens; clicking pins the flyout open until an outside
@@ -53,7 +52,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
-import { isGateOpen, useNavGateContext } from "./useNavGateContext";
+import { useNavGateContext, visibleSubnavChildren } from "./useNavGateContext";
 import { RailNavigationMarkKey, type SubnavChild } from "./ONavbar.types";
 import {
   AIM_IDLE,
@@ -69,10 +68,10 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { featureState } from "@/utils/featureGate";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { flyoutTop, needsColumns } from "./flyoutLayout";
+import { resolveActiveChild } from "./navGroups";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
 import { useFeatureNames } from "@/composables/useFeatureLock";
 import {
-  checkFeatureAccess,
   buildFeatureGateContext,
   featureGateLabelKey,
   isFeatureKey,
@@ -125,29 +124,11 @@ const { featureName, featureNames } = useFeatureNames();
 const licenseState = (c: SubnavChild) =>
   c.feature ? featureState(gateContext.value.features, c.feature) : "enabled";
 
-// A child shows when its route is registered and custom_hide_menus doesn't
-// name it. A FeatureKey `gate` then decides locked vs. unlocked instead of
-// show vs. hide (dropped only if `checkFeatureAccess` says not `visible` at
-// all); a non-FeatureKey gate (plain on/off flag) keeps the old hide-on-fail
-// behavior, which also still applies on top once a FeatureKey's edition
-// check passes (e.g. On-Call hides when the admin flag is off, not just the
-// edition).
+// Shared with the Jump to palette, so both list exactly the same destinations.
 const visibleChildren = computed<SubnavChild[]>(() =>
-  props.children
-    .filter((c) => router.hasRoute(c.name) && !gateContext.value.hiddenMenus.has(c.name))
-    .flatMap((c): SubnavChild[] => {
-      if (c.gate && isFeatureKey(c.gate)) {
-        const access = checkFeatureAccess(c.gate, buildFeatureGateContext(store.state.zoConfig));
-        if (!access.visible) return [];
-        if (!access.allowed) return [{ ...c, locked: true, lockedMessage: access.message }];
-      }
-      // The license applies once the edition allows the feature; a locked license also turns its runtime flag off.
-      const license = licenseState(c);
-      if (license === "hidden") return [];
-      if (license === "locked") return [{ ...c, locked: false, licenseLocked: true }];
-      if (!c.gate) return [{ ...c, locked: false }];
-      return isGateOpen(gateContext.value, c.gate) ? [{ ...c, locked: false }] : [];
-    }),
+  visibleSubnavChildren(props.children, gateContext.value, store.state.zoConfig, (name) =>
+    router.hasRoute(name),
+  ),
 );
 
 // A group with no surviving child is not a group — it is an empty tile that
@@ -266,53 +247,14 @@ function childPath(name: string): string | null {
   }
 }
 
-// At most ONE child is active, resolved for the whole flyout rather than per
-// child. Deciding per child lit up ancestors too: any section whose path is a
-// prefix of another's matched both, which is right for a drill-down like
-// /alerts/detail/:id but wrong for a sibling that merely sits underneath.
-//
-// Exact route-name match wins outright; otherwise the DEEPEST path prefix wins,
-// so a nested route is attributed to its own section, not a shallower sibling.
-function resolveActiveChild(children: SubnavChild[]): SubnavChild | null {
-  const route = router.currentRoute.value;
-
-  const exactTab = children.find(
-    (c) => c.tab && route.name === c.name && route.query.tab === c.tab,
-  );
-  if (exactTab) return exactTab;
-
-  // A route alias, same idea for a section whose sub-views are sibling ROUTES
-  // rendered as in-page tabs (Databases owns dbmQueries / dbmQueryDetail).
-  // Checked before the prefix pass below, which would otherwise attribute a
-  // detail route to whichever child has the longest matching path.
-  const routeAlias = children.find((c) => c.activeOnRoutes?.includes(route.name as string));
-  if (routeAlias) return routeAlias;
-
-  const exact = children.find((c) => route.name === c.name && !c.tab);
-  if (exact) return exact;
-
-  const routeDefault = children.find((c) => c.defaultForRoute && route.name === c.name);
-  if (routeDefault) return routeDefault;
-
-  let best: SubnavChild | null = null;
-  let bestLen = 0;
-  for (const child of children) {
-    if (child.tab) continue; // query-tab children only match by exact name
-    const base = childPath(child.name);
-    if (!base || base === "/") continue;
-    if (route.path !== base && !route.path.startsWith(`${base}/`)) continue;
-    if (base.length > bestLen) {
-      best = child;
-      bestLen = base.length;
-    }
-  }
-  return best;
-}
-
 // A page reached by URL still lights its group when its child was filtered out.
-const activeChild = computed<SubnavChild | null>(
-  () => resolveActiveChild(props.children) ?? resolveActiveChild(props.filteredChildren ?? []),
-);
+const activeChild = computed<SubnavChild | null>(() => {
+  const route = router.currentRoute.value;
+  return (
+    resolveActiveChild(props.children, route, childPath) ??
+    resolveActiveChild(props.filteredChildren ?? [], route, childPath)
+  );
+});
 
 // By KEY, not reference: `visibleChildren` (what actually renders) maps each
 // child through a `{ ...c, locked }` spread to attach the locked state
@@ -494,9 +436,12 @@ function close() {
 // Where the pointer last came to rest on the tile; the open timer counts from here.
 let restAnchor: Point | null = null;
 
+// Set by a tile click: the page under the pointer is the one just chosen, so hover waits until the pointer leaves.
+let hoverOpenSuppressed = false;
+
 function scheduleOpen(event?: MouseEvent) {
   // Some touch browsers emit a synthetic mouseenter, which would open a group the user only scrolled past.
-  if (isMobile.value) return;
+  if (isMobile.value || hoverOpenSuppressed) return;
   restAnchor = event ? { x: event.clientX, y: event.clientY } : null;
   clearTimers();
   // A neighbour whose flyout the pointer is still travelling towards keeps its turn.
@@ -539,6 +484,11 @@ function scheduleClose(event?: MouseEvent) {
   closeTimer = setTimeout(tryClose, CLOSE_DELAY);
 }
 
+function onTileMouseleave(event: MouseEvent) {
+  hoverOpenSuppressed = false;
+  scheduleClose(event);
+}
+
 // Firefox reports Enter on a link as a click with detail 1, so the keydown is the reliable signal.
 let activatedByKey = false;
 let activationKeyTimer: ReturnType<typeof setTimeout> | undefined;
@@ -571,7 +521,6 @@ function isKeyboardActivation(event?: MouseEvent): boolean {
   clearActivationKey();
   return byKey;
 }
-
 function onTriggerClick() {
   clearActivationKey();
   if (isPinned.value) {
@@ -582,13 +531,10 @@ function onTriggerClick() {
   }
 }
 
-// A keyboard activation navigates, so nothing should stay open.
+// A click navigates to the group's page, so the flyout must not stay open over it (N1); a keyboard activation leaves no pointer to wait on.
 function onLinkClick(event?: MouseEvent) {
-  if (isKeyboardActivation(event)) {
-    close();
-    return;
-  }
-  open();
+  hoverOpenSuppressed = !isKeyboardActivation(event);
+  close();
 }
 
 function isRtl(): boolean {
@@ -619,6 +565,14 @@ function onTileKeydown(event: KeyboardEvent) {
 watch(openGroupKey, (key) => {
   if (key !== props.groupKey && isOpen.value) close();
 });
+
+// Path, not query: a list page rewriting its own query must not shut a flyout the pointer is on.
+watch(
+  () => router.currentRoute.value.path,
+  () => {
+    if (isOpen.value && !isMobile.value) close();
+  },
+);
 
 function onDocumentPointerDown(event: PointerEvent) {
   clearActivationKey();
@@ -759,7 +713,7 @@ function onChildMouseenter(event: MouseEvent) {
     :data-test="`nav-group-${groupKey}`"
     class="nav-group relative shrink-0"
     @mouseenter="scheduleOpen"
-    @mouseleave="scheduleClose"
+    @mouseleave="onTileMouseleave"
     @mousemove="onTileMousemove"
     @keydown="noteActivationKey"
     @pointerdown="clearActivationKey"
@@ -839,7 +793,7 @@ function onChildMouseenter(event: MouseEvent) {
               role="menuitem"
               :to="child.locked ? undefined : childTo(child)"
               :tabindex="child.locked ? 0 : undefined"
-              class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
+              class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none [text-decoration:none]!"
               :class="[
                 flyoutTextClass,
                 isChildActive(child) ? 'bg-nav-flyout-item-selected-bg font-medium' : '',
@@ -858,7 +812,7 @@ function onChildMouseenter(event: MouseEvent) {
                 :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
               />
               <span class="leading-tight">{{ childLabel(child) }}</span>
-              <BetaBadge v-if="child.beta" size="xs" />
+              <BetaBadge v-if="child.beta" />
               <OIcon
                 v-if="isChildPaywalled(child) || child.locked || child.licenseLocked"
                 name="lock"
@@ -887,7 +841,7 @@ function onChildMouseenter(event: MouseEvent) {
             role="menuitem"
             :to="block.child.locked ? undefined : childTo(block.child)"
             :tabindex="block.child.locked ? 0 : undefined"
-            class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
+            class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none [text-decoration:none]!"
             :class="[
               flyoutTextClass,
               block.spaced ? 'mt-2' : '',
@@ -907,7 +861,7 @@ function onChildMouseenter(event: MouseEvent) {
               :class="isChildPaywalled(block.child) ? 'text-text-secondary!' : flyoutIconClass"
             />
             <span class="leading-tight">{{ childLabel(block.child) }}</span>
-            <BetaBadge v-if="block.child.beta" size="xs" />
+            <BetaBadge v-if="block.child.beta" />
             <OIcon
               v-if="
                 isChildPaywalled(block.child) || block.child.locked || block.child.licenseLocked
@@ -953,7 +907,7 @@ function onChildMouseenter(event: MouseEvent) {
         :aria-label="title"
         :aria-describedby="showTrialNote ? trialNoteId : undefined"
         :data-layout="useColumns ? 'columns' : 'single'"
-        class="nav-group-flyout rounded-default bg-dropdown-bg shadow-overlay min-w-52 overflow-y-auto overscroll-contain border border-transparent p-1"
+        class="nav-group-flyout rounded-default bg-dropdown-bg shadow-overlay border-border-default min-w-52 overflow-y-auto overscroll-contain border p-1"
         :style="flyoutStyle"
         @mouseenter="clearTimers"
         @mouseleave="scheduleClose"
@@ -1017,7 +971,7 @@ function onChildMouseenter(event: MouseEvent) {
                     role="menuitem"
                     :to="child.locked ? undefined : childTo(child)"
                     :tabindex="child.locked ? 0 : undefined"
-                    class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
+                    class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
                     :class="[
                       flyoutTextClass,
                       childIndex > 0 ? 'mt-0.5' : '',
@@ -1042,7 +996,7 @@ function onChildMouseenter(event: MouseEvent) {
                       :class="isChildPaywalled(child) ? 'text-text-secondary!' : flyoutIconClass"
                     />
                     <span class="leading-none">{{ childLabel(child) }}</span>
-                    <BetaBadge v-if="child.beta" size="xs" />
+                    <BetaBadge v-if="child.beta" />
                     <OIcon
                       v-if="isChildPaywalled(child) || child.locked || child.licenseLocked"
                       name="lock"
@@ -1079,7 +1033,7 @@ function onChildMouseenter(event: MouseEvent) {
                   role="menuitem"
                   :to="block.child.locked ? undefined : childTo(block.child)"
                   :tabindex="block.child.locked ? 0 : undefined"
-                  class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
+                  class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
                   :class="[
                     flyoutTextClass,
                     // Matches the pt-4 a header gets, so leaving a run and starting
@@ -1106,7 +1060,7 @@ function onChildMouseenter(event: MouseEvent) {
                     "
                   />
                   <span class="leading-none">{{ childLabel(block.child) }}</span>
-                  <BetaBadge v-if="block.child.beta" size="xs" />
+                  <BetaBadge v-if="block.child.beta" />
                   <OIcon
                     v-if="
                       isChildPaywalled(block.child) ||

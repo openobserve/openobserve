@@ -124,7 +124,7 @@ describe("buildInventory — pods", () => {
     it("shows only the newest uid's state, owner, limit and usage", () => {
       const row = onlyPod(fixture());
       expect(row.uid).toBe("B");
-      expect(row.status).toEqual({ text: "Running", variant: "success-soft" });
+      expect(row.status).toEqual({ text: "Running", variant: "ok" });
       expect(row.controller).toEqual({ kind: "ReplicaSet", name: "rs-b" });
       expect(row.workload).toEqual({ kind: "Deployment", name: "db" });
       expect(row.memoryLimit).toBe(1 * GI);
@@ -170,7 +170,7 @@ describe("buildInventory — pods", () => {
         P1: [ksm({ ...pod("rec"), phase: "Running" })],
         P2: [ksm({ ...pod("rec"), container: "main", reason: "CrashLoopBackOff" })],
       });
-      expect(row.status).toEqual({ text: "CrashLoopBackOff", variant: "error-soft" });
+      expect(row.status).toEqual({ text: "CrashLoopBackOff", variant: "err" });
       expect(row.warnings[0]).toMatchObject({ key: "infra.k8s2.warnWaiting", severity: "error" });
     });
 
@@ -203,18 +203,18 @@ describe("buildInventory — pods", () => {
     });
 
     it("Running and ready is success-soft", () => {
-      expect(onlyPod(running("true")).status).toEqual({ text: "Running", variant: "success-soft" });
+      expect(onlyPod(running("true")).status).toEqual({ text: "Running", variant: "ok" });
     });
 
     it("Running and not ready is a warning counted as not running", () => {
       const row = onlyPod(running("false"));
-      expect(row.status).toEqual({ key: "infra.k8s2.podRunningNotReady", variant: "warning-soft" });
+      expect(row.status).toEqual({ key: "infra.k8s2.podRunningNotReady", variant: "warn" });
       expect(keys(row)).toContain("infra.k8s2.warnNotReady");
     });
 
     it("Running with no ready series is neutral and not counted", () => {
       const row = onlyPod(running());
-      expect(row.status).toEqual({ text: "Running", variant: "default-soft" });
+      expect(row.status).toEqual({ text: "Running", variant: "neutral" });
       expect(row.warnings).toEqual([]);
     });
 
@@ -223,15 +223,15 @@ describe("buildInventory — pods", () => {
         P1: [ksm({ ...pod("o"), phase: "Pending" })],
         P2: [ksm({ ...pod("o"), container: "main", reason: "ContainerCreating" })],
       });
-      expect(row.status).toEqual({ text: "ContainerCreating", variant: "warning-soft" });
+      expect(row.status).toEqual({ text: "ContainerCreating", variant: "warn" });
       expect(keys(row)).not.toContain("infra.k8s2.warnWaiting");
     });
 
     it.each([
-      ["Failed", "error-soft"],
-      ["Pending", "warning-soft"],
-      ["Unknown", "amber-soft"],
-      ["Succeeded", "default-soft"],
+      ["Failed", "err"],
+      ["Pending", "warn"],
+      ["Unknown", "warn"],
+      ["Succeeded", "neutral"],
     ])("phase %s is %s", (phase, variant) => {
       expect(onlyPod({ P1: [ksm({ ...pod("o"), phase })] }).status).toEqual({
         text: phase,
@@ -523,30 +523,26 @@ describe("pods — Lens redesign", () => {
     [
       "Evicted beats a waiting reason",
       { reason: "Evicted", waiting: "CrashLoopBackOff", phase: "Failed" },
-      { text: "Evicted", variant: "error-soft" },
+      { text: "Evicted", variant: "err" },
     ],
     [
       "a waiting reason beats Failed",
       { waiting: "CrashLoopBackOff", phase: "Failed" },
-      { text: "CrashLoopBackOff", variant: "error-soft" },
+      { text: "CrashLoopBackOff", variant: "err" },
     ],
     [
       "Failed beats readiness",
       { phase: "Failed", ready: "true" },
-      { text: "Failed", variant: "error-soft" },
+      { text: "Failed", variant: "err" },
     ],
-    ["Pending", { phase: "Pending" }, { text: "Pending", variant: "warning-soft" }],
-    ["Unknown", { phase: "Unknown" }, { text: "Unknown", variant: "amber-soft" }],
+    ["Pending", { phase: "Pending" }, { text: "Pending", variant: "warn" }],
+    ["Unknown", { phase: "Unknown" }, { text: "Unknown", variant: "warn" }],
     [
       "Running not ready",
       { phase: "Running", ready: "false" },
-      { key: "infra.k8s2.podRunningNotReady", variant: "warning-soft" },
+      { key: "infra.k8s2.podRunningNotReady", variant: "warn" },
     ],
-    [
-      "Running ready",
-      { phase: "Running", ready: "true" },
-      { text: "Running", variant: "success-soft" },
-    ],
+    ["Running ready", { phase: "Running", ready: "true" }, { text: "Running", variant: "ok" }],
   ] as const)("status precedence: %s", (_name, f: any, expected) => {
     const p = pod("s");
     const row = onlyPod({
@@ -852,9 +848,9 @@ describe("nodes", () => {
   const n1 = (node: string, condition: string, status: string) => ksm({ node, condition, status });
 
   it.each([
-    ["true", "infra.k8s2.nodeReady", "success-soft"],
-    ["false", "infra.k8s2.nodeNotReady", "error-soft"],
-    ["unknown", "infra.k8s2.nodeUnknown", "amber-soft"],
+    ["true", "infra.k8s2.nodeReady", "ok"],
+    ["false", "infra.k8s2.nodeNotReady", "err"],
+    ["unknown", "infra.k8s2.nodeUnknown", "warn"],
   ])("Ready=%s is %s", (status, key, variant) => {
     const inventory = buildInventory(results({ N1: [n1("n1", "Ready", status)] }));
     expect(inventory.nodes[0].status).toEqual({ key, variant });
@@ -930,13 +926,13 @@ describe("nodes", () => {
     expect(node.info?.kubelet_version).toBe("v1.29.0");
     expect(node.createdAt).toBe(1_600_000_000_000_000);
     expect(nodeConditionWords(node)).toEqual([
-      { text: "Ready", variant: "success-soft" },
-      { text: "MemoryPressure", variant: "warning-soft" },
+      { text: "Ready", variant: "ok" },
+      { text: "MemoryPressure", variant: "warn" },
     ]);
     node.unschedulable = true;
     expect(nodeConditionWords(node).at(-1)).toEqual({
       text: "SchedulingDisabled",
-      variant: "warning-soft",
+      variant: "warn",
     });
   });
 
@@ -968,9 +964,7 @@ describe("workload kinds", () => {
       available: 3,
       replicas: 4,
       createdAt: 1_000_000_000,
-      conditions: [
-        { key: "infra.k8s2.conditionAvailable", text: "Available", variant: "success-soft" },
-      ],
+      conditions: [{ key: "infra.k8s2.conditionAvailable", text: "Available", variant: "ok" }],
       conditionsDerived: true,
       warnings: [],
     });
@@ -1271,9 +1265,9 @@ describe("formatters", () => {
   });
 
   it("tints usage bars with the Hosts thresholds", () => {
-    expect(usageBarVariant(95)).toBe("danger");
-    expect(usageBarVariant(75)).toBe("warning");
-    expect(usageBarVariant(10)).toBe("default");
-    expect(usageBarVariant(null)).toBe("default");
+    expect(usageBarVariant(95)).toBe("err");
+    expect(usageBarVariant(75)).toBe("warn");
+    expect(usageBarVariant(10)).toBe("accent");
+    expect(usageBarVariant(null)).toBe("accent");
   });
 });

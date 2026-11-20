@@ -73,69 +73,60 @@ const remove = (link: SlackMyLink): void => {
     :open="open"
     size="md"
     :title="t('slackApp.linkedAccounts.title')"
-    :sub-title="t('slackApp.linkedAccounts.description')"
-    :secondary-button-label="t('common.close')"
+    :subtitle="t('slackApp.linkedAccounts.description')"
+    :secondary="{ label: t('common.close') }"
     data-test="linked-accounts-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
   >
     <div class="flex flex-col gap-3">
-      <OSkeleton v-if="links.isPending.value" class="rounded-surface h-18 w-full" />
+      <OSkeleton v-if="links.isPending.value" shape="block" class="h-18 w-full" />
       <OEmptyState
         v-else-if="links.isError.value"
+        kind="error"
         size="compact"
-        variant="error"
-        illustration="broken-panel"
         :title="t('slackApp.linkedAccounts.loadFailed')"
-        :action-label="t('common.retry')"
-        :backdrop="false"
         data-test="linked-accounts-error"
         @action="links.refetch()"
       />
       <OEmptyState
         v-else-if="!rows.length"
         size="compact"
-        illustration="connect"
+        icon="link"
         :title="t('slackApp.linkedAccounts.emptyTitle')"
-        :description="t('slackApp.linkedAccounts.emptyDetail')"
-        :backdrop="false"
+        :text="t('slackApp.linkedAccounts.emptyDetail')"
         data-test="linked-accounts-empty"
       />
       <template v-else>
-        <OCard
-          v-for="link in rows"
-          :key="link.id"
-          variant="outlined"
-          class="flex-row flex-wrap items-center gap-3 p-3"
-          :data-test="`linked-accounts-item-${link.id}`"
-        >
-          <img :src="slackLogo" alt="" class="size-9 shrink-0" />
-          <div class="flex min-w-36 flex-1 flex-col gap-0.5">
-            <span class="text-text-heading text-sm font-semibold">
-              {{ t("slackApp.linkedAccounts.workspace", { team: raw(link.team_name) }) }}
-            </span>
-            <span class="text-text-secondary text-xs">{{ detail(link) }}</span>
-            <span class="text-text-secondary flex flex-wrap gap-x-3 text-xs">
-              <span>
-                {{ t("slackApp.linkedAccounts.linked") }}
-                <OTimeCell :value="link.created_at" unit="us" mode="date" />
+        <OCard v-for="link in rows" :key="link.id" :data-test="`linked-accounts-item-${link.id}`">
+          <div class="flex flex-wrap items-center gap-3">
+            <img :src="slackLogo" alt="" class="size-9 shrink-0" />
+            <div class="flex min-w-36 flex-1 flex-col gap-0.5">
+              <span class="text-text-heading text-sm font-semibold">
+                {{ t("slackApp.linkedAccounts.workspace", { team: raw(link.team_name) }) }}
               </span>
-              <span>
-                {{ t("slackApp.linkedAccounts.lastUsed") }}
-                <OTimeCell :value="link.last_used_at" unit="us" />
+              <span class="text-text-secondary text-xs">{{ detail(link) }}</span>
+              <span class="text-text-secondary flex flex-wrap gap-x-3 text-xs">
+                <span>
+                  {{ t("slackApp.linkedAccounts.linked") }}
+                  <OTimeCell :value="link.created_at" unit="us" mode="date" />
+                </span>
+                <span>
+                  {{ t("slackApp.linkedAccounts.lastUsed") }}
+                  <OTimeCell :value="link.last_used_at" unit="us" />
+                </span>
               </span>
-            </span>
+            </div>
+            <OButton
+              variant="danger-ghost"
+              :loading="unlinkingId === link.id"
+              :aria-label="t('slackApp.linkedAccounts.unlinkAria', { team: raw(link.team_name) })"
+              :data-test="`linked-accounts-unlink-${link.id}`"
+              @click="remove(link)"
+            >
+              {{ t("slackApp.linkedAccounts.unlink") }}
+            </OButton>
           </div>
-          <OButton
-            variant="outline-destructive"
-            size="sm"
-            :loading="unlinkingId === link.id"
-            :aria-label="t('slackApp.linkedAccounts.unlinkAria', { team: raw(link.team_name) })"
-            :data-test="`linked-accounts-unlink-${link.id}`"
-            @click="remove(link)"
-          >
-            {{ t("slackApp.linkedAccounts.unlink") }}
-          </OButton>
         </OCard>
       </template>
       <p v-if="rows.length" class="text-text-secondary text-xs" data-test="linked-accounts-note">

@@ -1,7 +1,7 @@
 <template>
   <ODrawer
     :open="drawer.isOpen.value"
-    :width="drawerWidth"
+    size="lg"
     :modal="false"
     seamless
     bleed
@@ -10,27 +10,13 @@
     @update:open="(value) => !value && drawer.close()"
     data-test="svcver-drawer"
   >
-    <template #header
-      ><div
-        role="separator"
-        aria-orientation="vertical"
-        tabindex="0"
-        :aria-label="t('serviceVersions.actions.resize')"
-        :aria-valuemin="30"
-        :aria-valuemax="Math.round(maxRem)"
-        :aria-valuenow="Math.round(width)"
-        class="bg-border-strong focus-visible:ring-accent absolute start-0 top-1/2 z-10 h-10 w-1.5 -translate-y-1/2 cursor-col-resize rounded-full focus-visible:ring-2 focus-visible:outline-none"
-        data-test="svcver-resize"
-        @pointerdown="startResize"
-        @keydown="resizeByKey"
-      />
+    <template #header>
       <div class="flex min-w-0 flex-col gap-1.5">
         <OButton
           v-if="state.fromPanel"
           class="self-start"
           variant="ghost"
-          size="sm"
-          icon-left="arrow-back"
+          icon="arrow-back"
           data-test="svcver-back"
           @click="drawer.backToService()"
           >{{ t("serviceVersions.actions.backToService", { service: state.service }) }}</OButton
@@ -62,26 +48,22 @@
             }}</span>
           </div>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon"
-            icon-left="close"
+            size="xs"
+            icon="close"
             data-test="svcver-close"
             :aria-label="t('serviceVersions.actions.close')"
             @click="drawer.close()"
           />
         </div>
         <div class="flex flex-wrap items-center gap-1">
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="share"
-            data-test="svcver-share"
-            @click="copy(true)"
-            >{{ t("serviceVersions.actions.share") }}</OButton
+          <OButton variant="secondary" icon="share" data-test="svcver-share" @click="copy(true)">{{
+            t("serviceVersions.actions.share")
+          }}</OButton
           ><OButton
-            variant="outline"
-            size="sm"
-            icon-left="link"
+            variant="secondary"
+            icon="link"
             data-test="svcver-copy-link"
             @click="copy(false)"
             >{{ t("serviceVersions.actions.copyLink") }}</OButton
@@ -91,8 +73,7 @@
               :tabindex="incidentBlocked ? 0 : undefined"
               data-test="svcver-open-incident-reason"
               ><OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 data-test="svcver-open-incident"
                 :disabled="Boolean(incidentBlocked)"
                 :loading="incidentPending"
@@ -103,15 +84,15 @@
           ><OButton
             v-if="!rumOnly"
             variant="ghost"
-            size="sm"
-            icon-left="account-tree"
+            icon="account-tree"
             data-test="svcver-open-service"
             @click="drawer.openService()"
             >{{ t("serviceVersions.actions.openService") }}</OButton
           ><OButton
+            icon-only
             variant="ghost"
-            size="icon"
-            :icon-left="state.pinned ? 'keep' : 'keep-outline'"
+            size="xs"
+            :icon="state.pinned ? 'keep' : 'keep-outline'"
             data-test="svcver-pin"
             :aria-pressed="state.pinned"
             :aria-label="
@@ -163,23 +144,25 @@
           ></OSelectItem
         ></OSelect
       >
-      <section
+      <OEmptyState
         v-if="versions.isError.value || scopes.isError.value"
-        class="flex items-center gap-2"
+        size="compact"
+        kind="error"
+        :title="t('serviceVersions.compare.error')"
         data-test="svcver-identity-error"
       >
-        <p class="text-text-body text-compact">{{ t("serviceVersions.compare.error") }}</p>
-        <OButton
-          variant="outline"
-          size="sm"
-          data-test="svcver-identity-retry"
-          @click="
-            versions.refetch();
-            scopes.refetch();
-          "
-          >{{ t("serviceVersions.actions.retry") }}</OButton
-        >
-      </section>
+        <template #actions>
+          <OButton
+            size="sm"
+            data-test="svcver-identity-retry"
+            @click="
+              versions.refetch();
+              scopes.refetch();
+            "
+            >{{ t("serviceVersions.actions.retry") }}</OButton
+          >
+        </template>
+      </OEmptyState>
       <p
         v-if="state.ambiguous"
         class="text-text-secondary text-compact"
@@ -203,23 +186,23 @@
       /></OSelect>
       <OSkeleton
         v-if="comparison.isPending.value && enabled"
+        shape="block"
         class="h-32 w-full"
         data-test="svcver-loading"
       />
-      <section
+      <OEmptyState
         v-if="comparison.isError.value && denied"
-        class="flex flex-wrap items-center gap-2"
+        size="compact"
+        kind="denied"
+        :title="t('serviceVersions.compare.denied')"
         data-test="svcver-denied"
       >
-        <p class="text-text-body text-compact">{{ t("serviceVersions.compare.denied") }}</p>
-        <OButton
-          variant="outline"
-          size="sm"
-          data-test="svcver-retry"
-          @click="comparison.refetch()"
-          >{{ t("serviceVersions.actions.retry") }}</OButton
-        >
-      </section>
+        <template #actions>
+          <OButton size="sm" data-test="svcver-retry" @click="comparison.refetch()">{{
+            t("serviceVersions.actions.retry")
+          }}</OButton>
+        </template>
+      </OEmptyState>
       <template v-else-if="comparison.isError.value"
         ><section
           v-if="stored && !result"
@@ -253,14 +236,14 @@
           }}
           <template #actions
             ><OButton
-              variant="outline"
-              size="xs"
+              variant="secondary"
+              size="sm"
               data-test="svcver-retry"
               @click="comparison.refetch()"
               >{{ t("serviceVersions.actions.retry") }}</OButton
             ><OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="svcver-shorter-window"
               @click="maxSpan = 3600"
               >{{ t("serviceVersions.actions.shorterWindow") }}</OButton
@@ -268,13 +251,12 @@
           ></ErrorPanel
         ></template
       >
-      <p
+      <OEmptyState
         v-if="!enabled && !state.ambiguous"
-        class="text-text-secondary text-compact"
+        size="compact"
+        :title="t('serviceVersions.compare.empty')"
         data-test="svcver-empty"
-      >
-        {{ t("serviceVersions.compare.empty") }}
-      </p>
+      />
       <template v-if="result"
         ><NoVerdictNotice
           v-if="missing"
@@ -406,16 +388,19 @@
           :result="result"
           :metric="chartMetric"
         />
-        <div v-if="sectionError" class="flex items-center gap-2" data-test="svcver-section-error">
-          <p class="text-text-body text-compact">{{ t("serviceVersions.compare.error") }}</p>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="svcver-section-retry"
-            @click="comparison.refetch()"
-            >{{ t("serviceVersions.actions.retry") }}</OButton
-          >
-        </div>
+        <OEmptyState
+          v-if="sectionError"
+          size="compact"
+          kind="error"
+          :title="t('serviceVersions.compare.error')"
+          data-test="svcver-section-error"
+        >
+          <template #actions>
+            <OButton size="sm" data-test="svcver-section-retry" @click="comparison.refetch()">{{
+              t("serviceVersions.actions.retry")
+            }}</OButton>
+          </template>
+        </OEmptyState>
         <section
           v-if="
             !restricted &&
@@ -471,32 +456,31 @@
           </div>
           <OSkeleton
             v-if="overlay.isPending.value && overlay.isFetching.value"
+            shape="block"
             data-test="svcver-overlay-loading"
             class="h-40 w-full"
           />
-          <div
+          <OEmptyState
             v-else-if="overlay.isError.value"
-            class="flex items-center gap-2"
+            size="compact"
+            kind="error"
+            :title="t('serviceVersions.compare.error')"
             data-test="svcver-overlay-error"
           >
-            <p class="text-text-body text-compact">{{ t("serviceVersions.compare.error") }}</p>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="svcver-overlay-retry"
-              @click="overlay.refetch()"
-              >{{ t("serviceVersions.actions.retry") }}</OButton
-            >
-          </div>
-          <p
+            <template #actions>
+              <OButton size="sm" data-test="svcver-overlay-retry" @click="overlay.refetch()">{{
+                t("serviceVersions.actions.retry")
+              }}</OButton>
+            </template>
+          </OEmptyState>
+          <OEmptyState
             v-else-if="
               overlay.data.value && !overlay.data.value.a.length && !overlay.data.value.b.length
             "
-            class="text-text-secondary text-compact"
+            size="compact"
+            :title="t('serviceVersions.compare.empty')"
             data-test="svcver-overlay-empty"
-          >
-            {{ t("serviceVersions.compare.empty") }}
-          </p>
+          />
           <VersionOverlayChart
             v-else-if="overlay.data.value"
             :series-a="overlaySeriesA"
@@ -519,7 +503,7 @@
           :total="pods.total"
         />
         <div v-if="!notServing && !noEvidence && !sectionError">
-          <OTabs v-model="tab" bordered dense data-test="svcver-tabs"
+          <OTabs v-model="tab" bordered size="compact" data-test="svcver-tabs"
             ><OTab
               name="what-changed"
               :label="t('serviceVersions.compare.whatChanged')"
@@ -554,7 +538,7 @@
   ></ODrawer>
 </template>
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import { isAxiosError } from "axios";
@@ -562,6 +546,7 @@ import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSelectItem from "@/lib/forms/Select/OSelectItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -996,55 +981,6 @@ const legendSeconds = computed(() =>
 );
 const tab = ref<string | number>("what-changed");
 watch(rumOnly, () => (tab.value = "what-changed"));
-const viewport = ref(window.innerWidth);
-const rootSize = ref(parseFloat(getComputedStyle(document.documentElement).fontSize) || 16);
-const width = ref(48);
-const maxRem = computed(() => Math.max(30, (viewport.value / rootSize.value) * 0.7));
-const drawerWidth = computed(() =>
-  viewport.value < 30 * rootSize.value
-    ? 100
-    : Math.min(
-        70,
-        ((Math.max(30, Math.min(width.value, maxRem.value)) * rootSize.value) / viewport.value) *
-          100,
-      ),
-);
-function resized() {
-  viewport.value = window.innerWidth;
-  rootSize.value = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-}
-function clampWidth(value: number) {
-  width.value = Math.max(30, Math.min(maxRem.value, value));
-}
-function dragTo(event: PointerEvent) {
-  clampWidth((viewport.value - event.clientX) / rootSize.value);
-}
-function stopResize() {
-  window.removeEventListener("pointermove", dragTo);
-  window.removeEventListener("pointerup", stopResize);
-}
-function startResize(event: PointerEvent) {
-  event.preventDefault();
-  window.addEventListener("pointermove", dragTo);
-  window.addEventListener("pointerup", stopResize);
-}
-function resizeByKey(event: KeyboardEvent) {
-  const steps: Record<string, () => number> = {
-    ArrowLeft: () => width.value + 2,
-    ArrowRight: () => width.value - 2,
-    Home: () => 30,
-    End: () => maxRem.value,
-  };
-  const next = steps[event.key];
-  if (!next) return;
-  event.preventDefault();
-  clampWidth(next());
-}
-window.addEventListener("resize", resized);
-onUnmounted(() => {
-  window.removeEventListener("resize", resized);
-  stopResize();
-});
 function baseline(value: unknown) {
   const chosen = String(value);
   const row = versions.data.value?.versions.find((row) => row.version_key === chosen);

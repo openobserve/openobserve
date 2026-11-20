@@ -17,36 +17,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :back="{
-      label: backToGaps ? t('modelPricing.unpriced.title') : t('modelPricing.header'),
-      onClick: goBack,
+      label: backToGaps ? t('modelPricing.unpriced.title') : t('settings.llmModelPricing'),
+      to: parentRoute,
       dataTest: 'model-pricing-editor-back-btn',
     }"
     :title="headerTitle"
+    title-data-test="model-pricing-editor-title"
     bleed
   >
-    <template #title>
-      <span data-test="model-pricing-editor-title">{{ headerTitle }}</span>
-    </template>
-
     <!-- Form Body -->
     <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 flex-1 flex-col">
       <ConstrainedPage size="md" align="left" :padded="false" class="min-h-0 flex-1">
-        <div class="flex flex-col gap-6 px-3 py-3">
-          <!-- ── Model Details Card ── -->
-          <div class="border-card-glass-border rounded-default border">
-            <div
-              class="bg-surface-panel border-card-glass-border rounded-t-default flex flex-row items-center justify-between gap-3 border-b px-4 py-2.5"
-            >
-              <div>
-                <OText variant="panel-title" class="text-compact font-semibold">
-                  {{ t("modelPricing.modelDetails") }}
-                </OText>
-                <OText variant="meta" class="text-2xs mt-px block">
-                  {{ t("modelPricing.modelDetailsDesc") }}
-                </OText>
-              </div>
-            </div>
-            <div class="flex flex-row gap-4 px-4 pt-2.5 pb-2 max-md:flex-col max-md:gap-2">
+        <div class="px-page-edge flex flex-col gap-6 py-4">
+          <OFormSection
+            variant="plain"
+            :title="t('modelPricing.modelDetails')"
+            :description="t('modelPricing.modelDetailsDesc')"
+            data-test="model-pricing-details-section"
+          >
+            <div class="flex flex-row gap-4 pb-2 max-md:flex-col max-md:gap-2">
               <div class="flex-1">
                 <OFormInput
                   name="name"
@@ -55,11 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="model-pricing-name-input"
                 >
                   <template #tooltip>
-                    <OTooltip
-                      side="right"
-                      max-width="18.75rem"
-                      :content="t('modelPricing.modelNameTooltip')"
-                    />
+                    <OTooltip side="right" :content="t('modelPricing.modelNameTooltip')" />
                   </template>
                 </OFormInput>
               </div>
@@ -74,35 +59,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="model-pricing-pattern-input"
                   >
                     <template #tooltip>
-                      <OTooltip
-                        side="right"
-                        max-width="18.75rem"
-                        :content="t('modelPricing.matchPatternTooltip')"
-                      />
+                      <OTooltip side="right" :content="t('modelPricing.matchPatternTooltip')" />
                     </template>
                   </OFormInput>
                 </div>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="text-theme-accent opacity-50 hover:opacity-100"
                   data-test="model-pricing-pattern-examples-btn"
                   @click="showExamples = true"
                 >
                   <OIcon name="lightbulb-outline" size="xs" />
-                  <OTooltip
-                    side="top"
-                    align="end"
-                    :side-offset="4"
-                    :content="t('modelPricing.patternExamplesBtn')"
-                  />
+                  <OTooltip side="top" :content="t('modelPricing.patternExamplesBtn')" />
                 </OButton>
               </div>
             </div>
             <!-- Known models the pattern would price if saved -->
             <div
               v-if="capturedPreview.pattern"
-              class="flex flex-col gap-2 px-4 pb-3"
+              class="flex flex-col gap-2 pt-1"
               data-test="model-pricing-captured-models"
             >
               <OText variant="meta" class="text-2xs block">
@@ -112,25 +89,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTag
                   v-for="m in visibleCapturedModels"
                   :key="m.model_name"
-                  :variant="m.primary ? 'default-soft' : 'warning-soft'"
+                  :tone="m.primary ? 'neutral' : 'warn'"
                   :data-test="`model-pricing-captured-${m.model_name}`"
                 >
                   {{ m.model_name }}
                   <OTooltip side="top" :content="capturedTooltip(m)" />
                 </OTag>
-                <OTag v-if="hiddenCapturedCount" variant="default-soft">
+                <OTag v-if="hiddenCapturedCount" tone="neutral">
                   {{ t("modelPricing.capturedModelsMore", { count: hiddenCapturedCount }) }}
                 </OTag>
               </div>
               <OText v-else variant="meta" class="text-2xs block">
                 {{ t("modelPricing.capturedModelsEmpty") }}
               </OText>
-              <OBanner
+              <OInlineNotice
                 v-if="otherCapturedModels.length"
-                variant="warning"
-                icon="warning"
+                tone="warn"
                 data-test="model-pricing-captured-warning"
-                :content="
+                :message="
                   t('modelPricing.capturedOtherModelsWarning', {
                     count: otherCapturedModels.length,
                     example: raw('^gpt-4o$'),
@@ -138,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               />
             </div>
-          </div>
+          </OFormSection>
 
           <!-- Pattern Examples Dialog -->
           <ODialog
@@ -146,13 +122,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:open="showExamples"
             size="sm"
             :title="t('modelPricing.patternExamplesTitle')"
-            :sub-title="t('modelPricing.patternExamplesDesc')"
+            :subtitle="t('modelPricing.patternExamplesDesc')"
           >
             <div
               class="examples-table border-card-glass-border rounded-default overflow-hidden border"
             >
               <div
-                class="bg-surface-subtle border-card-glass-border text-2xs text-text-secondary grid grid-cols-[11.25rem_1fr_auto] gap-3 border-b px-3 py-1.5 font-bold tracking-[0.06em] uppercase"
+                class="bg-surface-subtle border-card-glass-border text-2xs text-text-secondary grid grid-cols-[11.25rem_1fr_auto] gap-3 border-b px-3 py-1.5 font-semibold tracking-[0.06em] uppercase"
               >
                 <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
                 <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
@@ -169,8 +145,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      inside reka-ui's focus trap. -->
                 <OCode truncate>{{ ex.match_pattern }}</OCode>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="opacity-40 hover:opacity-100"
                   :data-test="`model-pricing-example-copy-btn-${ex.name}`"
                   @click="copyPattern(ex.match_pattern)"
@@ -181,7 +158,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="copiedPattern === ex.match_pattern ? 'text-status-positive' : ''"
                   />
                   <OTooltip
-                    :side-offset="4"
                     :content="
                       copiedPattern === ex.match_pattern
                         ? t('modelPricing.copied')
@@ -193,42 +169,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODialog>
 
-          <!-- ── Pricing Tiers ── -->
-          <div class="border-card-glass-border rounded-default border">
-            <div
-              class="bg-surface-panel border-card-glass-border rounded-t-default flex flex-row items-center justify-between gap-3 border-b px-4 py-2.5"
-            >
-              <div class="flex items-center gap-1">
-                <OText variant="panel-title" class="text-compact font-semibold">
-                  {{ t("modelPricing.pricingTiers") }}
-                </OText>
-                <OPopover
-                  v-model:open="tiersHintOpen"
-                  side="bottom"
-                  align="start"
-                  :aria-label="t('modelPricing.aboutPricingTiers')"
-                >
-                  <template #trigger>
-                    <OButton
-                      variant="ghost"
-                      size="xs"
-                      icon-left="info-outline"
-                      data-test="model-pricing-tiers-hint-trigger"
-                    >
-                      <span class="max-md:sr-only">{{ t("modelPricing.aboutPricingTiers") }}</span>
-                    </OButton>
-                  </template>
-                  <p
-                    class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
-                    data-test="model-pricing-tiers-hint"
+          <OFormSection
+            variant="plain"
+            :title="t('modelPricing.pricingTiers')"
+            data-test="model-pricing-tiers-section"
+          >
+            <template #actions>
+              <OPopover
+                size="lg"
+                v-model:open="tiersHintOpen"
+                side="bottom"
+                align="end"
+                :aria-label="t('modelPricing.aboutPricingTiers')"
+              >
+                <template #trigger>
+                  <OButton
+                    variant="ghost"
+                    size="sm"
+                    icon="info-outline"
+                    data-test="model-pricing-tiers-hint-trigger"
                   >
-                    <OText variant="meta">{{ t("modelPricing.pricingTiersDesc") }}</OText>
-                  </p>
-                </OPopover>
-              </div>
-            </div>
+                    <span class="max-md:sr-only">{{ t("modelPricing.aboutPricingTiers") }}</span>
+                  </OButton>
+                </template>
+                <p class="p-3 leading-5" data-test="model-pricing-tiers-hint">
+                  <OText variant="meta">{{ t("modelPricing.pricingTiersDesc") }}</OText>
+                </p>
+              </OPopover>
+            </template>
 
-            <div class="flex flex-col gap-3 px-4 pt-2.5 pb-2">
+            <div class="flex flex-col gap-3">
               <div
                 v-for="(tier, idx) in formTiers"
                 :key="idx"
@@ -251,10 +221,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="flex shrink-0 items-center gap-2">
                     <OButton
-                      :aria-label="t('common.remove')"
                       v-if="idx > 0"
-                      variant="outline-destructive"
-                      size="icon"
+                      icon-only
+                      :aria-label="t('common.remove')"
+                      variant="danger-ghost"
+                      size="xs"
                       type="button"
                       :data-test="`model-pricing-tier-remove-btn-${idx}`"
                       @click="removeTier(idx)"
@@ -330,17 +301,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <div class="flex h-8.5 items-center gap-2">
                           <OButton
-                            variant="outline-destructive"
-                            size="icon"
+                            icon-only
+                            variant="danger-ghost"
+                            size="xs"
                             type="button"
                             :data-test="`model-pricing-tier-window-remove-btn-${idx}-${winIdx}`"
                             @click="removeWindow(idx, winIdx)"
                           >
                             <OIcon name="delete" size="sm" />
-                            <OTooltip
-                              :side-offset="4"
-                              :content="t('modelPricing.removeTimeWindow')"
-                            />
+                            <OTooltip :content="t('modelPricing.removeTimeWindow')" />
                           </OButton>
                           <span
                             v-if="windowWraps(win)"
@@ -372,8 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Add a restriction to a non-default tier -->
                   <div v-if="idx > 0" class="flex flex-wrap items-center gap-2">
                     <OButton
-                      variant="outline"
-                      size="sm-action"
+                      variant="secondary"
                       type="button"
                       :data-test="`model-pricing-tier-add-window-btn-${idx}`"
                       @click="addWindow(idx)"
@@ -392,6 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- OFormInput's label only hosts a tooltip icon, so the popover trigger sits beside the input. -->
                       <div class="flex h-8.5 items-center">
                         <OPopover
+                          size="lg"
                           :open="priorityHintOpenIdx === idx"
                           side="bottom"
                           align="end"
@@ -402,15 +371,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <template #trigger>
                             <OButton
+                              icon-only
                               variant="ghost"
-                              size="icon-xs-sq"
-                              icon-left="info-outline"
+                              size="sm"
+                              icon="info-outline"
                               :aria-label="t('modelPricing.aboutTierPriority')"
                               :data-test="`model-pricing-tier-priority-hint-trigger-${idx}`"
                             />
                           </template>
                           <p
-                            class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
+                            class="p-3 leading-5"
                             :data-test="`model-pricing-tier-priority-hint-${idx}`"
                           >
                             <OText variant="meta">{{ t("modelPricing.tierPriorityHint") }}</OText>
@@ -426,14 +396,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       v-for="tpl in usageTemplates"
                       :key="tpl.name"
-                      variant="pricing-chip"
+                      variant="secondary"
                       type="button"
-                      :active="isTemplateActive(idx, tpl.keys)"
-                      class="h-auto! gap-1.5! rounded-full! px-3.5! py-1.25! text-xs! font-medium!"
+                      :pressed="isTemplateActive(idx, tpl.keys)"
+                      class="gap-1.5! rounded-full! px-3.5! py-1.25! text-xs! font-medium!"
                       :data-test="`model-pricing-tier-template-btn-${idx}-${tpl.name.toLowerCase()}`"
                       @click="applyTemplate(idx, tpl.keys)"
                     >
-                      <template #icon-left>
+                      <template #icon>
                         <span
                           class="pricing-chip-dot inline-block h-1.75 w-1.75 shrink-0 rounded-full"
                           :style="{ background: tpl.color }"
@@ -498,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :placeholder="raw('0.00')"
                           :data-test="`model-pricing-price-value-input-${idx}-${entryIdx}`"
                         >
-                          <template #icon-left>
+                          <template #icon>
                             <span class="price-dollar pb-0.5 text-xs">$</span></template
                           >
                         </OFormInput>
@@ -508,9 +478,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            push the value input / this button downward). -->
                         <div class="flex h-8.5 items-center">
                           <OButton
+                            icon-only
                             :aria-label="t('common.remove')"
-                            variant="outline-destructive"
-                            size="icon"
+                            variant="danger-ghost"
+                            size="xs"
                             type="button"
                             :data-test="`model-pricing-price-delete-btn-${idx}-${entryIdx}`"
                             @click="removePrice(idx, entryIdx)"
@@ -523,10 +494,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Empty state -->
                       <OEmptyState
                         v-if="!tier.prices.length"
-                        size="inline"
-                        hide-action
+                        size="compact"
                         :title="t('modelPricing.noPricesDefined')"
-                        :description="t('modelPricing.noPricesDesc')"
+                        :text="t('modelPricing.noPricesDesc')"
                       />
 
                       <!-- Add row (staging draft, form-owned) -->
@@ -553,14 +523,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :placeholder="raw('0.00')"
                           :data-test="`model-pricing-add-price-value-input-${idx}`"
                         >
-                          <template #icon-left>
+                          <template #icon>
                             <span class="price-dollar pb-0.5 text-xs">$</span></template
                           >
                         </OFormInput>
                         <OButton
+                          icon-only
                           :aria-label="t('common.add')"
-                          variant="outline"
-                          size="icon"
+                          variant="secondary"
+                          size="xs"
                           type="button"
                           :disabled="!String(tier.draftKey ?? '').trim()"
                           :data-test="`model-pricing-add-price-btn-${idx}`"
@@ -573,10 +544,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <OBanner
+              <OInlineNotice
                 v-if="ambiguousTierPairs.length"
-                variant="warning"
-                icon="warning"
+                tone="warn"
                 data-test="model-pricing-tier-tie-warning"
               >
                 <div class="text-xs font-semibold">{{ t("modelPricing.tierTieWarning") }}</div>
@@ -590,11 +560,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                   </li>
                 </ul>
-              </OBanner>
-              <OBanner
+              </OInlineNotice>
+              <OInlineNotice
                 v-if="unreachableTierPairs.length"
-                variant="warning"
-                icon="warning"
+                tone="warn"
                 data-test="model-pricing-tier-unreachable-warning"
               >
                 <div class="text-xs font-semibold">
@@ -610,10 +579,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                   </li>
                 </ul>
-              </OBanner>
+              </OInlineNotice>
               <OButton
-                variant="outline"
-                size="sm-action"
+                variant="secondary"
                 type="button"
                 class="self-start"
                 :disabled="formTiers.length >= MAX_TIERS"
@@ -623,7 +591,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("modelPricing.addTier") }}
               </OButton>
             </div>
-          </div>
+          </OFormSection>
         </div>
       </ConstrainedPage>
 
@@ -632,8 +600,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="page-footer border-card-glass-border flex h-12.5 shrink-0 items-center justify-end gap-2 border-t px-6"
       >
         <OButton
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           type="button"
           :disabled="isSubmitting"
           @click="goBack"
@@ -643,7 +610,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           variant="primary"
-          size="sm-action"
           type="submit"
           :loading="isSubmitting"
           data-test="model-pricing-editor-save-btn"
@@ -658,7 +624,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('modelPricing.confirmOtherModelsTitle')"
       :message="otherModelsConfirm.message"
       :ok-label="t('modelPricing.confirmOtherModelsOk')"
-      focus-cancel
       @update:ok="settleOtherModels(true)"
       @update:cancel="settleOtherModels(false)"
     />
@@ -672,7 +637,7 @@ import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -680,6 +645,7 @@ import modelPricingService from "@/services/model_pricing";
 import { saveModelPricingMutation } from "@/services/model_pricing.queries";
 import { useMutation } from "@tanstack/vue-query";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
@@ -1315,23 +1281,22 @@ function validateUsageKey(key: string): string | null {
 // Pricing gaps' Create price sets `from=gaps&stream=`, so Back and Save return to that stream's gaps.
 const backToGaps = computed(() => route.query.from === "gaps");
 
+const parentRoute = computed(() =>
+  backToGaps.value
+    ? {
+        name: "modelPricingGaps",
+        query: {
+          org_identifier: orgIdentifier.value,
+          stream: route.query.stream as string,
+          start_time: route.query.start_time,
+          end_time: route.query.end_time,
+        },
+      }
+    : { name: "modelPricing", query: { org_identifier: orgIdentifier.value } },
+);
+
 function goBack() {
-  if (backToGaps.value) {
-    router.push({
-      name: "modelPricingGaps",
-      query: {
-        org_identifier: orgIdentifier.value,
-        stream: route.query.stream as string,
-        start_time: route.query.start_time,
-        end_time: route.query.end_time,
-      },
-    });
-    return;
-  }
-  router.push({
-    name: "modelPricing",
-    query: { org_identifier: orgIdentifier.value },
-  });
+  router.push(parentRoute.value);
 }
 
 function notifyWarn(message: string) {

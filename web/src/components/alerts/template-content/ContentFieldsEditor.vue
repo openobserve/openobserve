@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           multiple
           :options="severityOptions"
           :searchable="false"
-          width="sm"
+          width="s"
           :placeholder="t('alert_templates.showWhenAllPlaceholder')"
           :title="t('alert_templates.showWhenCaption')"
           :aria-label="t('alert_templates.showWhenLabel')"
@@ -87,27 +87,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="flex items-center">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="arrow-upward"
+            icon="arrow-upward"
             :disabled="index === 0"
             :data-test="`${dataTestPrefix}-row-${index}-move-up-btn`"
             :aria-label="t('alert_templates.moveUp')"
             @click="moveRow(index, -1)"
           />
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="arrow-downward"
+            icon="arrow-downward"
             :disabled="index === rows.length - 1"
             :data-test="`${dataTestPrefix}-row-${index}-move-down-btn`"
             :aria-label="t('alert_templates.moveDown')"
             @click="moveRow(index, 1)"
           />
           <OButton
-            variant="ghost-destructive"
-            size="icon-sm"
-            icon-left="delete"
+            icon-only
+            variant="danger-ghost"
+            icon="delete"
             :data-test="`${dataTestPrefix}-row-${index}-remove-btn`"
             :aria-label="t('common.delete')"
             @click="removeRow(index)"
@@ -116,9 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <OButton
-      variant="dashed"
-      size="sm-action"
-      icon-left="add"
+      variant="ghost"
       class="self-start"
       :data-test="`${dataTestPrefix}-add-btn`"
       @click="addRow"

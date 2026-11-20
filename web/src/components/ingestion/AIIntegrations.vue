@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="compact" class="flex h-full min-h-0 flex-col">
     <div class="border-border-default shrink-0 border-b px-2">
-      <OTabs v-model="selectedCategory" dense>
+      <OTabs v-model="selectedCategory" size="compact">
         <OTab
           v-for="cat in aiCategories"
           :key="cat.slug"
@@ -33,11 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OButton
         variant="ghost"
-        size="sm"
         data-test="ai-integrations-list-mobile-btn"
         @click="listDrawerOpen = true"
       >
-        <template #icon-left><OIcon name="menu" size="sm" /></template>
+        <template #icon><OIcon name="menu" size="sm" /></template>
         {{ selectedIntegrationName || t("common.sidePanel") }}
       </OButton>
     </div>
@@ -61,7 +60,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSearchInput
             data-test="ai-integrations-search-input"
             v-model="integrationFilter"
-            clearable
             class="indexlist-search-input w-full"
             :placeholder="t('common.search')"
             :aria-label="t('common.search')"
@@ -71,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabs
             v-model="selectedIntegration"
             orientation="vertical"
-            dense
+            size="compact"
             class="px-1"
             @update:model-value="onIntegrationPicked"
           >
@@ -96,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <span
                   v-else
-                  class="rounded-default bg-theme-accent text-text-inverse text-3xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-bold"
+                  class="rounded-default bg-theme-accent text-text-inverse text-2xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-semibold"
                   aria-hidden="true"
                   >{{ integration.name.charAt(0) }}</span
                 >
@@ -113,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="h-full w-full">
         <div class="bg-surface-panel border-border-default h-full border-e">
           <div class="h-full overflow-y-auto pt-1.5">
-            <OTabs v-model="selectedCategory" orientation="vertical" dense class="px-1">
+            <OTabs v-model="selectedCategory" orientation="vertical" size="compact" class="px-1">
               <FirstSourcePickGroup
                 v-if="pickTab"
                 rail="ai"
@@ -143,7 +141,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSearchInput
                     data-test="ai-integrations-search-input"
                     v-model="integrationFilter"
-                    clearable
                     class="indexlist-search-input w-full"
                     :placeholder="t('common.search')"
                     :aria-label="t('common.search')"
@@ -153,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTabs
                     v-model="selectedIntegration"
                     orientation="vertical"
-                    dense
+                    size="compact"
                     class="px-1"
                     @update:model-value="navigateToIntegration"
                   >
@@ -179,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <span
                           v-else
-                          class="rounded-default bg-theme-accent text-text-inverse text-3xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-bold"
+                          class="rounded-default bg-theme-accent text-text-inverse text-2xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-semibold"
                           aria-hidden="true"
                           >{{ integration.name.charAt(0) }}</span
                         >
@@ -212,7 +209,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
-import { aiCategories } from "./ai/data";
+import { aiCategoriesWithLogos as aiCategories } from "./ai/cardLogos";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";

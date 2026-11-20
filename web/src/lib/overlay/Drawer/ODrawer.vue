@@ -1,7 +1,8 @@
 <script setup lang="ts">
+// Copyright 2026 OpenObserve Inc.
+
 import type { DrawerProps, DrawerEmits, DrawerSlots } from "./ODrawer.types";
 import {
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogOverlay,
@@ -25,39 +26,34 @@ import {
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OOverlayFooter from "@/lib/overlay/shared/OOverlayFooter.vue";
+import {
+  blockMultiFieldEnter,
+  outsideInteraction,
+  useDismissGuard,
+} from "@/lib/overlay/shared/useDismissGuard";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
-import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
+import { FORM_DIRTY_STATE_KEY, FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { useI18nTyped } from "@/types/i18n";
-import useBreakpoint from "@/composables/useBreakpoint";
 
 const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
-// Forward the consumer's `data-test` from <ODrawer data-test="…"> onto the
-// rendered panel so e2e selectors can scope to the specific drawer instance via
-// [data-test="<parent>"] [data-test="o-drawer-*-btn"].
-// (DialogRoot is renderless, so default attribute inheritance would lose it.)
+// DialogRoot is renderless, so the consumer's data-test is forwarded to the panel by hand.
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 const props = withDefaults(defineProps<DrawerProps>(), {
+  open: undefined,
+  dirty: false,
   persistent: false,
   side: "right",
   size: "md",
   bleed: false,
   showClose: true,
-  width: undefined,
   seamless: false,
-  primaryButtonDataTest: "o-drawer-primary-btn",
-  primaryButtonVariant: "primary",
-  secondaryButtonVariant: "outline",
-  neutralButtonVariant: "ghost",
-  primaryButtonDisabled: false,
-  secondaryButtonDisabled: false,
-  neutralButtonDisabled: false,
-  primaryButtonLoading: false,
-  secondaryButtonLoading: false,
-  neutralButtonLoading: false,
   lazy: true,
   portalTarget: undefined,
   anchor: undefined,
@@ -74,9 +70,7 @@ const slots = useSlots();
 const ESCAPE_KEEPS_OPEN =
   "input, textarea, select, [contenteditable], [data-reka-popper-content-wrapper]";
 
-// Mirrors the same controlled/uncontrolled pattern as ODialog — Vue
-// boolean-casts an absent `open` prop to `false`, locking reka-ui into
-// controlled-closed mode, so we manage state internally.
+// An absent `open` would otherwise lock reka in controlled-closed mode, so state lives here.
 const internalOpen = ref(props.open ?? false);
 
 watch(
@@ -124,135 +118,102 @@ function handleCloseAutoFocus(event: Event) {
   emit("after-close");
 }
 
-function handleOpenChange(v: boolean) {
-  if (!v && props.closeGuard?.() === false) return;
-  setOpen(v);
-}
-
 function setOpen(v: boolean) {
   internalOpen.value = v;
   emit("update:open", v);
 }
 
-function handleEscapeKeyDown(e: KeyboardEvent) {
-  const target = e.target instanceof Element ? e.target : null;
-  // A non-modal drawer sits beside live controls, so Escape there belongs to the field or open listbox.
-  const keepsOpen = !props.modal && target?.closest(ESCAPE_KEEPS_OPEN);
-  // A vetoed Escape must also cancel the library's own dismiss, or it closes on a second guard call.
-  if (props.persistent || keepsOpen || props.closeGuard?.() === false) {
-    e.preventDefault();
-    return;
-  }
-  setOpen(false);
-}
-
-function handleInteractOutside(e: Event) {
-  if (props.persistent || !props.modal) {
-    e.preventDefault();
-    return;
-  }
-
-  // Prevent the drawer from closing when a pointer-down lands inside a portaled
-  // floating element (e.g. a dropdown, select, combobox) that was opened from
-  // within the drawer. Those elements are teleported to document.body and
-  // therefore sit outside the DrawerContent DOM subtree, so reka-ui's
-  // DismissableLayer fires interactOutside for them — which would wrongly dismiss
-  // the drawer before the click on the item can register.
-  const originalEvent = (e as CustomEvent & { detail?: { originalEvent?: PointerEvent } }).detail
-    ?.originalEvent;
-  const target = originalEvent?.target as Element | null;
-  if (
-    target?.closest("[data-reka-popper-content-wrapper]") // reka-ui portals (ODropdown, OSelect, …)
-  ) {
-    e.preventDefault();
-    return;
-  }
-}
-
-// Stacking support: each nested ODrawer gets a higher z-index layer
+// Each nested ODrawer stacks one layer higher.
 const drawerDepth = inject<number>("o2DrawerDepth", 0);
 provide("o2DrawerDepth", drawerDepth + 1);
 
-// Auto loading: an OForm nested in the body (linked via `form-id`) mirrors its
-// `isSubmitting` into this ref, so the footer Save button shows its spinner
-// during an awaited @submit handler — no `:primary-button-loading` needed.
+// A nested OForm linked by `form-id` mirrors its submit and edit state here.
 const formSubmitting = ref(false);
 provide(FORM_SUBMIT_STATE_KEY, formSubmitting);
+const formDirty = ref(false);
+provide(FORM_DIRTY_STATE_KEY, formDirty);
+
+const busy = computed(
+  () =>
+    formSubmitting.value ||
+    !!props.primary?.loading ||
+    !!props.secondary?.loading ||
+    !!props.extra?.loading,
+);
+
+const guard = useDismissGuard({
+  dirty: () => props.dirty || formDirty.value,
+  locked: () => props.persistent || busy.value,
+  close: () => setOpen(false),
+});
+const asking = guard.asking;
+
+watch(internalOpen, (open) => {
+  if (!open) guard.keepEditing();
+});
+
+function handleOpenChange(v: boolean) {
+  if (v) setOpen(true);
+  else guard.requestDismiss();
+}
+
+function discardAndClose() {
+  emit("discard");
+  guard.discard();
+}
+
+function handleEscapeKeyDown(e: KeyboardEvent) {
+  e.preventDefault();
+  const target = e.target instanceof Element ? e.target : null;
+  // A non-modal drawer sits beside live controls, so Escape there belongs to the field or open listbox.
+  if (!props.modal && target?.closest(ESCAPE_KEEPS_OPEN)) return;
+  guard.requestDismiss();
+}
+
+function handleInteractOutside(e: Event) {
+  e.preventDefault();
+  if (!props.modal) return;
+  const outside = outsideInteraction(e);
+  if (outside === "dismiss") guard.requestDismiss();
+  else if (outside === "refocus") refocusInside(e);
+}
+
+// Focus code moved out of a modal overlay comes back to its first field, or to the panel itself.
+function refocusInside(e: Event) {
+  handleOpenAutoFocus(e);
+  nextTick(() => {
+    const panel = bodyRef.value?.closest<HTMLElement>("[data-o2-drawer]");
+    if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
+  });
+}
 
 const overlayZIndex = computed(() => 5999 + drawerDepth * 1000);
 const contentZIndex = computed(() => 6000 + drawerDepth * 1000);
 
-// Header renders when there is a header slot, a title, any sub-slot, OR a visible close button.
-const subtitleInHeader = computed(() => hasHeader.value && !slots.header);
+const closeShown = computed(() => props.showClose && !props.persistent);
 const hasHeader = computed(
   () =>
     !!slots.header ||
     !!slots["header-left"] ||
     !!slots["header-right"] ||
     !!props.title ||
-    props.showClose,
+    closeShown.value,
 );
-const hasFooter = computed(
-  () =>
-    !!slots.footer ||
-    !!props.primaryButtonLabel ||
-    !!props.secondaryButtonLabel ||
-    !!props.neutralButtonLabel,
-);
+const subtitleInHeader = computed(() => hasHeader.value && !slots.header);
 const hasTrigger = computed(() => !!slots.trigger);
 const isRight = computed(() => props.side !== "left");
+const hasTabs = computed(() => !!props.tabs?.length);
 
-// Fixed body inset (same token as ODialog's body) unless `bleed` is set. One
-// value app-wide → every drawer's content aligns identically. See the `bleed` prop.
-const bodyPaddingClass = computed(() =>
-  props.bleed ? "" : "px-dialog-content-px py-dialog-content-py",
-);
+// Fixed widths only (O3); under md a drawer takes the full width (R2).
+const sizeClasses: Record<NonNullable<DrawerProps["size"]>, string> = {
+  sm: "w-[min(30rem,100vw)]",
+  md: "w-[min(40rem,100vw)]",
+  lg: "w-[min(50rem,100vw)]",
+  xl: "w-[min(60rem,100vw)]",
+};
 
-// The primary button is loading when the consumer says so OR a nested OForm is
-// mid-submit (auto). Kept as a computed so the disabled logic below picks it up.
-const primaryLoading = computed(() => props.primaryButtonLoading || formSubmitting.value);
-
-// Auto-disable all buttons when any one of them is loading
-const anyButtonLoading = computed(
-  () => primaryLoading.value || props.secondaryButtonLoading || props.neutralButtonLoading,
-);
-
-const primaryEffectivelyDisabled = computed(
-  () => props.primaryButtonDisabled || anyButtonLoading.value,
-);
-const secondaryEffectivelyDisabled = computed(
-  () => props.secondaryButtonDisabled || anyButtonLoading.value,
-);
-const neutralEffectivelyDisabled = computed(
-  () => props.neutralButtonDisabled || anyButtonLoading.value,
-);
-
-// Width preset → CSS class
-const sizeClasses = computed(() => {
-  if (props.width) return "max-w-none";
-  switch (props.size) {
-    case "sm":
-      return "w-[min(22.5rem,100vw)]";
-    case "md":
-      return "w-[min(30rem,100vw)]";
-    case "lg":
-      return "w-[min(40rem,100vw)]";
-    case "xl":
-      return "w-[min(50rem,100vw)]";
-    case "xxl":
-      return "w-[min(62.5rem,100vw)]";
-    case "full":
-      return "w-screen";
-    default:
-      return "w-[min(30rem,100vw)]";
-  }
-});
-
-// When portaled into a specific container, use absolute positioning scoped to that element.
+// Contained in `portalTarget`: positioned inside that element's bounds instead of the window.
 const isContained = computed(() => !!props.portalTarget);
-
-// Explicit width override — vw when full-viewport, % when container-scoped
-const { isMobile } = useBreakpoint();
 
 // Measured, not CSS: the drawer is portaled to <body>, away from its anchor row.
 const anchorTop = ref(0);
@@ -286,22 +247,11 @@ const anchorStyle = computed(() => {
   return style;
 });
 const overlayStyle = computed(() => ({ zIndex: overlayZIndex.value, ...anchorStyle.value }));
+const contentStyle = computed(() => ({ zIndex: contentZIndex.value, ...anchorStyle.value }));
 
-const contentStyle = computed(() => {
-  const style: Record<string, string | number> = {
-    zIndex: contentZIndex.value,
-    ...anchorStyle.value,
-  };
-  if (props.width != null) {
-    const w = isMobile.value ? Math.min(100, Math.max(88, props.width)) : props.width;
-    style.width = isContained.value ? `${w}%` : `${w}vw`;
-  }
-  return style;
-});
-
-// ── Auto-focus logic ─────────────────────────────────────────────────────────
+// ── Auto-focus ───────────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
-const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
+const footerRef = ref<InstanceType<typeof OOverlayFooter> | null>(null);
 const AUTOFOCUS_TEXT_FIELDS = [
   'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
   "textarea:not([disabled])",
@@ -325,60 +275,28 @@ function handleOpenAutoFocus(event: Event) {
   // The panel is still translated off-screen by the slide-in, so a scrolling focus would drag a contained portal target sideways.
   nextTick(() => {
     const body = bodyRef.value;
-    const field = body ? findAutoFocusTarget(body) : null;
-    if (field) {
-      field.focus({ preventScroll: true });
-      return;
-    }
-    const autofocus = body?.querySelector<HTMLElement>("[autofocus]");
-    if (autofocus) {
-      autofocus.focus({ preventScroll: true });
-      return;
-    }
-    const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
-    if (btnEl) {
-      btnEl.focus({ preventScroll: true });
-      return;
-    }
-    body?.closest<HTMLElement>("[data-o2-drawer]")?.focus({ preventScroll: true });
+    const target =
+      (body && findAutoFocusTarget(body)) ??
+      body?.querySelector<HTMLElement>("[autofocus]") ??
+      footerRef.value?.initialFocusTarget() ??
+      body?.closest<HTMLElement>("[data-o2-drawer]");
+    target?.focus({ preventScroll: true });
   });
 }
 
-// ── Focus-trap workaround for portaled elements ─────────────────────────────
-// reka-ui's modal DialogContent wraps content in a FocusScope that listens for
-// both `focusin` AND `focusout` on `document` (bubble phase) and pulls focus
-// back whenever it moves outside the DrawerContent DOM. reka-ui portals
-// (ODropdown, OSelect listbox, …) are teleported to <body> and therefore sit
-// outside the FocusScope container.
-//
-// The `focusout` handler fires FIRST (when focus leaves the dialog) and checks
-// `relatedTarget` — if it's outside the container it immediately steals focus
-// back, so the `focusin` on the portal element never even gets a chance.
-//
-// Fix: while the drawer is open, intercept both events on `document.body` and
-// call `stopPropagation()` for events involving a known portal wrapper.  Since
-// body is below document in the DOM, this prevents the events from reaching
-// FocusScope's document-level handlers.
+// ── Focus trap and portaled popups ───────────────────────────────────────────
+// reka's FocusScope listens on document; stopping the events at <body> keeps it from stealing focus back.
 watchEffect((cleanup) => {
   if (!shown.value) return;
 
-  function isPortalElement(el: Element | null): boolean {
-    return !!el?.closest("[data-reka-popper-content-wrapper]");
-  }
+  const isPortalElement = (el: Element | null) =>
+    !!el?.closest("[data-reka-popper-content-wrapper]");
 
   const handleFocusIn = (e: FocusEvent) => {
-    if (isPortalElement(e.target as Element | null)) {
-      e.stopPropagation();
-    }
+    if (isPortalElement(e.target as Element | null)) e.stopPropagation();
   };
-
-  // focusout fires when focus LEAVES an element; relatedTarget is where
-  // focus is moving TO.  If it's heading to a portal, stop propagation so
-  // FocusScope's handleFocusOut doesn't steal it back.
   const handleFocusOut = (e: FocusEvent) => {
-    if (isPortalElement(e.relatedTarget as Element | null)) {
-      e.stopPropagation();
-    }
+    if (isPortalElement(e.relatedTarget as Element | null)) e.stopPropagation();
   };
 
   document.body.addEventListener("focusin", handleFocusIn);
@@ -409,11 +327,12 @@ watch(shown, (open) => {
     detachShadow();
   }
 });
+
+const activeTab = computed(() => props.tab ?? props.tabs?.[0]?.value ?? "");
 </script>
 
 <template>
   <DialogRoot :open="shown" :modal="modal" @update:open="handleOpenChange">
-    <!-- Trigger slot — omit when controlling via v-model:open -->
     <DialogTrigger v-if="hasTrigger" as-child>
       <slot name="trigger" />
     </DialogTrigger>
@@ -424,7 +343,6 @@ watch(shown, (open) => {
       :disabled="inline"
       :force-mount="inline ? true : undefined"
     >
-      <!-- Overlay / scrim — same z-index as ODialog -->
       <DialogOverlay
         data-test="o-drawer-overlay"
         :class="[
@@ -432,34 +350,26 @@ watch(shown, (open) => {
           seamless ? 'pointer-events-none bg-transparent' : 'bg-dialog-overlay',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=open]:duration-(--duration-dialog-in)',
+          'data-[state=closed]:animation-duration-(--duration-drawer-out) data-[state=open]:animation-duration-(--duration-drawer-in)',
         ]"
         :style="overlayStyle"
       />
 
-      <!-- Drawer panel -->
       <DialogContent
         :force-mount="inline ? true : undefined"
-        v-bind="subTitle && subtitleInHeader ? {} : { 'aria-describedby': undefined }"
+        v-bind="subtitle && subtitleInHeader ? {} : { 'aria-describedby': undefined }"
         data-o2-drawer
+        :data-o2-drawer-size="size"
         :data-test="parentDataTest || 'o-drawer-panel'"
         :style="contentStyle"
         :class="[
-          // Full-height, anchored to chosen edge
           isContained ? 'absolute inset-y-0' : 'fixed inset-y-0',
           isRight ? 'right-0' : 'left-0',
-          // Flex column so header/footer are shrink-0 and body scrolls
-          isContained
-            ? 'flex h-full flex-col overflow-hidden'
-            : 'flex max-h-screen flex-col overflow-hidden',
-          sizeClasses,
-          // Surface — reuse dialog tokens (same visual language)
-          'bg-dialog-bg text-dialog-content-text',
-          isRight
-            ? 'border-dialog-border border-s border-t'
-            : 'border-dialog-border border-e border-t',
-          'shadow-dialog',
-          // Focus ring
+          isContained ? 'h-full' : 'max-h-screen',
+          'flex flex-col overflow-hidden max-md:w-full',
+          sizeClasses[size],
+          'bg-dialog-bg text-dialog-content-text shadow-dialog border-dialog-border',
+          isRight ? 'rounded-s-surface border-s' : 'rounded-e-surface border-e',
           'focus-visible:ring-dialog-focus-ring outline-none focus-visible:ring-2',
           isRight
             ? [
@@ -470,190 +380,134 @@ watch(shown, (open) => {
                 'data-[state=open]:animate-in data-[state=open]:slide-in-from-left',
                 'data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left',
               ],
-          'data-[state=open]:duration-(--duration-dialog-in) data-[state=open]:ease-(--ease-out-expo)',
-          'data-[state=closed]:duration-(--duration-dialog-out) data-[state=closed]:ease-(--ease-overlay-out)',
+          'data-[state=open]:animation-duration-(--duration-drawer-in) data-[state=open]:ease-(--ease-out-expo)',
+          'data-[state=closed]:animation-duration-(--duration-drawer-out) data-[state=closed]:ease-(--ease-overlay-out)',
         ]"
         @escape-key-down="handleEscapeKeyDown"
         @interact-outside="handleInteractOutside"
         @open-auto-focus="handleOpenAutoFocus"
         @close-auto-focus="handleCloseAutoFocus"
       >
-        <!-- Accessibility: hidden title required by Reka UI -->
         <DialogTitle class="sr-only absolute">
           {{ ariaLabel ?? title ?? t("common.drawer") }}
         </DialogTitle>
 
-        <!-- ── Header ───────────────────────────────────────── -->
         <div
           v-if="hasHeader"
           :class="[
             'flex shrink-0 items-center gap-2',
             'px-dialog-header-px py-dialog-header-py',
             'bg-dialog-header-bg text-dialog-header-text',
-            'border-dialog-header-border border-b',
+            !hasTabs && 'border-dialog-header-border border-b',
           ]"
         >
-          <!-- CASE 1: Full override — backward compat, sub-slots are ignored -->
           <div v-if="slots.header" class="min-w-0 flex-1">
             <slot name="header" />
           </div>
 
-          <!-- CASE 2: Default / structured layout -->
           <template v-else>
-            <!-- Below lg a subtitle longer than the panel must truncate, or it pushes the close button off screen. -->
-            <div v-if="title || subTitle" class="min-w-0 shrink-0 max-lg:shrink">
+            <!-- Below lg a long subtitle truncates, or it pushes the close button off screen. -->
+            <div v-if="title || subtitle" class="min-w-0 shrink-0 max-lg:shrink">
               <OTruncatedText
                 v-if="title"
-                class="text-dialog-header-text block text-base font-semibold"
+                class="text-dialog-header-text text-title block font-semibold"
                 :data-test="titleDataTest"
               >
                 {{ title }}
               </OTruncatedText>
-              <!-- The visible subtitle is the description, so screen readers and text queries meet it once. -->
-              <DialogDescription v-if="subTitle" as-child>
+              <!-- The visible subtitle is the description, so screen readers meet it once. -->
+              <DialogDescription v-if="subtitle" as-child>
                 <OTruncatedText
-                  class="text-dialog-content-text mt-0.5 block text-xs opacity-70"
-                  :data-test="subTitleDataTest"
+                  class="text-text-secondary text-compact block"
+                  :data-test="subtitleDataTest"
                 >
-                  {{ subTitle }}
+                  {{ subtitle }}
                 </OTruncatedText>
               </DialogDescription>
             </div>
 
-            <!-- #header-left sub-slot — grows to fill space if present -->
             <div
               v-if="slots['header-left']"
               class="flex min-w-0 flex-1 items-center justify-start gap-2"
             >
               <slot name="header-left" />
             </div>
+            <div v-else class="flex-1" />
 
-            <!-- Spacer — fills gap when #header-left is absent; pushes header-right toward the close button -->
-            <div v-if="!slots['header-left']" class="flex-1" />
-
-            <!-- #header-right sub-slot — shrinks to content width, anchored just before the close button -->
             <div v-if="slots['header-right']" class="flex shrink-0 items-center gap-2">
               <slot name="header-right" />
             </div>
           </template>
 
-          <!-- Close button — always shrink-0 at the far right -->
-          <DialogClose v-if="showClose" as-child>
-            <button
-              type="button"
-              :aria-label="t('components.drawer.closeDrawer')"
-              data-test="o-drawer-close-btn"
-              @mousedown.prevent
-              :class="[
-                'flex shrink-0 items-center justify-center',
-                'rounded-default h-7 w-7',
-                'text-dialog-close-text',
-                'hover:bg-dialog-close-hover-bg',
-                'active:bg-dialog-close-active-bg',
-                'transition-colors duration-150',
-                'focus-visible:ring-dialog-focus-ring focus-visible:ring-2 focus-visible:outline-none',
-                'cursor-pointer',
-              ]"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </DialogClose>
+          <OButton
+            v-if="closeShown"
+            variant="ghost"
+            size="sm"
+            icon="close"
+            icon-only
+            :label="t('components.drawer.closeDrawer')"
+            :disabled="busy"
+            data-test="o-drawer-close-btn"
+            @mousedown.prevent
+            @click="guard.requestDismiss()"
+          />
         </div>
 
-        <!-- ── Content (scrollable body) ───────────────────── -->
-        <!-- flex-1 + min-h-0: body fills remaining height so the footer always sticks to the bottom -->
+        <div v-if="hasTabs" class="bg-dialog-header-bg shrink-0">
+          <OTabs
+            :model-value="activeTab"
+            size="compact"
+            bordered
+            data-test="o-drawer-tabs"
+            @update:model-value="emit('update:tab', String($event))"
+          >
+            <OTab
+              v-for="item in tabs"
+              :key="item.value"
+              :name="item.value"
+              :label="item.label"
+              :count="item.count"
+              :data-test="item.dataTest"
+            />
+          </OTabs>
+        </div>
+
+        <!-- The body fills the remaining height, so the footer always sits at the bottom (O6). -->
         <div
           ref="bodyRef"
           :class="[
             'min-h-0 flex-1 overflow-x-hidden overflow-y-auto',
             'text-dialog-content-text',
-            bodyPaddingClass,
+            !bleed && 'px-dialog-content-px py-dialog-content-py',
             canScrollUp && 'shadow-scroll-top',
             canScrollDown && 'shadow-scroll-bottom',
             canScrollUp && canScrollDown && 'shadow-scroll-both',
           ]"
+          @keydown="blockMultiFieldEnter"
         >
           <template v-if="!props.lazy || internalOpen">
             <slot />
           </template>
         </div>
 
-        <!-- ── Footer ───────────────────────────────────────── -->
-        <div
-          v-if="hasFooter"
-          :class="[
-            'shrink-0',
-            'px-dialog-footer-px py-dialog-footer-py',
-            'bg-dialog-footer-bg',
-            'border-dialog-footer-border border-t',
-            'border-dialog-footer-border border-b',
-          ]"
+        <OOverlayFooter
+          ref="footerRef"
+          test-prefix="o-drawer"
+          :primary="primary"
+          :secondary="secondary"
+          :extra="extra"
+          :form-id="formId"
+          :form-submitting="formSubmitting"
+          :asking="asking"
+          @primary="emit('click:primary')"
+          @secondary="emit('click:secondary')"
+          @extra="emit('click:extra')"
+          @keep="guard.keepEditing()"
+          @discard="discardAndClose"
         >
-          <!-- ── Built-in footer buttons ──────────────────────────────────────── -->
-          <div v-if="!slots.footer" class="flex items-center justify-between gap-2">
-            <!-- Left: neutral button -->
-            <div>
-              <OButton
-                v-if="neutralButtonLabel"
-                data-test="o-drawer-neutral-btn"
-                :variant="neutralButtonVariant"
-                size="sm-action"
-                :disabled="neutralEffectivelyDisabled"
-                :loading="neutralButtonLoading"
-                @click="emit('click:neutral')"
-              >
-                {{ neutralButtonLabel }}
-              </OButton>
-            </div>
-
-            <!-- Right: secondary + primary -->
-            <div class="flex items-center gap-2">
-              <OButton
-                v-if="secondaryButtonLabel"
-                data-test="o-drawer-secondary-btn"
-                :variant="secondaryButtonVariant"
-                size="sm-action"
-                :disabled="secondaryEffectivelyDisabled"
-                :loading="secondaryButtonLoading"
-                @mousedown.prevent
-                @click="emit('click:secondary')"
-              >
-                {{ secondaryButtonLabel }}
-              </OButton>
-              <OButton
-                v-if="primaryButtonLabel"
-                ref="primaryBtnRef"
-                :data-test="primaryButtonDataTest"
-                :variant="primaryButtonVariant"
-                size="sm-action"
-                :type="formId ? 'submit' : 'button'"
-                :form="formId || undefined"
-                :disabled="primaryEffectivelyDisabled"
-                :loading="primaryLoading"
-                @click="!formId && emit('click:primary')"
-              >
-                {{ primaryButtonLabel }}
-              </OButton>
-            </div>
-          </div>
-
-          <!-- Custom footer slot (takes over entirely when provided) -->
-          <slot v-else name="footer" />
-        </div>
+          <template v-if="slots.footer" #footer><slot name="footer" /></template>
+          <template v-if="slots['footer-left']" #footer-left><slot name="footer-left" /></template>
+        </OOverlayFooter>
       </DialogContent>
     </DialogPortal>
   </DialogRoot>

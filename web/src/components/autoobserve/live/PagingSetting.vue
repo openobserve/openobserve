@@ -37,9 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The save status shares the link's row, so it takes no space of its own until it speaks. -->
     <div class="flex min-h-6 flex-wrap items-center gap-x-3 gap-y-1">
       <OButton
-        variant="ghost-primary"
-        size="xs"
-        icon-right="arrow-forward"
+        variant="accent-ghost"
+        size="sm"
+        icon-end="arrow-forward"
         class="-ms-2"
         data-test="autoobserve-paging-routing"
         @click="openRouting"

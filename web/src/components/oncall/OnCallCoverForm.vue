@@ -27,11 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="open"
     :title="mode === 'swap' ? t('oncall.swapTitle') : t('oncall.coverTitle')"
-    :primary-button-label="t('oncall.save')"
-    :secondary-button-label="t('oncall.cancel')"
+    :primary="{
+      label: t('oncall.save'),
+      disabled: mode === 'swap' ? !swapReady : false,
+      loading: saving,
+    }"
+    :secondary="{ label: t('oncall.cancel') }"
     :form-id="mode === 'swap' ? undefined : FORM_ID"
-    :primary-button-loading="saving"
-    :primary-button-disabled="mode === 'swap' ? !swapReady : false"
     data-test="oncall-cover-dialog"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:primary="mode === 'swap' ? submitSwap() : undefined"
@@ -41,10 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          trade weeks" — because a swap expressed as two covers is two dialogs,
          two datetime ranges and a chance to get the second one wrong. -->
     <OToggleGroup v-if="shifts.length" v-model="mode" class="mb-4" data-test="oncall-cover-mode">
-      <OToggleGroupItem value="cover" size="sm" data-test="oncall-cover-mode-cover">
+      <OToggleGroupItem value="cover" data-test="oncall-cover-mode-cover">
         {{ t("oncall.coverModeCover") }}
       </OToggleGroupItem>
-      <OToggleGroupItem value="swap" size="sm" data-test="oncall-cover-mode-swap">
+      <OToggleGroupItem value="swap" data-test="oncall-cover-mode-swap">
         {{ t("oncall.coverModeSwap") }}
       </OToggleGroupItem>
     </OToggleGroup>
@@ -69,14 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Exactly what the two writes will do, named both ways round: a swap
            that says only "Ana and Bo swap" leaves the reader to work out which
            week each of them ends up holding. -->
-      <OBanner v-if="swapSummary" variant="info" data-test="oncall-swap-summary">
+      <OInlineNotice v-if="swapSummary" tone="info" data-test="oncall-swap-summary">
         <i18n-t keypath="oncall.swapSummary" tag="span" scope="global">
           <template #first><OnCallPersonName :email="swapSummary.first" /></template>
           <template #second><OnCallPersonName :email="swapSummary.second" /></template>
           <template #firstWhen>{{ swapSummary.firstWhen }}</template>
           <template #secondWhen>{{ swapSummary.secondWhen }}</template>
         </i18n-t>
-      </OBanner>
+      </OInlineNotice>
       <p
         v-else-if="swapProblem"
         class="text-status-warning-text text-sm"
@@ -154,8 +156,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-for="preset in PRESETS"
                 :key="preset.key"
-                :variant="activePreset === preset.key ? 'outline-primary' : 'outline'"
-                size="xs"
+                :pressed="activePreset === preset.key"
+                variant="secondary"
+                size="sm"
                 :aria-pressed="activePreset === preset.key"
                 :data-test="`oncall-cover-preset-${preset.key}`"
                 @click="applyPreset(preset.key)"
@@ -168,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- What this will actually do, in the team's own clock, before saving. -->
-      <OBanner v-if="summary" variant="info" data-test="oncall-cover-summary">
+      <OInlineNotice v-if="summary" tone="info" data-test="oncall-cover-summary">
         <i18n-t
           :keypath="summary.holder ? 'oncall.coverSummaryFor' : 'oncall.coverSummaryOn'"
           tag="span"
@@ -183,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </i18n-t>
         {{ raw(" ") }}
         <span class="text-text-secondary">{{ t("oncall.coverSummaryAfter") }}</span>
-      </OBanner>
+      </OInlineNotice>
     </OForm>
   </ODialog>
 </template>
@@ -192,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, watch } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import type { DateTimeRangeValue } from "@/lib/forms/DateTime/OFormDateTimeRange.types";
 import OFormDateTimeRange from "@/lib/forms/DateTime/OFormDateTimeRange.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";

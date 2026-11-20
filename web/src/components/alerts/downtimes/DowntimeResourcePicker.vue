@@ -23,15 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         :model-value="refineBy"
         class="w-44"
-        size="sm"
         :options="dimensionOptions"
         searchable
         data-test="downtime-resource-picker-dimension"
         @update:model-value="pickDimension"
       />
       <OButton
-        variant="outline"
-        size="sm"
+        variant="secondary"
         :loading="loading"
         :disabled="!canLoad"
         data-test="downtime-resource-picker-load"
@@ -44,11 +42,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
 
-    <OBanner
+    <OInlineNotice
       v-if="response && response.total > MAX_VALUES"
-      variant="warning"
-      dense
-      :content="t('alerts.downtimes.resources.tooMany', { count: response.total })"
+      tone="warn"
+      :message="t('alerts.downtimes.resources.tooMany', { count: response.total })"
       data-test="downtime-resource-picker-too-many"
     />
 
@@ -72,7 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         selection="multiple"
         pagination="none"
         :fill-height="false"
-        :show-global-filter="false"
         max-height="18rem"
         data-test="downtime-resource-picker-table"
       >
@@ -107,8 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex gap-2">
           <OButton
             v-if="response"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="downtime-resource-picker-cancel"
             @click="close"
           >
@@ -116,7 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             :disabled="selected.length === 0"
             data-test="downtime-resource-picker-apply"
             @click="apply"
@@ -145,7 +139,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";

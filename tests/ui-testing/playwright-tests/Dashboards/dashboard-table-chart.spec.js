@@ -519,10 +519,10 @@ test.describe("Dashboard Table Chart - Core Features", () => {
       await streamPromise;
       await pm.chartTypeSelector.waitForTableDataLoad();
 
-      // Screenshot shows "1-7 of 7" at bottom right of table
+      // The footer reads "1–7 of 7" at bottom right of table
       const table = pm.dashboardPanelActions.dashboardTable;
       const tableText = await table.textContent();
-      const hasRowCountInfo = /\d+-\d+\s+of\s+\d+/.test(tableText);
+      const hasRowCountInfo = /[\d,]+\s*[-–]\s*[\d,]+\s+of\s+[\d,]+/.test(tableText);
       expect(hasRowCountInfo).toBe(true);
 
       testLogger.info("Row count info displayed at bottom of table");

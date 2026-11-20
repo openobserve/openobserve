@@ -179,3 +179,15 @@ describe("EditorDraftLeaveDialog", () => {
     expect(button("o-dialog-secondary-btn")?.hasAttribute("disabled")).toBe(true);
   });
 });
+
+describe("EditorDraftLeaveDialog save reason", () => {
+  it("keeps Save visible but disabled, saying why, when the editor is invalid (V4)", async () => {
+    await mountDialog({ saveDisabledReason: raw("Fix 2 errors to save") });
+    const save = button("editor-draft-leave-save");
+    expect(save).not.toBeNull();
+    expect(save?.getAttribute("aria-disabled")).toBe("true");
+    click("editor-draft-leave-save");
+    await flushPromises();
+    expect(wrapper?.emitted("choose")).toBeFalsy();
+  });
+});

@@ -232,7 +232,6 @@ function onRow(row: HuntRow) {
     :sort-order="sort.order"
     :loading="loading || plansLoading"
     :error="error || null"
-    :show-global-filter="false"
     class="min-h-0 flex-1"
     data-test="security-events-hunt-table"
     @pagination-change="onPage"
@@ -258,9 +257,8 @@ function onRow(row: HuntRow) {
           @clear="run()"
         />
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="manage-search"
+          variant="secondary"
+          icon="manage-search"
           :disabled="!value.trim()"
           data-test="security-events-hunt-run"
           @click="run()"
@@ -269,16 +267,16 @@ function onRow(row: HuntRow) {
         </OButton>
         <OTag
           v-if="kind === 'user' && aliases.length"
-          variant="default-soft"
+          tone="neutral"
           size="sm"
           data-test="security-events-hunt-aliases"
           >{{ t("siem.events.hunt.aliases", aliases.length)
           }}<OTooltip :content="raw(aliases.join(', '))" />
           <template #trailing>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
-              icon-left="close"
+              icon="close"
               data-test="security-events-hunt-aliases-clear"
               @click="clearAliases"
             >
@@ -297,16 +295,16 @@ function onRow(row: HuntRow) {
         <OTag
           v-for="s in perSource"
           :key="s.stream"
-          variant="default-soft"
-          size="xs"
-          class="font-mono"
+          tone="neutral"
+          mono
+          size="sm"
           :data-test="`security-events-hunt-source-${s.stream}`"
           >{{ s.stream }} · {{ formatEventCount(s.n) }}</OTag
         >
         <OTag
           v-if="uncounted.length"
-          variant="warning-soft"
-          size="xs"
+          tone="warn"
+          size="sm"
           data-test="security-events-hunt-uncounted"
           >{{ t("siem.events.hunt.uncounted", { streams: uncounted.join(", ") }) }}</OTag
         >
@@ -319,10 +317,10 @@ function onRow(row: HuntRow) {
       }}</span>
     </template>
     <template #cell-source="{ row }">
-      <OTag variant="default-soft" size="xs" class="font-mono">{{ row.source }}</OTag>
+      <OTag tone="neutral" mono size="sm">{{ row.source }}</OTag>
     </template>
     <template #cell-outcome="{ row }">
-      <OTag v-if="row.outcome === 'failure'" variant="error-soft" size="xs">{{
+      <OTag v-if="row.outcome === 'failure'" tone="err" size="sm">{{
         t("siem.outcome.failure")
       }}</OTag>
       <span v-else class="text-text-secondary">—</span>
@@ -340,10 +338,9 @@ function onRow(row: HuntRow) {
       />
       <OEmptyState
         v-else-if="!loading"
-        size="block"
         icon="manage-search"
         :title="searched ? t('siem.events.hunt.noMatches') : t('siem.events.hunt.title')"
-        :description="searched ? t('siem.events.hunt.noMatchesHint') : t('siem.events.hunt.hint')"
+        :text="searched ? t('siem.events.hunt.noMatchesHint') : t('siem.events.hunt.hint')"
         data-test="security-events-hunt-empty"
       />
     </template>

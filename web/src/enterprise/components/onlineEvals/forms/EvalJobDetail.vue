@@ -1,12 +1,12 @@
 <template>
   <ODrawer
+    size="xl"
     bleed
     :open="open"
     side="right"
-    :width="70"
     :title="raw(row?.name)"
     :title-data-test="'eval-job-detail-name-badge'"
-    :sub-title="t('onlineEvals.job.detail.eyebrow')"
+    :subtitle="t('onlineEvals.job.detail.eyebrow')"
     data-test="eval-job-detail"
     @update:open="handleOpenChange"
   >
@@ -26,12 +26,9 @@
           class="flex-none"
           data-test="eval-job-detail-window"
         />
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+        <ORefreshButton
+          :last-run-at="lastRunAt"
           :loading="isLoadingKpis || isLoadingRuns"
-          :title="t('onlineEvals.job.detail.refresh')"
           data-test="eval-job-detail-refresh"
           @click="refreshAll"
         />
@@ -58,7 +55,7 @@
             {{ card.label }}
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
-            <span class="text-text-secondary text-2xl leading-none font-bold">
+            <span class="text-text-secondary text-2xl leading-none font-semibold">
               {{ card.value }}
             </span>
             <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
@@ -168,20 +165,12 @@
                 <span class="text-2xs text-text-secondary font-medium">{{
                   t("onlineEvals.job.detail.filterLabel")
                 }}</span>
-                <OButton
+                <OCopyButton
                   v-if="filterText"
-                  variant="ghost-muted"
-                  size="icon-xs-sq"
+                  size="sm"
                   data-test="eval-job-detail-filter-copy-btn"
-                  @click="
-                    copyToClipboard(filterText, t, {
-                      successMessage: t('common.copySuccess'),
-                    })
-                  "
-                >
-                  <OIcon name="content-copy" size="sm" />
-                  <OTooltip :content="t('common.copy')" />
-                </OButton>
+                  :value="filterText"
+                />
               </div>
               <!-- Hard cap the filter condition height; longer conditions scroll. -->
               <pre
@@ -200,7 +189,7 @@
             </h4>
             <OEmptyState
               v-if="resolvedScorers.length === 0"
-              size="inline"
+              size="compact"
               :title="t('onlineEvals.job.detail.scorersEmpty')"
               data-test="eval-job-detail-scorers-empty"
             />
@@ -248,7 +237,7 @@
                   </span>
                   <div class="flex min-w-0 flex-1 flex-col gap-1.25">
                     <div class="flex flex-wrap items-center gap-2">
-                      <span class="text-text-heading text-sm font-bold">{{ item.name }}</span>
+                      <span class="text-text-heading text-sm font-semibold">{{ item.name }}</span>
                       <OTag
                         v-if="item.scorerTypeLabel"
                         type="scorerType"
@@ -270,7 +259,7 @@
                       <span class="font-medium">
                         {{ t("onlineEvals.job.detail.producesPrefix") }}
                       </span>
-                      <span class="text-text-body font-bold">{{ item.scoreConfigName }}</span>
+                      <span class="text-text-body font-semibold">{{ item.scoreConfigName }}</span>
                       <template v-if="item.scoreConfigDataType">
                         <span class="text-text-secondary opacity-50">·</span>
                         <span class="text-text-secondary">
@@ -393,13 +382,9 @@
             row-key="id"
             :loading="isLoadingRuns"
             :loading-reset-key="jobIdRef"
-            :show-global-filter="false"
-            :show-footer="false"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.job.detail.runs.empty')"
-            show-index
-            width="100%"
             class="w-full"
             v-on="rowClickListeners"
           >
@@ -463,13 +448,9 @@
             row-key="id"
             :loading="isLoadingRuns"
             :loading-reset-key="jobIdRef"
-            :show-global-filter="false"
-            :show-footer="false"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.job.detail.failures.recentEmpty')"
-            show-index
-            width="100%"
             class="w-full"
             v-on="rowClickListeners"
           >
@@ -521,7 +502,9 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { useLoadedAt } from "@/composables/useLoadedAt";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -533,7 +516,6 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import JobWorkloadTab from "./job/JobWorkloadTab.vue";
-import { copyToClipboard } from "@/utils/clipboard";
 import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -904,6 +886,7 @@ function openEvaluationRun(run: JobRunRow) {
 }
 
 const refreshToken = ref(0);
+const lastRunAt = useLoadedAt(() => isLoadingKpis.value || isLoadingRuns.value);
 
 async function refreshAll() {
   syncDateWindow();

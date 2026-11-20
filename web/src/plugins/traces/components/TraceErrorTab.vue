@@ -17,10 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OEmptyState
     v-if="!hasSpanError"
-    size="inline"
-    variant="no-results"
+    icon="task-alt"
     :title="t('traces.noErrorPresent')"
-    hide-action
     data-test="trace-details-sidebar-no-error"
   />
   <!-- Error Summary: HTTP / gRPC status code -->
@@ -61,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="trace-details-sidebar-db-response-status-code"
   >
     <div class="flex-col items-center gap-1">
-      <div class="text-text-label! text-3xs w-full ps-2 pb-0.5 tracking-[0.03rem]">
+      <div class="text-text-label! text-2xs w-full ps-2 pb-0.5 tracking-[0.03rem]">
         {{ t("traces.traceErrorTab.dbResponseStatusCode") }}
       </div>
       <div class="flex items-center ps-2">
@@ -82,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="trace-details-sidebar-process-exit-code"
   >
     <div class="flex-col items-center gap-1">
-      <div class="text-text-label! text-3xs w-full ps-2 pb-0.5 tracking-[0.03rem]">
+      <div class="text-text-label! text-2xs w-full ps-2 pb-0.5 tracking-[0.03rem]">
         {{ t("traces.traceErrorTab.processExitCode") }}
       </div>
       <div class="flex items-center ps-2">
@@ -105,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="mb-1 flex items-center gap-2">
       <OIcon name="error" size="sm" class="text-status-error-text" />
       <span
-        class="text-status-error-text text-base font-semibold"
+        class="text-status-error-text text-sm font-semibold"
         data-test="trace-details-sidebar-error-summary-title"
       >
         {{ errorBannerTitle }}
@@ -132,7 +130,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :default-columns="false"
       row-key="_index"
       pagination="none"
-      :show-global-filter="false"
       expansion="multiple"
       :expanded-ids="expandedExceptionIds"
       @update:expanded-ids="expandedExceptionIds = $event"
@@ -186,17 +183,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-text-secondary block text-sm font-semibold">{{
                   t("traces.stacktraceLabel")
                 }}</span>
-                <OButton
+                <OCopyButton
                   v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
-                  variant="secondary"
-                  size="icon-sm"
                   class="copy-btn"
                   data-test="exception-copy-stacktrace-btn"
-                  @click="copyStackTrace(row['exception.stacktrace'])"
-                >
-                  <OIcon name="content-copy" size="sm" />
-                  <OTooltip :content="t('traces.copyStacktrace')" />
-                </OButton>
+                  variant="secondary"
+                  size="md"
+                  :label="t('traces.copyStacktrace')"
+                  :value="row['exception.stacktrace']"
+                />
               </div>
               <div
                 v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
@@ -208,14 +203,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-html="formatStackTrace(row['exception.stacktrace'])"
                 />
               </div>
-              <div
+              <OEmptyState
                 v-else
-                class="bg-code-bg text-text-muted border-border-default rounded-default flex items-center justify-center border border-dashed px-3 py-4 text-xs italic"
+                size="compact"
+                icon="info-outline"
+                :title="t('traces.noStacktraceAvailable')"
                 data-test="exception-stacktrace-empty"
-              >
-                <OIcon name="info" size="sm" class="me-1" />
-                <span>{{ t("traces.noStacktraceAvailable") }}</span>
-              </div>
+              />
             </div>
           </div>
         </div>
@@ -232,14 +226,12 @@ import { formatTimestampNs } from "@/utils/date";
 import { escapeHtml } from "@/utils/html";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
-import { copyToClipboard } from "@/utils/clipboard";
 
 const props = defineProps<{
   span: object;
@@ -531,15 +523,6 @@ function formatExceptionMessage(message: any) {
     }
   }
   return message;
-}
-
-function copyStackTrace(stacktrace: string) {
-  if (!stacktrace) return;
-  copyToClipboard(stacktrace, t, {
-    successMessage: t("traces.stacktraceCopied"),
-    errorMessage: t("traces.stacktraceCopyFailed"),
-    timeout: 2000,
-  });
 }
 </script>
 

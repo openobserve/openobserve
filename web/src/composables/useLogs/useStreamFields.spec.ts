@@ -363,6 +363,59 @@ describe("useStreamFields Composable", () => {
     });
   });
 
+  describe("updateGridColumns for SQL results", () => {
+    const { searchObj } = searchState();
+
+    beforeEach(() => {
+      searchObj.meta.sqlMode = true;
+      searchObj.meta.isFtsDefaultColumn = false;
+      searchObj.data.stream.selectedFields = [];
+      searchObj.data.stream.selectedStream = ["app_logs"];
+    });
+
+    afterEach(() => {
+      searchObj.meta.sqlMode = false;
+    });
+
+    const columns = () =>
+      searchObj.data.resultGrid.columns.map((column: any) => ({
+        id: column.id,
+        closable: column.meta?.closable,
+      }));
+
+    it("shows an aggregate's rows as its own columns, not one source blob", () => {
+      searchObj.data.query = 'SELECT service, count(*) FROM "app_logs" GROUP BY service';
+      searchObj.data.queryResults = {
+        hits: [
+          { service: "auth", "count(*)": 3 },
+          { service: "cart", "count(*)": 5 },
+        ],
+      } as any;
+
+      wrapper.vm.updateGridColumns();
+
+      expect(columns()).toEqual([
+        { id: "service", closable: false },
+        { id: "count(*)", closable: false },
+      ]);
+      const count = searchObj.data.resultGrid.columns.find((c: any) => c.id === "count(*)");
+      expect(count.meta).toMatchObject({ align: "right", cellClass: "tabular-nums" });
+      expect(count.accessorFn({ "count(*)": 3 })).toBe(3);
+    });
+
+    it("keeps raw rows of a plain SELECT in the source column", () => {
+      searchObj.data.query = 'SELECT * FROM "app_logs"';
+      searchObj.data.queryResults = { hits: [{ _timestamp: 1, service: "auth" }] } as any;
+
+      wrapper.vm.updateGridColumns();
+
+      expect(columns().map((column: { id: string }) => column.id)).toEqual([
+        "_timestamp",
+        "source",
+      ]);
+    });
+  });
+
   describe("updateGridColumns with a shared link's columns (4c C7)", () => {
     const { searchObj } = searchState();
     const org = () => store.state.selectedOrganization.identifier;

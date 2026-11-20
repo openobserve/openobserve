@@ -141,7 +141,8 @@ export default class DashboardPanelConfigs {
     // Pagination container scoped inside the rendered panel table (distinct from the
     // unscoped tablePagination, which can also match a PromQL legend bottom slot).
     this.tablePaginationInTable = page.locator('[data-test="dashboard-panel-table"] [data-test="dashboard-table-pagination"]');
-    this.tableRowsPerPageLabel = page.locator('[data-test="dashboard-table-rows-per-page-label"]');
+    // The pager has no "Records per page" label; its page-size select is the visible control.
+    this.tableRowsPerPageSelect = page.locator('[data-test="dashboard-table-rows-per-page-select"]');
     this.tableRowCount = page.locator('[data-test="dashboard-table-row-count"]');
     // Generic role=tooltip (e.g. rows-per-page info icon hover tooltip)
     this.infoTooltip = page.locator('[role="tooltip"]');
@@ -589,8 +590,8 @@ export default class DashboardPanelConfigs {
     await this._clickVirtualOption("dashboard-config-unit", unit);
   }
 
-  // ========== Unit select — the "Other Locale" group of per-locale Locale Format units ==========
-  // The locale options nest under a non-selectable "Other Locale" expander row, so they
+  // ========== Unit select — the "Other locale" group of per-locale Locale Format units ==========
+  // The locale options nest under a non-selectable "Other locale" expander row, so they
   // only exist in the DOM while that row is expanded or a search is flattening the list.
 
   /** Trigger of a unit OSelect; carries the saved unit in data-test-selected-value. */
@@ -598,7 +599,7 @@ export default class DashboardPanelConfigs {
     return this.page.locator(`[data-test="${parentDataTest}-trigger"]`);
   }
 
-  /** The non-selectable "Other Locale" expander row of a unit OSelect. */
+  /** The non-selectable "Other locale" expander row of a unit OSelect. */
   getLocaleGroupRow(parentDataTest = "dashboard-config-unit") {
     return this.page.locator(
       `[data-test="${parentDataTest}-expand"][data-test-value="other-locale"]`
@@ -619,7 +620,7 @@ export default class DashboardPanelConfigs {
     );
   }
 
-  /** Expand/collapse the "Other Locale" row and wait for its new aria-expanded state. */
+  /** Expand/collapse the "Other locale" row and wait for its new aria-expanded state. */
   async toggleLocaleGroup(parentDataTest = "dashboard-config-unit") {
     const row = this.getLocaleGroupRow(parentDataTest);
     await row.waitFor({ state: "visible", timeout: 10000 });
@@ -1018,13 +1019,12 @@ export default class DashboardPanelConfigs {
   }
 
   /**
-   * Select alignment (auto|left|center|right). Alignment buttons have no data-test
-   * (verified against source); the second `.cf-seg` toggle group in the popup is
-   * Alignment (the first is Field Type).
+   * Select alignment by its visible label (Auto|Left|Center|Right). Each alignment
+   * button is `o2-format-alignment-<value>-<field>`, and the popup shows one column.
    */
   async selectAlignment(label) {
-    const group = this.overrideDialog.locator(".cf-seg").nth(1);
-    await group.getByText(label, { exact: true }).click();
+    const options = this.overrideDialog.locator('[data-test^="o2-format-alignment-"]');
+    await options.getByText(label, { exact: true }).click();
   }
 
   /** Click "Add Rule" to append a conditional styling rule for the current column. */
@@ -1839,6 +1839,15 @@ export default class DashboardPanelConfigs {
    */
   async cancelColorBySeries() {
     await this.colorBySeriesCancelBtn.click();
+    // ✕ on an edited form asks "Discard changes?" in the dialog footer before it closes.
+    const discardBtn = this.page.locator(
+      '[data-test="color-by-series-popup-dialog"] [data-test="o-dialog-discard-btn"]'
+    );
+    const asked = await Promise.race([
+      discardBtn.waitFor({ state: "visible", timeout: 5000 }).then(() => true),
+      this.colorBySeriesPopup.waitFor({ state: "hidden", timeout: 5000 }).then(() => false),
+    ]).catch(() => false);
+    if (asked) await discardBtn.click();
     await this.colorBySeriesPopup.waitFor({ state: "hidden", timeout: 10000 });
   }
 
@@ -1874,7 +1883,7 @@ export default class DashboardPanelConfigs {
     return this.columnOrderRow(index).locator('[data-test="dashboard-column-order-column-number"]');
   }
 
-  /** Opens the column order dialog via the "Configure Column Order" button in the config sidebar. */
+  /** Opens the column order dialog via the "Configure column order" button in the config sidebar. */
   async openColumnOrderDialog() {
     await this.scrollSidebarToElement(this.columnOrderBtn);
     await this.columnOrderBtn.click();

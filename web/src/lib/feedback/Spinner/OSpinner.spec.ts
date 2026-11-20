@@ -3,72 +3,45 @@ import { mount } from "@vue/test-utils";
 import OSpinner from "./OSpinner.vue";
 
 describe("OSpinner", () => {
-  describe("variant: ring (default)", () => {
-    it("renders an svg with animate-spin class", () => {
-      const wrapper = mount(OSpinner);
-      expect(wrapper.find("svg").exists()).toBe(true);
-      expect(wrapper.find("svg").classes()).toContain("animate-spin");
-    });
-
-    it("does not render dots", () => {
-      const wrapper = mount(OSpinner, { props: { variant: "ring" } });
-      expect(wrapper.findAll("span.rounded-full").length).toBe(0);
-    });
+  it("renders a spinning 2 px ring with an accent arc", () => {
+    const ring = mount(OSpinner).get("[data-test='o-spinner-ring']");
+    expect(ring.classes()).toEqual(
+      expect.arrayContaining(["animate-spin", "rounded-full", "border-2", "border-t-spinner"]),
+    );
   });
 
-  describe("variant: dots", () => {
-    it("renders three dot spans", () => {
-      const wrapper = mount(OSpinner, { props: { variant: "dots" } });
-      const dots = wrapper.findAll("span[aria-hidden='true']");
-      expect(dots.length).toBe(3);
-    });
-
-    it("does not render an svg", () => {
-      const wrapper = mount(OSpinner, { props: { variant: "dots" } });
-      expect(wrapper.find("svg").exists()).toBe(false);
-    });
-
-    it("applies staggered animation delays", () => {
-      const wrapper = mount(OSpinner, { props: { variant: "dots" } });
-      const dots = wrapper.findAll("span[aria-hidden='true']");
-      expect(dots[0].attributes("style")).toContain("animation-delay: 0s");
-      expect(dots[1].attributes("style")).toContain("animation-delay: 0.15s");
-      expect(dots[2].attributes("style")).toContain("animation-delay: 0.3s");
-    });
+  it.each([
+    ["sm", "size-3"],
+    ["md", "size-4"],
+    ["lg", "size-5"],
+  ] as const)("size %s is %s", (size, cls) => {
+    expect(mount(OSpinner, { props: { size } }).classes()).toContain(cls);
   });
 
-  describe("sizes", () => {
-    const sizes = ["xs", "sm", "md", "lg", "xl"] as const;
-    const expectedClasses = {
-      xs: "size-4",
-      sm: "size-5",
-      md: "size-8",
-      lg: "size-12",
-      xl: "size-16",
-    };
-
-    sizes.forEach((size) => {
-      it(`applies ${expectedClasses[size]} for size="${size}"`, () => {
-        const wrapper = mount(OSpinner, { props: { size } });
-        expect(wrapper.find("span[role='status']").classes()).toContain(expectedClasses[size]);
-      });
-    });
+  it("defaults to md (16 px)", () => {
+    expect(mount(OSpinner).classes()).toContain("size-4");
   });
 
-  describe("accessibility", () => {
-    it("has role=status", () => {
-      const wrapper = mount(OSpinner);
-      expect(wrapper.find("[role='status']").exists()).toBe(true);
-    });
+  it("keeps spinning under reduced motion", () => {
+    expect(mount(OSpinner).get("[data-test='o-spinner-ring']").classes()).toContain(
+      "o2-motion-keep",
+    );
+  });
 
-    it("has aria-label=Loading", () => {
-      const wrapper = mount(OSpinner);
-      expect(wrapper.find("[role='status']").attributes("aria-label")).toBe("Loading");
-    });
+  it("is a polite status with an accessible name", () => {
+    const ring = mount(OSpinner).get("span");
+    expect(ring.attributes("role")).toBe("status");
+    expect(ring.attributes("aria-live")).toBe("polite");
+    expect(ring.attributes("aria-label")).toBeTruthy();
+  });
 
-    it("svg has aria-hidden=true", () => {
-      const wrapper = mount(OSpinner, { props: { variant: "ring" } });
-      expect(wrapper.find("svg").attributes("aria-hidden")).toBe("true");
-    });
+  it("waits out the loader delay before it shows", () => {
+    const classes = mount(OSpinner).classes();
+    expect(classes).toContain("delay-150");
+    expect(classes).toContain("fade-in-0");
+  });
+
+  it("shows at once when instant", () => {
+    expect(mount(OSpinner, { props: { instant: true } }).classes()).not.toContain("delay-150");
   });
 });

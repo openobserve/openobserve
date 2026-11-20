@@ -19,15 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full flex-col p-0">
     <OPageLayout
       v-if="!showAddDialog"
-      :title="t('cipherKey.header')"
-      icon="key"
-      :subtitle="t('settings.cipherKeysPage.subtitle')"
+      :title="t('settings.cipherKeys')"
+      :about="t('settings.cipherKeysPage.subtitle')"
       bleed
     >
       <template #actions>
         <OButton
           variant="primary"
-          size="sm"
           :aria-label="
             cipherKeyDrafts.hasNew
               ? t('common.editorDraft.newDot', { label: t('cipherKey.add') })
@@ -48,11 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           ref="oTableRef"
-          :frame="false"
           :data="visibleRows"
           :columns="columns"
           :row-actions="rowActions"
-          row-actions-more-data-test="cipher-keys-row-more-actions"
+          :row-menu="rowMenu"
+          row-menu-data-test="cipher-keys-row-more-actions"
           row-key="name"
           :loading="loading"
           :forbidden="forbidden"
@@ -71,11 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
-          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="settings-cipher-keys"
-          :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
@@ -87,21 +83,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              shortcut-id="cipherKeysRefresh"
+              shortcut="cipherKeysRefresh"
               data-test="cipher-keys-list-refresh-btn"
               @click="refreshData"
             />
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-cipher-keys"
-              :filtered="!!filterQuery"
-              @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : addCipherKey())"
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.cipherKeys') })
+                  : t('emptyState.noCipherKeys.title')
+              "
+              :text="
+                filterQuery
+                  ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.cipherKeys') })
+                  : t('emptyState.noCipherKeys.description')
+              "
+              :action-label="filterQuery ? undefined : t('emptyState.noCipherKeys.action')"
+              @action="filterQuery ? (filterQuery = '') : addCipherKey()"
             />
           </template>
           <template #cell-name="{ row }">
@@ -121,9 +124,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #selection-actions>
             <OButton
               data-test="cipher-keys-list-delete-keys-btn"
-              variant="outline-destructive"
-              size="sm"
-              icon-left="delete"
+              variant="danger-ghost"
+              icon="delete"
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
@@ -141,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('settings.cipherKeysPage.deleteCipherKeyTitle')"
     message-keypath="settings.cipherKeysPage.deleteCipherKeyMessage"
     :message-name="confirmDelete.data?.name"
-    ok-variant="destructive"
+    kind="destructive"
     @update:ok="deleteCipherKey"
     @update:cancel="cancelDeleteCipherKey"
     v-model="confirmDelete.visible"
@@ -150,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="t('settings.cipherKeysPage.deleteCipherKeysTitle')"
     :message="t('settings.cipherKeysPage.deleteCipherKeysMessage', { count: selectedKeys.length })"
-    ok-variant="destructive"
+    kind="destructive"
     @update:ok="bulkDeleteCipherKeys"
     @update:cancel="confirmBulkDelete = false"
     v-model="confirmBulkDelete"
@@ -177,7 +179,11 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import ONameLinkCell from "@/lib/core/Table/cells/ONameLinkCell.vue";
-import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
@@ -294,25 +300,22 @@ export default defineComponent({
         size: COL.type,
         meta: { align: "left" },
       },
-      {
-        id: "actions",
-        header: t("cipherKey.actions"),
-        isAction: true,
-        pinned: "right",
-      },
     ];
     const rowActions: OTableRowAction[] = [
       {
         id: "edit",
         label: t("common.edit"),
         icon: "edit",
-        onSelect: (row) => editCipherKey(row),
+        onClick: (row) => editCipherKey(row),
         dataTest: (row) => `cipherkey-list-${row.name}-update`,
       },
+    ];
+    const rowMenu: OTableRowMenuItem[] = [
       {
         id: "delete",
         label: t("common.delete"),
         icon: "delete",
+        destructive: true,
         onSelect: (row) => confirmDeleteCipherKey(row),
         dataTest: (row) => `cipherkey-list-${row.name}-delete`,
       },
@@ -610,6 +613,7 @@ export default defineComponent({
       tabledata,
       columns,
       rowActions,
+      rowMenu,
       showAddDialog,
       addCipherKey,
       getData,

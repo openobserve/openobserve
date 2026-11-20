@@ -20,7 +20,8 @@
       "close": "Đóng",
       "mitre": "MITRE ATT&CK",
       "severity": "Mức độ nghiêm trọng",
-      "viewAll": "Xem tất cả"
+      "viewAll": "Xem tất cả",
+      "moreActions": "Thao tác khác"
     },
     "caseStatus": {
       "open": "Mới",
@@ -161,7 +162,15 @@
       "explore": "Khám phá",
       "noSources": "Chưa có nguồn bảo mật nào",
       "noSourcesHint": "Tiếp nhận CloudTrail, Okta, VPC Flow hoặc syslog. Các stream có tên chứa security, audit, auth hoặc firewall sẽ tự động xuất hiện ở đây.",
-      "summaryPartial": "Khoảng thời gian này có nhiều lịch sử cảnh báo hơn mức một bản tóm tắt có thể chứa, nên số đếm và biểu đồ chỉ là giới hạn dưới; hãy chọn khoảng thời gian ngắn hơn để có số liệu đầy đủ."
+      "summaryPartial": "Khoảng thời gian này có nhiều lịch sử cảnh báo hơn mức một bản tóm tắt có thể chứa, nên số đếm và biểu đồ chỉ là giới hạn dưới; hãy chọn khoảng thời gian ngắn hơn để có số liệu đầy đủ.",
+      "autoRefresh": "Tự động làm mới mỗi phút",
+      "whatDetections": "phát hiện",
+      "rulesFailedHint": "Không đọc được các phát hiện nên không thể đếm số lần kích hoạt. Hãy thử lại hoặc kiểm tra trang Phát hiện.",
+      "historyFailedHint": "Lịch sử kích hoạt không khả dụng nên các lần kích hoạt không được đếm. Hãy thử lại hoặc kiểm tra trang Cảnh báo.",
+      "whatFirings": "lần kích hoạt",
+      "emptyTitle": "Chưa bật phát hiện nào",
+      "emptyHint": "Bật các phát hiện từ danh mục Sigma để bắt đầu giám sát. Kiểm tra trong Nguồn xem dữ liệu bảo mật có đang đến không.",
+      "openSources": "Mở nguồn"
     },
     "events": {
       "title": "Sự kiện bảo mật",
@@ -279,7 +288,8 @@
           "outcome": "Kết quả",
           "message": "Thông điệp"
         }
-      }
+      },
+      "openSources": "Mở nguồn"
     },
     "drawer": {
       "event": "Sự kiện bảo mật",
@@ -459,7 +469,9 @@
         "action": "Hành động",
         "object": "Đối tượng",
         "host": "Host"
-      }
+      },
+      "whatAlerts": "cảnh báo",
+      "loadFailedHint": "Không đọc được lịch sử kích hoạt. Hãy thử lại hoặc kiểm tra trong Phát hiện xem đã bật phát hiện nào chưa."
     },
     "cases": {
       "title": "Vụ việc",
@@ -708,7 +720,9 @@
         "showAll": "Hiện tất cả các dòng",
         "onlyEntity": "Chỉ thực thể của vụ việc này",
         "noneForEntity": "Không có dòng nào trong lần kích hoạt này nêu thực thể của vụ việc"
-      }
+      },
+      "whatCases": "vụ việc",
+      "loadFailedHint": "Không đọc được các vụ việc. Hãy thử lại hoặc kiểm tra xem quản lý vụ việc đã được bật cho tổ chức này chưa."
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -771,7 +785,9 @@
       "manageDetections": "Quản lý phát hiện",
       "historyNarrowed": "Phạm vi truy vấn tối đa của lịch sử cảnh báo chỉ giới hạn các lần kích hoạt từ {from} trở đi; các lần kích hoạt trước đó trong khoảng thời gian này không được tính.",
       "cellNone": "Không có quy tắc",
-      "coverageError": "Không thể tải độ bao phủ ATT&CK: {reason}"
+      "coverageError": "Không thể tải độ bao phủ ATT&CK: {reason}",
+      "whatCoverage": "phạm vi ATT&CK",
+      "loadFailedHint": "Không tính được phạm vi nên không hiển thị số liệu. Hãy thử lại hoặc kiểm tra trang Phát hiện."
     },
     "detections": {
       "title": "Phát hiện",
@@ -998,7 +1014,9 @@
           "in_cidr": "nằm trong dải (CIDR)",
           "in_list": "nằm trong danh sách cho phép"
         }
-      }
+      },
+      "whatDetections": "phát hiện",
+      "loadFailedHint": "Không đọc được các phát hiện. Hãy thử lại hoặc kiểm tra xem bạn có quyền xem cảnh báo trong tổ chức này không."
     },
     "tuning": {
       "open": "Tinh chỉnh",
@@ -1215,7 +1233,9 @@
         "openAllowlists": "Mở danh sách cho phép"
       },
       "otherSourceOnly": "Chỉ nguồn khác",
-      "otherSourceOnlyHint": "Được viết cho {logsource}. Nó chỉ biên dịch trên luồng của bạn nhờ tên trường dùng chung, nên không được tính là sẵn sàng cài đặt."
+      "otherSourceOnlyHint": "Được viết cho {logsource}. Nó chỉ biên dịch trên luồng của bạn nhờ tên trường dùng chung, nên không được tính là sẵn sàng cài đặt.",
+      "whatRules": "danh mục phát hiện",
+      "loadFailedHint": "Danh mục Sigma chưa tải được nên chưa biết số quy tắc và nguồn. Hãy thử lại sau giây lát."
     },
     "entities": {
       "title": "Thực thể",
@@ -1335,7 +1355,9 @@
       "loadError": "Không thể tải nguồn bảo mật",
       "detailFailed": "Một phần dữ liệu của thực thể này không thể đọc được: {streams}.",
       "aliasCount": "+{n} cách viết | +{n} cách viết",
-      "aliasHint": "Được ghi log với cách viết này; đây là cùng một danh tính."
+      "aliasHint": "Được ghi log với cách viết này; đây là cùng một danh tính.",
+      "whatEntities": "thực thể",
+      "loadFailedHint": "Không thể truy cập các nguồn bảo mật. Hãy kiểm tra trong Nguồn xem đã kết nối nguồn nào chưa rồi thử lại."
     },
     "ueba": {
       "title": "Phân tích hành vi người dùng",
@@ -1434,7 +1456,9 @@
       "volumeNotJudged": "Khối lượng không được xét cho người dùng này: các khoảng thời gian dưới một ngày được so sánh với cùng giờ trong ngày ở đường cơ sở, việc này cần ít nhất một ngày lịch sử.",
       "baselineBuilding": "Đang xây dựng đường cơ sở",
       "baselineBuildingHint": "Hiện có {span} lịch sử. Việc so sánh với quá khứ của chính người dùng này sẽ bắt đầu khi có đủ lịch sử {baseline}; trong lúc đó chỉ đánh dấu các giá trị ngoại lai rõ rệt so với người dùng khác.",
-      "buildingNotice": "Đường cơ sở vẫn đang được xây dựng cho {n} người dùng: cho đến khi có đủ lịch sử {baseline}, chỉ đánh dấu các giá trị ngoại lai rõ rệt so với người dùng khác. | Đường cơ sở vẫn đang được xây dựng cho {n} người dùng: cho đến khi có đủ lịch sử {baseline}, chỉ đánh dấu các giá trị ngoại lai rõ rệt so với người dùng khác."
+      "buildingNotice": "Đường cơ sở vẫn đang được xây dựng cho {n} người dùng: cho đến khi có đủ lịch sử {baseline}, chỉ đánh dấu các giá trị ngoại lai rõ rệt so với người dùng khác. | Đường cơ sở vẫn đang được xây dựng cho {n} người dùng: cho đến khi có đủ lịch sử {baseline}, chỉ đánh dấu các giá trị ngoại lai rõ rệt so với người dùng khác.",
+      "whatUsers": "hành vi người dùng",
+      "loadFailedHint": "Không thể truy cập các nguồn bảo mật. Hãy kiểm tra trong Nguồn xem đã kết nối nguồn nào chưa rồi thử lại."
     },
     "intel": {
       "title": "Tình báo mối đe dọa",
@@ -1602,7 +1626,11 @@
       },
       "partialChecked": "Kết quả một phần: đã kiểm tra {checked} trên {total} chỉ báo. Số liệu của phần còn lại có thể thấp hơn thực tế.",
       "partialCapped": "Kết quả một phần: đã kiểm tra {checked} trên {total} chỉ báo. Lượt quét dừng ở {n} truy vấn; các chỉ báo ít nghiêm trọng nhất chưa được kiểm tra.",
-      "inText": "{column} (trong văn bản)"
+      "inText": "{column} (trong văn bản)",
+      "runSweepDisabled": "Thêm ít nhất một chỉ báo để chạy quét.",
+      "whatIndicators": "thông tin về mối đe dọa",
+      "loadFailedHint": "Không đọc được danh sách chỉ báo. Hãy thử lại hoặc kiểm tra xem bạn có quyền đọc bảng tra cứu trong tổ chức này không.",
+      "filterType": "Loại"
     },
     "sources": {
       "title": "Nguồn dữ liệu",
@@ -1667,7 +1695,9 @@
         "pipeline_missing": "nó không còn tồn tại",
         "other_stream": "giờ nó đọc một stream khác",
         "other_pack": "giờ nó chạy một gói khác"
-      }
+      },
+      "whatSources": "nguồn bảo mật",
+      "loadFailedHint": "Không thể truy cập các nguồn bảo mật. Hãy kiểm tra kết nối hoặc quyền truy cập rồi thử lại."
     },
     "nav": {
       "overview": "Tổng quan",
@@ -1735,6 +1765,10 @@
       "indicatorType": "Loại chỉ báo",
       "severityFilter": "Bộ lọc mức độ nghiêm trọng",
       "stream": "Stream"
+    },
+    "loadError": {
+      "title": "Không thể tải {what}",
+      "hint": "Máy chủ không phản hồi cho {what}. Hãy kiểm tra kết nối hoặc quyền truy cập rồi thử lại."
     }
   }
 }

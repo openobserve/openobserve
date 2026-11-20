@@ -381,13 +381,20 @@ describe("SessionsList — empty sessions", () => {
 });
 
 describe("SessionsList — loading state", () => {
-  it("renders loading slot content when loading=true", async () => {
+  it("holds a skeleton until the agents list answers, then shows the table's loading slot", async () => {
     mockLoading.value = true;
     mockSessions.value = [];
     mockHasLoadedOnce.value = false;
 
     const wrapper = await mountComponent();
+    // The banner above the bar depends on the agents list, so nothing below it renders yet.
+    expect(wrapper.find("[data-test='sessions-list-pending']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='sessions-list-loading']").exists()).toBe(false);
+
+    mockAgentsLoaded.value = true;
+    await flushPromises();
     // The TenstackTable mock renders the loading slot when loading=true
+    expect(wrapper.find("[data-test='sessions-list-pending']").exists()).toBe(false);
     expect(wrapper.find("[data-test='sessions-list-loading']").exists()).toBe(true);
   });
 });
@@ -411,6 +418,9 @@ describe("SessionsList — sessions table", () => {
 
   it("uses server sorting and reloads the first page with the selected field", async () => {
     mockRouteQuery = { type: "stream" };
+    // This org's agents list has answered, so the table is on screen.
+    mockAgentsOrg.value = "test-org";
+    mockAgentsLoaded.value = true;
     mockCurrentPage.value = 3;
     const wrapper = await mountComponent();
     const table = wrapper.findComponent({ name: "OTable" });
@@ -437,6 +447,9 @@ describe("SessionsList — sessions table", () => {
 
   it("clearing a server sort resets to the default sort instead of sticking on the old field", async () => {
     mockRouteQuery = { type: "stream" };
+    // This org's agents list has answered, so the table is on screen.
+    mockAgentsOrg.value = "test-org";
+    mockAgentsLoaded.value = true;
     mockSortBy.value = "gen_ai_usage_cost";
     mockSortOrder.value = "desc";
     const wrapper = await mountComponent();
@@ -893,7 +906,7 @@ describe("SessionsList — agents list fails to load", () => {
 
     // Retry: the list loads (empty), so the mode is decided now — Stream.
     mockListAgents.mockResolvedValue({ agents: [] });
-    await wrapper.find("[data-test='o2-empty-state-action-retry']").trigger("click");
+    await wrapper.find("[data-test='o2-empty-state-action']").trigger("click");
     await flushPromises();
 
     expect((wrapper.vm as any).filterMode).toBe("stream");
@@ -964,6 +977,7 @@ describe("SessionsList — OSS builds (neither isEnterprise nor isCloud is 'true
     config.isEnterprise = "false";
     config.isCloud = "true";
     const wrapper = await mountComponent();
+    await refreshComponent(wrapper);
     expect(wrapper.find("[data-test='sessions-list-filter-mode']").exists()).toBe(true);
   });
 

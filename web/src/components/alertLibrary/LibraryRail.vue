@@ -62,7 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="item in severities"
             :key="item.id"
             :value="item.id"
-            size="sm"
             :data-test="`alert-library-rail-severity-${item.id}`"
           >
             {{ item.label }}
@@ -78,7 +77,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           :model-value="search"
           @update:model-value="emit('update:search', String($event ?? ''))"
-          size="sm"
           clearable
           :placeholder="t('alert_library.searchCategories')"
           :aria-label="t('alert_library.searchCategoriesAria')"
@@ -92,8 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("alert_library.selectedCount", { count: selectedCategories.length }) }}</span
           >
           <OButton
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             :disabled="selectedCategories.length === 0"
             data-test="alert-library-rail-clear-categories"
             @click="emit('update:selectedCategories', [])"
@@ -107,10 +105,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-h-0 flex-1 overflow-y-auto pb-3">
       <OEmptyState
         v-if="visibleGroups.length === 0"
-        size="inline"
+        size="compact"
         class="px-2"
-        illustration="no-results"
-        variant="no-results"
+        kind="filtered"
         :title="t('alert_library.noCategoryMatch')"
         data-test="alert-library-rail-empty-categories"
       />
@@ -139,7 +136,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="selectedCategories.includes(item.id) ? 'bg-surface-subtle' : ''"
         >
           <OCheckbox
-            size="sm"
             class="min-w-0 flex-1"
             :model-value="selectedCategories.includes(item.id)"
             :aria-label="t('alert_library.facetAria', { label: item.label, count: item.count })"
@@ -155,8 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="countChip"
             value="neutral"
-            size="xs"
-            shape="rounded"
+            size="sm"
             :data-test="`alert-library-rail-count-${item.id}`"
             >{{ item.count }}</OTag
           >

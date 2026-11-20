@@ -19,9 +19,8 @@ const wrapperAttrs = computed(() => split.value.wrapperAttrs);
 const controlAttrs = computed(() => split.value.controlAttrs);
 
 const props = withDefaults(defineProps<SwitchProps>(), {
-  size: "md",
   disabled: false,
-  labelPosition: "right",
+  labelPosition: "end",
   offTone: "brand",
   stateText: false,
 });
@@ -44,59 +43,15 @@ watch(
   },
 );
 
-const isChecked = computed((): boolean => {
-  const v = internalValue.value;
-  if (props.checkedValue !== undefined) return v === props.checkedValue;
-  return Boolean(v);
-});
+const isChecked = computed((): boolean => Boolean(internalValue.value));
 
 function toggle() {
   if (isDisabled.value) return;
   const next = !isChecked.value;
-  let emitValue: typeof props.modelValue;
-  if (props.checkedValue !== undefined || props.uncheckedValue !== undefined) {
-    emitValue = next ? (props.checkedValue ?? true) : (props.uncheckedValue ?? false);
-  } else {
-    emitValue = next;
-  }
-  internalValue.value = emitValue;
-  emit("update:modelValue", emitValue);
-  emit("change", emitValue);
+  internalValue.value = next;
+  emit("update:modelValue", next);
+  emit("change", next);
 }
-
-// ── Track sizes ────────────────────────────────────────────────────────────
-// border-2 (2px each side) + p-0.5 (2px each side) = 4px eaten from each dimension
-// thumb = track_height - 4(border) - 4(padding), translate = track_width - 4 - 4 - thumb
-type TrackSize = {
-  track: string;
-  thumb: string;
-  thumbTranslate: string;
-};
-
-const trackSizes: Record<NonNullable<SwitchProps["size"]>, TrackSize> = {
-  sm: {
-    track: "w-6 h-3.5",
-    thumb: "size-1.5",
-    thumbTranslate: "translate-x-2 rtl:-translate-x-2",
-  },
-  md: {
-    track: "w-7 h-4.5",
-    thumb: "size-2.5",
-    thumbTranslate: "translate-x-2.5 rtl:-translate-x-2.5",
-  },
-  lg: {
-    track: "w-8 h-5",
-    thumb: "size-3",
-    thumbTranslate: "translate-x-3 rtl:-translate-x-3",
-  },
-  xl: {
-    track: "w-11.5 h-6",
-    thumb: "size-4.5",
-    thumbTranslate: "translate-x-5 rtl:-translate-x-5",
-  },
-};
-
-const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
 
 const offClasses = computed(() =>
   props.offTone === "neutral"
@@ -109,7 +64,11 @@ const autoId = useId();
 const buttonId = computed(() => props.id ?? autoId);
 const labelId = computed(() => `${buttonId.value}-label`);
 const hasLabel = computed(
-  () => Boolean(slots.label) || props.label !== undefined || Boolean(slots.tooltip),
+  () =>
+    Boolean(slots.label) ||
+    props.label !== undefined ||
+    props.description !== undefined ||
+    Boolean(slots.tooltip),
 );
 onMounted(() =>
   warnIfUnlabelled(
@@ -123,8 +82,8 @@ onMounted(() =>
   <div
     v-bind="wrapperAttrs"
     :class="[
-      'inline-flex items-center gap-2',
-      labelPosition === 'left' ? 'flex-row-reverse' : 'flex-row',
+      'inline-flex items-start gap-2',
+      labelPosition === 'start' ? 'flex-row-reverse' : 'flex-row',
       isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
     ]"
     @click="toggle"
@@ -143,9 +102,8 @@ onMounted(() =>
       :tabindex="inputTabindex"
       v-bind="controlAttrs"
       :class="[
-        'relative inline-flex shrink-0 rounded-full',
-        'items-center border-2 p-0.5',
-        currentSizes.track,
+        'relative inline-flex h-4 w-7 shrink-0 items-center rounded-full border p-px',
+        (hasLabel || stateText) && 'mt-0.5',
         /* Three visually distinct states:
            ON       → primary FILLED track + white thumb (high contrast)
            OFF      → transparent track + primary outline + primary thumb
@@ -158,16 +116,15 @@ onMounted(() =>
         isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
         'outline-none',
         'focus-visible:ring-focus-ring-accent focus-visible:ring-4',
-        'transition-[color,background-color,border-color,box-shadow] duration-200',
+        'transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)',
       ]"
     >
       <span
         :class="[
-          'block rounded-full',
-          'transition-transform duration-200',
-          currentSizes.thumb,
+          'block size-3 rounded-full',
+          'transition-transform duration-(--duration-indicator) ease-(--ease-control)',
           isDisabled ? 'bg-switch-disabled-thumb' : isChecked ? 'bg-white' : offClasses.thumb,
-          isChecked ? currentSizes.thumbTranslate : 'translate-x-0',
+          isChecked ? 'translate-x-3 rtl:-translate-x-3' : 'translate-x-0',
         ]"
       />
     </button>
@@ -177,7 +134,7 @@ onMounted(() =>
       aria-hidden="true"
       :data-test="parentDataTest ? `${parentDataTest}-state` : undefined"
       :class="[
-        'text-compact min-w-6 select-none',
+        'text-compact min-w-6 leading-5 select-none',
         isDisabled
           ? 'text-input-label-text-disabled'
           : isChecked
@@ -187,26 +144,26 @@ onMounted(() =>
       >{{ isChecked ? t("common.switchOn") : t("common.switchOff") }}</span
     >
 
-    <span
-      v-if="hasLabel || $slots.tooltip"
-      :id="labelId"
-      :class="[
-        'o-input-label text-compact flex items-center gap-1 leading-tight select-none',
-        isDisabled
-          ? 'text-input-label-text-disabled font-normal'
-          : 'text-input-label-text font-medium',
-      ]"
-    >
-      <slot name="label">{{ label }}</slot
-      ><span v-if="required" aria-hidden="true">&nbsp;*</span>
-      <OIcon
-        v-if="$slots.tooltip"
-        name="info-outline"
-        size="sm"
-        :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="cursor-help"
-        ><slot name="tooltip"
-      /></OIcon>
+    <span v-if="hasLabel" class="flex min-w-0 flex-col">
+      <span
+        :id="labelId"
+        :class="[
+          'o-input-label text-compact flex items-center gap-1 leading-5 font-normal select-none',
+          isDisabled ? 'text-input-label-text-disabled' : 'text-input-label-text',
+        ]"
+      >
+        <slot name="label">{{ label }}</slot
+        ><span v-if="required" aria-hidden="true">&nbsp;*</span>
+        <OIcon
+          v-if="$slots.tooltip"
+          name="info-outline"
+          size="sm"
+          :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
+          class="cursor-help"
+          ><slot name="tooltip"
+        /></OIcon>
+      </span>
+      <span v-if="description" class="text-text-muted text-xs leading-4">{{ description }}</span>
     </span>
   </div>
 </template>

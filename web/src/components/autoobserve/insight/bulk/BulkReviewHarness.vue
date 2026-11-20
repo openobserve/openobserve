@@ -20,8 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-for="scenario in SCENARIOS"
         :key="scenario"
-        variant="outline"
-        size="sm"
+        variant="secondary"
         :data-test="`bulk-review-harness-open-${scenario}`"
         @click="open(scenario)"
       >

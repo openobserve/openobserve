@@ -158,7 +158,7 @@ const setupCardStub = defineComponent({
 // rather than swallowed into $attrs by inheritAttrs:false.
 const absoluteTimeCalls: [number, number][] = [];
 const dateTimeStub = defineComponent({
-  name: "DateTime",
+  name: "ODateTimeRange",
   inheritAttrs: false,
   props: ["defaultType", "defaultRelativeTime", "autoApply", "menuAlign"],
   emits: ["on:date-change"],
@@ -228,7 +228,7 @@ describe("CuratedPageView", () => {
         stubs: {
           RenderDashboardCharts: renderChartsStub,
           DataSourceSetupCard: setupCardStub,
-          DateTime: dateTimeStub,
+          ODateTimeRange: dateTimeStub,
           OPageLayout: passthrough("OPageLayout"),
           OPageHeader: passthrough("OPageHeader"),
           teleport: true,
@@ -254,20 +254,20 @@ describe("CuratedPageView", () => {
   // ── Faces (§6.1) ─────────────────────────────────────────────────────────
 
   describe("faces", () => {
-    it("`unknown` renders a spinner WITH the `checking` line under it", async () => {
-      // The AWS worst case is ~5s of spinner; a naked one reads as a hung page.
+    it("`unknown` renders a skeleton WITH the `checking` line above it", async () => {
+      // The AWS worst case is ~5s of loading; a bare skeleton reads as a hung page.
       wrapper = await mountView({}, { face: ref("unknown"), dashboard: ref(null) });
-      expect(wrapper.find('[data-test="curated-spinner"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="curated-loading"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="curated-checking"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="curated-error"]').exists()).toBe(false);
     });
 
-    it("`loadError` swaps the spinner for an error line + Retry firing refresh({force:true})", async () => {
+    it("`loadError` swaps the skeleton for an error line + Retry firing refresh({force:true})", async () => {
       wrapper = await mountView(
         {},
         { face: ref("unknown"), dashboard: ref(null), loadError: ref(true) },
       );
-      expect(wrapper.find('[data-test="curated-spinner"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="curated-loading"]').exists()).toBe(false);
       const retry = wrapper.find('[data-test="curated-error"] button');
       expect(retry.exists()).toBe(true);
       refreshSpy.mockClear();
@@ -593,7 +593,7 @@ describe("CuratedPageView", () => {
     it("the range watcher DEBOUNCES: two changes inside ~300ms produce ONE refresh", async () => {
       vi.useFakeTimers();
       wrapper = await mountView();
-      const picker = wrapper.findComponent({ name: "DateTime" });
+      const picker = wrapper.findComponent({ name: "ODateTimeRange" });
       refreshSpy.mockClear();
 
       picker.vm.$emit("on:date-change", {
@@ -627,7 +627,7 @@ describe("CuratedPageView", () => {
       wrapper = await mountView();
       refreshSpy.mockClear();
       vi.mocked(analytics.track).mockClear();
-      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+      wrapper.findComponent({ name: "ODateTimeRange" }).vm.$emit("on:date-change", {
         startTime: NOW_US - HOUR_US,
         endTime: NOW_US,
         userChangedValue: false,
@@ -657,7 +657,7 @@ describe("CuratedPageView", () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date(NOW_US / 1000));
       wrapper = await mountView();
-      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+      wrapper.findComponent({ name: "ODateTimeRange" }).vm.$emit("on:date-change", {
         startTime: NOW_US - 3 * HOUR_US,
         endTime: NOW_US,
         relativeTimePeriod: "3h",
@@ -686,7 +686,7 @@ describe("CuratedPageView", () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date(NOW_US / 1000));
       wrapper = await mountView();
-      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+      wrapper.findComponent({ name: "ODateTimeRange" }).vm.$emit("on:date-change", {
         startTime: NOW_US - 5 * HOUR_US,
         endTime: NOW_US - 2 * HOUR_US,
         relativeTimePeriod: null,
@@ -738,7 +738,7 @@ describe("CuratedPageView", () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date(NOW_US / 1000));
       wrapper = await mountView();
-      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+      wrapper.findComponent({ name: "ODateTimeRange" }).vm.$emit("on:date-change", {
         startTime: NOW_US - 3 * HOUR_US,
         endTime: NOW_US,
         relativeTimePeriod: "3h",
@@ -767,7 +767,7 @@ describe("CuratedPageView", () => {
       vi.setSystemTime(new Date(NOW_US / 1000));
       wrapper = await mountView();
       refreshSpy.mockClear();
-      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+      wrapper.findComponent({ name: "ODateTimeRange" }).vm.$emit("on:date-change", {
         startTime: NOW_US - 6 * HOUR_US,
         endTime: NOW_US,
         relativeTimePeriod: "6h",
@@ -1089,7 +1089,7 @@ describe("CuratedPageView", () => {
       // a NOW_US that is years ahead of real time. Without moving the page onto
       // that clock the age is negative and clamps to "1 minute", so the "3" is
       // underivable from anything the view was given. Drive the real seam.
-      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+      wrapper.findComponent({ name: "ODateTimeRange" }).vm.$emit("on:date-change", {
         startTime: NOW_US - 3 * HOUR_US,
         endTime: NOW_US,
         userChangedValue: true,
@@ -1139,7 +1139,7 @@ describe("CuratedPageView", () => {
       wrapper = await mountView({}, staleState());
       // The fixture clock sits years past the real one, so the default window ends before the data.
       expect(wrapper.find('[data-test="curated-stale-jump-to-data"]').exists()).toBe(false);
-      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+      wrapper.findComponent({ name: "ODateTimeRange" }).vm.$emit("on:date-change", {
         startTime: NOW_US - 3 * HOUR_US,
         endTime: NOW_US,
         userChangedValue: true,
@@ -1931,7 +1931,7 @@ describe("CuratedPageView", () => {
     // manifest.defaultRelativePeriod was declared and never read, so the header
     // said 15m while every panel query ran over the page's 3h window.
     wrapper = await mountView();
-    const picker = wrapper.findComponent({ name: "DateTime" });
+    const picker = wrapper.findComponent({ name: "ODateTimeRange" });
     expect(picker.exists()).toBe(true);
     expect(picker.props("defaultRelativeTime")).toBe(kubernetesPage.defaultRelativePeriod);
     expect(picker.props("defaultRelativeTime")).toBe("3h");

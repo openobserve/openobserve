@@ -8,17 +8,19 @@ import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
-import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 const JsonPreview = defineAsyncComponent(() => import("@/plugins/logs/JsonPreview.vue"));
 const ChartRenderer = defineAsyncComponent(
@@ -792,16 +794,15 @@ function openInLogs() {
       <div class="border-border-default flex min-w-0 shrink-0 flex-col border-b">
         <div class="flex min-w-0 items-center gap-2 px-2 pt-3 pb-2">
           <div class="flex-1" />
-          <DateTime
+          <ODateTimeRange
             default-type="absolute"
             :default-absolute-time="{ startTime: rangeStart, endTime: rangeEnd }"
             data-test-name="dashboard-log-drawer-date-time"
             @on:date-change="onDateChange"
           />
           <OButton
-            size="sm"
-            :variant="showSql ? 'primary' : 'outline'"
-            icon-left="code"
+            :variant="showSql ? 'primary' : 'secondary'"
+            icon="code"
             data-test="log-explorer-sql-toggle"
             @click="showSql = !showSql"
           >
@@ -809,8 +810,8 @@ function openInLogs() {
           </OButton>
           <OTooltip v-if="openInLogsLocked" :content="openInLogsLockedReason">
             <span class="inline-flex">
-              <OButton size="sm" variant="outline" disabled data-test="log-explorer-open-in-logs">
-                <template #icon-left>
+              <OButton variant="secondary" disabled data-test="log-explorer-open-in-logs">
+                <template #icon>
                   <OIcon
                     name="lock"
                     class="text-icon-locked"
@@ -824,18 +825,17 @@ function openInLogs() {
           </OTooltip>
           <OButton
             v-else
-            size="sm"
-            variant="outline"
-            icon-left="open-in-new"
+            variant="secondary"
+            icon="open-in-new"
             data-test="log-explorer-open-in-logs"
             @click="openInLogs"
           >
             {{ t("panel.logExplorer.openInLogs") }}
           </OButton>
           <OButton
-            size="icon-sm"
-            variant="outline"
-            icon-left="refresh"
+            icon-only
+            variant="ghost"
+            icon="refresh"
             :loading="loading"
             data-test="log-explorer-run"
             @click="runQuery"
@@ -872,20 +872,21 @@ function openInLogs() {
         class="relative flex min-h-0 flex-1 flex-col"
         data-test="log-explorer-results-table"
       >
-        <OInnerLoading :showing="loading" size="sm" :label="t('common.loading')" />
+        <OLoadingLine :active="loading && events.length > 0" />
+        <OSkeleton v-if="loading && !events.length" preset="tableRows" />
 
-        <!-- Empty state (after the fetch settles) -->
-        <div
-          v-if="!loading && !events.length"
-          class="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-10"
+        <OEmptyState
+          v-else-if="!events.length"
+          icon="manage-search"
+          :title="t('panel.logExplorer.noEvents')"
         >
-          <OIcon name="manage-search" size="xl" class="text-text-secondary opacity-30" />
-          <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
-          <code
-            class="text-text-secondary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
-            >{{ customSql }}</code
-          >
-        </div>
+          <template #extra>
+            <code
+              class="text-text-secondary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
+              >{{ customSql }}</code
+            >
+          </template>
+        </OEmptyState>
 
         <!-- Highlighted log rows — same LogsHighLighting + expandable JSON as Surrounding events. -->
         <div v-else class="min-h-0 flex-1 overflow-y-auto">
@@ -938,21 +939,17 @@ function openInLogs() {
         <!-- Server pagination: the list shows one loaded page; controls fetch the next. -->
         <div
           v-if="total > 0"
-          class="bg-dialog-bg border-border-default sticky bottom-0 z-10 flex w-full items-center border-t px-3 py-2"
+          class="bg-dialog-bg border-border-default sticky bottom-0 z-10 flex w-full items-center justify-end border-t px-3 py-2"
         >
-          <div class="flex-1" />
-          <TablePaginationControls
-            :show-pagination="true"
-            :pagination="{ page: page + 1, rowsPerPage: pageSize }"
-            :total-rows="total"
-            :pages-number="resultTotalPages"
-            :is-first-page="page === 0"
-            :is-last-page="page >= resultTotalPages - 1"
-            @update:rows-per-page="(n: number) => (pageSize = n)"
-            @first-page="goToPage(0)"
-            @prev-page="goToPage(page - 1)"
-            @next-page="goToPage(page + 1)"
-            @last-page="goToPage(resultTotalPages - 1)"
+          <OPagination
+            :page="page + 1"
+            :page-count="resultTotalPages"
+            :page-size="pageSize"
+            :page-sizes="[20, 50, 100]"
+            :total="total"
+            data-test="dashboard-log-drawer-pagination"
+            @update:page="(next: number) => goToPage(next - 1)"
+            @update:page-size="(n: number) => (pageSize = n)"
           />
         </div>
       </div>
@@ -966,9 +963,9 @@ function openInLogs() {
           class="border-border-default bg-surface-panel flex shrink-0 items-center gap-2 border-b px-2 py-1"
         >
           <OButton
-            size="icon-xs"
+            icon-only
             variant="ghost"
-            icon-left="arrow-back"
+            icon="arrow-back"
             :aria-label="t('panel.logExplorer.detail.back')"
             data-test="log-explorer-detail-back"
             @click="closeEventDetail"
@@ -983,9 +980,9 @@ function openInLogs() {
           </div>
           <div class="flex shrink-0 items-center gap-1">
             <OButton
-              size="icon-xs"
-              variant="outline"
-              icon-left="chevron-left"
+              icon-only
+              variant="ghost"
+              icon="chevron-left"
               :disabled="!hasPrev"
               data-test="log-explorer-detail-prev"
               @click="goPrev"
@@ -996,9 +993,9 @@ function openInLogs() {
               >{{ selectedIndex + 1 }} / {{ events.length }}</span
             >
             <OButton
-              size="icon-xs"
-              variant="outline"
-              icon-left="chevron-right"
+              icon-only
+              variant="ghost"
+              icon="chevron-right"
               :disabled="!hasNext"
               data-test="log-explorer-detail-next"
               @click="goNext"
@@ -1006,7 +1003,7 @@ function openInLogs() {
               <OTooltip :content="t('panel.logExplorer.detail.nextEvent')" />
             </OButton>
           </div>
-          <OButton size="sm-toolbar" variant="outline" icon-left="link" @click="copyCurrentUrl()">
+          <OButton variant="secondary" icon="link" @click="copyCurrentUrl()">
             {{ t("panel.logExplorer.detail.copyLink") }}
           </OButton>
         </div>
@@ -1047,9 +1044,6 @@ function openInLogs() {
                   :data="fieldAnomalyProfile"
                   :columns="anomalyColumns"
                   :default-columns="false"
-                  :show-global-filter="false"
-                  :bordered="true"
-                  :frame="false"
                   pagination="none"
                   sorting="none"
                   :horizontal-scroll="true"
@@ -1083,7 +1077,7 @@ function openInLogs() {
                   <!-- Sampled value -->
                   <template #cell-sv="{ value }">
                     <span class="text-text-secondary truncate"
-                      >{{ value }}<OTooltip :content="raw(String(value))" max-width="22.5rem"
+                      >{{ value }}<OTooltip :content="raw(String(value))"
                     /></span>
                   </template>
                 </OTable>
@@ -1101,10 +1095,7 @@ function openInLogs() {
               </header>
               <div class="px-2 pb-3">
                 <!-- Skeleton while loading -->
-                <div
-                  v-if="insightsLoading && !timeline.length"
-                  class="rounded-default bg-surface-subtle h-14 animate-pulse"
-                />
+                <OSkeleton v-if="insightsLoading && !timeline.length" shape="block" class="h-14" />
                 <div v-else-if="!timeline.length" class="flex h-14 items-center justify-center">
                   <span class="text-text-secondary text-xs">{{
                     t("panel.logExplorer.insights.timelineEmpty")
@@ -1131,11 +1122,7 @@ function openInLogs() {
                   v-if="insightsLoading && !insightPatterns.length"
                   class="flex flex-col gap-2 px-2 py-3"
                 >
-                  <div
-                    v-for="n in 3"
-                    :key="n"
-                    class="rounded-default bg-surface-subtle h-6 animate-pulse"
-                  />
+                  <OSkeleton v-for="n in 3" :key="n" shape="block" class="h-6" />
                 </div>
                 <div v-else-if="!insightPatterns.length" class="px-2 py-3">
                   <span class="text-text-secondary text-xs">{{
@@ -1175,12 +1162,11 @@ function openInLogs() {
                         <span class="inline-flex shrink-0">
                           <OButton
                             :aria-label="t('panel.logExplorer.openInLogs')"
-                            size="sm"
                             variant="ghost"
                             disabled
                             data-test="log-explorer-pattern-open"
                           >
-                            <template #icon-left>
+                            <template #icon>
                               <OIcon
                                 name="lock"
                                 class="text-icon-locked"
@@ -1194,9 +1180,8 @@ function openInLogs() {
                       <OButton
                         v-else
                         :aria-label="t('panel.logExplorer.openInLogs')"
-                        size="sm"
                         variant="ghost"
-                        icon-left="open-in-new"
+                        icon="open-in-new"
                         class="shrink-0"
                         data-test="log-explorer-pattern-open"
                         @click.stop="openPatternInLogs(p.template)"
@@ -1227,20 +1212,15 @@ function openInLogs() {
               <header class="dld-section-header">
                 <OIcon name="timeline" size="xs" class="text-accent shrink-0" />
                 <span>{{ t("panel.logExplorer.insights.contextTitle") }}</span>
-                <OTooltip
-                  :content="t('panel.logExplorer.insights.contextTooltip')"
-                  side="bottom"
-                  max-width="17.5rem"
-                >
+                <OTooltip :content="t('panel.logExplorer.insights.contextTooltip')" side="bottom">
                   <OIcon name="info-outline" size="xs" class="text-text-secondary cursor-help" />
                 </OTooltip>
                 <div class="ms-auto shrink-0">
                   <ODropdown side="bottom" align="end">
                     <template #trigger>
                       <OButton
-                        size="sm"
-                        variant="outline"
-                        icon-right="arrow-drop-down"
+                        variant="secondary"
+                        icon-end="arrow-drop-down"
                         data-test="log-explorer-surround-window"
                       >
                         {{ surroundLabel }}
@@ -1262,11 +1242,7 @@ function openInLogs() {
                   v-if="(insightsLoading || surroundLoading) && !surroundEvents.length"
                   class="flex flex-col gap-2 px-2 py-3"
                 >
-                  <div
-                    v-for="n in 5"
-                    :key="n"
-                    class="rounded-default bg-surface-subtle h-7 animate-pulse"
-                  />
+                  <OSkeleton v-for="n in 5" :key="n" shape="block" class="h-7" />
                 </div>
                 <div v-else-if="!surroundEvents.length" class="px-2 py-3">
                   <span class="text-text-secondary text-xs">{{
@@ -1359,26 +1335,22 @@ function openInLogs() {
                   </div>
                   <div
                     v-if="surroundEvents.length"
-                    class="bg-dialog-bg border-border-default sticky bottom-0 z-10 flex w-full items-center border-t px-3 py-2"
+                    class="bg-dialog-bg border-border-default sticky bottom-0 z-10 flex w-full items-center justify-end border-t px-3 py-2"
                   >
-                    <div class="flex-1" />
-                    <TablePaginationControls
-                      :show-pagination="true"
-                      :pagination="{ page: surroundPage + 1, rowsPerPage: surroundPageSize }"
-                      :total-rows="surroundEvents.length"
-                      :pages-number="surroundTotalPages"
-                      :is-first-page="surroundPage === 0"
-                      :is-last-page="surroundPage >= surroundTotalPages - 1"
-                      @update:rows-per-page="
-                        (n) => {
+                    <OPagination
+                      :page="surroundPage + 1"
+                      :page-count="surroundTotalPages"
+                      :page-size="surroundPageSize"
+                      :page-sizes="[20, 50, 100]"
+                      :total="surroundEvents.length"
+                      data-test="dashboard-log-drawer-surround-pagination"
+                      @update:page="(next: number) => (surroundPage = next - 1)"
+                      @update:page-size="
+                        (n: number) => {
                           surroundPageSize = n;
                           surroundPage = 0;
                         }
                       "
-                      @first-page="surroundPage = 0"
-                      @prev-page="surroundPage--"
-                      @next-page="surroundPage++"
-                      @last-page="surroundPage = surroundTotalPages - 1"
                     />
                   </div>
                 </template>

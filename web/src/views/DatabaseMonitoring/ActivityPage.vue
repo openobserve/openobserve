@@ -47,12 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
-        :frame="false"
-        :toolbar-bordered="false"
         :error="error"
         :forbidden="forbidden"
         sorting="client"
-        :show-global-filter="false"
         table-id="dbm-activity"
         persist-columns
         :column-visibility="defaultColumnVisibility"
@@ -62,8 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #error="{ message }">
           <OEmptyState
-            preset="load-error"
-            :description="raw(message)"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             data-test="dbm-activity-error"
             @action="onRefresh()"
           />
@@ -92,20 +90,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
-            <DateTime
+          <div class="flex items-center gap-2">
+            <ODateTimeRange
               auto-apply
               menu-align="end"
               :default-type="range.type"
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-activity-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
+              class="max-md:[&_.date-time-label]:hidden"
               @on:date-change="onDateChange"
             />
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :loading="loading"
               :last-run-at="lastRunAt"
               data-test="dbm-activity-refresh"
@@ -133,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="px-page-edge border-table-row-divider flex flex-wrap items-center gap-x-3 gap-y-1 border-b py-1.5"
             data-test="dbm-activity-wait-breakdown"
           >
-            <span class="text-text-secondary text-3xs shrink-0 font-semibold">
+            <span class="text-text-secondary text-2xs shrink-0 font-semibold">
               {{ t("dbm.activity.columns.waitEvent") }}
             </span>
             <span
@@ -150,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-2xs font-mono tabular-nums">
                 {{ formatCount(bucket.sessions) }}
               </span>
-              <span v-if="bucket.share !== null" class="text-text-secondary text-3xs font-mono">
+              <span v-if="bucket.share !== null" class="text-text-secondary text-2xs font-mono">
                 {{ formatPercent(bucket.share, 0) }}
               </span>
             </span>
@@ -269,7 +265,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                own filter. -->
           <OEmptyState
             v-if="!loading && searchHidEverything"
-            preset="no-search-results"
+            kind="filtered"
+            :title="t('emptyState.noSearchResults.title')"
+            :text="t('emptyState.noSearchResults.description')"
             data-test="dbm-activity-no-matches"
             @action="search = ''"
           />
@@ -320,12 +318,13 @@ import { useRoute, useRouter } from "vue-router";
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";

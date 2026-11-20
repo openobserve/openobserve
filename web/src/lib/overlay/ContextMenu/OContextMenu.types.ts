@@ -11,7 +11,6 @@ import type { ContextMenuRootProps } from "reka-ui";
 
 // Re-export family types so callers can import everything from one place if needed
 export type {
-  ContextMenuItemVariant,
   ContextMenuItemProps,
   ContextMenuItemEmits,
   ContextMenuItemSlots,

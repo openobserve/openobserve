@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <span
-    class="text-3xs flex items-center justify-end gap-1 font-mono tabular-nums"
+    class="text-2xs flex items-center justify-end gap-1 font-mono tabular-nums"
     :data-test="dataTest"
   >
     <OTooltip v-if="hoverTitle" :content="hoverTitle" />

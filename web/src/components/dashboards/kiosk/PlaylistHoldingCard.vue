@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </p>
     <p
       v-if="title"
-      class="text-text-heading text-3xl font-semibold"
+      class="text-text-heading text-2xl font-semibold"
       data-test="dashboard-playlist-holding-title"
     >
       {{ title }}

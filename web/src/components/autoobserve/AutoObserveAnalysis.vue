@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DrawerSection :title="t('autoobserve.analysis.verdict')">
         <template v-if="unconfirmed" #aside>
           <OTag
-            variant="warning-soft"
+            tone="warn"
             size="sm"
             icon="hourglass-empty"
             :label="t('autoobserve.analysis.unconfirmed')"
@@ -46,13 +46,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-for="(chip, i) in issue.analysis.impact"
             :key="i"
-            :variant="verdictTone.tag"
+            :tone="verdictTone.tag"
             size="sm"
             :label="chip"
           />
           <OTag
             v-if="issue.analysis.duration"
-            variant="default-soft"
+            tone="neutral"
             size="sm"
             icon="schedule"
             :label="issue.analysis.duration"
@@ -60,8 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-for="svc in issue.services"
             :key="svc"
-            variant="default-soft"
-            shape="rounded"
+            tone="neutral"
             size="sm"
             :label="raw(svc)"
           />
@@ -124,8 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="autoobserve-analysis-comparison-loading"
           >
             <li v-for="i in comparisonSlots" :key="i" class="flex flex-col gap-1">
-              <OSkeleton animation="pulse" class="h-4 w-1/2" />
-              <OSkeleton animation="pulse" class="h-2 w-full" />
+              <OSkeleton shape="block" class="h-4 w-1/2" />
+              <OSkeleton shape="block" class="h-2 w-full" />
             </li>
           </ul>
           <!-- The error keeps the bars' height, so the evidence trail below never jumps. -->
@@ -134,26 +133,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :style="{ minHeight: reservedHeight }"
             data-test="autoobserve-analysis-comparison-error"
           >
-            <p role="alert" class="text-status-error-text flex items-center gap-1.5 text-xs">
-              <OIcon name="error-outline" size="xs" />
-              {{ comparisonMissing ?? t("autoobserve.issueLive.compare.failed") }}
-              <OButton
-                v-if="!comparisonMissing || comparisonCanRetry"
-                variant="ghost-primary"
-                size="xs"
-                data-test="autoobserve-analysis-comparison-retry"
-                @click="emit('retry-comparison')"
-                >{{ t("autoobserve.issueLive.spark.retry") }}</OButton
-              >
-            </p>
+            <OEmptyState
+              size="compact"
+              kind="error"
+              role="alert"
+              :title="comparisonMissing ?? t('autoobserve.issueLive.compare.failed')"
+            >
+              <template v-if="!comparisonMissing || comparisonCanRetry" #actions>
+                <OButton
+                  variant="secondary"
+                  size="sm"
+                  data-test="autoobserve-analysis-comparison-retry"
+                  @click="emit('retry-comparison')"
+                  >{{ t("autoobserve.issueLive.spark.retry") }}</OButton
+                >
+              </template>
+            </OEmptyState>
           </div>
-          <p
+          <OEmptyState
             v-else-if="!issue.analysis.comparison?.rows.length"
-            class="text-text-secondary text-xs"
+            size="compact"
+            icon="bar-chart"
+            :title="t('autoobserve.issueLive.compare.empty')"
             data-test="autoobserve-analysis-comparison-empty"
-          >
-            {{ t("autoobserve.issueLive.compare.empty") }}
-          </p>
+          />
           <ul v-else class="flex flex-col gap-3">
             <li
               v-for="(row, i) in issue.analysis.comparison?.rows ?? []"
@@ -195,8 +198,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ comparisonMissing }}
             <OButton
               v-if="comparisonCanRetry"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="autoobserve-analysis-comparison-missing-retry"
               @click="emit('retry-comparison')"
               >{{ t("autoobserve.issueLive.spark.retry") }}</OButton
@@ -288,18 +291,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #aside>
           <div v-if="report" class="ms-auto flex items-center gap-1">
             <OButton
-              variant="ghost-muted"
-              size="sm"
-              icon-left="content-copy"
+              variant="ghost"
+              icon="content-copy"
               data-test="autoobserve-analysis-copy"
               @click="copyReport()"
             >
               {{ t("alerts.incidents.rcaCopy") }}
             </OButton>
             <OButton
-              variant="ghost-muted"
-              size="sm"
-              icon-left="download"
+              variant="ghost"
+              icon="download"
               data-test="autoobserve-analysis-download"
               @click="downloadReport()"
             >
@@ -317,11 +318,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="autoobserve-analysis-report"
     >
       <OCollapsible
-        v-model="reportOpen"
-        icon="description"
-        :label="t('autoobserve.analysis.fullReport')"
-        :caption="t('autoobserve.analysis.fullReportHint')"
-        trigger-class="px-4 py-3 rounded-none"
+        v-model:open="reportOpen"
+        :title="t('autoobserve.analysis.fullReport')"
+        :summary="t('autoobserve.analysis.fullReportHint')"
       >
         <div class="flex flex-col p-4 pt-0">
           <slot name="report" />
@@ -334,13 +333,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import DrawerSection from "./v2/DrawerSection.vue";
 import AoConfidenceMeter from "./live/AoConfidenceMeter.vue";
@@ -406,11 +406,11 @@ const { t, locale } = useI18nTyped();
 const CARD =
   "bg-surface-base border-border-default rounded-surface flex flex-col border p-4 shadow-xs";
 
-const SEVERITY_TONE: Record<Severity, { bar: string; ink: string; tag: BadgeVariant }> = {
-  p1: { bar: "bg-status-error-text", ink: "text-status-error-text", tag: "error-soft" },
-  p2: { bar: "bg-status-error-text", ink: "text-status-error-text", tag: "error-soft" },
-  p3: { bar: "bg-status-warning-text", ink: "text-status-warning-text", tag: "warning-soft" },
-  p4: { bar: "bg-border-strong", ink: "text-text-heading", tag: "default-soft" },
+const SEVERITY_TONE: Record<Severity, { bar: string; ink: string; tag: ChipTone }> = {
+  p1: { bar: "bg-status-error-text", ink: "text-status-error-text", tag: "err" },
+  p2: { bar: "bg-status-error-text", ink: "text-status-error-text", tag: "err" },
+  p3: { bar: "bg-status-warning-text", ink: "text-status-warning-text", tag: "warn" },
+  p4: { bar: "bg-border-strong", ink: "text-text-heading", tag: "neutral" },
 };
 
 const VERDICT: Record<HypothesisVerdict, { icon: IconName; circle: string; ink: string }> = {
@@ -442,7 +442,7 @@ const KIND_ICON: Record<StepKind, IconName> = {
 const RESOLVED_TONE = {
   bar: "bg-status-positive",
   ink: "text-text-heading",
-  tag: "default-soft",
+  tag: "neutral",
 } as const;
 
 const tone = computed(() => SEVERITY_TONE[props.issue.severity]);

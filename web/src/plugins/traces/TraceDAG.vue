@@ -16,31 +16,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="h-full min-h-125 w-full">
-    <div
+    <OSkeleton
       v-if="isLoading"
+      shape="block"
+      class="h-125"
       data-test="traces-trace-dag-loading-container"
-      class="flex h-125 flex-col items-center justify-center p-6"
-    >
-      <OSpinner size="lg" />
-      <div class="text-text-secondary mt-3 text-sm">{{ t("traces.loadingTraceDag") }}</div>
-    </div>
+    />
 
-    <div v-else-if="error" data-test="traces-trace-dag-error-message" class="p-3">
-      <OBanner
-        variant="error"
-        icon="error"
-        :content="t('traces.traceDAG.failedToLoad', { error })"
-      />
-    </div>
+    <OEmptyState
+      v-else-if="error"
+      kind="error"
+      :text="errorText"
+      data-test="traces-trace-dag-error-message"
+      @action="fetchDAG"
+    />
 
-    <div
+    <OEmptyState
       v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0"
+      icon="info-outline"
+      :title="t('traces.traceDAG.noData')"
       data-test="traces-trace-dag-empty-container"
-      class="flex h-125 flex-col items-center justify-center p-6"
-    >
-      <OIcon name="info" style="width: 3rem; height: 3rem" />
-      <div class="text-text-muted mt-3">{{ t("traces.traceDAG.noData") }}</div>
-    </div>
+    />
 
     <div
       v-else
@@ -90,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="spanStatus"
               :value="data.span_status"
               :label="t('traces.errLabel')"
-              class="text-3xs mt-0.5 h-3.5 px-1"
+              class="mt-0.5"
             />
           </div>
           <Handle
@@ -119,9 +115,9 @@ import { useI18nTyped } from "@/types/i18n";
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
@@ -154,10 +150,9 @@ export default defineComponent({
     Background,
     Controls,
     Handle,
-    OSpinner,
-    OIcon,
+    OSkeleton,
+    OEmptyState,
     OTag,
-    OBanner,
     OTruncatedText,
   },
   props: {
@@ -536,10 +531,19 @@ export default defineComponent({
       },
     );
 
+    // Axios status text is not a reason a reader can act on (K6).
+    const errorText = computed(() =>
+      error.value && !isRawHttpText(error.value)
+        ? t("traces.traceDAG.failedToLoad", { error: error.value })
+        : t("emptyState.loadError.description"),
+    );
+
     return {
       t,
       isLoading,
       error,
+      errorText,
+      fetchDAG,
       dagData,
       nodes,
       edges,

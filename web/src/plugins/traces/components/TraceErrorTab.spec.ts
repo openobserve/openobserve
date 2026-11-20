@@ -189,8 +189,8 @@ describe("TraceErrorTab", () => {
         defaultTraceDetails({
           hasSpanError: true,
           spanStatusCode: "500",
-          statusCodeTitle: "Internal Server Error",
-          errorBannerTitle: "Internal Server Error",
+          statusCodeTitle: "Internal server error",
+          errorBannerTitle: "Internal server error",
         }),
       );
     });
@@ -199,14 +199,14 @@ describe("TraceErrorTab", () => {
       wrapper = mountTraceErrorTab();
 
       expect(wrapper.find('[data-test="trace-details-sidebar-error-summary"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("HTTP Status Code");
+      expect(wrapper.text()).toContain("HTTP status code");
     });
 
     it("should display the status code title", () => {
       wrapper = mountTraceErrorTab();
 
       expect(wrapper.find('[data-test="trace-details-sidebar-error-summary-title"]').text()).toBe(
-        "Internal Server Error",
+        "Internal server error",
       );
     });
 
@@ -243,7 +243,7 @@ describe("TraceErrorTab", () => {
       wrapper = mountTraceErrorTab();
 
       expect(wrapper.find('[data-test="trace-details-sidebar-error-summary"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("gRPC Status Code");
+      expect(wrapper.text()).toContain("gRPC status code");
     });
 
     it("should display the gRPC status code title", () => {
@@ -281,7 +281,7 @@ describe("TraceErrorTab", () => {
       expect(
         wrapper.find('[data-test="trace-details-sidebar-db-response-status-code"]').exists(),
       ).toBe(true);
-      expect(wrapper.text()).toContain("DB Response Status Code");
+      expect(wrapper.text()).toContain("DB response status code");
     });
 
     it("should display the DB status code value", () => {
@@ -323,7 +323,7 @@ describe("TraceErrorTab", () => {
       expect(wrapper.find('[data-test="trace-details-sidebar-process-exit-code"]').exists()).toBe(
         true,
       );
-      expect(wrapper.text()).toContain("Process Exit Code");
+      expect(wrapper.text()).toContain("Process exit code");
     });
 
     it("should display the process exit code value", () => {
@@ -396,8 +396,8 @@ describe("TraceErrorTab", () => {
         defaultTraceDetails({
           hasSpanError: true,
           spanStatusCode: "500",
-          statusCodeTitle: "Internal Server Error",
-          errorBannerTitle: "Internal Server Error",
+          statusCodeTitle: "Internal server error",
+          errorBannerTitle: "Internal server error",
           errorBannerMessage: "The server encountered an error",
         }),
       );
@@ -417,14 +417,14 @@ describe("TraceErrorTab", () => {
       wrapper = mountTraceErrorTab();
 
       const summaryBanners = wrapper.findAll('[data-test="trace-details-sidebar-error-summary"]');
-      expect(summaryBanners[0].text()).toContain("HTTP Status Code");
+      expect(summaryBanners[0].text()).toContain("HTTP status code");
     });
 
     it("should show the status code title in the first banner", () => {
       wrapper = mountTraceErrorTab();
 
       const titles = wrapper.findAll('[data-test="trace-details-sidebar-error-summary-title"]');
-      expect(titles[0].text()).toBe("Internal Server Error");
+      expect(titles[0].text()).toBe("Internal server error");
     });
 
     it("should show the error message in the second (generic) banner", () => {
@@ -652,7 +652,7 @@ describe("TraceErrorTab", () => {
         );
       });
 
-      it("should show a success notification after copying", async () => {
+      it("confirms the copy in place with a check, not a toast", async () => {
         wrapper = mountTraceErrorTab();
 
         // Row is auto-expanded on mount — copy button is already visible
@@ -660,12 +660,10 @@ describe("TraceErrorTab", () => {
         await copyBtn.trigger("click");
         await flushPromises();
 
-        expect(mockToast).toHaveBeenCalledWith(
-          expect.objectContaining({
-            message: "Stacktrace copied to clipboard",
-            variant: "success",
-          }),
-        );
+        expect(
+          wrapper.find('[data-test="exception-copy-stacktrace-btn"]').attributes("data-copied"),
+        ).toBe("true");
+        expect(mockToast).not.toHaveBeenCalled();
       });
     });
   });

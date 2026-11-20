@@ -34,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="visual in usersDisplayOptions"
               :key="visual.value"
               :value="visual.value"
-              size="sm"
               :data-test="`iam-users-selection-show-${visual.value}-btn`"
             >
               {{ visual.label }}
@@ -44,9 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div data-test="iam-users-selection-search-input" class="me-3">
         <OSearchInput
+          width="list"
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          class="h-9 w-50"
           :placeholder="t('iam.groupUsers.searchUser')"
         />
       </div>
@@ -83,8 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="iam-group-users"
-        :show-global-filter="false"
-        dense
       >
         <template #cell-select="{ row }">
           <OCheckbox
@@ -116,38 +113,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <OEmptyState
             v-if="orgListStatus === 'error'"
-            size="block"
+            kind="error"
             class="shrink-0"
-            preset="load-error"
             data-test="iam-users-selection-load-error"
-            @action="(id) => (id === 'retry' ? retryOrgUsers() : null)"
+            @action="retryOrgUsers()"
           />
           <OEmptyState
             v-else-if="showNoneSelected"
-            size="block"
             class="shrink-0"
-            preset="no-users"
+            icon="group"
             data-test="iam-users-selection-none-selected"
             :title="t('iam.groupUsers.noneSelectedTitle')"
-            :description="t('iam.groupUsers.noneSelectedDescription')"
-            :actions="[
-              {
-                id: 'show-all',
-                icon: 'list',
-                titleKey: 'iam.groupUsers.showAll',
-                descriptionKey: 'iam.groupUsers.showAllDesc',
-              },
-            ]"
-            @action="(id) => (id === 'show-all' ? updateUserTable('all') : null)"
+            :text="t('iam.groupUsers.noneSelectedDescription')"
+            :action-label="t('iam.groupUsers.showAll')"
+            @action="updateUserTable('all')"
           />
           <OEmptyState
             v-else
-            size="block"
             class="shrink-0"
-            preset="no-users"
-            :filtered="!!userSearchKey"
-            :hide-action="!userSearchKey"
-            @action="(id) => (id === 'clear-filters' ? (userSearchKey = '') : null)"
+            :kind="userSearchKey ? 'filtered' : 'first-run'"
+            :title="
+              userSearchKey
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.users') })
+                : t('emptyState.noUsers.title')
+            "
+            :text="
+              userSearchKey
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.users') })
+                : t('emptyState.noUsers.description')
+            "
+            :icon="userSearchKey ? undefined : 'group'"
+            @action="userSearchKey = ''"
           />
         </template>
       </OTable>

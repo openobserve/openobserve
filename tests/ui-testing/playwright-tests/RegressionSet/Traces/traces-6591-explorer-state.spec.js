@@ -134,11 +134,12 @@ test.describe('Traces Explorer state (#6591)', () => {
     const pagination = page.locator('[data-test="traces-search-result-pagination"]');
     await expect(pagination).toBeVisible({ timeout: 30000 });
 
-    const secondPage = page.locator('[data-test="traces-search-result-pagination-page-2"]');
-    await expect(secondPage, 'the fixture must produce more than one page').toBeVisible({
+    const nextPage = page.locator('[data-test="traces-search-result-pagination-next"]');
+    await expect(nextPage, 'the fixture must produce more than one page').toBeEnabled({
       timeout: 15000,
     });
-    await secondPage.click();
+    await nextPage.click();
+    await expect(pagination).toHaveAttribute('data-test-page', '2');
     await page.waitForTimeout(3000);
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 20000 });
   });

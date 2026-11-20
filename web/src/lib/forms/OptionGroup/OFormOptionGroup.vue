@@ -33,7 +33,6 @@ if (import.meta.env.DEV && !form) {
           :help-text="props.helpText"
           :disabled="props.disabled"
           :required="props.required"
-          :size="props.size"
           :name="props.name"
           :model-value="field.state.value"
           :error="shown(field).invalid"

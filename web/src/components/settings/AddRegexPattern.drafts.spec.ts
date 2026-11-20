@@ -242,19 +242,21 @@ describe("AddRegexPattern drafts", () => {
     expect(readEditorDraft(newScope)).toBeNull();
   });
 
-  it("the close button asks too, and Keep draft closes the drawer with the work kept", async () => {
+  it("the close button asks in the drawer's own footer, and Discard drops the draft", async () => {
     await mountPage();
     await openNew();
-    await clickAndType("add-regex-pattern-name-input", "kept_for_later");
+    await clickAndType("add-regex-pattern-name-input", "not_kept");
+    window.dispatchEvent(new Event("pagehide"));
 
     clickIn("regex-pattern-list-add-regex-pattern-drawer", "o-drawer-close-btn");
     await flushPromises();
     expect(drawerOpen()).toBe(true);
-    clickLeave("o-dialog-secondary-btn");
+    expect(byTest("editor-draft-leave-dialog")).toBeNull();
+    clickIn("regex-pattern-list-add-regex-pattern-drawer", "o-drawer-discard-btn");
     await flushPromises();
 
     expect(drawerOpen()).toBe(false);
-    expect(readEditorDraft<{ name: string }>(newScope)?.data.name).toBe("kept_for_later");
+    expect(readEditorDraft(newScope)).toBeNull();
   });
 
   it("a clean drawer closes without asking", async () => {

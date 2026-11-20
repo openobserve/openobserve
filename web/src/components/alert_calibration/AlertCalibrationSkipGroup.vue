@@ -15,91 +15,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard
-    v-if="rows.length"
-    variant="glass"
-    class="border-s-status-neutral-text border-s-3"
-    data-test="alert-calibration-skip-group"
-  >
-    <OCardSection role="body" class="flex flex-col gap-0.5 pt-3 pb-2">
+  <OCard v-if="rows.length" data-test="alert-calibration-skip-group">
+    <template #header>
       <div class="flex min-w-0 items-center gap-1.5">
         <OIcon name="report-problem" size="sm" class="text-status-warning-text shrink-0" />
-        <OText variant="card-title" as="h2" data-test="alert-calibration-skip-group-title">{{
-          t(titleKey)
-        }}</OText>
-        <OBadge
-          variant="default-soft"
-          size="sm"
-          shape="rounded"
-          data-test="alert-calibration-skip-group-count"
-          >{{ countOrDash(rows.length, locale) }}</OBadge
+        <h2
+          class="text-text-heading text-compact min-w-0 truncate font-semibold"
+          data-test="alert-calibration-skip-group-title"
         >
+          {{ t(titleKey) }}
+        </h2>
+        <OBadge tone="neutral" size="sm" data-test="alert-calibration-skip-group-count">{{
+          countOrDash(rows.length, locale)
+        }}</OBadge>
       </div>
+    </template>
+    <div class="flex flex-col gap-3">
       <OText variant="meta" as="p">{{
         t(whyKey, { count: countOrDash(rows.length, locale) }, rows.length)
       }}</OText>
-    </OCardSection>
-    <OCardSection
-      v-for="group in groups"
-      :key="group.key"
-      role="body"
-      class="flex flex-col gap-2 py-2"
-      data-test="alert-calibration-skip-group-cause"
-    >
-      <dl class="grid grid-cols-[4rem_1fr] gap-x-3 gap-y-1 text-xs">
-        <dt class="text-text-secondary">{{ t("alertCalibration.notChecked.whyLabel") }}</dt>
-        <dd class="text-text-body" data-test="alert-calibration-skip-group-cause-why">
-          {{ group.why }}
-        </dd>
-        <dt class="text-text-secondary">{{ t("alertCalibration.notChecked.nextLabel") }}</dt>
-        <dd class="text-text-body" data-test="alert-calibration-skip-group-cause-next">
-          {{ nextFor(group.rows[0]) }}
-        </dd>
-      </dl>
-      <div class="flex flex-col">
-        <div
-          v-for="row in shownRows(group)"
-          :key="row.key"
-          class="border-border-subtle flex min-w-0 items-center justify-between gap-2 border-t py-1.5"
-          data-test="alert-calibration-skip-group-row"
-        >
-          <span class="text-text-heading min-w-0 truncate text-xs">{{ row.label }}</span>
-          <OButton
-            variant="outline"
-            size="xs"
-            :loading="ctaFor(row).pending"
-            data-test="alert-calibration-skip-group-cta"
-            @click="ctaFor(row).run()"
+      <div
+        v-for="group in groups"
+        :key="group.key"
+        class="flex flex-col gap-2"
+        data-test="alert-calibration-skip-group-cause"
+      >
+        <dl class="grid grid-cols-[4rem_1fr] gap-x-3 gap-y-1 text-xs">
+          <dt class="text-text-secondary">{{ t("alertCalibration.notChecked.whyLabel") }}</dt>
+          <dd class="text-text-body" data-test="alert-calibration-skip-group-cause-why">
+            {{ group.why }}
+          </dd>
+          <dt class="text-text-secondary">{{ t("alertCalibration.notChecked.nextLabel") }}</dt>
+          <dd class="text-text-body" data-test="alert-calibration-skip-group-cause-next">
+            {{ nextFor(group.rows[0]) }}
+          </dd>
+        </dl>
+        <div class="flex flex-col">
+          <div
+            v-for="row in shownRows(group)"
+            :key="row.key"
+            class="border-border-subtle flex min-w-0 items-center justify-between gap-2 border-t py-1.5"
+            data-test="alert-calibration-skip-group-row"
           >
-            {{ ctaFor(row).label }}
-          </OButton>
-        </div>
-        <div
-          v-if="hiddenCount(group) > 0"
-          class="border-border-subtle flex min-w-0 items-center gap-1 border-t pt-1.5"
-          data-test="alert-calibration-skip-group-more-line"
-        >
-          <OText variant="meta" as="span">{{
-            t("alertCalibration.notChecked.andMore", {
-              count: countOrDash(hiddenCount(group), locale),
-            })
-          }}</OText>
-          {{ " " }}
-          <OButton
-            variant="ghost-primary"
-            size="xs"
-            data-test="alert-calibration-skip-group-more"
-            @click="expand(group.key)"
+            <span class="text-text-heading min-w-0 truncate text-xs">{{ row.label }}</span>
+            <OButton
+              variant="secondary"
+              size="sm"
+              :loading="ctaFor(row).pending"
+              data-test="alert-calibration-skip-group-cta"
+              @click="ctaFor(row).run()"
+            >
+              {{ ctaFor(row).label }}
+            </OButton>
+          </div>
+          <div
+            v-if="hiddenCount(group) > 0"
+            class="border-border-subtle flex min-w-0 items-center gap-1 border-t pt-1.5"
+            data-test="alert-calibration-skip-group-more-line"
           >
-            {{
-              t("alertCalibration.notChecked.showAll", {
-                count: countOrDash(group.rows.length, locale),
+            <OText variant="meta" as="span">{{
+              t("alertCalibration.notChecked.andMore", {
+                count: countOrDash(hiddenCount(group), locale),
               })
-            }}
-          </OButton>
+            }}</OText>
+            {{ " " }}
+            <OButton
+              variant="accent-ghost"
+              size="sm"
+              data-test="alert-calibration-skip-group-more"
+              @click="expand(group.key)"
+            >
+              {{
+                t("alertCalibration.notChecked.showAll", {
+                  count: countOrDash(group.rows.length, locale),
+                })
+              }}
+            </OButton>
+          </div>
         </div>
       </div>
-    </OCardSection>
+    </div>
   </OCard>
 </template>
 
@@ -125,7 +120,6 @@ import { computed, ref } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";

@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          (Functions.vue) which may not have fully rendered when this component
          mounts on initial page load. -->
     <Teleport to="#o2-page-actions" defer>
-      <DateTime
+      <ODateTimeRange
         ref="dateTimeRef"
         auto-apply
         :default-type="dateTimeType"
@@ -69,8 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @reset:column-sizes="tableRef?.resetColumnSizes()"
         />
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           class="shrink-0"
           :last-run-at="lastUpdatedAt"
           :loading="loading"
@@ -87,17 +85,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTable
           :forbidden="forbidden"
           ref="tableRef"
-          :frame="false"
           :data="rows"
           :columns="columns"
           :column-visibility="columnVisibility"
           :default-columns="false"
-          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="pipelines-pipeline-history-list"
           row-key="id"
-          width="100%"
           class="h-full w-full"
           pagination="server"
           :current-page="pagination.page"
@@ -108,9 +103,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-by="pagination.sortBy"
           :sort-order="pagination.descending ? 'desc' : 'asc'"
           :loading="loading"
-          :show-global-filter="false"
-          dense
-          bordered
           sticky-header
           @pagination-change="onPaginationChange"
           @sort-change="onSortChange"
@@ -220,11 +212,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-pipeline-history"
-              :filtered="!!searchQuery"
-              :hide-action="!searchQuery"
-              @action="(id) => id === 'clear-filters' && clearSearch()"
+              :kind="searchQuery ? 'filtered' : 'first-run'"
+              :title="
+                searchQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.pipelineHistory') })
+                  : t('emptyState.noPipelineHistory.title')
+              "
+              :text="
+                searchQuery
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.nouns.pipelineHistory'),
+                    })
+                  : t('emptyState.noPipelineHistory.description')
+              "
+              :icon="searchQuery ? undefined : 'history'"
+              @action="clearSearch()"
             />
           </template>
         </OTable>
@@ -237,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="detailsDialog"
       size="lg"
       :title="t('pipeline.executionDetailsTitle')"
-      :primary-button-label="t('common.close')"
+      :primary="{ label: t('common.close') }"
       @click:primary="detailsDialog = false"
     >
       <div class="scroll" style="max-height: 70vh" v-if="selectedRow">
@@ -427,14 +429,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="errorDialog"
       size="sm"
       :title="errorMessage?.pipeline_name"
-      :sub-title="
+      :subtitle="
         errorMessage?.last_error_timestamp
           ? t('common.lastErrorAt', {
               time: new Date(errorMessage.last_error_timestamp / 1000).toLocaleString(),
             })
           : undefined
       "
-      :primary-button-label="t('common.close')"
+      :primary="{ label: t('common.close') }"
       @update:open="(v) => !v && closeErrorDialog()"
       @click:primary="closeErrorDialog"
     >
@@ -460,7 +462,7 @@ import { ref, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import * as dateUtils from "@/utils/date";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

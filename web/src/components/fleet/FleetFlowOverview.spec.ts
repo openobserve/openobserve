@@ -435,10 +435,10 @@ describe("FleetFlowOverview window and states", () => {
     ).toHaveLength(1);
   });
 
-  it("shows the loading overlay on the first load", async () => {
+  it("shows the loading line on the first load", async () => {
     serve(() => new Promise(() => {}));
     await mountOverview();
-    expect(wrapper.findComponent({ name: "OInnerLoading" }).props("showing")).toBe(true);
+    expect(wrapper.findComponent({ name: "OLoadingLine" }).props("active")).toBe(true);
   });
 
   it("shows the load-failed banner on an error, and Retry refetches", async () => {

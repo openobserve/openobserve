@@ -22,12 +22,12 @@ import { gt, raw, useI18nTyped } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import K8sListView from "./K8sListView.vue";
 import MapView from "./MapView.vue";
@@ -144,20 +144,6 @@ const treeGroups = computed(() =>
 const treeNodes = computed(() =>
   nodeSummary(k8s.inventory.value, k8s.effectiveCluster.value, stats.value),
 );
-
-const crumbs = computed(() => {
-  const group = treeGroups.value.find((g) => g.items.some((i) => i.view === state.value.view));
-  const item = group?.items.find((i) => i.view === state.value.view);
-  return group && item
-    ? {
-        group: t(group.label),
-        view:
-          group.id === "workloads" && item.view === "workloads"
-            ? t("infra.k8s2.treeOverview")
-            : t(item.label),
-      }
-    : null;
-});
 
 // Below md the hot-bar and tree are hidden, so views stay reachable through a select.
 const viewOptions = computed(() =>
@@ -477,24 +463,29 @@ k8s.loadStreams();
 </script>
 
 <template>
-  <OPageLayout :title="t('menu.kubernetes')" :subtitle="t('infra.k8s2.subtitle')" icon="hub" bleed>
-    <template v-if="ready && crumbs" #subtitle>
-      <OText class="flex min-w-0 items-center gap-1.5 text-sm" data-test="k8s2-breadcrumb">
-        <span class="max-md:hidden">{{ raw(k8s.effectiveCluster.value ?? "") }}</span>
-        <span class="max-md:hidden">/</span>
-        <span>{{ crumbs.group }}</span>
-        <span>/</span>
-        <span class="text-text-heading font-semibold">{{ crumbs.view }}</span>
-      </OText>
+  <OPageLayout :title="t('menu.kubernetes')" bleed>
+    <template v-if="ready" #banner>
+      <OBanner
+        v-if="lastKnown && !offline"
+        tone="info"
+        :message="t('infra.k8s2.offlineLastKnown')"
+        data-test="k8s2-banner-last-known"
+      />
+      <OBanner
+        v-for="banner in offline ? [] : k8s.banners.value"
+        :key="banner.id"
+        :tone="banner.tone"
+        :message="t(banner.key, banner.params ?? {})"
+        :data-test="`k8s2-banner-${banner.id}`"
+      />
     </template>
     <template #actions>
       <div class="flex items-center gap-2">
         <OButton
           v-if="ready"
           class="max-md:hidden"
-          variant="outline"
-          size="sm"
-          icon-left="search"
+          variant="secondary"
+          icon="search"
           data-test="k8s2-palette-open"
           @click="openPalette"
         >
@@ -502,9 +493,9 @@ k8s.loadStreams();
         </OButton>
         <OButton
           v-if="ready"
+          icon-only
           class="md:hidden"
-          variant="outline"
-          size="icon-sm"
+          variant="ghost"
           :aria-label="t('infra.k8s2.paletteButton')"
           data-test="k8s2-palette-open-compact"
           @click="openPalette"
@@ -514,7 +505,6 @@ k8s.loadStreams();
         <OSelect
           v-if="ready"
           class="w-40 md:hidden"
-          size="sm"
           :model-value="state.view"
           :options="viewOptions"
           :aria-label="t('infra.k8s2.viewSelect')"
@@ -524,7 +514,6 @@ k8s.loadStreams();
         <OSelect
           v-if="detection === 'detected' && (clusterOptions.length || clustersLoading)"
           class="w-48 max-md:w-32 md:hidden"
-          size="sm"
           searchable
           :model-value="clusterOptions.length ? k8s.effectiveCluster.value : null"
           :options="clusterOptions"
@@ -535,7 +524,7 @@ k8s.loadStreams();
           data-test="k8s2-cluster-select"
           @update:model-value="onCluster"
         />
-        <DateTime
+        <ODateTimeRange
           ref="dateTimePickerRef"
           apply-presets
           menu-align="end"
@@ -560,21 +549,6 @@ k8s.loadStreams();
         @cluster="onCluster"
       />
       <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col" data-k8s2-body data-test="k8s2-body">
-        <OBanner
-          v-if="lastKnown && !offline"
-          variant="info"
-          dense
-          :content="t('infra.k8s2.offlineLastKnown')"
-          data-test="k8s2-banner-last-known"
-        />
-        <OBanner
-          v-for="banner in offline ? [] : k8s.banners.value"
-          :key="banner.id"
-          :variant="banner.variant"
-          dense
-          :content="t(banner.key, banner.params ?? {})"
-          :data-test="`k8s2-banner-${banner.id}`"
-        />
         <div
           ref="viewsRef"
           class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto"
@@ -582,11 +556,10 @@ k8s.loadStreams();
         >
           <OEmptyState
             v-if="offline"
-            preset="no-data"
             :title="
               t('infra.k8s2.offlineTitle', { cluster: raw(k8s.effectiveCluster.value ?? '') })
             "
-            :description="
+            :text="
               t(lastKnown ? 'infra.k8s2.offlineLastKnownEmpty' : 'infra.k8s2.offlineDescription')
             "
             :action-label="lastKnown ? undefined : t('infra.k8s2.offlineShowLast')"
@@ -697,37 +670,34 @@ k8s.loadStreams();
       </div>
     </div>
 
-    <div
-      v-else-if="detection === 'unknown'"
-      class="flex min-h-60 items-center justify-center"
-      data-test="k8s2-spinner"
-    >
-      <OSpinner size="lg" />
+    <div v-else-if="detection === 'unknown'" class="px-page-edge" data-test="k8s2-loading">
+      <OSkeleton preset="tableRows" :rows="8" />
     </div>
 
     <OEmptyState
       v-else-if="detection === 'error'"
-      preset="load-error"
+      kind="error"
+      :text="t('emptyState.loadError.description')"
       :title="t('infra.k8s2.streamsError')"
       data-test="k8s2-streams-error"
       @action="retryStreams"
     />
 
     <div v-else-if="detection === 'undetected'" class="min-h-0 flex-1 overflow-y-auto">
-      <div
-        class="max-lg:px-page-edge mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
-        data-test="k8s2-empty-state"
-      >
-        <OText tag="h2" class="text-xl font-semibold">{{ t("infra.k8s2.emptyHeadline") }}</OText>
-        <DataSourceSetupCard slug="kubernetes" @detected="retryStreams" />
-      </div>
+      <OEmptyState icon="lan" :title="t('infra.k8s2.emptyHeadline')" data-test="k8s2-empty-state">
+        <template #extra>
+          <div class="w-full max-w-3xl min-w-0 text-start">
+            <DataSourceSetupCard slug="kubernetes" @detected="retryStreams" />
+          </div>
+        </template>
+      </OEmptyState>
     </div>
 
     <OEmptyState
       v-else-if="pageError"
-      preset="load-error"
+      kind="error"
       :title="t('infra.k8s2.pageError')"
-      :description="raw(pageError)"
+      :text="isRawHttpText(pageError) ? t('emptyState.loadError.description') : raw(pageError)"
       data-test="k8s2-page-error"
       @action="retryPage"
     />

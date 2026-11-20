@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- Category tag — shown in cross-category search results so hits are attributable -->
           <div v-if="categoryTag">
-            <OBadge data-test="semantic-group-category-tag" size="xs" variant="default-soft">{{
+            <OBadge data-test="semantic-group-category-tag" size="sm" tone="neutral">{{
               categoryTag
             }}</OBadge>
           </div>
@@ -62,22 +62,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex min-h-full flex-col justify-between">
           <div class="flex justify-end">
             <OButton
+              icon-only
               data-test="semantic-group-remove-group-btn"
               type="button"
-              :variant="isProtected ? 'ghost-muted' : 'ghost'"
-              size="icon-circle-sm"
+              variant="ghost"
+              size="sm"
+              icon="delete"
+              :label="t('correlation.removeSemanticGroup')"
               :disabled="isProtected"
+              :disabled-reason="isProtected ? t('correlation.serviceGroupProtected') : undefined"
               @click="!isProtected && emit('delete')"
-            >
-              <OIcon name="delete" size="sm" />
-              <OTooltip
-                :content="
-                  isProtected
-                    ? t('correlation.serviceGroupProtected')
-                    : t('correlation.removeSemanticGroup')
-                "
-              />
-            </OButton>
+            />
           </div>
         </div>
       </div>
@@ -95,7 +90,6 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
   makeSemanticGroupItemSchema,

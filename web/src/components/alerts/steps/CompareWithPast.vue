@@ -25,9 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
       >
-        <div
-          class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
-        />
         <span class="section-header-title text-compact text-text-heading font-semibold">{{
           t("alerts.steps.compareWithPast")
         }}</span>
@@ -35,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="px-3 pb-2">
         <!-- Alert set for header -->
         <div
-          class="multi-window-text text-text-body mt-3 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
+          class="multi-window-text text-text-body mt-3 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-semibold"
         >
           <span>{{ t("alerts.compareWithPast.alertSetFor") }}</span>
           <div class="border-line h-px flex-1"></div>
@@ -46,14 +43,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="bg-card-glass-bg border-border-default flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
         >
           <div
-            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-semibold"
           >
             {{ t("alerts.compareWithPast.currentWindow") }}
           </div>
 
           <div class="flex flex-col items-start gap-2">
             <div
-              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-semibold"
             >
               {{ t("alerts.compareWithPast.cycle") }}
               <span class="cursor-pointer">
@@ -63,12 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="ms-1 cursor-pointer"
                   :class="'text-text-secondary'"
                 />
-                <OTooltip
-                  :content="t('alerts.compareWithPast.cycleTooltip')"
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                />
+                <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" />
               </span>
             </div>
             <div class="flex items-start justify-between gap-4">
@@ -83,20 +75,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>
                 <span class="inline-block">
                   <OButton
+                    icon-only
                     aria-hidden="true"
                     tabindex="-1"
-                    class="pointer-events-none min-w-auto opacity-30"
+                    class="pointer-events-none opacity-30"
                     variant="ghost"
-                    size="icon-circle-sm"
-                    disable
+                    size="sm"
+                    disabled
                   >
                     <OIcon name="delete-outline" size="sm" />
                   </OButton>
                   <OTooltip
                     :content="t('alerts.compareWithPast.currentWindowCannotBeDeleted')"
                     side="top"
-                    align="center"
-                    :sideOffset="8"
                   />
                 </span>
               </div>
@@ -107,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Comparing with header -->
         <div
           v-if="localMultiTimeRange.length > 0"
-          class="multi-window-text text-text-body mt-2 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
+          class="multi-window-text text-text-body mt-2 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-semibold"
         >
           <span>{{ t("alerts.compareWithPast.comparingWith") }}</span>
           <div class="border-line h-px flex-1"></div>
@@ -125,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="reference-window-container bg-card-glass-bg border-border-default mt-2 flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
         >
           <div
-            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-semibold"
           >
             {{ t("alerts.compareWithPast.referenceWindow") }} {{ index + 1 }}
           </div>
@@ -142,12 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="ms-1 cursor-pointer"
                   :class="'text-text-secondary'"
                 />
-                <OTooltip
-                  :content="t('alerts.compareWithPast.timeFrameTooltip')"
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                />
+                <OTooltip :content="t('alerts.compareWithPast.timeFrameTooltip')" side="right" />
               </span>
             </div>
             <div class="datetime-picker-wrapper rounded-default !border-border-default mt-2 border">
@@ -164,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Cycle Info -->
           <div class="flex flex-col items-start gap-2">
             <div
-              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-semibold"
             >
               {{ t("alerts.compareWithPast.cycle") }}
               <span class="cursor-pointer">
@@ -174,12 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="ms-1 cursor-pointer"
                   :class="'text-text-secondary'"
                 />
-                <OTooltip
-                  :content="t('alerts.compareWithPast.cycleTooltip')"
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                />
+                <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" />
               </span>
             </div>
             <div class="flex items-start justify-between gap-4">
@@ -192,10 +173,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div>
                 <OButton
+                  icon-only
                   :aria-label="t('common.delete')"
                   data-test="multi-time-range-alerts-delete-btn"
                   variant="ghost"
-                  size="icon-circle-sm"
+                  size="sm"
                   @click="removeTimeShift(index)"
                 >
                   <OIcon name="delete-outline" size="sm" />
@@ -209,8 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mt-2 flex w-full items-center justify-center gap-3">
           <OButton
             data-test="multi-time-range-alerts-add-btn"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :disabled="isComparisonDisabled"
             @click="addTimeShift"
           >
@@ -219,8 +200,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isComparisonDisabled"
               :content="raw(comparisonDisabledTooltip)"
               side="top"
-              align="center"
-              :sideOffset="8"
             />
           </OButton>
         </div>
@@ -354,7 +333,7 @@ export default defineComponent({
     };
 
     // Offset code ("15m") → counted noun. Shares the *Count plural keys with
-    // convertMinutesToDisplayValue so "1m" reads "1 Minute", not "1 Minutes".
+    // convertMinutesToDisplayValue so "1m" reads "1 minute", not "1 minutes".
     const UNIT_COUNT_KEYS: Record<string, I18nKey> = {
       s: "alerts.compareWithPast.secondCount",
       m: "alerts.compareWithPast.minuteCount",
@@ -380,9 +359,8 @@ export default defineComponent({
       return value;
     };
 
-    // Counted nouns → vue-i18n plural forms ("{n} Minute | {n} Minutes"),
-    // called as t(key, n). vue-i18n picks the singular form only for n === 1
-    // (n === 0 → "0 Minutes").
+    // Counted nouns use vue-i18n plural forms via t(key, n), which picks the
+    // singular only for n === 1, so 0 reads "0 minutes".
     const convertMinutesToDisplayValue = (minutes: number) => {
       if (minutes < 60) {
         return t("alerts.compareWithPast.minuteCount", minutes);

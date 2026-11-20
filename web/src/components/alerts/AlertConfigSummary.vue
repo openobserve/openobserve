@@ -21,60 +21,56 @@
   every change.
 -->
 <template>
-  <div class="grid grid-cols-1 gap-4 lg:grid-cols-2" data-test="alerts-alertconfigsummary">
-    <OCard v-for="section in sections" :key="section.key">
-      <OCardSection role="body">
-        <h3 class="text-text-heading mb-3 text-lg">{{ section.title }}</h3>
-        <div class="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
-          <div
-            v-for="field in section.fields"
-            :key="field.key"
-            class="flex min-w-0 flex-col gap-1"
-            :class="fieldSpan(field)"
-            :data-test="`alerts-alertconfigsummary-${field.key}`"
+  <div class="grid grid-cols-1 gap-3 lg:grid-cols-2" data-test="alerts-alertconfigsummary">
+    <OCard v-for="section in sections" :key="section.key" :title="section.title">
+      <div class="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
+        <div
+          v-for="field in section.fields"
+          :key="field.key"
+          class="flex min-w-0 flex-col gap-1"
+          :class="fieldSpan(field)"
+          :data-test="`alerts-alertconfigsummary-${field.key}`"
+        >
+          <span
+            :id="labelId(field.key)"
+            class="text-compact text-text-secondary leading-tight font-medium"
+            >{{ field.label }}</span
           >
-            <span
-              :id="labelId(field.key)"
-              class="text-compact text-text-secondary leading-tight font-medium"
-              >{{ field.label }}</span
+          <OCodeBlock
+            v-if="field.code"
+            :code="field.value"
+            :lang="field.code"
+            :max-lines="12"
+            wrap
+            role="group"
+            :aria-labelledby="labelId(field.key)"
+            class="my-0!"
+            :data-test="`alerts-alertconfigsummary-${field.key}-code`"
+          />
+          <div v-else-if="field.badge" class="flex h-7 items-center">
+            <OTag :type="field.badge" :value="field.value" size="sm" />
+          </div>
+          <div
+            v-else
+            class="flex min-h-7 items-center gap-1 text-sm wrap-anywhere"
+            :class="shownValue(field.value) ? 'text-text-heading' : 'text-text-muted'"
+            :data-test="`alerts-alertconfigsummary-${field.key}-value`"
+          >
+            {{ shownValue(field.value) || t("alerts.configNotSet") }}
+            <!-- Unstyled: base-elements.css owns the link colour and its hover shade. -->
+            <router-link
+              v-if="field.link"
+              :to="field.link"
+              :aria-label="t('alerts.openSlo')"
+              :title="t('alerts.openSlo')"
+              class="flex items-center"
+              :data-test="`alerts-alertconfigsummary-${field.key}-link`"
             >
-            <OCodeBlock
-              v-if="field.code"
-              :code="field.value"
-              :lang="field.code"
-              :max-lines="12"
-              wrap
-              inset
-              role="group"
-              :aria-labelledby="labelId(field.key)"
-              class="my-0!"
-              :data-test="`alerts-alertconfigsummary-${field.key}-code`"
-            />
-            <div v-else-if="field.badge" class="flex h-7 items-center">
-              <OTag :type="field.badge" :value="field.value" size="sm" />
-            </div>
-            <div
-              v-else
-              class="flex min-h-7 items-center gap-1 text-sm wrap-anywhere"
-              :class="shownValue(field.value) ? 'text-text-heading' : 'text-text-muted'"
-              :data-test="`alerts-alertconfigsummary-${field.key}-value`"
-            >
-              {{ shownValue(field.value) || t("alerts.configNotSet") }}
-              <!-- Unstyled: base-elements.css owns the link colour and its hover shade. -->
-              <router-link
-                v-if="field.link"
-                :to="field.link"
-                :aria-label="t('alerts.openSlo')"
-                :title="t('alerts.openSlo')"
-                class="flex items-center"
-                :data-test="`alerts-alertconfigsummary-${field.key}-link`"
-              >
-                <OIcon name="open-in-new" size="sm" />
-              </router-link>
-            </div>
+              <OIcon name="open-in-new" size="sm" />
+            </router-link>
           </div>
         </div>
-      </OCardSection>
+      </div>
     </OCard>
   </div>
 </template>
@@ -86,13 +82,13 @@ import { useStore } from "vuex";
 
 import OCard from "@/lib/core/Card/OCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import {
   alertConditionIsQuery,
   alertConditionText,
   alertWarningConditionText,
+  formatAlertMinutes,
 } from "@/utils/alerts/alertCondition";
 import {
   buildAnomalyFilterExpression,
@@ -161,21 +157,8 @@ const fieldSpan = (field: SummaryField): string => {
 const idPrefix = useId();
 const labelId = (key: string) => `${idPrefix}-${key}-label`;
 
-/** Renders a minutes-granularity duration with its unit — minutes normally,
- *  hours when the value is a whole multiple of 60. `period` / `frequency` /
- *  `silence` / the pending-period-in-minutes are all whole minutes on the
- *  wire, so the sub-minute branch never actually fires today; it stays for
- *  correctness if that ever changes, rather than silently dropping to "0 min". */
-const formatMinutesDuration = (minutes: number | null | undefined): string => {
-  if (minutes == null || Number.isNaN(minutes)) return EMPTY;
-  if (minutes > 0 && minutes < 1) {
-    return t("common.secShort", { count: Math.round(minutes * 60) });
-  }
-  if (minutes >= 60 && minutes % 60 === 0) {
-    return t("common.hrShort", { count: minutes / 60 });
-  }
-  return t("common.minShort", { count: minutes });
-};
+const formatMinutesDuration = (minutes: number | null | undefined) =>
+  formatAlertMinutes(minutes, t);
 
 // Shared with the on-call page detail, which asks the same "what fired"
 // question of the same alert.

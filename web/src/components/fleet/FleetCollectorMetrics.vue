@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="option in windowOptions"
         :key="option.value"
         :value="option.value"
-        size="sm"
         :data-test="`fleet-collector-metrics-window-${option.value}`"
         >{{ option.label }}</OToggleGroupItem
       >
@@ -36,43 +35,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OEmptyState
       v-if="metrics.forbidden.value"
-      preset="no-access"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
       data-test="fleet-collector-metrics-forbidden"
     />
     <OEmptyState
       v-else-if="metrics.error.value && !values"
-      preset="load-error"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="t('emptyState.loadError.description')"
       data-test="fleet-collector-metrics-error"
       @action="retry"
     />
     <OEmptyState
       v-else-if="values && !reporting"
-      size="inline"
       icon="bar-chart"
       :title="t('fleet.collectorMetrics.emptyTitle')"
-      :description="t('fleet.collectorMetrics.emptyDescription', { name: raw(collectorName) })"
+      :text="t('fleet.collectorMetrics.emptyDescription', { name: raw(collectorName) })"
       data-test="fleet-collector-metrics-empty"
     />
     <template v-else>
-      <KpiCardRow :columns="3" data-test="fleet-collector-metrics-tiles">
-        <KpiCard
+      <OStatStrip data-test="fleet-collector-metrics-tiles">
+        <OStatCard
           v-for="tile in tiles"
           :key="tile.key"
+          class="grow basis-52 max-lg:shrink-0 max-lg:basis-auto"
           :label="tile.label"
           :icon="tile.icon"
+          :value="tile.text"
+          :loading="!values"
           :data-test="`fleet-collector-metrics-tile-${tile.key}`"
         >
           <template #value>
-            <span
-              v-if="values"
-              class="text-text-heading text-xl leading-tight font-semibold tabular-nums"
-              :data-test="`fleet-collector-metrics-value-${tile.key}`"
-              >{{ tile.text }}</span
-            >
-            <OSkeleton v-else class="h-6 w-16" />
+            <span :data-test="`fleet-collector-metrics-value-${tile.key}`">{{ tile.text }}</span>
           </template>
-        </KpiCard>
-      </KpiCardRow>
+        </OStatCard>
+      </OStatStrip>
 
       <div class="grid grid-cols-2 gap-3 max-md:grid-cols-1">
         <div
@@ -100,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :allow-annotations-add="false"
                 :allow-annotations-a-p-i="false"
               />
-              <OSkeleton v-else class="h-full w-full" />
+              <OSkeleton v-else shape="block" class="h-full w-full" />
             </div>
           </div>
         </div>
@@ -117,8 +116,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import KpiCard from "@/components/common/KpiCard.vue";
-import KpiCardRow from "@/components/common/KpiCardRow.vue";
+import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { FleetFlowWindow } from "@/services/fleet";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { durationFormatter, formatSizeFromMB } from "@/utils/formatters";

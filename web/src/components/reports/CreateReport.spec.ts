@@ -168,7 +168,7 @@ function mountComponent(routeQuery: Record<string, string> = {}) {
       plugins: [store, i18n],
       provide: { store, platform },
       stubs: {
-        DateTime: { template: '<div data-test="datetime-stub" />' },
+        ODateTimeRange: { template: '<div data-test="datetime-stub" />' },
         VariablesInput: { template: '<div data-test="variables-stub" />' },
         ConfirmDialog: { template: '<div data-test="confirm-dialog-stub" />' },
         SelectFolderDropdown: { template: '<div data-test="folder-dropdown-stub" />' },
@@ -804,11 +804,12 @@ describe("CreateReport", () => {
   // ── Back navigation ──────────────────────────────────────────────────────
 
   describe("back button", () => {
-    it("should call router.back() when back button is clicked", async () => {
+    it("should open the reports list when back is clicked with no history", async () => {
       ({ wrapper, mockRouter } = mountComponent());
       await flushPromises();
       await wrapper.find('[data-test="add-report-back-btn"]').trigger("click");
-      expect(mockRouter.back).toHaveBeenCalledTimes(1);
+      expect(mockRouter.back).not.toHaveBeenCalled();
+      expect(mockRouter.push).toHaveBeenCalledWith(expect.objectContaining({ name: "reports" }));
     });
   });
 

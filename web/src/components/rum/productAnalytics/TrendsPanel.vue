@@ -16,12 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <OCard
-    ref="card"
-    variant="outlined"
-    class="rounded-surface flex flex-col"
-    data-test="rum-analytics-trends"
-  >
+  <OCard ref="card" flush data-test="rum-analytics-trends">
     <span class="sr-only" aria-live="polite" data-test="rum-analytics-trends-announce">{{
       announcement
     }}</span>
@@ -35,31 +30,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </div>
       <OToggleGroup
+        size="sm"
         v-if="!series.length"
         :model-value="metric"
         type="single"
         data-test="rum-analytics-trends-metric"
         @update:model-value="(v) => v && (metric = v as 'sessions' | 'users')"
       >
-        <OToggleGroupItem
-          value="sessions"
-          size="xs"
-          data-test="rum-analytics-trends-metric-sessions"
-          >{{ t("rum.analytics.trends.sessions") }}</OToggleGroupItem
-        >
+        <OToggleGroupItem value="sessions" data-test="rum-analytics-trends-metric-sessions">{{
+          t("rum.analytics.trends.sessions")
+        }}</OToggleGroupItem>
         <OToggleGroupItem
           v-if="identity"
           value="users"
-          size="xs"
           data-test="rum-analytics-trends-metric-users"
           >{{ usersLabel ?? t("rum.analytics.trends.users") }}</OToggleGroupItem
         >
       </OToggleGroup>
       <span>
         <OButton
-          variant="outline"
-          size="icon-toolbar"
-          :icon-left="dashboardsLocked ? 'lock' : 'dashboard-customize'"
+          icon-only
+          variant="secondary"
+          :icon="dashboardsLocked ? 'lock' : 'dashboard-customize'"
           :disabled="dashboardsLocked || chartHeld || eventsGate !== 'ready'"
           :aria-label="t('rum.analytics.dashboard.add')"
           data-test="rum-analytics-trends-add-dashboard-btn"
@@ -75,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="(s, i) in series"
         :key="`${s.kind}:${s.key}`"
         :label="labelOf(s)"
-        :variant="s.kind === 'p' ? 'blue-soft' : s.kind === 'c' ? 'teal-soft' : 'purple-soft'"
+        tone="neutral"
         size="sm"
         removable
         :class="isFresh(s) ? 'outline-accent outline-2 outline-offset-2' : ''"
@@ -90,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OButton
         variant="ghost"
-        size="sm"
         data-test="rum-analytics-trends-clear-btn"
         @click="emit('update:series', [])"
         >{{ t("rum.analytics.trends.clear") }}</OButton
@@ -106,10 +97,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-if="!eventsHeld || chartSeries.length" class="h-64 w-full px-2 pb-2">
       <!-- v-if (not v-show): an unresolved event series must not mount the renderer at all. -->
-      <OSkeleton v-if="chartHeld" class="h-full w-full" data-test="rum-analytics-trends-loading" />
+      <OSkeleton
+        v-if="chartHeld"
+        shape="block"
+        class="h-full w-full"
+        data-test="rum-analytics-trends-loading"
+      />
       <template v-else>
         <OSkeleton
           v-if="chartLoading"
+          shape="block"
           class="h-full w-full"
           data-test="rum-analytics-trends-loading"
         />

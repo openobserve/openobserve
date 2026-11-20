@@ -16,18 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
-    :title="t('fleet.title')"
-    :subtitle="t('fleet.subtitle')"
-    icon="workspaces"
+    :title="t('menu.fleet')"
+    :about="t('fleet.subtitle')"
     bleed
-    tabs-below
     data-test="fleet-manager-page"
   >
     <template #actions>
       <OButton
         v-if="createLabel"
         variant="primary"
-        size="sm"
         :data-test="`fleet-manager-create-${activeTab}`"
         :aria-label="
           showNewConfigDot ? t('common.editorDraft.newDot', { label: createLabel }) : undefined
@@ -45,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #header-tabs>
-      <OTabs :model-value="activeTab" align="left" @change="onTabChange($event as FleetTab)">
+      <OTabs :model-value="activeTab" @change="onTabChange($event as FleetTab)">
         <OTab
           v-for="tab in tabs"
           :key="tab.name"

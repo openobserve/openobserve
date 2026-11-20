@@ -32,7 +32,6 @@ export function addLicenseDeniedError(features: string[], requestStartedAt = Dat
   const names = features.map((k) => store.state.zoConfig?.feature_names?.[k] ?? k).join(", ");
   toast({
     variant: "warning",
-    title: gt("featureLock.toastTitle"),
     message: features.length
       ? gt("featureLock.toastMessage", { features: raw(names) })
       : gt("featureLock.toastMessageGeneric"),

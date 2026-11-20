@@ -31,7 +31,7 @@
            header, and an enabled click could only discard or duplicate work.
            Cancel is the one way out of the form. -->
       <OButton
-        size="sm-action"
+        variant="primary"
         :disabled="editorOpen"
         @click="startCreate"
         data-test="slo-alerts-add"
@@ -40,9 +40,9 @@
       </OButton>
     </div>
 
-    <OBanner v-if="loadError" variant="error" data-test="slo-alerts-error">
+    <OInlineNotice v-if="loadError" tone="err" data-test="slo-alerts-error">
       {{ loadError }}
-    </OBanner>
+    </OInlineNotice>
 
     <div v-if="editorOpen" class="border-border-default rounded-surface border p-4">
       <!-- Keyed by target: without this a change of `editingId` mutates the
@@ -61,22 +61,11 @@
 
     <OEmptyState
       v-else-if="!alerts.length"
-      size="block"
-      illustration="alert"
+      icon="notifications"
       :title="t('slos.alerts.emptyTitle')"
-      :description="t('slos.alerts.emptyHint')"
+      :text="t('slos.alerts.emptyHint')"
       data-test="slo-alerts-empty"
-    >
-      <template #actions>
-        <EmptyStateActionCard
-          icon="add"
-          :label="t('slos.alerts.add')"
-          :sublabel="t('slos.alerts.emptyActionDesc')"
-          data-test="slo-alerts-empty-add"
-          @click="startCreate"
-        />
-      </template>
-    </OEmptyState>
+    />
 
     <ul v-else class="flex flex-col gap-2" data-test="slo-alerts-list">
       <li
@@ -94,8 +83,7 @@
             {{ t("slos.alerts.disabled") }}
           </OTag>
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             @click="startEdit(a.alert_id)"
             :data-test="`slo-alerts-edit-${a.alert_id}`"
           >
@@ -113,10 +101,9 @@ import { useStore } from "vuex";
 
 import { useI18nTyped } from "@/types/i18n";
 
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import SloAlertForm from "@/components/slos/SloAlertForm.vue";

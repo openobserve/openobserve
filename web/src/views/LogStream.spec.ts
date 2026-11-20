@@ -141,30 +141,30 @@ const ODialogStub = {
     "modelValue",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "width",
     "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div data-test="o-dialog-stub" v-if="open">
       <div data-test="o-dialog-title">{{ title }}</div>
       <slot />
-      <button data-test="o-dialog-primary" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
-      <button data-test="o-dialog-secondary" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+      <button data-test="o-dialog-primary" @click="$emit('click:primary')">{{ primary?.label }}</button>
+      <button data-test="o-dialog-secondary" @click="$emit('click:secondary')">{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -497,8 +497,8 @@ describe("LogStream Component", () => {
       const dialogs = wrapper.findAllComponents({ name: "ODialog" });
       const openDialog = dialogs.find((d: any) => d.props("open") === true);
       expect(openDialog).toBeTruthy();
-      expect(openDialog!.props("title")).toBe("Delete Stream");
-      expect(openDialog!.props("primaryButtonVariant")).toBe("destructive");
+      expect(openDialog!.props("title")).toBe("Delete stream");
+      expect(openDialog!.props("primary")?.variant).toBe("danger");
     });
 
     it("should close ODialog and not call delete when secondary (cancel) is emitted", async () => {
@@ -591,8 +591,8 @@ describe("LogStream Component", () => {
         .findAllComponents({ name: "ODialog" })
         .find((d: any) => d.props("open") === true)!;
       expect(dialog).toBeTruthy();
-      expect(dialog.props("title")).toBe("Delete Streams");
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      expect(dialog.props("title")).toBe("Delete streams");
+      expect(dialog.props("primary")?.variant).toBe("danger");
     });
 
     it("shows the number of selected streams in the message", () => {

@@ -132,7 +132,7 @@ describe("RealUserMonitoring tabs", () => {
   it("no longer carries a Product Analytics tab: it has its own menu", async () => {
     await mountAt("/rum/sessions");
     const tabs = wrapper!.findAll('[role="tab"]').map((t) => t.text());
-    expect(tabs).toEqual(["Performance", "Sessions", "Error Tracking", "Source Maps"]);
+    expect(tabs).toEqual(["Performance", "Sessions", "Error tracking", "Source maps"]);
     expect(wrapper!.find('[data-test="rum-tab-product-analytics"]').exists()).toBe(false);
   });
 

@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import type { ToastProps, ToastEmits } from "./OToast.types";
+import type { ToastProps, ToastEmits, ToastVariant } from "./OToast.types";
 import { computed, ref, onUnmounted } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import { pauseTimer, resumeTimer, isPageVisible } from "./useToast";
-import { ToastRoot, ToastTitle, ToastDescription, ToastClose } from "reka-ui";
+import { ToastRoot, ToastDescription, ToastClose } from "reka-ui";
 import { useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
@@ -30,86 +30,50 @@ defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(defineProps<ToastProps>(), {
   variant: "default",
-  position: "bottom-right",
   open: true,
   count: 1,
 });
 
 const emit = defineEmits<ToastEmits>();
 
-// ── Variant class maps ───────────────────────────────────────────────────────
+type ToastKind = "neutral" | "ok" | "error";
 
-const variantClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
-  success: ["bg-toast-success-bg border border-toast-success-border", "text-toast-fg"].join(" "),
-  error: ["bg-toast-error-bg border border-toast-error-border", "text-toast-fg"].join(" "),
-  warning: ["bg-toast-warning-bg border border-toast-warning-border", "text-toast-fg"].join(" "),
-  info: ["bg-toast-info-bg border border-toast-info-border", "text-toast-fg"].join(" "),
-  loading: ["bg-toast-loading-bg border border-toast-loading-border", "text-toast-fg"].join(" "),
-  default: ["bg-toast-default-bg border border-toast-default-border", "text-toast-fg"].join(" "),
+// Warning and info results read as neutral; only the outcome of an action earns a colour (K1).
+const KIND: Record<ToastVariant, ToastKind> = {
+  success: "ok",
+  error: "error",
+  warning: "neutral",
+  info: "neutral",
+  loading: "neutral",
+  default: "neutral",
 };
 
-const iconColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
-  success: "text-toast-success-icon",
-  error: "text-toast-error-icon",
-  warning: "text-toast-warning-icon",
-  info: "text-toast-info-icon",
-  loading: "text-toast-loading-icon",
-  default: "text-toast-fg",
+const KIND_ICON: Record<ToastKind, IconName> = {
+  neutral: "info",
+  ok: "check-circle",
+  error: "cancel",
 };
 
-const badgeColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
-  success: "bg-toast-success-icon text-white",
-  error: "bg-toast-error-icon text-white",
-  warning: "bg-toast-warning-icon text-white",
-  info: "bg-toast-info-icon text-white",
-  loading: "bg-toast-loading-icon text-white",
-  default: "bg-toast-default-border text-toast-fg",
+const KIND_ICON_CLASS: Record<ToastKind, string> = {
+  neutral: "text-toast-inverse-icon",
+  ok: "text-toast-inverse-icon-ok",
+  error: "text-toast-inverse-icon-err",
 };
 
-const progressBarColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
-  success: "bg-toast-success-icon",
-  error: "bg-toast-error-icon",
-  warning: "bg-toast-warning-icon",
-  info: "bg-toast-info-icon",
-  loading: "bg-toast-loading-icon",
-  default: "bg-toast-default-border",
-};
-
-const isHovered = ref(false);
-
-// isPaused drives the CSS progress-bar animation. It is a computed so it is
-// always derived from the two independent pause sources: hover AND page
-// visibility. A plain ref could fall out of sync; a computed never can.
-const isPaused = computed(() => isHovered.value || !isPageVisible.value);
+const kind = computed(() => KIND[props.variant ?? "default"]);
 
 function onMouseEnter() {
-  isHovered.value = true;
   pauseTimer(props.id);
 }
 
 function onMouseLeave() {
-  isHovered.value = false;
-  // Only resume if the page is actually visible right now; if the user somehow
-  // triggered mouseleave while the tab was backgrounded (unlikely but safe),
-  // we must not restart the timer.
-  if (isPageVisible.value) {
-    resumeTimer(props.id);
-  }
+  // A mouseleave while the tab is hidden must not restart a timer the visibility listener paused.
+  if (isPageVisible.value) resumeTimer(props.id);
 }
-
-// ── Computed ─────────────────────────────────────────────────────────────────
 
 const rootRole = computed<"alert" | "status">(() =>
   props.variant === "error" || props.variant === "warning" ? "alert" : "status",
 );
-
-const hasIcon = computed(() => props.variant !== "default");
-
-const screenReaderTitle = computed(() => (props.title ? props.title : props.message));
-
-const isTopPosition = computed(() => props.position.startsWith("top-"));
-
-const detailsExpanded = ref(false);
 
 // Temporary success state for the action button (e.g. "Copied!")
 const actionSucceeded = ref(false);
@@ -137,201 +101,58 @@ onUnmounted(() => {
     :open="open"
     :duration="0"
     :class="[
-      'pointer-events-auto relative',
-      details && details.length > 0 ? 'w-[28rem]' : 'w-[22rem]',
-      'max-w-[calc(100vw-2rem)]',
-      'data-[state=open]:animate-in data-[state=open]:fade-in-0',
-      isTopPosition
-        ? 'data-[state=open]:slide-in-from-top-4'
-        : 'data-[state=open]:slide-in-from-bottom-4',
-      'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-      isTopPosition
-        ? 'data-[state=closed]:slide-out-to-top-4'
-        : 'data-[state=closed]:slide-out-to-bottom-4',
+      'rounded-menu shadow-toast bg-toast-inverse-bg text-toast-inverse-text text-compact pointer-events-auto flex min-h-10 w-max max-w-[min(26.25rem,calc(100vw-2rem))] items-center gap-3 py-2 ps-3 pe-2',
+      'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-4',
+      'animation-duration-(--duration-overlay-in) data-[state=closed]:animation-duration-(--duration-overlay-out) ease-(--ease-out-expo) data-[state=closed]:ease-(--ease-overlay-out)',
+      'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-4',
     ]"
     :role="rootRole"
     :data-test="`o-toast-${id}`"
     :data-test-variant="variant ?? 'default'"
+    :data-test-kind="kind"
     :data-test-message="message"
     @mouseenter="onMouseEnter"
     @mouseleave="onMouseLeave"
     @update:open="(val) => emit('openChange', val)"
   >
-    <!-- Count badge — outside the clipped inner shell so it is never cut off -->
+    <span :class="['flex shrink-0', KIND_ICON_CLASS[kind]]" aria-hidden="true">
+      <OIcon
+        v-if="variant === 'loading'"
+        name="autorenew"
+        size="sm"
+        class="o2-motion-keep animate-spin"
+      />
+      <OIcon v-else :name="KIND_ICON[kind]" size="sm" />
+    </span>
+
+    <ToastDescription class="min-w-0 flex-1" data-test="o-toast-message">
+      <OTruncatedText class="block">{{ message }}</OTruncatedText>
+    </ToastDescription>
+
     <span
       v-if="count > 1"
-      :class="[
-        'absolute -top-2 -right-2 z-10 flex items-center justify-center',
-        'h-5 min-w-5 rounded-full px-1.5 text-xs font-semibold shadow',
-        badgeColorClasses[variant ?? 'default'],
-      ]"
+      class="text-toast-inverse-text-secondary shrink-0 text-xs tabular-nums"
       :data-test="`o-toast-count-${count}`"
-      aria-hidden="true"
-      >{{ count > 99 ? "99+" : count }}</span
+      >{{ count > 99 ? "99+" : `×${count}` }}</span
     >
 
-    <!-- Inner shell: carries all visual styling + overflow-hidden to clip the progress bar -->
-    <div
-      :class="[
-        'rounded-default shadow-toast relative flex w-full gap-2 overflow-hidden p-3',
-        title ? 'items-start' : 'items-center',
-        variantClasses[variant ?? 'default'],
-      ]"
+    <!-- A plain button, not reka's ToastAction, which wraps ToastClose and so closes on every click. -->
+    <button
+      v-if="action"
+      type="button"
+      data-test="o-toast-action-btn"
+      class="text-toast-inverse-action hover:bg-toast-inverse-text/10 focus-visible:outline-focus-ring-accent rounded-chip text-compact shrink-0 cursor-pointer px-1.5 py-1 font-semibold whitespace-nowrap transition-colors outline-none focus-visible:outline-2 focus-visible:outline-solid"
+      @click.stop="handleActionClick"
     >
-      <!-- Icon -->
-      <div
-        v-if="hasIcon"
-        :class="['flex shrink-0 items-center', iconColorClasses[variant ?? 'default']]"
-        aria-hidden="true"
-      >
-        <OIcon
-          name="autorenew"
-          size="sm"
-          v-if="variant === 'loading'"
-          class="o2-motion-keep size-5 animate-spin"
-        />
-        <OIcon name="check-circle" size="sm" v-else-if="variant === 'success'" class="size-5" />
-        <OIcon name="cancel" size="sm" v-else-if="variant === 'error'" class="size-5" />
-        <OIcon name="warning" size="sm" v-else-if="variant === 'warning'" class="size-5" />
-        <OIcon name="info" size="sm" v-else-if="variant === 'info'" class="size-5" />
-      </div>
+      {{ actionSucceeded && action.successLabel ? action.successLabel : action.label }}
+    </button>
 
-      <!-- Content -->
-      <div class="min-w-0 flex-1">
-        <!-- Title row: text + optional count badge side-by-side -->
-        <div :class="['flex items-center gap-2', !title ? 'sr-only' : '']">
-          <ToastTitle class="text-toast-fg text-sm leading-snug font-semibold">
-            {{ title ?? screenReaderTitle }}
-          </ToastTitle>
-          <OTag v-if="title && titleCount !== undefined" type="countChip" value="errorstrong">{{
-            titleCount
-          }}</OTag>
-        </div>
-
-        <!-- Message + inline action -->
-        <div :class="['flex flex-wrap items-start gap-x-3 gap-y-1.5', title ? 'mt-1' : '']">
-          <ToastDescription
-            :class="[
-              'text-sm leading-snug break-words whitespace-pre-line',
-              title ? 'text-toast-fg-secondary' : 'text-toast-fg',
-            ]"
-            data-test="o-toast-message"
-          >
-            {{ message }}
-          </ToastDescription>
-
-          <!-- Action button — plain <button>, NOT wrapped in ToastAction.
-               reka-ui's ToastAction wraps ToastClose internally, which means
-               any click on a ToastAction automatically dismisses the toast.
-               Using a plain button preserves click behaviour without closing. -->
-          <button
-            v-if="action"
-            type="button"
-            data-test="o-toast-action-btn"
-            :class="[
-              'rounded-default inline-flex items-center justify-center gap-1 px-2.5 py-0.5 text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
-              actionSucceeded
-                ? 'bg-toast-success-icon focus-visible:ring-toast-success-icon text-white'
-                : 'bg-toast-action-text hover:bg-toast-action-hover focus-visible:ring-toast-action-text text-white',
-            ]"
-            @click.stop="handleActionClick"
-          >
-            <OIcon
-              v-if="actionSucceeded"
-              name="check"
-              size="sm"
-              class="size-3.5"
-              aria-hidden="true"
-            />
-            {{ actionSucceeded && action.successLabel ? action.successLabel : action.label }}
-          </button>
-        </div>
-
-        <!-- Expandable affected-sections list -->
-        <div v-if="details && details.length > 0" class="mt-2 w-full" data-test="o-toast-details">
-          <button
-            type="button"
-            class="text-toast-fg-secondary hover:text-toast-fg flex cursor-pointer items-center gap-1 text-xs font-semibold tracking-wide uppercase transition-colors"
-            :aria-expanded="detailsExpanded"
-            data-test="o-toast-details-toggle"
-            @click.stop="detailsExpanded = !detailsExpanded"
-          >
-            <OIcon
-              :name="detailsExpanded ? 'expand-less' : 'expand-more'"
-              size="sm"
-              class="size-3.5"
-              aria-hidden="true"
-            />
-            {{ t("components.toast.affectedSections") }}
-          </button>
-          <ul v-if="detailsExpanded" class="mt-1.5 space-y-1.5" data-test="o-toast-details-list">
-            <li
-              v-for="detail in details"
-              :key="detail.url"
-              class="flex items-baseline justify-between gap-2 text-xs"
-            >
-              <span class="text-toast-fg shrink-0 font-medium">{{ detail.label }}</span>
-              <OTruncatedText class="text-toast-fg-secondary text-right font-mono">{{
-                detail.url
-              }}</OTruncatedText>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <!-- Dismiss button -->
-      <ToastClose
-        :class="[
-          'rounded-default text-toast-fg-secondary hover:text-toast-fg focus-visible:ring-toast-info-border flex shrink-0 items-center p-0.5 focus-visible:ring-2 focus-visible:outline-none',
-          title ? 'self-start' : 'self-center',
-        ]"
-        :aria-label="t('components.toast.dismissNotification')"
-        data-test="o-toast-dismiss"
-      >
-        <OIcon name="close" size="sm" class="size-4" aria-hidden="true" />
-      </ToastClose>
-
-      <!-- Timeout progress bar — clipped by parent overflow-hidden + rounded-default.
-           :key on the outer div ensures Vue remounts it (restarting the CSS animation)
-           whenever timerKey increments (i.e. a duplicate toast resets the timer). -->
-      <div
-        v-if="(timeout ?? 0) > 0"
-        :key="timerKey"
-        class="absolute right-0 bottom-0 left-0 h-0.5"
-        aria-hidden="true"
-      >
-        <div
-          :class="[
-            'toast-progress-bar h-full w-full origin-left',
-            progressBarColorClasses[variant ?? 'default'],
-          ]"
-          :style="{
-            animationDuration: `${timeout}ms`,
-            animationPlayState: isPaused ? 'paused' : 'running',
-          }"
-        />
-      </div>
-    </div>
+    <ToastClose
+      class="text-toast-inverse-text-secondary hover:bg-toast-inverse-text/10 hover:text-toast-inverse-text focus-visible:outline-focus-ring-accent rounded-chip grid size-6 shrink-0 cursor-pointer place-items-center transition-colors outline-none focus-visible:outline-2 focus-visible:outline-solid"
+      :aria-label="t('components.toast.dismissNotification')"
+      data-test="o-toast-dismiss"
+    >
+      <OIcon name="close" size="sm" class="size-3.5" aria-hidden="true" />
+    </ToastClose>
   </ToastRoot>
 </template>
-
-<style scoped>
-/* keep(keyframes): the auto-dismiss progress bar is used only by this toast. The
-   `animation` shorthand is declared here, not as a template `[animation:…]`
-   utility, so Vue's scoped compiler renames the keyframe and this reference
-   together. Duration and play-state stay as inline `:style` longhands because
-   they are runtime values (per-toast timeout, pause-on-hover) — inline longhands
-   override this shorthand's initial values, so the pairing is intentional. */
-.toast-progress-bar {
-  animation: shrink linear forwards;
-}
-
-@keyframes shrink {
-  from {
-    transform: scaleX(1);
-  }
-  to {
-    transform: scaleX(0);
-  }
-}
-</style>

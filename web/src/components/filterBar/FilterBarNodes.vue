@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import FilterBarChip from "./FilterBarChip.vue";
@@ -67,12 +66,10 @@ const groupJoin = (index: number) => {
 <template>
   <template v-for="(item, index) in items" :key="item.id">
     <slot v-if="caretAt(index)" name="caret" :group-id="groupId" :index="index" />
-    <OTag
+    <OButton
       v-if="showConnector && index > 0"
-      clickable
+      variant="ghost"
       size="xs"
-      shape="rounded"
-      variant="default-soft"
       :disabled="disabled"
       :label="raw(item.connector)"
       :aria-label="t('filterBar.toggleConnector')"
@@ -81,7 +78,7 @@ const groupJoin = (index: number) => {
     />
     <span
       v-if="anyOfGroups && item.kind === 'group'"
-      class="text-3xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
+      class="text-2xs text-text-secondary shrink-0 tracking-wide uppercase select-none"
       :data-test="`${dataTest}-group-join-${pathOf(index)}`"
       >{{ groupJoin(index) }}</span
     >
@@ -95,8 +92,8 @@ const groupJoin = (index: number) => {
       <OButton
         v-if="anyOfGroups"
         variant="ghost"
-        size="xs"
-        :active="Boolean(item.negate)"
+        size="sm"
+        :pressed="Boolean(item.negate)"
         :aria-pressed="Boolean(item.negate)"
         :disabled="disabled"
         :data-test="`${dataTest}-group-not-${pathOf(index)}`"
@@ -134,9 +131,10 @@ const groupJoin = (index: number) => {
       </FilterBarNodes>
       <span v-if="anyOfGroups && !disabled" class="inline-flex">
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs-sq"
-          icon-left="add"
+          size="sm"
+          icon="add"
           :aria-label="t('metrics.labelGroups.addToGroup')"
           :data-test="`${dataTest}-group-add-${pathOf(index)}`"
           @mousedown.prevent
@@ -146,9 +144,10 @@ const groupJoin = (index: number) => {
       </span>
       <span v-if="item.items.length && (canUngroup?.(item.id) ?? true)" class="inline-flex">
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs-sq"
-          icon-left="unfold-more"
+          size="sm"
+          icon="unfold-more"
           :disabled="disabled"
           :aria-label="t('filterBar.ungroup')"
           :data-test="`${dataTest}-ungroup-${pathOf(index)}`"

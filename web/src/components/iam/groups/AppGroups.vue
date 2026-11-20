@@ -15,56 +15,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout :title="t('iam.groups')" icon="group" bleed>
-    <template #subtitle>
-      <span data-test="iam-groups-subtitle">
-        {{ t("iam.groupsPage.subtitle") }}
-      </span>
-    </template>
+  <OPageLayout :title="t('iam.groups')" :about="t('iam.groupsPage.subtitle')" bleed>
     <template #actions>
-      <OButton data-test="iam-groups-add-group-btn" variant="primary" size="sm" @click="addGroup">
+      <OButton data-test="iam-groups-add-group-btn" variant="primary" @click="addGroup">
         {{ t("iam.addGroup") }}
       </OButton>
     </template>
     <!-- ?member=<email> (from the token popup's "Add to a user group" link) drives the Assign column below. -->
-    <OBanner
-      v-if="assignTarget"
-      variant="info"
-      icon="group"
-      inline-actions
-      dense
-      data-test="iam-groups-assign-banner"
-      class="mb-3"
-    >
-      {{ t("iam.groupsPage.assignBannerText", { member: assignTarget }) }}
-      <template #actions>
-        <OButton
-          data-test="iam-groups-assign-banner-dismiss"
-          variant="ghost"
-          size="sm"
-          @click="clearAssignTarget"
-        >
-          {{ t("iam.groupsPage.assignBannerDone") }}
-        </OButton>
-      </template>
-    </OBanner>
+    <template v-if="assignTarget" #banner>
+      <OBanner tone="info" icon="group" data-test="iam-groups-assign-banner">
+        {{ t("iam.groupsPage.assignBannerText", { member: assignTarget }) }}
+        <template #actions>
+          <OButton
+            data-test="iam-groups-assign-banner-dismiss"
+            variant="ghost"
+            @click="clearAssignTarget"
+          >
+            {{ t("iam.groupsPage.assignBannerDone") }}
+          </OButton>
+        </template>
+      </OBanner>
+    </template>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
           ref="oTableRef"
-          :frame="false"
           data-test="iam-groups-table-section"
           :data="rows"
           :columns="columns"
           row-key="group_name"
           :row-actions="rowActions"
-          row-actions-more-data-test="iam-groups-row-more-actions"
+          :row-menu="rowMenu"
+          row-menu-data-test="iam-groups-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
+          :error="loadError"
           forbidden-resource="groups"
           :selected-ids="selectedGroupNames"
           v-model:global-filter="filterQuery"
-          :show-global-filter="false"
           pagination="client"
           :page-size="pageSize"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -75,12 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           selection="multiple"
           filter-mode="client"
           :default-columns="false"
-          show-index
           @update:selected-ids="handleSelectedIdsUpdate"
           @update:page-size="pageSize = $event"
           @update:current-page="currentPage = $event"
           @update:sort-by="sortBy = $event"
           @update:sort-order="sortOrder = $event"
+          @retry="refreshGroups"
         >
           <template #toolbar>
             <div class="flex flex-1 items-center gap-2 max-md:contents">
@@ -94,25 +82,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              shortcut-id="iamGroupsRefresh"
+              shortcut="iamGroupsRefresh"
               data-test="iam-groups-refresh-btn"
               @click="refreshGroups"
             />
           </template>
           <template #cell-assign="{ row }">
             <div class="flex items-center justify-center">
-              <OBadge v-if="isAssigned(row)" variant="success" icon="check" size="sm">
+              <OBadge v-if="isAssigned(row)" tone="ok" icon="check" size="sm">
                 {{ t("iam.groupsPage.assignedBadge") }}
               </OBadge>
               <OButton
                 v-else
                 :data-test="`iam-groups-assign-${row.group_name}-btn`"
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 :loading="assigningGroupName === row.group_name"
                 @click="assignMemberToGroup(row)"
               >
@@ -122,20 +107,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-groups"
-              :filtered="!!filterQuery"
-              @action="(id) => (id === 'create' ? addGroup() : (filterQuery = ''))"
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.groups') })
+                  : t('emptyState.noGroups.title')
+              "
+              :text="
+                filterQuery
+                  ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.groups') })
+                  : t('emptyState.noGroups.description')
+              "
+              :icon="filterQuery ? undefined : 'group'"
+              :action-label="filterQuery ? undefined : t('emptyState.noGroups.action')"
+              @action="filterQuery ? (filterQuery = '') : addGroup()"
             />
           </template>
           <template #selection-actions>
             <OButton
               data-test="iam-groups-bulk-delete-btn"
-              variant="outline-destructive"
-              size="sm"
+              variant="danger-ghost"
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
-              icon-left="delete"
+              icon="delete"
             >
               {{ t("common.delete") }}
             </OButton>
@@ -153,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       message-keypath="iam.appGroups.deleteGroupConfirm"
       :message-name="deleteConformDialog.data?.group_name"
       :warning-message="deleteImpactMessage"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="_deleteGroup"
       @update:cancel="deleteConformDialog.show = false"
       v-model="deleteConformDialog.show"
@@ -161,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('iam.appGroups.bulkDeleteGroupsTitle')"
       :message="t('iam.appGroups.bulkDeleteGroupsConfirm', { count: selectedGroups.length })"
-      ok-variant="destructive"
+      kind="destructive"
       :warning-message="bulkDeleteImpactMessage"
       @update:ok="bulkDeleteUserGroups"
       @update:cancel="confirmBulkDelete = false"
@@ -184,7 +178,11 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
@@ -200,7 +198,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { forbiddenState } from "@/utils/featureGate";
+import { forbiddenState, loadErrorText } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
 
 const showAddGroup = ref(false);
@@ -349,13 +347,6 @@ const columns = computed<OTableColumnDef[]>(() => {
     });
   }
 
-  cols.push({
-    id: "actions",
-    header: t("alerts.actions"),
-    isAction: true,
-    pinned: "right",
-  });
-
   return cols;
 });
 
@@ -364,13 +355,17 @@ const rowActions: OTableRowAction[] = [
     id: "edit",
     label: t("common.edit"),
     icon: "edit",
-    onSelect: (row) => editGroup(row),
+    onClick: (row) => editGroup(row),
     dataTest: (row) => `iam-groups-edit-${row.group_name}-role-icon`,
   },
+];
+
+const rowMenu: OTableRowMenuItem[] = [
   {
     id: "delete",
     label: t("common.delete"),
     icon: "delete",
+    destructive: true,
     onSelect: (row) => showConfirmDialog(row),
     dataTest: (row) => `iam-groups-delete-${row.group_name}-role-icon`,
   },
@@ -431,9 +426,16 @@ const groupsList = useQuery(() =>
   Object.assign(groupsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
 );
 
-// Bound to the query rather than hand-managed: `isPending` is the cold read,
-// `isFetching` is any request in flight.
-const loading = groupsList.isPending;
+// A failed read with no rows on screen is the error state, never the first-run one (K5).
+const loadError = computed(() =>
+  rows.value.length
+    ? null
+    : loadErrorText(groupsList.error.value, t("emptyState.loadError.description")),
+);
+// `isPending` is the cold read; a retry from the error state shows the skeleton again.
+const loading = computed(
+  () => groupsList.isPending.value || (!!loadError.value && groupsList.isFetching.value),
+);
 // setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
 watch(
   loading,

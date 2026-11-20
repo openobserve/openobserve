@@ -34,9 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="filterOptions[f.key]"
         multiple
         searchable
-        size="sm"
-        width="md"
-        label-position="inside"
+        width="m"
+        variant="filter"
         :label="t(f.label)"
         :placeholder="t('rum.overviewPage.filterAll')"
         :data-test="`rum-overview-filter-${f.key}`"
@@ -45,17 +44,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-if="pageState === 'error'" role="alert" data-test="rum-overview-page-error">
-      <OEmptyState size="compact" preset="load-error">
-        <template #title>{{ t("rum.overviewPage.pageErrorTitle") }}</template>
-        <template #description>{{ t("rum.overviewPage.pageErrorBody") }}</template>
+      <OEmptyState
+        kind="error"
+        :title="t('rum.overviewPage.pageErrorTitle')"
+        :text="t('rum.overviewPage.pageErrorBody')"
+      >
         <template #actions>
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="refresh"
-            data-test="rum-overview-page-retry"
-            @click="loadAll"
-          >
+          <OButton variant="secondary" data-test="rum-overview-page-retry" @click="loadAll">
             {{ t("rum.overviewPage.retry") }}
           </OButton>
         </template>
@@ -64,43 +59,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OEmptyState
       v-else-if="pageState === 'forbidden'"
-      size="compact"
-      preset="no-access"
+      kind="denied"
       data-test="rum-overview-page-forbidden"
-    >
-      <template #title>{{ t("rum.overviewPage.pageForbiddenTitle") }}</template>
-      <template #description>{{ t("rum.overviewPage.forbiddenBody") }}</template>
-    </OEmptyState>
+      :title="t('rum.overviewPage.pageForbiddenTitle')"
+      :text="t('rum.overviewPage.forbiddenBody')"
+    />
 
     <OEmptyState
       v-else-if="pageState === 'empty'"
-      size="compact"
+      :kind="filtersActive ? 'filtered' : 'first-run'"
       data-test="rum-overview-page-empty"
+      :title="t('rum.overviewPage.stateEmptyTitle')"
+      :text="
+        filtersActive
+          ? t('rum.overviewPage.stateEmptyFiltered')
+          : t('rum.overviewPage.stateEmptyQuiet')
+      "
     >
-      <template #title>{{ t("rum.overviewPage.stateEmptyTitle") }}</template>
-      <template #description>
-        {{
-          filtersActive
-            ? t("rum.overviewPage.stateEmptyFiltered")
-            : t("rum.overviewPage.stateEmptyQuiet")
-        }}
-      </template>
       <template #actions>
         <OButton
           v-if="filtersActive"
-          variant="primary"
-          size="sm"
+          variant="secondary"
           data-test="rum-overview-page-clear-filters"
           @click="clearFilters"
         >
           {{ t("rum.overviewPage.clearFilters") }}
         </OButton>
-        <OButton
-          :variant="filtersActive ? 'ghost' : 'outline'"
-          size="sm"
-          data-test="rum-overview-page-setup"
-          @click="openSetup"
-        >
+        <OButton variant="secondary" data-test="rum-overview-page-setup" @click="openSetup">
           {{ t("rum.overviewPage.stateEmptyAction") }}
         </OButton>
       </template>

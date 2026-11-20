@@ -177,7 +177,7 @@ const createWrapper = (props = {}, options = {}) => {
           >
             <slot></slot>
           </button>`,
-          props: ["loading", "type", "variant", "size", "iconLeft", "iconRight", "label"],
+          props: ["loading", "type", "variant", "size", "icon", "iconEnd", "label"],
           emits: ["click"],
         },
         OFile: {
@@ -210,8 +210,8 @@ const createWrapper = (props = {}, options = {}) => {
               :data-open='String(open)'
               :data-size='size'
               :data-title='title'
-              :data-primary-label='primaryButtonLabel'
-              :data-secondary-label='secondaryButtonLabel'
+              :data-primary-label='primary?.label'
+              :data-secondary-label='secondary?.label'
             >
               <slot name='header' />
               <slot />
@@ -219,34 +219,34 @@ const createWrapper = (props = {}, options = {}) => {
               <button
                 data-test-stub='o-dialog-primary'
                 @click='$emit("click:primary")'
-              >{{ primaryButtonLabel }}</button>
+              >{{ primary?.label }}</button>
               <button
                 data-test-stub='o-dialog-secondary'
                 @click='$emit("click:secondary")'
-              >{{ secondaryButtonLabel }}</button>
+              >{{ secondary?.label }}</button>
             </div>`,
           props: [
             "open",
             "size",
             "title",
-            "subTitle",
+            "subtitle",
             "persistent",
             "showClose",
             "width",
-            "primaryButtonLabel",
-            "secondaryButtonLabel",
-            "neutralButtonLabel",
-            "primaryButtonVariant",
-            "secondaryButtonVariant",
-            "neutralButtonVariant",
-            "primaryButtonDisabled",
-            "secondaryButtonDisabled",
-            "neutralButtonDisabled",
-            "primaryButtonLoading",
-            "secondaryButtonLoading",
-            "neutralButtonLoading",
+            "primary",
+            "secondary",
+            "extra",
+            "primary",
+            "secondary",
+            "extra",
+            "primary",
+            "secondary",
+            "extra",
+            "primary",
+            "secondary",
+            "extra",
           ],
-          emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+          emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
         },
         OColor: {
           template: '<div data-test-stub="o-color" :data-value="modelValue"></div>',
@@ -318,7 +318,7 @@ describe("General", () => {
     it("counts theme colors with the form fields, and Discard restores both", async () => {
       const wrapper = createWrapper();
       const form = wrapper.findComponent({ name: "OForm" }).vm.form;
-      expect(bar(wrapper).attributes("data-state")).toBe("clean");
+      expect(bar(wrapper).exists()).toBe(false);
 
       await wrapper.find('[data-test="theme-light-chip"]').trigger("click");
       Object.assign(wrapper.vm, { tempColor: "#112233" });
@@ -334,7 +334,7 @@ describe("General", () => {
 
       expect((wrapper.vm as any).customLightColor).toBe("#3F7994");
       expect(form.state.values.scrape_interval).toBe("30");
-      expect(bar(wrapper).attributes("data-state")).toBe("clean");
+      expect(bar(wrapper).exists()).toBe(false);
     });
   });
 
@@ -791,7 +791,7 @@ describe("General", () => {
         );
         expect(mockOrganizations.post_organization_settings).not.toHaveBeenCalled();
         expect(successToasts()).toEqual([
-          [{ variant: "success", message: "Dark Mode logo updated successfully." }],
+          [{ variant: "success", message: "Dark mode logo updated successfully." }],
         ]);
       });
 
@@ -823,7 +823,7 @@ describe("General", () => {
 
         expect(mockToast).toHaveBeenCalledWith({
           variant: "error",
-          message: "Light Mode logo was not uploaded. Upload failed",
+          message: "Light mode logo was not uploaded. Upload failed",
         });
         expect(successToasts()).toHaveLength(1);
         expect(wrapper.vm.filesLight).toBe(lightFile);
@@ -875,7 +875,7 @@ describe("General", () => {
       expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "light");
       expect(mockToast).toHaveBeenCalledWith({
         variant: "success",
-        message: "Light Mode logo deleted successfully.",
+        message: "Light mode logo deleted successfully.",
       });
     });
 
@@ -898,7 +898,7 @@ describe("General", () => {
       expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "dark");
       expect(mockToast).toHaveBeenCalledWith({
         variant: "success",
-        message: "Dark Mode logo deleted successfully.",
+        message: "Dark mode logo deleted successfully.",
       });
     });
 
@@ -1002,7 +1002,7 @@ describe("General", () => {
       // Select the color-picker dialog by title (order-independent — other dialogs
       // like the delete-org confirmation also exist in the template).
       const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
-      const colorDialog = dialogs.find((d) => d.attributes("data-title") === "Pick Custom Color");
+      const colorDialog = dialogs.find((d) => d.attributes("data-title") === "Pick custom color");
       const closeBtn = colorDialog.find('[data-test-stub="o-dialog-primary"]');
       await closeBtn.trigger("click");
       await nextTick();
@@ -1016,20 +1016,20 @@ describe("General", () => {
       const deleteDialog = dialogs[0];
       // Component template uses size="sm" for delete confirmation dialog
       expect(deleteDialog.attributes("data-size")).toBe("sm");
-      expect(deleteDialog.attributes("data-primary-label")).toBe("OK");
+      expect(deleteDialog.attributes("data-primary-label")).toBe("Delete");
       expect(deleteDialog.attributes("data-secondary-label")).toBe("Cancel");
     });
 
-    it("names the logo theme in bold and uses a destructive OK button", async () => {
+    it("names the logo theme in bold and uses a destructive Delete button", async () => {
       const wrapper = createWrapper();
       wrapper.vm.confirmDeleteLogo("dark");
       await nextTick();
       const dialog = wrapper.findAllComponents({ name: "ODialog" })[0];
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
-      const message = wrapper.find('[data-test="general-delete-image-message"]');
-      const name = message.find("span.font-semibold");
-      expect(name.text()).toBe("Dark Mode");
-      expect(message.text()).toContain("Dark Mode");
+      expect(dialog.props("primary")?.variant).toBe("danger");
+      const message = wrapper.find('[data-test="dialog-box"]');
+      const name = message.find('[data-test="confirm-dialog-name"]');
+      expect(name.text()).toBe("Dark mode");
+      expect(message.text()).toContain("Dark mode");
     });
 
     it("forwards title and size to the color picker ODialog", () => {
@@ -1037,8 +1037,8 @@ describe("General", () => {
       const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
       // Select by title (order-independent — the delete-org confirmation dialog also
       // exists and would otherwise be the last dialog in the template).
-      const colorDialog = dialogs.find((d) => d.attributes("data-title") === "Pick Custom Color");
-      expect(colorDialog.attributes("data-size")).toBe("xs");
+      const colorDialog = dialogs.find((d) => d.attributes("data-title") === "Pick custom color");
+      expect(colorDialog.attributes("data-size")).toBe("sm");
       expect(colorDialog.attributes("data-primary-label")).toBe("Close");
     });
   });
@@ -1183,9 +1183,7 @@ describe("General", () => {
       expect(
         wrapper.find('[data-test="general-settings-scrape-interval-row"]').attributes("aria-busy"),
       ).toBe("true");
-      expect(wrapper.find('[data-test="general-settings-save-bar"]').attributes("data-state")).toBe(
-        "loading",
-      );
+      expect(wrapper.find('[data-test="general-settings-save-bar"]').exists()).toBe(false);
     });
   });
 });

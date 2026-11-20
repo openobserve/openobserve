@@ -29,16 +29,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           :model-value="compared[0].version"
           :options="versionOptions.filter((option) => option.value !== compared[1].version)"
-          size="sm"
-          width="xs"
+          width="s"
           :aria-label="t('aiObservability.promptManagement.form.baseVersion')"
           data-test="scorer-version-compare-base"
           @update:model-value="(value) => setCompared(0, Number(value))"
         />
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="swap-horiz"
+          icon="swap-horiz"
           data-test="scorer-version-compare-swap"
           @click="swapCompared"
         >
@@ -47,8 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSelect
           :model-value="compared[1].version"
           :options="versionOptions.filter((option) => option.value !== compared[0].version)"
-          size="sm"
-          width="xs"
+          width="s"
           :aria-label="t('aiObservability.promptManagement.form.targetVersion')"
           data-test="scorer-version-compare-target"
           @update:model-value="(value) => setCompared(1, Number(value))"
@@ -59,10 +57,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="scorer-version-compare-mode"
           @update:model-value="(value) => value && (diffMode = value as typeof diffMode)"
         >
-          <OToggleGroupItem value="split" size="sm">{{
+          <OToggleGroupItem value="split">{{
             t("aiObservability.promptManagement.form.split")
           }}</OToggleGroupItem>
-          <OToggleGroupItem value="unified" size="sm">{{
+          <OToggleGroupItem value="unified">{{
             t("aiObservability.promptManagement.form.unified")
           }}</OToggleGroupItem>
         </OToggleGroup>
@@ -137,12 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     pagination="none"
     :fill-height="false"
     :default-columns="false"
-    :show-global-filter="false"
-    :show-footer="false"
     :loading="loading"
     :loading-reset-key="loadingResetKey"
     :empty-message="t('onlineEvals.scorer.detail.versions.empty')"
-    :frame="false"
     selection="multiple"
     :show-select-all="false"
     :selected-ids="compareIds"
@@ -157,8 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
         <OTooltip :content="compareReason" :disabled="compareIds.length === 2">
           <OButton
-            variant="outline"
-            size="sm"
+            variant="secondary"
             :disabled="compareIds.length !== 2"
             data-test="scorer-version-compare-btn"
             @click="openCompare"

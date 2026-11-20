@@ -23,6 +23,11 @@ import { KeepAlive, defineComponent, h, nextTick, ref } from "vue";
 import { TooltipProvider } from "reka-ui";
 import OTooltip from "./OTooltip.vue";
 
+vi.mock("@/lib/styles/motion", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/styles/motion")>()),
+  TOOLTIP_DELAY_MS: 300,
+}));
+
 vi.mock("reka-ui", async (importOriginal) => {
   const actual = await importOriginal<typeof import("reka-ui")>();
   return { ...actual, TooltipPortal: actual.TooltipContent };

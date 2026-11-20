@@ -105,34 +105,24 @@ const ODrawerStub = {
   inheritAttrs: false,
   props: [
     "open",
-    "width",
     "title",
-    "subTitle",
+    "subtitle",
     "size",
     "persistent",
     "showClose",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
     "formId",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-drawer-stub"
       :data-open="String(open)"
       :data-title="title"
       :data-size="size"
-      :data-primary-label="primaryButtonLabel"
+      :data-primary-label="primary?.label"
     >
       <slot name="header-right" />
       <slot />
@@ -293,7 +283,7 @@ describe("AddRegexPattern", () => {
       });
       const drawer = wrapper.find('[data-test="o-drawer-stub"]');
       expect(drawer.exists()).toBe(true);
-      expect(drawer.attributes("data-title")).toBe("Edit Pattern");
+      expect(drawer.attributes("data-title")).toBe("Edit pattern");
       wrapper.unmount();
     });
   });
@@ -317,7 +307,7 @@ describe("AddRegexPattern", () => {
 
     it("should prefill the form via :default-values when editing", () => {
       const testData = {
-        name: "Test Pattern",
+        name: "Test pattern",
         pattern: "\\d+",
         description: "Test Description",
       };
@@ -325,7 +315,7 @@ describe("AddRegexPattern", () => {
 
       // name/pattern/description are all form-owned → seeded by the typed defaults computed.
       expect(wrapper.vm.addRegexPatternDefaults).toEqual({
-        name: "Test Pattern",
+        name: "Test pattern",
         pattern: "\\d+",
         description: "Test Description",
         testString: "",
@@ -432,7 +422,7 @@ describe("AddRegexPattern", () => {
 
       // @submit payload is the source of truth for name/pattern/description.
       await wrapper.vm.saveRegexPattern({
-        name: "Test Pattern",
+        name: "Test pattern",
         pattern: "\\d+",
         description: "Test Description",
       });
@@ -441,7 +431,7 @@ describe("AddRegexPattern", () => {
       expect(createSpy).toHaveBeenCalledWith(
         "default",
         expect.objectContaining({
-          name: "Test Pattern",
+          name: "Test pattern",
           pattern: "\\d+",
           description: "Test Description",
         }),
@@ -454,14 +444,14 @@ describe("AddRegexPattern", () => {
       const updateSpy = vi.spyOn(regexPatternService, "update");
       const testData = {
         id: "test-id",
-        name: "Test Pattern",
+        name: "Test pattern",
         pattern: "\\d+",
         description: "Test Description",
       };
 
       const wrapper = createWrapper({ isEdit: true, data: testData });
       await wrapper.vm.saveRegexPattern({
-        name: "Test Pattern",
+        name: "Test pattern",
         pattern: "\\d+",
         description: "Test Description",
       });
@@ -470,7 +460,7 @@ describe("AddRegexPattern", () => {
       expect(updateSpy).toHaveBeenCalledWith(
         "default",
         "test-id",
-        expect.objectContaining({ name: "Test Pattern", pattern: "\\d+" }),
+        expect.objectContaining({ name: "Test pattern", pattern: "\\d+" }),
       );
     });
 
@@ -483,7 +473,7 @@ describe("AddRegexPattern", () => {
       );
 
       const wrapper = createWrapper();
-      await wrapper.vm.saveRegexPattern({ name: "Test Pattern", pattern: "\\d+" });
+      await wrapper.vm.saveRegexPattern({ name: "Test pattern", pattern: "\\d+" });
       await flushPromises();
 
       // Error path: no success emits.
@@ -639,7 +629,7 @@ describe("AddRegexPattern", () => {
 
     it("should handle empty description in edit mode", () => {
       const testData = {
-        name: "Test Pattern",
+        name: "Test pattern",
         pattern: "\\d+",
         description: undefined,
       };
@@ -661,11 +651,17 @@ describe("AddRegexPattern", () => {
       expect(wrapper.vm.testStringValue).toBe("Test value");
     });
 
-    it("should widen the drawer to a size preset when AI chat is open", async () => {
+    it("opens the drawer at xl beside AI chat or in full screen, and at md otherwise", async () => {
       mockStore.state.isAiChatEnabled = true;
+      expect(createWrapper().find('[data-test="o-drawer-stub"]').attributes("data-size")).toBe(
+        "xl",
+      );
+      mockStore.state.isAiChatEnabled = false;
       const wrapper = createWrapper();
-      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
-      expect(drawer.attributes("data-size")).toBe("xxl");
+      expect(wrapper.find('[data-test="o-drawer-stub"]').attributes("data-size")).toBe("md");
+      wrapper.vm.toggleFullScreen();
+      await nextTick();
+      expect(wrapper.find('[data-test="o-drawer-stub"]').attributes("data-size")).toBe("xl");
     });
 
     it("should handle full screen mode", async () => {

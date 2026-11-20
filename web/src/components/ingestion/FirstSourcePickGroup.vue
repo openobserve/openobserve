@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import type { RouteLocationRaw } from "vue-router";
-import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 export interface FirstSourcePickTab {
@@ -46,13 +46,13 @@ const { t } = useI18nTyped();
   >
     {{ t("ingestion.firstSource.yourPick") }}
   </div>
-  <ORouteTab
+  <OTab
     :name="tab.name"
     :title="tab.title || tab.name"
     :to="tab.to"
     :icon="tab.icon"
     :label="tab.label"
-    :suffix-icon="locked ? 'lock' : undefined"
+    :locked="locked"
     :data-test="`ingestion-${rail}-pick-tab-${tab.name}`"
   />
   <div

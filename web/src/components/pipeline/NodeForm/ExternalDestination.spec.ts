@@ -37,24 +37,15 @@ import useDnD from "@/plugins/pipelines/useDnD";
 // picker's inline create form is open).
 const ODrawerStub = {
   name: "ODrawer",
-  props: [
-    "open",
-    "size",
-    "showClose",
-    "title",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "neutralButtonVariant",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  props: ["open", "size", "showClose", "title", "primary", "secondary", "extra", "extra"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div class="o-drawer-stub">
       <div class="o-drawer-title">{{ title }}</div>
       <slot />
-      <button v-if="secondaryButtonLabel" data-test="cancel-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-      <button v-if="primaryButtonLabel" data-test="save-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
-      <button v-if="neutralButtonLabel" data-test="delete-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
+      <button v-if="secondary?.label" data-test="cancel-btn" @click="$emit('click:secondary')">{{ secondary?.label }}</button>
+      <button v-if="primary?.label" data-test="save-btn" @click="$emit('click:primary')">{{ primary?.label }}</button>
+      <button v-if="extra?.label" data-test="delete-btn" @click="$emit('click:extra')">{{ extra?.label }}</button>
     </div>
   `,
 };
@@ -111,7 +102,7 @@ describe("ExternalDestination.vue (drawer chrome)", () => {
   it("mounts and renders the shared DestinationPicker as its body", () => {
     const wrapper = createWrapper();
     expect(wrapper.find(".destination-picker-stub").exists()).toBe(true);
-    expect(wrapper.find(".o-drawer-title").text()).toContain("External Destination");
+    expect(wrapper.find(".o-drawer-title").text()).toContain("External destination");
   });
 
   it("seeds the picker with the saved destination when editing", () => {
@@ -181,7 +172,7 @@ describe("ExternalDestination.vue (drawer chrome)", () => {
     await wrapper.find('[data-test="delete-btn"]').trigger("click");
     const dialog = (wrapper.vm as any).dialog;
     expect(dialog.show).toBe(true);
-    expect(dialog.title).toBe("Delete Node");
+    expect(dialog.title).toBe("Delete node");
     expect(typeof dialog.okCallback).toBe("function");
   });
 

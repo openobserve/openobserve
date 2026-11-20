@@ -44,15 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-secondary text-2xs font-medium">{{
             t("alerts.alertDetails.conditions")
           }}</span>
-          <OButton
-            variant="ghost-muted"
-            size="icon-xs-sq"
+          <OCopyButton
+            size="sm"
             data-test="workflow-config-summary-condition-copy"
-            @click="copyConditions"
-          >
-            <OIcon name="content-copy" size="sm" />
-            <OTooltip :content="t('common.copy')" />
-          </OButton>
+            :value="conditionText"
+          />
         </div>
         <pre
           class="text-compact m-0 overflow-x-auto p-[0.625rem_0.875rem] font-mono leading-relaxed whitespace-pre-wrap"
@@ -78,9 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`workflow-config-summary-branch-path-${path.handle}`"
           class="flex items-baseline gap-2"
         >
-          <OBadge :variant="path.isElse ? 'default-soft' : 'warning-soft'" size="sm">{{
-            path.order
-          }}</OBadge>
+          <OBadge :tone="path.isElse ? 'neutral' : 'warn'" size="sm">{{ path.order }}</OBadge>
           <div class="flex min-w-0 flex-col gap-0.5">
             <span class="text-text-body text-sm font-medium">{{ path.label }}</span>
             <span
@@ -103,8 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="functionName">
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-text-secondary text-sm">{{ t("workflow.results.functionLabel") }}</span>
-          <span class="text-text-body text-sm font-bold">{{ functionName }}</span>
-          <OBadge variant="default-soft" size="sm">{{ flattenLabel }}</OBadge>
+          <span class="text-text-body text-sm font-semibold">{{ functionName }}</span>
+          <OBadge tone="neutral" size="sm">{{ flattenLabel }}</OBadge>
         </div>
         <div
           v-if="functionCode"
@@ -139,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-body text-sm font-medium">{{ destinationName }}</span>
           <OBadge
             v-if="destinationUnsupported"
-            variant="warning-soft"
+            tone="warn"
             size="sm"
             data-test="workflow-config-summary-destination-unsupported"
             >{{ t("workflow.results.destinationUnsupported") }}</OBadge
@@ -149,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The request line. Wraps rather than truncates — a clipped URL is the one
              thing that makes this panel useless again. -->
         <div v-if="destinationUrl" class="flex flex-wrap items-baseline gap-2">
-          <OBadge variant="default-soft" size="sm">{{ destinationMethod }}</OBadge>
+          <OBadge tone="neutral" size="sm">{{ destinationMethod }}</OBadge>
           <span
             data-test="workflow-config-summary-destination-url"
             class="text-text-body font-mono text-sm break-all"
@@ -193,10 +187,7 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { copyToClipboard } from "@/utils/clipboard";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import WorkflowConfigHeader from "./WorkflowConfigHeader.vue";
 import { buildConditionPreview } from "@/utils/conditionPreview";
@@ -226,8 +217,6 @@ const ruleOf = (stored: any) =>
 
 // Condition → the rule expression; "" when empty (placeholder) → noConfig.
 const conditionText = computed(() => buildConditionPreview(ruleOf(data.value.conditions)));
-
-const copyConditions = () => copyToClipboard(conditionText.value, t);
 
 // Branch → one row per arm, in stored (evaluation) order, with the terminal else
 // last. Naming goes through branchEdgeLabel so a path reads the same here as on the

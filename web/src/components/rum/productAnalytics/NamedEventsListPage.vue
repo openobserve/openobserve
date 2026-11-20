@@ -18,32 +18,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full min-h-0 flex-col" data-test="rum-analytics-events-list">
     <OBanner
       v-if="permission === 'read'"
-      variant="warning"
-      dense
-      class="mx-page-edge mt-2"
-      :content="t('rum.analytics.events.readOnly')"
+      tone="warn"
+      :message="t('rum.analytics.events.readOnly')"
       data-test="rum-analytics-named-events-read-only"
     />
     <OBanner
       v-if="invalidCount > 0"
-      variant="warning"
-      dense
-      class="mx-page-edge mt-2"
-      :content="t('rum.analytics.events.unreadable', { count: invalidCount }, invalidCount)"
+      tone="warn"
+      :message="t('rum.analytics.events.unreadable', { count: invalidCount }, invalidCount)"
       data-test="rum-analytics-named-events-unreadable"
     />
     <OBanner
       v-if="status === 'failed' && events.length > 0"
-      variant="warning"
-      dense
-      class="mx-page-edge mt-2"
-      :content="t('rum.analytics.events.loadFailed')"
+      tone="warn"
+      :message="t('rum.analytics.events.loadFailed')"
       data-test="rum-analytics-named-events-stale"
     >
       <template #actions>
         <OButton
           variant="ghost"
-          size="sm"
           data-test="rum-analytics-named-events-retry-btn"
           @click="refresh"
           >{{ t("common.retry") }}</OButton
@@ -54,7 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTable
         ref="oTableRef"
         v-model:selected-ids="selectedIds"
-        :frame="false"
         :data="filtered"
         :columns="columns"
         row-key="id"
@@ -75,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:sort-by="sortBy = $event"
         @update:sort-order="sortOrder = $event"
         :default-columns="false"
-        :show-global-filter="false"
         :persist-columns="true"
         table-id="rum-analytics-named-events"
         :enable-column-resize="true"
@@ -88,15 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="filter"
               class="min-w-0 flex-1 max-md:min-w-40"
               :placeholder="t('rum.analytics.events.search')"
-              clearable
               data-test="rum-analytics-named-events-search"
             />
           </div>
         </template>
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
+            :last-run-at="lastRunAt"
             :loading="loading"
             data-test="rum-analytics-named-events-refresh-btn"
             @click="refresh"
@@ -105,20 +94,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <OEmptyState
             v-if="status === 'failed'"
-            size="hero"
-            preset="load-error"
-            :description="t('rum.analytics.events.loadFailed')"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="t('rum.analytics.events.loadFailed')"
             data-test="rum-analytics-named-events-load-error"
             @action="refresh"
           />
           <OEmptyState
             v-else
-            size="hero"
-            preset="no-named-events"
-            :filtered="!!filter.trim()"
-            :actions="canCreate ? undefined : []"
+            :kind="!!filter.trim() ? 'filtered' : 'first-run'"
+            :title="
+              !!filter.trim()
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.namedEvents') })
+                : t('emptyState.noNamedEvents.title')
+            "
+            :text="
+              !!filter.trim()
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.namedEvents') })
+                : t('emptyState.noNamedEvents.description')
+            "
+            :action-label="
+              filter.trim() || !canCreate ? undefined : t('emptyState.noNamedEvents.action')
+            "
             data-test="rum-analytics-named-events-empty"
-            @action="onEmptyAction"
+            @action="onEmptyAction(filter.trim() ? 'clear-filters' : 'create')"
           />
         </template>
         <template #cell-name="{ row, index }">
@@ -163,9 +162,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center justify-end gap-0.5" @click.stop>
             <span class="max-md:hidden">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="edit"
+                icon="edit"
                 :disabled="!canWrite"
                 :aria-label="t('rum.analytics.events.edit')"
                 :data-test="`rum-analytics-named-events-row-${index}-edit-btn`"
@@ -175,8 +174,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span class="max-md:hidden">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
                 :disabled="!canCreate"
                 :aria-label="duplicateDraftLabel(row, t('rum.analytics.events.duplicate'))"
                 :data-test="`rum-analytics-named-events-row-${index}-duplicate-btn`"
@@ -194,9 +193,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span class="max-md:hidden">
               <OButton
-                variant="ghost-destructive"
-                size="icon-sm"
-                icon-left="delete"
+                icon-only
+                variant="danger-ghost"
+                icon="delete"
                 :disabled="!canWrite"
                 :aria-label="t('rum.analytics.events.delete')"
                 :data-test="`rum-analytics-named-events-row-${index}-delete-btn`"
@@ -207,9 +206,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
-                  icon-left="more-vert"
+                  icon-only
+                  icon="more-vert"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   :aria-label="duplicateDraftLabel(row, t('rum.analytics.events.moreActions'))"
                   :data-test="`rum-analytics-named-events-row-${index}-more-btn`"
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
               </template>
               <ODropdownItem
-                icon-left="edit"
+                icon="edit"
                 class="md:hidden"
                 :disabled="!canWrite"
                 :data-test="`rum-analytics-named-events-row-${index}-edit-btn-menu`"
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>{{ t("rum.analytics.events.edit") }}</span>
               </ODropdownItem>
               <ODropdownItem
-                icon-left="content-copy"
+                icon="content-copy"
                 class="md:hidden"
                 :disabled="!canCreate"
                 :data-test="`rum-analytics-named-events-row-${index}-duplicate-btn-menu`"
@@ -247,8 +247,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </ODropdownItem>
               <ODropdownItem
-                icon-left="delete"
-                variant="destructive"
+                icon="delete"
+                tone="danger"
                 class="md:hidden"
                 :disabled="!canWrite"
                 :data-test="`rum-analytics-named-events-row-${index}-delete-btn-menu`"
@@ -261,9 +261,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #selection-actions>
           <OButton
-            variant="outline-destructive"
-            size="sm"
-            icon-left="delete"
+            variant="danger-ghost"
+            icon="delete"
             :loading="bulkDeleting"
             data-test="rum-analytics-named-events-bulk-delete-btn"
             @click="removeSelected"
@@ -282,11 +281,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       :open="removeAsk !== null"
       size="sm"
-      persistent
       :title="t('rum.analytics.events.deleteTitle')"
-      :primary-button-label="t('rum.analytics.events.delete')"
-      primary-button-variant="destructive"
-      :secondary-button-label="t('common.cancel')"
+      :primary="{ label: t('rum.analytics.events.delete'), variant: 'danger' }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="rum-analytics-named-events-delete-dialog"
       @update:open="(open: boolean) => !open && answerRemove(false)"
       @click:primary="answerRemove(true)"
@@ -331,6 +328,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { useLoadedAt } from "@/composables/useLoadedAt";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import useNamedEvents, {
   namedEventDraftVariant,
@@ -365,6 +363,7 @@ const ne = useNamedEvents();
 const savedFunnels = useSavedFunnels();
 const { confirm } = useConfirmDialog();
 const { events, permission, invalidCount, loading } = ne;
+const lastRunAt = useLoadedAt(loading);
 const eventDrafts = useEditorDraftIds("rum_named_event");
 
 const viewState = useListViewState("rumNamedEvents", {
@@ -616,7 +615,7 @@ const confirmBulk = (count: number, inUse: InUse[]) =>
       ? t("rum.analytics.events.bulkDeleteInUseMessage", { count, names: inUseNames(inUse) }, count)
       : t("rum.analytics.events.bulkDeleteMessage", { count }, count),
     confirmLabel: t("rum.analytics.events.delete"),
-    confirmVariant: "destructive",
+    kind: "destructive",
   });
 
 // A funnel saved with an event after the usage check refuses its delete: confirm those once more, then force.

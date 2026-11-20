@@ -15,63 +15,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex items-end gap-2">
-    <!-- select new folder -->
+  <div class="flex flex-col gap-2">
     <OSelect
+      ref="folderSelect"
       v-model="selectedFolder"
       :label="t('dashboard.selectFolderLabel')"
-      :labelPosition="labelPosition"
       :options="folderOptions"
       data-test="index-dropdown-stream_type"
       labelKey="label"
       :disabled="disabled"
-      class="flex-1"
     >
-      <template v-if="selectedFolder" #icon-left>
+      <template v-if="selectedFolder" #icon>
         <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
+      </template>
+      <!-- A nested create stays in this dialog: a second dialog over it would chain two modals (O8). -->
+      <template v-if="!disabled" #after-options>
+        <OSeparator />
+        <div class="p-2">
+          <OButton
+            variant="secondary"
+            block
+            data-test="dashboard-folder-move-new-add"
+            @click="startNewFolder"
+          >
+            {{ t("dashboard.newFolder") }}
+          </OButton>
+        </div>
       </template>
     </OSelect>
 
-    <OButton
-      :aria-label="t('dashboard.newFolder')"
-      data-test="dashboard-folder-move-new-add"
-      variant="outline"
-      size="icon-xs-sq"
-      class="h-8! w-8!"
-      :disabled="disabled"
-      @mousedown.prevent
-      @click="
-        () => {
-          showAddFolderDialog = true;
-        }
-      "
-      icon-left="add"
-    >
-    </OButton>
+    <div v-if="addingFolder" class="flex items-end gap-2" data-test="dashboard-folder-new-inline">
+      <OInput
+        v-model="newFolderName"
+        :label="t('dashboard.inlineCreate.folderName')"
+        :error="newFolderError !== ''"
+        :error-message="newFolderError || undefined"
+        autofocus
+        class="min-w-0 flex-1"
+        data-test="dashboard-folder-add-name"
+        @keydown.enter.prevent.stop="createNewFolder"
+        @keydown.esc.stop="cancelNewFolder"
+      />
+      <OButton
+        :loading="savingFolder"
+        data-test="dashboard-folder-add-create"
+        @click="createNewFolder"
+      >
+        {{ t("dashboard.inlineCreate.createFolder") }}
+      </OButton>
+      <OButton variant="ghost" data-test="dashboard-folder-add-cancel" @click="cancelNewFolder">
+        {{ t("dashboard.cancel") }}
+      </OButton>
+    </div>
   </div>
-  <!-- add folder -->
-  <ODialog
-    v-model:open="showAddFolderDialog"
-    :title="t('common.addFolder')"
-    size="sm"
-    data-test="dashboard-folder-move-dialog"
-    :secondary-button-label="t('dashboard.cancel')"
-    :primary-button-label="t('dashboard.save')"
-    form-id="add-folder-dashboards-form"
-    @click:secondary="showAddFolderDialog = false"
-  >
-    <AddFolder ref="addFolderRef" @update:modelValue="updateFolderList" :edit-mode="false" />
-  </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, watch, computed, type PropType } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { defineComponent, onActivated, ref, watch, computed } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
-import AddFolder from "../../components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { createFolder } from "@/utils/commons";
+import analytics from "@/services/product_analytics";
+import useNotifications from "@/composables/useNotifications";
 import { useRoute } from "vue-router";
 import { useFolderIcons } from "@/composables/useFolderIcons";
 import { folderIconOption } from "@/components/common/sidebar/folderIconOption";
@@ -79,7 +88,7 @@ import FolderIcon from "@/components/common/sidebar/FolderIcon.vue";
 
 export default defineComponent({
   name: "SelectedFolderDropdown",
-  components: { AddFolder, OButton, ODialog, OSelect, FolderIcon },
+  components: { OButton, OInput, OSelect, OSeparator, FolderIcon },
   emits: ["folder-selected"],
   props: {
     activeFolderId: {
@@ -87,10 +96,6 @@ export default defineComponent({
       validator: (value) => {
         return typeof value === "string" || value === null;
       },
-    },
-    labelPosition: {
-      type: String as PropType<"inside" | "outside">,
-      default: "outside",
     },
     disabled: {
       type: Boolean,
@@ -117,8 +122,12 @@ export default defineComponent({
       })),
     );
     const route = useRoute();
-    const showAddFolderDialog: any = ref(false);
-    const addFolderRef: any = ref(null);
+    const folderSelect = ref<InstanceType<typeof OSelect> | null>(null);
+    const addingFolder = ref(false);
+    const newFolderName = ref("");
+    const newFolderError = ref<I18nText | "">("");
+    const savingFolder = ref(false);
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
 
     const getInitialFolderValue = (): string => {
       // priority: activeFolderId > query.folder > default
@@ -133,10 +142,38 @@ export default defineComponent({
     const selectedFolder = ref<string>(getInitialFolderValue());
     const { t } = useI18nTyped();
 
-    const updateFolderList = async (newFolder: any) => {
-      showAddFolderDialog.value = false;
-      if (newFolder && newFolder.data) {
-        selectedFolder.value = newFolder.data.folderId;
+    const startNewFolder = () => {
+      folderSelect.value?.close();
+      newFolderName.value = "";
+      newFolderError.value = "";
+      addingFolder.value = true;
+    };
+
+    const cancelNewFolder = () => {
+      addingFolder.value = false;
+      newFolderError.value = "";
+    };
+
+    const createNewFolder = async () => {
+      if (savingFolder.value) return;
+      const name = newFolderName.value.trim();
+      if (!name) {
+        newFolderError.value = t("dashboard.nameRequired");
+        return;
+      }
+      savingFolder.value = true;
+      try {
+        const newFolder: any = await createFolder(store, { name, description: "", icon: null });
+        analytics.track("dashboard_folder_created");
+        showPositiveNotification(t("dashboard.addFolder.folderAdded"), { timeout: 2000 });
+        addingFolder.value = false;
+        if (newFolder?.data) selectedFolder.value = newFolder.data.folderId;
+      } catch (err: any) {
+        showErrorNotification(err?.message ?? t("dashboard.addFolder.folderCreateFailed"), {
+          timeout: 2000,
+        });
+      } finally {
+        savingFolder.value = false;
       }
     };
 
@@ -177,9 +214,14 @@ export default defineComponent({
       t,
       store,
       selectedFolder,
-      updateFolderList,
-      showAddFolderDialog,
-      addFolderRef,
+      folderSelect,
+      addingFolder,
+      newFolderName,
+      newFolderError,
+      savingFolder,
+      startNewFolder,
+      cancelNewFolder,
+      createNewFolder,
       computedStyle,
     };
   },

@@ -52,10 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="loading"
         :error="error"
         :forbidden="forbidden"
-        :frame="false"
-        :toolbar-bordered="false"
         sorting="client"
-        :show-global-filter="false"
         table-id="dbm-table-health"
         :total-count-exact="!truncated"
         persist-columns
@@ -64,8 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #error="{ message }">
           <OEmptyState
-            preset="load-error"
-            :description="raw(message)"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             data-test="dbm-table-health-error"
             @action="onRefresh()"
           />
@@ -151,20 +149,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <div class="flex items-center gap-1.5">
-            <DateTime
+          <div class="flex items-center gap-2">
+            <ODateTimeRange
               auto-apply
               menu-align="end"
               :default-type="range.type"
               :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
               :default-relative-time="range.relativeTimePeriod ?? undefined"
               data-test-name="dbm-table-health-date-time"
-              class="h-8 max-md:[&_.date-time-label]:hidden"
+              class="max-md:[&_.date-time-label]:hidden"
               @on:date-change="onDateChange"
             />
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :loading="loading"
               :last-run-at="lastRunAt"
               data-test="dbm-table-health-refresh"
@@ -228,7 +224,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- A search that matched nothing is not an absence of tables. -->
           <OEmptyState
             v-if="!loading && searchHidEverything"
-            preset="no-search-results"
+            kind="filtered"
+            :title="t('emptyState.noSearchResults.title')"
+            :text="t('emptyState.noSearchResults.description')"
             data-test="dbm-table-health-no-matches"
             @action="search = ''"
           />
@@ -273,10 +271,11 @@ import { useRoute, useRouter } from "vue-router";
 
 import DbmLockEmptyState, { type DbmLockCheck } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 // The shared in-cell magnitude bar from the core Table library — the same one

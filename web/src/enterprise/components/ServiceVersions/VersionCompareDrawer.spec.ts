@@ -334,7 +334,7 @@ describe("verdict details", () => {
     });
     expect(
       wrapper.find('[data-test="svcver-progress"] o-progress-bar-stub').attributes("value"),
-    ).toBe("0.61");
+    ).toBe("61");
     expect(wrapper.find('[data-test="svcver-baseline-detail"]').text()).toContain("remote");
     expect(wrapper.find('[data-test="svcver-baseline-detail"]').text()).not.toContain("k8s:");
     expect(wrapper.text()).toContain("compare.modeConcurrent");

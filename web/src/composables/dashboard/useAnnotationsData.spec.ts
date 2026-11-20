@@ -600,7 +600,7 @@ describe("useAnnotationsData", () => {
 
       await composable.fetchAllPanels();
 
-      expect(composable.panelsList.value[0].tabName).toBe("Unnamed Tab");
+      expect(composable.panelsList.value[0].tabName).toBe("Unnamed tab");
     });
 
     it("should handle tabs with empty string names", async () => {
@@ -631,7 +631,7 @@ describe("useAnnotationsData", () => {
 
       await composable.fetchAllPanels();
 
-      expect(composable.panelsList.value[0].tabName).toBe("Unnamed Tab");
+      expect(composable.panelsList.value[0].tabName).toBe("Unnamed tab");
     });
 
     it("should filter out non-chart panel types", async () => {

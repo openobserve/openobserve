@@ -34,8 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex h-8 min-w-0 items-center gap-x-3">
         <OButton
           v-if="line.link"
-          :variant="line.link.primary ? 'primary' : 'outline'"
-          size="sm"
+          :variant="line.link.primary ? 'primary' : 'secondary'"
           class="shrink-0"
           data-test="autoobserve-next-step-line-open"
           @click="go(line.link.to)"
@@ -50,15 +49,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-note="note.kind"
           data-test="autoobserve-next-step-line-note"
         >
-          <OSpinner v-if="note.kind === 'working'" size="xs" instant />
+          <OSpinner v-if="note.kind === 'working'" size="sm" instant />
           <OTruncatedText>{{ note.text }}</OTruncatedText>
         </span>
         <OButton
           v-if="judgeable"
-          :variant="pressed ? 'ghost-primary' : 'outline'"
-          size="xs"
+          :variant="pressed ? 'accent-ghost' : 'secondary'"
+          size="sm"
           class="ms-auto shrink-0"
-          :icon-left="pressed ? 'check' : 'thumb-down-off-alt'"
+          :icon="pressed ? 'check' : 'thumb-down-off-alt'"
           :aria-disabled="pressed"
           :loading="submitting"
           :aria-pressed="pressed"
@@ -74,10 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex h-10 flex-col justify-center gap-1.5"
         :aria-label="t('autoobserve.nextStep.loading')"
       >
-        <OSkeleton animation="none" class="h-3.5 w-11/12" />
-        <OSkeleton animation="none" class="h-3.5 w-3/5" />
+        <OSkeleton class="h-3.5 w-11/12" />
+        <OSkeleton class="h-3.5 w-3/5" />
       </span>
-      <OSkeleton animation="none" class="h-8 w-30" />
+      <OSkeleton class="h-8 w-30" />
     </template>
   </section>
 </template>

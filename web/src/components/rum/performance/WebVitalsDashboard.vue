@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
     >
       <div>
-        <OSpinner size="md" class="mx-auto block" />
+        <OSpinner size="lg" class="mx-auto block" />
         <div class="w-full text-center">{{ t("rum.loadingDashboard") }}</div>
       </div>
     </div>
@@ -37,21 +37,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     -->
     <OEmptyState
       v-else-if="showEmptyState"
+      icon="web"
       data-test="web-vitals-dashboard-browser-only-empty"
-      size="block"
-      illustration="browser-check"
-      :hide-action="true"
-    >
-      <template #title>{{ t("rum.webVitalsBrowserOnlyTitle") }}</template>
-      <template #description>{{ t("rum.webVitalsBrowserOnlyDescription") }}</template>
-    </OEmptyState>
+      :title="t('rum.webVitalsBrowserOnlyTitle')"
+      :text="t('rum.webVitalsBrowserOnlyDescription')"
+    />
 
     <!-- Browser RUM data present (or schema inconclusive): render the dashboard -->
     <template v-else>
       <div class="performance-dashboard" :class="isLoading.length ? 'invisible' : 'visible'">
         <div
           data-test="learn-web-vitals-link"
-          class="rounded-default bg-badge-indigo-soft-bg ms-3 mt-2 flex w-fit items-center px-2 py-1 text-sm font-bold"
+          class="rounded-default bg-badge-indigo-soft-bg ms-3 mt-2 flex w-fit items-center px-2 py-1 text-sm font-semibold"
         >
           <OIcon name="info" size="sm" class="me-1" />
           {{ t("rum.learnWebVitalsLabel", { product: raw("Web Vitals") }) }}
@@ -80,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="absolute top-0 flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
       >
         <div>
-          <OSpinner size="md" class="mx-auto block" />
+          <OSpinner size="lg" class="mx-auto block" />
           <div class="w-full text-center">{{ t("rum.loadingDashboard") }}</div>
         </div>
       </div>

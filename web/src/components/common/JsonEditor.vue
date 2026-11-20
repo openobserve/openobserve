@@ -20,7 +20,7 @@
         data-test="common-json-editor-validation-errors"
         class="text-status-error-text max-h-50 shrink-0 overflow-y-auto p-3"
       >
-        <div class="mb-2 font-bold">{{ t("common.pleaseFixIssues") }}</div>
+        <div class="mb-2 font-semibold">{{ t("common.pleaseFixIssues") }}</div>
         <ul class="ms-3">
           <li v-for="(error, index) in localValidationErrors" :key="index">
             {{ error }}
@@ -29,20 +29,12 @@
       </div>
 
       <div class="flex shrink-0 justify-end gap-2 p-3">
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="$emit('close')"
-          data-test="json-editor-cancel"
-          >{{ t("common.cancel") }}</OButton
-        >
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="saveChanges"
-          data-test="json-editor-save"
-          >{{ t("common.save") }}</OButton
-        >
+        <OButton variant="secondary" @click="$emit('close')" data-test="json-editor-cancel">{{
+          t("common.cancel")
+        }}</OButton>
+        <OButton variant="primary" @click="saveChanges" data-test="json-editor-save">{{
+          t("common.save")
+        }}</OButton>
       </div>
     </div>
     <!-- o2aichat enabled -->
@@ -61,6 +53,7 @@ import {
   defineComponent,
   ref,
   onMounted,
+  onBeforeUnmount,
   watch,
   computed,
   defineAsyncComponent,
@@ -105,12 +98,13 @@ export default defineComponent({
       default: false,
     },
   },
-  emits: ["close", "saveJson"],
+  emits: ["close", "saveJson", "update:dirty"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const jsonContent = ref("");
+    const loadedContent = ref("");
     const isValidJson = ref(true);
     const queryEditorRef = ref();
     const localValidationErrors = ref<any[]>(props.validationErrors || []);
@@ -206,6 +200,7 @@ export default defineComponent({
       });
 
       jsonContent.value = JSON.stringify(props.data, null, 2);
+      loadedContent.value = jsonContent.value;
     });
     //whenever user clicks on save button , we need to save the changes
     //we need to merge the stored fields with the parsed content
@@ -236,8 +231,15 @@ export default defineComponent({
 
         // Show complete data in editor
         jsonContent.value = JSON.stringify(newVal, null, 2);
+        loadedContent.value = jsonContent.value;
       },
     );
+    // The host overlay guards its dismissal with this, so an edit is never dropped by a stray Escape.
+    watch(
+      () => jsonContent.value !== loadedContent.value,
+      (dirty) => emit("update:dirty", dirty),
+    );
+    onBeforeUnmount(() => emit("update:dirty", false));
     //whenever any errors happens at the time of validating the pipeline ,
     //we need to show the errors in the json editor
     //so we need to watch the validationErrors array

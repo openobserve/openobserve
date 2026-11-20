@@ -57,7 +57,7 @@ import alertsService from "@/services/alerts";
 // which has an infinite-recursion bug (local fn shadows the import and calls itself).
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "size", "title", "width", "primaryButtonLabel", "secondaryButtonLabel"],
+  props: ["open", "size", "title", "width", "primary", "secondary"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div data-stub="o-dialog" :data-open="String(open)" :data-title="title" />
@@ -116,7 +116,7 @@ const mountComponent = async () => {
       plugins: [i18n, store, router],
       stubs: {
         ODialog: ODialogStub,
-        DateTime: {
+        ODateTimeRange: {
           template: '<div data-test="alert-history-date-picker" />',
           props: [],
           emits: ["on:date-change"],
@@ -438,7 +438,7 @@ describe("AlertHistory.vue", () => {
     it("ok / success / normal → green success-soft + check icon", () => {
       for (const s of ["ok", "success", "normal"]) {
         const r = resolveBadge("alertState", s);
-        expect(r.variant, s).toBe("success-soft");
+        expect(r.tone, s).toBe("ok");
         expect(r.icon, s).toBe("check-circle-outline");
       }
       // Wording is a `labelKey` now, resolved by OTag via t() (precedence:
@@ -450,46 +450,46 @@ describe("AlertHistory.vue", () => {
     // and must read identically, so pre-rename rows do not use different wording.
     it("condition_not_satisfied → green 'Normal' (same as the current `normal`)", () => {
       const r = resolveBadge("alertState", "condition_not_satisfied");
-      expect(r.variant).toBe("success-soft");
+      expect(r.tone).toBe("ok");
       expect(r.labelKey).toBe("components.badge.alertState.normal");
       expect(r.icon).toBe("check-circle-outline");
-      expect(resolveBadge("alertState", "normal").variant).toBe("success-soft");
+      expect(resolveBadge("alertState", "normal").tone).toBe("ok");
     });
 
     it("error / firing / anomaly → red error-soft", () => {
       for (const s of ["error", "firing", "anomaly"]) {
-        expect(resolveBadge("alertState", s).variant, s).toBe("error-soft");
+        expect(resolveBadge("alertState", s).tone, s).toBe("err");
       }
       expect(resolveBadge("alertState", "firing").icon).toBe("error-outline");
     });
 
     it("failed → red error-soft + cancel icon", () => {
       const r = resolveBadge("alertState", "failed");
-      expect(r.variant).toBe("error-soft");
+      expect(r.tone).toBe("err");
       expect(r.icon).toBe("cancel");
     });
 
     it("skipped → warning-soft + block icon", () => {
       const r = resolveBadge("alertState", "skipped");
-      expect(r.variant).toBe("warning-soft");
+      expect(r.tone).toBe("warn");
       expect(r.icon).toBe("block");
     });
 
     it("flapping → warning-soft + 'Flapping' label", () => {
       const r = resolveBadge("alertState", "flapping");
-      expect(r.variant).toBe("warning-soft");
+      expect(r.tone).toBe("warn");
       expect(r.label).toBe("Flapping");
     });
 
-    it("pending → blue-soft + schedule icon", () => {
+    it("pending → info + schedule icon", () => {
       const r = resolveBadge("alertState", "pending");
-      expect(r.variant).toBe("blue-soft");
+      expect(r.tone).toBe("info");
       expect(r.icon).toBe("schedule");
     });
 
     it("unknown status → neutral fallback + help-outline (no crash)", () => {
       const r = resolveBadge("alertState", "totally-unknown");
-      expect(r.variant).toBe("default-soft");
+      expect(r.tone).toBe("neutral");
       expect(r.icon).toBe("help-outline");
       expect(() => resolveBadge("alertState", undefined as any)).not.toThrow();
     });
@@ -499,14 +499,14 @@ describe("AlertHistory.vue", () => {
     // AND the timeline, which already aggregated it under firing.
     it("completed → red error-soft, labelled Firing (it is a firing state)", () => {
       const r = resolveBadge("alertState", "completed");
-      expect(r.variant).toBe("error-soft");
+      expect(r.tone).toBe("err");
       expect(r.labelKey).toBe("components.badge.alertState.firing");
       expect(r.icon).toBe("error-outline");
     });
 
-    it("notify_failed → red error-soft (condition matched, delivery failed)", () => {
+    it("notify_failed → amber warning (the condition matched; only delivery failed, C9)", () => {
       const r = resolveBadge("alertState", "notify_failed");
-      expect(r.variant).toBe("error-soft");
+      expect(r.tone).toBe("warn");
       expect(r.labelKey).toBe("components.badge.alertState.notifyfailed");
     });
   });

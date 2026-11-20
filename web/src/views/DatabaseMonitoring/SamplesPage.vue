@@ -54,22 +54,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            toolbar: both tables below own a toolbar and only one of them is
            mounted at a time, so a control in either would vanish with it.
            One row, above both, serving whichever table is showing. -->
-      <div class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-1.5">
-        <DbmScopeFilters
-          class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-1/4"
-          :filters="dimensionFilters"
-          @clear="clearScope"
-        />
-        <div class="min-w-48 flex-1 max-lg:order-last max-lg:w-full">
+      <div class="px-page-edge flex shrink-0 flex-wrap items-center gap-2 py-2">
+        <div class="w-70 min-w-0 max-lg:order-last max-lg:w-full">
           <OSearchInput
             :model-value="search"
             :placeholder="t('dbm.samples.searchPlaceholder')"
-            clearable
             :debounce="400"
             data-test="dbm-samples-search"
             @update:model-value="(v: unknown) => (search = typeof v === 'string' ? v : '')"
           />
         </div>
+        <DbmScopeFilters
+          class="min-w-0 max-lg:flex-none max-lg:basis-auto lg:max-w-1/4"
+          :filters="dimensionFilters"
+          @clear="clearScope"
+        />
         <DbmToolbarNote
           v-if="!serverListShown"
           class="ms-auto"
@@ -86,20 +85,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:column-visibility="setColumnVisibility"
           @reset:column-sizes="tableRef?.resetColumnSizes?.()"
         />
-        <DateTime
+        <ODateTimeRange
           auto-apply
           menu-align="end"
           :default-type="range.type"
           :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
           :default-relative-time="range.relativeTimePeriod ?? undefined"
           data-test-name="dbm-samples-date-time"
-          class="h-8 max-md:[&_.date-time-label]:hidden"
+          class="max-md:[&_.date-time-label]:hidden"
           @on:date-change="onDateChange"
         />
         <!-- ms-auto: when the row wraps, refresh lands right-aligned instead of orphaned at the start. -->
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           class="ms-auto"
           :loading="loading"
           :last-run-at="lastRunAt"
@@ -121,12 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="rowKey"
         :loading="loading"
-        :frame="false"
-        :toolbar-bordered="false"
         :error="error"
         :forbidden="forbidden"
         sorting="client"
-        :show-global-filter="false"
         table-id="dbm-samples"
         persist-columns
         :column-visibility="columnVisibility"
@@ -136,8 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #error="{ message }">
           <OEmptyState
-            preset="load-error"
-            :description="raw(message)"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             data-test="dbm-samples-error"
             @action="onRefresh()"
           />
@@ -210,13 +205,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <span class="inline-flex">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
                 disabled
                 :aria-label="t('dbm.samples.viewTrace')"
                 :data-test="`dbm-samples-trace-${row.rowKey}`"
               >
-                <template #icon-left>
+                <template #icon>
                   <OIcon
                     name="lock"
                     class="text-icon-locked"
@@ -229,9 +224,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTooltip>
           <OButton
             v-else-if="sampleTraceFilter(row)"
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="open-in-new"
+            icon="open-in-new"
             :data-test="`dbm-samples-trace-${row.rowKey}`"
             @click.stop="openSampleTrace(row)"
           >
@@ -261,7 +256,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The reader's own search emptied the table — not a quiet window. -->
           <OEmptyState
             v-if="!loading && searchHidEverything"
-            preset="no-search-results"
+            kind="filtered"
+            :title="t('emptyState.noSearchResults.title')"
+            :text="t('emptyState.noSearchResults.description')"
             data-test="dbm-samples-no-matches"
             @action="search = ''"
           />
@@ -320,10 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="filteredServerRows"
           :columns="serverColumns"
           row-key="rowKey"
-          :frame="false"
-          :toolbar-bordered="false"
           sorting="client"
-          :show-global-filter="false"
           table-id="dbm-server-samples"
           :total-count-exact="!serverTruncated"
           data-test="dbm-server-samples-table"
@@ -379,7 +373,7 @@ import { useStore } from "vuex";
 import DbmEmptyState, { type DbmEmptyCauseId } from "@/components/dbm/DbmEmptyState.vue";
 import DbmPageChrome from "@/components/dbm/DbmPageChrome.vue";
 import DbmQueryCell from "@/components/dbm/DbmQueryCell.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DbmScopeFilters, { type DbmScopeFilter } from "@/components/dbm/DbmScopeFilters.vue";
 import DbmToolbarNote from "@/components/dbm/DbmToolbarNote.vue";
@@ -392,6 +386,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";

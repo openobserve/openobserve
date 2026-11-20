@@ -299,7 +299,7 @@ describe("DependencyImpactDialog", () => {
     const confirm = await openDeleteConfirm("cpu");
     expect(confirm.props("messageKeypath")).toBe("alert_dependencies.deleteAlertMessage");
     expect(confirm.props("messageName")).toBe("cpu");
-    expect(confirm.props("okVariant")).toBe("destructive");
+    expect(confirm.props("kind")).toBe("destructive");
   });
 
   it("names a destination as a destination in the delete confirm", async () => {

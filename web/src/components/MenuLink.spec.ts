@@ -18,6 +18,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { ref } from "vue";
 import MenuLink from "@/components/MenuLink.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { TOOLTIP_DELAY_MS } from "@/lib/styles/motion";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
@@ -346,7 +347,7 @@ describe("MenuLink", async () => {
         await flushPromises();
         await tile.trigger("pointerleave");
         await tile.trigger("pointermove");
-        vi.advanceTimersByTime(300);
+        vi.advanceTimersByTime(TOOLTIP_DELAY_MS);
         await flushPromises();
         const bubble = document.querySelector('[data-test="menu-link-/billings-tooltip"]');
         expect(bubble?.textContent?.trim()).toBe("Abrechnungen");

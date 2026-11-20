@@ -4,31 +4,34 @@ import type {
   ContextMenuItemEmits,
   ContextMenuItemSlots,
 } from "./OContextMenuItem.types";
-import { computed, useId } from "vue";
+import { computed, useAttrs, useId } from "vue";
 import { ContextMenuItem } from "reka-ui";
-import OIcon from "../../core/Icon/OIcon.vue";
-import OShortcut from "../../core/Shortcut/OShortcut.vue";
+import OMenuItemContent from "@/lib/overlay/shared/OMenuItemContent.vue";
+import { menuItemClasses } from "@/lib/overlay/shared/menuItem";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 const props = withDefaults(defineProps<ContextMenuItemProps>(), {
+  as: "div",
   disabled: false,
-  focusableUnavailable: false,
-  variant: "default",
+  tone: "default",
+  checked: undefined,
 });
 
 const emit = defineEmits<ContextMenuItemEmits>();
 
 defineSlots<ContextMenuItemSlots>();
 
+const attrs = useAttrs();
+const id = useId();
 const isDisabled = useLockedDisabled(() => props.disabled);
-const unavailable = computed(() => isDisabled.value && props.focusableUnavailable);
-const reasonId = `${useId()}-reason`;
-
-const variantClasses: Record<NonNullable<ContextMenuItemProps["variant"]>, string> = {
-  default: "text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg",
-  destructive:
-    "text-dropdown-item-destructive-text data-[highlighted]:bg-dropdown-item-destructive-hover-bg",
-};
+// A disabled item that says why stays in the keyboard order, so the reason can be read.
+const unavailable = computed(() => isDisabled.value && !!props.disabledReason);
+const note = computed(() => (isDisabled.value ? props.disabledReason : null) || props.description);
+const noteId = computed(() => `${attrs["data-test"] ?? id}-reason`);
+// Only a single-choice item overrides the role; an undefined one would wipe reka's `menuitem` through as-child.
+const choiceAttrs = computed(() =>
+  props.checked === undefined ? {} : { role: "menuitemradio", "aria-checked": props.checked },
+);
 
 function blockActivation(event: Event) {
   if (!unavailable.value) return;
@@ -51,41 +54,35 @@ function onSelect(event: Event) {
 
 <template>
   <ContextMenuItem
-    :disabled="isDisabled && !focusableUnavailable"
+    :disabled="isDisabled && !unavailable"
     as-child
     :text-value="textValue"
-    :class="[
-      'relative flex items-center gap-2',
-      'rounded-default w-full px-3 py-1.5',
-      'cursor-pointer outline-none select-none',
-      'transition-colors duration-(--duration-control) ease-(--ease-control)',
-      unavailable
-        ? 'text-dropdown-item-disabled focus-visible:ring-focus-ring-accent cursor-not-allowed focus-visible:ring-2 focus-visible:ring-inset'
-        : variantClasses[variant],
-      'data-[disabled]:text-dropdown-item-disabled data-[disabled]:cursor-not-allowed',
-    ]"
+    :class="menuItemClasses(tone, unavailable, !!note)"
     @click.capture="blockActivation"
     @keydown.capture="onKeydown"
     @select="onSelect"
   >
-    <div
+    <component
+      :is="as"
+      :type="as === 'button' ? 'button' : undefined"
       :aria-disabled="isDisabled || undefined"
-      :aria-describedby="unavailable && description ? reasonId : undefined"
+      :aria-describedby="note ? noteId : undefined"
+      v-bind="choiceAttrs"
     >
-      <slot name="icon-left">
-        <OIcon v-if="props.iconLeft" :name="props.iconLeft" size="sm" />
-      </slot>
-      <slot />
-      <span v-if="unavailable && description" :id="reasonId" class="sr-only" aria-hidden="true">{{
-        description
-      }}</span>
-      <slot name="icon-right" />
-      <OShortcut
-        v-if="props.shortcut || props.shortcutId"
-        :keys="props.shortcut"
-        :id="props.shortcutId"
-        class="ms-auto ps-4"
-      />
-    </div>
+      <OMenuItemContent
+        :icon="icon"
+        :tone="tone"
+        :checked="checked"
+        :shortcut="shortcut"
+        :keys="keys"
+        :note="note"
+        :note-id="noteId"
+        :muted="unavailable"
+      >
+        <template v-if="$slots.icon" #icon><slot name="icon" /></template>
+        <slot />
+        <template v-if="$slots.end" #end><slot name="end" /></template>
+      </OMenuItemContent>
+    </component>
   </ContextMenuItem>
 </template>

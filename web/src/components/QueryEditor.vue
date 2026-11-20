@@ -19,14 +19,15 @@
       <!-- Show streaming status with spinner + stop button -->
       <template v-if="isGenerating">
         <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="h-5 w-5 shrink-0" />
-        <OSpinner variant="dots" size="xs" />
+        <OSpinner />
         <span class="flex-1 truncate text-sm">{{
           streamingText || aiStatusText || t("search.analyzingQuery")
         }}</span>
         <OButton
-          variant="ghost-destructive"
-          size="icon-circle-sm"
-          icon-left="stop"
+          icon-only
+          variant="danger-ghost"
+          size="sm"
+          icon="stop"
           :data-test="`${dataTestPrefix}-ai-stop-btn`"
           @click="cancelGeneration"
           class="text-status-error-text! shrink-0 transition-all! duration-200! hover:bg-[rgba(231,76,60,0.1)]"
@@ -43,19 +44,20 @@
           :data-test="`${dataTestPrefix}-ai-input-field`"
           @keydown.enter="handleAIInputEnter"
         >
-          <template #icon-left>
+          <template #icon>
             <img :src="nlpIcon" :alt="t('search.aiIconAlt')" class="h-5 w-5" />
           </template>
         </OInput>
         <!-- Send Button -->
         <OButton
-          variant="ai-gradient"
-          size="icon-xs-sq"
-          icon-left="send"
+          icon-only
+          variant="primary"
+          size="sm"
+          icon="send"
           :disabled="!aiInputText.trim() || props.disableAi"
           :data-test="`${dataTestPrefix}-ai-send-btn`"
           @click="handleAIGenerate"
-          class="text-text-inverse! disabled:bg-surface-subtle! bg-gradient-ai! enabled:hover:shadow-ai-accent/40! h-7! min-h-7! w-7! min-w-7! transition-all! duration-200! enabled:hover:-translate-y-px enabled:hover:shadow-md enabled:active:translate-y-0 disabled:opacity-40!"
+          class="text-text-inverse! disabled:bg-surface-subtle! bg-gradient-ai! enabled:hover:shadow-ai-accent/40! transition-all! duration-200! enabled:hover:-translate-y-px enabled:hover:shadow-md enabled:active:translate-y-0 disabled:opacity-40!"
         >
           <OTooltip
             v-if="props.disableAi && props.disableAiReason"
@@ -68,9 +70,10 @@
         </OButton>
         <!-- Close Button -->
         <OButton
-          variant="ghost-muted"
-          size="icon-circle-sm"
-          icon-left="close"
+          icon-only
+          variant="ghost"
+          size="sm"
+          icon="close"
           :data-test="`${dataTestPrefix}-ai-close-btn`"
           @click="dismissAIMode"
           class="transition-colors! duration-200!"
@@ -118,12 +121,12 @@
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
       <OButton
         v-if="aiFeatureVisible && !hideNlToggle && !isAIMode"
+        icon-only
         :data-test="`${dataTestPrefix}-ai-toggle-btn`"
         variant="ghost"
-        size="icon-toolbar"
         :disabled="props.disableAi"
         @click="onAiToggleClick"
-        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-1 z-100 h-7! min-h-7! w-7! min-w-7! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
+        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-1 z-100 [transition:background_var(--duration-control)_var(--ease-control),box-shadow_var(--duration-control)_var(--ease-control)]! hover:shadow-md"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
       >
         <img

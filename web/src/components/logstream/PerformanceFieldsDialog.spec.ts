@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import { createStore } from "vuex";
+import { byTest, pressEscape } from "@/test/unit/helpers/draftDom";
 
 // PerformanceFieldsDialog now wraps content in <ODialog>. The dialog exposes:
 //   - prop  : open (v-model:open), persistent, size, title,
@@ -35,19 +36,19 @@ const ODialogStub = {
       data-test-stub="o-dialog"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
     >
       <div data-test="o-dialog-title">{{ title }}</div>
       <div data-test="o-dialog-body"><slot /></div>
       <button
         data-test="o-dialog-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
       <button
         data-test="o-dialog-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-close"
         @click="$emit('update:open', false)"
@@ -59,23 +60,23 @@ const ODialogStub = {
     "persistent",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 describe("PerformanceFieldsDialog", () => {
@@ -121,12 +122,12 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
     });
 
-    it("should render the ODialog with title 'Index Fields Detected'", async () => {
+    it("should render the ODialog with title 'Index fields detected'", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
       const dialog = wrapper.find('[data-test-stub="o-dialog"]');
       expect(dialog.exists()).toBe(true);
-      expect(dialog.attributes("data-title")).toBe("Index Fields Detected");
+      expect(dialog.attributes("data-title")).toBe("Index fields detected");
     });
 
     it("should pass size='md' to ODialog", async () => {
@@ -146,7 +147,7 @@ describe("PerformanceFieldsDialog", () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
       const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.attributes("data-primary-label")).toBe("Add Fields");
+      expect(dialog.attributes("data-primary-label")).toBe("Add fields");
     });
 
     it("should not render the dialog body when modelValue is false", async () => {
@@ -162,7 +163,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.fts.length).toBeGreaterThan(0);
-      expect(wrapper.text()).toContain("Full Text Search (1)");
+      expect(wrapper.text()).toContain("Full text search (1)");
     });
 
     it("should show correct FTS field count", async () => {
@@ -173,7 +174,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.fts.length).toBe(2);
-      expect(wrapper.text()).toContain("Full Text Search (2)");
+      expect(wrapper.text()).toContain("Full text search (2)");
     });
 
     it("should display FTS field chip with the field name", async () => {
@@ -189,7 +190,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.fts.length).toBe(0);
-      expect(wrapper.text()).not.toContain("Full Text Search (");
+      expect(wrapper.text()).not.toContain("Full text search (");
     });
   });
 
@@ -199,7 +200,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.secondaryIndex.length).toBeGreaterThan(0);
-      expect(wrapper.text()).toContain("Secondary Index (1)");
+      expect(wrapper.text()).toContain("Secondary index (1)");
     });
 
     it("should show correct secondary index field count", async () => {
@@ -211,7 +212,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.secondaryIndex.length).toBe(3);
-      expect(wrapper.text()).toContain("Secondary Index (3)");
+      expect(wrapper.text()).toContain("Secondary index (3)");
     });
 
     it("should display secondary index field chip with the field name", async () => {
@@ -227,7 +228,7 @@ describe("PerformanceFieldsDialog", () => {
       await flushPromises();
       const vm = wrapper.vm as any;
       expect(vm.fieldsByType.secondaryIndex.length).toBe(0);
-      expect(wrapper.text()).not.toContain("Secondary Index (");
+      expect(wrapper.text()).not.toContain("Secondary index (");
     });
   });
 
@@ -320,6 +321,38 @@ describe("PerformanceFieldsDialog", () => {
 
       expect(wrapper.emitted("skip")).toBeFalsy();
       expect(wrapper.emitted("add-fields")).toBeFalsy();
+    });
+  });
+
+  describe("Dismiss guard (real dialog)", () => {
+    const mountReal = async () => {
+      wrapper = mount(PerformanceFieldsDialog, {
+        attachTo: document.body,
+        props: { modelValue: true, missingFields: [mockFtsFiled, mockSecondaryField] },
+        global: { plugins: [store] },
+      });
+      await flushPromises();
+    };
+
+    it("asks before Escape drops the fields the user took off the list", async () => {
+      await mountReal();
+      await wrapper.setProps({ missingFields: [mockFtsFiled] });
+
+      pressEscape();
+      await flushPromises();
+
+      expect(byTest("o-dialog-discard-row")).not.toBeNull();
+      expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+    });
+
+    it("closes on Escape while the list is as it opened", async () => {
+      await mountReal();
+
+      pressEscape();
+      await flushPromises();
+
+      expect(byTest("o-dialog-discard-row")).toBeNull();
+      expect(wrapper.emitted("update:modelValue")).toEqual([[false]]);
     });
   });
 

@@ -36,8 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="canConfigure"
         variant="primary"
-        size="sm"
-        icon-left="add"
         data-test="oncall-ownership-add-rule"
         @click="openAdd"
       >
@@ -64,9 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OButton
       v-if="openSignals.length"
-      variant="ghost-primary"
-      size="sm"
-      icon-left="alt-route"
+      variant="accent-ghost"
+      icon="alt-route"
       class="self-start"
       data-test="oncall-ownership-unclaimed"
       @click="goToRouting('signals')"
@@ -76,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODrawer
       :open="tester.open.value"
-      size="lg"
+      size="md"
       :title="t('oncall.routingTestRouting')"
       data-test="oncall-ownership-tester-drawer"
       @update:open="(v: boolean) => (tester.open.value = v)"
@@ -123,9 +120,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('oncall.removeRuleTitle')"
       message-keypath="oncall.removeRuleMessageNamed"
       :message-name="ruleToDelete ? readable(ruleToDelete.dimensions) : ''"
-      ok-variant="destructive"
+      kind="destructive"
       :ok-label="t('oncall.removeRule')"
-      focus-cancel
       @update:ok="deleteRule"
       @update:cancel="ruleToDelete = null"
     />

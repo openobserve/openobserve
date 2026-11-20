@@ -20,8 +20,8 @@ export class RumSourcemapsPage {
         // The list's filters carry no data-test and their label is not tied to the trigger, so the label's wrapper finds it.
         this.serviceFilter = page.locator('div:has(> label:text-is("Service")) [role="combobox"]');
         this.filterOptions = page.getByRole('option');
-        this.applyFiltersBtn = page.getByRole('button', { name: 'Apply Filters' });
-        this.uploadPageBtn = page.getByRole('button', { name: 'Upload Source Maps' });
+        this.applyFiltersBtn = page.getByRole('button', { name: 'Apply filters' });
+        this.uploadPageBtn = page.getByRole('button', { name: 'Upload source maps' });
         this.uploadCancelBtn = page.locator('[data-test="rum-upload-source-maps-cancel-btn"]');
         this.versionCells = page.locator('[data-test="o2-table-cell-version"]');
         this.pageSizeTrigger = page.locator('[data-test="o2-table-page-size-select-trigger"]');
@@ -65,7 +65,7 @@ export class RumSourcemapsPage {
     async setPageSize(size) {
         await this.pageSizeTrigger.click();
         await this.page.locator(`[data-test="o2-table-page-size-select-option"][data-test-value="${size}"]`).click();
-        await expect(this.pageSizeTrigger).toHaveText(String(size));
+        await expect(this.pageSizeTrigger).toHaveText(`${size} per page`);
     }
 
     /** Opens the Upload page from the list and cancels back to the list. */
@@ -88,7 +88,7 @@ export class RumSourcemapsPage {
     async expectListState({ service, column, direction, pageSize, versions }) {
         await expect(this.serviceFilter).toHaveAttribute('data-test-selected-value', service, { timeout: 15000 });
         await expect(this.sortIcon(column)).toHaveAttribute('data-test-sort-direction', direction);
-        await expect(this.pageSizeTrigger).toHaveText(String(pageSize));
+        await expect(this.pageSizeTrigger).toHaveText(`${pageSize} per page`);
         await expect(this.versionCells).toHaveText(versions, { timeout: 15000 });
     }
 

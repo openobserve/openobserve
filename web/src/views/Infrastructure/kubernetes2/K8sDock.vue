@@ -81,8 +81,8 @@ const heightClass = computed(() => (props.dock.maximized ? "h-2/3" : "h-80"));
           </span>
           <template #trailing>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
               :aria-label="t('infra.k8s2.dockCloseTab')"
               :data-test="`k8s2-dock-close-${tab.kind}`"
               @click.stop="emit('close', tab.id)"
@@ -93,8 +93,8 @@ const heightClass = computed(() => (props.dock.maximized ? "h-2/3" : "h-80"));
         </OTab>
       </OTabs>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-xs"
         :aria-label="dock.open ? t('infra.k8s2.dockMinimize') : t('infra.k8s2.dockRestore')"
         data-test="k8s2-dock-minimize"
         @click="emit('minimize')"
@@ -105,8 +105,8 @@ const heightClass = computed(() => (props.dock.maximized ? "h-2/3" : "h-80"));
         />
       </OButton>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-xs"
         :aria-label="dock.maximized ? t('infra.k8s2.dockUnmaximize') : t('infra.k8s2.dockMaximize')"
         data-test="k8s2-dock-maximize"
         @click="emit('maximize')"
@@ -117,8 +117,8 @@ const heightClass = computed(() => (props.dock.maximized ? "h-2/3" : "h-80"));
         />
       </OButton>
       <OButton
+        icon-only
         variant="ghost"
-        size="icon-xs"
         :aria-label="t('infra.k8s2.dockClose')"
         data-test="k8s2-dock-dismiss"
         @click="emit('dismiss')"

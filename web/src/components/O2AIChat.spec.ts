@@ -142,7 +142,7 @@ const stubs = {
   ConfirmDialog: {
     name: "ConfirmDialog",
     template: '<div data-test="confirm-dialog" />',
-    props: ["modelValue", "title", "message", "okVariant"],
+    props: ["modelValue", "title", "message", "kind"],
     emits: ["update:ok", "update:cancel", "update:modelValue"],
   },
   O2AIConfirmDialog: {
@@ -159,32 +159,32 @@ const stubs = {
       '<div data-test="o-dialog" v-if="open">' +
       '<div data-test="o-dialog-title">{{ title }}</div>' +
       '<div data-test="o-dialog-body"><slot /></div>' +
-      '<button data-test="o-dialog-primary" @click="$emit(\'click:primary\')">{{ primaryButtonLabel }}</button>' +
-      '<button data-test="o-dialog-secondary" @click="$emit(\'click:secondary\')">{{ secondaryButtonLabel }}</button>' +
+      '<button data-test="o-dialog-primary" @click="$emit(\'click:primary\')">{{ primary?.label }}</button>' +
+      '<button data-test="o-dialog-secondary" @click="$emit(\'click:secondary\')">{{ secondary?.label }}</button>' +
       '<button data-test="o-dialog-close" @click="$emit(\'update:open\', false)">x</button>' +
       "</div>",
     props: [
       "open",
       "title",
-      "subTitle",
+      "subtitle",
       "size",
       "width",
       "persistent",
       "showClose",
-      "primaryButtonLabel",
-      "secondaryButtonLabel",
-      "neutralButtonLabel",
-      "primaryButtonVariant",
-      "secondaryButtonVariant",
-      "neutralButtonVariant",
-      "primaryButtonDisabled",
-      "secondaryButtonDisabled",
-      "neutralButtonDisabled",
-      "primaryButtonLoading",
-      "secondaryButtonLoading",
-      "neutralButtonLoading",
+      "primary",
+      "secondary",
+      "extra",
+      "primary",
+      "secondary",
+      "extra",
+      "primary",
+      "secondary",
+      "extra",
+      "primary",
+      "secondary",
+      "extra",
     ],
-    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+    emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   },
   // Stub ODrawer with the same surface (default slot, v-model:open) so the
   // History drawer can be asserted without pulling in the real component.
@@ -199,16 +199,16 @@ const stubs = {
     props: [
       "open",
       "title",
-      "subTitle",
+      "subtitle",
       "size",
       "width",
       "persistent",
       "showClose",
-      "primaryButtonLabel",
-      "secondaryButtonLabel",
-      "neutralButtonLabel",
+      "primary",
+      "secondary",
+      "extra",
     ],
-    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+    emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   },
 };
 
@@ -416,7 +416,7 @@ describe("O2AIChat", () => {
     const deleteDialog = () =>
       wrapper
         .findAllComponents({ name: "ODialog" })
-        .find((d) => d.props("title") === "Delete Chat")!;
+        .find((d) => d.props("title") === "Delete chat")!;
 
     it("names the chat in bold behind a destructive Delete", async () => {
       (wrapper.vm as any).chatHistory = [{ id: 42, title: "Latency review", serverBacked: false }];
@@ -425,8 +425,8 @@ describe("O2AIChat", () => {
 
       const dialog = deleteDialog();
       expect(dialog.props("open")).toBe(true);
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
-      expect(dialog.props("primaryButtonLabel")).toBe("Delete");
+      expect(dialog.props("primary")?.variant).toBe("danger");
+      expect(dialog.props("primary")?.label).toBe("Delete");
       const name = wrapper.find('[data-test="o2-ai-chat-delete-chat-name"]');
       expect(name.text()).toBe("Latency review");
       expect(name.classes()).toContain("font-semibold");
@@ -517,9 +517,7 @@ describe("O2AIChat", () => {
       wrapper.unmount();
       wrapper = mountO2AIChat({ isOpen: true });
       await flushPromises();
-      expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("okVariant")).toBe(
-        "destructive",
-      );
+      expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("kind")).toBe("destructive");
     });
   });
 
@@ -592,9 +590,9 @@ describe("O2AIChat", () => {
       const drawer = wrapper.findComponent({ name: "ODrawer" });
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("open")).toBe(true);
-      expect(drawer.props("title")).toBe("Chat History");
+      expect(drawer.props("title")).toBe("Chat history");
       expect(drawer.props("size")).toBe("sm");
-      expect(wrapper.find('[data-test="o-drawer-title"]').text()).toBe("Chat History");
+      expect(wrapper.find('[data-test="o-drawer-title"]').text()).toBe("Chat history");
     });
 
     it("should close the drawer when update:open is emitted with false", async () => {
@@ -632,7 +630,7 @@ describe("O2AIChat", () => {
     function findEditTitleDialog() {
       return wrapper
         .findAllComponents({ name: "ODialog" })
-        .find((d) => d.props("title") === "Edit Chat Title");
+        .find((d) => d.props("title") === "Edit chat title");
     }
 
     it("should not render the edit title dialog when showEditTitleDialog is false", async () => {
@@ -651,8 +649,8 @@ describe("O2AIChat", () => {
 
       const dialog = findEditTitleDialog();
       expect(dialog).toBeDefined();
-      expect(dialog!.props("primaryButtonLabel")).toBe("Save");
-      expect(dialog!.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(dialog!.props("primary")?.label).toBe("Save");
+      expect(dialog!.props("secondary")?.label).toBe("Cancel");
       expect(dialog!.props("size")).toBe("sm");
     });
 
@@ -709,7 +707,7 @@ describe("O2AIChat", () => {
       // The image preview dialog has no primary/secondary labels.
       return wrapper
         .findAllComponents({ name: "ODialog" })
-        .find((d) => d.props("size") === "lg" && d.props("primaryButtonLabel") === undefined);
+        .find((d) => d.props("size") === "lg" && d.props("primary")?.label === undefined);
     }
 
     it("should not render the image preview dialog when showImagePreview is false", async () => {

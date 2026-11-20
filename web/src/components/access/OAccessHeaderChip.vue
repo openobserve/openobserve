@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPopover
+    size="md"
     v-model:open="open"
     side="bottom"
     align="end"
@@ -29,14 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #trigger>
       <OButton
-        variant="ghost-destructive"
-        :size="compactChip ? 'chip' : 'sm'"
-        icon-left="lock"
+        variant="danger-ghost"
+        :size="compactChip ? 'xs' : 'md'"
+        icon="lock"
         :aria-label="chipName"
         data-test="access-header-chip"
       >
         <span v-if="!compactChip">{{ t("accessBoundary.chip.label") }}</span>
-        <OBadge variant="error-soft" size="sm">{{ message.count }}</OBadge>
+        <OCountBadge :count="message.count" tone="err" />
       </OButton>
     </template>
     <OAccessDeniedCard
@@ -60,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCountBadge from "@/lib/core/Badge/OCountBadge.vue";
 import OAccessDeniedCard from "@/components/access/OAccessDeniedCard.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { withoutCovered } from "@/components/access/surfaceDenials";

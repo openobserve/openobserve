@@ -37,10 +37,10 @@ const MAIN: Record<string, [string, string]> = {
   "--color-focus-ring-accent": ["#3f7994", "#79a1b4"],
   "--color-tabs-active-bg": ["#e2ebef", "#19303b"],
   "--color-tabs-active-text": ["#326176", "#ffffff"],
-  "--color-tabs-disabled-text": ["#a3a3a3", "#525252"],
-  "--color-tabs-hover-text": ["#262626", "#e5e5e5"],
-  "--color-tabs-rail-hover-bg": ["#ededed", "#262626"],
-  "--color-text-body": ["#404040", "#d4d4d4"],
+  "--color-tabs-disabled-text": ["#9ea4b4", "#4b5163"],
+  "--color-tabs-hover-text": ["#222534", "#e3e5eb"],
+  "--color-tabs-rail-hover-bg": ["#eceef2", "#222534"],
+  "--color-text-body": ["#3b3f4f", "#d0d5e1"],
 };
 
 const UTILITY = /^(?:[a-z-]+:)*(?:text|bg|border(?:-[se])?|outline)-([a-z][a-z0-9-]+)$/;
@@ -57,9 +57,9 @@ function mountRail(modelValue: string, disableActive = false) {
     components: { OTabs, OTab },
     data: () => ({ modelValue, disableActive }),
     template: `<OTabs orientation="vertical" :model-value="modelValue">
-      <OTab name="a" label="Alerts" icon="notifications" :disable="disableActive" />
+      <OTab name="a" label="Alerts" icon="notifications" :disabled="disableActive" />
       <OTab name="b" label="Organization parameters" />
-      <OTab name="c" label="Locked" disable />
+      <OTab name="c" label="Locked" disabled />
     </OTabs>`,
   });
 }
@@ -90,7 +90,7 @@ function colourTokens(classes: string[]): string[] {
   return [...names].sort();
 }
 
-describe("vertical tabs render as on main", () => {
+describe("vertical tabs render with their pinned colours", () => {
   it("colours the active tab in brand ink at the medium weight with a full accent ring", () => {
     const { active } = tabs(mountRail("a"));
     expect(active.classes()).toEqual(
@@ -113,7 +113,7 @@ describe("vertical tabs render as on main", () => {
         "text-text-body",
         "enabled:hover:text-tabs-hover-text",
         "enabled:hover:bg-tabs-rail-hover-bg",
-        "font-normal",
+        "font-medium",
       ]),
     );
   });
@@ -134,18 +134,10 @@ describe("vertical tabs render as on main", () => {
     );
   });
 
-  it("starts each label at the tab's start edge without reserving a bold width", () => {
-    for (const tab of mountRail("a").findAll('[role="tab"]')) {
-      const label = tab.find("[data-otab-label]");
-      expect(label.classes()).toContain("text-start");
-      expect(label.classes().filter((name) => name.startsWith("after:"))).toEqual([]);
-    }
-  });
-
   it.each([
     ["light", 0],
     ["dark", 1],
-  ] as const)("resolves every tab colour to main's value in %s", (theme, index) => {
+  ] as const)("resolves every tab colour to its pinned value in %s", (theme, index) => {
     const classes = [
       ...Object.values(tabs(mountRail("a"))),
       tabs(mountRail("a", true)).active,

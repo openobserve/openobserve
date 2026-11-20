@@ -310,16 +310,13 @@ const openEdit = (source: AnnotationSource) => {
       <DashboardHeader :title="t('dashboard.annotationSources.title')">
         <template #right>
           <OButton
+            :disabled-reason="atSourceCap ? sourceCapHint : undefined"
             variant="primary"
-            size="sm"
             :disabled="atSourceCap"
-            :focusable-unavailable="atSourceCap"
             data-test="dashboard-annotation-source-add"
             @click="openAdd"
-            >{{ t("dashboard.annotationSources.addSource") }}
-            <template #unavailable-reason>{{ sourceCapHint }}</template>
-            <OTooltip v-if="atSourceCap" :content="sourceCapHint"
-          /></OButton>
+            >{{ t("dashboard.annotationSources.addSource") }}</OButton
+          >
         </template>
       </DashboardHeader>
       <div class="min-h-0 flex-1 overflow-y-auto">
@@ -328,20 +325,15 @@ const openEdit = (source: AnnotationSource) => {
           :data="sources"
           :columns="columns"
           row-key="id"
-          :frame="false"
           pagination="none"
           sorting="none"
           selection="none"
           :default-columns="false"
-          :show-global-filter="false"
         >
           <template #empty>
             <OEmptyState
-              size="hero"
-              illustration="box"
-              variant="create"
               :title="t('dashboard.annotationSources.emptyTitle')"
-              :description="t('dashboard.annotationSources.emptyDescription')"
+              :text="t('dashboard.annotationSources.emptyDescription')"
               :action-label="t('dashboard.annotationSources.addSource')"
               data-test="dashboard-annotation-sources-empty"
               @action="openAdd"
@@ -361,7 +353,7 @@ const openEdit = (source: AnnotationSource) => {
                     row.name
                   }}</OTruncatedText>
                   <OTag
-                    variant="default-soft"
+                    tone="neutral"
                     size="sm"
                     class="shrink-0"
                     :data-test="`dashboard-annotation-source-mode-${row.id}`"
@@ -389,7 +381,6 @@ const openEdit = (source: AnnotationSource) => {
               <OTooltip
                 v-if="livePanels(row)?.length === 0"
                 :content="t('dashboard.annotationSources.panelsDeletedHint')"
-                :delay="200"
               >
                 <span
                   tabindex="0"
@@ -417,18 +408,20 @@ const openEdit = (source: AnnotationSource) => {
           <template #cell-actions="{ row }">
             <div class="flex justify-center gap-2">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon"
-                icon-left="edit"
+                size="xs"
+                icon="edit"
                 class="max-md:hidden"
                 :title="t('dashboard.annotationSources.edit')"
                 :data-test="`dashboard-annotation-source-edit-${row.id}`"
                 @click="openEdit(row)"
               />
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon"
-                icon-left="delete"
+                size="xs"
+                icon="delete"
                 class="max-md:hidden"
                 :title="t('dashboard.annotationSources.delete')"
                 :data-test="`dashboard-annotation-source-delete-${row.id}`"
@@ -437,17 +430,18 @@ const openEdit = (source: AnnotationSource) => {
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
-                    icon-left="more-vert"
+                    icon-only
+                    icon="more-vert"
                     :title="t('dashboard.moreActions')"
                     variant="ghost"
-                    size="icon-xs-sq"
+                    size="sm"
                     class="md:hidden"
                     :data-test="`dashboard-annotation-source-menu-${row.id}`"
                     @click.stop
                   />
                 </template>
                 <ODropdownItem
-                  icon-left="edit"
+                  icon="edit"
                   class="md:hidden"
                   :data-test="`dashboard-annotation-source-edit-${row.id}-menu`"
                   @select="openEdit(row)"
@@ -455,8 +449,8 @@ const openEdit = (source: AnnotationSource) => {
                   <span>{{ t("dashboard.annotationSources.edit") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="delete"
-                  variant="destructive"
+                  icon="delete"
+                  tone="danger"
                   class="md:hidden"
                   :data-test="`dashboard-annotation-source-delete-${row.id}-menu`"
                   @select="askDelete(row)"

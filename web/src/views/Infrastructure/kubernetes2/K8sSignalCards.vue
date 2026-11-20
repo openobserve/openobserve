@@ -79,8 +79,8 @@ const ageOf = (us: number | null | undefined) =>
   >
     <OText variant="card-title">{{ t("infra.k8s2.overviewIncidentTitle") }}</OText>
     <template v-if="incidentsLoading">
-      <OSkeleton type="text" class="h-5 w-3/4" />
-      <OSkeleton type="text" class="h-3 w-1/2" />
+      <OSkeleton class="h-5 w-3/4" />
+      <OSkeleton class="h-3 w-1/2" />
     </template>
     <template v-else-if="incident">
       <div class="flex min-w-0 items-center gap-2">
@@ -94,9 +94,8 @@ const ageOf = (us: number | null | undefined) =>
       }}</OText>
       <div class="flex items-center gap-2">
         <OButton
-          variant="ghost-primary"
-          size="sm"
-          icon-right="arrow-forward"
+          variant="accent-ghost"
+          icon-end="arrow-forward"
           data-test="k8s2-overview-incident-open"
           @click="emit('open-incident', incident.id)"
         >
@@ -105,7 +104,6 @@ const ageOf = (us: number | null | undefined) =>
         <OButton
           v-if="incidents.length > 1"
           variant="ghost"
-          size="sm"
           data-test="k8s2-overview-incident-more"
           @click="emit('open-incidents')"
         >
@@ -140,7 +138,7 @@ const ageOf = (us: number | null | undefined) =>
   >
     <OText variant="card-title">{{ t("infra.k8s2.overviewAlertsTitle") }}</OText>
     <template v-if="alertsLoading">
-      <OSkeleton v-for="n in 2" :key="n" type="text" class="h-8" />
+      <OSkeleton v-for="n in 2" :key="n" class="h-8" />
     </template>
     <template v-else>
       <ul class="m-0 flex list-none flex-col p-0">
@@ -166,8 +164,7 @@ const ageOf = (us: number | null | undefined) =>
           >{{ t("infra.k8s2.overviewAlertsOrgWide") }}</OText
         >
         <OButton
-          variant="ghost-primary"
-          size="sm"
+          variant="accent-ghost"
           class="shrink-0"
           data-test="k8s2-overview-alerts-open"
           @click="emit('open-alerts')"

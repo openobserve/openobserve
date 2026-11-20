@@ -8,11 +8,29 @@ Each rule below states **what**, **why**, and **how**. The "why" matters: these
 aren't arbitrary — each one exists because breaking it produces a specific,
 recurring class of bug or drift in this codebase.
 
-### 1. Every page/module header is `OPageHeader`
+> **The v2 guidelines are binding** ([guidelines.md](guidelines.md)). Where a rule
+> below and a guideline disagree, the guideline wins; each rule cites the ids it
+> implements.
 
-**What.** The top of any routed view or module screen (title + icon + actions,
-optionally peer tabs and a back button) is rendered by `OPageHeader`, never a
-hand-rolled `<div class="header">…<h1>…` or a bespoke `q-toolbar`.
+### 1. Every page header is `OPageHeader`, the stacked v2 header (H1–H8)
+
+**What.** The top of any routed view is rendered by `OPageHeader` (or
+`OPageLayout`, which renders it), never a hand-rolled `<div class="header">…<h1>…`
+or a bespoke `q-toolbar`. The header is the one described in
+[header-spec.md](header-spec.md):
+
+- one 56 px band; on the left a **context line** (12 px, secondary) above the
+  **title** (18 px, weight 600); page actions on the right (H1);
+- the context line names the container: the rail group on grouped pages, the org
+  on the others, and a "‹ Parent" link on detail, editor and import pages. That
+  link is the Back affordance (H4);
+- **no icon tile and no subtitle paragraph** (H2). Explanations open from an About
+  (ⓘ) popover beside the title;
+- **no single-line breadcrumb trail and no boxed back button** (H4);
+- tabs on **their own row** under the header, never after the title; one font
+  weight for every tab state; the title never changes when a tab is clicked (H8);
+- actions: up to two secondary, one primary, then ⋯ More (H3); the create action
+  is "New <object>", label only (H6).
 
 ```vue
 <script setup lang="ts">
@@ -21,13 +39,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 </script>
 
 <template>
-  <OPageHeader
-    :title="t('dashboard.header')"
-    icon="dashboard"
-    :subtitle="t('dashboard.subtitle')"
-  >
+  <OPageHeader :title="t('dashboard.header')">
     <template #actions>
-      <OButton variant="primary" size="sm" @click="addDashboard">
+      <OButton variant="primary" @click="addDashboard">
         {{ t("dashboard.add") }}
       </OButton>
     </template>
@@ -35,90 +49,66 @@ import OButton from "@/lib/core/Button/OButton.vue";
 </template>
 ```
 
-**Why.** `OPageHeader` encodes a single header contract used app-wide: row 1 is
-a fixed-height band (icon tile + `<h1>` + right-aligned actions, with the
-`subtitle` tagline under the title); row 2 is the full-width peer-tab strip.
-Tabs and a tagline coexist — most module index pages carry both. Every
-hand-built header silently re-litigates title font size, icon tile geometry,
-back-button placement, and the tab underline — and drifts. Reusing the component
-keeps the title's X/Y position identical as a user navigates list → detail →
-edit, which is the whole point.
+**Why.** People aim for tabs and actions by position (H8). A header that changes
+height, a title that moves with an icon tile or a breadcrumb's length, or tabs
+that slide when the title changes all make every click need a second look. The
+rail already shows the area's icon, and a subtitle is read once and then costs a
+line forever (H2). Every hand-built header re-litigates title size, back-button
+placement and the tab underline, and drifts.
 
 **How.**
-- The component is `OPageHeader`, at
-  `web/src/lib/core/PageHeader/OPageHeader.vue`. Its full API — props, slots, and
-  the one-row-content contract — is documented in this rule (below), so you can
-  use it correctly without opening the file.
-- Props: `title`, `subtitle`, `icon` (an `IconName` from
-  `@/lib/core/Icon/OIcon.icons`), `back` (`{ label, to | onClick, dataTest }`),
-  `tabsBelow`, `titleDataTest` (a `data-test` on the `<h1>`, so a page needn't
-  take over the `#title` slot just to attach a test hook), and `titleOverflow`
-  (`"truncate"` default | `"visible"` — pass `"visible"` when `#title` hosts an
-  interactive control, or the `<h1>`'s `overflow:hidden` swallows its focus ring).
-  There is **no breadcrumb prop** — `OPageHeader` has no breadcrumb affordance
-  and no `BreadcrumbItem` type exists; a sub-page uses `back` instead.
-- Slots: `title-prefix`, `title`, `subtitle`, `title-trail`, `actions`, `tabs`,
-  `back`.
-- **Peer tabs need `tabs-below` — the slot alone is not enough.** `#tabs`
-  (`#header-tabs` on `OPageLayout`) defaults to rendering the strip *inline
-  beside the title*, which is the wrong place for Level-2 section nav: the title
-  block is `shrink-0`, so the strip's x-position moves with the title's width
-  and shifts under the cursor as you navigate between siblings. Pass
-  `tabs-below` to get the full-width row-2 strip every module uses. The four
-  alerting pages shipped inline for exactly this reason — nothing failed, they
-  just didn't look like the rest of the app.
-- **The header `icon` must be the SAME `IconName` the page's nav entry
-  declares** — see [navigation-menus](navigation-menus.md#icon-parity).
-- Put page actions in `#actions` using O2 components. Do not add your own
-  `border-b`, height, or padding around it — the header owns its own chrome.
-- **The header's create CTA is label-only — no `+` icon.** Write
-  `<OButton variant="primary" size="sm">New alert</OButton>`, never
-  `icon-left="add"`. This applies to every New/Add/Create button in `#actions`,
-  on list and detail pages alike. See *The header create CTA carries no icon*
-  below for the boundary — utility actions and in-section adders are different.
+- The component is `OPageHeader` (`web/src/lib/core/PageHeader/OPageHeader.vue`,
+  types in `OPageHeader.types.ts`), usually reached through `OPageLayout`'s props.
+  The stacked anatomy is [header-spec.md](header-spec.md) (H1–H8).
+- **There is no `icon` and no `subtitle`** (H2). Real help goes in `about` (an ⓘ
+  "About this page" popover beside the title); filler is dropped.
+- The context line is derived from the route (the rail group, else an empty slot; never the org);
+  `context` overrides it only where the derivation is wrong. `back`
+  (`{ label, to | onClick, dataTest }`) turns it into the "‹ Parent" link (H4):
+  `label` is the parent's own name, `to` is its route (the href, and where Back
+  lands from a deep link), and a click is smart back (N3). `onClick` only for an
+  in-page parent with no route; a handler that must do work first navigates with
+  `useSmartBack`, never `router.back()`. There is no breadcrumb prop and there will
+  not be one.
+- **Peer tabs** go in `#tabs` (`#header-tabs` on `OPageLayout`): always their own
+  40 px row under the band (H8). More than six tabs: the rest go in a "More ▾"
+  tab (N2).
+- `titleDataTest` puts a `data-test` on the `<h1>`. A `#title` slot is only for an
+  inline-edited name and owns its overflow; a text title truncates with a tooltip
+  and never wraps. Status chips go in `#status` (H5).
+- Put page actions in `#actions` (primary) and `#actions-overflow` (secondaries,
+  rendered first and folded into ⋯ More under 640 px), using O2 components. Do not
+  add your own `border-b`, height or padding around the header — it owns its
+  chrome and the one 16 px gutter (L3). `local/o2-page-header-api` enforces all of
+  this in `lint:ci`.
 - **Do not** style `OPageHeader` from the outside with utility classes or a
-  wrapper trying to change its internals. If it can't express what a page needs,
-  that's a change to `OPageHeader` itself, not a per-page override.
+  wrapper. If it cannot express what a page needs, change `OPageHeader`.
 
-#### The header create CTA carries no icon
+#### No `+` on a text button (B4, H6)
 
-The primary New/Add/Create button in `#actions` is **text only**:
+An icon goes on a text button only when it adds meaning the word lacks: menu
+chevron ▾, external link ↗, download, upload, copy, run (B4). So:
 
 ```vue
 <!-- ✅ -->
 <template #actions>
-  <OButton variant="primary" size="sm" data-test="alert-list-add-btn" @click="create">
+  <OButton variant="primary" data-test="alert-list-add-btn" @click="create">
     {{ t("alerts.add") }}
   </OButton>
 </template>
 
-<!-- ❌ never on a header CTA -->
-<OButton variant="primary" size="sm" icon-left="add">{{ t("alerts.add") }}</OButton>
+<!-- ❌ never: a "+" says nothing the label does not -->
+<OButton variant="primary" icon="add">{{ t("alerts.add") }}</OButton>
 ```
 
-**Why.** A page header has exactly one primary action, in a fixed, known place.
-The `+` adds no information there — the label already says what the button
-makes — and it competes with the module icon tile on the same row. The app had
-drifted both ways; the label-only form is the settled convention.
+This covers every text button, not only the header CTA: an in-section adder is
+"Add condition" with no `+` (W2), and Edit or Delete as text buttons carry no
+glyph either. Icon-only buttons are a separate case: only universal actions
+(refresh, close, more, copy, expand, settings, columns, and edit or delete in a
+row), each with a tooltip and an aria-label (B5).
 
-**The boundary — three things this rule does NOT cover.** Do not strip these:
-
-| Keep the `+` on | Because | Example |
-|---|---|---|
-| **In-section adders** — a repeatable row-adder inside a form, `OFormSection` / `OEmptyState` / `ODialog` `#actions`, or any body content | Repeated affordance in a dense form; the `+` is what makes it scannable as "one more of these" | `+ Add header`, `+ Add condition`, `+ Add variable` |
-| **Icon-only buttons** (`size="icon-*"`, label in an `OTooltip`) | The `+` *is* the button's content — removing it leaves an empty square | `ViewDashboard`'s Add-panel toolbar button |
-| **Utility actions in the header** that are not create CTAs | Semantic icons are correct and expected there | Import → `upload-file`, Refresh → `refresh`, Edit → `edit` |
-
-So the rule is narrow and precise: **a generic `+` prefixed to a create CTA in
-`#actions`**. A *semantic* icon on a header button is fine — the SLO detail
-page's outline "New alert" uses the `notifications` bell to match its `shield`
-and `edit` siblings, and that stays.
-
-**Auditing this.** Grep alone over-reports: an `OFormSection` or `OEmptyState`
-`#actions` slot nested inside `OPageLayout` looks identical to a header slot. To
-find real violations, resolve each `<OButton icon-left="add">` to the component
-that **owns** the enclosing `<template #actions>` and keep only the ones owned by
-`OPageHeader` / `OPageLayout`.
+**Auditing this.** Grep `<OButton` with `icon="add"`, then keep the ones that also
+render a label.
 
 ### 2. Build from O2 components in `web/src/lib`
 
@@ -201,15 +191,21 @@ utilities usually removes the temptation entirely.
   `<template>` — and close it right after that element's `>`. ESLint does not report an
   unused template directive, so an over-wide range will keep silencing new px forever
   without ever telling you.
-- **Corner radius is a token, not a guess — exactly two tiers + circle:**
-  `rounded-default` (**4px** — controls: buttons, inputs, chips, small icon
-  buttons), `rounded-surface` (**12px** — surfaces: dialogs, drawers, cards,
-  panels, the app-shell content area), and `rounded-full` (pills / avatars /
-  status dots). Per-corner variants use the same names (`rounded-t-surface`,
-  `rounded-s-default`). **Banned:** bare `rounded`, arbitrary `rounded-[10px]`,
-  and the retired `rounded-{sm,md,lg,xl}` / `var(--radius-{sm,md,lg,xl})` — they
-  were five names for one value and were deleted (`sm`/`md` → `default`,
-  `lg`/`xl` → `surface`). Pick the tier by the element's role, never by eye.
+- **Corner radius is a token, not a guess — four tiers by role + circle:**
+  `rounded-chip` (**4** — chips, badges, kbd, checkbox), `rounded-default` (**6** —
+  buttons, inputs, selects, segmented, every control), `rounded-menu` (**8** —
+  menus, popovers, tooltips), `rounded-surface` (**10** — dialogs, drawers, cards,
+  panels, the content frame), and `rounded-full` (pills / avatars / status dots).
+  Per-corner variants use the same names (`rounded-t-surface`, `rounded-s-default`).
+  **Banned:** bare `rounded`, arbitrary `rounded-[10px]`, and the retired
+  `rounded-{sm,md,lg,xl}` / `var(--radius-{sm,md,lg,xl})`. Pick the tier by the
+  element's role, never by eye. See [design-tokens § Corner radius](design-tokens.md).
+- **Control heights are tokens too, and the component owns them** (S1, S2):
+  `h-control-xs` / `-sm` / `-md` / `-lg` = 24 / 28 / 32 / 36, chosen through the
+  O* component's `size` prop (`md` is the default). Never size a control with a
+  class (`h-8`, `!h-9`, `size-7`, `[&_input]:h-8`); `local/o2-control-height`
+  flags it. A bespoke element that must line up with controls uses the same
+  `h-control-*` utility, never a raw step like `h-8`.
 
 ### 4. No scoped CSS — style with bare Tailwind utilities
 
@@ -270,8 +266,8 @@ everything — they're the last resort, not the default.
   `.vue` component is a **CI-counted bypass** (`rawVarInComponent`) — allowed only
   in the sanctioned residue (`:deep`, `@keyframes`, `color-mix`, `calc`, SVG
   `fill`/`stroke`, `v-html`). Never a hex/rgb literal.
-- **Form field spacing**: put `class="flex flex-col gap-5"` (or `gap-6`) on the
-  `<OForm>` — `class`/`style` fall through to its root `<form>`, so its direct
+- **Form field spacing**: put `class="flex flex-col gap-4"` on the `<OForm>`
+  (16 between fields; `gap-6` between form sections — L4, V1) — `class`/`style` fall through to its root `<form>`, so its direct
   children (the `OFormInput`/`OFormSelect` fields) get even vertical spacing.
   **Without a gap class on OForm, fields render flush with no spacing** — this is
   the #1 cause of "the dialog/drawer has no spacing".

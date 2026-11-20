@@ -20,7 +20,7 @@ import store from "@/test/unit/helpers/store";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertCalibrationKeys } from "@/services/alert_calibration.querykeys";
 import alertCalibration from "@/services/alert_calibration";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -401,9 +401,9 @@ describe("AlertCalibrationDigestDetail for a scoped reader", () => {
     const unread = { finding_count: null, skip_count: null, written_skip_count: null };
     const wrapper = await mountDetail([{ ...runRow(0), ...unread }]);
     const pending = wrapper
-      .findAllComponents(OBanner)
+      .findAllComponents(OInlineNotice)
       .find((b) => b.attributes("data-test") === "alert-calibration-digest-counts-pending");
-    expect(pending?.props("variant")).toBe("warning");
+    expect(pending?.props("tone")).toBe("warn");
     expect(pending?.text()).toBe(
       "Counts on the alerts you can access are not ready yet. Refresh shortly.",
     );
@@ -584,7 +584,7 @@ describe("AlertCalibrationDigestDetail dismissals", () => {
       "Dismissed findings couldn't be loaded, so some findings below may already be dismissed.",
     );
     expect(
-      wrapper.findAllComponents(OBanner).find((b) => b.props("variant") === "error"),
+      wrapper.findAllComponents(OInlineNotice).find((b) => b.props("tone") === "err"),
     ).toBeTruthy();
     expect(card(wrapper).find('[data-test="alert-calibration-finding-fold"]').exists()).toBe(false);
 

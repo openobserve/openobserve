@@ -583,6 +583,7 @@ export default class DashboardPanelTime {
    */
   async openPanelFullScreen(panelId) {
     // Click the panel actions menu
+    await this.page.locator('[data-test="dashboard-more-options-btn"]').click();
     await this.dashboardFullscreenBtn.waitFor({ state: "visible", timeout: 10000 });
     await this.dashboardFullscreenBtn.click();
 

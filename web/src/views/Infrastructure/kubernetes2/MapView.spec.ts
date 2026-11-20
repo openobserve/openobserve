@@ -498,7 +498,7 @@ describe("MapView empty states (AC 49)", () => {
     await mountView(mapState({ search: "nothing-matches" }));
     const empty = byTest(OEmptyState, "k8s2-map-empty");
     expect(empty.text()).toContain("No pods match");
-    expect(empty.props("filtered")).toBe(true);
+    expect(empty.props("kind")).toBe("filtered");
     empty.vm.$emit("action", "clear-filters");
     expect(wrapper.emitted("update")).toEqual([[{ namespaces: [], search: "", filter: [] }]]);
   });
@@ -772,7 +772,7 @@ describe("MapView label states (AC 80)", () => {
     await mountView(mapState({ filter: "app.kubernetes.io/name:ghost" }), labelledInventory());
     expect(wrapper.findAllComponents(ODimensionChip)[0].props("value")).toBe("ghost");
     const empty = byTest(OEmptyState, "k8s2-map-empty");
-    expect(empty.props("filtered")).toBe(true);
+    expect(empty.props("kind")).toBe("filtered");
     empty.vm.$emit("action", "clear-filters");
     expect(updates()).toEqual([{ namespaces: [], search: "", filter: [] }]);
   });

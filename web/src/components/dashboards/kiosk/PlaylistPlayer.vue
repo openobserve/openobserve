@@ -42,11 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <OBanner
       v-if="intervalNoticeVisible"
-      variant="info"
+      tone="info"
       icon="schedule"
-      dense
-      bar
-      :content="
+      :message="
         t('dashboard.playlist.intervalAdjusted', {
           interval: formatRefreshLabel(config.intervalSeconds, t),
         })
@@ -79,15 +77,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div
         v-if="player.state.phase === 'empty'"
-        class="bg-surface-base absolute inset-0 z-30 flex items-center justify-center"
+        class="bg-surface-base absolute inset-0 z-30"
         data-test="dashboard-playlist-empty-state"
       >
         <OEmptyState
           icon="tv"
           :title="t('dashboard.playlist.emptyStateTitle')"
-          :description="t('dashboard.playlist.emptyStateDescription')"
+          :text="t('dashboard.playlist.emptyStateDescription')"
           :action-label="t('dashboard.playlist.tryAgain')"
-          action-icon="refresh"
           @action="player.retry()"
         />
       </div>

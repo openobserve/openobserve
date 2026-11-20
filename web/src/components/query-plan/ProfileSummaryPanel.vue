@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="clusterView !== 'all'"
           variant="ghost"
-          size="xs"
+          size="sm"
           data-test="query-profile-clusters-all"
           @click="emit('cluster', 'all')"
           >{{ t("search.queryProfile.allClusters") }}</OButton
@@ -92,10 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="clusterColumns"
         row-key="name"
         pagination="none"
-        :show-global-filter="false"
         :fill-height="false"
         :row-class="(row) => (clusterViewOf(row.name) === clusterView ? 'bg-surface-subtle' : '')"
-        dense
         @row-click="(row) => toggleCluster(row.name)"
       >
         <template v-for="(_, i) in clusters.stages" :key="i" #[`cell-wall${i}`]="{ row }">
@@ -129,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-for="h in hotspots"
         :key="h.id"
-        variant="cell"
+        variant="link"
         :aria-current="h.id === selectedId || undefined"
         :data-test="`query-profile-hotspot-${h.id}`"
         @click="emit('select', h.id)"
@@ -140,19 +138,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex min-w-0 items-center gap-2 text-xs">
             <OTruncatedText class="text-text-body">{{ h.label }}</OTruncatedText>
-            <OBadge
-              v-if="h.where"
-              size="xs"
-              shape="rounded"
-              variant="default-soft"
-              class="shrink-0"
-              >{{ h.where }}</OBadge
-            >
+            <OBadge v-if="h.where" size="sm" tone="neutral" class="shrink-0">{{ h.where }}</OBadge>
             <span class="text-text-secondary ms-auto shrink-0 whitespace-nowrap tabular-nums">{{
               h.value
             }}</span>
           </div>
-          <OProgressBar size="xs" :value="h.share" :variant="h.variant" />
+          <OProgressBar :value="h.share * 100" :tone="h.tone" />
         </div>
       </OButton>
     </section>
@@ -170,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-for="row in timelineRows"
         :key="row.nodeKey"
-        variant="cell"
+        variant="link"
         :aria-pressed="row.active"
         :data-test="`query-profile-timeline-${row.nodeKey}`"
         @click="onTimelineRow(row)"
@@ -347,7 +338,7 @@ const hotspots = computed(() =>
       where,
       value: `${formatNs(op.totalComputeNs)} · ${formatPercent(share)}`,
       share,
-      variant: SHARE_BAR[shareTone(share)],
+      tone: SHARE_BAR[shareTone(share)],
     };
   }),
 );

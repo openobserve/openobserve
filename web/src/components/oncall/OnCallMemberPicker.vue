@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-label="ariaLabel"
     :error="error"
     :error-message="errorMessage"
-    size="sm"
     :data-test="dataTest"
     @update:model-value="(value: SelectModelValue) => (model = (value ?? []) as string[])"
   >

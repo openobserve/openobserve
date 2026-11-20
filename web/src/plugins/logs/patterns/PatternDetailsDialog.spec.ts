@@ -29,12 +29,12 @@ vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }))
 // emits directly. Mirrors the same shape used by other migrated specs.
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "width", "showClose", "persistent", "size", "title", "subTitle"],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  props: ["open", "width", "showClose", "persistent", "size", "title", "subtitle"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div data-test-stub="o-drawer" :data-open="open">
       <div data-test-stub="o-drawer-title">{{ title }}</div>
-      <div data-test-stub="o-drawer-subtitle">{{ subTitle }}</div>
+      <div data-test-stub="o-drawer-subtitle">{{ subtitle }}</div>
       <template v-if="open">
         <div data-test-stub="o-drawer-header"><slot name="header" /></div>
         <div data-test-stub="o-drawer-body"><slot /></div>
@@ -67,7 +67,7 @@ const OButtonStub = {
       :data-test="$attrs['data-test']"
       :disabled="disabled || null"
       @click="$emit('click', $event)"
-    ><slot name="icon-left" /><slot /><slot name="icon-right" /></button>
+    ><slot name="icon" /><slot /><slot name="icon-end" /></button>
   `,
 };
 
@@ -324,19 +324,19 @@ describe("PatternDetailsDialog", () => {
       expect(drawer.props("open")).toBe(true);
     });
 
-    it("should pass width=90 to ODrawer", () => {
+    it("should pass the fixed xl size to ODrawer", () => {
       const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("width")).toBe(90);
+      expect(drawer.props("size")).toBe("xl");
     });
 
     it("should pass the localized title to ODrawer", () => {
       const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("title")).toBe("Pattern Details");
+      expect(drawer.props("title")).toBe("Pattern details");
     });
 
     it("should pass the localized subTitle to ODrawer", () => {
       const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("subTitle")).toBe("Pattern 1 of 10");
+      expect(drawer.props("subtitle")).toBe("Pattern 1 of 10");
     });
 
     it("should pass undefined subTitle when selectedPattern is null", () => {
@@ -351,7 +351,7 @@ describe("PatternDetailsDialog", () => {
         global: globalConfig,
       });
       const drawer = w.findComponent({ name: "ODrawer" });
-      expect(drawer.props("subTitle")).toBeUndefined();
+      expect(drawer.props("subtitle")).toBeUndefined();
     });
 
     it("shows the pattern position once with the real drawer", async () => {
@@ -380,7 +380,7 @@ describe("PatternDetailsDialog", () => {
   describe("Header (title / subtitle)", () => {
     it("should display the drawer title in the rendered header stub", () => {
       const title = wrapper.find('[data-test-stub="o-drawer-title"]');
-      expect(title.text()).toBe("Pattern Details");
+      expect(title.text()).toBe("Pattern details");
     });
 
     it("should display pattern count in the subtitle stub", () => {
@@ -447,7 +447,7 @@ describe("PatternDetailsDialog", () => {
   describe("Template Section", () => {
     it("should display pattern template", () => {
       const text = wrapper.text();
-      expect(text).toContain("Pattern Template");
+      expect(text).toContain("Pattern template");
       expect(text).toContain("User * logged in from IP *");
     });
   });
@@ -491,7 +491,7 @@ describe("PatternDetailsDialog", () => {
   describe("Examples Section", () => {
     it("should display examples section header with count", () => {
       const text = wrapper.text();
-      expect(text).toContain("Example Logs (2)");
+      expect(text).toContain("Example logs (2)");
     });
 
     it("should display all example log messages", () => {
@@ -509,7 +509,7 @@ describe("PatternDetailsDialog", () => {
       });
 
       const text = wrapper.text();
-      expect(text).not.toContain("Example Logs");
+      expect(text).not.toContain("Example logs");
     });
   });
 
@@ -589,7 +589,7 @@ describe("PatternDetailsDialog", () => {
     it("should render the drawer body content when selectedPattern exists", () => {
       const body = wrapper.find('[data-test-stub="o-drawer-body"]');
       expect(body.exists()).toBe(true);
-      expect(body.text()).toContain("Pattern Template");
+      expect(body.text()).toContain("Pattern template");
     });
 
     it("should not render selected-pattern content when modelValue=false and selectedPattern is null", () => {
@@ -606,7 +606,7 @@ describe("PatternDetailsDialog", () => {
       // pattern content should be visible.
       expect(wrapperWithoutPattern.find('[data-test-stub="o-drawer-body"]').exists()).toBe(false);
       expect(wrapperWithoutPattern.find('[data-test-stub="o-drawer-footer"]').exists()).toBe(false);
-      expect(wrapperWithoutPattern.text()).not.toContain("Pattern Template");
+      expect(wrapperWithoutPattern.text()).not.toContain("Pattern template");
       expect(wrapperWithoutPattern.text()).not.toContain("Occurrences");
     });
   });
@@ -616,7 +616,7 @@ describe("PatternDetailsDialog", () => {
   describe("variableColumns definition", () => {
     it("should render Variable Name column header in variables table", () => {
       const text = wrapper.text();
-      expect(text).toContain("Variable Name");
+      expect(text).toContain("Variable name");
     });
 
     it("should render Type column header in variables table", () => {
@@ -711,7 +711,7 @@ describe("PatternDetailsDialog", () => {
         selectedPattern: { ...mockSelectedPattern, index: 5 },
       });
       const drawer = wrapper.findComponent({ name: "ODrawer" });
-      expect(drawer.props("subTitle")).toBe("Pattern 6 of 10");
+      expect(drawer.props("subtitle")).toBe("Pattern 6 of 10");
     });
 
     it("should show '6 of 10' counter in footer when index is 5", async () => {

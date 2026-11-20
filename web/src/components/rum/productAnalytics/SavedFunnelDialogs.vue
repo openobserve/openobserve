@@ -30,13 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="!!conflict"
     size="sm"
     :title="t('rum.analytics.saved.conflictTitle')"
-    :primary-button-label="
-      conflict?.renaming
+    :primary="{
+      label: conflict?.renaming
         ? t('rum.analytics.saved.renameAnyway')
-        : t('rum.analytics.saved.overwrite')
-    "
-    :primary-button-disabled="!!overwriteBlocked"
-    :secondary-button-label="t('rum.analytics.saved.reload')"
+        : t('rum.analytics.saved.overwrite'),
+      disabled: !!overwriteBlocked,
+    }"
+    :secondary="{ label: t('rum.analytics.saved.reload') }"
     data-test="rum-analytics-funnel-conflict-dialog"
     @update:open="(v) => !v && (conflict = null)"
     @click:primary="overwriteConflict"
@@ -331,7 +331,7 @@ const remove = async (f: SavedFunnel): Promise<boolean> => {
     messageKeypath: "rum.analytics.saved.deleteMessage",
     messageName: f.name,
     confirmLabel: t("rum.analytics.saved.delete"),
-    confirmVariant: "destructive",
+    kind: "destructive",
   });
   if (!ok) return false;
   try {
@@ -350,7 +350,7 @@ const removeMany = async (rows: readonly SavedFunnel[]): Promise<string[]> => {
     title: t("rum.analytics.saved.bulkDeleteTitle"),
     message: t("rum.analytics.saved.bulkDeleteMessage", { count: rows.length }, rows.length),
     confirmLabel: t("rum.analytics.saved.delete"),
-    confirmVariant: "destructive",
+    kind: "destructive",
   });
   if (!ok) return [];
   const gone = await sf.removeMany(

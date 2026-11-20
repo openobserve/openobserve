@@ -15,7 +15,7 @@ import {
 import { computed, ref, watch, type Ref } from "vue";
 import { raw } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { TABLE_INDEX_COL_SIZE, type OTableColumnDef, type OTableRowAction } from "../OTable.types";
+import { ROW_ACTIONS_COLUMN_ID, type OTableColumnDef } from "../OTable.types";
 
 // Register the custom "avg" fn (provided via table options below) so
 // OTableColumnDef.aggregate values type-check against AggregationFnOption.
@@ -36,8 +36,6 @@ export function useTableCore<TData>(
     columns: OTableColumnDef<TData>[];
     pageSize?: number;
     currentPage?: number;
-    /** Auto-render a fixed-width, auto-numbered row-index ("#") column. */
-    showIndex?: boolean;
     sortBy?: string;
     sortOrder?: "asc" | "desc";
     sortFieldMap?: Record<string, string>;
@@ -51,23 +49,17 @@ export function useTableCore<TData>(
     getSubRows?: (row: TData) => TData[];
     pagination: string;
     sorting: string;
-    rowHeight?: number;
     filterMode?: string;
     horizontalScroll?: boolean;
     /** Initial column sizes loaded from localStorage (for persistence) */
     initialColumnSizes?: Record<string, number> | null;
     /** When true, do not auto-reset page index when data changes */
     keepPageOnDataChange?: boolean;
-    rowActions?: readonly OTableRowAction<TData>[];
   },
   emit?: (event: any, ...args: any[]) => void,
 ) {
   // ── Effective columns ───────────────────────────────────────────
-  // When `showIndex` is set (and the caller hasn't already declared a `#`
-  // column), prepend an auto-rendered, auto-numbered row-index column. Its
-  // value is derived from the row's position so pages need not hand-roll a
-  // `"#"` field in their data. Under server pagination we add the page offset
-  // so numbering stays continuous across pages.
+  // < md wide columns are capped so the table scrolls instead of one column eating the screen.
   const MOBILE_MAX_COL_SIZE = 200;
   const { isMobile } = useBreakpoint();
   const responsiveColumns = computed<OTableColumnDef<TData>[]>(() => {
@@ -83,33 +75,6 @@ export function useTableCore<TData>(
     });
   });
 
-  const indexColumn = computed<OTableColumnDef<TData> | null>(() => {
-    if (!props.showIndex || isMobile.value) return null;
-    if (props.columns.some((c) => c.id === "#")) return null;
-    const isServer = props.pagination === "server";
-    const offset = isServer
-      ? Math.max(((props.currentPage ?? 1) - 1) * (props.pageSize ?? 0), 0)
-      : 0;
-    return {
-      id: "#",
-      header: raw("#"),
-      size: TABLE_INDEX_COL_SIZE,
-      sortable: false,
-      hideable: false,
-      resizable: false,
-      // accessorFn receives (row, index); returning the value lets the default
-      // text cell render it. (A `cell` *function* can't be used here — the core
-      // cell wrapper only forwards string/component cells.)
-      accessorFn: ((_row: TData, index: number) => {
-        const n = index + 1 + offset;
-        return n <= 9 ? `0${n}` : `${n}`;
-      }) as any,
-      // tabular-nums: uniform digit width so 3-/4-digit values never clip to
-      // "2…" on the fixed-width column (see TABLE_INDEX_COL_SIZE).
-      meta: { align: "left", cellClass: "tabular-nums" },
-    };
-  });
-
   // Invisible trailing spacer that absorbs the table's leftover width so the
   // real columns keep their exact widths (Excel-style resize) and an action
   // column can stay pinned flush-right. Only added when resizing is on and the
@@ -120,10 +85,7 @@ export function useTableCore<TData>(
   // keeps px-2; when false the actions column is last and gets the 1rem right
   // edge inset. `actionColumnWidth` reads this to budget the right padding.
   const hasTrailingSpacer = computed<boolean>(() => {
-    const base = indexColumn.value
-      ? [indexColumn.value, ...responsiveColumns.value]
-      : responsiveColumns.value;
-    const hasAutoWidth = base.some((c) => c.meta?.autoWidth);
+    const hasAutoWidth = responsiveColumns.value.some((c) => c.meta?.autoWidth);
     return (
       (props.enableColumnResize ?? false) &&
       !props.horizontalScroll &&
@@ -133,9 +95,7 @@ export function useTableCore<TData>(
   });
 
   const effectiveColumns = computed<OTableColumnDef<TData>[]>(() => {
-    const base = indexColumn.value
-      ? [indexColumn.value, ...responsiveColumns.value]
-      : responsiveColumns.value;
+    const base = responsiveColumns.value;
     // An `autoWidth` column flexes permanently and absorbs leftover on its own,
     // so those tables need no spacer. Every other resizable table gets an
     // invisible trailing spacer: it sits before the pinned actions column and
@@ -159,20 +119,27 @@ export function useTableCore<TData>(
     return [...base, spacer];
   });
 
-  // A column is "rigid" — width pinned independently of the other columns —
-  // when it's the selection-driven row index, or an action/buttons column.
+  // An action/buttons column is "rigid": its width is pinned independently of the other columns.
   const isRigidColumn = (col: OTableColumnDef<TData>) =>
-    col.isAction === true || col.id === "actions" || col.id === "#";
+    col.isAction === true || col.id === "actions";
 
   // Deterministic actions-column width from its icon count: N icon buttons
   // (icon-sm = 32px) + gaps + cell padding, never narrower than the "Actions"
   // header. Computed (not DOM-measured) so the skeleton and loaded table match.
-  const ACTION_ICON_BTN = 32; // OButton size="icon-sm" → w-8
+  const ACTION_ICON_BTN = 32; // OButton icon-only md → size-control-md
   const ACTION_BTN_GAP = 4; // gap-1 between buttons
   const ACTIONS_HEADER_MIN = 80; // enough to show the "Actions" header in full
   // The page-edge inset (--spacing-page-edge) that OTable applies to the last
   // cell's right padding, in px. Keep in sync with the token (0.75rem = 12px).
   const PAGE_EDGE_PX = 12;
+  // `rowActions` render as xs icon buttons under an empty header (B7, D7).
+  const ROW_ACTION_ICON_BTN = 24;
+  const ROW_ACTION_GAP = 2;
+  const rowActionsColumnWidth = (actionCount?: number): number => {
+    const n = isMobile.value ? 1 : Math.max(1, Number(actionCount) || 1);
+    const cellPad = hasTrailingSpacer.value ? 16 : 8 + PAGE_EDGE_PX;
+    return n * ROW_ACTION_ICON_BTN + (n - 1) * ROW_ACTION_GAP + cellPad;
+  };
   const actionColumnWidth = (actionCount?: number): number => {
     // < md row actions collapse behind one overflow kebab, so the column budgets a single button.
     const n = isMobile.value ? 1 : Math.max(1, Number(actionCount) || 2);
@@ -185,13 +152,6 @@ export function useTableCore<TData>(
     // < md the "Actions" header floor would leave the one-kebab column mostly dead width.
     return Math.max(content, isMobile.value ? 0 : ACTIONS_HEADER_MIN);
   };
-
-  // Sized by the declared list, not the rows on screen, so loading and loaded widths match.
-  const rowActionBudget = computed<number | undefined>(() =>
-    props.rowActions ? Math.min(3, props.rowActions.length) : undefined,
-  );
-  const actionCountOf = (col: OTableColumnDef<TData>): number | undefined =>
-    rowActionBudget.value ?? col.meta?.actionCount;
 
   // Track column order for drag-reorder
   const columnOrder = ref<string[]>([]) as Ref<string[]>;
@@ -278,11 +238,14 @@ export function useTableCore<TData>(
       // DETERMINISTICALLY from its icon count (not DOM-measured at runtime) so
       // the loading skeleton and the loaded table render it at the exact same
       // width — no flash when data arrives.
-      const size = isActionCol
-        ? isMobile.value
-          ? actionColumnWidth(actionCountOf(col))
-          : Math.max(col.size ?? 0, actionColumnWidth(actionCountOf(col)))
-        : (col.size ?? 150);
+      const size =
+        col.id === ROW_ACTIONS_COLUMN_ID
+          ? rowActionsColumnWidth(col.meta?.actionCount)
+          : isActionCol
+            ? isMobile.value
+              ? actionColumnWidth(col.meta?.actionCount)
+              : Math.max(col.size ?? 0, actionColumnWidth(col.meta?.actionCount))
+            : (col.size ?? 150);
       const columnDef: ColumnDef<TData> = {
         id: col.id,
         header: isActionCol && isMobile.value ? "" : (col.header as any),
@@ -319,9 +282,7 @@ export function useTableCore<TData>(
         meta: {
           // Action columns (pinned-right icon buttons) center by default — the
           // app-wide convention — unless a column opts into a specific align.
-          align:
-            col.meta?.align ??
-            (isActionCol ? (props.rowActions && !isMobile.value ? "right" : "center") : "left"),
+          align: col.meta?.align ?? (isActionCol ? "center" : "left"),
           headerClass: col.meta?.headerClass ?? "",
           cellClass: col.meta?.cellClass ?? "",
           isAction: col.isAction,
@@ -335,7 +296,6 @@ export function useTableCore<TData>(
           // min+max to the column's CSS size var.
           fixedWidth: rigid,
           ...col.meta,
-          ...(isActionCol && props.rowActions ? { actionCount: actionCountOf(col) } : {}),
         },
         footer: col.footer as any,
         aggregationFn: col.aggregate,

@@ -28,7 +28,7 @@ describe("statusChipsFor", () => {
   it("counts a running pod with an error waiting reason as failing, like the tree badge and overview", () => {
     const crash = {
       ...pod("Running", "false"),
-      status: { text: "CrashLoopBackOff", variant: "error-soft" },
+      status: { text: "CrashLoopBackOff", variant: "err" },
       containers: [{ name: "app", waitingReason: "CrashLoopBackOff" }],
     };
     const counts = statusChipsFor("pods", [pod("Running"), crash]);

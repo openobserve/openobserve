@@ -25,32 +25,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex h-full min-h-60 flex-col">
-    <div v-if="loading" class="flex items-center justify-center py-8">
-      <OSpinner variant="dots" size="md" />
+    <div v-if="loading" class="flex flex-col gap-3 p-3">
+      <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-12" />
     </div>
 
-    <div
+    <OEmptyState
       v-else-if="events.length === 0"
-      class="text-text-muted flex flex-col items-center justify-center py-8"
-    >
-      <OIcon name="forum" class="mb-2 size-10! opacity-40" />
-      <div class="mb-1 text-base font-medium">{{ emptyTitle }}</div>
-      <div class="text-text-muted text-sm">{{ emptySubtitle }}</div>
-    </div>
+      icon="forum"
+      :title="emptyTitle"
+      :text="emptySubtitle"
+    />
 
     <div v-else class="relative flex min-h-0 flex-1 flex-col">
       <div v-if="showScrollButtons" class="absolute top-1 right-1 z-10 flex flex-col gap-1">
         <OButton
-          variant="ghost-muted"
-          size="icon-circle-sm"
+          icon-only
+          variant="ghost"
+          size="sm"
           @click="scrollToTop"
           :aria-label="scrollTopTooltip"
           :data-test="dataTestScrollTop"
           ><OIcon name="keyboard-arrow-up" size="sm" /><OTooltip :content="scrollTopTooltip"
         /></OButton>
         <OButton
-          variant="ghost-muted"
-          size="icon-circle-sm"
+          icon-only
+          variant="ghost"
+          size="sm"
           @click="scrollToBottom"
           :aria-label="scrollBottomTooltip"
           :data-test="dataTestScrollBottom"
@@ -109,8 +109,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OTooltip
                           v-if="getTooltip && getTooltip(event)"
                           side="bottom"
-                          align="start"
-                          :max-width="'24rem'"
                           :content="getTooltip(event) ?? undefined"
                         />
                       </span>
@@ -210,8 +208,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="absolute right-3 bottom-3">
             <OButton
+              icon-only
               variant="primary"
-              size="icon-circle-sm"
+              size="sm"
               :disabled="!commentText.trim() || submitting"
               :loading="submitting"
               @click="onSubmit"
@@ -231,7 +230,8 @@ import { ref } from "vue";
 import { useTheme } from "@/composables/useTheme";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { raw, type I18nText } from "@/types/i18n";

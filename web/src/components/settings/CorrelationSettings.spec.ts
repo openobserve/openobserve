@@ -124,8 +124,8 @@ function mountComponent(store = mockStore) {
         },
         OTab: {
           template:
-            '<div class="o-tab" :data-test="`tab-${name}`" :data-name="name" :data-suffix="suffixIcon"><slot /></div>',
-          props: ["name", "label", "noCaps", "icon", "suffixIcon"],
+            '<div class="o-tab" :data-test="`tab-${name}`" :data-name="name" :data-suffix="locked ? \'lock\' : undefined"><slot /></div>',
+          props: ["name", "label", "noCaps", "icon", "locked"],
         },
         LicenseDeniedState: {
           name: "LicenseDeniedState",

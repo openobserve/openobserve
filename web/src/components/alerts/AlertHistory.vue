@@ -19,11 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-history-page"
     :title="t('alerts.history')"
     title-data-test="alerts-history-title"
-    :back="{ label: t('alerts.header'), onClick: goBack, dataTest: 'alert-history-back-btn' }"
+    :back="{ label: t('alerts.header'), to: alertListRoute, dataTest: 'alert-history-back-btn' }"
     bleed
   >
     <template #actions>
-      <DateTime
+      <ODateTimeRange
         ref="dateTimeRef"
         auto-apply
         :default-type="dateTimeType"
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         clearable
         @clear="clearSearch"
       >
-        <template #icon-left>
+        <template #icon>
           <OIcon class="o2-search-input-icon" name="search" size="sm" />
         </template>
         <template #empty>
@@ -57,9 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSelect>
       <OButton
+        icon-only
         variant="ghost"
-        icon-left="search"
-        size="icon-sm"
+        icon="search"
         class="max-lg:hidden"
         @click="manualSearch"
         data-test="alert-history-manual-search-btn"
@@ -68,12 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('common.search')" />
       </OButton>
       <ORefreshButton
-        layout="inline"
-        variant="outline"
         class="shrink-0"
         :last-run-at="shownAt"
         :failed-at="refreshFailure?.failedAt"
-        :data-from="refreshFailure?.dataFrom"
         :loading="fetching"
         data-test="alert-history-refresh-btn"
         @click="onRefreshClick"
@@ -94,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         clearable
         @clear="clearSearch"
       >
-        <template #icon-left>
+        <template #icon>
           <OIcon class="o2-search-input-icon" name="search" size="sm" />
         </template>
         <template #empty>
@@ -104,9 +101,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSelect>
       <OButton
+        icon-only
         variant="ghost"
-        icon-left="search"
-        size="icon-sm"
+        icon="search"
         @click="manualSearch"
         data-test="alert-history-manual-search-btn-mobile"
         :disabled="loading"
@@ -132,10 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-order="sortOrder"
           :loading="loading"
           :error="refreshFailure ? null : historyError"
-          show-index
-          :show-global-filter="false"
           :default-columns="false"
-          width="100%"
           max-height="calc(100vh - 130px)"
           @pagination-change="onPaginationChange"
           @sort-change="onSortChange"
@@ -281,9 +275,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-actions="{ row }">
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="visibility"
+              icon="visibility"
               class="max-md:hidden"
               @click="showDetailsDialog(row)"
               data-test="alert-history-view-details"
@@ -292,10 +286,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               v-if="row.error"
+              icon-only
               :data-test="`pipeline-list-${row.name}-error-indicator`"
-              variant="ghost-destructive"
-              size="icon-sm"
-              icon-left="error"
+              variant="danger-ghost"
+              icon="error"
               class="max-md:hidden"
               @click.stop="showErrorDialog(row)"
             >
@@ -309,17 +303,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown :key="row.id" side="bottom" align="end">
               <template #trigger>
                 <OButton
+                  icon-only
                   :aria-label="t('common.moreActions')"
-                  icon-left="more-vert"
+                  icon="more-vert"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   data-test="alert-history-row-more-actions"
                   @click.stop
                 />
               </template>
               <ODropdownItem
-                icon-left="visibility"
+                icon="visibility"
                 class="md:hidden"
                 data-test="alert-history-view-details-menu"
                 @select="showDetailsDialog(row)"
@@ -328,8 +323,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
               <ODropdownItem
                 v-if="row.error"
-                icon-left="error"
-                variant="destructive"
+                icon="error"
+                tone="danger"
                 class="md:hidden"
                 :data-test="`pipeline-list-${row.name}-error-indicator-menu`"
                 @select="showErrorDialog(row)"
@@ -346,11 +341,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Details Dialog -->
     <ODialog
+      size="lg"
       data-test="alert-history-details-dialog"
       v-model:open="detailsDialog"
-      :width="55"
       :title="t('alerts.alertExecutionDetails')"
-      :primary-button-label="t('common.close')"
+      :primary="{ label: t('common.close') }"
       @click:primary="detailsDialog = false"
     >
       <div v-if="selectedRow" class="gap-2">
@@ -479,7 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   font-family: var(--font-mono);
                   font-size: var(--text-xs);
                 "
-                >{{ selectedRow.error }}</pre>
+                >{{ plainAlertError(selectedRow.error) }}</pre>
             </div>
           </div>
         </template>
@@ -517,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="errorDialog"
       size="md"
       :title="errorMessage.alert_name"
-      :primary-button-label="t('common.close')"
+      :primary="{ label: t('common.close') }"
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
@@ -554,13 +549,14 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { alertHistoryQuery, alertsListQuery } from "@/services/alerts.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from "vue";
+import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { plainAlertError } from "@/utils/alerts/alertError";
 import analytics from "@/services/product_analytics";
 import { formatDate } from "@/utils/date";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -592,7 +588,6 @@ type HistoryView = { page: number; size: number; sortBy: string; sortOrder: "asc
 
 const { t } = useI18nTyped();
 const store = useStore();
-const router = useRouter();
 const route = useRoute();
 
 // Data
@@ -1082,13 +1077,13 @@ const closeErrorDialog = () => {
   errorMessage.value = null;
 };
 
-const goBack = () => {
+const alertListRoute = computed(() => {
   const { folder, tab } = route.query;
-  router.push({
+  return {
     name: "alertList",
     query: { org_identifier: store.state.selectedOrganization.identifier, folder, tab },
-  });
-};
+  };
+});
 
 onBeforeUnmount(() => {
   unmounted = true;

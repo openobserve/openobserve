@@ -15,10 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OBanner
+  <OInlineNotice
     v-if="variant === 'banner'"
-    variant="warning"
-    icon="warning"
+    tone="warn"
     data-test="logs-auto-run-guard-banner"
     class="mx-2.5 mt-2"
   >
@@ -27,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="showRun"
         variant="primary"
-        size="sm"
         data-test="logs-auto-run-guard-run-btn"
         @click="emit('run')"
       >
@@ -35,8 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-if="narrowTo"
-        variant="outline"
-        size="sm"
+        variant="secondary"
         data-test="logs-auto-run-guard-narrow-btn"
         @click="emit('narrow', narrowTo.period)"
       >
@@ -44,26 +41,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-if="showSearchJob"
-        variant="outline"
-        size="sm"
+        variant="secondary"
         data-test="logs-auto-run-guard-search-job-btn"
         @click="emit('search-job')"
       >
         {{ t("search.autoRunGuardSearchJob") }}
       </OButton>
     </template>
-  </OBanner>
+  </OInlineNotice>
 
-  <OEmptyState
-    v-else
-    size="hero"
-    illustration="query"
-    variant="neutral"
-    :hide-action="true"
-    data-test="logs-auto-run-guard"
-  >
-    <template #title>{{ heroTitle }}</template>
-    <template #description>
+  <OEmptyState v-else icon="query-stats" data-test="logs-auto-run-guard" :title="heroTitle">
+    <template #text>
       <span data-test="logs-auto-run-guard-estimate">{{ heroDescription }}</span>
     </template>
     <template #actions>
@@ -71,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="isUnresolved"
           variant="primary"
-          size="md"
           data-test="logs-auto-run-guard-select-stream-btn"
           @click="emit('select-stream')"
         >
@@ -80,8 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="showRun"
           variant="primary"
-          size="md"
-          icon-left="play-arrow"
+          icon="play-arrow"
           data-test="logs-auto-run-guard-run-btn"
           @click="emit('run')"
         >
@@ -89,8 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="narrowTo"
-          variant="outline"
-          size="md"
+          variant="secondary"
           data-test="logs-auto-run-guard-narrow-btn"
           @click="emit('narrow', narrowTo.period)"
         >
@@ -98,8 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="showSearchJob && !isUnresolved"
-          variant="outline"
-          size="md"
+          variant="secondary"
           data-test="logs-auto-run-guard-search-job-btn"
           @click="emit('search-job')"
         >
@@ -119,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { formatSizeFromMB, timestampToTimezoneDate } from "@/utils/zincutils";

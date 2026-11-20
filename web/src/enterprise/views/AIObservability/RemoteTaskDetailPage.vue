@@ -16,34 +16,30 @@
   <OPageLayout
     data-test="ai-remote-task-detail-page"
     :back="{
-      label: t('aiObservability.remoteTasks.detail.backTo'),
-      onClick: goBack,
+      label: t('aiObservability.nav.experiments'),
+      to: aiRemoteTasksRoute(orgId),
       dataTest: 'ai-remote-task-detail-back-btn',
     }"
+    :title="title"
+    title-data-test="ai-remote-task-detail-title"
     bleed
     :scroll="false"
   >
-    <template #title>
-      <span class="flex flex-wrap items-center gap-2">
-        <span class="font-mono" data-test="ai-remote-task-detail-title">{{ title }}</span>
-        <template v-if="task">
-          <OTag v-if="versionLabel(task)" variant="default-soft" shape="rounded">
-            {{ versionLabel(task) }}
-          </OTag>
-          <OTag type="remoteTaskAuth" :value="task.auth.type" />
-          <OTag v-if="task.signing.enabled" variant="success-soft" icon="lock">
-            {{ t("aiObservability.remoteTasks.signingOn") }}
-          </OTag>
-          <OTag type="remoteTaskStatus" :value="state" data-test="ai-remote-task-detail-state" />
-        </template>
-      </span>
+    <template v-if="task" #status>
+      <OTag v-if="versionLabel(task)" tone="neutral">
+        {{ versionLabel(task) }}
+      </OTag>
+      <OTag type="remoteTaskAuth" :value="task.auth.type" />
+      <OTag v-if="task.signing.enabled" tone="ok" icon="lock">
+        {{ t("aiObservability.remoteTasks.signingOn") }}
+      </OTag>
+      <OTag type="remoteTaskStatus" :value="state" data-test="ai-remote-task-detail-state" />
     </template>
 
     <template #actions>
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="edit"
+        variant="secondary"
+        icon="edit"
         :disabled="!canEdit"
         data-test="ai-remote-task-detail-edit-btn"
         @click="openEdit"
@@ -55,16 +51,12 @@
           :content="t('aiObservability.remoteTasks.statusHint.retired')"
         />
       </OButton>
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
+      <ORefreshButton
+        :last-run-at="loadedAt"
         :loading="loading"
         data-test="ai-remote-task-detail-refresh-btn"
         @click="refresh(true)"
-      >
-        <OTooltip side="bottom" :content="t('common.refresh')" />
-      </OButton>
+      />
     </template>
 
     <!-- A full-width strip under the header, like every other detail page in
@@ -163,9 +155,8 @@
             </dl>
             <OButton
               v-if="hasAuthSecret"
-              variant="outline"
-              size="sm"
-              icon-left="key"
+              variant="secondary"
+              icon="key"
               class="mt-3"
               :disabled="!canEdit"
               data-test="ai-remote-task-detail-replace-credentials"
@@ -201,7 +192,7 @@
                   {{ header.key }}
                 </code>
                 <!-- A Secret-backed header reports that it is, never what. -->
-                <OTag v-if="header.usesSecret" variant="purple-soft" icon="lock">
+                <OTag v-if="header.usesSecret" tone="neutral" icon="lock">
                   {{ t("aiObservability.remoteTasks.detail.headerSecret") }}
                 </OTag>
                 <span v-else class="text-text-secondary font-mono">{{ header.value }}</span>
@@ -254,9 +245,9 @@
                 {{ task.taskRef }}
               </code>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                :icon-left="refCopied ? 'check' : 'content-copy'"
+                :icon="refCopied ? 'check' : 'content-copy'"
                 :aria-label="t('aiObservability.remoteTasks.detail.copyRef')"
                 data-test="ai-remote-task-detail-copy-ref"
                 @click="copyRef"
@@ -294,9 +285,8 @@
         <template v-else-if="currentTab === 'versions'">
           <div v-if="hasDraft" class="flex items-center justify-end">
             <OButton
-              variant="outline"
-              size="sm-action"
-              icon-left="delete"
+              variant="secondary"
+              icon="delete"
               data-test="ai-remote-task-detail-discard-draft"
               @click="discardDraft"
             >
@@ -309,10 +299,7 @@
               :columns="versionColumns"
               row-key="id"
               :loading="loading"
-              :frame="false"
-              :show-global-filter="false"
               :page-size="20"
-              width="100%"
               class="h-full w-full"
               data-test="ai-remote-task-detail-versions-table"
             >
@@ -347,23 +334,18 @@
         </template>
 
         <template v-else-if="currentTab === 'usedBy'">
-          <p
+          <OEmptyState
             v-if="!usedBy.length"
-            class="text-text-secondary border-border-default rounded-default bg-surface-base m-0 border px-4 py-3 text-xs"
+            :title="t('aiObservability.remoteTasks.detail.usedByEmpty')"
             data-test="ai-remote-task-detail-used-by-empty"
-          >
-            {{ t("aiObservability.remoteTasks.detail.usedByEmpty") }}
-          </p>
+          />
           <div v-else class="card-container flex min-h-0 flex-1 flex-col overflow-hidden">
             <OTable
               :data="usedBy"
               :columns="usedByColumns"
               row-key="id"
               :loading="loadingUsedBy"
-              :frame="false"
-              :show-global-filter="false"
               :page-size="20"
-              width="100%"
               class="h-full w-full"
               data-test="ai-remote-task-detail-used-by-table"
               @row-click="openExperiment"
@@ -401,9 +383,10 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -457,6 +440,7 @@ const entityId = computed<string>(() => String(route.params.id ?? ""));
 const task = ref<RemoteTask | null>(null);
 const versions = ref<RemoteTask[]>([]);
 const loading = ref(false);
+const loadedAt = ref<number | null>(null);
 const refCopied = ref(false);
 const currentTab = ref<"configuration" | "versions" | "usedBy" | "signing">("configuration");
 
@@ -645,9 +629,6 @@ const versionColumns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
-// Real browser back when there's history to pop.
-const { goBack } = useSmartBack(() => aiRemoteTasksRoute(orgId.value));
-
 function openEdit() {
   if (!canEdit.value) return;
   void router.push(aiRemoteTaskEditRoute(orgId.value, entityId.value));
@@ -674,6 +655,7 @@ async function refresh(force = false) {
     ]);
     task.value = head;
     versions.value = allVersions;
+    loadedAt.value = Date.now();
     void loadUsedBy(head.name, force);
   } catch (error: any) {
     toast({
@@ -696,7 +678,7 @@ async function discardDraft() {
     messageName: task.value?.name ?? "",
     confirmLabel: t("aiObservability.remoteTasks.detail.discardDraft"),
     cancelLabel: t("common.cancel"),
-    confirmVariant: "destructive",
+    kind: "destructive",
   });
   if (!ok) return;
   try {

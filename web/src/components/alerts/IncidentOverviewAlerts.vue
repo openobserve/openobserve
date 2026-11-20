@@ -15,26 +15,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard variant="glass" class="shrink-0" data-test="incident-overview-alerts">
-    <OCardSection role="header" dense class="justify-between gap-3">
-      <h2 class="text-text-heading text-sm font-semibold">
+  <OCard class="shrink-0" data-test="incident-overview-alerts">
+    <template #header>
+      <h3 class="text-text-heading min-w-0 truncate text-sm font-semibold">
         {{ t("alerts.incidents.overview.alerts") }}
-      </h2>
+      </h3>
       <span
         v-if="model"
-        class="text-text-secondary text-xs tabular-nums"
+        class="text-text-secondary ms-auto text-xs tabular-nums"
         data-test="incident-overview-alerts-caption"
         >{{ caption }}</span
       >
-    </OCardSection>
-    <OCardSection role="body" dense>
-      <p
+    </template>
+    <div>
+      <OEmptyState
         v-if="!model"
-        class="text-text-secondary py-4 text-sm"
+        size="compact"
+        icon="bar-chart"
+        :title="t('alerts.incidents.overview.noFirings')"
         data-test="incident-overview-alerts-empty"
-      >
-        {{ t("alerts.incidents.overview.noFirings") }}
-      </p>
+      />
       <div v-else class="grid grid-cols-[minmax(0,17rem)_minmax(0,1fr)] gap-x-6">
         <template v-for="(lane, i) in shownLanes" :key="lane.alertId">
           <div
@@ -112,8 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OButton
         v-if="hiddenCount || expanded"
-        variant="ghost-primary"
-        size="sm"
+        variant="accent-ghost"
         class="mt-2"
         data-test="incident-overview-lanes-more"
         @click="expanded = !expanded"
@@ -123,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : t("alerts.incidents.overview.showMore", { count: hiddenCount }, hiddenCount)
         }}</OButton
       >
-    </OCardSection>
+    </div>
   </OCard>
 </template>
 
@@ -132,7 +131,7 @@ import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";

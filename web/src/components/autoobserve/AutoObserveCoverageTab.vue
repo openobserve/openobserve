@@ -39,21 +39,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="px-page-edge border-border-default flex items-center gap-x-5 border-b py-3.5"
           aria-hidden="true"
         >
-          <OSkeleton animation="none" class="h-4 w-44" />
+          <OSkeleton shape="block" class="h-4 w-44" />
           <OSkeleton
             v-if="!headerBar"
-            animation="none"
+            shape="block"
             class="h-2 w-56 max-md:w-24"
             data-test="autoobserve-coverage-skeleton-split"
           />
-          <OSkeleton animation="none" class="ms-auto h-3 w-20" />
+          <OSkeleton shape="block" class="ms-auto h-3 w-20" />
         </div>
         <div class="px-page-edge flex items-center gap-2 py-2" aria-hidden="true">
-          <OSkeleton animation="none" class="h-8 w-72 max-md:w-40" />
-          <OSkeleton animation="none" class="h-8 w-32" />
+          <OSkeleton shape="block" class="h-8 w-72 max-md:w-40" />
+          <OSkeleton shape="block" class="h-8 w-32" />
           <template v-if="view === 'map'">
-            <OSkeleton animation="none" class="h-8 w-44 max-md:hidden" />
-            <OSkeleton animation="none" class="h-8 w-56 max-md:hidden" />
+            <OSkeleton shape="block" class="h-8 w-44 max-md:hidden" />
+            <OSkeleton shape="block" class="h-8 w-56 max-md:hidden" />
           </template>
         </div>
         <div
@@ -64,8 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSkeleton
             v-for="i in MAP_SKELETON_HEXES"
             :key="i"
-            type="circle"
-            animation="none"
+            shape="circle"
             class="size-20 max-md:size-14"
           />
         </div>
@@ -73,10 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           :data="[]"
           :columns="columns"
-          :frame="false"
           loading
           pagination="none"
-          :show-global-filter="false"
           class="min-h-0 flex-1"
           aria-hidden="true"
         />
@@ -84,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <LiveNoticeState
         v-else-if="liveNoticeView"
         :notice="liveNoticeView"
-        size="block"
+        size="region"
         :detail="source.detail"
         :busy="source.busy"
         :data-test="`autoobserve-coverage-${liveNoticeView.failure}`"
@@ -103,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <LiveNoticeState
           :notice="emptyNotice"
-          size="block"
+          size="region"
           :data-test="
             source.passMinutes === null
               ? 'autoobserve-coverage-no-pass'
@@ -123,9 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="px-page-edge border-border-default flex min-h-14 flex-wrap items-center gap-x-5 gap-y-2 border-b py-3"
         data-test="autoobserve-coverage-summary"
       >
-        <span class="text-text-heading text-base font-semibold tabular-nums">{{
-          summaryText
-        }}</span>
+        <span class="text-text-heading text-sm font-semibold tabular-nums">{{ summaryText }}</span>
         <span
           v-if="totals.added"
           class="text-text-secondary flex items-center gap-1 text-xs tabular-nums"
@@ -175,20 +170,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <label :for="SEARCH_ID" class="sr-only">{{
             t("autoobserve.coverage.searchLabel")
           }}</label>
-          <OInput
+          <OSearchInput
             :id="SEARCH_ID"
             v-model="query"
-            size="sm"
-            clearable
             class="w-full"
             :placeholder="searchPlaceholder"
             data-test="autoobserve-coverage-search"
             @keydown.esc="clearSearch"
           >
-            <template #icon-left>
-              <OIcon name="search" size="sm" class="text-text-secondary" />
-            </template>
-          </OInput>
+          </OSearchInput>
           <span class="sr-only" role="status" data-test="autoobserve-coverage-search-status">{{
             announcement
           }}</span>
@@ -199,19 +189,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="autoobserve-coverage-view"
           @update:model-value="(v) => v && (view = v as CoverageView)"
         >
-          <OToggleGroupItem value="map" size="sm" data-test="autoobserve-coverage-view-map">
+          <OToggleGroupItem value="map" data-test="autoobserve-coverage-view-map">
             {{ t("autoobserve.coverage.viewMap") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="table" size="sm" data-test="autoobserve-coverage-view-table">
+          <OToggleGroupItem value="table" data-test="autoobserve-coverage-view-table">
             {{ t("autoobserve.coverage.viewTable") }}
           </OToggleGroupItem>
         </OToggleGroup>
         <template v-if="view === 'map'">
           <OSelect
             class="max-md:w-full"
-            width="md"
-            size="sm"
-            label-position="inside"
+            width="m"
+            variant="filter"
             :label="t('autoobserve.coverage.fillBy')"
             :model-value="fill"
             :options="fillOptions"
@@ -229,7 +218,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="item in legend"
               :key="item.cls"
               :value="item.cls"
-              size="sm"
               :data-test="`autoobserve-coverage-legend-${item.cls}`"
             >
               <span class="rounded-default size-3 shrink-0" :class="SWATCH[item.cls]" />
@@ -239,6 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
         </template>
         <OToggleGroup
+          size="sm"
           v-else
           :model-value="filter"
           :aria-label="t('autoobserve.coverage.filterLabel')"
@@ -249,7 +238,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="option in filters"
             :key="option"
             :value="option"
-            size="xs"
             :disabled="!counts[option] && option !== filter"
             :data-test="`autoobserve-coverage-filter-${option}`"
           >
@@ -262,8 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="view === 'map'">
         <OEmptyState
           v-if="term && !searched.length"
-          size="block"
-          illustration="no-results"
+          icon="search-off"
           :title="noMatchTitle"
           :action-label="t('autoobserve.coverage.clearSearch')"
           data-test="autoobserve-coverage-no-match"
@@ -290,8 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("autoobserve.coverage.mapMore", { count: num(mapView.more) }, mapView.more) }}
             <OButton
-              variant="ghost-primary"
-              size="sm"
+              variant="accent-ghost"
               data-test="autoobserve-coverage-map-more-table"
               @click="showAllInTable"
             >
@@ -306,10 +292,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:expanded-ids="expanded"
           :data="tableRows"
           :columns="columns"
-          :frame="false"
           row-key="service"
           pagination="none"
-          :show-global-filter="false"
           sorting="server"
           :sort-by="sortBy"
           :sort-order="sortOrder"
@@ -348,11 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-text-secondary flex items-center gap-1.5 text-xs tabular-nums"
             >
               <template v-if="groupGaps(row, check)">
-                <OTag
-                  variant="warning-soft"
-                  size="xs"
-                  :label="t('autoobserve.coverageLive.gapChip')"
-                />
+                <OTag tone="warn" size="sm" :label="t('autoobserve.coverageLive.gapChip')" />
                 {{
                   t("autoobserve.coverage.groupOf", {
                     count: num(groupGaps(row, check)),
@@ -364,9 +344,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-else-if="row.checks"
               variant="ghost"
-              size="sm"
               class="text-text-body -ms-1.5 gap-1.5 px-1.5 font-normal"
-              :active="isSelected(row.service, check)"
+              :pressed="isSelected(row.service, check)"
               :title="row.checks[check].state === 'gap' ? row.checks[check].reason : undefined"
               :aria-label="liveCellAria(row, check)"
               :aria-pressed="isSelected(row.service, check)"
@@ -375,8 +354,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OTag
                 v-if="cellLook(row, check) === 'gap'"
-                variant="warning-soft"
-                size="xs"
+                tone="warn"
+                size="sm"
                 :label="t('autoobserve.coverageLive.gapChip')"
               />
               <span v-else-if="cellLook(row, check) === 'learning'" class="text-text-secondary">{{
@@ -399,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
             <OTag
               v-else-if="row.status"
-              :variant="STATE_TAG[row.status.state]"
+              :tone="STATE_TAG[row.status.state]"
               size="sm"
               :label="row.status.label"
               :data-test="`autoobserve-coverage-state-${row.service}`"
@@ -413,8 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #empty>
             <OEmptyState
               v-if="searched.length && filter !== 'all'"
-              size="block"
-              illustration="no-results"
+              icon="search-off"
               :title="filterHidesTitle"
               :action-label="t('autoobserveLive.coverage.showAll')"
               data-test="autoobserve-coverage-filter-hides"
@@ -422,8 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OEmptyState
               v-else-if="term"
-              size="block"
-              illustration="no-results"
+              icon="search-off"
               :title="noMatchTitle"
               :action-label="t('autoobserve.coverage.clearSearch')"
               data-test="autoobserve-coverage-no-match"
@@ -442,8 +419,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #trigger>
               <OButton
                 variant="ghost"
-                size="xs"
-                icon-right="expand-more"
+                size="sm"
+                icon-end="expand-more"
                 class="text-text-secondary -ms-1.5 font-normal tabular-nums"
                 data-test="autoobserve-coverage-grouped"
                 >{{ groupLine }}</OButton
@@ -458,7 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="groupPick = option"
             >
               <span class="flex-1">{{ t(GROUP_PICK_LABEL[option]) }}</span>
-              <template #icon-right>
+              <template #end>
                 <OIcon
                   name="check"
                   size="sm"
@@ -483,11 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}
             </li>
             <li class="flex items-center gap-1.5" data-test="autoobserve-coverage-legend-gap-key">
-              <OTag
-                variant="warning-soft"
-                size="xs"
-                :label="t('autoobserve.coverageLive.gapChip')"
-              />
+              <OTag tone="warn" size="sm" :label="t('autoobserve.coverageLive.gapChip')" />
               {{ liveLookWord(t, "gap") }}
             </li>
             <li
@@ -526,14 +499,14 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { OTableColumnDef, OTableSortParams, RowRailTone } from "@/lib/core/Table/OTable.types";
 import { formatLargeNumber } from "@/utils/formatters";
 import CoverageHexMap, { type HexClass, type HexItem } from "./CoverageHexMap.vue";
@@ -630,11 +603,11 @@ const FILTER_ALIAS: Record<string, CoverageFilter> = {
 };
 // Partly watched and learning appear in the legend only while some service is in them.
 const OPTIONAL_STATES: ReadonlySet<HexClass> = new Set(["partial", "learning"]);
-const STATE_TAG: Record<ServiceState, BadgeVariant> = {
-  gap: "warning-soft",
-  partial: "warning-outline",
-  learning: "default-soft",
-  watched: "success-soft",
+const STATE_TAG: Record<ServiceState, ChipTone> = {
+  gap: "warn",
+  partial: "outline",
+  learning: "neutral",
+  watched: "ok",
 };
 // Three checks, so a service's alerts fall in 3+, 2, 1 or none.
 const DETECTOR_LEGEND: { cls: HexClass; key: I18nKey }[] = [

@@ -77,11 +77,11 @@ const forbidden = computed(() => (query.error.value ? forbiddenState(query.error
     <template #actions>
       <OSwitch
         v-model="includeReads"
-        size="sm"
         :label="t('siem.audit.includeReads')"
         data-test="security-audit-include-reads"
       />
       <ORefreshButton
+        :last-run-at="query.dataUpdatedAt.value || null"
         :loading="query.isFetching.value"
         data-test="security-audit-refresh"
         @click="query.refetch()"
@@ -89,10 +89,10 @@ const forbidden = computed(() => (query.error.value ? forbiddenState(query.error
     </template>
     <OEmptyState
       v-if="page && !page.audit_enabled"
-      size="inline"
+      size="compact"
       icon="history"
       :title="t('siem.audit.disabled')"
-      :description="t('siem.audit.disabledHint')"
+      :text="t('siem.audit.disabledHint')"
       data-test="security-audit-disabled"
     />
     <OTable
@@ -108,7 +108,6 @@ const forbidden = computed(() => (query.error.value ? forbiddenState(query.error
       :page-size-options="[PAGE_SIZE]"
       :total-count="total"
       sorting="none"
-      :show-global-filter="false"
       class="min-h-0 flex-1"
       data-test="security-audit-table"
       @pagination-change="onPage"
@@ -117,7 +116,7 @@ const forbidden = computed(() => (query.error.value ? forbiddenState(query.error
         <OTimeCell :value="row.timestamp" unit="us" />
       </template>
       <template #cell-category="{ row }">
-        <OTag variant="default-soft" size="xs">{{ t(`siem.audit.category.${row.category}`) }}</OTag>
+        <OTag tone="neutral" size="sm">{{ t(`siem.audit.category.${row.category}`) }}</OTag>
       </template>
       <template #cell-action="{ row }">
         {{ t(`siem.audit.verb.${row.action}`) }}
@@ -134,10 +133,9 @@ const forbidden = computed(() => (query.error.value ? forbiddenState(query.error
       </template>
       <template #empty>
         <OEmptyState
-          size="inline"
           icon="task-alt"
           :title="t('siem.audit.empty')"
-          :description="t('siem.audit.emptyHint')"
+          :text="t('siem.audit.emptyHint')"
         />
       </template>
     </OTable>

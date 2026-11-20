@@ -1,227 +1,123 @@
 /**
- * ODrawer.types.ts — public types for ODrawer.
- *
- * ODrawer is a slide-in panel anchored to the left or right edge of the
- * viewport. It shares the same visual surface tokens as ODialog but differs
- * in positioning and transition (slide instead of zoom/fade).
+ * ODrawer.types.ts — public types for ODrawer, the full-height panel from the right edge.
  */
 
 import type { I18nText } from "@/types/i18n";
+import type { OverlayAction } from "@/lib/overlay/shared/overlayFooter.types";
 
-import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
+export type { OverlayAction } from "@/lib/overlay/shared/overlayFooter.types";
 
-/** Which viewport edge the drawer slides in from. */
+/** `left` is only for the navigation drawer a rail becomes on small screens (guideline R1). */
 export type DrawerSide = "right" | "left";
 
-/**
- * Panel width presets.
- * sm=360px | md=480px (default) | lg=640px | xl=800px | xxl=1000px | full=100vw
- */
-export type DrawerSize = "sm" | "md" | "lg" | "xl" | "xxl" | "full";
+/** sm 480 · md 640 · lg 800 · xl 960 (guideline O3). */
+export type DrawerSize = "sm" | "md" | "lg" | "xl";
+
+export const DRAWER_SIZES = ["sm", "md", "lg", "xl"] as const satisfies readonly DrawerSize[];
+
+/** A compact tab under the drawer header. */
+export interface DrawerTab {
+  value: string;
+  label: I18nText;
+  count?: number;
+  dataTest?: string;
+}
 
 export interface DrawerProps {
   /** Controlled open state — use with v-model:open */
   open?: boolean;
 
-  /**
-   * Edge the drawer slides in from.
-   * @default "right"
-   */
-  side?: DrawerSide;
+  /** Unsaved edits: Escape, ✕ and an outside click ask "Discard changes?" in the footer (V5). A nested OForm reports its own. */
+  dirty?: boolean;
 
-  /**
-   * Prevents the drawer from closing when the user clicks the overlay
-   * or presses Escape.
-   * @default false
-   */
+  /** A forced flow that cannot be dismissed: no ✕, and Escape and outside clicks do nothing. */
   persistent?: boolean;
 
-  /**
-   * Panel width preset.
-   * sm=360px | md=480px (default) | lg=640px | xl=800px | full=100vw
-   * @default "md"
-   */
+  /** @default "right" */
+  side?: DrawerSide;
+
+  /** @default "md" */
   size?: DrawerSize;
 
-  /**
-   * Explicit panel width as a percentage of the viewport width (1–100).
-   * When provided, overrides the `size` preset entirely.
-   */
-  width?: number;
-
-  /**
-   * Full-bleed body (SPACING_AUDIT.md §7/§8). By default the drawer body owns a
-   * single, fixed inset — the same `--spacing-dialog-content-*` token ODialog
-   * uses — so every drawer's content lines up identically and consumers never
-   * hand-roll their own body padding. Set `bleed` for the exceptions that must
-   * reach the edges: code/JSON editors, embedded dashboards, and full-width
-   * tables/detail views that supply their own inset. This is the only body-
-   * spacing knob, on purpose — a fixed default with one escape hatch, not a
-   * size scale.
-   */
+  /** Full-bleed body for editors, embedded dashboards and tables that inset themselves. */
   bleed?: boolean;
 
-  /**
-   * Convenience prop: plain-text title rendered in the header.
-   * Ignored when the `header` slot is provided.
-   */
+  /** Header title, 15 px semibold. Ignored when the `header` slot is provided. */
   title?: I18nText;
 
-  /**
-   * Optional data-test attribute rendered on the structured title element,
-   * so consumers using the `title`/`subTitle` props keep a stable test hook.
-   */
   titleDataTest?: string;
 
-  /**
-   * Whether to render a built-in × close button in the header.
-   * Only applies when `persistent` is false.
-   * @default true
-   */
+  /** The header ✕; turn it off only when the header slot draws its own close. @default true */
   showClose?: boolean;
 
-  /**
-   * When true, the backdrop overlay is hidden so the rest of the page remains
-   * interactive and visually unobscured (a seamless dialog).
-   * @default false
-   */
+  /** No scrim, so the page behind stays visible. */
   seamless?: boolean;
 
   /** Accessible name for a drawer that renders its own header (no `title`). */
-  ariaLabel?: string;
+  ariaLabel?: I18nText;
 
-  // ── Header subtitle ────────────────────────────────────────────────────
+  /** One line of facts under the title. */
+  subtitle?: I18nText;
 
-  /**
-   * Optional subtitle rendered below the title in the header, left-aligned.
-   * Ignored when the `header` slot is provided.
-   */
-  subTitle?: I18nText;
+  subtitleDataTest?: string;
 
-  /** Optional data-test attribute rendered on the structured subtitle element. */
-  subTitleDataTest?: string;
+  /** Compact tabs fixed under the header; bind the active one with v-model:tab. */
+  tabs?: DrawerTab[];
 
-  // ── Inbuilt footer buttons ──────────────────────────────────────────────
+  tab?: string;
 
-  /**
-   * When provided, the built-in primary button becomes type="submit" associated
-   * with this form id. Enables Enter-key submission for forms in the drawer body.
-   */
+  /** Makes the primary a submit button of this form, so the form's own submit runs it. */
   formId?: string;
 
-  /** Label for the primary action button (right side). Omit to hide. */
-  primaryButtonLabel?: I18nText;
-  /** data-test for the primary button. @default "o-drawer-primary-btn" */
-  primaryButtonDataTest?: string;
-  /** Label for the secondary action button (right of neutral, left of primary). Omit to hide. */
-  secondaryButtonLabel?: I18nText;
-  /** Label for the neutral action button (left side). Omit to hide. */
-  neutralButtonLabel?: I18nText;
+  /** Footer primary, right-most (guideline O7). */
+  primary?: OverlayAction;
+  /** Footer Cancel, left of the primary. */
+  secondary?: OverlayAction;
+  /** An extra action at the left of the footer (Delete). */
+  extra?: OverlayAction;
 
-  /** OButton variant for the primary button. @default "primary" */
-  primaryButtonVariant?: ButtonVariant;
-  /** OButton variant for the secondary button. @default "secondary" */
-  secondaryButtonVariant?: ButtonVariant;
-  /** OButton variant for the neutral button. @default "ghost" */
-  neutralButtonVariant?: ButtonVariant;
-
-  /** Explicitly disables the primary button. Auto-disabled when any button is loading. */
-  primaryButtonDisabled?: boolean;
-  /** Explicitly disables the secondary button. Auto-disabled when any button is loading. */
-  secondaryButtonDisabled?: boolean;
-  /** Explicitly disables the neutral button. Auto-disabled when any button is loading. */
-  neutralButtonDisabled?: boolean;
-
-  /** Shows loading spinner on primary button (also disables all buttons). */
-  primaryButtonLoading?: boolean;
-  /** Shows loading spinner on secondary button (also disables all buttons). */
-  secondaryButtonLoading?: boolean;
-  /** Shows loading spinner on neutral button (also disables all buttons). */
-  neutralButtonLoading?: boolean;
-
-  /**
-   * When true (default), the default slot content is only rendered while the
-   * drawer is open and destroyed when it closes. Set to false for drawers that
-   * must preserve component state between open/close cycles.
-   * @default true
-   */
+  /** Renders the body only while open. @default true */
   lazy?: boolean;
 
-  /**
-   * When provided, portals the drawer into this element and uses `position:
-   * absolute` so the panel is scoped to the element's bounds rather than the
-   * full viewport. The target element must have `position: relative` and
-   * `overflow: hidden`.
-   * Accepts an HTMLElement reference or a CSS selector string.
-   * @default undefined  (portals to document.body with fixed positioning)
-   */
+  /** Portals into this element and positions inside its bounds instead of the window. */
   portalTarget?: string | HTMLElement | null;
 
   /** Element (or CSS selector) the drawer starts from, so app chrome above it stays visible; re-measured on resize. */
   anchor?: string | HTMLElement | null;
 
-  /** Which edge of `anchor` the drawer starts at. Default: "top". */
+  /** Which edge of `anchor` the drawer starts at. @default "top" */
   anchorEdge?: "top" | "bottom";
 
-  /** Render the portal in place for a contained drawer surface. Default: false. */
+  /** Render the portal in place for a contained drawer surface. */
   inline?: boolean;
 
-  /** Called before the close button, Escape or an outside click closes the drawer; return false to keep it open. */
-  closeGuard?: () => boolean;
-
-  /** When false, the page behind stays interactive and only the close button or Escape outside a field closes it. Default: true. */
+  /** When false, the page behind stays interactive and only ✕ or Escape outside a field closes it. @default true */
   modal?: boolean;
 
   returnFocusTo?: () => HTMLElement | null;
 }
 
 export interface DrawerEmits {
-  /** Fires whenever the open state changes — use with v-model:open */
   (e: "update:open", value: boolean): void;
-  /** Fires when the primary inbuilt button is clicked. */
+  (e: "update:tab", value: string): void;
   (e: "click:primary"): void;
-  /** Fires when the secondary inbuilt button is clicked. */
   (e: "click:secondary"): void;
-  /** Fires when the neutral inbuilt button is clicked. */
-  (e: "click:neutral"): void;
+  (e: "click:extra"): void;
+  /** The user chose Discard in the "Discard changes?" footer; the drawer then closes. */
+  (e: "discard"): void;
   (e: "after-close"): void;
 }
 
 export interface DrawerSlots {
-  /**
-   * Element that opens the drawer.
-   * Rendered as-child into Reka's DialogTrigger.
-   * Omit when controlling open state via v-model:open.
-   */
+  /** The element that opens the drawer; omit when controlling it with v-model:open. */
   trigger?: () => unknown;
-
-  /**
-   * Header section at the top of the drawer, above the scrollable body.
-   * When provided, the `title` prop is ignored and sub-slots are also ignored.
-   */
+  /** Replaces the whole title block; `header-left` and `header-right` are then ignored. */
   header?: () => unknown;
-
-  /**
-   * Optional left sub-slot in the header row.
-   * Rendered between the title/subtitle block and `#header-right`.
-   * Ignored when the `#header` full-override slot is provided.
-   */
   "header-left"?: () => unknown;
-
-  /**
-   * Optional right sub-slot in the header row.
-   * Rendered between `#header-left` (or the title block) and the close button.
-   * Ignored when the `#header` full-override slot is provided.
-   */
   "header-right"?: () => unknown;
-
-  /**
-   * Body / content — the main scrollable area.
-   */
+  /** The body; the only part that scrolls (guideline O6). */
   default?: () => unknown;
-
-  /**
-   * Footer section — always visible above the bottom edge; never scrolls.
-   */
+  /** Replaces the built-in footer actions; always visible above the bottom edge. */
   footer?: () => unknown;
+  "footer-left"?: () => unknown;
 }

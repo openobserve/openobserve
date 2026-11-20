@@ -64,7 +64,7 @@ test.describe('Security detections and access', { tag: ['@security', '@enterpris
     try {
       const mpm = new PageManager(locked.page);
       await mpm.securityPage.goto('detections');
-      await mpm.securityPage.expectSecurityLocked('Security Viewer');
+      await mpm.securityPage.expectSecurityLocked('Security viewer');
       // The switcher is also hidden while access is still loading, so it is checked only once the lock proves access resolved.
       await mpm.securityPage.expectSwitcherHidden();
     } finally {

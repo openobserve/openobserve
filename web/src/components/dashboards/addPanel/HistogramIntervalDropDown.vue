@@ -3,7 +3,7 @@
   <OSelect
     v-model="histogramIntervalModel"
     :label="t('dashboard.histogramIntervalDropDown.histogramInterval')"
-    label-position="inside"
+    variant="filter"
     :options="histogramIntervalOptions"
     data-test="histogram-interval-dropdown"
     @update:model-value="$emit('update:modelValue', $event)"

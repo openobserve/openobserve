@@ -27,19 +27,14 @@
 <template>
   <OPageLayout
     :title="t('slos.title')"
-    icon="target"
-    :subtitle="t('slos.subtitle')"
+    :about="t('slos.subtitle')"
     title-data-test="slos-slolist-title"
     bleed
   >
     <template #actions>
-      <!-- The provider behind the Terraform export, which is otherwise only
-           discoverable once the export dialog is already open. -->
-      <IacRegistryLinks data-test="slos-slolist-iac-registries" :compact="isMobile" />
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="upload-file"
+        variant="secondary"
+        icon="upload-file"
         data-test="slos-slolist-import"
         @click="goToImport"
       >
@@ -47,7 +42,6 @@
       </OButton>
       <OButton
         variant="primary"
-        size="sm-action"
         data-test="slos-slolist-new"
         :aria-label="
           sloDrafts.hasNew ? t('common.editorDraft.newDot', { label: t('slos.new') }) : undefined
@@ -62,6 +56,18 @@
           data-test="slos-slolist-new-draft-dot"
         />
       </OButton>
+      <ODropdown side="bottom" align="end">
+        <template #trigger>
+          <OButton
+            icon-only
+            variant="ghost"
+            icon="more-horiz"
+            data-test="app-page-header-more-btn"
+            :label="t('common.more')"
+          />
+        </template>
+        <IacRegistryLinks menu data-test="slos-slolist-iac-registries" />
+      </ODropdown>
     </template>
 
     <!-- SLOs share the ALERT folder namespace (there is no FolderType::Slos),
@@ -90,7 +96,6 @@
       @update:sort-order="sortOrder = $event"
       @update:page-size="pageSize = $event"
       :current-page="currentPage"
-      :show-global-filter="false"
       table-id="slos-list"
       :persist-columns="true"
       :column-visibility="defaultColumnVisibility"
@@ -106,7 +111,6 @@
               v-for="opt in typeOptions"
               :key="opt.value"
               :value="opt.value"
-              size="sm"
               :data-test="`slos-slolist-type-filter-${opt.value}`"
             >
               <template v-if="opt.icon" #icon-left>
@@ -124,7 +128,6 @@
               v-model="search"
               class="w-full"
               :placeholder="t('slos.searchPlaceholder')"
-              clearable
               data-test="slos-slolist-search"
             />
           </div>
@@ -149,8 +152,6 @@
            #toolbar it sat before the toggle and the two pages disagreed. -->
       <template #toolbar-trailing>
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :last-run-at="lastUpdatedAt"
           :loading="fetching"
           data-test="slos-slolist-refresh"
@@ -169,16 +170,16 @@
           />
           <OTag
             v-if="isGrouped(row)"
-            variant="purple-soft"
+            tone="neutral"
             icon="layers"
-            size="xs"
+            size="sm"
             :label="raw(String(row.group_by?.length ?? 0))"
           />
           <OTag
             v-if="!row.enabled"
-            variant="default-soft"
+            tone="neutral"
             icon="pause"
-            size="xs"
+            size="sm"
             :label="t('slos.paused')"
           />
           <span v-if="activeCorrections(row).length" class="inline-flex">
@@ -203,7 +204,7 @@
 
       <template #cell-health="{ row }">
         <OTag
-          :variant="healthVariant(row)"
+          :tone="healthVariant(row)"
           :icon="healthIcon(health(row))"
           size="sm"
           :label="t(`slos.health.${health(row)}`)"
@@ -256,7 +257,7 @@
         <OTooltip v-if="row.tags?.length" :content="raw(row.tags.join(', '))">
           <FitItems :items="row.tags">
             <template #default="{ item }">
-              <OTag variant="default-soft" size="xs" class="max-w-full">
+              <OTag tone="neutral" size="sm" class="max-w-full">
                 <span class="truncate">{{ item }}</span>
               </OTag>
             </template>
@@ -274,36 +275,40 @@
       <template #cell-actions="{ row }">
         <div class="flex items-center gap-1" @click.stop>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            icon-left="edit"
+            size="sm"
+            icon="edit"
             class="max-md:hidden"
             :title="t('slos.edit')"
             :data-test="`slos-slolist-edit-${row.name}`"
             @click="goToEdit(row)"
           />
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            icon-left="drive-file-move"
+            size="sm"
+            icon="drive-file-move"
             class="max-md:hidden"
             :title="t('slos.move')"
             :data-test="`slos-slolist-move-${row.name}`"
             @click="openMove([row])"
           />
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+            size="sm"
+            :icon="row.enabled ? 'pause' : 'play-arrow'"
             class="max-md:hidden"
             :title="row.enabled ? t('slos.pause') : t('slos.resume')"
             :data-test="`slos-slolist-toggle-${row.name}`"
             @click="toggleEnabled(row)"
           />
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            icon-left="download"
+            size="sm"
+            icon="download"
             class="max-md:hidden"
             :title="t('common.export')"
             :data-test="`slos-slolist-export-${row.name}`"
@@ -311,18 +316,20 @@
           />
           <OButton
             v-if="downtimesEnabled"
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            icon-left="notifications-paused"
+            size="sm"
+            icon="notifications-paused"
             class="max-md:hidden"
             :title="t('alerts.downtimes.mute.exclude')"
             :data-test="`slos-slolist-exclude-${row.name}`"
             @click="excludeWindow(row)"
           />
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            icon-left="delete"
+            size="sm"
+            icon="delete"
             class="max-md:hidden"
             :title="t('slos.delete')"
             :data-test="`slos-slolist-delete-${row.name}`"
@@ -331,17 +338,18 @@
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
+                icon-only
                 :aria-label="t('common.moreActions')"
-                icon-left="more-vert"
+                icon="more-vert"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 class="md:hidden"
                 data-test="slos-slolist-row-more-actions"
                 @click.stop
               />
             </template>
             <ODropdownItem
-              icon-left="edit"
+              icon="edit"
               class="md:hidden"
               :data-test="`slos-slolist-edit-${row.name}-menu`"
               @select="goToEdit(row)"
@@ -349,7 +357,7 @@
               <span>{{ t("slos.edit") }}</span>
             </ODropdownItem>
             <ODropdownItem
-              icon-left="drive-file-move"
+              icon="drive-file-move"
               class="md:hidden"
               :data-test="`slos-slolist-move-${row.name}-menu`"
               @select="openMove([row])"
@@ -357,7 +365,7 @@
               <span>{{ t("slos.move") }}</span>
             </ODropdownItem>
             <ODropdownItem
-              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+              :icon="row.enabled ? 'pause' : 'play-arrow'"
               class="md:hidden"
               :data-test="`slos-slolist-toggle-${row.name}-menu`"
               @select="toggleEnabled(row)"
@@ -365,7 +373,7 @@
               <span>{{ row.enabled ? t("slos.pause") : t("slos.resume") }}</span>
             </ODropdownItem>
             <ODropdownItem
-              icon-left="download"
+              icon="download"
               class="md:hidden"
               :data-test="`slos-slolist-export-${row.name}-menu`"
               @select="openExport([row])"
@@ -374,7 +382,7 @@
             </ODropdownItem>
             <ODropdownItem
               v-if="downtimesEnabled"
-              icon-left="notifications-paused"
+              icon="notifications-paused"
               class="md:hidden"
               :data-test="`slos-slolist-exclude-${row.name}-menu`"
               @select="excludeWindow(row)"
@@ -382,8 +390,8 @@
               <span>{{ t("alerts.downtimes.mute.exclude") }}</span>
             </ODropdownItem>
             <ODropdownItem
-              icon-left="delete"
-              variant="destructive"
+              icon="delete"
+              tone="danger"
               class="md:hidden"
               :data-test="`slos-slolist-delete-${row.name}-menu`"
               @select="confirmDelete(row)"
@@ -398,28 +406,24 @@
         <OEmptyState
           icon="target"
           :title="t('slos.empty.title')"
-          :description="t('slos.empty.description')"
-        >
-          <OButton variant="primary" size="sm-action" icon-left="add" @click="goToNew">
-            {{ t("slos.new") }}
-          </OButton>
-        </OEmptyState>
+          :text="t('slos.empty.description')"
+          :action-label="t('slos.new')"
+          @action="goToNew"
+        />
       </template>
 
       <template #selection-actions>
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="drive-file-move"
+          variant="secondary"
+          icon="drive-file-move"
           data-test="slos-slolist-move-selected"
           @click="openMove(selectedRows)"
         >
           {{ t("common.move") }}
         </OButton>
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="download"
+          variant="secondary"
+          icon="download"
           :loading="exporting"
           data-test="slos-slolist-export-selected"
           @click="openExport(selectedRows)"
@@ -451,45 +455,40 @@
            only about disk. Three states, all distinct: still checking, a known
            count, and "we could not find out" — silence is reserved for the one
            case where it truly means nothing happens (zero attached). -->
-      <OBanner
+      <OInlineNotice
         v-if="alertCountState === 'loading'"
-        variant="info"
+        tone="info"
         class="mt-3"
         data-test="slos-slolist-delete-alert-count-loading"
       >
         {{ t("slos.deleteAlertsChecking") }}
-      </OBanner>
-      <OBanner
+      </OInlineNotice>
+      <OInlineNotice
         v-else-if="alertCountState === 'ready' && alertCount > 0"
-        variant="warning"
+        tone="warn"
         class="mt-3"
         data-test="slos-slolist-delete-alert-count"
       >
         {{ t("slos.deleteAlertsNote", { count: alertCount }, alertCount) }}
-      </OBanner>
-      <OBanner
+      </OInlineNotice>
+      <OInlineNotice
         v-else-if="alertCountState === 'unknown'"
-        variant="warning"
+        tone="warn"
         class="mt-3"
         data-test="slos-slolist-delete-alert-count-unknown"
       >
         {{ t("slos.deleteAlertsUnknown") }}
-      </OBanner>
+      </OInlineNotice>
       <!-- Not a footnote: deleting an SLO does NOT free the storage its slices
            occupy, and the budget stays charged until they age out (S-14c). -->
-      <OBanner variant="info" class="mt-3">
+      <OInlineNotice tone="info" class="mt-3">
         {{ t("slos.deleteBudgetNote") }}
-      </OBanner>
+      </OInlineNotice>
       <template #footer>
-        <OButton variant="outline" size="sm-action" @click="deleteDialog = false">
+        <OButton variant="secondary" @click="deleteDialog = false">
           {{ t("common.cancel") }}
         </OButton>
-        <OButton
-          variant="destructive"
-          size="sm-action"
-          data-test="slos-slolist-delete-confirm"
-          @click="doDelete"
-        >
+        <OButton variant="danger" data-test="slos-slolist-delete-confirm" @click="doDelete">
           {{ t("slos.delete") }}
         </OButton>
       </template>
@@ -497,6 +496,7 @@
 
     <ODialog
       v-model:open="moveDialog"
+      :dirty="moveTargetChanged"
       :title="t('slos.moveTitle', { count: pendingMove.length })"
       data-test="slos-slolist-move-dialog"
     >
@@ -506,12 +506,11 @@
         @folder-selected="onMoveTargetSelected"
       />
       <template #footer>
-        <OButton variant="outline" size="sm-action" @click="moveDialog = false">
+        <OButton variant="secondary" @click="moveDialog = false">
           {{ t("common.cancel") }}
         </OButton>
         <OButton
           variant="primary"
-          size="sm-action"
           :disabled="!moveTarget || moveTarget === activeFolderId"
           data-test="slos-slolist-move-confirm"
           @click="doMove"
@@ -558,9 +557,10 @@ import { useStore } from "vuex";
 
 import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
+import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -569,6 +569,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import type { ProgressBarTone } from "@/lib/data/ProgressBar/OProgressBar.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -579,7 +580,7 @@ import FitItems from "@/components/common/FitItems.vue";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -588,7 +589,6 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { SloListItem } from "@/ts/interfaces/slo";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
 import alertsService from "@/services/alerts";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
@@ -609,7 +609,6 @@ import {
 } from "@/composables/useSloFormat";
 
 const { t } = useI18nTyped();
-const { isMobile } = useBreakpoint();
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
@@ -688,6 +687,11 @@ const selectedIds = ref<string[]>([]);
 const moveDialog = ref(false);
 const moveTarget = ref("");
 const pendingMove = ref<SloListItem[]>([]);
+// The picker settles on a folder once its list loads; only a pick after that is the user's (V5).
+const { dirty: moveTargetChanged } = useUnsavedChanges(
+  () => moveTarget.value,
+  () => moveDialog.value,
+);
 const oTableRef: any = ref(null);
 
 // URL-synced so returning from add/edit/detail (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
@@ -868,16 +872,16 @@ function health(row: SloListItem): SloHealth {
   return sloHealth(row.status);
 }
 
-function healthVariant(row: SloListItem): BadgeVariant {
+function healthVariant(row: SloListItem): ChipTone {
   switch (health(row)) {
     case "budget_blown":
-      return "error-soft";
+      return "err";
     case "at_risk":
-      return "warning-soft";
+      return "warn";
     case "meeting":
-      return "success-soft";
+      return "ok";
     default:
-      return "default-soft";
+      return "neutral";
   }
 }
 
@@ -903,11 +907,11 @@ function budgetBarValue(row: SloListItem): number {
   return Math.max(0, Math.min(100, v));
 }
 
-function budgetTone(row: SloListItem): string {
+function budgetTone(row: SloListItem): ProgressBarTone {
   const v = row.status?.error_budget_remaining ?? 0;
-  if (v <= 0) return "error";
-  if (v < 25) return "warning";
-  return "success";
+  if (v <= 0) return "err";
+  if (v < 25) return "warn";
+  return "ok";
 }
 
 function budgetTextClass(row: SloListItem): string {

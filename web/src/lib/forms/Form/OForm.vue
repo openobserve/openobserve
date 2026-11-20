@@ -2,7 +2,8 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { provide, inject, onBeforeUnmount, watch } from "vue";
-import { FORM_CONTEXT_KEY, FORM_SUBMIT_STATE_KEY } from "./OForm.types";
+import { FORM_CONTEXT_KEY, FORM_DIRTY_STATE_KEY, FORM_SUBMIT_STATE_KEY } from "./OForm.types";
+import { trackUnsavedEdits } from "./unsavedEdits";
 import { revealFieldErrors, useOForm, type FormFieldPath } from "./useOForm";
 import type { FormValidateOn } from "./OForm.types";
 
@@ -98,11 +99,16 @@ if (overlaySubmitting) {
   });
 }
 
+// Edits not yet put back or saved count as unsaved, so the enclosing overlay asks before discarding them.
+const overlayDirty = inject(FORM_DIRTY_STATE_KEY, null);
+const unsaved = overlayDirty ? trackUnsavedEdits(form, overlayDirty) : null;
+
 async function handleSubmit(e: Event) {
   e.preventDefault();
   if (isSubmitting.value) return; // guard double-submit (e.g. Enter while saving)
   try {
     await form.handleSubmit();
+    if (form.state.isSubmitSuccessful) unsaved?.markSaved();
   } catch {
     // The consumer's submit handler owns error reporting (e.g. a toast).
   }
@@ -171,7 +177,11 @@ function resetValidation() {
  */
 function submit() {
   if (isSubmitting.value) return; // guard double-submit
-  form.handleSubmit();
+  void Promise.resolve(form.handleSubmit())
+    .then(() => {
+      if (form.state.isSubmitSuccessful) unsaved?.markSaved();
+    })
+    .catch(() => {});
 }
 
 /** Reset every field to its initial defaultValues and clear meta state. */

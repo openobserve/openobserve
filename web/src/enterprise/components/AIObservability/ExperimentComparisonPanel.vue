@@ -11,7 +11,6 @@
         pagination="client"
         :page-size="20"
         :default-columns="false"
-        :show-global-filter="false"
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="ai-experiment-comparison-rows"
@@ -53,9 +52,7 @@
                       :searchable="true"
                       multiple
                       select-all
-                      option-tooltip
-                      size="md"
-                      width="sm"
+                      width="s"
                       data-test="ai-experiment-comparison-outcome-dimensions"
                       @update:model-value="selectOutcomeDimensions"
                     >
@@ -73,8 +70,7 @@
                       :options="thresholdOptions"
                       :searchable="false"
                       :disabled="loading"
-                      size="md"
-                      width="xs"
+                      width="s"
                       data-test="ai-experiment-comparison-threshold"
                       @update:model-value="selectThreshold"
                     />
@@ -86,7 +82,7 @@
         </template>
 
         <template #cell-bucket="{ row }">
-          <OTag size="sm" icon="" :variant="bucketVariant(row.bucket)" :label="bucketLabel(row)" />
+          <OTag size="sm" icon="" :tone="bucketVariant(row.bucket)" :label="bucketLabel(row)" />
         </template>
 
         <template #cell-input="{ row }">
@@ -109,7 +105,7 @@
               class="shrink-0"
               size="sm"
               icon=""
-              :variant="deltaVariant(rowDimension(row, dimension)!)"
+              :tone="deltaVariant(rowDimension(row, dimension)!)"
               :label="deltaLabel(rowDimension(row, dimension)!)"
             />
           </div>
@@ -130,7 +126,7 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem, StatTone } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ExperimentDimensionHeader from "./ExperimentDimensionHeader.vue";
@@ -243,13 +239,13 @@ const FILTER_ICONS: Record<string, IconName> = {
 // The row chip mirrors the strip's tone. Spelled out rather than derived from
 // the tone name — the two vocabularies only mostly overlap (there is no
 // `info-soft` badge), and a silent mismatch would show the wrong colour.
-const BUCKET_BADGES: Record<ExperimentComparisonBucket, BadgeVariant> = {
-  regressed: "error-soft",
-  improved: "success-soft",
-  unchanged: "default-soft",
-  inconclusive: "default-soft",
-  new: "blue-soft",
-  missing: "warning-soft",
+const BUCKET_BADGES: Record<ExperimentComparisonBucket, ChipTone> = {
+  regressed: "err",
+  improved: "ok",
+  unchanged: "neutral",
+  inconclusive: "neutral",
+  new: "neutral",
+  missing: "warn",
 };
 
 /** `null` is "no filter" — the All tile clears rather than being a selection. */
@@ -475,8 +471,8 @@ function deltaLabel(dimension: ExperimentComparisonDimension) {
 // one thing this page exists to say.
 function deltaVariant(dimension: ExperimentComparisonDimension) {
   const oriented = dimension.orientedDelta;
-  if (oriented === null || oriented === 0) return "default-soft" as const;
-  return oriented > 0 ? ("success-soft" as const) : ("error-soft" as const);
+  if (oriented === null || oriented === 0) return "neutral" as const;
+  return oriented > 0 ? ("ok" as const) : ("err" as const);
 }
 
 function bucketVariant(bucket: ExperimentComparisonBucket) {

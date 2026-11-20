@@ -1009,7 +1009,7 @@ export class ProfilesPage {
 
   async clickShareAndReadClipboard() {
     await this.page.locator(this.shareBtn).click();
-    await expect(this.page.locator(this.successToast).filter({ hasText: 'Link Copied Successfully!' })).toBeVisible({ timeout: 15000 });
+    await expect(this.page.locator(this.successToast).filter({ hasText: 'Link copied successfully!' })).toBeVisible({ timeout: 15000 });
     return this.readClipboard();
   }
 

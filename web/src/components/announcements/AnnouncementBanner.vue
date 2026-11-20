@@ -58,8 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-for="(cta, position) in banner.ctas" :key="position">
           <OButton
             v-if="isInApp(cta.url)"
-            variant="banner-dismiss"
-            size="sm"
+            variant="link"
             class="text-[length:inherit]!"
             :data-test="`announcement-banner-cta-${banner.id}-${position}`"
             @click="openInApp(cta.url)"
@@ -68,12 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
           <OButton
             v-else
-            as="a"
             :href="cta.url"
             target="_blank"
             rel="noopener noreferrer"
-            variant="banner-dismiss"
-            size="sm"
+            variant="link"
             class="text-[length:inherit]!"
             :data-test="`announcement-banner-cta-${banner.id}-${position}`"
           >
@@ -83,8 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <OButton
           v-if="banner.dismissible"
-          variant="banner-dismiss"
-          size="sm"
+          variant="link"
           class="text-[length:inherit]!"
           :aria-label="t('announcements.dismissAriaLabel')"
           :data-test="`announcement-banner-dismiss-${banner.id}`"

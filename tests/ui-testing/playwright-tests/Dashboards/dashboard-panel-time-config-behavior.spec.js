@@ -77,7 +77,7 @@ test.describe("Dashboard Panel Time - Part 1: Configuration and Basic Behavior",
     await pm.dashboardPanelTime.enablePanelTime();
     await assertPanelTimeToggleState(page, true);
 
-    // Step 4: Verify "+Set" button appears with "Default Duration" title
+    // Step 4: Verify "+Set" button appears with "Default duration" title
     const setButton = pm.dashboardPanelTime.getSetPanelTimeBtn();
     await expect(setButton).toBeVisible();
 

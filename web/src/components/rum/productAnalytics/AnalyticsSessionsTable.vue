@@ -31,8 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="sid"
       pagination="none"
       sorting="none"
-      :show-global-filter="false"
-      :frame="false"
       v-on="rowClickListeners"
     >
       <template #cell-replay="{ row, index }">
@@ -42,9 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? t('rum.analytics.sessions.replay')
               : t('rum.analytics.sessions.noReplay')
           "
-          :variant="Number(row.has_replay) === 1 ? 'primary-soft' : 'default-outline'"
+          :tone="Number(row.has_replay) === 1 ? 'accent' : 'outline'"
           :icon="Number(row.has_replay) === 1 ? 'play-circle' : ''"
-          size="xs"
+          size="sm"
           :data-test="`${dataTestPrefix}-row-${index}-replay`"
         />
       </template>
@@ -73,8 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="Number(row.errors) > 0"
             :label="t('rum.analytics.sessions.errors', { count: row.errors }, Number(row.errors))"
-            variant="error-soft"
-            size="xs"
+            tone="err"
+            size="sm"
           />
           <OTag
             v-if="Number(row.frustrations) > 0"
@@ -85,9 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 Number(row.frustrations),
               )
             "
-            variant="warning-soft"
+            tone="warn"
             icon="sentiment-very-dissatisfied"
-            size="xs"
+            size="sm"
           />
           <span
             v-if="!Number(row.errors) && !Number(row.frustrations)"
@@ -130,8 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
     <OButton
       v-if="total > PAGE_LIMIT && rows.length < total"
-      variant="outline"
-      size="sm"
+      variant="secondary"
       :loading="loadingMore"
       :data-test="`${dataTestPrefix}-load-more-btn`"
       @click="emit('load-more')"

@@ -48,9 +48,8 @@
         @click="emit('set-role', message.id, nextRoleAfter(message.role))"
       >
         <OTag
-          :variant="roleVariant(message.role)"
+          :tone="roleVariant(message.role)"
           size="sm"
-          shape="rounded"
           :label="roleLabel(message.role)"
           class="min-w-0 flex-1 justify-center"
           :data-test="`ai-playground-message-badge-${message.id}`"
@@ -62,9 +61,8 @@
            what the model actually saw. -->
       <div v-else class="flex w-20 shrink-0 self-center">
         <OTag
-          :variant="roleVariant(message.role)"
+          :tone="roleVariant(message.role)"
           size="sm"
-          shape="rounded"
           :label="roleLabel(message.role)"
           class="min-w-0 flex-1 justify-center"
           :data-test="`ai-playground-message-badge-${message.id}`"
@@ -106,7 +104,6 @@
             :model-value="message.toolName ?? ''"
             :options="toolOptions"
             :placeholder="t('aiObservability.playground.messageToolPlaceholder')"
-            size="md"
             width="full"
             searchable
             :data-test="`ai-playground-message-tool-${message.id}`"
@@ -121,7 +118,6 @@
             :placeholder="t('aiObservability.playground.toolArgumentsPlaceholder')"
             :rows="1"
             :max-rows="5"
-            size="sm"
             width="full"
             autogrow
             :data-test="`ai-playground-message-tool-arguments-${message.id}`"
@@ -144,7 +140,6 @@
             "
             :rows="1"
             :max-rows="5"
-            size="sm"
             autogrow
             :suggestions="suggestions"
             :values="vars"
@@ -157,9 +152,9 @@
       <!-- The opening system message is structural, not a turn: it is disabled
            rather than hidden so the row stays aligned with the ones below it. -->
       <OButton
-        variant="ghost-muted"
-        size="icon-xs"
-        icon-left="close"
+        icon-only
+        variant="ghost"
+        icon="close"
         class="mt-0.5"
         :disabled="message.role === 'system'"
         :title="
@@ -177,9 +172,8 @@
          is there for the times it is not. -->
     <div class="inline-flex items-stretch self-start [&_button:focus-visible]:z-1">
       <OButton
-        variant="outline"
-        size="xs"
-        icon-left="add"
+        variant="secondary"
+        size="sm"
         class="rounded-s-default! rounded-e-none!"
         :title="t('aiObservability.playground.addMessageAs', { role: roleLabel(nextRole) })"
         data-test="ai-playground-add-message"
@@ -190,8 +184,9 @@
       <ODropdown align="start" side="bottom">
         <template #trigger>
           <OButton
-            variant="outline"
-            size="icon-xs-sq"
+            icon-only
+            variant="secondary"
+            size="sm"
             class="rounded-e-default! rounded-s-none! border-s-0"
             :aria-label="t('aiObservability.playground.addMessageChoose')"
             data-test="ai-playground-add-message-menu"
@@ -225,7 +220,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OTemplateTextarea from "@/lib/forms/TemplateInput/OTemplateTextarea.vue";
 import { computed, ref } from "vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { TemplateSuggestion } from "@/lib/forms/TemplateInput/OTemplateInput.types";
 import {
   EXPECTED_OUTPUT_TOKEN,
@@ -273,11 +268,11 @@ const MESSAGE_ROLES: PlaygroundRole[] = ["user", "assistant", "tool"];
  * it is read. Soft fills rather than solid: four columns of these sit beside
  * the outputs, and solid pills at that density read as a status board.
  */
-const ROLE_VARIANTS: Record<PlaygroundRole, BadgeVariant> = {
-  system: "purple-soft",
-  user: "blue-soft",
-  assistant: "teal-soft",
-  tool: "amber-soft",
+const ROLE_VARIANTS: Record<PlaygroundRole, ChipTone> = {
+  system: "neutral",
+  user: "neutral",
+  assistant: "neutral",
+  tool: "warn",
 };
 
 const ROLE_LABELS = {
@@ -304,7 +299,7 @@ function roleLabel(role: PlaygroundRole) {
   return t(ROLE_LABELS[role]);
 }
 
-function roleVariant(role: PlaygroundRole): BadgeVariant {
+function roleVariant(role: PlaygroundRole): ChipTone {
   return ROLE_VARIANTS[role];
 }
 

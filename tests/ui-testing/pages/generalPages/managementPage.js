@@ -18,7 +18,7 @@ export
         this.customLogoText = page.locator("[aria-label ='Custom logo text']");
         this.deleteLogoButton = page.locator('[data-test="setting_ent_custom_logo_img_delete_btn"]');
         this.confirmDeleteButton = page.locator('[data-test="logs-search-bar-confirm-dialog-ok-btn"]');
-        this.fileUploadInput = page.locator('input[data-test="setting_ent_custom_logo_img_file_upload"]');
+        this.fileUploadInput = page.locator('input[data-test="setting_ent_custom_logo_img_file_upload-field"]');
     }
 
     async navigateToManagement() {
@@ -38,7 +38,7 @@ export
         // the click until the settings page actually renders.
         await expect(async () => {
             await this.managementMenuItem.click({ force: true });
-            await expect(this.page.getByRole('main')).toContainText('General Settings', { timeout: 5000 });
+            await expect(this.page.getByRole('main')).toContainText('General settings', { timeout: 5000 });
         }).toPass({ timeout: 30000 });
     }
 

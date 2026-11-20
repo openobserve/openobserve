@@ -72,31 +72,31 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-secondary-label="secondary?.label"
     >
       <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot name="header" />
@@ -105,11 +105,11 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -223,7 +223,7 @@ describe("AWSIntegrationTile.vue", () => {
           .findAllComponents({ name: "OButton" })
           .find((b) => b.attributes("data-test") === "aws-cloudwatch-logs-add-dashboard-btn")!;
         expect(btn.props("disabled")).toBe(true);
-        expect(btn.props("iconLeft")).toBe("lock");
+        expect(btn.props("icon")).toBe("lock");
         await (wrapper.vm as any).handleAddDashboard();
         expect(fetch).not.toHaveBeenCalled();
       } finally {
@@ -400,46 +400,46 @@ describe("AWSIntegrationTile.vue", () => {
       expect(dialogs.length).toBe(2);
     });
 
-    it('passes title "Choose Integration Method" to the template selection ODialog', () => {
+    it('passes title "Choose integration method" to the template selection ODialog', () => {
       wrapper = createWrapper();
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props("title") === "Choose Integration Method");
+      const templateDialog = dialogs.find((d) => d.props("title") === "Choose integration method");
       expect(templateDialog).toBeTruthy();
     });
 
     it('passes size "sm" to the template selection ODialog', () => {
       wrapper = createWrapper();
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props("title") === "Choose Integration Method");
+      const templateDialog = dialogs.find((d) => d.props("title") === "Choose integration method");
       expect(templateDialog!.props("size")).toBe("sm");
     });
 
-    it('passes secondaryButtonLabel "Cancel" to the template selection ODialog', () => {
+    it('passes secondary?.label "Cancel" to the template selection ODialog', () => {
       wrapper = createWrapper();
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props("title") === "Choose Integration Method");
-      expect(templateDialog!.props("secondaryButtonLabel")).toBe("Cancel");
+      const templateDialog = dialogs.find((d) => d.props("title") === "Choose integration method");
+      expect(templateDialog!.props("secondary")?.label).toBe("Cancel");
     });
 
-    it('passes size "xl" to the component-content ODialog', () => {
+    it('passes size "lg" (720) to the component-content ODialog', () => {
       wrapper = createWrapper();
       const dialogs = wrapper.findAllComponents(ODialogStub);
       // The component content dialog title is dynamic; size identifies it.
-      const componentDialog = dialogs.find((d) => d.props("size") === "xl");
+      const componentDialog = dialogs.find((d) => d.props("size") === "lg");
       expect(componentDialog).toBeTruthy();
     });
 
     it("forwards open=false to the template selection ODialog initially", () => {
       wrapper = createWrapper();
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props("title") === "Choose Integration Method");
+      const templateDialog = dialogs.find((d) => d.props("title") === "Choose integration method");
       expect(templateDialog!.props("open")).toBe(false);
     });
 
     it("forwards open=false to the component-content ODialog initially", () => {
       wrapper = createWrapper();
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const componentDialog = dialogs.find((d) => d.props("size") === "xl");
+      const componentDialog = dialogs.find((d) => d.props("size") === "lg");
       expect(componentDialog!.props("open")).toBe(false);
     });
 
@@ -463,7 +463,7 @@ describe("AWSIntegrationTile.vue", () => {
       await addSourceBtn.trigger("click");
 
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props("title") === "Choose Integration Method");
+      const templateDialog = dialogs.find((d) => d.props("title") === "Choose integration method");
       expect(templateDialog!.props("open")).toBe(true);
     });
 
@@ -491,7 +491,7 @@ describe("AWSIntegrationTile.vue", () => {
 
       // Drive Cancel button via click:secondary emit
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const templateDialog = dialogs.find((d) => d.props("title") === "Choose Integration Method");
+      const templateDialog = dialogs.find((d) => d.props("title") === "Choose integration method");
       await templateDialog!.vm.$emit("click:secondary");
 
       expect(vm.showTemplateDialog).toBe(false);
@@ -552,7 +552,7 @@ describe("AWSIntegrationTile.vue", () => {
       expect(vm.selectedComponentTitle).toBe("CloudWatch Logs - Linux");
 
       const dialogs = wrapper.findAllComponents(ODialogStub);
-      const componentDialog = dialogs.find((d) => d.props("size") === "xl");
+      const componentDialog = dialogs.find((d) => d.props("size") === "lg");
       expect(componentDialog!.props("open")).toBe(true);
       // Title is dynamically bound
       expect(componentDialog!.props("title")).toBe("CloudWatch Logs - Linux");
@@ -633,7 +633,7 @@ describe("AWSIntegrationTile.vue", () => {
       await flushPromises();
 
       const dialog = provider.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      expect(dialog.props("primary")?.variant).toBe("danger");
       const name = provider.find('[data-test="confirm-dialog-provider-name"]');
       expect(name.text()).toBe("CloudWatch Logs");
       expect(name.classes()).toContain("font-semibold");

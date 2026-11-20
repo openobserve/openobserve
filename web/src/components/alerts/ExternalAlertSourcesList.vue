@@ -17,13 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('alert_sources.header')"
-    :subtitle="t('alert_sources.subtitle')"
+    :about="t('alert_sources.subtitle')"
     title-data-test="alert-sources-list-title"
-    icon="webhook"
     bleed
   >
     <template #actions>
-      <OButton variant="primary" size="sm" data-test="alert-sources-add-btn" @click="openAddDrawer">
+      <OButton variant="primary" data-test="alert-sources-add-btn" @click="openAddDrawer">
         {{ t("alert_sources.add") }}
       </OButton>
     </template>
@@ -38,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
-          :frame="false"
           :data="visibleRows"
           :columns="advancedColumns"
           row-key="rowKey"
@@ -54,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="alerts-external-sources"
-          :show-global-filter="false"
           data-test="alert-sources-advanced-table"
         >
           <template #toolbar>
@@ -67,22 +64,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              shortcut-id="alertSourcesRefresh"
+              shortcut="alertSourcesRefresh"
               data-test="alert-sources-refresh-btn"
               @click="refreshAll"
             />
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-alert-sources"
-              :filtered="!!filterQuery"
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.alertSources') })
+                  : t('emptyState.noAlertSources.title')
+              "
+              :text="
+                filterQuery
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.nouns.alertSources'),
+                    })
+                  : t('emptyState.noAlertSources.description')
+              "
+              :icon="filterQuery ? undefined : 'notifications'"
               data-test="alert-sources-empty-state"
-              @action="onEmptyAction"
+              :action-label="filterQuery ? undefined : t('emptyState.noAlertSources.action')"
+              @action="onEmptyAction(filterQuery ? 'clear-filters' : 'create')"
             />
           </template>
           <template #cell-name="{ row }">
@@ -99,21 +106,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-status="{ row }">
             <div class="flex items-center gap-1">
-              <OTag v-if="row.status === 'receiving'" variant="success-soft" dot>
+              <OTag v-if="row.status === 'receiving'" tone="ok" dot>
                 {{ t("alert_sources.statusReceiving") }}
               </OTag>
-              <OTag v-else-if="row.status === 'stale'" variant="warning-soft" dot>
+              <OTag v-else-if="row.status === 'stale'" tone="warn" dot>
                 {{ t("alert_sources.statusStale") }}
               </OTag>
               <OTag
                 v-else-if="row.resolveWiringHint"
-                variant="warning-soft"
+                tone="warn"
                 dot
                 data-test="alert-sources-never-resolves-tag"
               >
                 {{ t("alert_sources.statusNeverResolves") }}
               </OTag>
-              <OTag v-else variant="default-outline">
+              <OTag v-else tone="outline">
                 {{ t("alert_sources.statusNotConnected") }}
               </OTag>
               <!-- The hint can co-occur with Receiving/Stale, so it also needs
@@ -125,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-status-warning-text"
                 data-test="alert-sources-never-resolves-icon"
               >
-                <OTooltip :max-width="'20rem'">
+                <OTooltip>
                   <template #content>
                     <span class="font-medium">
                       {{ t("alert_sources.resolveWiringWarningTitle", { name: row.displayName }) }}
@@ -142,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OTag
               v-else-if="row.integration"
-              variant="error-soft"
+              tone="err"
               dot
               data-test="alert-sources-no-destination-tag"
             >
@@ -156,9 +163,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-url="{ row }">
             <div v-if="row.integration?.token" class="flex items-center gap-1">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs-sq"
-                :icon-left="isRevealed(row.integration) ? 'visibility-off' : 'visibility'"
+                size="sm"
+                :icon="isRevealed(row.integration) ? 'visibility-off' : 'visibility'"
                 :title="
                   isRevealed(row.integration)
                     ? t('alert_sources.hideToken')
@@ -168,17 +176,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="toggleRevealFor(row.integration)"
               />
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs-sq"
-                icon-left="content-copy"
+                size="sm"
+                icon="content-copy"
                 :title="t('alert_sources.copyUrl')"
                 :data-test="`alert-sources-copy-${row.integration.id}`"
                 @click="copyUrlFor(row.integration)"
               />
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs-sq"
-                icon-left="key"
+                size="sm"
+                icon="key"
                 :title="t('alert_sources.copyToken')"
                 :data-test="`alert-sources-copy-token-${row.integration.id}`"
                 @click="copyTokenFor(row.integration)"
@@ -190,27 +200,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <div v-if="row.integration" class="flex items-center gap-1">
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs-sq"
-                icon-left="edit"
+                size="sm"
+                icon="edit"
                 class="max-md:hidden"
                 :title="t('alert_sources.edit')"
                 :data-test="`alert-sources-edit-${row.integration.id}`"
                 @click="openEditFor(row.integration)"
               />
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs-sq"
-                icon-left="autorenew"
+                size="sm"
+                icon="autorenew"
                 class="max-md:hidden"
                 :title="t('alert_sources.rotateToken')"
                 :data-test="`alert-sources-rotate-${row.integration.id}`"
                 @click="confirmRotate(row.integration)"
               />
               <OButton
-                :variant="row.integration.enabled ? 'ghost-destructive' : 'ghost-success'"
-                size="icon-xs-sq"
-                :icon-left="row.integration.enabled ? 'pause' : 'play-arrow'"
+                icon-only
+                :variant="row.integration.enabled ? 'danger-ghost' : 'ghost'"
+                size="sm"
+                :icon="row.integration.enabled ? 'pause' : 'play-arrow'"
                 class="max-md:hidden"
                 :title="
                   row.integration.enabled ? t('alert_sources.disable') : t('alert_sources.enable')
@@ -219,9 +232,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="toggleEnabledFor(row.integration)"
               />
               <OButton
-                variant="ghost-destructive"
-                size="icon-xs-sq"
-                icon-left="delete"
+                icon-only
+                variant="danger-ghost"
+                size="sm"
+                icon="delete"
                 class="max-md:hidden"
                 :disabled="row.integration.name === 'default'"
                 :title="
@@ -235,17 +249,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    icon-only
                     :aria-label="t('common.moreActions')"
-                    icon-left="more-vert"
+                    icon="more-vert"
                     variant="ghost"
-                    size="icon-xs-sq"
+                    size="sm"
                     class="md:hidden"
                     data-test="alert-sources-row-more-actions"
                     @click.stop
                   />
                 </template>
                 <ODropdownItem
-                  icon-left="edit"
+                  icon="edit"
                   class="md:hidden"
                   :data-test="`alert-sources-edit-${row.integration.id}-menu`"
                   @select="openEditFor(row.integration)"
@@ -253,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("alert_sources.edit") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="autorenew"
+                  icon="autorenew"
                   class="md:hidden"
                   :data-test="`alert-sources-rotate-${row.integration.id}-menu`"
                   @select="confirmRotate(row.integration)"
@@ -261,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("alert_sources.rotateToken") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  :icon-left="row.integration.enabled ? 'pause' : 'play-arrow'"
+                  :icon="row.integration.enabled ? 'pause' : 'play-arrow'"
                   class="md:hidden"
                   :data-test="`alert-sources-toggle-enabled-${row.integration.id}-menu`"
                   @select="toggleEnabledFor(row.integration)"
@@ -271,8 +286,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="delete"
-                  variant="destructive"
+                  icon="delete"
+                  tone="danger"
                   class="md:hidden"
                   :disabled="row.integration.name === 'default'"
                   :data-test="`alert-sources-delete-${row.integration.id}-menu`"
@@ -304,7 +319,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :message="t('alert_sources.rotateConfirmMessage')"
       :warning-message="t('alert_sources.rotateConfirmWarning')"
       :ok-label="t('alert_sources.rotateToken')"
-      ok-color="destructive"
       data-test="alert-sources-rotate-dialog"
       @update:ok="doRotate"
     />
@@ -316,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :message-name="deleteTarget?.name"
       :warning-message="t('alert_sources.deleteConfirmWarning')"
       :ok-label="t('alert_sources.delete')"
-      ok-variant="destructive"
+      kind="destructive"
       data-test="alert-sources-delete-dialog"
       @update:ok="doDelete"
     />
@@ -773,8 +787,7 @@ export default defineComponent({
     noDestinationRowClass(row: SourceTableRow): string {
       return row.integration && row.destinations.length === 0 ? "bg-banner-error-soft-bg" : "";
     },
-    // `id` is optional: OEmptyState's simple-button mode emits no id.
-    onEmptyAction(id?: string) {
+    onEmptyAction(id: "clear-filters" | "create") {
       if (id === "clear-filters") {
         this.filterQuery = "";
         return;

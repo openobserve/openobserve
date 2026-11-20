@@ -402,7 +402,7 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     await pm.metricsPage.waitForMetricsResults();
 
     // Click share and immediately check for loading state
-    const btn = pm.metricsPage.getShareButton();
+    const btn = await pm.metricsPage.openShareMenuItem();
     await btn.click();
     await page.waitForTimeout(100); // Tiny delay for UI to react
 
@@ -573,7 +573,7 @@ test.describe("Metrics Share & Deep-Link testcases", () => {
     await pm.metricsPage.waitForMetricsResults();
 
     // Click share
-    const btn = pm.metricsPage.getShareButton();
+    const btn = await pm.metricsPage.openShareMenuItem();
     await btn.click();
 
     // Wait for success

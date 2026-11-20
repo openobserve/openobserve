@@ -86,31 +86,31 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test-stub="o-dialog"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-sub-title="subTitle"
+      :data-sub-title="subtitle"
     >
       <slot name="header" />
       <slot />
@@ -118,11 +118,11 @@ const ODialogStub = {
       <button
         data-test-stub="o-dialog-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test-stub="o-dialog-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -221,7 +221,7 @@ describe("ModelPricingEditor.vue", () => {
       const wrapper = createWrapper();
       await flushPromises();
       const title = wrapper.find('[data-test="model-pricing-editor-title"]');
-      expect(title.text()).toBe("New Model Pricing");
+      expect(title.text()).toBe("New model pricing");
     });
 
     it("renders the Edit title when route has id and not duplicate", async () => {
@@ -237,7 +237,7 @@ describe("ModelPricingEditor.vue", () => {
       const wrapper = createWrapper({ query: { id: "abc" } });
       await flushPromises();
       const title = wrapper.find('[data-test="model-pricing-editor-title"]');
-      expect(title.text()).toBe("Edit Model Pricing");
+      expect(title.text()).toBe("Edit model pricing");
     });
 
     it("shows New title (and clears id) when route is duplicate", async () => {
@@ -253,7 +253,7 @@ describe("ModelPricingEditor.vue", () => {
       const wrapper = createWrapper({ query: { id: "abc", duplicate: "true" } });
       await flushPromises();
       const title = wrapper.find('[data-test="model-pricing-editor-title"]');
-      expect(title.text()).toBe("New Model Pricing");
+      expect(title.text()).toBe("New model pricing");
       expect((wrapper.vm as any).model.id).toBeNull();
       expect((wrapper.vm as any).model.name).toContain("(Copy)");
     });
@@ -1647,8 +1647,8 @@ describe("ModelPricingEditor.vue", () => {
       await flushPromises();
       const dialog = wrapper.findComponent(ODialogStub);
       expect(dialog.props("size")).toBe("sm");
-      expect(dialog.props("title")).toBe("Match Pattern Examples");
-      expect(dialog.props("subTitle")).toBe("Common regex patterns used for popular models");
+      expect(dialog.props("title")).toBe("Match pattern examples");
+      expect(dialog.props("subtitle")).toBe("Common regex patterns used for popular models");
     });
 
     it("binds open prop from showExamples state", async () => {

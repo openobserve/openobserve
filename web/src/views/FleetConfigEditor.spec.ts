@@ -69,6 +69,7 @@ vi.mock("@/composables/useBreakpoint", async () => {
       isMobile: computed(() => !mockViewport.mdUp),
       isTablet: computed(() => false),
       isDesktop: computed(() => mockViewport.mdUp),
+      smUp: computed(() => mockViewport.mdUp),
       mdUp: computed(() => mockViewport.mdUp),
       lgUp: computed(() => mockViewport.mdUp),
     }),
@@ -117,12 +118,12 @@ const published = (version: number) => ({
 
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "title", "formId", "primaryButtonLabel", "secondaryButtonLabel"],
+  props: ["open", "title", "formId", "primary", "secondary"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `<div v-if="open" :data-test="$attrs['data-test']">
       <span data-test="dialog-title">{{ title }}</span>
       <slot />
-      <button data-test="dialog-primary" :type="formId ? 'submit' : 'button'" :form="formId || undefined" @click="!formId && $emit('click:primary')">{{ primaryButtonLabel }}</button>
+      <button data-test="dialog-primary" :type="formId ? 'submit' : 'button'" :form="formId || undefined" @click="!formId && $emit('click:primary')">{{ primary?.label }}</button>
     </div>`,
 };
 

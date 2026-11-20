@@ -23,7 +23,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import searchService from "@/services/search";
 import DependencyMap, { type MapEdge, type MapNode } from "./kubernetes2/DependencyMap.vue";
@@ -58,6 +58,8 @@ const emit = defineEmits<{
   refresh: [];
   // While the map reloads, so the page's Refresh can show it.
   loading: [loading: boolean];
+  // When the map last loaded, the age the page's Refresh shows.
+  loaded: [at: number];
   "update:lowTraffic": [show: boolean];
 }>();
 
@@ -69,7 +71,6 @@ const loading = ref(false);
 const loadError = ref(false);
 const forbidden = ref(false);
 const loaded = ref(false);
-const lastUpdatedAt = ref<number | null>(null);
 const selectedEdgeId = ref<string | null>(null);
 
 const windowS = computed(() => flowWindowSeconds(props.range.start, props.range.end));
@@ -107,7 +108,7 @@ async function load() {
     series.value = parseVector(out);
     loaded.value = true;
     loadedFor = scopeKey;
-    lastUpdatedAt.value = Date.now();
+    emit("loaded", Date.now());
   } catch (e: any) {
     if (gen !== generation) return;
     loadError.value = true;
@@ -223,10 +224,6 @@ const wholeRange = computed(
   () => Math.round((props.range.end - props.range.start) / 1_000_000) === windowS.value,
 );
 
-const updatedAt = computed(() =>
-  lastUpdatedAt.value ? new Date(lastUpdatedAt.value).toLocaleTimeString() : "",
-);
-
 // Whole days or hours when exact, else minutes, so a 90 minute window does not read as 1h.
 const windowText = computed(() => {
   const minutes = Math.round(windowS.value / 60);
@@ -301,52 +298,46 @@ function onSetUp() {
           {{ t("infra.hosts.depsCaption", { window: windowText }) }}
         </OText>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="info"
+          icon="info"
           :aria-label="t('infra.hosts.depsCaptionMore')"
           data-test="hosts-deps-caption-more"
         >
-          <OTooltip :content="t('infra.hosts.depsCaptionMore')" max-width="24rem" />
+          <OTooltip :content="t('infra.hosts.depsCaptionMore')" />
         </OButton>
       </div>
       <OSwitch
         :model-value="lowTraffic"
-        size="sm"
         :label="t('infra.hosts.depsShowLowTraffic')"
         data-test="hosts-deps-show-low-traffic"
         @update:model-value="(show: unknown) => emit('update:lowTraffic', !!show)"
       />
-      <!-- The page's Refresh reloads the map; this only says how fresh it is. -->
-      <OText
-        v-if="updatedAt"
-        tag="span"
-        class="text-text-secondary ms-auto flex items-center gap-1.5 text-xs"
-        data-test="hosts-deps-updated"
-      >
-        <OSpinner v-if="loading" size="xs" />
-        {{ t("refreshButton.lastRefreshed", { time: updatedAt }) }}
-      </OText>
     </div>
-    <OEmptyState v-if="forbidden" preset="no-access" data-test="hosts-deps-forbidden" />
+    <OEmptyState
+      v-if="forbidden"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
+      data-test="hosts-deps-forbidden"
+    />
     <OEmptyState
       v-else-if="loadError"
-      preset="load-error"
+      kind="error"
+      :text="t('emptyState.loadError.description')"
       :title="t('infra.hosts.depsLoadError')"
       data-test="hosts-deps-error"
       @action="emit('refresh')"
     />
-    <div
+    <OSkeleton
       v-else-if="!loaded"
-      class="flex min-h-60 flex-1 items-center justify-center"
+      shape="block"
+      class="min-h-60 flex-1"
       data-test="hosts-deps-loading"
-    >
-      <OSpinner size="lg" />
-    </div>
+    />
     <OEmptyState
       v-else-if="!edges.length && allEdges.length"
-      variant="no-results"
-      illustration="no-results"
+      kind="filtered"
       :title="t('infra.hosts.depsAllQuiet')"
       :action-label="t('infra.hosts.depsShowQuiet')"
       data-test="hosts-deps-all-quiet"
@@ -354,9 +345,8 @@ function onSetUp() {
     />
     <OEmptyState
       v-else-if="!edges.length"
-      preset="no-data"
       :title="t('infra.hosts.depsNoFlowsTitle')"
-      :description="
+      :text="
         wholeRange
           ? t('infra.hosts.depsNoFlowsDescriptionRange')
           : t('infra.hosts.depsNoFlowsDescription', { window: windowText })
@@ -388,8 +378,8 @@ function onSetUp() {
             <OButton
               v-for="edge in navEdges"
               :key="edge.id"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="hosts-deps-link"
               @click="showEdge(edge.id, $event)"
             >
@@ -417,8 +407,8 @@ function onSetUp() {
         >
           <div class="flex items-center gap-1">
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :disabled="selectedEdge.source.kind !== 'host'"
               data-test="hosts-deps-edge-source"
               @click="openEnd(selectedEdge.source)"
@@ -427,8 +417,8 @@ function onSetUp() {
             </OButton>
             <OText tag="span" class="text-text-secondary">{{ raw(arrowOf(selectedEdge)) }}</OText>
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :disabled="selectedEdge.target.kind !== 'host'"
               data-test="hosts-deps-edge-target"
               @click="openEnd(selectedEdge.target)"
@@ -436,10 +426,10 @@ function onSetUp() {
               {{ raw(endLabel(selectedEdge.target)) }}
             </OButton>
             <OButton
+              icon-only
               class="ms-auto"
               variant="ghost"
-              size="icon-sm"
-              icon-left="close"
+              icon="close"
               :aria-label="t('common.close')"
               data-test="hosts-deps-edge-close"
               @click="closeEdge"

@@ -9,8 +9,8 @@ import {
   hasToolCallDetails,
   type ToolCallBlock,
 } from "@/components/O2AIChat.toolcall";
-import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { navigationFeature } from "@/components/O2AIChat.navigation";
@@ -100,10 +100,10 @@ const navLockReason = computed(() => {
       >
         <span class="ms-auto inline-flex" @click.stop>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs"
             disabled
-            icon-left="lock"
+            icon="lock"
             :aria-label="block.navigationAction.label"
             data-test="o2-ai-chat-tool-navigate-locked"
           />
@@ -231,15 +231,12 @@ const navLockReason = computed(() => {
           <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
             t("common.query")
           }}</span>
-          <OButton
-            variant="ghost"
-            size="icon-xs-circle"
+          <OCopyButton
+            size="xs"
             class="copy-btn opacity-60 hover:opacity-100"
-            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.query, t)"
-          >
-            <OIcon name="content-copy" size="sm" />
-            <OTooltip :content="t('aiAssistant.copyQuery')" />
-          </OButton>
+            :label="t('aiAssistant.copyQuery')"
+            :value="getToolCallDisplayData(block.context)?.query"
+          />
         </div>
         <code
           class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
@@ -338,15 +335,12 @@ const navLockReason = computed(() => {
           <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
             t("aiAssistant.welcome.taglineVrl")
           }}</span>
-          <OButton
-            variant="ghost"
-            size="icon-xs-circle"
+          <OCopyButton
+            size="xs"
             class="copy-btn opacity-60 hover:opacity-100"
-            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.vrl, t)"
-          >
-            <OIcon name="content-copy" size="sm" />
-            <OTooltip :content="t('aiAssistant.copyVrl')" />
-          </OButton>
+            :label="t('aiAssistant.copyVrl')"
+            :value="getToolCallDisplayData(block.context)?.vrl"
+          />
         </div>
         <code
           class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
@@ -361,15 +355,12 @@ const navLockReason = computed(() => {
           <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
             t("aiAssistant.command")
           }}</span>
-          <OButton
-            variant="ghost"
-            size="icon-xs-circle"
+          <OCopyButton
+            size="xs"
             class="copy-btn opacity-60 hover:opacity-100"
-            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.command, t)"
-          >
-            <OIcon name="content-copy" size="sm" />
-            <OTooltip :content="t('aiAssistant.copyCommand')" />
-          </OButton>
+            :label="t('aiAssistant.copyCommand')"
+            :value="getToolCallDisplayData(block.context)?.command"
+          />
         </div>
         <code
           class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
@@ -383,15 +374,12 @@ const navLockReason = computed(() => {
             <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
               t("aiAssistant.results")
             }}</span>
-            <OButton
-              variant="ghost"
-              size="icon-xs-circle"
+            <OCopyButton
+              size="xs"
               class="copy-btn opacity-60 hover:opacity-100"
-              @click.stop="copyToClipboard(JSON.stringify(block.response.hits, null, 2), t)"
-            >
-              <OIcon name="content-copy" size="sm" />
-              <OTooltip :content="t('aiAssistant.copyResults')" />
-            </OButton>
+              :label="t('aiAssistant.copyResults')"
+              :value="JSON.stringify(block.response.hits, null, 2)"
+            />
           </div>
           <div
             class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
@@ -499,15 +487,12 @@ const navLockReason = computed(() => {
             <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
               t("aiAssistant.items")
             }}</span>
-            <OButton
-              variant="ghost"
-              size="icon-xs-circle"
+            <OCopyButton
+              size="xs"
               class="copy-btn opacity-60 hover:opacity-100"
-              @click.stop="copyToClipboard(JSON.stringify(block.response.items, null, 2), t)"
-            >
-              <OIcon name="content-copy" size="sm" />
-              <OTooltip :content="t('aiAssistant.copyItems')" />
-            </OButton>
+              :label="t('aiAssistant.copyItems')"
+              :value="JSON.stringify(block.response.items, null, 2)"
+            />
           </div>
           <div
             class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
@@ -535,22 +520,16 @@ const navLockReason = computed(() => {
           <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
             t("aiAssistant.response")
           }}</span>
-          <OButton
-            variant="ghost"
-            size="icon-xs-circle"
+          <OCopyButton
+            size="xs"
             class="copy-btn opacity-60 hover:opacity-100"
-            @click.stop="
-              copyToClipboard(
-                typeof block.response === 'string'
-                  ? block.response
-                  : JSON.stringify(block.response, null, 2),
-                t,
-              )
+            :label="t('aiAssistant.copyResponse')"
+            :value="
+              typeof block.response === 'string'
+                ? block.response
+                : JSON.stringify(block.response, null, 2)
             "
-          >
-            <OIcon name="content-copy" size="sm" />
-            <OTooltip :content="t('aiAssistant.copyResponse')" />
-          </OButton>
+          />
         </div>
         <code
           class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"

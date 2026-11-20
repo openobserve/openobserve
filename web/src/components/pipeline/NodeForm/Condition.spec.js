@@ -21,9 +21,10 @@
 // node exercises through the very same component. Here we drive the builder via
 // a stub and assert only this drawer's own responsibilities.
 
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { ref } from "vue";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { byTest, click, pressEscape } from "@/test/unit/helpers/draftDom";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import Condition from "./Condition.vue";
@@ -54,6 +55,11 @@ vi.mock("@/composables/useStreams", () => ({
 let builderPayload = null;
 // reactive so the stub's computed re-evaluates when a test mutates it
 const builderGroup = ref({ filterType: "group", conditions: [] });
+// A rule only changes after the user acts in the builder, which comes before the new value.
+const userEdits = (group) => {
+  window.dispatchEvent(new Event("pointerdown"));
+  builderGroup.value = group;
+};
 
 const ConditionBuilderStub = {
   name: "ConditionBuilder",
@@ -69,30 +75,23 @@ const ConditionBuilderStub = {
 
 const ODrawerStub = {
   name: "ODrawer",
-  props: [
-    "open",
-    "title",
-    "width",
-    "showClose",
-    "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "neutralButtonVariant",
-    "secondaryButtonVariant",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  props: ["open", "title", "size", "showClose", "persistent", "primary", "secondary", "extra"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div class="o-drawer-stub">
       <slot />
-      <button v-if="primaryButtonLabel" data-test="save-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
-      <button v-if="secondaryButtonLabel" data-test="cancel-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-      <button v-if="neutralButtonLabel" data-test="delete-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
+      <button v-if="primary?.label" data-test="save-btn" @click="$emit('click:primary')">{{ primary.label }}</button>
+      <button v-if="secondary?.label" data-test="cancel-btn" @click="$emit('click:secondary')">{{ secondary.label }}</button>
+      <button v-if="extra?.label" data-test="delete-btn" @click="$emit('click:extra')">{{ extra.label }}</button>
     </div>
   `,
 };
 
-function createWrapper(pipelineObjOverrides = {}) {
+// A drawer left mounted keeps reacting to the shared builder stub, so each test unmounts its own.
+const stubbedWrappers = [];
+afterEach(() => stubbedWrappers.splice(0).forEach((w) => w.unmount()));
+
+function createWrapper(pipelineObjOverrides = {}, { realDrawer = false } = {}) {
   const mockPipelineObj = {
     currentSelectedNodeData: { data: {}, type: "condition" },
     currentSelectedNodeID: "node-123",
@@ -109,17 +108,20 @@ function createWrapper(pipelineObjOverrides = {}) {
     deletePipelineNode: mockDeletePipelineNode,
   }));
 
-  return mount(Condition, {
+  const wrapper = mount(Condition, {
     props: { open: true },
+    attachTo: realDrawer ? document.body : undefined,
     global: {
       plugins: [i18n, store],
       stubs: {
         ConfirmDialog: true,
-        ODrawer: ODrawerStub,
+        ODrawer: realDrawer ? false : ODrawerStub,
         ConditionBuilder: ConditionBuilderStub,
       },
     },
   });
+  if (!realDrawer) stubbedWrappers.push(wrapper);
+  return wrapper;
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
@@ -212,10 +214,71 @@ describe("Condition.vue (drawer chrome)", () => {
   it("prompts to discard when the rule was edited", async () => {
     const wrapper = createWrapper();
     await tick();
-    builderGroup.value = { filterType: "group", conditions: [{ column: "changed" }] };
+    userEdits({ filterType: "group", conditions: [{ column: "changed" }] });
     await wrapper.find('[data-test="cancel-btn"]').trigger("click");
     expect(wrapper.vm.dialog.show).toBe(true);
     expect(wrapper.vm.dialog.title).toBe("Discard changes");
+  });
+
+  // ── Escape and ✕ (the real drawer's own discard row) ────────────────────
+  describe("with the real drawer", () => {
+    let wrapper;
+    afterEach(() => {
+      wrapper?.unmount();
+      document.body.innerHTML = "";
+    });
+
+    it("asks in the footer before Escape drops an edited rule", async () => {
+      wrapper = createWrapper({}, { realDrawer: true });
+      await flushPromises();
+      userEdits({ filterType: "group", conditions: [{ column: "changed" }] });
+      await flushPromises();
+
+      pressEscape();
+      await flushPromises();
+
+      expect(byTest("o-drawer-discard-row")).not.toBeNull();
+      expect(byTest("add-condition-section")).not.toBeNull();
+      expect(wrapper.vm.internalOpen).toBe(true);
+      expect(wrapper.vm.dialog.show).toBe(false);
+    });
+
+    it("asks in the footer before the ✕ drops an edited rule", async () => {
+      wrapper = createWrapper({}, { realDrawer: true });
+      await flushPromises();
+      userEdits({ filterType: "group", conditions: [{ column: "changed" }] });
+      await flushPromises();
+
+      click("o-drawer-close-btn");
+      await flushPromises();
+
+      expect(byTest("o-drawer-discard-row")).not.toBeNull();
+      expect(wrapper.vm.internalOpen).toBe(true);
+    });
+
+    it("closes on Escape when the rule is unchanged", async () => {
+      wrapper = createWrapper({}, { realDrawer: true });
+      await flushPromises();
+
+      pressEscape();
+      await flushPromises();
+
+      expect(byTest("o-drawer-discard-row")).toBeNull();
+      expect(wrapper.vm.internalOpen).toBe(false);
+    });
+
+    it("closes on Escape when the builder settled the rule after it mounted", async () => {
+      wrapper = createWrapper({}, { realDrawer: true });
+      await flushPromises();
+      builderGroup.value = { filterType: "group", conditions: [{ column: "", id: "c1" }] };
+      await flushPromises();
+
+      pressEscape();
+      await flushPromises();
+
+      expect(byTest("o-drawer-discard-row")).toBeNull();
+      expect(wrapper.vm.internalOpen).toBe(false);
+    });
   });
 
   it("clears the selected/clicked node when closing", () => {
@@ -230,7 +293,7 @@ describe("Condition.vue (drawer chrome)", () => {
     const wrapper = createWrapper({ isEditNode: true });
     await wrapper.find('[data-test="delete-btn"]').trigger("click");
     expect(wrapper.vm.dialog.show).toBe(true);
-    expect(wrapper.vm.dialog.title).toBe("Delete Node");
+    expect(wrapper.vm.dialog.title).toBe("Delete node");
     expect(typeof wrapper.vm.dialog.okCallback).toBe("function");
   });
 

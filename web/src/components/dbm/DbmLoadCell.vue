@@ -59,22 +59,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              divide the engine's own total by a traced subtotal, a ratio of two
              different populations that routinely exceeds 100%. So it is
              withheld, and the qualifier takes its place. -->
-        <span v-if="showsShare" class="text-text-secondary text-3xs font-mono tabular-nums">
+        <span v-if="showsShare" class="text-text-secondary text-2xs font-mono tabular-nums">
           {{ formatPercent(share, 0) }}
         </span>
       </span>
       <span v-if="showsShare || qualifier || fromApp" class="flex items-center gap-1.5">
-        <OProgressBar
-          v-if="showsShare"
-          :value="share"
-          :variant="barVariant"
-          size="xs"
-          class="w-14"
-        />
+        <OProgressBar v-if="showsShare" :value="share * 100" :tone="barVariant" class="w-14" />
         <DbmAppSourceMarker v-if="fromApp" />
         <span
           v-else-if="qualifier"
-          class="text-text-secondary text-3xs"
+          class="text-text-secondary text-2xs"
           data-test="dbm-overlap-qualifier"
         >
           <OTooltip v-if="qualifierTitle" :content="qualifierTitle" />
@@ -90,6 +84,7 @@ import { computed } from "vue";
 
 import DbmAppSourceMarker from "@/components/dbm/DbmAppSourceMarker.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import type { ProgressBarTone } from "@/lib/data/ProgressBar/OProgressBar.types";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { SparklinePoint, SparklineTone } from "@/lib/data/Sparkline/OSparkline.types";
@@ -166,9 +161,9 @@ const DOMINANT_SHARE = 0.25;
  * row owns enough of the database that it is the thing to look at, and goes red
  * when the row is failing outright. A row that is merely large stays neutral.
  */
-const barVariant = computed(() => {
-  if (props.critical) return "danger";
-  return props.share >= DOMINANT_SHARE ? "warning" : "default";
+const barVariant = computed<ProgressBarTone>(() => {
+  if (props.critical) return "err";
+  return props.share >= DOMINANT_SHARE ? "warn" : "accent";
 });
 
 const sparklineTone = computed<SparklineTone>(() => {

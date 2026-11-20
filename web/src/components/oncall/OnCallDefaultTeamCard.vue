@@ -30,8 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <template v-if="dialog">
     <OButton
       v-if="showTrigger"
-      :variant="loadingRoutingConfig || defaultTeamId ? 'outline' : 'warning'"
-      size="sm"
+      :variant="loadingRoutingConfig || defaultTeamId ? 'secondary' : 'primary'"
       class="max-w-64"
       :loading="loadingRoutingConfig"
       data-test="oncall-default-team-open"
@@ -44,10 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :open="open"
       size="sm"
       :title="t('oncall.routingCatchAllTitle')"
-      :primary-button-label="t('oncall.save')"
-      :secondary-button-label="t('oncall.cancel')"
-      :primary-button-disabled="!defaultTeamDirty"
-      :primary-button-loading="savingDefault"
+      :primary="{ label: t('oncall.save'), disabled: !defaultTeamDirty, loading: savingDefault }"
+      :secondary="{ label: t('oncall.cancel') }"
       data-test="oncall-default-team-dialog"
       @update:open="(v: boolean) => (open = v)"
       @click:primary="saveDefaultTeam"
@@ -103,7 +100,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OButton
         variant="primary"
-        size="sm-action"
         :loading="savingDefault"
         :disabled="!defaultTeamDirty"
         data-test="oncall-default-team-save"

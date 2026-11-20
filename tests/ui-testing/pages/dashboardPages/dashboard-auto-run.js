@@ -17,11 +17,21 @@ const AUTO_RUN_STORAGE_KEY = "oo_toggle_auto_run";
 // Longer than the 300ms Auto Run debounce plus a panel request round trip.
 const QUIET_MS = 2500;
 
+// UI v2 has no "pending" variant: a waiting button keeps its variant and carries data-o2-stale.
+async function expectButtonState(button, state) {
+  if (state === "pending") {
+    await expect(button).toHaveAttribute("data-o2-stale", "true");
+    return;
+  }
+  await expect(button).toHaveAttribute("data-o2-variant", state);
+  await expect(button).not.toHaveAttribute("data-o2-stale", "true");
+}
+
 export default class DashboardAutoRun {
   constructor(page) {
     this.page = page;
     this.refreshBtn = page.locator('[data-test="dashboard-refresh-btn"]');
-    this.refreshOptionsBtn = page.locator('[data-test="dashboard-refresh-options-btn"]');
+    this.refreshOptionsBtn = page.locator('[data-test="dashboard-refresh-btn-auto-menu"]');
     this.refreshWithoutCacheItem = page.locator('[data-test="dashboard-refresh-without-cache-btn"]');
     this.autoRunToggle = page.locator('[data-test="dashboard-auto-run-toggle-btn"]');
     this.cancelBtn = page.locator('[data-test="dashboard-cancel-btn"]');
@@ -261,7 +271,7 @@ export default class DashboardAutoRun {
   }
 
   async expectRefreshVariant(variant) {
-    await expect(this.refreshBtn).toHaveAttribute("data-o2-variant", variant);
+    await expectButtonState(this.refreshBtn, variant);
   }
 
   async expectRefreshLabel(text) {
@@ -269,7 +279,7 @@ export default class DashboardAutoRun {
   }
 
   async expectRefreshOptionsVariant(variant) {
-    await expect(this.refreshOptionsBtn).toHaveAttribute("data-o2-variant", variant);
+    await expectButtonState(this.refreshOptionsBtn, variant);
   }
 
   async waitForRefreshIdle() {
@@ -278,15 +288,15 @@ export default class DashboardAutoRun {
   }
 
   async expectRefreshNotPending() {
-    await expect(this.refreshBtn).not.toHaveAttribute("data-o2-variant", "pending");
+    await expect(this.refreshBtn).not.toHaveAttribute("data-o2-stale", "true");
   }
 
   async expectViewRefreshVariant(variant) {
-    await expect(this.viewRefreshBtn).toHaveAttribute("data-o2-variant", variant);
+    await expectButtonState(this.viewRefreshBtn, variant);
   }
 
   async expectViewRefreshNotPending() {
-    await expect(this.viewRefreshBtn).not.toHaveAttribute("data-o2-variant", "pending");
+    await expect(this.viewRefreshBtn).not.toHaveAttribute("data-o2-stale", "true");
   }
 
   async expectRefreshTooltip(text) {

@@ -134,6 +134,11 @@ const tickSms = async () => {
   await flushPromises();
 };
 
+const clickCancel = () =>
+  [...document.body.querySelectorAll<HTMLElement>("button")]
+    .find((button) => button.textContent?.trim() === "Cancel")!
+    .click();
+
 const reopen = async () => {
   open.value = false;
   await flushPromises();
@@ -195,27 +200,31 @@ describe("OnCallPolicyEditor drafts", () => {
     expect(stored?.data.rungs[0].channels).toEqual(["email", "sms"]);
   });
 
-  it("the drawer's ✕ with edits asks; Discard closes and keeps nothing", async () => {
+  it("the drawer's ✕ with edits asks in its own footer; Discard closes and keeps nothing", async () => {
     await mountEditor();
     await tickSms();
 
     click("o-drawer-close-btn");
     await flushPromises();
-    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    expect(byTest("o-drawer-discard-row")).not.toBeNull();
+    expect(byTest("editor-draft-leave-dialog")).toBeNull();
     expect(open.value).toBe(true);
 
-    await choose("editor-draft-leave-dialog", "o-dialog-neutral-btn");
+    click("o-drawer-discard-btn");
+    await flushPromises();
     expect(open.value).toBe(false);
     expect(readEditorDraft(scope)).toBeNull();
   });
 
-  it("closing the leave dialog keeps the drawer open with the edit", async () => {
+  it("Keep editing keeps the drawer open with the edit", async () => {
     await mountEditor();
     await tickSms();
     click("o-drawer-close-btn");
     await flushPromises();
 
-    await choose("editor-draft-leave-dialog", "o-dialog-close-btn");
+    click("o-drawer-keep-editing-btn");
+    await flushPromises();
+    expect(byTest("o-drawer-discard-row")).toBeNull();
     expect(open.value).toBe(true);
     expect(smsBox()?.getAttribute("aria-checked")).toBe("true");
   });
@@ -223,10 +232,7 @@ describe("OnCallPolicyEditor drafts", () => {
   it("Keep draft closes; reopening offers it and Continue brings the edit back", async () => {
     await mountEditor();
     await tickSms();
-    const cancel = [...document.body.querySelectorAll<HTMLElement>("button")].find(
-      (button) => button.textContent?.trim() === "Cancel",
-    )!;
-    cancel.click();
+    clickCancel();
     await flushPromises();
     await choose("editor-draft-leave-dialog", "o-dialog-secondary-btn");
     expect(open.value).toBe(false);
@@ -296,7 +302,7 @@ describe("OnCallPolicyEditor drafts", () => {
   it("the leave dialog's Save stores the policy and closes the drawer without navigating", async () => {
     await mountEditor();
     await tickSms();
-    click("o-drawer-close-btn");
+    clickCancel();
     await flushPromises();
 
     await choose("editor-draft-leave-dialog", "editor-draft-leave-save");
@@ -318,15 +324,16 @@ describe("OnCallPolicyEditor drafts", () => {
     await flushPromises();
     vi.mocked(toast).mockClear();
 
-    click("o-drawer-close-btn");
+    clickCancel();
     await flushPromises();
     await choose("editor-draft-leave-dialog", "editor-draft-leave-save");
 
     expect(service.setPolicy).toHaveBeenCalledTimes(1);
     expect(vi.mocked(toast)).toHaveBeenCalledWith({
       variant: "error",
-      title: i18n.global.t("oncall.savePolicyFailed"),
-      message: i18n.global.t("oncall.configDenied"),
+      message: i18n.global.t("oncall.savePolicyFailedReason", {
+        reason: i18n.global.t("oncall.configDenied"),
+      }),
     });
     expect(open.value).toBe(true);
     expect(smsBox()?.getAttribute("aria-checked")).toBe("true");
@@ -350,15 +357,16 @@ describe("OnCallPolicyEditor drafts", () => {
     await flushPromises();
     vi.mocked(toast).mockClear();
 
-    click("o-drawer-close-btn");
+    clickCancel();
     await flushPromises();
     await choose("editor-draft-leave-dialog", "editor-draft-leave-save");
 
     expect(service.setPolicy).not.toHaveBeenCalled();
     expect(vi.mocked(toast)).toHaveBeenCalledWith({
       variant: "error",
-      title: i18n.global.t("oncall.savePolicyFailed"),
-      message: i18n.global.t("oncall.l0BudgetInvalidNotSaved"),
+      message: i18n.global.t("oncall.savePolicyFailedReason", {
+        reason: i18n.global.t("oncall.l0BudgetInvalidNotSaved"),
+      }),
     });
     expect(open.value).toBe(true);
   });

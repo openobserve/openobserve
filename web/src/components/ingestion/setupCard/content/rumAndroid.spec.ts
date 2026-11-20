@@ -127,10 +127,10 @@ describe("rumAndroidCard builder", () => {
   // ── provider metadata ────────────────────────────────────────────────────────
 
   describe("provider", () => {
-    it("names the provider 'Real User Monitoring'", () => {
+    it("names the provider 'Real user monitoring'", () => {
       const card = buildCard();
 
-      expect(card.provider.name).toBe("Real User Monitoring");
+      expect(card.provider.name).toBe("Real user monitoring");
     });
 
     it("sets runtime to 'Android'", () => {
@@ -153,7 +153,7 @@ describe("rumAndroidCard builder", () => {
         "Views",
         "Errors",
         "Crashes",
-        "Session Replay",
+        "Session replay",
       ]);
     });
 

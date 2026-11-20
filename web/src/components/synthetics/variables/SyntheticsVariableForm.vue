@@ -17,11 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="sm"
     :open="open"
     @update:open="$emit('update:open', $event)"
     :title="isEdit ? t('synthetics.variables.editTitle') : t('synthetics.variables.createTitle')"
-    :primary-button-label="isEdit ? t('common.save') : t('common.create')"
-    :secondary-button-label="t('common.cancel')"
+    :primary="{ label: isEdit ? t('common.save') : t('common.create') }"
+    :secondary="{ label: t('common.cancel') }"
     form-id="synthetics-variable-form"
     @click:secondary="handleClose"
     data-test="synthetics-variable-form-drawer"
@@ -35,16 +36,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col gap-4"
     >
       <!-- Scope is context, never a picker: you are creating where you stand. -->
-      <OBanner variant="info" data-test="synthetics-variable-scope">
+      <OInlineNotice tone="info" data-test="synthetics-variable-scope">
         {{
           environment
             ? t("synthetics.variables.scopeEnvironment", { env: environment })
             : t("synthetics.variables.scopeGlobal")
         }}
-      </OBanner>
-      <OBanner v-if="!environment" variant="warning" data-test="synthetics-variable-global-warning">
+      </OInlineNotice>
+      <OInlineNotice v-if="!environment" tone="warn" data-test="synthetics-variable-global-warning">
         {{ t("synthetics.variables.globalReachesProduction") }}
-      </OBanner>
+      </OInlineNotice>
 
       <OFormInput
         name="name"
@@ -81,8 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("synthetics.variables.secretWriteOnly") }}
         </p>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           class="mt-2"
           data-test="synthetics-variable-replace-btn"
           @click="replacing = true"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="example"
         :label="t('synthetics.variables.example')"
         :placeholder="t('synthetics.variables.examplePlaceholder')"
-        :hint="t('synthetics.variables.exampleHint')"
+        :help-text="t('synthetics.variables.exampleHint')"
         data-test="synthetics-variable-example-input"
       />
       <OFormTextarea
@@ -126,7 +126,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import syntheticsService from "@/services/synthetics";
@@ -145,7 +145,7 @@ export default defineComponent({
     OFormSelect,
     OFormTextarea,
     OButton,
-    OBanner,
+    OInlineNotice,
   },
   emits: ["close", "update:list", "update:open"],
   props: {

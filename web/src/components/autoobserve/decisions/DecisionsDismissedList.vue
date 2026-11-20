@@ -21,10 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <header class="flex flex-wrap items-center gap-2">
       <OText variant="label" as="h2">{{ t("insight.decisions.list.title") }}</OText>
-      <OBadge v-if="page.data.value" variant="default-soft" data-test="decision-dismissed-total">
+      <OBadge v-if="page.data.value" tone="neutral" data-test="decision-dismissed-total">
         {{ copy.count(total) }}
       </OBadge>
       <OToggleGroup
+        size="sm"
         :model-value="kind"
         class="ms-auto shrink-0"
         data-test="decision-dismissed-filter"
@@ -34,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="option in KINDS"
           :key="option"
           :value="option"
-          size="xs"
           :data-test="`decision-dismissed-filter-${option}`"
         >
           {{ t(KIND_FILTER_LABEL[option]) }}
@@ -43,25 +43,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </header>
 
     <div v-if="page.isPending.value" class="flex flex-col gap-2">
-      <OSkeleton class="rounded-surface h-12 w-full" />
-      <OSkeleton class="rounded-surface h-12 w-full" />
+      <OSkeleton shape="block" class="h-12 w-full" />
+      <OSkeleton shape="block" class="h-12 w-full" />
     </div>
 
-    <p
+    <OEmptyState
       v-else-if="page.isError.value && !page.data.value"
-      class="text-status-error-text flex items-center gap-2 text-sm"
+      size="compact"
+      kind="error"
+      :title="t('insight.decisions.list.loadFailed')"
       data-test="decision-dismissed-error"
     >
-      <OIcon name="error" size="xs" />
-      <span>{{ t("insight.decisions.list.loadFailed") }}</span>
-      <OButton variant="outline" size="xs" @click="page.refetch()">
-        {{ copy.retry() }}
-      </OButton>
-    </p>
+      <template #actions>
+        <OButton variant="secondary" size="sm" @click="page.refetch()">
+          {{ copy.retry() }}
+        </OButton>
+      </template>
+    </OEmptyState>
 
-    <OText v-else-if="!rows.length" variant="meta" as="p" data-test="decision-dismissed-empty">
-      {{ t(KIND_EMPTY[kind]) }}
-    </OText>
+    <OEmptyState
+      v-else-if="!rows.length"
+      size="compact"
+      icon="history"
+      :title="t(KIND_EMPTY[kind])"
+      data-test="decision-dismissed-empty"
+    />
 
     <ul
       v-else
@@ -100,8 +106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(KIND_LABEL[row.family]) }}
         </OText>
         <OButton
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           :loading="route.isUndoing(row.decision_id)"
           data-test="decision-dismissed-undo"
           @click="route.undo([{ org: orgId, view: row, title: row.subject?.title ?? null }])"
@@ -126,18 +132,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </OText>
       <OButton
-        variant="outline"
-        size="icon-xs"
-        icon-left="chevron-left"
+        icon-only
+        variant="secondary"
+        icon="chevron-left"
         :aria-label="t('insight.decisions.list.previous')"
         :disabled="offset === 0"
         data-test="decision-dismissed-previous"
         @click="offset = Math.max(0, offset - PAGE_SIZE)"
       />
       <OButton
-        variant="outline"
-        size="icon-xs"
-        icon-left="chevron-right"
+        icon-only
+        variant="secondary"
+        icon="chevron-right"
         :aria-label="t('insight.decisions.list.next')"
         :disabled="offset + PAGE_SIZE >= total"
         data-test="decision-dismissed-next"
@@ -153,7 +159,7 @@ import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

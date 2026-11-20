@@ -4,69 +4,86 @@ import { h, defineComponent } from "vue";
 import OCollapsible from "./OCollapsible.vue";
 
 describe("OCollapsible", () => {
-  it("renders label text", () => {
-    const wrapper = mount(OCollapsible, { props: { label: "Settings" } });
-    expect(wrapper.text()).toContain("Settings");
+  it("renders the title", () => {
+    const wrapper = mount(OCollapsible, { props: { title: "Settings" } });
+    expect(wrapper.find("[data-test='o-collapsible-title']").text()).toBe("Settings");
   });
 
-  it("renders caption when provided", () => {
+  it("renders the summary on the trigger when provided", () => {
     const wrapper = mount(OCollapsible, {
-      props: { label: "Options", caption: "Advanced settings" },
+      props: { title: "Advanced", summary: "3 settings" },
     });
-    expect(wrapper.text()).toContain("Advanced settings");
+    expect(wrapper.find("[data-test='o-collapsible-summary']").text()).toBe("3 settings");
   });
 
-  it("does not render caption when not provided", () => {
-    const wrapper = mount(OCollapsible, { props: { label: "Options" } });
-    expect(wrapper.text()).not.toContain("Advanced");
+  it("does not render a summary when not provided", () => {
+    const wrapper = mount(OCollapsible, { props: { title: "Options" } });
+    expect(wrapper.find("[data-test='o-collapsible-summary']").exists()).toBe(false);
   });
 
-  it("renders icon span when icon prop is set", () => {
+  it("draws one 32 px trigger with a leading chevron that turns when open", async () => {
+    const wrapper = mount(OCollapsible, { props: { title: "Test" } });
+    const trigger = wrapper.find("[data-test='o-collapsible-trigger']");
+    expect(trigger.classes()).toContain("min-h-control-md");
+    expect(trigger.find(".rotate-0").exists()).toBe(true);
+    await trigger.trigger("click");
+    expect(trigger.find(".rotate-90").exists()).toBe(true);
+  });
+
+  it("indents the body under the title", () => {
     const wrapper = mount(OCollapsible, {
-      props: { label: "Test", icon: "settings" },
+      props: { title: "Test", defaultOpen: true },
+      slots: { default: "<p>Body</p>" },
     });
-    // The "settings" icon is in the OIcon registry and renders as an SVG element.
-    // The icon name text does not appear in the HTML; the SVG path does.
-    expect(wrapper.find("svg").exists()).toBe(true);
+    expect(wrapper.find("p").element.parentElement?.className).toContain("ps-6");
+  });
+
+  it("restores and remembers the open state under persistKey", async () => {
+    localStorage.setItem("o2.collapsible.spec-key", "1");
+    const wrapper = mount(OCollapsible, { props: { title: "Test", persistKey: "spec-key" } });
+    expect(wrapper.html()).toContain('data-state="open"');
+    await wrapper.find("button").trigger("click");
+    expect(localStorage.getItem("o2.collapsible.spec-key")).toBe("0");
+    localStorage.removeItem("o2.collapsible.spec-key");
   });
 
   it("is closed by default", () => {
-    const wrapper = mount(OCollapsible, { props: { label: "Test" } });
+    const wrapper = mount(OCollapsible, { props: { title: "Test" } });
     // CollapsibleContent is hidden when closed (data-state=closed)
     expect(wrapper.html()).toContain('data-state="closed"');
   });
 
   it("opens when defaultOpen is true", () => {
     const wrapper = mount(OCollapsible, {
-      props: { label: "Test", defaultOpen: true },
+      props: { title: "Test", defaultOpen: true },
     });
     expect(wrapper.html()).toContain('data-state="open"');
   });
 
-  it("opens when modelValue is true", () => {
+  it("opens when open is true", () => {
     const wrapper = mount(OCollapsible, {
-      props: { label: "Test", modelValue: true },
+      props: { title: "Test", open: true },
     });
     expect(wrapper.html()).toContain('data-state="open"');
   });
 
-  it("emits update:modelValue on toggle", async () => {
-    const wrapper = mount(OCollapsible, { props: { label: "Test" } });
+  it("emits update:open on toggle", async () => {
+    const wrapper = mount(OCollapsible, { props: { title: "Test" } });
     const trigger = wrapper.find("button");
     await trigger.trigger("click");
-    expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-    expect(wrapper.emitted("update:modelValue")![0]).toEqual([true]);
+    expect(wrapper.emitted("update:open")).toBeTruthy();
+    expect(wrapper.emitted("update:open")![0]).toEqual([true]);
   });
 
   it("emits open event when opening", async () => {
-    const wrapper = mount(OCollapsible, { props: { label: "Test" } });
+    const wrapper = mount(OCollapsible, { props: { title: "Test" } });
     await wrapper.find("button").trigger("click");
     expect(wrapper.emitted("open")).toBeTruthy();
   });
 
   it("emits close event when closing", async () => {
     const wrapper = mount(OCollapsible, {
-      props: { label: "Test", modelValue: true },
+      props: { title: "Test", open: true },
     });
     await wrapper.find("button").trigger("click");
     expect(wrapper.emitted("close")).toBeTruthy();
@@ -74,21 +91,21 @@ describe("OCollapsible", () => {
 
   it("renders default slot content when open", async () => {
     const wrapper = mount(OCollapsible, {
-      props: { label: "Test", defaultOpen: true },
+      props: { title: "Test", defaultOpen: true },
       slots: { default: "<p>Content inside</p>" },
     });
     expect(wrapper.text()).toContain("Content inside");
   });
 
-  it("renders custom #trigger slot and hides default chevron", () => {
+  it("renders a custom #trigger in place of the title and keeps the chevron", () => {
     const wrapper = mount(OCollapsible, {
       slots: {
         trigger: '<span data-test="custom-trigger">Custom</span>',
       },
     });
     expect(wrapper.html()).toContain("custom-trigger");
-    // Default label span should not be present
-    expect(wrapper.find(".text-collapsible-label").exists()).toBe(false);
+    expect(wrapper.find("[data-test='o-collapsible-title']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='o-collapsible-trigger'] svg").exists()).toBe(true);
   });
 
   it("exposes open state to #trigger slot", async () => {
@@ -104,7 +121,7 @@ describe("OCollapsible", () => {
 
   it("forwards data-test attribute", () => {
     const wrapper = mount(OCollapsible, {
-      props: { label: "Test" },
+      props: { title: "Test" },
       attrs: { "data-test": "my-collapsible" },
     });
     expect(wrapper.html()).toContain('data-test="my-collapsible"');
@@ -119,8 +136,8 @@ describe("OCollapsible", () => {
         components: { OCollapsible },
         template: `
           <div>
-            <OCollapsible label="Item 1" :group="group" data-test="item1" />
-            <OCollapsible label="Item 2" :group="group" data-test="item2" />
+            <OCollapsible title="Item 1" :group="group" data-test="item1" />
+            <OCollapsible title="Item 2" :group="group" data-test="item2" />
           </div>
         `,
         props: { group: String },

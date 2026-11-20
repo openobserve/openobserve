@@ -55,10 +55,11 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
           class="preview-image rounded-default border-border-default h-16 w-16 border object-cover [transition:transform_0.2s_ease] hover:scale-105"
         />
         <OButton
+          icon-only
           :aria-label="t('common.remove')"
           variant="ghost"
-          size="icon-xs-circle"
-          class="image-remove-btn bg-status-negative! hover:bg-status-negative! absolute! -top-1.5! -right-1.5! z-10 h-5! min-h-5! w-5! min-w-5! p-0!"
+          size="xs"
+          class="image-remove-btn bg-status-negative! hover:bg-status-negative! absolute! -top-1.5! -right-1.5! z-10"
           @click.stop="emit('remove-image', index)"
         >
           <OIcon name="close" size="xs" />
@@ -88,40 +89,28 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
       @update:references="(refs: ReferenceChip[]) => emit('update:references', refs)"
     />
 
-    <!-- Bottom bar with buttons -->
-    <div class="input-bottom-bar flex items-center justify-between pt-2">
-      <div class="flex items-center gap-2">
-        <!-- Image upload button -->
+    <!-- Bottom bar: every control is the same sm size, so the row reads as one bar (S2). -->
+    <div class="input-bottom-bar flex items-center justify-between pt-1">
+      <div class="flex items-center gap-1">
         <OButton
           v-if="!isLoading"
-          @click.stop="emit('trigger-image-upload')"
-          variant="ghost"
-          size="icon-sm"
-          class="image-upload-btn opacity-70 transition-opacity duration-200 hover:opacity-100"
-        >
-          <OIcon name="image" size="sm" class="text-icon-color" />
-          <OTooltip :content="t('aiAssistant.attachImageTooltip')" />
-        </OButton>
-        <div v-else class="w-8"></div>
-
-        <!-- Auto navigation toggle button -->
-        <OButton
-          v-if="!isLoading"
-          @click.stop="emit('update:autoNavigation', !autoNavigation)"
+          icon-only
+          icon="image"
           variant="ghost"
           size="sm"
-          class="auto-nav-toggle-btn rounded-default hover:bg-surface-subtle flex items-center gap-1.5 px-2 py-1 transition-all duration-200"
+          :label="t('aiAssistant.attachImageTooltip')"
+          class="image-upload-btn"
+          @click.stop="emit('trigger-image-upload')"
+        />
+        <OButton
+          v-if="!isLoading"
+          variant="ghost"
+          size="sm"
+          :pressed="autoNavigation"
+          class="auto-nav-toggle-btn"
+          @click.stop="emit('update:autoNavigation', !autoNavigation)"
         >
-          <OIcon
-            :name="autoNavigation ? 'check-circle' : 'radio-button-unchecked'"
-            size="sm"
-            :class="['auto-nav-icon', autoNavigation ? 'text-theme-accent!' : 'text-icon-color']"
-          />
-          <span
-            class="auto-nav-label ms-1 text-xs font-medium"
-            :class="autoNavigation ? 'text-theme-accent' : 'text-text-secondary'"
-            >{{ t("aiAssistant.autoNavigation.label") }}</span
-          >
+          {{ t("aiAssistant.autoNavigation.label") }}
           <OTooltip
             :content="
               autoNavigation
@@ -132,61 +121,32 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
         </OButton>
       </div>
 
-      <div class="flex items-center gap-2">
-        <!-- Send button - shown when not loading -->
-        <OButton
-          :aria-label="t('common.send')"
-          v-if="!isLoading"
-          :disabled="!modelValue.trim() && pendingImages.length === 0"
-          @click="emit('send')"
-          variant="primary"
-          size="icon-xs-circle"
-          class="send-button hover:bg-gradient-ai!"
-        >
-          <OIcon name="arrow-upward" size="sm" />
-        </OButton>
-
-        <!-- Stop button - shown when loading/streaming -->
-        <OButton
-          :aria-label="t('common.stopGenerating')"
-          v-if="isLoading"
-          @click="emit('cancel')"
-          variant="ghost"
-          size="icon-xs-circle"
-          class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-gradient-danger! hover:bg-gradient-danger-hover! shadow-lg! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:shadow-lg! active:translate-y-0! active:shadow-md!"
-        >
-          <OIcon name="stop" size="sm" />
-        </OButton>
-      </div>
+      <OButton
+        v-if="!isLoading"
+        icon-only
+        icon="arrow-upward"
+        variant="primary"
+        size="sm"
+        :label="t('common.send')"
+        :disabled="!modelValue.trim() && pendingImages.length === 0"
+        class="send-button"
+        @click="emit('send')"
+      />
+      <OButton
+        v-else
+        icon-only
+        icon="stop"
+        variant="secondary"
+        size="sm"
+        :label="t('common.stopGenerating')"
+        class="stop-button"
+        @click="emit('cancel')"
+      />
     </div>
   </div>
 </template>
 
 <style scoped>
-/* keep(complex-state): .send-button's :not(.disabled):not([disabled]):not(:disabled)
-   guard has no utility equivalent (`enabled:` covers :disabled, not the .disabled class). */
-
-/* ============================================================
-   keep(complex-state) — send button.
-   The enabled guard is a .disabled CLASS plus [disabled] plus :disabled;
-   Tailwind's `enabled:` variant only covers the last two.
-   ============================================================ */
-.send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
-  /* The hover gradient is `hover:bg-gradient-ai!` on the button itself. It used to
-     be restated here, then dropped when the template briefly carried the gradient
-     unconditionally — and main later moved the button back to variant="primary",
-     so between the two changes the gradient stopped painting at all. */
-  box-shadow: var(--shadow-glow-xl-geom) color-mix(in srgb, var(--color-ai-accent) 40%, transparent) !important;
-  transform: translateY(-0.0625rem) !important;
-}
-.send-button:active:not(.disabled):not([disabled]):not(:disabled) {
-  transform: translateY(0) !important;
-  /* Pressed keeps the accent, dimmer than hover — NOT --shadow-glow, which is a
-     neutral black ring and turns the press state grey. */
-  box-shadow: var(--shadow-glow-press-geom)
-    color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
-}
-
 /* ============================================================
    keep(generated-content) — RichTextInput is a child component, so its
    internals carry no scope attribute of ours.

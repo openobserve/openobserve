@@ -1,17 +1,9 @@
-import type { ToastPosition } from "./OToast.types";
-
 export interface ToastProviderProps {
   // no public props — all state comes from the module-level store
 }
 
-export const viewportPositionClasses: Record<ToastPosition, string> = {
-  "top-center": ["fixed top-4 left-1/2 -translate-x-1/2", "flex flex-col gap-2 z-[9999]"].join(" "),
-  "top-right": ["fixed top-4 end-4", "flex flex-col gap-2 z-[9999]"].join(" "),
-  "top-left": ["fixed top-4 start-4", "flex flex-col gap-2 z-[9999]"].join(" "),
-  "bottom-center": [
-    "fixed bottom-4 left-1/2 -translate-x-1/2",
-    "flex flex-col-reverse gap-2 z-[9999]",
-  ].join(" "),
-  "bottom-right": ["fixed bottom-4 end-4", "flex flex-col-reverse gap-2 z-[9999]"].join(" "),
-  "bottom-left": ["fixed bottom-4 start-4", "flex flex-col-reverse gap-2 z-[9999]"].join(" "),
-};
+/** Put on a bar docked at the bottom of the screen (a table footer, a sticky Save) so toasts stack above it. */
+export const TOAST_AVOID_ATTR = "data-toast-avoid";
+
+/** Only a marked bar whose bottom lies within this many rem of the viewport's bottom edge lifts the toasts. */
+export const TOAST_AVOID_BAND_REM = 4;

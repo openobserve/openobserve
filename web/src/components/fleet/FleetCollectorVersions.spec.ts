@@ -94,7 +94,7 @@ const barVariant = (w: VueWrapper, version: string) =>
   w
     .find(`[data-test="fleet-version-bars-row-${version}"]`)
     .findComponent({ name: "OProgressBar" })
-    .props("variant");
+    .props("tone");
 
 describe("FleetCollectorVersions", () => {
   let wrapper: VueWrapper;
@@ -122,9 +122,9 @@ describe("FleetCollectorVersions", () => {
   it("colours version bars from the server's outdated flags", async () => {
     ok();
     wrapper = await mountVersions();
-    expect(barVariant(wrapper, "0.118.0")).toBe("warning");
-    expect(barVariant(wrapper, "0.124.0")).toBe("success");
-    expect(barVariant(wrapper, "0.99.1")).toBe("success");
+    expect(barVariant(wrapper, "0.118.0")).toBe("warn");
+    expect(barVariant(wrapper, "0.124.0")).toBe("ok");
+    expect(barVariant(wrapper, "0.99.1")).toBe("ok");
   });
 
   it("offers no upgrade or schedule action, since none has an API", async () => {
@@ -211,8 +211,8 @@ describe("FleetCollectorVersions", () => {
     vi.mocked(fleet.listCollectors).mockRejectedValueOnce(new Error("boom"));
     await refresh();
     await settle();
-    expect(barVariant(wrapper, "0.118.0")).toBe("warning");
-    expect(barVariant(wrapper, "0.124.0")).toBe("success");
+    expect(barVariant(wrapper, "0.118.0")).toBe("warn");
+    expect(barVariant(wrapper, "0.124.0")).toBe("ok");
   });
 
   it("scrolls to the outdated collectors when shown, else to the versions block", async () => {
@@ -258,8 +258,8 @@ describe("FleetCollectorVersions", () => {
     vi.mocked(fleet.listCollectors).mockReturnValue(new Promise(() => {}) as any);
     vi.mocked(fleet.summary).mockResolvedValue({ data: summary } as any);
     wrapper = await mountVersions();
-    expect(barVariant(wrapper, "0.118.0")).toBe("default");
-    expect(barVariant(wrapper, "0.124.0")).toBe("default");
+    expect(barVariant(wrapper, "0.118.0")).toBe("accent");
+    expect(barVariant(wrapper, "0.124.0")).toBe("accent");
   });
 
   it.each([new Error("boom"), { response: { status: 403 } }])(
@@ -268,7 +268,7 @@ describe("FleetCollectorVersions", () => {
       vi.mocked(fleet.listCollectors).mockRejectedValue(err);
       vi.mocked(fleet.summary).mockResolvedValue({ data: summary } as any);
       wrapper = await mountVersions();
-      expect(barVariant(wrapper, "0.118.0")).toBe("default");
+      expect(barVariant(wrapper, "0.118.0")).toBe("accent");
     },
   );
 

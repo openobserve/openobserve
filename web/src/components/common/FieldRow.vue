@@ -24,12 +24,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OFieldLabel :field="field" :show-type-icon="false" />
     <OButton
-      :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
       v-if="showQuickMode && isInterestingCandidate && field.name !== timestampColumn"
+      icon-only
+      :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
       :name="field.isInterestingField ? 'info-filled' : 'info-outline'"
-      variant="ghost-neutral"
+      variant="ghost"
       class="me-1 gap-0!"
-      size="icon"
+      size="xs"
       :title="
         field.isInterestingField
           ? t('logStream.removeFromInterestingFields')
@@ -42,20 +43,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-if="field.name !== timestampColumn" #actions>
       <OButton
-        :aria-label="t('common.addFilter')"
         v-if="field.isSchemaField && field.name != timestampColumn"
-        variant="ghost-neutral"
-        size="icon"
+        icon-only
+        :aria-label="t('common.addFilter')"
+        variant="ghost"
+        size="xs"
         :data-test="`log-search-index-list-filter-${field.name}-field-btn`"
         @click.stop="$emit('add-to-filter', `${field.name}=''`)"
       >
         <OIcon name="add" size="sm" />
       </OButton>
       <OButton
-        :data-test="`log-search-index-list-add-${field.name}-field-btn`"
         v-if="showVisibilityToggle && !isFieldSelected && field.name !== timestampColumn"
-        variant="ghost-neutral"
-        size="icon"
+        icon-only
+        :data-test="`log-search-index-list-add-${field.name}-field-btn`"
+        variant="ghost"
+        size="xs"
         class="gap-0!"
         :title="t('search.addFieldToTable')"
         @click.stop="$emit('toggle-field', field)"
@@ -63,22 +66,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="visibility" size="sm" />
       </OButton>
       <OButton
-        :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
         v-if="showVisibilityToggle && isFieldSelected"
-        variant="ghost-neutral"
+        icon-only
+        :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
+        variant="ghost"
         class="gap-0!"
-        size="icon"
+        size="xs"
         :title="t('search.removeFieldFromTable')"
         @click.stop="$emit('toggle-field', field)"
       >
         <OIcon name="visibility-off" size="sm" />
       </OButton>
       <OButton
-        :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
         v-if="showQuickMode && isInterestingCandidate && field.name !== timestampColumn"
-        variant="ghost-neutral"
+        icon-only
+        :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
+        variant="ghost"
         class="gap-0!"
-        size="icon"
+        size="xs"
         :title="
           field.isInterestingField
             ? t('logStream.removeFromInterestingFields')

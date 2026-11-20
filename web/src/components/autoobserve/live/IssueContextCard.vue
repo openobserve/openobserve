@@ -15,12 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard variant="glass" data-test="autoobserve-issue-context-card">
-    <OCardSection role="header" dense>
+  <OCard data-test="autoobserve-issue-context-card">
+    <template #header>
       <OIcon name="psychology" size="sm" class="text-text-secondary" />
-      <OText variant="panel-title">{{ t("autoobserve.issueLive.whatHappened") }}</OText>
-    </OCardSection>
-    <OCardSection role="body" dense class="flex flex-col gap-3">
+      <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+        {{ t("autoobserve.issueLive.whatHappened") }}
+      </h3>
+    </template>
+    <div class="flex flex-col gap-3">
       <div class="flex h-6 min-w-0 items-center">
         <OTruncatedText
           v-if="why"
@@ -30,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ why }}
         </OTruncatedText>
-        <OSkeleton v-else-if="!held" animation="none" class="h-3.5 w-3/5" />
+        <OSkeleton v-else-if="!held" class="h-3.5 w-3/5" />
       </div>
       <!-- A load that ends without context keeps the block's space and says why, so nothing below moves. -->
       <div
@@ -40,8 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OInlineNotice
           v-if="'failed' in held"
-          variant="error"
-          :text="t('autoobserve.context.loadFailed')"
+          tone="err"
+          :message="t('autoobserve.context.loadFailed')"
           :action-label="t('common.retry')"
           action-data-test="autoobserve-issue-context-card-retry"
           data-test="autoobserve-issue-context-card-failed"
@@ -62,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :now-ms="now"
         />
       </CauseList>
-    </OCardSection>
+    </div>
   </OCard>
 </template>
 
@@ -71,9 +73,7 @@ import { computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useNow } from "@/composables/useNow";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

@@ -34,6 +34,7 @@ import {
   okResponse,
   readOnly,
   settle,
+  openMoreMenu,
   triageOnly,
 } from "./__fixtures__/securityFixtures";
 
@@ -79,6 +80,11 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
 vi.mock("@/lib/overlay/Drawer/ODrawer.vue", async () => {
   const f = await import("./__fixtures__/securityFixtures");
   return f.drawerStubModule;
+});
+
+vi.mock("reka-ui", async (importOriginal) => {
+  const { inlineDropdownPortal } = await import("./__fixtures__/securityFixtures");
+  return inlineDropdownPortal(importOriginal);
 });
 
 import SecurityCases from "./SecurityCases.vue";
@@ -187,9 +193,9 @@ afterEach(() => {
 describe("SecurityCases", () => {
   it("lists correlated cases with priority, assignee and per-status totals", async () => {
     const w = await mountView();
-    expect(rowOf(w, "svc-deploy key used from 185.220.101.47")?.text()).toContain("P1");
+    expect(rowOf(w, "svc-deploy key used from 185.220.101.47")?.text()).toContain("Critical");
     const carol = rowOf(w, "carol@acme.io MFA reset after password spray");
-    expect(carol?.text()).toContain("P2");
+    expect(carol?.text()).toContain("High");
     expect(carol?.text()).toContain("dave@acme.io");
     expect(w.find('[data-test="security-cases-stat-resolved"]').text()).toContain("4");
   });
@@ -203,6 +209,20 @@ describe("SecurityCases", () => {
     const w = await mountView();
     expect(w.find('[data-test="security-cases-access-lock"]').exists()).toBe(true);
     expect(w.text()).not.toContain("Request failed with status code 403");
+  });
+
+  it("shows a failed list as the table's error state with Retry, never the first-run one", async () => {
+    vi.mocked(securityCases.searchCases).mockRejectedValue({
+      response: { status: 404, data: "Not Found" },
+      message: "Request failed with status code 404",
+    });
+    const w = await mountView();
+    expect(w.find('[data-test="security-cases-table"]').exists()).toBe(false);
+    expect(w.find('[data-test="security-cases-stats"]').exists()).toBe(false);
+    expect(w.find('[data-test="security-load-error"]').text()).toContain("Couldn't load cases");
+    expect(w.text()).not.toContain("No cases");
+    expect(w.text()).not.toContain("Request failed with status code 404");
+    expect(w.find('[data-test="security-cases-error"]').exists()).toBe(false);
   });
 
   it("opens a case showing only its SIEM detections and the correlated entities", async () => {
@@ -302,6 +322,7 @@ describe("SecurityCases", () => {
 
   it("offers case settings to a Security admin", async () => {
     const w = await mountView();
+    await openMoreMenu(w, "security-cases-more");
     await w.find('[data-test="security-cases-settings"]').trigger("click");
     await settle();
     expect(w.findComponent({ name: "SecurityCaseSettingsDialog" }).props("open")).toBe(true);
@@ -310,6 +331,7 @@ describe("SecurityCases", () => {
   it("hides case settings from an analyst who cannot administer Security", async () => {
     triageOnly();
     const w = await mountView();
+    await openMoreMenu(w, "security-cases-more");
     expect(w.find('[data-test="security-cases-settings"]').exists()).toBe(false);
     expect(w.findComponent({ name: "SecurityCaseSettingsDialog" }).exists()).toBe(false);
   });
@@ -317,10 +339,11 @@ describe("SecurityCases", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       const w = await mountView(
-        "/security/cases?priority=P1,P2&assignee=none&detection=alert-stop-logging",
+        "/security/cases?priority=P1,P2&assignee=none&detection=alert-stop-logging&entity=10.0.0.5",
       );
       expect(securityCases.searchCases).toHaveBeenCalledWith("default", {
         status: ["open", "acknowledged"],
+        entity: "10.0.0.5",
         priority: ["P1", "P2"],
         alert_id: ["alert-stop-logging"],
         assignee: "none",
@@ -328,7 +351,6 @@ describe("SecurityCases", () => {
         offset: 0,
       });
       await w.find('[data-test="security-cases-search"] input').setValue("svc-deploy");
-      await w.find('[data-test="security-cases-filter-entity"] input').setValue("10.0.0.5");
       await vi.advanceTimersByTimeAsync(400);
       await flushPromises();
       expect(securityCases.searchCases).toHaveBeenCalledWith(
@@ -768,10 +790,8 @@ describe("SecurityCases", () => {
         "default",
         expect.objectContaining({ status: ["open", "acknowledged"], limit: 50 }),
       );
-      w.findComponent('[data-test="security-cases-show-closed"]').vm.$emit(
-        "update:modelValue",
-        true,
-      );
+      await openMoreMenu(w, "security-cases-more");
+      await w.find('[data-test="security-cases-show-closed"]').trigger("click");
       await settle();
       const last = vi.mocked(securityCases.searchCases).mock.calls.at(-1)![1];
       expect(last.status).toBeUndefined();

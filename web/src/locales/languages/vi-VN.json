@@ -11,7 +11,11 @@
     "bannerMessage": "Tính năng này bị khóa. Cần có tính năng {feature} trong giấy phép của bạn.",
     "bannerMessageGeneric": "Trang này cần một tính năng không có trong giấy phép của bạn.",
     "headerLocked": "Đã khóa: cần {feature}",
-    "availableInEnterprise": "{feature} có trong OpenObserve Enterprise"
+    "availableInEnterprise": "{feature} có trong OpenObserve Enterprise",
+    "turnedOffTitle": "Đã tắt cho tổ chức này",
+    "enterpriseTitle": "Có trong Enterprise",
+    "readDocs": "Đọc tài liệu",
+    "rbacOff": "RBAC đang tắt cho tổ chức này. Quản trị viên bật nó bằng cách đặt {env} thành true trong cấu hình máy chủ."
   },
   "emptyState": {
     "illustrations": {
@@ -52,6 +56,7 @@
         "ariaLabel": "Đang chờ dữ liệu"
       }
     },
+    "requestId": "Yêu cầu {id}",
     "createFirstItem": "Tạo mục đầu tiên của bạn",
     "newBrowserCheck": "Kiểm tra trình duyệt mới",
     "allCaughtUp": "Bạn đã xem hết",
@@ -79,10 +84,6 @@
       "title": "Không tìm thấy mẫu nào",
       "description": "Hãy thử tăng khoảng thời gian hoặc chọn một stream khác có nhiều dữ liệu nhật ký hơn. Việc trích xuất mẫu hoạt động tốt nhất với ít nhất 1.000 nhật ký.",
       "logsAnalyzed": "Chỉ {count} nhật ký được phân tích."
-    },
-    "noStreamSelected": {
-      "title": "Chọn một stream để bắt đầu",
-      "description": "Chọn một stream, sau đó chạy truy vấn để khám phá dữ liệu của nó. Tinh chỉnh kết quả bằng bộ lọc và khoảng thời gian tùy chỉnh."
     },
     "noQueryApplied": {
       "title": "Chạy truy vấn để xem kết quả",
@@ -200,22 +201,6 @@
       "action": "Khóa mới",
       "actionDesc": "Tạo khóa mã hóa"
     },
-    "noSlackChannelDefaults": {
-      "title": "Chưa có kênh nào có tổ chức mặc định",
-      "description": "Các câu hỏi trong kênh chưa có tổ chức mặc định sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng /o2 org)."
-    },
-    "noSlackLinkedPeople": {
-      "title": "Chưa có ai trong tổ chức này liên kết Slack"
-    },
-    "slackNotConnected": {
-      "title": "Kết nối không gian làm việc Slack"
-    },
-    "noAnnouncementBanners": {
-      "title": "Chưa có biểu ngữ nào",
-      "description": "Biểu ngữ hiển thị thông báo ở đầu ứng dụng cho các tổ chức bạn chọn.",
-      "action": "Thêm biểu ngữ",
-      "actionDesc": "Viết thông báo và lên lịch"
-    },
     "noAiToolsets": {
       "title": "Chưa có bộ công cụ AI nào",
       "description": "Bộ công cụ AI kết nối tổ chức của bạn với các khả năng AI bên ngoài.",
@@ -329,7 +314,6 @@
     "noStreams": {
       "title": "Kết nối một nguồn để tạo stream đầu tiên của bạn",
       "description": "Stream được tạo tự động ngay khi dữ liệu đến. Thiết lập nhập dữ liệu từ ứng dụng, agent hoặc collector của bạn để bắt đầu.",
-      "action": "Thiết lập nhập dữ liệu",
       "actionDesc": "Kết nối một nguồn dữ liệu",
       "createAction": "Stream mới",
       "createActionDesc": "Xác định thủ công lược đồ stream"
@@ -469,7 +453,9 @@
       "description": "Không có {noun} nào khớp với bộ lọc hoặc tìm kiếm hiện tại. Hãy thử điều chỉnh hoặc xóa chúng.",
       "action": "Xóa bộ lọc",
       "actionDesc": "Đặt lại tất cả bộ lọc và tìm kiếm",
-      "fallbackNoun": "kết quả"
+      "fallbackNoun": "kết quả",
+      "noMatches": "Không có kết quả khớp",
+      "noMatchesText": "Không có gì khớp với tìm kiếm hoặc bộ lọc hiện tại."
     },
     "nouns": {
       "logs": "nhật ký",
@@ -652,6 +638,26 @@
     "noOncallUnrouted": {
       "title": "Không có gì cần người phụ trách",
       "description": "Mọi cảnh báo đã kích hoạt đều đã đến được một nhóm."
+    },
+    "noSlackChannelDefaults": {
+      "title": "Chưa có kênh nào có tổ chức mặc định",
+      "description": "Các câu hỏi trong kênh chưa có tổ chức mặc định sẽ được chuyển đến tổ chức mặc định của từng người (họ có thể thay đổi bằng /o2 org)."
+    },
+    "noSlackLinkedPeople": {
+      "title": "Chưa có ai trong tổ chức này liên kết Slack"
+    },
+    "slackNotConnected": {
+      "title": "Kết nối không gian làm việc Slack"
+    },
+    "noAnnouncementBanners": {
+      "title": "Chưa có biểu ngữ nào",
+      "description": "Biểu ngữ hiển thị thông báo ở đầu ứng dụng cho các tổ chức bạn chọn.",
+      "action": "Thêm biểu ngữ",
+      "actionDesc": "Viết thông báo và lên lịch"
+    },
+    "pageError": {
+      "title": "Không thể tải trang này",
+      "description": "Không có dữ liệu nào của trang này được tải. Hãy thử lại ngay hoặc thử lại sau một phút."
     }
   },
   "accessBoundary": {
@@ -800,7 +806,15 @@
       "logs": "nhật ký",
       "charts": "biểu đồ"
     },
+    "saveBar": {
+      "noChanges": "Không có thay đổi để lưu",
+      "unsavedChanges": "{n} thay đổi chưa lưu | {n} thay đổi chưa lưu",
+      "changesShort": "{n} thay đổi | {n} thay đổi",
+      "fixFields": "Sửa {n} trường | Sửa {n} trường",
+      "discard": "Hủy bỏ"
+    },
     "dismiss": "Bỏ qua",
+    "undo": "Hoàn tác",
     "exitFullscreen": "Thoát toàn màn hình",
     "moreActions": "Thêm thao tác",
     "moreOptions": "Thêm tùy chọn",
@@ -1194,18 +1208,6 @@
     "boolFalse": "Sai",
     "browserTimeWithZone": "Giờ trình duyệt ({zone})",
     "poweredBy": "Cung cấp bởi",
-    "saveBar": {
-      "noChanges": "Không có thay đổi để lưu",
-      "unsavedChanges": "{n} thay đổi chưa lưu | {n} thay đổi chưa lưu",
-      "changesShort": "{n} thay đổi | {n} thay đổi",
-      "fixFields": "Sửa {n} trường | Sửa {n} trường",
-      "discard": "Hủy bỏ"
-    },
-    "leaveGuard": {
-      "title": "Rời trang khi có thay đổi chưa lưu?",
-      "message": "Bạn có {n} thay đổi chưa lưu trên trang này. Thay đổi sẽ bị mất nếu bạn rời đi. | Bạn có {n} thay đổi chưa lưu trên trang này. Thay đổi sẽ bị mất nếu bạn rời đi.",
-      "keepEditing": "Tiếp tục chỉnh sửa"
-    },
     "editorDraft": {
       "restoreTitle": "Bản nháp chưa lưu",
       "restoreTitleInBrowser": "Thay đổi cục bộ chưa lưu",
@@ -1276,7 +1278,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "cấu hình collector"
+        "fleet_config": "cấu hình collector",
+        "workflow": "quy trình làm việc"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1286,100 +1289,11 @@
       "leaveMessageInBrowser": "Lưu {entity}, giữ các thay đổi của bạn trong trình duyệt này, hoặc hủy bỏ chúng.",
       "retentionInBrowser": "Các thay đổi được giữ trong trình duyệt này trong {days} ngày, hoặc cho đến khi bạn đăng xuất. Chỉ {max} bản mới nhất của mỗi loại được giữ lại.",
       "dotUndated": "Unsaved draft"
-    }
-  },
-  "filterBar": {
-    "ariaLabel": "Lọc theo trường",
-    "placeholder": "Lọc theo trường hoặc nhập field=value. Nhấn Enter để chạy",
-    "addFilter": "Thêm bộ lọc",
-    "searchFields": "Tìm trường",
-    "searchLabels": "Tìm nhãn",
-    "searchOperators": "Tìm điều kiện",
-    "searchValue": "Tìm hoặc nhập giá trị",
-    "searchValues": "Tìm giá trị",
-    "textField": "Văn bản",
-    "useValue": "Dùng \"{value}\"",
-    "useField": "Dùng trường \"{field}\"",
-    "useLabel": "Dùng nhãn \"{field}\"",
-    "searchText": "Tìm \"{text}\" trong toàn bộ văn bản",
-    "emptyValue": "(trống)",
-    "loadingFields": "Đang tải các trường…",
-    "noFields": "Không có trường phù hợp",
-    "noValues": "Không có gợi ý. Nhập một giá trị và nhấn Enter",
-    "noOperators": "Không có điều kiện phù hợp",
-    "removeFilter": "Xóa bộ lọc",
-    "clearAll": "Xóa tất cả bộ lọc",
-    "toggleConnector": "Chuyển đổi giữa AND và OR",
-    "selectedCount": "Chưa chọn giá trị nào | Đã chọn {count} giá trị | Đã chọn {count} giá trị",
-    "query": "Truy vấn",
-    "builderTooltip": "Tạo bộ lọc bằng cách chọn trường, điều kiện và giá trị",
-    "queryTooltip": "Tự viết truy vấn",
-    "queryNotParsableShort": "Trình tạo không thể hiển thị truy vấn này:",
-    "clearAndBuild": "Xóa và tạo mới",
-    "clearQueryTitle": "Xóa truy vấn?",
-    "clearQueryMessage": "Truy vấn sẽ bị xóa và trình tạo bắt đầu với nội dung trống.",
-    "where": "Trong đó",
-    "addCondition": "Thêm điều kiện",
-    "addGroup": "Thêm nhóm",
-    "startGroup": "Bắt đầu một nhóm",
-    "addBelow": "Thêm điều kiện bên dưới",
-    "ungroup": "Bỏ nhóm",
-    "collapseGroup": "Thu gọn nhóm",
-    "expandGroup": "Mở rộng nhóm",
-    "moreInGroup": "{count} mục khác",
-    "groupHasIssues": "Có gì đó trong nhóm này cần sửa",
-    "chooseField": "Chọn một trường",
-    "chooseValue": "Chọn một giá trị",
-    "lockedFilter": "Không thể chỉnh sửa bộ lọc này tại đây. Nó được giữ nguyên như đã lưu; hãy xóa để loại bỏ",
-    "limits": {
-      "conditions": "Tối đa {count} bộ lọc | Tối đa {count} bộ lọc",
-      "values": "Tối đa {count} giá trị | Tối đa {count} giá trị"
     },
-    "validation": {
-      "incomplete": "Hoàn thành bộ lọc này hoặc xóa nó",
-      "required": "Thêm ít nhất một bộ lọc",
-      "uniqueField": "{field} đã có bộ lọc; hãy sửa bộ lọc đó hoặc xóa bộ lọc này",
-      "oneUsageCondition": "Một bậc chỉ nhận một điều kiện sử dụng; hãy chuyển điều kiện này thành quy tắc hoặc xóa nó",
-      "rumField": "Dùng một trường tích hợp hoặc một cột gồm chữ thường, chữ số và dấu gạch dưới, tối đa 128 ký tự",
-      "valueLength": "Mỗi giá trị cần từ 1 đến {max} ký tự",
-      "regexLength": "Giữ mẫu trong tối đa {max} ký tự.",
-      "regexInvalid": "Mẫu này không hợp lệ hoặc không được hỗ trợ. Không thể dùng lookahead, lookbehind và tham chiếu ngược."
-    },
-    "operatorNames": {
-      "containsIgnoreCase": "Chứa (không phân biệt chữ hoa/thường)",
-      "notStartsWith": "Không bắt đầu bằng",
-      "notEndsWith": "Không kết thúc bằng",
-      "isEmpty": "Trống",
-      "isNotEmpty": "Không trống"
-    },
-    "types": {
-      "string": "Văn bản",
-      "number": "Số",
-      "boolean": "Boolean"
-    },
-    "operators": {
-      "eq": "là",
-      "neq": "không phải là",
-      "gt": "lớn hơn",
-      "gte": "lớn hơn hoặc bằng",
-      "lt": "nhỏ hơn",
-      "lte": "nhỏ hơn hoặc bằng",
-      "contains": "chứa",
-      "containsIgnoreCase": "chứa, không phân biệt chữ hoa chữ thường",
-      "notContains": "không chứa",
-      "startsWith": "bắt đầu bằng",
-      "notStartsWith": "không bắt đầu bằng",
-      "endsWith": "kết thúc bằng",
-      "notEndsWith": "không kết thúc bằng",
-      "in": "thuộc một trong các",
-      "notIn": "không thuộc bất kỳ giá trị nào",
-      "regex": "khớp regex",
-      "notRegex": "không khớp regex",
-      "isNull": "không có giá trị",
-      "isNotNull": "có giá trị",
-      "isEmpty": "trống hoặc không có giá trị",
-      "isNotEmpty": "có giá trị và không trống",
-      "matchAll": "khớp văn bản"
+    "leaveGuard": {
+      "title": "Rời trang khi có thay đổi chưa lưu?",
+      "message": "Bạn có {n} thay đổi chưa lưu trên trang này. Thay đổi sẽ bị mất nếu bạn rời đi. | Bạn có {n} thay đổi chưa lưu trên trang này. Thay đổi sẽ bị mất nếu bạn rời đi.",
+      "keepEditing": "Tiếp tục chỉnh sửa"
     }
   },
   "flow": {
@@ -1489,11 +1403,9 @@
     "patternNavPrevious": "Trước",
     "patternNavNext": "Tiếp",
     "patternNoValuesAvailable": "Không có giá trị nào",
-    "sqlModeLabel": "Chế độ SQL",
     "nlpModeLabel": "Chế độ Ngôn ngữ Tự nhiên",
     "quickModeLabel": "Chế độ Nhanh",
     "menuMore": "Thêm",
-    "menuGroupSetOnce": "Đặt một lần",
     "menuGroupHistory": "Lịch sử",
     "menuGroupDownloads": "Tải xuống",
     "menuGroupSchedule": "Lịch biểu",
@@ -1867,7 +1779,6 @@
     "viewDeletedSuccessfully": "Đã xóa chế độ xem thành công.",
     "viewCreatedSuccessfully": "Đã tạo chế độ xem thành công.",
     "viewUpdatedSuccessfully": "Đã cập nhật chế độ xem thành công.",
-    "linkCopiedSuccessfully": "Đã sao chép liên kết thành công!",
     "errorCopyingLink": "Lỗi khi sao chép liên kết.",
     "errorShorteningLink": "Lỗi khi rút ngắn liên kết.",
     "webUrlNotConfigured": "Chia sẻ URL bị tắt cho đến khi quản trị viên cấu hình ZO_WEB_URL.",
@@ -2069,7 +1980,24 @@
     "freeTextNoTextFields": "Stream này không có trường văn bản nào để tìm kiếm.",
     "freeTextNoTextFieldsNamed": "Không tìm kiếm: {streams} (không có trường văn bản).",
     "freeTextBuildNotice": "Bộ lọc này có tìm kiếm văn bản; hãy chỉnh sửa trong SQL.",
-    "filterNotChartableNotice": "Bộ lọc này không thể vẽ biểu đồ trong trình tạo. Bộ lọc tìm kiếm của bạn không thay đổi; hãy chuyển sang {custom} để vẽ biểu đồ."
+    "filterNotChartableNotice": "Bộ lọc này không thể vẽ biểu đồ trong trình tạo. Bộ lọc tìm kiếm của bạn không thay đổi; hãy chuyển sang {custom} để vẽ biểu đồ.",
+    "queryModeLabel": "Ngôn ngữ truy vấn",
+    "queryModeFilter": "Bộ lọc",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "Thu hẹp nhật ký theo trường và giá trị",
+    "queryModeSqlTooltip": "Viết truy vấn SQL đầy đủ, có tổng hợp và kết nối",
+    "sqlModeNeedsOneStream": "SQL trong chế độ xem này chỉ dùng một luồng",
+    "menuGroupViewOptions": "Tùy chọn hiển thị",
+    "histogramHiddenForAggregates": "Truy vấn này trả về các nhóm, không phải sự kiện theo thời gian, nên không có biểu đồ tần suất. Trực quan hóa sẽ vẽ biểu đồ kết quả.",
+    "linkCopied": "Đã sao chép liên kết",
+    "linkCopiedFixedTime": "Đã sao chép liên kết · thời gian cố định {from} – {to}",
+    "linkCopiedRelativeTime": "Đã sao chép liên kết · {period}, tính từ lúc mở",
+    "recordsChipRows": "{total} hàng | {total} hàng",
+    "histogramTitleRows": "Hiển thị {total} hàng trong {took} ms. | Hiển thị {total} hàng trong {took} ms.",
+    "histogramTitleRowsWithScan": "Hiển thị {total} hàng trong {took} ms. ({scanLabel}: {scanSize}) | Hiển thị {total} hàng trong {took} ms. ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "Hãy chọn một luồng trước",
+    "autoRefreshPausedInVisualize": "Tự động làm mới cập nhật kết quả tìm kiếm. Tính năng này tạm dừng khi bạn trực quan hóa.",
+    "histogramNoTimeAxis": "Kết quả được nhóm không có trục thời gian"
   },
   "menu": {
     "alertCalibration": "Hiệu chỉnh cảnh báo",
@@ -2103,6 +2031,14 @@
     "workflows": "Quy trình làm việc",
     "language": "Ngôn ngữ",
     "keyboardShortcuts": "Phím tắt",
+    "searchOrJumpTo": "Tìm kiếm hoặc chuyển đến…",
+    "jumpToTitle": "Chuyển đến",
+    "addData": "Thêm dữ liệu",
+    "jumpToPlaceholder": "Tìm trang, cảnh báo, bảng điều khiển và luồng",
+    "jumpToPlaceholderPages": "Tìm trang và hành động",
+    "jumpToPages": "Trang",
+    "jumpToShowAll": "Xem tất cả trong {page}",
+    "jumpToSearchLogs": "Tìm \"{text}\" trong nhật ký",
     "synthetic": "Synthetics",
     "experience": "Trải nghiệm",
     "slos": "SLO",
@@ -4183,7 +4119,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "Bạn không được ủy quyền quản lý giấy phép."
-      }
+      },
+      "usageTitle": "Lượng nạp hằng ngày"
     },
     "value_sso_requires_ha": "✅ Yêu cầu chế độ HA",
     "value_rbac_requires_ha": "✅ Yêu cầu chế độ HA",
@@ -4352,7 +4289,9 @@
     "revokeInvitationMsg": "Bạn có chắc muốn thu hồi lời mời cho {email}?",
     "deleteUsersTitle": "Xóa người dùng",
     "deleteUsersMsg": "Bạn có chắc chắn muốn xóa {count} người dùng? | Bạn có chắc chắn muốn xóa {count} người dùng?",
-    "deleteUsersBlockNote": "{count} trong số họ đã tham gia qua tên miền đã xác minh của bạn và sẽ bị chặn thay vì bị xóa."
+    "deleteUsersBlockNote": "{count} trong số họ đã tham gia qua tên miền đã xác minh của bạn và sẽ bị chặn thay vì bị xóa.",
+    "roleHint": "Admin quản lý tổ chức, Editor thay đổi dữ liệu và cài đặt, Viewer chỉ có thể đọc.",
+    "customRolesNeedRbac": "Vai trò tùy chỉnh cần RBAC, hiện đang tắt cho tổ chức này."
   },
   "invitation": {
     "pendingInvitations": "Lời mời đang chờ",
@@ -5205,6 +5144,7 @@
   },
   "organization": {
     "searchByNameOrId": "Tìm kiếm theo tên hoặc ID",
+    "currentLabel": "Tổ chức: {name}",
     "noOrganizationsFound": "Không tìm thấy tổ chức nào",
     "header": "Tổ chức",
     "orgBeingDeletedSwitching": "Tổ chức này đang bị xóa. Đang chuyển bạn sang tổ chức khác.",
@@ -5313,6 +5253,7 @@
     "timezone": "Múi giờ",
     "deleteActionMessage": "Bạn có chắc chắn muốn xóa {count} trường? Thao tác này không thể hoàn tác. | Bạn có chắc chắn muốn xóa {count} trường? Thao tác này không thể hoàn tác.",
     "deleteDatesMessage": "Bạn có chắc chắn muốn xóa {count} khoảng thời gian? Thao tác này không thể hoàn tác. | Bạn có chắc chắn muốn xóa {count} khoảng thời gian? Thao tác này không thể hoàn tác.",
+    "summaryAllTypes": "Stream (mọi loại)",
     "labelLogs": "Nhật ký",
     "labelMetrics": "Chỉ số",
     "labelTraces": "Trace",
@@ -7924,7 +7865,17 @@
       "metricsSketch": "Phân phối được lưu dưới dạng các bucket histogram, và phân vị được ước tính từ các bucket đó. ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA cao hơn cho các bucket mịn hơn và phân vị chính xác hơn, đổi lại là nhiều dòng được lưu hơn."
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU exporter"
+    "gpuExporter": "GPU exporter",
+    "rotationNote": "Mã thông báo không được xoay vòng tại chỗ. Để xoay vòng, hãy tạo mã mới, chuyển các nguồn sang mã đó rồi vô hiệu hóa mã cũ.",
+    "rotateAction": "Xoay vòng…",
+    "rotateTitle": "Xoay vòng {name}",
+    "rotateStep1": "Tạo một mã thông báo mới.",
+    "rotateStep2": "Chuyển các nguồn của bạn sang mã thông báo mới.",
+    "rotateStep3": "Khi không còn gì dùng {name}, hãy vô hiệu hóa nó từ menu của dòng.",
+    "rotateNever": "Không có gì bị vô hiệu hóa tự động. Mã thông báo cũ vẫn hoạt động cho đến khi bạn vô hiệu hóa nó.",
+    "rotateCreateNew": "Tạo mã thông báo mới",
+    "rotateNewName": "{name}-moi",
+    "rotateDescription": "Thay thế {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -9558,6 +9509,9 @@
       "addClause": "Thêm mệnh đề"
     },
     "viewDashboard": {
+      "apply": "Áp dụng",
+      "lastDataSeen": "Dữ liệu gần nhất {when}",
+      "jumpToLatest": "Chuyển đến mới nhất",
       "refreshToApplyVariables": "Làm mới để áp dụng các thay đổi biến mới nhất",
       "refresh": "Làm mới",
       "refreshCacheReload": "Làm mới cache & tải lại",
@@ -10303,9 +10257,16 @@
       "noPanels": "Không có bảng",
       "panelsDeletedHint": "Các bảng của nó đã bị xóa, nên hiện tại không vẽ trên bảng nào. Chọn bảng, hoặc chọn Chọn tất cả, để khắc phục.",
       "blankFiltersHint": "Các điều kiện không có giá trị sẽ bị bỏ qua."
+    },
+    "inlineCreate": {
+      "folderName": "Tên thư mục mới",
+      "createFolder": "Tạo thư mục",
+      "tabName": "Tên tab mới",
+      "createTab": "Tạo tab"
     }
   },
   "panel": {
+    "noDataInRange": "Không có dữ liệu trong khoảng",
     "saveAndStay": "Lưu và tiếp tục chỉnh sửa",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10586,12 +10547,32 @@
     "hoursAgo": "{count} giờ trước",
     "daysAgo": "{count} ngày trước",
     "cards": {
-      "openIncidents": "Sự cố đang mở"
+      "firingAlerts": "Cảnh báo đang kích hoạt",
+      "failingRules": "Quy tắc đang lỗi",
+      "openIncidents": "Sự cố đang mở",
+      "pipelineErrors": "Lỗi pipeline",
+      "pipelinesOf": "trong {enabled} đã bật",
+      "quietStreams": "Stream không hoạt động",
+      "firingNone": "Không có cảnh báo kích hoạt",
+      "noAlertRules": "Không có quy tắc cảnh báo",
+      "noEnabledRules": "Không có quy tắc nào được bật",
+      "failingNone": "Không có quy tắc lỗi",
+      "failingNote": "Lần đánh giá gần nhất bị lỗi",
+      "incidentsNone": "Không có sự cố đang mở",
+      "noPipelines": "Không có pipeline",
+      "noStreams": "Không có stream",
+      "quietNote": "Ngừng ghi dữ liệu trong 7 ngày qua",
+      "criticalUnit": "{count} ở mức nghiêm trọng",
+      "deliveryFailures": "Lỗi gửi cảnh báo",
+      "deliveryCount": "{count} lần gửi cảnh báo thất bại | {count} lần gửi cảnh báo thất bại",
+      "deliveryNote": "Cảnh báo đã kích hoạt nhưng không thể thông báo",
+      "oldestFiring": "Kích hoạt lâu nhất trong {age}"
     },
     "state": {
       "tileForbidden": "Không có quyền truy cập",
       "tileLocked": "Đã khóa",
       "tileError": "Không thể tải",
+      "tileUnavailable": "Không khả dụng",
       "sectionLocked": "Khả dụng với giấy phép doanh nghiệp",
       "sectionForbidden": "Vai trò của bạn không thể xem dữ liệu này. Hãy yêu cầu quản trị viên tổ chức cấp quyền truy cập."
     },
@@ -10715,6 +10696,39 @@
     "dataAsOf": "Dữ liệu tính đến {time}",
     "timeRange": {
       "heading": "Trong khoảng thời gian đã chọn"
+    },
+    "firingNow": {
+      "title": "Đang kích hoạt",
+      "byLevel": "{critical} nghiêm trọng · {warning} cảnh báo",
+      "allQuiet": "Mọi thứ yên ổn",
+      "watching": "{count} quy tắc cảnh báo đang bật, không có cái nào kích hoạt | {count} quy tắc cảnh báo đang bật, không có cái nào kích hoạt",
+      "noRules": "Chưa có quy tắc cảnh báo",
+      "browseLibrary": "Xem thư viện cảnh báo",
+      "notifyFailed": "Gửi thông báo thất bại",
+      "loadError": "Không tải được các cảnh báo đang kích hoạt",
+      "unavailable": "Hiện không đọc được trạng thái cảnh báo"
+    },
+    "health": {
+      "subtitle": "Dữ liệu nhận gần nhất, theo loại",
+      "lastData": "Dữ liệu gần nhất {age} trước",
+      "justNow": "Dữ liệu gần nhất vừa xong",
+      "noDataIn": "Không có dữ liệu trong {range} qua",
+      "noRecords": "Chưa có bản ghi",
+      "loadError": "Không đọc được các luồng của bạn"
+    },
+    "start": {
+      "text": "Chưa có dữ liệu nào đến. Hãy gửi dữ liệu, xem những gì bạn có hoặc thiết lập cảnh báo.",
+      "addData": "Thêm dữ liệu",
+      "createAlert": "Tạo cảnh báo"
+    },
+    "summary": {
+      "loadError": "Không tải được tóm tắt tổ chức",
+      "loadErrorRest": "Không tải được phần còn lại của tóm tắt",
+      "denied": "Không có quyền truy cập tóm tắt tổ chức. Hãy hỏi quản trị viên."
+    },
+    "events": {
+      "runFailed": "Chạy thất bại",
+      "timesInRange": "{count} lần trong khoảng đã chọn | {count} lần trong khoảng đã chọn"
     }
   },
   "chatHistory": {
@@ -10895,7 +10909,8 @@
       "taglineAnd": "và hướng dẫn bạn qua nhật ký, trace, chỉ số và sự cố của bạn.",
       "signedInAs": "Đã đăng nhập với tên",
       "role": "Vai trò",
-      "tryOneOfThese": "Hoặc thử một trong những"
+      "tryOneOfThese": "Hoặc thử một trong những",
+      "panelText": "Hỏi về log, trace, chỉ số và sự cố của bạn, hoặc nhờ trợ giúp viết truy vấn."
     },
     "capabilities": {
       "query": {
@@ -12005,13 +12020,21 @@
     }
   },
   "alerts": {
-    "rowAction": {
-      "leftFilter": "Không còn khớp bộ lọc",
-      "pausedLeftFilter": "{name} đã tạm dừng. Không còn khớp bộ lọc | {count} cảnh báo đã tạm dừng. Không còn khớp bộ lọc",
-      "resumedLeftFilter": "{name} đã tiếp tục. Không còn khớp bộ lọc | {count} cảnh báo đã tiếp tục. Không còn khớp bộ lọc",
-      "bulkPauseFailed": "Không thể tạm dừng {failed} trong {total} cảnh báo | Không thể tạm dừng {failed} trong {total} cảnh báo",
-      "bulkResumeFailed": "Không thể tiếp tục {failed} trong {total} cảnh báo | Không thể tiếp tục {failed} trong {total} cảnh báo"
+    "detail": {
+      "openInLogs": "Mở trong nhật ký",
+      "openInTraces": "Mở trong trace",
+      "openInMetrics": "Mở trong chỉ số",
+      "evidenceFiringTip": "Mở {stream} với bộ lọc của cảnh báo này, từ lúc bắt đầu kích hoạt đến hiện tại",
+      "evidenceWindowTip": "Mở {stream} với bộ lọc của cảnh báo này trong {window} gần nhất",
+      "threshold": "Ngưỡng",
+      "noIncident": "Chưa có sự cố",
+      "conditionLabel": "Điều kiện cảnh báo",
+      "allRows": "Mọi hàng",
+      "viewIncidents": "Xem sự cố"
     },
+    "summaryTrainingFailed": "Huấn luyện thất bại",
+    "columnState": "Trạng thái",
+    "startFromTemplate": "Bắt đầu từ một mẫu",
     "moreActions": "Thêm hành động",
     "promRuleMode": "Chế độ quy tắc",
     "promRulePreview": "{count} chuỗi trả về khớp hiện tại. Mỗi chuỗi phải hoàn thành khoảng thời gian chờ trước khi kích hoạt.",
@@ -13445,7 +13468,8 @@
       "condition": "Điều kiện",
       "result": "Kết quả",
       "anomalies": "Bất thường",
-      "forGroup": "cho {group}"
+      "forGroup": "cho {group}",
+      "errorFrom": "{status} từ {destination}"
     },
     "continue": "Tiếp tục",
     "wouldTrigger": "SẼ KÍCH HOẠT",
@@ -15009,7 +15033,8 @@
         "mute": "Bạn không thể tắt thông báo mục này.",
         "onCall": "Đang trực: {people}",
         "canAct": "Cũng có thể xử lý: {people}",
-        "people": "Trực: {onCall}. Cũng có thể xử lý: {canAct}"
+        "people": "Trực: {onCall}. Cũng có thể xử lý: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "Cảnh báo này không ở trạng thái đang kích hoạt nên không có gì để xác nhận.",
@@ -15067,6 +15092,17 @@
     "siemDetection": {
       "notice": "Cảnh báo này là một phát hiện Security. Truy vấn của nó được biên dịch từ quy tắc Sigma, vì vậy quy tắc, stream và lịch chạy được chỉnh sửa trong Security để giữ quy tắc và truy vấn luôn khớp nhau.",
       "open": "Chỉnh sửa trong Security"
+    },
+    "newAlertTitle": "Cảnh báo mới",
+    "newAnomalyTitle": "Phát hiện bất thường mới",
+    "rowAction": {
+      "leftFilter": "Không còn khớp bộ lọc",
+      "pausedLeftFilter": "{name} đã tạm dừng. Không còn khớp bộ lọc | {count} cảnh báo đã tạm dừng. Không còn khớp bộ lọc",
+      "resumedLeftFilter": "{name} đã tiếp tục. Không còn khớp bộ lọc | {count} cảnh báo đã tiếp tục. Không còn khớp bộ lọc",
+      "bulkPauseFailed": "Không thể tạm dừng {failed} trong {total} cảnh báo | Không thể tạm dừng {failed} trong {total} cảnh báo",
+      "bulkResumeFailed": "Không thể tiếp tục {failed} trong {total} cảnh báo | Không thể tiếp tục {failed} trong {total} cảnh báo",
+      "paused": "Đã tạm dừng {name}",
+      "resumed": "Đã tiếp tục {name}"
     }
   },
   "alert_dependencies": {
@@ -17937,7 +17973,13 @@
       "partial": "Một số span của trace này không thể đọc được. Biểu đồ thác nước có thể không đầy đủ.",
       "truncated": "Hiển thị span đầu tiên của trace này, theo thứ tự thời gian bắt đầu. Các span sau chưa được tải. | Hiển thị {count} span đầu tiên của trace này, theo thứ tự thời gian bắt đầu. Các span sau chưa được tải.",
       "loadMore": "Tải span tiếp theo | Tải {size} span tiếp theo",
-      "loadMoreFailed": "Không thể tải thêm span của trace này"
+      "loadMoreFailed": "Không thể tải thêm span của trace này",
+      "notFoundTitle": "Không có trace nào với ID này trong khoảng {from} đến {to}",
+      "notFoundText": "Trace {traceId} không có span nào trong luồng {stream} ở khoảng này. Có thể nó cũ hơn hoặc mới hơn, nằm trong luồng khác, hoặc chưa được thu thập.",
+      "searchWiderRange": "Tìm trong khoảng rộng hơn",
+      "searchSpansInRange": "Tìm span trong khoảng này",
+      "loadFailedTitle": "Không thể tải trace này",
+      "loadFailedText": "Không đọc được trace {traceId}. Hãy thử lại sau giây lát."
     },
     "traceTree": {
       "clickToExpand": "Nhấp để mở rộng",
@@ -19865,7 +19907,7 @@
       "streamHint": "Phiên bản agent này gửi trace đến {count} stream. Stream được dùng lâu nhất sẽ hiển thị trừ khi bạn chọn stream khác.",
       "agentIdHint": "Agent ID: {ids}",
       "noAgentIdentity": "Không tìm thấy danh tính agent",
-      "noAgentIdentityDescription": "Các span LLM này không có tên agent, nên chúng được hiển thị theo stream. Hãy ánh xạ thuộc tính đặt tên agent của bạn để xem chúng theo agent.",
+      "noAgentIdentityDescription": "Các span LLM này không có tên agent, nên chúng được hiển thị theo stream.",
       "noAgentIdentityAction": "Mở Ánh xạ Agent GenAI"
     },
     "agentGraph": {
@@ -21477,53 +21519,6 @@
       "description": "Các nhà cung cấp LLM lưu trữ chi tiết kết nối (URL gốc + thông tin xác thực) cho các mô hình ngôn ngữ mà các bộ chấm điểm LLM Judge của bạn gọi đến. Thêm một nhà cung cấp để bắt đầu chạy các đánh giá dựa trên LLM Judge."
     }
   },
-  "genAiAgentMapping": {
-    "tabLabel": "Ánh xạ Agent",
-    "title": "Ánh xạ Agent",
-    "subtitle": "Cách danh tính agent, phân bổ chi phí và tiêu đề phiên được đọc từ dữ liệu telemetry",
-    "identity": {
-      "title": "Trường danh tính agent",
-      "help": "Cách OpenObserve đặt tên cho từng agent và đọc môi trường cùng phiên bản của nó. Thuộc tính chuẩn được đọc trước. Khi một span không có thuộc tính đó, trường dự phòng đầu tiên mà span mang theo sẽ được dùng.",
-      "agentName": "Tên agent",
-      "agentId": "ID agent",
-      "env": "Môi trường",
-      "version": "Phiên bản"
-    },
-    "agentNameFields": "Trường dự phòng cho tên agent",
-    "agentNameHelp": "Các thuộc tính đến dùng làm dự phòng cho gen_ai.agent.name.",
-    "agentNameInfo": "Chỉ được kiểm tra khi thuộc tính chuẩn gen_ai.agent.name bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến trên mỗi dòng.",
-    "agentIdFields": "Trường dự phòng cho ID agent",
-    "agentIdHelp": "Các thuộc tính đến dùng làm dự phòng cho gen_ai.agent.id.",
-    "agentIdInfo": "Chỉ được kiểm tra khi thuộc tính chuẩn gen_ai.agent.id bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến trên mỗi dòng.",
-    "envFields": "Trường dự phòng cho môi trường",
-    "envHelp": "Các thuộc tính đến dùng làm môi trường của agent.",
-    "envInfo": "Chỉ được kiểm tra khi thuộc tính chuẩn deployment.environment.name bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến trên mỗi dòng.",
-    "versionFields": "Trường dự phòng cho phiên bản",
-    "versionHelp": "Các thuộc tính đến dùng làm phiên bản của agent.",
-    "versionInfo": "Chỉ được kiểm tra khi thuộc tính chuẩn gen_ai.agent.version bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến trên mỗi dòng.",
-    "alwaysAppliedStandard": "Chuẩn (kiểm tra trước):",
-    "coverageValue": "· trong {percent}% số trace, 24 giờ qua",
-    "fallbacksNote": "Nhập các trường dự phòng cách nhau bằng dấu phẩy, theo thứ tự cần kiểm tra.",
-    "fallbackInvalid": "Dùng tên trường cách nhau bằng dấu phẩy. Chỉ gồm chữ cái, chữ số và . _ - : / {'@'}.",
-    "sessions": {
-      "title": "Hiển thị phiên",
-      "help": "Cách đặt tiêu đề cho phiên và văn bản bao ngoài nào bị ẩn khỏi phiên.",
-      "noAgents": "Chưa có agent nào. Thêm một agent để ẩn văn bản bao ngoài của nó."
-    },
-    "applyDefaults": "Áp dụng mặc định",
-    "resetToEmpty": "Đặt lại về trống",
-    "clearRegistry": "Xóa registry",
-    "clearRegistryTitle": "Xóa registry agent?",
-    "clearRegistryDescription": "Thao tác này xóa tất cả các dòng registry agent GenAI đã phát hiện cho tổ chức này. Các trace khớp mới sẽ điền lại registry trong quá trình tiếp nhận dữ liệu.",
-    "clearRegistryConfirm": "Xóa registry",
-    "saved": "Đã lưu ánh xạ agent",
-    "unsavedConfirm": "Các thay đổi ánh xạ agent của bạn chưa được lưu. Bỏ các thay đổi này?",
-    "clearRegistrySuccess": "Đã xóa registry agent GenAI. Đã xóa {deletedCount} agent đã lưu và {bufferCount} quan sát trong hàng đợi.",
-    "saveFailed": "Lưu ánh xạ agent thất bại",
-    "clearRegistryFailed": "Xóa registry agent GenAI thất bại",
-    "defaultsLoadFailed": "Tải mặc định ánh xạ agent thất bại",
-    "defaultsFetchFailed": "Lấy mặc định thất bại ({status})"
-  },
   "logs": {
     "noData": {
       "title": "Bắt đầu gửi dữ liệu đến {product}",
@@ -21539,7 +21534,6 @@
     },
     "noStream": {
       "title": "Chọn một stream để bắt đầu khám phá",
-      "description": "Chọn một stream, sau đó nhấn <strong>Chạy truy vấn</strong>. Bạn có thể tinh chỉnh với bộ lọc, hàm VRL và phạm vi thời gian tùy chỉnh khi có kết quả.",
       "selectStream": "Chọn một stream",
       "selectStreamDesc": "Duyệt các stream nhật ký, trace, chỉ số và RUM",
       "queryGuide": "Đọc hướng dẫn truy vấn",
@@ -21591,7 +21585,18 @@
     "detailTable": {
       "noDataAvailable": "Không có dữ liệu.",
       "addIcon": "Thêm biểu tượng",
-      "sendToAiChat": "Gửi đến AI Chat"
+      "sendToAiChat": "Gửi đến AI Chat",
+      "openTrace": "Mở trace",
+      "noTraceTitle": "Không có trace nào liên kết với nhật ký này",
+      "noRelatedLogsTitle": "Không tìm thấy nhật ký liên quan",
+      "noRelatedMetricsTitle": "Không tìm thấy chỉ số liên quan",
+      "noServiceText": "Không thể khớp dịch vụ nào với nhật ký này nên không thể tự động tìm dữ liệu liên quan.",
+      "searchTracesAround": "Tìm trace quanh thời điểm này",
+      "searchAroundTip": "Tải các sự kiện được ghi ngay trước và sau sự kiện này.",
+      "noOfEventsTip": "Số sự kiện cần tải quanh sự kiện này.",
+      "severityTip": "Mức nhật ký được phát hiện. Chọn để xem cách phát hiện.",
+      "traceId": "ID trace",
+      "spanId": "ID span"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Truy vấn Select * không được hỗ trợ cho trực quan hóa.",
@@ -21883,6 +21888,7 @@
     "showDetail": "Hiển thị chi tiết",
     "hideDetail": "Ẩn chi tiết",
     "runAs": "Chạy với tư cách",
+    "runSuggestion": "Chạy {query}",
     "searchTextFor": "Tìm văn bản cho \"{text}\"",
     "searchTextDesc": "Tìm toàn bộ nội dung nhập như một cụm từ",
     "explain": {
@@ -21947,7 +21953,19 @@
     "dataStale": "Dữ liệu đã cũ",
     "lastRefreshed": "Cập nhật lần cuối: {time}",
     "refresh": "Làm mới",
-    "refreshWithAge": "Làm mới, lần làm mới cuối {age}"
+    "refreshWithAge": "Làm mới, lần làm mới cuối {age}",
+    "refreshing": "Đang làm mới",
+    "failed": "Thất bại",
+    "autoRefresh": "Tự động làm mới",
+    "autoOn": "Tự động · {interval}",
+    "every": "Mỗi {interval}",
+    "interval": {
+      "10s": "10 giây",
+      "30s": "30 giây",
+      "1m": "1 phút",
+      "5m": "5 phút",
+      "15m": "15 phút"
+    }
   },
   "synthetics": {
     "variables": {
@@ -22741,11 +22759,6 @@
       "disabling": "Đang vô hiệu hóa…",
       "editTitle": "Chỉnh sửa vị trí",
       "empty": "Không có vị trí nào khả dụng",
-      "emptyState": {
-        "title": "Chưa có vị trí nào",
-        "description": "Vị trí là nơi các trình giám sát tổng hợp của bạn thực hiện kiểm tra, chẳng hạn như một vùng đám mây.",
-        "actionDesc": "Thêm một nơi để chạy kiểm tra"
-      },
       "enable": "Kích hoạt",
       "enabled": "Đã kích hoạt",
       "enabledSuccess": "Vị trí đã được kích hoạt",
@@ -22813,7 +22826,12 @@
       "noPrivateMatches": "Không có vị trí riêng tư nào khớp với tìm kiếm của bạn",
       "newPrivateLocation": "Vị trí riêng tư mới",
       "publicSubtitle": "Các khu vực đám mây, luôn sẵn sàng",
-      "privateSubtitle": "Vị trí sẵn sàng khi có ít nhất một agent của nó đang hoạt động"
+      "privateSubtitle": "Vị trí sẵn sàng khi có ít nhất một agent của nó đang hoạt động",
+      "emptyState": {
+        "title": "Chưa có vị trí nào",
+        "description": "Vị trí là nơi các trình giám sát tổng hợp của bạn thực hiện kiểm tra, chẳng hạn như một vùng đám mây.",
+        "actionDesc": "Thêm một nơi để chạy kiểm tra"
+      }
     },
     "prefill": {
       "pageTitle": "Kiểm tra tổng hợp mới · HTTP",
@@ -23845,6 +23863,7 @@
     },
     "actions": {
       "openCheatsheet": "Mở bảng phím tắt",
+      "searchOrJumpTo": "Tìm kiếm hoặc chuyển đến trang",
       "closeDialog": "Đóng bất kỳ hộp thoại, ngăn kéo hoặc cửa sổ phương thức",
       "focusSearch": "Tập trung thanh tìm kiếm",
       "focusQuery": "Tập trung trình soạn thảo truy vấn",
@@ -23994,7 +24013,10 @@
       "tokenLinkTooltip": "Chọn token tiếp nhận dữ liệu mà các đoạn mã sử dụng",
       "copiedWithToken": "Đã sao chép với token tổ chức {name}",
       "tokenIncludedHint": "Việc sao chép bao gồm token tiếp nhận dữ liệu của tổ chức, token này vẫn được ẩn ở đây.",
-      "maskedSelectionWarning": "Token ẩn đã được sao chép dưới dạng dấu chấm. Hãy dùng Sao chép, hoặc Hiện nó trước."
+      "maskedSelectionWarning": "Token ẩn đã được sao chép dưới dạng dấu chấm. Hãy dùng Sao chép, hoặc Hiện nó trước.",
+      "wrapLines": "Ngắt dòng",
+      "showAll": "Hiện tất cả {count} dòng",
+      "showLess": "Hiện ít hơn"
     },
     "spinner": {
       "loading": "Đang tải"
@@ -24003,14 +24025,6 @@
       "steps": "Các bước",
       "stepOf": "Bước {current} / {total}",
       "swipeHint": "vuốt để xem phần còn lại"
-    },
-    "statStrip": {
-      "filters": "Bộ lọc",
-      "showOnly": "Chỉ hiển thị {label}",
-      "alsoShow": "Cũng hiển thị {label}",
-      "stopShowing": "Ngừng hiển thị {label}",
-      "scrollBack": "Hiển thị bộ lọc trước",
-      "scrollForward": "Hiển thị thêm bộ lọc"
     },
     "attributeValueCell": {
       "addIcon": "Thêm biểu tượng"
@@ -24049,7 +24063,10 @@
       "moreInfo": "Thêm thông tin"
     },
     "dialog": {
-      "closeDialog": "Đóng hộp thoại"
+      "closeDialog": "Đóng hộp thoại",
+      "discardChanges": "Hủy bỏ thay đổi?",
+      "keepEditing": "Tiếp tục chỉnh sửa",
+      "discard": "Hủy bỏ"
     },
     "drawer": {
       "closeDrawer": "Đóng ngăn kéo"
@@ -24072,6 +24089,32 @@
       "clear": "Xóa"
     },
     "file": {
+      "removeNamed": "Xóa {name}",
+      "sourceLabel": "Nhập từ",
+      "sourceFile": "Tệp",
+      "sourceUrl": "URL",
+      "sourcePaste": "Dán",
+      "dropPrompt": "Thả tệp vào đây hoặc {choose}",
+      "dropPromptMultiple": "Thả các tệp vào đây hoặc {choose}",
+      "chooseAFile": "chọn một tệp",
+      "chooseFiles": "chọn tệp",
+      "chooseFileButton": "Chọn tệp",
+      "chooseFilesButton": "Chọn các tệp",
+      "noFileChosen": "Chưa chọn tệp",
+      "dropToUpload": "Thả để tải lên",
+      "upToSize": "tối đa {size}",
+      "upToSizeEach": "tối đa {size} mỗi tệp",
+      "oneFile": "một tệp",
+      "upToFiles": "tối đa {count} tệp",
+      "typeRejected": "Chỉ chấp nhận tệp {allowed}",
+      "sizeRejected": "{size} vượt quá giới hạn {max}",
+      "countRejected": "Mỗi lần chỉ {count} tệp",
+      "uploadFailed": "Tải lên thất bại",
+      "uploaded": "Đã tải lên",
+      "urlPlaceholder": "URL tệp",
+      "urlHelp": "Chúng tôi tải một lần khi bạn nhập.",
+      "textPlaceholder": "Dán nội dung vào đây",
+      "invalidJson": "Không phải JSON hợp lệ: {detail}",
       "removeFile": "Xóa tệp",
       "clearAll": "Xóa tất cả"
     },
@@ -24086,7 +24129,14 @@
     "pagination": {
       "pagination": "Phân trang",
       "previousPage": "Trang trước",
-      "nextPage": "Trang sau"
+      "nextPage": "Trang sau",
+      "onFirstPage": "Đã ở trang đầu",
+      "onLastPage": "Đã ở trang cuối",
+      "range": "{from}–{to} trong {total}",
+      "rangeOfMany": "{from}–{to} trong nhiều",
+      "pageOf": "Trang {page} trên {pages}",
+      "perPage": "{size} mỗi trang",
+      "pageSize": "Số hàng mỗi trang"
     },
     "select": {
       "more": "thêm",
@@ -24096,6 +24146,10 @@
       "noOptionsFound": "Không tìm thấy tùy chọn",
       "multiSelect": "Chọn nhiều",
       "singleSelect": "Chọn một",
+      "any": "Bất kỳ",
+      "noMatches": "Không có kết quả khớp với \"{term}\"",
+      "clearSearch": "Xóa tìm kiếm",
+      "addOption": "Thêm \"{value}\"",
       "moreInfoAbout": "Thêm thông tin về {field}",
       "moreInfo": "Thêm thông tin"
     },
@@ -24138,7 +24192,10 @@
       "removeColumnAria": "Xóa cột",
       "formatColumnAria": "Định dạng cột",
       "selectedOfTotal": "Đã chọn {selected} trong {total}",
-      "selectedCount": "Đã chọn {selected}"
+      "selectedCount": "Đã chọn {selected}",
+      "clearSelection": "Xóa",
+      "rowActions": "Thao tác hàng",
+      "moreRowActions": "Thao tác khác"
     },
     "predefinedThemes": {
       "title": "Chủ đề",
@@ -24289,7 +24346,7 @@
         "ok": "OK",
         "normal": "Bình thường",
         "firing": "Đang kích hoạt",
-        "notifyfailed": "Thông báo thất bại",
+        "notifyfailed": "Gửi thất bại",
         "flapping": "Dao động",
         "anomaly": "Bất thường",
         "succeeded": "Thành công",
@@ -24512,6 +24569,26 @@
     },
     "chartPlaceholder": {
       "loading": "Đang tải biểu đồ"
+    },
+    "jsonViewer": {
+      "include": "Lọc theo giá trị này",
+      "exclude": "Lọc loại trừ giá trị này",
+      "copyValue": "Sao chép giá trị",
+      "fieldCount": "{count} trường",
+      "itemCount": "{count} mục"
+    },
+    "tabs": {
+      "more": "Thêm",
+      "unsaved": "Thay đổi chưa lưu",
+      "locked": "Đã khóa"
+    },
+    "statStrip": {
+      "filters": "Bộ lọc",
+      "showOnly": "Chỉ hiển thị {label}",
+      "alsoShow": "Cũng hiển thị {label}",
+      "stopShowing": "Ngừng hiển thị {label}",
+      "scrollBack": "Hiển thị bộ lọc trước",
+      "scrollForward": "Hiển thị thêm bộ lọc"
     }
   },
   "functions": {
@@ -25824,6 +25901,7 @@
       "packUnavailableHint": "Nội dung được tuyển chọn cho workload này chưa được phát hành. Hãy tạo một bảng điều khiển để trực quan hóa nó trong lúc chờ.",
       "partialTelemetryKubernetes": "Chúng tôi tìm thấy các stream Kubernetes, nhưng không thấy các chỉ số mà trang này cần (kubeletstats hoặc cluster receiver). Hãy kiểm tra các receiver của collector.",
       "partialTelemetryHosts": "Chúng tôi tìm thấy các stream host, nhưng không thấy các chỉ số mà trang này cần. Hãy kiểm tra hostmetrics receiver của collector.",
+      "hostMetricsMissingTitle": "Không tìm thấy metric của máy chủ",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}, và {count} mục khác",
       "hiddenFootnote": "Các nguồn dữ liệu bạn không có quyền truy cập cũng xuất hiện ở đây.",
@@ -26608,7 +26686,8 @@
         "p95": "Phần đuôi chậm — 1 trong 20 lệnh gọi mất ít nhất từng này thời gian. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
         "p99": "1% lệnh gọi tệ nhất mất ít nhất từng này thời gian. Được đo từ các lệnh gọi đã hoàn tất trong trace của ứng dụng của bạn.",
         "load": "Tổng thời gian ứng dụng của bạn dành cho các lệnh gọi đến cơ sở dữ liệu này, được đo từ trace của ứng dụng của bạn. Nó cho thấy cơ sở dữ liệu này đã phục vụ bao nhiêu lưu lượng cho ứng dụng của bạn.",
-        "attention": "Phiên bản này gần đến mức nào so với giới hạn mà công cụ của chính nó công bố — hôm nay, số kết nối so với max_connections. Tỷ lệ tệ nhất, không phải điểm tổng hợp. Sắp xếp theo thứ tự giảm dần, với các phiên bản không thể đọc tình trạng ở trên cùng, vì một phiên bản bạn không thể thấy không phải là phiên bản bạn biết là khỏe mạnh. Được đo trên máy chủ cơ sở dữ liệu, vì vậy nó không thể so sánh với Thời gian cơ sở dữ liệu bên cạnh."
+        "attention": "Phiên bản này gần đến mức nào so với giới hạn mà công cụ của chính nó công bố — hôm nay, số kết nối so với max_connections. Tỷ lệ tệ nhất, không phải điểm tổng hợp. Sắp xếp theo thứ tự giảm dần, với các phiên bản không thể đọc tình trạng ở trên cùng, vì một phiên bản bạn không thể thấy không phải là phiên bản bạn biết là khỏe mạnh. Được đo trên máy chủ cơ sở dữ liệu, vì vậy nó không thể so sánh với Thời gian cơ sở dữ liệu bên cạnh.",
+        "calls": "Số lần ứng dụng của bạn gọi cơ sở dữ liệu này, đo từ trace của ứng dụng."
       },
       "failedChip": "{count} thất bại",
       "columnSubLabels": {
@@ -27049,7 +27128,8 @@
         "tableHealthHint": "Kích thước bảng, độ phình và trạng thái dọn dẹp. Độ phình và dọn dẹp chỉ áp dụng cho PostgreSQL.",
         "deadlocksLocked": "Deadlock là tính năng Enterprise. Nâng cấp để xem truy vấn nào đã khóa lẫn nhau và tại sao. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói.",
         "blockedLocked": "Truy vấn bị chặn là tính năng Enterprise. Nâng cấp để xem phiên nào đang chờ khóa và điều gì đang giữ khóa. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói.",
-        "tableHealthLocked": "Sức khỏe bảng là tính năng Enterprise. Nâng cấp để theo dõi kích thước bảng, độ phình và trạng thái dọn dẹp. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói."
+        "tableHealthLocked": "Sức khỏe bảng là tính năng Enterprise. Nâng cấp để theo dõi kích thước bảng, độ phình và trạng thái dọn dẹp. Các tab cơ sở dữ liệu khác hoạt động trên mọi gói.",
+        "queriesHintServer": "Các loại truy vấn mà cơ sở dữ liệu của bạn báo cáo trong khoảng này, được đếm bên trong cơ sở dữ liệu."
       }
     },
     "metrics": {
@@ -28274,6 +28354,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Chặn thông báo trực",
     "savePolicyFailed": "Không thể lưu chính sách",
+    "savePolicyFailedReason": "Chưa lưu chính sách. {reason}",
     "state_triggered": "Đã kích hoạt",
     "state_triaged": "Đã phân loại",
     "state_acknowledged": "Đã xác nhận",
@@ -29958,423 +30039,6 @@
         "noData": "AutoObserve chưa có lịch sử cho {stream}, nên chưa có mức bình thường.",
         "approximate": "Mức bình thường chỉ mang tính gần đúng: một phần lịch sử của nó bị thiếu."
       }
-    }
-  },
-  "autoobserveLive": {
-    "where": "{cluster} / {namespace}",
-    "lessThan": "<{value}",
-    "topbar": {
-      "checked": "Đã kiểm tra {ago}",
-      "firstCheck": "Đang thực hiện lần kiểm tra đầu tiên"
-    },
-    "retry": "Thử lại",
-    "classes": {
-      "errors": "Lỗi",
-      "latency": "Độ trễ",
-      "saturation": "Độ bão hòa",
-      "absence": "Ngừng gửi dữ liệu",
-      "external_probe": "Kiểm tra synthetic",
-      "workload_health": "Tình trạng workload",
-      "node": "Node"
-    },
-    "classesInline": {
-      "errors": "lỗi",
-      "latency": "độ trễ",
-      "saturation": "độ bão hòa",
-      "absence": "thiếu dữ liệu",
-      "external_probe": "probe bên ngoài",
-      "workload_health": "tình trạng workload",
-      "node": "tình trạng node"
-    },
-    "states": {
-      "covered": "Đang theo dõi",
-      "weak": "Yếu",
-      "silent": "Im lặng",
-      "blind": "Mù",
-      "unmapped": "Chưa ánh xạ",
-      "none": "Không có"
-    },
-    "monitorKinds": {
-      "alert": "Cảnh báo",
-      "anomaly_detector": "Bộ phát hiện bất thường",
-      "slo": "SLO",
-      "synthetic": "Synthetic"
-    },
-    "coverage": {
-      "summaryWatched": "{watched} trên {total} được theo dõi · {pct}%",
-      "summaryWatchedShare": "{watched} trên {total} được theo dõi · {pct}",
-      "splitLabel": "{watched} được theo dõi, {gaps} có lỗ hổng bao phủ",
-      "stateWatched": "Đang theo dõi",
-      "stateGap": "Lỗ hổng bao phủ",
-      "columns": {
-        "where": "Vị trí",
-        "state": "Trạng thái",
-        "lastChecked": "Lần kiểm tra cuối"
-      },
-      "loading": "Đang tải độ bao phủ",
-      "loaded": "Đã tải độ bao phủ",
-      "sentence": {
-        "allWatched": "Tôi đang theo dõi 1 dịch vụ của bạn. | Tôi đang theo dõi tất cả {total} dịch vụ của bạn.",
-        "allGaps": "1 dịch vụ của bạn có lỗ hổng bao phủ. | Tất cả {total} dịch vụ của bạn đều có lỗ hổng bao phủ.",
-        "watching": "Tôi đang theo dõi {watched} trong số {total} dịch vụ của bạn.",
-        "gaps": "{count} có lỗ hổng bao phủ. | {count} có lỗ hổng bao phủ.",
-        "mixed": "{watching} {gaps}"
-      },
-      "gapAdded": "Đã thêm cảnh báo cho {checks}. AutoObserve sẽ ghi nhận vào lần kiểm tra tiếp theo. | Đã thêm cảnh báo cho {checks}. AutoObserve sẽ ghi nhận vào lần kiểm tra tiếp theo.",
-      "gapNone": "Không có cảnh báo nào theo dõi {checks}",
-      "searchPlaceholder": "Tìm kiếm dịch vụ, cluster hoặc namespace",
-      "labelNamespace": "{name} · {namespace}",
-      "labelPlace": "{name} · {cluster} · {namespace}",
-      "noNamespace": "không có namespace",
-      "noCluster": "không có cluster",
-      "noMatch": "Không có dịch vụ, cluster hoặc namespace nào khớp với “{query}”",
-      "showAll": "Hiển thị tất cả",
-      "bucketThree": "3 trở lên",
-      "bucketTwo": "2",
-      "bucketOne": "1",
-      "filterHides": "Không có dịch vụ nào ở trạng thái {state}",
-      "filterHidesSearch": "{count} dịch vụ khớp với “{query}”, nhưng nó không ở trạng thái {state} | {count} dịch vụ khớp với “{query}”, nhưng không có dịch vụ nào ở trạng thái {state}"
-    },
-    "cell": {
-      "noClass": "AutoObserve chưa kiểm tra tín hiệu này",
-      "tipNoClass": "{signal}: AutoObserve chưa kiểm tra tín hiệu này",
-      "gap": {
-        "weak": "{signal}: chỉ có {monitor}, một cảnh báo chung, có thể phát hiện vấn đề; nó không nhắm riêng đến dịch vụ này | {signal}: chỉ có {monitor}, các cảnh báo chung, có thể phát hiện vấn đề; chúng không nhắm riêng đến dịch vụ này",
-        "silent": "{signal}: {monitor} khớp, nhưng nó không thông báo cho ai | {signal}: {monitor} khớp, nhưng chúng không thông báo cho ai",
-        "blind": "{signal}: {monitor} khớp, nhưng nó không thể thấy dữ liệu của mình | {signal}: {monitor} khớp, nhưng chúng không thể thấy dữ liệu của mình",
-        "unmapped": "{signal}: {monitor} có thể khớp, nhưng không thể gắn phạm vi của nó với một dịch vụ | {signal}: {monitor} có thể khớp, nhưng không thể gắn phạm vi của chúng với một dịch vụ",
-        "none": "{signal}: không có cảnh báo nào theo dõi điều này"
-      },
-      "added": "Đã thêm"
-    },
-    "drawer": {
-      "moreChecks": "Các kiểm tra khác",
-      "chartNoData": "Biểu đồ chưa có sẵn",
-      "monitors": "Cảnh báo",
-      "monitorLine": "{kind} · {state}",
-      "noMonitor": "Không có cảnh báo nào khớp"
-    },
-    "charts": {
-      "empty1h": "Không có dữ liệu từ {service} trong giờ qua",
-      "empty24h": "Không có dữ liệu từ {service} trong 24 giờ qua",
-      "empty7d": "Không có dữ liệu từ {service} trong 7 ngày qua",
-      "emptyPartial1h": "Không có dữ liệu từ {service} trong phần đã tìm kiếm của giờ qua",
-      "emptyPartial24h": "Không có dữ liệu từ {service} trong phần đã tìm kiếm của 24 giờ qua",
-      "emptyPartial7d": "Không có dữ liệu từ {service} trong phần đã tìm kiếm của 7 ngày qua",
-      "noSpanStatus": "Không có trạng thái span trong {stream}",
-      "noLevel": "Không có mức log trong {stream}",
-      "noDuration": "Không có trường thời lượng trong {stream}",
-      "noTraces": "Độ trễ được vẽ biểu đồ từ trace. {service} không gửi trace nào.",
-      "noMatch": "Không thể khớp dịch vụ này với các stream của nó",
-      "failedQuery": "Không thể tải biểu đồ này từ {stream}",
-      "failedMatch": "Không thể tra cứu các stream của {service}",
-      "partial": "Dữ liệu một phần",
-      "wide": "Bao gồm các dịch vụ khác dùng chung stream này",
-      "loading": "Đang tải {metric}",
-      "summary": "{metric}, {value} hiện tại",
-      "summaryNone": "{metric}, không có dữ liệu đo nào trong khoảng thời gian mới nhất"
-    },
-    "suggestions": {
-      "serviceMeta": "{where}, khoảng {traffic} sự kiện mỗi giờ",
-      "trafficOnly": "Khoảng {traffic} sự kiện mỗi giờ",
-      "kinds": {
-        "coverage_gap": "Lỗ hổng bao phủ",
-        "no_absence_check": "Thiếu cảnh báo",
-        "silent_coverage": "Không thông báo cho ai",
-        "coverage_lost": "Mất bao phủ",
-        "blind_guardrail": "Không hoạt động",
-        "discovery_unusable": "Chất lượng dữ liệu",
-        "alert_no_destination": "Không thông báo cho ai",
-        "alert_notify_failed": "Thông báo thất bại",
-        "other": "Khác"
-      },
-      "severity": {
-        "high": "Cao",
-        "medium": "Trung bình"
-      },
-      "confidence": {
-        "sufficient": "Bằng chứng mạnh",
-        "suggestive": "Có một số bằng chứng",
-        "insufficient": "Bằng chứng yếu"
-      },
-      "body": {
-        "coverageGap": "Không có gì theo dõi {service}",
-        "noAbsenceNone": "Không có cảnh báo nào nếu {service} ngừng gửi dữ liệu",
-        "noAbsenceWeak": "Chỉ có một cảnh báo chung mới nhận ra nếu {service} ngừng gửi dữ liệu",
-        "noAbsenceSilent": "Bước kiểm tra có thể nhận ra khi {service} im lặng lại không thông báo cho ai",
-        "noAbsenceBlind": "Bước kiểm tra có thể nhận ra khi {service} im lặng lại không thấy được dữ liệu của nó",
-        "silentCoverage": "{monitor} theo dõi {classes} trên {count} dịch vụ nhưng không thông báo cho ai | {monitor} theo dõi {classes} trên {count} dịch vụ nhưng không thông báo cho ai",
-        "silentWhy": "{monitor} sẽ nhận ra {services} dừng lại, nhưng nó không thông báo cho ai.",
-        "silentWhyNoNames": "{monitor} sẽ nhận ra một dịch vụ dừng lại, nhưng nó không thông báo cho ai.",
-        "silentNext": "Hãy thêm đích cho nó.",
-        "undeliverable": "{monitor} không thể kết nối tới {destination}",
-        "undeliverableWhy": "{destination} nhận ticket, không phải cảnh báo. | {destination} nhận ticket, không phải cảnh báo.",
-        "undeliverableNext": "Thêm webhook hoặc email bên cạnh nó; {destination} vẫn giữ nguyên. | Thêm webhook hoặc email bên cạnh nó; {destination} vẫn giữ nguyên.",
-        "coverageLost": "{service} đã mất cảnh báo {classes} vào {day}",
-        "blindStreamMissing": "{monitor} đọc {detail}, thứ không tồn tại",
-        "blindNoData": "{monitor} đọc {detail}, thứ không có dữ liệu gần đây",
-        "blindEmptyScope": "{monitor} lọc theo các hàng không bao giờ đến",
-        "blindUnknownField": "{monitor} lọc theo {field}, một trường mà stream của nó không có",
-        "blindIgnoredMatcher": "{monitor} khớp theo {label}, một nhãn mà không chuỗi nào có, nên nó theo dõi mọi chuỗi",
-        "discovery": "Chỉ {good} trong {active} dịch vụ được phát hiện là dùng được, nên bảng xếp hạng lỗ hổng chỉ là một phần",
-        "alertSyntax": "{monitor} có một truy vấn không phân tích cú pháp được",
-        "alertTimeout": "{monitor} liên tục hết thời gian trước khi hoàn thành",
-        "alertMemory": "{monitor} liên tục hết bộ nhớ",
-        "alertOtherError": "{monitor} liên tục thất bại với một lỗi",
-        "alertNotWorkingGeneric": "{monitor} không hoạt động",
-        "alertNoDestination": "{monitor} đã kích hoạt và không thông báo cho ai",
-        "alertNotifyFailed": "{monitor} đã kích hoạt, và {failed} trong {tried} thông báo thất bại. | {monitor} đã kích hoạt, và {failed} trong {tried} thông báo thất bại.",
-        "alertNotifyFailedNoCounts": "{monitor} đã kích hoạt, và các thông báo của nó thất bại.",
-        "alertStreamGone": "{monitor} liên tục thất bại vì stream của nó không tồn tại",
-        "alertFieldGone": "{monitor} liên tục thất bại vì một trường nó dùng không tồn tại",
-        "other": "Tôi tìm thấy điều gì đó mà trang này chưa thể hiển thị"
-      },
-      "detail": {
-        "cell": "{check}: {state}",
-        "cells": "Những gì engine tìm thấy: {cells}.",
-        "services": "Các dịch vụ nó khớp bao gồm {services}.",
-        "text": "Chi tiết engine: {detail}",
-        "quality": "Tính năng phát hiện đang chạy ở chế độ {mode}.",
-        "none": "Engine không gửi thêm chi tiết nào.",
-        "joined": "{first} {rest}"
-      },
-      "analysedAt": "Từ lần chạy hiệu chỉnh {ago}",
-      "neverFired": "Chưa bao giờ kích hoạt",
-      "lastFired": "Kích hoạt lần cuối {time}",
-      "accept": "Chấp nhận",
-      "dismiss": "Bỏ qua…",
-      "accepted": "Đã chấp nhận trong bản xem trước này; chưa gửi gì cả",
-      "dismissed": "Đã bỏ qua trong bản xem trước này; chưa gửi gì cả",
-      "loading": "Đang tải gợi ý",
-      "loaded": "Đã tải xong gợi ý",
-      "more": "và {count} gợi ý khác | và {count} gợi ý khác",
-      "moreNames": "{count} mục khác | {count} mục khác",
-      "whyNext": "{why} {next}",
-      "seeAll": "Xem tất cả",
-      "drawerTitle": "Gợi ý",
-      "drawerLine": "Được xếp hạng theo mức độ quan trọng nhất trước. Mở một dòng để xem những gì tôi phát hiện.",
-      "focusGone": "Gợi ý này không còn mở.",
-      "clearKind": "Hiển thị tất cả gợi ý",
-      "kindEmptyTitle": "Không có gợi ý mở nào thuộc loại {kind}",
-      "kindEmptyDesc": "{count} gợi ý khác đang mở. | {count} gợi ý khác đang mở.",
-      "folder": "Thư mục {folder}",
-      "columns": {
-        "suggestion": "Gợi ý",
-        "where": "Vị trí",
-        "kind": "Loại",
-        "severity": "Mức độ nghiêm trọng"
-      }
-    },
-    "notice": {
-      "offTitle": "AutoObserve chưa được bật",
-      "details": "Chi tiết",
-      "refreshFailed": "Làm mới thất bại lúc {failedAt} · đang hiển thị {what} từ {dataAt}",
-      "what": {
-        "coverage": "độ bao phủ",
-        "suggestions": "gợi ý",
-        "incidents": "phát hiện đã gọi trực",
-        "issues": "vấn đề",
-        "history": "lịch sử"
-      },
-      "coverage": {
-        "deniedTitle": "Bạn không có quyền xem độ bao phủ",
-        "deniedDesc": "Độ bao phủ đếm các bộ giám sát trong mọi thư mục, nên cần quyền xem tất cả cảnh báo trong tổ chức này, không chỉ một số thư mục. Hãy yêu cầu quản trị viên tổ chức cấp quyền.",
-        "offDesc": "Quản trị viên bật tính năng này cho triển khai. Độ bao phủ sẽ xuất hiện ở đây sau lần kiểm tra đầu tiên.",
-        "unavailableTitle": "Tạm thời không thể xem độ bao phủ",
-        "unavailableDesc": "AutoObserve hiện không phản hồi. Tình trạng này thường hết trong một hoặc hai phút.",
-        "failedTitle": "Không thể tải độ bao phủ",
-        "failedDesc": "Đã xảy ra lỗi khi tải. Hãy thử lại sau giây lát.",
-        "noPassTitle": "Không có lần kiểm tra nào hoàn thành trong ngày qua",
-        "noPassDesc": "Độ bao phủ sẽ xuất hiện ở đây sau khi lần kiểm tra tiếp theo của tôi đối với các dịch vụ của bạn hoàn tất. Nếu AutoObserve vừa được bật, lần kiểm tra đầu tiên có thể mất một lúc.",
-        "noPassAction": "Cách tôi kiểm tra độ bao phủ",
-        "noServicesTitle": "Chưa tìm thấy dịch vụ nào",
-        "noServicesDesc": "Lần kiểm tra gần nhất của tôi, {when}, không tìm thấy dịch vụ nào. Dịch vụ sẽ xuất hiện ở đây khi chúng gửi nhật ký, chỉ số hoặc trace có nêu tên dịch vụ.",
-        "noServicesAction": "Cách tôi tìm dịch vụ"
-      },
-      "suggestions": {
-        "deniedTitle": "Bạn không có quyền xem gợi ý",
-        "deniedDesc": "Để xem chúng, bạn cần quyền xem cảnh báo trong tổ chức này. Hãy yêu cầu quản trị viên tổ chức cấp quyền.",
-        "offDesc": "Gợi ý sẽ xuất hiện ở đây sau khi quản trị viên bật tính năng này cho triển khai.",
-        "unavailableTitle": "Tạm thời không thể xem gợi ý",
-        "unavailableDesc": "AutoObserve hiện không phản hồi. Tình trạng này thường hết trong một hoặc hai phút.",
-        "failedTitle": "Không thể tải gợi ý",
-        "failedDesc": "Đã xảy ra lỗi khi tải chúng. Hãy thử lại sau giây lát.",
-        "emptyTitle": "Hiện không có gợi ý nào",
-        "emptyDesc": "Tôi sẽ thêm một gợi ý ở đây khi phát hiện lỗ hổng trong phạm vi giám sát của bạn.",
-        "pageEmptyTitle": "Các gợi ý hàng đầu đã được xử lý",
-        "pageEmptyDesc": "Mở danh sách đầy đủ để xem những mục vẫn đang chờ."
-      },
-      "history": {
-        "deniedTitle": "Bạn không có quyền xem lịch sử",
-        "deniedDesc": "Lịch sử liệt kê các sự cố mà AutoObserve đã mở, nên để xem lịch sử cần quyền liệt kê sự cố trong tổ chức này. Hãy yêu cầu quản trị viên tổ chức cấp quyền đó.",
-        "offDesc": "Lịch sử sẽ xuất hiện ở đây sau khi quản trị viên bật tính năng này cho triển khai này.",
-        "unavailableTitle": "Lịch sử tạm thời không khả dụng",
-        "unavailableDesc": "AutoObserve hiện không phản hồi. Tình trạng này thường hết trong một hoặc hai phút.",
-        "failedTitle": "Không thể tải lịch sử",
-        "failedDesc": "Đã xảy ra lỗi khi tải. Hãy thử lại sau giây lát."
-      },
-      "incidents": {
-        "deniedTitle": "Bạn không có quyền xem các phát hiện đã gọi trực",
-        "deniedDesc": "Các phát hiện đã gọi trực mở sự cố, nên để xem chúng cần quyền liệt kê sự cố trong tổ chức này. Hãy yêu cầu quản trị viên tổ chức cấp quyền đó.",
-        "offDesc": "Các phát hiện đã gọi trực sẽ xuất hiện ở đây sau khi quản trị viên bật tính năng này cho triển khai này.",
-        "unavailableTitle": "Các phát hiện đã gọi trực tạm thời không khả dụng",
-        "unavailableDesc": "AutoObserve hiện không phản hồi. Tình trạng này thường hết trong một hoặc hai phút.",
-        "failedTitle": "Không thể tải các phát hiện đã gọi trực",
-        "failedDesc": "Đã xảy ra lỗi khi tải chúng. Hãy thử lại sau giây lát."
-      },
-      "issues": {
-        "deniedTitle": "Bạn không có quyền xem vấn đề",
-        "deniedDesc": "Vấn đề là các sự cố AutoObserve đã mở, nên để xem chúng cần quyền liệt kê sự cố trong tổ chức này. Hãy yêu cầu quản trị viên tổ chức cấp quyền đó.",
-        "offDesc": "Vấn đề sẽ xuất hiện ở đây sau khi quản trị viên bật tính năng này cho triển khai này.",
-        "unavailableTitle": "Vấn đề tạm thời không khả dụng",
-        "unavailableDesc": "AutoObserve hiện không phản hồi. Tình trạng này thường hết trong một hoặc hai phút.",
-        "failedTitle": "Không thể tải vấn đề",
-        "failedDesc": "Đã xảy ra lỗi khi tải chúng. Hãy thử lại sau giây lát."
-      }
-    },
-    "time": {
-      "justNow": "vừa xong",
-      "ago": "{time} trước"
-    },
-    "history": {
-      "incident": "Đã mở sự cố: {title}",
-      "dismissed": "{actor} đã bỏ qua {title}",
-      "accepted": "{actor} đã đánh dấu {title} là báo cáo có chủ ý",
-      "changed": "{actor} đã thay đổi {title}",
-      "denied": {
-        "incidents": "Không liệt kê sự cố: bạn không có quyền xem chúng.",
-        "decisions": "Không liệt kê quyết định: bạn không có quyền xem chúng."
-      },
-      "untitled": "một gợi ý",
-      "openIncident": "Mở sự cố",
-      "newest": "Đang hiển thị {count} mục mới nhất. Các sự cố cũ hơn nằm trên trang Vấn đề.",
-      "loading": "Đang tải lịch sử",
-      "loaded": "Đã tải lịch sử"
-    },
-    "incidents": {
-      "title": "Phát hiện đã gọi trực",
-      "subtitle": "Các phát hiện đã mở sự cố cho nhóm trực của bạn, kèm phân tích.",
-      "pagingNote": "Tính năng gọi trực đang tắt đối với tổ chức này, nên AutoObserve không mở sự cố nào.",
-      "sharedFor": "{label}: {reason}",
-      "finding": {
-        "stream_silence": "{stream} ({type}) đã ngừng gửi dữ liệu",
-        "stream_drop": "Lưu lượng của {stream} ({type}) đã giảm mạnh",
-        "stream_rise": "Lưu lượng của {stream} ({type}) đã tăng mạnh"
-      },
-      "opened": "Sự cố được mở {when}",
-      "openIncident": "Mở sự cố",
-      "viewAnalysis": "Xem phân tích",
-      "newFindings": "{count} phát hiện mới | {count} phát hiện mới",
-      "showNew": "Hiển thị",
-      "more": "Đang hiển thị {count} mục mới nhất",
-      "seeAll": "Xem tất cả sự cố",
-      "seeAllIssues": "Xem tất cả vấn đề",
-      "failedDetail": {
-        "status": "Yêu cầu thất bại với trạng thái {status} lúc {time}.",
-        "noResponse": "Yêu cầu không nhận được phản hồi lúc {time}."
-      },
-      "analysis": {
-        "notRunDetail": "Chưa có phân tích nào bắt đầu. Mở sự cố để bắt đầu một phân tích.",
-        "disabledDetail": "Tính năng phân tích AI đang tắt đối với triển khai này.",
-        "offOther": "Phân tích tự động không chạy cho sự cố này.",
-        "failedDetail": "Phân tích đã dừng trước khi hoàn tất. Xem phân tích để biết chi tiết."
-      },
-      "empty": {
-        "title": "Chưa ai được gọi trực",
-        "desc": "Khi một stream ngừng hoạt động hoặc lưu lượng của nó thay đổi mạnh, sự cố và phân tích của stream đó sẽ hiển thị ở đây."
-      },
-      "emptyOff": {
-        "title": "Gọi trực đang tắt",
-        "desc": "AutoObserve ghi lại các phát hiện về stream cho tổ chức này nhưng không mở sự cố nào. Quản trị viên bật gọi trực."
-      },
-      "loading": "Đang tải các phát hiện từ gọi trực…",
-      "loaded": "Đã tải các phát hiện từ gọi trực",
-      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
-      "routing": "Set up on-call routing"
-    },
-    "issues": {
-      "searchPlaceholder": "Tìm sự việc đã xảy ra hoặc một stream",
-      "columns": {
-        "incident": "Điều đã xảy ra",
-        "severity": "Mức độ nghiêm trọng",
-        "status": "Trạng thái",
-        "stream": "Stream",
-        "opened": "Đã mở",
-        "analysis": "Phân tích",
-        "page": "Ai đã được gọi trực"
-      },
-      "count": "Không có sự cố | {count} sự cố | {count} sự cố",
-      "capNote": "Đang hiển thị {count} sự cố mới nhất. Thu hẹp phạm vi để xem các sự cố cũ hơn.",
-      "emptyRange": "Không có sự cố {within}",
-      "streamType": "stream {type}",
-      "streamMore": "{stream} +{count}",
-      "filterOpen": "Đang mở",
-      "loading": "Đang tải sự cố…",
-      "loaded": "Đã tải sự cố",
-      "page": {
-        "unrouted": "Không ai được gọi trực",
-        "failed": "Gọi trực thất bại",
-        "pending": "Chưa được xác nhận"
-      },
-      "today": "Hôm nay",
-      "yesterday": "Hôm qua",
-      "shared": {
-        "rcaDisabled": "Phân tích AI đã tắt khi các sự cố này được mở.",
-        "aiUnavailable": "Phân tích AI không khả dụng khi các sự cố này được mở.",
-        "quotaExceeded": "Tổ chức đã đạt giới hạn phân tích AI khi các sự cố này được mở.",
-        "coolingDown": "Một phân tích vừa chạy, nên không có phân tích mới nào bắt đầu cho các sự cố này.",
-        "startFailed": "Không thể bắt đầu các phân tích.",
-        "offOther": "Phân tích tự động không chạy cho các sự cố này.",
-        "disabled": "Tính năng phân tích AI đang tắt đối với triển khai này.",
-        "notRun": "Chưa có phân tích nào bắt đầu. Mở một sự cố để bắt đầu phân tích.",
-        "failed": "Các phân tích này đã dừng trước khi hoàn tất. Xem một phân tích để biết chi tiết."
-      }
-    },
-    "surfaces": {
-      "changes": {
-        "title": "Chưa có thay đổi nào",
-        "desc": "AutoObserve đề xuất cách khắc phục nhưng chưa thay đổi bất kỳ cảnh báo hay cài đặt nào. Khi nó thực hiện thay đổi, thông tin sẽ hiển thị ở đây kèm theo việc thay đổi đó có hiệu quả hay không. Hiện tại, hãy xem lại các đề xuất của nó và áp dụng những đề xuất bạn muốn.",
-        "action": "Xem lại đề xuất"
-      },
-      "history": {
-        "title": "Chưa có lịch sử",
-        "desc": "Những gì AutoObserve phát hiện, những gì nó thay đổi và những gì bạn quyết định sẽ được liệt kê ở đây, mới nhất trước. Hiện tại, các phát hiện của nó sẽ mở sự cố; các sự cố này nằm trên trang Sự cố.",
-        "action": "Mở sự cố"
-      },
-      "scenario": {
-        "tag": "Dữ liệu trực tiếp",
-        "text": "Bạn đang xem dữ liệu trực tiếp của tổ chức này. Các kịch bản mẫu không được hiển thị ở đây.",
-        "action": "Cách hoạt động"
-      },
-      "settings": {
-        "title": "Chưa có gì để thiết lập ở đây",
-        "desc": "Quản trị viên bật AutoObserve và tính năng gọi trực của nó cho triển khai này. Ai sẽ được thông báo và mức độ tự động hành động sẽ được thiết lập tại đây khi các điều khiển đó có sẵn.",
-        "action": "Cách hoạt động"
-      }
-    },
-    "paging": {
-      "title": "Paging",
-      "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
-      "routing": "On-call routing",
-      "unavailable": "Paging is turned off for this deployment.",
-      "denied": "{denied} {askAdmin}",
-      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
-      "deniedTitle": "Bạn không có quyền xem cài đặt gọi trực",
-      "deniedDesc": "Gọi trực được thiết lập một lần cho toàn bộ tổ chức. Hãy yêu cầu quản trị viên tổ chức cấp quyền truy cập.",
-      "failedTitle": "Không thể tải cài đặt gọi trực",
-      "failedDesc": "Đã xảy ra lỗi khi tải. Hãy thử lại sau giây lát.",
-      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
-    },
-    "learning": {
-      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
-      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
-      "emptyTitle": "Learning your streams",
-      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
-      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
-      "until": "Learning until {date} · {streams}",
-      "streams": "Learning {count} stream | Learning {count} streams",
-      "streamUntil": "until {date}"
     }
   },
   "autoobserve2": {
@@ -33081,6 +32745,520 @@
     "deletedQuery": "Đã xóa {query}",
     "undo": "Hoàn tác"
   },
+  "filterBar": {
+    "ariaLabel": "Lọc theo trường",
+    "placeholder": "Lọc theo trường hoặc nhập field=value. Nhấn Enter để chạy",
+    "addFilter": "Thêm bộ lọc",
+    "searchFields": "Tìm trường",
+    "searchLabels": "Tìm nhãn",
+    "searchOperators": "Tìm điều kiện",
+    "searchValue": "Tìm hoặc nhập giá trị",
+    "searchValues": "Tìm giá trị",
+    "textField": "Văn bản",
+    "useValue": "Dùng \"{value}\"",
+    "useField": "Dùng trường \"{field}\"",
+    "useLabel": "Dùng nhãn \"{field}\"",
+    "searchText": "Tìm \"{text}\" trong toàn bộ văn bản",
+    "emptyValue": "(trống)",
+    "loadingFields": "Đang tải các trường…",
+    "noFields": "Không có trường phù hợp",
+    "noValues": "Không có gợi ý. Nhập một giá trị và nhấn Enter",
+    "noOperators": "Không có điều kiện phù hợp",
+    "removeFilter": "Xóa bộ lọc",
+    "clearAll": "Xóa tất cả bộ lọc",
+    "toggleConnector": "Chuyển đổi giữa AND và OR",
+    "selectedCount": "Chưa chọn giá trị nào | Đã chọn {count} giá trị | Đã chọn {count} giá trị",
+    "query": "Truy vấn",
+    "validation": {
+      "incomplete": "Hoàn thành bộ lọc này hoặc xóa nó",
+      "required": "Thêm ít nhất một bộ lọc",
+      "uniqueField": "{field} đã có bộ lọc; hãy sửa bộ lọc đó hoặc xóa bộ lọc này",
+      "oneUsageCondition": "Một bậc chỉ nhận một điều kiện sử dụng; hãy chuyển điều kiện này thành quy tắc hoặc xóa nó",
+      "rumField": "Dùng một trường tích hợp hoặc một cột gồm chữ thường, chữ số và dấu gạch dưới, tối đa 128 ký tự",
+      "valueLength": "Mỗi giá trị cần từ 1 đến {max} ký tự",
+      "regexLength": "Giữ mẫu trong tối đa {max} ký tự.",
+      "regexInvalid": "Mẫu này không hợp lệ hoặc không được hỗ trợ. Không thể dùng lookahead, lookbehind và tham chiếu ngược."
+    },
+    "operatorNames": {
+      "containsIgnoreCase": "Chứa (không phân biệt chữ hoa/thường)",
+      "notStartsWith": "Không bắt đầu bằng",
+      "notEndsWith": "Không kết thúc bằng",
+      "isEmpty": "Trống",
+      "isNotEmpty": "Không trống"
+    },
+    "types": {
+      "string": "Văn bản",
+      "number": "Số",
+      "boolean": "Boolean"
+    },
+    "operators": {
+      "eq": "là",
+      "neq": "không phải là",
+      "gt": "lớn hơn",
+      "gte": "lớn hơn hoặc bằng",
+      "lt": "nhỏ hơn",
+      "lte": "nhỏ hơn hoặc bằng",
+      "contains": "chứa",
+      "containsIgnoreCase": "chứa, không phân biệt chữ hoa chữ thường",
+      "notContains": "không chứa",
+      "startsWith": "bắt đầu bằng",
+      "notStartsWith": "không bắt đầu bằng",
+      "endsWith": "kết thúc bằng",
+      "notEndsWith": "không kết thúc bằng",
+      "in": "thuộc một trong các",
+      "notIn": "không thuộc bất kỳ giá trị nào",
+      "regex": "khớp regex",
+      "notRegex": "không khớp regex",
+      "isNull": "không có giá trị",
+      "isNotNull": "có giá trị",
+      "isEmpty": "trống hoặc không có giá trị",
+      "isNotEmpty": "có giá trị và không trống",
+      "matchAll": "khớp văn bản"
+    },
+    "queryTooltip": "Sửa bộ lọc dạng văn bản",
+    "queryNotParsableShort": "Trình tạo không thể hiển thị truy vấn này:",
+    "clearAndBuild": "Xóa và tạo mới",
+    "clearQueryTitle": "Xóa truy vấn?",
+    "clearQueryMessage": "Truy vấn sẽ bị xóa và trình tạo bắt đầu với nội dung trống.",
+    "where": "Trong đó",
+    "addCondition": "Thêm điều kiện",
+    "addGroup": "Thêm nhóm",
+    "startGroup": "Bắt đầu một nhóm",
+    "addBelow": "Thêm điều kiện bên dưới",
+    "ungroup": "Bỏ nhóm",
+    "collapseGroup": "Thu gọn nhóm",
+    "expandGroup": "Mở rộng nhóm",
+    "moreInGroup": "{count} mục khác",
+    "groupHasIssues": "Có gì đó trong nhóm này cần sửa",
+    "chooseField": "Chọn một trường",
+    "chooseValue": "Chọn một giá trị",
+    "lockedFilter": "Không thể chỉnh sửa bộ lọc này tại đây. Nó được giữ nguyên như đã lưu; hãy xóa để loại bỏ",
+    "limits": {
+      "conditions": "Tối đa {count} bộ lọc | Tối đa {count} bộ lọc",
+      "values": "Tối đa {count} giá trị | Tối đa {count} giá trị"
+    },
+    "builderTooltip": "Sửa bộ lọc bằng trình dựng",
+    "editorModeLabel": "Trình chỉnh sửa bộ lọc",
+    "modeBuilder": "Trình tạo",
+    "modeText": "Văn bản"
+  },
+  "autoobserveLive": {
+    "where": "{cluster} / {namespace}",
+    "lessThan": "<{value}",
+    "topbar": {
+      "checked": "Đã kiểm tra {ago}",
+      "firstCheck": "Đang thực hiện lần kiểm tra đầu tiên"
+    },
+    "retry": "Thử lại",
+    "classes": {
+      "errors": "Lỗi",
+      "latency": "Độ trễ",
+      "saturation": "Độ bão hòa",
+      "absence": "Ngừng gửi dữ liệu",
+      "external_probe": "Kiểm tra synthetic",
+      "workload_health": "Tình trạng workload",
+      "node": "Node"
+    },
+    "classesInline": {
+      "errors": "lỗi",
+      "latency": "độ trễ",
+      "saturation": "độ bão hòa",
+      "absence": "thiếu dữ liệu",
+      "external_probe": "probe bên ngoài",
+      "workload_health": "tình trạng workload",
+      "node": "tình trạng node"
+    },
+    "states": {
+      "covered": "Đang theo dõi",
+      "weak": "Yếu",
+      "silent": "Im lặng",
+      "blind": "Mù",
+      "unmapped": "Chưa ánh xạ",
+      "none": "Không có"
+    },
+    "monitorKinds": {
+      "alert": "Cảnh báo",
+      "anomaly_detector": "Bộ phát hiện bất thường",
+      "slo": "SLO",
+      "synthetic": "Synthetic"
+    },
+    "coverage": {
+      "summaryWatched": "{watched} trên {total} được theo dõi · {pct}%",
+      "summaryWatchedShare": "{watched} trên {total} được theo dõi · {pct}",
+      "splitLabel": "{watched} được theo dõi, {gaps} có lỗ hổng bao phủ",
+      "stateWatched": "Đang theo dõi",
+      "stateGap": "Lỗ hổng bao phủ",
+      "columns": {
+        "where": "Vị trí",
+        "state": "Trạng thái",
+        "lastChecked": "Lần kiểm tra cuối"
+      },
+      "loading": "Đang tải độ bao phủ",
+      "loaded": "Đã tải độ bao phủ",
+      "sentence": {
+        "allWatched": "Tôi đang theo dõi 1 dịch vụ của bạn. | Tôi đang theo dõi tất cả {total} dịch vụ của bạn.",
+        "allGaps": "1 dịch vụ của bạn có lỗ hổng bao phủ. | Tất cả {total} dịch vụ của bạn đều có lỗ hổng bao phủ.",
+        "watching": "Tôi đang theo dõi {watched} trong số {total} dịch vụ của bạn.",
+        "gaps": "{count} có lỗ hổng bao phủ. | {count} có lỗ hổng bao phủ.",
+        "mixed": "{watching} {gaps}"
+      },
+      "gapAdded": "Đã thêm cảnh báo cho {checks}. AutoObserve sẽ ghi nhận vào lần kiểm tra tiếp theo. | Đã thêm cảnh báo cho {checks}. AutoObserve sẽ ghi nhận vào lần kiểm tra tiếp theo.",
+      "gapNone": "Không có cảnh báo nào theo dõi {checks}",
+      "searchPlaceholder": "Tìm kiếm dịch vụ, cluster hoặc namespace",
+      "labelNamespace": "{name} · {namespace}",
+      "labelPlace": "{name} · {cluster} · {namespace}",
+      "noNamespace": "không có namespace",
+      "noCluster": "không có cluster",
+      "noMatch": "Không có dịch vụ, cluster hoặc namespace nào khớp với “{query}”",
+      "showAll": "Hiển thị tất cả",
+      "bucketThree": "3 trở lên",
+      "bucketTwo": "2",
+      "bucketOne": "1",
+      "filterHides": "Không có dịch vụ nào ở trạng thái {state}",
+      "filterHidesSearch": "{count} dịch vụ khớp với “{query}”, nhưng nó không ở trạng thái {state} | {count} dịch vụ khớp với “{query}”, nhưng không có dịch vụ nào ở trạng thái {state}"
+    },
+    "cell": {
+      "noClass": "AutoObserve chưa kiểm tra tín hiệu này",
+      "tipNoClass": "{signal}: AutoObserve chưa kiểm tra tín hiệu này",
+      "gap": {
+        "weak": "{signal}: chỉ có {monitor}, một cảnh báo chung, có thể phát hiện vấn đề; nó không nhắm riêng đến dịch vụ này | {signal}: chỉ có {monitor}, các cảnh báo chung, có thể phát hiện vấn đề; chúng không nhắm riêng đến dịch vụ này",
+        "silent": "{signal}: {monitor} khớp, nhưng nó không thông báo cho ai | {signal}: {monitor} khớp, nhưng chúng không thông báo cho ai",
+        "blind": "{signal}: {monitor} khớp, nhưng nó không thể thấy dữ liệu của mình | {signal}: {monitor} khớp, nhưng chúng không thể thấy dữ liệu của mình",
+        "unmapped": "{signal}: {monitor} có thể khớp, nhưng không thể gắn phạm vi của nó với một dịch vụ | {signal}: {monitor} có thể khớp, nhưng không thể gắn phạm vi của chúng với một dịch vụ",
+        "none": "{signal}: không có cảnh báo nào theo dõi điều này"
+      },
+      "added": "Đã thêm"
+    },
+    "drawer": {
+      "moreChecks": "Các kiểm tra khác",
+      "chartNoData": "Biểu đồ chưa có sẵn",
+      "monitors": "Cảnh báo",
+      "monitorLine": "{kind} · {state}",
+      "noMonitor": "Không có cảnh báo nào khớp"
+    },
+    "charts": {
+      "empty1h": "Không có dữ liệu từ {service} trong giờ qua",
+      "empty24h": "Không có dữ liệu từ {service} trong 24 giờ qua",
+      "empty7d": "Không có dữ liệu từ {service} trong 7 ngày qua",
+      "emptyPartial1h": "Không có dữ liệu từ {service} trong phần đã tìm kiếm của giờ qua",
+      "emptyPartial24h": "Không có dữ liệu từ {service} trong phần đã tìm kiếm của 24 giờ qua",
+      "emptyPartial7d": "Không có dữ liệu từ {service} trong phần đã tìm kiếm của 7 ngày qua",
+      "noSpanStatus": "Không có trạng thái span trong {stream}",
+      "noLevel": "Không có mức log trong {stream}",
+      "noDuration": "Không có trường thời lượng trong {stream}",
+      "noTraces": "Độ trễ được vẽ biểu đồ từ trace. {service} không gửi trace nào.",
+      "noMatch": "Không thể khớp dịch vụ này với các stream của nó",
+      "failedQuery": "Không thể tải biểu đồ này từ {stream}",
+      "failedMatch": "Không thể tra cứu các stream của {service}",
+      "partial": "Dữ liệu một phần",
+      "wide": "Bao gồm các dịch vụ khác dùng chung stream này",
+      "loading": "Đang tải {metric}",
+      "summary": "{metric}, {value} hiện tại",
+      "summaryNone": "{metric}, không có dữ liệu đo nào trong khoảng thời gian mới nhất"
+    },
+    "suggestions": {
+      "serviceMeta": "{where}, khoảng {traffic} sự kiện mỗi giờ",
+      "trafficOnly": "Khoảng {traffic} sự kiện mỗi giờ",
+      "kinds": {
+        "coverage_gap": "Lỗ hổng bao phủ",
+        "no_absence_check": "Thiếu cảnh báo",
+        "silent_coverage": "Không thông báo cho ai",
+        "coverage_lost": "Mất bao phủ",
+        "blind_guardrail": "Không hoạt động",
+        "discovery_unusable": "Chất lượng dữ liệu",
+        "alert_no_destination": "Không thông báo cho ai",
+        "alert_notify_failed": "Thông báo thất bại",
+        "other": "Khác"
+      },
+      "severity": {
+        "high": "Cao",
+        "medium": "Trung bình"
+      },
+      "confidence": {
+        "sufficient": "Bằng chứng mạnh",
+        "suggestive": "Có một số bằng chứng",
+        "insufficient": "Bằng chứng yếu"
+      },
+      "body": {
+        "coverageGap": "Không có gì theo dõi {service}",
+        "noAbsenceNone": "Không có cảnh báo nào nếu {service} ngừng gửi dữ liệu",
+        "noAbsenceWeak": "Chỉ có một cảnh báo chung mới nhận ra nếu {service} ngừng gửi dữ liệu",
+        "noAbsenceSilent": "Bước kiểm tra có thể nhận ra khi {service} im lặng lại không thông báo cho ai",
+        "noAbsenceBlind": "Bước kiểm tra có thể nhận ra khi {service} im lặng lại không thấy được dữ liệu của nó",
+        "silentCoverage": "{monitor} theo dõi {classes} trên {count} dịch vụ nhưng không thông báo cho ai | {monitor} theo dõi {classes} trên {count} dịch vụ nhưng không thông báo cho ai",
+        "silentWhy": "{monitor} sẽ nhận ra {services} dừng lại, nhưng nó không thông báo cho ai.",
+        "silentWhyNoNames": "{monitor} sẽ nhận ra một dịch vụ dừng lại, nhưng nó không thông báo cho ai.",
+        "silentNext": "Hãy thêm đích cho nó.",
+        "undeliverable": "{monitor} không thể kết nối tới {destination}",
+        "undeliverableWhy": "{destination} nhận ticket, không phải cảnh báo. | {destination} nhận ticket, không phải cảnh báo.",
+        "undeliverableNext": "Thêm webhook hoặc email bên cạnh nó; {destination} vẫn giữ nguyên. | Thêm webhook hoặc email bên cạnh nó; {destination} vẫn giữ nguyên.",
+        "coverageLost": "{service} đã mất cảnh báo {classes} vào {day}",
+        "blindStreamMissing": "{monitor} đọc {detail}, thứ không tồn tại",
+        "blindNoData": "{monitor} đọc {detail}, thứ không có dữ liệu gần đây",
+        "blindEmptyScope": "{monitor} lọc theo các hàng không bao giờ đến",
+        "blindUnknownField": "{monitor} lọc theo {field}, một trường mà stream của nó không có",
+        "blindIgnoredMatcher": "{monitor} khớp theo {label}, một nhãn mà không chuỗi nào có, nên nó theo dõi mọi chuỗi",
+        "discovery": "Chỉ {good} trong {active} dịch vụ được phát hiện là dùng được, nên bảng xếp hạng lỗ hổng chỉ là một phần",
+        "alertSyntax": "{monitor} có một truy vấn không phân tích cú pháp được",
+        "alertTimeout": "{monitor} liên tục hết thời gian trước khi hoàn thành",
+        "alertMemory": "{monitor} liên tục hết bộ nhớ",
+        "alertOtherError": "{monitor} liên tục thất bại với một lỗi",
+        "alertNotWorkingGeneric": "{monitor} không hoạt động",
+        "alertNoDestination": "{monitor} đã kích hoạt và không thông báo cho ai",
+        "alertNotifyFailed": "{monitor} đã kích hoạt, và {failed} trong {tried} thông báo thất bại. | {monitor} đã kích hoạt, và {failed} trong {tried} thông báo thất bại.",
+        "alertNotifyFailedNoCounts": "{monitor} đã kích hoạt, và các thông báo của nó thất bại.",
+        "alertStreamGone": "{monitor} liên tục thất bại vì stream của nó không tồn tại",
+        "alertFieldGone": "{monitor} liên tục thất bại vì một trường nó dùng không tồn tại",
+        "other": "Tôi tìm thấy điều gì đó mà trang này chưa thể hiển thị"
+      },
+      "detail": {
+        "cell": "{check}: {state}",
+        "cells": "Những gì engine tìm thấy: {cells}.",
+        "services": "Các dịch vụ nó khớp bao gồm {services}.",
+        "text": "Chi tiết engine: {detail}",
+        "quality": "Tính năng phát hiện đang chạy ở chế độ {mode}.",
+        "none": "Engine không gửi thêm chi tiết nào.",
+        "joined": "{first} {rest}"
+      },
+      "analysedAt": "Từ lần chạy hiệu chỉnh {ago}",
+      "neverFired": "Chưa bao giờ kích hoạt",
+      "lastFired": "Kích hoạt lần cuối {time}",
+      "accept": "Chấp nhận",
+      "dismiss": "Bỏ qua…",
+      "accepted": "Đã chấp nhận trong bản xem trước này; chưa gửi gì cả",
+      "dismissed": "Đã bỏ qua trong bản xem trước này; chưa gửi gì cả",
+      "loading": "Đang tải gợi ý",
+      "loaded": "Đã tải xong gợi ý",
+      "more": "và {count} gợi ý khác | và {count} gợi ý khác",
+      "moreNames": "{count} mục khác | {count} mục khác",
+      "whyNext": "{why} {next}",
+      "seeAll": "Xem tất cả",
+      "drawerTitle": "Gợi ý",
+      "drawerLine": "Được xếp hạng theo mức độ quan trọng nhất trước. Mở một dòng để xem những gì tôi phát hiện.",
+      "focusGone": "Gợi ý này không còn mở.",
+      "clearKind": "Hiển thị tất cả gợi ý",
+      "kindEmptyTitle": "Không có gợi ý mở nào thuộc loại {kind}",
+      "kindEmptyDesc": "{count} gợi ý khác đang mở. | {count} gợi ý khác đang mở.",
+      "folder": "Thư mục {folder}",
+      "columns": {
+        "suggestion": "Gợi ý",
+        "where": "Vị trí",
+        "kind": "Loại",
+        "severity": "Mức độ nghiêm trọng"
+      }
+    },
+    "notice": {
+      "offTitle": "AutoObserve chưa được bật",
+      "details": "Chi tiết",
+      "refreshFailed": "Làm mới thất bại lúc {failedAt} · đang hiển thị {what} từ {dataAt}",
+      "what": {
+        "coverage": "độ bao phủ",
+        "suggestions": "gợi ý",
+        "incidents": "phát hiện đã gọi trực",
+        "issues": "vấn đề",
+        "history": "lịch sử"
+      },
+      "coverage": {
+        "deniedTitle": "Bạn không có quyền xem độ bao phủ",
+        "deniedDesc": "Độ bao phủ đếm các bộ giám sát trong mọi thư mục, nên cần quyền xem tất cả cảnh báo trong tổ chức này, không chỉ một số thư mục. Hãy yêu cầu quản trị viên tổ chức cấp quyền.",
+        "offDesc": "Quản trị viên bật tính năng này cho triển khai. Độ bao phủ sẽ xuất hiện ở đây sau lần kiểm tra đầu tiên.",
+        "unavailableTitle": "Tạm thời không thể xem độ bao phủ",
+        "unavailableDesc": "AutoObserve hiện không phản hồi. Tình trạng này thường hết trong một hoặc hai phút.",
+        "failedTitle": "Không thể tải độ bao phủ",
+        "failedDesc": "Đã xảy ra lỗi khi tải. Hãy thử lại sau giây lát.",
+        "noPassTitle": "Không có lần kiểm tra nào hoàn thành trong ngày qua",
+        "noPassDesc": "Độ bao phủ sẽ xuất hiện ở đây sau khi lần kiểm tra tiếp theo của tôi đối với các dịch vụ của bạn hoàn tất. Nếu AutoObserve vừa được bật, lần kiểm tra đầu tiên có thể mất một lúc.",
+        "noPassAction": "Cách tôi kiểm tra độ bao phủ",
+        "noServicesTitle": "Chưa tìm thấy dịch vụ nào",
+        "noServicesDesc": "Lần kiểm tra gần nhất của tôi, {when}, không tìm thấy dịch vụ nào. Dịch vụ sẽ xuất hiện ở đây khi chúng gửi nhật ký, chỉ số hoặc trace có nêu tên dịch vụ.",
+        "noServicesAction": "Cách tôi tìm dịch vụ"
+      },
+      "suggestions": {
+        "deniedTitle": "Bạn không có quyền xem gợi ý",
+        "deniedDesc": "Để xem chúng, bạn cần quyền xem cảnh báo trong tổ chức này. Hãy yêu cầu quản trị viên tổ chức cấp quyền.",
+        "offDesc": "Gợi ý sẽ xuất hiện ở đây sau khi quản trị viên bật tính năng này cho triển khai.",
+        "unavailableTitle": "Tạm thời không thể xem gợi ý",
+        "unavailableDesc": "AutoObserve hiện không phản hồi. Tình trạng này thường hết trong một hoặc hai phút.",
+        "failedTitle": "Không thể tải gợi ý",
+        "failedDesc": "Đã xảy ra lỗi khi tải chúng. Hãy thử lại sau giây lát.",
+        "emptyTitle": "Hiện không có gợi ý nào",
+        "emptyDesc": "Tôi sẽ thêm một gợi ý ở đây khi phát hiện lỗ hổng trong phạm vi giám sát của bạn.",
+        "pageEmptyTitle": "Các gợi ý hàng đầu đã được xử lý",
+        "pageEmptyDesc": "Mở danh sách đầy đủ để xem những mục vẫn đang chờ."
+      },
+      "history": {
+        "deniedTitle": "Bạn không có quyền xem lịch sử",
+        "deniedDesc": "Lịch sử liệt kê các sự cố mà AutoObserve đã mở, nên để xem lịch sử cần quyền liệt kê sự cố trong tổ chức này. Hãy yêu cầu quản trị viên tổ chức cấp quyền đó.",
+        "offDesc": "Lịch sử sẽ xuất hiện ở đây sau khi quản trị viên bật tính năng này cho triển khai này.",
+        "unavailableTitle": "Lịch sử tạm thời không khả dụng",
+        "unavailableDesc": "AutoObserve hiện không phản hồi. Tình trạng này thường hết trong một hoặc hai phút.",
+        "failedTitle": "Không thể tải lịch sử",
+        "failedDesc": "Đã xảy ra lỗi khi tải. Hãy thử lại sau giây lát."
+      },
+      "incidents": {
+        "deniedTitle": "Bạn không có quyền xem các phát hiện đã gọi trực",
+        "deniedDesc": "Các phát hiện đã gọi trực mở sự cố, nên để xem chúng cần quyền liệt kê sự cố trong tổ chức này. Hãy yêu cầu quản trị viên tổ chức cấp quyền đó.",
+        "offDesc": "Các phát hiện đã gọi trực sẽ xuất hiện ở đây sau khi quản trị viên bật tính năng này cho triển khai này.",
+        "unavailableTitle": "Các phát hiện đã gọi trực tạm thời không khả dụng",
+        "unavailableDesc": "AutoObserve hiện không phản hồi. Tình trạng này thường hết trong một hoặc hai phút.",
+        "failedTitle": "Không thể tải các phát hiện đã gọi trực",
+        "failedDesc": "Đã xảy ra lỗi khi tải chúng. Hãy thử lại sau giây lát."
+      },
+      "issues": {
+        "deniedTitle": "Bạn không có quyền xem vấn đề",
+        "deniedDesc": "Vấn đề là các sự cố AutoObserve đã mở, nên để xem chúng cần quyền liệt kê sự cố trong tổ chức này. Hãy yêu cầu quản trị viên tổ chức cấp quyền đó.",
+        "offDesc": "Vấn đề sẽ xuất hiện ở đây sau khi quản trị viên bật tính năng này cho triển khai này.",
+        "unavailableTitle": "Vấn đề tạm thời không khả dụng",
+        "unavailableDesc": "AutoObserve hiện không phản hồi. Tình trạng này thường hết trong một hoặc hai phút.",
+        "failedTitle": "Không thể tải vấn đề",
+        "failedDesc": "Đã xảy ra lỗi khi tải chúng. Hãy thử lại sau giây lát."
+      }
+    },
+    "time": {
+      "justNow": "vừa xong",
+      "ago": "{time} trước"
+    },
+    "history": {
+      "incident": "Đã mở sự cố: {title}",
+      "dismissed": "{actor} đã bỏ qua {title}",
+      "accepted": "{actor} đã đánh dấu {title} là báo cáo có chủ ý",
+      "changed": "{actor} đã thay đổi {title}",
+      "denied": {
+        "incidents": "Không liệt kê sự cố: bạn không có quyền xem chúng.",
+        "decisions": "Không liệt kê quyết định: bạn không có quyền xem chúng."
+      },
+      "untitled": "một gợi ý",
+      "openIncident": "Mở sự cố",
+      "newest": "Đang hiển thị {count} mục mới nhất. Các sự cố cũ hơn nằm trên trang Vấn đề.",
+      "loading": "Đang tải lịch sử",
+      "loaded": "Đã tải lịch sử"
+    },
+    "incidents": {
+      "title": "Phát hiện đã gọi trực",
+      "subtitle": "Các phát hiện đã mở sự cố cho nhóm trực của bạn, kèm phân tích.",
+      "pagingNote": "Tính năng gọi trực đang tắt đối với tổ chức này, nên AutoObserve không mở sự cố nào.",
+      "sharedFor": "{label}: {reason}",
+      "finding": {
+        "stream_silence": "{stream} ({type}) đã ngừng gửi dữ liệu",
+        "stream_drop": "Lưu lượng của {stream} ({type}) đã giảm mạnh",
+        "stream_rise": "Lưu lượng của {stream} ({type}) đã tăng mạnh"
+      },
+      "opened": "Sự cố được mở {when}",
+      "openIncident": "Mở sự cố",
+      "viewAnalysis": "Xem phân tích",
+      "newFindings": "{count} phát hiện mới | {count} phát hiện mới",
+      "showNew": "Hiển thị",
+      "more": "Đang hiển thị {count} mục mới nhất",
+      "seeAll": "Xem tất cả sự cố",
+      "seeAllIssues": "Xem tất cả vấn đề",
+      "failedDetail": {
+        "status": "Yêu cầu thất bại với trạng thái {status} lúc {time}.",
+        "noResponse": "Yêu cầu không nhận được phản hồi lúc {time}."
+      },
+      "analysis": {
+        "notRunDetail": "Chưa có phân tích nào bắt đầu. Mở sự cố để bắt đầu một phân tích.",
+        "disabledDetail": "Tính năng phân tích AI đang tắt đối với triển khai này.",
+        "offOther": "Phân tích tự động không chạy cho sự cố này.",
+        "failedDetail": "Phân tích đã dừng trước khi hoàn tất. Xem phân tích để biết chi tiết."
+      },
+      "empty": {
+        "title": "Chưa ai được gọi trực",
+        "desc": "Khi một stream ngừng hoạt động hoặc lưu lượng của nó thay đổi mạnh, sự cố và phân tích của stream đó sẽ hiển thị ở đây."
+      },
+      "emptyOff": {
+        "title": "Gọi trực đang tắt",
+        "desc": "AutoObserve ghi lại các phát hiện về stream cho tổ chức này nhưng không mở sự cố nào. Quản trị viên bật gọi trực."
+      },
+      "loading": "Đang tải các phát hiện từ gọi trực…",
+      "loaded": "Đã tải các phát hiện từ gọi trực",
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "issues": {
+      "searchPlaceholder": "Tìm sự việc đã xảy ra hoặc một stream",
+      "columns": {
+        "incident": "Điều đã xảy ra",
+        "severity": "Mức độ nghiêm trọng",
+        "status": "Trạng thái",
+        "stream": "Stream",
+        "opened": "Đã mở",
+        "analysis": "Phân tích",
+        "page": "Ai đã được gọi trực"
+      },
+      "count": "Không có sự cố | {count} sự cố | {count} sự cố",
+      "capNote": "Đang hiển thị {count} sự cố mới nhất. Thu hẹp phạm vi để xem các sự cố cũ hơn.",
+      "emptyRange": "Không có sự cố {within}",
+      "streamType": "stream {type}",
+      "streamMore": "{stream} +{count}",
+      "filterOpen": "Đang mở",
+      "loading": "Đang tải sự cố…",
+      "loaded": "Đã tải sự cố",
+      "page": {
+        "unrouted": "Không ai được gọi trực",
+        "failed": "Gọi trực thất bại",
+        "pending": "Chưa được xác nhận"
+      },
+      "today": "Hôm nay",
+      "yesterday": "Hôm qua",
+      "shared": {
+        "rcaDisabled": "Phân tích AI đã tắt khi các sự cố này được mở.",
+        "aiUnavailable": "Phân tích AI không khả dụng khi các sự cố này được mở.",
+        "quotaExceeded": "Tổ chức đã đạt giới hạn phân tích AI khi các sự cố này được mở.",
+        "coolingDown": "Một phân tích vừa chạy, nên không có phân tích mới nào bắt đầu cho các sự cố này.",
+        "startFailed": "Không thể bắt đầu các phân tích.",
+        "offOther": "Phân tích tự động không chạy cho các sự cố này.",
+        "disabled": "Tính năng phân tích AI đang tắt đối với triển khai này.",
+        "notRun": "Chưa có phân tích nào bắt đầu. Mở một sự cố để bắt đầu phân tích.",
+        "failed": "Các phân tích này đã dừng trước khi hoàn tất. Xem một phân tích để biết chi tiết."
+      }
+    },
+    "surfaces": {
+      "changes": {
+        "title": "Chưa có thay đổi nào",
+        "desc": "AutoObserve đề xuất cách khắc phục nhưng chưa thay đổi bất kỳ cảnh báo hay cài đặt nào. Khi nó thực hiện thay đổi, thông tin sẽ hiển thị ở đây kèm theo việc thay đổi đó có hiệu quả hay không. Hiện tại, hãy xem lại các đề xuất của nó và áp dụng những đề xuất bạn muốn.",
+        "action": "Xem lại đề xuất"
+      },
+      "history": {
+        "title": "Chưa có lịch sử",
+        "desc": "Những gì AutoObserve phát hiện, những gì nó thay đổi và những gì bạn quyết định sẽ được liệt kê ở đây, mới nhất trước. Hiện tại, các phát hiện của nó sẽ mở sự cố; các sự cố này nằm trên trang Sự cố.",
+        "action": "Mở sự cố"
+      },
+      "scenario": {
+        "tag": "Dữ liệu trực tiếp",
+        "text": "Bạn đang xem dữ liệu trực tiếp của tổ chức này. Các kịch bản mẫu không được hiển thị ở đây.",
+        "action": "Cách hoạt động"
+      },
+      "settings": {
+        "title": "Chưa có gì để thiết lập ở đây",
+        "desc": "Quản trị viên bật AutoObserve và tính năng gọi trực của nó cho triển khai này. Ai sẽ được thông báo và mức độ tự động hành động sẽ được thiết lập tại đây khi các điều khiển đó có sẵn.",
+        "action": "Cách hoạt động"
+      }
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "deniedTitle": "Bạn không có quyền xem cài đặt gọi trực",
+      "deniedDesc": "Gọi trực được thiết lập một lần cho toàn bộ tổ chức. Hãy yêu cầu quản trị viên tổ chức cấp quyền truy cập.",
+      "failedTitle": "Không thể tải cài đặt gọi trực",
+      "failedDesc": "Đã xảy ra lỗi khi tải. Hãy thử lại sau giây lát.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
+    }
+  },
   "insight": {
     "targets": {
       "origin": "Được tạo từ gợi ý của AutoObserve cho {service} vào {date}.",
@@ -34462,5 +34640,60 @@
       },
       "noHighConfidence": "Không có tên nào có độ tin cậy cao"
     }
+  },
+  "pageHeader": {
+    "about": "Giới thiệu trang này"
+  },
+  "genAiAgentMapping": {
+    "tabLabel": "Ánh xạ Agent",
+    "title": "Ánh xạ Agent",
+    "subtitle": "Cách danh tính agent, phân bổ chi phí và tiêu đề phiên được đọc từ dữ liệu telemetry",
+    "identity": {
+      "title": "Trường danh tính agent",
+      "help": "Cách OpenObserve đặt tên cho từng agent và đọc môi trường cùng phiên bản của nó. Thuộc tính chuẩn được đọc trước. Khi một span không có thuộc tính đó, trường dự phòng đầu tiên mà span mang theo sẽ được dùng.",
+      "agentName": "Tên agent",
+      "agentId": "ID agent",
+      "env": "Môi trường",
+      "version": "Phiên bản"
+    },
+    "agentNameFields": "Trường dự phòng cho tên agent",
+    "agentNameHelp": "Các thuộc tính đến dùng làm dự phòng cho gen_ai.agent.name.",
+    "agentNameInfo": "Chỉ được kiểm tra khi thuộc tính chuẩn gen_ai.agent.name bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến trên mỗi dòng.",
+    "agentIdFields": "Trường dự phòng cho ID agent",
+    "agentIdHelp": "Các thuộc tính đến dùng làm dự phòng cho gen_ai.agent.id.",
+    "agentIdInfo": "Chỉ được kiểm tra khi thuộc tính chuẩn gen_ai.agent.id bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến trên mỗi dòng.",
+    "envFields": "Trường dự phòng cho môi trường",
+    "envHelp": "Các thuộc tính đến dùng làm môi trường của agent.",
+    "envInfo": "Chỉ được kiểm tra khi thuộc tính chuẩn deployment.environment.name bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến trên mỗi dòng.",
+    "versionFields": "Trường dự phòng cho phiên bản",
+    "versionHelp": "Các thuộc tính đến dùng làm phiên bản của agent.",
+    "versionInfo": "Chỉ được kiểm tra khi thuộc tính chuẩn gen_ai.agent.version bị thiếu hoặc trống. Thêm một thuộc tính telemetry đến trên mỗi dòng.",
+    "alwaysAppliedStandard": "Chuẩn (kiểm tra trước):",
+    "coverageValue": "· trong {percent}% số trace, 24 giờ qua",
+    "fallbacksNote": "Nhập các trường dự phòng cách nhau bằng dấu phẩy, theo thứ tự cần kiểm tra.",
+    "fallbackInvalid": "Dùng tên trường cách nhau bằng dấu phẩy. Chỉ gồm chữ cái, chữ số và . _ - : / {'@'}.",
+    "sessions": {
+      "title": "Hiển thị phiên",
+      "help": "Cách đặt tiêu đề cho phiên và văn bản bao ngoài nào bị ẩn khỏi phiên.",
+      "noAgents": "Chưa có agent nào. Thêm một agent để ẩn văn bản bao ngoài của nó."
+    },
+    "applyDefaults": "Áp dụng mặc định",
+    "resetToEmpty": "Đặt lại về trống",
+    "clearRegistry": "Xóa registry",
+    "clearRegistryTitle": "Xóa registry agent?",
+    "clearRegistryDescription": "Thao tác này xóa tất cả các dòng registry agent GenAI đã phát hiện cho tổ chức này. Các trace khớp mới sẽ điền lại registry trong quá trình tiếp nhận dữ liệu.",
+    "clearRegistryConfirm": "Xóa registry",
+    "saved": "Đã lưu ánh xạ agent",
+    "unsavedConfirm": "Các thay đổi ánh xạ agent của bạn chưa được lưu. Bỏ các thay đổi này?",
+    "clearRegistrySuccess": "Đã xóa registry agent GenAI. Đã xóa {deletedCount} agent đã lưu và {bufferCount} quan sát trong hàng đợi.",
+    "saveFailed": "Lưu ánh xạ agent thất bại",
+    "clearRegistryFailed": "Xóa registry agent GenAI thất bại",
+    "defaultsLoadFailed": "Tải mặc định ánh xạ agent thất bại",
+    "defaultsFetchFailed": "Lấy mặc định thất bại ({status})"
+  },
+  "copyButton": {
+    "copy": "Sao chép",
+    "copied": "Đã sao chép",
+    "failed": "Sao chép bị chặn · nhấn Ctrl C"
   }
 }

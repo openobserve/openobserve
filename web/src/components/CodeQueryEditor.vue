@@ -51,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- AI Icon Button -->
     <OButton
       v-if="showAiIcon && !disableAi"
-      variant="sidebar-toggle"
-      size="icon-toolbar"
+      icon-only
+      variant="secondary"
       class="bg-card-glass-bg border-card-glass-border hover:bg-button-outline-hover-bg hover:border-accent absolute! top-2 right-2 z-10 border transition-all duration-200"
       :class="nlpMode ? 'bg-surface-accent-active border-accent' : ''"
       @click="toggleNlpMode"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="" size="md">
         <img :src="aiIcon" :alt="t('search.aiIconAlt')" class="h-4.5 w-4.5" />
       </OIcon>
-      <OTooltip side="top" align="center">
+      <OTooltip side="top">
         <template #content>{{
           disableAiReason || t(nlpMode ? "search.nlpModeEnabled" : "search.nlpModeLabel")
         }}</template>
@@ -993,7 +993,10 @@ export default defineComponent({
         // falls back to its built-in Menlo/Monaco/Courier New stack, which differs
         // per OS and from the rest of the app.
         fontFamily: getFontMono(),
-        // Pinned so the suggest rows do not change size between operating systems; the editor text keeps its default.
+        // Pinned to the 13/20 UI step: Monaco's own default is 14 px on Windows and Linux but 12 px on macOS,
+        // and the query placeholder overlays (tailwind.css) mirror these two values.
+        fontSize: 13,
+        lineHeight: 20,
         suggestFontSize: 12,
         suggestLineHeight: 24,
         theme: isDark.value ? "myCustomDarkTheme" : "myCustomTheme",

@@ -92,20 +92,11 @@ const ODrawerStub = {
     persistent: { type: Boolean, default: false },
     showClose: { type: Boolean, default: true },
     width: { type: [String, Number], default: undefined },
-    primaryButtonLabel: { type: String, default: undefined },
-    secondaryButtonLabel: { type: String, default: undefined },
-    neutralButtonLabel: { type: String, default: undefined },
-    primaryButtonVariant: { type: String, default: undefined },
-    secondaryButtonVariant: { type: String, default: undefined },
-    neutralButtonVariant: { type: String, default: undefined },
-    primaryButtonDisabled: { type: Boolean, default: false },
-    secondaryButtonDisabled: { type: Boolean, default: false },
-    neutralButtonDisabled: { type: Boolean, default: false },
-    primaryButtonLoading: { type: Boolean, default: false },
-    secondaryButtonLoading: { type: Boolean, default: false },
-    neutralButtonLoading: { type: Boolean, default: false },
+    primary: { type: Object, default: undefined },
+    secondary: { type: Object, default: undefined },
+    extra: { type: Object, default: undefined },
   },
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-drawer-stub"
@@ -116,7 +107,7 @@ const ODrawerStub = {
       :data-show-close="String(!!showClose)"
     >
       <span v-if="title" :data-test="titleDataTest">{{ title }}</span>
-      <span v-if="subTitle" data-test="o-drawer-sub-title">{{ subTitle }}</span>
+      <span v-if="subtitle" data-test="o-drawer-sub-title">{{ subtitle }}</span>
       <slot name="header" />
       <slot name="header-left" />
       <slot name="header-right" />
@@ -2146,11 +2137,11 @@ describe("Schema Component Tests", () => {
       await flushPromises();
 
       expect(wrapper.vm.confirmQueryModeChangeDialog).toBe(true);
-      const dialog = findConfirmDialog("Delete Fields");
+      const dialog = findConfirmDialog("Delete fields");
       expect(dialog.props("message")).toBe(
         "Are you sure you want to delete 2 fields? This action cannot be undone.",
       );
-      expect(dialog.props("okVariant")).toBe("destructive");
+      expect(dialog.props("kind")).toBe("destructive");
     });
 
     it("uses the singular form and keeps the count after the selection clears", async () => {
@@ -2159,7 +2150,7 @@ describe("Schema Component Tests", () => {
       wrapper.vm.selectedFields = [];
       await flushPromises();
 
-      expect(findConfirmDialog("Delete Field").props("message")).toBe(
+      expect(findConfirmDialog("Delete field").props("message")).toBe(
         "Are you sure you want to delete 1 field? This action cannot be undone.",
       );
     });
@@ -2189,11 +2180,11 @@ describe("Schema Component Tests", () => {
       await flushPromises();
 
       expect(wrapper.vm.confirmDeleteDatesDialog).toBe(true);
-      const dialog = findConfirmDialog("Delete Dates");
+      const dialog = findConfirmDialog("Delete dates");
       expect(dialog.props("message")).toBe(
         "Are you sure you want to delete 3 date ranges? This action cannot be undone.",
       );
-      expect(dialog.props("okVariant")).toBe("destructive");
+      expect(dialog.props("kind")).toBe("destructive");
     });
 
     it("should handle deleteFields error gracefully", async () => {
@@ -2580,8 +2571,8 @@ describe("Schema Component Tests", () => {
     });
 
     it.each([
-      [1, "View 1 Pattern"],
-      [2, "View 2 Patterns"],
+      [1, "View 1 pattern"],
+      [2, "View 2 patterns"],
     ])("labels %i pattern(s) as %s", async (count, label) => {
       mockGetStream.mockResolvedValue({
         name: "test-stream",

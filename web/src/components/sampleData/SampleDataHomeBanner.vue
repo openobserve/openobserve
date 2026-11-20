@@ -15,11 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OBanner
+  <OInlineNotice
     v-if="mode === 'cleanup'"
-    variant="info"
-    dense
-    inline-actions
+    tone="info"
     v-bind="$attrs"
     data-test="sample-data-cleanup-banner"
   >
@@ -27,7 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <OButton
         variant="ghost"
-        size="sm-action"
         data-test="sample-data-cleanup-keep"
         @click="session.dismissCleanup(org)"
       >
@@ -35,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         variant="primary"
-        size="sm-action"
         :loading="session.removing.value"
         data-test="sample-data-cleanup-remove"
         @click="confirmRemove = true"
@@ -43,15 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("sampleData.homeBanner.cleanup.remove") }}
       </OButton>
     </template>
-  </OBanner>
+  </OInlineNotice>
 
   <ConfirmDialog
     v-model="confirmRemove"
     :title="t('sampleData.removeConfirm.title')"
     :message="t('sampleData.removeConfirm.message')"
     :ok-label="t('sampleData.delete')"
-    ok-variant="destructive"
-    focus-cancel
+    kind="destructive"
     data-test="sample-data-cleanup-dialog"
     @update:ok="removeAll"
     @update:cancel="confirmRemove = false"
@@ -61,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useI18nTyped } from "@/types/i18n";

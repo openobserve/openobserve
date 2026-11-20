@@ -18,13 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- A failed read is not "no budgets": saving then would replace every stored budget. -->
   <div v-if="loadFailed" data-test="billings-usagebudget-error">
     <OEmptyState
-      size="hero"
-      variant="error"
-      illustration="broken-panel"
+      kind="error"
       :title="t('billing.usageV2.budgetLoadFailedTitle')"
-      :description="t('billing.usageV2.budgetLoadFailed')"
-      :action-label="t('common.retry')"
-      action-icon="refresh"
+      :text="t('billing.usageV2.budgetLoadFailed')"
       @action="loadSettings"
     />
   </div>
@@ -33,18 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="@container/budget flex flex-col gap-3 pb-3"
     data-test="billings-usagebudget-root"
   >
-    <KpiCardRow :columns="4" class="shrink-0" data-test="billings-usagebudget-kpis">
-      <UsageKpiCard
-        v-for="card in kpiCards"
-        :key="card.key"
-        :label="card.label"
-        :icon="card.icon"
-        :value="card.value"
-        :hint="card.hint"
-        :tone="card.tone"
-        :data-test="`billings-usagebudget-kpi-${card.key}`"
-      />
-    </KpiCardRow>
+    <OStatStrip :items="kpiStats" stacked class="shrink-0" data-test="billings-usagebudget-kpis" />
 
     <div
       class="grid items-stretch gap-3 @min-[62rem]/budget:grid-cols-[minmax(0,1.55fr)_minmax(18.75rem,0.85fr)]"
@@ -58,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="px-4 pt-3 pb-1.5">
           <div class="flex items-baseline gap-2.5">
-            <span class="text-text-heading text-xl font-bold tabular-nums">
+            <span class="text-text-heading text-xl font-semibold tabular-nums">
               {{ formatCost(spent) }}
             </span>
             <span v-if="hasBudget" class="text-text-secondary text-sm tabular-nums">
@@ -73,14 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="hasBudget">
             <div class="relative mt-2">
               <OProgressBar
-                :value="Math.min(usedPercent / 100, 1)"
-                :variant="
-                  spendTone === 'over' ? 'danger' : spendTone === 'warn' ? 'warning' : 'default'
-                "
+                :value="Math.min(usedPercent, 100)"
+                :tone="spendTone === 'over' ? 'err' : spendTone === 'warn' ? 'warn' : 'accent'"
                 data-test="billings-usagebudget-meter"
               />
               <span
-                class="bg-text-secondary absolute -top-1 h-4 w-0.5"
+                class="bg-text-secondary absolute -top-1.5 h-4 w-0.5"
                 :style="{ left: `calc(${warnPercent}% - 0.0625rem)` }"
                 :title="t('billing.usageV2.warnAt')"
                 data-test="billings-usagebudget-warn-mark"
@@ -121,9 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-right font-semibold tabular-nums">{{ formatCost(row.cost) }}</span>
             <OProgressBar
               class="col-span-2 col-start-2"
-              size="xs"
-              :value="hasBudget ? Math.min(row.cost / draftTotal, 1) : 0"
-              :color="meterColorFor(row.key)"
+              :value="hasBudget ? Math.min(row.cost / draftTotal, 1) * 100 : 0"
             />
             <span
               class="text-text-secondary col-span-2 col-start-2 flex justify-between gap-2 text-xs whitespace-nowrap tabular-nums"
@@ -154,7 +135,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             :model-value="draftTotal || undefined"
             type="number"
-            size="md"
             prefix="$"
             :label="t('billing.usageV2.budgetAmount')"
             :placeholder="raw(suggestedBudget)"
@@ -190,7 +170,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OSwitch
               v-model="alertsOn"
-              size="sm"
               :aria-label="t('billing.usageV2.emailAlerts')"
               data-test="billings-usagebudget-alerts"
             />
@@ -222,10 +201,10 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import organizations from "@/services/organizations";
-import UsageKpiCard from "./UsageKpiCard.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import { usageKpiStats } from "./usageKpiStats";
 import UsagePaneHeader from "./UsagePaneHeader.vue";
 import UsageWarnAt from "./UsageWarnAt.vue";
 import {
@@ -471,4 +450,6 @@ const kpiCards = computed(() => {
   ];
   return cards;
 });
+
+const kpiStats = computed(() => usageKpiStats(kpiCards.value, "billings-usagebudget-kpi"));
 </script>

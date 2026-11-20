@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     :open="open"
     side="right"
-    size="lg"
+    size="md"
     :title="raw(item.id)"
     title-data-test="ai-dataset-item-detail-id"
-    :sub-title="t('aiObservability.datasets.detail.itemDetail.eyebrow')"
+    :subtitle="t('aiObservability.datasets.detail.itemDetail.eyebrow')"
     data-test="ai-dataset-item-detail"
     @update:open="handleOpenChange"
   >
@@ -62,19 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ── Item ── -->
         <template v-if="activeTab === 'item'">
           <div class="flex items-center justify-between gap-2">
-            <OTag
-              :variant="sourceVariant"
-              shape="rounded"
-              data-test="ai-dataset-item-detail-source"
-            >
+            <OTag :tone="sourceVariant" data-test="ai-dataset-item-detail-source">
               {{ t(`aiObservability.datasets.source.${item.source}`) }}
             </OTag>
             <!-- The version count is the whole reason this view exists, so it
                  doubles as the way into the Versions tab. -->
             <OButton
-              variant="outline"
-              size="sm"
-              icon-left="history"
+              variant="secondary"
+              icon="history"
               data-test="ai-dataset-item-detail-version-pill"
               @click="activeTab = 'versions'"
             >
@@ -156,8 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("aiObservability.datasets.detail.itemDetail.expectedSection") }}
               </h4>
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 data-test="ai-dataset-item-detail-edit"
                 @click="emit('edit', item)"
               >
@@ -177,13 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("aiObservability.datasets.detail.itemDetail.tagsSection") }}
             </h4>
             <div v-if="item.tags.length" class="flex flex-wrap items-center gap-1">
-              <OTag
-                v-for="tag in item.tags"
-                :key="tag"
-                variant="default-soft"
-                shape="rounded"
-                class="shrink-0"
-              >
+              <OTag v-for="tag in item.tags" :key="tag" tone="neutral" class="shrink-0">
                 {{ raw(tag) }}
               </OTag>
             </div>
@@ -201,9 +189,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("aiObservability.datasets.detail.itemDetail.metadataNote") }}
               </span>
             </div>
-            <OCode block copyable data-test="ai-dataset-item-detail-metadata">
-              {{ metadataJson }}
-            </OCode>
+            <OCodeBlock
+              :code="metadataJson"
+              lang="json"
+              data-test="ai-dataset-item-detail-metadata"
+            />
           </section>
         </template>
 
@@ -215,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OEmptyState
             v-if="!versionsLoading && !versions.length"
-            size="inline"
+            size="compact"
             :title="t('aiObservability.datasets.detail.itemDetail.versionsEmpty')"
             data-test="ai-dataset-item-detail-versions-empty"
           />
@@ -228,21 +218,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`ai-dataset-item-detail-version-${itemLocalVersion(index)}`"
             >
               <div class="flex flex-wrap items-center gap-2">
-                <span class="text-text-heading text-compact font-bold">
+                <span class="text-text-heading text-compact font-semibold">
                   {{
                     t("aiObservability.datasets.detail.itemDetail.versionLabel", {
                       version: itemLocalVersion(index),
                     })
                   }}
                 </span>
-                <OTag v-if="index === 0" variant="primary-soft" shape="rounded">
+                <OTag v-if="index === 0" tone="accent">
                   {{ t("aiObservability.datasets.detail.itemDetail.versionCurrent") }}
                 </OTag>
                 <span class="text-text-secondary text-2xs">{{ versionMeta(version) }}</span>
               </div>
               <!-- The raw stored payload, not the reading preview: a version is
                    only meaningful next to what actually changed. -->
-              <OCode block>{{ version.expectedOutput ?? "—" }}</OCode>
+              <OCodeBlock :code="version.expectedOutput ?? '—'" wrap :copyable="false" />
             </li>
           </ul>
         </template>
@@ -251,9 +241,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #footer>
       <OButton
-        variant="outline-destructive"
-        size="sm-action"
-        icon-left="delete"
+        variant="danger-ghost"
+        icon="delete"
         data-test="ai-dataset-item-detail-delete"
         @click="emit('delete', item)"
       >
@@ -272,10 +261,11 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, { type LlmDatasetItem } from "@/services/llm-datasets.service";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -343,12 +333,12 @@ function itemLocalVersion(index: number): number {
   return versionCount.value - index;
 }
 
-const sourceVariant = computed<BadgeVariant>(() =>
+const sourceVariant = computed<ChipTone>(() =>
   props.item.source === "trace"
-    ? "blue-soft"
+    ? "neutral"
     : props.item.source === "annotation"
-      ? "purple-soft"
-      : "orange-soft",
+      ? "neutral"
+      : "warn",
 );
 
 /** Lineage is four independent pointers, and an annotation push sets two of

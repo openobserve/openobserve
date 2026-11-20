@@ -10,7 +10,7 @@ beforeAll(() => {
 });
 
 import OTable from "./OTable.vue";
-import type { OTableColumnDef } from "./OTable.types";
+import { ROW_ACTIONS_COLUMN_ID, type OTableColumnDef } from "./OTable.types";
 
 const columns: OTableColumnDef[] = [
   {
@@ -62,7 +62,6 @@ describe("OTable flex column width", () => {
         data,
         columns,
         selection: "multiple",
-        showIndex: true,
         enableColumnResize: true,
         defaultColumns: false,
         tableId: "flexdiag",
@@ -80,29 +79,27 @@ describe("OTable flex column width", () => {
     expect(tableWidth(wrapper)).toBe(-1);
 
     // Resize freezes the flex column at its current fill width. With no layout,
-    // the arithmetic fallback = container − nonFlex (1000 − 284) = 716 is pinned
-    // into columnSizing. nonFlex = #(56) + type(100) + actions(84) + checkbox(44).
+    // the arithmetic fallback = container − nonFlex (1000 − 228) = 772 is pinned
+    // into columnSizing. nonFlex = type(100) + actions(84) + checkbox(44).
     // Then widen Type to 400 (TanStack preserves name).
     st.freezeFlexColumns();
     st.columnSizing = { ...st.columnSizing, type: 400 };
     await flushPromises();
 
-    // Now explicit width: Name HOLDS at 716, table grows to 1300 (scroll)
-    // (56 + 716 + 400 + 84 + 44 = 1300), # stays 56, and w-full is dropped.
+    // Now explicit width: Name HOLDS at 772, table grows to 1300 (scroll)
+    // (772 + 400 + 84 + 44 = 1300), and w-full is dropped.
     expect(isWFull(wrapper)).toBe(false);
-    expect(colVar(wrapper, "name")).toBe(716);
+    expect(colVar(wrapper, "name")).toBe(772);
     expect(tableWidth(wrapper)).toBe(1300);
-    expect(colVar(wrapper, "#")).toBe(56);
 
     // DECREASE Type to 50 (below its original 100). Name must NOT grow to
-    // absorb the freed space — it stays frozen at 716. Real columns sum to 950
-    // (56 + 716 + 50 + 84 + 44 = 950 < container) so the invisible spacer absorbs
+    // absorb the freed space — it stays frozen at 772. Real columns sum to 950
+    // (772 + 50 + 84 + 44 = 950 < container) so the invisible spacer absorbs
     // the 50px (its var) and the table stays at the container width (1000) →
     // actions flush-right.
     st.columnSizing = { ...st.columnSizing, type: 50 };
     await flushPromises();
-    expect(colVar(wrapper, "name")).toBe(716);
-    expect(colVar(wrapper, "#")).toBe(56);
+    expect(colVar(wrapper, "name")).toBe(772);
     expect(colVar(wrapper, "__spacer__")).toBe(50);
     expect(tableWidth(wrapper)).toBe(1000);
 
@@ -119,7 +116,6 @@ describe("OTable flex column width", () => {
         data,
         columns,
         selection: "multiple",
-        showIndex: true,
         enableColumnResize: true,
         defaultColumns: false,
         tableId: "flexdiag2",
@@ -129,9 +125,9 @@ describe("OTable flex column width", () => {
     (wrapper.vm.$ as any).setupState.containerWidth = 1000;
     await flushPromises();
 
-    // The flex (name) column fills explicitly (container 1000 − nonFlex 284).
+    // The flex (name) column fills explicitly (container 1000 − nonFlex 228).
     expect(thHasExplicitWidth(wrapper, "name")).toBe(true);
-    expect(headerVar(wrapper, "name")).toBe(716);
+    expect(headerVar(wrapper, "name")).toBe(772);
     // The invisible spacer must be 0 in the fill state — no trailing gap.
     expect(headerVar(wrapper, "--spacer--")).toBe(0);
   });
@@ -146,7 +142,6 @@ describe("OTable flex column width", () => {
         data,
         columns,
         selection: "multiple",
-        showIndex: true,
         enableColumnResize: true,
         defaultColumns: false,
         tableId: "flexdiag3",
@@ -155,27 +150,27 @@ describe("OTable flex column width", () => {
     await flushPromises();
     const st: any = (wrapper.vm.$ as any).setupState;
 
-    // Wide container: fixed (272) + flex min (160) = 432 < 1000 → fills, no scroll.
+    // Wide container: fixed (216) + flex min (160) = 376 < 1000 → fills, no scroll.
     st.containerWidth = 1000;
     await flushPromises();
     expect(st.frozen).toBe(false);
     expect(st.allowHorizontalScroll).toBe(false);
 
-    // Narrow container: 432 > 400 → even at min widths the columns overflow, so
+    // Narrow container: 376 > 350 → even at min widths the columns overflow, so
     // the scroll container must expose a horizontal scrollbar.
-    st.containerWidth = 400;
+    st.containerWidth = 350;
     await flushPromises();
     expect(st.frozen).toBe(false);
     expect(st.allowHorizontalScroll).toBe(true);
   });
 
   it("keeps the actions column pinned and scrolls sideways while the columns overflow", async () => {
-    const rowActions = [{ id: "edit", label: "Edit", icon: "edit", onSelect: () => {} }];
+    const rowActions = [{ id: "edit", label: "Edit", icon: "edit", onClick: () => {} }];
     const mountAt = async (width: number, props: Record<string, unknown> = {}) => {
       const wrapper = mount(OTable, {
         props: {
           data,
-          columns,
+          columns: columns.filter((c) => !c.isAction),
           rowActions,
           enableColumnResize: true,
           defaultColumns: false,
@@ -189,7 +184,9 @@ describe("OTable flex column width", () => {
       const state = () => ({
         pinned: ["th", "cell"].every((part) =>
           /position:\s*sticky/.test(
-            wrapper.find(`[data-test="o2-table-${part}-actions"]`).attributes("style") || "",
+            wrapper
+              .find(`[data-test="o2-table-${part}-${ROW_ACTIONS_COLUMN_ID}"]`)
+              .attributes("style") || "",
           ),
         ),
         scrolls: st.allowHorizontalScroll,
@@ -198,7 +195,7 @@ describe("OTable flex column width", () => {
     };
 
     expect((await mountAt(1000)).state()).toEqual({ pinned: true, scrolls: false });
-    expect((await mountAt(300)).state()).toEqual({ pinned: true, scrolls: true });
+    expect((await mountAt(250)).state()).toEqual({ pinned: true, scrolls: true });
 
     // A resize holds the filler at its filled width, so widening a sibling overflows a container the minimums fit.
     const resized = await mountAt(1000);
@@ -210,7 +207,6 @@ describe("OTable flex column width", () => {
     const elastic = [
       { id: "name", header: "Name", accessorKey: "name", minSize: 160, meta: { autoWidth: true } },
       { id: "type", header: "Type", accessorKey: "type", size: 700 },
-      { id: "actions", header: "Actions", isAction: true, size: 80 },
     ];
     const autoWidth = { columns: elastic, enableColumnResize: false };
     expect((await mountAt(1000, autoWidth)).state()).toEqual({ pinned: true, scrolls: false });
@@ -308,5 +304,52 @@ describe("OTable flex column width", () => {
     await flushPromises();
     expect(st.allowHorizontalScroll).toBe(true);
     expect(Number(minWidth())).toBeGreaterThanOrEqual(980);
+  });
+
+  // Regression: the floor read the built def's 48 resize minimum, so a leftover of
+  // 56 passed it and Alert History showed every alert name as "cp…".
+  describe("autoWidth floor when the fixed columns fit but leave less than its size", () => {
+    const mountAuto = async (name: Record<string, unknown>) => {
+      const wrapper = mount(OTable, {
+        props: {
+          data,
+          columns: [
+            { id: "name", header: "Name", accessorKey: "name", meta: { autoWidth: true }, ...name },
+            { id: "type", header: "Type", accessorKey: "type", size: 700 },
+            { id: "actions", header: "Actions", isAction: true, size: 80 },
+          ],
+          defaultColumns: false,
+          tableId: "autowidth-leftover",
+        } as any,
+      });
+      await flushPromises();
+      const st: any = (wrapper.vm.$ as any).setupState;
+      const minWidth = () =>
+        (wrapper.find('[data-test="o2-table"]').attributes("style") || "").match(
+          /min-width:\s*(\d+)px/,
+        )?.[1];
+      const fixed = (wrapper.find('[data-test="o2-table"]').attributes("style") || "").match(
+        /--col-actions-size:\s*(\d+)px/,
+      )?.[1];
+      return { st, minWidth, fixedSum: 700 + Number(fixed) };
+    };
+
+    it("keeps the column at its size and scrolls instead of handing it the leftover", async () => {
+      const { st, minWidth, fixedSum } = await mountAuto({ size: 200 });
+      st.containerWidth = fixedSum + 56;
+      await flushPromises();
+      expect(st.allowHorizontalScroll).toBe(true);
+      expect(Number(minWidth())).toBe(fixedSum + 200);
+    });
+
+    it("floors at the page's minSize when it is set below the size", async () => {
+      const { st, minWidth, fixedSum } = await mountAuto({ size: 200, minSize: 120 });
+      st.containerWidth = fixedSum + 150;
+      await flushPromises();
+      expect(minWidth()).toBeUndefined();
+      st.containerWidth = fixedSum + 56;
+      await flushPromises();
+      expect(Number(minWidth())).toBe(fixedSum + 120);
+    });
   });
 });

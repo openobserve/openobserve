@@ -95,7 +95,7 @@ const OButtonStub = {
       :aria-label="ariaLabel"
       @click="$emit('click')"
     >
-      <slot name="icon-left" />
+      <slot name="icon" />
       <slot />
     </button>
   `,
@@ -106,8 +106,26 @@ const OIconStub = {
   template: "<i />",
 };
 
+// OTextarea replaced OInput type="textarea"; the stub keeps the same model contract.
+const OTextareaStub = {
+  inheritAttrs: false,
+  props: ["modelValue", "label", "placeholder", "required", "rows"],
+  emits: ["update:modelValue"],
+  template: `
+    <textarea
+      :value="modelValue"
+      :rows="rows"
+      :placeholder="placeholder"
+      :required="required"
+      :data-test="$attrs['data-test']"
+      @input="$emit('update:modelValue', $event.target.value)"
+    />
+  `,
+};
+
 const STUBS = {
   OInput: OInputStub,
+  OTextarea: OTextareaStub,
   OSelect: OSelectStub,
   OSwitch: OSwitchStub,
   OButton: OButtonStub,

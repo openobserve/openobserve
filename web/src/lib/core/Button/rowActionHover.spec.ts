@@ -18,36 +18,33 @@ import { mount } from "@vue/test-utils";
 import OButton from "./OButton.vue";
 import type { ButtonVariant } from "./OButton.types";
 
-const STEP = "group-hover/row:enabled:hover:not-active:bg-table-row-action-hover-bg";
-const NEUTRAL_HOVER =
-  /(^|\s)enabled:hover:bg-button-(ghost|ghost-primary|ghost-muted|ghost-subtle)-hover-bg(\s|$)|(^|\s)enabled:hover:bg-button-secondary-hover(\s|$)/;
+const STEP = "group-hover/row:hover:not-active:bg-table-row-action-hover-bg";
 
-function classesOf(variant: ButtonVariant): string {
+function classesOf(variant: ButtonVariant): string[] {
   return mount(OButton, { props: { variant }, slots: { default: "Go" } })
     .find("button")
-    .classes()
-    .join(" ");
+    .classes();
 }
 
-describe("a ghost hover inside a hovered table row (item 1)", () => {
-  it.each([
-    "ghost",
-    "ghost-primary",
-    "ghost-muted",
-    "ghost-subtle",
-    "secondary",
-    "ghost-neutral",
-    "row",
-  ] as const)("steps the %s hover up to the row-action fill", (variant) => {
-    const classes = classesOf(variant);
-    expect(classes).toMatch(NEUTRAL_HOVER);
-    expect(classes.split(" ")).toContain(STEP);
-  });
-
-  it.each(["primary", "ghost-destructive", "outline"] as const)(
-    "leaves the %s hover, which never matched the row fill, alone",
+describe("an accent hover inside a hovered table row", () => {
+  it.each(["ghost", "accent-ghost"] as const)(
+    "steps the %s hover up to the row-action fill",
     (variant) => {
-      expect(classesOf(variant).split(" ")).not.toContain(STEP);
+      expect(classesOf(variant)).toContain(STEP);
     },
   );
+
+  it.each(["primary", "secondary", "danger", "danger-ghost", "link"] as const)(
+    "leaves the %s hover, which never matched the row fill, alone",
+    (variant) => {
+      expect(classesOf(variant)).not.toContain(STEP);
+    },
+  );
+
+  it("drops the step while the button is disabled", () => {
+    const classes = mount(OButton, { props: { variant: "ghost", disabled: true } })
+      .find("button")
+      .classes();
+    expect(classes).not.toContain(STEP);
+  });
 });

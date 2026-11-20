@@ -68,15 +68,15 @@ describe("CauseList", () => {
   it.each<[string, AutoObserveChecked | null, string[]]>([
     ["every check ran: no notice", { kind: "ok" }, []],
     ["not recorded: no notice, a footer note", { kind: "not_recorded" }, []],
-    ["off: amber", { kind: "off" }, ["gap:warning"]],
-    ["partly checked: amber", { kind: "partial" }, ["gap:warning"]],
-    ["failed: red", { kind: "failed", reason: "timeout" }, ["failed:error"]],
+    ["off: amber", { kind: "off" }, ["gap:warn"]],
+    ["partly checked: amber", { kind: "partial" }, ["gap:warn"]],
+    ["failed: red", { kind: "failed", reason: "timeout" }, ["failed:err"]],
   ])("the title's notice follows the checks: %s", (_name, state, want) => {
     const checks = state ? [{ label: "pipelines", state }] : [];
     const wrapper = mountList(context({ checks }));
     const notices = ["gap", "failed"].flatMap((n) => {
       const el = wrapper.find(sel(n));
-      return el.exists() ? [`${n}:${el.attributes("data-variant")}`] : [];
+      return el.exists() ? [`${n}:${el.attributes("data-tone")}`] : [];
     });
     expect(notices).toEqual(want);
   });

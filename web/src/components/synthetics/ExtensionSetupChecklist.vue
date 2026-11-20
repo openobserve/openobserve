@@ -80,7 +80,6 @@ function refreshPage() {
       <OButton
         v-else
         variant="ghost"
-        size="sm"
         class="text-text-link underline"
         data-test="synthetics-setup-install-undo"
         @click="installAck = false"
@@ -102,8 +101,7 @@ function refreshPage() {
         </p>
         <OButton
           variant="primary"
-          size="sm"
-          icon-left="open-in-new"
+          icon="open-in-new"
           data-test="synthetics-setup-install-btn"
           @click="openWebStore"
         >
@@ -114,7 +112,6 @@ function refreshPage() {
         >
           <OCheckbox
             :model-value="installAck"
-            size="sm"
             data-test="synthetics-setup-install-ack"
             class="mt-1"
             @update:model-value="installAck = $event === true"
@@ -154,7 +151,6 @@ function refreshPage() {
       </h4>
       <OButton
         variant="ghost"
-        size="sm"
         class="text-text-link underline"
         data-test="synthetics-setup-incognito-undo"
         @click="incognitoDone = false"
@@ -214,7 +210,6 @@ function refreshPage() {
         >
           <OCheckbox
             :model-value="incognitoDone"
-            size="sm"
             data-test="synthetics-setup-incognito-ack"
             class="mt-1"
             @update:model-value="incognitoDone = $event === true"
@@ -278,9 +273,8 @@ function refreshPage() {
             <template #menu>{{ CHROME_UI_LABELS.extensionsMenu }}</template>
           </i18n-t>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="refresh"
+            variant="secondary"
+            icon="refresh"
             data-test="synthetics-setup-refresh-btn"
             @click="refreshPage"
           >

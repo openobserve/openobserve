@@ -32,24 +32,24 @@ const ODialogStub = {
     "size",
     "width",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "seamless",
     "formId",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 // Create mock store
@@ -146,8 +146,8 @@ describe("PanelLayoutSettings.vue", () => {
       expect(dialog.props("open")).toBe(true);
       expect(dialog.props("title")).toBe("Layout");
       // The dialog only adds a draft step, so it must not read as a second Save beside the header's.
-      expect(dialog.props("primaryButtonLabel")).toBe("Apply");
-      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(dialog.props("primary")?.label).toBe("Apply");
+      expect(dialog.props("secondary")?.label).toBe("Cancel");
       expect(dialog.props("size")).toBe("sm");
     });
 
@@ -162,8 +162,8 @@ describe("PanelLayoutSettings.vue", () => {
     it("does NOT disable the Save button (R3 — save stays enabled)", () => {
       wrapper = mountComponent();
       const dialog = wrapper.findComponent(ODialogStub);
-      // primaryButtonDisabled is never bound → defaults to undefined/false.
-      expect(dialog.props("primaryButtonDisabled")).toBeFalsy();
+      // primary?.disabled is never bound → defaults to undefined/false.
+      expect(dialog.props("primary")?.disabled).toBeFalsy();
     });
 
     it("re-emits update:open from the ODialog", async () => {

@@ -18,20 +18,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="edit-role-page"
     :title="raw(editingRole)"
-    :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
+    :back="{ label: t('iam.roles'), to: rolesRoute }"
     bleed
   >
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div data-test="edit-role-title" class="shrink-0">
-      <div class="bg-card-glass-bg flex flex-col py-2">
-        <AppTabs
-          data-test="edit-role-tabs"
-          :tabs="tabs"
-          :active-tab="activeTab"
-          :dirty-title="t('iam.editRole.unsavedDot.title')"
-          @update:active-tab="updateActiveTab"
+      <OTabs
+        :model-value="activeTab"
+        bordered
+        data-test="edit-role-tabs"
+        @update:model-value="(v) => updateActiveTab(String(v))"
+      >
+        <OTab
+          v-for="tab in tabs"
+          :key="tab.value"
+          :name="tab.value"
+          :label="tab.label"
+          :icon="tab.icon"
+          :dirty="tab.dirty"
+          :data-test="`tab-${tab.value}`"
         />
-      </div>
+      </OTabs>
     </div>
 
     <div class="flex min-h-0 flex-1">
@@ -75,8 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OButton
                   variant="ghost"
-                  size="sm"
-                  icon-left="help"
+                  icon="help"
                   data-test="edit-role-json-help-btn"
                   @click="toggleHelpSection"
                 >
@@ -110,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :loading="moduleLoading || isFetchingInitialRoles"
                   :is-granted="isGranted"
                   :is-pending-removal="isPendingRemoval"
-                  :icon="isAllModules ? ALL_MODULES_ICON : activeRailModule?.icon"
+                  :context="raw(editingRole)"
                   :added="activeRailModule?.added"
                   :removed="activeRailModule?.removed"
                   @change="changeFromPane"
@@ -140,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :entity-label="entityLabel"
                   :summary-actions="summaryActions"
                   :license-denied="licenseDenied"
+                  :context="raw(editingRole)"
                   @open="(moduleKey) => (activeModule = moduleKey)"
                   @preset="(presetId) => applyPreset(presetId, { announce: true })"
                   @load-streams="loadPresetStreams()"
@@ -174,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div v-if="isHelpOpen" style="width: 21.875rem" class="p-2">
                       <div class="flex items-center justify-between px-2">
-                        <div style="font-size: var(--text-base)">
+                        <div style="font-size: var(--text-sm)">
                           {{ t("iam.editRole.quickReference") }}
                         </div>
                         <OIcon
@@ -192,10 +199,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                         <pre style="font-size: var(--text-xs)">{{ raw(jsonPermissionSample) }}</pre>
                         <div>
-                          <span class="font-bold">{{ t("iam.editRole.childResource") }}</span>
+                          <span class="font-semibold">{{ t("iam.editRole.childResource") }}</span>
                           <br />
                           {{ t("iam.editRole.specificInstanceOr") }}
-                          <span class="font-bold">{{ raw("organizationID") }}</span>
+                          <span class="font-semibold">{{ raw("organizationID") }}</span>
                           {{ t("iam.editRole.forAllInstances") }}
                         </div>
                       </div>
@@ -223,13 +230,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="!companionGaps.length"
             >
               <OButton
-                variant="outline"
-                size="sm-action"
+                variant="secondary"
                 :disabled="!pendingChanges.length && !companionGaps.length"
                 data-test="edit-role-review-changes-btn"
                 @click="unsavedDrawerOpen = true"
               >
-                <template #icon-left>
+                <template #icon>
                   <OIcon
                     v-if="companionGaps.length"
                     name="warning"
@@ -239,21 +245,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 {{ t("iam.editRole.reviewChanges") }}
-                <OBadge
+                <OCountBadge
                   v-if="pendingChanges.length"
-                  variant="default-soft"
-                  size="sm"
+                  :count="pendingChanges.length"
                   class="ms-1.5"
                   data-test="edit-role-unsaved-count"
-                >
-                  {{ raw(String(pendingChanges.length)) }}
-                </OBadge>
+                />
               </OButton>
             </OTooltip>
             <OButton
               data-test="edit-role-cancel-btn"
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               @click="cancelPermissionsUpdate"
             >
               {{ t("alerts.cancel") }}
@@ -261,7 +263,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="edit-role-save-btn"
               variant="primary"
-              size="sm-action"
               :loading="isSaving"
               @click="saveRoleAndMark"
             >
@@ -315,7 +316,7 @@ import {
   type Ref,
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCountBadge from "@/lib/core/Badge/OCountBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -329,7 +330,6 @@ import PermissionsViewSwitch from "@/components/iam/roles/PermissionsViewSwitch.
 import UnsavedChangesDrawer from "@/components/iam/roles/UnsavedChangesDrawer.vue";
 import RoleSummary from "@/components/iam/roles/RoleSummary.vue";
 import {
-  ALL_MODULES_ICON,
   ALL_MODULES_KEY,
   buildRoleModules,
   GROUP_LABEL_KEYS,
@@ -353,7 +353,8 @@ import { useRoleSave } from "@/composables/iam/useRoleSave";
 import { useRolePermissionTree } from "@/composables/iam/useRolePermissionTree";
 import useStreams from "@/composables/useStreams";
 import GroupUsers from "../groups/GroupUsers.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -740,13 +741,13 @@ const decodePermission = (permission: string) => {
   return { resource, entity };
 };
 
+const rolesRoute = computed(() => ({
+  name: "roles",
+  query: { org_identifier: store.state.selectedOrganization.identifier },
+}));
+
 const cancelPermissionsUpdate = () => {
-  router.push({
-    name: "roles",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
+  router.push(rolesRoute.value);
 };
 
 // The pane reads with the same key the toggle writes, so the two can never disagree.

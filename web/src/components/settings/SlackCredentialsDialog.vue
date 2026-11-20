@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useMutation } from "@tanstack/vue-query";
 import { useStore } from "vuex";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -77,10 +77,10 @@ const submit = async (value: CredentialsForm): Promise<void> => {
     :open="open"
     size="md"
     :title="t('slackApp.credentials.title')"
-    :sub-title="t('slackApp.credentials.description')"
+    :subtitle="t('slackApp.credentials.description')"
     :form-id="FORM_ID"
-    :primary-button-label="t('common.save')"
-    :secondary-button-label="t('common.cancel')"
+    :primary="{ label: t('common.save') }"
+    :secondary="{ label: t('common.cancel') }"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
   >
@@ -93,22 +93,19 @@ const submit = async (value: CredentialsForm): Promise<void> => {
       class="flex flex-col gap-5"
       @submit="submit"
     >
-      <OBanner
+      <OInlineNotice
         v-if="!installation.credentials_readable"
-        variant="error-soft"
-        dense
-        icon="error-outline"
+        tone="err"
         data-test="slack-credentials-unreadable-note"
       >
         {{ t("slackApp.credentials.unreadable") }}
-      </OBanner>
+      </OInlineNotice>
       <OFormInput
         v-for="field in fields"
         :key="field.name"
         :name="field.name"
         :label="field.label"
         :type="field.name === 'client_id' ? 'text' : 'password'"
-        :revealable="field.name !== 'client_id'"
         autocomplete="off"
         :data-test="`slack-credentials-${field.name}`"
       />

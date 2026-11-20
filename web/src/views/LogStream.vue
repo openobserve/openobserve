@@ -18,22 +18,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="alert-list-page" class="h-full">
-    <OPageLayout
-      bleed
-      :title="t('logStream.header')"
-      title-data-test="log-stream-title-text"
-      :subtitle="t('logStream.subtitle')"
-      icon="window"
-    >
+    <OPageLayout bleed :title="t('menu.index')" title-data-test="log-stream-title-text">
+      <template v-if="isSchemaUDSEnabled" #actions-overflow>
+        <OButton data-test="log-stream-add-stream-btn" variant="secondary" @click="addStream">
+          {{ t(`logStream.add`) }}
+        </OButton>
+      </template>
+      <!-- Streams appear when data arrives, so adding data is the page's main job (H6). -->
       <template #actions>
         <OButton
-          v-if="isSchemaUDSEnabled"
-          data-test="log-stream-add-stream-btn"
+          data-test="log-stream-add-data-btn"
           variant="primary"
-          size="sm-action"
-          @click="addStream"
+          @click="onStreamsEmptyStateAction('setup-ingestion')"
         >
-          {{ t(`logStream.add`) }}
+          {{ t("menu.addData") }}
         </OButton>
       </template>
 
@@ -49,9 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="log-stream-table"
           :data="logStream"
           :columns="columns"
-          show-index
           row-key="_rowKey"
-          :frame="false"
           selection="multiple"
           v-model:selected-ids="selectedIds"
           pagination="server"
@@ -62,7 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="server"
           v-model:sort-by="sortBy"
           v-model:sort-order="sortOrder"
-          :show-global-filter="false"
           :default-columns="false"
           :loading="loadingState"
           :forbidden="forbidden"
@@ -83,17 +78,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="log-stream-type-filter"
                 @update:model-value="(v) => filterLogStreamByTab(v as string)"
               >
-                <OToggleGroupItem value="logs" size="sm">
+                <OToggleGroupItem value="logs">
                   <template #icon-left><OIcon name="search" size="xs" class="shrink-0" /></template>
                   {{ t("logStream.labelLogs") }}
                 </OToggleGroupItem>
-                <OToggleGroupItem value="metrics" size="sm">
+                <OToggleGroupItem value="metrics">
                   <template #icon-left
                     ><OIcon name="bar-chart" size="xs" class="shrink-0"
                   /></template>
                   {{ t("logStream.labelMetrics") }}
                 </OToggleGroupItem>
-                <OToggleGroupItem value="traces" size="sm">
+                <OToggleGroupItem value="traces">
                   <template #icon-left
                     ><OIcon name="account-tree" size="xs" class="shrink-0"
                   /></template>
@@ -102,7 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OToggleGroupItem
                   v-if="store.state.zoConfig?.profiling_enabled"
                   value="profiles"
-                  size="sm"
                   :disabled="profilesLocked"
                   :tooltip="profilesLocked ? profilesLockedReason : undefined"
                   data-test="log-stream-profiles-toggle"
@@ -116,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   /></template>
                   {{ t("logStream.labelProfiles") }}
                 </OToggleGroupItem>
-                <OToggleGroupItem value="metadata" size="sm">
+                <OToggleGroupItem value="metadata">
                   <template #icon-left><OIcon name="info" size="xs" class="shrink-0" /></template>
                   {{ t("logStream.labelMetadata") }}
                 </OToggleGroupItem>
@@ -132,11 +126,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="isRefreshing"
-              shortcut-id="streamsRefresh"
+              shortcut="streamsRefresh"
               data-test="log-stream-refresh-stats-btn"
               @click="refreshStreams"
             />
@@ -187,50 +179,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-actions="{ row }">
             <div class="actions-container flex items-center">
-              <OButton
-                icon-left="search"
-                :title="t('logStream.explore')"
-                data-test="log-stream-explore-btn"
-                data-row-action="view"
-                variant="ghost"
-                size="icon-xs-sq"
-                class="max-md:hidden"
-                @click="exploreStream({ row })"
-              />
-              <OButton
-                icon-left="description"
-                :title="t('logStream.schemaHeader')"
-                data-test="log-stream-schema-btn"
-                data-row-action="view"
-                variant="ghost"
-                size="icon-xs-sq"
-                class="max-md:hidden"
-                @click="listSchema({ row })"
-              />
-              <OButton
-                icon-left="delete"
-                :title="t('logStream.delete')"
-                data-test="log-stream-delete-btn"
+              <div
+                class="flex items-center opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 max-md:hidden pointer-coarse:opacity-100"
+              >
+                <OButton
+                  icon-only
+                  icon="search"
+                  :label="t('logStream.explore')"
+                  data-test="log-stream-explore-btn"
+                  data-row-action="view"
+                  variant="ghost"
+                  size="sm"
+                  @click="exploreStream({ row })"
+                />
+                <OButton
+                  icon-only
+                  icon="description"
+                  :label="t('logStream.schemaHeader')"
+                  data-test="log-stream-schema-btn"
+                  data-row-action="view"
+                  variant="ghost"
+                  size="sm"
+                  @click="listSchema({ row })"
+                />
+              </div>
+              <button
+                type="button"
                 data-row-action="delete"
-                variant="ghost-destructive"
-                size="icon-xs-sq"
-                class="max-md:hidden"
-                @click="confirmDeleteAction({ row })"
+                class="hidden"
+                tabindex="-1"
+                aria-hidden="true"
+                @click.stop="confirmDeleteAction({ row })"
               />
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    icon-only
                     :aria-label="t('common.moreActions')"
-                    icon-left="more-vert"
+                    icon="more-vert"
                     variant="ghost"
-                    size="icon-xs-sq"
-                    class="md:hidden"
+                    size="sm"
                     data-test="log-stream-row-more-actions"
                     @click.stop
                   />
                 </template>
                 <ODropdownItem
-                  icon-left="search"
+                  icon="search"
                   class="md:hidden"
                   data-test="log-stream-explore-btn-menu"
                   @select="exploreStream({ row })"
@@ -238,17 +232,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span>{{ t("logStream.explore") }}</span>
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="description"
+                  icon="description"
                   class="md:hidden"
                   data-test="log-stream-schema-btn-menu"
                   @select="listSchema({ row })"
                 >
                   <span>{{ t("logStream.schemaHeader") }}</span>
                 </ODropdownItem>
+                <ODropdownSeparator class="md:hidden" />
                 <ODropdownItem
-                  icon-left="delete"
-                  variant="destructive"
-                  class="md:hidden"
+                  icon="delete"
+                  tone="danger"
                   data-test="log-stream-delete-btn-menu"
                   @select="confirmDeleteAction({ row })"
                 >
@@ -258,93 +252,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #empty>
-            <div v-if="!loadingState">
-              <OEmptyState
-                size="hero"
-                preset="no-streams"
-                :actions="streamsEmptyActions"
-                :filtered="!!filterQuery"
-                @action="onStreamsEmptyStateAction"
-              >
-                <template v-if="!filterQuery" #extra>
-                  <div class="flex flex-wrap items-center justify-center gap-2">
-                    <span class="text-text-secondary me-1 text-sm font-semibold">
-                      {{ t("logStream.emptyOr") }}
-                    </span>
-                    <EmptyStateIngestionChip
-                      data-test="log-stream-empty-kubernetes-btn"
-                      @click="
-                        router.push({
-                          name: 'ingestFromKubernetes',
-                          query: { org_identifier: store.state.selectedOrganization.identifier },
-                        })
-                      "
-                    >
-                      <img
-                        :src="getImageURL('images/common/kubernetes.svg')"
-                        class="h-3.5 w-3.5 shrink-0 object-contain"
-                        alt=""
-                      />
-                      {{ raw("Kubernetes") }}
-                    </EmptyStateIngestionChip>
-                    <EmptyStateIngestionChip
-                      data-test="log-stream-empty-aws-btn"
-                      @click="
-                        router.push({
-                          name: 'AWSConfig',
-                          query: { org_identifier: store.state.selectedOrganization.identifier },
-                        })
-                      "
-                    >
-                      <img
-                        :src="getImageURL('images/ingestion/aws.svg')"
-                        class="h-3.5 w-3.5 shrink-0 object-contain"
-                        alt=""
-                      />
-                      {{ t("logStream.emptyAws") }}
-                    </EmptyStateIngestionChip>
-                    <EmptyStateIngestionChip
-                      data-test="log-stream-empty-linux-btn"
-                      @click="
-                        router.push({
-                          name: 'ingestFromLinux',
-                          query: { org_identifier: store.state.selectedOrganization.identifier },
-                        })
-                      "
-                    >
-                      <img
-                        :src="getImageURL('images/common/linux.svg')"
-                        class="h-3.5 w-3.5 shrink-0 object-contain"
-                        alt=""
-                      />
-                      {{ raw("Linux") }}
-                    </EmptyStateIngestionChip>
-                    <EmptyStateIngestionChip
-                      data-test="log-stream-empty-windows-btn"
-                      @click="
-                        router.push({
-                          name: 'ingestFromWindows',
-                          query: { org_identifier: store.state.selectedOrganization.identifier },
-                        })
-                      "
-                    >
-                      <img
-                        :src="getImageURL('images/common/windows.svg')"
-                        class="h-3.5 w-3.5 shrink-0 object-contain"
-                        alt=""
-                      />
-                      {{ raw("Windows") }}
-                    </EmptyStateIngestionChip>
-                  </div>
-                </template>
-              </OEmptyState>
-            </div>
+            <OEmptyState
+              v-if="!loadingState"
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.streams') })
+                  : t('emptyState.noStreams.title')
+              "
+              :text="
+                filterQuery
+                  ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.streams') })
+                  : t('emptyState.noStreams.description')
+              "
+              :icon="filterQuery ? undefined : 'link'"
+              :action-label="filterQuery ? undefined : t('menu.addData')"
+              :secondary-action-label="
+                filterQuery || !isSchemaUDSEnabled
+                  ? undefined
+                  : t('emptyState.noStreams.createAction')
+              "
+              @action="onStreamsEmptyStateAction(filterQuery ? 'clear-filters' : 'setup-ingestion')"
+              @secondary-action="onStreamsEmptyStateAction('create')"
+            >
+              <template v-if="!filterQuery" #extra>
+                <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+                  <span class="text-text-secondary text-compact">
+                    {{ t("logStream.emptyOr") }}
+                  </span>
+                  <OButton
+                    variant="link"
+                    size="sm"
+                    data-test="log-stream-empty-kubernetes-btn"
+                    @click="
+                      router.push({
+                        name: 'ingestFromKubernetes',
+                        query: { org_identifier: store.state.selectedOrganization.identifier },
+                      })
+                    "
+                  >
+                    {{ raw("Kubernetes") }}
+                  </OButton>
+                  <OButton
+                    variant="link"
+                    size="sm"
+                    data-test="log-stream-empty-aws-btn"
+                    @click="
+                      router.push({
+                        name: 'AWSConfig',
+                        query: { org_identifier: store.state.selectedOrganization.identifier },
+                      })
+                    "
+                  >
+                    {{ t("logStream.emptyAws") }}
+                  </OButton>
+                  <OButton
+                    variant="link"
+                    size="sm"
+                    data-test="log-stream-empty-linux-btn"
+                    @click="
+                      router.push({
+                        name: 'ingestFromLinux',
+                        query: { org_identifier: store.state.selectedOrganization.identifier },
+                      })
+                    "
+                  >
+                    {{ raw("Linux") }}
+                  </OButton>
+                  <OButton
+                    variant="link"
+                    size="sm"
+                    data-test="log-stream-empty-windows-btn"
+                    @click="
+                      router.push({
+                        name: 'ingestFromWindows',
+                        query: { org_identifier: store.state.selectedOrganization.identifier },
+                      })
+                    "
+                  >
+                    {{ raw("Windows") }}
+                  </OButton>
+                </div>
+              </template>
+            </OEmptyState>
           </template>
           <template #selection-actions>
             <OButton
-              icon-left="delete"
-              variant="outline-destructive"
-              size="sm"
+              icon="delete"
+              variant="danger-ghost"
               :disabled="isDeleting"
               @click="confirmBatchDeleteAction"
             >
@@ -374,9 +369,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="confirmDelete"
       size="sm"
       :title="t('logStream.confirmDeleteHead')"
-      :secondary-button-label="t('logStream.cancel')"
-      :primary-button-label="t('logStream.ok')"
-      primary-button-variant="destructive"
+      :secondary="{ label: t('logStream.cancel') }"
+      :primary="{ label: t('logStream.delete'), variant: 'danger' }"
       @click:secondary="cancelDelete"
       @click:primary="
         () => {
@@ -412,9 +406,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="confirmBatchDelete"
       size="sm"
       :title="t('logStream.confirmBatchDeleteHead')"
-      :secondary-button-label="t('logStream.cancel')"
-      :primary-button-label="t('logStream.ok')"
-      primary-button-variant="destructive"
+      :secondary="{ label: t('logStream.cancel') }"
+      :primary="{ label: t('logStream.ok'), variant: 'danger' }"
       @click:secondary="cancelBatchDelete"
       @click:primary="
         () => {
@@ -446,12 +439,11 @@ import { orgSummaryQuery } from "@/services/organizations.queries";
 import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useListViewState } from "@/composables/useListViewState";
+import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem, StatTrend } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -460,9 +452,8 @@ import streamService from "../services/stream";
 import { addCommasToNumber, formatEventCount } from "@/utils/formatters";
 import SchemaIndex from "../components/logstream/schema.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import analytics from "../services/product_analytics";
-import { getImageURL, verifyOrganizationStatus, formatSizeFromMB } from "../utils/zincutils";
+import { verifyOrganizationStatus, formatSizeFromMB } from "../utils/zincutils";
 import config from "@/aws-exports";
 import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
@@ -471,6 +462,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -487,13 +479,13 @@ export default defineComponent({
     OPageLayout,
     SchemaIndex,
     OEmptyState,
-    EmptyStateIngestionChip,
     AddStream,
     OButton,
     ORefreshButton,
     ODialog,
     ODropdown,
     ODropdownItem,
+    ODropdownSeparator,
     OIcon,
     OToggleGroup,
     OToggleGroupItem,
@@ -519,14 +511,18 @@ export default defineComponent({
     const selectedIds = ref<string[]>([]);
     const orgData: any = ref(store.state.selectedOrganization);
     const previousOrgIdentifier = ref("");
-    const viewState = useListViewState("logStreams", {
-      filterQuery: "",
-      streamType: "logs",
-      pageSize: 20,
-      currentPage: 1,
-      sortBy: "name",
-      sortOrder: "asc" as "asc" | "desc",
-    });
+    const viewState = useListViewState(
+      "logStreams",
+      {
+        filterQuery: "",
+        streamType: "logs",
+        pageSize: 20,
+        currentPage: 1,
+        sortBy: "name",
+        sortOrder: "asc" as "asc" | "desc",
+      },
+      { url: { ...LIST_URL_PARAMS, streamType: "type" } },
+    );
     const { locked: profilesLocked, lockedReason: profilesLockedReason } =
       useLicenseLock("continuous_profiling");
     // a remembered profiles tab must not reopen a locked feature
@@ -969,9 +965,10 @@ export default defineComponent({
         return { direction: "down", label: raw(ratio), tone: "success" };
       };
       return [
+        // The one label that differs from Home: it sits above a one-type table, so it names its scope.
         {
           key: "streams",
-          label: t("home.streams"),
+          label: t("logStream.summaryAllTypes"),
           value: count(s?.num_streams),
           icon: "window",
           tone: "primary",
@@ -1326,26 +1323,6 @@ export default defineComponent({
       // });
     };
 
-    const streamsEmptyActions = computed(() => {
-      const actions: EmptyStateAction[] = [
-        {
-          id: "setup-ingestion",
-          icon: "cloud-upload",
-          titleKey: "emptyState.noStreams.action",
-          descriptionKey: "emptyState.noStreams.actionDesc",
-        },
-      ];
-      if (isSchemaUDSEnabled.value) {
-        actions.push({
-          id: "create",
-          icon: "add",
-          titleKey: "emptyState.noStreams.createAction",
-          descriptionKey: "emptyState.noStreams.createActionDesc",
-        });
-      }
-      return actions;
-    });
-
     const onStreamsEmptyStateAction = (id?: string) => {
       if (id === "clear-filters") {
         filterQuery.value = "";
@@ -1451,7 +1428,6 @@ export default defineComponent({
       showIndexSchemaDialog,
       isSchemaUDSEnabled,
       filterQuery,
-      getImageURL,
       verifyOrganizationStatus,
       exploreStream,
       selectedStreamType,
@@ -1459,7 +1435,6 @@ export default defineComponent({
       onChangeStreamFilter,
       addStreamDialog,
       addStream,
-      streamsEmptyActions,
       onStreamsEmptyStateAction,
       loadingState,
       isRefreshing,

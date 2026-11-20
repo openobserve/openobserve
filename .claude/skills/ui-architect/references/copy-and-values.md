@@ -182,8 +182,9 @@ the raw server string. Every table that can fail supplies the slot:
 ```vue
 <template #error="{ message }">
   <OEmptyState
-    preset="load-error"
-    :description="raw(message)"
+    kind="error"
+    :title="t('common.errorLoadingData')"
+    :text="raw(message)"
     @action="onRefresh()"
   />
 </template>

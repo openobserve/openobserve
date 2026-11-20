@@ -22,28 +22,29 @@
   <div class="bg-surface-base flex h-screen flex-col">
     <div
       v-if="errorMessage"
-      class="flex min-h-[60vh] flex-col items-center justify-center px-4"
+      class="flex min-h-0 flex-1 flex-col"
       data-test="dashboards-public-dashboard-error"
     >
-      <OEmptyState size="hero" :illustration="errorIllustration" :title="errorMessage" />
+      <OEmptyState :kind="errorLook.kind" :icon="errorLook.icon" :title="errorMessage" />
     </div>
 
     <div
       v-else-if="!configLoaded"
-      class="flex min-h-[60vh] flex-col items-center justify-center gap-3"
+      class="flex min-h-0 flex-1 flex-col gap-3 p-4"
       data-test="dashboards-public-dashboard-loading"
     >
-      <OSpinner variant="dots" size="lg" />
-      <div class="text-text-secondary text-sm">
-        {{ t("dashboard.publicDashboard.loading") }}
+      <OSkeleton class="h-6 w-64" />
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <OSkeleton v-for="panel in 4" :key="panel" shape="block" class="h-60" />
       </div>
     </div>
 
     <!-- A range that is loading or cooling down keeps the header, so the viewer can still switch range. -->
     <template v-else>
+      <!-- The viewer may be anonymous or in another org, so the derived org would mislabel a shared dashboard. -->
       <OPageHeader
         :title="raw(config.title)"
-        icon="dashboard"
+        :context="t('dashboard.header')"
         title-data-test="dashboards-public-dashboard-title"
       >
         <template #actions>
@@ -90,6 +91,7 @@
           </div>
           <!-- One picker for range and timezone, as the app's own date-time picker. -->
           <OPopover
+            size="md"
             v-model:open="rangeMenuOpen"
             side="bottom"
             align="end"
@@ -98,29 +100,26 @@
           >
             <template #trigger>
               <OButton
-                variant="outline"
-                size="sm-toolbar"
-                class="h-8!"
-                icon-left="schedule"
-                icon-right="keyboard-arrow-down"
+                variant="secondary"
+                icon="schedule"
+                icon-end="keyboard-arrow-down"
                 data-test="dashboards-public-dashboard-preset-btn"
               >
                 {{ selectedRange ? rangeLabel(selectedRange) : "" }}
               </OButton>
             </template>
-            <div class="flex w-max max-w-[calc(100vw-1.5rem)] min-w-72 flex-col">
+            <div class="flex flex-col">
               <template v-if="rangeOptions.length > 1">
                 <OButton
                   v-for="option in rangeOptions"
                   :key="option.key"
                   variant="ghost"
-                  size="sm"
                   block
                   :data-test="`dashboards-public-dashboard-preset-${option.key}`"
                   @click="pickRange(option.key)"
                 >
                   <span class="flex-1 text-start">{{ rangeLabel(option) }}</span>
-                  <template v-if="option.key === selectedKey" #icon-right>
+                  <template v-if="option.key === selectedKey" #icon-end>
                     <OIcon name="check" size="sm" />
                   </template>
                 </OButton>
@@ -143,41 +142,34 @@
       </OPageHeader>
 
       <div v-if="holdNote" class="px-page-edge pt-2">
-        <OBanner
-          variant="warning"
-          icon="warning"
-          dense
-          :content="holdNote"
+        <OInlineNotice
+          tone="warn"
+          :message="holdNote"
           data-test="dashboards-public-dashboard-held"
         />
       </div>
       <div v-else-if="failureNote" class="px-page-edge pt-2">
-        <OBanner
-          variant="warning"
-          icon="warning"
-          dense
-          :content="failureNote"
+        <OInlineNotice
+          tone="warn"
+          :message="failureNote"
           data-test="dashboards-public-dashboard-refresh-failed"
         />
       </div>
 
       <div
         v-if="state === 'loading' || state === 'building'"
-        class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3"
+        class="grid min-h-0 flex-1 grid-cols-1 content-start gap-3 p-4 md:grid-cols-2"
         data-test="dashboards-public-dashboard-loading"
       >
-        <OSpinner variant="dots" size="lg" />
-        <div class="text-text-secondary text-sm">
-          {{ t("dashboard.publicDashboard.loading") }}
-        </div>
+        <OSkeleton v-for="panel in 4" :key="panel" shape="block" class="h-60" />
       </div>
 
       <div
         v-else-if="state === 'cooldown'"
-        class="flex min-h-0 flex-1 flex-col items-center justify-center px-4"
+        class="flex min-h-0 flex-1 flex-col"
         data-test="dashboards-public-dashboard-cooldown"
       >
-        <OEmptyState size="hero" illustration="schedule" :title="cooldownMessage" />
+        <OEmptyState icon="schedule" :title="cooldownMessage" />
       </div>
 
       <RenderDashboardCharts
@@ -207,11 +199,7 @@
           class="cursor-help"
           data-test="dashboards-public-dashboard-footer-info"
         >
-          <OTooltip
-            side="top"
-            max-width="20rem"
-            :content="t('dashboard.publicDashboard.footerNote')"
-          />
+          <OTooltip side="top" :content="t('dashboard.publicDashboard.footerNote')" />
         </OIcon>
       </footer>
     </template>
@@ -230,10 +218,11 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { useLocalTimezone } from "@/utils/storage";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import type { IllustrationName } from "@/lib/core/EmptyState/illustrations";
+import type { EmptyStateKind } from "@/lib/core/EmptyState/OEmptyState.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -664,16 +653,13 @@ const ERROR_MESSAGES: Partial<Record<ViewState, () => I18nText>> = {
   offline: () => t("dashboard.publicDashboard.offline"),
 };
 const errorMessage = computed<I18nText | null>(() => ERROR_MESSAGES[state.value]?.() ?? null);
-const ERROR_ILLUSTRATIONS: Partial<Record<ViewState, IllustrationName>> = {
-  notfound: "lock",
-  expired: "hourglass",
-  unavailable: "schedule",
-  ratelimited: "hourglass",
-  offline: "broken-panel",
+const ERROR_LOOKS: Partial<Record<ViewState, { kind?: EmptyStateKind; icon?: IconName }>> = {
+  notfound: { kind: "denied" },
+  expired: { icon: "hourglass-empty" },
+  unavailable: { icon: "schedule" },
+  ratelimited: { icon: "hourglass-empty" },
 };
-const errorIllustration = computed<IllustrationName>(
-  () => ERROR_ILLUSTRATIONS[state.value] ?? "broken-panel",
-);
+const errorLook = computed(() => ERROR_LOOKS[state.value] ?? { kind: "error" as const });
 
 const pickDefaultRange = (): string | null => {
   const def: string | undefined = config.value?.default_key;

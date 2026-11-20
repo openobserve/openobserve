@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="slo"
     class="min-h-0 flex-1"
     :is-importing="importing || foldersLoading"
-    @back="goToList(initialFolder)"
+    :back="{ label: t('slos.title'), to: listRoute(initialFolder) }"
     @cancel="goToList(initialFolder)"
     @import="importJson"
   >
@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             data-test="slo-import-url-input"
             :model-value="url"
-            size="md"
             :label="t('dashboard.addURL')"
             @update:model-value="updateUrl"
           />
@@ -53,12 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OFile
             data-test="slo-import-json-file-input"
             :model-value="jsonFiles"
-            :label="t('dashboard.dropFileMsg')"
             accept=".json"
             multiple
-            drop-zone
-            :help-text="t('common.jsonFilesOnlyHint')"
-            size="md"
+            :validate="validateJsonFile"
             @update:model-value="updateFiles"
           />
         </div>
@@ -91,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(result, index) in results"
             :key="index"
-            class="px-0 py-1.25 text-sm font-bold wrap-break-word"
+            class="px-0 py-1.25 text-sm font-semibold wrap-break-word"
             :class="result.success ? 'text-green' : 'text-status-negative'"
             :data-test="`slo-import-result-${index}`"
           >
@@ -117,6 +113,7 @@ import BaseImport from "@/components/common/BaseImport.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import { createJsonFileValidator } from "@/lib/forms/File/validateJsonFile";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 type ImportResult = { success: boolean; message: I18nText };
@@ -133,6 +130,7 @@ const STRIPPED_FIELDS = [
 ];
 
 const { t } = useI18nTyped();
+const validateJsonFile = createJsonFileValidator(t);
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -183,11 +181,12 @@ function onFolderSelected(folder: { value?: string }) {
   selectedFolder.value = folder?.value || selectedFolder.value;
 }
 
+function listRoute(folder: string) {
+  return { name: "sloList", query: { ...route.query, org_identifier: org.value, folder } };
+}
+
 function goToList(folder: string) {
-  router.push({
-    name: "sloList",
-    query: { ...route.query, org_identifier: org.value, folder },
-  });
+  router.push(listRoute(folder));
 }
 
 function toCreatePayload(

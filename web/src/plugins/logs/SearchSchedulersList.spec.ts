@@ -120,7 +120,7 @@ describe("SearchSchedulersList Component", () => {
         },
         stubs: {
           OIcon: true,
-          DateTime: {
+          ODateTimeRange: {
             template: '<div class="mock-datetime"></div>',
             methods: {
               setAbsoluteTime: vi.fn(),
@@ -150,12 +150,15 @@ describe("SearchSchedulersList Component", () => {
   });
 
   describe("Navigation", () => {
-    it("should navigate back to logs on closeSearchHistory", async () => {
-      // Standalone route: close navigates to the Logs route (no history to pop in
-      // jsdom) instead of emitting to a parent overlay.
-      wrapper.vm.closeSearchHistory();
+    it("goes back to Logs from the header's parent link", async () => {
+      // jsdom has no history to pop, so smart back lands on the Logs route.
+      await wrapper.find('[data-test="app-page-header-back"]').trigger("click");
       await nextTick();
-      expect(mockRouter.push).toHaveBeenCalledWith({ name: "logs" });
+      expect(wrapper.find('[data-test="app-page-header-back"]').text()).toBe("Logs");
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "logs",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
     });
   });
 
@@ -388,8 +391,8 @@ describe("SearchSchedulersList Component", () => {
 
     it("gives the delete confirm a destructive button and leaves cancel-job plain", () => {
       const [deleteDialog, cancelDialog] = wrapper.findAllComponents({ name: "ConfirmDialog" });
-      expect(deleteDialog.props("okVariant")).toBe("destructive");
-      expect(cancelDialog.props("okVariant")).not.toBe("destructive");
+      expect(deleteDialog.props("kind")).toBe("destructive");
+      expect(cancelDialog.props("kind")).not.toBe("destructive");
     });
 
     it("should set up cancel confirmation", () => {

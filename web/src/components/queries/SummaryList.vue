@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OTable
     v-if="isMetaOrg"
-    :frame="false"
     data-test="running-queries-table"
     :data="rows"
     :columns="columns"
@@ -29,9 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:selected-ids="selectedIds"
     @row-click="getAllUserQueries"
     class="w-full"
-    :show-global-filter="false"
     :default-columns="false"
-    show-index
     :enable-column-resize="true"
     :persist-columns="true"
     table-id="settings-query-management-summary"
@@ -43,8 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #toolbar-trailing>
       <ORefreshButton
-        layout="inline"
-        variant="outline"
         :last-run-at="lastRefreshedAt"
         data-test="summary-list-refresh-btn"
         @click="$emit('refresh')"
@@ -52,21 +47,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #empty>
       <OEmptyState
-        size="hero"
-        preset="no-queries"
-        :filtered="filtered"
-        :hide-action="!filtered"
-        @action="(id) => id === 'clear-filters' && $emit('clear:filters')"
+        :kind="filtered ? 'filtered' : 'first-run'"
+        :title="
+          filtered
+            ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.queries') })
+            : t('emptyState.noQueries.title')
+        "
+        :text="
+          filtered
+            ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.queries') })
+            : t('emptyState.noQueries.description')
+        "
+        :icon="filtered ? undefined : 'query-stats'"
+        @action="$emit('clear:filters')"
       />
     </template>
     <template #cell-actions="{ row }">
       <OButton
-        variant="ghost-destructive"
-        size="icon-xs-sq"
+        icon-only
+        variant="danger-ghost"
+        size="sm"
         :title="t('queries.cancelQuery')"
         data-test="cancelQuery-btn"
         @click.stop="confirmDeleteAction({ row })"
-        icon-left="close"
+        icon="close"
       />
     </template>
     <template #cell-user_id="{ row }">
@@ -87,8 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #selection-actions>
       <OButton
         data-test="qm-multiple-cancel-query-btn"
-        variant="outline-destructive"
-        size="sm"
+        variant="danger-ghost"
         @click="handleMultiQueryCancel"
       >
         {{ t("queries.cancelQuery") }}

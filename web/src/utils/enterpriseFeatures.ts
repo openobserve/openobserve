@@ -456,11 +456,17 @@ export function withFeatureGate(
   guard: (to: any, from: any, next: any) => void,
   getContext: () => FeatureGateContext = () => buildFeatureGateContext(),
 ) {
-  return (to: any, from: any, next: any) => {
+  const gate = (to: any, from: any, next: any) => {
     if (!checkFeatureAccess(key, getContext()).allowed) {
       next(featureLockedLocation(key, to));
       return;
     }
     guard(to, from, next);
   };
+  // `lockGatedRoutes` reads these to open the page in place with its lock instead of redirecting.
+  return Object.assign(gate, {
+    lockKey: key,
+    lockGuard: guard,
+    lockAllowed: () => checkFeatureAccess(key, getContext()).allowed,
+  });
 }

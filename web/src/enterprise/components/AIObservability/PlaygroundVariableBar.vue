@@ -11,12 +11,12 @@
 -->
 <template>
   <div
-    class="border-border-default flex flex-wrap items-start gap-2.5 border-b px-4 py-2.5"
+    class="border-border-default px-page-edge flex flex-wrap items-start gap-2 border-b py-2.5"
     data-test="ai-playground-variable-bar"
   >
     <OTag
       v-if="provenance"
-      variant="default"
+      tone="neutral"
       size="sm"
       class="self-center"
       :label="provenance.label"
@@ -40,9 +40,10 @@
       </span>
       <div class="inline-flex items-stretch self-center [&_button:focus-visible]:z-1">
         <OButton
-          variant="outline"
-          size="icon-xs-sq"
-          icon-left="chevron-left"
+          icon-only
+          variant="secondary"
+          size="sm"
+          icon="chevron-left"
           class="rounded-s-default! rounded-e-none!"
           :disabled="stepping || sample.index <= 0"
           :title="t('aiObservability.playground.samplePrev')"
@@ -50,9 +51,10 @@
           @click="emit('step-sample', -1)"
         />
         <OButton
-          variant="outline"
-          size="icon-xs-sq"
-          icon-left="chevron-right"
+          icon-only
+          variant="secondary"
+          size="sm"
+          icon="chevron-right"
           class="rounded-e-default! rounded-s-none! border-s-0"
           :disabled="stepping || sample.index >= sample.total - 1"
           :title="t('aiObservability.playground.sampleNext')"
@@ -61,9 +63,10 @@
         />
       </div>
       <OButton
-        variant="ghost-muted"
-        size="icon-xs-sq"
-        icon-left="close"
+        icon-only
+        variant="ghost"
+        size="sm"
+        icon="close"
         class="self-center"
         :title="t('aiObservability.playground.sampleClear')"
         data-test="ai-playground-sample-clear"
@@ -77,9 +80,9 @@
          does not. -->
     <div class="inline-flex items-stretch self-center [&_button:focus-visible]:z-1">
       <OButton
-        variant="outline"
-        size="xs"
-        icon-left="build"
+        variant="secondary"
+        size="sm"
+        icon="build"
         class="rounded-s-default! rounded-e-none!"
         data-test="ai-playground-tools-btn"
         @click="openTool(null)"
@@ -93,8 +96,9 @@
       <ODropdown align="start" side="bottom">
         <template #trigger>
           <OButton
-            variant="outline"
-            size="icon-xs-sq"
+            icon-only
+            variant="secondary"
+            size="sm"
             class="rounded-e-default! rounded-s-none! border-s-0"
             :aria-label="t('aiObservability.playground.tools')"
             data-test="ai-playground-tools-menu"
@@ -105,18 +109,18 @@
         <ODropdownItem
           v-for="(tool, index) in tools"
           :key="index"
-          icon-left="build"
+          icon="build"
           :data-test="`ai-playground-tool-item-${index}`"
           @select="openTool(index)"
         >
           {{ raw(tool.name) || t("aiObservability.playground.toolUnnamed") }}
           <!-- `.stop` keeps the row's own select from firing and opening the
                dialog for the tool that is being deleted. -->
-          <template #icon-right>
+          <template #end>
             <OButton
-              variant="ghost-destructive"
-              size="icon-xs"
-              icon-left="delete"
+              icon-only
+              variant="danger-ghost"
+              icon="delete"
               class="ms-auto"
               :aria-label="t('aiObservability.playground.removeTool')"
               :data-test="`ai-playground-tool-remove-${index}`"
@@ -132,7 +136,7 @@
              opened the list to see what exists is already looking for the way to
              add one, and the button that does it is behind them. -->
         <OSeparator v-if="tools.length" />
-        <ODropdownItem icon-left="add" data-test="ai-playground-tool-add" @select="openTool(null)">
+        <ODropdownItem icon="add" data-test="ai-playground-tool-add" @select="openTool(null)">
           {{ t("aiObservability.playground.addTool") }}
         </ODropdownItem>
       </ODropdown>
@@ -149,9 +153,9 @@
     />
 
     <OButton
-      variant="outline"
-      size="xs"
-      icon-left="table-chart"
+      variant="secondary"
+      size="sm"
+      icon="table-chart"
       class="self-center"
       data-test="ai-playground-sample-btn"
       @click="emit('sample')"

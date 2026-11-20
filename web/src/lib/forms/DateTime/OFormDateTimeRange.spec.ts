@@ -17,7 +17,7 @@ import OFormDateTimeRange from "./OFormDateTimeRange.vue";
 // Stub that reads default-* ONCE at setup (like the real DateTime) and can emit
 // an on:date-change with a controllable payload.
 const DateTimeStub = defineComponent({
-  name: "DateTime",
+  name: "ODateTimeRange",
   props: {
     defaultType: String,
     defaultAbsoluteTime: Object,
@@ -47,7 +47,7 @@ function mountForm(defaultValues: Record<string, unknown>) {
     slots: { default: '<OFormDateTimeRange name="timerange" />' },
     global: {
       components: { OFormDateTimeRange },
-      stubs: { DateTime: DateTimeStub },
+      stubs: { ODateTimeRange: DateTimeStub },
     },
   });
 }
@@ -136,7 +136,7 @@ describe("OFormDateTimeRange", () => {
       },
       global: {
         components: { OFormDateTimeRange },
-        stubs: { DateTime: DateTimeStub },
+        stubs: { ODateTimeRange: DateTimeStub },
       },
     });
     await (wrapper.vm as any).form.handleSubmit();
@@ -161,7 +161,7 @@ describe("OFormDateTimeRange", () => {
       },
       global: {
         components: { OFormDateTimeRange },
-        stubs: { DateTime: DateTimeStub },
+        stubs: { ODateTimeRange: DateTimeStub },
       },
     });
     expect(wrapper.find('[data-test="dt-stub"]').text()).toBe("relative|30m");

@@ -158,14 +158,14 @@ const waitForPreview = async () => {
 describe("OverrideConfigPopup in chart mode", () => {
   it("opens as Series Formatting with the empty states", async () => {
     await mountChart();
-    expect(document.body.textContent).toContain("Series Formatting");
+    expect(document.body.textContent).toContain("Series formatting");
     expect(document.body.textContent).toContain(
       "Add the series you want to format, then style each one with a live preview.",
     );
     expect(document.body.textContent).toContain("No series added");
     expect(document.body.textContent).toContain("Format a series");
     expect(document.body.textContent).toContain("No series formatted yet");
-    expect(document.body.textContent).not.toContain("Column Formatting");
+    expect(document.body.textContent).not.toContain("Column formatting");
   });
 
   it("adds a series picked from the legend list with a Name badge and a live match line", async () => {

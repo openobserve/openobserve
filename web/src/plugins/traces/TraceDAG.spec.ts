@@ -206,7 +206,6 @@ describe("TraceDAG", () => {
     it("should show loading state initially before data resolves", () => {
       wrapper = mountDAG();
       expect(wrapper.find('[data-test="traces-trace-dag-loading-container"]').exists()).toBe(true);
-      expect(wrapper.text()).toContain("Loading trace DAG");
     });
 
     it("should call getTraceDAG with correct arguments on mount", async () => {

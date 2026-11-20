@@ -173,11 +173,8 @@ const removeSelected = async (): Promise<void> => {
     :open="open"
     size="md"
     :title="title"
-    :primary-button-label="primaryLabel"
-    :primary-button-variant="result ? 'primary' : 'destructive'"
-    :primary-button-loading="busy"
-    :secondary-button-label="result ? undefined : t('common.cancel')"
-    initial-focus="secondary"
+    :primary="{ label: primaryLabel, variant: result ? 'primary' : 'danger', loading: busy }"
+    :secondary="{ label: result ? undefined : t('common.cancel') }"
     @update:open="emit('update:open', $event)"
     @click:primary="confirm"
     @click:secondary="emit('update:open', false)"
@@ -255,38 +252,18 @@ const removeSelected = async (): Promise<void> => {
           :is-row-selectable="isThisOrg"
           :selected-ids="selectedIds"
           pagination="none"
-          :show-global-filter="false"
-          dense
           @update:selected-ids="selectedIds = $event"
         >
-          <!-- OTable draws #selection-actions only in its pager, which pagination="none" turns off. -->
-          <template v-if="selectedIds.length" #pagination-bar>
-            <div
-              class="border-border-default flex items-center gap-3 border-t px-3 py-1"
-              data-test="slack-remove-bar"
+          <template #selection-actions>
+            <OButton
+              variant="danger-ghost"
+              size="sm"
+              :loading="removeDestinations.isPending.value"
+              data-test="slack-remove-destinations"
+              @click="removeSelected"
             >
-              <span
-                class="text-text-heading text-xs font-medium"
-                role="status"
-                data-test="slack-selected-count"
-              >
-                {{
-                  t("components.table.selectedOfTotal", {
-                    selected: selectedIds.length,
-                    total: removable.length,
-                  })
-                }}
-              </span>
-              <OButton
-                variant="destructive"
-                size="sm"
-                :loading="removeDestinations.isPending.value"
-                data-test="slack-remove-destinations"
-                @click="removeSelected"
-              >
-                {{ t("slackApp.uninstall.remove") }}
-              </OButton>
-            </div>
+              {{ t("slackApp.uninstall.remove") }}
+            </OButton>
           </template>
         </OTable>
         <p v-else class="text-text-secondary m-0">
@@ -297,13 +274,11 @@ const removeSelected = async (): Promise<void> => {
         </p>
         <OButton
           v-if="deleteAppUrl"
-          as="a"
           :href="deleteAppUrl"
           target="_blank"
           rel="noopener noreferrer"
-          variant="ghost-primary"
-          size="sm"
-          icon-right="open-in-new"
+          variant="accent-ghost"
+          icon-end="open-in-new"
           class="w-fit"
           data-test="slack-delete-app"
         >

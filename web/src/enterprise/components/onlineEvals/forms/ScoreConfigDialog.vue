@@ -4,15 +4,14 @@
        so Save (and Enter) route through the schema-validated submit; the Save
        spinner is auto-driven by the nested OForm's isSubmitting. -->
   <ODrawer
+    size="lg"
     :open="open"
     side="right"
-    :width="50"
     data-test="score-config-dialog"
     :title="raw(drawerTitle)"
     form-id="score-config-form"
-    :secondary-button-label="t('onlineEvals.buttons.cancel')"
-    :primary-button-label="t('onlineEvals.buttons.save')"
-    :primary-button-disabled="mode === 'edit' && !isDirty"
+    :secondary="{ label: t('onlineEvals.buttons.cancel') }"
+    :primary="{ label: t('onlineEvals.buttons.save'), disabled: mode === 'edit' && !isDirty }"
     @update:open="handleOpenChange"
     @click:secondary="$emit('cancel')"
   >
@@ -29,7 +28,7 @@
             class="font-normal"
           >
             <template #nextVersion>
-              <strong class="font-bold">{{ nextVersionLabel }}</strong>
+              <strong class="font-semibold">{{ nextVersionLabel }}</strong>
             </template>
           </i18n-t>
           <em class="text-text-secondary font-normal italic">{{
@@ -50,7 +49,6 @@
               example: raw(`&quot;faithfulness&quot;`),
             })
           "
-          size="sm"
           data-test="score-config-name-input"
         />
       </div>
@@ -61,7 +59,6 @@
           name="description"
           :label="t('onlineEvals.scoreConfig.descriptionLabel')"
           :placeholder="t('onlineEvals.scoreConfig.descriptionPlaceholder')"
-          size="sm"
           :rows="3"
           data-test="score-config-description-input"
         />
@@ -107,11 +104,10 @@
             <ORadio
               :value="type"
               :disabled="mode === 'edit'"
-              size="sm"
               :data-test="`score-config-datatype-${type}`"
             >
               <template #label>
-                <span class="text-compact text-text-heading font-bold">{{
+                <span class="text-compact text-text-heading font-semibold">{{
                   t(`onlineEvals.scoreConfig.dataTypes.${type}`)
                 }}</span>
                 <span class="text-2xs text-text-secondary mt-0.75 leading-[1.4] font-normal">{{
@@ -134,23 +130,11 @@
           <span class="text-text-secondary text-2xs">{{
             t("onlineEvals.scoreConfig.minLabel")
           }}</span>
-          <OFormInput
-            name="min"
-            type="number"
-            size="sm"
-            field-width="xs"
-            data-test="score-config-min-input"
-          />
+          <OFormInput name="min" type="number" width="s" data-test="score-config-min-input" />
           <span class="text-text-secondary text-2xs">{{
             t("onlineEvals.scoreConfig.maxLabel")
           }}</span>
-          <OFormInput
-            name="max"
-            type="number"
-            size="sm"
-            field-width="xs"
-            data-test="score-config-max-input"
-          />
+          <OFormInput name="max" type="number" width="s" data-test="score-config-max-input" />
         </div>
       </div>
 
@@ -192,10 +176,7 @@
               >{{ t("onlineEvals.scoreConfig.healthyThresholdTitle") }}</span
             >
             <OIcon name="info-outline" size="sm" class="text-text-secondary">
-              <OTooltip
-                :content="t('onlineEvals.scoreConfig.healthyThresholdIntro')"
-                max-width="18.75rem"
-              />
+              <OTooltip :content="t('onlineEvals.scoreConfig.healthyThresholdIntro')" />
             </OIcon>
           </span>
           <OTag type="fieldTag" value="outlinesm">{{ t("onlineEvals.scoreConfig.optional") }}</OTag>
@@ -223,7 +204,7 @@
                 :checked="formValues.healthyDirection === 'gte'"
                 @change="form.setFieldValue('healthyDirection', 'gte')"
               />
-              <span class="text-text-body text-center font-mono text-lg font-bold">{{
+              <span class="text-text-body text-center font-mono text-lg font-semibold">{{
                 t("onlineEvals.scoreConfig.gteSymbol")
               }}</span>
               <span class="text-compact text-text-body">{{
@@ -232,8 +213,7 @@
               <OFormInput
                 name="healthyGteValue"
                 type="number"
-                size="sm"
-                field-width="xs"
+                width="s"
                 :placeholder="raw(String(defaultGteValue))"
                 data-test="score-config-gte-value-input"
                 @focus="form.setFieldValue('healthyDirection', 'gte')"
@@ -254,7 +234,7 @@
                 :checked="formValues.healthyDirection === 'lte'"
                 @change="form.setFieldValue('healthyDirection', 'lte')"
               />
-              <span class="text-text-body text-center font-mono text-lg font-bold">{{
+              <span class="text-text-body text-center font-mono text-lg font-semibold">{{
                 t("onlineEvals.scoreConfig.lteSymbol")
               }}</span>
               <span class="text-compact text-text-body">{{
@@ -263,8 +243,7 @@
               <OFormInput
                 name="healthyLteValue"
                 type="number"
-                size="sm"
-                field-width="xs"
+                width="s"
                 :placeholder="raw(String(defaultLteValue))"
                 data-test="score-config-lte-value-input"
                 @focus="form.setFieldValue('healthyDirection', 'lte')"

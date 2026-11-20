@@ -21,16 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full min-h-0 flex-col" data-test="model-pricing-unpriced-tab">
     <OBanner
       v-if="models.length"
-      variant="warning"
-      icon="warning-amber"
-      dense
-      class="mx-page-edge mt-2 shrink-0"
-      :content="bannerText"
+      tone="warn"
+      class="shrink-0"
+      :message="bannerText"
       data-test="model-pricing-unpriced-banner"
     />
     <div class="min-h-0 flex-1 overflow-hidden">
       <OTable
-        :frame="false"
         data-test="model-pricing-unpriced-table"
         :data="models"
         :columns="columns"
@@ -41,34 +38,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         pagination="none"
         sorting="client"
         :default-columns="false"
-        :show-global-filter="false"
       >
         <template #toolbar>
           <div class="flex flex-1 flex-wrap items-center gap-2">
             <div class="w-64" data-test="model-pricing-unpriced-stream-select">
               <OSelect
+                width="full"
                 :model-value="stream"
                 :label="t('modelPricing.unpriced.streamLabel')"
-                label-position="inside"
+                variant="filter"
                 :options="streams"
                 :disabled="!streams.length"
                 class="w-full"
                 @update:model-value="(v) => emit('update:stream', String(v ?? ''))"
               />
             </div>
-            <OBadge
-              variant="default-outline"
-              icon="schedule"
-              data-test="model-pricing-unpriced-window"
-            >
+            <OBadge tone="outline" icon="schedule" data-test="model-pricing-unpriced-window">
               {{ windowLabel }}
             </OBadge>
           </div>
         </template>
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastRunAt"
             :loading="fetching"
             data-test="model-pricing-unpriced-refresh-btn"
@@ -85,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-priced_as="{ row }">
-          <OBadge v-if="!row.matched" variant="error-soft" size="sm">
+          <OBadge v-if="!row.matched" tone="err" size="sm">
             {{ t("modelPricing.unpriced.noMatch") }}
           </OBadge>
           <div v-else class="flex min-w-0 flex-col py-1">
@@ -94,11 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTruncatedText as="span" class="max-w-full min-w-0">{{
                 row.matched.name
               }}</OTruncatedText>
-              <OBadge
-                :variant="row.priced_now ? 'success-soft' : 'warning-soft'"
-                size="sm"
-                class="shrink-0"
-              >
+              <OBadge :tone="row.priced_now ? 'ok' : 'warn'" size="sm" class="shrink-0">
                 {{
                   t(
                     row.priced_now
@@ -123,8 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- The hint rides in a tooltip so the pinned column never outgrows its width. -->
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               data-test="model-pricing-unpriced-docs-btn"
               @click.stop="openInstrumentationDocs"
             >
@@ -143,8 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <div v-else class="flex items-center justify-end gap-1">
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               data-test="model-pricing-unpriced-create-btn"
               @click.stop="createPrice(row)"
             >
@@ -152,8 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               v-if="row.matched"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               :loading="pendingModel === row.model"
               :disabled="!!pendingModel"
               data-test="model-pricing-unpriced-keep-btn"
@@ -166,8 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               v-else
-              variant="outline"
-              size="sm"
+              variant="secondary"
               :loading="pendingModel === row.model"
               :disabled="!!pendingModel"
               data-test="model-pricing-unpriced-mute-btn"
@@ -180,8 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #error>
           <OEmptyState
-            size="block"
-            preset="load-error"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="t('emptyState.loadError.description')"
             data-test="model-pricing-unpriced-error"
             @action="emit('refresh')"
           />
@@ -189,16 +173,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #empty>
           <OEmptyState
             v-if="noStreams"
-            size="block"
-            illustration="stream-select"
+            icon="dataset"
             :title="t('modelPricing.unpriced.noStreamsTitle')"
-            :description="t('modelPricing.unpriced.noStreamsDesc')"
+            :text="t('modelPricing.unpriced.noStreamsDesc')"
             data-test="model-pricing-unpriced-no-streams"
           />
           <OEmptyState
             v-else-if="loaded"
-            size="block"
-            illustration="check"
+            icon="task-alt"
             :title="t('modelPricing.unpriced.emptyTitle')"
             data-test="model-pricing-unpriced-empty"
           />

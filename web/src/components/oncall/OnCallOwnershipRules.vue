@@ -21,11 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="ordered"
       :columns="columns"
       row-key="rule_id"
-      :frame="false"
       :loading="loading"
       :pagination="showPager ? 'client' : 'none'"
       :global-filter="search"
-      :show-global-filter="false"
       :table-id="teamId ? 'oncall-team-routing-rules' : 'oncall-ownership-rules'"
       :persist-columns="true"
       :enable-column-resize="true"
@@ -112,9 +110,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="flex items-center justify-end gap-1">
           <OButton
             v-if="testable"
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="manage-search"
+            icon="manage-search"
             class="max-md:hidden"
             :aria-label="t('oncall.routingTestRouting')"
             :data-test="`oncall-routing-test-${row.rule_id}`"
@@ -123,9 +121,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip side="bottom" :content="t('oncall.routingTestRouting')" />
           </OButton>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="edit"
+            icon="edit"
             class="max-md:hidden"
             :aria-label="t('oncall.edit')"
             :data-test="`oncall-routing-edit-${row.rule_id}`"
@@ -134,9 +132,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip side="bottom" :content="t('oncall.edit')" />
           </OButton>
           <OButton
-            variant="ghost-destructive"
-            size="icon-sm"
-            icon-left="delete-outline"
+            icon-only
+            variant="danger-ghost"
+            icon="delete-outline"
             class="max-md:hidden"
             :aria-label="t('oncall.removeRule')"
             :data-test="`oncall-ownership-delete-${row.rule_id}`"
@@ -147,9 +145,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
-                icon-left="more-vert"
+                icon-only
+                icon="more-vert"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 class="md:hidden"
                 :aria-label="t('oncall.moreActions')"
                 :data-test="`oncall-routing-more-${row.rule_id}`"
@@ -158,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <ODropdownItem
               v-if="testable"
-              icon-left="manage-search"
+              icon="manage-search"
               class="md:hidden"
               :data-test="`oncall-routing-test-${row.rule_id}-menu`"
               @select="emit('test', row)"
@@ -166,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("oncall.routingTestRouting") }}</span>
             </ODropdownItem>
             <ODropdownItem
-              icon-left="edit"
+              icon="edit"
               class="md:hidden"
               :data-test="`oncall-routing-edit-${row.rule_id}-menu`"
               @select="emit('edit', row)"
@@ -174,8 +173,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("oncall.edit") }}</span>
             </ODropdownItem>
             <ODropdownItem
-              icon-left="delete-outline"
-              variant="destructive"
+              icon="delete-outline"
+              tone="danger"
               class="md:hidden"
               :data-test="`oncall-ownership-delete-${row.rule_id}-menu`"
               @select="emit('remove', row)"
@@ -199,9 +198,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <OButton
                 v-if="editable"
-                variant="outline"
-                size="xs"
-                icon-left="alt-route"
+                variant="secondary"
+                size="sm"
+                icon="alt-route"
                 data-test="oncall-routing-catch-all-set"
                 @click="emit('change-default')"
               >
@@ -229,9 +228,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <OButton
             v-if="editable"
-            variant="outline"
-            size="xs"
-            icon-left="edit"
+            variant="secondary"
+            size="sm"
+            icon="edit"
             data-test="oncall-routing-catch-all-set"
             @click="emit('change-default')"
           >
@@ -245,18 +244,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- A search that matched nothing is not an org without rules. -->
           <OEmptyState
             v-if="search"
-            size="block"
-            preset="no-oncall-rules"
-            filtered
+            kind="filtered"
+            :title="t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })"
+            :text="
+              t('emptyState.filtered.description', { noun: t('emptyState.filtered.fallbackNoun') })
+            "
             data-test="oncall-ownership-empty"
-            @action="onEmptyAction"
+            @action="emit('clear-search')"
           />
           <OEmptyState
             v-else
-            size="block"
-            preset="no-oncall-rules"
-            :hide-action="!editable"
+            :title="t('emptyState.noOncallRules.title')"
+            icon="link"
             data-test="oncall-ownership-empty"
+            :action-label="!editable ? undefined : t('emptyState.noOncallRules.action')"
             @action="onEmptyAction"
           />
         </template>
@@ -516,11 +517,7 @@ function healthLabel(rule: OwnershipRuleStats): I18nText {
   return rule.health === "never_used" ? t("oncall.ruleNeverMatchedYet") : t("oncall.ruleActive");
 }
 
-function onEmptyAction(id?: string) {
-  if (id === "clear-filters") {
-    emit("clear-search");
-    return;
-  }
+function onEmptyAction() {
   // A reader who cannot write routing gets no editor that would only answer 403.
   if (props.editable) emit("add");
 }

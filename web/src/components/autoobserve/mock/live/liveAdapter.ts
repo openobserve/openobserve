@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import { formatLargeNumber } from "@/utils/formatters";
 import type {
   AutoObserveCell,
@@ -115,10 +115,10 @@ export interface SuggestionRow {
   headline: I18nText;
   where: I18nText;
   kind: I18nText;
-  kindVariant: BadgeVariant;
+  kindVariant: ChipTone;
   // Why and next, shown under the headline only for kinds that say what to do.
   note: I18nText | null;
-  severity: { label: I18nText; variant: BadgeVariant } | null;
+  severity: { label: I18nText; variant: ChipTone } | null;
   detail: Msg;
 }
 
@@ -185,7 +185,7 @@ const MONITOR_KIND_LABEL: Record<string, I18nKey> = {
   synthetic: "autoobserveLive.monitorKinds.synthetic",
 };
 
-const SUGGESTION_KIND: Record<string, { label: I18nKey; look: LookKind; tag?: BadgeVariant }> = {
+const SUGGESTION_KIND: Record<string, { label: I18nKey; look: LookKind; tag?: ChipTone }> = {
   discovery_unusable: {
     label: "autoobserveLive.suggestions.kinds.discovery_unusable",
     look: "watching",
@@ -200,24 +200,24 @@ const SUGGESTION_KIND: Record<string, { label: I18nKey; look: LookKind; tag?: Ba
   silent_coverage: {
     label: "autoobserveLive.suggestions.kinds.silent_coverage",
     look: "notify",
-    tag: "error-soft",
+    tag: "err",
   },
   coverage_lost: { label: "autoobserveLive.suggestions.kinds.coverage_lost", look: "watching" },
   alert_not_working: { label: "insight.chip.notWorking", look: "notify" },
   alert_no_destination: {
     label: "autoobserveLive.suggestions.kinds.alert_no_destination",
     look: "notify",
-    tag: "error-soft",
+    tag: "err",
   },
   alert_notify_failed: {
     label: "autoobserveLive.suggestions.kinds.alert_notify_failed",
     look: "notify",
-    tag: "error-soft",
+    tag: "err",
   },
   source_silence: {
     label: "insight.kind.chip.stoppedSending",
     look: "watching",
-    tag: "error-soft",
+    tag: "err",
   },
   heartbeat_on_success: { label: "insight.kind.chip.missingAlert", look: "watching" },
 };
@@ -716,7 +716,7 @@ const kindOf = (t: TranslateFn, s: AutoObserveSuggestion): I18nText => {
 const severityTag = (t: TranslateFn, s: AutoObserveSuggestion) => {
   const severity = str(s.evidence.severity);
   if (severity !== "high" && severity !== "medium") return null;
-  const variant: BadgeVariant = severity === "high" ? "warning-soft" : "default-soft";
+  const variant: ChipTone = severity === "high" ? "warn" : "neutral";
   return { label: t(SEVERITY_KEY[severity]), variant };
 };
 
@@ -726,7 +726,7 @@ const tagsFor = (t: TranslateFn, s: AutoObserveSuggestion): RequestCopy["tags"] 
     if (s.tier && Object.hasOwn(TIER_LABEL, s.tier))
       tags.push({
         label: t(TIER_LABEL[s.tier]),
-        variant: "default-soft",
+        variant: "neutral",
         hint: t(TIER_HINT[s.tier]),
       });
     return tags;
@@ -734,7 +734,7 @@ const tagsFor = (t: TranslateFn, s: AutoObserveSuggestion): RequestCopy["tags"] 
   const severity = severityTag(t, s);
   if (severity) tags.push(severity);
   if (CONFIDENCE_KEY[s.confidence])
-    tags.push({ label: t(CONFIDENCE_KEY[s.confidence]), variant: "default-soft" });
+    tags.push({ label: t(CONFIDENCE_KEY[s.confidence]), variant: "neutral" });
   return tags;
 };
 

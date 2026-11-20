@@ -18,7 +18,6 @@ the Free Software Foundation, either version 3 of the License, or
             v-model="selectedProviderId"
             :options="providerOptions"
             :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
-            size="md"
             class="w-full"
             data-test="scorer-library-provider-select"
           />
@@ -26,7 +25,6 @@ the Free Software Foundation, either version 3 of the License, or
         <OSearchInput
           v-model="searchQuery"
           :placeholder="t('onlineEvals.scorerLibrary.searchPlaceholder')"
-          clearable
           class="min-w-0 flex-1"
           data-test="scorer-library-search"
         />
@@ -60,7 +58,7 @@ the Free Software Foundation, either version 3 of the License, or
             :data-test="`scorer-library-section-${group.category === CODE_GROUP ? 'code' : group.category}`"
           >
             <h4
-              class="text-text-heading m-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-bold tracking-[0.04em] uppercase"
+              class="text-text-heading m-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-semibold tracking-[0.04em] uppercase"
             >
               <span>{{
                 group.category === CODE_GROUP ? t("codeScorer.libraryGroup") : group.category
@@ -107,31 +105,26 @@ the Free Software Foundation, either version 3 of the License, or
 
         <div
           v-if="isLoadingCatalog"
-          class="flex flex-col items-center justify-center p-8"
+          class="mt-4 flex flex-col gap-2"
           data-test="scorer-library-loading"
         >
-          <OSpinner size="lg" />
+          <OSkeleton v-for="row in 4" :key="row" class="h-8 w-full" />
         </div>
 
-        <div
+        <OEmptyState
           v-else-if="loadError"
-          class="text-text-secondary flex flex-col items-center justify-center p-8"
+          size="compact"
+          kind="error"
           data-test="scorer-library-error"
-        >
-          <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
-          <div class="text-status-error-text">{{ loadError }}</div>
-          <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
-            {{ t("common.retry") }}
-          </OButton>
-        </div>
+          @action="loadCatalog"
+        />
 
-        <div
+        <OEmptyState
           v-else-if="providers.length === 0"
-          class="text-text-secondary flex flex-col items-center justify-center p-8"
+          size="compact"
+          :title="t('onlineEvals.scorerLibrary.noProvidersMessage')"
           data-test="scorer-library-no-providers"
-        >
-          {{ t("onlineEvals.scorerLibrary.noProvidersMessage") }}
-        </div>
+        />
       </div>
     </div>
   </div>
@@ -147,12 +140,11 @@ import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { type Provider, type ScoreConfig } from "@/services/online-evals.service";
 import {

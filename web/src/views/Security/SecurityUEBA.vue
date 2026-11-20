@@ -4,25 +4,28 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import SecurityTimeRange from "@/components/security/SecurityTimeRange.vue";
+import { useSecurityRange } from "@/composables/security/useSecurityRange";
+import type { DateTimeRangeChange } from "@/lib/forms/DateTimeRange/ODateTimeRange.types";
+import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import SecurityRecordDrawer, {
   type RecordFact,
@@ -57,27 +60,33 @@ const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
 const HOUR_US = 3_600_000_000;
-const WINDOWS = [
-  { value: "1h", current: 1, baseline: 24, baselineLabel: "24h" },
-  { value: "24h", current: 24, baseline: 24 * 7, baselineLabel: "7d" },
-  { value: "7d", current: 24 * 7, baseline: 24 * 30, baselineLabel: "30d" },
+// The window is scored against the baseline of the nearest supported size, so any range maps to one.
+const BASELINES = [
+  { current: 0.25, baseline: 24, baselineLabel: "24h" },
+  { current: 1, baseline: 24, baselineLabel: "24h" },
+  { current: 6, baseline: 24 * 3, baselineLabel: "3d" },
+  { current: 24, baseline: 24 * 7, baselineLabel: "7d" },
+  { current: 24 * 7, baseline: 24 * 30, baselineLabel: "30d" },
+  { current: 24 * 30, baseline: 24 * 90, baselineLabel: "90d" },
 ] as const;
-type WindowKey = (typeof WINDOWS)[number]["value"];
 
-const win = ref<WindowKey>(
-  WINDOWS.some((w) => w.value === route.query.period) ? (route.query.period as WindowKey) : "24h",
-);
-const windowDef = computed(() => WINDOWS.find((w) => w.value === win.value)!);
+const range = useSecurityRange(route.query);
+const windowDef = computed(() => {
+  const hours = range.windowMs.value / 3_600_000;
+  const distance = (b: { current: number }) => Math.abs(Math.log(hours / b.current));
+  const nearest = BASELINES.reduce((best, b) => (distance(b) < distance(best) ? b : best));
+  return { ...nearest, current: hours };
+});
 const search = ref(route.query.q ? String(route.query.q) : "");
 const toneFilters = ref<SeverityTone[]>([]);
 const pendingUser = ref<string | null>(route.query.user ? String(route.query.user) : null);
 
-const nowUs = ref(Date.now() * 1000);
-const currentStart = computed(() => nowUs.value - windowDef.value.current * HOUR_US);
+const nowUs = range.endUs;
+const currentStart = range.startUs;
 const baselineStart = computed(() => currentStart.value - windowDef.value.baseline * HOUR_US);
 
 function syncUrl() {
-  const query: Record<string, string> = { org_identifier: orgId.value, period: win.value };
+  const query: Record<string, string> = { org_identifier: orgId.value, ...range.linkQuery.value };
   if (search.value.trim()) query.q = search.value.trim();
   if (selected.value) query.user = selected.value.user;
   router.replace({ query });
@@ -179,7 +188,7 @@ async function refresh() {
   controller?.abort();
   const ctrl = new AbortController();
   controller = ctrl;
-  nowUs.value = Date.now() * 1000;
+  range.touch();
   answered.value = false;
   running.value = true;
   runFailure.value = null;
@@ -229,20 +238,19 @@ watch(orgId, () => {
 });
 watch(search, () => syncUrl());
 
-function onWindow(value: unknown) {
-  if (!value || value === win.value) return;
-  win.value = value as WindowKey;
-  analytics.track("security_time_range_changed", { view: "ueba", range: win.value });
+function onWindow(change: DateTimeRangeChange) {
+  if (!range.apply(change)) return;
+  analytics.track("security_time_range_changed", { view: "ueba", range: range.text.value });
   fullWindow.clear();
   closeDrawer();
   syncUrl();
   void refresh();
 }
 
-const STATUS_TAG: Record<StreamStatus, { variant: BadgeVariant; icon: string }> = {
-  loading: { variant: "default-soft", icon: "hourglass-empty" },
-  done: { variant: "success-soft", icon: "check-circle" },
-  failed: { variant: "error-soft", icon: "error-outline" },
+const STATUS_TAG: Record<StreamStatus, { variant: ChipTone; icon: string }> = {
+  loading: { variant: "neutral", icon: "hourglass-empty" },
+  done: { variant: "ok", icon: "check-circle" },
+  failed: { variant: "err", icon: "error-outline" },
 };
 const statusOf = (stream: string): StreamStatus => streamStatus.value[stream] ?? "loading";
 const tableLoading = computed(() => loading.value && !lastRunAt.value && !answered.value);
@@ -298,16 +306,16 @@ const columns = computed<OTableColumnDef<UserRisk>[]>(() => [
   },
 ]);
 
-const SIGNAL_TAG: Record<UebaSignalKind, BadgeVariant> = {
-  volume: "orange-soft",
-  new_ip: "error-soft",
-  failure_jump: "error-soft",
-  new_hours: "amber-soft",
-  first_seen: "blue-soft",
-  peer_volume: "orange-soft",
-  peer_failures: "error-soft",
-  fail_then_success: "error-soft",
-  open_case: "orange-soft",
+const SIGNAL_TAG: Record<UebaSignalKind, ChipTone> = {
+  volume: "warn",
+  new_ip: "err",
+  failure_jump: "err",
+  new_hours: "warn",
+  first_seen: "neutral",
+  peer_volume: "warn",
+  peer_failures: "err",
+  fail_then_success: "err",
+  open_case: "warn",
 };
 const SIGNAL_ICON: Record<UebaSignalKind, string> = {
   volume: "trending-up",
@@ -374,13 +382,13 @@ function reason(sig: UebaSignal): I18nText {
 /** Raw spellings that differ from the canonical user, so the stored value stays visible. */
 const otherAliases = (r: UserRisk) => r.current.aliases.filter((a) => a !== r.user);
 
-const RISK_BAR: Record<SeverityTone, "danger" | "warning" | "default"> = {
-  critical: "danger",
-  high: "danger",
-  medium: "warning",
-  low: "default",
-  info: "default",
-  unknown: "default",
+const RISK_BAR: Record<SeverityTone, "err" | "warn" | "accent"> = {
+  critical: "err",
+  high: "err",
+  medium: "warn",
+  low: "accent",
+  info: "accent",
+  unknown: "accent",
 };
 const RISK_TEXT: Record<SeverityTone, string> = {
   critical: "text-icon-chip-error-text",
@@ -391,8 +399,16 @@ const RISK_TEXT: Record<SeverityTone, string> = {
   unknown: "text-text-secondary",
 };
 
+// A failed load reads "—" and one error with Retry, never zero counts (R8).
+const failed = computed(() => !!(plansError.value || runError.value));
+const failedHint = computed(() => {
+  const message = String(runError.value || plansError.value || "");
+  return message && !isRawHttpText(message) ? message : t("siem.ueba.loadFailedHint");
+});
+
 const stats = computed<StatItem[]>(() => {
-  const count = (tone: SeverityTone) => risks.value.filter((r) => r.tone === tone).length;
+  const count = (tone: SeverityTone) =>
+    failed.value ? "—" : risks.value.filter((r) => r.tone === tone).length;
   const n = risks.value.length || undefined;
   return [
     {
@@ -425,7 +441,7 @@ const stats = computed<StatItem[]>(() => {
     {
       key: "all",
       label: t("common.all"),
-      value: risks.value.length,
+      value: failed.value ? "—" : risks.value.length,
       icon: "groups",
       tone: "neutral",
       dataTest: "security-ueba-stat-all",
@@ -435,7 +451,7 @@ const stats = computed<StatItem[]>(() => {
 
 const notices = computed<SecurityNotice[]>(() => {
   const baseline = windowDef.value.baselineLabel;
-  const current = t(`siem.range.${win.value}`);
+  const current = range.text.value;
   const out: SecurityNotice[] = [
     {
       key: "method",
@@ -534,7 +550,11 @@ function step(delta: number) {
 // Built from the intended query: window.location may not have caught up with router.replace.
 const shareUrl = computed(() => {
   if (!selected.value || typeof window === "undefined") return "";
-  const query = { org_identifier: orgId.value, period: win.value, user: selected.value.user };
+  const query = {
+    org_identifier: orgId.value,
+    ...range.linkQuery.value,
+    user: selected.value.user,
+  };
   return new URL(
     router.resolve({ path: route.path, query }).href,
     window.location.origin,
@@ -638,7 +658,7 @@ function openEntity() {
     query: {
       org_identifier: orgId.value,
       kind: "user",
-      period: win.value,
+      ...range.linkQuery.value,
       entity: selected.value.user,
     },
   });
@@ -646,7 +666,7 @@ function openEntity() {
 function openIp(ip: string) {
   router.push({
     path: "/security/entities",
-    query: { org_identifier: orgId.value, kind: "ip", period: win.value, entity: ip },
+    query: { org_identifier: orgId.value, kind: "ip", ...range.linkQuery.value, entity: ip },
   });
 }
 // Every source and spelling at once: a user's events rarely sit in one stream.
@@ -657,17 +677,15 @@ function openEvents() {
     path: "/security/events",
     query: {
       org_identifier: orgId.value,
-      period: win.value,
+      ...range.linkQuery.value,
       ...huntLinkQuery({ kind: "user", value: r.user, aliases: r.current.aliases }),
     },
   });
 }
 
-function onEmptyAction(id?: string) {
-  if (id === "clear-filters") {
-    search.value = "";
-    toneFilters.value = [];
-  }
+function onEmptyAction() {
+  search.value = "";
+  toneFilters.value = [];
 }
 const noUserSources = computed(
   () =>
@@ -680,34 +698,18 @@ const noUserSources = computed(
 
 <template>
   <OPageLayout
-    :title="t('siem.ueba.title')"
-    :subtitle="t('siem.ueba.subtitle')"
-    icon="insights"
+    :title="t('siem.nav.ueba')"
+    :about="t('siem.ueba.subtitle')"
     bleed
     title-data-test="security-ueba-title"
   >
     <template #actions>
       <div class="flex items-center gap-2">
-        <OToggleGroup
-          :model-value="win"
+        <SecurityTimeRange
+          :picker-props="range.pickerProps.value"
           data-test="security-ueba-window"
-          @update:model-value="onWindow"
-        >
-          <OToggleGroupItem
-            v-for="w in WINDOWS"
-            :key="w.value"
-            :value="w.value"
-            size="sm"
-            :tooltip="
-              t('siem.ueba.windowHint', {
-                current: t(`siem.range.${w.value}`),
-                baseline: w.baselineLabel,
-              })
-            "
-          >
-            {{ t(`siem.range.${w.value}`) }}
-          </OToggleGroupItem>
-        </OToggleGroup>
+          @change="onWindow"
+        />
         <ORefreshButton
           :last-run-at="lastRunAt"
           :loading="loading"
@@ -719,6 +721,7 @@ const noUserSources = computed(
 
     <div class="flex min-h-0 flex-1 flex-col">
       <SecurityNotices
+        v-if="!failed"
         :notices="notices"
         class="mx-page-edge mt-2"
         data-test="security-ueba-notices"
@@ -733,10 +736,10 @@ const noUserSources = computed(
         <OTag
           v-for="name in streamNames"
           :key="name"
-          :variant="STATUS_TAG[statusOf(name)].variant"
+          :tone="STATUS_TAG[statusOf(name)].variant"
+          mono
           :icon="STATUS_TAG[statusOf(name)].icon"
-          size="xs"
-          class="font-mono"
+          size="sm"
           :data-test="`security-ueba-source-${name}`"
           >{{ name }}<OTooltip :content="t(`siem.entities.sourceStatus.${statusOf(name)}`)"
         /></OTag>
@@ -746,15 +749,20 @@ const noUserSources = computed(
         v-if="accessDenials.length"
         :denials="accessDenials"
         :reason="raw(forbiddenReason(refusal))"
-        size="hero"
         data-test="security-ueba-access-lock"
+      />
+      <SecurityLoadError
+        v-else-if="failed"
+        :what="t('siem.ueba.whatUsers')"
+        :hint="failedHint"
+        data-test="security-ueba-load-error"
+        @retry="refresh"
       />
       <OEmptyState
         v-else-if="noUserSources"
-        size="hero"
         icon="person"
         :title="t('siem.ueba.noSources')"
-        :description="t('siem.ueba.noSourcesHint')"
+        :text="t('siem.ueba.noSourcesHint')"
       />
       <OTable
         v-else
@@ -766,7 +774,6 @@ const noUserSources = computed(
         :error="plansError || runError || null"
         :page-size="50"
         :page-size-options="[50, 100, 250]"
-        :show-global-filter="false"
         :persist-columns="true"
         table-id="security-ueba"
         :get-row-status-color="(r: UserRisk) => severityRailColor(r.tone)"
@@ -797,18 +804,6 @@ const noUserSources = computed(
             @update:selected-keys="toneFilters = $event as SeverityTone[]"
           />
         </template>
-        <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
-            data-test="security-ueba-refresh-table"
-            @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('siem.entities.refresh')" />
-          </OButton>
-        </template>
 
         <template #cell-user="{ row }">
           <div class="flex min-w-0 items-center gap-2">
@@ -816,8 +811,8 @@ const noUserSources = computed(
             <span class="text-text-heading truncate font-medium">{{ row.user }}</span>
             <OTag
               v-if="otherAliases(row).length"
-              variant="default-soft"
-              size="xs"
+              tone="neutral"
+              size="sm"
               class="shrink-0"
               :data-test="`security-ueba-aliases-${row.user}`"
               >{{ t("siem.entities.aliasCount", otherAliases(row).length)
@@ -825,17 +820,17 @@ const noUserSources = computed(
             /></OTag>
             <OTag
               v-if="limitedUsers.has(row.user)"
-              variant="default-soft"
-              size="xs"
+              tone="neutral"
+              size="sm"
               :data-test="`security-ueba-limited-row-${row.user}`"
               >{{ t("siem.ueba.limitedTag", { slice: t("siem.range.1h") })
               }}<OTooltip :content="t('siem.ueba.limitedTagHint', { slice: t('siem.range.1h') })"
             /></OTag>
             <OTag
               v-if="row.baselineState === 'building'"
-              variant="default-soft"
+              tone="neutral"
               icon="hourglass-empty"
-              size="xs"
+              size="sm"
               class="shrink-0"
               :data-test="`security-ueba-building-${row.user}`"
               >{{ t("siem.ueba.baselineBuilding")
@@ -857,9 +852,8 @@ const noUserSources = computed(
               >{{ row.score }}</span
             >
             <OProgressBar
-              :value="row.score / 100"
-              :variant="RISK_BAR[row.tone as SeverityTone]"
-              size="xs"
+              :value="row.score"
+              :tone="RISK_BAR[row.tone as SeverityTone]"
               class="flex-1"
             />
           </div>
@@ -869,9 +863,9 @@ const noUserSources = computed(
             <OTag
               v-for="sig in row.signals"
               :key="sig.kind"
-              :variant="SIGNAL_TAG[sig.kind as UebaSignalKind]"
+              :tone="SIGNAL_TAG[sig.kind as UebaSignalKind]"
               :icon="SIGNAL_ICON[sig.kind as UebaSignalKind]"
-              size="xs"
+              size="sm"
               >{{ t(`siem.ueba.signal.${sig.kind}`) }}<OTooltip :content="reason(sig)"
             /></OTag>
             <span v-if="!row.signals.length" class="text-text-secondary">—</span>
@@ -882,7 +876,7 @@ const noUserSources = computed(
           <span v-if="row.baseline && row.volumeJudged" class="text-text-secondary ms-1 text-xs">
             {{ t("siem.ueba.expected", { n: formatEventCount(Math.round(row.expected)) }) }}
           </span>
-          <OTag v-else-if="!row.baseline" variant="blue-soft" size="xs" class="ms-1">{{
+          <OTag v-else-if="!row.baseline" tone="neutral" size="sm" class="ms-1">{{
             t("siem.ueba.new")
           }}</OTag>
         </template>
@@ -897,11 +891,9 @@ const noUserSources = computed(
 
         <template #error="{ message }">
           <OEmptyState
-            size="block"
-            icon="error-outline"
+            kind="error"
             :title="t('siem.ueba.loadError')"
-            :description="raw(message)"
-            :action-label="t('siem.entities.refresh')"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
             @action="refresh"
           />
         </template>
@@ -909,11 +901,10 @@ const noUserSources = computed(
         <template #empty>
           <OEmptyState
             v-if="!loading"
-            size="block"
-            icon="task-alt"
+            :icon="!!search.trim() || toneFilters.length > 0 ? undefined : 'task-alt'"
+            :kind="!!search.trim() || toneFilters.length > 0 ? 'filtered' : 'first-run'"
             :title="t('siem.ueba.empty')"
-            :description="t('siem.ueba.emptyHint')"
-            :filtered="!!search.trim() || toneFilters.length > 0"
+            :text="t('siem.ueba.emptyHint')"
             @action="onEmptyAction"
           />
         </template>
@@ -928,7 +919,7 @@ const noUserSources = computed(
       :eyebrow="t('siem.ueba.eyebrow')"
       :subtitle="
         t('siem.ueba.windowHint', {
-          current: t(`siem.range.${win}`),
+          current: range.text.value,
           baseline: windowDef.baselineLabel,
         })
       "
@@ -955,47 +946,35 @@ const noUserSources = computed(
         />
         <OTag
           v-if="selected.baselineState === 'building'"
-          variant="default-soft"
+          tone="neutral"
           icon="hourglass-empty"
           size="sm"
           data-test="security-ueba-drawer-building"
           >{{ t("siem.ueba.baselineBuilding") }}</OTag
         >
-        <OTag
-          v-for="alias in otherAliases(selected)"
-          :key="alias"
-          variant="default-soft"
-          size="sm"
-          class="font-mono"
+        <OTag v-for="alias in otherAliases(selected)" :key="alias" tone="neutral" mono size="sm"
           >{{ alias }}<OTooltip :content="t('siem.entities.aliasHint')"
         /></OTag>
-        <OTag
-          v-for="s in [...selected.current.streams]"
-          :key="s"
-          variant="default-soft"
-          size="sm"
-          class="font-mono"
-          >{{ s }}</OTag
-        >
+        <OTag v-for="s in [...selected.current.streams]" :key="s" tone="neutral" mono size="sm">{{
+          s
+        }}</OTag>
       </template>
 
       <template #tab-signals>
-        <OBanner
+        <OInlineNotice
           v-if="!selected.volumeJudged && selected.baseline"
-          variant="default"
-          icon="info-outline"
-          dense
+          tone="neutral"
           data-test="security-ueba-drawer-volume-not-judged"
         >
           {{ t("siem.ueba.volumeNotJudged") }}
-        </OBanner>
+        </OInlineNotice>
         <div
           v-for="sig in selected.signals"
           :key="sig.kind"
           class="border-border-default rounded-surface flex items-start gap-3 border p-3"
           :data-test="`security-ueba-drawer-signal-${sig.kind}`"
         >
-          <OTag :variant="SIGNAL_TAG[sig.kind]" :icon="SIGNAL_ICON[sig.kind]" size="sm">{{
+          <OTag :tone="SIGNAL_TAG[sig.kind]" :icon="SIGNAL_ICON[sig.kind]" size="sm">{{
             t(`siem.ueba.signal.${sig.kind}`)
           }}</OTag>
           <p class="text-text-heading min-w-0 flex-1 text-sm leading-relaxed">{{ reason(sig) }}</p>
@@ -1003,11 +982,9 @@ const noUserSources = computed(
             >+{{ sig.weight }}</span
           >
         </div>
-        <OBanner
+        <OInlineNotice
           v-if="selected.withheld.length"
-          variant="warning"
-          icon="warning-amber"
-          dense
+          tone="warn"
           data-test="security-ueba-drawer-withheld"
         >
           {{
@@ -1015,13 +992,13 @@ const noUserSources = computed(
               signals: selected.withheld.map((k) => t(`siem.ueba.signal.${k}`)).join(", "),
             })
           }}
-        </OBanner>
+        </OInlineNotice>
         <OEmptyState
           v-if="!selected.signals.length"
-          size="inline"
+          size="compact"
           icon="task-alt"
           :title="t('siem.ueba.noSignals')"
-          :description="t('siem.ueba.noSignalsHint')"
+          :text="t('siem.ueba.noSignalsHint')"
         />
         <p class="text-text-secondary text-xs leading-relaxed">
           {{
@@ -1036,11 +1013,9 @@ const noUserSources = computed(
       </template>
 
       <template #tab-hours>
-        <OBanner
+        <OInlineNotice
           v-if="!selected.hoursEligible"
-          variant="default"
-          icon="info-outline"
-          dense
+          tone="neutral"
           data-test="security-ueba-drawer-hours-not-judged"
         >
           {{
@@ -1050,7 +1025,7 @@ const noUserSources = computed(
               baseline: windowDef.baselineLabel,
             })
           }}
-        </OBanner>
+        </OInlineNotice>
         <div
           class="border-border-default rounded-surface flex flex-col gap-3 border p-3"
           data-test="security-ueba-drawer-hours"
@@ -1071,7 +1046,7 @@ const noUserSources = computed(
               },
               {
                 key: 'now',
-                label: t('siem.ueba.nowRow', { w: t(`siem.range.${win}`) }),
+                label: t('siem.ueba.nowRow', { w: range.text.value }),
                 map: selected.current.hours,
                 now: true,
               },
@@ -1096,7 +1071,7 @@ const noUserSources = computed(
               /></span>
             </div>
           </div>
-          <div class="text-text-secondary text-3xs grid grid-cols-24 gap-0.5 ps-30">
+          <div class="text-text-secondary text-2xs grid grid-cols-24 gap-0.5 ps-30">
             <span v-for="h in HOURS" :key="h" class="text-center">{{
               h % 6 === 0 ? String(h).padStart(2, "0") : ""
             }}</span>
@@ -1133,11 +1108,11 @@ const noUserSources = computed(
             <span class="text-text-heading min-w-0 flex-1 truncate font-mono text-sm">{{
               ip.ip
             }}</span>
-            <OTag v-if="ip.isNew" variant="error-soft" size="xs">{{ t("siem.ueba.newIp") }}</OTag>
-            <OTag v-if="ip.external" variant="blue-soft" size="xs">{{
+            <OTag v-if="ip.isNew" tone="err" size="sm">{{ t("siem.ueba.newIp") }}</OTag>
+            <OTag v-if="ip.external" tone="neutral" size="sm">{{
               t("siem.entities.signal.external")
             }}</OTag>
-            <OTag v-if="ip.failures" variant="default-soft" size="xs">{{
+            <OTag v-if="ip.failures" tone="neutral" size="sm">{{
               t("siem.entities.failedCount", ip.failures)
             }}</OTag>
             <span class="text-text-secondary w-14 text-right text-xs tabular-nums">{{
@@ -1151,7 +1126,8 @@ const noUserSources = computed(
           </div>
           <OEmptyState
             v-if="!ipRows.length"
-            size="inline"
+            size="compact"
+            class="px-3"
             icon="lan"
             :title="t('siem.ueba.noIps')"
           />
@@ -1160,9 +1136,8 @@ const noUserSources = computed(
 
       <template #footer>
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="groups"
+          variant="secondary"
+          icon="groups"
           data-test="security-ueba-drawer-entity"
           @click="openEntity"
         >
@@ -1170,8 +1145,7 @@ const noUserSources = computed(
         </OButton>
         <OButton
           variant="primary"
-          size="sm-action"
-          icon-left="manage-search"
+          icon="manage-search"
           data-test="security-ueba-drawer-events"
           @click="openEvents"
         >

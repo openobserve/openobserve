@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { SlackInstallConfirmation } from "@/types/slack";
 
@@ -57,19 +57,14 @@ const channel = computed(() => props.confirmation.destination?.channel.replace(/
     data-test="slack-install-confirmation"
   >
     <template #actions>
-      <OButton
-        variant="primary"
-        size="sm-action"
-        data-test="slack-install-continue"
-        @click="emit('continue')"
-      >
+      <OButton variant="primary" data-test="slack-install-continue" @click="emit('continue')">
         {{ t("slackApp.connect.continue") }}
       </OButton>
     </template>
     <div class="flex flex-col gap-3">
-      <OBanner variant="success" icon="check-circle" data-test="slack-install-connected">
+      <OInlineNotice tone="ok" data-test="slack-install-connected">
         {{ t("slackApp.connect.connectedTitle", { team: confirmation.team }) }}
-      </OBanner>
+      </OInlineNotice>
       <p v-if="linkingLine" class="text-text-body m-0 text-sm">{{ linkingLine }}</p>
       <p v-if="linkAllLine" class="text-text-body m-0 text-sm">{{ linkAllLine }}</p>
       <p

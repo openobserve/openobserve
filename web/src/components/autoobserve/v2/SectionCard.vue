@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <header class="flex min-h-14 flex-wrap items-center gap-3 px-5 pt-4 pb-3 sm:px-6">
       <slot name="title">
-        <h2 class="text-text-heading text-base font-semibold whitespace-nowrap">{{ title }}</h2>
+        <h2 class="text-text-heading text-sm font-semibold whitespace-nowrap">{{ title }}</h2>
       </slot>
       <span
         v-if="count !== undefined"

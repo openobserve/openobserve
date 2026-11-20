@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :can-save="draft.state.canSave"
     :server-draft-item="draft.state.serverDraftItem"
     :save-label="draft.state.saveLabel"
+    :save-disabled-reason="draft.state.saveDisabledReason"
     @choose="draft.chooseLeave"
   />
 </template>

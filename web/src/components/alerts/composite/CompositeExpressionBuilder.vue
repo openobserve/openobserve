@@ -125,8 +125,8 @@ onMounted(maybeApplyDefault);
       <OButton
         v-for="(child, index) in selectedChildren"
         :key="child.alert_id"
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         :data-test="`alerts-composite-expression-insert-${child.alert_id}`"
         :aria-label="t('alerts.composite.placeOperand', { name: child.name ?? child.alert_id })"
         @click="appendToken(letterFor(index))"
@@ -134,8 +134,8 @@ onMounted(maybeApplyDefault);
         {{ raw(letterFor(index)) }}
       </OButton>
       <OButton
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         data-test="alerts-composite-expression-and"
         :aria-label="t('alerts.composite.addAnd')"
         @click="appendToken('&&')"
@@ -143,8 +143,8 @@ onMounted(maybeApplyDefault);
         {{ t("alerts.composite.and") }}
       </OButton>
       <OButton
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         data-test="alerts-composite-expression-or"
         :aria-label="t('alerts.composite.addOr')"
         @click="appendToken('||')"
@@ -152,8 +152,8 @@ onMounted(maybeApplyDefault);
         {{ t("alerts.composite.or") }}
       </OButton>
       <OButton
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         data-test="alerts-composite-expression-not"
         :aria-label="t('alerts.composite.addNot')"
         @click="appendToken('!')"
@@ -161,8 +161,8 @@ onMounted(maybeApplyDefault);
         {{ t("alerts.composite.not") }}
       </OButton>
       <OButton
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         data-test="alerts-composite-expression-open-group"
         :aria-label="t('alerts.composite.openGroup')"
         @click="appendToken('(')"
@@ -170,8 +170,8 @@ onMounted(maybeApplyDefault);
         {{ raw("(") }}
       </OButton>
       <OButton
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         data-test="alerts-composite-expression-close-group"
         :aria-label="t('alerts.composite.closeGroup')"
         @click="appendToken(')')"
@@ -190,8 +190,8 @@ onMounted(maybeApplyDefault);
       <OButton
         v-for="child in unusedChildren"
         :key="child.alert_id"
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         :data-test="`alerts-composite-operand-tray-${child.alert_id}`"
         :aria-label="t('alerts.composite.placeOperand', { name: child.name ?? child.alert_id })"
         @click="placeChild(child.alert_id)"
@@ -211,9 +211,9 @@ onMounted(maybeApplyDefault);
     <!-- Advanced: the raw `{id}` form, hidden behind a toggle. -->
     <div class="border-border-default flex flex-col gap-2 border-t pt-2">
       <OButton
-        variant="ghost-muted"
-        size="xs"
-        icon-left="code"
+        variant="ghost"
+        size="sm"
+        icon="code"
         data-test="alerts-composite-expression-advanced-toggle"
         :aria-expanded="advancedOpen"
         @click="advancedOpen = !advancedOpen"

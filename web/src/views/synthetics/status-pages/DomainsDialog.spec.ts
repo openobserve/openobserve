@@ -74,7 +74,7 @@ function makeDomain(overrides: Partial<StatusPageDomain> = {}): StatusPageDomain
 
 const ODialogStub = {
   template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
-  props: ["open", "size", "title", "secondaryButtonLabel"],
+  props: ["open", "size", "title", "secondary"],
 };
 
 const OButtonStub = {
@@ -92,13 +92,13 @@ const OInputStub = {
 };
 
 const OBadgeStub = {
-  template: '<span class="obadge-stub" :data-variant="variant"><slot /></span>',
-  props: ["variant", "size"],
+  template: '<span class="obadge-stub" :data-variant="tone"><slot /></span>',
+  props: ["tone", "size"],
 };
 
-const OBannerStub = {
-  template: '<div :data-test="$attrs[\'data-test\']" :data-variant="variant"><slot /></div>',
-  props: ["variant", "icon", "dense", "content"],
+const OInlineNoticeStub = {
+  template: '<div :data-test="$attrs[\'data-test\']" :data-tone="tone"><slot /></div>',
+  props: ["tone", "icon", "message"],
 };
 
 const OCodeStub = {
@@ -125,7 +125,7 @@ function makeWrapper() {
         OButton: OButtonStub,
         OInput: OInputStub,
         OBadge: OBadgeStub,
-        OBanner: OBannerStub,
+        OInlineNotice: OInlineNoticeStub,
         OCode: OCodeStub,
         OTooltip: OTooltipStub,
         OSpinner: true,
@@ -260,7 +260,7 @@ describe("DomainsDialog", () => {
 
       const failure = wrapper.find('[data-test="status-page-domain-failure-dom-1"]');
       expect(failure.exists()).toBe(true);
-      expect(failure.attributes("data-variant")).toBe("error");
+      expect(failure.attributes("data-tone")).toBe("err");
     });
 
     it("shows no failure banner while the domain is still pending", async () => {
@@ -297,7 +297,7 @@ describe("DomainsDialog", () => {
         expect.objectContaining({
           messageKeypath: "statusPages.domains.deleteBody",
           messageName: "status.brandname.com",
-          confirmVariant: "destructive",
+          kind: "destructive",
         }),
       );
     });

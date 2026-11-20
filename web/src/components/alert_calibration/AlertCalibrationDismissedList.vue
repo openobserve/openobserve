@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col gap-2" data-test="alert-calibration-dismissed">
     <div v-if="!settled" class="flex flex-col gap-2">
-      <OSkeleton class="rounded-surface h-10 w-full" />
-      <OSkeleton class="rounded-surface h-32 w-full" />
+      <OSkeleton shape="block" class="h-10 w-full" />
+      <OSkeleton shape="block" class="h-32 w-full" />
     </div>
 
     <LiveNoticeState
       v-else-if="unknown"
-      size="block"
+      size="region"
       :notice="readNotice(t, query.error.value, t('alertCalibration.dismiss.loadFailedTitle'))"
       :detail="readFailedDetail(query.error.value)"
       data-test="alert-calibration-dismissed-error"
@@ -33,11 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OEmptyState
       v-else-if="!rows.length"
-      size="block"
-      illustration="history"
+      icon="history"
       :title="t('alertCalibration.dismiss.emptyTitle')"
-      :description="t('alertCalibration.dismiss.emptyDescription')"
-      hide-action
+      :text="t('alertCalibration.dismiss.emptyDescription')"
       data-test="alert-calibration-dismissed-empty"
     />
 
@@ -53,9 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="none"
         :page-size="PAGE_SIZE"
         :page-size-options="PAGE_SIZE_OPTIONS"
-        :show-global-filter="false"
         :fill-height="false"
-        :frame="false"
         data-test="alert-calibration-dismissed-table"
       >
         <template #cell-alert="{ row }">
@@ -81,8 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-reopen="{ row }">
           <OButton
-            variant="outline"
-            size="xs"
+            variant="secondary"
+            size="sm"
             :loading="isPending(row.id)"
             data-test="alert-calibration-dismissed-reopen"
             @click="reopen(row)"

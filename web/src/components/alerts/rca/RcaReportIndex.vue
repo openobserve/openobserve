@@ -30,10 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <li v-for="(title, idx) in sections" :key="idx">
           <OButton
             data-test="rca-report-index-item"
-            :variant="active === idx ? 'ghost-primary' : 'ghost-neutral'"
-            size="sm"
+            :variant="active === idx ? 'accent-ghost' : 'ghost'"
             block
-            :active="active === idx"
+            :pressed="active === idx"
             class="justify-start text-start whitespace-normal"
             :aria-current="active === idx ? 'true' : undefined"
             @click="go(idx)"

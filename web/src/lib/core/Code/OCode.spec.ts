@@ -24,10 +24,17 @@ describe("OCode", () => {
     const text = wrapper.findComponent(OTruncatedText);
     expect(text.exists()).toBe(true);
     expect(text.text()).toBe("refs/heads/feature/very-long-branch-name");
-    expect(text.find("button").exists()).toBe(false);
-    expect(wrapper.find("code > button").exists()).toBe(true);
+    expect(wrapper.find("code button").exists()).toBe(false);
+    expect(wrapper.find("[data-test='o-code-copy']").exists()).toBe(true);
     expect(wrapper.find("code").classes()).toContain("max-w-full");
     expect(wrapper.find("code").classes()).not.toContain("truncate");
+  });
+
+  it("draws a 4 px chip in mono 12 px", () => {
+    const wrapper = mount(OCode, { slots: { default: "x" } });
+    expect(wrapper.find("code").classes()).toEqual(
+      expect.arrayContaining(["rounded-chip", "font-mono", "text-xs"]),
+    );
   });
 
   it("passes custom hover text to the cut-only tooltip", () => {

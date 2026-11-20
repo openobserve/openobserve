@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="md"
+    size="sm"
     :title="isEdit ? t('oncall.editTeam') : t('oncall.addTeam')"
     :form-id="FORM_ID"
-    :primary-button-label="primaryLabel"
-    :secondary-button-label="t('oncall.cancel')"
+    :primary="{ label: primaryLabel }"
+    :secondary="{ label: t('oncall.cancel') }"
     data-test="oncall-team-form-drawer"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:secondary="close"
@@ -71,11 +71,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            pencil that got them here is a dead end. -->
       <OButton
         v-if="isEdit"
-        variant="outline"
-        size="sm-action"
-        icon-right="arrow-right-alt"
+        variant="secondary"
+        icon-end="arrow-right-alt"
         class="self-start"
-        icon-left="open-in-new"
+        icon="open-in-new"
         data-test="oncall-team-form-manage-link"
         @click="goToTeamDetail"
       >
@@ -99,9 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div v-if="userOptions.length" class="flex">
             <OButton
-              variant="outline"
-              size="sm-action"
-              icon-left="group-add"
+              variant="secondary"
+              icon="group-add"
               data-test="oncall-team-form-add-everyone"
               @click="addEveryone"
             >

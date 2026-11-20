@@ -35,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <OButton
-      variant="ghost-primary"
-      size="sm"
+      variant="accent-ghost"
       class="-ms-3 self-start"
       data-test="autoobserve-paging-routing"
       @click="openRouting"

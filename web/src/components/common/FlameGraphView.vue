@@ -34,8 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OButton
               :variant="labelAlign === 'left' ? 'primary' : 'ghost'"
-              size="xs"
-              icon-left="align-left"
+              size="sm"
+              icon="align-left"
               :aria-label="t('profiles.alignLeft')"
               data-test="flame-graph-align-left"
               @click="labelAlign = 'left'"
@@ -44,8 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :variant="labelAlign === 'right' ? 'primary' : 'ghost'"
-              size="xs"
-              icon-left="align-right"
+              size="sm"
+              icon="align-right"
               :aria-label="t('profiles.alignRight')"
               data-test="flame-graph-align-right"
               @click="labelAlign = 'right'"
@@ -59,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
             <OSwitch
               v-model="rootAtBottom"
-              size="sm"
               :aria-label="t('profiles.rootAtBottom')"
               data-test="flame-graph-root-at-bottom"
             />
@@ -92,10 +91,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <div v-if="moreButton" class="absolute z-10" :style="moreButton.style">
             <OButton
+              icon-only
               class="bg-surface-panel/90"
               variant="ghost"
-              size="icon-chip"
-              icon-left="more-vert"
+              size="xs"
+              icon="more-vert"
               :aria-label="t('profiles.frameActions', { name: moreButton.block.name })"
               data-test="flame-graph-frame-more"
               @pointerdown.stop
@@ -112,16 +112,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-body">{{ t("profiles.zoomHint", { key: zoomKey }) }}</span>
         <OButton
           variant="ghost"
-          size="xs"
+          size="sm"
           data-test="flame-graph-zoom-hint-never"
           @click="hideZoomHint(true)"
         >
           {{ t("profiles.dontShowAgain") }}
         </OButton>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="close"
+          icon="close"
           :aria-label="t('common.close')"
           data-test="flame-graph-zoom-hint-close"
           @click="hideZoomHint(false)"
@@ -144,9 +144,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}</OTruncatedText>
         </div>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="content-copy"
+          icon="content-copy"
           :aria-label="t('profiles.copyFunctionName')"
           data-test="flame-graph-copy-name"
           @click="copyFunctionName"
@@ -158,8 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="menu.block.id === focusPath"
         variant="ghost"
-        size="sm"
-        icon-left="zoom-out"
+        icon="zoom-out"
         class="w-full justify-start"
         data-test="flame-graph-zoom-out"
         @click="zoomTo(parentPath(menu.block.id))"
@@ -169,8 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else-if="menu.block.ancestor && menu.block.id !== 'root'"
         variant="ghost"
-        size="sm"
-        icon-left="zoom-out"
+        icon="zoom-out"
         class="w-full justify-start"
         data-test="flame-graph-zoom-out-here"
         @click="zoomTo(menu.block.id)"
@@ -180,8 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else-if="menu.block.id !== 'root'"
         variant="ghost"
-        size="sm"
-        icon-left="zoom-in"
+        icon="zoom-in"
         class="w-full justify-start"
         data-test="flame-graph-zoom-in"
         @click="zoomTo(menu.block.id)"
@@ -191,8 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="focusPath"
         variant="ghost"
-        size="sm"
-        icon-left="fit-screen"
+        icon="fit-screen"
         class="w-full justify-start"
         data-test="flame-graph-zoom-reset"
         @click="zoomTo(null)"
@@ -201,8 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         variant="ghost"
-        size="sm"
-        icon-left="search"
+        icon="search"
         class="w-full justify-start"
         data-test="flame-graph-search-function"
         @click="searchFunction"
@@ -212,9 +207,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="!hideProfileActions"
         variant="ghost"
-        size="sm"
         class="w-full justify-start"
-        icon-left="swap-vert"
+        icon="swap-vert"
         data-test="flame-graph-sandwich"
         @click="showSandwich"
       >
@@ -223,9 +217,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="!hideProfileActions"
         variant="ghost"
-        size="sm"
         class="w-full justify-start"
-        icon-left="info-outline"
+        icon="info-outline"
         data-test="flame-graph-details"
         @click="showDetails"
       >

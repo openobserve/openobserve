@@ -36,8 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
         <OButton
           v-if="impact.copy.link && impact.open"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           class="ms-auto shrink-0"
           data-test="autoobserve-cause-list-impact-open"
           @click="go(impact.open)"
@@ -73,16 +73,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="copy">
           <OInlineNotice
             v-if="copy.failed"
-            variant="error"
+            tone="err"
             class="min-w-0"
-            :text="copy.failed"
+            :message="copy.failed"
             data-test="autoobserve-cause-list-failed"
           />
           <OInlineNotice
             v-if="copy.gap"
-            variant="warning"
+            tone="warn"
             class="min-w-0"
-            :text="copy.gap"
+            :message="copy.gap"
             data-test="autoobserve-cause-list-gap"
           />
         </template>
@@ -100,10 +100,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="grid h-14 grid-cols-[2.5rem_4.5rem_minmax(0,1fr)] items-center gap-x-2"
           >
             <span />
-            <OSkeleton animation="none" class="h-5 w-14" />
+            <OSkeleton class="h-5 w-14" />
             <span class="flex flex-col gap-1.5">
-              <OSkeleton animation="none" class="h-3.5 w-4/5" />
-              <OSkeleton animation="none" class="h-3 w-2/5" />
+              <OSkeleton class="h-3.5 w-4/5" />
+              <OSkeleton class="h-3 w-2/5" />
             </span>
           </li>
         </template>
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="row.used">{{ t("autoobserve.context.used") }}</template>
           </span>
           <OTag
-            variant="default-outline"
+            tone="outline"
             size="sm"
             class="justify-self-start"
             :label="gradeLabel(t, row.grade)"
@@ -138,8 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTruncatedText>
           <OButton
             v-if="row.record.open"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             data-test="autoobserve-cause-list-open"
             @click="go(row.record.open)"
           >
@@ -156,10 +156,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="copy">
           <OButton
             v-if="copy.fold"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             class="shrink-0"
-            :icon-right="open ? 'expand-less' : 'expand-more'"
+            :icon-end="open ? 'expand-less' : 'expand-more'"
             :aria-expanded="open"
             data-test="autoobserve-cause-list-fold"
             @click="open = !open"
@@ -185,8 +185,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <span v-if="loading" class="flex h-8 flex-col justify-center gap-1.5">
-        <OSkeleton animation="none" class="h-3 w-full" />
-        <OSkeleton animation="none" class="h-3 w-2/5" />
+        <OSkeleton class="h-3 w-full" />
+        <OSkeleton class="h-3 w-2/5" />
       </span>
       <div v-else class="h-8">
         <OTruncatedText

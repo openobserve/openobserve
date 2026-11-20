@@ -196,15 +196,15 @@ const ODrawerStub = {
     "modal",
     "portalTarget",
     "title",
-    "subTitle",
+    "subtitle",
     "size",
     "showClose",
     "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       v-if="open"
@@ -249,7 +249,7 @@ function mountPanel(props: Partial<InstanceType<typeof ServiceGraphNodeSidePanel
         ODropdownItem: {
           name: "ODropdownItem",
           template:
-            '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /></div>',
+            '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon" /><slot /></div>',
           emits: ["select"],
         },
         // OTabs stub — Reka UI-based, needs stub to avoid context errors
@@ -1501,7 +1501,7 @@ describe("ServiceGraphNodeSidePanel", () => {
           available_groups: [
             {
               group_id: "service-namespace",
-              display: "Service Namespace",
+              display: "Service namespace",
               stream_types: ["traces"],
               aliases: { traces: namespaceField },
               recommended: true,
@@ -1646,7 +1646,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       const configs = wrapper.vm.activeResourceTabConfigs;
       const queriesTab = configs.find((c: any) => c.id === "queries");
       expect(queriesTab).toBeDefined();
-      expect(queriesTab.colLabel).toBe("DB Operation");
+      expect(queriesTab.colLabel).toBe("DB operation");
       expect(queriesTab.groupField).toContain("db_operations");
     });
   });
@@ -2687,7 +2687,7 @@ describe("ServiceGraphNodeSidePanel — license locks", () => {
     await flushPromises();
     await wrapper.find(METRICS_TAB).trigger("click");
     await flushPromises();
-    expect(wrapper.find(METRICS_TAB).attributes("suffix-icon")).toBe("lock");
+    expect(wrapper.find(METRICS_TAB).attributes("locked")).toBe("true");
     expect(
       wrapper.find('[data-test="service-graph-side-panel-metrics-license-denied"]').exists(),
     ).toBe(true);
@@ -2704,7 +2704,7 @@ describe("ServiceGraphNodeSidePanel — license locks", () => {
     await flushPromises();
     await wrapper.find(METRICS_TAB).trigger("click");
     await flushPromises();
-    expect(wrapper.find(METRICS_TAB).attributes("suffix-icon")).toBeUndefined();
+    expect(wrapper.find(METRICS_TAB).attributes("locked")).toBe("false");
     expect(correlateStreams).toHaveBeenCalled();
   });
 

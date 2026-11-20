@@ -29,33 +29,33 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-      :data-primary-disabled="String(primaryButtonDisabled)"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
+      :data-primary-disabled="String(primary?.disabled)"
     >
       <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot name="header" />
@@ -63,13 +63,13 @@ const ODialogStub = {
       <slot name="footer" />
       <button
         data-test="o-dialog-stub-primary"
-        :disabled="primaryButtonDisabled"
+        :disabled="primary?.disabled"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -184,7 +184,7 @@ describe("License.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should show loading spinner while fetching license data", async () => {
+    it("should show a loading skeleton while fetching license data", async () => {
       vi.mocked(licenseServer.get_license).mockImplementation(
         () =>
           new Promise((resolve) =>
@@ -194,9 +194,7 @@ describe("License.vue", () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();
 
-      // Check if loading text is present initially
-      const hasLoadingText = wrapper.text().includes("Loading license information");
-      expect(hasLoadingText).toBe(true);
+      expect(wrapper.find('[aria-busy="true"]').exists()).toBe(true);
     });
 
     it("should call loadLicenseData on mount", async () => {
@@ -1004,21 +1002,19 @@ describe("License.vue", () => {
       expect(dialog.props("size")).toBe("md");
     });
 
-    it("should pass persistent prop to ODialog", () => {
+    it("can be dismissed, since the key dialog holds nothing to lose", () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      // Vue passes valueless boolean attributes through as an empty string for
-      // string-typed props; either value satisfies the persistent contract.
-      expect(["", true]).toContain(dialog.props("persistent"));
+      expect(dialog.props("persistent")).toBeFalsy();
     });
 
-    it('should pass primaryButtonLabel "Copy key" to ODialog', () => {
+    it('should pass primary?.label "Copy key" to ODialog', () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Copy key");
+      expect(dialog.props("primary")?.label).toBe("Copy key");
     });
 
-    it('should pass secondaryButtonLabel "Cancel" to ODialog', () => {
+    it('should pass secondary?.label "Cancel" to ODialog', () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(dialog.props("secondary")?.label).toBe("Cancel");
     });
 
     it("should bind open prop from showLicenseKeyModal state", async () => {
@@ -1036,12 +1032,12 @@ describe("License.vue", () => {
       await wrapper.vm.$nextTick();
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonDisabled")).toBe(true);
+      expect(dialog.props("primary")?.disabled).toBe(true);
     });
 
     it("should enable primary button when license key exists", () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonDisabled")).toBe(false);
+      expect(dialog.props("primary")?.disabled).toBeFalsy();
     });
 
     it("should show full license key in modal", async () => {
@@ -2192,8 +2188,7 @@ describe("License.vue", () => {
         linesDataTest: "license-key-losses",
         confirmLabel: "Yes, update license",
         cancelLabel: "No, keep current",
-        confirmVariant: "destructive",
-        focusCancel: true,
+        kind: "destructive",
       });
       const date = (us: number) =>
         new Date(us / 1000).toLocaleDateString("en-us", {

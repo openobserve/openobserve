@@ -31,9 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div>
       <div v-if="loading" class="flex flex-col gap-2" data-test="oncall-report-loading">
-        <OSkeleton type="text" class="h-4 w-1/2" />
-        <OSkeleton type="text" class="h-4 w-5/6" />
-        <OSkeleton type="text" class="h-4 w-2/3" />
+        <OSkeleton class="h-4 w-1/2" />
+        <OSkeleton class="h-4 w-5/6" />
+        <OSkeleton class="h-4 w-2/3" />
       </div>
 
       <!-- eslint-disable-next-line vue/no-v-html -- sanitized by renderRcaReport -->
@@ -77,7 +77,7 @@ const rendered = computed(() => (props.report?.report ? renderRcaReport(props.re
 /* Capped at the page title's own 16px: a heading ramp taller than the page title
    reads as a different application embedded in the card. */
 .report-body :deep(.rca-h1) {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
 }
 .report-body :deep(.rca-h2) {
   font-size: var(--text-sm);

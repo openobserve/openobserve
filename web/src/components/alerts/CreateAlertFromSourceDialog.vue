@@ -32,10 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="isOpen"
     size="md"
     :title="t('alerts.prefill.dialog.title')"
-    :sub-title="raw(prefill?.sourceLabel)"
-    :secondary-button-label="t('confirmDialog.cancel')"
-    :primary-button-label="t('alerts.prefill.dialog.continue')"
-    :primary-button-disabled="isBlocked"
+    :subtitle="raw(prefill?.sourceLabel)"
+    :dirty="isChoiceChanged"
+    :secondary="{ label: t('confirmDialog.cancel') }"
+    :primary="{ label: t('alerts.prefill.dialog.continue'), disabled: isBlocked }"
     data-test="create-alert-from-source-dialog"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
@@ -56,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="queryOptions"
           :label="pickQueryOnly ? undefined : t('alerts.prefill.dialog.queryChoiceLabel')"
           :searchable="false"
-          :dropdown-style="QUERY_PICKER_DROPDOWN"
           data-test="create-alert-query-picker"
           @update:model-value="onQueryChange"
         />
@@ -64,18 +63,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="pickQueryOnly && pickedQuery" data-test="create-alert-picked-query">
         <div class="flex items-center justify-between">
-          <span class="text-xs font-bold tracking-wider">
+          <span class="text-xs font-semibold tracking-wider">
             {{ t("alerts.prefill.dialog.queryLabel") }}
           </span>
-          <OButton
-            variant="ghost-primary"
-            size="sm"
-            icon-left="content-copy"
+          <OCopyButton
             data-test="create-alert-picked-query-copy"
-            @click="copyToClipboard(pickedQuery, t)"
-          >
-            {{ t("common.copy") }}
-          </OButton>
+            size="md"
+            show-label
+            :value="pickedQuery"
+          />
         </div>
         <div
           class="rounded-default bg-theme-body-bg-primary border-card-glass-border [&::-webkit-scrollbar-thumb]:bg-border-default [&::-webkit-scrollbar-thumb:hover]:bg-border-strong mt-1 max-h-40 [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] overflow-y-auto border p-2 font-mono text-sm break-all whitespace-pre-wrap [&::-webkit-scrollbar]:size-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent"
@@ -115,18 +111,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.prefill.dialog.patternsLabel") }}
         </span>
         <OToggleGroup
+          size="sm"
           :model-value="patternMode"
           type="single"
           data-test="create-alert-pattern-mode"
           @update:model-value="onPatternModeChange"
         >
-          <OToggleGroupItem value="none" size="xs" data-test="create-alert-patterns-none">
+          <OToggleGroupItem value="none" data-test="create-alert-patterns-none">
             {{ t("alerts.prefill.dialog.patternsNone") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="include" size="xs" data-test="create-alert-patterns-include">
+          <OToggleGroupItem value="include" data-test="create-alert-patterns-include">
             {{ t("alerts.prefill.dialog.patternsIncludeAll") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="exclude" size="xs" data-test="create-alert-patterns-exclude">
+          <OToggleGroupItem value="exclude" data-test="create-alert-patterns-exclude">
             {{ t("alerts.prefill.dialog.patternsExcludeAll") }}
           </OToggleGroupItem>
         </OToggleGroup>
@@ -158,10 +155,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="self-start"
           data-test="create-alert-threshold-shape"
         >
-          <OToggleGroupItem value="matching-rows" size="sm" data-test="create-alert-threshold-rows">
+          <OToggleGroupItem value="matching-rows" data-test="create-alert-threshold-rows">
             {{ t("alerts.prefill.dialog.thresholdMatchingRows") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="count" size="sm" data-test="create-alert-threshold-count">
+          <OToggleGroupItem value="count" data-test="create-alert-threshold-count">
             {{ t("alerts.prefill.dialog.thresholdCount") }}
           </OToggleGroupItem>
         </OToggleGroup>
@@ -171,7 +168,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           :model-value="thresholdDraft"
           type="number"
-          size="sm"
           class="max-w-60"
           :label="raw(prefill.thresholdInput.label)"
           :suffix="prefill.thresholdInput.suffix"
@@ -205,24 +201,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.prefill.dialog.queryLabel") }}
         </span>
         <OCodeBlock
-          padded
           wrap
           :max-lines="10"
           :code="previewQuery"
           :lang="prefill.queryType === 'promql' ? 'promql' : 'sql'"
-          :copy-message="t('alerts.prefill.dialog.queryCopied')"
           data-test="create-alert-query-preview"
         />
       </div>
 
       <!-- Every lossy transform the adapters performed, stated plainly. -->
       <div v-if="shownWarnings.length" class="flex flex-col gap-2">
-        <OBanner
+        <OInlineNotice
           v-for="(warning, index) in shownWarnings"
           :key="`${warning.key}-${index}`"
-          dense
-          :variant="bannerVariant(warning.level)"
-          :content="warningText(warning)"
+          :tone="warningTone(warning.level)"
+          :message="warningText(warning)"
           :data-test="`create-alert-warning-${warning.key}`"
         />
       </div>
@@ -240,11 +233,11 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import { useColorizedQuery } from "@/composables/useColorizedQuery";
-import { copyToClipboard } from "@/utils/clipboard";
 import { escapeHtml } from "@/utils/html";
 import type {
   AlertBuildOptions,
@@ -258,8 +251,6 @@ import { isPrefillBlocked, needsThreshold } from "@/utils/alerts/alertPrefill";
 import { typedThreshold } from "@/components/autoobserve/insight/targets/thresholds";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { formatSqlForDisplay } from "@/utils/query/formatSql";
-
-const QUERY_PICKER_DROPDOWN = { width: "var(--reka-select-trigger-width)" };
 
 const props = defineProps<{
   open: boolean;
@@ -377,6 +368,18 @@ const previewQuery = computed(() => {
   return prefill.queryType === "promql" ? (prefill.promql ?? "") : formatSqlForDisplay(prefill.sql);
 });
 
+// A stray dismiss asks before dropping a changed answer (V5); the seeding below is not one.
+const { dirty: isChoiceChanged } = useUnsavedChanges(
+  () => [
+    props.prefill?.queryIndex ?? null,
+    patternMode.value,
+    selectedStream.value,
+    thresholdShape.value,
+    thresholdDraft.value,
+  ],
+  () => props.open,
+);
+
 // Seed the controls from the incoming prefill each time the dialog opens, so a
 // second run never inherits the previous run's answers.
 watch(
@@ -392,8 +395,8 @@ watch(
   { immediate: true },
 );
 
-const bannerVariant = (level: AlertPrefillWarningLevel) =>
-  level === "blocking" ? "error" : level === "info" ? "info" : "warning";
+const warningTone = (level: AlertPrefillWarningLevel) =>
+  level === "blocking" ? "err" : level === "info" ? "info" : "warn";
 
 const warningText = (warning: AlertPrefillWarning) =>
   t(`alerts.prefill.warnings.${warning.key}`, warning.params ?? {});

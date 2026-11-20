@@ -25,12 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #trigger>
       <!-- Compact mode is a button GROUP, not a lone icon: the caret segment is
            what tells you this opens a menu rather than firing an action. -->
-      <OButtonGroup v-if="compact" radius="sm" :data-test="dataTest">
+      <OButtonGroup v-if="compact" :data-test="dataTest">
         <!-- In split mode this segment is its OWN action (annotate now); `.stop`
              keeps the click from reaching the dropdown trigger wrapper. -->
         <OButton
+          icon-only
           :variant="variant"
-          size="icon-xs"
           :loading="busy"
           :aria-label="splitAction ? actionLabel : label"
           @click.stop.prevent="splitAction && emit('action')"
@@ -38,20 +38,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="fact-check" size="sm" />
           <OTooltip v-if="splitAction" side="bottom" :content="actionLabel" />
         </OButton>
-        <OButton :variant="variant" size="icon-xs" tabindex="-1" aria-hidden="true">
+        <OButton icon-only :variant="variant" tabindex="-1" aria-hidden="true">
           <OIcon :name="open ? 'expand-less' : 'expand-more'" size="xs" />
         </OButton>
         <OTooltip side="bottom" :content="label" />
       </OButtonGroup>
 
-      <OButton
-        v-else
-        :variant="variant"
-        :size="size"
-        icon-left="add"
-        :loading="busy"
-        :data-test="dataTest"
-      >
+      <OButton v-else :variant="variant" :size="size" :loading="busy" :data-test="dataTest">
         {{ label }}
       </OButton>
     </template>
@@ -107,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- The way out of the menu: no queue fits, or one needs editing. -->
       <ODropdownItem
-        icon-left="format-list-bulleted"
+        icon="format-list-bulleted"
         data-test="add-to-queue-menu-manage"
         @select="manageQueues"
       >
@@ -162,8 +155,8 @@ const props = withDefaults(
   {
     loading: false,
     busy: false,
-    variant: "outline",
-    size: "sm-toolbar",
+    variant: "secondary",
+    size: "md",
     compact: false,
     side: "bottom",
     splitAction: false,

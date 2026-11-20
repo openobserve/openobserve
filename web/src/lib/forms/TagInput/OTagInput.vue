@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="tag-input-container" class="h-full w-full" v-bind="wrapperAttrs">
     <div
       data-test="tag-input-wrapper"
-      class="group border-card-glass-border rounded-default bg-card-glass-bg focus-within:border-theme-accent relative flex h-full min-h-14 w-full max-w-full cursor-text flex-col overflow-hidden border px-1.25 py-0 transition-colors duration-300"
+      class="group border-card-glass-border rounded-default bg-card-glass-bg focus-within:border-theme-accent relative flex h-full min-h-14 w-full max-w-full cursor-text flex-col overflow-hidden border px-1.25 py-0 transition-colors"
     >
       <label
         v-if="label"
         data-test="tag-input-label"
-        class="group-focus-within:text-theme-accent pointer-events-none absolute top-4 left-3 -ms-1 origin-top-left bg-transparent px-1 text-base transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.5,1)]"
+        class="group-focus-within:text-theme-accent pointer-events-none absolute top-4 left-3 -ms-1 origin-top-left bg-transparent px-1 text-base transition-[color,translate,scale] duration-(--duration-indicator) ease-(--ease-control)"
         :class="
           hasContent || isFocused
             ? 'text-theme-accent -translate-y-2 scale-75'
@@ -39,21 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(tag, index) in modelValue"
           :key="index"
           :data-test="`tag-chip-${index}`"
-          type="selectionChip"
-          class="tag-chip m-0! shrink-0 grow-0 basis-auto bg-[color-mix(in_srgb,var(--color-button-primary)_20%,white_10%)]"
+          tone="accent"
+          removable
+          :remove-label="t('common.removeTag', { tag })"
+          class="tag-chip m-0! shrink-0 grow-0 basis-auto"
           :class="isHighlighted(tag) ? 'ring-theme-accent ring-1' : ''"
+          @remove="removeTag(index)"
         >
           {{ tag }}
-          <template #trailing>
-            <button
-              type="button"
-              :aria-label="t('common.removeTag', { tag })"
-              class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
-              @click="removeTag(index)"
-            >
-              <OIcon name="close" size="xs" />
-            </button>
-          </template>
         </OTag>
         <input
           v-bind="controlAttrs"
@@ -64,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="
             modelValue.length > 0 ? '' : (placeholder ?? t('common.typeAndPressEnterOrComma'))
           "
-          class="text-text-body placeholder:text-input-placeholder min-w-25 [flex:1_1_6.25rem] border-0 bg-transparent p-1 text-sm outline-none"
+          class="text-text-body placeholder:text-input-placeholder text-compact min-w-25 [flex:1_1_6.25rem] border-0 bg-transparent p-1 outline-none"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"
@@ -83,7 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, useAttrs } from "vue";
 import { splitControlAttrs } from "@/lib/forms/controlAttrs";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 const { t } = useI18nTyped();

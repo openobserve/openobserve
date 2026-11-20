@@ -69,9 +69,9 @@ const pending = () => new Promise<never>(() => undefined);
 
 // The page header is the shared layout's; its slots render so the body and actions stay reachable.
 const PageLayoutStub = {
-  props: ["title", "subtitle", "back", "icon", "titleDataTest"],
+  props: ["title", "about", "back", "titleDataTest"],
   template:
-    "<div><h1 :data-test='titleDataTest'>{{ title }}</h1><p>{{ subtitle }}</p><slot name='subtitle' /><slot name='actions' /><slot /></div>",
+    "<div><h1 :data-test='titleDataTest'>{{ title }}</h1><slot name='status' /><slot name='actions' /><slot /></div>",
 };
 
 const mountView = () =>

@@ -16,11 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="px-page-edge flex flex-col gap-3 py-3" data-test="rum-analytics-overview">
-    <OBanner
+    <OInlineNotice
       v-if="suggest.banner.value"
-      :variant="suggest.banner.value"
-      dense
-      :content="bannerText"
+      :tone="suggest.banner.value"
+      :message="bannerText"
       data-test="rum-analytics-exclusions-banner"
     >
       <template #actions>
@@ -28,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="s in canExclude ? suggest.ua.value : []"
           :key="s.value"
           variant="ghost"
-          size="sm"
           :disabled="excluding"
           :data-test="`rum-analytics-exclusions-banner-exclude-${s.value}`"
           @click="excludeNow(s.rule)"
@@ -36,25 +34,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <OButton
           variant="ghost"
-          size="sm"
           data-test="rum-analytics-exclusions-banner-review"
           @click="emit('open-exclusions')"
           >{{ t("rum.analytics.exclusions.review") }}</OButton
         >
       </template>
-    </OBanner>
+    </OInlineNotice>
     <OEmptyState
       v-if="isEmpty"
-      preset="no-search-results"
+      kind="filtered"
       :title="t('rum.analytics.overview.emptyTitle', { app: raw(pa.state.app) })"
-      :description="t('rum.analytics.overview.emptyDescription')"
+      :text="t('rum.analytics.overview.emptyDescription')"
       data-test="rum-analytics-overview-empty"
     >
       <template #actions>
         <OButton
           v-if="pa.canWidenRange.value"
-          variant="primary"
-          size="sm"
+          variant="secondary"
           data-test="rum-analytics-overview-widen-range-btn"
           @click="widenRange"
           >{{ t("rum.analytics.overview.widenRange") }}</OButton
@@ -73,8 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span>{{ kpiFootnote }}</span>
         <span aria-hidden="true">{{ separator }}</span>
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           data-test="rum-analytics-kpi-include-them"
           @click="includeExcluded"
           >{{ t("rum.analytics.exclusions.includeThem") }}</OButton
@@ -105,24 +101,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex flex-wrap items-center gap-3" data-test="rum-analytics-overview-chips">
         <OToggleGroup
+          size="sm"
           :model-value="chip"
           type="single"
           mobile-dropdown
           @update:model-value="onChip"
         >
-          <OToggleGroupItem value="all" size="xs" data-test="rum-analytics-overview-chip-all">{{
+          <OToggleGroupItem value="all" data-test="rum-analytics-overview-chip-all">{{
             chipLabel(t("rum.analytics.chips.all"), counts.all)
           }}</OToggleGroupItem>
           <OToggleGroupItem
             value="rising"
-            size="xs"
             icon-left="trending-up"
             data-test="rum-analytics-overview-chip-rising"
             >{{ chipLabel(t("rum.analytics.chips.rising"), counts.rising) }}</OToggleGroupItem
           >
           <OToggleGroupItem
             value="declining"
-            size="xs"
             icon-left="trending-down"
             data-test="rum-analytics-overview-chip-declining"
             >{{ chipLabel(t("rum.analytics.chips.declining"), counts.declining) }}</OToggleGroupItem
@@ -130,7 +125,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OToggleGroupItem
             v-if="prevHasData"
             value="not_used"
-            size="xs"
             data-test="rum-analytics-overview-chip-not-used"
             >{{ chipLabel(t("rum.analytics.chips.notUsed"), counts.not_used) }}</OToggleGroupItem
           >
@@ -140,45 +134,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span>
       </div>
 
-      <OCard
-        variant="outlined"
-        class="rounded-surface overflow-hidden"
-        data-test="rum-analytics-overview-pages"
-      >
-        <div class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2">
-          <span class="text-text-heading text-sm font-semibold">{{
-            t("rum.analytics.overview.pages")
-          }}</span>
-          <span class="text-text-secondary min-w-0 flex-1 truncate text-xs">{{
+      <OCard flush data-test="rum-analytics-overview-pages">
+        <template #header>
+          <h3 class="text-text-heading text-compact shrink-0 font-semibold">
+            {{ t("rum.analytics.overview.pages") }}
+          </h3>
+          <span class="text-text-muted min-w-0 flex-1 truncate text-xs">{{
             t("rum.analytics.overview.pagesCaption")
           }}</span>
+        </template>
+        <template #actions>
           <OToggleGroup
+            size="sm"
             :model-value="view"
             type="single"
             mobile-dropdown
             data-test="rum-analytics-overview-pages-view-toggle"
             @update:model-value="onView"
           >
-            <OToggleGroupItem
-              value="all"
-              size="xs"
-              data-test="rum-analytics-overview-pages-view-all"
-              >{{ t("rum.analytics.overview.allPages") }}</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              value="entry"
-              size="xs"
-              data-test="rum-analytics-overview-pages-view-entry"
-              >{{ t("rum.analytics.overview.entryPages") }}</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              value="exit"
-              size="xs"
-              data-test="rum-analytics-overview-pages-view-exit"
-              >{{ t("rum.analytics.overview.exitPages") }}</OToggleGroupItem
-            >
+            <OToggleGroupItem value="all" data-test="rum-analytics-overview-pages-view-all">{{
+              t("rum.analytics.overview.allPages")
+            }}</OToggleGroupItem>
+            <OToggleGroupItem value="entry" data-test="rum-analytics-overview-pages-view-entry">{{
+              t("rum.analytics.overview.entryPages")
+            }}</OToggleGroupItem>
+            <OToggleGroupItem value="exit" data-test="rum-analytics-overview-pages-view-exit">{{
+              t("rum.analytics.overview.exitPages")
+            }}</OToggleGroupItem>
           </OToggleGroup>
-        </div>
+        </template>
         <RankedKeysTable
           :rows="pageRows"
           kind="p"
@@ -199,54 +183,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @trend="toggleTrend"
           @retry="view === 'all' ? runner.retry('pages') : loadEntryExit(true)"
         />
-        <div
-          v-if="ignoredPages.length"
-          class="border-border-default text-text-secondary flex flex-wrap items-center gap-1.5 border-t px-4 py-2 text-xs"
-          data-test="rum-analytics-overview-pages-hidden"
-        >
-          <span>{{
-            t(
-              "rum.analytics.exclusions.hiddenPages",
-              { count: ignoredPages.length, pages: raw(ignoredPages.join(", ")) },
-              ignoredPages.length,
-            )
-          }}</span>
-          <span aria-hidden="true">{{ separator }}</span>
-          <OButton
-            variant="ghost-primary"
-            size="xs"
-            data-test="rum-analytics-overview-pages-hidden-edit"
-            @click="emit('open-exclusions')"
-            >{{ t("rum.analytics.exclusions.edit") }}</OButton
+        <template v-if="ignoredPages.length" #footer>
+          <div
+            class="me-auto flex flex-wrap items-center gap-1.5"
+            data-test="rum-analytics-overview-pages-hidden"
           >
-        </div>
+            <span>{{
+              t(
+                "rum.analytics.exclusions.hiddenPages",
+                { count: ignoredPages.length, pages: raw(ignoredPages.join(", ")) },
+                ignoredPages.length,
+              )
+            }}</span>
+            <span aria-hidden="true">{{ separator }}</span>
+            <OButton
+              variant="accent-ghost"
+              size="sm"
+              data-test="rum-analytics-overview-pages-hidden-edit"
+              @click="emit('open-exclusions')"
+              >{{ t("rum.analytics.exclusions.edit") }}</OButton
+            >
+          </div>
+        </template>
       </OCard>
 
-      <OCard
-        variant="outlined"
-        class="rounded-surface overflow-hidden"
-        data-test="rum-analytics-overview-clicks"
-      >
-        <div class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2">
-          <span class="text-text-heading text-sm font-semibold">{{
-            t("rum.analytics.overview.clicks")
-          }}</span>
-          <span class="text-text-secondary min-w-0 flex-1 truncate text-xs">{{
+      <OCard flush data-test="rum-analytics-overview-clicks">
+        <template #header>
+          <h3 class="text-text-heading text-compact shrink-0 font-semibold">
+            {{ t("rum.analytics.overview.clicks") }}
+          </h3>
+          <span class="text-text-muted min-w-0 flex-1 truncate text-xs">{{
             t("rum.analytics.overview.clicksCaption")
           }}</span>
-          <span
-            v-if="identityRuleNote"
-            class="text-text-secondary w-full text-xs"
-            data-test="rum-analytics-overview-clicks-identity-note"
-            >{{ t("rum.analytics.exclusions.identityRowForm") }}</span
-          >
-        </div>
-        <OBanner
+        </template>
+        <p
+          v-if="identityRuleNote"
+          class="text-text-secondary px-3 pt-2 text-xs"
+          data-test="rum-analytics-overview-clicks-identity-note"
+        >
+          {{ t("rum.analytics.exclusions.identityRowForm") }}
+        </p>
+        <OInlineNotice
           v-if="showNameHint"
-          variant="info"
-          dense
-          class="mx-4 mt-2"
-          :content="
+          tone="info"
+          class="mx-3 mt-2"
+          :message="
             t('rum.analytics.overview.clickNameHint', { attribute: raw('actionNameAttribute') })
           "
           data-test="rum-analytics-overview-clicks-name-hint"
@@ -254,7 +235,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #actions>
             <OButton
               variant="ghost"
-              size="sm"
               data-test="rum-analytics-overview-clicks-name-hint-link"
               @click="openSetup"
               >{{
@@ -264,18 +244,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</OButton
             >
           </template>
-        </OBanner>
+        </OInlineNotice>
         <OEmptyState
           v-if="clicksNotCaptured"
-          preset="no-data"
-          size="inline"
+          size="compact"
           :title="t('rum.analytics.overview.clicksNotCapturedTitle')"
-          :description="t('rum.analytics.overview.clicksNotCaptured')"
+          :text="t('rum.analytics.overview.clicksNotCaptured')"
           data-test="rum-analytics-overview-clicks-not-captured"
         >
           <template #actions>
             <OButton
-              variant="outline"
+              variant="secondary"
               size="sm"
               data-test="rum-analytics-overview-clicks-setup-link"
               @click="openSetup"
@@ -312,14 +291,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OCard
         v-if="unnamedPanel.status !== 'ok' || unnamedRows.length"
-        variant="outlined"
-        class="rounded-surface overflow-hidden"
+        flush
         data-test="rum-analytics-overview-unnamed-clicks"
       >
-        <div class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2">
-          <span class="text-text-heading text-sm font-semibold">{{
-            t("rum.analytics.unnamedClicks.title")
-          }}</span>
+        <template #header>
+          <h3 class="text-text-heading text-compact min-w-0 truncate font-semibold">
+            {{ t("rum.analytics.unnamedClicks.title") }}
+          </h3>
           <span
             tabindex="0"
             role="img"
@@ -330,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="info-outline" size="xs" />
             <OTooltip :content="unnamedCaption" />
           </span>
-        </div>
+        </template>
         <AnalyticsPanelState
           :state="unnamedPanel"
           data-test="rum-analytics-overview-unnamed-clicks-panel"
@@ -343,8 +321,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="pg"
             pagination="none"
             sorting="none"
-            :show-global-filter="false"
-            :frame="false"
             data-test="rum-analytics-overview-unnamed-clicks-table"
           >
             <template #cell-share="{ row }">
@@ -399,7 +375,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -1041,7 +1017,7 @@ watch(
 );
 
 watch(
-  () => suggest.banner.value === "warning",
+  () => suggest.banner.value === "warn",
   (warn) => emit("likely-bot", warn),
   { immediate: true },
 );

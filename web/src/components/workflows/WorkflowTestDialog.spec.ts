@@ -51,23 +51,15 @@ import { INCIDENT_EVENT_TYPES } from "@/plugins/workflows/incidentSample";
 // ── stubs ────────────────────────────────────────────────────────────────────
 const ODrawerStub = {
   name: "ODrawer",
-  props: [
-    "open",
-    "size",
-    "title",
-    "primaryButtonLabel",
-    "primaryButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLabel",
-  ],
+  props: ["open", "size", "title", "primary", "primary", "primary", "secondary"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div class="o-drawer" :data-open="String(open)">
       <button class="dlg-primary" data-test="dlg-primary"
-        :disabled="primaryButtonDisabled"
-        :data-loading="String(!!primaryButtonLoading)"
-        @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
-      <button class="dlg-secondary" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+        :disabled="primary?.disabled"
+        :data-loading="String(!!primary?.loading)"
+        @click="$emit('click:primary')">{{ primary?.label }}</button>
+      <button class="dlg-secondary" @click="$emit('click:secondary')">{{ secondary?.label }}</button>
       <button class="dlg-dismiss" @click="$emit('update:open', false)">x</button>
       <slot />
     </div>`,
@@ -82,7 +74,7 @@ const OSelectStub = {
 
 const OButtonStub = {
   name: "OButton",
-  props: ["variant", "size", "disabled", "loading", "iconLeft", "title"],
+  props: ["variant", "size", "disabled", "loading", "icon", "title"],
   template: `<button :disabled="disabled"><slot /></button>`,
 };
 
@@ -107,10 +99,10 @@ const OSwitchStub = {
     @click="$emit('update:modelValue', !modelValue)">{{ label }}</button>`,
 };
 
-const OBannerStub = {
-  name: "OBanner",
-  props: ["variant", "content", "icon", "dense", "dataTest"],
-  template: `<div class="o-banner" :data-variant="variant" :data-test="dataTest"><slot />{{ content }}</div>`,
+const OInlineNoticeStub = {
+  name: "OInlineNotice",
+  props: ["tone", "message", "icon"],
+  template: `<div class="o-banner" :data-tone="tone"><slot />{{ message }}</div>`,
 };
 
 const globalConfig = {
@@ -121,7 +113,7 @@ const globalConfig = {
     OButton: OButtonStub,
     OText: OTextStub,
     OSwitch: OSwitchStub,
-    OBanner: OBannerStub,
+    OInlineNotice: OInlineNoticeStub,
     CodeQueryEditor: CodeQueryEditorStub,
   },
 };
@@ -742,7 +734,7 @@ describe("destination suppression (P0 safety)", () => {
     expect(workflowObj.testRun.suppressDestinations).toBe(false);
     const w = warning(wrapper);
     expect(w.exists()).toBe(true);
-    expect(w.attributes("data-variant")).toBe("warning");
+    expect(w.attributes("data-tone")).toBe("warn");
     // the warning must NAME the destination, not just say "destinations"
     expect(w.text()).toContain("sink-a");
   });

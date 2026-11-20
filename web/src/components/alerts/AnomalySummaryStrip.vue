@@ -25,11 +25,11 @@
       data-test="alerts-anomalysummarystrip-loading"
     >
       <div class="flex w-52 flex-col gap-2">
-        <OSkeleton type="text" class="w-3/4" />
-        <OSkeleton type="text" class="w-1/2" />
+        <OSkeleton shape="line" class="w-3/4" />
+        <OSkeleton shape="line" class="w-1/2" />
       </div>
-      <OSkeleton type="rect" class="h-8 w-64 max-md:hidden" />
-      <OSkeleton type="rect" class="ms-auto h-8 w-24" />
+      <OSkeleton shape="block" class="h-8 w-64 max-md:hidden" />
+      <OSkeleton shape="block" class="ms-auto h-8 w-24" />
     </div>
 
     <template v-else-if="failed || !view">
@@ -37,9 +37,8 @@
         {{ t("alerts.anomaly.stripLoadFailed") }}
       </span>
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="refresh"
+        variant="secondary"
+        icon="refresh"
         data-test="alerts-anomalysummarystrip-retry"
         @click="emit('retry')"
       >
@@ -54,7 +53,7 @@
       >
         <div class="flex items-center gap-2 text-sm whitespace-nowrap">
           <OBadge
-            :variant="chip.variant"
+            :tone="chip.tone"
             :dot="view.state === 'ongoing'"
             data-test="alerts-anomalysummarystrip-chip"
           >
@@ -137,7 +136,6 @@
         <OButton
           v-if="response?.url"
           variant="primary"
-          size="sm-action"
           data-test="alerts-anomalysummarystrip-open"
           @click="emit('open', response.url)"
         >
@@ -152,7 +150,7 @@
 import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -213,22 +211,22 @@ const since = (us: number): TimedText => ({
   utc: utc(us),
 });
 
-const chip = computed<{ label: I18nText; variant: BadgeVariant }>(() => {
+const chip = computed<{ label: I18nText; tone: ChipTone }>(() => {
   switch (view.value?.state) {
     case "ongoing":
-      return { label: t("alerts.anomaly.stripOngoing"), variant: "error-soft" };
+      return { label: t("alerts.anomaly.stripOngoing"), tone: "err" };
     case "back_in_range":
-      return { label: t("alerts.anomaly.stripBackInRange"), variant: "default-soft" };
+      return { label: t("alerts.anomaly.stripBackInRange"), tone: "neutral" };
     case "no_new_data":
-      return { label: t("alerts.anomaly.stripNoNewDataChip"), variant: "warning-soft" };
+      return { label: t("alerts.anomaly.stripNoNewDataChip"), tone: "warn" };
     case "no_recent_runs":
-      return { label: t("alerts.anomaly.stripNoRecentRuns"), variant: "warning-soft" };
+      return { label: t("alerts.anomaly.stripNoRecentRuns"), tone: "warn" };
     case "learning":
-      return { label: t("alerts.anomaly.stripLearningChip"), variant: "default-soft" };
+      return { label: t("alerts.anomaly.stripLearningChip"), tone: "neutral" };
     case "paused":
-      return { label: t("alerts.anomaly.stripPausedChip"), variant: "default-soft" };
+      return { label: t("alerts.anomaly.stripPausedChip"), tone: "neutral" };
     default:
-      return { label: t("alerts.anomaly.stripInRange"), variant: "default-soft" };
+      return { label: t("alerts.anomaly.stripInRange"), tone: "neutral" };
   }
 });
 

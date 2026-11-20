@@ -125,9 +125,9 @@ const createWrapper = (props = {}, options = {}) => {
         ODialog: {
           name: "ODialog",
           template:
-            '<div data-test-stub="o-dialog" :data-title="title"><span data-test-stub="o-dialog-title">{{ title }}</span><slot name="header"></slot><slot></slot><slot name="footer"></slot><button data-test-stub="o-dialog-primary" @click="$emit(\'click:primary\')">{{ primaryButtonLabel }}</button><button data-test-stub="o-dialog-neutral" @click="$emit(\'click:neutral\')">{{ neutralButtonLabel }}</button></div>',
-          props: ["open", "size", "title", "primaryButtonLabel", "neutralButtonLabel"],
-          emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+            '<div data-test-stub="o-dialog" :data-title="title"><span data-test-stub="o-dialog-title">{{ title }}</span><slot name="header"></slot><slot></slot><slot name="footer"></slot><button data-test-stub="o-dialog-primary" @click="$emit(\'click:primary\')">{{ primary?.label }}</button><button data-test-stub="o-dialog-neutral" @click="$emit(\'click:extra\')">{{ extra?.label }}</button></div>',
+          props: ["open", "size", "title", "primary", "extra"],
+          emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
         },
         // OToggleGroup — replaces the old OTabs segmented control
         OToggleGroup: {
@@ -155,13 +155,10 @@ const createWrapper = (props = {}, options = {}) => {
         },
         OButton: {
           template:
-            '<button data-test-stub="o-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot></slot><slot name="icon-left"></slot></button>',
+            '<button data-test-stub="o-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot></slot><slot name="icon"></slot></button>',
           props: ["variant", "size", "disabled", "loading"],
           emits: ["click"],
           inheritAttrs: false,
-        },
-        OCardSection: {
-          template: '<div data-test-stub="o-card-section"><slot></slot></div>',
         },
         OSeparator: {
           template: '<hr data-test-stub="o-separator" />',
@@ -303,7 +300,7 @@ describe("PredefinedThemes", () => {
     it("should display custom color option", () => {
       const wrapper = createWrapper();
 
-      expect(wrapper.text()).toContain("Custom Color");
+      expect(wrapper.text()).toContain("Custom color");
     });
 
     it("should use the default theme (O2 Signature) colors as defaults", () => {
@@ -1074,8 +1071,8 @@ describe("PredefinedThemes", () => {
                 name: "ODialog",
                 template:
                   '<div data-test-stub="o-dialog"><slot></slot><button data-test-stub="o-dialog-primary" @click="$emit(\'click:primary\')">Apply</button></div>',
-                props: ["open", "size", "title", "primaryButtonLabel", "neutralButtonLabel"],
-                emits: ["update:open", "click:primary", "click:neutral"],
+                props: ["open", "size", "title", "primary", "extra"],
+                emits: ["update:open", "click:primary", "click:extra"],
               },
               OToggleGroup: {
                 name: "OToggleGroup",
@@ -1104,7 +1101,6 @@ describe("PredefinedThemes", () => {
                 emits: ["click"],
                 inheritAttrs: false,
               },
-              OCardSection: { template: "<div><slot></slot></div>" },
               OSeparator: { template: "<hr />" },
               OIcon: { template: "<i></i>", props: ["name", "size"] },
               OColor: {
@@ -1305,12 +1301,12 @@ describe("PredefinedThemes", () => {
       expect(drawer.attributes("data-title")).toBe("Theme");
     });
 
-    it("should pass title 'Pick Custom Color' to inner ODialog", () => {
+    it("should pass title 'Pick custom color' to inner ODialog", () => {
       const wrapper = createWrapper();
 
       const dialog = wrapper.find('[data-test-stub="o-dialog"]');
       expect(dialog.exists()).toBe(true);
-      expect(dialog.attributes("data-title")).toBe("Pick Custom Color");
+      expect(dialog.attributes("data-title")).toBe("Pick custom color");
     });
 
     it("should close color picker when ODialog emits click:primary", async () => {
@@ -1342,7 +1338,7 @@ describe("PredefinedThemes", () => {
       expect(neutralBtn.text()).toBe("Cancel");
     });
 
-    it("should close color picker when ODialog emits click:neutral", async () => {
+    it("should close color picker when ODialog emits click:extra", async () => {
       const wrapper = createWrapper();
       const vm = wrapper.vm as any;
 

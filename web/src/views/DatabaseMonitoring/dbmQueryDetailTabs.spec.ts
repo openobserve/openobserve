@@ -93,7 +93,7 @@ describe("the tab strip is built from the O2 tab primitives", () => {
     expect(strip).toContain('name="lock"');
     expect(strip).toContain('aria-hidden="true"');
     expect(strip).toContain("<OTooltip");
-    expect(strip).toContain(":disable=");
+    expect(strip).toContain(":disabled=");
   });
 });
 

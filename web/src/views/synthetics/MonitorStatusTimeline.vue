@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="monitor-status-timeline"
   >
     <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
-      <span class="text-text-heading text-xs font-bold">
+      <span class="text-text-heading text-xs font-semibold">
         {{ t("synthetics.timeline.title") }}
       </span>
       <span class="flex-1" />
@@ -55,8 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col gap-1 px-3.5 py-2">
       <div class="flex items-center gap-1">
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
           :disabled="!canScrollLeft"
           data-test="synthetics-timeline-scroll-left-btn"
           :aria-label="t('synthetics.timeline.scrollLeft')"
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTruncatedText
             v-for="lane in lanes"
             :key="lane.label"
-            class="text-3xs text-text-secondary h-3 max-w-24 pe-1 text-right font-mono leading-3"
+            class="text-2xs text-text-secondary h-3 max-w-24 pe-1 text-right font-mono leading-3"
           >
             {{ lane.label }}
           </OTruncatedText>
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'bg-border-default/40',
               ]"
             >
-              <OTooltip v-if="cell.seg" side="top" :delay="0" :max-width="'auto'">
+              <OTooltip v-if="cell.seg" side="top">
                 <template #content>
                   <div class="min-w-50 py-0.5">
                     <div
@@ -210,8 +210,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
           :disabled="!canScrollRight"
           data-test="synthetics-timeline-scroll-right-btn"
           :aria-label="t('synthetics.timeline.scrollRight')"
@@ -220,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="chevron-right" size="xs" />
         </OButton>
       </div>
-      <div class="text-3xs text-text-secondary flex justify-between font-mono tabular-nums">
+      <div class="text-2xs text-text-secondary flex justify-between font-mono tabular-nums">
         <span>{{ endLabel }}</span>
         <span>{{ rangeLabel }}</span>
         <span>{{ startLabel }}</span>

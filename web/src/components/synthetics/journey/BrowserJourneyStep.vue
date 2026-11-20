@@ -183,7 +183,6 @@ function toggleExpanded() {
       <span class="flex w-12 shrink-0 items-center gap-1">
         <OCheckbox
           :model-value="selected ? true : false"
-          size="xs"
           class="ps-1"
           :data-test="`synthetics-journey-step-checkbox-${index}`"
           @update:model-value="emit('toggle-select')"
@@ -200,7 +199,7 @@ function toggleExpanded() {
               : undefined
           "
         >
-          <OSpinner v-if="stepNumberSpinning" variant="ring" size="xs" class="text-accent" />
+          <OSpinner v-if="stepNumberSpinning" />
           <template v-else>{{ index + 1 }}</template>
         </span>
       </span>
@@ -211,7 +210,7 @@ function toggleExpanded() {
       </span>
 
       <!-- Action label badge -->
-      <OBadge variant="default" size="sm">{{ actionLabel }}</OBadge>
+      <OBadge tone="neutral" size="sm">{{ actionLabel }}</OBadge>
 
       <!-- Step display name -->
       <span class="text-text-body min-w-0 flex-1 truncate text-sm">
@@ -230,7 +229,7 @@ function toggleExpanded() {
       <div class="flex shrink-0 items-center gap-0.5" :class="{ invisible: replayLocked }">
         <OButton
           variant="ghost"
-          size="xs"
+          size="sm"
           :aria-label="
             expanded ? t('synthetics.journey.collapseStep') : t('synthetics.journey.expandStep')
           "
@@ -242,7 +241,7 @@ function toggleExpanded() {
 
         <OButton
           variant="ghost"
-          size="xs"
+          size="sm"
           :aria-label="t('synthetics.journey.insertStepBelow')"
           data-test="synthetics-journey-step-insert-btn"
           :disabled="replayLocked"
@@ -253,7 +252,7 @@ function toggleExpanded() {
 
         <OButton
           variant="ghost"
-          size="xs"
+          size="sm"
           :aria-label="t('synthetics.journey.duplicateStep')"
           data-test="synthetics-journey-step-duplicate-btn"
           :disabled="replayLocked"
@@ -264,7 +263,7 @@ function toggleExpanded() {
 
         <OButton
           variant="ghost"
-          size="xs"
+          size="sm"
           :aria-label="t('synthetics.journey.deleteStepAria')"
           data-test="synthetics-journey-step-delete-btn"
           :disabled="replayLocked"
@@ -303,7 +302,7 @@ function toggleExpanded() {
         <div class="flex items-center gap-1">
           <OButton
             variant="ghost"
-            size="xs"
+            size="sm"
             class="text-text-link text-xs"
             data-test="synthetics-journey-step-stack-toggle"
             @click="toggleStackTrace"
@@ -320,7 +319,7 @@ function toggleExpanded() {
             :aria-label="t('common.copyToClipboard')"
             v-if="showStackTrace"
             variant="ghost"
-            size="xs"
+            size="sm"
             data-test="synthetics-journey-step-stack-copy"
             @click.stop="copyStackTrace"
           >
@@ -355,11 +354,11 @@ function toggleExpanded() {
       <!-- Error card actions -->
       <div class="flex items-center gap-2 px-3 pb-3">
         <OButton
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           data-test="synthetics-journey-error-retry-btn"
           @click="emit('retry-replay')"
-          icon-left="replay"
+          icon="replay"
         >
           {{ t("synthetics.journey.reRun") }}
         </OButton>

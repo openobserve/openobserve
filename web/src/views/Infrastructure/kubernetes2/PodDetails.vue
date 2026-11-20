@@ -259,12 +259,12 @@ const sections = computed(() => [
 
 <template>
   <div class="flex flex-col gap-4">
-    <ODescriptionList dense>
+    <ODescriptionList>
       <ODescriptionItem :label="t('infra.k8s2.columnStatus')" data-test="k8s2-pod-status">
         <OTag
           v-if="row.status"
           size="sm"
-          :variant="TONE_PILL[toneOf(row.status.variant)].variant"
+          :tone="TONE_PILL[toneOf(row.status.variant)].variant"
           :icon="TONE_PILL[toneOf(row.status.variant)].icon"
           >{{ chipLabel(row.status, t) }}</OTag
         >
@@ -272,8 +272,8 @@ const sections = computed(() => [
       <ODescriptionItem :label="t('infra.k8s2.columnNode')">
         <OButton
           v-if="row.node"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           data-test="k8s2-pod-node-link"
           @click="openNode"
           >{{ raw(row.node) }}</OButton
@@ -305,7 +305,7 @@ const sections = computed(() => [
           <OTag
             v-for="c in conditions"
             :key="c.type"
-            :variant="c.active ? 'success-soft' : 'default-soft'"
+            :tone="c.active ? 'ok' : 'neutral'"
             size="sm"
             :icon="c.active ? 'check' : 'close'"
             :class="{ 'opacity-50': !c.active }"
@@ -325,16 +325,12 @@ const sections = computed(() => [
         data-test="k8s2-pod-node-selector"
       >
         <div v-if="nodeSelector.length" class="flex flex-col items-start gap-1">
-          <OTag v-for="s in nodeSelector" :key="s" size="sm" variant="default-soft">{{
-            raw(s)
-          }}</OTag>
+          <OTag v-for="s in nodeSelector" :key="s" size="sm" tone="neutral">{{ raw(s) }}</OTag>
         </div>
       </ODescriptionItem>
       <ODescriptionItem :label="t('infra.k8s2.drawerTolerations')" data-test="k8s2-pod-tolerations">
         <div v-if="tolerations.length" class="flex flex-col items-start gap-1">
-          <OTag v-for="(s, i) in tolerations" :key="i" size="sm" variant="default-soft">{{
-            raw(s)
-          }}</OTag>
+          <OTag v-for="(s, i) in tolerations" :key="i" size="sm" tone="neutral">{{ raw(s) }}</OTag>
         </div>
       </ODescriptionItem>
     </ODescriptionList>
@@ -356,7 +352,7 @@ const sections = computed(() => [
             <ContainerSquares :containers="[v.row]" />
             <OText variant="body-strong">{{ raw(v.row.name) }}</OText>
           </div>
-          <ODescriptionList dense>
+          <ODescriptionList>
             <ODescriptionItem
               :label="t('infra.k8s2.columnStatus')"
               :data-test="`k8s2-pod-container-${v.row.name}-status`"

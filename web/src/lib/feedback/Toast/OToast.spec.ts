@@ -30,54 +30,50 @@ describe("OToast", () => {
     expect(document.body.textContent).toContain("Hello world");
   });
 
-  it("keeps each line of a multi-line message on its own line", async () => {
-    mountToast({ id: "1", open: true, message: "First: a; b\nSecond: c" });
+  it("keeps the message on one line, cut with its full text on hover", async () => {
+    mountToast({ id: "1", open: true, message: "Pipeline payments-ingest saved" });
     await vueNextTick();
     const body = document.body.querySelector('[data-test="o-toast-message"]');
-    expect(body?.textContent).toContain("First: a; b\nSecond: c");
-    expect(body?.className).toContain("whitespace-pre-line");
-    expect(body?.className).toContain("break-words");
+    expect(body?.querySelector(".truncate")?.textContent).toContain(
+      "Pipeline payments-ingest saved",
+    );
   });
 
-  it("renders title when provided", async () => {
-    mountToast({ id: "1", open: true, message: "Body text", title: "My Title" });
+  it("is one inverse line, 40 high, at most 420 wide, with the menu radius", async () => {
+    mountToast({ id: "1", open: true, message: "Dashboard saved" });
     await vueNextTick();
-    expect(document.body.textContent).toContain("My Title");
-    expect(document.body.textContent).toContain("Body text");
+    const root = document.body.querySelector('[data-test="o-toast-1"]');
+    for (const c of [
+      "bg-toast-inverse-bg",
+      "text-toast-inverse-text",
+      "rounded-menu",
+      "min-h-10",
+      "text-compact",
+      "max-w-[min(26.25rem,calc(100vw-2rem))]",
+    ])
+      expect(root?.className).toContain(c);
   });
 
-  it("renders success icon for success variant", async () => {
-    mountToast({ id: "1", open: true, message: "Done", variant: "success" });
+  it.each([
+    ["success", "ok", "text-toast-inverse-icon-ok"],
+    ["error", "error", "text-toast-inverse-icon-err"],
+    ["warning", "neutral", "text-toast-inverse-icon"],
+    ["info", "neutral", "text-toast-inverse-icon"],
+    ["default", "neutral", "text-toast-inverse-icon"],
+  ] as const)("renders the %s variant as the %s kind", async (variant, kind, iconClass) => {
+    mountToast({ id: "1", open: true, message: "m", variant });
     await vueNextTick();
-    expect(document.body.querySelector("svg")).not.toBeNull();
+    const root = document.body.querySelector('[data-test="o-toast-1"]');
+    expect(root?.getAttribute("data-test-kind")).toBe(kind);
+    const icon = root?.querySelector('span[aria-hidden="true"]');
+    expect(icon?.className.split(" ")).toContain(iconClass);
+    expect(icon?.querySelector("svg")).not.toBeNull();
   });
 
-  it("renders error icon for error variant", async () => {
-    mountToast({ id: "1", open: true, message: "Error", variant: "error" });
+  it("shows how many identical results it collapsed", async () => {
+    mountToast({ id: "1", open: true, message: "Forbidden", count: 3 });
     await vueNextTick();
-    expect(document.body.querySelector("svg")).not.toBeNull();
-  });
-
-  it("renders warning icon for warning variant", async () => {
-    mountToast({ id: "1", open: true, message: "Warn", variant: "warning" });
-    await vueNextTick();
-    expect(document.body.querySelector("svg")).not.toBeNull();
-  });
-
-  it("renders info icon for info variant", async () => {
-    mountToast({ id: "1", open: true, message: "FYI", variant: "info" });
-    await vueNextTick();
-    expect(document.body.querySelector("svg")).not.toBeNull();
-  });
-
-  it("does not render an icon for default variant", async () => {
-    mountToast({ id: "1", open: true, message: "Plain", variant: "default" });
-    await vueNextTick();
-    // default variant has no variant-icon div — only the dismiss button X renders
-    const toastEl = document.body.querySelector('[role="status"]');
-    expect(toastEl).not.toBeNull();
-    // The variant icon is wrapped in a <div aria-hidden="true">; close button X is not
-    expect(toastEl!.querySelector('div[aria-hidden="true"]')).toBeNull();
+    expect(document.body.querySelector('[data-test="o-toast-count-3"]')?.textContent).toBe("×3");
   });
 
   it("renders a spinning icon for loading variant", async () => {

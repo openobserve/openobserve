@@ -31,7 +31,7 @@ describe("DbmRowChips", () => {
       { id: "new", label: raw("New"), tone: "new" },
     ]);
     const tags = wrapper.findAllComponents(OTag);
-    expect(tags.map((tag) => tag.props("variant"))).toEqual(["error-soft", "primary-soft"]);
+    expect(tags.map((tag) => tag.props("tone"))).toEqual(["err", "accent"]);
     expect(wrapper.find('[data-test="dbm-row-chip-failing"]').text()).toContain("All 380 failed");
   });
 

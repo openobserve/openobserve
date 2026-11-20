@@ -14,12 +14,11 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 const props = withDefaults(
   defineProps<{
     denials: AccessDenial[];
-    size?: "hero" | "block";
     dataTest?: string;
     /** The server's own reason, such as the streams it could not read. */
     reason?: I18nText;
   }>(),
-  { size: "block", dataTest: "security-access-lock", reason: undefined },
+  { dataTest: "security-access-lock", reason: undefined },
 );
 
 const { t } = useI18nTyped();
@@ -49,12 +48,10 @@ function openPreset() {
   <div class="flex flex-col items-center gap-2" :data-test="dataTest">
     <OAccessLock
       :denials="denials"
-      :size="size"
       covers
       :action-label="
         presetTitle && manages ? t('siem.access.openPreset', { preset: presetTitle }) : undefined
       "
-      action-icon="manage-accounts"
       @action="openPreset"
     />
     <p

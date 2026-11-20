@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
@@ -456,32 +456,30 @@ function linkText(g: RowGroup): I18nText {
     class="flex h-full min-h-0 flex-col gap-2 p-3 max-md:overflow-y-auto"
     data-test="k8s2-map-view"
   >
-    <OBanner
+    <OInlineNotice
       v-for="n in notices"
       :key="n.id"
-      variant="warning"
-      dense
-      inline-actions
-      :content="n.text"
+      tone="warn"
+      :message="n.text"
       :data-test="`k8s2-map-notice-${n.id}`"
     >
       <template #actions>
         <OButton
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           :data-test="`k8s2-map-notice-retry-${n.id}`"
           @click="emit('refresh')"
           >{{ t("infra.k8s2.mapRetry") }}</OButton
         >
         <OButton
           variant="ghost"
-          size="xs"
+          size="sm"
           :data-test="`k8s2-map-notice-dismiss-${n.id}`"
           @click="dismiss(n.id)"
           >{{ t("infra.k8s2.mapDismiss") }}</OButton
         >
       </template>
-    </OBanner>
+    </OInlineNotice>
     <K8sListHeader
       :title="t('infra.k8s2.mapTitle')"
       :count="rows.length"
@@ -501,8 +499,8 @@ function linkText(g: RowGroup): I18nText {
       <template #trailing>
         <OButton
           class="shrink-0"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           data-test="k8s2-map-show-list"
           @click="showList"
         >
@@ -523,18 +521,17 @@ function linkText(g: RowGroup): I18nText {
         data-test="k8s2-map-entity"
         @update:model-value="(v) => emit('update', { entity: v as MapEntity })"
       >
-        <OToggleGroupItem value="pods" size="sm" data-test="k8s2-map-entity-pods">
+        <OToggleGroupItem value="pods" data-test="k8s2-map-entity-pods">
           {{ t("infra.k8s2.mapEntityPods") }}
         </OToggleGroupItem>
-        <OToggleGroupItem value="nodes" size="sm" data-test="k8s2-map-entity-nodes">
+        <OToggleGroupItem value="nodes" data-test="k8s2-map-entity-nodes">
           {{ t("infra.k8s2.mapEntityNodes") }}
         </OToggleGroupItem>
       </OToggleGroup>
       <OSelect
         class="max-md:min-w-0 max-md:flex-1"
-        width="md"
-        size="sm"
-        label-position="inside"
+        width="m"
+        variant="filter"
         :label="t('infra.k8s2.mapFillBy')"
         :model-value="state.fill"
         :options="fillOptions"
@@ -543,10 +540,9 @@ function linkText(g: RowGroup): I18nText {
       />
       <OSelect
         class="max-md:min-w-0 max-md:flex-1"
-        width="sm"
-        size="sm"
+        width="s"
         searchable
-        label-position="inside"
+        variant="filter"
         :label="t('infra.k8s2.mapGroupBy')"
         :model-value="state.group"
         :options="groupOptions"
@@ -555,8 +551,7 @@ function linkText(g: RowGroup): I18nText {
       />
       <OSelect
         class="max-md:w-full"
-        width="md"
-        size="sm"
+        width="m"
         multiple
         searchable
         :model-value="state.filter"
@@ -564,7 +559,7 @@ function linkText(g: RowGroup): I18nText {
         data-test="k8s2-map-filter"
         @update:model-value="onFilter"
       >
-        <template #icon-left>
+        <template #icon>
           <OIcon name="filter-list" size="sm" />
         </template>
         <template #trigger>{{ filterTrigger }}</template>
@@ -586,8 +581,8 @@ function linkText(g: RowGroup): I18nText {
         @remove="removeTerm(term)"
       />
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="k8s2-map-filter-clear"
         @click="emit('update', { filter: [] })"
       >
@@ -599,24 +594,33 @@ function linkText(g: RowGroup): I18nText {
     </div>
     <OEmptyState
       v-if="anchorMissing"
-      preset="no-data"
       :title="isPods ? t('infra.k8s2.mapAnchorPods') : t('infra.k8s2.mapAnchorNodes')"
-      :description="t('infra.k8s2.mapAnchorNeeds', { stream: anchorMissing })"
+      :text="t('infra.k8s2.mapAnchorNeeds', { stream: anchorMissing })"
       data-test="k8s2-map-anchor-empty"
     />
-    <OEmptyState v-else-if="forbidden" preset="no-access" data-test="k8s2-map-forbidden" />
+    <OEmptyState
+      v-else-if="forbidden"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
+      data-test="k8s2-map-forbidden"
+    />
     <OEmptyState
       v-else-if="filterUnavailable"
       :title="t('infra.k8s2.mapFilterUnavailable')"
-      :description="labelsState ?? undefined"
+      :text="labelsState ?? undefined"
       :action-label="clearLabelsText()"
       data-test="k8s2-map-filter-unavailable"
       @action="clearLabels"
     />
     <OEmptyState
       v-else-if="!loading && rows.length === 0"
-      :filtered="filtered"
-      :hide-action="!filtered"
+      :kind="filtered ? 'filtered' : 'first-run'"
+      :text="
+        filtered
+          ? t('emptyState.filtered.description', { noun: t('emptyState.filtered.fallbackNoun') })
+          : undefined
+      "
       :title="isPods ? t('infra.k8s2.mapNoMatchPods') : t('infra.k8s2.mapNoMatchNodes')"
       data-test="k8s2-map-empty"
       @action="clearFilters"
@@ -647,8 +651,8 @@ function linkText(g: RowGroup): I18nText {
             <OButton
               v-for="item in legend"
               :key="item.cls"
-              :variant="hidden.includes(item.cls) ? 'ghost-muted' : 'ghost'"
-              size="xs"
+              variant="ghost"
+              size="sm"
               :aria-pressed="!hidden.includes(item.cls)"
               :data-test="`k8s2-map-legend-${item.cls}`"
               @click="toggleBucket(item.cls)"
@@ -665,8 +669,8 @@ function linkText(g: RowGroup): I18nText {
             </OButton>
             <OButton
               v-if="hidden.length"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="k8s2-map-legend-show-all"
               @click="hidden = []"
             >
@@ -688,20 +692,20 @@ function linkText(g: RowGroup): I18nText {
           <template v-for="g in navGroups" :key="g.id">
             <OButton
               v-if="linkOf(g)"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="k8s2-map-group-link"
               @click="linkOf(g)?.()"
             >
               {{ linkText(g) }}
             </OButton>
-            <OCollapsible v-else :label="linkText(g)" data-test="k8s2-map-group-disclosure">
+            <OCollapsible v-else :title="linkText(g)" data-test="k8s2-map-group-disclosure">
               <div class="flex flex-col items-start gap-0.5 ps-2">
                 <OButton
                   v-for="row in g.rows.slice(0, MAX_GROUP_MEMBERS)"
                   :key="row.key"
-                  variant="ghost-primary"
-                  size="xs"
+                  variant="accent-ghost"
+                  size="sm"
                   data-test="k8s2-map-group-member"
                   @click="onSelect(row)"
                 >
@@ -717,8 +721,8 @@ function linkText(g: RowGroup): I18nText {
           </template>
           <OButton
             v-if="grouped.totalGroups > navGroups.length"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             data-test="k8s2-map-show-all"
             @click="showList"
           >

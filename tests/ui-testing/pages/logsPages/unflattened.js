@@ -37,7 +37,7 @@ class UnflattenedPage {
         // collision with the dashboard panel-editor field list also on the page.
         this.indexFieldSearchInput = page.locator('[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]');
         this.utilitiesMenuButton = page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
-        this.sqlModeToggle = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
+        this.sqlModeToggle = page.locator('[data-test="logs-search-bar-query-mode-sql"]');
         this.logsSearchBarQueryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
         // FieldListPagination receives data-test-prefix="logs-page" from IndexList.vue,
         // so the rendered data-test is `${prefix}-all-fields-btn`.
@@ -142,13 +142,17 @@ class UnflattenedPage {
     /**
      * Switch to SQL mode.
      *
-     * The SQL mode toggle button was removed from the UI — SQL mode is now
-     * auto-detected from query content (SELECT...FROM = SQL ON).
-     * This method reads the current interesting fields and selected stream from
-     * Vue component state, then writes a SELECT query into the Monaco editor so
-     * that the interesting fields appear in the editor (matching previous behavior).
+     * Selects SQL in the toolbar's "Filter | SQL" tray (only when not already on), then
+     * writes a SELECT of the interesting fields so the editor names them whatever the
+     * quick-mode setting is.
      */
     async toggleSqlMode() {
+        if (await this.sqlModeToggle.isVisible({ timeout: 2000 }).catch(() => false)) {
+            if ((await this.sqlModeToggle.getAttribute('data-state')) !== 'on') {
+                await this.sqlModeToggle.click();
+                await expect(this.sqlModeToggle).toHaveAttribute('data-state', 'on', { timeout: 10000 });
+            }
+        }
         // Read the set of "interesting" fields from the DOM instead of walking
         // `__vueParentComponent`, which is dev-only and undefined in production
         // builds (the build CI ships). Each interesting-field toggle button's

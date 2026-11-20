@@ -20,15 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("announcements.preview.title") }}
     </span>
 
-    <OBanner
+    <OInlineNotice
       v-if="hidden"
-      variant="warning"
+      tone="warn"
       icon="visibility-off"
-      dense
       :data-test="`${dataTest}-hidden`"
     >
       {{ t("announcements.preview.hiddenByCritical") }}
-    </OBanner>
+    </OInlineNotice>
 
     <div v-for="mode in MODES" :key="mode" class="flex flex-col gap-1.5">
       <span class="text-text-secondary text-xs">
@@ -67,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import AnnouncementBar from "@/components/announcements/AnnouncementBar.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { BannerThemeMode } from "@/utils/announcementAppearance";
 import type { BannerDraft } from "./announcementDrafts";

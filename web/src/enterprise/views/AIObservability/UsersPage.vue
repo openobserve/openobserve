@@ -18,23 +18,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AiPageShell
     data-test="ai-users"
     :title="t('llmAttribution.users.title')"
-    :subtitle="t('llmAttribution.users.subtitle')"
-    icon="group"
+    :about="t('llmAttribution.users.subtitle')"
     :date-state="dateState"
     :last-run-at="lastRunAt"
     :is-loading="loading"
     @date-change="onDateChange"
     @refresh="refresh"
   >
-    <div class="px-page-edge flex min-h-0 flex-1 flex-col gap-2 py-2">
-      <div class="flex flex-wrap items-center gap-2">
+    <!-- The gutter goes on the rows that need it, so the table keeps its own edge inset (L3). -->
+    <div class="flex min-h-0 flex-1 flex-col gap-2 py-2">
+      <div class="px-page-edge flex flex-wrap items-center gap-2">
         <OSelect
           v-model="stream"
           :options="availableStreams.map((s) => ({ value: s, label: raw(s) }))"
           :label="t('llmAttribution.users.stream')"
-          label-position="inside"
-          size="sm"
-          width="sm"
+          variant="filter"
+          width="s"
           data-test="ai-users-stream"
         />
         <OSelect
@@ -42,10 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="agentNames.map((a) => ({ value: a, label: raw(a) }))"
           :label="t('llmAttribution.users.agent')"
           :placeholder="t('llmInsightsDrill.all')"
-          label-position="inside"
+          variant="filter"
           clearable
-          size="sm"
-          width="sm"
+          width="s"
           data-test="ai-users-agent"
         />
         <OSelect
@@ -54,23 +52,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="tenantOptions"
           :label="t('llmAttribution.dims.tenant')"
           :placeholder="t('llmInsightsDrill.all')"
-          label-position="inside"
+          variant="filter"
           clearable
-          size="sm"
-          width="sm"
+          width="s"
           data-test="ai-users-tenant"
         />
         <OSearchInput
+          width="list"
           v-model="search"
           :placeholder="t('llmAttribution.users.search')"
-          class="w-64"
           data-test="ai-users-search"
         />
       </div>
 
       <div
         v-if="noStream"
-        class="text-compact text-text-secondary flex flex-1 flex-col items-center justify-center gap-1"
+        class="text-compact text-text-secondary px-page-edge flex flex-1 flex-col items-center justify-center gap-1"
         data-test="ai-users-no-stream"
       >
         <span class="text-text-heading font-semibold">{{
@@ -84,7 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="user_id"
           :loading="loading"
-          :show-global-filter="false"
           pagination="client"
           class="min-h-0 flex-1"
           :empty-message="
@@ -112,8 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-actions="{ row }">
             <OButton
-              variant="outline"
-              size="xs"
+              variant="secondary"
+              size="sm"
               :title="tenant ? t('llmAttribution.users.sessionsNoTenant') : undefined"
               :data-test="`ai-users-sessions-${row.user_id}`"
               @click="openSessions(row.user_id)"
@@ -124,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
         <span
           v-if="!failed && !loading"
-          class="text-2xs text-text-secondary"
+          class="text-2xs text-text-secondary px-page-edge"
           data-test="ai-users-count"
         >
           {{

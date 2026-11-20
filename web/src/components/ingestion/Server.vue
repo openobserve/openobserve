@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :tab="pickTab"
         :rest-label="t('ingestion.serverLabel')"
       />
-      <ORouteTab
+      <OTab
         v-for="tab in tabs.filter((tab) => tab.name !== pickTab?.name)"
         :key="tab.name"
         :title="tab.name"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 import FirstSourcePickGroup from "@/components/ingestion/FirstSourcePickGroup.vue";
-import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -66,7 +66,7 @@ import { firstSourcePickRoute } from "@/components/login/firstSourceOptions";
 
 export default defineComponent({
   name: "ServerPage",
-  components: { DataSourceSidebarLayout, FirstSourcePickGroup, ORouteTab },
+  components: { DataSourceSidebarLayout, FirstSourcePickGroup, OTab },
   props: {
     currOrgIdentifier: {
       type: String,

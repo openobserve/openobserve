@@ -708,7 +708,9 @@ describe("GeneralSettings", () => {
       refreshSelect().vm.btnRefreshInterval = true;
       await flushPromises();
 
-      expect(document.body.querySelector('[data-test="auto-refresh-panel"]')).not.toBeNull();
+      expect(
+        document.body.querySelector('[data-test="logs-search-off-refresh-interval"]'),
+      ).not.toBeNull();
       expect(document.body.querySelector('[data-test="auto-refresh-footer"]')).toBeNull();
     });
 

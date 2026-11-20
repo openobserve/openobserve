@@ -97,7 +97,7 @@ describe("LlmProvidersSettings delete dialog", () => {
       "Are you sure you want to delete openai-prod? This action cannot be undone.",
     );
     const dialog = w.findComponent({ name: "ODialog" });
-    expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+    expect(dialog.props("primary")?.variant).toBe("danger");
     w.unmount();
   });
 

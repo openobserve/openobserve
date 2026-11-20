@@ -25,16 +25,14 @@
       >
         <OTooltip
           side="bottom"
-          align="end"
-          max-width="22rem"
           hoverable
           :open="openTooltip === notice.id"
           @update:open="(open: boolean) => setTooltipOpen(notice.id, open)"
         >
           <OTag
-            :variant="notice.tone === 'error' ? 'error-soft' : 'warning-soft'"
-            size="sm"
-            clickable
+            :tone="notice.tone === 'error' ? 'err' : 'warn'"
+            toggle
+            :pressed="openTooltip === notice.id"
             :icon="notice.icon"
             class="shrink-0"
             :data-test="`panel-notice-chip-${notice.id}`"
@@ -56,16 +54,14 @@
       <span :class="collapseClasses.collapsed">
         <OTooltip
           side="bottom"
-          align="end"
-          max-width="22rem"
           hoverable
           :open="openTooltip === 'collapsed'"
           @update:open="(open: boolean) => setTooltipOpen('collapsed', open)"
         >
           <OTag
-            :variant="collapsedTone === 'error' ? 'error-soft' : 'warning-soft'"
-            size="sm"
-            clickable
+            :tone="collapsedTone === 'error' ? 'err' : 'warn'"
+            toggle
+            :pressed="openTooltip === 'collapsed'"
             :icon="collapsedTone === 'error' ? 'error-outline' : 'warning'"
             class="shrink-0"
             :aria-label="collapsedLabel"
@@ -105,8 +101,8 @@
               />
               <div v-if="canInspect">
                 <OButton
-                  variant="ghost-primary"
-                  size="xs"
+                  variant="accent-ghost"
+                  size="sm"
                   data-test="panel-notice-action-open-inspector"
                   @click="onOpenInspector"
                 >
@@ -119,15 +115,16 @@
       </span>
     </div>
     <OButton
-      :aria-label="t('dashboard.panelError', { message: raw(error) })"
       v-if="error"
       :key="error"
-      variant="ghost-warning"
-      size="icon"
-      icon-left="warning"
+      icon-only
+      :aria-label="t('dashboard.panelError', { message: raw(error) })"
+      variant="ghost"
+      size="xs"
+      icon="warning"
       data-test="panel-error-data"
     >
-      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
+      <OTooltip side="bottom" hoverable>
         <template #content
           ><div class="whitespace-pre-wrap">{{ error }}</div></template
         >
@@ -135,13 +132,14 @@
     </OButton>
     <OButton
       v-if="exemplarError"
-      variant="ghost-warning"
-      size="icon"
-      icon-left="warning"
+      icon-only
+      variant="ghost"
+      size="xs"
+      icon="warning"
       :aria-label="t('dashboard.exemplars.loadFailed')"
       data-test="dashboard-panel-exemplars-error"
     >
-      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
+      <OTooltip side="bottom" hoverable>
         <template #content>
           <div class="flex flex-col gap-1.5">
             <div class="font-medium">{{ t("dashboard.exemplars.loadFailed") }}</div>
@@ -151,9 +149,9 @@
             <div class="text-2xs">{{ t("dashboard.exemplars.loadFailedHint") }}</div>
             <div>
               <OButton
-                variant="outline"
-                size="xs"
-                icon-left="replay"
+                variant="secondary"
+                size="sm"
+                icon="replay"
                 data-test="dashboard-panel-exemplars-retry"
                 @click="$emit('retry-exemplars')"
               >
@@ -165,14 +163,15 @@
       </OTooltip>
     </OButton>
     <OButton
-      :aria-label="t('dashboard.panelWarning')"
       v-if="maxQueryRangeWarning"
-      variant="ghost-warning"
-      size="icon"
-      icon-left="warning"
+      icon-only
+      :aria-label="t('dashboard.panelWarning')"
+      variant="ghost"
+      size="xs"
+      icon="warning"
       data-test="panel-max-duration-warning"
     >
-      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
+      <OTooltip side="bottom" hoverable>
         <template #content
           ><div class="whitespace-pre-wrap" data-test="panel-max-duration-warning-content">
             {{ maxQueryRangeWarning }}
@@ -181,14 +180,15 @@
       </OTooltip>
     </OButton>
     <OButton
-      :aria-label="t('dashboard.panelWarning')"
       v-if="sparklineWarning"
-      variant="ghost-warning"
-      size="icon"
+      icon-only
+      :aria-label="t('dashboard.panelWarning')"
+      variant="ghost"
+      size="xs"
       data-test="panel-sparkline-warning"
     >
-      <template #icon-left><OIcon name="show-chart" size="sm" /></template>
-      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
+      <template #icon><OIcon name="show-chart" size="sm" /></template>
+      <OTooltip side="bottom" hoverable>
         <template #content
           ><div class="whitespace-pre-wrap" data-test="panel-sparkline-warning-content">
             {{ sparklineWarning }}
@@ -197,14 +197,15 @@
       </OTooltip>
     </OButton>
     <OButton
-      :aria-label="t('dashboard.panelWarning')"
       v-if="xAliasInconsistencyWarning"
-      variant="ghost-warning"
-      size="icon"
-      icon-left="warning"
+      icon-only
+      :aria-label="t('dashboard.panelWarning')"
+      variant="ghost"
+      size="xs"
+      icon="warning"
       data-test="panel-x-alias-inconsistency-warning"
     >
-      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
+      <OTooltip side="bottom" hoverable>
         <template #content>
           <div class="whitespace-pre-wrap">{{ t("dashboard.xAliasInconsistencyWarning") }}</div>
         </template>
@@ -212,14 +213,14 @@
     </OButton>
     <OButton
       v-if="isCachedDataDifferWithCurrentTimeRange"
-      variant="ghost-warning"
-      size="icon"
+      icon-only
+      variant="ghost"
+      size="xs"
       data-test="panel-is-cached-data-differ-with-current-time-range-warning"
     >
-      <template #icon-left><OIcon name="running-with-errors" size="sm" /></template>
+      <template #icon><OIcon name="running-with-errors" size="sm" /></template>
       <OTooltip
         side="bottom"
-        align="end"
         hoverable
         :content="t('dashboard.panelErrorButtons.cachedDataDiffers')"
       />
@@ -227,12 +228,12 @@
     <!-- Universal Last Refreshed Clock Icon and Time; a narrow bar drops it before any notice chip. -->
     <span
       v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView"
-      class="lastRefreshedAt ms-1.25 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap @max-[28rem]/panelbar:hidden"
+      class="lastRefreshedAt text-2xs ms-1.25 overflow-hidden text-ellipsis whitespace-nowrap @max-[28rem]/panelbar:hidden"
       data-test="panel-last-refreshed-at"
     >
       <span class="lastRefreshedAtIcon me-0.5 inline-flex align-middle">
         <OIcon name="schedule" size="xs" data-test="panel-last-refreshed-icon" />
-        <OTooltip side="bottom" align="end">
+        <OTooltip side="bottom">
           <template #content
             >{{ t("dashboard.panelErrorButtons.lastRefreshed")
             }}<RelativeTime :timestamp="lastTriggeredAt"

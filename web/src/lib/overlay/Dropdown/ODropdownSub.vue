@@ -8,7 +8,9 @@ import {
 } from "reka-ui";
 import type { DropdownSubProps, DropdownSubEmits, DropdownSubSlots } from "./ODropdownSub.types";
 import { O_DROPDOWN_NESTED_KEY, type DropdownNestedRegistry } from "./ODropdown.context";
-import OText from "../../core/Typography/OText.vue";
+import OIcon from "../../core/Icon/OIcon.vue";
+import OMenuItemContent from "@/lib/overlay/shared/OMenuItemContent.vue";
+import { MENU_SURFACE, menuItemClasses } from "@/lib/overlay/shared/menuItem";
 
 defineOptions({ inheritAttrs: false });
 const props = defineProps<DropdownSubProps>();
@@ -17,9 +19,7 @@ defineSlots<DropdownSubSlots>();
 
 const attrs = useAttrs();
 const id = useId();
-const descriptionDomId = computed(
-  () => props.descriptionId ?? `${attrs["data-test"] ?? id}-reason`,
-);
+const descriptionDomId = computed(() => `${attrs["data-test"] ?? id}-reason`);
 
 const internalOpen = ref(props.open ?? false);
 const trigger = ref<{ $el: HTMLElement } | null>(null);
@@ -81,24 +81,18 @@ function onKeydown(event: KeyboardEvent) {
       v-bind="$attrs"
       as="button"
       type="button"
-      :text-value="textValue"
+      :text-value="label"
       :aria-describedby="description ? descriptionDomId : undefined"
-      class="group/sub rounded-default text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg relative flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-start transition-colors duration-(--duration-control) ease-(--ease-control) outline-none select-none"
+      :class="[menuItemClasses('default', false, !!description), 'text-start']"
     >
-      <slot name="icon-left" />
-      <span v-if="description" class="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span><slot name="trigger" /></span>
-        <OText
-          :id="descriptionDomId"
-          :data-test="descriptionDomId"
-          as="span"
-          variant="meta"
-          class="text-text-secondary! group-data-[highlighted]/sub:text-text-heading! leading-snug! whitespace-normal"
-          >{{ description }}</OText
-        >
-      </span>
-      <slot v-else name="trigger" />
-      <slot name="icon-right" />
+      <OMenuItemContent :icon="icon" :note="description" :note-id="descriptionDomId">
+        <template v-if="$slots.icon" #icon><slot name="icon" /></template>
+        {{ label }}
+        <template #end>
+          <slot name="end" />
+          <OIcon name="chevron-right" size="sm" class="text-text-muted ms-auto shrink-0" />
+        </template>
+      </OMenuItemContent>
     </DropdownMenuSubTrigger>
     <DropdownMenuPortal>
       <DropdownMenuSubContent
@@ -106,7 +100,10 @@ function onKeydown(event: KeyboardEvent) {
         :collision-padding="8"
         :hide-when-detached="true"
         :style="{ zIndex: contentZIndex }"
-        class="bg-dropdown-bg rounded-default text-dropdown-item-text shadow-overlay max-h-[var(--reka-popper-available-height,75vh)] max-w-[calc(100vw-1rem)] min-w-40 overflow-y-auto border border-transparent p-1 text-sm"
+        :class="[
+          MENU_SURFACE,
+          'max-h-[var(--reka-popper-available-height,75vh)] max-w-[calc(100vw-1rem)] overflow-y-auto',
+        ]"
         @keydown.capture="onKeydown"
         @pointer-down-outside="onPointerDownOutside"
       >

@@ -353,7 +353,7 @@ describe("source silence (FU-SRC-UI): a real kind, not Other", () => {
 
   it("opens Logs from the server's inspect_source action and drafts one no-data alert", () => {
     const parts = insightOf(gt, zone, source(1), NOW_MS);
-    expect(parts.cta?.label).toBe("Open in Logs");
+    expect(parts.cta?.label).toBe("Open in logs");
     const to = (parts.cta?.target as { to: { query: Record<string, string> } }).to;
     expect(to.query.stream).toBe("k8s_events");
     expect(Number(to.query.from)).toBe(SIGNAL - 6 * HOUR_US);

@@ -53,10 +53,10 @@ const store = createStore({
 const stubs = {
   ODialog: {
     name: "ODialog",
-    props: ["open", "title", "primaryButtonLabel", "secondaryButtonLabel", "formId"],
+    props: ["open", "title", "primary", "secondary", "formId"],
     emits: ["update:open", "click:primary", "click:secondary"],
     template: `<div v-if="open" v-bind="$attrs"><slot />
-      <button v-if="formId" type="submit" :form="formId">{{ primaryButtonLabel }}</button></div>`,
+      <button v-if="formId" type="submit" :form="formId">{{ primary?.label }}</button></div>`,
   },
 };
 
@@ -171,7 +171,7 @@ describe("pa gap fixes: SavedFunnelDialogs recompiles on rename and duplicate", 
       expect.objectContaining({
         messageKeypath: "rum.analytics.saved.deleteMessage",
         messageName: "Signup flow",
-        confirmVariant: "destructive",
+        kind: "destructive",
       }),
     );
   });
@@ -185,9 +185,7 @@ describe("pa gap fixes: SavedFunnelDialogs recompiles on rename and duplicate", 
     ] as SavedFunnel[]);
 
     expect(gone).toEqual([]);
-    expect(confirmMock).toHaveBeenCalledWith(
-      expect.objectContaining({ confirmVariant: "destructive" }),
-    );
+    expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ kind: "destructive" }));
   });
 
   it("P7-R1: rename recompiles sql from the stored def and sends the current rules_hash", async () => {

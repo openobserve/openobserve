@@ -39,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :title="t('dbm.detail.title')"
     :back="{ label: backTarget.label, to: backTarget.to }"
-    icon="storage"
     title-data-test="dbm-detail-title"
     scroll
     bleed
@@ -48,20 +47,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          nothing — copy in particular composes its summary from a row that is
          not there. The empty state below carries the only action that applies. -->
     <template v-if="hasQuery" #actions>
-      <DateTime
+      <ODateTimeRange
         auto-apply
         menu-align="end"
         :default-type="range.type"
         :default-absolute-time="{ startTime: range.startTime, endTime: range.endTime }"
         :default-relative-time="range.relativeTimePeriod ?? undefined"
         data-test-name="dbm-detail-date-time"
-        class="h-8 max-md:[&_.date-time-label]:hidden"
+        class="max-md:[&_.date-time-label]:hidden"
         @on:date-change="onDateChange"
       />
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="content-copy"
+        variant="secondary"
+        icon="content-copy"
         class="shrink-0"
         data-test="dbm-detail-copy-summary"
         @click="copySummary"
@@ -70,8 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip side="bottom" :content="t('dbm.detail.copySummaryHint')" />
       </OButton>
       <ORefreshButton
-        layout="inline"
-        variant="outline"
         :loading="loading"
         :last-run-at="lastRunAt"
         data-test="dbm-detail-refresh"
@@ -91,12 +87,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            leaves the content standing. -->
       <OEmptyState
         v-if="!hasQuery"
-        size="hero"
-        illustration="query"
+        icon="query-stats"
         :title="notFoundCopy.title"
-        :description="notFoundCopy.description"
+        :text="notFoundCopy.description"
         :action-label="t('dbm.detail.notFound.action')"
-        action-icon="chevron-right"
         data-test="dbm-detail-not-found"
         @action="openQueriesList"
       />
@@ -175,7 +169,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <FeatureLockExempt v-if="hasQuery" class="contents">
         <OTabs
           :model-value="activeTab"
-          align="left"
           bordered
           class="px-page-edge shrink-0"
           data-test="dbm-detail-tabs"
@@ -185,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="tab in detailTabs"
             :key="tab.key"
             :name="tab.key"
-            :disable="tab.disabled"
+            :disabled="tab.disabled"
             :data-test="`dbm-detail-tab-${tab.key}`"
           >
             <span>{{ tab.label }}</span>
@@ -268,10 +261,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
                 <template #value>
-                  <OSkeleton v-if="loading" type="text" class="h-6 w-16" />
+                  <OSkeleton v-if="loading" class="h-6 w-16" />
                   <template v-else>
                     <span
-                      class="text-2xl leading-none font-bold tabular-nums"
+                      class="text-2xl leading-none font-semibold tabular-nums"
                       :class="tile.tone || 'text-text-heading'"
                       >{{ tile.num }}</span
                     >
@@ -281,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </template>
                 <template v-if="loading || tile.detail" #trend>
-                  <OSkeleton v-if="loading" type="text" class="h-3 w-20" />
+                  <OSkeleton v-if="loading" class="h-3 w-20" />
                   <span v-else :class="tile.detailTone ?? 'text-text-secondary'">{{
                     tile.detail
                   }}</span>
@@ -296,16 +289,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            headline numbers, while the evidence stays where it is. Same state and
            copy as the plans section (nothing recomputed), and when there is no
            drift this renders nothing: only exceptions get a chip. -->
-          <OBanner
+          <OInlineNotice
             v-if="planDrift === 'drifted'"
-            variant="warning"
+            tone="warn"
             data-test="dbm-detail-plans-drift-top"
           >
             <div class="flex flex-wrap items-center gap-2">
               <span>{{ t("dbm.detail.plans.driftCallout", { count: plans.length }) }}</span>
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 class="shrink-0"
                 data-test="dbm-detail-plans-drift-view"
                 @click="scrollToPlans"
@@ -313,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dbm.detail.plans.viewPlans") }}
               </OButton>
             </div>
-          </OBanner>
+          </OInlineNotice>
 
           <!-- W6 · What the DATABASE recorded.
            A SEPARATE block under its own heading, never merged into the grid
@@ -343,9 +335,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip side="top" :content="t('dbm.detail.serverMetrics.offHint')" />
             </span>
             <OButton
-              variant="outline"
-              size="xs"
-              icon-right="open-in-new"
+              variant="secondary"
+              size="sm"
+              icon-end="open-in-new"
               class="shrink-0"
               data-test="dbm-detail-server-metrics-setup"
               @click="openDbmSetup"
@@ -425,13 +417,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dbm-detail-server-metrics-unmatched"
               />
 
-              <DbmMetricTiles
+              <div
                 v-else
-                :items="serverTileItems"
-                variant="attached"
-                tile-data-test="dbm-detail-server-metric"
+                class="border-border-subtle border-t p-3"
                 data-test="dbm-detail-server-metrics-tiles"
-              />
+              >
+                <OStatStrip :items="serverTileItems" />
+              </div>
 
               <!-- D5 · WHO CALLED IT — the one thing this vantage cannot answer.
                The database counts every execution and records no caller;
@@ -535,10 +527,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Fidelity disclosure. Fires only when the series actually contains
            below-top-N windows, so it describes this chart rather than standing
            permanently and being skipped. -->
-          <OBanner
+          <OInlineNotice
             v-if="history?.hasBelowTopN"
-            variant="info"
-            icon="info"
+            tone="info"
             data-test="dbm-detail-below-top-n"
           >
             <div class="flex flex-col gap-1">
@@ -551,7 +542,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </span>
             </div>
-          </OBanner>
+          </OInlineNotice>
 
           <!-- Both charts are drawn from the rollup series, which only traces fill.
            Hidden entirely rather than shown as two empty axes labelled "No
@@ -613,8 +604,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex-1"></div>
               <OButton
                 v-if="whereScopeActive"
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 class="shrink-0"
                 data-test="dbm-detail-where-show-all"
                 @click="clearWhereScope"
@@ -639,8 +629,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :columns="whereColumns"
               row-key="rowKey"
               :loading="loading"
-              :frame="false"
-              :show-global-filter="false"
               :page-size="10"
               table-id="dbm-query-where-it-runs"
               data-test="dbm-detail-where-table"
@@ -751,7 +739,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}
               </span>
             </template>
-            <div class="flex flex-col gap-1.5 p-3 pt-1">
+            <div class="flex flex-col gap-1.5 pt-1">
               <div
                 v-for="entry in errorClasses"
                 :key="entry.status_code"
@@ -829,14 +817,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-else>
               <!-- Drift leads the section when it happened; otherwise the caveat
                does, because a single stable shape is NOT an all-clear. -->
-              <OBanner
+              <OInlineNotice
                 v-if="planDrift === 'drifted'"
-                variant="warning"
+                tone="warn"
                 class="mx-3 mb-2"
                 data-test="dbm-detail-plans-drift"
               >
                 {{ t("dbm.detail.plans.driftCallout", { count: plans.length }) }}
-              </OBanner>
+              </OInlineNotice>
               <p
                 v-else
                 class="text-text-muted mx-3 mb-2 text-xs"
@@ -845,7 +833,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dbm.detail.plans.stableCaveat") }}
               </p>
 
-              <div class="flex flex-col gap-3 p-3 pt-0">
+              <div class="flex flex-col gap-3">
                 <article
                   v-for="plan in plans"
                   :key="plan.rowKey"
@@ -861,8 +849,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      Executed rows are labelled as what they are instead. -->
                     <OTag
                       v-if="plan.planSource === 'auto_explain'"
-                      variant="success-soft"
-                      size="xs"
+                      tone="ok"
+                      size="sm"
                       :label="t('dbm.detail.plans.executedLabel')"
                       :data-test="`dbm-detail-plan-source-executed-${plan.planHash}`"
                     >
@@ -979,9 +967,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- The picker exists to disambiguate WHICH trace stream to read. With no
            trace vantage for this fingerprint there is nothing to pick between —
            every stream would answer empty — so asking would be busywork. -->
-          <OBanner
+          <OInlineNotice
             v-if="traceVantage && streamAmbiguous"
-            variant="warning"
+            tone="warn"
             class="shrink-0"
             data-test="dbm-detail-stream-ambiguous"
           >
@@ -990,13 +978,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSelect
                 :model-value="pickedStream"
                 :options="streamOptions"
-                width="sm"
+                width="s"
                 :placeholder="t('dbm.detail.pickStream')"
                 data-test="dbm-detail-stream-picker"
                 @update:model-value="onStreamPick"
               />
             </div>
-          </OBanner>
+          </OInlineNotice>
 
           <!-- Calling endpoints: who is responsible for this query's load. The
            per-caller bars answer the share question ("which caller do I go
@@ -1020,8 +1008,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :columns="endpointColumns"
               row-key="rowKey"
               :loading="loading"
-              :frame="false"
-              :show-global-filter="false"
               :page-size="10"
               table-id="dbm-query-endpoints"
               data-test="dbm-detail-endpoints-table"
@@ -1062,13 +1048,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span class="inline-flex">
                     <OButton
+                      icon-only
                       variant="ghost"
-                      size="icon-sm"
                       disabled
                       :aria-label="t('dbm.detail.viewTraces')"
                       :data-test="`dbm-detail-endpoint-traces-${endpoint.rowKey}`"
                     >
-                      <template #icon-left>
+                      <template #icon>
                         <OIcon
                           name="lock"
                           class="text-icon-locked"
@@ -1081,9 +1067,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
                 <OButton
                   v-else
+                  icon-only
                   variant="ghost"
-                  size="icon-sm"
-                  icon-left="open-in-new"
+                  icon="open-in-new"
                   :data-test="`dbm-detail-endpoint-traces-${endpoint.rowKey}`"
                   @click="openEndpointTraces(endpoint)"
                 >
@@ -1114,7 +1100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-xs">{{ t("dbm.detail.samplesHint") }}</span>
             </template>
 
-            <div v-if="samples.length" class="h-50 w-full px-3">
+            <div v-if="samples.length" class="h-50 w-full">
               <ChartRenderer
                 :data="scatterData"
                 v-on="tracesLock.locked.value ? {} : { click: onSampleClick }"
@@ -1127,8 +1113,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :columns="sampleColumns"
               row-key="rowKey"
               :loading="loading"
-              :frame="false"
-              :show-global-filter="false"
               :page-size="10"
               table-id="dbm-query-samples"
               data-test="dbm-detail-samples-table"
@@ -1157,13 +1141,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <span class="inline-flex">
                     <OButton
+                      icon-only
                       variant="ghost"
-                      size="icon-sm"
                       disabled
                       :aria-label="t('dbm.detail.viewTrace')"
                       :data-test="`dbm-detail-sample-trace-${sample.rowKey}`"
                     >
-                      <template #icon-left>
+                      <template #icon>
                         <OIcon
                           name="lock"
                           class="text-icon-locked"
@@ -1176,9 +1160,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
                 <OButton
                   v-else
+                  icon-only
                   variant="ghost"
-                  size="icon-sm"
-                  icon-left="open-in-new"
+                  icon="open-in-new"
                   :data-test="`dbm-detail-sample-trace-${sample.rowKey}`"
                   @click.stop="openSampleTrace(sample)"
                 >
@@ -1239,7 +1223,9 @@ import DbmAppSourceMarker from "@/components/dbm/DbmAppSourceMarker.vue";
 import DbmCoverageLine from "@/components/dbm/DbmCoverageLine.vue";
 import DbmHistoryPanel from "@/components/dbm/DbmHistoryPanel.vue";
 import DbmQueryText from "@/components/dbm/DbmQueryText.vue";
-import DbmMetricTiles, { type DbmMetricTile } from "@/components/dbm/DbmMetricTiles.vue";
+import type { DbmMetricTile } from "@/components/dbm/dbmMetricTile.types";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import KpiCard from "@/components/common/KpiCard.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -1253,7 +1239,7 @@ import DbmLockEmptyState, {
 } from "@/components/dbm/DbmLockEmptyState.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -1264,7 +1250,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -1499,11 +1485,12 @@ const serverTiles = computed(() => serverMetricsTiles(serverMetrics.value));
  * translation, so no copy is duplicated between it and the messages file — and
  * the label is resolved here, at the one place that has `t`.
  */
-const serverTileItems = computed<DbmMetricTile[]>(() =>
+const serverTileItems = computed<StatItem[]>(() =>
   serverTiles.value.map((tile) => ({
-    id: tile.id,
+    key: tile.id,
     label: t(`dbm.detail.serverMetrics.${tile.labelKey}`),
     value: raw(tile.value),
+    dataTest: `dbm-detail-server-metric-${tile.id}`,
   })),
 );
 const freshness = ref<Freshness | null>(null);
@@ -1773,13 +1760,13 @@ watch(
  */
 const backTarget = computed(() => {
   const targets: Record<string, { name: string; label: I18nText }> = {
-    queries: { name: "dbmQueries", label: t("dbm.detail.backToQueries") },
-    activity: { name: "dbmActivity", label: t("dbm.detail.backToActivity") },
-    samples: { name: "dbmSamples", label: t("dbm.detail.backToSamples") },
+    queries: { name: "dbmQueries", label: t("dbm.page.tabs.queries") },
+    activity: { name: "dbmActivity", label: t("dbm.page.tabs.activity") },
+    samples: { name: "dbmSamples", label: t("dbm.page.tabs.samples") },
     // String comparison: `isEnterprise` is a string env value, and
     // `Boolean("false")` is true.
     ...(config.isEnterprise === "true"
-      ? { deadlocks: { name: "dbmDeadlocks", label: t("dbm.detail.backToDeadlocks") } }
+      ? { deadlocks: { name: "dbmDeadlocks", label: t("dbm.page.tabs.deadlocks") } }
       : {}),
   };
   const origin = targets[readDbmQueryDetailOrigin(route.query) ?? ""] ?? targets.queries;
@@ -2386,7 +2373,6 @@ const endpointColumns = computed<OTableColumnDef<EndpointCallerRow>[]>(() => [
     sortable: true,
     meta: {
       align: "right",
-      headerSubLabel: raw("p95"),
       headerTooltip: t("dbm.queries.columnHints.p95"),
     },
   },

@@ -22,8 +22,12 @@ import type { EscalationProgress } from "@/ts/interfaces/oncall";
 
 const stubs = {
   OButton: { name: "OButton", template: "<button><slot /></button>" },
-  OCard: { name: "OCard", template: "<div><slot /></div>" },
-  OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
+  OCard: {
+    name: "OCard",
+    props: ["title"],
+    template:
+      '<div><h3>{{ title }}</h3><slot name="header" /><slot name="actions" /><slot /></div>',
+  },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OTimeCell: { name: "OTimeCell", template: "<span />" },
 };

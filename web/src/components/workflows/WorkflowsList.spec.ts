@@ -148,7 +148,7 @@ const OTableStub = {
 
 const OButtonStub = {
   name: "OButton",
-  props: ["variant", "size", "iconLeft", "loading", "title"],
+  props: ["variant", "size", "icon", "loading", "title"],
   emits: ["click"],
   template:
     '<button class="o-button" v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></button>',
@@ -170,9 +170,9 @@ const globalStubs = {
     props: ["modelValue", "placeholder"],
     emits: ["update:modelValue"],
     template:
-      '<span class="o-input-wrap"><slot name="icon-left" />' +
+      '<span class="o-input-wrap"><slot name="icon" />' +
       '<input class="o-input" v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />' +
-      '<slot name="icon-right" /></span>',
+      '<slot name="icon-end" /></span>',
   },
   OTag: {
     name: "OTag",
@@ -197,21 +197,21 @@ const globalStubs = {
   },
   OEmptyState: {
     name: "OEmptyState",
-    props: ["size", "preset", "filtered"],
+    props: ["size", "kind", "title"],
     emits: ["action"],
-    template: '<div data-test="empty-state-stub" :data-filtered="String(filtered)" />',
+    template: '<div data-test="empty-state-stub" :data-kind="kind" />',
   },
   ConfirmDialog: {
     name: "ConfirmDialog",
-    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
+    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "kind"],
     emits: ["update:ok", "update:cancel", "update:modelValue"],
     template: '<div data-test="confirm-dialog-stub" :data-open="String(modelValue)" />',
   },
   OPageLayout: {
     name: "OPageLayout",
-    props: ["title", "subtitle", "icon", "bleed"],
+    props: ["title", "about", "bleed"],
     template:
-      '<div class="page-layout"><slot name="title" /><slot name="sidebar" />' +
+      '<div class="page-layout"><slot name="status" /><slot name="sidebar" />' +
       '<slot name="actions" /><slot /></div>',
   },
   BetaBadge: { name: "BetaBadge", template: '<span class="beta-badge" />' },
@@ -373,18 +373,6 @@ describe("WorkflowsList", () => {
       expect(table(wrapper).props("loading")).toBe(false);
     });
 
-    it("adds a zero-padded index for the first nine rows and a plain one after", async () => {
-      listWorkflows.mockResolvedValue({
-        data: Array.from({ length: 10 }, (_, i) => makeWorkflow(i + 1)),
-      });
-      wrapper = mountList();
-      await flushPromises();
-      const r = rows(wrapper);
-      expect(r[0]["#"]).toBe("01");
-      expect(r[8]["#"]).toBe("09");
-      expect(r[9]["#"]).toBe(10);
-    });
-
     it("derives the Trigger label from the trigger node in the graph", async () => {
       wrapper = mountList();
       await flushPromises();
@@ -493,7 +481,7 @@ describe("WorkflowsList", () => {
         table(wrapper)
           .props("columns")
           .map((c: any) => c.id),
-      ).toEqual(["#", "name", "description", "trigger", "updated_at", "actions"]);
+      ).toEqual(["name", "description", "trigger", "updated_at", "actions"]);
     });
 
     // Measured in the built UI: the Incident Event tag 94 + gap 4 + HTTP tag 63 + 16 cell padding.
@@ -650,14 +638,14 @@ describe("WorkflowsList", () => {
       await nextTick();
       const empty = wrapper.findComponent({ name: "OEmptyState" });
       expect(empty.exists()).toBe(true);
-      expect(empty.props("filtered")).toBe(true);
+      expect(empty.props("kind")).toBe("filtered");
     });
 
     it("shows the unfiltered empty state when the org has no workflows", async () => {
       listWorkflows.mockResolvedValue({ data: [] });
       wrapper = mountList();
       await flushPromises();
-      expect(wrapper.findComponent({ name: "OEmptyState" }).props("filtered")).toBe(false);
+      expect(wrapper.findComponent({ name: "OEmptyState" }).props("kind")).toBe("first-run");
     });
 
     it("clears the filter from the empty state's clear-filters action", async () => {
@@ -666,7 +654,7 @@ describe("WorkflowsList", () => {
       await search(wrapper).setValue("no-such-workflow");
       await nextTick();
 
-      wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "clear-filters");
+      wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action");
       await nextTick();
       expect(rows(wrapper)).toHaveLength(2);
     });
@@ -681,8 +669,10 @@ describe("WorkflowsList", () => {
         scopeGroup(wrapper).vm.$emit("update:model-value", "all");
         await flushPromises();
         expect(scopeGroup(wrapper).props("modelValue")).toBe("all");
+        await search(wrapper).setValue("no-such-workflow");
+        await nextTick();
 
-        wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "clear-filters");
+        wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action");
         await nextTick();
         // Left on "all" the toggle stays lit while the list is back to one folder.
         expect(scopeGroup(wrapper).props("modelValue")).toBe("this");
@@ -696,7 +686,7 @@ describe("WorkflowsList", () => {
       wrapper = mountList();
       await flushPromises();
 
-      wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "create");
+      wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action");
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createWorkflow",
         query: { org_identifier: "default", folder: "default" },
@@ -927,14 +917,14 @@ describe("WorkflowsList", () => {
       expect(confirm(wrapper).props("title")).toBe(t("workflow.deleteTitle"));
       expect(confirm(wrapper).props("messageKeypath")).toBe("workflow.deleteMessage");
       expect(confirm(wrapper).props("messageName")).toBe("workflow-1");
-      expect(confirm(wrapper).props("okVariant")).toBe("destructive");
+      expect(confirm(wrapper).props("kind")).toBe("destructive");
       expect(deleteWorkflow).not.toHaveBeenCalled();
     });
 
     it("names the workflow in bold in the real ConfirmDialog", async () => {
       const ODialogStub = {
         name: "ODialog",
-        props: ["open", "primaryButtonLabel", "primaryButtonVariant"],
+        props: ["open", "primary", "primary"],
         template: '<div v-if="open" data-test="o-dialog-stub"><slot /></div>',
       };
       wrapper = mount(WorkflowsList, {
@@ -951,8 +941,8 @@ describe("WorkflowsList", () => {
       expect(name.text()).toBe("workflow-2");
       expect(name.classes()).toContain("font-semibold");
       expect(dialog.text()).toContain("Are you sure you want to delete the workflow-2 workflow?");
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
-      expect(dialog.props("primaryButtonLabel")).toBe(t("confirmDialog.ok"));
+      expect(dialog.props("primary")?.variant).toBe("danger");
+      expect(dialog.props("primary")?.label).toBe(t("common.delete"));
     });
 
     it("deletes on confirm, toasts and refetches", async () => {

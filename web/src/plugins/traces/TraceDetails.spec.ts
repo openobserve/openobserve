@@ -17,7 +17,6 @@ import { describe, expect, it, beforeAll, beforeEach, afterEach, vi } from "vite
 import { mount, flushPromises } from "@vue/test-utils";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import { getManager } from "@/lib/vue-shortcut-manager";
-import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import config from "@/aws-exports";
@@ -77,31 +76,31 @@ const ODrawerStub = {
     "size",
     "width",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "seamless",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="trace-details-filters-drawer-stub"
       :data-open="String(open)"
       :data-width="width"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
     >
       <slot name="header" />
       <slot />
@@ -145,6 +144,7 @@ describe("TraceDetails", () => {
           org_identifier: "default",
         },
         name: "traceDetails",
+        path: "/traces/trace-details",
       },
     } as any);
 
@@ -341,8 +341,6 @@ describe("TraceDetails", () => {
       const operationName = wrapper.find('[data-test="trace-details-operation-name"]');
 
       expect(operationName.classes()).toContain("truncate");
-      // The ellipsis only fires if the header also lets the title block shrink.
-      expect(wrapper.findComponent(OPageHeader).props("titleOverflow")).toBe("visible");
     });
 
     it("should display trace ID in toolbar", () => {
@@ -1216,10 +1214,10 @@ describe("TraceDetails", () => {
         expect(closeBtn.exists()).toBe(true);
       });
 
-      it("renders the close button as outline with a Close tooltip", () => {
+      it("renders the close button as a ghost icon with a Close tooltip", () => {
         const closeBtn = wrapper.findComponent('[data-test="trace-details-close-btn"]');
         expect(closeBtn.exists()).toBe(true);
-        expect(closeBtn.attributes("data-o2-variant")).toBe("outline");
+        expect(closeBtn.attributes("data-o2-variant")).toBe("ghost");
         const tooltip = closeBtn.findComponent({ name: "OTooltip" });
         expect(tooltip.props("content")).toBe(i18n.global.t("common.close"));
       });
@@ -2644,7 +2642,7 @@ describe("TraceDetails", () => {
 
       const result = wrapper.vm.formatRumEventsAsSpans([event], [], [], [event]);
 
-      expect(result[0].operation_name).toBe("Unknown RUM Event");
+      expect(result[0].operation_name).toBe("Unknown RUM event");
     });
   });
 

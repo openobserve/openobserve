@@ -138,8 +138,6 @@ const columns = computed<K8sColumn[]>(() => [
   actionsColumn,
 ]);
 
-const hasSub = computed(() => props.view === "nodes");
-
 const defaultVisibility = computed(() =>
   Object.fromEntries((HIDDEN_BY_DEFAULT[props.view] ?? []).map((id) => [id, false])),
 );
@@ -279,8 +277,6 @@ const namespaceOf = (row: any): string =>
     :data="filtered"
     :columns="columns"
     row-key="key"
-    dense
-    :row-height="hasSub ? 44 : 32"
     sticky-header
     virtual-scroll
     :overscan="10"
@@ -288,8 +284,6 @@ const namespaceOf = (row: any): string =>
     sorting="client"
     :sort-by="sortBy"
     :sort-order="sortOrder"
-    :frame="false"
-    :show-global-filter="false"
     persist-columns
     enable-column-resize
     :table-id="tableId"
@@ -350,8 +344,8 @@ const namespaceOf = (row: any): string =>
       <span v-else-if="c.meta.render === 'status'" class="inline-flex">
         <OTag
           v-if="toneOfCell(c, row)"
-          size="xs"
-          :variant="TONE_PILL[toneOfCell(c, row) ?? 'neutral'].variant"
+          size="sm"
+          :tone="TONE_PILL[toneOfCell(c, row) ?? 'neutral'].variant"
           :icon="TONE_PILL[toneOfCell(c, row) ?? 'neutral'].icon"
           :data-test="`k8s2-cell-${c.id}-${row.key}`"
           >{{ c.meta.text?.(row)
@@ -383,8 +377,8 @@ const namespaceOf = (row: any): string =>
       <template v-else-if="c.meta.render === 'namespace'">
         <OButton
           v-if="namespaceOf(row)"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :data-test="`k8s2-namespace-${row.key}`"
           @click.stop="setNamespace(namespaceOf(row))"
           >{{ raw(namespaceOf(row)) }}</OButton
@@ -394,8 +388,8 @@ const namespaceOf = (row: any): string =>
         <template v-for="link in c.meta.links?.(row) ?? []" :key="link.label">
           <OButton
             v-if="link.target"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             :data-test="`k8s2-link-${c.id}-${row.key}`"
             @click.stop="emit('open', link.target)"
             >{{ link.label }}<OTooltip v-if="link.tip" :content="link.tip"
@@ -431,10 +425,9 @@ const namespaceOf = (row: any): string =>
           </span>
           <template v-if="c.meta.bar?.(row).pct != null">
             <OProgressBar
-              size="xs"
               class="min-w-0"
-              :value="Math.min(c.meta.bar?.(row).pct ?? 0, 100) / 100"
-              :variant="usageBarVariant(c.meta.bar?.(row).pct ?? null)"
+              :value="Math.min(c.meta.bar?.(row).pct ?? 0, 100)"
+              :tone="usageBarVariant(c.meta.bar?.(row).pct ?? null)"
               :data-test="`k8s2-bar-${c.id}-${row.key}`"
             />
             <OTooltip v-if="c.meta.bar?.(row).tip" :content="c.meta.bar?.(row).tip" />
@@ -450,8 +443,8 @@ const namespaceOf = (row: any): string =>
           <OTag
             v-for="badge in c.meta.badges?.(row)"
             :key="badge.text"
-            size="xs"
-            :variant="badge.variant"
+            size="sm"
+            :tone="badge.variant"
             >{{ badge.text }}</OTag
           >
         </template>
@@ -495,19 +488,19 @@ const namespaceOf = (row: any): string =>
     <template #empty>
       <OEmptyState
         v-if="anchorMissing"
-        preset="no-data"
-        size="inline"
         :title="t('infra.k8s2.noKindData', { kind: kindLabel })"
-        :description="t('infra.k8s2.needsMetric', { stream: raw(anchorMissing) })"
-        hide-action
+        :text="t('infra.k8s2.needsMetric', { stream: raw(anchorMissing) })"
         data-test="k8s2-empty-anchor"
       />
       <OEmptyState
         v-else
-        size="inline"
-        :filtered="narrowed"
+        :kind="narrowed ? 'filtered' : 'first-run'"
+        :text="
+          narrowed
+            ? t('emptyState.filtered.description', { noun: t('emptyState.filtered.fallbackNoun') })
+            : undefined
+        "
         :title="t('infra.k8s2.noKindFound', { kind: kindLabel })"
-        :hide-action="!narrowed"
         data-test="k8s2-empty"
         @action="clear"
       />

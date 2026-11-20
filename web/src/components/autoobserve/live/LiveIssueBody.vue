@@ -35,15 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('autoobserve.drawer.unfoldTab')"
         data-test="autoobserve-issue-tab-graph"
       />
-      <OTab name="firings" :autofocus="tab === 'firings'" data-test="autoobserve-issue-tab-firings">
-        <div class="flex items-center gap-1.5">
-          <span>{{ t("alerts.incidents.alertTriggers") }}</span>
-          <!-- The badge holds its place while the incident loads, so the tabs after it never move. -->
-          <OTag type="countChip" value="neutral" :class="{ invisible: !detail }">{{
-            triggers.length
-          }}</OTag>
-        </div>
-      </OTab>
+      <OTab
+        name="firings"
+        :autofocus="tab === 'firings'"
+        :label="t('alerts.incidents.alertTriggers')"
+        :count="detail ? triggers.length : null"
+        data-test="autoobserve-issue-tab-firings"
+      />
       <OTab
         name="activity"
         :autofocus="tab === 'activity'"
@@ -101,8 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OButton
             variant="primary"
-            size="sm"
-            :icon-left="canStart ? 'auto-awesome' : 'lock'"
+            :icon="canStart ? 'auto-awesome' : 'lock'"
             :disabled="!canStart || !detail"
             :loading="rca.triggering.value"
             data-test="autoobserve-issue-analyze-btn"
@@ -119,12 +116,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OBadge
           v-else-if="runLine && runLine.label !== completedLabel"
-          :variant="RCA_BADGE_VARIANT[runLine.tone]"
+          :tone="RCA_BADGE_VARIANT[runLine.tone]"
           size="sm"
           class="self-start"
           data-test="autoobserve-issue-run-state"
         >
-          <template v-if="runLine.spinner" #icon><OSpinner size="xs" /></template>
+          <template v-if="runLine.spinner" #icon><OSpinner /></template>
           {{ runLine.label }}
         </OBadge>
       </template>
@@ -163,25 +160,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="border-card-glass-border rounded-default flex min-h-40 flex-col gap-3 border p-3"
           >
-            <div
+            <OEmptyState
               v-if="detailQuery.isError.value"
+              size="compact"
+              kind="error"
               role="alert"
-              class="text-status-error-text flex items-center gap-2 text-sm"
+              :title="t('autoobserve.issueLive.triggersFailed')"
               data-test="autoobserve-issue-triggers-error"
             >
-              <OIcon name="error-outline" size="sm" />
-              {{ t("autoobserve.issueLive.triggersFailed") }}
-              <OButton variant="ghost-primary" size="xs" @click="detailQuery.refetch()">{{
-                t("autoobserve.issueLive.spark.retry")
-              }}</OButton>
-            </div>
+              <template #actions>
+                <OButton variant="secondary" size="sm" @click="detailQuery.refetch()">{{
+                  t("autoobserve.issueLive.spark.retry")
+                }}</OButton>
+              </template>
+            </OEmptyState>
             <template v-else>
               <OSkeleton
-                animation="pulse"
+                shape="block"
                 class="h-5 w-full"
                 data-test="autoobserve-issue-triggers-loading"
               />
-              <OSkeleton v-for="i in 3" :key="i" animation="pulse" class="h-6 w-full" />
+              <OSkeleton v-for="i in 3" :key="i" shape="block" class="h-6 w-full" />
             </template>
           </div>
         </div>
@@ -189,9 +188,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!detailQuery.isError.value"
           class="border-card-glass-border rounded-default flex min-h-40 w-80 shrink-0 flex-col gap-2 self-start border p-3 max-lg:w-full"
         >
-          <OSkeleton animation="pulse" class="h-4 w-1/3" />
-          <OSkeleton animation="pulse" class="h-5 w-2/3" />
-          <OSkeleton animation="pulse" class="h-4 w-1/2" />
+          <OSkeleton shape="block" class="h-4 w-1/3" />
+          <OSkeleton shape="block" class="h-5 w-2/3" />
+          <OSkeleton shape="block" class="h-4 w-1/2" />
         </div>
       </template>
       <template v-else>
@@ -255,8 +254,7 @@ import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useIncidentRca } from "@/composables/useIncidentRca";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";

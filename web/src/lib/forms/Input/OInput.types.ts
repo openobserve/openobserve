@@ -1,30 +1,19 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { I18nText } from "@/types/i18n";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
-export type InputSize = "xs" | "sm" | "md";
+/** Control height (S1): xs 24 inside table rows only, sm 28, md 32 (default), lg 36 sign-in only. */
+export type InputSize = "xs" | "sm" | "md" | "lg";
 
-/**
- * Semantic field width — maps to pre-defined CSS tokens.
- * - `xs`   ~120px  zip codes, CVV, short numbers
- * - `sm`   ~200px  dates, narrow labels
- * - `md`   ~280px  names, phone numbers
- * - `lg`   ~400px  emails, full addresses
- * - `full` 100%    fills the container (default)
- */
-export type FieldWidth = "xs" | "sm" | "md" | "lg" | "full";
+/** Width by the expected value (S7): s 160, m 240, l 360, or the container's full width. */
+export type FieldWidth = "s" | "m" | "l" | "full";
+
+export const INPUT_SIZES = ["xs", "sm", "md", "lg"] as const satisfies readonly InputSize[];
+export const FIELD_WIDTHS = ["s", "m", "l", "full"] as const satisfies readonly FieldWidth[];
 
 export type InputType =
-  | "text"
-  | "password"
-  | "email"
-  | "number"
-  | "search"
-  | "url"
-  | "tel"
-  | "date"
-  | "datetime-local"
-  | "textarea";
+  "text" | "password" | "email" | "number" | "search" | "url" | "tel" | "date" | "datetime-local";
 
 export interface InputProps {
   /** Bound value */
@@ -34,9 +23,9 @@ export interface InputProps {
     number?: boolean;
     trim?: boolean;
   };
-  /** HTML input type — use `textarea` for a multi-line field */
+  /** HTML input type. A password always gets the show/hide toggle. */
   type?: InputType;
-  /** Floating / static label */
+  /** Label above the field (S3) */
   label?: I18nText;
   /** Placeholder text */
   placeholder?: I18nText;
@@ -46,29 +35,28 @@ export interface InputProps {
   errorMessage?: I18nText;
   /** Marks the field as being in an error state without a message */
   error?: boolean;
-  /** Text prefix rendered inside the field (left) */
+  /** Leading icon inside the box */
+  icon?: IconName;
+  /** Text inside the box before the value, such as "$" */
   prefix?: string;
-  /** Text suffix rendered inside the field (right) */
+  /** Unit or suffix inside the box after the value, such as "%" or "ms" (T4) */
   suffix?: string;
-  /** Shows a ✕ button to clear the field */
+  /** Shows a ✕ button to clear the field: on for filters, off for required fields (S6) */
   clearable?: boolean;
-  /**
-   * Adds a show/hide toggle to a `type="password"` field. Ignored for every
-   * other type — revealing a value only means anything when it starts masked.
-   */
-  revealable?: boolean;
   /** Prevents value editing */
   readonly?: boolean;
+  /** Adds a copy button inside the box; meant for read-only values */
+  copyable?: boolean;
   /** Prevents interaction */
   disabled?: boolean;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
   required?: boolean;
+  /** Monospace value for IDs, patterns and paths (T4) */
+  mono?: boolean;
   /** Focuses the input on mount */
   autofocus?: boolean;
   /** Debounce delay in milliseconds before emitting model updates */
   debounce?: number;
-  /** Auto-resize textarea height to fit content */
-  autogrow?: boolean;
   /** Input mask compatibility (supports `time`, `fulltime`, `DD-MM-YYYY`) */
   mask?: string;
   /** Maximum character length — shows a counter when set */
@@ -79,9 +67,7 @@ export interface InputProps {
   max?: number | string;
   /** Step increment — `type="number"` only */
   step?: number | string;
-  /** Rows for textarea type */
-  rows?: number;
-  /** Control size */
+  /** Control height; xs is for inline editing inside a table row only */
   size?: InputSize;
   /** HTML id */
   id?: string;
@@ -89,17 +75,8 @@ export interface InputProps {
   name?: string;
   /** HTML autocomplete */
   autocomplete?: string;
-  /**
-   * Semantic field width — controls how wide the component renders.
-   * Defaults to `"full"` (fills the container).
-   * @see FieldWidth
-   */
+  /** Width by the expected value (S7); defaults to `full` */
   width?: FieldWidth;
-  /**
-   * Position of the label: 'outside' renders above the field (default),
-   * 'inside' renders as a compact floating mini-label inside the field border.
-   */
-  labelPosition?: "inside" | "outside";
 }
 
 export interface InputEmits {
@@ -114,19 +91,10 @@ export interface InputEmits {
 }
 
 export interface InputSlots {
-  /** Icon placed inside the border on the left — matches OButton's `#icon-left` pattern */
-  "icon-left"?: () => unknown;
-  /** Icon placed inside the border on the right — matches OButton's `#icon-right` pattern */
-  "icon-right"?: () => unknown;
-  /** Text prefix rendered inside the field (left) */
-  prefix?: () => unknown;
-  /** Text suffix rendered inside the field (right) */
-  suffix?: () => unknown;
-  /**
-   * Tooltip content rendered inside an info icon in the label area.
-   * Provide a tooltip element as the slot content.
-   */
+  /** Custom leading content inside the box when `icon` cannot express it */
+  icon?: () => unknown;
+  /** Trailing content inside the box, before the clear and reveal buttons */
+  "icon-end"?: () => unknown;
+  /** Tooltip content rendered inside an info icon beside the label */
   tooltip?: () => unknown;
-  /** Content rendered after the field, outside the border */
-  append?: () => unknown;
 }

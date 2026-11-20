@@ -26,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Not part of the select target: the mouseup ending a drag-to-zoom arrives as a click. -->
     <div class="relative min-h-0 flex-1 cursor-default">
-      <LoadingProgress
-        :loading="state.status === 'loading' || refreshing"
-        :loading-progress-percentage="0"
+      <OLoadingLine
+        :active="state.status === 'loading' || refreshing"
+        class="absolute inset-x-0 top-0 z-10"
       />
       <div
         v-if="state.status === 'error'"
@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="error" size="sm" class="text-error-600" />
         <span>{{ t("metrics.explorer.queryFailed") }}</span>
         <OButton
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :data-test="`${dataTest}-retry`"
           @click.stop="load"
         >
@@ -48,21 +48,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <div
+      <OEmptyState
         v-else-if="queries && !queries.length"
-        class="text-text-secondary flex h-full items-center justify-center text-xs"
+        size="compact"
+        icon="show-chart"
+        class="h-full"
+        :title="t('metrics.explorer.card.noPreview')"
         :data-test="`${dataTest}-nopreview`"
-      >
-        {{ t("metrics.explorer.card.noPreview") }}
-      </div>
+      />
 
-      <div
+      <OEmptyState
         v-else-if="state.status === 'done' && !hasData"
-        class="text-text-secondary flex h-full items-center justify-center text-xs"
+        size="compact"
+        icon="bar-chart"
+        class="h-full"
+        :title="t('metrics.explorer.noData')"
         :data-test="`${dataTest}-nodata`"
-      >
-        {{ t("metrics.explorer.noData") }}
-      </div>
+      />
 
       <slot
         v-else-if="state.status === 'done'"
@@ -102,8 +104,9 @@ import MetricCardChart from "./MetricCardChart.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
-import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 import { parseSearchError } from "@/utils/query/searchError";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";

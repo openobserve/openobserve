@@ -58,16 +58,14 @@ change — justify it or gate it.
 
 ## Page shell: the header stays on one row
 
-`OPageLayout` / `OPageHeader` handle the phone header: the decorative module icon and
-the subtitle drop below md, the title truncates, and below lg the row may wrap
-(desktop keeps its fixed `h-15` row so `h-full` slot content — inline tabs, dividers —
-spans it).
+`OPageLayout` / `OPageHeader` handle the phone header: the band is a fixed 56 px at
+every width and never wraps (H1), the title truncates with a tooltip, and the tabs
+keep their own row.
 
 - **Primary actions in `#actions`, secondary ones in `#actions-overflow`.** The
-  overflow slot renders inline on desktop and collapses behind one ⋮ "More" button
-  below md, so the primary CTA keeps the title row. Add **`overflow-first`** when the
-  secondaries sit *before* the primary on desktop (the usual "Import · Export · New"
-  order) — without it they render after `#actions`.
+  overflow slot renders before `#actions` (the usual "Import · Export · New" order)
+  and folds into one ⋯ More, after the primary, under 640 px (R2), so the title
+  keeps its room.
 - **Never reorder the laptop toolbar by moving a control between slots.** If a
   secondary control sits between primaries on desktop, render it twice:
   `v-if="!isMobile"` at its desktop position in `#actions`, `v-if="isMobile"` in
@@ -75,10 +73,10 @@ spans it).
 - A date picker in the header's `#actions` drops its text label below md on its own
   (`OPageHeader` hides `.date-time-label`). If an icon-only picker still does not fit
   beside the title, pass `:hide-range-shift="isMobile"` (Metrics editor, Search
-  history). Labelled buttons go icon-only with
+  history). Labelled buttons go icon-only with `:icon-only="isMobile"` and
+  `:label="label"` (the label becomes the aria-label and tooltip), or with
   `<span class="max-md:sr-only">{{ label }}</span>` — `sr-only`, not `hidden`, so the
-  button keeps its accessible name — and an `sm-action` button also needs
-  `max-md:min-w-0 max-md:ps-2 max-md:pe-2` (it carries `min-w-20`).
+  button keeps its accessible name. Never shrink a button's padding or height to fit (B8).
 - A control that owns a dialog or popover (a trigger with its own `ODialog`) cannot
   move into `#actions-overflow`: the menu unmounts it when it closes. Move a plain
   button instead, or let the header take a second row.
@@ -108,8 +106,9 @@ visible.
 
   ```vue
   <div data-drawer-anchor="alert-library-toolbar" class="flex items-center gap-3">
-    <OButton class="md:hidden" size="icon-toolbar" icon-left="filter-list"
-      data-test="alert-library-mobile-filters-btn" @click="filtersOpen = true" />
+    <OButton class="md:hidden" variant="secondary" icon-only icon="filter-list"
+      :label="t('common.filters')" data-test="alert-library-mobile-filters-btn"
+      @click="filtersOpen = true" />
     …
   </div>
   <ODrawer v-if="isMobile" v-model:open="filtersOpen" side="left" size="sm" bleed seamless
@@ -137,7 +136,7 @@ The recipe every list toolbar follows:
   <!-- max-md:contents lets the filter, the search and OTable's own controls share one row -->
   <div class="flex flex-1 items-center gap-2 max-md:contents">
     <OToggleGroup v-model="typeFilter" mobile-dropdown data-test="channels-type-filter">
-      <OToggleGroupItem value="all" size="sm" data-test="channels-type-all">…</OToggleGroupItem>
+      <OToggleGroupItem value="all" data-test="channels-type-all">…</OToggleGroupItem>
       …
     </OToggleGroup>
     <div class="min-w-0 flex-1 max-md:min-w-40">
@@ -161,8 +160,8 @@ The recipe every list toolbar follows:
   toolbar wraps at every width: `w-full` takes the whole row and always pushes the
   column toggle and refresh onto a second line, while `min-w-0` stops the row from ever
   wrapping, so the filters slide under those controls once space runs out.
-- `ORefreshButton layout="inline"` drops its "Nm ago" label below md (icon-only);
-  do not re-add a text refresh button to a phone toolbar.
+- `ORefreshButton` drops its data age below 1024 px (icon only); do not re-add a text
+  refresh button to a phone toolbar.
 - **Page toolbars** (Logs / Metrics / Traces style): the mode toggle becomes an
   `ODropdown` showing the current mode (see `MetricsExplorer.vue`),
   `AutoRefreshInterval :is-compact="isMobile"`, text buttons go icon-only, spacers
@@ -177,20 +176,20 @@ The recipe every list toolbar follows:
   column is dropped and persisted desktop column sizes are ignored. Tablets get a
   horizontal-scroll fallback once fill columns can't fit. **Do not hide data columns
   for mobile** — there is no per-column breakpoint flag.
-- **Row actions → one kebab below md.** Prefer `OTable`'s `row-actions` prop: pass
-  the list once and the table draws at most three buttons at md and up (more than
-  three: two plus a menu), in the fixed order Edit, the item's own actions, Delete,
-  and one kebab below md. The hand-written form below remains for tables not yet
+- **Row actions → one kebab below md.** Prefer `OTable`'s `row-actions` +
+  `row-menu` props: the table draws at most two inline buttons at md and up, the
+  rest (Delete last) in ⋯, and one kebab below md (B7). The hand-written form below remains for tables not yet
   moved:
 
   ```vue
-  <OButton class="max-md:hidden" icon-left="edit" :data-test="`x-${row.id}-edit`" @click="edit(row)" />
+  <OButton class="max-md:hidden" variant="ghost" icon-only size="xs" icon="edit"
+    :label="t('common.edit')" :data-test="`x-${row.id}-edit`" @click="edit(row)" />
   <ODropdown side="bottom" align="end">
     <template #trigger>
-      <OButton icon-left="more-vert" variant="ghost" size="icon-xs-sq" class="md:hidden"
-        data-test="x-row-more-actions" @click.stop />
+      <OButton variant="ghost" icon-only size="xs" icon="more-vert" class="md:hidden"
+        :label="t('common.moreActions')" data-test="x-row-more-actions" @click.stop />
     </template>
-    <ODropdownItem icon-left="edit" class="md:hidden" :data-test="`x-${row.id}-edit-menu`"
+    <ODropdownItem icon="edit" class="md:hidden" :data-test="`x-${row.id}-edit-menu`"
       @select="edit(row)">
       <span>{{ t("common.edit") }}</span>
     </ODropdownItem>
@@ -203,7 +202,7 @@ The recipe every list toolbar follows:
   opens an empty menu. Hover-only buttons with no click action (a preview tooltip) have
   no menu counterpart.
 - **The footer is `OTable`'s own, never hand-built**: there is no "N items" total
-  label at any width — the pager's "x – y of z" already says it. Bulk actions go
+  label at any width — the pager's "1–20 of 143" already says it. Bulk actions go
   in `#selection-actions` and a note in `#footer-note`; below md the selected
   count and the actions take a full row above the pager, and a note takes its own
   row. Give a note that should not show on a phone a `max-md:hidden` root and it
@@ -243,12 +242,11 @@ the same recipe so it never takes two rows of chrome:
   pane `max-md:h-auto max-md:min-h-0`.
 - A fixed-height region whose content grows on phones scrolls: `max-lg:overflow-y-auto`,
   and grids that must size to content use `max-lg:auto-rows-min`.
-- `OEmptyState` compacts itself below md (smaller illustration, title, padding and
-  action cards) so the whole state — action included — fits one phone screen; it
-  also scrolls with safe centering below lg. Never size an empty state per page;
-  custom hero content goes in a `max-lg:overflow-y-auto` container.
-- `OBanner inline-actions` keeps its message at least 12rem wide below md and wraps
-  the actions under it; do not stack them by hand.
+- `OEmptyState` keeps its 64 px top offset at every width and narrows its side padding
+  below md, so the whole state fits one phone screen. Never size or centre an empty state
+  per page; custom hero content goes in a `max-lg:overflow-y-auto` container.
+- `OBanner` and `OInlineNotice` keep their one action beside the message; a long
+  message wraps, so do not stack the action under it by hand.
 - Full-viewport shells use `h-dvh`, never `100vh` (mobile browser chrome overlaps it).
 - Long chips and IDs: cut the text, not the row — `<OTruncatedText class="max-md:max-w-full">`, which keeps the full value on hover. A bare `max-md:truncate` cuts it on phones with no way to read the rest.
 - **No horizontal page scroll does not mean nothing is clipped.** An
@@ -323,7 +321,7 @@ the same recipe so it never takes two rows of chrome:
 - **An `OEmptyState` in a scroll pane clips itself.** Its root is
   `overflow-hidden`; as a flex child of a `flex-col overflow-y-auto` pane it shrinks
   to the pane and cuts off its own list and actions instead of letting the pane
-  scroll. Give it `shrink-0`, and centre with `justify-center-safe` on the pane.
+  scroll. Give it `shrink-0`; never centre it on the pane (R3 pins it 64 px from the top).
 - **Six tiles to a row leave a title ~110px.** "DaemonSets unavailable" was cut at
   1280, every Health title at 1024 and "Contain…" at 768. Panel titles wrap to two
   lines below lg (`max-lg:line-clamp-2 max-lg:whitespace-normal`); a page whose

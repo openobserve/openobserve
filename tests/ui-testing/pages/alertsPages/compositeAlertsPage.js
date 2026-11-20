@@ -708,7 +708,9 @@ export class CompositeAlertsPage {
     await this.openListTab('composite');
   }
 
+  /** Clone lives in the row's ⋯ menu, so open it first. */
   async clickCloneButton(name) {
+    await this.page.locator(`[data-test="alert-list-${name}-more-options"]`).click();
     await this.cloneButton(name).click();
   }
 
@@ -751,6 +753,6 @@ export class CompositeAlertsPage {
   }
 
   async expectCloneSuccessToast() {
-    await expect(this.successToast('Alert Cloned Successfully')).toBeVisible({ timeout: 30000 });
+    await expect(this.successToast('Alert cloned successfully')).toBeVisible({ timeout: 30000 });
   }
 }

@@ -66,11 +66,59 @@ describe("OSearchInput", () => {
     expect(wrapper.find('button[aria-label="Clear"]').exists()).toBe(false);
   });
 
-  it("should not show clear button when clearable is explicitly false", () => {
-    wrapper = mount(OSearchInput, {
-      props: { clearable: false, modelValue: "query" },
-    });
-    expect(wrapper.find('button[aria-label="Clear"]').exists()).toBe(false);
+  it("is always clearable once there is text", () => {
+    wrapper = mount(OSearchInput, { props: { modelValue: "query" } });
+    expect(wrapper.find('button[aria-label="Clear"]').exists()).toBe(true);
+  });
+
+  it("clears on Escape and stops it reaching the overlay behind", async () => {
+    wrapper = mount(OSearchInput, { props: { modelValue: "query" } });
+    const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true });
+    const stop = vi.spyOn(event, "stopPropagation");
+    wrapper.find("input").element.dispatchEvent(event);
+    expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe("");
+    expect(stop).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["md", "h-control-md"],
+    ["sm", "h-control-sm"],
+  ] as const)("takes its height from the %s control token", (size, expected) => {
+    wrapper = mount(OSearchInput, { props: { size } });
+    expect(wrapper.find(".rounded-default").classes()).toContain(expected);
+  });
+
+  it("caps a list search at 280 px and a scoped search at 360 px", () => {
+    wrapper = mount(OSearchInput, { props: { width: "list" } });
+    expect(wrapper.classes()).toContain("max-w-70");
+    wrapper.unmount();
+    wrapper = mount(OSearchInput, { props: { width: "scope" } });
+    expect(wrapper.classes()).toContain("max-w-90");
+  });
+
+  it("filters a client-side list at once when no debounce is asked for", async () => {
+    wrapper = mount(OSearchInput, { props: { modelValue: "" } });
+    await wrapper.find("input").setValue("pay");
+    expect(wrapper.emitted("update:modelValue")?.[0]?.[0]).toBe("pay");
+  });
+
+  it("shows the / key while empty and focuses on / from the page", async () => {
+    wrapper = mount(OSearchInput, { attachTo: document.body, attrs: { "data-test": "q" } });
+    expect(wrapper.find('[data-test="q-shortcut"]').exists()).toBe(true);
+    // jsdom has no layout, so every rect is empty; pretend the field is on screen.
+    vi.spyOn(Element.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "/" }));
+    expect(document.activeElement).toBe(wrapper.find("input").element);
+  });
+
+  it("leaves / alone in a menu-sized search unless asked", () => {
+    wrapper = mount(OSearchInput, { props: { size: "sm" }, attrs: { "data-test": "q" } });
+    expect(wrapper.find('[data-test="q-shortcut"]').exists()).toBe(false);
+  });
+
+  it("swaps the glyph for a spinner while loading", () => {
+    wrapper = mount(OSearchInput, { props: { loading: true }, attrs: { "data-test": "q" } });
+    expect(wrapper.find('[data-test="q-loading"]').exists()).toBe(true);
   });
 
   it("should emit clear and reset modelValue when clear button is clicked", async () => {
@@ -103,25 +151,27 @@ describe("OSearchInput", () => {
     expect(fieldEl.element.tagName.toLowerCase()).toBe("input");
   });
 
-  it("renders an icon-right slot inside the field", () => {
-    // So a search can carry a control within its own border — the scope toggle the
-    // dashboard list and the metrics explorer both put in their search box.
+  it("renders the in-field scope switch and emits the picked scope", async () => {
     wrapper = mount(OSearchInput, {
-      props: { modelValue: "" },
-      slots: { "icon-right": '<button data-test="scope">All</button>' },
+      props: {
+        modelValue: "",
+        scope: "this",
+        scopeOptions: [
+          { value: "this", label: "This folder" },
+          { value: "all", label: "All folders", dataTest: "scope-all" },
+        ],
+      },
+      attrs: { "data-test": "q" },
     });
-
-    expect(wrapper.find('[data-test="scope"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="q-scope-this"]').exists()).toBe(true);
+    await wrapper.find('[data-test="scope-all"]').trigger("click");
+    expect(wrapper.emitted("update:scope")?.[0]?.[0]).toBe("all");
   });
 
-  it("hands OInput no icon-right slot at all when the caller passes none", () => {
-    // The forwarding is under a `v-if` for a reason: OInput renders its right-hand
-    // box on `v-if="$slots['icon-right']"`, and an always-present-but-empty
-    // template still counts as present — which would give EVERY plain search input
-    // in the app an invisible, padded box on its right.
-    wrapper = mount(OSearchInput, { props: { modelValue: "" } });
-
-    expect(wrapper.findComponent(OInput).vm.$slots["icon-right"]).toBeUndefined();
+  it("hands OInput no end slot when there is nothing to show at the end", () => {
+    // OInput pads an end box whenever the slot exists, so an empty one would add dead space.
+    wrapper = mount(OSearchInput, { props: { modelValue: "x" } });
+    expect(wrapper.findComponent(OInput).vm.$slots["icon-end"]).toBeUndefined();
   });
 
   it("should debounce update:modelValue when debounce is set", async () => {

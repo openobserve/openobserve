@@ -18,7 +18,7 @@ import { flushPromises, shallowMount } from "@vue/test-utils";
 import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { nextTick, ref } from "vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import { GridStack } from "gridstack";
 import { updateDashboard } from "../../utils/commons";
 import { LIVE_COMMIT_DEBOUNCE_MS } from "@/composables/dashboard/useVariablesManager";
@@ -36,24 +36,24 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
@@ -815,7 +815,7 @@ describe("RenderDashboardCharts", () => {
             ODialog: ODialogStub,
             PanelContainer: PanelContainerStub,
             DateTimePickerDashboard: false,
-            DateTime: false,
+            ODateTimeRange: false,
           },
         },
       });
@@ -827,7 +827,7 @@ describe("RenderDashboardCharts", () => {
     const panel = () => wrapper.findComponent({ name: "PanelContainer" });
     const dateTime = () => wrapper.findComponent({ name: "DateTimePickerDashboard" });
     const pickPreset = async (unit: string, value: number) => {
-      dateTime().findComponent(DateTime).vm.setRelativeDate(unit, value);
+      dateTime().findComponent(ODateTimeRange).vm.setRelativeDate(unit, value);
       await flushPromises();
     };
     const panelRefreshRequests = () =>
@@ -931,7 +931,7 @@ describe("RenderDashboardCharts", () => {
       async (_label, isOn) => {
         autoRun.value = isOn;
         await mountWithPanelPicker();
-        const realPicker = dateTime().findComponent(DateTime);
+        const realPicker = dateTime().findComponent(ODateTimeRange);
 
         realPicker.vm.onMenuOpenChange(true);
         realPicker.vm.selectedType = "absolute";
@@ -943,7 +943,7 @@ describe("RenderDashboardCharts", () => {
         realPicker.vm.onMenuOpenChange(false);
         await flushPromises();
 
-        expect(realPicker.vm.getDisplayValue).toBe("Past 1 Hour");
+        expect(realPicker.vm.getDisplayValue).toBe("Past 1 hour");
         expect(wrapper.vm.getPanelTimeGate("P1").picked.value.relativeTimePeriod).toBe("1h");
         expect(panel().props("isTimeRangeWaiting")).toBe(false);
         expect(panelRefreshRequests()).toHaveLength(0);
@@ -958,7 +958,7 @@ describe("RenderDashboardCharts", () => {
         startTime: start,
         endTime: start + 30 * 60e6,
       });
-      const realPicker = dateTime().findComponent(DateTime);
+      const realPicker = dateTime().findComponent(ODateTimeRange);
       const appliedLabel = "2026/10/13 10:00:00 - 2026/10/13 10:30:00";
       expect(realPicker.vm.getDisplayValue).toBe(appliedLabel);
 
@@ -1301,7 +1301,7 @@ describe("RenderDashboardCharts", () => {
       await nextTick();
       const dialog = wrapper.findComponent(ODialogStub);
       expect(dialog.exists()).toBe(true);
-      expect(dialog.props("width")).toBe(98);
+      expect(dialog.props("size")).toBe("full");
       expect(dialog.props("showClose")).toBe(false);
     });
 

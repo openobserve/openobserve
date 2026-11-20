@@ -16,12 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col py-3.5" data-test="svcver-env-versions">
-    <div class="text-text-body mb-3 flex flex-wrap items-center gap-2 text-[0.8125rem]">
+    <div class="text-text-body text-compact mb-3 flex flex-wrap items-center gap-2">
       <OIcon name="info" size="sm" class="text-text-secondary" />
       <span>{{ t("serviceVersions.settings.intro") }}</span>
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="svcver-overrides-how-detection"
         @click="showDetection = !showDetection"
         >{{ t("serviceVersions.settings.howDetection") }}</OButton
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <p
       v-if="showDetection && rows.length"
-      class="text-text-secondary mb-3 max-w-[48rem] text-[0.8125rem]"
+      class="text-text-secondary text-compact mb-3 max-w-[48rem]"
       data-test="svcver-overrides-detection-text"
     >
       <i18n-t keypath="serviceVersions.settings.emptyBody" tag="span"
@@ -45,40 +45,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col gap-2"
       data-test="svcver-overrides-loading"
     >
-      <OSkeleton class="h-6 w-48" />
-      <OSkeleton class="h-40 w-full" />
+      <OSkeleton shape="block" class="h-6 w-48" />
+      <OSkeleton shape="block" class="h-40 w-full" />
     </div>
     <OEmptyState
       v-else-if="denied"
-      size="hero"
-      preset="no-access"
-      :description="t('serviceVersions.settings.denied')"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('serviceVersions.settings.denied')"
       data-test="svcver-overrides-denied"
     />
-    <div
+    <OEmptyState
       v-else-if="overrides.isError.value"
-      class="rounded-default border-border-default text-text-secondary flex items-center gap-2 border px-4 py-3 text-sm"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="loadError"
       data-test="svcver-overrides-error"
-    >
-      <OIcon name="error-outline" size="sm" class="text-status-error-text" />
-      <span>{{ loadError }}</span>
-      <OButton variant="ghost-primary" size="xs" @click="overrides.refetch()">{{
-        t("serviceVersions.actions.retry")
-      }}</OButton>
-    </div>
-    <div
+      @action="overrides.refetch()"
+    />
+    <OEmptyState
       v-else-if="!rows.length && page === 1"
-      class="rounded-default border-border-default flex flex-col items-center gap-2.5 border px-6 py-10 text-center"
+      icon="check"
+      :title="t('serviceVersions.settings.emptyTitle')"
       data-test="svcver-overrides-empty"
     >
-      <span
-        class="bg-tabs-active-bg text-tabs-active-text rounded-surface flex h-12 w-12 items-center justify-center"
-        ><OIcon name="check" size="md"
-      /></span>
-      <div class="text-text-heading text-base font-semibold">
-        {{ t("serviceVersions.settings.emptyTitle") }}
-      </div>
-      <div class="text-text-secondary max-w-[34rem] text-[0.8125rem]">
+      <template #text>
         <i18n-t keypath="serviceVersions.settings.emptyBody" tag="span"
           ><template #attribute
             ><span class="font-mono">{{ raw("deployment.environment") }}</span></template
@@ -86,8 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ><b class="text-text-heading">{{ t("serviceVersions.envEdit.title") }}</b></template
           ></i18n-t
         >
-      </div>
-    </div>
+      </template>
+    </OEmptyState>
     <template v-else>
       <div class="mb-2 flex items-center gap-2">
         <span class="text-text-heading text-sm font-semibold">{{
@@ -107,8 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :page-size-options="[PAGE_SIZE]"
         :total-count="total"
         :default-columns="false"
-        dense
-        bordered
         data-test="svcver-overrides-table"
       >
         <template #cell-matches="{ row }">
@@ -119,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ raw(" ") }}{{ t("serviceVersions.settings.match.allNamespaces") }}</span
               ></span
             >
-            <span v-if="row.affected" class="text-text-secondary text-[0.6875rem]">{{
+            <span v-if="row.affected" class="text-text-secondary text-2xs">{{
               reach(row.affected)
             }}</span>
           </div>
@@ -132,7 +121,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dim-key="env"
                 :key-label="t('serviceVersions.compare.envChip')"
                 :value="t('serviceVersions.env.noEnv')"
-                variant="default-soft"
                 muted
                 :value-tooltip="false"
               />
@@ -141,23 +129,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dim-key="env"
                 :key-label="t('serviceVersions.compare.envChip')"
                 :value="row.inferred_value"
-                variant="success-soft"
                 :value-tooltip="false"
               />
-              <span
-                v-if="row.inferred_source !== 'default'"
-                class="text-text-secondary text-[0.6875rem]"
-                >{{
-                  t("serviceVersions.settings.from", { kind: envKind(row.inferred_source, t) })
-                }}</span
-              >
+              <span v-if="row.inferred_source !== 'default'" class="text-text-secondary text-2xs">{{
+                t("serviceVersions.settings.from", { kind: envKind(row.inferred_source, t) })
+              }}</span>
             </span>
             <OIcon name="arrow-forward" size="xs" class="text-text-muted" />
             <ODimensionChip
               dim-key="env"
               :key-label="t('serviceVersions.compare.envChip')"
               :value="row.value"
-              variant="success-soft"
               :value-tooltip="false"
             />
           </span>
@@ -165,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-who="{ row }">
           <span class="flex items-center gap-2" :title="row.updated_by || row.created_by">
             <span
-              class="bg-surface-panel text-text-secondary flex h-5 w-5 items-center justify-center rounded-full text-[0.5625rem] font-semibold"
+              class="bg-surface-panel text-text-secondary text-2xs flex h-5 w-5 items-center justify-center rounded-full font-semibold"
               >{{ initials(row.updated_by || row.created_by) }}</span
             >{{ person(row.updated_by || row.created_by) }}
           </span>
@@ -175,8 +157,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-remove="{ row }">
           <OButton
-            variant="ghost-destructive"
-            size="xs"
+            variant="danger-ghost"
+            size="sm"
             :loading="removing === row.rule_key"
             :disabled="Boolean(removing)"
             :data-test="`svcver-override-remove-${row.rule_key}`"
@@ -196,7 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <div
-      class="rounded-default bg-surface-panel border-border-default mt-4 flex items-center gap-2 border px-3 py-2.5 text-[0.8125rem]"
+      class="rounded-default bg-surface-panel border-border-default text-compact mt-4 flex items-center gap-2 border px-3 py-2.5"
       data-test="svcver-overrides-versions-note"
     >
       <OIcon name="check" size="sm" class="text-text-secondary" />
@@ -221,8 +203,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span>{{ undo.error || t("serviceVersions.settings.removed") }}</span>
         <OButton
           v-if="!undo.error"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :loading="undo.busy"
           data-test="svcver-overrides-undo"
           @click="runUndo"

@@ -16,15 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="md"
     data-test="semantic-field-groups-config-import-drawer"
     v-model:open="internalOpen"
-    :width="40"
     :title="t('correlation.importSemanticGroupsTitle')"
-    :sub-title="t('correlation.importSemanticGroupsSubtitle')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="t('correlation.applyChanges')"
-    :primary-button-disabled="!hasSelectedChanges"
-    :primary-button-loading="isApplying"
+    :subtitle="t('correlation.importSemanticGroupsSubtitle')"
+    :secondary="{ label: t('common.cancel') }"
+    :primary="{
+      label: t('correlation.applyChanges'),
+      disabled: !hasSelectedChanges,
+      loading: isApplying,
+    }"
     @click:secondary="handleClose"
     @click:primary="handleApply"
     @update:open="handleOpenChange"
@@ -37,26 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('correlation.selectJsonFile')"
           accept=".json"
           @update:model-value="loadFile"
+          @clear="clearFile"
           data-test="semantic-groups-import-file-drawer"
-        >
-          <template v-slot:prepend>
-            <OIcon name="cloud-upload" size="sm" />
-          </template>
-          <template v-slot:append>
-            <OIcon
-              v-if="jsonFile"
-              name="close"
-              size="sm"
-              @click.stop="clearFile"
-              class="cursor-pointer"
-            />
-          </template>
-        </OFile>
+        />
       </div>
 
       <!-- Loading State -->
       <div v-if="isLoading" class="p-4 text-center">
-        <OSpinner variant="dots" size="lg" />
+        <OSpinner size="lg" />
         <div class="text-text-muted mt-3 text-sm">{{ t("correlation.analyzingFile") }}</div>
       </div>
 
@@ -88,13 +78,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Selection Actions -->
         <div class="selection-actions mb-3">
           <OButtonGroup>
-            <OButton variant="ghost-primary" size="xs" @click="selectAllAdditions">{{
+            <OButton variant="accent-ghost" size="sm" @click="selectAllAdditions">{{
               t("correlation.selectAllNew")
             }}</OButton>
-            <OButton variant="ghost-warning" size="xs" @click="selectAllModifications">{{
+            <OButton variant="ghost" size="sm" @click="selectAllModifications">{{
               t("correlation.selectAllModified")
             }}</OButton>
-            <OButton variant="ghost-muted" size="xs" @click="deselectAll">{{
+            <OButton variant="ghost" size="sm" @click="deselectAll">{{
               t("correlation.clearAll")
             }}</OButton>
           </OButtonGroup>
@@ -133,9 +123,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="ms-auto flex shrink-0 items-center">
                   <OButton
+                    icon-only
                     :aria-label="t('common.view')"
                     variant="ghost"
-                    size="icon-circle-sm"
+                    size="sm"
                     @click.stop="viewGroup(group)"
                   >
                     <OIcon name="visibility" size="sm" />
@@ -178,9 +169,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="ms-auto flex shrink-0 items-center">
                   <OButton
+                    icon-only
                     :aria-label="t('common.compare')"
                     variant="ghost"
-                    size="icon-circle-sm"
+                    size="sm"
                     @click.stop="viewModification(mod)"
                   >
                     <OIcon name="compare" size="sm" />
@@ -193,9 +185,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Unchanged (Collapsed) -->
           <div v-if="diffData.unchanged.length > 0">
             <OCollapsible
-              v-model="unchangedOpen"
-              :label="t('common.unchangedCount', { count: diffData.unchanged.length })"
-              icon="check-circle"
+              v-model:open="unchangedOpen"
+              :title="t('common.unchangedCount', { count: diffData.unchanged.length })"
             >
               <ul class="divide-border rounded-default flex flex-col divide-y border">
                 <li
@@ -236,8 +227,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="showGroupDialog"
     size="md"
     :title="raw(selectedGroup?.display)"
-    :sub-title="t('common.idPrefix', { id: selectedGroup?.id })"
-    :primary-button-label="t('common.close')"
+    :subtitle="t('common.idPrefix', { id: selectedGroup?.id })"
+    :primary="{ label: t('common.close') }"
     @click:primary="showGroupDialog = false"
   >
     <div>
@@ -262,8 +253,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="showModificationDialog"
     size="lg"
     :title="raw(selectedModification?.proposed.display)"
-    :sub-title="t('correlation.compareChanges')"
-    :primary-button-label="t('common.close')"
+    :subtitle="t('correlation.compareChanges')"
+    :primary="{ label: t('common.close') }"
     @click:primary="showModificationDialog = false"
   >
     <div class="flex gap-3">

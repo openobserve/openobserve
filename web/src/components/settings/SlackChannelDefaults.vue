@@ -25,7 +25,7 @@ import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
@@ -218,9 +218,7 @@ const save = async (value: DefaultForm): Promise<void> => {
   >
     <template #actions>
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="add"
+        variant="secondary"
         :disabled="readOnly"
         data-test="slack-channel-set-default"
         @click="openDrawer(null)"
@@ -230,19 +228,16 @@ const save = async (value: DefaultForm): Promise<void> => {
       </OButton>
     </template>
 
-    <div class="rounded-b-surface -mx-4 -my-3 overflow-hidden">
+    <div class="rounded-surface border-border-default overflow-hidden border">
       <OTable
         :data="rows"
         :columns="columns"
         row-key="channel_id"
         pagination="none"
-        :show-global-filter="false"
         :loading="defaults.isPending.value"
         :error="loadError"
         :forbidden="forbidden"
         :cell-overflow-tooltip="false"
-        :frame="false"
-        dense
       >
         <template #cell-channel="{ row }">{{ raw(`#${row.channel_name}`) }}</template>
         <template #cell-default_org="{ row }">
@@ -282,9 +277,9 @@ const save = async (value: DefaultForm): Promise<void> => {
         <template #cell-actions="{ row }">
           <div v-if="canChange(row)" class="flex items-center justify-end">
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="edit"
+              icon="edit"
               class="max-md:hidden"
               :aria-label="t('slackApp.channels.edit')"
               :data-test="`slack-channel-edit-${row.channel_id}`"
@@ -293,9 +288,9 @@ const save = async (value: DefaultForm): Promise<void> => {
               <OTooltip side="bottom" :content="t('slackApp.channels.edit')" />
             </OButton>
             <OButton
-              variant="ghost-destructive"
-              size="icon-sm"
-              icon-left="delete-outline"
+              icon-only
+              variant="danger-ghost"
+              icon="delete-outline"
               class="max-md:hidden"
               :aria-label="t('slackApp.channels.remove')"
               :data-test="`slack-channel-remove-${row.channel_id}`"
@@ -306,25 +301,26 @@ const save = async (value: DefaultForm): Promise<void> => {
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
-                  icon-left="more-vert"
+                  icon-only
+                  icon="more-vert"
                   :aria-label="t('dashboard.moreActions')"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   :data-test="`slack-channel-${row.channel_id}-menu`"
                   @click.stop
                 />
               </template>
               <ODropdownItem
-                icon-left="edit"
+                icon="edit"
                 :data-test="`slack-channel-edit-${row.channel_id}-menu`"
                 @select="openDrawer(row)"
               >
                 {{ t("slackApp.channels.edit") }}
               </ODropdownItem>
               <ODropdownItem
-                icon-left="delete-outline"
-                variant="destructive"
+                icon="delete-outline"
+                tone="danger"
                 :data-test="`slack-channel-remove-${row.channel_id}-menu`"
                 @select="askRemove(row)"
               >
@@ -343,26 +339,30 @@ const save = async (value: DefaultForm): Promise<void> => {
         </template>
         <template #error>
           <OEmptyState
-            size="compact"
-            preset="load-error"
-            :backdrop="false"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="t('emptyState.loadError.description')"
             data-test="slack-channel-defaults-error"
             @action="defaults.refetch()"
           />
         </template>
         <template #empty>
-          <OEmptyState size="compact" preset="no-slack-channel-defaults" :backdrop="false" />
+          <OEmptyState
+            icon="dashboard"
+            :title="t('emptyState.noSlackChannelDefaults.title')"
+            :text="t('emptyState.noSlackChannelDefaults.description')"
+          />
         </template>
       </OTable>
     </div>
 
     <ODrawer
       v-model:open="drawerOpen"
-      size="md"
+      size="sm"
       :title="editing ? t('slackApp.channels.editDefault') : t('slackApp.channels.setDefault')"
       :form-id="FORM_ID"
-      :primary-button-label="t('common.save')"
-      :secondary-button-label="t('common.cancel')"
+      :primary="{ label: t('common.save') }"
+      :secondary="{ label: t('common.cancel') }"
       @click:secondary="drawerOpen = false"
     >
       <OForm
@@ -374,16 +374,12 @@ const save = async (value: DefaultForm): Promise<void> => {
         class="flex flex-col gap-5"
         @submit="save"
       >
-        <OBanner
-          v-if="saveError"
-          variant="error-soft"
-          dense
-          icon="error-outline"
-          data-test="slack-channel-save-error"
-          >{{ raw(saveError) }}</OBanner
-        >
+        <OInlineNotice v-if="saveError" tone="err" data-test="slack-channel-save-error">{{
+          raw(saveError)
+        }}</OInlineNotice>
         <div class="flex flex-col gap-1">
           <OFormSelect
+            searchable
             name="channel_id"
             :label="t('slackApp.channels.channel')"
             :placeholder="t('slackApp.channels.channelPlaceholder')"
@@ -402,8 +398,8 @@ const save = async (value: DefaultForm): Promise<void> => {
           />
           <OButton
             v-if="!editing && channels.hasNextPage.value"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             class="w-fit"
             :loading="channels.isFetchingNextPage.value"
             data-test="slack-channel-more"
@@ -456,8 +452,7 @@ const save = async (value: DefaultForm): Promise<void> => {
       message-keypath="slackApp.channels.removeMessage"
       :message-name="removing ? `#${removing.channel_name}` : ''"
       :ok-label="t('slackApp.channels.removeConfirm')"
-      ok-variant="destructive"
-      focus-cancel
+      kind="destructive"
       @update:ok="confirmRemove"
     />
   </OFormSection>

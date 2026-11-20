@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col items-center gap-1.5 text-sm">
       <template v-if="state === 'error'">
         <span data-test="replay-overlay-message">{{ t("rum.sessionReplayLoadFailed") }}</span>
-        <OButton size="sm" data-test="replay-overlay-retry" @click="emit('retry')">
+        <OButton variant="primary" data-test="replay-overlay-retry" @click="emit('retry')">
           {{ t("rum.sessionReplayRetry") }}
         </OButton>
       </template>
@@ -34,12 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span data-test="replay-overlay-message">
           {{ t("rum.sessionReplayLoadFailedRange", { from: failedFromLabel, to: failedToLabel }) }}
         </span>
-        <OButton size="sm" data-test="replay-overlay-retry" @click="emit('retry')">
+        <OButton variant="primary" data-test="replay-overlay-retry" @click="emit('retry')">
           {{ t("rum.sessionReplayRetry") }}
         </OButton>
       </template>
       <template v-else-if="pendingSeekMs !== null">
-        <OSpinner size="sm" />
+        <OSpinner size="lg" />
         <span data-test="replay-overlay-message">
           {{ t("rum.sessionReplayLoadingUpTo", { time: targetLabel }) }}
         </span>
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </template>
       <template v-else>
-        <OSpinner size="sm" />
+        <OSpinner size="lg" />
         <span data-test="replay-overlay-message">{{ t("rum.sessionReplayNextPart") }}</span>
         <span class="text-text-secondary text-xs">{{ t("rum.sessionReplayResumesOnItsOwn") }}</span>
       </template>

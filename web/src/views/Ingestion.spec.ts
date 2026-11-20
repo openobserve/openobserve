@@ -168,7 +168,7 @@ describe("Ingestion", () => {
               props: ["modelValue", "horizontal", "align"],
               emits: ["update:modelValue"],
             },
-            ORouteTab: {
+            OTab: {
               template: '<div class="o-route-tab-stub"><slot /></div>',
               props: ["name", "to", "label", "icon"],
             },
@@ -481,7 +481,7 @@ describe("Ingestion", () => {
             ConfirmDialog: { template: "<div />" },
             OButton: { template: "<button><slot /></button>" },
             OTabs: { template: "<div><slot /></div>" },
-            ORouteTab: { template: "<div class='route-tab-stub'><slot /></div>" },
+            OTab: { template: "<div class='route-tab-stub'><slot /></div>" },
             "router-view": { template: "<div />" },
           },
         },
@@ -544,7 +544,7 @@ describe("Ingestion", () => {
             ConfirmDialog: { template: "<div />" },
             OButton: { template: "<button><slot /></button>" },
             OTabs: { template: "<div><slot /></div>" },
-            ORouteTab: { template: "<div class='route-tab-stub'><slot /></div>" },
+            OTab: { template: "<div class='route-tab-stub'><slot /></div>" },
             "router-view": { template: "<div />" },
           },
         },
@@ -1009,7 +1009,7 @@ describe("Ingestion", () => {
       await flushPromises();
 
       expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -1035,7 +1035,7 @@ describe("Ingestion", () => {
 
       // Verify that copyToClipboard was called
       expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -1096,11 +1096,11 @@ describe("Ingestion", () => {
             OButton: {
               name: "OButton",
               template: "<button @click=\"$emit('click')\"><slot /></button>",
-              props: { variant: String, size: String, disabled: Boolean, iconLeft: String },
+              props: { variant: String, size: String, disabled: Boolean, icon: String },
               emits: ["click"],
             },
             OTabs: { template: "<div><slot /></div>" },
-            ORouteTab: { template: "<div class='route-tab-stub'><slot /></div>" },
+            OTab: { template: "<div class='route-tab-stub'><slot /></div>" },
             "router-view": { template: "<div />" },
           },
         },
@@ -1142,7 +1142,7 @@ describe("Ingestion", () => {
         .findAllComponents({ name: "OButton" })
         .find((b: any) => b.attributes("data-test") === "ingestion-reset-token-btn");
       expect(btn?.exists()).toBe(true);
-      expect(btn?.props("iconLeft")).not.toBe("lock");
+      expect(btn?.props("icon")).not.toBe("lock");
       w.unmount();
       await router.push(before);
     });
@@ -1479,7 +1479,7 @@ describe("Ingestion default child", () => {
           ConfirmDialog: { template: "<div />" },
           OButton: { template: "<button><slot /></button>" },
           OTabs: { template: "<div><slot /></div>" },
-          ORouteTab: { template: "<div><slot /></div>" },
+          OTab: { template: "<div><slot /></div>" },
           "router-view": { template: "<div />" },
         },
       },

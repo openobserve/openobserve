@@ -40,8 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="signals.length && teamName"
         variant="primary"
-        size="sm"
-        icon-left="add"
         class="ms-auto"
         :loading="claiming"
         data-test="oncall-unrouted-claim-all"
@@ -55,13 +53,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="signals"
       :columns="columns"
       row-key="id"
-      :frame="false"
       :loading="loading"
       :error="error || null"
-      show-index
       pagination="client"
       :global-filter="search"
-      :show-global-filter="false"
       :row-class="rowClass"
       table-id="oncall-unrouted-queue"
       :persist-columns="true"
@@ -76,9 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Inside the table, so the host's toolbar — and the way back to the other tab — stays up. -->
       <template #error>
         <OEmptyState
-          size="block"
-          preset="load-error"
-          :title="error || undefined"
+          kind="error"
+          :text="t('emptyState.loadError.description')"
+          :title="error || t('emptyState.loadError.title')"
           data-test="oncall-unrouted-error"
           @action="emit('retry')"
         />
@@ -90,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                a page fell through is worth more than a tidy table. -->
           <OTag
             v-if="row.dismissed_at"
-            variant="default-soft"
+            tone="neutral"
             size="sm"
             class="shrink-0"
             :data-test="`oncall-unrouted-dismissed-${row.id}`"
@@ -155,9 +150,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <span class="flex items-center justify-end gap-1">
           <OButton
-            variant="outline-primary"
-            size="xs"
-            icon-left="alt-route"
+            variant="secondary"
+            size="sm"
+            icon="alt-route"
             class="max-md:hidden"
             :data-test="`oncall-unrouted-claim-${row.id}`"
             @click.stop="emit('claim', row)"
@@ -165,9 +160,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ claimLabel }}
           </OButton>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="close"
+            icon="close"
             class="max-md:hidden"
             :aria-label="t('oncall.routingNotOurs')"
             :data-test="`oncall-unrouted-dismiss-${row.id}`"
@@ -178,9 +173,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
-                icon-left="more-vert"
+                icon-only
+                icon="more-vert"
                 variant="ghost"
-                size="icon-xs-sq"
+                size="sm"
                 class="md:hidden"
                 :aria-label="t('oncall.moreActions')"
                 data-test="oncall-unrouted-row-more-actions"
@@ -188,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <ODropdownItem
-              icon-left="alt-route"
+              icon="alt-route"
               class="md:hidden"
               :data-test="`oncall-unrouted-claim-${row.id}-menu`"
               @select="emit('claim', row)"
@@ -196,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ claimLabel }}</span>
             </ODropdownItem>
             <ODropdownItem
-              icon-left="close"
+              icon="close"
               class="md:hidden"
               :data-test="`oncall-unrouted-dismiss-${row.id}-menu`"
               @select="emit('dismiss', row)"
@@ -214,16 +210,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="!loading">
           <OEmptyState
             v-if="search"
-            size="block"
-            preset="no-oncall-unrouted"
-            filtered
+            kind="filtered"
+            :title="t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })"
+            :text="
+              t('emptyState.filtered.description', { noun: t('emptyState.filtered.fallbackNoun') })
+            "
             data-test="oncall-unrouted-empty"
-            @action="onEmptyAction"
+            @action="emit('clear-search')"
           />
           <OEmptyState
             v-else
-            size="block"
-            preset="no-oncall-unrouted"
+            :title="t('emptyState.noOncallUnrouted.title')"
+            :text="t('emptyState.noOncallUnrouted.description')"
+            icon="task-alt"
             data-test="oncall-unrouted-empty"
           />
         </template>
@@ -413,9 +412,5 @@ function pathChipsText(signal: UnroutedSignal): I18nText {
       .map((chip) => `${chip.label} ${chip.value}`)
       .join(" · "),
   );
-}
-
-function onEmptyAction(id?: string) {
-  if (id === "clear-filters") emit("clear-search");
 }
 </script>

@@ -5,18 +5,18 @@
     copy-snippet="first"
   >
     <div class="flex flex-col gap-2">
-      <div class="text-base font-semibold">{{ t("ingestion.hostMetricsReceiver") }}</div>
+      <div class="text-sm font-semibold">{{ t("ingestion.hostMetricsReceiver") }}</div>
       <CredentialCodeBlock slug="metrics-otel-host-metrics" :content="getHostMetricsConfig" />
       <div class="text-text-secondary text-xs">
         {{ t("ingestion.hostMetricsReceiverNote", { attr: raw("host.name") }) }}
       </div>
     </div>
     <div class="flex flex-col gap-2">
-      <div class="text-base font-semibold">{{ t("ingestion.otlpHttp") }}</div>
+      <div class="text-sm font-semibold">{{ t("ingestion.otlpHttp") }}</div>
       <CredentialCodeBlock slug="metrics-otel-http" :content="getOtelHttpConfig" />
     </div>
     <div class="flex flex-col gap-2" v-if="showOtlpGrpc">
-      <div class="text-base font-semibold">{{ t("ingestion.otlpGrpc") }}</div>
+      <div class="text-sm font-semibold">{{ t("ingestion.otlpGrpc") }}</div>
       <CredentialCodeBlock slug="metrics-otel-grpc" :content="getOtelGrpcConfig" />
     </div>
   </IngestionContent>

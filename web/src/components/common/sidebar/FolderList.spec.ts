@@ -52,8 +52,7 @@ const ConfirmDialogStub = {
     messageName: { type: String },
     confirmText: { type: String },
     okLabel: { type: String },
-    okVariant: { type: String },
-    focusCancel: { type: Boolean, default: false },
+    kind: { type: String },
   },
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: `
@@ -373,7 +372,7 @@ describe("FolderList.vue", () => {
 
     describe("updateFolderList", () => {
       it("should update folder list and emit event", async () => {
-        const mockFolders = [{ folderId: "new-folder", name: "New Folder" }];
+        const mockFolders = [{ folderId: "new-folder", name: "New folder" }];
 
         await wrapper.vm.updateFolderList(mockFolders);
 
@@ -610,7 +609,7 @@ describe("FolderList.vue", () => {
     it("reads Folders in the rail header and Add Folder on the add button by default", () => {
       expect(wrapper.text()).toContain("Folders");
       expect(wrapper.find('[data-test="dashboard-new-folder-btn"]').attributes("title")).toBe(
-        "Add Folder",
+        "Add folder",
       );
     });
 
@@ -657,8 +656,7 @@ describe("FolderList.vue", () => {
       expect(fleets.findComponent(ConfirmDialogStub).props()).toMatchObject({
         confirmText: "test1",
         okLabel: "Delete",
-        okVariant: "destructive",
-        focusCancel: true,
+        kind: "typeToConfirm",
       });
       fleets.unmount();
       (wrapper.vm as any).showDeleteFolderDialogFn("folder1");
@@ -666,8 +664,7 @@ describe("FolderList.vue", () => {
       expect(wrapper.findComponent(ConfirmDialogStub).props()).toMatchObject({
         confirmText: undefined,
         okLabel: undefined,
-        okVariant: "destructive",
-        focusCancel: false,
+        kind: "typeToConfirm",
       });
     });
 
@@ -878,7 +875,7 @@ describe("FolderList.vue", () => {
         messageKeypath: "dashboard.deleteFolderMessage",
         messageName: "Test Folder 1",
         message: undefined,
-        okVariant: "destructive",
+        kind: "typeToConfirm",
       });
     });
 

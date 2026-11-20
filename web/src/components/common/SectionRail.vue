@@ -27,40 +27,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-surface-panel flex h-full min-h-0 flex-col"
     data-test="section-rail"
   >
-    <!-- Collapsed there is room for one mark, so the module icon doubles as the
-         expand control rather than sitting inert beside a second button. It is
-         tinted like MenuLink's active module for the same reason the primary nav
-         tints one: a grey glyph alone reads as decoration, not as a target. -->
-    <OButton
+    <!-- One 56 px row with the page header band and its hairline, so the two read as one header row (H4). -->
+    <div
       v-if="collapsible && collapsed && icon"
-      variant="ghost"
-      size="icon-xs-sq"
-      class="bg-tabs-hover-bg mx-auto mt-3 mb-1 shrink-0"
-      :aria-expanded="false"
-      :aria-label="collapsedLabel"
-      data-test="section-rail-toggle"
-      @click="toggle"
+      class="border-border-default flex h-14 shrink-0 items-center justify-center border-b"
+      data-test="section-rail-head"
     >
-      <OIcon :name="icon" size="sm" class="text-accent" />
-      <!-- The mark stands in for the title, so the tooltip names the module
-           rather than the gesture: `aria-expanded` already carries the action,
-           and "Expand" alone leaves a collapsed rail unlabelled. -->
-      <OTooltip :content="collapsedLabel" side="right" />
-    </OButton>
+      <!-- The module mark doubles as the expand control, tinted so it reads as a target. -->
+      <OButton
+        icon-only
+        variant="ghost"
+        class="bg-tabs-hover-bg"
+        :aria-expanded="false"
+        :aria-label="collapsedLabel"
+        data-test="section-rail-toggle"
+        @click="toggle"
+      >
+        <OIcon :name="icon" size="sm" class="text-accent" />
+        <!-- Names the module, not the gesture: `aria-expanded` already carries the action. -->
+        <OTooltip :content="collapsedLabel" side="right" />
+      </OButton>
+    </div>
 
-    <!-- Title aligns with the item LABELS below it (the page-edge grid line the
-         OTab pills' text lands on), not the pill edge — so 'IAM'/'Settings' sits
-         directly above 'Users'. Matches FolderList's heading. -->
-    <div v-else-if="title" class="ps-page-edge flex shrink-0 items-center gap-1.5 pe-1.5 pt-3 pb-1">
+    <!-- The title starts on the page-edge line that the group headings and item icons below share. -->
+    <div
+      v-else-if="title"
+      class="ps-page-edge border-border-default flex h-14 shrink-0 items-center gap-1.5 border-b pe-2"
+      data-test="section-rail-head"
+    >
       <OTruncatedText class="text-text-heading flex-1 text-sm font-semibold">{{
         title
       }}</OTruncatedText>
-      <!-- Same control the logs field panel uses, so the two rails collapse by
-           the same affordance rather than each inventing one. -->
+      <!-- Same control the logs field panel uses, so the two rails collapse by the same affordance. -->
       <OButton
         v-if="collapsible"
-        variant="outline"
-        size="icon-xs-sq"
+        icon-only
+        variant="ghost"
         class="shrink-0"
         :aria-expanded="true"
         :aria-label="toggleLabel"
@@ -72,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-1 pt-1 pb-3">
+    <div class="flex-1 overflow-y-auto px-2 pt-3 pb-3">
       <OTabs
         :model-value="activeKey ?? ''"
         orientation="vertical"
@@ -80,10 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @change="onTabChange"
       >
         <template v-for="(group, idx) in visibleGroups" :key="group.label || idx">
-          <!-- Section label. Each group after the first gets top spacing so the
-               sub-sections read as separate blocks rather than one merged list. -->
-          <!-- ps-2 (on top of the container's px-1) puts the section label on
-               the same 12px item-label grid line as the tabs below it. -->
+          <!-- ps-2 on the container's px-2 lands the heading on the title's 16 px line. -->
           <div
             v-if="!collapsed && group.label"
             class="text-text-secondary py-1 ps-2 text-xs font-semibold"
@@ -108,12 +107,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="collapsed ? undefined : item.label"
               :tooltip="collapsed ? item.label : undefined"
               :icon="item.icon"
-              :suffix-icon="(item.locked || item.licenseLocked) && !collapsed ? 'lock' : undefined"
-              :suffix-label="item.lockedLabel"
+              :locked="(item.locked || item.licenseLocked) && !collapsed"
+              :locked-label="item.lockedLabel"
               :data-test="item.locked ? `${item.dataTest}-locked` : item.dataTest"
               class="w-full"
               :class="collapsed ? 'justify-center!' : undefined"
-              @click="navigate(item.locked ? { name: 'enterpriseFeatures' } : item.to)"
+              @click="navigate(item.to)"
             >
               <template v-if="collapsed && (item.locked || item.licenseLocked)" #icon>
                 <span class="relative inline-flex shrink-0">

@@ -9,7 +9,7 @@
 //   dashboard / alert / report    `<type>:<folderId>/<itemId>`   folder in the object
 //   synthetics / workflows        `<type>:<itemId>`              folder NOT in the object
 //   logs / metrics / traces / index   `<type>:<streamName>`      own type per stream
-//   "Every Stream"                `stream:_all_<org>`
+//   "Every stream"                `stream:_all_<org>`
 //
 // synthetics and workflows are parented to folders in OpenFGA (mapping.rs) yet save
 // flat — useRoleJsonView.ts has to SEARCH the folders to find which one holds an id
@@ -46,7 +46,7 @@ const F_OBJ = `${NS}_o_folder`;
 let fid;
 
 // One logs stream is enough: O-04 only needs a single stream whose saved object must
-// carry the `logs:` prefix rather than collapsing onto `stream:`. ("Every Stream" is
+// carry the `logs:` prefix rather than collapsing onto `stream:`. ("Every stream" is
 // asserted on the pinned scope row in the same test, which needs no fixture.)
 const S_LOG = `${NS}_o_log`;
 
@@ -199,7 +199,7 @@ test.describe('IAM · Edit Role · saved object format', { tag: '@enterprise' },
         const name = await openFresh(page, 'stream');
         await pm.rolesPage.openModule('stream');
 
-        // "Every Stream" is the pinned scope row on the stream module.
+        // "Every stream" is the pinned scope row on the stream module.
         await pm.rolesPage.grantScope('stream', 'AllowList');
         const wide = await pm.rolesPage.saveAndCapture();
         expect(wide.add).toEqual([{ object: obj('stream'), permission: 'AllowList' }]);

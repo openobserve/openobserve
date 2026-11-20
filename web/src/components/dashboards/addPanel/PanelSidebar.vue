@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-sidebar"
       />
       <div
-        class="font-bold [text-orientation:mixed] [writing-mode:vertical-rl]"
+        class="font-semibold [text-orientation:mixed] [writing-mode:vertical-rl]"
         data-test="panel-sidebar-collapsed-title"
       >
         {{ title }}
@@ -49,13 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ title }}
       </div>
       <OButton
+        icon-only
         :aria-label="t('common.collapse')"
-        variant="outline"
-        size="icon-xs-sq"
+        variant="ghost"
+        size="sm"
         class="rotate-90"
         @click="toggleSidebar"
         data-test="dashboard-sidebar-collapse-btn"
-        icon-left="unfold-less"
+        icon="unfold-less"
       >
       </OButton>
     </div>

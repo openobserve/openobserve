@@ -108,7 +108,8 @@ function createWrapper(props: Record<string, any> = {}) {
         OSpinner: { template: '<div data-test="spinner" />' },
         OEmptyState: {
           name: "OEmptyState",
-          template: '<div><slot name="title" /><slot name="description" /></div>',
+          props: ["title", "text"],
+          template: "<div>{{ title }}{{ text }}</div>",
         },
       },
     },
@@ -293,7 +294,7 @@ describe("ErrorsDashboard", () => {
       await nextTick();
 
       // Assert
-      expect(wrapper.text()).toContain("Loading Dashboard");
+      expect(wrapper.text()).toContain("Loading dashboard");
     });
   });
 

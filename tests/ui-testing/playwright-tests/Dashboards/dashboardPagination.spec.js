@@ -74,15 +74,15 @@ test.describe("Folder Switch Pagination Reset testcases", () => {
     async ({ page }) => {
       testLogger.info("Opening folder A and navigating to page 2");
       await pm.dashboardFolder.openFolderByName(folderA.name);
-      await pm.dashboardList.expectPaginationInfoToMatch(/Showing 1 - 20 of 25/);
+      await pm.dashboardList.expectPaginationInfoToMatch(/^1–20 of 25$/);
 
       await pm.dashboardList.clickNextPage();
-      await pm.dashboardList.expectPaginationInfoToMatch(/Showing 21 - /);
+      await pm.dashboardList.expectPaginationInfoToMatch(/^21–/);
       await pm.dashboardList.expectUrlHasPageParam("2");
 
       testLogger.info("Switching to folder B");
       await pm.dashboardFolder.openFolderByName(folderB.name);
-      await pm.dashboardList.expectPaginationInfoToMatch(/Showing 1 - 2 of 2/);
+      await pm.dashboardList.expectPaginationInfoToMatch(/^1–2 of 2$/);
       await pm.dashboardList.expectUrlHasNoPageParam();
       testLogger.info("Test completed");
     },
@@ -94,10 +94,10 @@ test.describe("Folder Switch Pagination Reset testcases", () => {
     async ({ page }) => {
       testLogger.info("Opening folder A and navigating to page 2");
       await pm.dashboardFolder.openFolderByName(folderA.name);
-      await pm.dashboardList.expectPaginationInfoToMatch(/Showing 1 - 20 of 25/);
+      await pm.dashboardList.expectPaginationInfoToMatch(/^1–20 of 25$/);
 
       await pm.dashboardList.clickNextPage();
-      await pm.dashboardList.expectPaginationInfoToMatch(/Showing 21 - /);
+      await pm.dashboardList.expectPaginationInfoToMatch(/^21–/);
       await pm.dashboardList.expectUrlHasPageParam("2");
 
       testLogger.info("Opening a dashboard from page 2");
@@ -107,7 +107,7 @@ test.describe("Folder Switch Pagination Reset testcases", () => {
       testLogger.info("Returning to the list");
       await pm.dashboardCreate.backToDashboardList();
 
-      await pm.dashboardList.expectPaginationInfoToMatch(/Showing 21 - /);
+      await pm.dashboardList.expectPaginationInfoToMatch(/^21–/);
       await pm.dashboardList.expectUrlHasPageParam("2");
       testLogger.info("Test completed");
     },
@@ -125,7 +125,7 @@ test.describe("Folder Switch Pagination Reset testcases", () => {
       );
       await waitForDashboardPage(page);
 
-      await pm.dashboardList.expectPaginationInfoToMatch(/Showing 1 - 2 of 2/);
+      await pm.dashboardList.expectPaginationInfoToMatch(/^1–2 of 2$/);
       await pm.dashboardList.expectUrlNotHasPageParam("5");
       testLogger.info("Test completed");
     },
@@ -137,15 +137,15 @@ test.describe("Folder Switch Pagination Reset testcases", () => {
     async ({ page }) => {
       testLogger.info("Opening folder A and navigating to page 2");
       await pm.dashboardFolder.openFolderByName(folderA.name);
-      await pm.dashboardList.expectPaginationInfoToMatch(/Showing 1 - 20 of 25/);
+      await pm.dashboardList.expectPaginationInfoToMatch(/^1–20 of 25$/);
 
       await pm.dashboardList.clickNextPage();
-      await pm.dashboardList.expectPaginationInfoToMatch(/Showing 21 - /);
+      await pm.dashboardList.expectPaginationInfoToMatch(/^21–/);
 
       testLogger.info("Switching to the shorter folder B");
       await pm.dashboardFolder.openFolderByName(folderB.name);
 
-      await pm.dashboardList.expectPaginationInfoToMatch(/Showing 1 - 2 of 2/);
+      await pm.dashboardList.expectPaginationInfoToMatch(/^1–2 of 2$/);
       await pm.dashboardList.expectAtLeastOneRow();
       await pm.dashboardList.expectUrlHasNoPageParam();
       testLogger.info("Test completed");

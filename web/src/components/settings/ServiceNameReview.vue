@@ -35,7 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="item in FILTERS"
           :key="item"
           :value="item"
-          size="sm"
           :data-test="`svcver-name-review-filter-${item}`"
           >{{ t(`serviceVersions.nameReview.filters.${item}`) }}
           <span class="text-text-secondary ms-1.5 text-xs tabular-nums">{{
@@ -52,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="!readOnly"
         class="ms-auto"
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         :disabled="acceptHigh.done || !highTotal || busy !== ''"
         :loading="busy === BULK"
         data-test="svcver-name-review-accept-high"
@@ -68,18 +67,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </div>
     <div v-if="actionError" class="px-page-edge">
-      <OBanner
-        variant="error"
-        icon="error-outline"
-        dense
-        data-test="svcver-name-review-action-error"
-        >{{ actionError }}</OBanner
-      >
+      <OInlineNotice tone="err" data-test="svcver-name-review-action-error">{{
+        actionError
+      }}</OInlineNotice>
     </div>
     <div v-if="skipped" class="px-page-edge">
-      <OBanner variant="warning" icon="warning" dense data-test="svcver-name-review-skipped">{{
+      <OInlineNotice tone="warn" data-test="svcver-name-review-skipped">{{
         t("serviceVersions.nameReview.collision.skipped", { n: skipped }, skipped)
-      }}</OBanner>
+      }}</OInlineNotice>
     </div>
 
     <div
@@ -87,35 +82,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="px-page-edge flex min-h-64 shrink-0 flex-col gap-2"
       data-test="svcver-name-review-loading"
     >
-      <OSkeleton class="h-10 w-full" />
-      <OSkeleton class="w-full flex-1" />
+      <OSkeleton shape="block" class="h-10 w-full" />
+      <OSkeleton shape="block" class="w-full flex-1" />
     </div>
     <OEmptyState
       v-else-if="denied"
-      size="hero"
-      preset="no-access"
-      :description="t('serviceVersions.nameReview.states.denied')"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('serviceVersions.nameReview.states.denied')"
       data-test="svcver-name-review-denied"
     />
-    <div
+    <OEmptyState
       v-else-if="list.isError.value"
-      class="mx-page-edge rounded-default border-border-default text-text-secondary flex items-center gap-2 border px-4 py-3 text-sm"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="loadError"
       data-test="svcver-name-review-error"
-    >
-      <OIcon name="error-outline" size="sm" class="text-status-error-text" />
-      <span>{{ loadError }}</span>
-      <OButton variant="ghost-primary" size="xs" @click="list.refetch()">{{
-        t("serviceVersions.actions.retry")
-      }}</OButton>
-    </div>
+      @action="list.refetch()"
+    />
     <!-- Shares min-h-64 with the loading skeleton and is taller than the empty state's content, so Unresolved stays put. -->
     <div v-else-if="!rows.length && page === 1" class="flex min-h-64 shrink-0 flex-col">
       <OEmptyState
-        size="compact"
-        preset="no-data"
         class="flex-1"
         :title="t(`serviceVersions.nameReview.states.${EMPTY[filter]}`)"
-        :description="t('serviceVersions.nameReview.states.emptyBody')"
+        :text="t('serviceVersions.nameReview.states.emptyBody')"
         data-test="svcver-name-review-empty"
       />
     </div>
@@ -132,7 +122,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :expanded-ids="expandedIds"
         :get-row-expansion-enabled="() => false"
         :default-columns="false"
-        :show-global-filter="false"
         class="o2-table o2-row-md w-full"
         data-test="svcver-name-review-table"
         @pagination-change="({ page: next }: { page: number }) => (page = next)"
@@ -178,9 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ><div v-if="!readOnly" class="flex items-center justify-end gap-1">
             <template v-if="filter !== 'accepted'">
               <OButton
-                variant="outline"
-                size="xs"
-                icon-left="check"
+                variant="secondary"
+                size="sm"
+                icon="check"
                 :loading="busy === row.alias_key"
                 :disabled="busy !== '' && busy !== row.alias_key"
                 :data-test="`svcver-alias-accept-${row.alias_key}`"
@@ -189,8 +178,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
               <OButton
                 variant="ghost"
-                size="xs"
-                icon-left="edit"
+                size="sm"
+                icon="edit"
                 :aria-label="t('serviceVersions.nameReview.edit')"
                 :disabled="busy !== ''"
                 :data-test="`svcver-alias-edit-${row.alias_key}`"
@@ -198,8 +187,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <OButton
                 v-if="filter === 'pending'"
-                variant="ghost-destructive"
-                size="xs"
+                variant="danger-ghost"
+                size="sm"
                 :disabled="busy !== ''"
                 :data-test="`svcver-alias-reject-${row.alias_key}`"
                 @click="reject(row)"
@@ -208,9 +197,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <OButton
               v-else
-              variant="outline"
-              size="xs"
-              icon-left="undo"
+              variant="secondary"
+              size="sm"
+              icon="undo"
               :loading="busy === row.alias_key"
               :disabled="busy !== '' && busy !== row.alias_key"
               :data-test="`svcver-alias-revert-${row.alias_key}`"
@@ -259,7 +248,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :expanded-ids="unresolvedExpanded"
           :get-row-expansion-enabled="() => false"
           :default-columns="false"
-          :show-global-filter="false"
           wrap
           class="o2-table o2-row-sm w-full"
           data-test="svcver-unresolved-table"
@@ -291,8 +279,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-action="{ row }"
             ><OButton
               v-if="!readOnly && !row.candidates.length && row.name && !internalName(row.name)"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :data-test="`svcver-unresolved-display-as-${row.slug}`"
               @click="openUnresolved(row)"
               >{{ t("serviceVersions.nameReview.unresolved.displayAs") }}</OButton
@@ -325,8 +313,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span>{{ undo.error || undo.message }}</span>
         <OButton
           v-if="undo.batchId && !undo.error"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :loading="undo.busy"
           data-test="svcver-name-review-undo-action"
           @click="runUndo"
@@ -344,7 +332,7 @@ import type { Alias, AliasCollisionError, Collision, Scope } from "@/services/se
 import { placeholderLineKey, type DisplaySource } from "@/types/serviceRef";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 
 export type NameReviewFilter = "pending" | "accepted" | "rejected";
@@ -423,11 +411,9 @@ export const NameReviewEditor = defineComponent({
       const qualifier = collision.suggested_qualifier;
       return [
         h(
-          OBanner,
+          OInlineNotice,
           {
-            variant: "warning",
-            icon: "warning",
-            dense: true,
+            tone: "warn",
             "data-test": "svcver-alias-collision",
           },
           () =>
@@ -605,7 +591,6 @@ import {
 } from "@/services/service_versions.queries";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import InfoNotice from "@/components/shared/InfoNotice.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

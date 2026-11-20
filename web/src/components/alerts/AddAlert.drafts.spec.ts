@@ -31,7 +31,14 @@ import {
 import { alertDraftBase } from "@/utils/alerts/alertEditorDraft";
 import { fillField } from "@/test/unit/helpers/fillField";
 import { PANEL_DRAFT_AUTOSAVE_MS } from "@/composables/dashboard/usePanelDraft";
-import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
+import {
+  byTest,
+  click,
+  clickLeave,
+  clickRestore,
+  inDialog,
+  pressEscape,
+} from "@/test/unit/helpers/draftDom";
 import AddAlert from "./AddAlert.vue";
 
 vi.mock("@/composables/useStreams", () => ({
@@ -90,6 +97,7 @@ interface AddAlertVm {
   activeFolderId: string;
   handleSave: () => Promise<void>;
   alertDraft: { hasUnsavedChanges: () => boolean };
+  showJsonEditorDialog: boolean;
 }
 
 const newScope: EditorDraftScope = {
@@ -383,6 +391,20 @@ describe("AddAlert drafts", () => {
     await flushPromises();
     expect(vm().formData.name).toBe("");
     expect(readEditorDraft(newScope)).toBeNull();
+  });
+
+  it("Escape asks before the JSON editor drawer drops an edit the alert form cannot see", async () => {
+    await mountEditor();
+    vm().showJsonEditorDialog = true;
+    await flushPromises();
+    wrapper!.findComponent({ name: "JsonEditor" }).vm.$emit("update:dirty", true);
+    await flushPromises();
+
+    pressEscape();
+    await flushPromises();
+
+    expect(inDialog("add-alert-json-editor-drawer", "o-drawer-discard-row")).not.toBeNull();
+    expect(vm().showJsonEditorDialog).toBe(true);
   });
 
   it("a new anomaly detection's draft has its own slot, with Escape and Start fresh", async () => {

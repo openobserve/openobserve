@@ -8,7 +8,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { type CompositeChildOption, letterFor } from "./expression";
 
@@ -82,23 +81,20 @@ const childLink = (child: CompositeChildOption): string =>
   <section class="flex flex-col gap-2" data-test="alerts-composite-child-selector">
     <div class="flex items-center justify-between gap-3">
       <div class="flex">
-        <OTooltip v-if="addUnavailableReason" :content="addUnavailableReason" />
         <OButton
-          variant="outline"
-          size="xs"
-          icon-left="add"
+          :disabled-reason="addUnavailableReason || undefined"
+          variant="secondary"
+          size="sm"
           :disabled="!!addUnavailableReason"
-          focusable-unavailable
           data-test="alerts-composite-child-add"
           @click="add"
         >
           {{ t("alerts.composite.addAlert") }}
-          <template #unavailable-reason>{{ addUnavailableReason }}</template>
         </OButton>
       </div>
       <OTag
         data-test="alerts-composite-child-cap"
-        :variant="atCap ? 'warning-soft' : 'default-soft'"
+        :tone="atCap ? 'warn' : 'neutral'"
         size="sm"
         :label="t('alerts.composite.childCap', { count, max })"
       />
@@ -112,7 +108,7 @@ const childLink = (child: CompositeChildOption): string =>
         :data-test="`alerts-composite-selected-child-${id}`"
       >
         <span
-          class="bg-theme-accent-soft text-theme-accent rounded-default flex h-7 w-7 shrink-0 items-center justify-center font-bold"
+          class="bg-theme-accent-soft text-theme-accent rounded-default flex h-7 w-7 shrink-0 items-center justify-center font-semibold"
         >
           {{ raw(letterFor(index)) }}
         </span>
@@ -136,14 +132,14 @@ const childLink = (child: CompositeChildOption): string =>
           v-if="byId.get(id)?.alert_type"
           type="alertType"
           :value="byId.get(id)!.alert_type!"
-          size="xs"
+          size="sm"
           :data-test="`alerts-composite-child-type-${id}`"
         />
         <OTag
           v-if="byId.has(id)"
           type="alertLevel"
           :value="byId.get(id)!.level ?? 'nodata'"
-          size="xs"
+          size="sm"
           :data-test="`alerts-composite-child-level-${id}`"
         />
 
@@ -159,9 +155,9 @@ const childLink = (child: CompositeChildOption): string =>
           <OIcon name="open-in-new" size="sm" />
         </a>
         <OButton
-          variant="ghost-destructive"
-          size="icon-sm"
-          icon-left="close"
+          icon-only
+          variant="danger-ghost"
+          icon="close"
           :aria-label="t('alerts.composite.removeChild', { name: byId.get(id)?.name ?? id })"
           :data-test="`alerts-composite-child-remove-${id}`"
           @click="removeAt(index)"

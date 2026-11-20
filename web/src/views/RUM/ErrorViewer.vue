@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isLoading.length">
       <div class="flex h-[calc(100vh-12.5rem)] items-center justify-center pb-4 text-center">
         <div>
-          <OSpinner size="md" class="mx-auto block" data-test="error-viewer-loading-indicator" />
+          <OSpinner size="lg" class="mx-auto block" data-test="error-viewer-loading-indicator" />
           <div class="w-full text-center">
             {{ t("rum.loadingErrorDetails") }}
           </div>
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <div v-else class="pb-4">
-      <div class="py-2.5">
+      <div class="pb-2.5">
         <ErrorHeader :error="errorDetails" />
       </div>
       <OSeparator class="w-full" />

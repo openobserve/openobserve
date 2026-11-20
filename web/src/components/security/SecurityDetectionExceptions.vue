@@ -7,14 +7,13 @@ import { computed, ref } from "vue";
 import { securityTime } from "@/utils/security/time";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -166,9 +165,7 @@ const opLabel = (op: string) =>
       }}</span>
       <OButton
         v-if="canAuthor && !adding"
-        variant="outline"
-        size="sm"
-        icon-left="add"
+        variant="secondary"
         data-test="security-detection-exceptions-add"
         @click="startAdding"
         >{{ t("siem.detections.exceptions.add") }}</OButton
@@ -244,40 +241,33 @@ const opLabel = (op: string) =>
         </div>
         <div class="flex justify-end gap-2">
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="security-detection-exceptions-cancel"
             @click="adding = false"
             >{{ t("siem.detections.cancel") }}</OButton
           >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            data-test="security-detection-exceptions-save"
-            >{{ t("siem.detections.exceptions.save") }}</OButton
-          >
+          <OButton variant="primary" type="submit" data-test="security-detection-exceptions-save">{{
+            t("siem.detections.exceptions.save")
+          }}</OButton>
         </div>
       </OForm>
     </div>
 
-    <div v-if="list.isLoading.value" class="flex items-center justify-center py-6">
-      <OSpinner size="sm" />
-    </div>
-    <OBanner
+    <OSkeleton v-if="list.isLoading.value" preset="tableRows" :rows="3" />
+    <OEmptyState
       v-else-if="list.isError.value && !isForbiddenError(list.error.value)"
-      variant="error-soft"
-      icon="error-outline"
-      dense
+      kind="error"
+      size="compact"
+      :title="t('siem.detections.exceptions.loadError')"
       data-test="security-detection-exceptions-error"
-      >{{ t("siem.detections.exceptions.loadError") }}</OBanner
-    >
+      @action="list.refetch()"
+    />
     <OEmptyState
       v-else-if="!exceptions.length && !adding"
-      size="inline"
+      size="compact"
       icon="rule"
       :title="t('siem.detections.exceptions.empty')"
-      :description="t('siem.detections.exceptions.emptyHint')"
+      :text="t('siem.detections.exceptions.emptyHint')"
       data-test="security-detection-exceptions-empty"
     />
     <ul
@@ -298,22 +288,22 @@ const opLabel = (op: string) =>
             <OTag
               v-for="v in ex.values.slice(0, 6)"
               :key="v"
-              variant="default-soft"
-              size="xs"
+              tone="neutral"
+              size="sm"
               class="font-mono"
               >{{ valueLabel(ex, v) }}</OTag
             >
             <span v-if="ex.values.length > 6" class="text-text-secondary">{{
               t("siem.detections.exceptions.moreValues", { n: ex.values.length - 6 })
             }}</span>
-            <OTag v-if="ex.expired" variant="warning-soft" size="xs">{{
+            <OTag v-if="ex.expired" tone="warn" size="sm">{{
               t("siem.detections.exceptions.expired")
             }}</OTag>
             <span
               v-if="ex.not_enforced?.length"
               :data-test="`security-detection-exception-not-enforced-${ex.id}`"
             >
-              <OTag variant="warning-soft" size="xs">{{
+              <OTag tone="warn" size="sm">{{
                 t(
                   "siem.detections.exceptions.notEnforced",
                   { n: ex.not_enforced.length },
@@ -337,15 +327,13 @@ const opLabel = (op: string) =>
         </div>
         <OButton
           v-if="canAdmin"
-          variant="ghost-destructive"
-          size="icon-sm"
-          icon-left="delete"
-          :aria-label="t('siem.detections.exceptions.delete')"
+          variant="danger-ghost"
+          icon-only
+          icon="delete"
+          :label="t('siem.detections.exceptions.delete')"
           :data-test="`security-detection-exception-delete-${ex.id}`"
           @click="onDelete(ex)"
-        >
-          <OTooltip :content="t('siem.detections.exceptions.delete')" />
-        </OButton>
+        />
       </li>
     </ul>
   </div>

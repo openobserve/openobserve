@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       atEnd
         ? '@container flex flex-wrap items-center gap-x-6 gap-y-2'
-        : 'flex items-center gap-6 max-md:flex-col max-md:items-stretch max-md:gap-2',
+        : atBelow
+          ? 'flex flex-col items-stretch gap-2'
+          : 'flex items-center gap-6 max-md:flex-col max-md:items-stretch max-md:gap-2',
       'border-border-default border-b px-3 py-3 last:border-b-0',
       disabled && 'opacity-60',
     ]"
@@ -30,37 +32,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       class="min-w-0"
-      :class="atEnd ? 'flex-1 @max-2xl:basis-full' : 'w-[22.5%] shrink-0 max-md:w-full'"
+      :class="
+        atEnd
+          ? 'flex-1 @max-2xl:basis-full'
+          : atBelow
+            ? 'w-full'
+            : 'w-[22.5%] shrink-0 max-md:w-full'
+      "
     >
-      <div class="text-text-heading text-sm font-medium">{{ label }}</div>
+      <div class="text-text-heading text-compact font-medium">{{ label }}</div>
       <div
         v-if="shownError"
         :id="errorId"
         role="alert"
-        class="text-input-error-text mt-0.5 flex items-start gap-1 text-xs"
+        class="text-input-error-text text-compact mt-0.5 flex items-start gap-1"
       >
-        <OIcon name="error-outline" size="xs" class="mt-0.5 shrink-0" />
+        <OIcon name="error-outline" size="xs" class="mt-1 shrink-0" />
         <span class="min-w-0" :data-test="errorTestId">{{ shownError }}</span>
       </div>
-      <div v-else-if="description || $slots.description" class="text-text-secondary mt-0.5 text-xs">
+      <div
+        v-else-if="description || $slots.description"
+        class="text-text-secondary text-compact mt-0.5"
+      >
         <slot name="description">{{ description }}</slot>
       </div>
       <!-- Holds the line an error will take, so a row without help does not grow. -->
-      <div v-else-if="reservesLine" class="mt-0.5 min-h-4" aria-hidden="true"></div>
+      <div v-else-if="reservesLine" class="mt-0.5 min-h-5" aria-hidden="true"></div>
     </div>
     <div
       class="flex items-center"
       :class="
         atEnd
-          ? 'w-75 shrink-0 justify-start @max-2xl:w-full'
-          : 'shrink-0 justify-end max-md:min-w-0 max-md:justify-start'
+          ? 'w-75 shrink-0 justify-end @max-2xl:w-full'
+          : atBelow
+            ? 'w-full max-w-md justify-start'
+            : 'shrink-0 justify-end max-md:min-w-0 max-md:justify-start'
       "
     >
       <OSkeleton
         v-if="loading"
-        animation="none"
+        shape="block"
         aria-hidden="true"
-        class="h-8.5"
+        class="h-control-md"
         :class="atEnd ? 'w-full' : 'w-40'"
       />
       <ControlSlot v-else :render="$slots.default" :described-by="describedBy" />
@@ -87,6 +100,7 @@ const form = inject(FORM_CONTEXT_KEY, null);
 const errorId = useId();
 
 const atEnd = computed(() => props.controlAt === "end");
+const atBelow = computed(() => props.controlAt === "below");
 
 const fieldErrors = form?.useStore((s: any) =>
   props.name ? s.fieldMeta?.[props.name]?.errors : undefined,

@@ -615,9 +615,35 @@ describe("TraceDetails - first page load failure", () => {
       props: { traceId: "trace-a" },
       global: { plugins: [i18n, router], provide: { store }, stubs: STUBS },
     });
-    await vi.waitFor(() => expect(mocks.notifyError).toHaveBeenCalled(), { timeout: 10_000 });
+    await vi.waitFor(
+      () => expect(wrapper.find('[data-test="trace-details-load-error"]').exists()).toBe(true),
+      { timeout: 10_000 },
+    );
     return consoleError;
   };
+
+  it("says the trace is not in the searched range and offers a wider one, without a toast", async () => {
+    mocks.getTraceDetails.mockResolvedValueOnce({ data: { hits: [] } });
+    wrapper = mount(TraceDetails, {
+      attachTo: "#app",
+      props: { traceId: "trace-a" },
+      global: { plugins: [i18n, router], provide: { store }, stubs: STUBS },
+    });
+    await vi.waitFor(
+      () => expect(wrapper.find('[data-test="trace-details-not-found"]').exists()).toBe(true),
+      { timeout: 10_000 },
+    );
+    const state = wrapper.find('[data-test="trace-details-not-found"]');
+    expect(state.text()).toContain(i18n.global.t("traces.traceDetails.searchWiderRange"));
+    expect(state.text()).toContain("test-stream");
+    expect(mocks.notifyError).not.toHaveBeenCalled();
+  }, 30_000);
+
+  it("states the failure in place, with Retry, instead of leaving the page", async () => {
+    await failFirstPage(500);
+    expect(mocks.notifyError).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-test="trace-details-load-error"]').text()).toContain("Retry");
+  }, 30_000);
 
   it("does not log a 401, which the global handler turns into a logout", async () => {
     const consoleError = await failFirstPage(401);

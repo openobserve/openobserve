@@ -21,10 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="rows"
       :columns="columns"
       row-key="id"
-      :frame="false"
       pagination="client"
       :page-size="20"
-      :show-global-filter="false"
       :persist-columns="true"
       table-id="fleet-configurations"
       :loading="loading"
@@ -39,16 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput
               v-model="search"
               class="w-full"
-              size="sm"
-              clearable
               :placeholder="t('fleet.configs.search')"
               data-test="fleet-configurations-search"
             />
           </div>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="upload-file"
+            variant="secondary"
+            icon="upload-file"
             data-test="fleet-configurations-import"
             @click="fileInput?.click()"
           >
@@ -108,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-for="f in row.fleets"
             :key="f.id"
-            variant="default-soft"
+            tone="neutral"
             :label="f.name === null ? t('fleet.fleets.deletedFleet') : raw(f.name)"
           />
           <OText
@@ -130,13 +125,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #empty>
         <div data-test="fleet-configurations-empty">
-          <OEmptyState size="hero" preset="no-data" :filtered="!!search" @action="clearFilters" />
+          <OEmptyState
+            :kind="search ? 'filtered' : 'first-run'"
+            :title="
+              search
+                ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
+                : t('emptyState.noData.title')
+            "
+            :text="
+              search
+                ? t('emptyState.filtered.description', {
+                    noun: t('emptyState.filtered.fallbackNoun'),
+                  })
+                : t('emptyState.noData.description')
+            "
+            @action="clearFilters"
+          />
         </div>
       </template>
 
       <template #error>
         <div data-test="fleet-configurations-error">
-          <OEmptyState size="hero" preset="load-error" @action="refresh" />
+          <OEmptyState
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="t('emptyState.loadError.description')"
+            @action="refresh"
+          />
         </div>
       </template>
     </OTable>

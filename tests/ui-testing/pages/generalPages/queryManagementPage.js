@@ -1,9 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Page Object Model for the Settings Query Management navigation/gating feature.
-// Query Management ("Running Queries") is an enterprise-only, meta-org-only
+// Query Management ("Running queries") is an enterprise-only, meta-org-only
 // settings section. On an OSS build the sidebar tab is hidden and a direct URL
-// redirects to the enterprise-locked page.
+// shows the feature's lock in place.
 
 import { expect } from '@playwright/test';
 
@@ -20,7 +20,7 @@ export class QueryManagementPage {
     this.generalPageTitle = page.locator('[data-test="settings-general-page-title"]');
     // Query Management rail tab — filtered out on OSS (SectionRail drops `visible !== false` items), so count 0 rather than merely hidden.
     this.queryManagementTab = page.locator('[data-test="query-management-tab"]');
-    this.enterpriseLockedPage = page.locator('[data-test="enterprise-feature-locked"]');
+    this.enterpriseLockedPage = page.locator('[data-test="feature-lock-inline"]');
     this.queryListButton = page.locator('[data-test="queryList-btn"]');
     this.queryDetailsTable = page.locator('[data-test="queryList-table"]');
     this.tooltipBubble = page.locator('[data-test="o-tooltip-content"]');
@@ -194,11 +194,14 @@ export class QueryManagementPage {
     await expect(this.confirmDialog).toBeHidden({ timeout: 10000 });
   }
 
-  // All Queries tab: cancel the row whose org_id cell matches `orgId`.
+  // All Queries tab: cancel the row whose org_id cell matches `orgId`. Cancel sits in the
+  // row's ⋯ menu, which renders in a portal outside the row.
   async cancelAllQueriesRow(orgId) {
     const row = this.allQueriesList.locator('tr', { hasText: orgId }).first();
     await expect(row).toBeVisible({ timeout: 15000 });
-    await row.locator('[data-test="cancelQuery-btn"]').first().click();
+    await row.hover();
+    await row.locator('[data-test="running-queries-row-more-actions"]').click();
+    await this.page.locator('[role="menu"] [data-test="cancelQuery-btn"]').click();
   }
 
   // Summary tab: cancel the summary row whose user_id cell matches `email`.

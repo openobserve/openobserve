@@ -42,28 +42,28 @@ const GROUPED = [
   { label: "w4", value: "w4" },
 ];
 
-describe("OSelect multi-select floats the selection to the top on open", () => {
-  let wrapper: VueWrapper;
+let wrapper: VueWrapper;
 
-  afterEach(() => {
-    wrapper?.unmount();
+afterEach(() => {
+  wrapper?.unmount();
+});
+
+const open = async (props: Record<string, unknown>) => {
+  wrapper = mount(OSelect, {
+    attachTo: document.body,
+    attrs: { "data-test": "unit" },
+    props: { multiple: true, searchable: true, ...props },
   });
+  await wrapper.find("button").trigger("click");
+  await flushPromises();
+};
+// Every rendered row (headers and options) in list order.
+const rows = () =>
+  Array.from(document.body.querySelectorAll<HTMLElement>("[data-vrow]")).map((el) =>
+    el.textContent!.trim(),
+  );
 
-  const open = async (props: Record<string, unknown>) => {
-    wrapper = mount(OSelect, {
-      attachTo: document.body,
-      attrs: { "data-test": "unit" },
-      props: { multiple: true, ...props },
-    });
-    await wrapper.find("button").trigger("click");
-    await flushPromises();
-  };
-  // Every rendered row (headers and options) in list order.
-  const rows = () =>
-    Array.from(document.body.querySelectorAll<HTMLElement>("[data-vrow]")).map((el) =>
-      el.textContent!.trim(),
-    );
-
+describe("OSelect multi-select floats the selection to the top on open", () => {
   it("floats selected options to the top of a flat list", async () => {
     await open({
       modelValue: ["c", "a"],
@@ -165,5 +165,60 @@ describe("OSelect multi-select floats the selection to the top on open", () => {
       await flushPromises();
       expect(rows()).toEqual(["Destinations", "d3", "d1", "d2", "Workflows"]);
     });
+  });
+});
+
+describe("OSelect rowClickSingleSelect", () => {
+  const OPTIONS = ["a", "b", "c"].map((v) => ({ label: v, value: v }));
+  const option = (value: string) =>
+    document.body.querySelector<HTMLElement>(
+      `[data-test="unit-option"][data-test-value="${value}"]`,
+    )!;
+  // The separator's right edge splits the row: at or left of it is the checkbox zone.
+  const clickAt = (value: string, clientX: number) => {
+    const row = option(value);
+    const separator = row.querySelector<HTMLElement>("[data-select-separator]")!;
+    separator.getBoundingClientRect = () => ({ right: 40 }) as DOMRect;
+    row.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, clientX }));
+  };
+  const hint = () => document.body.querySelector('[data-test="o-select-row-click-hint"]');
+  const lastUpdate = () => wrapper.emitted("update:modelValue")?.at(-1)?.[0];
+
+  it("replaces the selection with the clicked row and closes", async () => {
+    await open({ modelValue: ["a", "c"], options: OPTIONS, rowClickSingleSelect: true });
+    clickAt("b", 120);
+    await flushPromises();
+    expect(lastUpdate()).toEqual(["b"]);
+    expect(document.body.querySelector('[data-test="unit-option"]')).toBeNull();
+  });
+
+  it("adds the row through its checkbox zone and stays open", async () => {
+    await open({ modelValue: ["a"], options: OPTIONS, rowClickSingleSelect: true });
+    clickAt("b", 20);
+    await flushPromises();
+    expect(lastUpdate()).toEqual(["a", "b"]);
+    expect(option("c")).not.toBeNull();
+  });
+
+  it("explains both zones in a footer under the list", async () => {
+    await open({ modelValue: [], options: OPTIONS, rowClickSingleSelect: true });
+    expect(hint()?.textContent).toContain("Multi select");
+    expect(hint()?.textContent).toContain("Single select");
+    expect(option("a").querySelector("[data-select-separator]")).not.toBeNull();
+  });
+
+  it("is a plain toggle with neither separator nor footer when off", async () => {
+    await open({ modelValue: ["a"], options: OPTIONS });
+    expect(hint()).toBeNull();
+    expect(option("b").querySelector("[data-select-separator]")).toBeNull();
+    option("b").click();
+    await flushPromises();
+    expect(lastUpdate()).toEqual(["a", "b"]);
+  });
+
+  it("has no effect on a single-select", async () => {
+    await open({ multiple: false, modelValue: "a", options: OPTIONS, rowClickSingleSelect: true });
+    expect(hint()).toBeNull();
+    expect(option("b").querySelector("[data-select-separator]")).toBeNull();
   });
 });

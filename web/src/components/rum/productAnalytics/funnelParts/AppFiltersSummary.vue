@@ -40,7 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           :model-value="included"
           :label="t('rum.analytics.appFilters.switchLabel')"
-          size="sm"
           :disabled="!included && !canInclude"
           data-test="rum-analytics-funnel-app-filters-switch"
           @update:model-value="(v) => (v ? emit('include') : emit('hide'))"
@@ -52,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="item in items"
         :key="item.id"
         :label="item.text"
-        variant="default-soft"
+        tone="neutral"
         size="sm"
         :data-test="`rum-analytics-funnel-app-filters-${item.id}`"
       />
@@ -60,15 +59,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #trailing>
       <OButton
         v-if="canInclude && !stacked"
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="rum-analytics-funnel-app-filters-include"
         @click="emit('include')"
         >{{ t("rum.analytics.appFilters.includeHidden") }}</OButton
       >
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="rum-analytics-funnel-app-filters-edit"
         @click="emit('edit')"
         >{{ t("rum.analytics.appFilters.edit") }}</OButton

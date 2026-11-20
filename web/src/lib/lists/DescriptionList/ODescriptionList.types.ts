@@ -1,50 +1,55 @@
 // Copyright 2026 OpenObserve Inc.
-//
-// Types for ODescriptionList / ODescriptionItem — the label/value detail block
-// that sits beside a detail page's main content ("Acknowledged by / Team /
-// Alert / Opened"). It renders a real <dl>/<dt>/<dd>, so the pairing is in the
-// markup rather than implied by a two-column grid of <div>s.
-//
-// Distinct from OFieldList (lib/lists/FieldList), which is a stream-schema field
-// BROWSER — searchable, typed, interactive. This is static metadata.
+// A real <dl> of one entity's properties; comparing rows is a table's job, not this one's.
 
 import type { ComputedRef, InjectionKey } from "vue";
 import type { I18nText } from "@/types/i18n";
 
-export interface DescriptionListProps {
-  /**
-   * How many label/value pairs sit side by side on a wide viewport. Always one
-   * column below `md`, where a two-column detail block is unreadable.
-   */
-  columns?: 1 | 2;
-  /** Tighter row rhythm, for a list inside a card rather than a page column. */
-  dense?: boolean;
-  /** Width of every item's label column; `narrow` gives the value the room in a side-column card. */
-  labelWidth?: DescriptionLabelWidth;
+/** `text` for entity properties, `mono` for field keys and machine values (T4). */
+export type DescriptionLabels = "text" | "mono";
+
+/** `auto` puts labels beside values and stacks them when the list is under 30rem wide. */
+export type DescriptionLayout = "columns" | "stacked" | "auto";
+
+export type DescriptionValue = string | number | null | undefined;
+
+export interface DescriptionListItem {
+  label: I18nText;
+  value?: DescriptionValue;
+  /** A machine value inside a `text` list. */
+  mono?: boolean;
+  /** Offers copy on hover. */
+  copy?: boolean;
 }
 
-export type DescriptionLabelWidth = "default" | "narrow";
+export interface DescriptionListProps {
+  /** Rendered as items; children `ODescriptionItem`s work instead. */
+  items?: DescriptionListItem[];
+  labels?: DescriptionLabels;
+  layout?: DescriptionLayout;
+  /** Shown for a missing value; "—" in tertiary text by default (C4, D4). */
+  emptyLabel?: I18nText;
+}
 
-/** The list's label width, read by each item so one prop sets the whole column. */
-export const DESCRIPTION_LABEL_WIDTH: InjectionKey<ComputedRef<DescriptionLabelWidth>> =
-  Symbol("descriptionLabelWidth");
+export interface DescriptionContext {
+  labels: DescriptionLabels;
+  emptyLabel: I18nText;
+}
+
+export const DESCRIPTION_CONTEXT: InjectionKey<ComputedRef<DescriptionContext>> =
+  Symbol("descriptionContext");
 
 export interface DescriptionItemProps {
   label: I18nText;
-  /**
-   * Value shown when the default slot is empty. Defaults to an em dash — an
-   * absent value must read as absent, never as a blank row.
-   */
+  /** The value as data; the default slot replaces it with rich content. */
+  value?: DescriptionValue;
+  /** Overrides the list's empty label for this row. */
   emptyLabel?: I18nText;
-  /**
-   * Stack the value under the label instead of beside it. For values that need
-   * the full width (a long id, a chip row, a code fragment).
-   */
-  stacked?: boolean;
+  mono?: boolean;
+  copy?: boolean;
 }
 
 export interface DescriptionListSlots {
-  default: () => unknown;
+  default?: () => unknown;
 }
 
 export interface DescriptionItemSlots {

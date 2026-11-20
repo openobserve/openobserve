@@ -29,26 +29,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="md"
     :title="copy.title(finding.alert_name)"
     :form-id="formId"
-    :primary-button-label="copy.button()"
-    primary-button-data-test="alert-calibration-dismiss-submit"
-    :secondary-button-label="t('common.cancel')"
-    secondary-button-variant="outline"
+    :primary="{ label: copy.button(), dataTest: 'alert-calibration-dismiss-submit' }"
+    :secondary="{ label: t('common.cancel'), variant: 'secondary' }"
     data-test="alert-calibration-dismiss-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
   >
     <OForm :id="formId" :form="form">
       <div class="flex flex-col gap-4">
-        <OBanner
-          dense
+        <OInlineNotice
           class="min-h-20 justify-center"
-          :variant="notice?.variant ?? 'default'"
-          :icon="NOTICE_ICON[notice?.variant ?? 'default']"
-          :data-severity="notice?.variant ?? 'default'"
+          :tone="notice?.tone ?? 'neutral'"
+          :data-severity="notice?.tone ?? 'neutral'"
           data-test="alert-calibration-dismiss-notice"
         >
           {{ notice?.text ?? copy.scopeLine(orgName, duration, openedAt) }}
-        </OBanner>
+        </OInlineNotice>
 
         <div class="flex flex-col gap-1">
           <span class="text-input-label-text text-compact leading-tight font-medium">
@@ -106,7 +102,7 @@ import { computed, ref, useId, watch } from "vue";
 import { useStore } from "vuex";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -139,8 +135,6 @@ import {
   type DismissTarget,
   type WriteNotice,
 } from "./dismissals";
-
-const NOTICE_ICON = { default: "info", error: "error", warning: "warning" } as const;
 
 const props = defineProps<{
   open: boolean;

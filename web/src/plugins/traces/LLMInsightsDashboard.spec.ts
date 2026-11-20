@@ -767,7 +767,8 @@ describe("LLMInsightsDashboard — scope resolution", () => {
     },
   );
 
-  it("shows explicit Stream panels while the agents registry is still pending", async () => {
+  // The no-agent-identity banner sits above the panels and depends on the agents list.
+  it("holds explicit Stream panels until the agents registry answers, then mounts them once", async () => {
     mockRouteQuery.type = "stream";
     const agentsResult = Promise.withResolvers<{ agents: GenAiAgentListItem[] }>();
     mockListAgents.mockReturnValue(agentsResult.promise);
@@ -778,7 +779,7 @@ describe("LLMInsightsDashboard — scope resolution", () => {
     };
     const pending = vm.refresh(undefined, undefined, false);
     await flushPromises();
-    expect(panelMounts).toEqual(["default"]);
+    expect(panelMounts).toEqual([]);
     agentsResult.resolve({ agents: [agentAt("omp", "s1", "production", "1")] });
     await pending;
     await flushPromises();

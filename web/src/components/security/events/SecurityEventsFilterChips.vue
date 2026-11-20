@@ -25,8 +25,7 @@ const OP_SYMBOL: Record<string, string> = {
     <OTag
       v-for="(f, i) in filters"
       :key="`${f.field}-${f.op}-${f.value}`"
-      :variant="f.op === '!=' || f.op === 'not_contains' ? 'error-soft' : 'primary-soft'"
-      shape="rounded"
+      :tone="f.op === '!=' || f.op === 'not_contains' ? 'err' : 'accent'"
       size="sm"
       :data-test="`security-events-filter-${i}`"
     >
@@ -36,18 +35,18 @@ const OP_SYMBOL: Record<string, string> = {
       </span>
       <template #trailing>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="swap-horiz"
+          icon="swap-horiz"
           :data-test="`security-events-filter-invert-${i}`"
           @click="emit('invert', i)"
         >
           <OTooltip :content="t('siem.events.invertFilter')" />
         </OButton>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="close"
+          icon="close"
           :data-test="`security-events-filter-remove-${i}`"
           @click="emit('remove', i)"
         >
@@ -56,8 +55,8 @@ const OP_SYMBOL: Record<string, string> = {
       </template>
     </OTag>
     <OButton
-      variant="ghost-muted"
-      size="xs"
+      variant="ghost"
+      size="sm"
       data-test="security-events-clear-filters"
       @click="emit('clear')"
     >

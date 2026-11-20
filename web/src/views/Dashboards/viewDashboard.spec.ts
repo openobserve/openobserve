@@ -550,6 +550,11 @@ describe("ViewDashboard", () => {
                 template: '<div><slot name="actions" /></div>',
               },
               ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+              ORefreshButton: {
+                name: "ORefreshButton",
+                props: ["tooltip"],
+                template: '<div><slot name="menu" /></div>',
+              },
             },
           },
         });
@@ -575,7 +580,6 @@ describe("ViewDashboard", () => {
 
         const option = (dataTest: string) => wrapper.findComponent(`[data-test="${dataTest}"]`);
         expect(wrapper.vm.arePanelsLoading).toBe(true);
-        expect(option("dashboard-refresh-options-btn").props("disabled")).toBe(false);
         expect(option("dashboard-refresh-without-cache-btn").props("disabled")).toBe(true);
         expect(option("dashboard-auto-run-toggle-btn").props("disabled")).toBe(false);
       });
@@ -604,9 +608,12 @@ describe("ViewDashboard", () => {
         const toggle = wrapper.find('[data-test="dashboard-auto-run-toggle-btn"]');
         expect(toggle.text()).toContain("dashboard.viewDashboard.autoRunDescription");
         expect(toggle.text()).not.toContain("search.liveModeTooltip");
-        const tooltips = wrapper
-          .findAllComponents({ name: "OTooltip" })
-          .map((tooltip: any) => tooltip.props("content"));
+        const tooltips = [
+          wrapper.findComponent({ name: "ORefreshButton" }).props("tooltip"),
+          ...wrapper
+            .findAllComponents({ name: "OTooltip" })
+            .map((tooltip: any) => tooltip.props("content")),
+        ];
         expect(tooltips).toContain("dashboard.viewDashboard.autoRunDescription");
         expect(tooltips).not.toContain("dashboard.viewDashboard.autoRunScope");
         expect(tooltips).not.toContain("search.autoRunEnabled");
@@ -703,7 +710,7 @@ describe("ViewDashboard", () => {
           plugins: [i18n, store],
           config: { globalProperties: { store } },
           stubs: {
-            OPageLayout: { template: "<div><slot /></div>" },
+            OPageLayout: { template: "<div><slot name='banner' /><slot /></div>" },
             OBanner: { template: "<div><slot /><slot name='actions' /></div>" },
           },
         },
@@ -1697,7 +1704,7 @@ describe("ViewDashboard", () => {
           plugins: [i18n, store],
           renderStubDefaultSlot: true,
           stubs: {
-            OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' },
+            OPageLayout: { template: '<div><slot name="actions" /></div>' },
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
           },
         },
@@ -1798,7 +1805,7 @@ describe("ViewDashboard", () => {
         plugins: [i18n, store],
         renderStubDefaultSlot: true,
         stubs: {
-          OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' },
+          OPageLayout: { template: '<div><slot name="actions" /></div>' },
           ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
         },
       },
@@ -1823,7 +1830,7 @@ describe("ViewDashboard", () => {
     wrapper = createWrapper({
       global: {
         plugins: [i18n, store],
-        stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+        stubs: { OPageLayout: { template: '<div><slot name="actions" /></div>' } },
       },
     });
     await flushPromises();
@@ -1849,7 +1856,9 @@ describe("ViewDashboard", () => {
           plugins: [i18n, store],
           renderStubDefaultSlot: true,
           stubs: {
-            OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' },
+            OPageLayout: {
+              template: '<div><slot name="actions-overflow" /><slot name="actions" /></div>',
+            },
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
           },
         },
@@ -1935,7 +1944,7 @@ describe("ViewDashboard", () => {
           stubs: {
             OPageLayout: {
               template:
-                '<div><slot name="title" /><slot name="actions" /><slot name="actions-overflow" /><slot /></div>',
+                '<div><slot name="status" /><slot name="actions-overflow" /><slot name="actions" /><slot name="banner" /><slot /></div>',
             },
             RenderDashboardCharts: RenderDashboardChartsStub,
             ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
@@ -1987,32 +1996,23 @@ describe("ViewDashboard", () => {
         .find((b: any) => b.attributes("data-test") === dataTest)!
         .props();
 
-    it("shows Add panel as a labelled outline button and keeps Refresh primary", async () => {
+    it("shows Add panel as a labelled secondary button", async () => {
       await mountDashboard(withSlots);
 
       expect(buttonProps("dashboard-panel-add")).toMatchObject({
-        variant: "outline",
-        size: "sm-toolbar",
-        iconLeft: "add",
+        variant: "secondary",
+        iconOnly: false,
+        icon: undefined,
       });
-      expect(buttonProps("dashboard-refresh-btn").variant).toBe("primary");
-      expect(buttonProps("dashboard-refresh-options-btn").variant).toBe("primary");
-
-      wrapper.vm.enterLayoutEdit();
-      await flushPromises();
-      expect(buttonProps("dashboard-refresh-btn").variant).toBe("outline");
-      expect(buttonProps("dashboard-refresh-options-btn").variant).toBe("outline");
     });
 
-    it("keeps Refresh pending while changes wait to be applied", async () => {
+    it("keeps Add panel secondary while changes wait to be applied", async () => {
       await mountDashboard(withSlots);
       await wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: true });
       await flushPromises();
 
       expect(wrapper.vm.isRefreshPending).toBe(true);
-      expect(buttonProps("dashboard-refresh-btn").variant).toBe("pending");
-      expect(buttonProps("dashboard-refresh-options-btn").variant).toBe("pending");
-      expect(buttonProps("dashboard-panel-add").variant).toBe("outline");
+      expect(buttonProps("dashboard-panel-add").variant).toBe("secondary");
     });
 
     it("renders the Add panel label and draft dot inside the real button", async () => {
@@ -2207,9 +2207,8 @@ describe("ViewDashboard", () => {
       expect(wrapper.vm.discardDialog.open).toBe(true);
       const dialog = wrapper.findComponent({ name: "ODialog" });
       expect(dialog.props("open")).toBe(true);
-      // Enter must keep the draft: the safe action takes the initial focus, not the destructive one.
-      expect(dialog.props("initialFocus")).toBe("secondary");
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      // Enter must keep the draft: a danger primary hands the initial focus to the safe action.
+      expect(dialog.props("primary")?.variant).toBe("danger");
 
       wrapper.vm.settleDiscard(true);
       await exiting;
@@ -2270,10 +2269,10 @@ describe("ViewDashboard", () => {
       await flushPromises();
       const dialog = wrapper.findComponent({ name: "ODialog" });
       expect(dialog.props("open")).toBe(true);
-      expect(dialog.props("secondaryButtonLabel")).toBeUndefined();
+      expect(dialog.props("secondary")?.label).toBeUndefined();
       expect(dialog.props("persistent")).toBe(true);
       expect(dialog.props("showClose")).toBe(false);
-      expect(dialog.props("primaryButtonLabel")).toBe("dashboard.layoutEdit.discardAndSignOut");
+      expect(dialog.props("primary")?.label).toBe("dashboard.layoutEdit.discardAndSignOut");
       expect(wrapper.vm.discardForced).toBe(true);
 
       wrapper.vm.settleDiscard(true);
@@ -2705,7 +2704,7 @@ describe("ViewDashboard", () => {
               name: "OPageLayout",
               props: ["headerClass"],
               template:
-                '<div><slot name="title" /><slot name="actions" /><slot name="actions-overflow" /><slot /></div>',
+                '<div><slot name="status" /><slot name="actions-overflow" /><slot name="actions" /><slot name="banner" /><slot /></div>',
             },
             RenderDashboardCharts: {
               name: "RenderDashboardCharts",

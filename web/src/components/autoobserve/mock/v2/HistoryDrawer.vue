@@ -17,15 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="md"
+    size="sm"
     :title="t('autoobserve2.historyDrawer.title')"
     data-test="autoobserve2-history-drawer"
     @update:open="(v) => emit('update:open', v)"
   >
     <template #header-right>
       <OTag
-        variant="purple-soft"
-        size="xs"
+        tone="neutral"
+        size="sm"
         :label="t('autoobserve2.demoTag')"
         data-test="autoobserve-sample-tag-drawer"
       />
@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <slot v-if="$slots.empty && !entries.length" name="empty" />
     <div v-else class="flex flex-col gap-4 pb-8">
       <OToggleGroup
+        size="sm"
         :model-value="filter"
         mobile-dropdown
         data-test="autoobserve2-history-filter"
@@ -42,7 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="f in FILTERS"
           :key="f.value"
           :value="f.value"
-          size="xs"
           :data-test="`autoobserve2-history-filter-${f.value}`"
         >
           {{ t(f.label) }}
@@ -80,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ say(t, entry.text) }}
               <OTag
                 v-if="entry.worked !== undefined"
-                :variant="entry.worked ? 'success-soft' : 'warning-soft'"
-                size="xs"
+                :tone="entry.worked ? 'ok' : 'warn'"
+                size="sm"
                 class="ms-1 align-middle"
                 :label="
                   entry.worked
@@ -92,9 +92,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </p>
             <OButton
               v-if="entry.ledgerId && changeIds.has(entry.ledgerId)"
-              variant="ghost-primary"
-              size="xs"
-              icon-right="arrow-forward"
+              variant="accent-ghost"
+              size="sm"
+              icon-end="arrow-forward"
               class="-ms-2 self-start"
               :data-test="`autoobserve2-history-${entry.id}-change`"
               @click="emit('open-change', entry.ledgerId)"

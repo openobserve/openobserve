@@ -15,12 +15,7 @@
             class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
-            <OTooltip
-              side="right"
-              align="center"
-              :side-offset="10"
-              :content="raw(sqlQueryErrorMsg)"
-            />
+            <OTooltip side="right" :content="raw(sqlQueryErrorMsg)" />
           </OIcon>
         </template>
         <template #right>
@@ -73,7 +68,7 @@
           </div>
 
           <div class="flex items-center gap-3">
-            <DateTime
+            <ODateTimeRange
               :label="t('alerts.startTime')"
               auto-apply
               :default-type="dateTime.type"
@@ -88,7 +83,6 @@
             <OButton
               data-test="test-function-run-query-btn"
               variant="primary"
-              size="sm-action"
               :disabled="!selectedStream.name || !inputQuery || loading.events"
               @click="getResults"
             >
@@ -119,7 +113,7 @@
             class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start p-[0.1875rem_0.5rem_0_2.15rem] select-none"
           >
             <span
-              class="query-editor-placeholder-typewriter text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
+              class="query-editor-placeholder-typewriter text-text-placeholder text-compact overflow-hidden font-mono leading-5 text-ellipsis whitespace-nowrap"
               >{{ queryEditorPlaceholder }}</span
             >
           </div>
@@ -144,9 +138,9 @@
         <template #left>
           <div
             v-if="loading.events"
-            class="text-text-secondary text-compact ms-2 flex items-center font-bold"
+            class="text-text-secondary text-compact ms-2 flex items-center font-semibold"
           >
-            <OSpinner size="xs" />
+            <OSpinner />
             <div class="relative top-0.5">
               {{ t("confirmDialog.loading") }}
             </div>
@@ -157,12 +151,7 @@
             class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
-            <OTooltip
-              side="right"
-              align="center"
-              :side-offset="10"
-              :content="raw(eventsErrorMsg)"
-            />
+            <OTooltip side="right" :content="raw(eventsErrorMsg)" />
           </OIcon>
         </template>
         <template #right>
@@ -205,9 +194,9 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="text-text-secondary text-compact ms-2 flex items-center text-sm font-bold font-medium"
+            class="text-text-secondary text-compact ms-2 flex items-center text-sm font-semibold"
           >
-            <OSpinner size="xs" />
+            <OSpinner />
             <div class="relative top-0.5">
               {{ t("confirmDialog.loading") }}
             </div>
@@ -219,12 +208,7 @@
             class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
-            <OTooltip
-              side="right"
-              align="center"
-              :side-offset="10"
-              :content="raw(outputEventsErrorMsg)"
-            />
+            <OTooltip side="right" :content="raw(outputEventsErrorMsg)" />
           </OIcon>
         </template>
       </FullViewContainer>
@@ -272,7 +256,7 @@ import {
 } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { isJsFunction } from "@/utils/functionLanguage";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
 import useSqlSuggestions from "@/composables/useSuggestions";

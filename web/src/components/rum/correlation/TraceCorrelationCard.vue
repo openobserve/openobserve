@@ -16,31 +16,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="border-card-glass-border rounded-default mt-3 border border-solid">
-    <div class="text-text-heading ms-1 mb-2 text-base font-bold">
+    <div class="text-text-heading ms-1 mb-2 text-sm font-semibold">
       {{ t("traces.correlation.distributedTrace") }}
     </div>
 
     <template v-if="isLoading">
       <div class="p-3 text-center">
-        <OSpinner size="sm" />
+        <OSpinner size="lg" />
         <div class="text-text-muted mt-2">{{ t("traces.correlation.loadingTraceData") }}</div>
       </div>
     </template>
 
-    <template v-else-if="!traceId">
-      <div class="text-text-muted p-3 text-center">
-        <OIcon name="info" size="md" class="mb-2" />
-        <div>{{ t("traces.correlation.noTraceInfoAvailable") }}</div>
-      </div>
-    </template>
+    <OEmptyState
+      v-else-if="!traceId"
+      size="compact"
+      class="px-3"
+      icon="timeline"
+      :title="t('traces.correlation.noTraceInfoAvailable')"
+    />
 
     <template v-else>
       <!-- Trace ID Section -->
       <div class="bg-card-glass-bg p-3">
-        <OBanner
+        <OInlineNotice
           v-if="error"
-          variant="error-soft"
-          :content="t('correlation.failedToLoad')"
+          tone="err"
+          :message="t('correlation.failedToLoad')"
           class="mb-3"
           data-test="trace-correlation-error"
         />
@@ -52,15 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="bg-surface-accent rounded-default text-text-body px-2 py-1 font-mono text-sm"
               >{{ formatTraceId(traceId) }}</code
             >
-            <OButton
-              icon-left="content-copy"
-              variant="ghost"
-              size="icon-sm"
+            <OCopyButton
               class="ms-1"
-              @click="copyTraceId"
-            >
-              <OTooltip :content="t('traces.correlation.copyTraceId')" />
-            </OButton>
+              size="md"
+              :label="t('traces.correlation.copyTraceId')"
+              :value="traceId"
+            />
           </div>
         </div>
 
@@ -108,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="bg-surface-accent rounded-default p-2 text-sm">
             <div class="mb-1 flex items-center">
               <div class="text-text-label w-5/12">{{ t("traces.correlation.totalDuration") }}</div>
-              <div class="w-7/12 font-bold">{{ performanceData.total_duration_ms }}ms</div>
+              <div class="w-7/12 font-semibold">{{ performanceData.total_duration_ms }}ms</div>
             </div>
             <div class="mb-1 flex items-center" v-if="performanceData.browser_duration_ms">
               <div class="text-text-label w-5/12">{{ t("traces.correlation.browserLabel") }}</div>
@@ -160,8 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Action Buttons -->
         <div class="flex gap-2">
           <OButton
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :disabled="!hasBackendTrace"
             data-test="trace-correlation-card-view-details-btn"
             @click="viewTraceDetails"
@@ -173,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :content="t('traces.correlation.backendTraceNotAvailable')"
             />
           </OButton>
-          <OButton icon-left="refresh" variant="ghost" size="sm-action" @click="refreshTraceData">
+          <OButton icon="refresh" variant="ghost" @click="refreshTraceData">
             {{ t("common.refresh") }}
           </OButton>
         </div>
@@ -197,15 +194,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { copyToClipboard } from "@/utils/clipboard";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import { normalizeTraceId } from "@/utils/rum/fields";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCopyButton from "@/lib/core/CopyButton/OCopyButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -297,13 +295,6 @@ const formatSpanId = (id: string) => {
 const calculatePercentage = (value: number, total: number) => {
   if (!total) return 0;
   return Math.round((value / total) * 100);
-};
-
-const copyTraceId = () => {
-  copyToClipboard(props.traceId, t, {
-    successMessage: t("traces.traceDetails.traceIdCopied"),
-    timeout: 1500,
-  });
 };
 
 const viewTraceDetails = () => {

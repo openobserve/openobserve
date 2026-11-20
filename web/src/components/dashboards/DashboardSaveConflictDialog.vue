@@ -25,25 +25,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="onOpenChange"
   >
     <div class="flex flex-col gap-4">
-      <OBanner
+      <OInlineNotice
         v-if="state.notice === 'savedAgain'"
-        variant="warning"
-        icon="warning"
-        :content="t('dashboard.saveConflict.savedAgain')"
+        tone="warn"
+        :message="t('dashboard.saveConflict.savedAgain')"
         data-test="dashboard-save-conflict-saved-again"
       />
-      <OBanner
+      <OInlineNotice
         v-if="state.notice === 'stillUnresolved'"
-        variant="warning"
-        icon="warning"
-        :content="t('dashboard.saveConflict.stillUnresolved')"
+        tone="warn"
+        :message="t('dashboard.saveConflict.stillUnresolved')"
         data-test="dashboard-save-conflict-still-unresolved"
       />
-      <OBanner
+      <OInlineNotice
         v-if="state.notice === 'saveFailed'"
-        variant="error"
-        icon="error"
-        :content="t('dashboard.saveConflict.saveFailed', { message: state.errorMessage })"
+        tone="err"
+        :message="t('dashboard.saveConflict.saveFailed', { message: state.errorMessage })"
         data-test="dashboard-save-conflict-save-failed"
       />
 
@@ -53,19 +50,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-save-conflict-loading"
       >
         <div class="text-text-secondary flex items-center gap-2 text-sm">
-          <OSpinner size="xs" />
+          <OSpinner />
           {{ t("dashboard.saveConflict.checking") }}
         </div>
-        <OSkeleton class="h-4 w-3/4" />
-        <OSkeleton class="h-4 w-11/12" />
-        <OSkeleton class="h-4 w-1/2" />
+        <OSkeleton shape="block" class="h-4 w-3/4" />
+        <OSkeleton shape="block" class="h-4 w-11/12" />
+        <OSkeleton shape="block" class="h-4 w-1/2" />
       </div>
 
-      <OBanner
+      <OInlineNotice
         v-else-if="state.step === 'error'"
-        variant="error"
-        icon="error"
-        :content="t('dashboard.saveConflict.loadFailed')"
+        tone="err"
+        :message="t('dashboard.saveConflict.loadFailed')"
         data-test="dashboard-save-conflict-load-failed"
       />
 
@@ -95,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="state.isPanelEditor">
           <OBadge
             v-if="state.panelTouched"
-            variant="warning-soft"
+            tone="warn"
             icon="warning"
             data-test="dashboard-save-conflict-panel-touched"
           >
@@ -103,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OBadge>
           <OBadge
             v-else
-            variant="success-soft"
+            tone="ok"
             icon="check-circle"
             data-test="dashboard-save-conflict-panel-untouched"
           >
@@ -141,18 +137,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="border-border-default rounded-default border">
-          <OCollapsible v-model="changesOpen" data-test="dashboard-save-conflict-changes">
-            <template #trigger="{ open }">
+          <OCollapsible v-model:open="changesOpen" data-test="dashboard-save-conflict-changes">
+            <template #trigger>
               <div class="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
-                <OIcon :name="open ? 'expand-more' : 'chevron-right'" size="sm" />
                 <span class="text-text-heading font-medium">
                   {{ t("dashboard.saveConflict.whatChanged") }}
                 </span>
                 <OBadge
                   v-for="chip in chips"
                   :key="chip.key"
-                  :variant="chip.variant"
-                  size="xs"
+                  :tone="chip.variant"
+                  size="sm"
                   :data-test="`dashboard-save-conflict-chip-${chip.key}`"
                 >
                   {{ chip.label }}
@@ -171,9 +166,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ row.kind }}
                   </span>
                   <OBadge
-                    :variant="CHANGE_BADGE[row.change].variant"
+                    :tone="CHANGE_BADGE[row.change].variant"
                     :icon="CHANGE_BADGE[row.change].icon"
-                    size="xs"
+                    size="sm"
                   >
                     {{ changeLabel(row.change) }}
                   </OBadge>
@@ -193,11 +188,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OCollapsible>
         </div>
 
-        <OBanner
+        <OInlineNotice
           v-if="state.mergeUnavailable"
-          variant="warning"
-          icon="warning"
-          :content="t('dashboard.saveConflict.mergeUnavailable')"
+          tone="warn"
+          :message="t('dashboard.saveConflict.mergeUnavailable')"
           data-test="dashboard-save-conflict-merge-unavailable"
         />
 
@@ -209,10 +203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </dl>
       </template>
 
-      <OBanner
+      <OInlineNotice
         v-else-if="state.step === 'confirm'"
-        variant="error-soft"
-        icon="warning"
+        tone="err"
         data-test="dashboard-save-conflict-confirm"
       >
         <div class="flex flex-col gap-2">
@@ -223,17 +216,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span data-test="dashboard-save-conflict-confirm-saved-by">{{ savedByText }}</span>
           <span>{{ t("dashboard.saveConflict.cannotUndo") }}</span>
         </div>
-      </OBanner>
+      </OInlineNotice>
 
       <div
         v-else-if="state.step === 'review'"
         class="flex flex-col gap-3"
         data-test="dashboard-save-conflict-review"
       >
-        <OBanner
-          variant="warning"
+        <OInlineNotice
+          tone="warn"
           icon="call-merge"
-          :content="t('dashboard.saveConflict.reviewIntro')"
+          :message="t('dashboard.saveConflict.reviewIntro')"
         />
         <span class="text-text-heading text-sm font-medium">
           {{ t("dashboard.saveConflict.reviewHeading") }}
@@ -246,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-save-conflict-merged-${row.key}`"
           >
             <OTruncatedText class="text-text-body min-w-0 flex-1">{{ row.name }}</OTruncatedText>
-            <OBadge v-if="row.tag" :variant="MERGE_TAG[row.tag]" size="xs">
+            <OBadge v-if="row.tag" :tone="MERGE_TAG[row.tag]" size="sm">
               {{ tagLabel(row.tag) }}
             </OBadge>
           </li>
@@ -259,8 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-2">
           <OButton
             v-if="state.step === 'main' || state.step === 'loading'"
-            variant="outline-destructive"
-            size="sm-action"
+            variant="danger-ghost"
             :disabled="!actionsReady || !state.hasMine"
             data-test="dashboard-save-conflict-overwrite"
             @click="startOverwrite"
@@ -270,7 +262,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-else-if="state.step !== 'error'"
             variant="ghost"
-            size="sm-action"
             :disabled="!!state.busy"
             data-test="dashboard-save-conflict-back"
             @click="back"
@@ -285,7 +276,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="action in mainActions"
               :key="action.key"
               :variant="action.variant"
-              size="sm-action"
               :disabled="!actionsReady || action.disabled"
               :loading="state.busy === action.key"
               :data-test="`dashboard-save-conflict-${action.key}`"
@@ -296,23 +286,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template v-else-if="state.step === 'error'">
-            <OButton variant="outline" size="sm-action" @click="close">
+            <OButton variant="secondary" @click="close">
               {{ t("common.close") }}
             </OButton>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              data-test="dashboard-save-conflict-retry"
-              @click="retry"
-            >
+            <OButton variant="primary" data-test="dashboard-save-conflict-retry" @click="retry">
               {{ t("dashboard.saveConflict.retry") }}
             </OButton>
           </template>
 
           <OButton
             v-else-if="state.step === 'confirm'"
-            variant="destructive"
-            size="sm-action"
+            variant="danger"
             :loading="state.busy === 'overwrite'"
             data-test="dashboard-save-conflict-confirm-overwrite"
             @click="confirmOverwrite"
@@ -326,8 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-else-if="state.step === 'review'">
             <OButton
-              variant="outline-destructive"
-              size="sm-action"
+              variant="danger-ghost"
               :disabled="!!state.busy"
               data-test="dashboard-save-conflict-discard-merge"
               @click="discardMerge"
@@ -336,7 +319,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="primary"
-              size="sm-action"
               :loading="state.busy === 'saveMerged'"
               data-test="dashboard-save-conflict-save-merged"
               @click="saveMerged"
@@ -359,10 +341,10 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -389,16 +371,16 @@ interface MainAction {
   run: () => void;
 }
 
-const CHANGE_BADGE: Record<ConflictChangeType, { variant: BadgeVariant; icon: IconName }> = {
-  added: { variant: "success-soft", icon: "add" },
-  changed: { variant: "warning-soft", icon: "edit" },
-  removed: { variant: "error-soft", icon: "remove" },
+const CHANGE_BADGE: Record<ConflictChangeType, { variant: ChipTone; icon: IconName }> = {
+  added: { variant: "ok", icon: "add" },
+  changed: { variant: "warn", icon: "edit" },
+  removed: { variant: "err", icon: "remove" },
 };
 
-const MERGE_TAG: Record<NonNullable<MergedPanelRow["tag"]>, BadgeVariant> = {
-  yours: "primary-soft",
-  theirsNew: "success-soft",
-  theirsEdited: "warning-soft",
+const MERGE_TAG: Record<NonNullable<MergedPanelRow["tag"]>, ChipTone> = {
+  yours: "accent",
+  theirsNew: "ok",
+  theirsEdited: "warn",
 };
 
 const KINDS: ConflictItemKind[] = ["panel", "tab", "variable"];
@@ -483,18 +465,18 @@ const itemsPhrase = (changes: ConflictChange[], type: ConflictChangeType) => {
 };
 
 const chips = computed(() => {
-  const out: { key: string; label: I18nText; variant: BadgeVariant }[] = [];
+  const out: { key: string; label: I18nText; variant: ChipTone }[] = [];
   const typed = (type: ConflictChangeType) => state.changes.filter((c) => c.change === type);
   if (typed("added").length)
     out.push({
       key: "added",
-      variant: "success-soft",
+      variant: "ok",
       label: t("dashboard.saveConflict.chipAdded", { items: itemsPhrase(state.changes, "added") }),
     });
   if (typed("changed").length)
     out.push({
       key: "changed",
-      variant: "warning-soft",
+      variant: "warn",
       label: t("dashboard.saveConflict.chipChanged", {
         items: itemsPhrase(state.changes, "changed"),
       }),
@@ -502,7 +484,7 @@ const chips = computed(() => {
   if (typed("removed").length)
     out.push({
       key: "removed",
-      variant: "error-soft",
+      variant: "err",
       label: t("dashboard.saveConflict.chipRemoved", {
         items: itemsPhrase(state.changes, "removed"),
       }),

@@ -24,8 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
     :title="t('dashboard.columnOrder')"
     size="lg"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="t('common.save')"
+    :secondary="{ label: t('common.cancel') }"
+    :primary="{ label: t('common.save') }"
     @click:secondary="cancelEdit"
     @click:primary="saveEdit"
     data-test="dashboard-column-order-popup"
@@ -36,18 +36,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("dashboard.columnOrderDescription") }}
       </div>
 
-      <!-- Empty state -->
-      <div
+      <OEmptyState
         v-if="!editColumnOrder || editColumnOrder.length === 0"
-        class="text-text-muted p-6 text-center"
+        size="compact"
+        icon="view-column"
+        :title="t('dashboard.noColumnsOrdered')"
+        :text="t('dashboard.columnsDefaultOrder')"
         data-test="dashboard-column-order-empty-state"
-      >
-        <OIcon name="view-column" class="mb-3 h-12 w-12" />
-        <div class="text-base">{{ t("dashboard.noColumnsOrdered") }}</div>
-        <div class="text-xs">
-          {{ t("dashboard.columnsDefaultOrder") }}
-        </div>
-      </div>
+      />
 
       <!-- Draggable list -->
       <draggable
@@ -95,22 +91,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Actions -->
           <div class="ms-2 flex gap-0.5" data-test="dashboard-column-order-column-actions">
             <OButton
+              icon-only
               variant="ghost"
-              size="icon"
+              size="xs"
               :disabled="index === 0"
               @click="moveColumnUp(index)"
               :data-test="`column-order-move-up-${index}`"
-              icon-left="arrow-upward"
+              icon="arrow-upward"
             >
               <OTooltip :content="t('dashboard.moveUp')" />
             </OButton>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon"
+              size="xs"
               :disabled="index === editColumnOrder.length - 1"
               @click="moveColumnDown(index)"
               :data-test="`column-order-move-down-${index}`"
-              icon-left="arrow-downward"
+              icon="arrow-downward"
             >
               <OTooltip :content="t('dashboard.moveDown')" />
             </OButton>
@@ -126,6 +124,7 @@ import { defineComponent, ref, onMounted, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -134,6 +133,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 export default defineComponent({
   name: "ColumnOrderPopUp",
   components: {
+    OEmptyState,
     OTruncatedText,
     draggable: VueDraggableNext as any,
     OButton,

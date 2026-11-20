@@ -151,31 +151,31 @@ const baseStubs = {
     props: [
       "open",
       "title",
-      "subTitle",
+      "subtitle",
       "size",
       "width",
       "persistent",
       "showClose",
-      "primaryButtonLabel",
-      "secondaryButtonLabel",
-      "neutralButtonLabel",
-      "primaryButtonVariant",
-      "secondaryButtonVariant",
-      "neutralButtonVariant",
-      "primaryButtonDisabled",
-      "secondaryButtonDisabled",
-      "neutralButtonDisabled",
-      "primaryButtonLoading",
-      "secondaryButtonLoading",
-      "neutralButtonLoading",
+      "primary",
+      "secondary",
+      "extra",
+      "primary",
+      "secondary",
+      "extra",
+      "primary",
+      "secondary",
+      "extra",
+      "primary",
+      "secondary",
+      "extra",
     ],
-    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+    emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   },
   ODrawer: {
     name: "ODrawer",
     template: '<div data-test="o-drawer" v-if="open"><slot /></div>',
-    props: ["open", "title", "subTitle", "size", "width", "persistent", "showClose"],
-    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+    props: ["open", "title", "subtitle", "size", "width", "persistent", "showClose"],
+    emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   },
 };
 
@@ -1462,21 +1462,16 @@ describe("O2AIChat session, persistence and lifecycle", () => {
             props: {
               open: Boolean,
               title: String,
-              primaryButtonLabel: String,
-              primaryButtonVariant: String,
-              initialFocus: String,
+              primary: { type: Object, default: undefined },
             },
           },
         },
       );
       const dialog = wrapper
         .findAllComponents({ name: "ODialog" })
-        .find((c) => c.props("title") === "Delete Chat")!;
-      expect(dialog.props()).toMatchObject({
-        primaryButtonLabel: "Delete",
-        primaryButtonVariant: "destructive",
-        initialFocus: "secondary",
-      });
+        .find((c) => c.props("title") === "Delete chat")!;
+      // A danger primary makes ODialog focus Cancel on open, so no focus prop is needed.
+      expect(dialog.props("primary")).toMatchObject({ label: "Delete", variant: "danger" });
     });
   });
 

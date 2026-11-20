@@ -17,18 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <OPageLayout
-    :title="t('iam.basicUsers')"
-    :subtitle="t('user.subtitle', { org: store.state.selectedOrganization?.label ?? '' })"
-    icon="person"
-    bleed
-  >
+  <OPageLayout :title="t('iam.basicUsers')" bleed>
     <template #actions>
       <OButton
         v-if="config.isCloud === 'true' && canInvite"
         variant="primary"
-        size="sm"
-        icon-left="person-add"
+        icon="person-add"
         data-test="invite-members-btn"
         @click="openInviteDialog()"
       >
@@ -37,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else-if="config.isCloud !== 'true'"
         variant="primary"
-        size="sm"
         @click="addRoutePush({})"
         data-test="add-basic-user"
       >
@@ -48,18 +41,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg h-full">
         <OTable
           :key="tableKey"
-          :frame="false"
           :data="displayedRows"
           :columns="columns"
           row-key="email"
           :row-actions="rowActions"
-          row-actions-more-data-test="user-list-row-more-actions"
+          :row-menu="rowMenu"
+          row-menu-data-test="user-list-row-more-actions"
           :loading="loading"
           :forbidden="forbidden"
+          :error="loadError"
           forbidden-resource="users"
           :selected-ids="selectedUserIds"
           v-model:global-filter="filterQuery"
-          :show-global-filter="false"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -68,11 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-row-selectable="(row: any) => row.enableDelete"
           filter-mode="client"
           :default-columns="false"
-          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-users-list"
           @update:selected-ids="handleSelectedIdsUpdate"
+          @retry="refreshUsers"
         >
           <template #toolbar>
             <div class="contents">
@@ -99,40 +92,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              shortcut-id="iamUsersRefresh"
+              shortcut="iamUsersRefresh"
               data-test="user-list-refresh-btn"
               @click="refreshUsers"
             />
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-users"
-              :filtered="!!(filterQuery || roleFilters.length)"
-              :hide-action="
-                config.isCloud === 'true' && !canInvite && !(filterQuery || roleFilters.length)
+              :kind="filterQuery || roleFilters.length ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery || roleFilters.length
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.users') })
+                  : t('emptyState.noUsers.title')
               "
-              @action="(id) => (id === 'clear-filters' ? clearFilters() : openAddFlow())"
+              :text="
+                filterQuery || roleFilters.length
+                  ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.users') })
+                  : t('emptyState.noUsers.description')
+              "
+              :icon="filterQuery || roleFilters.length ? undefined : 'group'"
+              :action-label="
+                filterQuery || roleFilters.length || (config.isCloud === 'true' && !canInvite)
+                  ? undefined
+                  : t('emptyState.noUsers.action')
+              "
+              @action="filterQuery || roleFilters.length ? clearFilters() : openAddFlow()"
             >
               <template v-if="searchInviteEmail" #actions>
-                <EmptyStateActionCard
-                  icon="person-add"
-                  :label="t('user.inviteSearchedEmail', { email: searchInviteEmail })"
-                  :sublabel="t('user.inviteSearchedEmailDesc')"
+                <OButton
+                  variant="primary"
                   data-test="user-list-invite-searched-email"
                   @click="openInviteDialog(searchInviteEmail)"
-                />
-                <EmptyStateActionCard
-                  icon="filter-list"
-                  :label="t('emptyState.filtered.action')"
-                  :sublabel="t('emptyState.filtered.actionDesc')"
+                >
+                  {{ t("user.inviteSearchedEmail", { email: searchInviteEmail }) }}
+                </OButton>
+                <OButton
+                  variant="secondary"
                   data-test="user-list-clear-filters"
                   @click="clearFilters()"
-                />
+                >
+                  {{ t("emptyState.filtered.action") }}
+                </OButton>
               </template>
             </OEmptyState>
           </template>
@@ -155,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="(roleName, idx) in row.roles || []"
                 :key="`${roleName}-${idx}`"
                 :type="isBuiltinRole(roleName) ? 'userRole' : undefined"
-                :variant="isBuiltinRole(roleName) ? undefined : 'default-soft'"
+                :tone="isBuiltinRole(roleName) ? undefined : 'neutral'"
                 :value="roleName"
               />
               <OTag v-if="row.status === 'pending'" type="userStatus" value="invited" />
@@ -177,9 +179,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #selection-actions>
             <OButton
               data-test="users-list-delete-users-btn"
-              variant="outline-destructive"
-              size="sm"
-              icon-left="delete"
+              variant="danger-ghost"
+              icon="delete"
               :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
@@ -216,47 +217,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @invite-sent="handleInviteSent"
     />
 
-    <ODialog
+    <ConfirmDialog
+      v-model="confirmDelete"
+      kind="destructive"
       data-test="user-delete-dialog"
-      v-model:open="confirmDelete"
-      size="sm"
       :title="t('user.confirmDeleteHead')"
-      :secondary-button-label="t('user.cancel')"
-      :primary-button-label="t('user.ok')"
-      primary-button-variant="destructive"
-      @click:secondary="confirmDelete = false"
-      @click:primary="deleteUser"
-    >
-      <i18n-t keypath="user.confirmDeleteMsg" tag="p" data-test="user-delete-dialog-message">
-        <template #name
-          ><span class="text-text-heading font-semibold break-all">{{
-            deleteUserEmail
-          }}</span></template
-        >
-      </i18n-t>
-    </ODialog>
+      message-keypath="user.confirmDeleteMsg"
+      :message-name="deleteUserEmail"
+      :cancel-label="t('user.cancel')"
+      @update:ok="deleteUser"
+      @update:cancel="confirmDelete = false"
+    />
 
-    <ODialog
+    <ConfirmDialog
+      v-model="confirmBlock"
       data-test="user-block-dialog"
-      v-model:open="confirmBlock"
-      size="sm"
       :title="t('user.confirmBlockHead')"
-      :secondary-button-label="t('user.cancel')"
-      :primary-button-label="t('user.block')"
-      @click:secondary="confirmBlock = false"
-      @click:primary="blockUser"
-    >
-      <p>{{ t("user.confirmBlockMsg", { email: blockUserEmail }) }}</p>
-    </ODialog>
+      :message="t('user.confirmBlockMsg', { email: blockUserEmail })"
+      :ok-label="t('user.block')"
+      :cancel-label="t('user.cancel')"
+      @update:ok="blockUser"
+      @update:cancel="confirmBlock = false"
+    />
 
     <ODialog
       data-test="user-revoke-dialog"
       v-model:open="confirmRevoke"
-      size="xs"
+      size="sm"
       :title="t('user.revokeInvitationTitle')"
-      :secondary-button-label="t('user.cancel')"
-      :primary-button-label="t('user.ok')"
-      primary-button-variant="destructive"
+      :secondary="{ label: t('user.cancel') }"
+      :primary="{ label: t('user.ok'), variant: 'danger' }"
       @click:secondary="confirmRevoke = false"
       @click:primary="revokeInvite"
     >
@@ -274,9 +264,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="confirmBulkDelete"
       size="sm"
       :title="t('user.deleteUsersTitle')"
-      :secondary-button-label="t('user.cancel')"
-      :primary-button-label="t('user.ok')"
-      primary-button-variant="destructive"
+      :secondary="{ label: t('user.cancel') }"
+      :primary="{ label: t('user.ok'), variant: 'danger' }"
       @click:secondary="confirmBulkDelete = false"
       @click:primary="bulkDeleteUsers"
     >
@@ -301,7 +290,7 @@ import { blockEmailsInConfig } from "@/components/settings/orgDomainRestrictions
 import { queryClient } from "@/composables/query/queryClient";
 import { useMutation } from "@tanstack/vue-query";
 import { defineComponent, ref, toRef, onActivated, onBeforeMount, watch, computed } from "vue";
-import { useListViewState } from "@/composables/useListViewState";
+import { LIST_URL_PARAMS, useListViewState } from "@/composables/useListViewState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -309,9 +298,14 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -325,13 +319,17 @@ import InviteMembersDialog from "@/components/iam/users/InviteMembersDialog.vue"
 import { splitInviteEmails } from "@/components/iam/users/MemberInvitation.schema";
 import { getImageURL, verifyOrganizationStatus, maskText, validateEmail } from "@/utils/zincutils";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { featureState, forbiddenState, type ForbiddenState } from "@/utils/featureGate";
+import {
+  featureState,
+  forbiddenState,
+  loadErrorText,
+  type ForbiddenState,
+} from "@/utils/featureGate";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -350,8 +348,8 @@ export default defineComponent({
     OTag,
     OStatStrip,
     ODialog,
+    ConfirmDialog,
     OEmptyState,
-    EmptyStateActionCard,
     OSearchInput,
   },
   emits: ["updated:fields", "deleted:fields", "updated:dates"],
@@ -375,7 +373,10 @@ export default defineComponent({
     const { usersState } = usePermissions();
     const isEnterprise = ref(false);
     const isCurrentUserInternal = ref(false);
-    const filterQuery = toRef(useListViewState("iam-users", { filterQuery: "" }), "filterQuery");
+    const filterQuery = toRef(
+      useListViewState("iam-users", { filterQuery: "" }, { url: LIST_URL_PARAMS }),
+      "filterQuery",
+    );
 
     const toCamelCase = (str: string) => {
       return str.charAt(0).toUpperCase() + str.slice(1);
@@ -511,13 +512,6 @@ export default defineComponent({
         meta: { align: "left" },
       });
 
-      cols.push({
-        id: "actions",
-        header: t("user.actions"),
-        isAction: true,
-        pinned: "right",
-      });
-
       return cols;
     });
 
@@ -528,36 +522,39 @@ export default defineComponent({
         id: "edit",
         label: t("user.update"),
         icon: "edit",
-        onSelect: (row) => addRoutePush(row),
-        visible: canEditRow,
+        onClick: (row) => addRoutePush(row),
+        hidden: (row) => !canEditRow(row),
         dataTest: (_row, index) => `edit-basic-user-${index}`,
       },
+    ];
+    const rowMenu: OTableRowMenuItem[] = [
       {
         id: "block",
         label: t("user.block"),
         icon: "block",
-        tone: "destructive",
+        destructive: true,
         shortcut: "delete",
         onSelect: (row) => confirmBlockAction(row),
-        visible: (row) => canRemoveRow(row) && !!row.isDomainMapped,
+        hidden: (row) => !(canRemoveRow(row) && !!row.isDomainMapped),
         dataTest: (row) => `block-basic-user-${row.email}`,
       },
       {
         id: "revoke",
         label: t("user.revoke_invite"),
         icon: "cancel",
-        tone: "destructive",
+        destructive: true,
         shortcut: "delete",
         onSelect: (row) => confirmRevokeAction(row),
-        visible: (row) => row.status == "pending" && !!row.token,
+        hidden: (row) => !(row.status == "pending" && !!row.token),
         dataTest: (row) => `revoke-invite-${row.email}`,
       },
       {
         id: "delete",
         label: t("user.delete"),
         icon: "delete",
+        destructive: true,
         onSelect: (row) => confirmDeleteAction(row),
-        visible: (row) => canRemoveRow(row) && !row.isDomainMapped,
+        hidden: (row) => !(canRemoveRow(row) && !row.isDomainMapped),
         dataTest: (row) => `delete-basic-user-${row.email}`,
       },
     ];
@@ -846,6 +843,8 @@ export default defineComponent({
     const fetching = ref(false);
     const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref<ForbiddenState>(false);
+    // A failed read with no rows on screen is the table's error state, never the first-run one (K5).
+    const loadError = ref<string | null>(null);
     // The ?email= deep link opens the edit dialog, so it is latched — the
     // cached paint and the fresh one must not open it twice.
     let deepLinkOpened = false;
@@ -934,6 +933,7 @@ export default defineComponent({
       loading.value = !warm;
       fetching.value = true;
       forbidden.value = false;
+      loadError.value = null;
       return new Promise((resolve, reject) => {
         (force
           ? queryClient
@@ -1001,7 +1001,9 @@ export default defineComponent({
             console.error("Failed to fetch org members:", err);
             dismiss();
             forbidden.value = forbiddenState(err);
-            if (!forbidden.value) {
+            if (!rows.value.length) {
+              loadError.value = loadErrorText(err, t("emptyState.loadError.description"));
+            } else if (!forbidden.value) {
               toast({
                 variant: "error",
                 message: t("iam.user.failedToLoadUsers", {
@@ -1672,6 +1674,7 @@ export default defineComponent({
       usersState,
       columns,
       loading,
+      loadError,
       fetching,
       lastUpdatedAt,
       forbidden,
@@ -1743,6 +1746,7 @@ export default defineComponent({
       rows,
       displayedRows,
       rowActions,
+      rowMenu,
       roleFilters,
       onStatSelect,
       summaryStats,

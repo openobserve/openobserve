@@ -16,8 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full flex-col overflow-hidden px-6 pt-4" data-test="organization-group-page">
-    <div v-if="loading" class="flex justify-center py-10">
-      <OSpinner size="md" />
+    <div v-if="loading" class="flex flex-col gap-5" data-test="org-group-loading">
+      <OSkeleton preset="statStrip" :count="3" />
+      <OSkeleton preset="tableRows" />
     </div>
 
     <template v-else>
@@ -60,14 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :activeTab="superFilter"
             @update:activeTab="(v: string) => (superFilter = v)"
           />
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="org-group-view-usage-btn"
-            @click="goToUsage"
-          >
+          <OButton variant="secondary" data-test="org-group-view-usage-btn" @click="goToUsage">
             {{ t("billing.billingGroup.viewUsage") }}
-            <template #icon-right>
+            <template #icon-end>
               <OIcon name="arrow-forward" size="sm" class="ms-1" />
             </template>
           </OButton>
@@ -84,12 +80,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size-options="[10, 20, 50, 100]"
             :default-columns="false"
             :fill-height="true"
+            :global-filter="memberSearch"
             data-test="org-group-members-table"
           >
+            <template #toolbar>
+              <OSearchInput
+                v-model="memberSearch"
+                width="list"
+                class="max-md:min-w-40"
+                data-test="org-group-members-search"
+              />
+            </template>
             <template #empty>
-              <div class="py-4 text-center">
-                {{ t("billing.billingGroup.noMembers") }}
-              </div>
+              <OEmptyState
+                :kind="memberSearch ? 'filtered' : 'first-run'"
+                :title="memberSearch ? undefined : t('billing.billingGroup.noMembers')"
+                @action="memberSearch = ''"
+              />
             </template>
             <template #cell-status="{ row }">
               <OTag type="billingGroupMemberStatus" :value="row.status" />
@@ -103,8 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-actions="{ row }">
               <div v-if="row.status === 'Active'" class="flex justify-end gap-2 pe-3">
                 <OButton
-                  variant="ghost-destructive"
-                  size="icon-sm"
+                  icon-only
+                  variant="danger-ghost"
                   :title="t('billing.billingGroup.remove')"
                   :aria-label="t('billing.billingGroup.remove')"
                   :disabled="actioningToken === row.org_id"
@@ -117,17 +124,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
+                      icon-only
                       :aria-label="t('common.moreActions')"
-                      icon-left="more-vert"
+                      icon="more-vert"
                       variant="ghost"
-                      size="icon-xs-sq"
+                      size="sm"
                       class="md:hidden"
                       data-test="org-group-row-more-actions"
                       @click.stop
                     />
                   </template>
                   <ODropdownItem
-                    variant="destructive"
+                    tone="danger"
                     class="md:hidden"
                     :disabled="actioningToken === row.org_id"
                     :data-test="`org-group-remove-member-${row.org_id}-menu`"
@@ -157,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="verified" size="xs" />
               {{ t("billing.billingGroup.statusActive") }}
             </div>
-            <div class="mb-4 text-4xl leading-[1.2] font-bold tracking-[-0.0375rem]">
+            <div class="mb-4 text-2xl leading-[1.2] font-semibold tracking-[-0.0375rem]">
               {{ t("billing.billingGroup.childHeadline") }}
               <span
                 class="text-tabs-active-text inline-block max-w-full cursor-pointer overflow-hidden align-bottom text-ellipsis whitespace-nowrap"
@@ -175,24 +183,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTooltip>
               </span>
             </div>
-            <div class="mb-8 max-w-105 text-base leading-[1.7] opacity-70">
+            <div class="mb-8 max-w-105 text-sm leading-[1.7] opacity-70">
               {{ t("billing.billingGroup.childHeroSub") }}
             </div>
             <div class="flex flex-wrap items-center gap-3">
               <OButton
                 variant="primary"
-                class="h-11 px-6 font-semibold"
+                class="px-6 font-semibold"
                 data-test="org-group-child-view-usage-btn"
                 @click="goToUsage"
               >
                 {{ t("billing.billingGroup.viewUsage") }}
-                <template #icon-right>
+                <template #icon-end>
                   <OIcon name="arrow-forward" size="sm" class="ms-1" />
                 </template>
               </OButton>
               <OButton
-                variant="outline-destructive"
-                class="h-11 px-6 font-semibold"
+                variant="danger-ghost"
+                class="px-6 font-semibold"
                 data-test="org-group-leave"
                 @click="showLeaveDialog = true"
               >
@@ -215,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.invitedBy") }}
                 </div>
-                <OTruncatedText as="div" class="text-base font-semibold">
+                <OTruncatedText as="div" class="text-sm font-semibold">
                   {{ membership?.created_by }}
                 </OTruncatedText>
               </div>
@@ -232,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.acceptedBy") }}
                 </div>
-                <OTruncatedText as="div" class="text-base font-semibold">
+                <OTruncatedText as="div" class="text-sm font-semibold">
                   {{ membership?.accepted_by || t("billing.billingGroup.addedOnCreation") }}
                 </OTruncatedText>
               </div>
@@ -249,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.memberSince") }}
                 </div>
-                <div class="text-base font-semibold">
+                <div class="text-sm font-semibold">
                   {{ formatDate(membership?.created_at) }}
                 </div>
               </div>
@@ -286,7 +294,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex justify-end gap-2 pe-3">
                 <OButton
                   variant="primary"
-                  size="sm"
                   :disabled="actioningToken === row.token"
                   class="max-md:hidden"
                   :data-test="`org-group-accept-invite-${row.inviter_org_id}`"
@@ -295,8 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("billing.billingGroup.accept") }}
                 </OButton>
                 <OButton
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
                   :disabled="actioningToken === row.token"
                   class="max-md:hidden"
                   :data-test="`org-group-reject-invite-${row.inviter_org_id}`"
@@ -307,10 +313,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
+                      icon-only
                       :aria-label="t('common.moreActions')"
-                      icon-left="more-vert"
+                      icon="more-vert"
                       variant="ghost"
-                      size="icon-xs-sq"
+                      size="sm"
                       class="md:hidden"
                       data-test="org-group-row-more-actions"
                       @click.stop
@@ -359,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="mb-2.5 text-xl font-bold tracking-[-0.0125rem]">
+          <div class="mb-2.5 text-xl font-semibold tracking-[-0.0125rem]">
             {{
               allowedForBillingGroup
                 ? t("billing.billingGroup.emptyTitle")
@@ -392,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OButton
               variant="primary"
-              class="h-10 px-6 font-semibold"
+              class="px-6 font-semibold"
               data-test="org-group-standalone-invite-btn-empty"
               @click="showInviteDialog = true"
             >
@@ -405,10 +412,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Invite side panel -->
     <ODrawer
+      size="sm"
       :open="showInviteDialog"
       :title="t('billing.billingGroup.inviteTitle')"
-      :primary-button-label="t('billing.billingGroup.sendInvite')"
-      :secondary-button-label="t('billing.billingGroup.cancel')"
+      :primary="{ label: t('billing.billingGroup.sendInvite') }"
+      :secondary="{ label: t('billing.billingGroup.cancel') }"
       form-id="billing-group-invite-form"
       data-test="org-group-invite-dialog"
       @update:open="showInviteDialog = $event"
@@ -439,11 +447,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="sm"
       :persistent="actioningToken !== ''"
       :title="t('billing.billingGroup.removeTitle')"
-      :secondary-button-label="t('billing.billingGroup.cancel')"
-      secondary-button-variant="outline"
-      :primary-button-label="t('billing.billingGroup.remove')"
-      primary-button-variant="destructive"
-      :primary-button-loading="actioningToken !== ''"
+      :secondary="{ label: t('billing.billingGroup.cancel'), variant: 'secondary' }"
+      :primary="{
+        label: t('billing.billingGroup.remove'),
+        variant: 'danger',
+        loading: actioningToken !== '',
+      }"
       data-test="org-group-remove-dialog"
       @update:open="(v: boolean) => !v && (removeTarget = null)"
       @click:secondary="removeTarget = null"
@@ -465,11 +474,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="sm"
       :persistent="actioningToken !== ''"
       :title="t('billing.billingGroup.leaveTitle', { name: payerName })"
-      :secondary-button-label="t('billing.billingGroup.cancel')"
-      secondary-button-variant="outline"
-      :primary-button-label="t('billing.billingGroup.leave')"
-      primary-button-variant="destructive"
-      :primary-button-loading="actioningToken !== ''"
+      :secondary="{ label: t('billing.billingGroup.cancel'), variant: 'secondary' }"
+      :primary="{
+        label: t('billing.billingGroup.leave'),
+        variant: 'danger',
+        loading: actioningToken !== '',
+      }"
       data-test="org-group-leave-dialog"
       @update:open="showLeaveDialog = $event"
       @click:secondary="showLeaveDialog = false"
@@ -491,8 +501,10 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -543,8 +555,10 @@ export default defineComponent({
     OIcon,
     OForm,
     OFormInput,
-    OSpinner,
+    OSkeleton,
+    OEmptyState,
     OTable,
+    OSearchInput,
     OUserCell,
     ODrawer,
     ODialog,
@@ -566,6 +580,7 @@ export default defineComponent({
     const showInviteDialog = ref(false);
     const showLeaveDialog = ref(false);
     const superFilter = ref("all");
+    const memberSearch = ref("");
 
     const currentOrg = computed(() => store.state.selectedOrganization.identifier);
 
@@ -954,6 +969,7 @@ export default defineComponent({
 
     return {
       t,
+      memberSearch,
       loading,
       role,
       membership,

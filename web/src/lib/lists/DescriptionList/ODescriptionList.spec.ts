@@ -6,63 +6,105 @@ import ODescriptionItem from "./ODescriptionItem.vue";
 import { raw } from "@/types/i18n";
 
 describe("ODescriptionList", () => {
-  it("renders a real <dl>", () => {
+  it("renders a real <dl> inside its container", () => {
     const w = mount(ODescriptionList);
-    expect(w.element.tagName).toBe("DL");
+    expect(w.find("dl[data-test='o2-description-list']").exists()).toBe(true);
   });
 
   it.each([
-    [1, false],
-    [2, true],
-  ] as const)("columns=%s adds the md two-column class: %s", (columns, expected) => {
-    const w = mount(ODescriptionList, { props: { columns } });
-    expect(w.classes().includes("md:grid-cols-2")).toBe(expected);
+    ["columns", "grid-cols-[10rem_minmax(0,1fr)]"],
+    ["stacked", "grid-cols-1"],
+    ["auto", "@max-[30rem]/dl:grid-cols-1"],
+  ] as const)("layout=%s picks its grid", (layout, expected) => {
+    const w = mount(ODescriptionList, { props: { layout } });
+    expect(w.find("dl").classes()).toContain(expected);
   });
 
-  it("switches row rhythm on dense", () => {
-    expect(mount(ODescriptionList).classes()).toContain("gap-y-3");
-    expect(mount(ODescriptionList, { props: { dense: true } }).classes()).toContain("gap-y-1.5");
+  it("renders items from data, with a muted dash for a missing value", () => {
+    const w = mount(ODescriptionList, {
+      props: {
+        items: [
+          { label: raw("Owner"), value: "priya" },
+          { label: raw("Description"), value: null },
+        ],
+      },
+    });
+    const values = w.findAll("dd");
+    expect(values[0].text()).toBe("priya");
+    expect(values[1].text()).toBe("—");
+    expect(values[1].find("[data-test='o2-description-empty']").classes()).toContain(
+      "text-text-muted",
+    );
+  });
+
+  it("uses mono keys and values for labels='mono' (T4)", () => {
+    const w = mount(ODescriptionList, {
+      props: { labels: "mono", items: [{ label: raw("k8s.pod.name"), value: "api-7c9f" }] },
+    });
+    expect(w.find("dt").classes()).toContain("font-mono");
+    expect(w.find("dd").classes()).toContain("font-mono");
+  });
+
+  it("keeps sans text for labels='text' and lets one value go mono", () => {
+    const w = mount(ODescriptionList, {
+      props: {
+        items: [
+          { label: raw("Owner"), value: "priya" },
+          { label: raw("Trace"), value: "4bf92f", mono: true },
+        ],
+      },
+    });
+    const [owner, trace] = w.findAll("dd");
+    expect(w.find("dt").classes()).toContain("text-compact");
+    expect(owner.classes()).not.toContain("font-mono");
+    expect(trace.classes()).toContain("font-mono");
+  });
+
+  it("offers copy on hover only for a present value", () => {
+    const w = mount(ODescriptionList, {
+      props: {
+        items: [
+          { label: raw("Trace"), value: "4bf92f", copy: true },
+          { label: raw("Span"), value: null, copy: true },
+        ],
+      },
+    });
+    expect(w.findAll("[data-test='o2-description-copy']")).toHaveLength(1);
+  });
+
+  it("applies the list's empty label to child items", () => {
+    const w = mount(ODescriptionList, {
+      props: { emptyLabel: raw("not set") },
+      slots: { default: () => h(ODescriptionItem, { label: raw("Team") }) },
+    });
+    expect(w.find("dd").text()).toBe("not set");
   });
 });
 
 describe("ODescriptionItem", () => {
-  it("pairs the label and the value as <dt>/<dd>", () => {
+  it("pairs the label and the value as <dt>/<dd> in one subgrid row", () => {
     const w = mount(ODescriptionItem, {
       props: { label: raw("Team") },
       slots: { default: "Platform" },
     });
+    expect(w.classes()).toContain("grid-cols-subgrid");
     expect(w.find("dt").text()).toBe("Team");
     expect(w.find("dd").text()).toBe("Platform");
   });
 
-  // An absent value must read as absent, not as a blank row the eye skips.
   it.each([
     [undefined, "—"],
     [raw("not set"), "not set"],
-  ])("falls back to emptyLabel %s when the slot is empty", (emptyLabel, expected) => {
+  ])("falls back to emptyLabel %s when there is no value", (emptyLabel, expected) => {
     const w = mount(ODescriptionItem, {
       props: emptyLabel ? { label: raw("Team"), emptyLabel } : { label: raw("Team") },
     });
     expect(w.find("dd").text()).toBe(expected);
   });
 
-  it.each([
-    [false, "grid-cols-[10rem_1fr]"],
-    [true, "flex-col"],
-  ])("stacked=%s picks its layout", (stacked, expected) => {
-    const w = mount(ODescriptionItem, { props: { label: raw("Team"), stacked } });
-    expect(w.classes().join(" ")).toContain(expected);
-  });
-
-  it.each([
-    [undefined, "grid-cols-[10rem_1fr]"],
-    ["narrow", "grid-cols-[7rem_1fr]"],
-  ] as const)("takes its label width %s from the list", (labelWidth, expected) => {
-    const w = mount(ODescriptionList, {
-      props: labelWidth ? { labelWidth } : {},
-      slots: { default: () => h(ODescriptionItem, { label: raw("Team") }) },
-    });
-    expect(w.find("[data-test=o2-description-item]").classes()).toContain(expected);
+  it("shows a real zero, not the empty dash", () => {
+    const w = mount(ODescriptionItem, { props: { label: raw("Retries"), value: 0 } });
+    expect(w.find("dd").text()).toBe("0");
   });
 
   it("lets the label be replaced by a slot", () => {
@@ -71,15 +113,5 @@ describe("ODescriptionItem", () => {
       slots: { label: "<span>Owning team</span>" },
     });
     expect(w.find("dt").text()).toBe("Owning team");
-  });
-
-  it("groups pairs so a two-column list keeps each value beside its own label", () => {
-    const w = mount(ODescriptionList, {
-      props: { columns: 2 },
-      slots: {
-        default: `<div data-test="o2-description-item"><dt>a</dt><dd>1</dd></div>`,
-      },
-    });
-    expect(w.findAll("dl > [data-test='o2-description-item']")).toHaveLength(1);
   });
 });

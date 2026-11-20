@@ -452,7 +452,7 @@ export class StreamsPage {
         await retentionTab.waitFor({ state: 'visible', timeout: 15000 });
         await retentionTab.click();
 
-        // Wait for the tab's date picker ("Select Date" button) to render before
+        // Wait for the tab's date picker ("Select date" button) to render before
         // returning — this is the exact element the caller needs, so a fixed 1s
         // wait was the source of the "date-time-btn not visible" CI failure.
         await this.page.locator('[data-test="date-time-btn"]').waitFor({ state: 'visible', timeout: 15000 });
@@ -899,6 +899,14 @@ export class StreamsPage {
     async clickCloseStreamModal() {
         testLogger.info('Clicking Close button');
         await this.closeStreamButton.click();
+        // ✕ on an edited form asks "Discard changes?" in the dialog footer before it closes.
+        const dialog = this.page.locator('[data-test="add-stream-dialog"]');
+        const discardBtn = dialog.locator('[data-test="o-dialog-discard-btn"]');
+        const asked = await Promise.race([
+            discardBtn.waitFor({ state: 'visible', timeout: 5000 }).then(() => true),
+            dialog.waitFor({ state: 'hidden', timeout: 5000 }).then(() => false),
+        ]).catch(() => false);
+        if (asked) await discardBtn.click();
         await this.waitForUI(500);
     }
 

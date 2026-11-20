@@ -39,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </span>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
           class="ms-auto"
           :aria-label="t('iam.editRole.presetsClose')"
           data-test="edit-role-presets-close"
@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTruncatedText class="flex-1">{{ t(item.preset.titleKey) }}</OTruncatedText>
                   <OSkeleton
                     v-if="item.badge === 'loading'"
+                    shape="block"
                     class="h-5 w-8 shrink-0"
                     :aria-label="
                       loading
@@ -88,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template v-else-if="item.badge === 'adds'">
                     <!-- Hidden from readers so the badge text stays "+N"; the sentence below names it. -->
                     <OBadge
-                      variant="primary-soft"
+                      tone="accent"
                       size="sm"
                       class="shrink-0"
                       aria-hidden="true"
@@ -100,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <OBadge
                     v-else-if="item.badge === 'in-role'"
-                    variant="success-soft"
+                    tone="ok"
                     size="sm"
                     class="shrink-0"
                     :data-test="`edit-role-preset-${item.preset.id}-status`"
@@ -122,8 +123,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default flex min-h-14 shrink-0 items-center gap-2 border-b px-3 py-2"
       >
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
           :aria-label="t('iam.editRole.presetBack')"
           data-test="edit-role-preset-back"
           @click="closePreset"
@@ -145,8 +146,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </span>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
           class="ms-auto"
           :aria-label="t('iam.editRole.presetsClose')"
           data-test="edit-role-presets-close"
@@ -162,33 +163,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex flex-col gap-2 px-1 py-3"
           data-test="edit-role-preset-loading"
         >
-          <OSkeleton
-            type="text"
-            class="w-3/4"
-            :aria-label="t('iam.editRole.presetLoadingStreams')"
-          />
-          <OSkeleton type="text" class="w-1/2" aria-hidden="true" />
+          <OSkeleton class="w-3/4" :aria-label="t('iam.editRole.presetLoadingStreams')" />
+          <OSkeleton class="w-1/2" aria-hidden="true" />
         </div>
 
-        <div
+        <OEmptyState
           v-else-if="detailPreview?.status === 'failed'"
-          class="flex flex-col items-start gap-2 px-1 py-3"
+          kind="error"
+          size="compact"
+          class="px-1"
+          :title="t('iam.editRole.presetStreamsFailed')"
           data-test="edit-role-preset-failed"
         >
-          <span class="text-badge-warning-soft-text flex items-start gap-1 text-xs">
-            <OIcon name="warning" size="sm" class="shrink-0" />
-            {{ t("iam.editRole.presetStreamsFailed") }}
-          </span>
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="refresh"
-            data-test="edit-role-preset-retry"
-            @click="requestStreams"
-          >
-            {{ t("iam.editRole.presetRetry") }}
-          </OButton>
-        </div>
+          <template #actions>
+            <OButton
+              variant="secondary"
+              size="sm"
+              data-test="edit-role-preset-retry"
+              @click="requestStreams"
+            >
+              {{ t("iam.editRole.presetRetry") }}
+            </OButton>
+          </template>
+        </OEmptyState>
 
         <template v-else-if="detailPreview">
           <div class="border-border-subtle border-b px-1 pt-2 pb-2.5">
@@ -259,12 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTruncatedText>
               </span>
               <span class="flex max-w-30 flex-wrap justify-end gap-1">
-                <OBadge
-                  v-for="action in row.actions"
-                  :key="action.action"
-                  variant="primary-soft"
-                  size="sm"
-                >
+                <OBadge v-for="action in row.actions" :key="action.action" tone="accent" size="sm">
                   {{ action.label }}
                 </OBadge>
               </span>
@@ -278,8 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default shrink-0 border-t p-3"
       >
         <OButton
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           block
           :disabled="!addCount || applying"
           data-test="edit-role-preset-apply"
@@ -301,6 +292,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";

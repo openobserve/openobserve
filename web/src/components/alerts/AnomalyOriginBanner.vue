@@ -15,7 +15,7 @@
 
 <!-- Logs, Traces and Metrics opened from an anomaly link; the values come from the link, so they stay the alert's. -->
 <template>
-  <OBanner v-if="link" variant="info" icon="insights" dense inline-actions :data-test="dataTest">
+  <OBanner v-if="link" tone="info" icon="insights" :data-test="dataTest">
     <div class="flex min-w-0 flex-col gap-0.5">
       <span class="text-text-heading text-sm font-semibold" :data-test="`${dataTest}-title`">
         {{ title }}
@@ -35,8 +35,7 @@
       <div v-if="link" class="flex shrink-0 items-center gap-1">
         <OButton
           v-if="canSwitchView"
-          variant="ghost-primary"
-          size="sm"
+          variant="accent-ghost"
           :data-test="`${dataTest}-switch-view`"
           @click="switchView"
         >
@@ -47,18 +46,18 @@
           }}
         </OButton>
         <OButton
-          variant="ghost-primary"
-          size="sm"
-          icon-left="arrow-back"
+          variant="accent-ghost"
+          icon="arrow-back"
           :data-test="`${dataTest}-back`"
           @click="backToAnomaly"
         >
           {{ t("alerts.anomaly.originBack") }}
         </OButton>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs-sq"
-          icon-left="close"
+          size="sm"
+          icon="close"
           :aria-label="t('common.close')"
           :data-test="`${dataTest}-close`"
           @click="close"

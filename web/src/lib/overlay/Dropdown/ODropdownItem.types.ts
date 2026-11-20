@@ -1,50 +1,48 @@
 /**
- * ODropdownItem.types.ts — public types for ODropdownItem.
+ * ODropdownItem.types.ts — public types for a menu item (ODropdownItem and OContextMenuItem).
  */
 
 import type { I18nText } from "@/types/i18n";
 
 import type { IconName } from "../../core/Icon/OIcon.icons";
 
-/** Visual intent of the item */
-export type DropdownItemVariant = "default" | "destructive";
+/** `danger` items go last, after a separator, and confirm (guideline B7). */
+export type MenuItemTone = "default" | "danger";
 
-export interface DropdownItemProps {
-  /** Visual intent — use destructive for Delete/Remove actions */
-  variant?: DropdownItemVariant;
-  /** Prevents the user from interacting with this item */
+export interface MenuItemProps {
+  /** Leading glyph. */
+  icon?: IconName;
+  /** @default "default" */
+  tone?: MenuItemTone;
   disabled?: boolean;
-  focusableUnavailable?: boolean;
-  as?: "div" | "button";
+  /** With `disabled`, keeps the item focusable and says why under its label (guideline B9). */
+  disabledReason?: I18nText | null;
+  /** A second line under the label for a rich item. */
   description?: I18nText | null;
-  descriptionId?: string;
+  /** Single-choice groups: a check mark at the end of the chosen item. */
+  checked?: boolean;
+  /** Shortcut registry id; its keys show at the end (KB3). */
+  shortcut?: string;
+  /** Keys to show when there is no registry binding. */
+  keys?: string | string[];
   /** Text used for typeahead matching (overrides text content) */
   textValue?: string;
-  /** Icon placed before the label — renders an OIcon internally */
-  iconLeft?: IconName;
-  /**
-   * Renders a keyboard-shortcut hint (OShortcut keycaps) at the trailing edge
-   * of the item. Accepts a pre-symbolised string (`"⌘I"`) or an array of
-   * keycaps (`["⌘", "I"]`). Omit to show no hint.
-   */
-  shortcut?: string | string[];
-  /**
-   * Registry shortcut id — resolves the hint keys from `shortcutRegistry.ts`
-   * (the single source of truth) so a key change there updates this item too.
-   * Prefer this over `shortcut`; `shortcut` wins if both are set.
-   */
-  shortcutId?: string;
+  as?: "div" | "button";
 }
+
+export type DropdownItemProps = MenuItemProps;
 
 export interface DropdownItemEmits {
   (e: "select", event: Event): void;
 }
 
-export interface DropdownItemSlots {
-  /** Icon placed before the label */
-  "icon-left"?: () => unknown;
+export interface MenuItemSlots {
+  /** A custom leading glyph (an avatar, a colour dot) instead of `icon`. */
+  icon?: () => unknown;
   /** Label text / content */
   default?: () => unknown;
-  /** Icon placed after the label */
-  "icon-right"?: () => unknown;
+  /** Trailing content (a count, a badge) before the shortcut. */
+  end?: () => unknown;
 }
+
+export type DropdownItemSlots = MenuItemSlots;

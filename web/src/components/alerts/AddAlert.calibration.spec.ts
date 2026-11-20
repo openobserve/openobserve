@@ -356,7 +356,7 @@ describe("AddAlert calibration handoff", () => {
     await flushPromises();
     expect(vm().formData.trigger_condition.silence).toBe(99);
     expect(vm().formData.pending_period_sec).toBe(1);
-    expect(banner()?.getAttribute("data-severity")).toBe("warning");
+    expect(banner()?.getAttribute("data-severity")).toBe("warn");
     expect(bannerText()).toContain("this alert has unsaved changes");
     wrapper!.unmount();
     localStorage.clear();
@@ -388,7 +388,7 @@ describe("AddAlert calibration handoff", () => {
     });
 
     expect(vm().formData.trigger_condition.silence).toBe(30);
-    expect(banner()?.getAttribute("data-severity")).toBe("warning");
+    expect(banner()?.getAttribute("data-severity")).toBe("warn");
     expect(bannerText()).toContain("this alert changed after the analysis");
     expect(vm().alertDraft.hasUnsavedChanges()).toBe(false);
   });
@@ -412,14 +412,14 @@ describe("AddAlert calibration handoff", () => {
     await mountEditor();
     expect(vm().formData.trigger_condition.silence).toBe(10);
     expect(vm().formData.destinations).toEqual([]);
-    expect(banner()?.getAttribute("data-severity")).toBe("warning");
+    expect(banner()?.getAttribute("data-severity")).toBe("warn");
     expect(bannerText()).toContain("gone no longer exists");
     wrapper!.unmount();
 
     writeAlertEditHandoff(handoff({ patch: { silenceMinutes: { from: 10, to: 45 } } }));
     await mountEditor({ ...savedAlert, is_real_time: true });
     expect(vm().formData.trigger_condition.silence).toBe(10);
-    expect(banner()?.getAttribute("data-severity")).toBe("default");
+    expect(banner()?.getAttribute("data-severity")).toBe("neutral");
     expect(bannerText()).toContain("applies only to scheduled alerts");
     wrapper!.unmount();
 
@@ -441,7 +441,7 @@ describe("AddAlert calibration handoff", () => {
     expect(vm().formData.trigger_condition.silence).toBe(99);
     expect(vm().formData.pending_period_sec).toBe(1);
     expect(vm().formData.destinations).toEqual([]);
-    expect(banner()?.getAttribute("data-severity")).toBe("warning");
+    expect(banner()?.getAttribute("data-severity")).toBe("warn");
     expect(bannerText()).toContain("this alert has unsaved changes");
     wrapper!.unmount();
     localStorage.clear();
@@ -475,7 +475,7 @@ describe("AddAlert calibration handoff", () => {
     );
     await mountEditor();
     expect(vm().formData.pending_period_sec).toBe(1);
-    expect(banner()?.getAttribute("data-severity")).toBe("warning");
+    expect(banner()?.getAttribute("data-severity")).toBe("warn");
     expect(bannerText()).toContain("this alert changed after the analysis");
     expect(vm().alertDraft.hasUnsavedChanges()).toBe(false);
     wrapper!.unmount();
@@ -505,7 +505,7 @@ describe("AddAlert calibration handoff", () => {
     writeAlertEditHandoff(handoff({ patch: { silenceMinutes: { from: 10, to: 45 } } }));
     await mountEditor();
     expect(vm().formData.trigger_condition.silence).toBe(10);
-    expect(banner()?.getAttribute("data-severity")).toBe("warning");
+    expect(banner()?.getAttribute("data-severity")).toBe("warn");
     expect(bannerText()).toContain("could not be read");
   });
 

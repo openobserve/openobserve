@@ -403,9 +403,9 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.expectUrlInputVisible();
         testLogger.info('URL input visible');
 
-        // Toggle to "Upload File"
+        // Toggle to "Upload file"
         await enrichmentPage.selectSourceOption('file');
-        testLogger.info('Toggled to "Upload File"');
+        testLogger.info('Toggled to "Upload file"');
 
         // Verify file input is visible
         await enrichmentPage.expectFileInputVisible();
@@ -452,7 +452,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         // Step 5: Add URL with a different CSV that has incompatible schema (to trigger schema mismatch)
         // enrichment_info.csv has 11 different columns, which will fail schema validation
-        // Use fillNewUrlInput because in edit/append mode the label is "New CSV File URL"
+        // Use fillNewUrlInput because in edit/append mode the label is "New CSV file URL"
         await enrichmentPage.fillNewUrlInput(DIFFERENT_SCHEMA_CSV_URL);
         testLogger.info('Added URL with different schema CSV');
 
@@ -569,9 +569,9 @@ test.describe('Enrichment Table URL Feature Tests', () => {
             const hasUrlOption = await enrichmentPage.isFromUrlOptionVisible();
             testLogger.info(`'From URL' option visible: ${hasUrlOption}`);
 
-            // Check for "Upload File" option (using POM)
+            // Check for "Upload file" option (using POM)
             const hasFileOption = await enrichmentPage.isUploadFileOptionVisible();
-            testLogger.info(`'Upload File' option visible: ${hasFileOption}`);
+            testLogger.info(`'Upload file' option visible: ${hasFileOption}`);
 
             // PRIMARY ASSERTION: At least one source option should be available
             expect(hasUrlOption || hasFileOption).toBeTruthy();

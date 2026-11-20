@@ -16,32 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="bg-surface-base flex h-full w-full items-end gap-1 overflow-hidden"
+    class="bg-surface-base flex h-full w-full items-end overflow-hidden"
     data-test="billings-usagechartskeleton"
   >
-    <OSkeleton v-for="(bar, index) in BAR_HEIGHTS" :key="index" class="flex-1" :class="bar" />
+    <OSkeleton preset="chart" class="h-full" />
   </div>
 </template>
 
 <script setup lang="ts">
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-
-/** One bar per day of a cycle's first half, so the placeholder is as dense as the chart. */
-const BAR_HEIGHTS = [
-  "h-1/4",
-  "h-2/5",
-  "h-3/5",
-  "h-1/3",
-  "h-4/5",
-  "h-1/2",
-  "h-3/4",
-  "h-2/5",
-  "h-3/5",
-  "h-1/4",
-  "h-1/2",
-  "h-2/3",
-  "h-1/3",
-  "h-3/5",
-  "h-2/5",
-];
 </script>

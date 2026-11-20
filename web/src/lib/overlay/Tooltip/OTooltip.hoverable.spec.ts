@@ -19,14 +19,15 @@ import { h, nextTick } from "vue";
 import { TooltipProvider } from "reka-ui";
 import OTooltip from "./OTooltip.vue";
 
-function mountHoverable(delay?: number, underProvider = false) {
+vi.mock("@/lib/styles/motion", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/styles/motion")>()),
+  TOOLTIP_DELAY_MS: 300,
+}));
+
+function mountHoverable(underProvider = false) {
   const trigger = () =>
     h("button", { "data-test": "trigger" }, [
-      h(OTooltip, {
-        content: "Detailed failure",
-        hoverable: true,
-        ...(delay === undefined ? {} : { delay }),
-      }),
+      h(OTooltip, { content: "Detailed failure", hoverable: true }),
     ]);
   const render = underProvider
     ? () => h(TooltipProvider, { delayDuration: 300, skipDelayDuration: 300 }, { default: trigger })
@@ -50,14 +51,14 @@ describe("OTooltip hoverable bubble", () => {
       {
         render: () =>
           h("button", { "data-test": "trigger" }, [
-            h(OTooltip, { content: "Detailed failure", delay: 0, hoverable: true }),
+            h(OTooltip, { content: "Detailed failure", hoverable: true }),
           ]),
       },
       { attachTo: document.body },
     );
     try {
       host.get('[data-test="trigger"]').element.dispatchEvent(new MouseEvent("mouseenter"));
-      await nextTick();
+      await settle(300);
       await nextTick();
       const content = document.querySelector('[data-test="o-tooltip-content"]')!;
       expect(content).not.toBeNull();
@@ -78,7 +79,7 @@ describe("OTooltip hoverable bubble", () => {
 
   it("stays open when the pointer returns inside the grace window and the skip window", async () => {
     vi.useFakeTimers();
-    const host = mountHoverable(undefined, true);
+    const host = mountHoverable(true);
     try {
       const trigger = host.get('[data-test="trigger"]').element;
       trigger.dispatchEvent(new MouseEvent("mouseenter"));
@@ -99,7 +100,7 @@ describe("OTooltip hoverable bubble", () => {
 
   it("does not blink shut when the pointer returns inside the grace window on the delayed path", async () => {
     vi.useFakeTimers();
-    const host = mountHoverable(300);
+    const host = mountHoverable();
     try {
       const trigger = host.get('[data-test="trigger"]').element;
       trigger.dispatchEvent(new MouseEvent("mouseenter"));

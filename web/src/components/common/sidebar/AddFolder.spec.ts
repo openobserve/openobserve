@@ -45,24 +45,24 @@ const ODialogStub = {
     "size",
     "width",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "seamless",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
     "formId",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 // OForm stub: renders the form + slot and captures `defaultValues` so prefill
@@ -261,8 +261,8 @@ describe("AddFolder.vue", () => {
       wrapper = createWrapper();
       const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.props("size")).toBe("sm");
-      expect(drawer.props("primaryButtonLabel")).toBe("Save");
-      expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(drawer.props("primary")?.label).toBe("Save");
+      expect(drawer.props("secondary")?.label).toBe("Cancel");
       expect(drawer.props("formId")).toBe("add-folder-sidebar-form");
     });
 
@@ -277,9 +277,9 @@ describe("AddFolder.vue", () => {
       expect(editTitle).not.toBe(createTitle);
     });
 
-    it("does not bind primaryButtonLoading (auto Save spinner)", () => {
+    it("does not bind primary?.loading (auto Save spinner)", () => {
       wrapper = createWrapper();
-      expect(wrapper.findComponent(ODialogStub).props("primaryButtonLoading")).toBeFalsy();
+      expect(wrapper.findComponent(ODialogStub).props("primary")?.loading).toBeFalsy();
     });
 
     it("re-emits update:open from the dialog", async () => {

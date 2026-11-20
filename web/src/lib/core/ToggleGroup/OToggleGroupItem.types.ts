@@ -6,9 +6,6 @@ import type { I18nText } from "@/types/i18n";
 
 import type { AcceptableValue } from "reka-ui";
 
-/** Size controls padding and font-size — height is determined by content */
-export type ToggleGroupItemSize = "md" | "sm" | "toolbar" | "xs";
-
 export interface ToggleGroupItemProps {
   /** Unique value for this option — required */
   value: AcceptableValue;
@@ -18,8 +15,8 @@ export interface ToggleGroupItemProps {
   focusableUnavailable?: boolean;
   /** Tooltip shown on hover — especially useful when disabled is true to explain why */
   tooltip?: I18nText;
-  /** Size controls padding and font-size. md (default) = full toolbar; sm = small toolbar; xs = compact inline toggle */
-  size?: ToggleGroupItemSize;
+  /** Count shown after the label in tabular figures. */
+  count?: number;
   /** Icon name (from OIcon registry) placed before the label. For custom icon components, use the `icon-left` slot. */
   iconLeft?: string;
   /** Icon name (from OIcon registry) placed after the label. For custom icon components, use the `icon-right` slot. */

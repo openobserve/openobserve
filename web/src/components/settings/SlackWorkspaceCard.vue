@@ -28,7 +28,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useFormCounts } from "@/lib/forms/SaveBar/formCounts";
@@ -325,8 +325,7 @@ useSlackSavePart({
       <template #actions>
         <OTag
           v-if="isInstance"
-          variant="primary-soft"
-          shape="pill"
+          tone="accent"
           size="sm"
           :label="t('slackApp.card.instanceTag')"
           data-test="slack-workspace-instance-tag"
@@ -337,9 +336,8 @@ useSlackSavePart({
           data-test="slack-workspace-status"
         />
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="network-check"
+          variant="secondary"
+          icon="network-check"
           :loading="testMutation.isPending.value"
           :disabled="readOnly"
           data-test="slack-test-connection"
@@ -350,9 +348,8 @@ useSlackSavePart({
         </OButton>
         <OButton
           v-if="!managed"
-          variant="outline"
-          size="sm-action"
-          icon-left="refresh"
+          variant="secondary"
+          icon="refresh"
           :loading="reinstall.connecting.value"
           :disabled="readOnly"
           data-test="slack-reinstall"
@@ -363,9 +360,8 @@ useSlackSavePart({
         </OButton>
         <OButton
           v-if="ownsInstallation"
-          variant="outline"
-          size="sm-action"
-          icon-left="key"
+          variant="secondary"
+          icon="key"
           :disabled="readOnly"
           data-test="slack-update-credentials"
           @click="credentialsOpen = true"
@@ -383,9 +379,9 @@ useSlackSavePart({
           refused ||
           appTokenWarning
         "
-        class="border-border-default flex flex-col gap-3 border-b px-4 py-3"
+        class="border-border-subtle flex flex-col gap-3 border-b py-3"
       >
-        <OBanner v-if="managed" variant="info" icon="info" data-test="slack-managed-banner">
+        <OInlineNotice v-if="managed" tone="info" data-test="slack-managed-banner">
           <span class="font-semibold">{{ t("slackApp.card.managedTitle") }}</span>
           {{ t("slackApp.card.managedDetail", { team: installation.team_name }) }}
           <template v-if="installation.instance_help_contact">
@@ -393,12 +389,11 @@ useSlackSavePart({
               t("slackApp.card.managedQuestions", { contact: installation.instance_help_contact })
             }}
           </template>
-        </OBanner>
+        </OInlineNotice>
 
-        <OBanner
+        <OInlineNotice
           v-if="!installation.credentials_readable"
-          variant="error-soft"
-          icon="error-outline"
+          tone="err"
           data-test="slack-credentials-unreadable"
         >
           {{
@@ -409,9 +404,8 @@ useSlackSavePart({
           <template v-if="!managed" #actions>
             <OButton
               v-if="selfHosted"
-              variant="outline"
-              size="sm-action"
-              icon-left="key"
+              variant="secondary"
+              icon="key"
               :disabled="readOnly"
               data-test="slack-credentials-update"
               @click="credentialsOpen = true"
@@ -425,9 +419,8 @@ useSlackSavePart({
             </OButton>
             <OButton
               v-else
-              variant="outline"
-              size="sm-action"
-              icon-left="refresh"
+              variant="secondary"
+              icon="refresh"
               :loading="reinstall.connecting.value"
               :disabled="readOnly"
               data-test="slack-credentials-reinstall"
@@ -441,37 +434,19 @@ useSlackSavePart({
               />
             </OButton>
           </template>
-        </OBanner>
+        </OInlineNotice>
 
-        <OBanner
-          v-if="reinstalledTeam"
-          variant="success"
-          dense
-          icon="check-circle"
-          data-test="slack-reinstall-result"
-        >
+        <OInlineNotice v-if="reinstalledTeam" tone="ok" data-test="slack-reinstall-result">
           {{ t("slackApp.card.reinstalled", { team: reinstalledTeam }) }}
-        </OBanner>
+        </OInlineNotice>
 
-        <OBanner
-          v-if="refused"
-          variant="warning"
-          dense
-          icon="warning"
-          data-test="slack-workspace-refused"
-        >
+        <OInlineNotice v-if="refused" tone="warn" data-test="slack-workspace-refused">
           {{ refused.text }}
           <OTimeCell :value="refused.at" unit="us" />
-        </OBanner>
-        <OBanner
-          v-if="appTokenWarning"
-          variant="warning"
-          dense
-          icon="warning"
-          data-test="slack-workspace-app-token"
-        >
+        </OInlineNotice>
+        <OInlineNotice v-if="appTokenWarning" tone="warn" data-test="slack-workspace-app-token">
           {{ appTokenWarning }}
-        </OBanner>
+        </OInlineNotice>
       </div>
 
       <OSettingRow control-at="end" :label="t('slackApp.card.eventsLabel')">
@@ -500,6 +475,7 @@ useSlackSavePart({
           {{ socketsUp ? t("slackApp.card.connectionUp") : t("slackApp.card.connectionDown") }}
           <OPopover
             v-model:open="connectionInfoOpen"
+            size="lg"
             side="bottom"
             align="start"
             :aria-label="t('slackApp.card.aboutConnection')"
@@ -507,14 +483,14 @@ useSlackSavePart({
             <template #trigger>
               <OButton
                 variant="ghost"
-                size="xs"
-                icon-left="info-outline"
+                size="sm"
+                icon="info-outline"
                 data-test="slack-workspace-connection-info"
               >
                 <span class="sr-only">{{ t("slackApp.card.aboutConnection") }}</span>
               </OButton>
             </template>
-            <p class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5">
+            <p class="p-3 leading-5">
               <OText variant="meta" data-test="slack-workspace-connection-detail">
                 {{ modeLabel }} {{ raw("·") }}
                 {{
@@ -551,13 +527,11 @@ useSlackSavePart({
         :description="t('slackApp.card.collaborator')"
       >
         <OButton
-          as="a"
           :href="collaboratorsUrl"
           target="_blank"
           rel="noopener noreferrer"
-          variant="outline"
-          size="sm-action"
-          icon-right="open-in-new"
+          variant="secondary"
+          icon-end="open-in-new"
           data-test="slack-collaborators"
         >
           {{ t("slackApp.card.openCollaborators") }}
@@ -570,9 +544,8 @@ useSlackSavePart({
         data-test="slack-refresh-token"
       >
         <OButton
-          variant="outline-destructive"
-          size="sm-action"
-          icon-left="delete"
+          variant="danger-ghost"
+          icon="delete"
           :loading="credentialsMutation.isPending.value"
           :disabled="readOnly"
           data-test="slack-forget-token"
@@ -604,7 +577,7 @@ useSlackSavePart({
 
       <div
         v-if="testItems.length"
-        class="border-border-default flex flex-col gap-3 border-t px-4 py-3"
+        class="border-border-subtle flex flex-col gap-3 border-t py-3"
         data-test="slack-test-results"
       >
         <span class="text-text-heading text-sm font-medium">
@@ -613,13 +586,11 @@ useSlackSavePart({
         <SlackCheckList :items="testItems" />
         <div v-if="verifyUrl" class="flex flex-col gap-1">
           <OButton
-            as="a"
             :href="verifyUrl"
             target="_blank"
             rel="noopener noreferrer"
-            variant="outline"
-            size="sm-action"
-            icon-right="open-in-new"
+            variant="secondary"
+            icon-end="open-in-new"
             class="w-fit"
             data-test="slack-test-verify"
           >
@@ -641,16 +612,13 @@ useSlackSavePart({
       :description="otherOrgsLine"
       data-test="slack-connected-orgs"
     >
-      <div class="rounded-b-surface -mx-4 -my-3 overflow-hidden">
+      <div class="rounded-surface border-border-default overflow-hidden border">
         <OTable
           :data="orgRows"
           :columns="orgColumns"
           row-key="org"
           pagination="none"
-          :show-global-filter="false"
           :cell-overflow-tooltip="false"
-          :frame="false"
-          dense
         />
       </div>
     </OFormSection>
@@ -665,7 +633,7 @@ useSlackSavePart({
     >
       <p
         v-if="readOnly"
-        class="text-text-secondary border-border-default flex items-start gap-2 border-b px-4 py-3 text-sm"
+        class="text-text-secondary border-border-subtle flex items-start gap-2 border-b py-3 text-sm"
         data-test="slack-danger-locked"
       >
         <OIcon name="lock" size="sm" class="mt-0.5 shrink-0" />
@@ -678,9 +646,8 @@ useSlackSavePart({
         :description="t('slackApp.card.disconnectDescription', { org: orgName })"
       >
         <OButton
-          variant="outline-destructive"
-          size="sm-action"
-          icon-left="link-off"
+          variant="danger-ghost"
+          icon="link-off"
           :disabled="readOnly"
           data-test="slack-disconnect-org"
           @click="emit('disconnect')"
@@ -695,9 +662,8 @@ useSlackSavePart({
         :description="t('slackApp.card.uninstallDescription')"
       >
         <OButton
-          variant="destructive"
-          size="sm-action"
-          icon-left="delete"
+          variant="danger"
+          icon="delete"
           :disabled="readOnly"
           data-test="slack-uninstall"
           @click="emit('uninstall')"
@@ -714,8 +680,7 @@ useSlackSavePart({
       message-keypath="slackApp.card.forgetMessage"
       :message-name="installation.team_name"
       :ok-label="t('slackApp.card.forgetConfirm')"
-      ok-variant="destructive"
-      focus-cancel
+      kind="destructive"
       @update:ok="forget"
     />
   </div>

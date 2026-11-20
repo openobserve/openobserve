@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPopover side="bottom" align="end" content-class="p-3 w-96 max-w-[calc(100vw-1.5rem)]">
+  <OPopover size="lg" side="bottom" align="end" content-class="p-3">
     <template #trigger>
       <slot name="trigger">
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="filter-alt"
+          icon="filter-alt"
           :aria-label="t('rum.analytics.funnel.stepFilters')"
           :data-test="`rum-analytics-funnel-step-${index}-filters`"
           ><OTooltip :content="t('rum.analytics.funnel.stepFilters')"

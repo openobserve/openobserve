@@ -697,9 +697,9 @@ describe("EnrichmentTableList Component", () => {
       expect(wrapper.find('[data-test-stub="o-drawer"]').exists()).toBe(true);
     });
 
-    it('passes size "lg" to the URL Jobs ODrawer', () => {
+    it('passes size "md" (640) to the URL Jobs ODrawer', () => {
       const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-size")).toBe("lg");
+      expect(drawer.attributes("data-size")).toBe("md");
     });
 
     it('is closed by default (data-open="false")', () => {

@@ -15,39 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout :title="t('iam.roles')" icon="shield" bleed>
-    <template #subtitle>
-      <span data-test="iam-roles-subtitle">
-        {{ t("iam.rolesPage.subtitle") }}
-      </span>
-    </template>
+  <OPageLayout :title="t('iam.roles')" :about="t('iam.rolesPage.subtitle')" bleed>
     <template #actions>
-      <OButton data-test="iam-roles-add-role-btn" variant="primary" size="sm" @click="addRole">
+      <OButton data-test="iam-roles-add-role-btn" variant="primary" @click="addRole">
         {{ t("iam.addRole") }}
       </OButton>
     </template>
     <!-- ?member=<email> (from the token popup's "Assign a role" link) drives the Assign column below. -->
-    <OBanner
-      v-if="assignTarget"
-      variant="info"
-      icon="shield"
-      inline-actions
-      dense
-      data-test="iam-roles-assign-banner"
-      class="mb-3"
-    >
-      {{ t("iam.rolesPage.assignBannerText", { member: assignTarget }) }}
-      <template #actions>
-        <OButton
-          data-test="iam-roles-assign-banner-dismiss"
-          variant="ghost"
-          size="sm"
-          @click="clearAssignTarget"
-        >
-          {{ t("iam.rolesPage.assignBannerDone") }}
-        </OButton>
-      </template>
-    </OBanner>
+    <template v-if="assignTarget" #banner>
+      <OBanner tone="info" icon="shield" data-test="iam-roles-assign-banner">
+        {{ t("iam.rolesPage.assignBannerText", { member: assignTarget }) }}
+        <template #actions>
+          <OButton
+            data-test="iam-roles-assign-banner-dismiss"
+            variant="ghost"
+            @click="clearAssignTarget"
+          >
+            {{ t("iam.rolesPage.assignBannerDone") }}
+          </OButton>
+        </template>
+      </OBanner>
+    </template>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <RoleTable
@@ -56,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="rows"
           :loading="loading"
           :forbidden="forbidden"
+          :error="loadError"
           :counts-unavailable="!countsAvailable"
           forbidden-resource="roles"
           :action-loading="bulkDeleteLoading"
@@ -75,14 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @bulk-delete="openBulkDeleteDialog"
           @create="addRole"
           @assign="assignMemberToRole"
+          @retry="refreshRoles"
         >
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              shortcut-id="iamRolesRefresh"
+              shortcut="iamRolesRefresh"
               data-test="iam-roles-refresh-btn"
               @click="refreshRoles"
             />
@@ -97,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     message-keypath="iam.appRoles.deleteConfirm"
     :message-name="deleteConformDialog.data?.role_name"
     :warning-message="deleteImpactMessage"
-    ok-variant="destructive"
+    kind="destructive"
     @update:ok="_deleteRole"
     @update:cancel="deleteConformDialog.show = false"
     v-model="deleteConformDialog.show"
@@ -105,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="t('iam.appRoles.bulkDeleteRoles')"
     :message="t('iam.appRoles.bulkDeleteConfirm', { count: selectedRoleNames.length })"
-    ok-variant="destructive"
+    kind="destructive"
     :warning-message="bulkDeleteImpactMessage"
     @update:ok="bulkDeleteUserRoles"
     @update:cancel="confirmBulkDelete = false"
@@ -142,7 +130,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { forbiddenState } from "@/utils/featureGate";
+import { forbiddenState, loadErrorText } from "@/utils/featureGate";
 import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
@@ -332,9 +320,16 @@ const rolesList = useQuery(() =>
   Object.assign(rolesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
 );
 
-// Bound to the query rather than hand-managed: `isPending` is the cold read,
-// `isFetching` is any request in flight.
-const loading = rolesList.isPending;
+// A failed read with no rows on screen is the error state, never the first-run one (K5).
+const loadError = computed(() =>
+  rows.value.length
+    ? null
+    : loadErrorText(rolesList.error.value, t("emptyState.loadError.description")),
+);
+// `isPending` is the cold read; a retry from the error state shows the skeleton again.
+const loading = computed(
+  () => rolesList.isPending.value || (!!loadError.value && rolesList.isFetching.value),
+);
 // setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
 watch(
   loading,

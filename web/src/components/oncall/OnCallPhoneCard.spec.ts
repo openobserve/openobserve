@@ -54,11 +54,11 @@ const PHONE = "+14155550134";
 const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
   OIcon: { name: "OIcon", template: "<i />" },
-  OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
-  OBanner: { name: "OBanner", props: ["variant"], template: "<div><slot /></div>" },
+  OTag: { name: "OTag", props: ["tone"], template: "<span><slot /></span>" },
+  OBanner: { name: "OBanner", props: ["tone"], template: "<div><slot /></div>" },
   OButton: {
     name: "OButton",
-    props: ["disabled", "loading", "variant", "iconLeft"],
+    props: ["disabled", "loading", "variant", "icon"],
     emits: ["click"],
     template: `<button :disabled="disabled" @click="$emit('click', $event)"><slot /></button>`,
   },
@@ -75,7 +75,7 @@ const stubs = {
   },
   ConfirmDialog: {
     name: "ConfirmDialog",
-    props: ["modelValue", "title", "message", "okLabel", "okVariant"],
+    props: ["modelValue", "title", "message", "okLabel", "kind"],
     emits: ["update:ok", "update:cancel"],
     template: "<div v-if='modelValue' data-test='confirm'>{{ title }} {{ message }}</div>",
   },
@@ -508,11 +508,11 @@ describe("OnCallPhoneCard", () => {
     const w = await render(VERIFIED);
     const change = w.findComponent('[data-test="oncall-phone-change"]');
     const remove = w.findComponent('[data-test="oncall-phone-remove"]');
-    expect(change.props("iconLeft")).toBe("edit");
+    expect(change.props("icon")).toBe("edit");
     expect(change.props("variant")).toBe("ghost");
     expect(change.text()).toBe("Change phone");
-    expect(remove.props("iconLeft")).toBe("delete");
-    expect(remove.props("variant")).toBe("ghost-destructive");
+    expect(remove.props("icon")).toBe("delete");
+    expect(remove.props("variant")).toBe("danger-ghost");
     expect(remove.text()).toBe("Remove phone");
   });
 
@@ -669,7 +669,7 @@ describe("OnCallPhoneCard", () => {
   it("changed: an unverified saved number is amber, not red", async () => {
     const w = await render(UNVERIFIED);
     expect(find(w, "state").text()).toMatch(/^Not verified/);
-    expect(w.findComponent({ name: "OTag" }).props("variant")).toBe("amber-soft");
+    expect(w.findComponent({ name: "OTag" }).props("tone")).toBe("warn");
     expect(w.text()).toContain("Pages will not text or call this number until you confirm it.");
   });
 });

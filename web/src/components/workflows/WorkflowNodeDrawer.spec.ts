@@ -136,18 +136,18 @@ const makeContainerStub = (name: string, cls: string) => ({
     "size",
     "maxHeight",
     "showClose",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div class="${cls}" v-bind="$attrs">
       <div class="drawer-title">{{ title }}</div>
       <div class="header-slot"><slot name="header" /></div>
-      <button class="btn-primary" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
-      <button class="btn-secondary" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-      <button class="btn-neutral" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
+      <button class="btn-primary" @click="$emit('click:primary')">{{ primary?.label }}</button>
+      <button class="btn-secondary" @click="$emit('click:secondary')">{{ secondary?.label }}</button>
+      <button class="btn-neutral" @click="$emit('click:extra')">{{ extra?.label }}</button>
       <button class="btn-close" @click="$emit('update:open', false)" />
       <button class="btn-open" @click="$emit('update:open', true)" />
       <slot />
@@ -382,12 +382,12 @@ describe("WorkflowNodeDrawer", () => {
     });
 
     // Sized so the dialog centers with margin rather than going edge-to-edge.
-    it("is a centered xl dialog at a fixed width, regardless of type or run", () => {
+    it("is a full-size dialog, regardless of type or run", () => {
       const node = stageNode("function", { isEdit: true });
       seedRun(node.id);
       wrapper = mountDrawer();
-      expect(drawerProps(wrapper).size).toBe("xl");
-      expect(drawerProps(wrapper).width).toBe(95);
+      expect(drawerProps(wrapper).size).toBe("full");
+      expect(drawerProps(wrapper).width).toBeUndefined();
     });
   });
 
@@ -491,7 +491,7 @@ describe("WorkflowNodeDrawer", () => {
       expect(deleteBtn(wrapper).attributes("disabled")).toBeDefined();
     });
 
-    // The inline "Create New Destination" form lives inside the Config pane, and an
+    // The inline "Create new destination" form lives inside the Config pane, and an
     // unfinished one simply saves a dummy node — so the footer stays intact rather
     // than trapping the user in a form with no way out.
     it("keeps Delete available while the destination body creates a new destination", async () => {
@@ -588,11 +588,10 @@ describe("WorkflowNodeDrawer", () => {
         { id: "e2", source: "fn", target: "dest" },
       ] as any;
     };
-    const unsaved = (w: any) =>
-      w
-        .findAllComponents(ODialogStub)
-        .find((d: any) => d.props("title") === t("workflow.node.unsavedFnTitle"));
-    const promptOpen = (w: any) => !!unsaved(w)?.props("open");
+    // The question replaces the NDV's own footer rather than opening a dialog over it.
+    const promptOpen = (w: any) => w.find('[data-test="workflow-ndv-unsaved-fn"]').exists();
+    const choose = (w: any, which: "keep" | "discard" | "save") =>
+      w.find(`[data-test="workflow-ndv-unsaved-fn-${which}"]`).trigger("click");
     const next = (w: any) => w.find('[data-test="workflow-ndv-next-step"]');
 
     beforeEach(() => functionIsDirty.mockReturnValue(false));
@@ -624,7 +623,7 @@ describe("WorkflowNodeDrawer", () => {
       functionIsDirty.mockReturnValue(true);
       wrapper = mountDrawer();
       await next(wrapper).trigger("click");
-      await unsaved(wrapper).find(".btn-secondary").trigger("click"); // Discard
+      await choose(wrapper, "discard");
       await flushPromises();
       expect(functionDiscard).toHaveBeenCalled();
       expect(workflowObj.currentSelectedNodeID).toBe("dest");
@@ -637,7 +636,7 @@ describe("WorkflowNodeDrawer", () => {
       functionIsDirty.mockReturnValue(true);
       wrapper = mountDrawer();
       await next(wrapper).trigger("click");
-      await unsaved(wrapper).find(".btn-primary").trigger("click"); // Save
+      await choose(wrapper, "save");
       await flushPromises();
       expect(functionSave).toHaveBeenCalled();
       expect(workflowObj.currentSelectedNodeID).toBe("fn"); // stayed
@@ -650,7 +649,7 @@ describe("WorkflowNodeDrawer", () => {
       functionIsDirty.mockReturnValue(true);
       wrapper = mountDrawer();
       await next(wrapper).trigger("click");
-      await unsaved(wrapper).find(".btn-neutral").trigger("click"); // Keep editing
+      await choose(wrapper, "keep");
       await flushPromises();
       expect(workflowObj.currentSelectedNodeID).toBe("fn");
       expect(promptOpen(wrapper)).toBe(false);
@@ -685,7 +684,7 @@ describe("WorkflowNodeDrawer", () => {
       functionIsDirty.mockReturnValue(true);
       wrapper = mountDrawer();
       await wrapper.find('[data-test="workflow-ndv-close"]').trigger("click");
-      await unsaved(wrapper).find(".btn-secondary").trigger("click"); // Discard
+      await choose(wrapper, "discard");
       await flushPromises();
       expect(workflowObj.dialog.show).toBe(false); // now closed
     });
@@ -701,7 +700,7 @@ describe("WorkflowNodeDrawer", () => {
     });
   });
 
-  // Re-running a step is now "Run Step" in the footer (it executes against the
+  // Re-running a step is now "Run step" in the footer (it executes against the
   // Input pane's records), replacing the old Replay button.
   describe("run step (NDV footer)", () => {
     const runBtn = (w: any) => w.find('[data-test="workflow-node-execute"]');
@@ -1799,7 +1798,7 @@ describe("WorkflowNodeDrawer", () => {
       wrapper = mountDrawer();
       await nextTick();
 
-      expect(wrapper.find(STATUS).text()).toBe("No Match");
+      expect(wrapper.find(STATUS).text()).toBe("No match");
       expect(wrapper.find(STATUS).text()).not.toContain("Passed");
       const noMatch = wrapper.find(NO_MATCH);
       expect(noMatch.exists()).toBe(true);
@@ -1837,7 +1836,7 @@ describe("WorkflowNodeDrawer", () => {
       expect(rows.length).toBe(2);
       expect(rows[0].text()).toContain("Payments");
       expect(rows[0].text()).toContain("2");
-      expect(rows[1].text()).toContain("Everything Else");
+      expect(rows[1].text()).toContain("Everything else");
       expect(rows[1].text()).toContain("0");
       expect(wrapper.find(DROPPED).text()).toMatch(/1/);
     });
@@ -1856,7 +1855,7 @@ describe("WorkflowNodeDrawer", () => {
       wrapper = mountDrawer();
       await nextTick();
 
-      expect(wrapper.find(STATUS).text()).toBe("No Match");
+      expect(wrapper.find(STATUS).text()).toBe("No match");
       expect(wrapper.find(DROPPED).text()).toMatch(/3/);
     });
 

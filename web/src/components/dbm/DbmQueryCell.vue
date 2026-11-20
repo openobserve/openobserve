@@ -34,8 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTruncatedText class="text-text-code font-mono text-xs">
       {{ text || raw("—") }}
     </OTruncatedText>
-    <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
-      <OTag v-if="dbSystem" type="dbSystem" :value="dbSystem" size="xs" />
+    <div class="text-text-secondary text-2xs flex min-w-0 items-center gap-1">
+      <OTag v-if="dbSystem" type="dbSystem" :value="dbSystem" size="sm" />
       <template v-if="shownItems.length">
         <span class="opacity-45">·</span>
         <OTruncatedText :tooltip="shownItemsText">

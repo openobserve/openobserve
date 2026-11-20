@@ -22,7 +22,7 @@ import { alertCalibrationKeys } from "@/services/alert_calibration.querykeys";
 import alertCalibration from "@/services/alert_calibration";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import AlertCalibrationDashboard from "./AlertCalibrationDashboard.vue";
@@ -439,9 +439,9 @@ describe("AlertCalibrationDashboard", () => {
     store.state.selectedOrganization = { ...selected, identifier: "_meta" };
     try {
       const wrapper = await mountPage();
-      const banner = wrapper.findComponent(OBanner);
+      const banner = wrapper.findComponent(OInlineNotice);
       expect(banner.text()).toBe("No findings on the alerts you can access in the latest run.");
-      expect(banner.props("variant")).toBe("info");
+      expect(banner.props("tone")).toBe("info");
       const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
       expect(items[0]).toMatchObject({ value: "0", tone: "neutral" });
       expect(items[1]).toMatchObject({
@@ -462,9 +462,9 @@ describe("AlertCalibrationDashboard", () => {
       read === "" ? ([clean] as never) : ([] as never),
     );
     const root = await mountPage();
-    const banner = root.findComponent(OBanner);
+    const banner = root.findComponent(OInlineNotice);
     expect(banner.text()).toBe("The latest run found nothing to fix.");
-    expect(banner.props("variant")).toBe("success");
+    expect(banner.props("tone")).toBe("ok");
     const items = root.findComponent(OStatStrip).props("items") as StatItem[];
     expect(items[0]).toMatchObject({ value: "0", tone: "success" });
     expect(items[1]).toMatchObject({ value: "4" });
@@ -486,11 +486,11 @@ describe("AlertCalibrationDashboard", () => {
       read === "" ? ([latest] as never) : ([runRow] as never),
     );
     const wrapper = await mountPage();
-    const banner = wrapper.findComponent(OBanner);
+    const banner = wrapper.findComponent(OInlineNotice);
     expect(banner.text()).toBe(
       "Counts on the alerts you can access are not ready yet. Refresh shortly.",
     );
-    expect(banner.props("variant")).toBe("warning");
+    expect(banner.props("tone")).toBe("warn");
     const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
     expect(items[0]).toMatchObject({ value: "—", tone: "neutral" });
     wrapper.unmount();
@@ -514,7 +514,7 @@ describe("AlertCalibrationDashboard", () => {
     expect(rules.length).toBeGreaterThan(0);
     const pending = wrapper.findAllComponents(OBadge).filter((b) => b.text() === "Pending");
     expect(pending).toHaveLength(rules.length);
-    for (const badge of pending) expect(badge.props("variant")).toBe("warning-soft");
+    for (const badge of pending) expect(badge.props("tone")).toBe("warn");
     for (const rule of rules) {
       expect(rule.text()).not.toMatch(/\d+ alerts?/);
       expect(rule.text()).toContain("Pending");
@@ -570,11 +570,11 @@ describe("AlertCalibrationDashboard", () => {
         read === "" ? ([latest] as never) : ([runRow] as never),
       );
       const wrapper = await mountPage();
-      const banners = wrapper.findAllComponents(OBanner);
+      const banners = wrapper.findAllComponents(OInlineNotice);
       expect(banners.map((b) => b.text())).toEqual([
         "Counts on the alerts you can access are not ready yet. Refresh shortly.",
       ]);
-      expect(banners[0].props("variant")).toBe("warning");
+      expect(banners[0].props("tone")).toBe("warn");
       const items = wrapper.findComponent(OStatStrip).props("items") as StatItem[];
       expect(items[0]).toMatchObject({ value: "—", tone: "neutral" });
       const rules = wrapper.findAll('[data-test^="alert-calibration-dashboard-rule-"]');
@@ -655,7 +655,7 @@ describe("AlertCalibrationDashboard", () => {
       read === "" ? ([latest] as never) : ([runRow] as never),
     );
     const wrapper = await mountPage();
-    const banners = wrapper.findAllComponents(OBanner);
+    const banners = wrapper.findAllComponents(OInlineNotice);
     expect(banners.map((b) => b.text())).toEqual([
       "Counts on the alerts you can access are not ready yet. Refresh shortly.",
     ]);
@@ -774,9 +774,9 @@ describe("AlertCalibrationDashboard dismissals", () => {
     const banner = wrapper.find('[data-test="alert-calibration-dashboard-all-dismissed"]');
     expect(banner.text()).toBe("Nothing open. 1 dismissed finding is hidden; see Dismissed.");
     const notice = wrapper
-      .findAllComponents(OBanner)
-      .find((b) => b.props("dataTest") === "alert-calibration-dashboard-all-dismissed");
-    expect(notice?.props("variant")).toBe("default");
+      .findAllComponents(OInlineNotice)
+      .find((b) => b.attributes("data-test") === "alert-calibration-dashboard-all-dismissed");
+    expect(notice?.props("tone")).toBe("neutral");
     expect(wrapper.text()).not.toContain("The latest run found nothing to fix.");
     const group = wrapper.find('[data-test="alert-calibration-dashboard-rule-no_destination"]');
     await group.find("button").trigger("click");
@@ -1294,8 +1294,8 @@ describe("AlertCalibrationDashboard row next steps", () => {
     const dismiss = w
       .findAllComponents(OButton)
       .find((b) => b.attributes("data-test") === "alert-calibration-dashboard-dismiss");
-    expect(dismiss?.props("variant")).toBe("ghost-muted");
-    expect(dismiss?.props("size")).toBe("xs");
+    expect(dismiss?.props("variant")).toBe("ghost");
+    expect(dismiss?.props("size")).toBe("sm");
     w.unmount();
   });
 

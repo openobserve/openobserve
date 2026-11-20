@@ -10,9 +10,7 @@
     <template v-if="!formRows.length">
       <OButton
         data-test="add-stream-add-field-btn"
-        variant="outline"
-        size="sm-action"
-        icon-left="add"
+        variant="secondary"
         class="mt-2"
         @click="addRow"
       >
@@ -82,21 +80,21 @@
           >
           <div class="flex items-center gap-1">
             <OButton
-              data-test="add-stream-add-field-btn"
               v-if="index === formRows.length - 1"
-              variant="outline"
-              size="icon-sm"
+              icon-only
+              data-test="add-stream-add-field-btn"
+              variant="secondary"
               :disabled="!String(row.name || '').trim()"
               :title="t('logStream.addField')"
-              icon-left="add"
+              icon="add"
               @click="addRow"
             />
             <OButton
+              icon-only
               data-test="add-stream-delete-field-btn"
-              variant="outline-destructive"
-              size="icon-sm"
+              variant="danger-ghost"
               :title="t('logStream.deleteField')"
-              icon-left="delete"
+              icon="delete"
               @click="removeRow(index)"
             />
           </div>

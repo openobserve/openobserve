@@ -15,27 +15,20 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="flex flex-col gap-2.5" data-test="agent-behavior-panel">
+  <div class="flex flex-col gap-6" data-test="agent-behavior-panel">
     <!-- Summary strip: behaviour signals at a glance (loops, failures, agents). -->
     <div class="shrink-0" data-test="agent-behavior-summary">
-      <OStatStrip :items="behaviorStats" :loading="tableLoading" inline />
+      <OStatStrip :items="behaviorStats" :loading="tableLoading" inline stacked />
     </div>
-    <div
-      class="bg-card-glass-bg rounded-default border-border-default flex min-h-0 flex-1 flex-col overflow-hidden border"
-      data-test="agent-behavior-loops-card"
-    >
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden" data-test="agent-behavior-loops-card">
       <PanelSectionHeader
         :title="t('aiObservability.behavior.loopsTitle')"
         :hint="t('aiObservability.behavior.loopsHint')"
-        icon="restart-alt"
-        tone="warning"
       >
         <!-- The ai-agents alert pack, in one screen. -->
         <template #actions>
           <OButton
-            variant="outline"
-            size="sm"
-            icon-left="notifications-active"
+            variant="secondary"
             data-test="agent-behavior-install-ai-alerts"
             @click="packOpen = true"
           >
@@ -49,11 +42,8 @@
         :columns="loopColumns"
         :loading="tableLoading"
         :default-columns="false"
-        :frame="false"
-        :show-global-filter="false"
         :row-class="loopRowClass"
         class="min-h-0 flex-1"
-        show-index
         pagination="client"
         row-key="id"
         expansion="multiple"
@@ -67,9 +57,7 @@
             :data="row.variants"
             :columns="variantColumns"
             :default-columns="false"
-            :frame="false"
             :fill-height="false"
-            :show-global-filter="false"
             :row-class="loopRowClass"
             row-key="id"
             pagination="none"
@@ -93,14 +81,12 @@
 
     <!-- Failure taxonomy -->
     <div
-      class="bg-card-glass-bg rounded-default border-border-default flex min-h-0 flex-1 flex-col overflow-hidden border"
+      class="flex min-h-0 flex-1 flex-col overflow-hidden"
       data-test="agent-behavior-failures-card"
     >
       <PanelSectionHeader
         :title="t('aiObservability.behavior.failuresTitle')"
         :hint="t('aiObservability.behavior.failuresHint')"
-        icon="error-outline"
-        tone="error"
       />
       <OTable
         data-test="agent-behavior-failures-table"
@@ -108,11 +94,8 @@
         :columns="failureColumns"
         :loading="tableLoading"
         :default-columns="false"
-        :frame="false"
-        :show-global-filter="false"
         :row-class="failureRowClass"
         class="min-h-0 flex-1"
-        show-index
         pagination="client"
         row-key="id"
         expansion="multiple"
@@ -126,9 +109,7 @@
             :data="row.variants"
             :columns="failureVariantColumns"
             :default-columns="false"
-            :frame="false"
             :fill-height="false"
-            :show-global-filter="false"
             :row-class="failureRowClass"
             row-key="id"
             pagination="none"
@@ -137,7 +118,7 @@
           />
         </template>
         <template #cell-failClass="{ row }">
-          <OTag variant="warning-soft" size="sm">{{ row.failClass }}</OTag>
+          <OTag tone="warn" size="sm">{{ row.failClass }}</OTag>
         </template>
       </OTable>
     </div>
@@ -319,8 +300,8 @@ const loopMetricColumns = computed<OTableColumnDef[]>(() => [
     id: "ratio",
     header: t("aiObservability.behavior.colRatio"),
     accessorKey: "ratio",
-    // Fits the "Calls / trace" header beside its sort icon.
-    size: 108,
+    // Fits the "Calls / trace" header beside its sort icon and the cell padding.
+    size: 132,
     meta: { align: "right" },
     sortable: true,
   },
@@ -336,7 +317,7 @@ const loopMetricColumns = computed<OTableColumnDef[]>(() => [
     id: "traces",
     header: t("aiObservability.behavior.colTraces"),
     accessorKey: "traces",
-    size: 76,
+    size: 92,
     meta: { align: "right" },
     sortable: true,
   },
@@ -426,7 +407,7 @@ const failureCountColumn = computed<OTableColumnDef>(() => ({
   id: "count",
   header: t("aiObservability.behavior.colCount"),
   accessorKey: "count",
-  size: 76,
+  size: 92,
   meta: { align: "right" },
   sortable: true,
 }));

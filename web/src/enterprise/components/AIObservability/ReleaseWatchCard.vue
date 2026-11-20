@@ -26,11 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-compact text-text-heading font-semibold">
         {{ t("releaseWatch.title", { agent: pair!.next.name, version: pair!.next.version }) }}
       </span>
-      <OBadge
-        :variant="regressions ? 'error-soft' : 'success-soft'"
-        size="sm"
-        data-test="release-watch-verdict"
-      >
+      <OBadge :tone="regressions ? 'err' : 'ok'" size="sm" data-test="release-watch-verdict">
         {{
           regressions
             ? t("releaseWatch.regressions", { n: regressions }, regressions)
@@ -46,14 +42,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <span class="flex-1" />
       <OButton
-        variant="outline"
-        size="sm"
+        variant="secondary"
         data-test="release-watch-open-compare"
         @click="emit('open-compare', pair!)"
       >
         {{ t("releaseWatch.openCompare") }}
       </OButton>
-      <OButton variant="ghost" size="sm" data-test="release-watch-mute" @click="mute">
+      <OButton variant="ghost" data-test="release-watch-mute" @click="mute">
         {{ t("releaseWatch.mute") }}
       </OButton>
     </div>
@@ -113,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span>{{
       t("releaseWatch.muted", { agent: pair!.next.name, version: pair!.next.version })
     }}</span>
-    <OButton variant="ghost" size="sm" data-test="release-watch-unmute" @click="unmute">
+    <OButton variant="ghost" data-test="release-watch-unmute" @click="unmute">
       {{ t("releaseWatch.unmute") }}
     </OButton>
   </div>

@@ -94,24 +94,16 @@ import config from "@/aws-exports";
 // ODialog — the logout confirm — is also covered by this stub.)
 const ODialogStub = {
   name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "formId",
-    "persistent",
-  ],
+  props: ["open", "size", "title", "primary", "secondary", "formId", "persistent"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-form-id="formId">
       <slot />
       <button
-        v-if="secondaryButtonLabel"
+        v-if="secondary?.label"
         data-test="o-dialog-secondary-btn"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
   inheritAttrs: false,
@@ -784,6 +776,20 @@ describe("AddUser", () => {
       const field = wrapper.find('[data-test="user-custom-role-field"]');
       expect(field.exists()).toBe(true);
       expect(field.find("button[role=combobox]").attributes("disabled")).toBeDefined();
+      store.state.zoConfig = saved;
+    });
+
+    it("says custom roles need RBAC, not 'create one in Roles', when RBAC is off", async () => {
+      const saved = store.state.zoConfig;
+      store.state.zoConfig = { ...saved, rbac_enabled: false };
+      wrapper = mountComp({
+        modelValue: { email: "other@example.com", first_name: "Other", org_member_id: "2" },
+      });
+      await flushPromises();
+
+      const text = wrapper.find('[data-test="user-custom-role-field"]').text();
+      expect(text).toContain("Custom roles need RBAC");
+      expect(text).not.toContain("IAM → Roles");
       store.state.zoConfig = saved;
     });
 

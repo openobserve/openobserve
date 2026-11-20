@@ -26,10 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <OEmptyState
         v-if="!loading && !firings.length"
-        size="inline"
-        variant="no-results"
+        size="compact"
         :title="t('oncall.firingHistoryNone')"
-        hide-action
         data-test="oncall-firing-history-empty"
       />
       <OTable
@@ -37,10 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="firings"
         :columns="columns"
         row-key="id"
-        :frame="false"
         :loading="loading"
         :pagination="firings.length ? 'client' : 'none'"
-        :show-global-filter="false"
         table-id="oncall-firing-history"
         data-test="oncall-firing-history-table"
         @row-click="(row: OnCallResponse) => emit('open', row.id)"
@@ -61,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-cause="{ row }">
-          <OTag v-if="row.cause" variant="amber-soft" size="sm">
+          <OTag v-if="row.cause" tone="warn" size="sm">
             {{ t(`oncall.cause_${row.cause}`) }}
           </OTag>
           <span v-else class="text-text-secondary text-sm">{{ ABSENT }}</span>

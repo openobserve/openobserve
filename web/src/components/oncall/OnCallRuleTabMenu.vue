@@ -20,9 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODropdown side="bottom" align="start" @close-auto-focus="onMenuClosed">
       <template #trigger>
         <OButton
-          icon-left="more-vert"
+          icon-only
+          icon="more-vert"
           variant="ghost"
-          size="icon-xs-sq"
+          size="sm"
           :aria-label="t('oncall.ruleMenu', { name: raw(ruleLabel) })"
           :data-test="`oncall-schedule-rule-menu-${ruleIndex}`"
           @click.stop
@@ -48,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="canRemove">
         <ODropdownSeparator />
         <ODropdownItem
-          variant="destructive"
+          tone="danger"
           :data-test="`oncall-schedule-rule-remove-${ruleIndex}`"
           @select="emit('remove')"
         >
@@ -58,12 +59,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODropdown>
 
     <!-- The menu closes as it selects, so each popover hangs off its own invisible anchor here. -->
-    <OPopover v-model:open="renameOpen" :aria-label="t('oncall.ruleRename')">
+    <OPopover size="sm" v-model:open="renameOpen" :aria-label="t('oncall.ruleRename')">
       <template #trigger>
         <span class="block size-0" aria-hidden="true" />
       </template>
       <div
-        class="flex w-72 flex-col gap-4 p-4"
+        class="flex flex-col gap-4 p-4"
         :data-test="`oncall-schedule-rule-rename-popover-${ruleIndex}`"
       >
         <OInput
@@ -75,8 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex justify-end">
           <OButton
             variant="primary"
-            size="sm-action"
-            icon-left="check"
+            icon="check"
             :data-test="`oncall-schedule-rule-rename-done-${ruleIndex}`"
             @click="renameOpen = false"
           >
@@ -86,16 +86,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </OPopover>
 
-    <OPopover v-model:open="stopOpen" :aria-label="t('oncall.stopTitle', { name: raw(ruleLabel) })">
+    <OPopover
+      size="lg"
+      v-model:open="stopOpen"
+      :aria-label="t('oncall.stopTitle', { name: raw(ruleLabel) })"
+    >
       <template #trigger>
         <span class="block size-0" aria-hidden="true" />
       </template>
       <div
-        class="flex w-120 flex-col gap-4 p-4"
+        class="flex flex-col gap-4 p-4"
         :data-test="`oncall-schedule-rule-stop-popover-${ruleIndex}`"
       >
         <div class="flex flex-col gap-1">
-          <h3 class="text-base font-semibold">
+          <h3 class="text-sm font-semibold">
             {{ t("oncall.stopTitle", { name: raw(ruleLabel) }) }}
           </h3>
           <OText variant="meta">{{ t("oncall.stopAfter") }}</OText>
@@ -164,14 +168,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </p>
 
         <div class="flex justify-end gap-2">
-          <OButton variant="outline" size="sm-action" @click="stopOpen = false">
+          <OButton variant="secondary" @click="stopOpen = false">
             {{ t("oncall.cancel") }}
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             :disabled="stopAt === null"
-            icon-left="stop-circle"
+            icon="stop-circle"
             :data-test="`oncall-schedule-rule-stop-confirm-${ruleIndex}`"
             @click="confirmStop"
           >

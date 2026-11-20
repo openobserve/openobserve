@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { KIND_INFO, type DetailKind, type View } from "./kubernetesQueries";
@@ -71,7 +71,7 @@ export interface CellWord {
 
 export interface CellBadge {
   text: I18nText;
-  variant: BadgeVariant;
+  variant: ChipTone;
 }
 
 export interface K8sCellMeta {
@@ -111,10 +111,10 @@ const STATUS_TONE: Record<string, Tone> = {
   Terminating: "error",
 };
 
-const HPA_VARIANT: Record<string, BadgeVariant> = {
-  AbleToScale: "success-soft",
-  ScalingActive: "blue-soft",
-  ScalingLimited: "error-soft",
+const HPA_VARIANT: Record<string, ChipTone> = {
+  AbleToScale: "ok",
+  ScalingActive: "info",
+  ScalingLimited: "err",
 };
 
 export const HIDDEN_BY_DEFAULT: Partial<Record<View, string[]>> = {
@@ -628,7 +628,7 @@ function daemonSetColumns(ctx: ColumnContext): K8sColumn[] {
           r.nodeSelector
             ? Object.entries(r.nodeSelector).map(([k, v]) => ({
                 text: raw(`${k}: ${v}`),
-                variant: "default-soft",
+                variant: "neutral",
               }))
             : null,
       },
@@ -861,7 +861,7 @@ function hpaColumns(ctx: ColumnContext): K8sColumn[] {
         badges: (r: HpaRow) =>
           r.conditions.map((c) => ({
             text: raw(c.condition),
-            variant: HPA_VARIANT[c.condition] ?? "default-soft",
+            variant: HPA_VARIANT[c.condition] ?? "neutral",
           })),
       },
       {
@@ -887,7 +887,7 @@ function namespaceColumns(ctx: ColumnContext): K8sColumn[] {
           return labels
             ? Object.entries(labels).map(([k, v]) => ({
                 text: raw(`${k}=${v}`),
-                variant: "default-soft",
+                variant: "neutral",
               }))
             : null;
         },

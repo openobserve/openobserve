@@ -6,8 +6,8 @@ import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 vi.mock("@/lib/overlay/Dialog/ODialog.vue", () => ({
   default: {
     name: "ODialog",
-    props: ["open", "title", "primaryButtonLabel"],
-    template: `<div v-if="open"><span data-test="primary">{{ primaryButtonLabel }}</span><slot /></div>`,
+    props: ["open", "title", "primary"],
+    template: `<div v-if="open"><span data-test="primary">{{ primary?.label }}</span><slot /></div>`,
   },
 }));
 

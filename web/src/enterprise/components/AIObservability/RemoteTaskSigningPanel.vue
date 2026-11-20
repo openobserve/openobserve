@@ -12,7 +12,7 @@
 <template>
   <section class="flex flex-col gap-3" data-test="ai-remote-task-signing-panel">
     <div class="flex flex-col gap-1">
-      <h3 class="text-text-heading m-0 text-sm font-bold">
+      <h3 class="text-text-heading m-0 text-sm font-semibold">
         {{ t("aiObservability.remoteTasks.signingPanel.title") }}
       </h3>
       <p class="text-text-secondary m-0 text-xs leading-relaxed">
@@ -36,7 +36,7 @@
           class="card-container rounded-default border-border-default bg-surface-base flex min-w-56 flex-1 flex-col gap-2 border p-3"
           :data-test="`ai-remote-task-signing-key-${key.state}`"
         >
-          <OTag :variant="stateVariant(key.state)" dot>{{ stateLabel(key.state) }}</OTag>
+          <OTag :tone="stateVariant(key.state)" dot>{{ stateLabel(key.state) }}</OTag>
           <dl
             class="text-text-secondary m-0 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs"
           >
@@ -100,17 +100,15 @@
              request. -->
         <OInput
           v-model="newKeyId"
-          width="sm"
-          size="sm"
+          width="s"
           :label="t('aiObservability.remoteTasks.signingPanel.newKeyIdLabel')"
           :placeholder="t('aiObservability.remoteTasks.signingPanel.newKeyIdPlaceholder')"
           :disabled="Boolean(busy) || Boolean(candidate)"
           data-test="ai-remote-task-signing-new-key-id"
         />
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="autorenew"
+          variant="secondary"
+          icon="autorenew"
           :loading="busy === 'rotate'"
           :disabled="Boolean(busy) || Boolean(candidate)"
           data-test="ai-remote-task-signing-rotate-btn"
@@ -119,9 +117,8 @@
           {{ t("aiObservability.remoteTasks.signingPanel.rotate") }}
         </OButton>
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="play-arrow"
+          variant="secondary"
+          icon="play-arrow"
           :loading="busy === 'test'"
           :disabled="Boolean(busy) || !candidate"
           data-test="ai-remote-task-signing-test-btn"
@@ -131,8 +128,7 @@
         </OButton>
         <OSelect
           v-model="graceHours"
-          width="sm"
-          size="sm"
+          width="s"
           :label="t('aiObservability.remoteTasks.signingPanel.graceLabel')"
           :help-text="t('aiObservability.remoteTasks.signingPanel.graceHelp')"
           :options="graceOptions"
@@ -141,7 +137,6 @@
         />
         <OButton
           variant="primary"
-          size="sm-action"
           :loading="busy === 'activate'"
           :disabled="Boolean(busy) || !candidateVerified"
           data-test="ai-remote-task-signing-activate-btn"
@@ -151,8 +146,7 @@
         </OButton>
         <OButton
           v-if="graceActive"
-          variant="ghost-destructive"
-          size="sm-action"
+          variant="danger-ghost"
           :loading="busy === 'endGrace'"
           :disabled="Boolean(busy)"
           data-test="ai-remote-task-signing-end-grace-btn"
@@ -191,9 +185,8 @@
       <template #footer>
         <div class="flex w-full items-center justify-between gap-2">
           <OButton
-            variant="outline"
-            size="sm-action"
-            :icon-left="candidateCopied ? 'check' : 'content-copy'"
+            variant="secondary"
+            :icon="candidateCopied ? 'check' : 'content-copy'"
             data-test="ai-remote-task-signing-secret-copy"
             @click="copyCandidateKey"
           >
@@ -205,7 +198,6 @@
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             data-test="ai-remote-task-signing-secret-done"
             @click="candidateSecretOpen = false"
           >
@@ -226,7 +218,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import {
@@ -285,10 +277,10 @@ const graceActive = computed(() =>
   keys.value.some((key) => typeof key.graceExpiresAt === "number" && key.graceExpiresAt > 0),
 );
 
-function stateVariant(state: string): BadgeVariant {
-  if (state === "current") return "success-soft";
-  if (state === "candidate") return "blue-soft";
-  return "default-soft";
+function stateVariant(state: string): ChipTone {
+  if (state === "current") return "ok";
+  if (state === "candidate") return "neutral";
+  return "neutral";
 }
 
 function stateLabel(state: string): I18nText {

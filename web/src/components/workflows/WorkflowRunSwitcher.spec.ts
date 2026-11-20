@@ -61,7 +61,7 @@ const globalCfg = {
     ODropdown: ODropdownStub,
     ODropdownItem: ODropdownItemStub,
     OIcon: stub("OIcon", ["name", "size"]),
-    OBadge: stub("OBadge", ["variant", "size"]),
+    OBadge: stub("OBadge", ["tone", "size"]),
     OTooltip: stub("OTooltip", ["side", "content", "maxWidth"]),
     OTimeCell: stub("OTimeCell", ["value", "unit", "mode", "timezone", "emptyLabel", "format"]),
     ORefreshButton: stub("ORefreshButton", ["lastRunAt", "loading"]),

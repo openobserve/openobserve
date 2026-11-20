@@ -27,14 +27,14 @@ const passthroughProps = computed(() => {
   if (props.label !== undefined) out.label = props.label;
   if (props.disabled !== undefined) out.disabled = props.disabled;
   if (props.required !== undefined) out.required = props.required;
-  if (props.size !== undefined) out.size = props.size;
   if (props.value !== undefined) out.value = props.value;
-  if (props.val !== undefined) out.val = props.val;
   if (props.trueValue !== undefined) out.trueValue = props.trueValue;
   if (props.falseValue !== undefined) out.falseValue = props.falseValue;
   if (props.indeterminateValue !== undefined) {
     out.indeterminateValue = props.indeterminateValue;
   }
+  if (props.description !== undefined) out.description = props.description;
+  if (props.indeterminate) out.indeterminate = props.indeterminate;
   if (props.id !== undefined) out.id = props.id;
   if (props.name !== undefined) out.name = props.name;
   return out;

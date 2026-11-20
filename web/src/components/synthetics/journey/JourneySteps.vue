@@ -76,7 +76,7 @@ const props = withDefaults(
     /** When set, renders a "{done}/{total}" counter on a collapsed reference row. */
     stepProgressFn?: (row: TData) => { done: number; total: number } | null;
     /** When set, renders a badge on an editor row where the progress counter would sit. */
-    stepBadgeFn?: (row: TData) => { label: string; variant: "default" | "error" } | null;
+    stepBadgeFn?: (row: TData) => { label: string; variant: "neutral" | "err" } | null;
     /** When true, hides row action buttons (during replay). */
     locked?: boolean;
     /**
@@ -222,7 +222,7 @@ function stepProgress(row: TData): { done: number; total: number } | null {
   return props.stepProgressFn?.(row) ?? null;
 }
 
-function stepBadge(row: TData): { label: string; variant: "default" | "error" } | null {
+function stepBadge(row: TData): { label: string; variant: "neutral" | "err" } | null {
   return props.stepBadgeFn?.(row) ?? null;
 }
 
@@ -430,12 +430,8 @@ const startRowColspan = computed(
     :expanded-ids="expandedIds"
     :enable-row-reorder="reorderEnabled"
     :disable-row-reorder="disableRowReorder"
-    :global-filter-active="filterActive"
     :pagination="'none'"
     :sorting="'none'"
-    :show-global-filter="false"
-    :dense="true"
-    :bordered="true"
     :default-columns="false"
     :fill-height="false"
     :expand-on-row-click="mode !== 'preview'"
@@ -518,12 +514,7 @@ const startRowColspan = computed(
           "
           :data-dot-state="mode === 'preview' ? getDotState(row) : undefined"
         >
-          <OSpinner
-            v-if="getDotState(row) === 'active'"
-            variant="ring"
-            size="xs"
-            class="text-accent"
-          />
+          <OSpinner v-if="getDotState(row) === 'active'" />
           <template v-else>{{ stepNumber(row) }}</template>
         </span>
 
@@ -541,7 +532,7 @@ const startRowColspan = computed(
 
         <!-- Action label badge -->
         <div class="w-24!">
-          <OBadge variant="default" size="sm">{{ actionLabel(row) }}</OBadge>
+          <OBadge tone="neutral" size="sm">{{ actionLabel(row) }}</OBadge>
         </div>
 
         <!-- Step display name -->
@@ -566,7 +557,7 @@ const startRowColspan = computed(
         >
         <OBadge
           v-else-if="mode !== 'preview' && stepBadge(row)"
-          :variant="stepBadge(row)!.variant"
+          :tone="stepBadge(row)!.variant"
           size="sm"
           :data-test="`synthetics-journey-step-badge-${rowIndex(row)}`"
           >{{ stepBadge(row)!.label }}</OBadge
@@ -626,10 +617,11 @@ const startRowColspan = computed(
          six bars all anchored to the same left edge. -->
     <template v-if="mode === 'results'" #cell-progress="{ row }">
       <OProgressBar
-        :start="((row as any).offsetMs ?? 0) / timelineTotal"
-        :value="(((row as any).offsetMs ?? 0) + ((row as any).duration ?? 0)) / timelineTotal"
-        :variant="(row as any).status === 'fail' ? 'danger' : 'default'"
-        size="xs"
+        :start="(((row as any).offsetMs ?? 0) * 100) / timelineTotal"
+        :value="
+          ((((row as any).offsetMs ?? 0) + ((row as any).duration ?? 0)) * 100) / timelineTotal
+        "
+        :tone="(row as any).status === 'fail' ? 'err' : 'accent'"
         class="w-full"
         data-test="synthetics-journey-step-timeline-bar"
       />
@@ -668,7 +660,7 @@ const startRowColspan = computed(
           >
             <OButton
               variant="ghost"
-              size="xs"
+              size="sm"
               :aria-label="t('synthetics.journey.recordBeforeStep')"
               data-test="synthetics-journey-step-record-before-btn"
               :disabled="recordBeforeDisabled()"
@@ -684,7 +676,7 @@ const startRowColspan = computed(
         <OButton
           v-if="!readonly"
           variant="ghost"
-          size="xs"
+          size="sm"
           class="max-md:hidden"
           :aria-label="t('synthetics.journey.insertStepBelow')"
           data-test="synthetics-journey-step-insert-btn"
@@ -697,7 +689,7 @@ const startRowColspan = computed(
         <OButton
           v-if="!readonly"
           variant="ghost"
-          size="xs"
+          size="sm"
           class="max-md:hidden"
           :aria-label="t('synthetics.journey.duplicateStep')"
           data-test="synthetics-journey-step-duplicate-btn"
@@ -711,7 +703,7 @@ const startRowColspan = computed(
         <OButton
           v-if="!readonly"
           variant="ghost"
-          size="xs"
+          size="sm"
           :aria-label="t('synthetics.journey.deleteStepAria')"
           data-test="synthetics-journey-step-delete-btn"
           data-row-action="delete"
@@ -725,17 +717,18 @@ const startRowColspan = computed(
         <ODropdown v-if="!readonly" side="bottom" align="end">
           <template #trigger>
             <OButton
+              icon-only
               :aria-label="t('common.moreActions')"
-              icon-left="more-vert"
+              icon="more-vert"
               variant="ghost"
-              size="icon-xs-sq"
+              size="sm"
               class="md:hidden"
               data-test="synthetics-journey-step-row-more-actions"
               @click.stop
             />
           </template>
           <ODropdownItem
-            icon-left="smart-display"
+            icon="smart-display"
             class="md:hidden"
             :disabled="recordBeforeDisabled()"
             data-test="synthetics-journey-step-record-before-btn-menu"
@@ -744,7 +737,7 @@ const startRowColspan = computed(
             <span>{{ t("synthetics.journey.recordBeforeStep") }}</span>
           </ODropdownItem>
           <ODropdownItem
-            icon-left="add"
+            icon="add"
             class="md:hidden"
             :disabled="isLocked"
             data-test="synthetics-journey-step-insert-btn-menu"
@@ -753,7 +746,7 @@ const startRowColspan = computed(
             <span>{{ t("synthetics.journey.insertStepBelow") }}</span>
           </ODropdownItem>
           <ODropdownItem
-            icon-left="content-copy"
+            icon="content-copy"
             class="md:hidden"
             :disabled="isLocked"
             data-test="synthetics-journey-step-duplicate-btn-menu"
@@ -762,8 +755,8 @@ const startRowColspan = computed(
             <span>{{ t("synthetics.journey.duplicateStep") }}</span>
           </ODropdownItem>
           <ODropdownItem
-            icon-left="delete"
-            variant="destructive"
+            icon="delete"
+            tone="danger"
             class="md:hidden"
             :disabled="isLocked"
             data-test="synthetics-journey-step-delete-btn-menu"

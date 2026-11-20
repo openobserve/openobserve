@@ -21,21 +21,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OEmptyState
       v-if="forbidden"
       data-test="password-policy-not-admin-empty-state"
-      size="block"
       icon="lock"
       :title="t('passwordPolicy.notAdminTitle')"
-      :description="t('passwordPolicy.notAdmin')"
-      hide-action
+      :text="t('passwordPolicy.notAdmin')"
     />
 
     <OEmptyState
       v-else-if="loadError"
       data-test="password-policy-load-error-empty-state"
-      size="block"
-      icon="error"
+      kind="error"
       :title="t('passwordPolicy.loadFailedTitle')"
-      :description="t('passwordPolicy.loadFailed')"
-      :action-label="t('common.retry')"
+      :text="t('passwordPolicy.loadFailed')"
       @action="loadPolicy"
     />
 
@@ -43,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Headless: the owner reads the form for the dependent rows, previews and change count. -->
       <OForm id="password-policy-form" :form="form">
         <div
-          class="flex flex-col gap-4"
+          class="flex flex-col gap-6"
           :data-test="pending ? 'password-policy-loading' : undefined"
         >
           <OFormSection
@@ -199,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <p
               v-if="rotationOn"
-              class="text-text-secondary px-4 py-3 text-xs"
+              class="text-text-secondary py-3 text-xs"
               data-test="settings-password-policy-rotation-preview"
             >
               {{ rotationPreview }}
@@ -242,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OSettingRow>
 
-            <p class="text-text-secondary px-4 py-3 text-xs">
+            <p class="text-text-secondary py-3 text-xs">
               {{ t("passwordPolicy.reuseExplainer") }}
             </p>
           </OFormSection>
@@ -337,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <p
               v-if="lockoutOn"
-              class="text-text-secondary px-4 py-3 text-xs"
+              class="text-text-secondary py-3 text-xs"
               data-test="settings-password-policy-lockout-preview"
             >
               {{ lockoutPreview }}
@@ -384,13 +380,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OSettingRow>
 
             <!-- Standing, not one-off: a warning shown once is one the next administrator never sees. -->
-            <OBanner
+            <OInlineNotice
               v-if="values.apply_to_root"
-              variant="error-soft"
-              icon="warning"
-              dense
+              tone="err"
               class="my-3"
-              :content="t('passwordPolicy.rootWarning')"
+              :message="t('passwordPolicy.rootWarning')"
               data-test="settings-password-policy-root-warning"
             />
           </OFormSection>
@@ -415,21 +409,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="settings-password-policy-root-dialog"
         size="sm"
         :title="t('passwordPolicy.rootDialogTitle')"
-        :secondary-button-label="t('common.cancel')"
-        :primary-button-label="t('passwordPolicy.rootDialogConfirm')"
-        primary-button-variant="destructive"
-        :primary-button-disabled="!rootAcknowledged"
+        :secondary="{ label: t('common.cancel') }"
+        :primary="{
+          label: t('passwordPolicy.rootDialogConfirm'),
+          variant: 'danger',
+          disabled: !rootAcknowledged,
+        }"
         @update:open="(open: boolean) => !open && cancelApplyToRoot()"
         @click:secondary="cancelApplyToRoot"
         @click:primary="rootDialogOpen = false"
       >
         <div class="flex flex-col gap-4">
-          <OBanner
-            variant="error"
-            icon="warning"
-            dense
-            :content="t('passwordPolicy.rootWarning')"
-          />
+          <OInlineNotice tone="err" :message="t('passwordPolicy.rootWarning')" />
           <p class="text-text-body text-sm">{{ t("passwordPolicy.rootDialogMessage") }}</p>
           <OCheckbox
             v-model="rootAcknowledged"
@@ -450,7 +441,7 @@ import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { OEmptyState } from "@/lib/core/EmptyState";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";

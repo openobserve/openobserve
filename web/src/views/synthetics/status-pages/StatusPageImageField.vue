@@ -40,10 +40,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OButton
         v-if="!locked"
+        icon-only
         type="button"
-        variant="ghost-destructive"
-        size="icon-xs-sq"
-        icon-left="close"
+        variant="danger-ghost"
+        size="sm"
+        icon="close"
         :data-test="`${dataTest}-clear`"
         @click="emit('clear')"
       >
@@ -53,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="contents" @click.capture="onCaptureClick">
       <OFile
         class="min-w-0"
+        variant="compact"
         :model-value="null"
         :placeholder="uploadLabel"
         accept=".png, .jpg, .jpeg, .gif, .svg, .ico, image/*"

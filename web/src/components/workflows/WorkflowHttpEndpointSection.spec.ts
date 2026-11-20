@@ -359,7 +359,6 @@ describe("WorkflowHttpEndpointSection", () => {
       expect(byTest(w, "workflow-http-test-input").text()).toContain("trigger_source");
       const blocks = w.findAllComponents({ name: "OCodeBlock" });
       expect(blocks).toHaveLength(3);
-      for (const block of blocks) expect(block.props("padded")).toBe(true);
       // A long header value must wrap, not run past the panel edge.
       expect(blocks.find((b) => b.props("lang") === "json")?.props("wrap")).toBe(true);
       expect(vi.mocked(dryRunHook).mock.calls[0][0]).toMatchObject({
@@ -762,9 +761,9 @@ describe("WorkflowHttpEndpointSection", () => {
       );
       const w = await mountSection();
       expect(byTest(w, "workflow-http-rotate").attributes("aria-disabled")).toBe("true");
-      expect(byTest(w, "workflow-http-rotate-blocked-tooltip").attributes("data-content")).toBe(
-        t("workflow.http.rotateBlocked"),
-      );
+      expect(
+        byTest(w, "workflow-http-rotate").find("[data-content]").attributes("data-content"),
+      ).toBe(t("workflow.http.rotateBlocked"));
     });
   });
 
@@ -777,7 +776,7 @@ describe("WorkflowHttpEndpointSection", () => {
       await flushPromises();
       const inputs = w.findAllComponents({ name: "OFormInput" });
       expect(inputs.map((c) => c.props("name"))).toEqual(["maxBodyKib", "rateLimit"]);
-      for (const input of inputs) expect(input.props("width")).toBe("md");
+      for (const input of inputs) expect(input.props("width")).toBe("l");
     });
 
     it("rate field max is the org budget", async () => {

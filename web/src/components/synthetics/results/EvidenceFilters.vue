@@ -88,7 +88,6 @@ const stepFilter = computed({
         v-for="v in views"
         :key="v.key"
         :value="v.key"
-        size="sm"
         :data-test="`synthetics-evidence-filter-${v.key}`"
       >
         {{ v.label }} <span class="text-text-secondary">({{ v.count }})</span>
@@ -100,23 +99,22 @@ const stepFilter = computed({
       v-if="stepOptions?.length"
       v-model="stepFilter"
       :options="stepOptions"
-      size="md"
       class="w-56! shrink-0"
       :searchable="false"
       data-test="synthetics-evidence-step-filter"
     />
     <OCheckbox
       v-model="firstPartyOnly"
-      size="sm"
       :label="t('synthetics.evidence.firstPartyOnly')"
       class="ms-2"
       data-test="synthetics-evidence-first-party"
     />
     <OButton
-      variant="outline"
-      size="icon-chip"
+      icon-only
+      variant="ghost"
+      size="xs"
       class="ms-auto"
-      :active="wrap"
+      :pressed="wrap"
       data-test="synthetics-evidence-wrap-btn"
       @click="wrap = !wrap"
     >

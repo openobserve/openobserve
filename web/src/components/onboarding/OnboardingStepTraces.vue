@@ -26,9 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mx-auto flex w-full max-w-176 flex-col">
         <div class="mb-2 flex min-h-8.5 items-center gap-3">
           <OButton
-            variant="ghost-muted"
-            size="sm"
-            icon-left="arrow-back"
+            variant="ghost"
+            icon="arrow-back"
             data-test="onboarding-step-traces-back"
             @click="emit('back')"
           >
@@ -84,7 +83,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   type="submit"
                   variant="primary"
-                  size="md"
                   class="self-start"
                   data-test="onboarding-step-traces-continue"
                 >

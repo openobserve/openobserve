@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!hideTestPanel"
       id="add-function-form"
       :form="addFunctionForm"
-      class="border-border-default shrink-0 border-b px-2"
+      class="shrink-0"
       v-slot="{ isSubmitting }"
     >
       <FunctionsToolbar
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 pb-0 select-none"
                   >
                     <span
-                      class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] [text-overflow:ellipsis] whitespace-nowrap text-[var(--text-sm)]"
+                      class="text-text-placeholder text-compact overflow-hidden font-mono leading-5 [text-overflow:ellipsis] whitespace-nowrap"
                       >{{ transType === "1" ? jsPlaceholder : vrlPlaceholder }}</span
                     >
                   </div>

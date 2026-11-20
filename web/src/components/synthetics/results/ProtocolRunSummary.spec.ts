@@ -63,17 +63,17 @@ vi.mock("vue-router", () => ({
 vi.mock("@/lib/core/PageHeader/OPageHeader.vue", () => ({
   default: {
     name: "OPageHeader",
-    props: ["subtitle", "back", "drawerMode"],
+    props: ["title", "titleDataTest", "back"],
     template:
-      '<div data-test="app-page-header"><slot name="title"></slot><slot name="title-trail"></slot></div>',
+      '<div data-test="app-page-header"><h1 :data-test="titleDataTest">{{ title }}</h1><slot name="status"></slot></div>',
   },
 }));
 
 vi.mock("@/lib/core/Badge/OBadge.vue", () => ({
   default: {
     name: "OBadge",
-    props: ["variant", "size", "icon"],
-    template: '<span data-test="obadge" :class="variant"><slot></slot></span>',
+    props: ["tone", "size", "icon"],
+    template: '<span data-test="obadge" :class="tone"><slot></slot></span>',
   },
 }));
 
@@ -442,9 +442,9 @@ describe("ProtocolRunSummary", () => {
         wrapper
           .find(`[data-test="synthetics-protocol-run-assertion-${i}"]`)
           .findComponent({ name: "OBadge" })
-          .props("variant"),
+          .props("tone"),
       );
-      expect(variants).toEqual(["error", "success", "error"]);
+      expect(variants).toEqual(["err", "ok", "err"]);
       // Both failures show their own comparison, not one shared error string.
       expect(
         wrapper.find('[data-test="synthetics-protocol-run-assertion-detail-0"]').text(),
@@ -516,8 +516,8 @@ describe("ProtocolRunSummary", () => {
           .find(`[data-test="synthetics-protocol-run-assertion-${i}"]`)
           .findComponent({ name: "OBadge" }),
       );
-      expect(rows[0].props("variant")).toBe("error");
-      expect(rows[1].props("variant")).toBe("success");
+      expect(rows[0].props("tone")).toBe("err");
+      expect(rows[1].props("tone")).toBe("ok");
       expect(wrapper.text()).toContain("synthetics.protocolRun.assertionsFailed");
     });
 
@@ -547,7 +547,7 @@ describe("ProtocolRunSummary", () => {
       const badge = wrapper
         .find('[data-test="synthetics-protocol-run-assertion-0"]')
         .findComponent({ name: "OBadge" });
-      expect(badge.props("variant")).toBe("error");
+      expect(badge.props("tone")).toBe("err");
       expect(badge.props("icon")).toBe("cancel");
     });
   });

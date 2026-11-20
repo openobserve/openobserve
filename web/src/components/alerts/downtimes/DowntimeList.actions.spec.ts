@@ -257,8 +257,7 @@ describe("DowntimeList row actions", () => {
       const ok = dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-primary-btn"]')!;
       expect(ok.textContent).toContain("End now and stop future windows");
       const props = confirmProps(wrapper, "End this downtime now?");
-      expect(props.props("okVariant")).toBe("destructive");
-      expect(props.props("focusCancel")).toBe(true);
+      expect(props.props("kind")).toBe("destructive");
       wrapper.unmount();
     });
 
@@ -416,7 +415,7 @@ describe("DowntimeList row actions", () => {
       .find((c) => c.props("messageKeypath") === "alerts.downtimes.confirmDelete.message");
     expect(confirm!.props("modelValue")).toBe(true);
     expect(confirm!.props("messageName")).toBe("ended window");
-    expect(confirm!.props("okVariant")).toBe("destructive");
+    expect(confirm!.props("kind")).toBe("destructive");
     expect(String(confirm!.props("okLabel"))).toBe("Delete downtime");
     expect(String(confirm!.props("cancelLabel"))).toBe("Keep");
     wrapper.unmount();

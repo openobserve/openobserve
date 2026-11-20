@@ -52,32 +52,32 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
     >
       <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot name="header" />
@@ -86,11 +86,11 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
@@ -228,7 +228,7 @@ describe("TabsDeletePopUp", () => {
     it("uses a destructive confirm button", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.findComponent(ODialogStub).props("primaryButtonVariant")).toBe("destructive");
+      expect(wrapper.findComponent(ODialogStub).props("primary")?.variant).toBe("danger");
     });
 
     it("should handle missing tab gracefully in the title", () => {
@@ -409,18 +409,18 @@ describe("TabsDeletePopUp", () => {
   });
 
   describe("Confirmation Buttons", () => {
-    it("should forward the cancel label to ODialog as secondaryButtonLabel", () => {
+    it("should forward the cancel label to ODialog as secondary?.label", () => {
       wrapper = createWrapper();
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("secondaryButtonLabel")).toBe("confirmDialog.cancel");
+      expect(dialog.props("secondary")?.label).toBe("confirmDialog.cancel");
     });
 
-    it("should forward the confirm label to ODialog as primaryButtonLabel", () => {
+    it("should forward the confirm label to ODialog as primary?.label", () => {
       wrapper = createWrapper();
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("confirmDialog.ok");
+      expect(dialog.props("primary")?.label).toBe("confirmDialog.ok");
     });
 
     it("should render stubbed primary and secondary buttons inside the dialog", () => {
@@ -746,8 +746,8 @@ describe("TabsDeletePopUp", () => {
       wrapper = createWrapper();
 
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBeTruthy();
-      expect(dialog.props("secondaryButtonLabel")).toBeTruthy();
+      expect(dialog.props("primary")?.label).toBeTruthy();
+      expect(dialog.props("secondary")?.label).toBeTruthy();
     });
 
     it("should provide clear action feedback through UI state", () => {

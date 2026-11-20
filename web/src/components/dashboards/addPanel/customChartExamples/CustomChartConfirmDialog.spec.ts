@@ -29,32 +29,32 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-size="size"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
     >
       <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot name="header" />
@@ -63,19 +63,19 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-secondary"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
     </div>
   `,
 };
 
-const OBannerStub = {
-  name: "OBanner",
-  props: ["variant", "icon", "content"],
-  template: `<div data-test="o-banner" :data-variant="variant" :data-icon="icon"><span data-test="OIcon" :data-name="icon" /><span>{{ content }}</span></div>`,
+const OInlineNoticeStub = {
+  name: "OInlineNotice",
+  props: ["tone", "icon", "message"],
+  template: `<div data-test="o-banner" :data-tone="tone" :data-icon="icon"><span>{{ message }}</span></div>`,
 };
 
 const OCheckboxStub = {
@@ -111,7 +111,7 @@ function buildWrapper(props: Record<string, any> = {}): VueWrapper<any> {
       plugins: [i18n, store],
       stubs: {
         ODialog: ODialogStub,
-        OBanner: OBannerStub,
+        OInlineNotice: OInlineNoticeStub,
         OCheckbox: OCheckboxStub,
       },
     },
@@ -183,7 +183,7 @@ describe("CustomChartConfirmDialog", () => {
           plugins: [i18n, store],
           stubs: {
             ODialog: ODialogStub,
-            OBanner: OBannerStub,
+            OInlineNotice: OInlineNoticeStub,
             OCheckbox: OCheckboxStub,
           },
         },
@@ -194,8 +194,8 @@ describe("CustomChartConfirmDialog", () => {
 
     it("renders i18n labels on the primary and secondary buttons", () => {
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("OK");
-      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(dialog.props("primary")?.label).toBe("OK");
+      expect(dialog.props("secondary")?.label).toBe("Cancel");
     });
   });
 
@@ -233,44 +233,26 @@ describe("CustomChartConfirmDialog", () => {
       expect(banner.text()).toContain("Be careful");
     });
 
-    it("renders the warning icon inside the banner", () => {
+    it("leaves the glyph to the warn tone instead of naming an icon", () => {
       wrapper.unmount();
       wrapper = buildWrapper({ warningMessage: "Heads up" });
-      const icon = wrapper.find('[data-test="OIcon"]');
-      expect(icon.exists()).toBe(true);
-      expect(icon.attributes("data-name")).toBe("warning");
+      expect(wrapper.find('[data-test="o-banner"]').attributes("data-icon")).toBeUndefined();
     });
 
-    it("forwards variant='warning' to the OBanner in dark theme", () => {
+    it("forwards tone='warn' to the OInlineNotice in dark theme", () => {
       store.state.theme = "dark";
       wrapper.unmount();
       wrapper = buildWrapper({ warningMessage: "Be careful" });
       const banner = wrapper.find('[data-test="o-banner"]');
-      expect(banner.attributes("data-variant")).toBe("warning");
+      expect(banner.attributes("data-tone")).toBe("warn");
     });
 
-    it("forwards variant='warning' to the OBanner in light theme", () => {
+    it("forwards tone='warn' to the OInlineNotice in light theme", () => {
       store.state.theme = "light";
       wrapper.unmount();
       wrapper = buildWrapper({ warningMessage: "Be careful" });
       const banner = wrapper.find('[data-test="o-banner"]');
-      expect(banner.attributes("data-variant")).toBe("warning");
-    });
-
-    it("forwards icon='warning' to the OBanner in dark theme", () => {
-      store.state.theme = "dark";
-      wrapper.unmount();
-      wrapper = buildWrapper({ warningMessage: "Heads up" });
-      const banner = wrapper.find('[data-test="o-banner"]');
-      expect(banner.attributes("data-icon")).toBe("warning");
-    });
-
-    it("forwards icon='warning' to the OBanner in light theme", () => {
-      store.state.theme = "light";
-      wrapper.unmount();
-      wrapper = buildWrapper({ warningMessage: "Heads up" });
-      const banner = wrapper.find('[data-test="o-banner"]');
-      expect(banner.attributes("data-icon")).toBe("warning");
+      expect(banner.attributes("data-tone")).toBe("warn");
     });
   });
 

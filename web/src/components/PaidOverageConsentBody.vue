@@ -14,8 +14,8 @@
     <p class="text-text-secondary text-xs" data-test="paid-overage-scope-copy">
       {{ t("paidUsage.consentScope") }}
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         data-test="paid-overage-view-billing"
         @click="openBilling"
       >

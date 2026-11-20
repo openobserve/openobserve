@@ -3,16 +3,15 @@
   <OPageLayout
     bleed
     :title="t('aiObservability.nav.prompts')"
-    icon="edit"
-    :subtitle="t('aiObservability.promptManagement.subtitle')"
+    :about="t('aiObservability.promptManagement.subtitle')"
     data-test="prompts-page"
   >
     <template #actions>
       <OButton
         v-if="canManageSettings"
-        variant="outline"
-        size="icon-sm"
-        icon-left="settings"
+        icon-only
+        variant="ghost"
+        icon="settings"
         :aria-label="t('aiObservability.promptManagement.settings')"
         data-test="prompts-settings"
         @click="settingsOpen = true"
@@ -21,7 +20,6 @@
       </OButton>
       <OButton
         variant="primary"
-        size="sm"
         data-test="prompt-new"
         :aria-label="
           promptDrafts.hasNew
@@ -54,10 +52,7 @@
         :loading-reset-key="activeFolderId"
         :error="listError"
         :forbidden="forbiddenState(promptQuery.error.value)"
-        :frame="false"
         :default-columns="false"
-        :show-global-filter="false"
-        show-index
         :page-size="20"
         :page-size-options="[20, 50, 100]"
         :enable-column-resize="true"
@@ -82,55 +77,38 @@
                 v-for="option in statusOptions"
                 :key="option.value"
                 :value="option.value"
-                size="sm"
                 :data-test="`prompt-status-${option.value}`"
                 >{{ option.label }}</OToggleGroupItem
               >
             </OToggleGroup>
             <div class="min-w-0 flex-1 max-md:min-w-40">
-              <OInput
+              <OSearchInput
                 v-model="search"
                 class="w-full"
                 :placeholder="t('aiObservability.promptManagement.searchNameOrTag')"
                 data-test="prompt-search"
-              >
-                <template #icon-left><OIcon name="search" size="sm" /></template>
-                <template #icon-right>
-                  <OToggleGroup
-                    :model-value="folderScope"
-                    type="single"
-                    class="me-1 self-center"
-                    data-test="prompt-folder-scope"
-                    @update:model-value="(v) => v && (folderScope = v as typeof folderScope)"
-                  >
-                    <OToggleGroupItem
-                      value="current"
-                      size="xs"
-                      icon-left="folder-outline"
-                      data-test="prompt-folder-scope-current"
-                      ><span class="max-md:hidden @max-[34rem]/prompt-toolbar:hidden">{{
-                        t("aiObservability.promptManagement.thisFolder")
-                      }}</span></OToggleGroupItem
-                    >
-                    <OToggleGroupItem
-                      value="all"
-                      size="xs"
-                      icon-left="search"
-                      data-test="prompt-folder-scope-all"
-                      ><span class="max-md:hidden @max-[34rem]/prompt-toolbar:hidden">{{
-                        t("aiObservability.promptManagement.allFolders")
-                      }}</span></OToggleGroupItem
-                    >
-                  </OToggleGroup>
-                </template>
-              </OInput>
+                :scope="folderScope"
+                :scope-options="[
+                  {
+                    value: 'current',
+                    label: t('aiObservability.promptManagement.thisFolder'),
+                    icon: 'folder-outline',
+                    dataTest: 'prompt-folder-scope-current',
+                  },
+                  {
+                    value: 'all',
+                    label: t('aiObservability.promptManagement.allFolders'),
+                    icon: 'search',
+                    dataTest: 'prompt-folder-scope-all',
+                  },
+                ]"
+                @update:scope="(v) => v && (folderScope = v as typeof folderScope)"
+              />
             </div>
           </div>
         </template>
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :loading="refreshing || promptQuery.isFetching.value"
             :last-run-at="promptQuery.dataUpdatedAt.value"
             data-test="prompt-refresh"
@@ -139,20 +117,35 @@
         </template>
 
         <template #error="{ message }">
-          <OEmptyState preset="load-error" :description="raw(message)" @action="refresh" />
+          <OEmptyState
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="isRawHttpText(message) ? t('emptyState.loadError.description') : raw(message)"
+            @action="refresh"
+          />
         </template>
         <template #empty>
           <OEmptyState
-            size="hero"
-            preset="no-prompts"
-            :filtered="hasFilters"
+            :kind="hasFilters ? 'filtered' : 'first-run'"
+            :title="
+              hasFilters
+                ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.prompts') })
+                : t('emptyState.noPrompts.title')
+            "
+            :text="
+              hasFilters
+                ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.prompts') })
+                : t('emptyState.noPrompts.description')
+            "
+            :icon="hasFilters ? undefined : 'functions'"
             data-test="prompt-empty-state"
-            @action="(id) => (id === 'clear-filters' ? clearFilters() : openCreate())"
+            :action-label="hasFilters ? undefined : t('emptyState.noPrompts.action')"
+            @action="hasFilters ? clearFilters() : openCreate()"
           />
         </template>
         <template #cell-name="{ row }">
           <span class="inline-flex items-center gap-2">
-            <OButton variant="ghost" size="xs" @click.stop="openDetail(row)">{{
+            <OButton variant="ghost" size="sm" @click.stop="openDetail(row)">{{
               row.name
             }}</OButton>
             <EditorDraftDot
@@ -172,9 +165,7 @@
             class="flex max-w-64 flex-wrap gap-1"
             :tooltip="raw(row.tags.join(', '))"
           >
-            <OTag v-for="tag in row.tags" :key="tag" variant="default-soft" shape="rounded">{{
-              tag
-            }}</OTag>
+            <OTag v-for="tag in row.tags" :key="tag" tone="neutral">{{ tag }}</OTag>
           </OTruncatedText>
           <span v-else class="text-text-secondary">{{ raw("—") }}</span>
         </template>
@@ -188,8 +179,7 @@
             <OTag
               v-for="label in activeLabels(row)"
               :key="label.name"
-              :variant="protectedLabels.includes(label.name) ? 'amber-soft' : 'blue-soft'"
-              shape="rounded"
+              :tone="protectedLabels.includes(label.name) ? 'warn' : 'neutral'"
             >
               <OIcon v-if="protectedLabels.includes(label.name)" name="lock" size="xs" />
               {{
@@ -208,7 +198,7 @@
           }}</span>
         </template>
         <template #cell-status="{ row }">
-          <OTag :variant="row.status === 'active' ? 'success-soft' : 'default-soft'">{{
+          <OTag :tone="row.status === 'active' ? 'ok' : 'neutral'">{{
             statusLabel(row.status)
           }}</OTag>
         </template>
@@ -219,9 +209,9 @@
           <ODropdown side="bottom" align="end" @click.stop>
             <template #trigger>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs"
-                icon-left="more-vert"
+                icon="more-vert"
                 :title="t('aiObservability.promptManagement.promptActions')"
               />
             </template>
@@ -273,10 +263,12 @@
     <ODialog
       :open="moveOpen"
       :title="t('aiObservability.promptManagement.movePrompt')"
-      :primary-button-label="t('aiObservability.promptManagement.move')"
-      :secondary-button-label="t('aiObservability.promptManagement.cancel')"
-      :primary-button-disabled="!moveDestination || moveDestination === movingPrompt?.folderId"
-      :primary-button-loading="updateMutation.isPending.value"
+      :primary="{
+        label: t('aiObservability.promptManagement.move'),
+        disabled: !moveDestination || moveDestination === movingPrompt?.folderId,
+        loading: updateMutation.isPending.value,
+      }"
+      :secondary="{ label: t('aiObservability.promptManagement.cancel') }"
       @update:open="moveOpen = $event"
       @click:secondary="moveOpen = false"
       @click:primary="movePrompt"
@@ -317,6 +309,7 @@ import config from "@/aws-exports";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -327,7 +320,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -693,7 +686,7 @@ async function archive(prompt: Prompt) {
       messageKeypath: "aiObservability.promptManagement.archivePromptConfirmMessage",
       messageName: prompt.name,
       confirmLabel: t("aiObservability.promptManagement.archive"),
-      confirmVariant: "destructive",
+      kind: "destructive",
     }))
   )
     return;

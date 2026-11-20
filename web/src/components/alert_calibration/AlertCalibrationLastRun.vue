@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OBanner
+  <OInlineNotice
     v-if="lastRun?.status === 'error'"
-    variant="error"
+    tone="err"
     data-test="alert-calibration-last-run-failed"
   >
     {{
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         error: raw(lastRun.error ?? ""),
       })
     }}
-  </OBanner>
+  </OInlineNotice>
   <OText v-else-if="!onlyFailure" variant="meta" as="p" data-test="alert-calibration-last-run">
     {{ statusLine }}
   </OText>
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { formatDistanceToNowStrict } from "date-fns";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { useOrgId } from "@/composables/query";
 import { raw, useI18nTyped } from "@/types/i18n";

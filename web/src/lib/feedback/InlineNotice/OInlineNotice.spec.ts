@@ -16,47 +16,82 @@
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import OInlineNotice from "./OInlineNotice.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { INLINE_NOTICE_TONES } from "./OInlineNotice.types";
+
+const iconStub = { props: ["name"], template: '<i data-test="icon" :data-name="name" />' };
+const stubs = { OIcon: iconStub };
+
+const mountNotice = (props: Record<string, unknown> = {}, slots: Record<string, string> = {}) =>
+  mount(OInlineNotice, { props, slots, global: { stubs } });
 
 describe("OInlineNotice", () => {
-  it("is a status, not an alert, and shows its sentence", () => {
-    const wrapper = mount(OInlineNotice, {
-      props: { text: "No log stream has logs for this trace.", dataTest: "notice" },
-    });
-    const root = wrapper.get('[data-test="notice"]');
-    expect(root.attributes("role")).toBe("status");
-    expect(root.text()).toContain("No log stream has logs for this trace.");
-    expect(root.classes()).toContain("bg-status-warning-bg");
-    expect(root.classes()).toContain("text-status-warning-text");
-    expect(root.attributes("data-variant")).toBe("warning");
+  it("is a rounded box with a 1 px edge that wraps its 13 px text", () => {
+    const root = mountNotice({ message: "Fields with no events in 30 days are hidden." });
+    expect(root.classes()).toEqual(
+      expect.arrayContaining(["rounded-default", "border", "px-3", "py-2", "text-compact"]),
+    );
+    expect(root.find(".truncate").exists()).toBe(false);
+    expect(root.text()).toBe("Fields with no events in 30 days are hidden.");
   });
 
-  it("is a red alert in the error variant", () => {
-    const wrapper = mount(OInlineNotice, {
-      props: { text: "Couldn't load: the server returned an error.", variant: "error" },
-    });
-    const root = wrapper.get('[data-test="inline-notice"]');
-    expect(root.attributes("role")).toBe("alert");
-    expect(root.attributes("data-variant")).toBe("error");
-    expect(root.classes()).toContain("bg-status-error-bg");
-    expect(root.classes()).toContain("text-status-error-text");
-    expect(root.classes()).not.toContain("bg-status-warning-bg");
+  it("defaults to info and paints each of its five tones", () => {
+    expect(mountNotice().attributes("data-tone")).toBe("info");
+    const fills = {
+      neutral: "bg-banner-default-bg",
+      info: "bg-banner-info-bg",
+      warn: "bg-banner-warning-bg",
+      err: "bg-banner-error-soft-bg",
+      ok: "bg-banner-success-bg",
+    } as const;
+    for (const tone of INLINE_NOTICE_TONES) {
+      expect(mountNotice({ tone }).classes()).toContain(fills[tone]);
+    }
   });
 
-  it("renders no action without a label", () => {
-    const wrapper = mount(OInlineNotice, { props: { text: "Nothing here." } });
-    expect(wrapper.find("button").exists()).toBe(false);
+  it("is an alert for err and warn, a status otherwise", () => {
+    expect(mountNotice({ tone: "err" }).attributes("role")).toBe("alert");
+    expect(mountNotice({ tone: "warn" }).attributes("role")).toBe("alert");
+    expect(mountNotice({ tone: "ok" }).attributes("role")).toBe("status");
+    expect(mountNotice({ tone: "neutral" }).attributes("role")).toBe("status");
   });
 
-  it("emits action from a real button that never truncates", async () => {
-    const wrapper = mount(OInlineNotice, {
-      props: { text: "Nothing here.", actionLabel: "Open Logs tab", actionDataTest: "open" },
+  it("top-aligns the tone glyph, or a glyph that names the condition", () => {
+    const icon = mountNotice({ tone: "ok" }).get('[data-test="icon"]');
+    expect(icon.attributes("data-name")).toBe("check-circle");
+    expect(icon.classes()).toContain("mt-0.5");
+    expect(mountNotice({ icon: "history" }).get('[data-test="icon"]').attributes("data-name")).toBe(
+      "history",
+    );
+  });
+
+  it("lets the default slot replace the message", () => {
+    const wrapper = mountNotice({ message: "plain" }, { default: "<code>line 4</code>" });
+    expect(wrapper.get('[data-test="o-inline-notice-message"]').html()).toContain("<code>");
+    expect(wrapper.text()).not.toContain("plain");
+  });
+
+  it("sizes its secondary action to the small control height", () => {
+    const wrapper = mountNotice({ actionLabel: "Retry", actionDataTest: "retry" });
+    expect(wrapper.getComponent(OButton).props("variant")).toBe("secondary");
+    expect(wrapper.get('[data-test="retry"]').classes()).toContain("h-control-sm");
+  });
+
+  it("renders no action without a label or slot", () => {
+    expect(mountNotice({ message: "Nothing here." }).find("button").exists()).toBe(false);
+  });
+
+  it("emits action from one small end-aligned button", async () => {
+    const wrapper = mountNotice({
+      message: "Nothing here.",
+      actionLabel: "Open Logs tab",
+      actionVariant: "link",
+      actionDataTest: "open",
     });
-    const button = wrapper.get('[data-test="open"]');
-    expect(button.element.tagName).toBe("BUTTON");
-    expect(button.attributes("type")).toBe("button");
-    expect(button.classes()).toContain("shrink-0");
-    expect(button.classes()).toContain("whitespace-nowrap");
-    await button.trigger("click");
+    const button = wrapper.getComponent(OButton);
+    expect(button.props("variant")).toBe("link");
+    expect(wrapper.get('[data-test="open"]').element.parentElement?.classList).toContain("ms-auto");
+    await wrapper.get('[data-test="open"]').trigger("click");
     expect(wrapper.emitted("action")).toHaveLength(1);
   });
 });

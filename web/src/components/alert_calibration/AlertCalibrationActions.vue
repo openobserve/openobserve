@@ -18,9 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <template v-if="noAccess" />
   <OButton
     v-else-if="part === 'configure'"
-    variant="outline"
-    size="sm"
-    icon-left="settings"
+    variant="secondary"
+    icon="settings"
     data-test="alert-calibration-configure"
     @click="configure"
   >
@@ -29,8 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OButton
     v-else-if="canRun"
     variant="primary"
-    size="sm"
-    icon-left="play-arrow"
+    icon="play-arrow"
     :loading="pending"
     :disabled="!config?.enabled || denied"
     data-test="alert-calibration-run-now"

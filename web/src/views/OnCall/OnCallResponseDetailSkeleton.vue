@@ -43,8 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="rounded-default bg-surface-base border-border-default flex min-w-0 grow basis-52 flex-col justify-center gap-1 overflow-hidden border px-2.5 py-1"
       >
         <div class="flex min-w-0 items-center justify-between gap-2">
-          <OSkeleton type="text" class="h-6 w-16" />
-          <OSkeleton type="circle" class="h-7 w-7 shrink-0" />
+          <OSkeleton class="h-6 w-16" />
+          <OSkeleton shape="circle" class="h-7 w-7 shrink-0" />
         </div>
         <div class="bg-surface-subtle h-1 overflow-hidden rounded-full" />
       </div>
@@ -52,27 +52,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <div class="flex flex-col gap-4 lg:col-span-2">
-        <OCard variant="glass">
-          <OCardSection role="header" dense>
-            <OSkeleton type="text" class="h-4 w-24" />
-          </OCardSection>
-          <OCardSection role="body" dense class="flex flex-col gap-2">
-            <OSkeleton type="text" class="h-4 w-full" />
-            <OSkeleton type="text" class="h-4 w-5/6" />
-            <OSkeleton type="text" class="h-4 w-2/3" />
-          </OCardSection>
+        <OCard>
+          <template #header>
+            <OSkeleton class="h-4 w-24" />
+          </template>
+          <div class="flex flex-col gap-2">
+            <OSkeleton class="h-4 w-full" />
+            <OSkeleton class="h-4 w-5/6" />
+            <OSkeleton class="h-4 w-2/3" />
+          </div>
         </OCard>
       </div>
 
       <div class="flex flex-col gap-4">
-        <OCard v-for="card in 3" :key="card" variant="glass">
-          <OCardSection role="header" dense>
-            <OSkeleton type="text" class="h-4 w-32" />
-          </OCardSection>
-          <OCardSection role="body" dense class="flex flex-col gap-2">
-            <OSkeleton type="text" class="h-4 w-full" />
-            <OSkeleton type="text" class="h-4 w-1/2" />
-          </OCardSection>
+        <OCard v-for="card in 3" :key="card">
+          <template #header>
+            <OSkeleton class="h-4 w-32" />
+          </template>
+          <div class="flex flex-col gap-2">
+            <OSkeleton class="h-4 w-full" />
+            <OSkeleton class="h-4 w-1/2" />
+          </div>
         </OCard>
       </div>
     </div>
@@ -81,7 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { useI18nTyped } from "@/types/i18n";
 

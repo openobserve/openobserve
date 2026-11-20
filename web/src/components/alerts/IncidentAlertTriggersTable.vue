@@ -33,18 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :enable-column-resize="true"
       :persist-columns="true"
       :table-id="tableId"
-      :show-global-filter="false"
       @row-click="onRowClick"
       @pagination-change="refitLabels"
       @sort-change="refitLabels"
       @update:column-sizes="refitLabels"
     >
       <template #empty>
-        <div data-test="no-triggers-message" class="py-8 text-center">
-          <span class="text-text-secondary text-sm">
-            {{ t("alerts.noTriggersLoaded") }}
-          </span>
-        </div>
+        <OEmptyState :title="t('alerts.noTriggersLoaded')" data-test="no-triggers-message" />
       </template>
 
       <template #cell-alert_name="{ row }">
@@ -73,14 +68,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-if="row.alert_kind === 'external' && row.detected_source"
           data-test="trigger-source-badge"
-          variant="default-outline"
+          tone="outline"
         >
           {{ row.detected_source }}
         </OTag>
         <OTag
           v-else-if="row.alert_kind === 'autoobserve'"
           data-test="trigger-source-autoobserve"
-          variant="default-outline"
+          tone="outline"
         >
           {{ t("alerts.incidents.triggerSourceAutoObserve") }}
         </OTag>
@@ -102,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="pair in labelPairs(row.labels)"
               :key="pair"
               data-test="trigger-label-chip"
-              variant="default-outline"
+              tone="outline"
               class="max-w-full min-w-0"
             >
               <OTruncatedText :tooltip="hiddenLabels[row.created_at] ? false : undefined">
@@ -111,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTag>
           </div>
           <span v-if="hiddenLabels[row.created_at]" data-test="trigger-label-more" class="shrink-0">
-            <OTag variant="default-outline">{{ raw(`+${hiddenLabels[row.created_at]}`) }}</OTag>
+            <OTag tone="outline">{{ raw(`+${hiddenLabels[row.created_at]}`) }}</OTag>
             <OTooltip :content="labelsText(row.labels)" side="top" />
           </span>
         </div>
@@ -123,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="reasonLabel(row)"
             data-test="correlation-reason-label"
-            variant="default-soft"
+            tone="neutral"
             size="sm"
             :label="raw(reasonLabel(row) ?? '')"
           />
@@ -141,10 +136,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <OButton
           v-if="row.alert_kind === 'external'"
+          icon-only
           data-test="trigger-view-payload-btn"
           variant="ghost"
-          size="icon-sm"
-          icon-left="visibility"
+          icon="visibility"
           :title="t('alerts.incidents.viewPayload')"
           @click.stop="openPayload(row)"
         />
@@ -156,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="payloadDialogOpen"
       size="md"
       :title="t('alerts.incidents.rawPayloadTitle')"
-      :primary-button-label="t('common.close')"
+      :primary="{ label: t('common.close') }"
       @click:primary="payloadDialogOpen = false"
     >
       <div v-if="payloadLoading" class="text-text-secondary py-4 text-center text-sm">
@@ -200,6 +195,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -234,6 +230,7 @@ export default defineComponent({
     OButton,
     ODialog,
     OTruncatedText,
+    OEmptyState,
     OTimeCell,
   },
   props: {

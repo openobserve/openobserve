@@ -42,7 +42,7 @@ describe("prompt settings recovery", () => {
     const wrapper = mountSettings();
     await flushPromises();
     expect(wrapper.findComponent(OForm).exists()).toBe(false);
-    expect(wrapper.findComponent(OEmptyState).props("description")).toBe("Unavailable");
+    expect(wrapper.findComponent(OEmptyState).props("text")).toBe("Unavailable");
     wrapper.findComponent(OEmptyState).vm.$emit("action");
     await flushPromises();
     expect(wrapper.findComponent(OForm).props("form").state.values.protectedLabels).toEqual([

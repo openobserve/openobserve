@@ -4,7 +4,12 @@
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL, type OTableColumnDef, type OTableRowAction } from "@/lib/core/Table/OTable.types";
+import {
+  COL,
+  type OTableColumnDef,
+  type OTableRowAction,
+  type OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import ONameLinkCell from "@/lib/core/Table/cells/ONameLinkCell.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -25,6 +30,8 @@ const props = defineProps<{
   data: any[];
   loading?: boolean;
   forbidden?: ForbiddenState;
+  /** A failed load's message: the table shows the error state with Retry, never the first-run one. */
+  error?: string | null;
   actionLoading?: boolean;
   /** Member counts are still being fetched; unknown counts draw a placeholder instead of a dash. */
   countsLoading?: boolean;
@@ -58,6 +65,7 @@ const emit = defineEmits<{
   "bulk-delete": [];
   create: [];
   assign: [row: any];
+  retry: [];
 }>();
 
 const oTableRef = ref<any>(null);
@@ -121,13 +129,6 @@ const columns = computed<OTableColumnDef[]>(() => {
     });
   }
 
-  cols.push({
-    id: "actions",
-    header: t("common.actions"),
-    isAction: true,
-    pinned: "right",
-  });
-
   return cols;
 });
 
@@ -136,13 +137,17 @@ const rowActions: OTableRowAction[] = [
     id: "edit",
     label: t("common.edit"),
     icon: "edit",
-    onSelect: (row) => emit("edit", row),
+    onClick: (row) => emit("edit", row),
     dataTest: (row) => `iam-roles-edit-${row.role_name}-role-icon`,
   },
+];
+
+const rowMenu: OTableRowMenuItem[] = [
   {
     id: "delete",
     label: t("common.delete"),
     icon: "delete",
+    destructive: true,
     onSelect: (row) => emit("delete", row),
     dataTest: (row) => `iam-roles-delete-${row.role_name}-role-icon`,
   },
@@ -154,14 +159,13 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
 <template>
   <OTable
     ref="oTableRef"
-    :frame="false"
     :data="data"
     :columns="columns"
     :loading="loading"
     :forbidden="forbidden"
+    :error="error"
     :selected-ids="selectedIds"
     :global-filter="globalFilter"
-    :show-global-filter="false"
     pagination="client"
     :page-size="pageSize ?? 20"
     :page-size-options="[20, 50, 100, 250, 500]"
@@ -172,16 +176,17 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     selection="multiple"
     row-key="role_name"
     :row-actions="rowActions"
-    row-actions-more-data-test="iam-roles-row-more-actions"
+    :row-menu="rowMenu"
+    row-menu-data-test="iam-roles-row-more-actions"
     filter-mode="client"
     :default-columns="false"
-    show-index
     @update:selected-ids="emit('update:selectedIds', $event)"
     @update:global-filter="emit('update:globalFilter', $event)"
     @update:page-size="emit('update:pageSize', $event)"
     @update:current-page="emit('update:currentPage', $event)"
     @update:sort-by="emit('update:sortBy', $event)"
     @update:sort-order="emit('update:sortOrder', $event)"
+    @retry="emit('retry')"
   >
     <template #toolbar>
       <div class="flex flex-1 items-center gap-2 max-md:contents">
@@ -211,8 +216,8 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     <template #cell-user_count="{ row }">
       <OButton
         v-if="typeof row.user_count === 'number'"
-        :variant="row.user_count === 0 ? 'ghost-muted' : 'ghost-primary'"
-        size="xs"
+        :variant="row.user_count === 0 ? 'ghost' : 'accent-ghost'"
+        size="sm"
         class="tabular-nums"
         :aria-label="`${row.role_name}: ${row.user_count} ${t('iam.roleUsers')}`"
         :data-test="`iam-roles-${row.role_name}-users-link`"
@@ -222,8 +227,7 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
       </OButton>
       <OSkeleton
         v-else-if="countsLoading"
-        type="text"
-        class="ms-auto h-3 w-8"
+        class="ms-auto w-8"
         :data-test="`iam-roles-${row.role_name}-users-loading`"
       />
       <span v-else class="text-text-muted tabular-nums">—</span>
@@ -231,8 +235,8 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     <template #cell-service_account_count="{ row }">
       <OButton
         v-if="typeof row.service_account_count === 'number'"
-        :variant="row.service_account_count === 0 ? 'ghost-muted' : 'ghost-primary'"
-        size="xs"
+        :variant="row.service_account_count === 0 ? 'ghost' : 'accent-ghost'"
+        size="sm"
         class="tabular-nums"
         :aria-label="`${row.role_name}: ${row.service_account_count} ${t('iam.serviceAccounts')}`"
         :data-test="`iam-roles-${row.role_name}-service-accounts-link`"
@@ -242,8 +246,7 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
       </OButton>
       <OSkeleton
         v-else-if="countsLoading"
-        type="text"
-        class="ms-auto h-3 w-8"
+        class="ms-auto w-8"
         :data-test="`iam-roles-${row.role_name}-service-accounts-loading`"
       />
       <span v-else class="text-text-muted tabular-nums">—</span>
@@ -255,14 +258,13 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
     <!-- Rendered only when a member (?member=<email>) is being assigned via the token popup's link. -->
     <template #cell-assign="{ row }">
       <div class="flex items-center justify-center">
-        <OBadge v-if="isAssigned(row)" variant="success" icon="check" size="sm">
+        <OBadge v-if="isAssigned(row)" tone="ok" icon="check" size="sm">
           {{ t("iam.rolesPage.assignedBadge") }}
         </OBadge>
         <OButton
           v-else
           :data-test="`iam-roles-assign-${row.role_name}-btn`"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :loading="assigningRoleName === row.role_name"
           @click="emit('assign', row)"
         >
@@ -273,22 +275,31 @@ const isAssigned = (row: any): boolean => (props.assignedRoleNames ?? []).includ
 
     <template #empty>
       <OEmptyState
-        size="hero"
-        preset="no-roles"
-        :filtered="!!globalFilter"
-        @action="onEmptyStateAction"
+        :kind="globalFilter ? 'filtered' : 'first-run'"
+        :title="
+          globalFilter
+            ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.roles') })
+            : t('emptyState.noRoles.title')
+        "
+        :text="
+          globalFilter
+            ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.roles') })
+            : t('emptyState.noRoles.description')
+        "
+        :icon="globalFilter ? undefined : 'group'"
+        :action-label="globalFilter ? undefined : t('emptyState.noRoles.action')"
+        @action="onEmptyStateAction(globalFilter ? 'clear-filters' : 'create')"
       />
     </template>
 
     <template #selection-actions>
       <OButton
         data-test="iam-roles-bulk-delete-btn"
-        variant="outline-destructive"
-        size="sm"
+        variant="danger-ghost"
         :loading="actionLoading"
         @click="emit('bulk-delete')"
       >
-        <template #icon-left>
+        <template #icon>
           <OIcon name="delete" size="sm" />
         </template>
         {{ t("common.delete") }}

@@ -308,13 +308,14 @@ describe("HostsDependenciesView", () => {
     });
     expect(metricsQuery).toHaveBeenCalledTimes(2);
     expect(chart().exists()).toBe(true);
-    // The page's Refresh does the reloading; the view only says how fresh the map is.
+    // The page's Refresh does the reloading and shows the age; the view only reports when it loaded.
     expect(testId("hosts-deps-refresh").exists()).toBe(false);
-    expect(testId("hosts-deps-updated").text()).toContain("Last refreshed");
-    expect(testId("hosts-deps-updated").findComponent({ name: "OSpinner" }).exists()).toBe(true);
+    expect(testId("hosts-deps-updated").exists()).toBe(false);
+    const before = wrapper.emitted("loaded")?.length ?? 0;
     resolve({ data: { data: { result: [] } } });
     await flushPromises();
     expect(testId("hosts-deps-no-flows").exists()).toBe(true);
+    expect(wrapper.emitted("loaded")).toHaveLength(before + 1);
   });
 
   it("drops another org's graph at once and ignores its late response", async () => {

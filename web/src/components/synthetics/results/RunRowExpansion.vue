@@ -19,6 +19,8 @@ import { computed, onUnmounted, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
 import {
@@ -192,11 +194,11 @@ function failedAtStep(steps: StepResult[]): string {
     <!-- Loading skeleton -->
     <div v-if="loading" class="flex flex-col gap-2 p-4">
       <div class="flex items-center gap-3 py-2">
-        <div class="rounded-default bg-border-default h-4 w-24 animate-pulse" />
-        <div class="rounded-default bg-border-default h-4 w-16 animate-pulse" />
-        <div class="rounded-default bg-border-default h-4 w-40 animate-pulse" />
+        <OSkeleton class="h-4 w-24" />
+        <OSkeleton class="h-4 w-16" />
+        <OSkeleton class="h-4 w-40" />
       </div>
-      <div class="rounded-default bg-border-default h-24 w-full animate-pulse" />
+      <OSkeleton shape="block" class="h-24" />
     </div>
 
     <!-- Query error -->
@@ -206,13 +208,17 @@ function failedAtStep(steps: StepResult[]): string {
     </div>
 
     <!-- No data -->
-    <div v-else-if="!executions.length" class="text-text-muted flex items-center gap-2 p-4 text-xs">
-      <OIcon name="info" size="sm" />
-      <span v-if="runStatus === 'error'">{{
-        t("synthetics.runRowExpansion.probeInfraError")
-      }}</span>
-      <span v-else>{{ t("synthetics.runRowExpansion.noExecutionData") }}</span>
-    </div>
+    <OEmptyState
+      v-else-if="!executions.length"
+      size="compact"
+      class="px-4"
+      :kind="runStatus === 'error' ? 'error' : 'first-run'"
+      :title="
+        runStatus === 'error'
+          ? t('synthetics.runRowExpansion.probeInfraError')
+          : t('synthetics.runRowExpansion.noExecutionData')
+      "
+    />
 
     <!-- Location groups -->
     <template v-else>
@@ -233,7 +239,7 @@ function failedAtStep(steps: StepResult[]): string {
           <!-- Location header row — click to expand/collapse -->
           <OButton
             variant="ghost"
-            size="xs"
+            size="sm"
             class="w-full justify-start gap-2 px-4 py-2.5 text-left text-xs font-medium"
             :data-test="`synthetics-run-row-toggle-location-${group.location}-btn`"
             @click="toggleLocation(group.location)"
@@ -243,7 +249,7 @@ function failedAtStep(steps: StepResult[]): string {
               size="sm"
               class="text-text-muted shrink-0"
             />
-            <span :class="STATUS_COLOR[group.status]" class="text-sm font-bold">
+            <span :class="STATUS_COLOR[group.status]" class="text-sm font-semibold">
               {{ statusDot(group.status) }}
             </span>
             <span class="text-text-heading font-semibold">{{ group.location }}</span>
@@ -264,27 +270,27 @@ function failedAtStep(steps: StepResult[]): string {
                 <thead>
                   <tr class="bg-surface-panel border-border-default border-b">
                     <th
-                      class="text-text-muted text-3xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
+                      class="text-text-muted text-2xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.runRowExpansion.browserHeader") }}
                     </th>
                     <th
-                      class="text-text-muted text-3xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
+                      class="text-text-muted text-2xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.runRowExpansion.deviceHeader") }}
                     </th>
                     <th
-                      class="text-text-muted text-3xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
+                      class="text-text-muted text-2xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.results.status") }}
                     </th>
                     <th
-                      class="text-text-muted text-3xs px-3 py-2 text-right font-semibold tracking-wide uppercase"
+                      class="text-text-muted text-2xs px-3 py-2 text-right font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.results.duration") }}
                     </th>
                     <th
-                      class="text-text-muted text-3xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
+                      class="text-text-muted text-2xs px-3 py-2 text-left font-semibold tracking-wide uppercase"
                     >
                       {{ t("synthetics.runRowExpansion.failedAtHeader") }}
                     </th>
@@ -309,7 +315,7 @@ function failedAtStep(steps: StepResult[]): string {
                         class="flex items-center gap-1.5 font-semibold"
                         :class="STATUS_COLOR[ex.status]"
                       >
-                        <span class="text-base leading-none">{{ statusDot(ex.status) }}</span>
+                        <span class="text-sm leading-none">{{ statusDot(ex.status) }}</span>
                         {{ statusLabel(ex.status) }}
                         <span v-if="ex.status === 'warning'" class="text-text-muted font-normal">{{
                           t("synthetics.runRowExpansion.flaky")

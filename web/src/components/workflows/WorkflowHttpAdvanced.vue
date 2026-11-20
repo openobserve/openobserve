@@ -16,10 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCollapsible
-    v-model="open"
-    variant="sidebar"
-    :label="t('workflow.http.advanced')"
-    :caption="summary"
+    v-model:open="open"
+    :title="t('workflow.http.advanced')"
+    :summary="summary"
     data-test="workflow-http-advanced"
   >
     <div ref="body" class="flex flex-col gap-4 px-3 pt-2 pb-1">
@@ -35,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="number"
           :label="t('workflow.http.maxBody')"
           :help-text="t('workflow.http.maxBodyHint')"
-          width="md"
+          width="l"
           data-test="workflow-http-max-body"
         />
         <OFormInput
@@ -43,23 +42,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="number"
           :label="t('workflow.http.rateLimit')"
           :help-text="t('workflow.http.rateLimitHint', { org: orgBudget })"
-          width="md"
+          width="l"
           data-test="workflow-http-rate-limit"
         />
-        <OBanner
+        <OInlineNotice
           v-if="saveError"
-          variant="error-soft"
-          dense
+          tone="err"
           data-test="workflow-http-limits-error"
-          :content="saveError"
+          :message="saveError"
         />
         <div>
-          <OButton
-            type="submit"
-            variant="primary"
-            size="sm-action"
-            data-test="workflow-http-limits-save"
-          >
+          <OButton type="submit" variant="primary" data-test="workflow-http-limits-save">
             {{ t("common.save") }}
           </OButton>
         </div>
@@ -68,41 +61,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="border-border-default flex flex-wrap items-center gap-3 border-t pt-3">
         <OText variant="meta" class="min-w-0 flex-1">{{ t("workflow.http.deleteMeta") }}</OText>
         <OPopover
+          size="md"
           v-model:open="deleteOpen"
           side="bottom"
           align="end"
           :aria-label="t('workflow.http.deleteTitle')"
         >
           <template #trigger>
-            <OButton variant="outline-destructive" size="xs" data-test="workflow-http-delete">
+            <OButton variant="danger-ghost" size="sm" data-test="workflow-http-delete">
               {{ t("workflow.http.deleteButton") }}
             </OButton>
           </template>
-          <div
-            data-test="workflow-http-delete-popover"
-            class="flex w-80 max-w-[calc(100vw-1.5rem)] flex-col gap-2 p-3"
-          >
+          <div data-test="workflow-http-delete-popover" class="flex flex-col gap-2 p-3">
             <OText variant="body-strong">{{ t("workflow.http.deleteTitle") }}</OText>
             <OText variant="meta" as="p">{{ t("workflow.http.deleteBody") }}</OText>
-            <OBanner
+            <OInlineNotice
               v-if="deleteError"
-              variant="error-soft"
-              dense
+              tone="err"
               data-test="workflow-http-delete-error"
-              :content="deleteError"
+              :message="deleteError"
             />
             <div class="flex justify-end gap-2">
               <OButton
-                variant="outline"
-                size="sm-action"
+                variant="secondary"
                 data-test="workflow-http-delete-cancel"
                 @click="deleteOpen = false"
               >
                 {{ t("common.cancel") }}
               </OButton>
               <OButton
-                variant="destructive"
-                size="sm-action"
+                variant="danger"
                 :loading="deleting"
                 data-test="workflow-http-delete-confirm"
                 @click="onDelete"
@@ -120,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OText from "@/lib/core/Typography/OText.vue";

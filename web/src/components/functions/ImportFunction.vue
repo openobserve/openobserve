@@ -19,23 +19,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('function.import.title')"
     :back="{
       label: t('function.header'),
-      onClick: goBack,
+      to: functionListRoute(),
       dataTest: 'function-import-back-btn',
     }"
     bleed
   >
     <template #actions>
-      <OButton
-        variant="outline"
-        size="sm-action"
-        data-test="function-import-cancel-btn"
-        @click="goBack"
-      >
+      <OButton variant="secondary" data-test="function-import-cancel-btn" @click="goBack">
         {{ t("function.cancel") }}
       </OButton>
       <OButton
         variant="primary"
-        size="sm-action"
         data-test="function-import-json-btn"
         :loading="isImporting"
         :disabled="isImporting"
@@ -116,7 +110,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                            than the default the name box offers. -->
                       <div v-if="errorMessage.field === 'name_exists'" class="pt-3">
                         <OCheckbox
-                          size="sm"
                           :data-test="`function-import-override-checkbox-${errorMessage.itemIndex}`"
                           :model-value="overrideExisting[errorMessage.name] === true"
                           :label="t('function.import.overrideExisting')"
@@ -205,13 +198,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <div v-if="importResults.length > 0" class="mb-2.5 p-2.5">
-              <div class="text-primary mb-2.5 text-base" data-test="function-import-results-title">
+              <div class="text-primary mb-2.5 text-sm" data-test="function-import-results-title">
                 {{ t("function.import.results") }}
               </div>
               <div
                 v-for="(result, index) in importResults"
                 :key="index"
-                class="py-1.25 text-sm font-bold whitespace-pre-wrap"
+                class="py-1.25 text-sm font-semibold whitespace-pre-wrap"
                 :class="resultClass(result.status)"
                 :data-test="`function-import-result-${index}`"
               >
@@ -343,12 +336,11 @@ export default defineComponent({
       if (redirectTimer !== undefined) clearTimeout(redirectTimer);
     });
 
-    const goBack = () => {
-      router.push({
-        name: "functionList",
-        query: { org_identifier: store.state.selectedOrganization.identifier },
-      });
-    };
+    const functionListRoute = () => ({
+      name: "functionList",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+    const goBack = () => router.push(functionListRoute());
 
     const triggerImport = () => baseImportRef.value?.handleImport();
 
@@ -730,6 +722,7 @@ export default defineComponent({
       transTypeOptions,
       dependentPipelines,
       goBack,
+      functionListRoute,
       triggerImport,
       resultClass,
       bodyLanguage,

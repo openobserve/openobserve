@@ -51,7 +51,7 @@
       <OInput
         v-model.number="form.frequencyMinutes"
         type="number"
-        width="sm"
+        width="s"
         suffix="min"
         :label="t('alerts.frequency')"
         required
@@ -62,7 +62,7 @@
       <OInput
         v-model.number="form.silenceMinutes"
         type="number"
-        width="sm"
+        width="s"
         suffix="min"
         :label="t('alerts.silence')"
         required
@@ -87,15 +87,15 @@
     />
 
     <div class="flex justify-end gap-2">
-      <OButton
-        variant="outline"
-        size="sm-action"
-        @click="emit('cancel')"
-        data-test="slo-alert-form-cancel"
-      >
+      <OButton variant="secondary" @click="emit('cancel')" data-test="slo-alert-form-cancel">
         {{ t("common.cancel") }}
       </OButton>
-      <OButton size="sm-action" :loading="saving" @click="submit" data-test="slo-alert-form-submit">
+      <OButton
+        variant="primary"
+        :loading="saving"
+        @click="submit"
+        data-test="slo-alert-form-submit"
+      >
         {{ t("common.save") }}
       </OButton>
     </div>

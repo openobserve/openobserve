@@ -61,12 +61,7 @@ const tooltip = computed(() =>
     :data-test="dataTest"
   >
     <template v-if="state === 'loading'">
-      <OSkeleton
-        type="text"
-        animation="none"
-        aria-hidden="true"
-        :class="['h-[1em]', skeletonClass]"
-      />
+      <OSkeleton aria-hidden="true" :class="['h-[1em]', skeletonClass]" />
       <span class="sr-only">{{ t("components.skeleton.loading") }}</span>
     </template>
     <template v-else-if="state === 'none'">

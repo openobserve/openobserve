@@ -50,11 +50,13 @@ export class LogsPage {
         this.allFieldsToggleBtn = '[data-test="logs-page-all-fields-btn"], [data-test="logs-all-fields-btn"], [data-test="logs-page-user-defined-fields-btn-all_fields_slot"], [data-test="logs-user-defined-fields-btn-all_fields_slot"]';
         this.interestingFieldsToggleBtn = '[data-test="logs-page-interesting-fields-btn"], [data-test="logs-interesting-fields-btn"], [data-test="logs-page-user-defined-fields-btn-interesting_fields_slot"], [data-test="logs-user-defined-fields-btn-interesting_fields_slot"]';
         this.fieldListResetIcon = '[data-test="logs-page-fields-list-reset-icon"]';
-        this.sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
-        // OSwitch renders the wrapper data-test on a div and the toggle state on an inner
-        // <button data-state="checked|unchecked"> — drill into that button via data-state attr.
-        this.sqlModeToggleStateBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state]';
-        this.sqlModeSwitch = { role: 'switch', name: 'SQL Mode' };
+        // The toolbar's "Filter | SQL" tray; each segment carries data-state="on|off" itself.
+        this.sqlModeToggle = '[data-test="logs-search-bar-query-mode-sql"]';
+        this.filterModeToggle = '[data-test="logs-search-bar-query-mode-filter"]';
+        this.sqlModeToggleStateBtn = '[data-test="logs-search-bar-query-mode-sql"]';
+        // Below the tray's width it folds into the toolbar ⋯ as a "Query language" group.
+        this.menuQueryModeSql = '[data-test="logs-search-bar-menu-query-mode-sql"]';
+        this.menuQueryModeFilter = '[data-test="logs-search-bar-menu-query-mode-filter"]';
         this.dateTimeButton = '[data-test="date-time-btn"]';
         this.indexDropDown = '[data-test="log-search-index-list-select-stream"]';
         // OSelect post-migration: the wrapper is a div (cannot be `.fill()`'d) — use the
@@ -138,8 +140,8 @@ export class LogsPage {
         this.menuListSavedViewsBtn = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
         this.menuCreateSavedViewBtn = '[data-test="logs-search-bar-menu-create-saved-view-btn"]';
         this.menuHistogramBtn = '[data-test="logs-search-bar-menu-histogram-btn"]';
-        this.menuSqlModeBtn = '[data-test="logs-search-bar-menu-sql-mode-btn"]';
-        this.menuSqlModeBtnState = '[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]';
+        this.menuSqlModeBtn = '[data-test="logs-search-bar-menu-query-mode-sql"]';
+        this.menuSqlModeBtnState = '[data-test="logs-search-bar-menu-query-mode-sql"][aria-checked]';
         this.resetFiltersButton = '[data-test="logs-search-bar-reset-filters-btn"]';
         this.savedViewsDropdownBtn = '[data-test="logs-search-saved-views-btn"]';
         this.includeExcludeFieldButton = ':nth-child(1) [data-test="log-details-include-exclude-field-btn"]';
@@ -193,8 +195,9 @@ export class LogsPage {
         // SearchResult.vue exposes the result title via data-test — replacement for the
         // legacy class-based searchListFirstTextLeft selector in expectSearchListVisible.
         this.searchResultTitle = '[data-test="logs-search-result-title"]';
-        this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn"]';
-        this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
+        // Auto-refresh lives in the refresh button's menu; each interval item carries its seconds.
+        this.liveModeToggleBtn = '[data-test="logs-search-bar-data-age-refresh-auto-menu"]';
+        this.liveMode5SecBtn = '[data-test="logs-search-bar-data-age-refresh-auto-5"]';
         this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
         this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"]';
@@ -207,8 +210,10 @@ export class LogsPage {
         // OSelect-based records-per-page dropdown (logs SearchResult.vue:138)
         this.recordsPerPageDropdown = '[data-test="logs-search-result-records-per-page"]';
         this.recordsPerPageOption = value => `[data-test="logs-search-result-records-per-page-option"][data-test-value="${value}"]`;
-        // OPagination per-page buttons forward parentDataTest as `${parent}-page-{n}` (OPagination.vue:98)
-        this.resultPaginationPageBtn = pageNumber => `[data-test="logs-search-result-pagination-page-${pageNumber}"]`;
+        // OPagination has no numbered buttons: it steps with `${parent}-prev|next` and carries
+        // the page state as data-test-page / data-test-page-count on its root.
+        this.resultPaginationPrevBtn = '[data-test="logs-search-result-pagination-prev"]';
+        this.resultPaginationNextBtn = '[data-test="logs-search-result-pagination-next"]';
         this.interestingFieldBtn = field => `[data-test="log-search-index-list-interesting-${field}-field-btn"]`;
         this.logsSearchBarFunctionDropdown = '[data-test="logs-search-bar-function-dropdown"]';
         this.logsSearchBarFunctionDropdownSave = '[data-test="logs-search-bar-function-dropdown"] button';
@@ -220,7 +225,7 @@ export class LogsPage {
         this.qPageContainer = '[data-test="logs-page-container"]';
         this.cmContent = '.view-lines';
         this.cmLine = '.view-line';
-        this.searchFunctionInput = { placeholder: 'Search Function' };
+        this.searchFunctionInput = { placeholder: 'Search function' };
         this.timestampFieldTable = '[data-test="log-search-index-list-fields-table"]';
 
         // Error handling locators
@@ -234,7 +239,7 @@ export class LogsPage {
         this.searchErrorSummary = '[data-test="error-detail-summary"], [data-test="query-error-summary"]';
 
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
-        this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
+        this.moreOptionsBtn = '[data-test="logs-search-bar-utilities-menu-btn"]';
         this.explainQueryMenuBtn = '[data-test="logs-search-bar-explain-query-menu-btn"]';
         // Hover trigger for the nested CSV/JSON submenu (data-test added on the wrapper div).
         this.downloadSubmenuTrigger = '[data-test="search-download-submenu-trigger"]';
@@ -356,8 +361,10 @@ export class LogsPage {
         this.multiStreamPatternsToastText = 'Patterns are not available when multiple streams are selected. Please select a single stream.';
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
+        // A menu item inside ⋯: open it with openShareLinkMenuItem().
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
-        this.shareLinkTooltip = '[data-test="o-tooltip-content"]';
+        // A disabled menu item states its reason under its label.
+        this.shareLinkTooltip = '[id="logs-search-bar-share-link-btn-reason"], [data-test="o-tooltip-content"]';
         // OToast convention §4: variant-prefixed data-test (`o-toast-success`, `o-toast-error`,
         // `o-toast-info`, `o-toast-warning`, `o-toast-loading`, `o-toast-default`). Enumerate
         // known variants on the root only — also dodges Monaco's `role="alert"` accessibility
@@ -365,7 +372,7 @@ export class LogsPage {
         this.successNotification = '[data-test-variant="success"], [data-test-variant="error"], [data-test-variant="info"], [data-test-variant="warning"], [data-test-variant="loading"], [data-test-variant="default"]';
         // Success-only toast variant (e.g. saved view created)
         this.successToast = '[data-test-variant="success"]';
-        this.linkCopiedSuccessText = 'Link Copied Successfully';
+        this.linkCopiedSuccessText = 'Link copied';
         this.errorCopyingLinkText = 'Error while copy link';
 
         // ===== QUERY EDITOR EXPAND/COLLAPSE SELECTORS =====
@@ -430,16 +437,11 @@ export class LogsPage {
         this.dimensionCheckboxAny = '[data-test^="dimension-checkbox-"]';
         // Dashboard chart panel inside the analysis dashboard page (via data-test prefix)
         this.analysisDashboardChartPanel = '[data-test="traces-analysis-dashboard-page"] [data-test^="dashboard-panel-"]';
-        // SQL Mode toggle (OSwitch) — sourced from SearchBar.vue
-        this.sqlModeToggleBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
-        // Inner <button role="switch"> rendered by OSwitch — carries data-state="checked|unchecked"
-        // OSwitch's inner switch button does NOT receive a derived `-button` data-test in the
-        // current OSwitch.vue implementation (button is plain `role="switch"` with data-state).
-        // Drill into the wrapper and target the inner [data-state] attribute directly.
-        this.sqlModeToggleInnerBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state]';
-        // Pre-scoped checked/unchecked state filters — mirror histogramToggleCheckedBtn pattern.
-        this.sqlModeToggleCheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="checked"]';
-        this.sqlModeToggleUncheckedBtn = '[data-test="logs-search-bar-sql-mode-toggle-btn"] [data-state="unchecked"]';
+        // SQL segment of the toolbar's "Filter | SQL" tray (SearchBar.vue); it carries data-state itself.
+        this.sqlModeToggleBtn = '[data-test="logs-search-bar-query-mode-sql"]';
+        this.sqlModeToggleInnerBtn = '[data-test="logs-search-bar-query-mode-sql"]';
+        this.sqlModeToggleCheckedBtn = '[data-test="logs-search-bar-query-mode-sql"][data-state="on"]';
+        this.sqlModeToggleUncheckedBtn = '[data-test="logs-search-bar-query-mode-sql"][data-state="off"]';
 
         // ===== REGRESSION TEST LOCATORS =====
         // Query history
@@ -1918,12 +1920,8 @@ export class LogsPage {
         const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
         const isInline = await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false);
         if (isInline) {
-            // Normal viewport: the OSwitch inner button carries data-state="unchecked" when OFF.
-            // The Reka OSwitch animates the checked→unchecked transition, and under CI load the
-            // settled state can appear >5s after the toggle+execute — poll longer (still asserts
-            // the real end-state, not an arbitrary sleep) to avoid the flaky 5s ceiling.
-            const switchUnchecked = inlineBtn.locator('[data-state="unchecked"]');
-            await expect(switchUnchecked).toBeVisible({ timeout: 15000 });
+            // A pinned histogram is a pressed toggle button; poll for the settled OFF state.
+            await expect(inlineBtn).toHaveAttribute('aria-pressed', 'false', { timeout: 15000 });
             return;
         }
         // Narrow-viewport fallback: check state via the utilities menu item.
@@ -2175,9 +2173,7 @@ export class LogsPage {
         // Pagination buttons can be slow to respond on cloud — retry
         // the click up to 3 times if the expected text doesn't appear.
         for (let attempt = 1; attempt <= 3; attempt++) {
-            // OPagination forwards the parent data-test as `${parent}-page-{n}` for each page button.
-            const pageBtn = this.page.locator(this.resultPaginationPageBtn(resultsPerPage));
-            await pageBtn.click({ force: true }).catch(() => {});
+            await this.goToResultPage(Number(resultsPerPage)).catch(() => {});
             await this.page.waitForTimeout(3000);
 
             try {
@@ -2604,9 +2600,9 @@ export class LogsPage {
     // Force the real flag here so every kubernetesContainerName*Join* helper is
     // deterministically SQL-mode regardless of caller or auto-detect timing.
     async _ensureSqlModeAfterJoinQuery() {
-        if (!(await this._isSqlModeEnabledViaVue())) {
-            await this._setSqlModeViaVue(true);
-        }
+        // Idempotent: the tray is clicked only while the app is still in Filter mode; an
+        // authored SELECT in the editor is kept as it is.
+        await this._setSqlModeViaTray(true);
     }
 
     /**
@@ -2684,10 +2680,10 @@ export class LogsPage {
         let previousValue = orderType === 'desc' ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
 
         for (const row of rows) {
-            const sourceCell = await row.locator('[data-test="o2-table-cell-source"]').textContent();
+            // Aggregate rows render one column per result key, so logcount has its own cell.
+            const sourceCell = await row.locator('[data-test="o2-table-cell-logcount"]').textContent();
             try {
-                const logcountMatch = sourceCell.match(/logcount":(\d+)/);
-                const currentValue = logcountMatch ? parseInt(logcountMatch[1]) : 0;
+                const currentValue = parseInt(sourceCell.trim(), 10) || 0;
 
                 if (orderType === 'desc') {
                     expect(currentValue).toBeLessThanOrEqual(previousValue);
@@ -2787,6 +2783,22 @@ export class LogsPage {
         return this.page.locator(this.shareLinkButton);
     }
 
+    /** Opens the toolbar ⋯ unless it is already open. */
+    async openToolbarMoreMenu() {
+        const trigger = this.page.locator(this.utilitiesMenuButton);
+        await trigger.waitFor({ state: 'visible', timeout: 10000 });
+        if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+        await expect(trigger).toHaveAttribute('aria-expanded', 'true', { timeout: 5000 });
+    }
+
+    /** Opens ⋯ and returns the Share link item. */
+    async openShareLinkMenuItem() {
+        await this.openToolbarMoreMenu();
+        const item = this.page.locator(this.shareLinkButton);
+        await item.waitFor({ state: 'visible', timeout: 10000 });
+        return item;
+    }
+
     // Readiness gates (deterministic waits keyed on the search-bar controls).
     async waitForStreamSelectReady(timeout = 15000) {
         await this.page.locator(this.indexDropDown).waitFor({ state: 'visible', timeout });
@@ -2848,7 +2860,7 @@ export class LogsPage {
     async runQueryAfterModeChange(timeout = 60000) {
         if (await this.logsQueryPage._isAutoQueryEnabled()) {
             // Auto-run fires after mode switch — wait for the button to return
-            // to "Run Query" (not disabled / loading / Cancel) before asserting.
+            // to "Run query" (not disabled / loading / Cancel) before asserting.
             await this.page.waitForFunction(
                 (sel) => {
                     const b = document.querySelector(sel);
@@ -3380,42 +3392,30 @@ export class LogsPage {
     }
 
     async clickSQLModeToggle() {
-        // Behaves as a true toggle:
-        //   SQL ON  → clear the editor (FTS mode, no SELECT)
-        //   SQL OFF → write SELECT query with current interesting fields (SQL mode)
-        //
-        // Uses setQueryEditorContent (Monaco executeEdits API) rather than keyboard input —
-        // keyboard typing is focus-sensitive and silently fails in headless CI when focus
-        // lands on another element.
-        const isSQL = await this.isSqlModeEnabled();
-        if (isSQL) {
-            // Toggle OFF: clear editor so auto-detection sets sqlMode = false
-            await this.setQueryEditorContent('');
-            await this.page.waitForTimeout(300);
-            testLogger.info('clickSQLModeToggle: toggled OFF (editor cleared)');
-            return;
-        }
+        // A true toggle through the toolbar's "Filter | SQL" tray, as a user does it: turning
+        // SQL on lets the app write the SELECT (with the interesting fields in quick mode);
+        // turning it off keeps the WHERE clause as the filter.
+        const wasSql = await this._readSqlMode();
+        await this._setSqlModeViaTray(!wasSql);
+        await this._waitForEditorSql(!wasSql);
+        testLogger.info(`clickSQLModeToggle: toggled ${wasSql ? 'OFF' : 'ON'} via the query mode tray`);
+    }
 
-        // Toggle ON: read interesting fields + stream from Vue state, build SELECT
-        const appState = await this._mutateSearchObj((searchObj) => ({
-            fields: [...(searchObj.data?.stream?.interestingFieldList || [])],
-            stream: searchObj.data?.stream?.selectedStream?.[0] || 'e2e_automate',
-        }));
-
-        const timestamp = '_timestamp';
-        const fields = appState?.fields || [];
-        const stream = appState?.stream || 'e2e_automate';
-        const allFields = fields.includes(timestamp) ? fields : [timestamp, ...fields];
-        // Always build an explicit field list — never fall back to SELECT * when we
-        // have at least _timestamp, so assertions like "includes(_timestamp,field)"
-        // work even when interestingFieldList had only one user field.
-        const sql = allFields.length > 0
-            ? `SELECT ${allFields.join(',')} FROM "${stream}" ORDER BY ${timestamp} DESC`
-            : `SELECT * FROM "${stream}"`;
-
-        await this.setQueryEditorContent(sql);
-        await this.page.waitForTimeout(300);
-        testLogger.info(`clickSQLModeToggle: toggled ON — set SQL="${sql.substring(0, 80)}"`);
+    /** Waits for the editor text to (not) read as SQL after a mode switch; resolves quietly on timeout. */
+    async _waitForEditorSql(expectSql, timeout = 5000) {
+        await this.page.waitForFunction(({ selector, want }) => {
+            const host = document.querySelector(selector);
+            if (!host) return !want;
+            const editors = window.monaco?.editor?.getEditors?.() ?? [];
+            for (const ed of editors) {
+                const node = ed.getDomNode?.();
+                if (node && host.contains(node)) {
+                    const val = (ed.getValue() || '').toLowerCase();
+                    return (val.includes('select') && val.includes('from')) === want;
+                }
+            }
+            return !want;
+        }, { selector: this.queryEditor, want: expectSql }, { timeout, polling: 100 }).catch(() => {});
     }
 
     async clickShowQueryToggle() {
@@ -3862,7 +3862,7 @@ export class LogsPage {
     // "Add field to the table" shares the include data-test, so the menu item is picked by its label.
     async includeLogDetailFieldValue(field) {
         await this.page.locator(this.logDetailDialog).locator(`[data-test="log-details-include-exclude-field-btn-${field}"]`).click();
-        await this.page.locator(this.includeFieldButton).filter({ hasText: 'Include Search Term' }).click();
+        await this.page.locator(this.includeFieldButton).filter({ hasText: 'Include search term' }).click();
     }
 
     async clickCloseDialog() {
@@ -4077,7 +4077,7 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async isViewRelatedButtonVisible() {
-        // Correlation ("View Related") was redesigned into inline tabs in the log-detail drawer;
+        // Correlation ("View related") was redesigned into inline tabs in the log-detail drawer;
         // the old log-correlation-btn is gone. The presence of the traces correlation tab means
         // the enterprise correlation feature is available (OSS lacks it, so the caller skips).
         try {
@@ -4843,7 +4843,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator} The button locator
      */
     getLiveModeButtonByValue(value) {
-        return this.page.locator(`[data-test="logs-search-bar-refresh-time-${value}"]`);
+        return this.page.locator(`[data-test="logs-search-bar-data-age-refresh-auto-${value}"]`);
     }
 
     async getPageContent() {
@@ -4974,17 +4974,31 @@ export class LogsPage {
     }
 
     async clickPaginationPage(pageNumber) {
-        return await this.page.locator(this.resultPaginationPageBtn(pageNumber)).first().click();
+        return await this.goToResultPage(Number(pageNumber));
+    }
+
+    /** Steps the result pager with prev/next until its root reports `pageNumber`. */
+    async goToResultPage(pageNumber) {
+        const pager = this.page.locator(this.resultPagination).first();
+        for (let guard = 0; guard < 50; guard++) {
+            const current = Number(await pager.getAttribute('data-test-page'));
+            if (current === pageNumber) return;
+            const step = current < pageNumber ? this.resultPaginationNextBtn : this.resultPaginationPrevBtn;
+            await this.page.locator(step).first().click();
+            await expect(pager).not.toHaveAttribute('data-test-page', String(current), { timeout: 30000 });
+        }
+        await expect(pager).toHaveAttribute('data-test-page', String(pageNumber));
     }
 
     async getPaginationPageCount() {
-        const pageButtons = this.page.locator(`[data-test^="logs-search-result-pagination-page-"]`);
-        return await pageButtons.count();
+        const count = await this.page.locator(this.resultPagination).first().getAttribute('data-test-page-count');
+        return Number(count) || 0;
     }
 
+    /** 'true' when `pageNumber` is the pager's current page, as the old page buttons' data-test-active read. */
     async getPaginationPageClasses(pageNumber) {
-        const pageButton = this.page.locator(this.resultPaginationPageBtn(pageNumber)).first();
-        return await pageButton.getAttribute('data-test-active');
+        const current = await this.page.locator(this.resultPagination).first().getAttribute('data-test-page');
+        return current === String(pageNumber) ? 'true' : 'false';
     }
 
     async isPaginationPageActive(pageNumber) {
@@ -4993,7 +5007,7 @@ export class LogsPage {
     }
 
     async getActivePaginationPageText() {
-        return await this.page.locator(`${this.resultPagination} button[aria-current='true'], ${this.resultPagination} button[aria-pressed='true'], ${this.resultPagination} button[data-state='active']`).first().textContent({ timeout: 5000 }).catch(() => 'unknown');
+        return await this.page.locator(this.resultPagination).first().getAttribute('data-test-page', { timeout: 5000 }).catch(() => 'unknown');
     }
 
     async expectSQLPaginationNotVisible() {
@@ -5365,7 +5379,7 @@ export class LogsPage {
      * column (full row as JSON). With the FTS default-column feature, a plain
      * (non-SQL, no-pin) view instead promotes the best-fill full-text "body"
      * field (e.g. "log"/"message"/"body") to its own column, so "source" is no
-     * longer guaranteed. Custom SQL queries and aggregates still render "source".
+     * longer guaranteed. Custom SQL queries still render "source"; aggregates render their own columns.
      *
      * This helper therefore passes when EITHER the "source" column OR any other
      * first-row column cell is visible — i.e. "results rendered", independent of
@@ -5385,11 +5399,9 @@ export class LogsPage {
 
     /**
      * Wait for a specific named column cell in the first result row to be visible.
-     * Only applicable when the user has pinned fields via selectedFields — those
-     * fields are rendered as individual columns with id equal to the field name.
-     * For aggregate CTEs or any query where no fields are pinned, the table shows
-     * a single "source" column (JSON.stringify of the row); use
-     * expectLogTableColumnSourceVisible() + expectInterestingFieldInTable() instead.
+     * Applies to fields pinned via selectedFields and to SQL aggregates, whose
+     * result keys render as their own columns (id = the key). Other unpinned
+     * queries show a single "source" column (JSON.stringify of the row).
      * @param {string} columnName - The column/field name (e.g. 'level', 'kubernetes_pod_name')
      * @param {number} rowIndex - Row index (default 0 = first row)
      */
@@ -6263,7 +6275,9 @@ export class LogsPage {
 
     // J on a page's last row crosses only once the page-count query has given the pager its next page.
     async expectResultPageCountAtLeast(pageNumber, timeout = 60000) {
-        await expect(this.page.locator(this.resultPaginationPageBtn(pageNumber)).first()).toBeVisible({ timeout });
+        await expect
+            .poll(async () => await this.getPaginationPageCount(), { timeout })
+            .toBeGreaterThanOrEqual(pageNumber);
     }
 
     async setupAPICallTracking() {
@@ -7750,12 +7764,12 @@ export class LogsPage {
      * Click the share link button on the logs search bar
      */
     async clickShareLinkButton() {
-        const btn = this.page.locator(this.shareLinkButton);
-        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        let btn = await this.openShareLinkMenuItem();
         const enabled = await expect(btn).toBeEnabled({ timeout: 30000 }).then(() => true).catch(() => false);
         if (!enabled) {
             testLogger.warn('Share link button still disabled after 30s; reloading once', { url: this.page.url() });
             await this.page.reload({ waitUntil: 'domcontentloaded' });
+            btn = await this.openShareLinkMenuItem();
             await expect(btn, 'share link button never enabled: the query has not run yet (G1), or web_url is missing from the org config').toBeEnabled({ timeout: 30000 });
         }
         await btn.click();
@@ -7766,6 +7780,7 @@ export class LogsPage {
      * Verify the share link button is visible
      */
     async expectShareLinkButtonVisible() {
+        await this.openShareLinkMenuItem();
         await expect(this.page.locator(this.shareLinkButton)).toBeVisible();
         testLogger.info('Share link button is visible');
     }
@@ -7813,7 +7828,7 @@ export class LogsPage {
     async clickShareLinkAndExpectNotification() {
         await this.clickShareLinkButton();
 
-        // Wait for the share-RESULT toast specifically — the "Link Copied Successfully!"
+        // Wait for the share-RESULT toast specifically — the "Link copied successfully!"
         // success toast OR the "Error while copy link" error toast — matched by message
         // and .first(). This skips an unrelated "Running query cancelled" info toast that
         // can coexist, which would otherwise trip strict mode on the broad selector.
@@ -7859,6 +7874,7 @@ export class LogsPage {
      * Verify the share link button is disabled
      */
     async expectShareLinkButtonDisabled() {
+        await this.openShareLinkMenuItem();
         await expect(this.page.locator(this.shareLinkButton)).toBeDisabled();
         testLogger.info('Share link button is disabled');
     }
@@ -7867,6 +7883,7 @@ export class LogsPage {
      * Hover over the share link button to show tooltip
      */
     async hoverShareLinkButton() {
+        await this.openShareLinkMenuItem();
         await this.page.locator(this.shareLinkButton).hover();
         testLogger.info('Hovered over share link button');
     }
@@ -7947,7 +7964,7 @@ export class LogsPage {
 
         await this.clickShareLinkButton();
 
-        // Wait for the SUCCESS ("Link Copied Successfully!") toast specifically, using
+        // Wait for the SUCCESS ("Link copied successfully!") toast specifically, using
         // .first(). A clickRefresh just before sharing can leave a "Running query
         // cancelled successfully" info toast on screen; the broad any-variant
         // successNotification selector then matches 2 toasts and trips strict mode.
@@ -8253,7 +8270,7 @@ export class LogsPage {
             return;
         }
         const stream = await this._getSelectedStream();
-        const set = await this._setSqlModeViaVue(true);
+        const set = await this._setSqlModeViaTray(true);
         if (!set) {
             // Vue state inaccessible — write SELECT directly to trigger auto-detection
             await this.setQueryEditorValue(`SELECT * FROM "${stream}"`);
@@ -8285,6 +8302,57 @@ export class LogsPage {
             return true;
         }, value);
         return result === true;
+    }
+
+    /**
+     * Current SQL mode as the user sees it: the real flag, else the tray segment's
+     * data-state, else the editor-text heuristic.
+     * @returns {Promise<boolean>}
+     */
+    async _readSqlMode() {
+        const flag = await this._isSqlModeEnabledViaVue();
+        if (flag !== null && flag !== undefined) return flag;
+        const segment = this.page.locator(this.sqlModeToggle);
+        if (await segment.isVisible({ timeout: 1000 }).catch(() => false)) {
+            return (await segment.getAttribute('data-state')) === 'on';
+        }
+        return await this.isSqlModeEnabled();
+    }
+
+    /**
+     * Switch the query language the way a user does: the toolbar's "Filter | SQL" tray,
+     * or its "Query language" group in ⋯ when the toolbar is too narrow. Idempotent: it
+     * clicks only when the mode differs. Falls back to the Vue flag when the segment is
+     * unavailable (e.g. SQL is disabled in Drill down).
+     * @param {boolean} on - true for SQL, false for Filter
+     * @returns {Promise<boolean>} true once the mode matches
+     */
+    async _setSqlModeViaTray(on) {
+        if ((await this._readSqlMode()) === on) return true;
+        const segment = this.page.locator(on ? this.sqlModeToggle : this.filterModeToggle);
+        const segmentUsable = await segment.isVisible({ timeout: 2000 }).catch(() => false)
+            && (await segment.getAttribute('aria-hidden')) !== 'true'
+            && await segment.isEnabled().catch(() => false);
+        if (segmentUsable) {
+            await segment.click();
+        } else {
+            const menuItem = this.page.locator(on ? this.menuQueryModeSql : this.menuQueryModeFilter);
+            const moreButton = this.page.locator(this.utilitiesMenuButton);
+            let picked = false;
+            if (await moreButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+                await moreButton.click();
+                if (await menuItem.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await menuItem.click();
+                    picked = true;
+                } else {
+                    await this.page.keyboard.press('Escape');
+                }
+            }
+            if (!picked) return await this._setSqlModeViaVue(on);
+        }
+        await expect.poll(() => this._readSqlMode(), { timeout: 10000 }).toBe(on);
+        testLogger.info(`_setSqlModeViaTray: query language set to ${on ? 'SQL' : 'Filter'}`);
+        return true;
     }
 
     /**
@@ -8732,8 +8800,7 @@ export class LogsPage {
      * @returns {Promise<string|null>}
      */
     async getSQLModeState() {
-        testLogger.info('getSQLModeState: SQL mode toggle removed from UI — returning null');
-        return null;
+        return String(await this._readSqlMode());
     }
 
     /**
@@ -8798,7 +8865,7 @@ export class LogsPage {
     async disableAutoRefresh() {
         await this.clickLiveModeButton();
         await this.page.waitForTimeout(500);
-        const offButton = this.page.locator('[data-test="logs-search-bar-refresh-time-0"]');
+        const offButton = this.page.locator('[data-test="logs-search-bar-data-age-refresh-auto-0"]');
         if (await offButton.isVisible({ timeout: 2000 }).catch(() => false)) {
             await offButton.click();
         }
@@ -8868,9 +8935,7 @@ export class LogsPage {
     }
 
     /**
-     * Toggle histogram on/off.
-     * In normal viewports the histogram is a standalone inline toolbar button.
-     * Only falls back to the utilities menu in narrow viewports (shouldMoveButtonsToMenu).
+     * Toggle histogram on/off: the ⋯ item, or the toolbar copy when the user pinned it.
      */
     async toggleHistogram() {
         await this.page.keyboard.press('Escape').catch(() => {});
@@ -8881,7 +8946,6 @@ export class LogsPage {
             testLogger.info('Histogram toggled (inline button)');
             return;
         }
-        // Narrow-viewport fallback: open the utilities menu and click the menu item.
         await this.page.locator(this.utilitiesMenuButton).click();
         const menuItem = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
         await menuItem.waitFor({ state: 'visible', timeout: 5000 });
@@ -9491,9 +9555,9 @@ export class LogsPage {
             testLogger.info('enableSqlModeIfNeeded: SQL mode already on — skipping');
             return;
         }
-        // Set the Vue flag first — in the build tab this triggers the sqlMode watcher
-        // which updates the editor with the full generated SQL query.
-        await this._setSqlModeViaVue(true);
+        // Switch through the "Filter | SQL" tray as a user does; the app then writes the SELECT
+        // (logs tab) or the builder's generated SQL (build tab) into the editor.
+        await this._setSqlModeViaTray(true);
 
         // Poll up to 2000ms for the Vue watcher chain to update the Monaco editor.
         // The watcher is async (reads buildDashboardPanelData, awaits onBuildQueryGenerated,
@@ -9563,15 +9627,14 @@ export class LogsPage {
      * (build tab auto mode) or the async watcher chain is too slow.
      */
     async disableSqlModeIfNeeded() {
-        const isSQL = await this.isSqlModeEnabled();
+        const isSQL = (await this._isSqlModeEnabledViaVue()) === true || (await this.isSqlModeEnabled());
         if (!isSQL) {
             testLogger.info('disableSqlModeIfNeeded: SQL mode already off — skipping');
             return;
         }
-        // Set sqlMode=false via Vue state — in build mode this triggers the Index.vue
-        // watcher which calls onBuildQueryGenerated() → extractWhereClause() (async) →
-        // searchObj.data.query = whereClause → QueryEditor prop watcher → Monaco setValue.
-        await this._setSqlModeViaVue(false);
+        // Switch to Filter through the tray; the app keeps the query's WHERE clause as the filter
+        // (in build mode via onBuildQueryGenerated() → extractWhereClause()).
+        await this._setSqlModeViaTray(false);
         // Wait for the watcher chain to strip the SELECT from the editor instead of a fixed
         // 600ms sleep — resolves as soon as the editor updates, falls through on timeout to
         // the isStillSQL fallback below (same recovery path as before).
@@ -11004,8 +11067,7 @@ export class LogsPage {
      * @returns {Promise<boolean>} True if SQL mode is ON
      */
     async isSqlModeOn() {
-        // Opens the utilities dropdown to read the SQL mode OSwitch state, then closes it.
-        return await this.isSqlModeEnabled();
+        return await this._readSqlMode();
     }
 
     /**
@@ -11790,7 +11852,7 @@ export class LogsPage {
     }
 
     /**
-     * Get "Include Search Term" menu item (Bug #11041)
+     * Get "Include search term" menu item (Bug #11041)
      * @returns {Locator}
      */
     getIncludeSearchTermMenuItem() {
@@ -12183,8 +12245,7 @@ export class LogsPage {
      * @param {string|number} pageNum - The page number to click (e.g., '1', '2')
      */
     async clickPageNumber(pageNum) {
-        const pageBtn = this.page.locator(this.resultPaginationPageBtn(pageNum));
-        await pageBtn.click({ force: true });
+        await this.goToResultPage(Number(pageNum));
         await this.waitForResultsLoaded();
     }
 
@@ -12201,14 +12262,14 @@ export class LogsPage {
      * Open the "More Options" menu on the logs search bar.
      */
     async openMoreOptionsMenu() {
-        const menuBtn = this.page.locator('[data-test="logs-search-bar-more-options-btn"]');
+        const menuBtn = this.page.locator(this.moreOptionsBtn);
         await menuBtn.waitFor({ state: 'visible', timeout: 10000 });
         await menuBtn.click();
         await this.page.waitForTimeout(500);
     }
 
     /**
-     * Click "List Scheduled Search" in the open More Options menu.
+     * Click "List scheduled search" in the open More Options menu.
      * Uses the data-test selector on the menu item when available (enterprise),
      * falling back to text-based DOM matching for OSS builds.
      */
@@ -12220,7 +12281,7 @@ export class LogsPage {
             await this.page.evaluate(() => {
                 const items = document.querySelectorAll('[role="menuitem"]');
                 for (const item of items) {
-                    if (item.textContent?.trim() === 'List Scheduled Search') {
+                    if (item.textContent?.trim() === 'List scheduled search') {
                         item.click();
                         break;
                     }
@@ -12309,7 +12370,7 @@ export class LogsPage {
     }
 
     /**
-     * Open the "Refresh Cache & Run Query" / Live Mode dropdown next to the
+     * Open the "Refresh cache & run query" / Live Mode dropdown next to the
      * Run Query button. Works on both the Logs tab and the Visualize tab —
      * both render the same trigger data-test (GH #14488 requires their
      * dropdown to be visibility-consistent).
@@ -12323,11 +12384,11 @@ export class LogsPage {
     }
 
     /**
-     * Locator for the "Refresh Cache & Run Query" item inside the open dropdown.
+     * Locator for the "Refresh cache & run query" item inside the open dropdown.
      * @returns {import('@playwright/test').Locator}
      */
     getRefreshCacheAndRunQueryMenuItem() {
-        return this.page.getByRole('menuitem', { name: 'Refresh Cache & Run Query' });
+        return this.page.getByRole('menuitem', { name: 'Refresh cache & run query' });
     }
 
     /**
@@ -12339,7 +12400,7 @@ export class LogsPage {
     }
 
     /**
-     * Open the dropdown and click "Refresh Cache & Run Query", waiting for the
+     * Open the dropdown and click "Refresh cache & run query", waiting for the
      * resulting search request — which must be issued with clear_cache=true,
      * bypassing the result cache, matching the backend's meta::search::Request
      * contract (src/config/src/meta/search.rs).
@@ -12367,12 +12428,7 @@ export class LogsPage {
     async getCurrentPageNumber() {
         return await this.page.evaluate(() => {
             const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
-            if (!pagination) return '';
-            const btn = pagination.querySelector('button[aria-current="page"]');
-            if (!btn) return '';
-            const label = btn.getAttribute('aria-label') || '';
-            const match = label.match(/\d+/);
-            return match ? match[0] : '';
+            return pagination?.getAttribute('data-test-page') ?? '';
         });
     }
 
@@ -13155,7 +13211,7 @@ export class LogsPage {
 
     /**
      * Asserts the stream dropdown wrapper shows the selected stream name
-     * (i.e. the placeholder "Select Stream" has been replaced by a selected-item chip).
+     * (i.e. the placeholder "Select stream" has been replaced by a selected-item chip).
      * Uses the wrapper div since OSelect renders selected items as tokens within it.
      * @param {string} streamName
      */
@@ -14063,6 +14119,7 @@ export class LogsPage {
     /** The query input mode is remembered per browser, so turn the filter builder off when a previous test left it on. */
     async ensureQueryEditorMode() {
         const toggle = this.page.locator(this.filterBuilderToggle);
+        if ((await toggle.count()) === 0) return;
         if ((await toggle.getAttribute('aria-pressed').catch(() => null)) !== 'true') return;
         await toggle.click();
         await expect(toggle).toHaveAttribute('aria-pressed', 'false');

@@ -1838,7 +1838,7 @@ describe("Logs Index", async () => {
 
       expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(["audit_logs"]);
       expect(wrapper.vm.searchObj.data.filterErrMsg).toBe("");
-      expect(streamChangeCalls).toEqual([["", { origin: "selector" }]]);
+      expect(streamChangeCalls).toEqual([["", { origin: "selector", runNow: false }]]);
     });
 
     it("opens the drill-down stream select when a state asks to select a stream", async () => {

@@ -3,9 +3,11 @@
     :open="open"
     size="sm"
     :title="dialogTitle"
-    :primary-button-label="t('onlineEvals.manualEvaluation.run')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-disabled="loadingJobs || jobOptions.length === 0"
+    :primary="{
+      label: t('onlineEvals.manualEvaluation.run'),
+      disabled: loadingJobs || jobOptions.length === 0,
+    }"
+    :secondary="{ label: t('common.cancel') }"
     :form-id="formId"
     data-test="manual-evaluation-dialog"
     @update:open="emit('update:open', $event)"
@@ -21,14 +23,13 @@
         </p>
       </div>
 
-      <OBanner v-if="loadError" variant="error-soft" dense data-test="manual-evaluation-jobs-error">
+      <OInlineNotice v-if="loadError" tone="err" data-test="manual-evaluation-jobs-error">
         {{ loadError }}
-      </OBanner>
+      </OInlineNotice>
 
-      <OBanner
+      <OInlineNotice
         v-else-if="!loadingJobs && jobOptions.length === 0"
-        variant="info"
-        dense
+        tone="info"
         data-test="manual-evaluation-no-jobs"
       >
         {{
@@ -37,7 +38,7 @@
             stream,
           })
         }}
-      </OBanner>
+      </OInlineNotice>
 
       <OForm :id="formId" :form="form" class="flex flex-col gap-5">
         <OFormSelect
@@ -48,7 +49,6 @@
           :loading="loadingJobs"
           :disabled="loadingJobs || jobOptions.length === 0"
           required
-          size="md"
           data-test="manual-evaluation-job-select"
         />
       </OForm>
@@ -70,7 +70,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   makeManualEvaluationDialogSchema,

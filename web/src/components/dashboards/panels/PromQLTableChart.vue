@@ -47,13 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template v-else-if="emptyText" #empty>
-          <OEmptyState
-            size="inline"
-            icon="bar-chart"
-            :title="emptyText"
-            :backdrop="false"
-            data-test="no-data"
-          />
+          <OEmptyState size="compact" icon="bar-chart" :title="emptyText" data-test="no-data" />
         </template>
 
         <!-- Override bottom slot to add legend filter alongside native pagination -->
@@ -67,25 +61,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="legendOptions"
                 :placeholder="t('dashboard.promQLTableChart.selectSeriesToFilter')"
               >
-                <template #icon-left>
+                <template #icon>
                   <OIcon name="filter-list" size="xs" />
                 </template>
               </OSelect>
             </div>
             <div class="flex-1" />
-            <TablePaginationControls
-              :show-pagination="panelConfig.table_pagination && !store.state.printMode"
-              :pagination="{ page: scope.currentPage, rowsPerPage: scope.pageSize }"
-              :total-rows="scope.totalRows"
-              :pages-number="scope.totalPages"
-              :is-first-page="scope.isFirstPage"
-              :is-last-page="scope.isLastPage"
-              @update:rows-per-page="scope.setPageSize"
-              @first-page="scope.firstPage"
-              @prev-page="scope.prevPage"
-              @next-page="scope.nextPage"
-              @last-page="scope.lastPage"
+            <OPagination
+              v-if="panelConfig.table_pagination && !store.state.printMode"
+              :page="scope.currentPage"
+              :page-count="scope.totalPages"
+              :page-size="scope.pageSize"
+              :page-sizes="[20, 50, 100]"
+              :total="scope.totalRows"
+              :test-ids="DASHBOARD_TABLE_PAGER_TEST_IDS"
+              @update:page="scope.goToPage"
+              @update:page-size="scope.setPageSize"
             />
+            <span
+              v-else-if="scope.totalRows > 0"
+              class="text-text-secondary text-xs tabular-nums"
+              data-test="dashboard-table-row-count"
+              >{{
+                t("components.pagination.range", {
+                  from: 1,
+                  to: scope.totalRows.toLocaleString(),
+                  total: scope.totalRows.toLocaleString(),
+                })
+              }}</span
+            >
           </div>
         </template>
         <!-- "0 of 0" under "All clear" reads as a broken table, so a healthy empty triage table drops the count. -->
@@ -105,7 +109,8 @@ import { defineComponent, ref, computed, watch, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import TableRenderer from "./TableRenderer.vue";
-import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
+import { DASHBOARD_TABLE_PAGER_TEST_IDS } from "@/utils/dashboard/tableOptions";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -132,7 +137,7 @@ export default defineComponent({
       default: null,
     },
   },
-  components: { TableRenderer, TablePaginationControls, OSelect, OIcon, OEmptyState },
+  components: { TableRenderer, OPagination, OSelect, OIcon, OEmptyState },
   setup(props) {
     const store = useStore();
     const { t } = useI18nTyped();
@@ -277,6 +282,7 @@ export default defineComponent({
 
     return {
       t,
+      DASHBOARD_TABLE_PAGER_TEST_IDS,
       filter,
       store,
       loading,

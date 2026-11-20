@@ -516,11 +516,6 @@ const onNoteClick = (e: MouseEvent) => {
 
 const chipIcon = (kind: StepChipKind) =>
   ({ terminal: "", editor: "code", run: "play-arrow", traces: "timeline" })[kind];
-// A code block with a filename is a file, not a shell command — render it with
-// editor chrome even under a terminal-chip step. Needed when one step mixes
-// command and file variants (e.g. RUM's npm install vs CDN HTML snippet).
-const codeChrome = (step: RichCardStep): "terminal" | "editor" =>
-  !displayCode(step)?.filename && step.chip?.kind === "terminal" ? "terminal" : "editor";
 
 const extras = computed(() => props.content.extras ?? {});
 const uninstallSection = computed(() => {
@@ -675,8 +670,7 @@ function fireConfetti() {
           :help-text="!streamNameError ? streamInputHelp(content.streamInput) : undefined"
           :error="!!streamNameError"
           :error-message="streamNameError"
-          size="sm"
-          width="md"
+          width="m"
           data-test="ai-stream-name-input"
         />
       </div>
@@ -692,7 +686,6 @@ function fireConfetti() {
             v-for="m in content.setupModes"
             :key="m.id"
             :value="m.id"
-            size="sm"
             :data-test="`ai-setup-mode-${m.id}`"
           >
             {{ setupModeLabel(m) }}
@@ -750,8 +743,7 @@ function fireConfetti() {
                   :label="inputLabel(inp)"
                   :placeholder="raw(inp.placeholder || inp.default)"
                   :help-text="inp.helpKey ? t(inp.helpKey) : undefined"
-                  size="sm"
-                  :width="inp.width || 'md'"
+                  :width="inp.width || 'm'"
                   :data-test="`ai-input-${inp.id}`"
                 />
               </div>
@@ -772,7 +764,6 @@ function fireConfetti() {
                     v-for="v in step.variants"
                     :key="v.id"
                     :value="v.id"
-                    size="sm"
                     :data-test="`ai-variant-${v.id}`"
                   >
                     <template v-if="v.icon" #icon-left>
@@ -802,7 +793,6 @@ function fireConfetti() {
                     v-for="v in subVariants(step)"
                     :key="v.id"
                     :value="v.id"
-                    size="sm"
                     :data-test="`ai-variant-${v.id}`"
                   >
                     <template v-if="v.icon" #icon-left>
@@ -831,8 +821,7 @@ function fireConfetti() {
                   :label="inputLabel(inp)"
                   :placeholder="raw(inp.placeholder || inp.default)"
                   :help-text="inp.helpKey ? t(inp.helpKey) : undefined"
-                  size="sm"
-                  :width="inp.width || 'md'"
+                  :width="inp.width || 'm'"
                   :data-test="`ai-input-${inp.id}`"
                 />
               </div>
@@ -857,7 +846,7 @@ function fireConfetti() {
 
               <OSkeleton
                 v-if="tokenLoading(displayCode(step)) && !missingRequired(activeVariant(step))"
-                type="rect"
+                shape="block"
                 class="my-3 h-20"
                 :data-test="`${displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK}-loading`"
               />
@@ -868,22 +857,20 @@ function fireConfetti() {
                   !tokenWithheld(displayCode(step))
                 "
                 :lang="displayCode(step)?.lang"
-                :chrome="codeChrome(step)"
                 :filename="displayCode(step)?.filename"
                 :code="subStream(displayCode(step)?.raw, activeVariant(step)) || ''"
                 :code-masked="subStream(displayCode(step)?.masked, activeVariant(step))"
                 :data-test="displayCode(step)?.dataTest ?? SETUP_CODE_BLOCK"
-                :reveal-tooltip="t('ingestion.setupCard.revealToken')"
-                :hide-tooltip="t('ingestion.setupCard.hideToken')"
                 :token-name="displayCode(step)?.masked ? tokenName : undefined"
                 @copy="(payload: CodeBlockCopyPayload) => onStepCopy(step, i, payload)"
                 @token-click="openTokenPicker?.()"
               >
                 <template v-if="displayCode(step)?.downloadEnv" #actions>
                   <OButton
+                    icon-only
                     data-test="ai-code-env-btn"
                     variant="ghost"
-                    size="icon-xs-sq"
+                    size="sm"
                     @click="downloadEnv"
                   >
                     <OIcon name="download" size="sm" />
@@ -922,8 +909,7 @@ function fireConfetti() {
                   <span class="inline-flex">
                     <OButton
                       :variant="step.action.variant || 'primary'"
-                      size="sm-action"
-                      :icon-left="step.action.icon"
+                      :icon="step.action.icon"
                       disabled
                       :data-test="`ai-step-action-${step.action.id}`"
                     >
@@ -934,8 +920,7 @@ function fireConfetti() {
                 <OButton
                   v-else
                   :variant="step.action.variant || 'primary'"
-                  size="sm-action"
-                  :icon-left="step.action.icon"
+                  :icon="step.action.icon"
                   :disabled="step.action.disabled"
                   :data-test="`ai-step-action-${step.action.id}`"
                   @click="onStepAction(step, i)"
@@ -983,8 +968,7 @@ function fireConfetti() {
                 <div class="fixbox-actions">
                   <OButton
                     variant="primary"
-                    size="sm"
-                    icon-left="refresh"
+                    icon="refresh"
                     data-test="ai-c-fix-recheck"
                     @click="statusBar?.probeNow()"
                   >
@@ -992,8 +976,7 @@ function fireConfetti() {
                   </OButton>
                   <OButton
                     v-if="extras.troubleshooting?.length"
-                    variant="ghost-primary"
-                    size="sm"
+                    variant="accent-ghost"
                     data-test="ai-c-see-troubleshooting"
                     @click="openTroubleshooting()"
                   >
@@ -1021,9 +1004,8 @@ function fireConfetti() {
         <OCollapsible
           v-if="extras.advanced"
           ref="advancedRef"
-          v-model="advancedOpen"
-          :label="sectionLabel(extras.advanced)"
-          icon="settings"
+          v-model:open="advancedOpen"
+          :title="sectionLabel(extras.advanced)"
           class="acc-item"
           data-test="ai-advanced-accordion"
         >
@@ -1035,20 +1017,17 @@ function fireConfetti() {
             ></p>
             <OSkeleton
               v-if="tokenLoading(extras.advanced.code)"
-              type="rect"
+              shape="block"
               class="my-3 h-20"
               data-test="ai-advanced-code-loading"
             />
             <OCodeBlock
               v-else-if="!tokenWithheld(extras.advanced.code)"
               :lang="extras.advanced.code.lang"
-              :chrome="extras.advanced.code.filename ? 'editor' : 'terminal'"
               :filename="extras.advanced.code.filename"
               :code="subStream(extras.advanced.code.raw) || ''"
               :code-masked="subStream(extras.advanced.code.masked)"
               data-test="ai-advanced-code"
-              :reveal-tooltip="t('ingestion.setupCard.revealToken')"
-              :hide-tooltip="t('ingestion.setupCard.hideToken')"
               :token-name="extras.advanced.code.masked ? tokenName : undefined"
               @token-click="openTokenPicker?.()"
             />
@@ -1057,8 +1036,7 @@ function fireConfetti() {
 
         <OCollapsible
           v-if="hasInstallerAccordion"
-          :label="t('ingestion.setupCard.whatTheInstallerDoes')"
-          icon="layers"
+          :title="t('ingestion.setupCard.whatTheInstallerDoes')"
           class="acc-item"
         >
           <div class="acc-body">
@@ -1087,9 +1065,8 @@ function fireConfetti() {
         <OCollapsible
           v-if="extras.troubleshooting?.length"
           ref="troubleshootingRef"
-          v-model="troubleshootingOpen"
-          :label="t('ingestion.setupCard.troubleshooting')"
-          icon="help-outline"
+          v-model:open="troubleshootingOpen"
+          :title="t('ingestion.setupCard.troubleshooting')"
           class="acc-item"
         >
           <div class="acc-body">
@@ -1103,8 +1080,7 @@ function fireConfetti() {
         <!-- Removal path — last, and collapsed, since it undoes the flow above. -->
         <OCollapsible
           v-if="uninstallSection"
-          :label="sectionLabel(uninstallSection)"
-          icon="delete-outline"
+          :title="sectionLabel(uninstallSection)"
           class="acc-item"
           data-test="ai-uninstall-accordion"
         >
@@ -1204,7 +1180,7 @@ function fireConfetti() {
   border-radius: var(--radius-default);
   display: grid;
   place-items: center;
-  font-weight: 800;
+  font-weight: var(--font-semibold);
   font-size: var(--text-xs);
   letter-spacing: -0.02em;
   background: var(--clay-bright);
@@ -1246,11 +1222,11 @@ function fireConfetti() {
 }
 
 .c-h1 {
-  font-weight: 800;
-  font-size: var(--text-2xl);
+  font-weight: var(--font-semibold);
+  font-size: var(--text-lg);
   letter-spacing: -0.02em;
   margin: 0;
-  line-height: 1.1;
+  line-height: var(--leading-lg);
 }
 
 .c-sub {
@@ -1298,7 +1274,7 @@ function fireConfetti() {
 }
 @media (max-width: 47.9375rem) {
   .step-inputs > *,
-  .step-inputs :deep(.w-field-width-md) {
+  .step-inputs :deep(.w-field-width-m) {
     max-width: 100%;
   }
   .variant-tabs {
@@ -1316,7 +1292,7 @@ function fireConfetti() {
 /* Step context chip is now <OTag> (lib). Only the terminal "$_" glyph (used
    in the badge's #icon slot) keeps a monospace style. */
 .step-tag-glyph {
-  font-weight: 800;
+  font-weight: var(--font-semibold);
   font-size: var(--text-2xs);
 }
 
@@ -1378,7 +1354,7 @@ function fireConfetti() {
 /* In-card jump link (see noteMd) — same treatment as the footer's doc link. */
 .step-note :deep(a.note-jump) {
   color: var(--primary-ink);
-  font-weight: 700;
+  font-weight: var(--font-semibold);
   text-decoration: none;
   cursor: pointer;
 }
@@ -1431,7 +1407,7 @@ function fireConfetti() {
   display: flex;
   align-items: center;
   gap: 0.5625rem;
-  font-weight: 800;
+  font-weight: var(--font-semibold);
   font-size: var(--text-sm);
   color: var(--warn-ink);
 }
@@ -1519,7 +1495,7 @@ function fireConfetti() {
   display: flex;
   align-items: flex-start;
   gap: 0.5625rem;
-  font-weight: 700;
+  font-weight: var(--font-semibold);
   font-size: var(--text-compact);
   color: var(--text-1);
 }
@@ -1554,7 +1530,7 @@ function fireConfetti() {
 
 .pv-foot a {
   color: var(--primary-ink);
-  font-weight: 700;
+  font-weight: var(--font-semibold);
   text-decoration: none;
 }
 

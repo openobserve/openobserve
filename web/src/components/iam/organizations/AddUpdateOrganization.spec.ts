@@ -68,21 +68,21 @@ vi.mock("@/services/reodotdev_analytics", () => ({
 // ODialog stub: keeps slot content queryable + exposes form-id and open state.
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "size", "title", "primaryButtonLabel", "secondaryButtonLabel", "formId"],
+  props: ["open", "size", "title", "primary", "secondary", "formId"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `
     <div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-form-id="formId">
       <slot />
       <button
-        v-if="secondaryButtonLabel"
+        v-if="secondary?.label"
         data-test="o-dialog-secondary-btn"
         @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
+      >{{ secondary?.label }}</button>
       <button
-        v-if="primaryButtonLabel"
+        v-if="primary?.label"
         data-test="o-dialog-primary-btn"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
     </div>
   `,
   inheritAttrs: false,

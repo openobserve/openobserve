@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="px-page-edge flex flex-wrap items-center gap-3 py-2"
+    class="px-page-edge flex flex-wrap items-center gap-2 py-2"
     :class="{ 'border-border-default border-b': bordered }"
   >
     <template v-if="showAgentToggle || agentToggleLockedMessage">
@@ -55,7 +55,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              (see `agentToggleLockedMessage`) instead of just disappearing. -->
         <OToggleGroupItem
           value="agent"
-          size="sm"
           :icon-right="!showAgentToggle || aiObsLock.locked.value ? 'lock' : undefined"
           :disabled="aiObsLock.locked.value"
           :focusable-unavailable="aiObsLock.locked.value"
@@ -63,9 +62,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ labels.agent }}
         </OToggleGroupItem>
-        <OToggleGroupItem value="stream" size="sm">{{ labels.stream }}</OToggleGroupItem>
+        <OToggleGroupItem value="stream">{{ labels.stream }}</OToggleGroupItem>
       </OToggleGroup>
     </template>
+
+    <!-- R1: the page's search follows the view switcher, before the scope filters. -->
+    <slot name="search" />
 
     <!-- Explicit if/else on isStreamMode itself (not on a descendant's own
          condition) — StreamAgentCountBadge below has its own separate
@@ -74,16 +76,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          silently fall through to rendering the agent cascade. -->
     <template v-if="isStreamMode">
       <div :data-test="`${dataTest}-stream-selector`" class="w-64 flex-shrink-0">
-        <OSkeleton type="text" v-if="showStreamSkeleton && !streamsLoaded" class="h-8.5 w-full" />
+        <OSkeleton v-if="showStreamSkeleton && !streamsLoaded" class="h-control-md w-full" />
         <OSelect
+          width="full"
           v-else
           v-model="activeStreamModel"
           :label="raw(labels.streamLabel)"
-          label-position="inside"
+          variant="filter"
           :options="streamSelectOptions"
           labelKey="label"
           valueKey="value"
-          :option-tooltip="streamOptionTooltip"
           class="rounded-default w-full"
           @update:model-value="onStreamChange"
         />
@@ -105,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          reachable when `showAgentToggle` is false — there's no control to
          switch into it and the parent never sets filterMode to "agent". -->
     <template v-else>
-      <OSkeleton type="text" v-if="agentSkeleton && !agentsLoaded" class="h-8.5 w-44" />
+      <OSkeleton v-if="agentSkeleton && !agentsLoaded" class="h-control-md w-44" />
       <AgentScopeCascade
         v-else
         :prefix="dataTest"
@@ -204,10 +206,8 @@ const props = withDefaults(
         so preserving byte-identical data-test values needs an explicit override.
         Defaults to `${dataTest}-stream-count`. */
     countDataTest?: string;
-    /** Draw the bottom divider on the bar root. Sessions/LLM place the bar in a
-        plain page div and own the divider here (true, the default). Graph/
-        Behavior place it in OPageLayout's `#subnav`, which already draws the
-        full-bleed divider, so they pass false to avoid a double border. */
+    /** Draw a bottom divider on the bar root. Off by default: the bar is a
+        toolbar row (R1), and the table or `#subnav` below already draws one. */
     bordered?: boolean;
     /** Enable the stream picker's per-option tooltip (Graph, whose stream names
         can be long). Matches OSelect's own default (false) for the others. */
@@ -234,7 +234,7 @@ const props = withDefaults(
     showStreamSkeleton: false,
     agentSkeleton: false,
     countDataTest: undefined,
-    bordered: true,
+    bordered: false,
     streamOptionTooltip: false,
     showVersion: true,
     showAgentToggle: true,

@@ -24,9 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OButton
       v-if="model.kind === 'analyze'"
-      variant="ghost-primary"
-      size="xs"
-      icon-left="auto-awesome"
+      variant="accent-ghost"
+      size="sm"
+      icon="auto-awesome"
       :loading="starting"
       :title="t('alerts.incidents.aiAnalysis.analyzeTooltip')"
       data-test="incident-ai-analysis-analyze-btn"
@@ -36,16 +36,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OButton>
     <template v-else>
       <OBadge
-        :variant="RCA_BADGE_VARIANT[model.tone]"
-        size="sm"
-        clickable
+        :tone="RCA_BADGE_VARIANT[model.tone]"
+        toggle
         :aria-describedby="model.detail || model.rerunNote ? detailId : undefined"
         :data-tone="model.tone"
         data-test="incident-ai-analysis-label"
         @click.stop="emit('open')"
       >
         <template v-if="model.spinner" #icon>
-          <OSpinner size="xs" data-test="incident-ai-analysis-spinner" />
+          <OSpinner data-test="incident-ai-analysis-spinner" />
         </template>
         <template v-else-if="model.locked" #icon>
           <OIcon name="lock" size="xs" class="lock-chip" data-test="incident-ai-analysis-lock" />
@@ -70,9 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OButton
         v-if="model.showAnalyzeOnHover"
-        variant="ghost-primary"
-        size="xs"
-        icon-left="auto-awesome"
+        variant="accent-ghost"
+        size="sm"
+        icon="auto-awesome"
         class="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
         :loading="starting"
         :title="t('alerts.incidents.aiAnalysis.analyzeTooltip')"

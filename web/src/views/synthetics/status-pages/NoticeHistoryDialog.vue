@@ -23,18 +23,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="md"
     :title="t('statusPages.notices.title', { name: pageName })"
-    :secondary-button-label="t('common.close')"
+    :secondary="{ label: t('common.close') }"
     data-test="status-page-notice-history-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
   >
     <div class="flex flex-col gap-3">
-      <div v-if="loading" class="flex justify-center py-8">
-        <OSpinner />
+      <div v-if="loading" class="flex flex-col gap-2">
+        <OSkeleton v-for="row in 3" :key="row" shape="block" class="h-20" />
       </div>
-      <p v-else-if="notices.length === 0" class="text-text-secondary py-8 text-center text-sm">
-        {{ t("statusPages.notices.empty") }}
-      </p>
+      <OEmptyState
+        v-else-if="notices.length === 0"
+        size="compact"
+        :title="t('statusPages.notices.empty')"
+      />
       <div
         v-for="notice in notices"
         v-else
@@ -44,15 +46,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="flex items-start justify-between gap-2">
           <div class="flex flex-wrap items-center gap-2">
-            <OBadge :variant="impactBadge(notice.impact).variant" size="sm">
+            <OBadge :tone="impactBadge(notice.impact).variant" size="sm">
               {{ t(impactBadge(notice.impact).labelKey) }}
             </OBadge>
-            <OBadge :variant="noticeStateBadge(notice.state).variant" size="sm">
+            <OBadge :tone="noticeStateBadge(notice.state).variant" size="sm">
               {{ t(noticeStateBadge(notice.state).labelKey) }}
             </OBadge>
             <OBadge
               v-if="notice.false_alarm"
-              variant="default-soft"
+              tone="neutral"
               size="sm"
               :data-test="`status-page-notice-false-alarm-${notice.id}`"
             >
@@ -69,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="canMarkFalseAlarm(notice)"
               variant="ghost"
-              size="xs"
+              size="sm"
               :data-test="`status-page-notice-mark-false-alarm-${notice.id}`"
               @click="startFalseAlarm(notice)"
             >
@@ -78,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="notice.false_alarm"
               variant="ghost"
-              size="xs"
+              size="sm"
               :loading="busyId === notice.id"
               :data-test="`status-page-notice-undo-false-alarm-${notice.id}`"
               @click="undoFalseAlarm(notice)"
@@ -86,9 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("statusPages.notices.falseAlarm.undo") }}
             </OButton>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs"
-              icon-left="delete"
+              icon="delete"
               :data-test="`status-page-notice-delete-${notice.id}`"
               @click="confirmDelete(notice)"
             >
@@ -126,12 +128,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`status-page-notice-false-alarm-reason-${notice.id}`"
           />
           <div class="flex justify-end gap-2">
-            <OButton variant="outline" size="sm-action" @click="falseAlarmFor = null">
+            <OButton variant="secondary" @click="falseAlarmFor = null">
               {{ t("common.cancel") }}
             </OButton>
             <OButton
               variant="primary"
-              size="sm-action"
               :disabled="!falseAlarmReason.trim()"
               :loading="busyId === notice.id"
               :data-test="`status-page-notice-false-alarm-confirm-${notice.id}`"
@@ -151,17 +152,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               v-for="name in affectedNames(notice)"
               :key="name"
-              size="xs"
-              shape="rounded"
-              variant="default-soft"
+              size="sm"
+              tone="neutral"
               :label="raw(name)"
             />
           </template>
           <OTag
             v-else
-            size="xs"
-            shape="rounded"
-            variant="default-soft"
+            size="sm"
+            tone="neutral"
             :label="
               notice.component_ids.length
                 ? t('statusPages.notices.componentsUnavailable')
@@ -202,7 +201,8 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
@@ -347,7 +347,7 @@ async function confirmDelete(notice: StatusPageNotice) {
     title: t("statusPages.notices.deleteTitle"),
     messageKeypath: "statusPages.notices.deleteBody",
     messageName: notice.title,
-    confirmVariant: "destructive",
+    kind: "destructive",
   });
   if (!ok) return;
   const dismiss = toast({

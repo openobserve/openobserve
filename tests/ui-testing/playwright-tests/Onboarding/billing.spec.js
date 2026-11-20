@@ -71,7 +71,7 @@ test.describe('Billing landing and trial strip', () => {
         await openBillingFromRail(page);
 
         const strip = page.locator('[data-test="trial-period-container"]');
-        await expect(strip).toHaveAttribute('data-tone', 'warning');
+        await expect(strip).toHaveAttribute('data-tone', 'warn');
         await expect(strip).toContainText('2 days left');
     });
 
@@ -83,7 +83,7 @@ test.describe('Billing landing and trial strip', () => {
         await page.goto(`${baseUrl()}/web/billings/plans?org_identifier=${orgId}`);
 
         const strip = page.locator('[data-test="trial-period-container"]');
-        await expect(strip).toHaveAttribute('data-tone', 'warning');
+        await expect(strip).toHaveAttribute('data-tone', 'warn');
         await expect(strip).toContainText('ended');
     });
 

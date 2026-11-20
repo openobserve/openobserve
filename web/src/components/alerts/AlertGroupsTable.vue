@@ -31,10 +31,8 @@
     :columns="columns"
     row-key="group_key"
     :loading="loading"
-    :frame="false"
     :page-size="25"
     :page-size-options="[25, 50, 100]"
-    :show-global-filter="false"
     :persist-columns="true"
     table-id="alert-groups"
     :column-visibility="defaultColumnVisibility"
@@ -47,23 +45,18 @@
           v-model="search"
           class="flex-1"
           :placeholder="t('alerts.groups.searchPlaceholder')"
-          clearable
           data-test="alerts-alertgroupstable-search"
         />
       </div>
     </template>
 
     <template #toolbar-trailing>
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
+      <ORefreshButton
+        :last-run-at="lastRunAt"
         :loading="loading"
         data-test="alerts-alertgroupstable-refresh"
         @click="emit('refresh')"
-      >
-        <OTooltip side="bottom" :content="t('alerts.groups.refresh')" />
-      </OButton>
+      />
     </template>
 
     <template #cell-level="{ row }">
@@ -152,9 +145,9 @@
     <template #cell-actions="{ row }">
       <div class="flex items-center">
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="history"
+          icon="history"
           :data-test="`alerts-alertgroupstable-history-${row.group_key}`"
           @click.stop="emit('show-history', row)"
         >
@@ -163,9 +156,9 @@
         <ODropdown align="end">
           <template #trigger>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
-              icon-left="more-vert"
+              icon="more-vert"
               :aria-label="t('alerts.groupActions.menu')"
               :data-test="`alerts-alertgroupstable-menu-${row.group_key}`"
               @click.stop
@@ -173,7 +166,7 @@
           </template>
           <ODropdownItem
             v-if="canAcknowledge(row)"
-            icon-left="check"
+            icon="check"
             :data-test="`alerts-alertgroupstable-ack-${row.group_key}`"
             @select="onAcknowledge(row)"
           >
@@ -181,7 +174,7 @@
           </ODropdownItem>
           <template v-if="row.ack">
             <ODropdownItem
-              icon-left="person"
+              icon="person"
               :data-test="`alerts-alertgroupstable-unack-${row.group_key}`"
               @select="onUnack(row)"
             >
@@ -189,7 +182,7 @@
             </ODropdownItem>
             <ODropdownItem
               v-if="row.ack.acked_by !== actions.me.value"
-              icon-left="person"
+              icon="person"
               :data-test="`alerts-alertgroupstable-take-over-${row.group_key}`"
               @select="onTakeOver(row)"
             >
@@ -222,7 +215,7 @@
           </template>
           <ODropdownSeparator />
           <ODropdownItem
-            icon-left="history"
+            icon="history"
             :data-test="`alerts-alertgroupstable-menu-history-${row.group_key}`"
             @select="emit('show-history', row)"
           >
@@ -235,17 +228,17 @@
     <template #empty>
       <OEmptyState
         v-if="!loading && loadError"
-        size="hero"
-        preset="load-error"
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="t('emptyState.loadError.description')"
         data-test="alerts-alertgroupstable-load-error"
         @action="emit('refresh')"
       />
       <OEmptyState
         v-else-if="!loading"
-        size="hero"
+        :kind="search ? 'filtered' : 'first-run'"
         :title="t('alerts.groups.emptyTitle')"
-        :description="t('alerts.groups.emptyDescription')"
-        :filtered="!!search"
+        :text="t('alerts.groups.emptyDescription')"
         data-test="alerts-alertgroupstable-empty"
         @action="onEmptyAction"
       />
@@ -286,6 +279,7 @@ import {
 } from "@/utils/downtimes/quickMute";
 import { formatInZone } from "@/utils/oncall";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -308,6 +302,8 @@ const props = withDefaults(
   defineProps<{
     groups: AlertGroup[];
     loading?: boolean;
+    /** Epoch-ms of the last successful load, shown as the refresh age. */
+    lastRunAt?: number | null;
     loadError?: boolean;
     alertId?: string;
     alertName?: string;
@@ -318,6 +314,7 @@ const props = withDefaults(
   }>(),
   {
     loading: false,
+    lastRunAt: null,
     loadError: false,
     alertId: "",
     alertName: "",
@@ -460,8 +457,8 @@ const rows = computed<AlertGroup[]>(() => {
   return props.groups.filter((g) => (g.group_labels || "").toLowerCase().includes(term));
 });
 
-const onEmptyAction = (id?: string) => {
-  if (id === "clear-filters") search.value = "";
+const onEmptyAction = () => {
+  search.value = "";
 };
 
 // The label pairs hold no separators in their text, so the cut-cell tooltip spells them out.

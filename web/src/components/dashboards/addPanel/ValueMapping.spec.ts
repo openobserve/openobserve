@@ -120,22 +120,22 @@ describe("ValueMapping", () => {
   });
 
   describe("Button Label Logic", () => {
-    it("should show 'Add Value Mapping' when no mappings exist", () => {
+    it("should show 'Add value mapping' when no mappings exist", () => {
       mockDashboardPanelData.data.config.mappings = [];
       wrapper = createWrapper();
 
       const button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
-      expect(button.text().trim()).toBe("Add Value Mapping");
+      expect(button.text().trim()).toBe("Add value mapping");
     });
 
-    it("should show 'Edit Value Mapping' when mappings exist", () => {
+    it("should show 'Edit value mapping' when mappings exist", () => {
       mockDashboardPanelData.data.config.mappings = [
         { value: "1", text: "Active", color: "green" },
       ];
       wrapper = createWrapper();
 
       const button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
-      expect(button.text().trim()).toBe("Edit Value Mapping");
+      expect(button.text().trim()).toBe("Edit value mapping");
     });
 
     it("should handle button label based on mappings state", () => {
@@ -144,7 +144,7 @@ describe("ValueMapping", () => {
       wrapper = createWrapper();
 
       let button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
-      expect(button.text().trim()).toBe("Add Value Mapping");
+      expect(button.text().trim()).toBe("Add value mapping");
 
       // Test with non-empty mappings
       wrapper.unmount();
@@ -152,7 +152,7 @@ describe("ValueMapping", () => {
       wrapper = createWrapper();
 
       button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
-      expect(button.text().trim()).toBe("Edit Value Mapping");
+      expect(button.text().trim()).toBe("Edit value mapping");
     });
   });
 
@@ -423,7 +423,7 @@ describe("ValueMapping", () => {
       wrapper = createWrapper();
 
       let button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
-      expect(button.text().trim()).toBe("Add Value Mapping");
+      expect(button.text().trim()).toBe("Add value mapping");
 
       // Save new mappings
       wrapper.vm.saveValueMappingConfig([{ value: "1", text: "Test" }]);
@@ -437,7 +437,7 @@ describe("ValueMapping", () => {
       wrapper = createWrapper();
 
       let button = wrapper.find('[data-test="dashboard-addpanel-config-value-mapping-add-btn"]');
-      expect(button.text().trim()).toBe("Edit Value Mapping");
+      expect(button.text().trim()).toBe("Edit value mapping");
 
       // Clear mappings
       wrapper.vm.saveValueMappingConfig([]);

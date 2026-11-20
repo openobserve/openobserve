@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="query-plan-analyze-running"
   >
     <h3 class="text-text-heading m-0 flex items-center gap-2.5 text-lg font-semibold">
-      <OSpinner size="sm" />
+      <OSpinner size="lg" />
       {{
         rerun
           ? t("search.queryProfile.rerunningTitle", { command })
@@ -29,26 +29,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </h3>
     <div class="flex flex-wrap items-baseline gap-2.5">
       <span
-        class="text-text-heading font-mono text-3xl font-semibold tabular-nums"
+        class="text-text-heading font-mono text-2xl font-semibold tabular-nums"
         data-test="query-plan-analyze-elapsed"
         >{{ elapsed }}</span
       >
       <span class="text-text-secondary text-xs">{{ elapsedNote }}</span>
     </div>
-    <OProgressBar
-      :value="0"
-      indeterminate
-      size="xs"
-      :aria-label="t('search.queryProfile.runningAria')"
-    />
+    <OProgressBar :value="null" :label="t('search.queryProfile.runningAria')" />
     <p class="text-text-secondary m-0 text-sm leading-relaxed">
       {{ rerun ? t("search.queryProfile.rerunNote") : t("search.queryProfile.runningNote") }}
     </p>
     <div>
       <OButton
-        variant="outline-destructive"
-        size="sm"
-        icon-left="stop-circle"
+        variant="danger-ghost"
+        icon="stop-circle"
         data-test="query-plan-analyze-cancel"
         @click="emit('cancel')"
         >{{ t("common.cancel") }}</OButton

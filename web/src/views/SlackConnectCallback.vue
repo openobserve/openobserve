@@ -22,7 +22,7 @@ import SlackLinkCard from "@/components/slack/SlackLinkCard.vue";
 import { useSlackLinkOrg } from "@/composables/slack/useSlackLinkOrg";
 import { ensureBrowserRum } from "@/utils/rum/ensureBrowserRum";
 import OButton from "@/lib/core/Button/OButton.vue";
-import type { IllustrationName } from "@/lib/core/EmptyState/illustrations";
+import type { EmptyStateKind } from "@/lib/core/EmptyState/OEmptyState.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { confirmConnectionMutation } from "@/services/slack.queries";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -36,7 +36,7 @@ interface Refused {
 }
 
 interface Outcome extends Refused {
-  illustration: IllustrationName;
+  kind: EmptyStateKind;
   dataTest: string;
   refused: boolean;
 }
@@ -97,7 +97,7 @@ const confirmHere = async (code: string, state: string): Promise<void> => {
 const outcome = computed<Outcome | null>(() => {
   if (result.value && "test" in result.value) {
     return {
-      illustration: "check",
+      kind: "first-run",
       title: t("slackApp.connectCallback.testTitle"),
       detail: t("slackApp.connectCallback.testDetail"),
       dataTest: "slack-connect-callback-test",
@@ -106,7 +106,7 @@ const outcome = computed<Outcome | null>(() => {
   }
   if (result.value) {
     return {
-      illustration: "check",
+      kind: "first-run",
       title: t("slackApp.connectCallback.connectedTitle"),
       detail: t("slackApp.connectCallback.connectedDetail"),
       dataTest: "slack-connect-callback-connected",
@@ -115,7 +115,7 @@ const outcome = computed<Outcome | null>(() => {
   }
   if (refused.value) {
     return {
-      illustration: "broken-panel",
+      kind: "error",
       ...refused.value,
       dataTest: "slack-connect-callback-refused",
       refused: true,
@@ -171,15 +171,15 @@ onMounted(() => {
     <div class="py-6">
       <SlackLinkCard
         v-if="outcome"
-        :illustration="outcome.illustration"
+        :kind="outcome.kind"
+        :icon="outcome.refused ? undefined : 'task-alt'"
         :title="outcome.title"
         :description="outcome.detail"
         :data-test="outcome.dataTest"
       >
         <template #actions>
           <OButton
-            :variant="outcome.refused ? 'outline' : 'primary'"
-            size="sm-action"
+            :variant="outcome.refused ? 'secondary' : 'primary'"
             data-test="slack-connect-callback-settings"
             @click="openSettings"
           >

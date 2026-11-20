@@ -146,9 +146,9 @@ function handleClick(): void {
 const indicatorClasses = computed<string>(() => {
   const base = [
     "flex items-center justify-center",
-    "size-8 rounded-full shrink-0",
-    "text-sm font-semibold leading-none",
-    "transition-colors duration-150",
+    "size-control-md rounded-full shrink-0",
+    "text-compact font-semibold leading-none",
+    "transition-colors duration-(--duration-control) ease-(--ease-control)",
   ].join(" ");
 
   const cursor = canClick.value ? "cursor-pointer" : "cursor-default";
@@ -166,7 +166,7 @@ const indicatorClasses = computed<string>(() => {
 });
 
 const titleClasses = computed<string>(() => {
-  const base = "text-sm font-medium leading-tight";
+  const base = "text-compact font-medium leading-tight";
   if (isActive.value) return `${base} text-stepper-title-active`;
   if (props.done) return `${base} text-stepper-title-done`;
   return `${base} text-stepper-title-default`;
@@ -176,7 +176,7 @@ const triggerClasses = computed<string>(() => {
   const base = [
     "flex items-center gap-3 w-full text-start",
     "rounded-default px-1.5 py-1.5 outline-none select-none",
-    "transition-colors duration-150",
+    "transition-colors duration-(--duration-control) ease-(--ease-control)",
   ].join(" ");
   if (canClick.value) {
     return [

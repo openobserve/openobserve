@@ -84,40 +84,30 @@ function onKeydown(event: KeyboardEvent) {
       :disabled="props.disabled"
       :required="props.required"
       :autofocus="props.autofocus"
-      :autogrow="props.autogrow"
       :maxlength="props.maxlength"
       :min="props.min"
       :max="props.max"
       :step="props.step"
-      :rows="props.rows"
       :size="props.size"
       :id="props.id"
       :name="props.name"
       :autocomplete="props.autocomplete"
       :width="props.width"
-      :label-position="props.labelPosition"
+      :icon="props.icon"
+      :mono="props.mono"
       @update:model-value="onUpdate"
       @focus="onFocus"
       @blur="onBlur"
       @keydown="onKeydown"
     >
-      <template v-if="$slots['icon-left']" #icon-left>
-        <slot name="icon-left" />
+      <template v-if="$slots.icon" #icon>
+        <slot name="icon" />
       </template>
-      <template v-if="$slots['icon-right']" #icon-right>
-        <slot name="icon-right" />
-      </template>
-      <template v-if="$slots.prefix" #prefix>
-        <slot name="prefix" />
-      </template>
-      <template v-if="$slots.suffix" #suffix>
-        <slot name="suffix" />
+      <template v-if="$slots['icon-end']" #icon-end>
+        <slot name="icon-end" />
       </template>
       <template v-if="$slots.tooltip" #tooltip>
         <slot name="tooltip" />
-      </template>
-      <template v-if="$slots.append" #append>
-        <slot name="append" />
       </template>
     </OInput>
 

@@ -32,7 +32,7 @@ import { failedRequests, viewDenial } from "@/composables/useAccessStore";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import SecurityEventsSources from "@/components/security/events/SecurityEventsSources.vue";
 import SecurityEventsDetected from "@/components/security/events/SecurityEventsDetected.vue";
 import SecurityEventsFilterBar from "@/components/security/events/SecurityEventsFilterBar.vue";
@@ -1123,6 +1123,10 @@ function onHuntQuery(q: HuntQuery) {
   if (mountComplete) syncUrl();
 }
 
+function openSources() {
+  router.push({ path: "/security/sources", query: { org_identifier: orgId.value } });
+}
+
 function openFromHunt(stream: string, ts: number) {
   huntJump = { stream, ts };
   selectedStream.value = stream;
@@ -1289,9 +1293,8 @@ function widenTo(period: string) {
 
 <template>
   <OPageLayout
-    :title="t('siem.events.title')"
-    :subtitle="t('siem.events.subtitle')"
-    icon="manage-search"
+    :title="t('siem.nav.events')"
+    :about="t('siem.events.subtitle')"
     bleed
     resizable
     v-model:sidebar-width="sidebarWidth"
@@ -1300,7 +1303,7 @@ function widenTo(period: string) {
   >
     <template #actions>
       <div class="flex items-center gap-2">
-        <DateTime
+        <ODateTimeRange
           :key="dateKey"
           :default-type="dateState.type"
           :default-relative-time="dateState.period || '15m'"
@@ -1311,9 +1314,8 @@ function widenTo(period: string) {
         />
         <OButton
           v-if="loading || histogramLoading || huntLoading"
-          variant="outline-destructive"
-          size="sm"
-          icon-left="close"
+          variant="danger-ghost"
+          icon="close"
           data-test="security-events-cancel"
           @click="cancelSearch()"
         >
@@ -1322,8 +1324,7 @@ function widenTo(period: string) {
         <OButton
           v-else
           variant="primary"
-          size="sm"
-          icon-left="play-arrow"
+          icon="play-arrow"
           data-test="security-events-run"
           @click="runSearch({ userRun: true })"
         >
@@ -1336,9 +1337,9 @@ function widenTo(period: string) {
       <div class="px-page-edge flex flex-col gap-2 py-2" data-test="security-events-query-bar">
         <div class="flex flex-wrap items-center gap-2">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            :icon-left="sidebarWidth > 0 ? 'left-panel-close' : 'left-panel-open'"
+            :icon="sidebarWidth > 0 ? 'left-panel-close' : 'left-panel-open'"
             data-test="security-events-toggle-sidebar"
             @click="toggleSidebar"
           >
@@ -1369,19 +1370,14 @@ function widenTo(period: string) {
           >
             <OToggleGroupItem
               value="builder"
-              size="sm"
               icon-left="filter-list"
               data-test="security-events-mode-builder"
             >
               {{ t("siem.events.builder") }}
             </OToggleGroupItem>
-            <OToggleGroupItem
-              value="sql"
-              size="sm"
-              icon-left="code"
-              data-test="security-events-mode-sql"
-              >{{ t("siem.events.sql") }}</OToggleGroupItem
-            >
+            <OToggleGroupItem value="sql" icon-left="code" data-test="security-events-mode-sql">{{
+              t("siem.events.sql")
+            }}</OToggleGroupItem>
           </OToggleGroup>
 
           <SecurityEventsFilterBar
@@ -1451,11 +1447,9 @@ function widenTo(period: string) {
 
         <template #field-actions="{ row }">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs"
-            :icon-left="
-              showRaw && visibleCols.includes(row.name) ? 'visibility-off' : 'view-column'
-            "
+            :icon="showRaw && visibleCols.includes(row.name) ? 'visibility-off' : 'view-column'"
             :data-test="`security-events-field-column-${row.name}`"
             @click.stop="toggleCol(row.name)"
           >
@@ -1526,15 +1520,16 @@ function widenTo(period: string) {
       <SecurityAccessLock
         v-if="!selectedStream && !streamsLoading && !secSources.streamsReadable.value"
         :denials="streamDenials"
-        size="hero"
         data-test="security-events-access-lock"
       />
       <OEmptyState
         v-else-if="!selectedStream && !streamsLoading"
-        size="hero"
         icon="manage-search"
         :title="t('siem.events.noStreamTitle')"
-        :description="t('siem.events.noStreamHint')"
+        :text="t('siem.events.noStreamHint')"
+        :action-label="t('siem.events.openSources')"
+        data-test="security-events-no-streams"
+        @action="openSources"
       />
       <SecurityEventsHunt
         v-else-if="isHunt"
@@ -1551,7 +1546,6 @@ function widenTo(period: string) {
         v-else-if="searchDenials.length"
         :denials="searchDenials"
         :reason="raw(forbiddenReason(searchRefusal))"
-        size="hero"
         data-test="security-events-search-lock"
       />
       <SecurityEventsTable
@@ -1562,6 +1556,7 @@ function widenTo(period: string) {
         :rows="rows"
         :columns="columns"
         :loading="loading"
+        :last-run-at="lastRunAt"
         :error="errorMsg"
         :page="page"
         :page-size="pageSize"

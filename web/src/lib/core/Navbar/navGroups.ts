@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { RouteLocationNormalizedLoaded } from "vue-router";
 import type { NavItem, RailEntry, SubnavChild, NavGateContext } from "./ONavbar.types";
 import { raw, type I18nKey, type TranslateFn } from "@/types/i18n";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
@@ -558,6 +559,18 @@ export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
   ],
 };
 
+/** A nav entry whose pages carry their own section rail, so their header names the rail group (H4). */
+export interface ModuleRailDef {
+  /** The nav entry's route name; every page under its path belongs to the module. */
+  name: string;
+}
+
+export const MODULE_RAILS: ModuleRailDef[] = [
+  { name: "settings" },
+  { name: "iam" },
+  { name: "aiObservability" },
+];
+
 /**
  * Transform the flat `linksList` into rail entries, PRESERVING the input order
  * (which is the main-branch menu order — MainLayout builds it). A group's tile
@@ -689,4 +702,71 @@ export function groupNavLinks(
   }
 
   return result;
+}
+
+/**
+ * At most ONE child is active. An exact tab, route alias or route name wins outright;
+ * otherwise the DEEPEST path prefix wins, so a drill-down belongs to its own section.
+ */
+export function resolveActiveChild(
+  children: SubnavChild[],
+  route: Pick<RouteLocationNormalizedLoaded, "name" | "path" | "query">,
+  childPath: (name: string) => string | null,
+): SubnavChild | null {
+  const exactTab = children.find(
+    (c) => c.tab && route.name === c.name && route.query?.tab === c.tab,
+  );
+  if (exactTab) return exactTab;
+
+  // Checked before the prefix pass, which would hand a sibling detail route to the longest path.
+  const routeAlias = children.find((c) => c.activeOnRoutes?.includes(route.name as string));
+  if (routeAlias) return routeAlias;
+
+  const exact = children.find((c) => route.name === c.name && !c.tab);
+  if (exact) return exact;
+
+  const routeDefault = children.find((c) => c.defaultForRoute && route.name === c.name);
+  if (routeDefault) return routeDefault;
+
+  // A partial route (a spec's mock, a kept-alive view mid-teardown) may carry no path.
+  const path = route.path ?? "";
+  let best: SubnavChild | null = null;
+  let bestLen = 0;
+  for (const child of children) {
+    if (child.tab) continue;
+    const base = childPath(child.name);
+    if (!base || base === "/") continue;
+    if (path !== base && !path.startsWith(`${base}/`)) continue;
+    if (base.length > bestLen) {
+      best = child;
+      bestLen = base.length;
+    }
+  }
+  return best;
+}
+
+/** The rail group whose flyout holds the route's page; `shown` limits it to the groups the rail emits. */
+export function railGroupForRoute(
+  route: Pick<RouteLocationNormalizedLoaded, "name" | "path" | "query">,
+  childPath: (name: string) => string | null,
+  shown?: ReadonlySet<string>,
+): NavGroupDef | null {
+  for (const def of NAV_GROUPS) {
+    if (shown && !shown.has(def.key)) continue;
+    if (resolveActiveChild(def.children, route, childPath)) return def;
+  }
+  return null;
+}
+
+/** The module whose section rail holds the route's page, whichever rail the solution shows. */
+export function moduleRailForRoute(
+  route: Pick<RouteLocationNormalizedLoaded, "path">,
+  childPath: (name: string) => string | null,
+): ModuleRailDef | null {
+  const path = route.path ?? "";
+  for (const def of MODULE_RAILS) {
+    const base = childPath(def.name);
+    if (base && base !== "/" && (path === base || path.startsWith(`${base}/`))) return def;
+  }
+  return null;
 }

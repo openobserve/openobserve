@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("oncall.upcomingNobody") }}
         </OText>
         <OText variant="meta" class="ms-auto">{{ segmentRange(segment) }}</OText>
-        <OTag v-if="isCurrent(segment)" variant="success-soft" size="xs">
+        <OTag v-if="isCurrent(segment)" tone="ok" size="sm">
           {{ t("oncall.onCallNowTag") }}
         </OTag>
       </div>

@@ -513,7 +513,7 @@ function onKeydown(event: KeyboardEvent) {
             />
             <OIcon :name="data.icon" size="sm" class="text-text-secondary shrink-0" />
             <div class="min-w-0 flex-1 leading-tight">
-              <div class="text-text-heading truncate text-base leading-tight font-semibold">
+              <div class="text-text-heading truncate text-sm leading-tight font-semibold">
                 {{ raw(data.label) }}
               </div>
               <div class="text-text-secondary truncate text-sm leading-tight">
@@ -573,9 +573,9 @@ function onKeydown(event: KeyboardEvent) {
         data-test="dependency-map-zoom"
       >
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="add"
+          icon="add"
           class="rounded-none"
           :aria-label="t('fleet.flow.zoomIn')"
           data-test="dependency-map-zoom-in"
@@ -585,9 +585,9 @@ function onKeydown(event: KeyboardEvent) {
         </OButton>
         <OSeparator />
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="remove"
+          icon="remove"
           class="rounded-none"
           :aria-label="t('fleet.flow.zoomOut')"
           data-test="dependency-map-zoom-out"
@@ -597,9 +597,9 @@ function onKeydown(event: KeyboardEvent) {
         </OButton>
         <OSeparator />
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="fullscreen"
+          icon="fullscreen"
           class="rounded-none"
           :aria-label="t('fleet.flow.fitView')"
           data-test="dependency-map-fit"

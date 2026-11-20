@@ -51,18 +51,19 @@ const tooltip = computed(() => {
 
 <template>
   <span class="inline-flex items-center gap-0.5">
-    <OSpinner v-if="on && loading" size="xs" :data-test="loadingDataTest" />
+    <OSpinner v-if="on && loading" :data-test="loadingDataTest" />
     <OButton
-      :variant="on ? 'ghost-primary' : 'ghost'"
-      size="icon"
-      icon-left="account-tree"
+      icon-only
+      :variant="on ? 'accent-ghost' : 'ghost'"
+      size="xs"
+      icon="account-tree"
       :aria-pressed="String(on)"
       :aria-label="tooltip"
       :data-test="dataTest"
       :data-swaps-variant="swapsVariant || undefined"
       @click="emit('toggle')"
     >
-      <OTooltip :content="tooltip" side="bottom" align="end" />
+      <OTooltip :content="tooltip" side="bottom" />
     </OButton>
   </span>
 </template>

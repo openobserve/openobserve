@@ -4,11 +4,9 @@ export class LogsAutoRefreshPage {
   constructor(page) {
     this.page = page;
     this.trigger = '[data-test^="logs-search-bar-refresh-interval-btn"]';
-    this.panel = '[data-test="auto-refresh-panel"]';
-    this.subtitle = '[data-test="auto-refresh-subtitle"]';
+    this.panel = '[role="menu"]:has([data-test="logs-search-off-refresh-interval"])';
     this.footer = '[data-test="auto-refresh-footer"]';
-    this.offSwitch = '[data-test="logs-search-off-refresh-interval"]';
-    this.offSwitchRole = '[data-test="logs-search-off-refresh-interval"] [role="switch"]';
+    this.offItem = '[data-test="logs-search-off-refresh-interval"]';
     this.intervalOption = (secs) => `[data-test="logs-search-bar-refresh-time-${secs}"]`;
     // SearchBar.vue has no running-state data-test; the run button takes this class while a search is in flight.
     this.runInFlight = '[data-test="logs-search-bar-refresh-btn"][class*="bg-cancel-query-bg"]';
@@ -41,16 +39,16 @@ export class LogsAutoRefreshPage {
     await this.page.locator(this.intervalOption(secs)).click();
   }
 
-  async clickOffSwitch() {
-    await this.page.locator(this.offSwitch).first().click();
+  async pickOff() {
+    await this.page.locator(this.offItem).first().click();
   }
 
-  async expectSwitchChecked(checked) {
-    await expect(this.page.locator(this.offSwitchRole).first()).toHaveAttribute('aria-checked', String(checked));
+  async expectOffChecked(checked) {
+    await expect(this.page.locator(this.offItem).first()).toHaveAttribute('aria-checked', String(checked));
   }
 
-  async expectSubtitle(pattern) {
-    await expect(this.page.locator(this.subtitle)).toContainText(pattern);
+  async expectIntervalChecked(secs) {
+    await expect(this.page.locator(this.intervalOption(secs))).toHaveAttribute('aria-checked', 'true');
   }
 
   async expectFooterVisible() {

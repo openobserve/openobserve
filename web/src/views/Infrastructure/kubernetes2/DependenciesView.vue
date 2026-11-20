@@ -20,11 +20,10 @@ import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -451,16 +450,6 @@ function onSetUp() {
   router.push({ name: "ingestFromKubernetes", query: { org_identifier: props.orgId } });
 }
 
-// Clear filters here resets only the namespace filter and search, so it says so.
-const CLEAR_ACTION: EmptyStateAction[] = [
-  {
-    id: "clear-filters",
-    icon: "filter-list",
-    titleKey: "emptyState.filtered.action",
-    descriptionKey: "infra.k8s2.depsClearDescription",
-  },
-];
-
 const filtersSet = computed(() => props.state.namespaces.length > 0 || !!props.state.search);
 
 // Whether the switches, not only the namespace filter and search, keep flows off the map.
@@ -539,14 +528,12 @@ function clearFilters() {
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1" data-test="k8s2-deps-controls">
       <OSwitch
         :model-value="state.system"
-        size="sm"
         :label="t('infra.k8s2.depsShowSystem')"
         data-test="k8s2-deps-show-system"
         @update:model-value="(system: unknown) => emit('update', { system: !!system })"
       />
       <OSwitch
         :model-value="state.nodeTraffic"
-        size="sm"
         :label="t('infra.k8s2.depsShowNodeTraffic')"
         data-test="k8s2-deps-show-node-traffic"
         @update:model-value="
@@ -555,7 +542,6 @@ function clearFilters() {
       />
       <OSwitch
         :model-value="state.lowTraffic"
-        size="sm"
         :label="t('infra.k8s2.depsShowLowTraffic')"
         data-test="k8s2-deps-show-low-traffic"
         @update:model-value="(lowTraffic: unknown) => emit('update', { lowTraffic: !!lowTraffic })"
@@ -569,6 +555,7 @@ function clearFilters() {
           />
         </OText>
         <OToggleGroup
+          size="sm"
           ref="collapseModeGroup"
           :model-value="filtering ? 'expanded' : collapseMode"
           :aria-label="t('infra.k8s2.depsCollapseMode')"
@@ -581,7 +568,6 @@ function clearFilters() {
             v-for="m in COLLAPSE_MODES"
             :key="m"
             :value="m"
-            size="xs"
             :data-test="`k8s2-deps-collapse-${m}`"
           >
             {{ t(COLLAPSE_LABEL[m]) }}
@@ -600,45 +586,49 @@ function clearFilters() {
           {{ t("infra.k8s2.depsCaption", { window: windowText }) }}
         </OText>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs"
-          icon-left="info"
+          icon="info"
           :aria-label="t('infra.k8s2.depsCaptionMore')"
           data-test="k8s2-deps-caption-more"
         >
-          <OTooltip :content="t('infra.k8s2.depsCaptionMore')" max-width="20rem" />
+          <OTooltip :content="t('infra.k8s2.depsCaptionMore')" />
         </OButton>
       </div>
     </div>
     <OEmptyState
       v-if="!hasFlows"
-      preset="no-data"
       :title="t('infra.k8s2.depsNoStreamTitle')"
-      :description="t('infra.k8s2.depsNoStreamDescription', { stream: FLOW_STREAM })"
+      :text="t('infra.k8s2.depsNoStreamDescription', { stream: FLOW_STREAM })"
       :action-label="t('infra.k8s2.depsSetUp')"
       data-test="k8s2-deps-no-stream"
       @action="onSetUp"
     />
-    <OEmptyState v-else-if="forbidden" preset="no-access" data-test="k8s2-deps-forbidden" />
+    <OEmptyState
+      v-else-if="forbidden"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
+      data-test="k8s2-deps-forbidden"
+    />
     <OEmptyState
       v-else-if="loadError"
-      preset="load-error"
+      kind="error"
+      :text="t('emptyState.loadError.description')"
       :title="t('infra.k8s2.depsLoadError')"
       data-test="k8s2-deps-error"
       @action="emit('refresh')"
     />
-    <div
+    <OSkeleton
       v-else-if="!loaded"
-      class="flex min-h-60 flex-1 items-center justify-center"
+      shape="block"
+      class="min-h-60 flex-1"
       data-test="k8s2-deps-loading"
-    >
-      <OSpinner size="lg" />
-    </div>
+    />
     <OEmptyState
       v-else-if="!allEdges.length"
-      preset="no-data"
       :title="t('infra.k8s2.depsNoFlowsTitle')"
-      :description="t('infra.k8s2.depsNoFlowsDescription', { window: windowText })"
+      :text="t('infra.k8s2.depsNoFlowsDescription', { window: windowText })"
       :action-label="t('infra.k8s2.depsSetUp')"
       data-test="k8s2-deps-no-flows"
       @action="onSetUp"
@@ -646,10 +636,9 @@ function clearFilters() {
     <!-- The switches hide what the namespace filter and search let through: turning them on shows it. -->
     <OEmptyState
       v-else-if="!graph.edges.length && switchesHide"
-      variant="no-results"
-      illustration="no-results"
+      kind="filtered"
       :title="t('infra.k8s2.depsNoMatch')"
-      :description="t('infra.k8s2.depsHiddenBySwitches')"
+      :text="t('infra.k8s2.depsHiddenBySwitches')"
       :action-label="t('infra.k8s2.depsShowAll')"
       :secondary-action-label="filtersSet ? t('emptyState.filtered.action') : undefined"
       data-test="k8s2-deps-empty"
@@ -658,11 +647,9 @@ function clearFilters() {
     />
     <OEmptyState
       v-else-if="!graph.edges.length"
-      variant="no-results"
-      illustration="no-results"
+      kind="filtered"
       :title="t('infra.k8s2.depsNoMatch')"
-      :description="t('infra.k8s2.depsNoMatchDescription')"
-      :actions="CLEAR_ACTION"
+      :text="t('infra.k8s2.depsNoMatchDescription')"
       data-test="k8s2-deps-empty"
       @action="clearFilters"
     />
@@ -694,9 +681,9 @@ function clearFilters() {
         <OButton
           v-for="id in expandedList"
           :key="id"
-          variant="outline"
-          size="xs"
-          icon-left="close"
+          variant="secondary"
+          size="sm"
+          icon="close"
           :data-ns-id="id"
           data-test="k8s2-deps-group-collapse"
           @click="toggleNamespace(id)"
@@ -718,8 +705,8 @@ function clearFilters() {
             <OButton
               v-for="edge in navEdges"
               :key="edge.id"
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               data-test="k8s2-deps-link"
               @click="showEdge(edge.id, $event)"
             >
@@ -748,8 +735,8 @@ function clearFilters() {
         >
           <div class="flex items-center gap-1">
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :disabled="!canOpen(selectedEdge.source)"
               data-test="k8s2-deps-edge-source"
               @click="openEnd(selectedEdge.source)"
@@ -758,8 +745,8 @@ function clearFilters() {
             </OButton>
             <OText tag="span" class="text-text-secondary">{{ raw(arrowOf(selectedEdge)) }}</OText>
             <OButton
-              variant="ghost-primary"
-              size="xs"
+              variant="accent-ghost"
+              size="sm"
               :disabled="!canOpen(selectedEdge.target)"
               data-test="k8s2-deps-edge-target"
               @click="openEnd(selectedEdge.target)"
@@ -767,10 +754,10 @@ function clearFilters() {
               {{ raw(endLabel(selectedEdge.target)) }}
             </OButton>
             <OButton
+              icon-only
               class="ms-auto"
               variant="ghost"
-              size="icon-sm"
-              icon-left="close"
+              icon="close"
               :aria-label="t('common.close')"
               data-test="k8s2-deps-edge-close"
               @click="closeEdge"

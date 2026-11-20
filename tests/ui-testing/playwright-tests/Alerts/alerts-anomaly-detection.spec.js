@@ -22,7 +22,7 @@ const { TIME_SHIFT_METRIC, seedTimeShiftMetric } = require('../utils/metrics-exp
 const { listAnomalyDetections, triggerAnomalyDetection, getAnomalyHistory, deleteDestination, deleteTemplate, createAnomalyViaApi, waitForAnomalyListed, createMockDestination, destinationExists, searchSql, seedAnomalyStream, waitForStream,
   triggerAnomalyTraining, waitForAnomalyTrained } = require('../utils/api-helper.js');
 
-test.describe('Anomaly Detection', () => {
+test.describe('Anomaly detection', () => {
   let pm;
   // One value per run so the lifecycle chain can hand names between tests.
   // Timestamp ALONE is not unique per worker: workers start within the same

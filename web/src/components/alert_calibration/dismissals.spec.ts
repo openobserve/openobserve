@@ -144,15 +144,7 @@ describe("dismissals", () => {
       }),
     );
     const notices = errors.map((error) => copy.writeError(error));
-    expect(notices.map((n) => n.variant)).toEqual([
-      "error",
-      "error",
-      "warning",
-      "error",
-      "error",
-      "error",
-      "error",
-    ]);
+    expect(notices.map((n) => n.tone)).toEqual(["err", "err", "warn", "err", "err", "err", "err"]);
     expect(notices.map((n) => n.text)).toEqual([
       t("alertCalibration.dismiss.error.denied"),
       t("alertCalibration.dismiss.error.gone"),

@@ -42,10 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data="covers"
       :columns="columns"
       row-key="id"
-      :frame="false"
       :loading-reset-key="teamId"
       pagination="client"
-      :show-global-filter="false"
       :column-visibility="{ reason: false }"
       :persist-columns="true"
       table-id="oncall-team-covers"
@@ -78,9 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <div class="flex items-center justify-end">
           <OButton
-            variant="ghost-destructive"
-            size="icon-xs-sq"
-            icon-left="delete-outline"
+            icon-only
+            variant="danger-ghost"
+            size="sm"
+            icon="delete-outline"
             :aria-label="t('oncall.coverRemove')"
             :data-test="`oncall-cover-remove-${row.id}`"
             @click.stop="openRemove(row)"
@@ -96,10 +95,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="!!toRemove"
     :title="t('oncall.coverRemoveTitle')"
-    :primary-button-label="t('oncall.coverRemove')"
-    :secondary-button-label="t('oncall.cancel')"
-    primary-button-variant="destructive"
-    :primary-button-loading="removing"
+    :primary="{ label: t('oncall.coverRemove'), variant: 'danger', loading: removing }"
+    :secondary="{ label: t('oncall.cancel') }"
     data-test="oncall-cover-remove-dialog"
     @update:open="(v: boolean) => !v && (toRemove = null)"
     @click:primary="removeCover"

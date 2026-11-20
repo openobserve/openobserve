@@ -103,6 +103,8 @@ const OTableStub = {
     data: { default: () => [] },
     columns: { default: () => [] },
     loading: { default: false },
+    rowActions: { default: () => [] },
+    rowMenu: { default: () => [] },
     selectedIds: { default: () => [] },
     selection: { default: "none" },
   },
@@ -113,6 +115,9 @@ const OTableStub = {
     },
     methodOf(row: any) {
       return cellValue(this.columns, "method", row);
+    },
+    testOf(item: any, row: any) {
+      return typeof item.dataTest === "function" ? item.dataTest(row, 0) : item.dataTest;
     },
   },
   template: `
@@ -131,6 +136,19 @@ const OTableStub = {
         </div>
         <slot name="cell-type" :row="row" />
         <slot name="cell-actions" :row="row" />
+        <button
+          v-for="action in rowActions"
+          :key="action.id"
+          :data-test="testOf(action, row)"
+          @click="action.onClick(row)"
+        />
+        <button
+          v-for="item in rowMenu"
+          :key="item.id"
+          :data-test="testOf(item, row)"
+          :data-destructive="item.destructive ? 'true' : undefined"
+          @click="item.onSelect(row)"
+        />
       </template>
     </div>
   `,
@@ -138,7 +156,7 @@ const OTableStub = {
 
 const ConfirmDialogStub = {
   name: "ConfirmDialog",
-  props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
+  props: ["modelValue", "title", "message", "messageKeypath", "messageName", "kind"],
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: '<div data-test="confirm-dialog-stub" :data-open="modelValue" />',
 };
@@ -416,6 +434,27 @@ describe("AlertsDestinationList", () => {
   // ── delete flow ────────────────────────────────────────────────────────────
 
   describe("delete destination", () => {
+    it("keeps Export and Edit inline and puts Delete last in the row's ⋯ menu (B7, R9)", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("rowActions").map((a: any) => a.id)).toEqual(["export", "edit"]);
+      const menu = table.props("rowMenu");
+      expect(menu.map((m: any) => m.id)).toEqual(["delete"]);
+      expect(menu[0].destructive).toBe(true);
+      expect(wrapper.vm.columns.some((c: any) => c.id === "actions")).toBe(false);
+    });
+
+    it("opens the confirm naming the destination from the row menu (V8)", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const dest = (wrapper.vm as any).destinations[0];
+      await wrapper
+        .get(`[data-test="alert-destination-list-${dest.name}-delete-destination"]`)
+        .trigger("click");
+      expect((wrapper.vm as any).confirmDelete.data.name).toBe(dest.name);
+    });
+
     it("sets confirmDelete.visible to true when conformDeleteDestination is called", async () => {
       wrapper = mountComponent();
       await flushPromises();
@@ -432,7 +471,7 @@ describe("AlertsDestinationList", () => {
           (c: any) => c.props("messageKeypath") === "alert_destinations.deleteDestinationMessage",
         );
       expect(dialog!.props("messageName")).toBe(dest.name);
-      expect(dialog!.props("okVariant")).toBe("destructive");
+      expect(dialog!.props("kind")).toBe("destructive");
     });
 
     it("calls destinationService.delete with correct args on deleteDestination()", async () => {
@@ -609,7 +648,7 @@ describe("AlertsDestinationList", () => {
           (c: any) =>
             c.props("title") === i18n.global.t("alert_destinations.deleteDestinationsTitle"),
         );
-      expect(dialog!.props("okVariant")).toBe("destructive");
+      expect(dialog!.props("kind")).toBe("destructive");
     });
   });
 
@@ -693,7 +732,7 @@ describe("AlertsDestinationList", () => {
     it("labels the column URL / Recipients, not URL", () => {
       const table = wrapper!.findComponent({ name: "OTable" });
       const urlCol = table.props("columns").find((c: any) => c.id === "url");
-      expect(urlCol?.header).toBe("URL / Recipients");
+      expect(urlCol?.header).toBe("URL / recipients");
     });
   });
 

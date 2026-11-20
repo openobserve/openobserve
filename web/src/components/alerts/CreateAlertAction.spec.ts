@@ -36,17 +36,17 @@ const DropdownItemStub = {
   name: "ODropdownItem",
   props: {
     disabled: Boolean,
-    iconLeft: String,
+    icon: String,
     description: String,
-    focusableUnavailable: Boolean,
+    disabledReason: String,
   },
   emits: ["select"],
-  template: `<div class="menu-item-stub" @click="$emit('select')"><slot /><span v-if="description">{{ description }}</span></div>`,
+  template: `<div class="menu-item-stub" @click="$emit('select')"><slot /><span v-if="disabled ? disabledReason || description : description">{{ disabled ? disabledReason || description : description }}</span></div>`,
 };
 
 const ButtonStub = {
   name: "OButton",
-  props: ["disabled", "variant", "iconLeft"],
+  props: ["disabled", "variant", "icon", "disabledReason", "label"],
   emits: ["click"],
   template: `<button :disabled="disabled" @click="$emit('click')"><slot /></button>`,
 };
@@ -114,7 +114,7 @@ describe("CreateAlertAction", () => {
   it("renders a toolbar button that keeps its name when the label hides on a phone", () => {
     wrapper = mountAction({ variant: "toolbar", source: "explorer" });
     const button = wrapper.findComponent({ name: "OButton" });
-    expect(button.props("variant")).toBe("outline");
+    expect(button.props("variant")).toBe("secondary");
     expect(button.attributes("aria-label")).toBe("Add alert");
     expect(button.find("span.max-md\\:hidden").text()).toBe("Add alert");
   });
@@ -218,7 +218,9 @@ describe("CreateAlertAction", () => {
       const build = vi.fn(prefill);
       wrapper = mountAction({ source, disabledReason: "Select a stream first" }, build);
       expect(wrapper.text()).toContain("Select a stream first");
-      expect(wrapper.findComponent(DropdownItemStub).props("focusableUnavailable")).toBe(true);
+      expect(wrapper.findComponent(DropdownItemStub).props("disabledReason")).toBe(
+        "Select a stream first",
+      );
       await wrapper.find(".menu-item-stub").trigger("click");
       expect(build).not.toHaveBeenCalled();
     },
@@ -230,7 +232,7 @@ describe("CreateAlertAction", () => {
       const build = vi.fn(prefill);
       wrapper = mountAction({ variant, disabledReason: "Select a stream first" }, build);
       expect(wrapper.findComponent(ButtonStub).props("disabled")).toBe(true);
-      expect(wrapper.findComponent({ name: "OTooltip" }).props("content")).toBe(
+      expect(wrapper.findComponent(ButtonStub).props("disabledReason")).toBe(
         "Select a stream first",
       );
       await wrapper.findComponent(ButtonStub).trigger("click");
@@ -248,7 +250,7 @@ describe("CreateAlertAction", () => {
         global: { plugins: [i18n], stubs: { ...stubs, OButton: false } },
       });
       const button = wrapper.get("button");
-      expect(wrapper.findComponent(OButton).props("focusableUnavailable")).toBe(true);
+      expect(wrapper.findComponent(OButton).props("disabledReason")).toBe("Select a stream first");
       expect(button.attributes("disabled")).toBeUndefined();
       expect(button.attributes("aria-disabled")).toBe("true");
       const reason = wrapper.get(".sr-only");
@@ -294,7 +296,7 @@ describe("CreateAlertAction", () => {
       name: "ODropdownItem",
       props: ["disabled"],
       emits: ["select"],
-      template: `<div class="menu-item-stub"><slot name="icon-left" /><slot /></div>`,
+      template: `<div class="menu-item-stub"><slot name="icon" /><slot /></div>`,
     };
 
     it("renders a default icon when the host supplies none", () => {
@@ -354,7 +356,7 @@ describe("CreateAlertAction", () => {
         expect(tooltip.props("content")).toBe("Locked: needs Alerts");
         const button = tooltip.find("span.inline-flex").findComponent({ name: "OButton" });
         expect(button.find("button").attributes("disabled")).toBeDefined();
-        expect(button.props("iconLeft")).toBe("lock");
+        expect(button.props("icon")).toBe("lock");
       },
     );
 
@@ -370,14 +372,14 @@ describe("CreateAlertAction", () => {
       wrapper = mountWithFeatures({ alerts: "locked" }, { variant: "menu-item" });
       const item = wrapper.findComponent(DropdownItemStub);
       expect(item.props("disabled")).toBe(true);
-      expect(item.props("description")).toBe("Locked: needs Alerts");
+      expect(item.props("disabledReason")).toBe("Locked: needs Alerts");
     });
 
     it("is unchanged while alerts is enabled", async () => {
       wrapper = mountWithFeatures({ alerts: "enabled" });
       const button = wrapper.findComponent({ name: "OButton" });
       expect(button.props("disabled")).toBe(false);
-      expect(button.props("iconLeft")).not.toBe("lock");
+      expect(button.props("icon")).not.toBe("lock");
       await wrapper.find("button").trigger("click");
       expect(alertCreationDialog.value).not.toBeNull();
     });

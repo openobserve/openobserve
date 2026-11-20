@@ -16,12 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <OPageLayout
-    :title="t('settings.nodes')"
-    icon="hub"
-    :subtitle="t('settings.nodesPage.subtitle')"
-    bleed
-  >
+  <OPageLayout :title="t('settings.nodes')" bleed>
     <OSplitter
       :model-value="splitterModel"
       @update:model-value="(v: number) => (splitterModel = v)"
@@ -41,8 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="filter-list" size="sm" />
               </span>
               <OButton
-                variant="outline"
-                size="xs"
+                variant="secondary"
                 :class="filterApplied ? 'text-primary' : ''"
                 @click="clearAll()"
                 >{{ t("nodes.clear_all") }}</OButton
@@ -61,12 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-for="key in ['region', 'cluster'] as const"
                     :key="key"
                     variant="ghost"
-                    size="sm"
                     class="justify-start"
                     disabled
                     :data-test="`nodes-${key}-filter-locked`"
                   >
-                    <template #icon-left>
+                    <template #icon>
                       <OIcon name="lock" size="sm" class="lock-chip" />
                     </template>
                     {{ t(`nodes.${key}`) }}
@@ -75,16 +68,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTooltip>
               <OCollapsible
                 v-if="regionRows.length > 0 && superClusterOn"
-                variant="sidebar"
-                :model-value="sectionOpen.region"
-                @update:model-value="(v) => (sectionOpen.region = v)"
-                :label="t('nodes.region')"
+                :open="sectionOpen.region"
+                @update:open="(v) => (sectionOpen.region = v)"
+                :title="t('nodes.region')"
               >
                 <div class="p-0">
                   <OSearchInput
                     data-test="nodes-region-filter-search-input"
                     v-model="filterRegionQuery"
-                    clearable
                     :debounce="1"
                     :placeholder="t('nodes.searchRegion')"
                     class="filter-input w-full"
@@ -97,12 +88,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :selected-ids="selectedRegionIds"
                     selection="multiple"
                     pagination="none"
-                    :show-global-filter="false"
                     :default-columns="false"
                     @update:selected-ids="handleSelectedRegionIdsUpdate"
                   >
                     <template #empty>
-                      <OEmptyState size="block" preset="no-nodes" />
+                      <OEmptyState
+                        :title="t('emptyState.noNodes.title')"
+                        :text="t('emptyState.noNodes.description')"
+                      />
                     </template>
                   </OTable>
                 </div>
@@ -114,16 +107,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <OCollapsible
                 v-if="clusterRows.length > 0 && superClusterOn"
-                variant="sidebar"
-                :model-value="sectionOpen.cluster"
-                @update:model-value="(v) => (sectionOpen.cluster = v)"
-                :label="t('nodes.cluster')"
+                :open="sectionOpen.cluster"
+                @update:open="(v) => (sectionOpen.cluster = v)"
+                :title="t('nodes.cluster')"
               >
                 <div class="p-0">
                   <OSearchInput
                     data-test="nodes-cluster-filter-search-input"
                     v-model="filterClusterQuery"
-                    clearable
                     :debounce="1"
                     :placeholder="t('nodes.searchCluster')"
                     class="filter-input w-full"
@@ -136,12 +127,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :selected-ids="selectedClusterIds"
                     selection="multiple"
                     pagination="none"
-                    :show-global-filter="false"
                     :default-columns="false"
                     @update:selected-ids="handleSelectedClusterIdsUpdate"
                   >
                     <template #empty>
-                      <OEmptyState size="block" preset="no-nodes" />
+                      <OEmptyState
+                        :title="t('emptyState.noNodes.title')"
+                        :text="t('emptyState.noNodes.description')"
+                      />
                     </template>
                   </OTable>
                 </div>
@@ -153,10 +146,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <OCollapsible
                 v-if="nodetypeRows.length > 0"
-                variant="sidebar"
-                :model-value="sectionOpen.nodetype"
-                @update:model-value="(v) => (sectionOpen.nodetype = v)"
-                :label="t('nodes.nodetype')"
+                :open="sectionOpen.nodetype"
+                @update:open="(v) => (sectionOpen.nodetype = v)"
+                :title="t('nodes.nodetype')"
               >
                 <div class="px-1">
                   <OTable
@@ -167,7 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :selected-ids="selectedNodetypeIds"
                     selection="multiple"
                     pagination="none"
-                    :show-global-filter="false"
                     :default-columns="false"
                     @update:selected-ids="handleSelectedNodetypeIdsUpdate"
                   />
@@ -176,10 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <OCollapsible
                 v-if="statusesRows.length > 0"
-                variant="sidebar"
-                :model-value="sectionOpen.status"
-                @update:model-value="(v) => (sectionOpen.status = v)"
-                :label="t('nodes.status')"
+                :open="sectionOpen.status"
+                @update:open="(v) => (sectionOpen.status = v)"
+                :title="t('nodes.status')"
               >
                 <div class="px-1">
                   <OTable
@@ -190,7 +180,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :selected-ids="selectedStatusIds"
                     selection="multiple"
                     pagination="none"
-                    :show-global-filter="false"
                     :default-columns="false"
                     @update:selected-ids="handleSelectedStatusIdsUpdate"
                   >
@@ -203,10 +192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OCollapsible>
 
               <OCollapsible
-                variant="sidebar"
-                :model-value="sectionOpen.cpu"
-                @update:model-value="(v) => (sectionOpen.cpu = v)"
-                :label="t('nodes.cpuusage')"
+                :open="sectionOpen.cpu"
+                @update:open="(v) => (sectionOpen.cpu = v)"
+                :title="t('nodes.cpuusage')"
               >
                 <div class="px-1 pb-2">
                   <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
@@ -245,10 +233,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSeparator v-if="sectionOpen.cpu" class="my-2" />
 
               <OCollapsible
-                variant="sidebar"
-                :model-value="sectionOpen.memory"
-                @update:model-value="(v) => (sectionOpen.memory = v)"
-                :label="t('nodes.memoryusage')"
+                :open="sectionOpen.memory"
+                @update:open="(v) => (sectionOpen.memory = v)"
+                :title="t('nodes.memoryusage')"
               >
                 <div class="px-1 pb-2">
                   <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
@@ -287,20 +274,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSeparator v-if="sectionOpen.memory" class="my-2" />
 
               <OCollapsible
-                variant="sidebar"
-                :model-value="sectionOpen.tcp"
-                @update:model-value="(v) => (sectionOpen.tcp = v)"
-                :label="raw('TCP')"
+                :open="sectionOpen.tcp"
+                @update:open="(v) => (sectionOpen.tcp = v)"
+                :title="raw('TCP')"
               >
                 <div class="px-1 pb-2">
-                  <OCheckbox
-                    type="checkbox"
-                    v-model="establishedToggle"
-                    :label="t('nodes.establishedLabel')"
-                  />
+                  <OCheckbox v-model="establishedToggle" :label="t('nodes.establishedLabel')" />
                   <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
                     <OInput
-                      :disable="!establishedToggle"
+                      :disabled="!establishedToggle"
                       data-test="nodes-filter-established-min"
                       type="number"
                       class="w-full min-w-0"
@@ -310,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <span class="px-1 text-center">{{ t("settings.nodesPage.to") }}</span>
                     <OInput
-                      :disable="!establishedToggle"
+                      :disabled="!establishedToggle"
                       data-test="nodes-filter-established-max"
                       type="number"
                       class="w-full min-w-0"
@@ -334,14 +316,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
 
                   <OCheckbox
-                    type="checkbox"
                     class="mt-6"
                     v-model="closewaitToggle"
                     :label="t('nodes.closewaitLabel')"
                   />
                   <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
                     <OInput
-                      :disable="!closewaitToggle"
+                      :disabled="!closewaitToggle"
                       data-test="nodes-filter-closewait-min"
                       type="number"
                       class="w-full min-w-0"
@@ -351,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <span class="px-1 text-center">{{ t("settings.nodesPage.to") }}</span>
                     <OInput
-                      :disable="!closewaitToggle"
+                      :disabled="!closewaitToggle"
                       data-test="nodes-filter-closewait-max"
                       type="number"
                       class="w-full min-w-0"
@@ -375,14 +356,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
 
                   <OCheckbox
-                    type="checkbox"
                     class="mt-6"
                     v-model="waittimeToggle"
                     :label="t('nodes.waittimeLabel')"
                   />
                   <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
                     <OInput
-                      :disable="!waittimeToggle"
+                      :disabled="!waittimeToggle"
                       data-test="nodes-filter-waittime-min"
                       type="number"
                       class="w-full min-w-0"
@@ -392,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <span class="px-1 text-center">{{ t("settings.nodesPage.to") }}</span>
                     <OInput
-                      :disable="!waittimeToggle"
+                      :disabled="!waittimeToggle"
                       data-test="nodes-filter-waittime-max"
                       type="number"
                       class="w-full min-w-0"
@@ -419,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="flex shrink-0 justify-end border-t px-2 py-2">
-            <OButton variant="primary" size="sm-action" @click="onApplyFilterClick">
+            <OButton variant="primary" @click="onApplyFilterClick">
               {{ t("nodes.applyFilter") }}
             </OButton>
           </div>
@@ -434,7 +414,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data="displayedRows"
             :columns="computedOTableColumns"
             row-key="name"
-            show-index
             pagination="client"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
@@ -446,7 +425,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :enable-column-resize="true"
             :persist-columns="true"
             table-id="settings-nodes"
-            :show-global-filter="false"
             :loading="loading"
           >
             <template #toolbar>
@@ -471,24 +449,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #toolbar-trailing>
               <ORefreshButton
-                layout="inline"
-                variant="outline"
                 :last-run-at="lastUpdatedAt"
                 :loading="fetching"
-                shortcut-id="nodesRefresh"
+                shortcut="nodesRefresh"
                 data-test="nodes-list-refresh-btn"
                 @click="refreshData"
               />
             </template>
             <template #empty>
               <OEmptyState
-                size="hero"
-                preset="no-nodes"
-                :filtered="!!(filterQuery || statusFilters.length)"
-                :hide-action="!(filterQuery || statusFilters.length)"
-                @action="
-                  (id) => id === 'clear-filters' && ((filterQuery = ''), (statusFilters = []))
+                :kind="filterQuery || statusFilters.length ? 'filtered' : 'first-run'"
+                :title="
+                  filterQuery || statusFilters.length
+                    ? t('emptyState.filtered.title', {
+                        noun: t('emptyState.filtered.fallbackNoun'),
+                      })
+                    : t('emptyState.noNodes.title')
                 "
+                :text="
+                  filterQuery || statusFilters.length
+                    ? t('emptyState.filtered.description', {
+                        noun: t('emptyState.filtered.fallbackNoun'),
+                      })
+                    : t('emptyState.noNodes.description')
+                "
+                @action="((filterQuery = ''), (statusFilters = []))"
               />
             </template>
 
@@ -531,10 +516,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-cpu="{ row }">
               <div class="flex w-full min-w-0 items-center justify-end gap-2">
                 <OProgressBar
-                  size="sm"
                   class="min-w-0 flex-1"
-                  :value="row.cpu_usage / 100"
-                  :variant="usageVariant(row.cpu_usage)"
+                  :value="row.cpu_usage"
+                  :tone="usageVariant(row.cpu_usage)"
                 />
                 <span class="shrink-0 tabular-nums">{{ row.cpu_usage }}%</span>
               </div>
@@ -543,10 +527,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-memory="{ row }">
               <div class="flex w-full min-w-0 items-center justify-end gap-2">
                 <OProgressBar
-                  size="sm"
                   class="min-w-0 flex-1"
-                  :value="row.percentage_memory_usage / 100"
-                  :variant="usageVariant(row.percentage_memory_usage)"
+                  :value="row.percentage_memory_usage"
+                  :tone="usageVariant(row.percentage_memory_usage)"
                 />
                 <span class="shrink-0 tabular-nums">{{ row.percentage_memory_usage }}%</span>
               </div>
@@ -583,7 +566,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
+import type { ProgressBarTone } from "@/lib/data/ProgressBar/OProgressBar.types";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -1176,12 +1159,12 @@ export default defineComponent({
 
     // Utilisation tiers shared by the CPU and memory bars: amber from 70%, red
     // from 85%, so a saturated node stands out before it is a problem.
-    const usageVariant = (usage: unknown): ProgressBarVariant => {
+    const usageVariant = (usage: unknown): ProgressBarTone => {
       const n = Number(usage);
-      if (!Number.isFinite(n)) return "default";
-      if (n > 85) return "danger";
-      if (n > 70) return "warning";
-      return "default";
+      if (!Number.isFinite(n)) return "accent";
+      if (n > 85) return "err";
+      if (n > 70) return "warn";
+      return "accent";
     };
 
     // ── Health facet + summary strip ─────────────────────────────────────────

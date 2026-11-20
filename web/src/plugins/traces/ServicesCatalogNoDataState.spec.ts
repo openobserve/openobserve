@@ -29,7 +29,7 @@ import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 const OEmptyStateStub = {
   name: "OEmptyState",
   template: '<div data-test="o-empty-state" />',
-  props: ["preset", "size", "hideAction", "description"],
+  props: ["kind", "size", "title", "text", "actionLabel"],
 };
 
 // ---------------------------------------------------------------------------
@@ -71,20 +71,16 @@ describe("ServicesCatalogNoDataState", () => {
       expect(wrapper.find('[data-test="o-empty-state"]').exists()).toBe(true);
     });
 
-    it("passes preset='no-services-catalog' to OEmptyState", () => {
+    it("shows the no-services copy as a filtered (time range) state at page size", () => {
       const stub = wrapper.findComponent({ name: "OEmptyState" });
-      expect(stub.props("preset")).toBe("no-services-catalog");
+      expect(stub.props("kind")).toBe("filtered");
+      expect(String(stub.props("title"))).toBe("No services found");
+      expect(stub.props("size")).toBeUndefined();
     });
 
-    it("passes size='hero' to OEmptyState so it matches the other traces empty states", () => {
+    it("offers no action when the stream has no data to jump to", () => {
       const stub = wrapper.findComponent({ name: "OEmptyState" });
-      expect(stub.props("size")).toBe("hero");
-    });
-
-    it("hides the action when the stream has no data to jump to", () => {
-      // No stream selected in the default mount → no jump target → hide-action.
-      const stub = wrapper.findComponent({ name: "OEmptyState" });
-      expect(stub.props("hideAction")).toBe(true);
+      expect(stub.props("actionLabel")).toBeUndefined();
     });
 
     it("does not emit widen-range (feature removed)", () => {
@@ -97,9 +93,9 @@ describe("ServicesCatalogNoDataState", () => {
       wrapper.unmount();
       wrapper = mountComponent({ noTraceStream: true });
       const stub = wrapper.findComponent({ name: "OEmptyState" });
-      expect(stub.props("preset")).toBe("no-services-catalog");
-      expect(stub.props("hideAction")).toBe(true);
-      expect(String(stub.props("description"))).toBe(
+      expect(stub.props("kind")).toBeUndefined();
+      expect(stub.props("actionLabel")).toBeUndefined();
+      expect(String(stub.props("text"))).toBe(
         "No services were detected in the selected time range.",
       );
     });

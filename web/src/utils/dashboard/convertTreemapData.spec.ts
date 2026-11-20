@@ -308,7 +308,7 @@ describe("treemap through convertPanelData", () => {
     });
     expect(series.label.textBorderWidth).toBe(0);
     expect(series.upperLabel.textBorderWidth).toBe(0);
-    expect(series.levels[0].upperLabel.color).toBe("#404040");
+    expect(series.levels[0].upperLabel.color).toBe("#3b3f4f");
   });
 
   it("puts white on dark tiles and black on light ones, following the children's lightness", () => {

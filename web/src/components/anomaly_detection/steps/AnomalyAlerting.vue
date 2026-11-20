@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             valueKey="value"
             :searchable="false"
             clearable
-            width="xs"
+            width="s"
             :placeholder="t('alerts.priorityUnset')"
             :aria-label="t('alerts.priority')"
             data-test="anomaly-priority-select"
@@ -104,44 +104,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="t('alerts.destination')"
               data-test="anomaly-destination"
             >
-              <template #selected-item="{ index, opt, removeAtIndex }">
-                <OTag v-if="index < visibleChipCount" type="selectionChip">
-                  {{ typeof opt === "object" ? opt.name : opt }}
-                  <template #trailing>
-                    <button
-                      type="button"
-                      :aria-label="t('common.remove')"
-                      class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
-                      @click="removeAtIndex(index)"
-                    >
-                      <OIcon name="close" size="xs" />
-                    </button>
-                  </template>
-                </OTag>
-                <span
-                  v-if="
-                    index === visibleChipCount &&
-                    config.alert_destination_ids.length > visibleChipCount
-                  "
-                  class="text-compact text-text-secondary ms-1 whitespace-nowrap"
-                >
-                  +{{ config.alert_destination_ids.length - visibleChipCount }}
-                </span>
-              </template>
               <template #empty>
                 <span>{{ t("alerts.anomaly.noDestinationsFound") }}</span>
               </template>
             </OSelect>
             <OButton
               variant="ghost"
-              size="sm"
               class="ms-1"
               :title="t('alerts.alertSettings.refreshDestinations')"
               data-test="anomaly-refresh-destinations"
               @click="$emit('refresh:destinations')"
-              icon-left="refresh"
+              icon="refresh"
             />
-            <OButton variant="outline" size="sm" class="ms-2" @click="openAddDestination">
+            <OButton variant="secondary" class="ms-2" @click="openAddDestination">
               {{ t("alerts.anomaly.addNewDestination") }}
             </OButton>
           </div>
@@ -189,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             labelKey="label"
             valueKey="value"
             :searchable="false"
-            width="sm"
+            width="s"
             :aria-label="t('alerts.anomaly.alertDirection')"
             data-test="anomaly-alert-direction"
           />
@@ -212,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.anomaly.windowBuckets')"
               :placeholder="raw('1')"
               :error="!!windowShareErrors.buckets"
-              width="xs"
+              width="s"
               data-test="anomaly-window-buckets"
             />
             <OInput
@@ -222,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.anomaly.windowFirePct')"
               :placeholder="raw('100')"
               :error="!!windowShareErrors.fire"
-              width="xs"
+              width="s"
               data-test="anomaly-window-fire-pct"
             />
             <OInput
@@ -232,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('alerts.anomaly.windowRecoverPct')"
               :placeholder="t('alerts.anomaly.windowRecoverSameAsFire')"
               :error="!!windowShareErrors.recover"
-              width="xs"
+              width="s"
               data-test="anomaly-window-recover-pct"
             />
           </div>
@@ -280,7 +255,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import TemplateOverridePicker from "@/components/alerts/TemplateOverridePicker.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import {
@@ -299,7 +273,6 @@ export default defineComponent({
     OTagInput,
     OTooltip,
     OIcon,
-    OTag,
     TemplateOverridePicker,
   },
 

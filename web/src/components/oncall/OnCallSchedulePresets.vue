@@ -21,8 +21,8 @@
   Applying replaces the chosen rotation's shift rules, keeping its id and name, or adds a new rotation.
 -->
 <template>
-  <ODrawer v-model:open="open" size="xxl" :title="drawerTitle" data-test="oncall-presets-drawer">
-    <OInnerLoading v-if="loading" showing />
+  <ODrawer v-model:open="open" size="xl" :title="drawerTitle" data-test="oncall-presets-drawer">
+    <OSkeleton v-if="loading" preset="tableRows" />
 
     <div v-else class="flex flex-col gap-4">
       <div
@@ -38,15 +38,10 @@
           data-test="oncall-presets-target"
           @update:model-value="setTarget"
         >
-          <OToggleGroupItem :value="NEW_ROTATION" size="sm">
+          <OToggleGroupItem :value="NEW_ROTATION">
             {{ t("oncall.presetsNewRotation") }}
           </OToggleGroupItem>
-          <OToggleGroupItem
-            v-for="rotation in rotations"
-            :key="rotation.id"
-            :value="rotation.id"
-            size="sm"
-          >
+          <OToggleGroupItem v-for="rotation in rotations" :key="rotation.id" :value="rotation.id">
             {{ raw(rotation.name) }}
           </OToggleGroupItem>
         </OToggleGroup>
@@ -56,8 +51,7 @@
           :label="t('oncall.rotationName')"
           :maxlength="MAX_ROTATION_NAME_CHARS"
           :disabled="Boolean(targetRotation)"
-          size="sm"
-          width="md"
+          width="m"
           class="gap-2!"
           :error="newNameBlank || newNameTaken"
           data-test="oncall-presets-new-name"
@@ -160,10 +154,9 @@
                 {{ t("oncall.presetCatchAllDefault") }}
               </OText>
               <OButton
-                variant="outline"
-                size="sm-action"
+                variant="secondary"
                 class="ms-auto"
-                icon-left="edit"
+                icon="edit"
                 :data-test="`oncall-preset-override-${row.key}`"
                 @click="overridden[row.key] = true"
               >
@@ -184,13 +177,14 @@
 
               <template v-if="row.window">
                 <OToggleGroup
+                  size="sm"
                   v-if="row.window.days"
                   type="multiple"
                   :model-value="dayValues(row.window)"
                   :data-test="`oncall-preset-field-${row.key}-days`"
                   @update:model-value="(v: unknown) => setDays(row.window, v)"
                 >
-                  <OToggleGroupItem v-for="day in WEEK_DAYS" :key="day" :value="day" size="xs">
+                  <OToggleGroupItem v-for="day in WEEK_DAYS" :key="day" :value="day">
                     {{ dayName(day) }}
                   </OToggleGroupItem>
                 </OToggleGroup>
@@ -199,8 +193,7 @@
                   <OSelect
                     :model-value="edgeOf(row.window, 'from')"
                     :options="HALF_HOURS"
-                    size="sm"
-                    width="xs"
+                    width="s"
                     :aria-label="raw(row.window.from.label)"
                     :data-test="`oncall-preset-field-${row.key}-from`"
                     @update:model-value="(v: SelectModelValue) => setEdge(row.window, 'from', v)"
@@ -209,8 +202,7 @@
                   <OSelect
                     :model-value="edgeOf(row.window, 'to')"
                     :options="MINUTES"
-                    size="sm"
-                    width="xs"
+                    width="s"
                     :aria-label="raw(row.window.to.label)"
                     :data-test="`oncall-preset-field-${row.key}-to`"
                     @update:model-value="(v: SelectModelValue) => setEdge(row.window, 'to', v)"
@@ -224,8 +216,7 @@
 
               <OButton
                 v-if="row.optional"
-                variant="ghost-primary"
-                size="sm-action"
+                variant="accent-ghost"
                 class="ms-auto"
                 :data-test="`oncall-preset-revert-${row.key}`"
                 @click="revert(row)"
@@ -235,9 +226,9 @@
 
               <OButton
                 v-if="row.removable"
+                icon-only
                 variant="ghost"
-                size="icon-sm"
-                icon-left="delete"
+                icon="delete"
                 class="ms-auto"
                 :aria-label="t('oncall.presetsRemoveGroup')"
                 :data-test="`oncall-preset-remove-${row.key}`"
@@ -259,8 +250,7 @@
               <OSelect
                 :model-value="model[input.field] as SelectModelValue"
                 :options="optionsFor(input)"
-                size="sm"
-                width="xs"
+                width="s"
                 :aria-label="raw(input.label)"
                 :data-test="`oncall-preset-field-${input.field}`"
                 @update:model-value="(v: SelectModelValue) => (model[input.field] = v)"
@@ -274,9 +264,7 @@
 
         <span v-if="growable" class="flex items-center gap-2 self-start">
           <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="add"
+            variant="secondary"
             :disabled="atLimit"
             :data-test="`oncall-preset-group-add-${growable.field}`"
             @click="addGroup(growable)"
@@ -298,9 +286,8 @@
             <OText variant="meta" class="min-w-0">{{ defaultsSentence }}</OText>
             <OButton
               variant="ghost"
-              size="sm-action"
               class="ms-auto"
-              icon-left="tune"
+              icon="tune"
               data-test="oncall-preset-defaults-toggle"
               @click="defaultsOpen = !defaultsOpen"
             >
@@ -315,8 +302,7 @@
               :model-value="model[input.field] as SelectModelValue"
               :options="optionsFor(input)"
               :label="raw(input.label)"
-              size="sm"
-              width="md"
+              width="m"
               :data-test="`oncall-preset-field-${input.field}`"
               @update:model-value="(v: SelectModelValue) => (model[input.field] = v)"
             >
@@ -372,12 +358,11 @@
           </span>
         </span>
         <div class="ms-auto flex gap-2">
-          <OButton variant="outline" size="sm-action" @click="open = false">
+          <OButton variant="secondary" @click="open = false">
             {{ t("oncall.cancel") }}
           </OButton>
           <OButton
             variant="primary"
-            size="sm-action"
             :loading="applying"
             :disabled="!chosen || Boolean(blockedReason)"
             data-test="oncall-presets-apply"
@@ -396,8 +381,8 @@
     size="sm"
     data-test="oncall-presets-replace-confirm"
     :title="t('oncall.presetsReplaceTitle', { name: raw(targetRotation?.name ?? '') })"
-    :primary-button-label="t('oncall.presetsReplaceOk')"
-    :secondary-button-label="t('oncall.cancel')"
+    :primary="{ label: t('oncall.presetsReplaceOk') }"
+    :secondary="{ label: t('oncall.cancel') }"
     @click:primary="confirmApply"
     @click:secondary="confirmReplace = false"
   >
@@ -427,7 +412,7 @@ import { useOrgUserNames } from "@/composables/useOrgUserNames";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
-import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODate from "@/lib/forms/Date/ODate.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";

@@ -43,16 +43,16 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "formId",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "secondaryButtonVariant",
-    "primaryButtonLoading",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
+    "primary",
+    "secondary",
+    "secondary",
+    "primary",
+    "primary",
+    "secondary",
   ],
   emits: ["update:open", "click:secondary"],
   template: '<div v-if="open" class="dialog-stub"><slot /></div>',
@@ -270,9 +270,9 @@ describe("ExtractSubtestDialog", () => {
     expect(dialog.props("persistent")).toBe(true);
     expect(dialog.props("showClose")).toBe(false);
     // ODialog derives the footer state from the form itself; no hand-kept flags.
-    expect(dialog.props("primaryButtonLoading")).toBeUndefined();
-    expect(dialog.props("primaryButtonDisabled")).toBeUndefined();
-    expect(dialog.props("secondaryButtonDisabled")).toBeUndefined();
+    expect(dialog.props("primary")?.loading).toBeUndefined();
+    expect(dialog.props("primary")?.disabled).toBeUndefined();
+    expect(dialog.props("secondary")?.disabled).toBeUndefined();
 
     dialog.vm.$emit("update:open", false);
     await nextTick();

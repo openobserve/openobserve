@@ -97,7 +97,7 @@ const OBadgeStub = {
 const OProgressBarStub = {
   name: "OProgressBarStub",
   template: '<div class="oprogressbar-stub" />',
-  props: ["value", "variant", "size"],
+  props: ["value", "tone"],
 };
 
 const OSpinnerStub = {
@@ -113,7 +113,7 @@ const ODropdownStub = {
 
 const ODropdownItemStub = {
   name: "ODropdownItemStub",
-  template: `<button :data-test="$attrs['data-test'] || ''" :disabled="!!$attrs['disabled']" @click="$emit('select')"><slot name="icon-left" /><slot /></button>`,
+  template: `<button :data-test="$attrs['data-test'] || ''" :disabled="!!$attrs['disabled']" @click="$emit('select')"><slot name="icon" /><slot /></button>`,
   inheritAttrs: false,
   props: ["variant"],
 };
@@ -127,14 +127,14 @@ const OTooltipStub = {
   name: "OTooltipStub",
   template:
     '<div class="otooltip-stub" :data-content="content" :data-content-class="contentClass"><slot /></div>',
-  props: ["content", "side", "contentClass", "delay"],
+  props: ["content", "side", "contentClass"],
 };
 
 const OEmptyStateStub = {
   name: "OEmptyStateStub",
   template: `<div :data-test="$attrs['data-test'] || ''" class="oemptystate-stub"><slot /></div>`,
   inheritAttrs: false,
-  props: ["size", "preset", "description", "filtered"],
+  props: ["size", "kind", "title", "text", "actionLabel", "secondaryActionLabel"],
 };
 
 // ── Mount factory ───────────────────────────────────────────────────────
@@ -495,29 +495,35 @@ describe("MonitorTable", () => {
     it("should emit empty-action when OEmptyState action is triggered", async () => {
       wrapper = mountMonitorTable({ data: [] });
       const emptyState = wrapper.findComponent({ name: "OEmptyStateStub" });
-      await emptyState.vm.$emit("action", "create-browser");
+      await emptyState.vm.$emit("action");
       expect(wrapper.emitted("empty-action")).toHaveLength(1);
       expect(wrapper.emitted("empty-action")![0]).toEqual(["create-browser"]);
     });
 
     // ── hasFilters prop ───────────────────────────────────────────
 
-    it("should pass filtered=false to OEmptyState when hasFilters defaults to false", () => {
+    it("should pass kind first-run to OEmptyState when hasFilters defaults to false", () => {
       wrapper = mountMonitorTable({ data: [] });
       const emptyState = wrapper.findComponent({ name: "OEmptyStateStub" });
-      expect(emptyState.props("filtered")).toBe(false);
+      expect(emptyState.props("kind")).toBe("first-run");
     });
 
-    it("should pass filtered=true to OEmptyState when hasFilters is true", () => {
+    it("should pass kind filtered to OEmptyState when hasFilters is true", () => {
       wrapper = mountMonitorTable({ data: [], hasFilters: true });
       const emptyState = wrapper.findComponent({ name: "OEmptyStateStub" });
-      expect(emptyState.props("filtered")).toBe(true);
+      expect(emptyState.props("kind")).toBe("filtered");
     });
 
-    it("should pass filtered=false to OEmptyState when hasFilters is explicitly false", () => {
+    it("should pass kind first-run to OEmptyState when hasFilters is explicitly false", () => {
       wrapper = mountMonitorTable({ data: [], hasFilters: false });
       const emptyState = wrapper.findComponent({ name: "OEmptyStateStub" });
-      expect(emptyState.props("filtered")).toBe(false);
+      expect(emptyState.props("kind")).toBe("first-run");
+    });
+
+    it("emits the HTTP check type from the empty state's secondary action", async () => {
+      wrapper = mountMonitorTable({ data: [] });
+      await wrapper.findComponent({ name: "OEmptyStateStub" }).vm.$emit("secondaryAction");
+      expect(wrapper.emitted("empty-action")![0]).toEqual(["create-http"]);
     });
   });
 
@@ -965,13 +971,6 @@ describe("MonitorTable", () => {
         // Name + URL + 5 actions = 7 OTooltips (locations cell skipped)
         expect(tooltips.length).toBe(7);
         expect(wrapper.text()).toContain("—");
-      });
-
-      it("has delay=0 for instant tooltip appearance", () => {
-        wrapper = mountMonitorTable();
-        const tooltips = wrapper.findAllComponents({ name: "OTooltipStub" });
-        const locTooltip = tooltips[2];
-        expect(locTooltip.props("delay")).toBe(0);
       });
     });
 

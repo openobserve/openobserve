@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[{ 'hover:bg-interactive-hover-bg': !noHover }, deleting ? 'opacity-50' : '']"
     :data-test="`dependency-impact-row-${node.name}`"
   >
-    <OSpinner v-if="deleting" size="xs" class="shrink-0" />
+    <OSpinner v-if="deleting" class="shrink-0" />
     <span
       v-else-if="node.kind === 'alert'"
       class="size-2 shrink-0 rounded-full"
@@ -61,8 +61,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OButton
         v-if="!node.missing"
+        icon-only
         variant="ghost"
-        size="icon-xs"
         :data-test="`dependency-impact-open-${node.name}`"
         @click.stop="emit('open', node)"
       >
@@ -71,8 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-if="!node.missing"
+        icon-only
         variant="ghost"
-        size="icon-xs"
         :data-test="`dependency-impact-delete-${node.name}`"
         @click.stop="emit('delete', node)"
       >

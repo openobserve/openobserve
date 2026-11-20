@@ -26,24 +26,24 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
@@ -51,7 +51,7 @@ const ODialogStub = {
       :data-size="size"
       :data-title="title"
       :data-width="width"
-      :data-primary-label="primaryButtonLabel"
+      :data-primary-label="primary?.label"
     >
       <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot name="header" />
@@ -60,7 +60,7 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
     </div>
   `,
 };
@@ -126,7 +126,7 @@ describe("DestinationPreview", () => {
   });
 
   it("should render a Close button in the footer", () => {
-    // primaryButtonLabel prop removed — Close moved to manual footer slot (commit 1f896ef747)
+    // primary?.label prop removed — Close moved to manual footer slot (commit 1f896ef747)
     wrapper = mountComponent({ type: "slack" });
     expect(wrapper.text()).toContain("Close");
   });
@@ -230,19 +230,19 @@ describe("DestinationPreview", () => {
     expect(wrapper.find('[data-test="opsgenie-preview"]').exists()).toBe(true);
   });
 
-  // The cards are fixed-light brand replicas, so each CTA needs its fixed brand
-  // variant; a theme-following one turns unreadable in dark mode.
+  // The cards are fixed-light brand replicas, so each CTA is an inert picture in its fixed
+  // brand colour; a theme-following button turns unreadable in dark mode.
   it.each([
-    ["slack", "preview-slack"],
-    ["msteams", "preview-teams"],
-    ["email", "preview-email"],
-    ["opsgenie", "preview-opsgenie"],
-  ])("renders the %s CTA with the %s variant", (type, variant) => {
+    ["slack", "bg-brand-slack"],
+    ["msteams", "bg-brand-teams"],
+    ["email", "bg-brand-email"],
+    ["opsgenie", "bg-brand-email-ink"],
+  ])("renders the %s CTA as an inert %s replica", (type, fill) => {
     wrapper = mountComponent({ type });
-    const cta = wrapper
-      .findAllComponents({ name: "OButton" })
-      .find((button) => button.text() === "View in OpenObserve");
-    expect(cta?.props("variant")).toBe(variant);
+    const card = wrapper.find(`[data-test="${type}-preview"]`);
+    const cta = card.findAll("span").find((span) => span.text() === "View in OpenObserve");
+    expect(cta?.classes()).toContain(fill);
+    expect(card.findAllComponents({ name: "OButton" })).toHaveLength(0);
   });
 
   it.each(["slack", "msteams", "email", "pagerduty", "servicenow", "opsgenie"])(
@@ -354,7 +354,7 @@ describe("DestinationPreview", () => {
     wrapper = mountComponent({ type: "slack" });
     const copyBtn = wrapper.find('[data-test="preview-copy-button"]');
     expect(copyBtn.exists()).toBe(true);
-    expect(copyBtn.text()).toContain("Copy Template");
+    expect(copyBtn.text()).toContain("Copy template");
   });
 
   it("should reflect modelValue=false on ODialog open prop", () => {
@@ -433,7 +433,7 @@ describe("DestinationPreview", () => {
 
   it("names a custom destination Web Hook in the dialog title", () => {
     wrapper = mountComponent({ type: "custom" });
-    expect(wrapper.findComponent(ODialogStub).props("title")).toContain("Web Hook");
+    expect(wrapper.findComponent(ODialogStub).props("title")).toContain("Web hook");
   });
 
   it("notes a generic sample only when asked", () => {

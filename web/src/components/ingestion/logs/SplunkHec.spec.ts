@@ -24,7 +24,7 @@ const barStart = vi.fn();
 vi.mock("@/lib/core/Code/OCodeBlock.vue", () => ({
   default: {
     name: "OCodeBlock",
-    props: ["code", "inset"],
+    props: ["code"],
     emits: ["copy"],
     template: "<div class='copy-content-mock'>{{ code }}</div>",
   },
@@ -78,7 +78,7 @@ describe("SplunkHec", () => {
         mocks: { $store: customStore },
         provide,
         stubs: {
-          OBanner: { template: "<div class='o-banner-mock'><slot /></div>" },
+          OInlineNotice: { template: "<div class='o-banner-mock'><slot /></div>" },
           OText: { template: "<div class='o-text-mock'><slot /></div>" },
           RouterLink: { template: "<a class='router-link-mock'><slot /></a>" },
           FirstEventStatus: { template: "<div />", methods: { start: barStart } },
@@ -217,12 +217,6 @@ describe("SplunkHec", () => {
     it("should render one copy block per snippet", () => {
       wrapper = createWrapper();
       expect(wrapper.findAll(".copy-content-mock")).toHaveLength(4);
-    });
-
-    it("should inset every snippet from the block border, as CopyContent did", () => {
-      wrapper = createWrapper();
-      const blocks = wrapper.findAllComponents({ name: "OCodeBlock" });
-      expect(blocks.every((b: any) => b.props("inset") !== undefined)).toBe(true);
     });
 
     it("should track snippet_copied with partial on copy", async () => {

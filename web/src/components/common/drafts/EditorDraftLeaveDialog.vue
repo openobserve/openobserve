@@ -22,17 +22,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :persistent="saving || forced"
     :show-close="!forced"
     :title="t('common.editorDraft.leaveTitle')"
-    :primary-button-label="canSave ? (saveLabel ?? t('common.save')) : undefined"
-    primary-button-data-test="editor-draft-leave-save"
-    :primary-button-loading="saving"
-    :secondary-button-label="secondaryLabel"
-    :neutral-button-label="t('common.editorDraft.discard')"
-    neutral-button-variant="ghost-destructive"
+    :primary="{
+      label: canSave ? (saveLabel ?? t('common.save')) : undefined,
+      disabled: !!saveDisabledReason,
+      disabledReason: saveDisabledReason ?? undefined,
+      loading: saving,
+      dataTest: 'editor-draft-leave-save',
+    }"
+    :secondary="{ label: secondaryLabel }"
+    :extra="{ label: t('common.editorDraft.discard'), variant: 'danger-ghost' }"
     data-test="editor-draft-leave-dialog"
     @update:open="onOpenChange"
     @click:primary="emit('choose', 'save')"
     @click:secondary="emit('choose', canKeepDraft ? 'keep' : 'stay')"
-    @click:neutral="emit('choose', 'discard')"
+    @click:extra="emit('choose', 'discard')"
   >
     <div class="flex items-start gap-1">
       <div class="flex min-w-0 flex-1 flex-col gap-2">
@@ -90,6 +93,8 @@ const props = withDefaults(
     /** The item has a server-side draft of its own, so the copy avoids the word "draft". */
     serverDraftItem?: boolean;
     saveLabel?: I18nText | null;
+    /** Save stays visible but disabled, saying why (an invalid form), instead of disappearing (guideline V4). */
+    saveDisabledReason?: I18nText | null;
     /** The host's own message, when the default copy does not fit its buttons. */
     message?: I18nText | null;
   }>(),

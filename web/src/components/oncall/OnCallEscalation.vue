@@ -23,104 +23,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   row with a count, which is also how a human describes it out loud.
 -->
 <template>
-  <OCard variant="glass" data-test="oncall-escalation">
-    <OCardSection role="header" dense class="justify-between">
-      <OText variant="card-title">{{ t("oncall.escalation") }}</OText>
+  <OCard :title="t('oncall.escalation')" data-test="oncall-escalation">
+    <template #actions>
       <OButton
         v-if="teamId"
         variant="ghost"
-        size="xs"
+        size="sm"
         data-test="oncall-escalation-edit"
         @click="emit('edit')"
       >
         {{ t("oncall.edit") }}
       </OButton>
-    </OCardSection>
+    </template>
 
-    <OCardSection role="body" dense>
-      <p
-        v-if="!groups.length"
-        class="text-text-secondary mb-3 text-sm"
-        data-test="oncall-escalation-none"
-      >
-        {{ t("oncall.ladderNothingSent") }}
-      </p>
+    <p
+      v-if="!groups.length"
+      class="text-text-secondary mb-3 text-sm"
+      data-test="oncall-escalation-none"
+    >
+      {{ t("oncall.ladderNothingSent") }}
+    </p>
 
-      <!-- A rail, not a list: the rungs are one climb, and the level rides the
+    <!-- A rail, not a list: the rungs are one climb, and the level rides the
            rail itself the way the policy editor numbers them. The end is the
            last stop on the same rail rather than a footnote under a rule —
            a ladder that has sent nothing still has one. -->
-      <OTimeline>
-        <OTimelineItem
-          v-for="group in groups"
-          :key="group.key"
-          :label="group.levelLabel"
-          :variant="rungVariant(group)"
-          :data-test="`oncall-escalation-rung-${group.firstMicros}`"
+    <OTimeline>
+      <OTimelineItem
+        v-for="group in groups"
+        :key="group.key"
+        :label="group.levelLabel"
+        :variant="rungVariant(group)"
+        :data-test="`oncall-escalation-rung-${group.firstMicros}`"
+      >
+        <div
+          class="flex flex-wrap items-baseline gap-x-2 gap-y-1"
+          :data-test="`oncall-escalation-level-${group.key}`"
         >
-          <div
-            class="flex flex-wrap items-baseline gap-x-2 gap-y-1"
-            :data-test="`oncall-escalation-level-${group.key}`"
-          >
-            <span class="text-text-body min-w-0 flex-1 text-sm">
-              {{ group.said }}
-              <span v-if="group.everyLabel" class="text-text-secondary">{{
-                group.everyLabel
-              }}</span>
-            </span>
+          <span class="text-text-body min-w-0 flex-1 text-sm">
+            {{ group.said }}
+            <span v-if="group.everyLabel" class="text-text-secondary">{{ group.everyLabel }}</span>
+          </span>
 
-            <!-- `/escalation` cannot say this (§G.9 #6): a fired rung that
+          <!-- `/escalation` cannot say this (§G.9 #6): a fired rung that
                  reached nobody looks exactly like one that landed. The timeline
                  can — its page entry carries the whole-rung-lost marker — so the
                  rail cross-references it rather than vouching for every rung. -->
-            <OTag
-              v-if="group.lost"
-              variant="error-soft"
-              size="sm"
-              class="shrink-0"
-              :data-test="`oncall-escalation-rung-lost-${group.firstMicros}`"
-            >
-              {{
-                group.count > 1
-                  ? t("oncall.rungLostTimes", { count: group.count })
-                  : t("oncall.rungLost")
-              }}
-            </OTag>
-            <!-- B9's other "nobody": a rung whose targets resolved to no one.
+          <OTag
+            v-if="group.lost"
+            tone="err"
+            size="sm"
+            class="shrink-0"
+            :data-test="`oncall-escalation-rung-lost-${group.firstMicros}`"
+          >
+            {{
+              group.count > 1
+                ? t("oncall.rungLostTimes", { count: group.count })
+                : t("oncall.rungLost")
+            }}
+          </OTag>
+          <!-- B9's other "nobody": a rung whose targets resolved to no one.
                  The ladder does the OPPOSITE thing about it — an empty rung is
                  consumed and advanced past at once, a lost rung is retried — so
                  the two must not share a tag. -->
-            <OTag
-              v-else-if="group.empty"
-              variant="warning-soft"
-              size="sm"
-              class="shrink-0"
-              :data-test="`oncall-escalation-rung-empty-${group.firstMicros}`"
-            >
-              {{ t("oncall.rungMatchedNobody") }}
-            </OTag>
-            <OTimeCell
-              v-else
-              class="text-text-secondary shrink-0"
-              :value="group.lastAt"
-              unit="us"
-            />
-          </div>
-        </OTimelineItem>
+          <OTag
+            v-else-if="group.empty"
+            tone="warn"
+            size="sm"
+            class="shrink-0"
+            :data-test="`oncall-escalation-rung-empty-${group.firstMicros}`"
+          >
+            {{ t("oncall.rungMatchedNobody") }}
+          </OTag>
+          <OTimeCell v-else class="text-text-secondary shrink-0" :value="group.lastAt" unit="us" />
+        </div>
+      </OTimelineItem>
 
-        <!-- What is still to come, or that nothing is. -->
-        <OTimelineItem
-          :label="t('oncall.ladderEnd')"
-          :variant="endVariant"
-          data-test="oncall-escalation-end"
-        >
-          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span class="min-w-0 flex-1 text-sm" :class="endTone">{{ endLabel }}</span>
-            <OTimeCell v-if="endAt" class="text-text-secondary shrink-0" :value="endAt" unit="us" />
-          </div>
-        </OTimelineItem>
-      </OTimeline>
-    </OCardSection>
+      <!-- What is still to come, or that nothing is. -->
+      <OTimelineItem
+        :label="t('oncall.ladderEnd')"
+        :variant="endVariant"
+        data-test="oncall-escalation-end"
+      >
+        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span class="min-w-0 flex-1 text-sm" :class="endTone">{{ endLabel }}</span>
+          <OTimeCell v-if="endAt" class="text-text-secondary shrink-0" :value="endAt" unit="us" />
+        </div>
+      </OTimelineItem>
+    </OTimeline>
   </OCard>
 </template>
 
@@ -130,9 +120,7 @@ import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.types";

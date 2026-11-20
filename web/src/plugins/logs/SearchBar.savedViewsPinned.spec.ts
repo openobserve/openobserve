@@ -68,45 +68,41 @@ describe("SearchBar — pinned saved views", () => {
     vi.restoreAllMocks();
   });
 
-  it("gives the list trigger the toolbar size with an icon and a caret", async () => {
+  it("gives the list trigger the md toolbar size with an icon and a caret", async () => {
     wrapper = mountSearchBar(1600);
     await flushPromises();
 
     const trigger = group()
       .findAllComponents({ name: "OButton" })
       .find((b) => b.attributes("data-test") === "logs-search-bar-saved-views-pinned-list-btn")!;
-    expect(trigger.props("size")).toBe("sm-toolbar");
+    expect(trigger.attributes("data-o2-size")).toBe("md");
     const icons = trigger.findAllComponents({ name: "OIcon" }).map((c) => c.props("name"));
     expect(icons).toEqual(["saved-search", "arrow-drop-down"]);
   });
 
-  it("divides the list trigger from the save button with a vertical separator", async () => {
+  it("joins the list trigger and the save button as one secondary button group", async () => {
     wrapper = mountSearchBar(1600);
     await flushPromises();
 
     expect(group().exists()).toBe(true);
-    const separator = group().findComponent({ name: "OSeparator" });
-    expect(separator.exists()).toBe(true);
-    expect(separator.props("vertical")).toBe(true);
-    expect(
-      group().find('[data-test="logs-search-bar-saved-views-pinned-create-btn"]').exists(),
-    ).toBe(true);
+    for (const id of ["list-btn", "create-btn"]) {
+      const button = group().find(`[data-test="logs-search-bar-saved-views-pinned-${id}"]`);
+      expect(button.attributes("data-o2-variant")).toBe("secondary");
+    }
   });
 
-  it("is as tall as the 34px toolbar buttons: a hairline border around 2rem children", async () => {
+  it("is as tall as the other md toolbar buttons", async () => {
     wrapper = mountSearchBar(1600);
     await flushPromises();
 
-    expect(group().classes()).toContain("border");
-    expect(group().classes()).toContain("p-0");
     expect(
       group().find('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').classes(),
-    ).toContain("h-8!");
+    ).toContain("h-control-md");
     expect(
       group().find('[data-test="logs-search-bar-saved-views-pinned-create-btn"]').classes(),
-    ).toContain("size-8!");
+    ).toContain("size-control-md");
     expect(wrapper!.find('[data-test="logs-search-bar-reset-filters-btn"]').classes()).toContain(
-      "h-8.5",
+      "h-control-md",
     );
   });
 
@@ -258,14 +254,15 @@ describe("SearchBar — pinned saved views", () => {
   });
 
   // 93px = 1px border + 58px list trigger + 1px separator + 32px create button + 1px border.
+  // The Filter | SQL tray takes its 101px + gap ahead of the pins.
   it.each([
-    [405, false],
-    [406, true],
+    [391, false],
+    [392, true],
   ])(
     "budgets the group at its rendered 93px width (toolbar %ipx → shown: %s)",
     async (width, shown) => {
-      const otherPins = (["histogram", "sqlMode", "quickMode", "syntaxGuide"] as const).filter(
-        (key) => isPinned(key),
+      const otherPins = (["histogram", "quickMode", "syntaxGuide"] as const).filter((key) =>
+        isPinned(key),
       );
       otherPins.forEach((key) => togglePin(key));
       try {

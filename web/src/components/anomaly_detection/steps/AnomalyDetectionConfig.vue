@@ -34,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="tab in queryTabOptions"
               :key="tab.value"
               :value="tab.value"
-              size="sm"
               :data-test="`anomaly-query-tab-${tab.value}`"
             >
               {{ tab.label }}
@@ -155,12 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.detectionFunction") }}
               <span class="text-status-error-text ms-1">*</span>
               <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-                <OTooltip
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                  :content="t('alerts.anomaly.detectionFunctionTooltip')"
-                />
+                <OTooltip side="right" :content="t('alerts.anomaly.detectionFunctionTooltip')" />
               </OIcon>
             </div>
             <!-- items-start, not items-center: the field select renders its
@@ -208,12 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.anomaly.detectionResolution") }}
               <span class="text-status-error-text ms-1">*</span>
               <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-                <OTooltip
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                  :content="t('alerts.anomaly.detectionResolutionTooltip')"
-                />
+                <OTooltip side="right" :content="t('alerts.anomaly.detectionResolutionTooltip')" />
               </OIcon>
             </div>
             <div class="min-w-0 flex-1 basis-48">
@@ -259,12 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.anomaly.detectionResolution") }}
             <span class="text-status-error-text ms-1">*</span>
             <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-              <OTooltip
-                side="right"
-                align="center"
-                max-width="18.75rem"
-                :content="t('alerts.anomaly.detectionResolutionTooltip')"
-              />
+              <OTooltip side="right" :content="t('alerts.anomaly.detectionResolutionTooltip')" />
             </OIcon>
           </div>
           <div class="min-w-0 flex-1 basis-48">
@@ -313,12 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.anomaly.checkEvery") }}
               <span class="text-status-error-text ms-1">*</span>
               <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-                <OTooltip
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                  :content="t('alerts.anomaly.checkEveryTooltip')"
-                />
+                <OTooltip side="right" :content="t('alerts.anomaly.checkEveryTooltip')" />
               </OIcon>
             </div>
             <div class="min-w-0 flex-1 basis-48">
@@ -362,12 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.anomaly.lookBackWindow") }}
               <span class="text-status-error-text ms-1">*</span>
               <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-                <OTooltip
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                  :content="t('alerts.anomaly.lookBackWindowTooltip')"
-                />
+                <OTooltip side="right" :content="t('alerts.anomaly.lookBackWindowTooltip')" />
               </OIcon>
             </div>
             <div class="min-w-0 flex-1 basis-48">
@@ -430,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.trainingWindow") }}
               <span class="text-status-error-text ms-1">*</span>
               <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-                <OTooltip side="right" align="center" max-width="18.75rem">
+                <OTooltip side="right">
                   <!-- Uses a #content slot (not :content) so the font-size
                        span survives. -->
                   <template #content
@@ -466,12 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alerts.anomaly.retrainEvery") }}
               <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-                <OTooltip
-                  side="right"
-                  align="center"
-                  max-width="18.75rem"
-                  :content="t('alerts.anomaly.retrainEveryTooltip')"
-                />
+                <OTooltip side="right" :content="t('alerts.anomaly.retrainEveryTooltip')" />
               </OIcon>
             </div>
             <div class="min-w-0 flex-1 basis-48">
@@ -497,12 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("alerts.sensitivity") }}
             <span class="text-status-error-text ms-1">*</span>
             <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
-              <OTooltip
-                side="right"
-                align="center"
-                max-width="18.75rem"
-                :content="sensitivityTooltip"
-              />
+              <OTooltip side="right" :content="sensitivityTooltip" />
             </OIcon>
           </div>
           <div
@@ -522,7 +486,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="tier in budgetTiers"
                   :key="tier.value"
                   :value="tier.value"
-                  size="sm"
                   :data-test="`anomaly-budget-tier-${tier.value}`"
                 >
                   {{ tier.label }}
@@ -563,7 +526,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="tier in sensitivityTiers"
                   :key="tier.value"
                   :value="tier.value"
-                  size="sm"
                   :data-test="`anomaly-sensitivity-tier-${tier.value}`"
                 >
                   {{ tier.label }}

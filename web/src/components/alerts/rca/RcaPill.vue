@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <span
-    class="text-3xs inline-flex items-center gap-1.5 border px-2 font-bold"
+    class="text-2xs inline-flex items-center gap-1.5 border px-2 font-semibold"
     :class="[
       RCA_PILL_TONE_CLASS[tone],
       wrap
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         : 'h-5.5 shrink-0 rounded-full leading-none whitespace-nowrap',
     ]"
   >
-    <OSpinner v-if="spinner" size="xs" />
+    <OSpinner v-if="spinner" />
     <OIcon v-else-if="icon" :name="icon" size="xs" />
     <slot />
   </span>

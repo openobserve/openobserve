@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, inject } from "vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -113,9 +112,10 @@ const hasIssue = (group: FilterGroup) =>
           }}</span>
           <span v-else-if="index === 0" class="inline-flex">
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs-sq"
-              icon-left="expand-more"
+              size="sm"
+              icon="expand-more"
               aria-expanded="true"
               :aria-label="t('filterBar.collapseGroup')"
               :data-fold-toggle="groupId"
@@ -125,12 +125,10 @@ const hasIssue = (group: FilterGroup) =>
             />
             <OTooltip :content="t('filterBar.collapseGroup')" />
           </span>
-          <OTag
+          <OButton
             v-else-if="connectorMode !== 'and-only'"
-            clickable
+            variant="ghost"
             size="xs"
-            shape="rounded"
-            variant="default-soft"
             :disabled="disabled"
             :label="raw(item.connector)"
             :aria-label="t('filterBar.toggleConnector')"
@@ -141,9 +139,10 @@ const hasIssue = (group: FilterGroup) =>
         </div>
         <span v-if="item.kind === 'group' && canAdd && !isFolded(item.id)" class="inline-flex">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            icon-left="add"
+            size="sm"
+            icon="add"
             :class="REVEAL_GROUP"
             :aria-label="t('filterBar.addBelow')"
             :data-test="`${dataTest}-add-after-${pathOf(index)}`"
@@ -165,9 +164,10 @@ const hasIssue = (group: FilterGroup) =>
         <div class="flex h-6 w-10 shrink-0 items-center">
           <span class="inline-flex">
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs-sq"
-              icon-left="chevron-right"
+              size="sm"
+              icon="chevron-right"
               aria-expanded="false"
               :aria-label="t('filterBar.expandGroup')"
               :data-fold-toggle="item.id"
@@ -180,7 +180,7 @@ const hasIssue = (group: FilterGroup) =>
         </div>
         <span class="inline-flex min-w-0">
           <OButton
-            variant="cell"
+            variant="link"
             class="min-w-0"
             aria-expanded="false"
             :data-fold-toggle="item.id"
@@ -207,9 +207,10 @@ const hasIssue = (group: FilterGroup) =>
         </span>
         <span v-if="canAdd" class="inline-flex">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            icon-left="add"
+            size="sm"
+            icon="add"
             :class="REVEAL_LINE"
             :aria-label="t('filterBar.addBelow')"
             :data-test="`${dataTest}-add-after-${pathOf(index)}`"
@@ -288,9 +289,10 @@ const hasIssue = (group: FilterGroup) =>
         >
         <span v-if="canAdd" class="inline-flex">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            icon-left="add"
+            size="sm"
+            icon="add"
             :class="REVEAL_LINE"
             :aria-label="t('filterBar.addBelow')"
             :data-test="`${dataTest}-add-after-${pathOf(index)}`"
@@ -310,8 +312,7 @@ const hasIssue = (group: FilterGroup) =>
       <span class="inline-flex">
         <OButton
           variant="ghost"
-          size="xs"
-          icon-left="add"
+          size="sm"
           :disabled="disabled || Boolean(limitReason)"
           :data-test="`${dataTest}-add-condition${suffix(path)}`"
           @mousedown.prevent
@@ -323,8 +324,7 @@ const hasIssue = (group: FilterGroup) =>
       <span v-if="canGroupIn(groupId)" class="inline-flex">
         <OButton
           variant="ghost"
-          size="xs"
-          icon-left="add"
+          size="sm"
           :disabled="disabled || Boolean(limitReason)"
           :data-test="`${dataTest}-add-group${suffix(path)}`"
           @mousedown.prevent
@@ -336,8 +336,8 @@ const hasIssue = (group: FilterGroup) =>
       <OButton
         v-if="items.length && (canUngroup?.(groupId) ?? true)"
         variant="ghost"
-        size="xs"
-        icon-left="unfold-more"
+        size="sm"
+        icon="unfold-more"
         :disabled="disabled"
         :data-test="`${dataTest}-ungroup${suffix(path)}`"
         @mousedown.prevent

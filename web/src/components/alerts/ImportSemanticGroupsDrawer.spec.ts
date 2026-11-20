@@ -24,11 +24,11 @@ const ODrawerStub = {
     "open",
     "width",
     "title",
-    "subTitle",
-    "secondaryButtonLabel",
-    "primaryButtonLabel",
-    "primaryButtonDisabled",
-    "primaryButtonLoading",
+    "subtitle",
+    "secondary",
+    "primary",
+    "primary",
+    "primary",
     "persistent",
     "showClose",
     "size",
@@ -37,8 +37,8 @@ const ODrawerStub = {
   template: `
     <div data-test="o-drawer-stub" :data-open="String(open)">
       <slot />
-      <button data-test="import-drawer-cancel-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-      <button data-test="import-drawer-apply-btn" @click="$emit('click:primary')" :disabled="primaryButtonDisabled">{{ primaryButtonLabel }}</button>
+      <button data-test="import-drawer-cancel-btn" @click="$emit('click:secondary')">{{ secondary?.label }}</button>
+      <button data-test="import-drawer-apply-btn" @click="$emit('click:primary')" :disabled="primary?.disabled">{{ primary?.label }}</button>
     </div>
   `,
 };
@@ -46,18 +46,18 @@ const ODrawerStub = {
 const ODialogStub = {
   name: "ODialog",
   template:
-    '<div class="o-dialog-stub" :data-open="open" :data-title="title" :data-sub-title="subTitle" :data-size="size"><slot name="header-left" /><slot name="header-right" /><slot /><slot name="footer" /></div>',
+    '<div class="o-dialog-stub" :data-open="open" :data-title="title" :data-sub-title="subtitle" :data-size="size"><slot name="header-left" /><slot name="header-right" /><slot /><slot name="footer" /></div>',
   props: [
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
+    "primary",
+    "secondary",
+    "extra",
     "primaryVariant",
     "secondaryVariant",
     "neutralVariant",
@@ -68,7 +68,7 @@ const ODialogStub = {
     "secondaryLoading",
     "neutralLoading",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 const mockDiffData = vi.hoisted(() => ({
@@ -392,13 +392,13 @@ describe("ImportSemanticGroupsDrawer - ODialog group details", () => {
     (w.vm as any).viewGroup(mockDiffData.additions[0]);
     await w.vm.$nextTick();
     const dialogs = w.findAllComponents(ODialogStub);
-    expect(dialogs[0].props("subTitle")).toContain("add-1");
+    expect(dialogs[0].props("subtitle")).toContain("add-1");
   });
 
-  it("group details ODialog has primaryButtonLabel 'Close'", async () => {
+  it("group details ODialog has primary?.label 'Close'", async () => {
     const w = await mountComp();
     const dialogs = w.findAllComponents(ODialogStub);
-    expect(dialogs[0].props("primaryButtonLabel")).toBe("Close");
+    expect(dialogs[0].props("primary")?.label).toBe("Close");
   });
 
   it("group details ODialog uses size 'md'", async () => {
@@ -435,16 +435,16 @@ describe("ImportSemanticGroupsDrawer - ODialog modification compare", () => {
     expect(dialogs[1].props("title")).toBe("Updated Group");
   });
 
-  it("modification ODialog passes 'Compare Changes' subTitle", async () => {
+  it("modification ODialog passes 'Compare changes' subTitle", async () => {
     const w = await mountComp();
     const dialogs = w.findAllComponents(ODialogStub);
-    expect(dialogs[1].props("subTitle")).toBe("Compare Changes");
+    expect(dialogs[1].props("subtitle")).toBe("Compare changes");
   });
 
-  it("modification ODialog has primaryButtonLabel 'Close'", async () => {
+  it("modification ODialog has primary?.label 'Close'", async () => {
     const w = await mountComp();
     const dialogs = w.findAllComponents(ODialogStub);
-    expect(dialogs[1].props("primaryButtonLabel")).toBe("Close");
+    expect(dialogs[1].props("primary")?.label).toBe("Close");
   });
 
   it("modification ODialog uses size 'lg'", async () => {

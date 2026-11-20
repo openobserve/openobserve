@@ -1,24 +1,22 @@
 <template>
   <OFormSection
     variant="plain"
-    class="mb-4"
+    class="mb-6"
     :title="t('about.online_title')"
     data-test="license-online-card"
   >
     <template v-if="canUpdate" #actions>
       <OButton
         v-if="canCopy && refresh.successor_available"
-        variant="outline"
-        size="sm-action"
-        icon-left="content-copy"
+        variant="secondary"
+        icon="content-copy"
         data-test="license-online-copy"
         @click="copyStoredKey"
         >{{ t("about.online_copy_renewed") }}</OButton
       >
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="refresh"
+        variant="secondary"
+        icon="refresh"
         :loading="busy"
         data-test="license-online-refresh"
         @click="run(false)"
@@ -26,17 +24,15 @@
       >
       <OButton
         v-if="canCopy && !refresh.successor_available"
-        variant="outline"
-        size="sm-action"
-        icon-left="content-copy"
+        variant="secondary"
+        icon="content-copy"
         data-test="license-online-copy"
         @click="copyStoredKey"
         >{{ t("about.online_copy_fetched") }}</OButton
       >
       <OButton
         v-if="canRotate"
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         :disabled="busy"
         data-test="license-online-rotate"
         @click="run(true)"
@@ -46,8 +42,7 @@
         v-if="
           refresh.mode === 'airgapped' || refresh.mode === 'not_v2' || refresh.mode === 'no_license'
         "
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         data-test="license-online-add-key"
         @click="emit('add-license-key')"
         >{{ t("about.add_new_license_key") }}</OButton
@@ -55,7 +50,7 @@
     </template>
     <OSettingRow control-at="end" :label="t('about.status_lbl')">
       <div class="text-sm">
-        <OTag :variant="badgeVariant">{{ statusLabel(registrationStatus, t) }}</OTag>
+        <OTag :tone="badgeVariant">{{ statusLabel(registrationStatus, t) }}</OTag>
         <span class="text-text-secondary ms-1">{{ statusHint }}</span>
       </div>
     </OSettingRow>
@@ -103,10 +98,7 @@
         <span v-else class="text-text-secondary">{{ t("about.online_key_root_only") }}</span>
       </div>
     </OSettingRow>
-    <div
-      v-if="!canUpdate || outcome || neverRefreshed || refresh.rotate_recommended"
-      class="px-4 py-3"
-    >
+    <div v-if="!canUpdate || outcome || neverRefreshed || refresh.rotate_recommended" class="py-3">
       <div v-if="!canUpdate" class="text-text-secondary text-sm">
         {{ t("about.online_ask_admin") }}
       </div>
@@ -169,15 +161,7 @@ const rotated = ref(false);
 const registrationStatus = computed(() =>
   props.refresh.mode === "online" ? props.refresh.registration : props.refresh.mode,
 );
-const badgeVariant = computed(() =>
-  registrationStatus.value === "registered"
-    ? "success-outline"
-    : registrationStatus.value === "blocked"
-      ? "error-outline"
-      : registrationStatus.value === "key_conflict"
-        ? "warning-outline"
-        : "default-outline",
-);
+const badgeVariant = computed(() => (registrationStatus.value === "blocked" ? "err" : "outline"));
 const statusHint = computed(() =>
   props.refresh.registration === "blocked" && props.licenseExpiresAt
     ? t("about.online_blocked_until", { date: issuedOn(props.licenseExpiresAt, locale.value) })

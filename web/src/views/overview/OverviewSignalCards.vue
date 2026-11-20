@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="view === 'ok' || view === 'loading'"
-    class="grid grid-cols-3 gap-3 max-lg:grid-cols-1"
+    class="grid grid-cols-3 gap-x-8 gap-y-6 max-lg:grid-cols-1"
     data-test="overview-signal-cards"
   >
     <template v-if="view === 'loading'">
@@ -47,15 +47,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`overview-signal-${card.signal}-swatch`"
           />
         </template>
-        <dl class="flex flex-col" :data-test="`overview-signal-${card.signal}-stats`">
+        <dl
+          class="divide-border-subtle flex flex-col divide-y"
+          :data-test="`overview-signal-${card.signal}-stats`"
+        >
           <div
             v-for="stat in card.stats"
             :key="stat.key"
-            class="border-border-default flex items-baseline justify-between gap-3 border-t px-3 py-2"
+            class="flex items-baseline justify-between gap-3 py-1.5"
           >
-            <dt class="text-text-label text-xs">{{ stat.label }}</dt>
+            <dt class="text-text-secondary text-xs">{{ stat.label }}</dt>
             <dd
-              class="text-text-heading text-sm font-semibold tabular-nums"
+              class="text-text-heading text-compact font-semibold tabular-nums"
               :data-test="`overview-signal-${card.signal}-${stat.key}`"
             >
               {{ stat.value }}
@@ -71,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { SEGMENT_SWATCH } from "@/lib/data/SegmentedBar/OSegmentedBar.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { formatEventCount, formatSizeFromMB } from "@/utils/formatters";
+import { formatCompactCount, formatSizeFromMB } from "@/utils/formatters";
 import type { OverviewSection, OverviewStreamsData } from "@/ts/interfaces/overview";
 import OverviewSectionCard from "./OverviewSectionCard.vue";
 import {
@@ -106,11 +109,15 @@ const cards = computed(() => {
     return {
       signal,
       stats: [
-        { key: "streams", label: t("overview.signals.streams"), value: raw(summary?.count ?? 0) },
+        {
+          key: "streams",
+          label: t("overview.signals.streams"),
+          value: raw(formatCompactCount(summary?.count ?? 0)),
+        },
         {
           key: "events",
           label: t(`overview.signals.${COUNT_LABEL[signal]}`),
-          value: raw(formatEventCount(summary?.doc_num ?? 0)),
+          value: raw(formatCompactCount(summary?.doc_num ?? 0)),
         },
         {
           key: "stored",

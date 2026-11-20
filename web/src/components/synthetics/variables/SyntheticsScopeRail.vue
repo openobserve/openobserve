@@ -24,8 +24,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("synthetics.variables.scope") }}
       <div>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon"
+          size="xs"
           :title="t('synthetics.environments.newButton')"
           data-test="synthetics-scope-new-environment"
           @click.stop="$emit('new-environment')"
@@ -39,7 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSearchInput
         v-model="searchQuery"
         :placeholder="t('synthetics.environments.searchPlaceholder')"
-        clearable
         class="w-full"
         data-test="synthetics-scope-search"
       />
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex-1 overflow-y-auto px-1">
       <OTabs
         orientation="vertical"
-        dense
+        size="compact"
         :model-value="modelValue"
         data-test="synthetics-scope-tabs"
         @update:model-value="$emit('update:modelValue', String($event))"
@@ -57,7 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="env in filteredEnvironments"
           :key="env.id"
           :name="env.name"
-          class="min-h-6"
           :data-test="env.is_global ? 'synthetics-scope-global' : `synthetics-scope-${env.name}`"
         >
           <div class="group/row flex w-full flex-nowrap items-center gap-2">
@@ -75,11 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="start">
                 <template #trigger>
                   <OButton
+                    icon-only
                     :aria-label="t('common.moreActions')"
-                    size="icon"
+                    size="xs"
                     variant="ghost"
-                    icon-left="more-vert"
-                    class="h-5 w-5"
+                    icon="more-vert"
                     :data-test="`synthetics-scope-more-${env.name}`"
                   />
                 </template>
@@ -88,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`synthetics-scope-edit-${env.name}`"
                   @select="$emit('edit', env)"
                 >
-                  <template #icon-left><OIcon name="edit" size="xs" /></template>
+                  <template #icon><OIcon name="edit" size="xs" /></template>
                   {{ t("common.edit") }}
                 </ODropdownItem>
 
@@ -96,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`synthetics-scope-duplicate-${env.name}`"
                   @select="$emit('duplicate', env)"
                 >
-                  <template #icon-left><OIcon name="content-copy" size="xs" /></template>
+                  <template #icon><OIcon name="content-copy" size="xs" /></template>
                   {{ t("synthetics.duplicate.action") }}
                 </ODropdownItem>
 
@@ -104,12 +103,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <ODropdownItem
                   v-if="canDeleteEnvironment(env)"
-                  variant="destructive"
+                  tone="danger"
                   :disabled="Boolean(deleteBlockFor(env))"
                   :data-test="`synthetics-scope-delete-${env.name}`"
                   @select="$emit('delete', env)"
                 >
-                  <template #icon-left><OIcon name="delete" size="xs" /></template>
+                  <template #icon><OIcon name="delete" size="xs" /></template>
                   <span class="flex flex-col">
                     <span>{{ t("common.delete") }}</span>
                     <span v-if="deleteBlockFor(env)" class="text-text-secondary text-xs">{{

@@ -102,13 +102,13 @@ const stubs = {
       </template>
     </div>`,
   },
-  // Renders its description and action so the error assertions test OUR
+  // Renders its text and action so the error assertions test OUR
   // wiring rather than the stub swallowing both.
   OEmptyState: {
     name: "OEmptyState",
-    props: ["description", "actionLabel"],
+    props: ["text", "actionLabel"],
     emits: ["action"],
-    template: `<div>{{ description }}<button @click="$emit('action')">{{ actionLabel }}</button></div>`,
+    template: `<div>{{ text }}<button @click="$emit('action')">{{ actionLabel }}</button></div>`,
   },
   OSearchInput: {
     name: "OSearchInput",
@@ -124,15 +124,19 @@ const stubs = {
     props: ["content"],
     template: "<span>{{ content }}<slot /></span>",
   },
-  OTag: { name: "OTag", props: ["variant", "type", "value"], template: "<span><slot /></span>" },
+  OTag: {
+    name: "OTag",
+    props: ["tone", "type", "value", "label"],
+    template: "<span><slot>{{ label }}</slot></span>",
+  },
   OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
   // Renders the menu open, so a row action behind ⋯ can be found and clicked like any other.
   ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
   ODropdownItem: {
     name: "ODropdownItem",
-    props: ["iconLeft", "variant", "disabled", "description", "focusableUnavailable"],
+    props: ["icon", "tone", "disabled", "disabledReason", "description"],
     emits: ["select"],
-    template: `<button :data-icon="iconLeft" @click="$emit('select')"><slot /></button>`,
+    template: `<button :data-icon="icon" @click="$emit('select')"><slot /></button>`,
   },
   OnCallTeamForm: {
     name: "OnCallTeamForm",
@@ -142,7 +146,7 @@ const stubs = {
   },
   ConfirmDialog: {
     name: "ConfirmDialog",
-    props: ["modelValue", "message", "messageKeypath", "messageName", "okLabel", "okVariant"],
+    props: ["modelValue", "message", "messageKeypath", "messageName", "okLabel", "kind"],
     emits: ["update:ok", "update:cancel"],
     template:
       "<div v-if='modelValue' data-test='confirm'>{{ messageKeypath ? $t(messageKeypath, { name: messageName }) : message }}</div>",
@@ -239,7 +243,7 @@ describe("OnCallTeams", () => {
     service.listTeams.mockResolvedValue(ok([]));
     const wrapper = render();
     await flushPromises();
-    expect(wrapper.find('[data-test="oncall-teams-add-btn"]').attributes("icon-left")).toBe("add");
+    expect(wrapper.find('[data-test="oncall-teams-add-btn"]').attributes("icon")).toBeUndefined();
   });
 
   // Search, columns and refresh have nothing to act on until a team exists.
@@ -478,7 +482,7 @@ describe("OnCallTeams", () => {
       const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
       expect(dialog.props("messageKeypath")).toBe("oncall.deleteTeamMessageToUnrouted");
       expect(dialog.props("messageName")).toBe("Platform");
-      expect(dialog.props("okVariant")).toBe("destructive");
+      expect(dialog.props("kind")).toBe("destructive");
       expect(service.deleteTeam).not.toHaveBeenCalled();
     });
 
@@ -488,7 +492,7 @@ describe("OnCallTeams", () => {
       const confirm = wrapper.findComponent({ name: "ConfirmDialog" });
 
       expect(confirm.props("okLabel")).toBe("Delete team");
-      expect(confirm.props("okVariant")).toBe("destructive");
+      expect(confirm.props("kind")).toBe("destructive");
       expect(confirm.props("messageKeypath")).toBe("oncall.deleteTeamMessageToUnrouted");
       expect(confirm.props("messageName")).toBe("Platform");
     });
@@ -598,7 +602,7 @@ describe("OnCallTeams", () => {
         '[data-test="oncall-team-delete-team_1-menu"]',
       ) as AnyPropsWrapper;
       expect(item.props("disabled")).toBe(true);
-      expect(String(item.props("description"))).toBe("Make another team the default first");
+      expect(String(item.props("disabledReason"))).toBe("Make another team the default first");
     });
 
     /// The destructive one last, so the mouse does not pass over it on the way
@@ -669,8 +673,7 @@ describe("OnCallTeams", () => {
 
       const blocked = wrapper.findComponent('[data-test="oncall-team-delete-team_2"]');
       expect(blocked.attributes("disabled")).toBeDefined();
-      expect(blocked.attributes("focusable-unavailable")).toBeDefined();
-      expect(blocked.element.parentElement?.textContent).toContain(
+      expect(blocked.attributes("disabled-reason")).toContain(
         "Make another team the default first",
       );
       const open = wrapper.find('[data-test="oncall-team-delete-team_1"]');
@@ -966,7 +969,7 @@ describe("OnCallTeams - editor drafts", () => {
       expect(wrapper.find('[data-test="setup-banner"]').exists()).toBe(false);
       const empty = wrapper.findComponent('[data-test="oncall-teams-empty"]') as AnyPropsWrapper;
       expect(empty.exists()).toBe(true);
-      expect(empty.props("description")).toBeUndefined();
+      expect(empty.props("text")).toBeUndefined();
       expect(empty.text()).not.toContain("A team decides who gets woken");
     });
   });

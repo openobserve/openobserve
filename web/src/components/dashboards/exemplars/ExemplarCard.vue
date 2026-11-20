@@ -166,7 +166,7 @@ const position = computed(() => {
         <OTag
           v-for="tag in tags"
           :key="tag.index"
-          variant="default-soft"
+          tone="neutral"
           size="sm"
           :title="tag.query"
           :data-query-index="tag.index"
@@ -204,12 +204,11 @@ const position = computed(() => {
           <OTooltip v-if="lockedReason" :content="lockedReason">
             <span class="inline-flex">
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 disabled
                 data-test="dashboard-panel-exemplar-open-trace-locked"
               >
-                <template #icon-left>
+                <template #icon>
                   <OIcon
                     name="lock"
                     class="text-icon-locked"
@@ -223,19 +222,17 @@ const position = computed(() => {
           </OTooltip>
           <OButton
             v-else-if="verdict.state === 'checking'"
-            variant="outline"
-            size="sm"
+            variant="secondary"
             disabled
             data-test="dashboard-panel-exemplar-trace-checking"
           >
-            <template #icon-left><OSpinner size="xs" /></template>
+            <template #icon><OSpinner /></template>
             {{ t("dashboard.exemplars.checkingTrace") }}
           </OButton>
           <OButton
             v-else-if="verdict.state === 'found'"
             variant="primary"
-            size="sm"
-            icon-left="account-tree"
+            icon="account-tree"
             data-test="dashboard-panel-exemplar-open-trace"
             @click="emit('open-trace')"
           >
@@ -244,9 +241,8 @@ const position = computed(() => {
 
           <OButton
             v-else-if="verdict.state === 'unverified'"
-            variant="outline"
-            size="sm"
-            icon-left="account-tree"
+            variant="secondary"
+            icon="account-tree"
             :data-reason="verdict.reason"
             data-test="dashboard-panel-exemplar-open-trace-unverified"
             @click="emit('open-trace')"
@@ -275,19 +271,19 @@ const position = computed(() => {
 
       <template v-if="labelEntries.length">
         <OSeparator />
-        <ODescriptionList dense data-test="dashboard-panel-exemplar-labels">
+        <ODescriptionList
+          layout="stacked"
+          labels="mono"
+          data-test="dashboard-panel-exemplar-labels"
+        >
           <ODescriptionItem
             v-for="[key, value] in labelEntries"
             :key="key"
             :label="raw(key)"
-            stacked
+            :value="value"
             :data-test="`dashboard-panel-exemplar-label-${key}`"
-          >
-            <template #label>
-              <span class="text-text-secondary text-2xs font-mono">{{ key }}</span>
-            </template>
-            <span class="text-text-body text-2xs font-mono break-all select-text">{{ value }}</span>
-          </ODescriptionItem>
+            class="select-text"
+          />
         </ODescriptionList>
       </template>
     </div>

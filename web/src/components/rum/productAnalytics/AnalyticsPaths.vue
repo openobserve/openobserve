@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="px-page-edge flex flex-col gap-3 py-3" data-test="rum-analytics-paths">
-    <OCard variant="outlined" class="rounded-surface flex flex-col">
+    <OCard flush>
       <div
         class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2"
         data-test="rum-analytics-paths-toolbar"
@@ -27,9 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="rum-analytics-paths-cohort-source"
         >
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="chevron-left"
+            icon="chevron-left"
             :aria-label="t('rum.analytics.pathsView.backToFunnel')"
             data-test="rum-analytics-paths-cohort-back-btn"
             @click="backToFunnel"
@@ -70,20 +70,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("rum.analytics.pathsView.cohortWord") }}</span
               >
               <OPopover
+                size="md"
                 :open="cohortOpen"
                 side="bottom"
                 align="start"
-                content-class="p-3 w-80 max-w-[calc(100vw-1.5rem)]"
+                content-class="p-3"
                 @update:open="(v) => (cohortOpen = v)"
               >
                 <template #trigger>
                   <span class="flex min-w-0">
                     <OTag
                       :label="raw(anchorLabel)"
-                      variant="primary-outline"
-                      size="md"
                       icon="filter-alt"
-                      clickable
+                      toggle
+                      :pressed="cohortOpen"
                       removable
                       class="max-w-full min-w-0"
                       :remove-label="t('rum.analytics.pathsView.clearScope')"
@@ -112,7 +112,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex flex-wrap gap-2">
                     <OButton
                       variant="ghost"
-                      size="sm-action"
                       data-test="rum-analytics-paths-cohort-clear-btn"
                       @click="clearCohort"
                       >{{ t("rum.analytics.pathsView.clearScope") }}</OButton
@@ -124,69 +123,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #direction>
             <OToggleGroup
+              size="sm"
               :model-value="def.direction"
               type="single"
               data-test="rum-analytics-paths-direction-toggle"
               @update:model-value="(v) => v && update({ direction: v as 'next' | 'prev' })"
             >
-              <OToggleGroupItem
-                value="next"
-                size="xs"
-                data-test="rum-analytics-paths-direction-next"
-                >{{ t("rum.analytics.pathsView.next") }}</OToggleGroupItem
-              >
-              <OToggleGroupItem
-                value="prev"
-                size="xs"
-                data-test="rum-analytics-paths-direction-prev"
-                >{{ t("rum.analytics.pathsView.previous") }}</OToggleGroupItem
-              >
+              <OToggleGroupItem value="next" data-test="rum-analytics-paths-direction-next">{{
+                t("rum.analytics.pathsView.next")
+              }}</OToggleGroupItem>
+              <OToggleGroupItem value="prev" data-test="rum-analytics-paths-direction-prev">{{
+                t("rum.analytics.pathsView.previous")
+              }}</OToggleGroupItem>
             </OToggleGroup>
           </template>
           <template #depth>
             <OSelect
               :model-value="def.depth"
               :options="depthOptions"
-              size="sm"
-              width="xs"
+              width="s"
               data-test="rum-analytics-paths-depth-select"
               @update:model-value="(v) => update({ depth: Number(v) })"
             />
           </template>
           <template #include>
             <OToggleGroup
+              size="sm"
               :model-value="def.include"
               type="single"
               mobile-dropdown
               data-test="rum-analytics-paths-include-toggle"
               @update:model-value="(v) => v && update({ include: v as PathsInclude })"
             >
-              <OToggleGroupItem value="all" size="xs" data-test="rum-analytics-paths-include-all">{{
+              <OToggleGroupItem value="all" data-test="rum-analytics-paths-include-all">{{
                 t("rum.analytics.pathsView.includeAll")
               }}</OToggleGroupItem>
-              <OToggleGroupItem
-                value="pages"
-                size="xs"
-                data-test="rum-analytics-paths-include-pages"
-                >{{ t("rum.analytics.pathsView.includePages") }}</OToggleGroupItem
-              >
-              <OToggleGroupItem
-                value="clicks"
-                size="xs"
-                data-test="rum-analytics-paths-include-clicks"
-                >{{ t("rum.analytics.pathsView.includeClicks") }}</OToggleGroupItem
-              >
+              <OToggleGroupItem value="pages" data-test="rum-analytics-paths-include-pages">{{
+                t("rum.analytics.pathsView.includePages")
+              }}</OToggleGroupItem>
+              <OToggleGroupItem value="clicks" data-test="rum-analytics-paths-include-clicks">{{
+                t("rum.analytics.pathsView.includeClicks")
+              }}</OToggleGroupItem>
             </OToggleGroup>
           </template>
         </i18n-t>
       </div>
       <div class="px-4 py-3">
-        <OBanner
+        <OInlineNotice
           v-if="flow && flow.truncated"
-          variant="info"
-          dense
+          tone="info"
           class="mb-2"
-          :content="
+          :message="
             t('rum.analytics.pathsView.truncated', {
               pct: shownPct,
               anchor: formatCount(flow.anchorSessions, ratio),
@@ -202,16 +189,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OEmptyState
           v-else-if="anchorIgnored"
-          preset="no-search-results"
-          size="block"
+          kind="filtered"
           :title="t('rum.analytics.pathsView.anchorIgnoredTitle')"
-          :description="t('rum.analytics.pathsView.anchorIgnoredDescription')"
+          :text="t('rum.analytics.pathsView.anchorIgnoredDescription')"
           data-test="rum-analytics-paths-anchor-ignored"
         >
           <template #actions>
             <OButton
-              variant="outline"
-              size="md"
+              variant="secondary"
               data-test="rum-analytics-paths-anchor-ignored-edit-btn"
               @click="emit('open-exclusions')"
               >{{ t("rum.analytics.pathsView.editExclusions") }}</OButton
@@ -220,17 +205,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OEmptyState>
         <OEmptyState
           v-else-if="anchorIssue === 'none'"
-          preset="no-search-results"
-          size="block"
+          kind="filtered"
           :title="t('rum.analytics.pathsView.noAnchorTitle')"
-          :description="t('rum.analytics.pathsView.noAnchorDescription')"
+          :text="t('rum.analytics.pathsView.noAnchorDescription')"
           data-test="rum-analytics-paths-no-anchor"
         >
           <template #actions>
             <OButton
               v-if="pa.canWidenRange.value"
-              variant="outline"
-              size="md"
+              variant="secondary"
               data-test="rum-analytics-paths-no-anchor-widen-range-btn"
               @click="widenRange"
               >{{ t("rum.analytics.overview.widenRange") }}</OButton
@@ -246,14 +229,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OEmptyState
             v-if="!flow || !flow.anchorSessions"
-            preset="no-search-results"
-            size="block"
+            kind="filtered"
             :title="
               def.cohort
                 ? t('rum.analytics.pathsView.emptyCohortTitle', { anchor: raw(anchorLabel) })
                 : t('rum.analytics.pathsView.emptyTitle', { anchor: raw(anchorLabel) })
             "
-            :description="
+            :text="
               def.cohort
                 ? t('rum.analytics.pathsView.emptyCohortDescription')
                 : t('rum.analytics.pathsView.emptyDescription')
@@ -263,17 +245,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #actions>
               <OButton
                 v-if="def.cohort"
-                variant="outline"
-                size="md"
-                icon-left="arrow-back"
+                variant="secondary"
                 data-test="rum-analytics-paths-empty-back-btn"
                 @click="backToFunnel"
                 >{{ t("rum.analytics.pathsView.backToFunnel") }}</OButton
               >
               <OButton
                 v-if="pa.canWidenRange.value"
-                variant="outline"
-                size="md"
+                variant="secondary"
                 data-test="rum-analytics-paths-widen-range-btn"
                 @click="widenRange"
                 >{{ t("rum.analytics.overview.widenRange") }}</OButton
@@ -306,8 +285,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             )
           }}
           <OButton
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             data-test="rum-analytics-paths-ignored-edit-btn"
             @click="emit('open-exclusions')"
             >{{ t("rum.analytics.pathsView.editExclusions") }}</OButton
@@ -318,21 +297,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OCard
       v-if="flow && flow.anchorSessions"
-      variant="outlined"
-      class="rounded-surface overflow-hidden"
+      flush
+      :title="t('rum.analytics.pathsView.topPaths')"
+      :meta="
+        t(
+          'rum.analytics.pathsView.topPathsCaption',
+          { count: formatCount(flow.anchorSessions, ratio), anchor: raw(anchorLabel) },
+          flow.anchorSessions,
+        )
+      "
     >
-      <div class="border-border-default flex items-baseline gap-2 border-b px-4 py-2">
-        <span class="text-text-heading text-sm font-semibold">{{
-          t("rum.analytics.pathsView.topPaths")
-        }}</span>
-        <span class="text-text-secondary text-xs">{{
-          t(
-            "rum.analytics.pathsView.topPathsCaption",
-            { count: formatCount(flow.anchorSessions, ratio), anchor: raw(anchorLabel) },
-            flow.anchorSessions,
-          )
-        }}</span>
-      </div>
       <TopPathsTable
         :rows="pathsPanel.rows"
         :anchor-sessions="flow.anchorSessions"
@@ -370,7 +344,7 @@ import { useStore } from "vuex";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

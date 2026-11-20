@@ -1,49 +1,13 @@
 /**
- * OContextMenuItem.types.ts — public types for OContextMenuItem.
+ * OContextMenuItem.types.ts — a context-menu item shares the dropdown menu item's API.
  */
 
-import type { I18nText } from "@/types/i18n";
-import type { IconName } from "../../core/Icon/OIcon.icons";
+import type { MenuItemProps, MenuItemSlots } from "../Dropdown/ODropdownItem.types";
 
-/** Visual intent of the item */
-export type ContextMenuItemVariant = "default" | "destructive";
-
-export interface ContextMenuItemProps {
-  /** Visual intent — use destructive for Delete/Remove actions */
-  variant?: ContextMenuItemVariant;
-  /** Prevents the user from interacting with this item */
-  disabled?: boolean;
-  /** Keeps an unavailable item in keyboard navigation. */
-  focusableUnavailable?: boolean;
-  /** Explains why the item cannot be activated. */
-  description?: I18nText;
-  /** Text used for typeahead matching (overrides text content) */
-  textValue?: string;
-  /** Icon placed before the label — renders an OIcon internally */
-  iconLeft?: IconName;
-  /**
-   * Renders a keyboard-shortcut hint (OShortcut keycaps) at the trailing edge
-   * of the item. Accepts a pre-symbolised string (`"⌘I"`) or an array of
-   * keycaps (`["⌘", "I"]`). Omit to show no hint.
-   */
-  shortcut?: string | string[];
-  /**
-   * Registry shortcut id — resolves the hint keys from `shortcutRegistry.ts`
-   * (the single source of truth) so a key change there updates this item too.
-   * Prefer this over `shortcut`; `shortcut` wins if both are set.
-   */
-  shortcutId?: string;
-}
+export type ContextMenuItemProps = MenuItemProps;
 
 export interface ContextMenuItemEmits {
   (e: "select", event: Event): void;
 }
 
-export interface ContextMenuItemSlots {
-  /** Icon placed before the label */
-  "icon-left"?: () => unknown;
-  /** Label text / content */
-  default?: () => unknown;
-  /** Icon placed after the label */
-  "icon-right"?: () => unknown;
-}
+export type ContextMenuItemSlots = MenuItemSlots;

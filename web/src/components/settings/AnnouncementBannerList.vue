@@ -17,14 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('announcements.settings.label')"
-    icon="campaign"
-    :subtitle="t('announcements.list.subtitle')"
+    :about="t('announcements.list.subtitle')"
     bleed
   >
     <template #actions>
       <OButton
         variant="primary"
-        size="sm"
         data-test="announcement-list-add-btn"
         :aria-label="
           bannerDrafts.hasNew
@@ -83,7 +81,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
-          :frame="false"
           data-test="announcement-list-table"
           :data="rows"
           :columns="columns"
@@ -92,17 +89,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="none"
           :default-columns="false"
           :enable-column-resize="true"
-          :show-global-filter="false"
           :column-visibility="isMobile ? PHONE_HIDDEN_COLUMNS : undefined"
           :loading="configQuery.isLoading.value"
           :row-actions="rowActions"
+          :row-menu="rowMenu"
           @row-click="(row) => openEditor({ index: String(row.index) })"
         >
           <template #empty>
             <OEmptyState
               v-if="!configQuery.isLoading.value"
-              size="hero"
-              preset="no-announcement-banners"
+              icon="campaign"
+              :title="t('emptyState.noAnnouncementBanners.title')"
+              :text="t('emptyState.noAnnouncementBanners.description')"
+              :action-label="t('emptyState.noAnnouncementBanners.action')"
               data-test="announcement-list-empty"
               @action="openEditor()"
             />
@@ -123,13 +122,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #cell-severity="{ row }">
-            <OBadge :variant="SEVERITY_BADGE[row.draft.variant]" size="sm">
+            <OBadge :tone="SEVERITY_BADGE[row.draft.variant]" size="sm">
               {{ row.severityLabel }}
             </OBadge>
           </template>
           <template #cell-status="{ row }">
             <OBadge
-              :variant="STATUS_BADGE[row.status]"
+              :tone="STATUS_BADGE[row.status]"
               size="sm"
               :title="row.statusHint"
               :data-test="`announcement-list-status-${row.index}`"
@@ -147,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       message-keypath="announcements.list.deleteMessage"
       :message-name="deleteName"
       :ok-label="t('announcements.list.deleteConfirm')"
-      ok-variant="destructive"
+      kind="destructive"
       @update:ok="removeBanner"
       @update:cancel="deleteOpen = false"
     />
@@ -166,13 +165,17 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { useTheme } from "@/composables/useTheme";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { ONameLinkCell } from "@/lib/core/Table/cells";
-import type { OTableColumnDef, OTableRowAction } from "@/lib/core/Table/OTable.types";
+import type {
+  OTableColumnDef,
+  OTableRowAction,
+  OTableRowMenuItem,
+} from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
@@ -219,18 +222,18 @@ interface BannerRow {
   audience: string;
 }
 
-const SEVERITY_BADGE: Record<BannerVariantName, BadgeVariant> = {
-  critical: "error-soft",
-  warning: "warning-soft",
-  info: "primary-soft",
-  promo: "default-soft",
+const SEVERITY_BADGE: Record<BannerVariantName, ChipTone> = {
+  critical: "err",
+  warning: "warn",
+  info: "accent",
+  promo: "neutral",
 };
 
-const STATUS_BADGE: Record<RowStatus, BadgeVariant> = {
-  live: "success-soft",
-  hidden: "warning-soft",
-  scheduled: "primary-soft",
-  ended: "default-soft",
+const STATUS_BADGE: Record<RowStatus, ChipTone> = {
+  live: "ok",
+  hidden: "warn",
+  scheduled: "accent",
+  ended: "neutral",
 };
 
 /** Statuses like "ends in 5 min" and Live/Ended flips go stale without a refresh. */
@@ -353,12 +356,6 @@ const columns = computed<OTableColumnDef<BannerRow>[]>(() => [
     meta: { flex: true },
   },
   { id: "audience", header: t("announcements.form.orgs"), accessorKey: "audience", size: 150 },
-  {
-    id: "actions",
-    header: t("announcements.list.actions"),
-    isAction: true,
-    pinned: "right",
-  },
 ]);
 
 const draftLabel = useDraftLabel();
@@ -375,14 +372,14 @@ const rowActions = computed<OTableRowAction<BannerRow>[]>(() => [
     id: "edit",
     label: t("announcements.card.edit"),
     icon: "edit",
-    onSelect: (row) => openEditor({ index: String(row.index) }),
+    onClick: (row) => openEditor({ index: String(row.index) }),
     dataTest: (row) => `announcement-list-edit-${row.index}`,
   },
   {
     id: "duplicate",
     label: duplicateLabel,
     icon: "content-copy",
-    onSelect: (row) => openEditor({ duplicate: String(row.index) }),
+    onClick: (row) => openEditor({ duplicate: String(row.index) }),
     badge: (row) =>
       hasDuplicateDraft(row) && {
         label: duplicateLabel(row),
@@ -390,10 +387,14 @@ const rowActions = computed<OTableRowAction<BannerRow>[]>(() => [
       },
     dataTest: (row) => `announcement-list-duplicate-${row.index}`,
   },
+]);
+
+const rowMenu = computed<OTableRowMenuItem<BannerRow>[]>(() => [
   {
     id: "delete",
     label: t("announcements.card.remove"),
     icon: "delete",
+    destructive: true,
     onSelect: (row) => confirmDelete(row.index),
     dataTest: (row) => `announcement-list-delete-${row.index}`,
   },

@@ -20,7 +20,8 @@
       "close": "Sluiten",
       "mitre": "MITRE ATT&CK",
       "severity": "Ernst",
-      "viewAll": "Alles bekijken"
+      "viewAll": "Alles bekijken",
+      "moreActions": "Meer acties"
     },
     "caseStatus": {
       "open": "Nieuw",
@@ -161,7 +162,15 @@
       "explore": "Verkennen",
       "noSources": "Nog geen beveiligingsbronnen",
       "noSourcesHint": "Ingesteer CloudTrail, Okta, VPC Flow of syslog. Streams met security, audit, auth of firewall in de naam verschijnen hier automatisch.",
-      "summaryPartial": "Dit venster bevat meer alarmgeschiedenis dan één samenvatting aankan, dus tellingen en grafieken zijn een ondergrens; kies een korter venster voor volledige cijfers."
+      "summaryPartial": "Dit venster bevat meer alarmgeschiedenis dan één samenvatting aankan, dus tellingen en grafieken zijn een ondergrens; kies een korter venster voor volledige cijfers.",
+      "autoRefresh": "Elke minuut automatisch vernieuwen",
+      "whatDetections": "detecties",
+      "rulesFailedHint": "Detecties konden niet worden gelezen, dus triggers kunnen niet worden geteld. Probeer opnieuw of bekijk de pagina Detecties.",
+      "historyFailedHint": "De triggergeschiedenis is niet beschikbaar, dus triggers worden niet geteld. Probeer opnieuw of bekijk de pagina Meldingen.",
+      "whatFirings": "triggers",
+      "emptyTitle": "Nog geen detecties ingeschakeld",
+      "emptyHint": "Schakel detecties in vanuit de Sigma-catalogus om te beginnen met monitoren. Controleer onder Bronnen of je beveiligingsdata binnenkomt.",
+      "openSources": "Bronnen openen"
     },
     "events": {
       "title": "Beveiligingsgebeurtenissen",
@@ -279,7 +288,8 @@
           "outcome": "Uitkomst",
           "message": "Bericht"
         }
-      }
+      },
+      "openSources": "Bronnen openen"
     },
     "drawer": {
       "event": "Beveiligingsgebeurtenis",
@@ -459,7 +469,9 @@
         "action": "Actie",
         "object": "Object",
         "host": "Host"
-      }
+      },
+      "whatAlerts": "meldingen",
+      "loadFailedHint": "De triggergeschiedenis kon niet worden gelezen. Probeer opnieuw of controleer onder Detecties of detecties zijn ingeschakeld."
     },
     "cases": {
       "title": "Casussen",
@@ -708,7 +720,9 @@
         "showAll": "Alle rijen tonen",
         "onlyEntity": "Alleen entiteiten van deze casus",
         "noneForEntity": "Geen rij in deze melding noemt de entiteiten van deze casus"
-      }
+      },
+      "whatCases": "zaken",
+      "loadFailedHint": "Zaken konden niet worden gelezen. Probeer opnieuw of controleer of zaakbeheer is ingeschakeld voor deze organisatie."
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
@@ -771,7 +785,9 @@
       "manageDetections": "Detecties beheren",
       "historyNarrowed": "Het maximale querybereik van de alarmgeschiedenis beperkt afgaan tot die sinds {from}; eerdere afgaan in dit venster worden niet meegeteld.",
       "cellNone": "Geen regel",
-      "coverageError": "De ATT&CK-dekking kon niet worden geladen: {reason}"
+      "coverageError": "De ATT&CK-dekking kon niet worden geladen: {reason}",
+      "whatCoverage": "ATT&CK-dekking",
+      "loadFailedHint": "De dekking kon niet worden berekend, dus er worden geen aantallen getoond. Probeer opnieuw of bekijk de pagina Detecties."
     },
     "detections": {
       "title": "Detecties",
@@ -998,7 +1014,9 @@
           "in_cidr": "valt in bereik (CIDR)",
           "in_list": "staat in allowlist"
         }
-      }
+      },
+      "whatDetections": "detecties",
+      "loadFailedHint": "Detecties konden niet worden gelezen. Probeer opnieuw of controleer of je meldingen in deze organisatie mag bekijken."
     },
     "tuning": {
       "open": "Afstemming",
@@ -1215,7 +1233,9 @@
         "openAllowlists": "Allowlists openen"
       },
       "otherSourceOnly": "Alleen andere bronnen",
-      "otherSourceOnlyHint": "Geschreven voor {logsource}. Hij compileert op uw streams alleen via gedeelde veldnamen, dus telt niet als klaar om te installeren."
+      "otherSourceOnlyHint": "Geschreven voor {logsource}. Hij compileert op uw streams alleen via gedeelde veldnamen, dus telt niet als klaar om te installeren.",
+      "whatRules": "de detectiecatalogus",
+      "loadFailedHint": "De Sigma-catalogus is niet geladen, dus aantallen regels en bronnen zijn onbekend. Probeer het zo opnieuw."
     },
     "entities": {
       "title": "Entiteiten",
@@ -1335,7 +1355,9 @@
       "loadError": "Kon beveiligingsbronnen niet laden",
       "detailFailed": "Sommige gegevens van deze entiteit konden niet worden gelezen: {streams}.",
       "aliasCount": "+{n} spelling | +{n} spellingen",
-      "aliasHint": "Gelogd met deze spelling; het is dezelfde identiteit."
+      "aliasHint": "Gelogd met deze spelling; het is dezelfde identiteit.",
+      "whatEntities": "entiteiten",
+      "loadFailedHint": "Beveiligingsbronnen zijn onbereikbaar. Controleer onder Bronnen of een bron is verbonden en probeer opnieuw."
     },
     "ueba": {
       "title": "Gebruikersgedraganalyse",
@@ -1434,7 +1456,9 @@
       "volumeNotJudged": "Volume wordt niet beoordeeld voor deze gebruiker: vensters korter dan een dag worden vergeleken met dezelfde uren van de dag in de basislijn, wat ten minste een dag geschiedenis vereist.",
       "baselineBuilding": "Baseline wordt opgebouwd",
       "baselineBuildingHint": "Tot nu toe {span} aan geschiedenis. Vergelijking met het eigen verleden van deze gebruiker begint zodra er een volledige geschiedenis van {baseline} is; tot die tijd worden alleen duidelijke uitschieters ten opzichte van andere gebruikers gemarkeerd.",
-      "buildingNotice": "De baseline wordt nog opgebouwd voor {n} gebruiker: tot er een volledige geschiedenis van {baseline} is, worden alleen duidelijke uitschieters ten opzichte van andere gebruikers gemarkeerd. | De baselines worden nog opgebouwd voor {n} gebruikers: tot er een volledige geschiedenis van {baseline} is, worden alleen duidelijke uitschieters ten opzichte van andere gebruikers gemarkeerd."
+      "buildingNotice": "De baseline wordt nog opgebouwd voor {n} gebruiker: tot er een volledige geschiedenis van {baseline} is, worden alleen duidelijke uitschieters ten opzichte van andere gebruikers gemarkeerd. | De baselines worden nog opgebouwd voor {n} gebruikers: tot er een volledige geschiedenis van {baseline} is, worden alleen duidelijke uitschieters ten opzichte van andere gebruikers gemarkeerd.",
+      "whatUsers": "gebruikersgedrag",
+      "loadFailedHint": "Beveiligingsbronnen zijn onbereikbaar. Controleer onder Bronnen of een bron is verbonden en probeer opnieuw."
     },
     "intel": {
       "title": "Threat Intel",
@@ -1602,7 +1626,11 @@
       },
       "partialChecked": "Gedeeltelijk resultaat: {checked} van {total} indicatoren gecontroleerd. Aantallen voor de rest kunnen te laag zijn.",
       "partialCapped": "Gedeeltelijk resultaat: {checked} van {total} indicatoren gecontroleerd. De sweep stopt bij {n} queries; de minst ernstige indicatoren zijn niet gecontroleerd.",
-      "inText": "{column} (in tekst)"
+      "inText": "{column} (in tekst)",
+      "runSweepDisabled": "Voeg minstens één indicator toe om een sweep uit te voeren.",
+      "whatIndicators": "threat intel",
+      "loadFailedHint": "Indicatorlijsten konden niet worden gelezen. Probeer opnieuw of controleer of je opzoektabellen in deze organisatie mag lezen.",
+      "filterType": "Type"
     },
     "sources": {
       "title": "Gegevensbronnen",
@@ -1667,7 +1695,9 @@
         "pipeline_missing": "het bestaat niet meer",
         "other_stream": "het leest nu een andere stream",
         "other_pack": "het draait nu een ander pack"
-      }
+      },
+      "whatSources": "beveiligingsbronnen",
+      "loadFailedHint": "Beveiligingsbronnen zijn onbereikbaar. Controleer je verbinding of rechten en probeer het opnieuw."
     },
     "nav": {
       "overview": "Overzicht",
@@ -1735,6 +1765,10 @@
       "indicatorType": "Type indicator",
       "severityFilter": "Ernstfilter",
       "stream": "Stream"
+    },
+    "loadError": {
+      "title": "{what} kon niet worden geladen",
+      "hint": "De server antwoordde niet voor {what}. Controleer je verbinding of rechten en probeer het opnieuw."
     }
   }
 }

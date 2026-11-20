@@ -1,23 +1,20 @@
 <template>
   <OForm class="bg-card-bg flex min-h-0 flex-1 flex-col" :form="form" v-slot="{ isSubmitting }">
     <OPageLayout
-      :subtitle="t('onlineEvals.provider.subtitle')"
+      :about="t('onlineEvals.provider.subtitle')"
       :back="{
-        label: t('onlineEvals.provider.backTo'),
+        label: t('llmProviders.title'),
         onClick: () => $emit('cancel'),
         dataTest: 'provider-form-back-btn',
       }"
+      :title="
+        mode === 'create'
+          ? t('onlineEvals.provider.createTitle')
+          : t('onlineEvals.provider.editTitle')
+      "
+      title-data-test="provider-form-title"
       scroll
     >
-      <template #title>
-        <span data-test="provider-form-title">
-          {{
-            mode === "create"
-              ? t("onlineEvals.provider.createTitle")
-              : t("onlineEvals.provider.editTitle")
-          }}
-        </span>
-      </template>
       <div class="provider-form__main flex min-h-0 flex-col gap-2 p-2">
         <!-- Provider details -->
         <section
@@ -25,7 +22,6 @@
           data-test="provider-form-identity-section"
         >
           <div class="border-border-default flex items-center border-b px-3 py-2.5">
-            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
             <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
               t("onlineEvals.provider.sectionTitle")
             }}</span>
@@ -37,7 +33,6 @@
                   name="name"
                   :label="t('onlineEvals.provider.nameLabel')"
                   :placeholder="raw('Production OpenAI')"
-                  size="sm"
                   required
                   :disabled="mode === 'edit'"
                   :help-text="mode === 'edit' ? t('onlineEvals.provider.cannotRename') : undefined"
@@ -50,7 +45,6 @@
                   name="providerType"
                   :label="t('onlineEvals.provider.typeLabel')"
                   :options="providerTypeOptions"
-                  size="md"
                   required
                   :disabled="mode === 'edit'"
                   data-test="provider-form-type-select"
@@ -64,7 +58,6 @@
                   name="defaultModel"
                   :label="t('onlineEvals.provider.defaultModelLabel')"
                   :placeholder="raw('gpt-4o-mini')"
-                  size="sm"
                   required
                   data-test="provider-form-default-model-input"
                 />
@@ -75,7 +68,6 @@
                   name="availableModels"
                   :label="t('onlineEvals.provider.availableModelsLabel')"
                   :placeholder="raw('gpt-4o-mini, gpt-4.1')"
-                  size="sm"
                   data-test="provider-form-available-models-input"
                 />
               </div>
@@ -86,7 +78,6 @@
                 name="endpoint"
                 :label="t('onlineEvals.provider.endpointLabel')"
                 :placeholder="raw(endpointPlaceholder)"
-                size="sm"
                 :help-text="endpointHelpText"
                 data-test="provider-form-endpoint-input"
               />
@@ -100,7 +91,6 @@
           data-test="provider-form-auth-section"
         >
           <div class="border-border-default flex items-center border-b px-3 py-2.5">
-            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
             <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
               t("onlineEvals.provider.authSection")
             }}</span>
@@ -120,7 +110,6 @@
                 type="password"
                 :label="t('onlineEvals.provider.apiKeyLabel')"
                 :required="mode === 'create' && apiKeyRequired"
-                size="sm"
                 :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
                 :help-text="t('onlineEvals.provider.apiKeyHelp')"
                 data-test="provider-form-api-key-input"
@@ -142,7 +131,7 @@
             {{ t("onlineEvals.provider.testRunning") }}
           </span>
           <template v-else>
-            <OTag :variant="testState === 'passed' ? 'success-soft' : 'error-soft'" dot>
+            <OTag :tone="testState === 'passed' ? 'ok' : 'err'" dot>
               {{
                 testState === "passed"
                   ? t("onlineEvals.provider.testPassed")
@@ -163,8 +152,7 @@
         <OButton
           data-test="provider-form-test-btn"
           type="button"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :loading="testState === 'running'"
           :disabled="isSubmitting"
           @click="testConnection"
@@ -174,8 +162,7 @@
         <OButton
           data-test="provider-form-cancel-btn"
           type="button"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="isSubmitting"
           @click="$emit('cancel')"
         >
@@ -185,7 +172,6 @@
           data-test="provider-form-save-btn"
           type="submit"
           variant="primary"
-          size="sm-action"
           :loading="isSubmitting"
         >
           {{ t("onlineEvals.buttons.save") }}

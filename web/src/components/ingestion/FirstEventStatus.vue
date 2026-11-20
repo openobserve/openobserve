@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, inject, onBeforeUnmount, onMounted, ref, toRef, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -196,16 +196,16 @@ const diagnosisForm = computed(() =>
       : "unavailable",
 );
 
-const bannerVariant = computed(() => {
+const bannerTone = computed(() => {
   switch (state.value) {
     case "received":
-      return "success";
+      return "ok";
     case "rejected":
-      return "error-soft";
+      return "err";
     case "no-requests":
       return "info";
     default:
-      return "default";
+      return "neutral";
   }
 });
 
@@ -232,7 +232,7 @@ const waitingText = computed((): I18nText => {
 const pill = computed(
   (): {
     label: I18nText;
-    variant: "default" | "success" | "error" | "primary";
+    variant: "neutral" | "ok" | "err" | "accent";
     icon?: string;
     dot?: boolean;
   } => {
@@ -245,26 +245,26 @@ const pill = computed(
               : scope.value === "since-watch-start"
                 ? t("ingestion.firstEvent.receivedNewPill")
                 : t("ingestion.firstEvent.receivedPill"),
-          variant: "success",
+          variant: "ok",
           icon: "check-circle",
         };
       case "rejected":
-        return { label: t("ingestion.firstEvent.rejectedPill"), variant: "error", icon: "cancel" };
+        return { label: t("ingestion.firstEvent.rejectedPill"), variant: "err", icon: "cancel" };
       case "no-requests":
         return {
           label: t("ingestion.firstEvent.noRequestsPill"),
-          variant: "primary",
+          variant: "accent",
           icon: "info",
         };
       case "stopped":
-        return { label: t("ingestion.firstEvent.stoppedPill"), variant: "default" };
+        return { label: t("ingestion.firstEvent.stoppedPill"), variant: "neutral" };
       case "idle":
-        return { label: t("ingestion.firstEvent.idlePill"), variant: "default" };
+        return { label: t("ingestion.firstEvent.idlePill"), variant: "neutral" };
       default:
         return {
           label:
             props.display === "pill" && props.waitingLabel ? props.waitingLabel : waitingText.value,
-          variant: "default",
+          variant: "neutral",
           dot: true,
         };
     }
@@ -504,25 +504,19 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
     data-state="deciding"
     data-display="pill"
   >
-    <OSkeleton class="h-5 w-28" />
-    <OSkeleton class="h-3.5 w-48" />
+    <OSkeleton shape="block" class="h-5 w-28" />
+    <OSkeleton shape="block" class="h-3.5 w-48" />
   </div>
   <div v-else-if="deciding" class="flex flex-col gap-2 text-sm">
-    <OBanner
-      variant="default"
-      inline-actions
-      dense
-      data-test="first-event-status"
-      data-state="deciding"
-    >
+    <OInlineNotice tone="neutral" data-test="first-event-status" data-state="deciding">
       <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <OSkeleton class="h-5 w-28" />
-        <OSkeleton class="h-3.5 w-56" />
+        <OSkeleton shape="block" class="h-5 w-28" />
+        <OSkeleton shape="block" class="h-3.5 w-56" />
       </div>
       <template #actions>
-        <OSkeleton class="h-8.5 w-24" />
+        <OSkeleton shape="block" class="h-8.5 w-24" />
       </template>
-    </OBanner>
+    </OInlineNotice>
   </div>
   <div
     v-else-if="display === 'pill'"
@@ -533,7 +527,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
   >
     <OTag
       :label="pill.label"
-      :variant="pill.variant"
+      :tone="pill.variant"
       :icon="pill.icon ?? ''"
       :dot="pill.dot"
       size="sm"
@@ -546,9 +540,8 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
         t("ingestion.firstEvent.stoppedMeta")
       }}</OText>
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="refresh"
+        variant="secondary"
+        icon="refresh"
         data-test="first-event-status-restart-btn"
         @click="watcher.start('open')"
       >
@@ -560,8 +553,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
         t(idleKey, { stream: idleStream ?? raw("") })
       }}</OText>
       <OButton
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         data-test="first-event-status-check-now-btn"
         @click="watcher.start('check')"
       >
@@ -578,10 +570,8 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
     }}</OText>
   </div>
   <div v-else class="flex flex-col gap-2 text-sm">
-    <OBanner
-      :variant="bannerVariant"
-      :inline-actions="state !== 'rejected'"
-      dense
+    <OInlineNotice
+      :tone="bannerTone"
       data-test="first-event-status"
       :data-state="state"
       :data-kind="kind === 'test' ? 'test' : undefined"
@@ -597,7 +587,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
       >
         <OTag
           :label="pill.label"
-          :variant="pill.variant"
+          :tone="pill.variant"
           :icon="pill.icon ?? ''"
           :dot="pill.dot"
           size="sm"
@@ -679,7 +669,6 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
           <OButton
             v-if="showTroubleshoot"
             variant="ghost"
-            size="sm-action"
             :loading="troubleshooting"
             data-test="first-event-status-troubleshoot-btn"
             @click="watcher.troubleshoot()"
@@ -688,8 +677,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
           </OButton>
           <OButton
             v-if="state === 'stopped'"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="first-event-status-restart-btn"
             @click="watcher.start('open')"
           >
@@ -697,8 +685,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
           </OButton>
           <OButton
             v-if="state === 'idle'"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             data-test="first-event-status-check-now-btn"
             @click="watcher.start('check')"
           >
@@ -708,9 +695,8 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
             <OTooltip :content="lockedReason(openFeature ?? '')" :disabled="!openLocked">
               <span class="inline-flex">
                 <OButton
-                  variant="outline"
-                  size="sm-action"
-                  :icon-left="openLocked ? 'lock' : 'open-in-new'"
+                  variant="secondary"
+                  :icon="openLocked ? 'lock' : 'open-in-new'"
                   :disabled="openLocked"
                   data-test="first-event-status-open-btn"
                   @click="openData"
@@ -721,7 +707,6 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
             </OTooltip>
             <OButton
               variant="primary"
-              size="sm-action"
               data-test="first-event-status-connect-source-btn"
               @click="goTo(guideRoute ?? 'recommended')"
             >
@@ -730,8 +715,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
           </template>
           <template v-else-if="state === 'received'">
             <OButton
-              variant="outline"
-              size="sm-action"
+              variant="secondary"
               data-test="first-event-status-setup-another-btn"
               @click="goTo('recommended')"
             >
@@ -741,8 +725,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
               <span class="inline-flex">
                 <OButton
                   variant="primary"
-                  size="sm-action"
-                  :icon-left="openLocked ? 'lock' : 'open-in-new'"
+                  :icon="openLocked ? 'lock' : 'open-in-new'"
                   :disabled="openLocked"
                   data-test="first-event-status-open-btn"
                   @click="openData"
@@ -754,7 +737,7 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
           </template>
         </div>
       </template>
-    </OBanner>
+    </OInlineNotice>
 
     <div
       v-if="state === 'received' && result?.firstRecord"
@@ -806,9 +789,8 @@ defineExpose({ start: watcher.start, probeNow: watcher.probeNow, startedAtMs });
           </template>
         </div>
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="content-copy"
+          variant="secondary"
+          icon="content-copy"
           data-test="first-event-diagnosis-copy-btn"
           @click="emit('copy-command')"
         >

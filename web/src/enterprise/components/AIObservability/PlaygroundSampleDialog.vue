@@ -19,10 +19,12 @@
     :open="open"
     size="md"
     :title="t('aiObservability.playground.sampleTitle')"
-    :primary-button-label="t('aiObservability.playground.sampleSubmit')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-loading="loading"
-    :primary-button-disabled="!selectedItem"
+    :primary="{
+      label: t('aiObservability.playground.sampleSubmit'),
+      disabled: !selectedItem,
+      loading: loading,
+    }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="ai-playground-sample-dialog"
     @update:open="emit('update:open', $event)"
     @click:primary="submit"
@@ -32,9 +34,9 @@
       <template v-if="viewing && selectedItem">
         <div class="flex items-center gap-2">
           <OButton
-            variant="outline"
-            size="xs"
-            icon-left="arrow-back"
+            variant="secondary"
+            size="sm"
+            icon="arrow-back"
             data-test="ai-playground-sample-back"
             @click="viewing = false"
           >
@@ -87,7 +89,6 @@
           :options="datasetOptions"
           :label="t('aiObservability.playground.sampleDataset')"
           :placeholder="t('aiObservability.playground.sampleDatasetPlaceholder')"
-          size="sm"
           searchable
           data-test="ai-playground-sample-dataset"
         />
@@ -156,7 +157,7 @@
                    what keeps an unbroken 400-character token inside the row
                    instead of pushing a scrollbar across the dialog. -->
                 <div class="flex items-start gap-1.5">
-                  <OTag variant="blue-soft" size="xs" shape="rounded" :label="inputToken" />
+                  <OTag tone="neutral" size="sm" :label="inputToken" />
                   <span
                     class="text-text-body line-clamp-2 min-w-0 flex-1 text-xs leading-relaxed wrap-break-word"
                   >
@@ -164,7 +165,7 @@
                   </span>
                 </div>
                 <div class="flex items-start gap-1.5">
-                  <OTag variant="amber-soft" size="xs" shape="rounded" :label="expectedToken" />
+                  <OTag tone="warn" size="sm" :label="expectedToken" />
                   <span
                     class="text-text-secondary line-clamp-1 min-w-0 flex-1 text-xs wrap-break-word"
                     :class="item.expectedOutput ? '' : 'italic'"
@@ -182,9 +183,9 @@
                  pushes every other candidate off the screen. -->
               <OButton
                 v-if="item.id === selectedItemId"
-                variant="ghost-muted"
-                size="icon-xs"
-                icon-left="open-in-full"
+                icon-only
+                variant="ghost"
+                icon="open-in-full"
                 class="shrink-0"
                 :title="t('aiObservability.playground.sampleFullView')"
                 :data-test="`ai-playground-sample-expand-${from + position}`"
@@ -208,8 +209,8 @@
           </span>
           <div class="grow" />
           <OButton
-            variant="outline"
-            size="xs"
+            variant="secondary"
+            size="sm"
             :disabled="from === 0 || loadingItems"
             data-test="ai-playground-sample-prev-page"
             @click="loadPage(from - PAGE_SIZE)"
@@ -217,8 +218,8 @@
             {{ t("common.previous") }}
           </OButton>
           <OButton
-            variant="outline"
-            size="xs"
+            variant="secondary"
+            size="sm"
             :disabled="from + items.length >= total || loadingItems"
             data-test="ai-playground-sample-next-page"
             @click="loadPage(from + PAGE_SIZE)"

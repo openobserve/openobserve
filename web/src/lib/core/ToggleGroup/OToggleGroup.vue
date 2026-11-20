@@ -5,7 +5,11 @@ import type {
   ToggleGroupSlots,
   ToggleGroupContext,
 } from "./OToggleGroup.types";
-import { ToggleGroupAnimatedKey, TOGGLE_GROUP_CONTEXT_KEY } from "./OToggleGroup.types";
+import {
+  ToggleGroupAnimatedKey,
+  ToggleGroupSizeKey,
+  TOGGLE_GROUP_CONTEXT_KEY,
+} from "./OToggleGroup.types";
 import { ToggleGroupRoot, type AcceptableValue } from "reka-ui";
 import { computed, provide, ref, watch, nextTick, onMounted, onBeforeUnmount, useAttrs } from "vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -15,6 +19,7 @@ import useBreakpoint from "@/composables/useBreakpoint";
 
 const props = withDefaults(defineProps<ToggleGroupProps>(), {
   type: "single",
+  size: "md",
   disabled: false,
   orientation: "horizontal",
   variant: "default",
@@ -55,6 +60,10 @@ const animate = computed(() => props.type === "single");
 
 // Tell descendant items to defer their active fill to the shared indicator.
 provide(ToggleGroupAnimatedKey, animate);
+provide(
+  ToggleGroupSizeKey,
+  computed(() => props.size),
+);
 
 const indicatorRef = ref<HTMLElement | null>(null);
 // Runtime, per-render geometry of the active item — inherently pixel values from
@@ -183,10 +192,9 @@ onBeforeUnmount(() => {
 });
 
 const indicatorClasses = computed(() => [
-  // An inset ring paints inside the measured box, so the edge moves neither the pill nor the items.
-  "pointer-events-none absolute left-0 top-0 rounded-default bg-toggle-item-active-bg ring-1 ring-inset ring-toggle-item-active-border shadow-xs",
+  "pointer-events-none absolute left-0 top-0 rounded-default bg-toggle-item-active-bg ring-1 ring-toggle-item-active-border shadow-xs",
   transitionOn.value &&
-    "transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none",
+    "transition-[transform,width,height] duration-(--duration-indicator) ease-(--ease-control) motion-reduce:transition-none",
   indicatorVisible.value ? "opacity-100" : "opacity-0",
 ]);
 
@@ -212,6 +220,15 @@ const wrapperClasses = computed(() => {
 // reports the intended move (by item value + side) via `reorder`; the parent
 // applies it to its data.
 const isVertical = computed(() => props.orientation === "vertical");
+
+// Horizontal tracks take the control height; items take the next token down, inside the padding.
+// The tray is a fill with no edge; the raised selected segment carries the only hairline.
+const trackClasses = computed(() => [
+  "relative inline-flex rounded-default bg-toggle-track-bg",
+  isVertical.value
+    ? "flex-col items-stretch p-0.5"
+    : ["flex-row items-center p-0.5", props.size === "sm" ? "h-control-sm" : "h-control-md"],
+]);
 
 const draggingValue = ref<string | null>(null);
 const dropTargetValue = ref<string | null>(null);
@@ -305,9 +322,9 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
   <ODropdown v-if="asDropdown" side="bottom" align="start">
     <template #trigger>
       <OButton
-        variant="outline"
-        size="sm-toolbar"
-        icon-right="arrow-drop-down"
+        variant="secondary"
+        :size="size"
+        icon-end="arrow-drop-down"
         class="shrink-0"
         :disabled="disabled"
         :data-test="dropdownTestId"
@@ -340,11 +357,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       :disabled="disabled"
       :orientation="orientation"
       :data-variant="variant"
-      :class="[
-        'relative inline-flex items-stretch',
-        orientation === 'vertical' ? 'flex-col' : 'flex-row',
-        'bg-toggle-track-bg rounded-default p-0.5',
-      ]"
+      :class="trackClasses"
       v-bind="dragListeners"
       @update:model-value="
         (v) => {
@@ -373,10 +386,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
     :orientation="orientation"
     :data-variant="variant"
     :class="[
-      'relative inline-flex items-stretch',
-      orientation === 'vertical' ? 'flex-col' : 'flex-row',
-      'bg-toggle-track-bg rounded-default p-0.5',
-      'border-toggle-border border',
+      trackClasses,
       // Wrapped toggle chips read as two unrelated controls, so the strip scrolls within its track.
       orientation !== 'vertical' &&
         'max-md:max-w-full max-md:overflow-x-auto @max-4xl/page:max-w-full @max-4xl/page:overflow-x-auto',

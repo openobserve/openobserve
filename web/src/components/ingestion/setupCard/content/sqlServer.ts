@@ -167,7 +167,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
             labelKey: "ingestion.setupCard.portLabel",
             default: "1433",
             placeholder: raw("1433"),
-            width: "sm",
+            width: "s",
           },
         ],
         variants: writeConfigVariants(CONFIG_YAML, subs),

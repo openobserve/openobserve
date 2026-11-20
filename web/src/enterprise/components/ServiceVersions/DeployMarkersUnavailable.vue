@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OButton
     v-if="unavailableDeployServices.size"
     variant="ghost"
-    size="chip"
-    icon-left="refresh"
+    size="xs"
+    icon="refresh"
     class="text-text-secondary"
     data-test="svcver-marker-unavailable-retry"
     @click="retry"

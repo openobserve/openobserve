@@ -51,15 +51,14 @@ type TimelineProps = InstanceType<typeof OnCallScheduleTimeline>["$props"];
 
 const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
-  OInnerLoading: { name: "OInnerLoading", template: "<div />" },
   OButton: {
     name: "OButton",
-    props: ["iconLeft"],
+    props: ["icon"],
     emits: ["click"],
     // `aria-label` and `data-test` fall through; `icon-left` is a prop, so the
     // stub has to publish it for a test to tell a labelled button from one
     // carrying only an icon.
-    template: '<button :data-icon="iconLeft" @click="$emit(\'click\')"><slot /></button>',
+    template: '<button :data-icon="icon" @click="$emit(\'click\')"><slot /></button>',
   },
   OScheduleTimeline: {
     name: "OScheduleTimeline",
@@ -95,8 +94,8 @@ const stubs = {
   OTooltip: { name: "OTooltip", template: "<span><slot /></span>" },
   OEmptyState: {
     name: "OEmptyState",
-    props: ["preset"],
-    emits: ["action"],
+    props: ["title", "actionLabel", "secondaryActionLabel"],
+    emits: ["action", "secondaryAction"],
     template: "<div />",
   },
   OToggleGroup: { name: "OToggleGroup", template: "<div><slot /></div>" },
@@ -105,9 +104,9 @@ const stubs = {
   ODropdownItem: {
     name: "ODropdownItem",
     emits: ["select"],
-    props: ["description", "iconLeft"],
+    props: ["description", "icon"],
     template:
-      "<button :data-icon='iconLeft' @click=\"$emit('select')\"><slot />{{ description }}</button>",
+      "<button :data-icon='icon' @click=\"$emit('select')\"><slot />{{ description }}</button>",
   },
 };
 
@@ -178,12 +177,12 @@ describe("OnCallScheduleTimeline", () => {
   });
 
   /// One "Cover a shift" lives in the team header, and templates replace a schedule, so neither sits in the toolbar.
-  it("labels Add rotation with a leading icon", () => {
+  it("labels Add rotation with text only", () => {
     const wrapper = render();
 
     const add = wrapper.find('[data-test="oncall-timeline-add"]');
     expect(add.text()).toBe("Add rotation");
-    expect(add.attributes("data-icon")).toBe("add");
+    expect(add.attributes("data-icon")).toBeUndefined();
   });
 
   // A staffed team still finds the templates where it adds a rotation, not only in the first lane's menu.
@@ -905,11 +904,12 @@ describe("OnCallScheduleTimeline", () => {
       const wrapper = render({ rotations: [], segments: [] });
       const empty = wrapper.findComponent({ name: "OEmptyState" });
 
-      expect(empty.props("preset")).toBe("no-oncall-schedule");
-      empty.vm.$emit("action", "presets");
+      expect(empty.props("actionLabel")).toBeTruthy();
+      expect(empty.props("secondaryActionLabel")).toBeTruthy();
+      empty.vm.$emit("action");
       await nextTick();
       expect(wrapper.emitted("presets")).toHaveLength(1);
-      empty.vm.$emit("action", "add");
+      empty.vm.$emit("secondaryAction");
       await nextTick();
       expect(wrapper.emitted("add")).toHaveLength(1);
     });

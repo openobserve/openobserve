@@ -43,7 +43,7 @@ const stubs = {
     emits: ["update:modelValue", "create"],
     template: "<span />",
   },
-  OCollapsible: { name: "OCollapsible", props: ["label"], template: "<div><slot /></div>" },
+  OCollapsible: { name: "OCollapsible", props: ["title"], template: "<div><slot /></div>" },
 };
 
 function preview(over: Partial<RoutingPreview> = {}): RoutingPreview {

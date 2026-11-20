@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="
       beingUpdated ? t('organization.updateOrganization') : t('organization.createOrganization')
     "
-    :primaryButtonLabel="t('organization.save')"
-    :secondaryButtonLabel="t('organization.cancel')"
+    :primary="{ label: t('organization.save') }"
+    :secondary="{ label: t('organization.cancel') }"
     form-id="add-update-organization-form"
     @click:secondary="$emit('update:open', false)"
     @update:open="$emit('update:open', $event)"
@@ -63,12 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <div class="mt-4 flex justify-center" v-if="proPlanRequired">
-          <OButton
-            variant="secondary"
-            size="md"
-            class="ms-4 mb-4"
-            @click="completeSubscriptionProcess"
-          >
+          <OButton variant="secondary" class="ms-4 mb-4" @click="completeSubscriptionProcess">
             {{ t("organization.proceed_subscription") }}
           </OButton>
         </div>

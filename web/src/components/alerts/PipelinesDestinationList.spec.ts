@@ -87,7 +87,7 @@ const OTableStub = {
 
 const ConfirmDialogStub = {
   name: "ConfirmDialog",
-  props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
+  props: ["modelValue", "title", "message", "messageKeypath", "messageName", "kind"],
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   template: '<div data-test="confirm-dialog-stub" :data-open="modelValue" />',
 };
@@ -217,12 +217,24 @@ describe("PipelinesDestinationList", () => {
       expect((wrapper.vm as any).confirmDelete.data).toBeNull();
     });
 
-    it("has 6 table columns", async () => {
-      // The "#" index column is now OTable's built-in show-index gutter, not a
-      // member of `columns`, so the array holds only the 6 real data columns.
+    it("has 5 table columns", async () => {
+      // OTable draws the actions column from rowActions / rowMenu, so `columns` holds only data.
       wrapper = mountComponent();
       await flushPromises();
-      expect((wrapper.vm as any).columns).toHaveLength(6);
+      expect((wrapper.vm as any).columns).toHaveLength(5);
+    });
+
+    it("keeps edit inline and delete last in the row menu", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      const row = { name: "dest-a" };
+      expect(vm.rowActions.map((a: any) => [a.id, a.dataTest(row, 0)])).toEqual([
+        ["edit", "alert-destination-list-dest-a-update-destination"],
+      ]);
+      expect(vm.rowMenu.map((a: any) => [a.id, a.destructive, a.dataTest(row, 0)])).toEqual([
+        ["delete", true, "alert-destination-list-dest-a-delete-destination"],
+      ]);
     });
   });
 
@@ -473,7 +485,7 @@ describe("PipelinesDestinationList", () => {
           (c: any) => c.props("messageKeypath") === "alert_destinations.deleteDestinationMessage",
         );
       expect(dialog!.props("messageName")).toBe(dest.name);
-      expect(dialog!.props("okVariant")).toBe("destructive");
+      expect(dialog!.props("kind")).toBe("destructive");
     });
 
     it("cancelDeleteDestination resets confirmDelete", async () => {
@@ -539,7 +551,7 @@ describe("PipelinesDestinationList", () => {
           (c: any) =>
             c.props("title") === i18n.global.t("alert_destinations.deleteDestinationsTitle"),
         );
-      expect(dialog!.props("okVariant")).toBe("destructive");
+      expect(dialog!.props("kind")).toBe("destructive");
     });
   });
 

@@ -26,11 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @exit="exit"
       />
     </template>
-    <div v-else class="flex h-full items-center justify-center" data-test="dashboard-tv-invalid">
+    <div v-else class="flex h-full flex-col" data-test="dashboard-tv-invalid">
       <OEmptyState
         icon="tv"
         :title="t('dashboard.playlist.invalidTitle')"
-        :description="t('dashboard.playlist.invalidDescription')"
+        :text="t('dashboard.playlist.invalidDescription')"
         :action-label="t('dashboard.playlist.backToDashboards')"
         @action="exit"
       />

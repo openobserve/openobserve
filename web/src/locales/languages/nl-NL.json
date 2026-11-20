@@ -11,7 +11,11 @@
     "bannerMessage": "Deze functie is vergrendeld. Je licentie moet de functie {feature} bevatten.",
     "bannerMessageGeneric": "Deze pagina vereist een functie die niet in je licentie zit.",
     "headerLocked": "Vergrendeld: vereist {feature}",
-    "availableInEnterprise": "{feature} is beschikbaar in OpenObserve Enterprise"
+    "availableInEnterprise": "{feature} is beschikbaar in OpenObserve Enterprise",
+    "turnedOffTitle": "Uitgeschakeld voor deze organisatie",
+    "enterpriseTitle": "Beschikbaar in Enterprise",
+    "readDocs": "Documentatie lezen",
+    "rbacOff": "RBAC is uitgeschakeld voor deze organisatie. Een beheerder schakelt het in door {env} in de serverconfiguratie op true te zetten."
   },
   "emptyState": {
     "illustrations": {
@@ -52,6 +56,7 @@
         "ariaLabel": "Wachten op gegevens"
       }
     },
+    "requestId": "Verzoek {id}",
     "createFirstItem": "Maak je eerste item",
     "newBrowserCheck": "Nieuwe browsercheck",
     "allCaughtUp": "Je bent weer helemaal bij",
@@ -79,10 +84,6 @@
       "title": "Geen patronen gevonden",
       "description": "Probeer het tijdbereik te vergroten of een andere stream te selecteren met meer loggegevens. Patroonextractie werkt het beste met minstens 1.000 logs.",
       "logsAnalyzed": "Slechts {count} logs zijn geanalyseerd."
-    },
-    "noStreamSelected": {
-      "title": "Selecteer een stream om aan de slag te gaan",
-      "description": "Kies een stream en voer vervolgens uw zoekopdracht uit om de bijbehorende gegevens te verkennen. Verfijn de resultaten met filters en een aangepast tijdbereik."
     },
     "noQueryApplied": {
       "title": "Voer een query uit om logs te bekijken",
@@ -200,22 +201,6 @@
       "action": "Nieuwe sleutel",
       "actionDesc": "Genereer een cipher key"
     },
-    "noSlackChannelDefaults": {
-      "title": "Nog geen enkel kanaal heeft een standaardorganisatie",
-      "description": "Vragen in een kanaal zonder standaard gaan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met /o2 org)."
-    },
-    "noSlackLinkedPeople": {
-      "title": "Nog niemand in deze organisatie heeft Slack gekoppeld"
-    },
-    "slackNotConnected": {
-      "title": "Een Slack-workspace koppelen"
-    },
-    "noAnnouncementBanners": {
-      "title": "Nog geen banners",
-      "description": "Banners tonen een melding boven aan de app aan de organisaties die je kiest.",
-      "action": "Banner toevoegen",
-      "actionDesc": "Schrijf een melding en plan deze in"
-    },
     "noAiToolsets": {
       "title": "Nog geen AI-toolsets",
       "description": "AI-toolsets verbinden je organisatie met externe AI-mogelijkheden.",
@@ -329,7 +314,6 @@
     "noStreams": {
       "title": "Sluit een bron aan om je eerste stream te maken",
       "description": "Streams worden automatisch aangemaakt op het moment dat gegevens binnenkomen. Stel de ingestie via je app, agent of verzamelaar in om aan de slag te gaan.",
-      "action": "Ingestie instellen",
       "actionDesc": "Een gegevensbron aansluiten",
       "createAction": "Nieuwe stream",
       "createActionDesc": "Handmatig een streamschema definiëren"
@@ -469,7 +453,9 @@
       "description": "Er komt geen {noun} overeen met je huidige filters of zoekopdracht. Probeer ze aan te passen of te wissen.",
       "action": "Filters wissen",
       "actionDesc": "Alle filters opnieuw instellen en zoeken",
-      "fallbackNoun": "uitslagen"
+      "fallbackNoun": "uitslagen",
+      "noMatches": "Geen resultaten",
+      "noMatchesText": "Niets komt overeen met de huidige zoekopdracht of filters."
     },
     "nouns": {
       "logs": "logs",
@@ -652,6 +638,26 @@
     "noOncallUnrouted": {
       "title": "Niets heeft een eigenaar nodig",
       "description": "Elk alarm dat afging, bereikte een team."
+    },
+    "noSlackChannelDefaults": {
+      "title": "Nog geen enkel kanaal heeft een standaardorganisatie",
+      "description": "Vragen in een kanaal zonder standaard gaan naar de standaardorganisatie van elke persoon (die kunnen ze wijzigen met /o2 org)."
+    },
+    "noSlackLinkedPeople": {
+      "title": "Nog niemand in deze organisatie heeft Slack gekoppeld"
+    },
+    "slackNotConnected": {
+      "title": "Een Slack-workspace koppelen"
+    },
+    "noAnnouncementBanners": {
+      "title": "Nog geen banners",
+      "description": "Banners tonen een melding boven aan de app aan de organisaties die je kiest.",
+      "action": "Banner toevoegen",
+      "actionDesc": "Schrijf een melding en plan deze in"
+    },
+    "pageError": {
+      "title": "Deze pagina kon niet worden geladen",
+      "description": "Geen van de gegevens van deze pagina is geladen. Probeer het nu opnieuw of over een minuut."
     }
   },
   "accessBoundary": {
@@ -800,7 +806,15 @@
       "logs": "logs",
       "charts": "grafieken"
     },
+    "saveBar": {
+      "noChanges": "Geen wijzigingen om op te slaan",
+      "unsavedChanges": "{n} niet-opgeslagen wijziging | {n} niet-opgeslagen wijzigingen",
+      "changesShort": "{n} wijziging | {n} wijzigingen",
+      "fixFields": "Herstel {n} veld | Herstel {n} velden",
+      "discard": "Verwerpen"
+    },
     "dismiss": "Sluiten",
+    "undo": "Ongedaan maken",
     "exitFullscreen": "Volledig scherm sluiten",
     "moreActions": "Meer acties",
     "moreOptions": "Meer opties",
@@ -1194,18 +1208,6 @@
     "boolFalse": "Onwaar",
     "browserTimeWithZone": "Browsertijd ({zone})",
     "poweredBy": "Mogelijk gemaakt door",
-    "saveBar": {
-      "noChanges": "Geen wijzigingen om op te slaan",
-      "unsavedChanges": "{n} niet-opgeslagen wijziging | {n} niet-opgeslagen wijzigingen",
-      "changesShort": "{n} wijziging | {n} wijzigingen",
-      "fixFields": "Herstel {n} veld | Herstel {n} velden",
-      "discard": "Verwerpen"
-    },
-    "leaveGuard": {
-      "title": "Vertrekken met niet-opgeslagen wijzigingen?",
-      "message": "Je hebt {n} niet-opgeslagen wijziging op deze pagina. Deze gaat verloren als je vertrekt. | Je hebt {n} niet-opgeslagen wijzigingen op deze pagina. Deze gaan verloren als je vertrekt.",
-      "keepEditing": "Doorgaan met bewerken"
-    },
     "editorDraft": {
       "restoreTitle": "Niet-opgeslagen concept",
       "restoreTitleInBrowser": "Niet-opgeslagen lokale wijzigingen",
@@ -1276,7 +1278,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "collectorconfiguratie"
+        "fleet_config": "collectorconfiguratie",
+        "workflow": "workflow"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1286,100 +1289,11 @@
       "leaveMessageInBrowser": "Sla de {entity} op, bewaar je wijzigingen in deze browser, of verwerp ze.",
       "retentionInBrowser": "Wijzigingen worden {days} dagen in deze browser bewaard, of totdat je uitlogt. Alleen de {max} nieuwste van elke soort worden bewaard.",
       "dotUndated": "Unsaved draft"
-    }
-  },
-  "filterBar": {
-    "ariaLabel": "Filteren op veld",
-    "placeholder": "Filter op veld, of typ field=value. Druk op Enter om uit te voeren",
-    "addFilter": "Filter toevoegen",
-    "searchFields": "Velden zoeken",
-    "searchLabels": "Labels zoeken",
-    "searchOperators": "Voorwaarden zoeken",
-    "searchValue": "Zoek of typ een waarde",
-    "searchValues": "Waarden zoeken",
-    "textField": "Tekst",
-    "useValue": "Gebruik \"{value}\"",
-    "useField": "Gebruik veld \"{field}\"",
-    "useLabel": "Gebruik label \"{field}\"",
-    "searchText": "Alle tekst doorzoeken op \"{text}\"",
-    "emptyValue": "(leeg)",
-    "loadingFields": "Velden laden…",
-    "noFields": "Geen overeenkomende velden",
-    "noValues": "Geen suggesties. Typ een waarde en druk op Enter",
-    "noOperators": "Geen overeenkomende voorwaarden",
-    "removeFilter": "Filter verwijderen",
-    "clearAll": "Alle filters wissen",
-    "toggleConnector": "Schakel tussen AND en OR",
-    "selectedCount": "Geen waarden geselecteerd | {count} waarde geselecteerd | {count} waarden geselecteerd",
-    "query": "Query",
-    "builderTooltip": "Bouw filters door velden, voorwaarden en waarden te kiezen",
-    "queryTooltip": "Schrijf de query zelf",
-    "queryNotParsableShort": "De builder kan deze query niet weergeven:",
-    "clearAndBuild": "Wissen en opbouwen",
-    "clearQueryTitle": "Query wissen?",
-    "clearQueryMessage": "De query wordt verwijderd en de builder begint leeg.",
-    "where": "Waar",
-    "addCondition": "Voorwaarde toevoegen",
-    "addGroup": "Groep toevoegen",
-    "startGroup": "Groep starten",
-    "addBelow": "Voorwaarde hieronder toevoegen",
-    "ungroup": "Groep opheffen",
-    "collapseGroup": "Groep samenvouwen",
-    "expandGroup": "Groep uitvouwen",
-    "moreInGroup": "{count} meer",
-    "groupHasIssues": "Iets in deze groep moet worden gecorrigeerd",
-    "chooseField": "Kies een veld",
-    "chooseValue": "Kies een waarde",
-    "lockedFilter": "Dit filter kan hier niet worden bewerkt. Het blijft zoals opgeslagen; verwijder het om het te laten verdwijnen.",
-    "limits": {
-      "conditions": "Maximaal {count} filter | Maximaal {count} filters",
-      "values": "Maximaal {count} waarde | Maximaal {count} waarden"
     },
-    "validation": {
-      "incomplete": "Voltooi dit filter of verwijder het",
-      "required": "Voeg ten minste één filter toe",
-      "uniqueField": "{field} heeft al een filter; bewerk dat of verwijder deze",
-      "oneUsageCondition": "Een tier accepteert één gebruiksconditie; zet deze om in een regel of verwijder hem",
-      "rumField": "Gebruik een ingebouwd veld of een kolom met kleine letters, cijfers en underscores, van maximaal 128 tekens",
-      "valueLength": "Elke waarde moet 1 tot {max} tekens hebben",
-      "regexLength": "Gebruik maximaal {max} tekens voor het patroon.",
-      "regexInvalid": "Dit patroon is ongeldig of wordt niet ondersteund. Lookahead, lookbehind en terugverwijzingen kunnen niet worden gebruikt."
-    },
-    "operatorNames": {
-      "containsIgnoreCase": "Bevat (hoofdletterongevoelig)",
-      "notStartsWith": "Begint niet met",
-      "notEndsWith": "Eindigt niet met",
-      "isEmpty": "Is leeg",
-      "isNotEmpty": "Is niet leeg"
-    },
-    "types": {
-      "string": "Tekst",
-      "number": "Getal",
-      "boolean": "Booleaans"
-    },
-    "operators": {
-      "eq": "is",
-      "neq": "is niet",
-      "gt": "groter dan",
-      "gte": "groter dan of gelijk aan",
-      "lt": "kleiner dan",
-      "lte": "kleiner dan of gelijk aan",
-      "contains": "bevat",
-      "containsIgnoreCase": "bevat, hoofdletterongevoelig",
-      "notContains": "bevat niet",
-      "startsWith": "begint met",
-      "notStartsWith": "begint niet met",
-      "endsWith": "eindigt met",
-      "notEndsWith": "eindigt niet met",
-      "in": "is een van",
-      "notIn": "is geen van",
-      "regex": "komt overeen met regex",
-      "notRegex": "komt niet overeen met regex",
-      "isNull": "heeft geen waarde",
-      "isNotNull": "heeft een waarde",
-      "isEmpty": "is leeg of heeft geen waarde",
-      "isNotEmpty": "heeft een waarde die niet leeg is",
-      "matchAll": "komt overeen met tekst"
+    "leaveGuard": {
+      "title": "Vertrekken met niet-opgeslagen wijzigingen?",
+      "message": "Je hebt {n} niet-opgeslagen wijziging op deze pagina. Deze gaat verloren als je vertrekt. | Je hebt {n} niet-opgeslagen wijzigingen op deze pagina. Deze gaan verloren als je vertrekt.",
+      "keepEditing": "Doorgaan met bewerken"
     }
   },
   "flow": {
@@ -1489,11 +1403,9 @@
     "patternNavPrevious": "Vorige",
     "patternNavNext": "Volgende",
     "patternNoValuesAvailable": "Geen waarden beschikbaar",
-    "sqlModeLabel": "SQL-modus",
     "nlpModeLabel": "Modus voor natuurlijke taal",
     "quickModeLabel": "Snelle modus",
     "menuMore": "Meer",
-    "menuGroupSetOnce": "Eenmaal instellen",
     "menuGroupHistory": "Historie",
     "menuGroupDownloads": "Downloads",
     "menuGroupSchedule": "Schema",
@@ -1867,7 +1779,6 @@
     "viewDeletedSuccessfully": "Bekijk succesvol verwijderd.",
     "viewCreatedSuccessfully": "De weergave is succesvol aangemaakt.",
     "viewUpdatedSuccessfully": "Bekijk met succes bijgewerkt.",
-    "linkCopiedSuccessfully": "Link succesvol gekopieerd!",
     "errorCopyingLink": "Fout tijdens het kopiëren van de link.",
     "errorShorteningLink": "Fout bij het inkorten van de link.",
     "webUrlNotConfigured": "Share-URL is uitgeschakeld totdat ZO_WEB_URL is geconfigureerd door uw beheerder.",
@@ -2069,7 +1980,24 @@
     "freeTextNoTextFields": "Deze stream heeft geen tekstvelden om te doorzoeken.",
     "freeTextNoTextFieldsNamed": "Niet doorzocht: {streams} (geen tekstvelden).",
     "freeTextBuildNotice": "Dit filter heeft tekstzoekopdracht; bewerk het in SQL.",
-    "filterNotChartableNotice": "Dit filter kan niet in de builder worden weergegeven in een grafiek. Uw zoekfilter is ongewijzigd; schakel over naar {custom} om het weer te geven."
+    "filterNotChartableNotice": "Dit filter kan niet in de builder worden weergegeven in een grafiek. Uw zoekfilter is ongewijzigd; schakel over naar {custom} om het weer te geven.",
+    "queryModeLabel": "Querytaal",
+    "queryModeFilter": "Filter",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "Logs beperken op veld en waarde",
+    "queryModeSqlTooltip": "Een volledige SQL-query schrijven, met aggregaties en joins",
+    "sqlModeNeedsOneStream": "SQL in deze weergave werkt met één stream",
+    "menuGroupViewOptions": "Weergaveopties",
+    "histogramHiddenForAggregates": "Deze query geeft groepen terug, geen gebeurtenissen in de tijd, dus er is geen histogram. Visualiseren zet het resultaat in een grafiek.",
+    "linkCopied": "Link gekopieerd",
+    "linkCopiedFixedTime": "Link gekopieerd · vaste tijd {from} – {to}",
+    "linkCopiedRelativeTime": "Link gekopieerd · {period}, gerekend vanaf het openen",
+    "recordsChipRows": "{total} rij | {total} rijen",
+    "histogramTitleRows": "{total} rij in {took} ms. | {total} rijen in {took} ms.",
+    "histogramTitleRowsWithScan": "{total} rij in {took} ms. ({scanLabel}: {scanSize}) | {total} rijen in {took} ms. ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "Kies eerst een stream",
+    "autoRefreshPausedInVisualize": "Automatisch vernieuwen werkt zoekresultaten bij. Het pauzeert terwijl je visualiseert.",
+    "histogramNoTimeAxis": "Gegroepeerde resultaten hebben geen tijdas"
   },
   "menu": {
     "alertCalibration": "Alarmkalibratie",
@@ -2103,6 +2031,14 @@
     "workflows": "Workflows",
     "language": "Taal",
     "keyboardShortcuts": "Sneltoetsen",
+    "searchOrJumpTo": "Zoeken of ga naar…",
+    "jumpToTitle": "Ga naar",
+    "addData": "Gegevens toevoegen",
+    "jumpToPlaceholder": "Zoek pagina's, waarschuwingen, dashboards en streams",
+    "jumpToPlaceholderPages": "Pagina's en acties zoeken",
+    "jumpToPages": "Pagina's",
+    "jumpToShowAll": "Alles tonen in {page}",
+    "jumpToSearchLogs": "Logs doorzoeken op \"{text}\"",
     "synthetic": "Synthetics",
     "experience": "Ervaring",
     "slos": "SLO's",
@@ -4183,7 +4119,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "Je bent niet bevoegd om de licentie te beheren."
-      }
+      },
+      "usageTitle": "Dagelijkse opname"
     },
     "value_sso_requires_ha": "✅ HA-modus vereist",
     "value_rbac_requires_ha": "✅ HA-modus vereist",
@@ -4352,7 +4289,9 @@
     "revokeInvitationMsg": "Weet je zeker dat je de uitnodiging voor {email} wilt intrekken?",
     "deleteUsersTitle": "Gebruikers verwijderen",
     "deleteUsersMsg": "Weet je zeker dat je {count} gebruiker wilt verwijderen? | Weet je zeker dat je {count} gebruikers wilt verwijderen?",
-    "deleteUsersBlockNote": "{count} van hen is via je geverifieerde domein lid geworden en wordt geblokkeerd in plaats van verwijderd."
+    "deleteUsersBlockNote": "{count} van hen is via je geverifieerde domein lid geworden en wordt geblokkeerd in plaats van verwijderd.",
+    "roleHint": "Admin beheert de organisatie, Editor wijzigt gegevens en instellingen, Viewer kan alleen lezen.",
+    "customRolesNeedRbac": "Aangepaste rollen vereisen RBAC, dat is uitgeschakeld voor deze organisatie."
   },
   "invitation": {
     "pendingInvitations": "Uitnodigingen in behandeling",
@@ -5205,6 +5144,7 @@
   },
   "organization": {
     "searchByNameOrId": "Zoeken op naam of ID",
+    "currentLabel": "Organisatie: {name}",
     "noOrganizationsFound": "Geen organisaties gevonden",
     "header": "Organisaties",
     "orgBeingDeletedSwitching": "Deze organisatie wordt verwijderd. U wordt omgeschakeld naar een andere organisatie.",
@@ -5313,6 +5253,7 @@
     "timezone": "Tijdzone",
     "deleteActionMessage": "Weet je zeker dat je {count} veld wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt. | Weet je zeker dat je {count} velden wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
     "deleteDatesMessage": "Weet je zeker dat je {count} datumbereik wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt. | Weet je zeker dat je {count} datumbereiken wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
+    "summaryAllTypes": "Streams (alle typen)",
     "labelLogs": "Logs",
     "labelMetrics": "Metrieken",
     "labelTraces": "Traces",
@@ -5506,7 +5447,7 @@
         "intro": "Wanneer een alarm dat is afgegaan herstelt, ontvangt elke volgende stap deze payload."
       },
       "incidentEvent": {
-        "label": "Incident event",
+        "label": "Incidentgebeurtenis",
         "tab": "Incidenten",
         "node": "Incidenttrigger",
         "desc": "Uitvoeren bij een incident lifecycle-gebeurtenis",
@@ -7184,7 +7125,7 @@
       "aiCategoryFrameworks": "AI-frameworks & agents",
       "aiCategoryGateways": "AI-gateways & proxies",
       "aiCategoryModelProviders": "Modelproviders",
-      "aiCategoryNoCode": "No-code platforms",
+      "aiCategoryNoCode": "No-codeplatforms",
       "aiCategoryTools": "Tools & integraties",
       "anyLinuxHostNote": "Elke Linux-server of VM.",
       "anyWindowsHostNote": "Elke Windows-server of VM.",
@@ -7924,7 +7865,17 @@
       "metricsSketch": "Distributies worden opgeslagen als histogram-buckets, en percentielen worden geschat op basis van die buckets. Een hogere ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA geeft fijnere buckets en nauwkeurigere percentielen, ten koste van meer opgeslagen rijen."
     },
     "gpu": "GPU",
-    "gpuExporter": "GPU-exporter"
+    "gpuExporter": "GPU-exporter",
+    "rotationNote": "Tokens worden niet ter plaatse geroteerd. Maak om te roteren een nieuw token, schakel uw bronnen erop over en schakel daarna het oude uit.",
+    "rotateAction": "Roteren…",
+    "rotateTitle": "{name} roteren",
+    "rotateStep1": "Maak een nieuw token.",
+    "rotateStep2": "Schakel uw bronnen over naar het nieuwe token.",
+    "rotateStep3": "Schakel {name} uit via het rijmenu zodra niets het meer gebruikt.",
+    "rotateNever": "Er wordt niets automatisch uitgeschakeld. Het oude token blijft werken totdat u het uitschakelt.",
+    "rotateCreateNew": "Nieuw token maken",
+    "rotateNewName": "{name}-nieuw",
+    "rotateDescription": "Vervangt {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -9558,6 +9509,9 @@
       "addClause": "Clausule toevoegen"
     },
     "viewDashboard": {
+      "apply": "Toepassen",
+      "lastDataSeen": "Laatste gegevens {when}",
+      "jumpToLatest": "Naar de nieuwste gaan",
       "refreshToApplyVariables": "Vernieuwen om de laatste variabelewijzigingen toe te passen",
       "refresh": "Vernieuwen",
       "refreshCacheReload": "Cache vernieuwen en herladen",
@@ -10303,9 +10257,16 @@
       "noPanels": "Geen panelen",
       "panelsDeletedHint": "De panelen zijn verwijderd, dus er wordt momenteel op geen enkel paneel getekend. Selecteer panelen, of kies Alles selecteren, om dit op te lossen.",
       "blankFiltersHint": "Voorwaarden zonder waarde worden genegeerd."
+    },
+    "inlineCreate": {
+      "folderName": "Naam van nieuwe map",
+      "createFolder": "Map maken",
+      "tabName": "Naam van nieuw tabblad",
+      "createTab": "Tabblad maken"
     }
   },
   "panel": {
+    "noDataInRange": "Geen gegevens in bereik",
     "saveAndStay": "Opslaan en verder bewerken",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10586,12 +10547,32 @@
     "hoursAgo": "{count} uur geleden",
     "daysAgo": "{count} d geleden",
     "cards": {
-      "openIncidents": "Open incidenten"
+      "firingAlerts": "Afgaande alarmen",
+      "failingRules": "Falende regels",
+      "openIncidents": "Open incidenten",
+      "pipelineErrors": "Pipelinefouten",
+      "pipelinesOf": "van {enabled} ingeschakeld",
+      "quietStreams": "Stille streams",
+      "firingNone": "Geen afgaande",
+      "noAlertRules": "Geen alarmregels",
+      "noEnabledRules": "Geen ingeschakelde regels",
+      "failingNone": "Geen falende",
+      "failingNote": "Laatste evaluatie gaf een fout",
+      "incidentsNone": "Geen open",
+      "noPipelines": "Geen pipelines",
+      "noStreams": "Geen streams",
+      "quietNote": "Geen nieuwe data in de afgelopen 7 dagen",
+      "criticalUnit": "{count} op kritiek niveau",
+      "deliveryFailures": "Fouten bij alarmlevering",
+      "deliveryCount": "{count} alarmmelding niet bezorgd | {count} alarmmeldingen niet bezorgd",
+      "deliveryNote": "Alarmen die afgingen maar geen melding konden versturen",
+      "oldestFiring": "Langst afgaand: {age}"
     },
     "state": {
       "tileForbidden": "Geen toegang",
       "tileLocked": "Vergrendeld",
       "tileError": "Kon niet laden",
+      "tileUnavailable": "Niet beschikbaar",
       "sectionLocked": "Beschikbaar met een enterprise-licentie",
       "sectionForbidden": "Je rol kan deze gegevens niet zien. Vraag een org-beheerder om toegang."
     },
@@ -10715,6 +10696,39 @@
     "dataAsOf": "Gegevens per {time}",
     "timeRange": {
       "heading": "In het geselecteerde tijdsbereik"
+    },
+    "firingNow": {
+      "title": "Gaat nu af",
+      "byLevel": "{critical} kritiek · {warning} waarschuwing",
+      "allQuiet": "Alles rustig",
+      "watching": "{count} alarmregel actief, geen gaat af | {count} alarmregels actief, geen gaat af",
+      "noRules": "Nog geen alarmregels",
+      "browseLibrary": "Alarmbibliotheek bekijken",
+      "notifyFailed": "Melding mislukt",
+      "loadError": "Afgaande alarmen konden niet worden geladen",
+      "unavailable": "Alarmstatussen kunnen nu niet worden gelezen"
+    },
+    "health": {
+      "subtitle": "Laatst ontvangen gegevens, per type",
+      "lastData": "Laatste gegevens {age} geleden",
+      "justNow": "Laatste gegevens zojuist",
+      "noDataIn": "Geen gegevens in de afgelopen {range}",
+      "noRecords": "Nog geen records",
+      "loadError": "Je streams konden niet worden gelezen"
+    },
+    "start": {
+      "text": "Er zijn nog geen gegevens binnengekomen. Stuur gegevens, bekijk wat je hebt of stel een alarm in.",
+      "addData": "Gegevens toevoegen",
+      "createAlert": "Alarm maken"
+    },
+    "summary": {
+      "loadError": "Het organisatieoverzicht kon niet worden geladen",
+      "loadErrorRest": "De rest van het overzicht kon niet worden geladen",
+      "denied": "Geen toegang tot het organisatieoverzicht. Vraag het een beheerder."
+    },
+    "events": {
+      "runFailed": "Uitvoering mislukt",
+      "timesInRange": "{count} keer in het geselecteerde bereik | {count} keer in het geselecteerde bereik"
     }
   },
   "chatHistory": {
@@ -10895,7 +10909,8 @@
       "taglineAnd": "en begeleidt u door uw logs, traces, metrieken en incidenten.",
       "signedInAs": "Ingelogd als",
       "role": "Rol",
-      "tryOneOfThese": "Of probeer een van deze"
+      "tryOneOfThese": "Of probeer een van deze",
+      "panelText": "Stel vragen over je logs, traces, metrics en incidenten, of krijg hulp bij het schrijven van een query."
     },
     "capabilities": {
       "query": {
@@ -12005,13 +12020,21 @@
     }
   },
   "alerts": {
-    "rowAction": {
-      "leftFilter": "Komt niet meer overeen met het filter",
-      "pausedLeftFilter": "{name} is gepauzeerd. Komt niet meer overeen met het filter | {count} alarmen gepauzeerd. Komen niet meer overeen met het filter",
-      "resumedLeftFilter": "{name} is hervat. Komt niet meer overeen met het filter | {count} alarmen hervat. Komen niet meer overeen met het filter",
-      "bulkPauseFailed": "{failed} van {total} alarm kon niet worden gepauzeerd | {failed} van {total} alarmen konden niet worden gepauzeerd",
-      "bulkResumeFailed": "{failed} van {total} alarm kon niet worden hervat | {failed} van {total} alarmen konden niet worden hervat"
+    "detail": {
+      "openInLogs": "Openen in logs",
+      "openInTraces": "Openen in traces",
+      "openInMetrics": "Openen in metrieken",
+      "evidenceFiringTip": "Opent {stream} met het filter van deze waarschuwing, vanaf het begin van deze activering tot nu",
+      "evidenceWindowTip": "Opent {stream} met het filter van deze waarschuwing over de laatste {window}",
+      "threshold": "Drempel",
+      "noIncident": "Nog geen incident",
+      "conditionLabel": "Waarschuwingsvoorwaarde",
+      "allRows": "Elke rij",
+      "viewIncidents": "Incidenten bekijken"
     },
+    "summaryTrainingFailed": "Training mislukt",
+    "columnState": "Status",
+    "startFromTemplate": "Begin met een sjabloon",
     "moreActions": "Meer acties",
     "promRuleMode": "Regelmodus",
     "promRulePreview": "{count} geretourneerde reeksen komen nu overeen. Elke reeks moet de wachtperiode voltooien voordat deze afgaat.",
@@ -13445,7 +13468,8 @@
       "condition": "Voorwaarde",
       "result": "Resultaat",
       "anomalies": "Anomalieën",
-      "forGroup": "voor {group}"
+      "forGroup": "voor {group}",
+      "errorFrom": "{status} van {destination}"
     },
     "continue": "Ga verder",
     "wouldTrigger": "ZOU TRIGGEREN",
@@ -15009,7 +15033,8 @@
         "mute": "Je kunt dit niet dempen.",
         "onCall": "Piket: {people}",
         "canAct": "Kan ook actie ondernemen: {people}",
-        "people": "Piket: {onCall}. Kan ook actie ondernemen: {canAct}"
+        "people": "Piket: {onCall}. Kan ook actie ondernemen: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "Dit alarm gaat niet af, dus er is niets te bevestigen.",
@@ -15067,6 +15092,17 @@
     "siemDetection": {
       "notice": "Dit alarm is een Security-detectie. De query wordt gecompileerd uit de Sigma-regel, dus regel, stream en schema bewerk je in Security, zodat regel en query gelijk blijven.",
       "open": "Bewerken in Security"
+    },
+    "newAlertTitle": "Nieuwe waarschuwing",
+    "newAnomalyTitle": "Nieuwe anomaliedetectie",
+    "rowAction": {
+      "leftFilter": "Komt niet meer overeen met het filter",
+      "pausedLeftFilter": "{name} is gepauzeerd. Komt niet meer overeen met het filter | {count} alarmen gepauzeerd. Komen niet meer overeen met het filter",
+      "resumedLeftFilter": "{name} is hervat. Komt niet meer overeen met het filter | {count} alarmen hervat. Komen niet meer overeen met het filter",
+      "bulkPauseFailed": "{failed} van {total} alarm kon niet worden gepauzeerd | {failed} van {total} alarmen konden niet worden gepauzeerd",
+      "bulkResumeFailed": "{failed} van {total} alarm kon niet worden hervat | {failed} van {total} alarmen konden niet worden hervat",
+      "paused": "{name} gepauzeerd | {count} alerts gepauzeerd",
+      "resumed": "{name} hervat | {count} alerts hervat"
     }
   },
   "alert_dependencies": {
@@ -16124,7 +16160,7 @@
       "legend": "Legenda - ",
       "stepValuePlaceholder": "bijv. 30s, 1m",
       "step": "Stap - ",
-      "queryType": "Query type - ",
+      "queryType": "Querytype -",
       "rangeDescription": "Bereik: Retourneert tijdreeksgegevens over een tijdsbereik.",
       "instantDescription": "Direct: Retourneert enkele waarde op een specifiek tijdstip.",
       "range": "Bereik",
@@ -17937,7 +17973,13 @@
       "partial": "Sommige spans van deze trace konden niet worden gelezen. De waterval is mogelijk onvolledig.",
       "truncated": "Toont de eerste span van deze trace, in starttijdvolgorde. Latere spans zijn nog niet geladen. | Toont de eerste {count} spans van deze trace, in starttijdvolgorde. Latere spans zijn nog niet geladen.",
       "loadMore": "Laad de volgende span | Laad de volgende {size} spans",
-      "loadMoreFailed": "Kon niet meer spans van deze trace laden"
+      "loadMoreFailed": "Kon niet meer spans van deze trace laden",
+      "notFoundTitle": "Geen trace met dit ID tussen {from} en {to}",
+      "notFoundText": "Trace {traceId} heeft geen spans in de stream {stream} in dit bereik. Hij kan ouder of nieuwer zijn, in een andere stream staan of niet zijn verzameld.",
+      "searchWiderRange": "Zoek in een breder bereik",
+      "searchSpansInRange": "Zoek spans in dit bereik",
+      "loadFailedTitle": "Deze trace kon niet worden geladen",
+      "loadFailedText": "Trace {traceId} kon niet worden gelezen. Probeer het zo opnieuw."
     },
     "traceTree": {
       "clickToExpand": "Klik om uit te vouwen",
@@ -19865,7 +19907,7 @@
       "streamHint": "Deze agentversie stuurt traces naar {count} streams. De stream die al het langst wordt gebruikt, wordt getoond tenzij je een andere kiest.",
       "agentIdHint": "Agent-ID: {ids}",
       "noAgentIdentity": "Geen agentidentiteit gevonden",
-      "noAgentIdentityDescription": "Deze LLM-spans bevatten geen agentnaam, dus ze worden per stream getoond. Koppel het attribuut dat de naam van je agent bevat om ze per agent te bekijken.",
+      "noAgentIdentityDescription": "Deze LLM-spans bevatten geen agentnaam, dus ze worden per stream getoond.",
       "noAgentIdentityAction": "GenAI Agent Mapping openen"
     },
     "agentGraph": {
@@ -21477,53 +21519,6 @@
       "description": "LLM-providers slaan de verbindingsgegevens (basis-URL en credentials) op voor de taalmodellen die uw LLM Judge-scorers aanroepen. Voeg er een toe om evaluaties met een judge uit te voeren."
     }
   },
-  "genAiAgentMapping": {
-    "tabLabel": "Agenttoewijzing",
-    "title": "Agenttoewijzing",
-    "subtitle": "Hoe agentidentiteit, kostentoerekening en sessietitels uit telemetrie worden gelezen",
-    "identity": {
-      "title": "Velden voor agentidentiteit",
-      "help": "Hoe OpenObserve elke agent een naam geeft en de omgeving en versie ervan leest. Het leest eerst het standaardattribuut. Als een span dat niet heeft, wordt het eerste terugvalveld dat de span bevat gebruikt.",
-      "agentName": "Agentnaam",
-      "agentId": "Agent-ID",
-      "env": "Omgeving",
-      "version": "Versie"
-    },
-    "agentNameFields": "Terugvalvelden voor agentnaam",
-    "agentNameHelp": "Binnenkomende attributen om te gebruiken als terugval voor gen_ai.agent.name.",
-    "agentNameInfo": "Alleen gecontroleerd wanneer het standaardattribuut gen_ai.agent.name ontbreekt of leeg is. Voeg één binnenkomend telemetrieattribuut per regel toe.",
-    "agentIdFields": "Terugvalvelden voor agent-ID",
-    "agentIdHelp": "Binnenkomende attributen om te gebruiken als terugval voor gen_ai.agent.id.",
-    "agentIdInfo": "Alleen gecontroleerd wanneer het standaardattribuut gen_ai.agent.id ontbreekt of leeg is. Voeg één binnenkomend telemetrieattribuut per regel toe.",
-    "envFields": "Terugvalvelden voor omgeving",
-    "envHelp": "Binnenkomende attributen om te gebruiken als de omgeving van de agent.",
-    "envInfo": "Alleen gecontroleerd wanneer het standaardattribuut deployment.environment.name ontbreekt of leeg is. Voeg één binnenkomend telemetrieattribuut per regel toe.",
-    "versionFields": "Terugvalvelden voor versie",
-    "versionHelp": "Binnenkomende attributen om te gebruiken als de versie van de agent.",
-    "versionInfo": "Alleen gecontroleerd wanneer het standaardattribuut gen_ai.agent.version ontbreekt of leeg is. Voeg één binnenkomend telemetrieattribuut per regel toe.",
-    "alwaysAppliedStandard": "Standaard (eerst gecontroleerd):",
-    "coverageValue": "· in {percent}% van de traces, afgelopen 24 uur",
-    "fallbacksNote": "Voer terugvalvelden in, gescheiden door komma's, in de volgorde waarin ze gecontroleerd moeten worden.",
-    "fallbackInvalid": "Gebruik veldnamen gescheiden door komma's. Alleen letters, cijfers en . _ - : / {'@'}.",
-    "sessions": {
-      "title": "Sessieweergave",
-      "help": "Hoe sessies een titel krijgen en welke wrapper-tekst ervan wordt verborgen.",
-      "noAgents": "Nog geen agents. Voeg een agent toe om de wrapper-tekst ervan te verbergen."
-    },
-    "applyDefaults": "Standaardwaarden toepassen",
-    "resetToEmpty": "Terugzetten naar leeg",
-    "clearRegistry": "Register wissen",
-    "clearRegistryTitle": "Agentregister wissen?",
-    "clearRegistryDescription": "Hiermee verwijdert u alle ontdekte GenAI-agentregisterrijen voor deze organisatie. Nieuwe overeenkomende traces vullen het register opnieuw tijdens de ingestie.",
-    "clearRegistryConfirm": "Register wissen",
-    "saved": "Agenttoewijzing opgeslagen",
-    "unsavedConfirm": "Je wijzigingen in de agenttoewijzing zijn niet opgeslagen. Weggooien?",
-    "clearRegistrySuccess": "GenAI-agentregister gewist. {deletedCount} opgeslagen agents en {bufferCount} in de wachtrij staande observaties verwijderd.",
-    "saveFailed": "Opslaan van agenttoewijzing mislukt",
-    "clearRegistryFailed": "Wissen van GenAI-agentregister mislukt",
-    "defaultsLoadFailed": "Laden van standaardwaarden voor agenttoewijzing mislukt",
-    "defaultsFetchFailed": "Ophalen van standaardwaarden mislukt ({status})"
-  },
   "logs": {
     "noData": {
       "title": "Start met het verzenden van gegevens naar {product}",
@@ -21539,7 +21534,6 @@
     },
     "noStream": {
       "title": "Kies een stream om te beginnen met verkennen",
-      "description": "Kies een stream en druk vervolgens op <strong>Query uitvoeren</strong>. Je kunt verfijnen met filters, een VRL-functie en een aangepast tijdbereik zodra de resultaten binnen zijn.",
       "selectStream": "Selecteer een stream",
       "selectStreamDesc": "Blader door logs, traces, metrieken en RUM-streams.",
       "queryGuide": "Lees de handleiding voor zoekopdrachten",
@@ -21591,7 +21585,18 @@
     "detailTable": {
       "noDataAvailable": "Geen gegevens beschikbaar.",
       "addIcon": "Pictogram toevoegen",
-      "sendToAiChat": "Verzenden naar AI-chat"
+      "sendToAiChat": "Verzenden naar AI-chat",
+      "openTrace": "Trace openen",
+      "noTraceTitle": "Geen trace gekoppeld aan dit logbericht",
+      "noRelatedLogsTitle": "Geen gerelateerde logs gevonden",
+      "noRelatedMetricsTitle": "Geen gerelateerde metrics gevonden",
+      "noServiceText": "Er kon geen service aan dit logbericht worden gekoppeld, dus gerelateerde gegevens kunnen niet automatisch worden gevonden.",
+      "searchTracesAround": "Traces rond dit tijdstip zoeken",
+      "searchAroundTip": "Laad de gebeurtenissen die vlak voor en na deze zijn gelogd.",
+      "noOfEventsTip": "Hoeveel gebeurtenissen rond deze worden geladen.",
+      "severityTip": "Gedetecteerd logniveau. Selecteer om te zien hoe het is bepaald.",
+      "traceId": "Trace-ID",
+      "spanId": "Span-ID"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select *-query wordt niet ondersteund voor visualisatie.",
@@ -21883,6 +21888,7 @@
     "showDetail": "Details weergeven",
     "hideDetail": "Details verbergen",
     "runAs": "Uitvoeren als",
+    "runSuggestion": "{query} uitvoeren",
     "searchTextFor": "Zoek naar tekst \"{text}\"",
     "searchTextDesc": "Doorzoek de hele invoer als één frase",
     "explain": {
@@ -21947,7 +21953,19 @@
     "dataStale": "Gegevens zijn verouderd",
     "lastRefreshed": "Laatst ververst: {time}",
     "refresh": "Vernieuwen",
-    "refreshWithAge": "Vernieuwen, laatst vernieuwd {age}"
+    "refreshWithAge": "Vernieuwen, laatst vernieuwd {age}",
+    "refreshing": "Vernieuwen",
+    "failed": "Mislukt",
+    "autoRefresh": "Automatisch vernieuwen",
+    "autoOn": "Auto · {interval}",
+    "every": "Elke {interval}",
+    "interval": {
+      "10s": "10 s",
+      "30s": "30 s",
+      "1m": "1 min",
+      "5m": "5 min",
+      "15m": "15 min"
+    }
   },
   "synthetics": {
     "variables": {
@@ -22741,11 +22759,6 @@
       "disabling": "Uitschakelen…",
       "editTitle": "Locatie bewerken",
       "empty": "Geen locaties beschikbaar",
-      "emptyState": {
-        "title": "Nog geen locaties",
-        "description": "Een locatie is een plek van waaruit je synthetische monitors hun checks uitvoeren, zoals een cloudregio.",
-        "actionDesc": "Voeg een plek toe om checks uit te voeren"
-      },
       "enable": "Inschakelen",
       "enabled": "Ingeschakeld",
       "enabledSuccess": "Locatie ingeschakeld",
@@ -22813,7 +22826,12 @@
       "noPrivateMatches": "Geen privélocaties gevonden voor uw zoekopdracht",
       "newPrivateLocation": "Nieuwe privélocatie",
       "publicSubtitle": "Cloudregio's, altijd beschikbaar",
-      "privateSubtitle": "De locatie is klaar wanneer ten minste een van de agents actief is"
+      "privateSubtitle": "De locatie is klaar wanneer ten minste een van de agents actief is",
+      "emptyState": {
+        "title": "Nog geen locaties",
+        "description": "Een locatie is een plek van waaruit je synthetische monitors hun checks uitvoeren, zoals een cloudregio.",
+        "actionDesc": "Voeg een plek toe om checks uit te voeren"
+      }
     },
     "prefill": {
       "pageTitle": "Nieuwe synthetische check · HTTP",
@@ -23845,6 +23863,7 @@
     },
     "actions": {
       "openCheatsheet": "Cheatsheet voor sneltoetsen openen",
+      "searchOrJumpTo": "Zoeken of naar een pagina gaan",
       "closeDialog": "Elke dialoog, lade of modaal sluiten",
       "focusSearch": "Focuszoekbalk",
       "focusQuery": "Editor voor focusquery's",
@@ -23994,7 +24013,10 @@
       "tokenLinkTooltip": "Kies welk ingestietoken de snippets gebruiken",
       "copiedWithToken": "Gekopieerd met org-token {name}",
       "tokenIncludedHint": "Kopiëren bevat het ingestietoken van de organisatie, dat hier verborgen blijft.",
-      "maskedSelectionWarning": "Het verborgen token is als punten gekopieerd. Gebruik Kopiëren of maak het eerst zichtbaar."
+      "maskedSelectionWarning": "Het verborgen token is als punten gekopieerd. Gebruik Kopiëren of maak het eerst zichtbaar.",
+      "wrapLines": "Regels afbreken",
+      "showAll": "Alle {count} regel tonen | Alle {count} regels tonen",
+      "showLess": "Minder tonen"
     },
     "spinner": {
       "loading": "Laden"
@@ -24003,14 +24025,6 @@
       "steps": "Stappen",
       "stepOf": "Stap {current} van {total}",
       "swipeHint": "veeg om de rest te zien"
-    },
-    "statStrip": {
-      "filters": "Filters",
-      "showOnly": "Toon alleen {label}",
-      "alsoShow": "Ook {label} tonen",
-      "stopShowing": "Stop met tonen van {label}",
-      "scrollBack": "Vorige filters tonen",
-      "scrollForward": "Meer filters tonen"
     },
     "attributeValueCell": {
       "addIcon": "Pictogram toevoegen"
@@ -24049,7 +24063,10 @@
       "moreInfo": "Meer informatie"
     },
     "dialog": {
-      "closeDialog": "Dialoogvenster sluiten"
+      "closeDialog": "Dialoogvenster sluiten",
+      "discardChanges": "Wijzigingen negeren?",
+      "keepEditing": "Blijven bewerken",
+      "discard": "Negeren"
     },
     "drawer": {
       "closeDrawer": "Paneel sluiten"
@@ -24072,6 +24089,32 @@
       "clear": "Wissen"
     },
     "file": {
+      "removeNamed": "{name} verwijderen",
+      "sourceLabel": "Importeren uit",
+      "sourceFile": "Bestand",
+      "sourceUrl": "URL",
+      "sourcePaste": "Plakken",
+      "dropPrompt": "Sleep een bestand hierheen of {choose}",
+      "dropPromptMultiple": "Sleep bestanden hierheen of {choose}",
+      "chooseAFile": "kies een bestand",
+      "chooseFiles": "kies bestanden",
+      "chooseFileButton": "Bestand kiezen",
+      "chooseFilesButton": "Bestanden kiezen",
+      "noFileChosen": "Geen bestand gekozen",
+      "dropToUpload": "Laat los om te uploaden",
+      "upToSize": "tot {size}",
+      "upToSizeEach": "tot {size} per bestand",
+      "oneFile": "één bestand",
+      "upToFiles": "tot {count} bestanden",
+      "typeRejected": "Alleen {allowed}-bestanden worden geaccepteerd",
+      "sizeRejected": "{size} overschrijdt de limiet van {max}",
+      "countRejected": "Slechts {count} bestand tegelijk | Slechts {count} bestanden tegelijk",
+      "uploadFailed": "Upload mislukt",
+      "uploaded": "Geüpload",
+      "urlPlaceholder": "Bestands-URL",
+      "urlHelp": "We halen het één keer op wanneer je importeert.",
+      "textPlaceholder": "Plak de inhoud hier",
+      "invalidJson": "Geen geldige JSON: {detail}",
       "removeFile": "Bestand verwijderen",
       "clearAll": "Alles wissen"
     },
@@ -24086,7 +24129,14 @@
     "pagination": {
       "pagination": "Paginering",
       "previousPage": "Vorige pagina",
-      "nextPage": "Volgende pagina"
+      "nextPage": "Volgende pagina",
+      "onFirstPage": "Je bent al op de eerste pagina",
+      "onLastPage": "Je bent al op de laatste pagina",
+      "range": "{from}–{to} van {total}",
+      "rangeOfMany": "{from}–{to} van veel",
+      "pageOf": "Pagina {page} van {pages}",
+      "perPage": "{size} per pagina",
+      "pageSize": "Rijen per pagina"
     },
     "select": {
       "more": "meer",
@@ -24096,6 +24146,10 @@
       "noOptionsFound": "Geen opties gevonden",
       "multiSelect": "Meervoudige selectie",
       "singleSelect": "Enkele selectie",
+      "any": "Alle",
+      "noMatches": "Geen resultaten voor \"{term}\"",
+      "clearSearch": "Zoekopdracht wissen",
+      "addOption": "\"{value}\" toevoegen",
       "moreInfoAbout": "Meer informatie over {field}",
       "moreInfo": "Meer informatie"
     },
@@ -24138,7 +24192,10 @@
       "removeColumnAria": "Kolom verwijderen",
       "formatColumnAria": "Kolom opmaken",
       "selectedOfTotal": "{selected} van {total} geselecteerd",
-      "selectedCount": "{selected} geselecteerd"
+      "selectedCount": "{selected} geselecteerd",
+      "clearSelection": "Wissen",
+      "rowActions": "Rijacties",
+      "moreRowActions": "Meer acties"
     },
     "predefinedThemes": {
       "title": "Thema",
@@ -24289,7 +24346,7 @@
         "ok": "Ok",
         "normal": "Normaal",
         "firing": "Actief",
-        "notifyfailed": "Melding mislukt",
+        "notifyfailed": "Bezorging mislukt",
         "flapping": "Flapperen",
         "anomaly": "Anomalie",
         "succeeded": "Geslaagd",
@@ -24512,6 +24569,26 @@
     },
     "chartPlaceholder": {
       "loading": "Grafiek laden"
+    },
+    "jsonViewer": {
+      "include": "Filteren op deze waarde",
+      "exclude": "Deze waarde uitsluiten",
+      "copyValue": "Waarde kopiëren",
+      "fieldCount": "{count} veld | {count} velden",
+      "itemCount": "{count} item | {count} items"
+    },
+    "tabs": {
+      "more": "Meer",
+      "unsaved": "Niet-opgeslagen wijzigingen",
+      "locked": "Vergrendeld"
+    },
+    "statStrip": {
+      "filters": "Filters",
+      "showOnly": "Toon alleen {label}",
+      "alsoShow": "Ook {label} tonen",
+      "stopShowing": "Stop met tonen van {label}",
+      "scrollBack": "Vorige filters tonen",
+      "scrollForward": "Meer filters tonen"
     }
   },
   "functions": {
@@ -25824,6 +25901,7 @@
       "packUnavailableHint": "Samengestelde content voor deze workload is nog niet uitgebracht. Bouw ondertussen een dashboard om dit in kaart te brengen.",
       "partialTelemetryKubernetes": "We hebben Kubernetes-streams gevonden, maar niet de metrieken die deze pagina nodig heeft (kubeletstats of cluster-receiver). Controleer de receivers van je collector.",
       "partialTelemetryHosts": "We hebben host-streams gevonden, maar niet de metrieken die deze pagina nodig heeft. Controleer de hostmetrics-receiver van je collector.",
+      "hostMetricsMissingTitle": "Geen hostmetrics gevonden",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first}, en nog {count} meer",
       "hiddenFootnote": "Gegevensbronnen waarvoor je geen toegang hebt, verschijnen hier ook.",
@@ -26608,7 +26686,8 @@
         "p95": "De trage staart — 1 op de 20 calls duurde minstens zo lang. Gemeten op basis van voltooide calls in de traces van je applicatie.",
         "p99": "De slechtste 1% van de calls duurde minstens zo lang. Gemeten op basis van voltooide calls in de traces van je applicatie.",
         "load": "Totale tijd die je apps besteedden aan calls naar deze database, gemeten op basis van de traces van je applicatie. Het toont hoeveel verkeer deze database voor je apps verwerkte.",
-        "attention": "Hoe dicht deze instantie bij een limiet zit die de eigen engine publiceert — vandaag, verbindingen ten opzichte van max_connections. De slechtste dergelijke ratio, geen samengestelde score. Gesorteerd van hoog naar laag, met instanties waarvan de gezondheid niet kan worden uitgelezen bovenaan, want van een instantie die je niet kunt zien weet je niet of ze gezond is. Gemeten op de databaseserver, dus het is niet vergelijkbaar met de Databasetijd ernaast."
+        "attention": "Hoe dicht deze instantie bij een limiet zit die de eigen engine publiceert — vandaag, verbindingen ten opzichte van max_connections. De slechtste dergelijke ratio, geen samengestelde score. Gesorteerd van hoog naar laag, met instanties waarvan de gezondheid niet kan worden uitgelezen bovenaan, want van een instantie die je niet kunt zien weet je niet of ze gezond is. Gemeten op de databaseserver, dus het is niet vergelijkbaar met de Databasetijd ernaast.",
+        "calls": "Hoe vaak je apps deze database aanriepen, gemeten uit de traces van je applicatie."
       },
       "failedChip": "{count} mislukt",
       "columnSubLabels": {
@@ -27049,7 +27128,8 @@
         "tableHealthHint": "Tabelgrootte, bloat en vacuumstatus. Bloat en vacuum zijn alleen voor PostgreSQL beschikbaar.",
         "deadlocksLocked": "Deadlocks is een Enterprise-functie. Upgrade om te zien welke queries tegen elkaar deadlocked zijn en waarom. De andere database-tabbladen werken op elk abonnement.",
         "blockedLocked": "Geblokkeerde queries is een Enterprise-functie. Upgrade om te zien welke sessies op een lock wachten en wat die vasthoudt. De andere database-tabbladen werken op elk abonnement.",
-        "tableHealthLocked": "Tabelgezondheid is een Enterprise-functie. Upgrade om tabelgrootte, bloat en vacuumstatus bij te houden. De andere database-tabbladen werken op elk abonnement."
+        "tableHealthLocked": "Tabelgezondheid is een Enterprise-functie. Upgrade om tabelgrootte, bloat en vacuumstatus bij te houden. De andere database-tabbladen werken op elk abonnement.",
+        "queriesHintServer": "Soorten query's die je databases in dit venster meldden, geteld in de database zelf."
       }
     },
     "metrics": {
@@ -28274,6 +28354,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "De oproep onderdrukken",
     "savePolicyFailed": "Het beleid kon niet worden opgeslagen",
+    "savePolicyFailedReason": "Beleid niet opgeslagen. {reason}",
     "state_triggered": "Geactiveerd",
     "state_triaged": "Getrieerd",
     "state_acknowledged": "Erkend",
@@ -29958,423 +30039,6 @@
         "noData": "AutoObserve heeft nog geen geschiedenis voor {stream}, dus die heeft geen gebruikelijk niveau.",
         "approximate": "Het gebruikelijke niveau is bij benadering: een deel van de geschiedenis ontbreekt."
       }
-    }
-  },
-  "autoobserveLive": {
-    "where": "{cluster} / {namespace}",
-    "lessThan": "<{value}",
-    "topbar": {
-      "checked": "Gecontroleerd {ago}",
-      "firstCheck": "Eerste controle bezig"
-    },
-    "retry": "Opnieuw proberen",
-    "classes": {
-      "errors": "Fouten",
-      "latency": "Latentie",
-      "saturation": "Verzadiging",
-      "absence": "Stopt met verzenden",
-      "external_probe": "Synthetische controle",
-      "workload_health": "Herstarts",
-      "node": "Nodes"
-    },
-    "classesInline": {
-      "errors": "fouten",
-      "latency": "latentie",
-      "saturation": "verzadiging",
-      "absence": "afwezigheid",
-      "external_probe": "externe probes",
-      "workload_health": "workloadgezondheid",
-      "node": "nodegezondheid"
-    },
-    "states": {
-      "covered": "Bewaakt",
-      "weak": "Zwak",
-      "silent": "Stil",
-      "blind": "Blind",
-      "unmapped": "Niet toegewezen",
-      "none": "Geen"
-    },
-    "monitorKinds": {
-      "alert": "Alarm",
-      "anomaly_detector": "Anomaliedetector",
-      "slo": "SLO",
-      "synthetic": "Synthetisch"
-    },
-    "coverage": {
-      "summaryWatched": "{watched} van {total} bewaakt · {pct}%",
-      "summaryWatchedShare": "{watched} van {total} bewaakt · {pct}",
-      "splitLabel": "{watched} bewaakt, {gaps} met een dekkingsgat",
-      "stateWatched": "Bewaakt",
-      "stateGap": "Dekkingsgat",
-      "columns": {
-        "where": "Waar",
-        "state": "Status",
-        "lastChecked": "Laatst gecontroleerd"
-      },
-      "loading": "Dekking laden",
-      "loaded": "Dekking geladen",
-      "sentence": {
-        "allWatched": "Ik houd je 1 service in de gaten. | Ik houd al je {total} services in de gaten.",
-        "allGaps": "Je 1 service heeft een dekkingsgat. | Al je {total} services hebben een dekkingsgat.",
-        "watching": "Ik houd {watched} van je {total} services in de gaten.",
-        "gaps": "{count} heeft een dekkingsgat. | {count} hebben een dekkingsgat.",
-        "mixed": "{watching} {gaps}"
-      },
-      "gapAdded": "Een alarm toegevoegd voor {checks}. AutoObserve telt het bij de volgende controle mee. | Alarmen toegevoegd voor {checks}. AutoObserve telt ze bij de volgende controle mee.",
-      "gapNone": "Geen alarm bewaakt {checks}",
-      "searchPlaceholder": "Zoek service, cluster of namespace",
-      "labelNamespace": "{name} · {namespace}",
-      "labelPlace": "{name} · {cluster} · {namespace}",
-      "noNamespace": "geen namespace",
-      "noCluster": "geen cluster",
-      "noMatch": "Geen service, cluster of namespace komt overeen met “{query}”",
-      "showAll": "Alles tonen",
-      "bucketThree": "3 of meer",
-      "bucketTwo": "2",
-      "bucketOne": "1",
-      "filterHides": "Geen service is {state}",
-      "filterHidesSearch": "{count} service komt overeen met “{query}”, maar is niet {state} | {count} services komen overeen met “{query}”, maar geen enkele is {state}"
-    },
-    "cell": {
-      "noClass": "AutoObserve controleert dit signaal nog niet",
-      "tipNoClass": "{signal}: AutoObserve controleert dit nog niet",
-      "gap": {
-        "weak": "{signal}: alleen {monitor}, een breed alarm, merkt een probleem mogelijk op; het is niet beperkt tot deze service | {signal}: alleen {monitor}, brede alarmen, merken een probleem mogelijk op; ze zijn niet beperkt tot deze service",
-        "silent": "{signal}: {monitor} komt overeen, maar waarschuwt niemand | {signal}: {monitor} komen overeen, maar waarschuwen niemand",
-        "blind": "{signal}: {monitor} komt overeen, maar kan de gegevens niet zien | {signal}: {monitor} komen overeen, maar kunnen de gegevens niet zien",
-        "unmapped": "{signal}: {monitor} komt mogelijk overeen, maar het bereik kon niet aan een service worden gekoppeld | {signal}: {monitor} komen mogelijk overeen, maar hun bereik kon niet aan een service worden gekoppeld",
-        "none": "{signal}: geen alarm houdt dit in de gaten"
-      },
-      "added": "Toegevoegd"
-    },
-    "drawer": {
-      "moreChecks": "Andere controles",
-      "chartNoData": "Grafiek nog niet beschikbaar",
-      "monitors": "Alarmen",
-      "monitorLine": "{kind} · {state}",
-      "noMonitor": "Geen alarm komt overeen"
-    },
-    "charts": {
-      "empty1h": "Geen gegevens van {service} in het afgelopen uur",
-      "empty24h": "Geen gegevens van {service} in de afgelopen 24 uur",
-      "empty7d": "Geen gegevens van {service} in de afgelopen 7 dagen",
-      "emptyPartial1h": "Geen gegevens van {service} in het doorzochte deel van het afgelopen uur",
-      "emptyPartial24h": "Geen gegevens van {service} in het doorzochte deel van de afgelopen 24 uur",
-      "emptyPartial7d": "Geen gegevens van {service} in het doorzochte deel van de afgelopen 7 dagen",
-      "noSpanStatus": "Geen spanstatus in {stream}",
-      "noLevel": "Geen logniveau in {stream}",
-      "noDuration": "Geen duurveld in {stream}",
-      "noTraces": "Latentie wordt op basis van traces in een grafiek weergegeven. {service} verstuurt er geen.",
-      "noMatch": "Deze service kan niet aan zijn streams worden gekoppeld",
-      "failedQuery": "Kon deze grafiek niet laden uit {stream}",
-      "failedMatch": "Kon de streams van {service} niet opzoeken",
-      "partial": "Gedeeltelijke gegevens",
-      "wide": "Bevat ook andere services die deze stream delen",
-      "loading": "{metric} laden",
-      "summary": "{metric}, nu {value}",
-      "summaryNone": "{metric}, niets gemeten in de nieuwste bucket"
-    },
-    "suggestions": {
-      "serviceMeta": "{where}, ongeveer {traffic} gebeurtenissen per uur",
-      "trafficOnly": "Ongeveer {traffic} gebeurtenissen per uur",
-      "kinds": {
-        "coverage_gap": "Dekkingsgat",
-        "no_absence_check": "Ontbrekend alarm",
-        "silent_coverage": "Waarschuwt niemand",
-        "coverage_lost": "Dekking verloren",
-        "blind_guardrail": "Werkt niet",
-        "discovery_unusable": "Gegevenskwaliteit",
-        "alert_no_destination": "Waarschuwt niemand",
-        "alert_notify_failed": "Melding mislukt",
-        "other": "Overig"
-      },
-      "severity": {
-        "high": "Hoog",
-        "medium": "Gemiddeld"
-      },
-      "confidence": {
-        "sufficient": "Sterk bewijs",
-        "suggestive": "Enig bewijs",
-        "insufficient": "Zwak bewijs"
-      },
-      "body": {
-        "coverageGap": "Niets houdt {service} in de gaten",
-        "noAbsenceNone": "Er is geen alarm als {service} stopt met het verzenden van gegevens",
-        "noAbsenceWeak": "Alleen een breed alarm zou merken dat {service} stopt met het verzenden van gegevens",
-        "noAbsenceSilent": "De controle die zou merken dat {service} stilvalt, waarschuwt niemand",
-        "noAbsenceBlind": "De controle die zou merken dat {service} stilvalt, kan de gegevens niet zien",
-        "silentCoverage": "{monitor} houdt {classes} in de gaten op {count} service, maar waarschuwt niemand | {monitor} houdt {classes} in de gaten op {count} services, maar waarschuwt niemand",
-        "silentWhy": "{monitor} zou merken dat {services} stoppen, maar waarschuwt niemand.",
-        "silentWhyNoNames": "{monitor} zou merken dat een service stopt, maar waarschuwt niemand.",
-        "silentNext": "Geef het een bestemming.",
-        "undeliverable": "{monitor} kan {destination} niet bereiken",
-        "undeliverableWhy": "{destination} neemt tickets aan, geen alarmen. | {destination} nemen tickets aan, geen alarmen.",
-        "undeliverableNext": "Voeg een webhook of e-mail ernaast toe; {destination} blijft. | Voeg een webhook of e-mail ernaast toe; {destination} blijven.",
-        "coverageLost": "{service} is op {day} zijn {classes}-alarm kwijtgeraakt",
-        "blindStreamMissing": "{monitor} leest {detail}, dat niet bestaat",
-        "blindNoData": "{monitor} leest {detail}, dat geen recente gegevens heeft",
-        "blindEmptyScope": "{monitor} filtert op rijen die nooit aankomen",
-        "blindUnknownField": "{monitor} filtert op {field}, een veld dat zijn stream niet heeft",
-        "blindIgnoredMatcher": "{monitor} matcht op {label}, een label dat geen enkele reeks heeft, dus het houdt elke reeks in de gaten",
-        "discovery": "Slechts {good} van {active} ontdekte services zijn bruikbaar, dus de rangschikking van hiaten is gedeeltelijk",
-        "alertSyntax": "{monitor} heeft een query die niet parseert",
-        "alertTimeout": "{monitor} krijgt steeds een timeout voordat het klaar is",
-        "alertMemory": "{monitor} krijgt steeds onvoldoende geheugen",
-        "alertOtherError": "{monitor} faalt steeds met een fout",
-        "alertNotWorkingGeneric": "{monitor} werkt niet",
-        "alertNoDestination": "{monitor} is afgegaan en waarschuwt niemand",
-        "alertNotifyFailed": "{monitor} is afgegaan en {failed} van {tried} melding is mislukt. | {monitor} is afgegaan en {failed} van {tried} meldingen zijn mislukt.",
-        "alertNotifyFailedNoCounts": "{monitor} is afgegaan en de meldingen zijn mislukt.",
-        "alertStreamGone": "{monitor} faalt steeds omdat de stream niet bestaat",
-        "alertFieldGone": "{monitor} faalt steeds omdat een veld dat het gebruikt niet bestaat",
-        "other": "Ik heb iets gevonden dat deze pagina nog niet kan tonen"
-      },
-      "detail": {
-        "cell": "{check}: {state}",
-        "cells": "Wat de engine heeft gevonden: {cells}.",
-        "services": "Services die het matcht zijn onder meer {services}.",
-        "text": "Details van de engine: {detail}",
-        "quality": "Discovery draait in de modus {mode}.",
-        "none": "De engine heeft geen verdere details gestuurd.",
-        "joined": "{first} {rest}"
-      },
-      "analysedAt": "Uit de kalibratierun {ago}",
-      "neverFired": "Nooit afgegaan",
-      "lastFired": "Laatst afgegaan {time}",
-      "accept": "Accepteren",
-      "dismiss": "Negeren…",
-      "accepted": "Geaccepteerd in deze preview; er is niets verzonden",
-      "dismissed": "Genegeerd in deze preview; er is niets verzonden",
-      "loading": "Suggesties laden",
-      "loaded": "Suggesties geladen",
-      "more": "en nog {count} meer | en nog {count} meer",
-      "moreNames": "nog {count} | nog {count}",
-      "whyNext": "{why} {next}",
-      "seeAll": "Alles bekijken",
-      "drawerTitle": "Suggesties",
-      "drawerLine": "Gerangschikt op wat het belangrijkst is. Open een rij voor wat ik heb gevonden.",
-      "focusGone": "Deze suggestie is niet meer open.",
-      "clearKind": "Alle suggesties tonen",
-      "kindEmptyTitle": "Geen open suggesties van het soort {kind}",
-      "kindEmptyDesc": "Nog {count} andere suggestie is open. | Nog {count} andere suggesties zijn open.",
-      "folder": "Map {folder}",
-      "columns": {
-        "suggestion": "Suggestie",
-        "where": "Waar",
-        "kind": "Soort",
-        "severity": "Ernst"
-      }
-    },
-    "notice": {
-      "offTitle": "AutoObserve is niet ingeschakeld",
-      "details": "Details",
-      "refreshFailed": "Vernieuwen mislukt om {failedAt} · toont {what} van {dataAt}",
-      "what": {
-        "coverage": "dekking",
-        "suggestions": "suggesties",
-        "incidents": "opgeroepen bevindingen",
-        "issues": "problemen",
-        "history": "geschiedenis"
-      },
-      "coverage": {
-        "deniedTitle": "Je hebt geen toestemming om dekking te bekijken",
-        "deniedDesc": "Dekking telt de monitors in elke map, dus daarvoor is toestemming nodig om alle alarmen in deze organisatie te bekijken, niet alleen die in sommige mappen. Vraag dit aan een organisatiebeheerder.",
-        "offDesc": "Een beheerder schakelt dit in voor deze deployment. Dekking verschijnt hier na de eerste controle.",
-        "unavailableTitle": "Dekking is tijdelijk niet beschikbaar",
-        "unavailableDesc": "AutoObserve antwoordt momenteel niet. Dit lost meestal binnen een minuut of twee op.",
-        "failedTitle": "Dekking kon niet worden geladen",
-        "failedDesc": "Er is iets misgegaan bij het laden. Probeer het zo meteen opnieuw.",
-        "noPassTitle": "Er is de afgelopen dag geen controle afgerond",
-        "noPassDesc": "Dekking verschijnt hier nadat mijn volgende controle van je services is afgerond. Als AutoObserve net is ingeschakeld, kan de eerste controle even duren.",
-        "noPassAction": "Hoe ik dekking controleer",
-        "noServicesTitle": "Nog geen services gevonden",
-        "noServicesDesc": "Mijn laatste controle, {when}, vond geen services. Services verschijnen hier zodra ze logs, metrieken of traces sturen die een service benoemen.",
-        "noServicesAction": "Hoe ik services vind"
-      },
-      "suggestions": {
-        "deniedTitle": "Je hebt geen toestemming om suggesties te bekijken",
-        "deniedDesc": "Om ze te bekijken is toestemming nodig om alarmen in deze organisatie te bekijken. Vraag dit aan een organisatiebeheerder.",
-        "offDesc": "Suggesties verschijnen hier nadat een beheerder dit voor deze deployment heeft ingeschakeld.",
-        "unavailableTitle": "Suggesties zijn tijdelijk niet beschikbaar",
-        "unavailableDesc": "AutoObserve antwoordt momenteel niet. Dit lost meestal binnen een minuut of twee op.",
-        "failedTitle": "Suggesties konden niet worden geladen",
-        "failedDesc": "Er is iets misgegaan bij het laden ervan. Probeer het zo meteen opnieuw.",
-        "emptyTitle": "Momenteel geen suggesties",
-        "emptyDesc": "Ik voeg er hier een toe zodra ik een gat vind in wat je monitors bewaken.",
-        "pageEmptyTitle": "De belangrijkste suggesties zijn al afgehandeld",
-        "pageEmptyDesc": "Open de volledige lijst voor de suggesties die nog wachten."
-      },
-      "history": {
-        "deniedTitle": "Je hebt geen toestemming om geschiedenis te bekijken",
-        "deniedDesc": "Geschiedenis bevat de incidenten die AutoObserve heeft geopend, dus om het te bekijken is toestemming nodig om incidenten in deze organisatie te bekijken. Vraag dit aan een organisatiebeheerder.",
-        "offDesc": "Geschiedenis verschijnt hier nadat een beheerder deze voor deze implementatie heeft ingeschakeld.",
-        "unavailableTitle": "Geschiedenis is tijdelijk niet beschikbaar",
-        "unavailableDesc": "AutoObserve reageert nu niet. Meestal is dit binnen een minuut of twee verholpen.",
-        "failedTitle": "Kan geschiedenis niet laden",
-        "failedDesc": "Er is iets misgegaan tijdens het laden. Probeer het zo opnieuw."
-      },
-      "incidents": {
-        "deniedTitle": "Je hebt geen toestemming om opgeroepen bevindingen te bekijken",
-        "deniedDesc": "Opgeroepen bevindingen openen incidenten, dus om ze te bekijken heb je toestemming nodig om incidenten in deze organisatie op te sommen. Vraag een organisatiebeheerder om die toestemming.",
-        "offDesc": "Opgeroepen bevindingen verschijnen hier nadat een beheerder deze functie voor deze implementatie heeft ingeschakeld.",
-        "unavailableTitle": "Opgeroepen bevindingen zijn tijdelijk niet beschikbaar",
-        "unavailableDesc": "AutoObserve reageert nu niet. Meestal is dit binnen een minuut of twee verholpen.",
-        "failedTitle": "Kan opgeroepen bevindingen niet laden",
-        "failedDesc": "Er is iets misgegaan tijdens het laden. Probeer het zo opnieuw."
-      },
-      "issues": {
-        "deniedTitle": "Je hebt geen toestemming om issues te bekijken",
-        "deniedDesc": "Issues zijn incidenten die AutoObserve heeft geopend, dus om ze te bekijken heb je toestemming nodig om incidenten in deze organisatie op te sommen. Vraag een organisatiebeheerder om die toestemming.",
-        "offDesc": "Issues verschijnen hier nadat een beheerder deze functie voor deze implementatie heeft ingeschakeld.",
-        "unavailableTitle": "Issues zijn tijdelijk niet beschikbaar",
-        "unavailableDesc": "AutoObserve reageert nu niet. Meestal is dit binnen een minuut of twee verholpen.",
-        "failedTitle": "Kan issues niet laden",
-        "failedDesc": "Er is iets misgegaan tijdens het laden. Probeer het zo opnieuw."
-      }
-    },
-    "time": {
-      "justNow": "zojuist",
-      "ago": "{time} geleden"
-    },
-    "history": {
-      "incident": "Incident geopend: {title}",
-      "dismissed": "{actor} heeft {title} afgewezen",
-      "accepted": "{actor} heeft {title} gemarkeerd als bedoeld rapport",
-      "changed": "{actor} heeft {title} gewijzigd",
-      "denied": {
-        "incidents": "Incidenten worden niet weergegeven: je hebt geen toestemming om ze te bekijken.",
-        "decisions": "Beslissingen worden niet weergegeven: je hebt geen toestemming om ze te bekijken."
-      },
-      "untitled": "een suggestie",
-      "openIncident": "Incident openen",
-      "newest": "De {count} nieuwste worden weergegeven. Oudere incidenten staan op de pagina Issues.",
-      "loading": "Geschiedenis laden",
-      "loaded": "Geschiedenis geladen"
-    },
-    "incidents": {
-      "title": "Opgeroepen bevindingen",
-      "subtitle": "Bevindingen die een incident hebben geopend voor je piketteam, met de bijbehorende analyse.",
-      "pagingNote": "Oproepen is uitgeschakeld voor deze organisatie, dus AutoObserve opent geen incidenten.",
-      "sharedFor": "{label}: {reason}",
-      "finding": {
-        "stream_silence": "{stream} ({type}) is gestopt met gegevens verzenden",
-        "stream_drop": "Het volume van {stream} ({type}) is sterk gedaald",
-        "stream_rise": "Het volume van {stream} ({type}) is sterk gestegen"
-      },
-      "opened": "Incident {when} geopend",
-      "openIncident": "Incident openen",
-      "viewAnalysis": "Analyse bekijken",
-      "newFindings": "{count} nieuwe bevinding | {count} nieuwe bevindingen",
-      "showNew": "Tonen",
-      "more": "De {count} nieuwste worden getoond",
-      "seeAll": "Alle incidenten bekijken",
-      "seeAllIssues": "Alle issues bekijken",
-      "failedDetail": {
-        "status": "De aanvraag is mislukt met status {status} om {time}.",
-        "noResponse": "De aanvraag kreeg geen reactie om {time}."
-      },
-      "analysis": {
-        "notRunDetail": "Er is nog geen analyse gestart. Open het incident om er een te starten.",
-        "disabledDetail": "AI-analyse is uitgeschakeld voor deze deployment.",
-        "offOther": "Automatische analyse is niet uitgevoerd voor dit incident.",
-        "failedDetail": "De analyse is voortijdig gestopt. Bekijk de analyse voor details."
-      },
-      "empty": {
-        "title": "Er is nog niemand opgeroepen",
-        "desc": "Als een stream stopt of het volume sterk verandert, verschijnen het bijbehorende incident en de analyse hier."
-      },
-      "emptyOff": {
-        "title": "Oproepen is uitgeschakeld",
-        "desc": "AutoObserve registreert streambevindingen voor deze organisatie, maar opent geen incidenten. Een beheerder schakelt oproepen in."
-      },
-      "loading": "Opgeroepen bevindingen laden…",
-      "loaded": "Opgeroepen bevindingen geladen",
-      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
-      "routing": "Set up on-call routing"
-    },
-    "issues": {
-      "searchPlaceholder": "Zoek wat er is gebeurd of een stream",
-      "columns": {
-        "incident": "Wat er is gebeurd",
-        "severity": "Ernst",
-        "status": "Status",
-        "stream": "Stream",
-        "opened": "Geopend",
-        "analysis": "Analyse",
-        "page": "Wie is opgeroepen"
-      },
-      "count": "Geen problemen | {count} probleem | {count} problemen",
-      "capNote": "De nieuwste {count} problemen worden getoond. Beperk het bereik om oudere te zien.",
-      "emptyRange": "Geen problemen {within}",
-      "streamType": "{type} stream",
-      "streamMore": "{stream} +{count}",
-      "filterOpen": "Open",
-      "loading": "Problemen laden…",
-      "loaded": "Problemen geladen",
-      "page": {
-        "unrouted": "Niemand opgeroepen",
-        "failed": "Oproepen mislukt",
-        "pending": "Nog niet bevestigd"
-      },
-      "today": "Vandaag",
-      "yesterday": "Gisteren",
-      "shared": {
-        "rcaDisabled": "AI-analyse was uitgeschakeld toen deze incidenten werden geopend.",
-        "aiUnavailable": "AI-analyse was niet beschikbaar toen deze incidenten werden geopend.",
-        "quotaExceeded": "De organisatie had haar limiet voor AI-analyse bereikt toen deze incidenten werden geopend.",
-        "coolingDown": "Er was net een analyse uitgevoerd, dus voor deze incidenten is er geen nieuwe gestart.",
-        "startFailed": "De analyses konden niet worden gestart.",
-        "offOther": "Automatische analyse is niet uitgevoerd voor deze incidenten.",
-        "disabled": "AI-analyse is uitgeschakeld voor deze deployment.",
-        "notRun": "Er is nog geen analyse gestart. Open een incident om er een te starten.",
-        "failed": "Deze analyses zijn voortijdig gestopt. Bekijk er een voor details."
-      }
-    },
-    "surfaces": {
-      "changes": {
-        "title": "Nog geen wijzigingen",
-        "desc": "AutoObserve stelt oplossingen voor, maar heeft nog geen alarm of instelling gewijzigd. Als het iets wijzigt, wordt hier getoond of dat gewerkt heeft. Bekijk voorlopig de suggesties en pas de gewenste toe.",
-        "action": "Suggesties bekijken"
-      },
-      "history": {
-        "title": "Nog geen geschiedenis",
-        "desc": "Wat AutoObserve vindt, wat het wijzigt en wat je besluit, staat hier, nieuwste eerst. Momenteel openen de bevindingen incidenten, die op de pagina Problemen staan.",
-        "action": "Problemen openen"
-      },
-      "scenario": {
-        "tag": "Live gegevens",
-        "text": "Je ziet de live gegevens van deze organisatie. Voorbeeldscenario's worden hier niet getoond.",
-        "action": "Hoe het werkt"
-      },
-      "settings": {
-        "title": "Hier is nog niets in te stellen",
-        "desc": "Een beheerder schakelt AutoObserve en het oproepen ervan in voor deze deployment. Wie er een melding krijgt en in hoeverre het zelfstandig handelt, wordt hier ingesteld zodra die opties beschikbaar zijn.",
-        "action": "Hoe het werkt"
-      }
-    },
-    "paging": {
-      "title": "Paging",
-      "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
-      "routing": "On-call routing",
-      "unavailable": "Paging is turned off for this deployment.",
-      "denied": "{denied} {askAdmin}",
-      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
-      "deniedTitle": "Je hebt geen toestemming om de oproepinstelling te zien",
-      "deniedDesc": "Oproepen worden één keer ingesteld voor de hele organisatie. Vraag een organisatiebeheerder om toegang.",
-      "failedTitle": "Kon de oproepinstelling niet laden",
-      "failedDesc": "Er ging iets mis bij het laden. Probeer het zo meteen opnieuw.",
-      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
-    },
-    "learning": {
-      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
-      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
-      "emptyTitle": "Learning your streams",
-      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
-      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
-      "until": "Learning until {date} · {streams}",
-      "streams": "Learning {count} stream | Learning {count} streams",
-      "streamUntil": "until {date}"
     }
   },
   "autoobserve2": {
@@ -33081,6 +32745,520 @@
     "deletedQuery": "{query} verwijderd",
     "undo": "Ongedaan maken"
   },
+  "filterBar": {
+    "ariaLabel": "Filteren op veld",
+    "placeholder": "Filter op veld, of typ field=value. Druk op Enter om uit te voeren",
+    "addFilter": "Filter toevoegen",
+    "searchFields": "Velden zoeken",
+    "searchLabels": "Labels zoeken",
+    "searchOperators": "Voorwaarden zoeken",
+    "searchValue": "Zoek of typ een waarde",
+    "searchValues": "Waarden zoeken",
+    "textField": "Tekst",
+    "useValue": "Gebruik \"{value}\"",
+    "useField": "Gebruik veld \"{field}\"",
+    "useLabel": "Gebruik label \"{field}\"",
+    "searchText": "Alle tekst doorzoeken op \"{text}\"",
+    "emptyValue": "(leeg)",
+    "loadingFields": "Velden laden…",
+    "noFields": "Geen overeenkomende velden",
+    "noValues": "Geen suggesties. Typ een waarde en druk op Enter",
+    "noOperators": "Geen overeenkomende voorwaarden",
+    "removeFilter": "Filter verwijderen",
+    "clearAll": "Alle filters wissen",
+    "toggleConnector": "Schakel tussen AND en OR",
+    "selectedCount": "Geen waarden geselecteerd | {count} waarde geselecteerd | {count} waarden geselecteerd",
+    "query": "Query",
+    "validation": {
+      "incomplete": "Voltooi dit filter of verwijder het",
+      "required": "Voeg ten minste één filter toe",
+      "uniqueField": "{field} heeft al een filter; bewerk dat of verwijder deze",
+      "oneUsageCondition": "Een tier accepteert één gebruiksconditie; zet deze om in een regel of verwijder hem",
+      "rumField": "Gebruik een ingebouwd veld of een kolom met kleine letters, cijfers en underscores, van maximaal 128 tekens",
+      "valueLength": "Elke waarde moet 1 tot {max} tekens hebben",
+      "regexLength": "Gebruik maximaal {max} tekens voor het patroon.",
+      "regexInvalid": "Dit patroon is ongeldig of wordt niet ondersteund. Lookahead, lookbehind en terugverwijzingen kunnen niet worden gebruikt."
+    },
+    "operatorNames": {
+      "containsIgnoreCase": "Bevat (hoofdletterongevoelig)",
+      "notStartsWith": "Begint niet met",
+      "notEndsWith": "Eindigt niet met",
+      "isEmpty": "Is leeg",
+      "isNotEmpty": "Is niet leeg"
+    },
+    "types": {
+      "string": "Tekst",
+      "number": "Getal",
+      "boolean": "Booleaans"
+    },
+    "operators": {
+      "eq": "is",
+      "neq": "is niet",
+      "gt": "groter dan",
+      "gte": "groter dan of gelijk aan",
+      "lt": "kleiner dan",
+      "lte": "kleiner dan of gelijk aan",
+      "contains": "bevat",
+      "containsIgnoreCase": "bevat, hoofdletterongevoelig",
+      "notContains": "bevat niet",
+      "startsWith": "begint met",
+      "notStartsWith": "begint niet met",
+      "endsWith": "eindigt met",
+      "notEndsWith": "eindigt niet met",
+      "in": "is een van",
+      "notIn": "is geen van",
+      "regex": "komt overeen met regex",
+      "notRegex": "komt niet overeen met regex",
+      "isNull": "heeft geen waarde",
+      "isNotNull": "heeft een waarde",
+      "isEmpty": "is leeg of heeft geen waarde",
+      "isNotEmpty": "heeft een waarde die niet leeg is",
+      "matchAll": "komt overeen met tekst"
+    },
+    "queryTooltip": "Filter als tekst bewerken",
+    "queryNotParsableShort": "De builder kan deze query niet weergeven:",
+    "clearAndBuild": "Wissen en opbouwen",
+    "clearQueryTitle": "Query wissen?",
+    "clearQueryMessage": "De query wordt verwijderd en de builder begint leeg.",
+    "where": "Waar",
+    "addCondition": "Voorwaarde toevoegen",
+    "addGroup": "Groep toevoegen",
+    "startGroup": "Groep starten",
+    "addBelow": "Voorwaarde hieronder toevoegen",
+    "ungroup": "Groep opheffen",
+    "collapseGroup": "Groep samenvouwen",
+    "expandGroup": "Groep uitvouwen",
+    "moreInGroup": "{count} meer",
+    "groupHasIssues": "Iets in deze groep moet worden gecorrigeerd",
+    "chooseField": "Kies een veld",
+    "chooseValue": "Kies een waarde",
+    "lockedFilter": "Dit filter kan hier niet worden bewerkt. Het blijft zoals opgeslagen; verwijder het om het te laten verdwijnen.",
+    "limits": {
+      "conditions": "Maximaal {count} filter | Maximaal {count} filters",
+      "values": "Maximaal {count} waarde | Maximaal {count} waarden"
+    },
+    "builderTooltip": "Filter bewerken met de builder",
+    "editorModeLabel": "Filtereditor",
+    "modeBuilder": "Builder",
+    "modeText": "Tekst"
+  },
+  "autoobserveLive": {
+    "where": "{cluster} / {namespace}",
+    "lessThan": "<{value}",
+    "topbar": {
+      "checked": "Gecontroleerd {ago}",
+      "firstCheck": "Eerste controle bezig"
+    },
+    "retry": "Opnieuw proberen",
+    "classes": {
+      "errors": "Fouten",
+      "latency": "Latentie",
+      "saturation": "Verzadiging",
+      "absence": "Stopt met verzenden",
+      "external_probe": "Synthetische controle",
+      "workload_health": "Herstarts",
+      "node": "Nodes"
+    },
+    "classesInline": {
+      "errors": "fouten",
+      "latency": "latentie",
+      "saturation": "verzadiging",
+      "absence": "afwezigheid",
+      "external_probe": "externe probes",
+      "workload_health": "workloadgezondheid",
+      "node": "nodegezondheid"
+    },
+    "states": {
+      "covered": "Bewaakt",
+      "weak": "Zwak",
+      "silent": "Stil",
+      "blind": "Blind",
+      "unmapped": "Niet toegewezen",
+      "none": "Geen"
+    },
+    "monitorKinds": {
+      "alert": "Alarm",
+      "anomaly_detector": "Anomaliedetector",
+      "slo": "SLO",
+      "synthetic": "Synthetisch"
+    },
+    "coverage": {
+      "summaryWatched": "{watched} van {total} bewaakt · {pct}%",
+      "summaryWatchedShare": "{watched} van {total} bewaakt · {pct}",
+      "splitLabel": "{watched} bewaakt, {gaps} met een dekkingsgat",
+      "stateWatched": "Bewaakt",
+      "stateGap": "Dekkingsgat",
+      "columns": {
+        "where": "Waar",
+        "state": "Status",
+        "lastChecked": "Laatst gecontroleerd"
+      },
+      "loading": "Dekking laden",
+      "loaded": "Dekking geladen",
+      "sentence": {
+        "allWatched": "Ik houd je 1 service in de gaten. | Ik houd al je {total} services in de gaten.",
+        "allGaps": "Je 1 service heeft een dekkingsgat. | Al je {total} services hebben een dekkingsgat.",
+        "watching": "Ik houd {watched} van je {total} services in de gaten.",
+        "gaps": "{count} heeft een dekkingsgat. | {count} hebben een dekkingsgat.",
+        "mixed": "{watching} {gaps}"
+      },
+      "gapAdded": "Een alarm toegevoegd voor {checks}. AutoObserve telt het bij de volgende controle mee. | Alarmen toegevoegd voor {checks}. AutoObserve telt ze bij de volgende controle mee.",
+      "gapNone": "Geen alarm bewaakt {checks}",
+      "searchPlaceholder": "Zoek service, cluster of namespace",
+      "labelNamespace": "{name} · {namespace}",
+      "labelPlace": "{name} · {cluster} · {namespace}",
+      "noNamespace": "geen namespace",
+      "noCluster": "geen cluster",
+      "noMatch": "Geen service, cluster of namespace komt overeen met “{query}”",
+      "showAll": "Alles tonen",
+      "bucketThree": "3 of meer",
+      "bucketTwo": "2",
+      "bucketOne": "1",
+      "filterHides": "Geen service is {state}",
+      "filterHidesSearch": "{count} service komt overeen met “{query}”, maar is niet {state} | {count} services komen overeen met “{query}”, maar geen enkele is {state}"
+    },
+    "cell": {
+      "noClass": "AutoObserve controleert dit signaal nog niet",
+      "tipNoClass": "{signal}: AutoObserve controleert dit nog niet",
+      "gap": {
+        "weak": "{signal}: alleen {monitor}, een breed alarm, merkt een probleem mogelijk op; het is niet beperkt tot deze service | {signal}: alleen {monitor}, brede alarmen, merken een probleem mogelijk op; ze zijn niet beperkt tot deze service",
+        "silent": "{signal}: {monitor} komt overeen, maar waarschuwt niemand | {signal}: {monitor} komen overeen, maar waarschuwen niemand",
+        "blind": "{signal}: {monitor} komt overeen, maar kan de gegevens niet zien | {signal}: {monitor} komen overeen, maar kunnen de gegevens niet zien",
+        "unmapped": "{signal}: {monitor} komt mogelijk overeen, maar het bereik kon niet aan een service worden gekoppeld | {signal}: {monitor} komen mogelijk overeen, maar hun bereik kon niet aan een service worden gekoppeld",
+        "none": "{signal}: geen alarm houdt dit in de gaten"
+      },
+      "added": "Toegevoegd"
+    },
+    "drawer": {
+      "moreChecks": "Andere controles",
+      "chartNoData": "Grafiek nog niet beschikbaar",
+      "monitors": "Alarmen",
+      "monitorLine": "{kind} · {state}",
+      "noMonitor": "Geen alarm komt overeen"
+    },
+    "charts": {
+      "empty1h": "Geen gegevens van {service} in het afgelopen uur",
+      "empty24h": "Geen gegevens van {service} in de afgelopen 24 uur",
+      "empty7d": "Geen gegevens van {service} in de afgelopen 7 dagen",
+      "emptyPartial1h": "Geen gegevens van {service} in het doorzochte deel van het afgelopen uur",
+      "emptyPartial24h": "Geen gegevens van {service} in het doorzochte deel van de afgelopen 24 uur",
+      "emptyPartial7d": "Geen gegevens van {service} in het doorzochte deel van de afgelopen 7 dagen",
+      "noSpanStatus": "Geen spanstatus in {stream}",
+      "noLevel": "Geen logniveau in {stream}",
+      "noDuration": "Geen duurveld in {stream}",
+      "noTraces": "Latentie wordt op basis van traces in een grafiek weergegeven. {service} verstuurt er geen.",
+      "noMatch": "Deze service kan niet aan zijn streams worden gekoppeld",
+      "failedQuery": "Kon deze grafiek niet laden uit {stream}",
+      "failedMatch": "Kon de streams van {service} niet opzoeken",
+      "partial": "Gedeeltelijke gegevens",
+      "wide": "Bevat ook andere services die deze stream delen",
+      "loading": "{metric} laden",
+      "summary": "{metric}, nu {value}",
+      "summaryNone": "{metric}, niets gemeten in de nieuwste bucket"
+    },
+    "suggestions": {
+      "serviceMeta": "{where}, ongeveer {traffic} gebeurtenissen per uur",
+      "trafficOnly": "Ongeveer {traffic} gebeurtenissen per uur",
+      "kinds": {
+        "coverage_gap": "Dekkingsgat",
+        "no_absence_check": "Ontbrekend alarm",
+        "silent_coverage": "Waarschuwt niemand",
+        "coverage_lost": "Dekking verloren",
+        "blind_guardrail": "Werkt niet",
+        "discovery_unusable": "Gegevenskwaliteit",
+        "alert_no_destination": "Waarschuwt niemand",
+        "alert_notify_failed": "Melding mislukt",
+        "other": "Overig"
+      },
+      "severity": {
+        "high": "Hoog",
+        "medium": "Gemiddeld"
+      },
+      "confidence": {
+        "sufficient": "Sterk bewijs",
+        "suggestive": "Enig bewijs",
+        "insufficient": "Zwak bewijs"
+      },
+      "body": {
+        "coverageGap": "Niets houdt {service} in de gaten",
+        "noAbsenceNone": "Er is geen alarm als {service} stopt met het verzenden van gegevens",
+        "noAbsenceWeak": "Alleen een breed alarm zou merken dat {service} stopt met het verzenden van gegevens",
+        "noAbsenceSilent": "De controle die zou merken dat {service} stilvalt, waarschuwt niemand",
+        "noAbsenceBlind": "De controle die zou merken dat {service} stilvalt, kan de gegevens niet zien",
+        "silentCoverage": "{monitor} houdt {classes} in de gaten op {count} service, maar waarschuwt niemand | {monitor} houdt {classes} in de gaten op {count} services, maar waarschuwt niemand",
+        "silentWhy": "{monitor} zou merken dat {services} stoppen, maar waarschuwt niemand.",
+        "silentWhyNoNames": "{monitor} zou merken dat een service stopt, maar waarschuwt niemand.",
+        "silentNext": "Geef het een bestemming.",
+        "undeliverable": "{monitor} kan {destination} niet bereiken",
+        "undeliverableWhy": "{destination} neemt tickets aan, geen alarmen. | {destination} nemen tickets aan, geen alarmen.",
+        "undeliverableNext": "Voeg een webhook of e-mail ernaast toe; {destination} blijft. | Voeg een webhook of e-mail ernaast toe; {destination} blijven.",
+        "coverageLost": "{service} is op {day} zijn {classes}-alarm kwijtgeraakt",
+        "blindStreamMissing": "{monitor} leest {detail}, dat niet bestaat",
+        "blindNoData": "{monitor} leest {detail}, dat geen recente gegevens heeft",
+        "blindEmptyScope": "{monitor} filtert op rijen die nooit aankomen",
+        "blindUnknownField": "{monitor} filtert op {field}, een veld dat zijn stream niet heeft",
+        "blindIgnoredMatcher": "{monitor} matcht op {label}, een label dat geen enkele reeks heeft, dus het houdt elke reeks in de gaten",
+        "discovery": "Slechts {good} van {active} ontdekte services zijn bruikbaar, dus de rangschikking van hiaten is gedeeltelijk",
+        "alertSyntax": "{monitor} heeft een query die niet parseert",
+        "alertTimeout": "{monitor} krijgt steeds een timeout voordat het klaar is",
+        "alertMemory": "{monitor} krijgt steeds onvoldoende geheugen",
+        "alertOtherError": "{monitor} faalt steeds met een fout",
+        "alertNotWorkingGeneric": "{monitor} werkt niet",
+        "alertNoDestination": "{monitor} is afgegaan en waarschuwt niemand",
+        "alertNotifyFailed": "{monitor} is afgegaan en {failed} van {tried} melding is mislukt. | {monitor} is afgegaan en {failed} van {tried} meldingen zijn mislukt.",
+        "alertNotifyFailedNoCounts": "{monitor} is afgegaan en de meldingen zijn mislukt.",
+        "alertStreamGone": "{monitor} faalt steeds omdat de stream niet bestaat",
+        "alertFieldGone": "{monitor} faalt steeds omdat een veld dat het gebruikt niet bestaat",
+        "other": "Ik heb iets gevonden dat deze pagina nog niet kan tonen"
+      },
+      "detail": {
+        "cell": "{check}: {state}",
+        "cells": "Wat de engine heeft gevonden: {cells}.",
+        "services": "Services die het matcht zijn onder meer {services}.",
+        "text": "Details van de engine: {detail}",
+        "quality": "Discovery draait in de modus {mode}.",
+        "none": "De engine heeft geen verdere details gestuurd.",
+        "joined": "{first} {rest}"
+      },
+      "analysedAt": "Uit de kalibratierun {ago}",
+      "neverFired": "Nooit afgegaan",
+      "lastFired": "Laatst afgegaan {time}",
+      "accept": "Accepteren",
+      "dismiss": "Negeren…",
+      "accepted": "Geaccepteerd in deze preview; er is niets verzonden",
+      "dismissed": "Genegeerd in deze preview; er is niets verzonden",
+      "loading": "Suggesties laden",
+      "loaded": "Suggesties geladen",
+      "more": "en nog {count} meer | en nog {count} meer",
+      "moreNames": "nog {count} | nog {count}",
+      "whyNext": "{why} {next}",
+      "seeAll": "Alles bekijken",
+      "drawerTitle": "Suggesties",
+      "drawerLine": "Gerangschikt op wat het belangrijkst is. Open een rij voor wat ik heb gevonden.",
+      "focusGone": "Deze suggestie is niet meer open.",
+      "clearKind": "Alle suggesties tonen",
+      "kindEmptyTitle": "Geen open suggesties van het soort {kind}",
+      "kindEmptyDesc": "Nog {count} andere suggestie is open. | Nog {count} andere suggesties zijn open.",
+      "folder": "Map {folder}",
+      "columns": {
+        "suggestion": "Suggestie",
+        "where": "Waar",
+        "kind": "Soort",
+        "severity": "Ernst"
+      }
+    },
+    "notice": {
+      "offTitle": "AutoObserve is niet ingeschakeld",
+      "details": "Details",
+      "refreshFailed": "Vernieuwen mislukt om {failedAt} · toont {what} van {dataAt}",
+      "what": {
+        "coverage": "dekking",
+        "suggestions": "suggesties",
+        "incidents": "opgeroepen bevindingen",
+        "issues": "problemen",
+        "history": "geschiedenis"
+      },
+      "coverage": {
+        "deniedTitle": "Je hebt geen toestemming om dekking te bekijken",
+        "deniedDesc": "Dekking telt de monitors in elke map, dus daarvoor is toestemming nodig om alle alarmen in deze organisatie te bekijken, niet alleen die in sommige mappen. Vraag dit aan een organisatiebeheerder.",
+        "offDesc": "Een beheerder schakelt dit in voor deze deployment. Dekking verschijnt hier na de eerste controle.",
+        "unavailableTitle": "Dekking is tijdelijk niet beschikbaar",
+        "unavailableDesc": "AutoObserve antwoordt momenteel niet. Dit lost meestal binnen een minuut of twee op.",
+        "failedTitle": "Dekking kon niet worden geladen",
+        "failedDesc": "Er is iets misgegaan bij het laden. Probeer het zo meteen opnieuw.",
+        "noPassTitle": "Er is de afgelopen dag geen controle afgerond",
+        "noPassDesc": "Dekking verschijnt hier nadat mijn volgende controle van je services is afgerond. Als AutoObserve net is ingeschakeld, kan de eerste controle even duren.",
+        "noPassAction": "Hoe ik dekking controleer",
+        "noServicesTitle": "Nog geen services gevonden",
+        "noServicesDesc": "Mijn laatste controle, {when}, vond geen services. Services verschijnen hier zodra ze logs, metrieken of traces sturen die een service benoemen.",
+        "noServicesAction": "Hoe ik services vind"
+      },
+      "suggestions": {
+        "deniedTitle": "Je hebt geen toestemming om suggesties te bekijken",
+        "deniedDesc": "Om ze te bekijken is toestemming nodig om alarmen in deze organisatie te bekijken. Vraag dit aan een organisatiebeheerder.",
+        "offDesc": "Suggesties verschijnen hier nadat een beheerder dit voor deze deployment heeft ingeschakeld.",
+        "unavailableTitle": "Suggesties zijn tijdelijk niet beschikbaar",
+        "unavailableDesc": "AutoObserve antwoordt momenteel niet. Dit lost meestal binnen een minuut of twee op.",
+        "failedTitle": "Suggesties konden niet worden geladen",
+        "failedDesc": "Er is iets misgegaan bij het laden ervan. Probeer het zo meteen opnieuw.",
+        "emptyTitle": "Momenteel geen suggesties",
+        "emptyDesc": "Ik voeg er hier een toe zodra ik een gat vind in wat je monitors bewaken.",
+        "pageEmptyTitle": "De belangrijkste suggesties zijn al afgehandeld",
+        "pageEmptyDesc": "Open de volledige lijst voor de suggesties die nog wachten."
+      },
+      "history": {
+        "deniedTitle": "Je hebt geen toestemming om geschiedenis te bekijken",
+        "deniedDesc": "Geschiedenis bevat de incidenten die AutoObserve heeft geopend, dus om het te bekijken is toestemming nodig om incidenten in deze organisatie te bekijken. Vraag dit aan een organisatiebeheerder.",
+        "offDesc": "Geschiedenis verschijnt hier nadat een beheerder deze voor deze implementatie heeft ingeschakeld.",
+        "unavailableTitle": "Geschiedenis is tijdelijk niet beschikbaar",
+        "unavailableDesc": "AutoObserve reageert nu niet. Meestal is dit binnen een minuut of twee verholpen.",
+        "failedTitle": "Kan geschiedenis niet laden",
+        "failedDesc": "Er is iets misgegaan tijdens het laden. Probeer het zo opnieuw."
+      },
+      "incidents": {
+        "deniedTitle": "Je hebt geen toestemming om opgeroepen bevindingen te bekijken",
+        "deniedDesc": "Opgeroepen bevindingen openen incidenten, dus om ze te bekijken heb je toestemming nodig om incidenten in deze organisatie op te sommen. Vraag een organisatiebeheerder om die toestemming.",
+        "offDesc": "Opgeroepen bevindingen verschijnen hier nadat een beheerder deze functie voor deze implementatie heeft ingeschakeld.",
+        "unavailableTitle": "Opgeroepen bevindingen zijn tijdelijk niet beschikbaar",
+        "unavailableDesc": "AutoObserve reageert nu niet. Meestal is dit binnen een minuut of twee verholpen.",
+        "failedTitle": "Kan opgeroepen bevindingen niet laden",
+        "failedDesc": "Er is iets misgegaan tijdens het laden. Probeer het zo opnieuw."
+      },
+      "issues": {
+        "deniedTitle": "Je hebt geen toestemming om issues te bekijken",
+        "deniedDesc": "Issues zijn incidenten die AutoObserve heeft geopend, dus om ze te bekijken heb je toestemming nodig om incidenten in deze organisatie op te sommen. Vraag een organisatiebeheerder om die toestemming.",
+        "offDesc": "Issues verschijnen hier nadat een beheerder deze functie voor deze implementatie heeft ingeschakeld.",
+        "unavailableTitle": "Issues zijn tijdelijk niet beschikbaar",
+        "unavailableDesc": "AutoObserve reageert nu niet. Meestal is dit binnen een minuut of twee verholpen.",
+        "failedTitle": "Kan issues niet laden",
+        "failedDesc": "Er is iets misgegaan tijdens het laden. Probeer het zo opnieuw."
+      }
+    },
+    "time": {
+      "justNow": "zojuist",
+      "ago": "{time} geleden"
+    },
+    "history": {
+      "incident": "Incident geopend: {title}",
+      "dismissed": "{actor} heeft {title} afgewezen",
+      "accepted": "{actor} heeft {title} gemarkeerd als bedoeld rapport",
+      "changed": "{actor} heeft {title} gewijzigd",
+      "denied": {
+        "incidents": "Incidenten worden niet weergegeven: je hebt geen toestemming om ze te bekijken.",
+        "decisions": "Beslissingen worden niet weergegeven: je hebt geen toestemming om ze te bekijken."
+      },
+      "untitled": "een suggestie",
+      "openIncident": "Incident openen",
+      "newest": "De {count} nieuwste worden weergegeven. Oudere incidenten staan op de pagina Issues.",
+      "loading": "Geschiedenis laden",
+      "loaded": "Geschiedenis geladen"
+    },
+    "incidents": {
+      "title": "Opgeroepen bevindingen",
+      "subtitle": "Bevindingen die een incident hebben geopend voor je piketteam, met de bijbehorende analyse.",
+      "pagingNote": "Oproepen is uitgeschakeld voor deze organisatie, dus AutoObserve opent geen incidenten.",
+      "sharedFor": "{label}: {reason}",
+      "finding": {
+        "stream_silence": "{stream} ({type}) is gestopt met gegevens verzenden",
+        "stream_drop": "Het volume van {stream} ({type}) is sterk gedaald",
+        "stream_rise": "Het volume van {stream} ({type}) is sterk gestegen"
+      },
+      "opened": "Incident {when} geopend",
+      "openIncident": "Incident openen",
+      "viewAnalysis": "Analyse bekijken",
+      "newFindings": "{count} nieuwe bevinding | {count} nieuwe bevindingen",
+      "showNew": "Tonen",
+      "more": "De {count} nieuwste worden getoond",
+      "seeAll": "Alle incidenten bekijken",
+      "seeAllIssues": "Alle issues bekijken",
+      "failedDetail": {
+        "status": "De aanvraag is mislukt met status {status} om {time}.",
+        "noResponse": "De aanvraag kreeg geen reactie om {time}."
+      },
+      "analysis": {
+        "notRunDetail": "Er is nog geen analyse gestart. Open het incident om er een te starten.",
+        "disabledDetail": "AI-analyse is uitgeschakeld voor deze deployment.",
+        "offOther": "Automatische analyse is niet uitgevoerd voor dit incident.",
+        "failedDetail": "De analyse is voortijdig gestopt. Bekijk de analyse voor details."
+      },
+      "empty": {
+        "title": "Er is nog niemand opgeroepen",
+        "desc": "Als een stream stopt of het volume sterk verandert, verschijnen het bijbehorende incident en de analyse hier."
+      },
+      "emptyOff": {
+        "title": "Oproepen is uitgeschakeld",
+        "desc": "AutoObserve registreert streambevindingen voor deze organisatie, maar opent geen incidenten. Een beheerder schakelt oproepen in."
+      },
+      "loading": "Opgeroepen bevindingen laden…",
+      "loaded": "Opgeroepen bevindingen geladen",
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "issues": {
+      "searchPlaceholder": "Zoek wat er is gebeurd of een stream",
+      "columns": {
+        "incident": "Wat er is gebeurd",
+        "severity": "Ernst",
+        "status": "Status",
+        "stream": "Stream",
+        "opened": "Geopend",
+        "analysis": "Analyse",
+        "page": "Wie is opgeroepen"
+      },
+      "count": "Geen problemen | {count} probleem | {count} problemen",
+      "capNote": "De nieuwste {count} problemen worden getoond. Beperk het bereik om oudere te zien.",
+      "emptyRange": "Geen problemen {within}",
+      "streamType": "{type} stream",
+      "streamMore": "{stream} +{count}",
+      "filterOpen": "Open",
+      "loading": "Problemen laden…",
+      "loaded": "Problemen geladen",
+      "page": {
+        "unrouted": "Niemand opgeroepen",
+        "failed": "Oproepen mislukt",
+        "pending": "Nog niet bevestigd"
+      },
+      "today": "Vandaag",
+      "yesterday": "Gisteren",
+      "shared": {
+        "rcaDisabled": "AI-analyse was uitgeschakeld toen deze incidenten werden geopend.",
+        "aiUnavailable": "AI-analyse was niet beschikbaar toen deze incidenten werden geopend.",
+        "quotaExceeded": "De organisatie had haar limiet voor AI-analyse bereikt toen deze incidenten werden geopend.",
+        "coolingDown": "Er was net een analyse uitgevoerd, dus voor deze incidenten is er geen nieuwe gestart.",
+        "startFailed": "De analyses konden niet worden gestart.",
+        "offOther": "Automatische analyse is niet uitgevoerd voor deze incidenten.",
+        "disabled": "AI-analyse is uitgeschakeld voor deze deployment.",
+        "notRun": "Er is nog geen analyse gestart. Open een incident om er een te starten.",
+        "failed": "Deze analyses zijn voortijdig gestopt. Bekijk er een voor details."
+      }
+    },
+    "surfaces": {
+      "changes": {
+        "title": "Nog geen wijzigingen",
+        "desc": "AutoObserve stelt oplossingen voor, maar heeft nog geen alarm of instelling gewijzigd. Als het iets wijzigt, wordt hier getoond of dat gewerkt heeft. Bekijk voorlopig de suggesties en pas de gewenste toe.",
+        "action": "Suggesties bekijken"
+      },
+      "history": {
+        "title": "Nog geen geschiedenis",
+        "desc": "Wat AutoObserve vindt, wat het wijzigt en wat je besluit, staat hier, nieuwste eerst. Momenteel openen de bevindingen incidenten, die op de pagina Problemen staan.",
+        "action": "Problemen openen"
+      },
+      "scenario": {
+        "tag": "Live gegevens",
+        "text": "Je ziet de live gegevens van deze organisatie. Voorbeeldscenario's worden hier niet getoond.",
+        "action": "Hoe het werkt"
+      },
+      "settings": {
+        "title": "Hier is nog niets in te stellen",
+        "desc": "Een beheerder schakelt AutoObserve en het oproepen ervan in voor deze deployment. Wie er een melding krijgt en in hoeverre het zelfstandig handelt, wordt hier ingesteld zodra die opties beschikbaar zijn.",
+        "action": "Hoe het werkt"
+      }
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "deniedTitle": "Je hebt geen toestemming om de oproepinstelling te zien",
+      "deniedDesc": "Oproepen worden één keer ingesteld voor de hele organisatie. Vraag een organisatiebeheerder om toegang.",
+      "failedTitle": "Kon de oproepinstelling niet laden",
+      "failedDesc": "Er ging iets mis bij het laden. Probeer het zo meteen opnieuw.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
+    }
+  },
   "insight": {
     "targets": {
       "origin": "Gemaakt op basis van een AutoObserve-suggestie voor {service} op {date}.",
@@ -34462,5 +34640,60 @@
       },
       "noHighConfidence": "Geen namen met hoge betrouwbaarheid"
     }
+  },
+  "pageHeader": {
+    "about": "Over deze pagina"
+  },
+  "genAiAgentMapping": {
+    "tabLabel": "Agenttoewijzing",
+    "title": "Agenttoewijzing",
+    "subtitle": "Hoe agentidentiteit, kostentoerekening en sessietitels uit telemetrie worden gelezen",
+    "identity": {
+      "title": "Velden voor agentidentiteit",
+      "help": "Hoe OpenObserve elke agent een naam geeft en de omgeving en versie ervan leest. Het leest eerst het standaardattribuut. Als een span dat niet heeft, wordt het eerste terugvalveld dat de span bevat gebruikt.",
+      "agentName": "Agentnaam",
+      "agentId": "Agent-ID",
+      "env": "Omgeving",
+      "version": "Versie"
+    },
+    "agentNameFields": "Terugvalvelden voor agentnaam",
+    "agentNameHelp": "Binnenkomende attributen om te gebruiken als terugval voor gen_ai.agent.name.",
+    "agentNameInfo": "Alleen gecontroleerd wanneer het standaardattribuut gen_ai.agent.name ontbreekt of leeg is. Voeg één binnenkomend telemetrieattribuut per regel toe.",
+    "agentIdFields": "Terugvalvelden voor agent-ID",
+    "agentIdHelp": "Binnenkomende attributen om te gebruiken als terugval voor gen_ai.agent.id.",
+    "agentIdInfo": "Alleen gecontroleerd wanneer het standaardattribuut gen_ai.agent.id ontbreekt of leeg is. Voeg één binnenkomend telemetrieattribuut per regel toe.",
+    "envFields": "Terugvalvelden voor omgeving",
+    "envHelp": "Binnenkomende attributen om te gebruiken als de omgeving van de agent.",
+    "envInfo": "Alleen gecontroleerd wanneer het standaardattribuut deployment.environment.name ontbreekt of leeg is. Voeg één binnenkomend telemetrieattribuut per regel toe.",
+    "versionFields": "Terugvalvelden voor versie",
+    "versionHelp": "Binnenkomende attributen om te gebruiken als de versie van de agent.",
+    "versionInfo": "Alleen gecontroleerd wanneer het standaardattribuut gen_ai.agent.version ontbreekt of leeg is. Voeg één binnenkomend telemetrieattribuut per regel toe.",
+    "alwaysAppliedStandard": "Standaard (eerst gecontroleerd):",
+    "coverageValue": "· in {percent}% van de traces, afgelopen 24 uur",
+    "fallbacksNote": "Voer terugvalvelden in, gescheiden door komma's, in de volgorde waarin ze gecontroleerd moeten worden.",
+    "fallbackInvalid": "Gebruik veldnamen gescheiden door komma's. Alleen letters, cijfers en . _ - : / {'@'}.",
+    "sessions": {
+      "title": "Sessieweergave",
+      "help": "Hoe sessies een titel krijgen en welke wrapper-tekst ervan wordt verborgen.",
+      "noAgents": "Nog geen agents. Voeg een agent toe om de wrapper-tekst ervan te verbergen."
+    },
+    "applyDefaults": "Standaardwaarden toepassen",
+    "resetToEmpty": "Terugzetten naar leeg",
+    "clearRegistry": "Register wissen",
+    "clearRegistryTitle": "Agentregister wissen?",
+    "clearRegistryDescription": "Hiermee verwijdert u alle ontdekte GenAI-agentregisterrijen voor deze organisatie. Nieuwe overeenkomende traces vullen het register opnieuw tijdens de ingestie.",
+    "clearRegistryConfirm": "Register wissen",
+    "saved": "Agenttoewijzing opgeslagen",
+    "unsavedConfirm": "Je wijzigingen in de agenttoewijzing zijn niet opgeslagen. Weggooien?",
+    "clearRegistrySuccess": "GenAI-agentregister gewist. {deletedCount} opgeslagen agents en {bufferCount} in de wachtrij staande observaties verwijderd.",
+    "saveFailed": "Opslaan van agenttoewijzing mislukt",
+    "clearRegistryFailed": "Wissen van GenAI-agentregister mislukt",
+    "defaultsLoadFailed": "Laden van standaardwaarden voor agenttoewijzing mislukt",
+    "defaultsFetchFailed": "Ophalen van standaardwaarden mislukt ({status})"
+  },
+  "copyButton": {
+    "copy": "Kopiëren",
+    "copied": "Gekopieerd",
+    "failed": "Kopiëren geblokkeerd · druk op Ctrl C"
   }
 }

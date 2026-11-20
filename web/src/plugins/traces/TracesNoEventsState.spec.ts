@@ -63,8 +63,7 @@ const OEmptyStateStub = defineComponent({
   setup(_, { slots }) {
     return () =>
       h("div", { "data-test": "o-empty-state" }, [
-        slots.title?.(),
-        slots.description?.(),
+        slots.text?.(),
         slots.actions?.(),
         slots.extra?.(),
       ]);

@@ -42,8 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? 'stickyHeader fullscreenHeader bg-surface-panel'
               : 'shrink-0'
         "
-        :subtitle="folderNameFromFolderId"
-        :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
+        :title="dashboardTitle"
+        title-data-test="dashboard-name-title"
         :back="
           !isFullscreen && store.state.printMode !== true
             ? {
@@ -54,14 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : undefined
         "
       >
-        <template #title>
-          <span data-test="dashboard-name-title">{{ currentDashboardData.data?.title }}</span>
+        <template #status>
           <OBadge
             v-if="isEditingLayout"
-            variant="primary-soft"
+            tone="accent"
             size="sm"
             icon="edit"
-            class="ms-2 align-middle"
             data-test="dashboard-edit-badge"
             >{{ t("dashboard.layoutEdit.editing") }}</OBadge
           >
@@ -70,18 +68,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Add panel is the most-used action, so it leads the toolbar. -->
           <OButton
             v-if="!isFullscreen && !isEditingLayout"
+            :icon-only="isMobile"
             v-show="store.state.printMode !== true"
-            variant="outline"
-            :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+            variant="secondary"
             @click="addPanelData"
             data-test="dashboard-panel-add"
-            icon-left="add"
+            :icon="isMobile ? 'add' : undefined"
             :aria-label="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
           >
             <template v-if="!isMobile">{{ t("panel.add") }}</template>
             <OTooltip
               :content="hasNewPanelDraft ? t('dashboard.panelDraft.addPanelDot') : t('panel.add')"
-              shortcut-id="dashboardAddPanel"
+              shortcut="dashboardAddPanel"
             />
             <!-- A button's children are presentational, so the draft state is also in the button's own name. -->
             <span
@@ -92,6 +90,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-panel-add-draft-dot"
             />
           </OButton>
+          <template v-if="!isEditingLayout">
+            <OButtonGroup v-if="!isFullscreen" v-show="store.state.printMode !== true">
+              <ShareButton
+                :url="dashboardShareURL"
+                @copy:success="onDashboardShared"
+                variant="secondary"
+                :show-label="!isMobile"
+                data-test="dashboard-share-btn"
+              />
+              <ODropdown
+                v-if="store.state.zoConfig?.public_dashboards_enabled"
+                align="end"
+                side="bottom"
+              >
+                <template #trigger>
+                  <OButton
+                    icon-only
+                    variant="secondary"
+                    :aria-label="t('dashboard.viewDashboard.moreShareOptions')"
+                    data-test="dashboard-share-options-btn"
+                    icon="arrow-drop-down"
+                  />
+                </template>
+                <ODropdownItem
+                  data-test="dashboard-publish-public-btn"
+                  icon="language"
+                  @select="showPublicLinksPanel = true"
+                >
+                  {{ t("dashboard.publicDashboard.shareTooltip") }}
+                </ODropdownItem>
+              </ODropdown>
+            </OButtonGroup>
+            <PublicLinksPanel
+              v-if="
+                currentDashboardData.data?.dashboardId &&
+                store.state.zoConfig?.public_dashboards_enabled
+              "
+              v-model="showPublicLinksPanel"
+              :dashboard-id="currentDashboardData.data.dashboardId"
+              :dashboard-title="currentDashboardData.data?.title"
+              :variables-config="currentDashboardData.data?.variables"
+              :time-obj="currentTimeObj"
+              :current-values="variablesData"
+              :dashboard-data="currentDashboardData.data"
+              :dashboard-variables="variablesManager"
+              :folder-id="(route.query.folder as string) ?? 'default'"
+            />
+          </template>
           <!-- <DateTimePicker 
             class="ms-2"
             ref="refDateTime"
@@ -114,11 +160,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
             class="dashboard-icons max-md:[&_.date-time-label]:hidden"
-            size="sm"
             :modelValue="pickedDate ?? selectedDate"
             :auto-apply-dashboard="true"
             :initialTimezone="initialTimezone"
-            :disable="arePanelsLoading"
+            :disabled="arePanelsLoading"
             calendar-presets
             @update:modelValue="timeGate.onPick"
             @show="timeGate.onShow"
@@ -126,128 +171,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @timezone-change="timeGate.flush"
             data-test="dashboard-global-date-time-picker"
           />
-          <!-- Kiosk keeps this mounted on every width: it owns the refresh value and its URL sync. -->
-          <AutoRefreshInterval
-            v-if="!isMobile || kioskMode"
-            v-model="refreshInterval"
-            trigger
-            :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
-            @trigger="onAutoRefreshTick"
-            class="dashboard-icons hideOnPrintMode"
-            size="sm"
-          />
           <DeployMarkersUnavailable
             v-if="
               (config.isEnterprise == 'true' || config.isCloud == 'true') && !store.state.printMode
             "
             @retry="refreshData()"
           />
-          <OButtonGroup v-show="store.state.printMode !== true">
-            <OTooltip
-              v-if="config.isEnterprise == 'true' && arePanelsLoading"
-              :content="t('panel.cancel')"
-              :disabled="!isMobile"
+          <div v-show="store.state.printMode !== true" class="inline-grid">
+            <ORefreshButton
+              class="col-start-1 row-start-1"
+              :class="{ invisible: showCancel }"
+              :last-run-at="lastRefreshedAt"
+              :loading="arePanelsLoading"
+              :pending-label="refreshPendingLabel"
+              :auto-refresh="refreshInterval"
+              :min-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+              :tooltip="refreshTooltip"
+              shortcut="dashboardRefresh"
+              data-test="dashboard-refresh-btn"
+              @click="refreshData()"
+              @update:auto-refresh="refreshInterval = $event"
             >
-              <OButton
-                variant="cancel-query"
-                :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
-                @click="cancelQuery"
-                :aria-label="t('panel.cancel')"
-                data-test="dashboard-cancel-btn"
-                :icon-left="isMobile ? 'cancel' : undefined"
-              >
-                <!-- Both labels share one grid cell: Cancel keeps the Refresh width and still fits a longer translation. -->
-                <span v-if="!isMobile" class="grid items-center justify-items-center">
-                  <span
-                    class="invisible col-start-1 row-start-1 flex items-center gap-1.5"
-                    aria-hidden="true"
-                  >
-                    <OIcon name="refresh" size="sm" />{{ t("dashboard.viewDashboard.refresh") }}
-                  </span>
-                  <span class="col-start-1 row-start-1">{{ t("panel.cancel") }}</span>
-                </span>
-              </OButton>
-            </OTooltip>
-            <OTooltip v-else :content="refreshTooltip" shortcut-id="dashboardRefresh">
-              <OButton
-                :variant="refreshVariant"
-                :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
-                @click="refreshData()"
-                :disabled="arePanelsLoading"
-                :loading="arePanelsLoading"
-                :aria-label="t('dashboard.viewDashboard.refresh')"
-                data-test="dashboard-refresh-btn"
-                :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
-              >
-                <template v-if="!isMobile">{{ t("dashboard.viewDashboard.refresh") }}</template>
-              </OButton>
-            </OTooltip>
-            <ODropdown align="end" side="bottom">
-              <template #trigger>
-                <OButton
-                  :variant="refreshOptionsVariant"
-                  size="icon-toolbar"
-                  class="w-5"
-                  :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
-                  data-test="dashboard-refresh-options-btn"
-                  icon-left="arrow-drop-down"
-                />
-              </template>
-              <ODropdownItem
-                data-test="dashboard-refresh-without-cache-btn"
-                icon-left="cached"
-                :disabled="arePanelsLoading"
-                @select="refreshData(true)"
-              >
-                {{ t("dashboard.viewDashboard.refreshCacheReload") }}
-              </ODropdownItem>
-              <template v-if="isAutoRunAvailable">
+              <template #menu>
                 <ODropdownSeparator />
-                <ODropdownItem data-test="dashboard-auto-run-toggle-btn" @select="toggleAutoRun">
-                  <template #icon-left>
-                    <OIcon
-                      :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
-                      size="sm"
-                      :class="isAutoRunOn ? 'text-accent' : ''"
-                    />
-                  </template>
-                  <span>
-                    <div class="font-medium">
-                      {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
-                    </div>
-                    <div class="text-text-secondary text-xs">
-                      {{ t("dashboard.viewDashboard.autoRunDescription") }}
-                    </div>
-                    <div class="text-text-secondary text-xs" data-test="dashboard-auto-run-scope">
-                      {{ t("dashboard.viewDashboard.autoRunScope") }}
-                    </div>
-                  </span>
+                <ODropdownItem
+                  data-test="dashboard-refresh-without-cache-btn"
+                  icon="cached"
+                  :disabled="arePanelsLoading"
+                  @select="refreshData(true)"
+                >
+                  {{ t("dashboard.viewDashboard.refreshCacheReload") }}
                 </ODropdownItem>
+                <template v-if="isAutoRunAvailable">
+                  <ODropdownSeparator />
+                  <ODropdownItem data-test="dashboard-auto-run-toggle-btn" @select="toggleAutoRun">
+                    <template #icon>
+                      <OIcon
+                        :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
+                        size="sm"
+                        :class="isAutoRunOn ? 'text-accent' : ''"
+                      />
+                    </template>
+                    <span>
+                      <div class="font-medium">
+                        {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+                      </div>
+                      <div class="text-text-secondary text-xs">
+                        {{ t("dashboard.viewDashboard.autoRunDescription") }}
+                      </div>
+                      <div class="text-text-secondary text-xs" data-test="dashboard-auto-run-scope">
+                        {{ t("dashboard.viewDashboard.autoRunScope") }}
+                      </div>
+                    </span>
+                  </ODropdownItem>
+                </template>
               </template>
-            </ODropdown>
-          </OButtonGroup>
-          <OButton
-            v-if="!isFullscreen && !isEditingLayout"
-            v-show="store.state.printMode !== true"
-            variant="outline"
-            :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
-            icon-left="edit"
-            :aria-label="t('dashboard.layoutEdit.enter')"
-            data-test="dashboard-edit-btn"
-            @click="enterLayoutEdit"
-          >
-            <template v-if="!isMobile">{{ t("dashboard.layoutEdit.edit") }}</template>
-            <OTooltip :content="t('dashboard.layoutEdit.enter')" />
-          </OButton>
+            </ORefreshButton>
+            <OButton
+              v-if="showCancel"
+              class="col-start-1 row-start-1"
+              variant="secondary"
+              icon="cancel"
+              :aria-label="t('panel.cancel')"
+              data-test="dashboard-cancel-btn"
+              @click="cancelQuery"
+            >
+              <template v-if="!isMobile">{{ t("panel.cancel") }}</template>
+            </OButton>
+          </div>
           <template v-if="isEditingLayout">
             <div v-if="!isMobile" class="flex h-5 items-stretch">
               <OSeparator vertical />
             </div>
             <template v-if="!isMobile">
               <OButton
-                variant="outline"
-                size="icon-toolbar"
-                icon-left="undo"
+                icon-only
+                variant="ghost"
+                icon="undo"
                 :disabled="!canUndoLayout || isSavingLayout"
                 :aria-label="t('dashboard.layoutEdit.undo')"
                 data-test="dashboard-edit-undo-btn"
@@ -255,13 +255,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OTooltip
                   :content="t('dashboard.layoutEdit.undo')"
-                  shortcut-id="dashboardLayoutUndo"
+                  shortcut="dashboardLayoutUndo"
                 />
               </OButton>
               <OButton
-                variant="outline"
-                size="icon-toolbar"
-                icon-left="redo"
+                icon-only
+                variant="ghost"
+                icon="redo"
                 :disabled="!canRedoLayout || isSavingLayout"
                 :aria-label="t('dashboard.layoutEdit.redo')"
                 data-test="dashboard-edit-redo-btn"
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OTooltip
                   :content="t('dashboard.layoutEdit.redo')"
-                  shortcut-id="dashboardLayoutRedo"
+                  shortcut="dashboardLayoutRedo"
                 />
               </OButton>
               <span
@@ -282,8 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
               <OButton
                 variant="ghost"
-                size="sm-toolbar"
-                icon-left="close"
+                icon="close"
                 :disabled="isSavingLayout"
                 data-test="dashboard-edit-discard-btn"
                 @click="requestExitLayoutEdit"
@@ -291,96 +290,141 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dashboard.layoutEdit.discard") }}
                 <OTooltip
                   :content="t('dashboard.layoutEdit.discardTooltip')"
-                  shortcut-id="dashboardLayoutExit"
+                  shortcut="dashboardLayoutExit"
                 />
               </OButton>
             </template>
             <OButton
               variant="primary"
-              size="sm-toolbar"
-              icon-left="check"
+              icon="check"
               :disabled="layoutChangeCount === 0"
               :loading="isSavingLayout"
               data-test="dashboard-edit-save-btn"
               @click="saveLayout"
             >
               {{ t("dashboard.layoutEdit.save") }}
-              <OTooltip
-                :content="t('dashboard.layoutEdit.saveTooltip')"
-                shortcut-id="dashboardSave"
-              />
+              <OTooltip :content="t('dashboard.layoutEdit.saveTooltip')" shortcut="dashboardSave" />
             </OButton>
           </template>
+          <span
+            v-if="!isFullscreen && !isEditingLayout"
+            v-show="store.state.printMode !== true"
+            class="inline-flex items-center"
+          >
+            <ODropdown align="end" side="bottom" @close-auto-focus="onMoreOptionsClosed">
+              <template #trigger>
+                <OButton
+                  icon-only
+                  variant="ghost"
+                  icon="more-horiz"
+                  :aria-label="
+                    hasSettingsDraft
+                      ? t('dashboard.moreOptionsSettingsDraft')
+                      : t('common.moreOptions')
+                  "
+                  data-test="dashboard-more-options-btn"
+                >
+                  <OTooltip :content="t('common.moreOptions')" />
+                  <EditorDraftDot
+                    v-if="hasSettingsDraft"
+                    corner
+                    :tooltip="false"
+                    data-test="dashboard-setting-btn-draft-dot"
+                  />
+                </OButton>
+              </template>
+              <ODropdownItem data-test="dashboard-edit-btn" icon="edit" @select="enterLayoutEdit">
+                {{ t("dashboard.layoutEdit.enter") }}
+              </ODropdownItem>
+              <ODropdownItem
+                data-test="dashboard-fullscreen-btn"
+                icon="fullscreen"
+                shortcut="dashboardFullscreen"
+                @select="toggleFullscreen"
+              >
+                {{ t("dashboard.fullscreen") }}
+              </ODropdownItem>
+              <ODropdownSeparator />
+              <ODropdownItem
+                data-test="dashboard-kiosk-btn"
+                icon="tv"
+                @select="kioskSetupChosen = true"
+              >
+                {{ t("dashboard.kiosk.tvMode") }}
+              </ODropdownItem>
+              <ODropdownItem
+                data-test="dashboard-print-menu-item"
+                icon="print"
+                @select="printDashboard"
+              >
+                {{ t("dashboard.print") }}
+              </ODropdownItem>
+              <ODropdownSeparator />
+              <ODropdownItem
+                data-test="export-dashboard"
+                icon="download"
+                shortcut="dashboardExport"
+                @select="exportDashboard"
+              >
+                {{ t("dashboard.export") }}
+              </ODropdownItem>
+              <ODropdownItem
+                data-test="view-dashboard-scheduled-reports"
+                :icon="reportsLocked ? 'lock' : 'description'"
+                :disabled="reportsLocked"
+                :disabled-reason="reportsLocked ? reportsLockedReason : null"
+                @select="openScheduledReports"
+              >
+                {{ t("dashboard.scheduledDashboards") }}
+              </ODropdownItem>
+              <ODropdownSeparator />
+              <ODropdownItem
+                data-test="dashboard-setting-btn"
+                icon="settings"
+                @select="openSettingsDialog"
+              >
+                {{ settingsButtonLabel }}
+              </ODropdownItem>
+              <ODropdownItem
+                data-test="dashboard-json-edit-btn"
+                icon="code"
+                @select="openJsonEditor"
+              >
+                {{ t("dashboard.editJson") }}
+              </ODropdownItem>
+              <ODropdownItem
+                data-test="dashboard-view-set-home-btn"
+                :icon="isHome(dashboardId) ? 'keep' : 'keep-outline'"
+                :description="isHome(dashboardId) ? null : t('dashboard.setAsHomeDesc')"
+                @select="toggleHomeDashboard"
+              >
+                {{ isHome(dashboardId) ? t("dashboard.removeFromHome") : t("dashboard.setAsHome") }}
+              </ODropdownItem>
+            </ODropdown>
+            <KioskSetupPopover
+              v-model:open="kioskSetupOpen"
+              :current-refresh-seconds="refreshInterval"
+              :min-refresh-seconds="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+              @open="enterKiosk"
+            >
+              <template #trigger>
+                <span class="block size-0" aria-hidden="true" />
+              </template>
+            </KioskSetupPopover>
+          </span>
         </template>
 
         <template #actions-overflow>
-          <AutoRefreshInterval
-            v-if="isMobile && !kioskMode"
-            v-model="refreshInterval"
-            trigger
-            :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
-            @trigger="onAutoRefreshTick"
-            class="dashboard-icons hideOnPrintMode"
-            size="sm"
-          />
           <!-- These save, print or reload outside the draft, so edit mode hides them until Save or Discard. -->
           <template v-if="!isEditingLayout">
-            <OButtonGroup v-if="!isFullscreen" v-show="store.state.printMode !== true">
-              <ShareButton
-                :url="dashboardShareURL"
-                @copy:success="onDashboardShared"
-                variant="outline"
-                :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
-                :show-label="!isMobile"
-                data-test="dashboard-share-btn"
-              />
-              <ODropdown
-                v-if="store.state.zoConfig?.public_dashboards_enabled"
-                align="end"
-                side="bottom"
-              >
-                <template #trigger>
-                  <OButton
-                    variant="outline"
-                    size="icon-toolbar"
-                    class="w-5"
-                    :aria-label="t('dashboard.viewDashboard.moreShareOptions')"
-                    data-test="dashboard-share-options-btn"
-                    icon-left="arrow-drop-down"
-                  />
-                </template>
-                <ODropdownItem
-                  data-test="dashboard-publish-public-btn"
-                  icon-left="language"
-                  @select="showPublicLinksPanel = true"
-                >
-                  {{ t("dashboard.publicDashboard.shareTooltip") }}
-                </ODropdownItem>
-              </ODropdown>
-            </OButtonGroup>
-            <PublicLinksPanel
-              v-if="
-                currentDashboardData.data?.dashboardId &&
-                store.state.zoConfig?.public_dashboards_enabled
-              "
-              v-model="showPublicLinksPanel"
-              :dashboard-id="currentDashboardData.data.dashboardId"
-              :dashboard-title="currentDashboardData.data?.title"
-              :variables-config="currentDashboardData.data?.variables"
-              :time-obj="currentTimeObj"
-              :current-values="variablesData"
-              :dashboard-data="currentDashboardData.data"
-              :dashboard-variables="variablesManager"
-              :folder-id="(route.query.folder as string) ?? 'default'"
-            />
             <OButton
               v-if="store.state.printMode === true || isFullscreen"
-              variant="outline"
-              size="icon-toolbar"
+              icon-only
+              variant="ghost"
               @click="printDashboard"
               data-test="dashboard-print-btn"
             >
-              <template #icon-left
+              <template #icon
                 ><OIcon :name="store.state.printMode === true ? 'close' : 'print'" size="sm"
               /></template>
               <OTooltip
@@ -388,124 +432,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OButton>
             <OButton
+              v-if="isFullscreen"
+              icon-only
               v-show="store.state.printMode !== true"
-              variant="outline"
-              size="icon-toolbar"
+              variant="ghost"
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
             >
-              <template #icon-left
+              <template #icon
                 ><OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="sm"
               /></template>
               <OTooltip
                 :content="isFullscreen ? t('dashboard.exitFullscreen') : t('dashboard.fullscreen')"
-                shortcut-id="dashboardFullscreen"
+                shortcut="dashboardFullscreen"
               />
             </OButton>
-            <span
-              v-if="!isFullscreen"
-              v-show="store.state.printMode !== true"
-              class="inline-flex items-center"
-            >
-              <ODropdown align="end" side="bottom" @close-auto-focus="onMoreOptionsClosed">
-                <template #trigger>
-                  <OButton
-                    variant="outline"
-                    :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
-                    icon-left="more-horiz"
-                    :aria-label="
-                      hasSettingsDraft
-                        ? t('dashboard.moreOptionsSettingsDraft')
-                        : t('common.moreOptions')
-                    "
-                    data-test="dashboard-more-options-btn"
-                  >
-                    <template v-if="!isMobile">{{ t("search.menuMore") }}</template>
-                    <OTooltip v-if="isMobile" :content="t('common.moreOptions')" />
-                    <EditorDraftDot
-                      v-if="hasSettingsDraft"
-                      corner
-                      :tooltip="false"
-                      data-test="dashboard-setting-btn-draft-dot"
-                    />
-                  </OButton>
-                </template>
-                <ODropdownItem
-                  data-test="dashboard-kiosk-btn"
-                  icon-left="tv"
-                  @select="kioskSetupChosen = true"
-                >
-                  {{ t("dashboard.kiosk.tvMode") }}
-                </ODropdownItem>
-                <ODropdownItem
-                  data-test="dashboard-print-menu-item"
-                  icon-left="print"
-                  @select="printDashboard"
-                >
-                  {{ t("dashboard.print") }}
-                </ODropdownItem>
-                <ODropdownSeparator />
-                <ODropdownItem
-                  data-test="export-dashboard"
-                  icon-left="download"
-                  shortcut-id="dashboardExport"
-                  @select="exportDashboard"
-                >
-                  {{ t("dashboard.export") }}
-                </ODropdownItem>
-                <ODropdownItem
-                  data-test="view-dashboard-scheduled-reports"
-                  :icon-left="reportsLocked ? 'lock' : 'description'"
-                  :disabled="reportsLocked"
-                  :focusable-unavailable="reportsLocked"
-                  :description="reportsLocked ? reportsLockedReason : null"
-                  @select="openScheduledReports"
-                >
-                  {{ t("dashboard.scheduledDashboards") }}
-                </ODropdownItem>
-                <ODropdownSeparator />
-                <ODropdownItem
-                  data-test="dashboard-setting-btn"
-                  icon-left="settings"
-                  @select="openSettingsDialog"
-                >
-                  {{ settingsButtonLabel }}
-                </ODropdownItem>
-                <ODropdownItem
-                  data-test="dashboard-json-edit-btn"
-                  icon-left="code"
-                  @select="openJsonEditor"
-                >
-                  {{ t("dashboard.editJson") }}
-                </ODropdownItem>
-                <ODropdownItem
-                  data-test="dashboard-view-set-home-btn"
-                  :icon-left="isHome(dashboardId) ? 'keep' : 'keep-outline'"
-                  :description="isHome(dashboardId) ? null : t('dashboard.setAsHomeDesc')"
-                  @select="toggleHomeDashboard"
-                >
-                  {{
-                    isHome(dashboardId) ? t("dashboard.removeFromHome") : t("dashboard.setAsHome")
-                  }}
-                </ODropdownItem>
-              </ODropdown>
-              <KioskSetupPopover
-                v-model:open="kioskSetupOpen"
-                :current-refresh-seconds="refreshInterval"
-                :min-refresh-seconds="store.state?.zoConfig?.min_auto_refresh_interval || 5"
-                @open="enterKiosk"
-              >
-                <template #trigger>
-                  <span class="block size-0" aria-hidden="true" />
-                </template>
-              </KioskSetupPopover>
-            </span>
           </template>
           <template v-if="isEditingLayout && isMobile">
             <OButton
-              variant="outline"
-              size="icon-toolbar"
-              icon-left="undo"
+              icon-only
+              variant="ghost"
+              icon="undo"
               :disabled="!canUndoLayout || isSavingLayout"
               :aria-label="t('dashboard.layoutEdit.undo')"
               data-test="dashboard-edit-undo-btn"
@@ -514,9 +461,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('dashboard.layoutEdit.undo')" />
             </OButton>
             <OButton
-              variant="outline"
-              size="icon-toolbar"
-              icon-left="redo"
+              icon-only
+              variant="ghost"
+              icon="redo"
               :disabled="!canRedoLayout || isSavingLayout"
               :aria-label="t('dashboard.layoutEdit.redo')"
               data-test="dashboard-edit-redo-btn"
@@ -526,8 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="ghost"
-              size="sm-toolbar"
-              icon-left="close"
+              icon="close"
               :disabled="isSavingLayout"
               data-test="dashboard-edit-discard-btn"
               @click="requestExitLayoutEdit"
@@ -535,6 +481,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dashboard.layoutEdit.discard") }}
             </OButton>
           </template>
+        </template>
+
+        <template #banner>
+          <OBanner
+            v-if="hasUnsavedConflict"
+            tone="warn"
+            data-test="dashboard-unsaved-conflict-banner"
+          >
+            {{
+              saveConflictState.myChange
+                ? t("dashboard.saveConflict.notSavedChange", { change: saveConflictState.myChange })
+                : t("dashboard.saveConflict.notSaved")
+            }}
+            <template #actions>
+              <OButton
+                variant="secondary"
+                data-test="dashboard-unsaved-conflict-resolve"
+                @click="resolveSaveConflict"
+              >
+                {{ t("dashboard.saveConflict.resolve") }}
+              </OButton>
+            </template>
+          </OBanner>
         </template>
 
         <KioskStrip
@@ -557,31 +526,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :note="playlistHolding.note"
           />
         </div>
-        <OBanner
-          v-if="hasUnsavedConflict"
-          variant="warning"
-          icon="warning"
-          dense
-          inline-actions
-          class="mx-page-edge mt-2 shrink-0"
-          data-test="dashboard-unsaved-conflict-banner"
-        >
-          {{
-            saveConflictState.myChange
-              ? t("dashboard.saveConflict.notSavedChange", { change: saveConflictState.myChange })
-              : t("dashboard.saveConflict.notSaved")
-          }}
-          <template #actions>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="dashboard-unsaved-conflict-resolve"
-              @click="resolveSaveConflict"
-            >
-              {{ t("dashboard.saveConflict.resolve") }}
-            </OButton>
-          </template>
-        </OBanner>
 
         <RenderDashboardCharts
           :frame="false"
@@ -623,7 +567,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :runId="runId"
           @update:runId="updateRunId"
           @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
-        />
+        >
+          <!-- Sits in the existing tab row, so the hint appearing never moves the panels. -->
+          <template #tab_end>
+            <span
+              v-if="showLastDataHint"
+              class="text-text-secondary flex items-center gap-1 text-xs"
+              data-test="dashboard-last-data-hint"
+            >
+              {{ t("dashboard.viewDashboard.lastDataSeen", { when: lastDataAgo }) }}
+              <OButton
+                variant="link"
+                size="sm"
+                data-test="dashboard-jump-to-latest"
+                @click="jumpToLatestData"
+              >
+                {{ t("dashboard.viewDashboard.jumpToLatest") }}
+              </OButton>
+            </span>
+          </template>
+        </RenderDashboardCharts>
         <DashboardSettings
           v-model:open="showDashboardSettingsDialog"
           @refresh="loadDashboard"
@@ -660,22 +623,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('dashboard.layoutEdit.discardTitle')"
           :persistent="discardForced"
           :show-close="!discardForced"
-          :secondary-button-label="
-            discardForced
+          :secondary="{
+            label: discardForced
               ? undefined
               : discardDialog.reason === 'leave'
                 ? t('dashboard.layoutEdit.stay')
-                : t('dashboard.layoutEdit.keepEditing')
-          "
-          :primary-button-label="
-            discardForced
+                : t('dashboard.layoutEdit.keepEditing'),
+          }"
+          :primary="{
+            label: discardForced
               ? t('dashboard.layoutEdit.discardAndSignOut')
               : discardDialog.reason === 'leave'
                 ? t('dashboard.layoutEdit.discardAndLeave')
-                : t('dashboard.layoutEdit.discard')
-          "
-          primary-button-variant="destructive"
-          :initial-focus="discardForced ? 'primary' : 'secondary'"
+                : t('dashboard.layoutEdit.discard'),
+            variant: 'danger',
+          }"
           data-test="dashboard-edit-discard-dialog"
           @update:open="(open) => !open && settleDiscard(false)"
           @click:secondary="settleDiscard(false)"
@@ -743,7 +705,8 @@ import {
   getPanelTimeFromURL,
   convertPanelTimeRangeToPicker,
 } from "@/utils/dashboard/panelTimeUtils";
-import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { useAutoRefreshTimer } from "@/composables/useAutoRefreshTimer";
 import PublicLinksPanel from "@/components/dashboards/PublicLinksPanel.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import useNotifications from "@/composables/useNotifications";
@@ -844,6 +807,16 @@ import { usePlaylistFrame, usePlaylistPage } from "@/composables/dashboard/usePl
 import PlaylistHoldingCard from "@/components/dashboards/kiosk/PlaylistHoldingCard.vue";
 import { pingBackend } from "@/services/health";
 import { raw } from "@/types/i18n";
+import { formatDistanceToNowStrict } from "date-fns";
+import {
+  PANEL_EMPTY_REGISTRY_KEY,
+  createPanelEmptyRegistry,
+} from "@/composables/dashboard/usePanelEmptyRegistry";
+import {
+  collectDashboardStreams,
+  latestDataWindow,
+  useDashboardLastData,
+} from "@/composables/dashboard/useDashboardLastData";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -869,7 +842,7 @@ export default defineComponent({
     DateTimePickerDashboard,
     ShareButton,
     PublicLinksPanel,
-    AutoRefreshInterval,
+    ORefreshButton,
     DashboardSettings,
     RenderDashboardCharts,
     DeployMarkersUnavailable,
@@ -936,6 +909,8 @@ export default defineComponent({
     const variablesManager = ref(null);
 
     let moment: any = () => {};
+
+    const dashboardTitle = computed(() => raw(currentDashboardData.data?.title));
 
     const folderNameFromFolderId = computed(() => {
       if (store.state.organizationData.folders.length === 0) {
@@ -1207,6 +1182,11 @@ export default defineComponent({
     );
     const isRefreshPending = computed(
       () => isVariablesChanged.value || timeGate.needsRefresh.value || zoneRefreshPending.value,
+    );
+
+    // With Auto Run off, a pending range or variable change waits for this button, so it says "Apply".
+    const refreshPendingLabel = computed(() =>
+      isRefreshPending.value && !isAutoRunOn.value ? t("dashboard.viewDashboard.apply") : undefined,
     );
 
     const refreshTooltip = computed(() => {
@@ -2021,17 +2001,6 @@ export default defineComponent({
       });
     };
 
-    // Refresh is the dashboard's main action, but in layout edit Save owns the primary slot.
-    const refreshVariant = computed(() => {
-      if (isRefreshPending.value) return "pending";
-      return isEditingLayout.value ? "outline" : "primary";
-    });
-
-    const refreshOptionsVariant = computed(() => {
-      if (config.isEnterprise == "true" && arePanelsLoading.value) return "cancel-query";
-      return refreshVariant.value;
-    });
-
     const refreshData = async (withoutCache = false) => {
       if (!arePanelsLoading.value) await runRefresh(withoutCache);
     };
@@ -2076,6 +2045,13 @@ export default defineComponent({
     const onAutoRefreshTick = () => {
       if (!kioskMode.value) refreshData();
     };
+    useAutoRefreshTimer(() => refreshInterval.value, onAutoRefreshTick);
+
+    const showCancel = computed(() => config.isEnterprise == "true" && arePanelsLoading.value);
+    const lastRefreshedAt = ref<number | null>(null);
+    watch(arePanelsLoading, (loading, wasLoading) => {
+      if (wasLoading && !loading) lastRefreshedAt.value = Date.now();
+    });
 
     const kioskRefresh = useKioskRefresh({
       enabled: kioskMode,
@@ -2087,6 +2063,40 @@ export default defineComponent({
       probe: pingBackend,
     });
     provide(KIOSK_PANEL_HEALTH_KEY, kioskRefresh.registry);
+
+    const panelEmptyRegistry = createPanelEmptyRegistry();
+    provide(PANEL_EMPTY_REGISTRY_KEY, panelEmptyRegistry);
+    const latestDataUs = useDashboardLastData(
+      () => store.state.selectedOrganization.identifier,
+      () => collectDashboardStreams(currentDashboardData.data?.tabs),
+      () => panelEmptyRegistry.allEmpty.value,
+    );
+    // Data inside the range means a filter emptied it, and jumping would not help.
+    const latestOutsideRange = computed(() => {
+      const range = getAppliedGlobalTime();
+      if (latestDataUs.value === null || !range) return false;
+      const latestMs = latestDataUs.value / 1000;
+      return latestMs < range.start_time.getTime() || latestMs > range.end_time.getTime();
+    });
+    const showLastDataHint = computed(
+      () =>
+        panelEmptyRegistry.allEmpty.value &&
+        !arePanelsLoading.value &&
+        !kioskMode.value &&
+        latestOutsideRange.value,
+    );
+    const lastDataAgo = computed(() =>
+      latestDataUs.value
+        ? raw(formatDistanceToNowStrict(new Date(latestDataUs.value / 1000), { addSuffix: true }))
+        : "",
+    );
+    const jumpToLatestData = async () => {
+      if (latestDataUs.value === null) return;
+      const next = { valueType: "absolute", ...latestDataWindow(latestDataUs.value) };
+      showRangeInPicker(next);
+      timeGate.onPick(next);
+      await runRefresh();
+    };
 
     const playlistFrame = usePlaylistFrame(playlistEmbed, {
       title: computed(() => currentDashboardData.data?.title),
@@ -2994,9 +3004,13 @@ export default defineComponent({
       refreshData,
       isAutoRunAvailable,
       isAutoRunOn,
+      refreshPendingLabel,
+      showCancel,
+      lastRefreshedAt,
+      showLastDataHint,
+      lastDataAgo,
+      jumpToLatestData,
       toggleAutoRun,
-      refreshVariant,
-      refreshOptionsVariant,
       isVariablesChanged,
       isRefreshPending,
       refreshTooltip,
@@ -3071,6 +3085,7 @@ export default defineComponent({
       discardForced,
       settleDiscard,
       folderNameFromFolderId,
+      dashboardTitle,
       showJsonEditorDialog,
       openJsonEditor,
       saveJsonDashboard,

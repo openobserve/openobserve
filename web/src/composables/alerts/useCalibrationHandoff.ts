@@ -24,6 +24,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { newRequestId, useDecisionRoute } from "@/composables/autoobserve/useDecisionRoute";
 import { isItemGone, isRouteDisabled } from "@/services/autoobserveDecisions";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import type { BannerTone } from "@/lib/feedback/Banner/OBanner.types";
 import type { AlertEditHandoff, AlertFieldPatch } from "@/ts/interfaces/alertPrefill";
 import { takeAlertEditHandoff } from "@/utils/alerts/alertPrefillStorage";
 import {
@@ -46,7 +47,7 @@ type AlertForm = ReturnType<typeof useAlertForm>;
 
 /** Applied and review are info, a patch withheld is amber, an unsupported type is neutral. */
 export interface CalibrationBanner {
-  variant: "info" | "warning" | "default";
+  tone: Extract<BannerTone, "info" | "warn" | "neutral">;
   text: I18nText;
 }
 
@@ -127,7 +128,7 @@ export const useCalibrationHandoff = ({
   ): Promise<CalibrationBanner> => {
     // A stored draft or an edit typed while the checks ran is the user's own work, so a suggestion never lands over it (P6-D6).
     if (editorDraft.hasStoredDraft() || editorDraft.draft.hasUnsavedChanges()) {
-      return { variant: "warning", text: copy.notApplied("draft") };
+      return { tone: "warn", text: copy.notApplied("draft") };
     }
     const patch = handoff.patch as AlertFieldPatch;
     await editorDraft.applyProgrammaticChange(() => form.applyFieldPatch(patch));
@@ -138,7 +139,7 @@ export const useCalibrationHandoff = ({
         title: String(form.formData.value?.name ?? ""),
       };
     await focus(plan);
-    return { variant: "info", text: copy.applied(plan.fields) };
+    return { tone: "info", text: copy.applied(plan.fields) };
   };
 
   const outcome = async (
@@ -151,18 +152,18 @@ export const useCalibrationHandoff = ({
         return apply(handoff, plan, copy);
       case "review":
         await focus(plan);
-        return { variant: "info", text: copy.review() };
+        return { tone: "info", text: copy.review() };
       case "unsupported":
-        return { variant: "default", text: copy.unsupported() };
+        return { tone: "neutral", text: copy.unsupported() };
       case "stale":
-        return { variant: "warning", text: copy.notApplied("stale") };
+        return { tone: "warn", text: copy.notApplied("stale") };
       case "missing_destination":
         return {
-          variant: "warning",
+          tone: "warn",
           text: copy.notApplied("missingDestination", plan.missingDestinations),
         };
       default:
-        return { variant: "warning", text: copy.notApplied("invalid") };
+        return { tone: "warn", text: copy.notApplied("invalid") };
     }
   };
 

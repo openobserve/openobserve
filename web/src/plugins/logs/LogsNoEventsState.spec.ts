@@ -23,7 +23,7 @@ import LogsNoEventsState from "./LogsNoEventsState.vue";
 const OEmptyStateStub = defineComponent({
   name: "OEmptyState",
   setup(_, { slots }) {
-    return () => h("div", { "data-test": "o-empty-state" }, [slots.description?.()]);
+    return () => h("div", { "data-test": "o-empty-state" }, [slots.text?.()]);
   },
 });
 
@@ -53,7 +53,7 @@ describe("LogsNoEventsState", () => {
   });
 
   it("keeps the rolling wording for a rolling period", () => {
-    expect(mountState("15m").text()).toContain("Past 15 Minutes");
+    expect(mountState("15m").text()).toContain("Past 15 minutes");
   });
 
   it.each([

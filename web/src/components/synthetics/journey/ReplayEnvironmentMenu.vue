@@ -84,8 +84,8 @@ function itemKey(option: ReplayEnvironmentOption) {
   <ODropdown side="bottom" align="end">
     <template #trigger>
       <OButton
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         :disabled="disabled"
         :aria-label="t('synthetics.journey.replayEnv.triggerAria', { environment: selectedName })"
         data-test="synthetics-journey-replay-menu-trigger"
@@ -119,6 +119,7 @@ function itemKey(option: ReplayEnvironmentOption) {
           v-for="option in group.options"
           :key="option.id"
           :data-test="`synthetics-journey-replay-menu-env-${itemKey(option)}`"
+          :checked="option.id === selectedId"
           @select="emit('update:selected-id', option.id)"
         >
           <span class="flex min-w-0 flex-col">
@@ -128,18 +129,13 @@ function itemKey(option: ReplayEnvironmentOption) {
           <span v-if="option.id === selectedId" class="sr-only">
             {{ t("synthetics.journey.replayEnv.selected") }}
           </span>
-          <template v-if="option.id === selectedId" #icon-right>
-            <span class="ms-auto inline-flex">
-              <OIcon name="check" size="sm" aria-hidden="true" />
-            </span>
-          </template>
         </ODropdownItem>
       </ODropdownGroup>
     </template>
     <template v-if="secretsNeeded > 0">
       <ODropdownSeparator />
       <ODropdownItem
-        icon-left="key"
+        icon="key"
         :aria-label="
           t('synthetics.journey.replaySecrets.menuAria', {
             environment: selectedName,
@@ -150,7 +146,7 @@ function itemKey(option: ReplayEnvironmentOption) {
         @select="emit('edit-secrets')"
       >
         <span>{{ t("synthetics.journey.replaySecrets.menuItem", secretCounts) }}</span>
-        <template v-if="secretFailed" #icon-right>
+        <template v-if="secretFailed" #end>
           <ReplaySecretFailedDot class="ms-auto" />
         </template>
       </ODropdownItem>

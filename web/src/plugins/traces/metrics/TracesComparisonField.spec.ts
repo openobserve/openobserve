@@ -100,18 +100,15 @@ describe("TracesComparisonField", () => {
     expect(Number(card.attributes("data-score"))).toBeCloseTo(field.score, 1);
   });
 
-  it("draws a selection bar and a neutral baseline bar per value, both 0 to 1", () => {
+  it("draws a selection bar and a baseline bar per value, both 0 to 100", () => {
     wrapper = mountField(categorical());
     const bars = wrapper.findAllComponents(OProgressBar);
     // Six values plus Other, two bars each.
     expect(bars).toHaveLength(14);
-    for (let i = 0; i < bars.length; i += 2) {
-      expect(bars[i].props("variant") ?? "default").toBe("default");
-      expect(bars[i + 1].props("variant")).toBe("neutral");
-      for (const bar of [bars[i], bars[i + 1]]) {
-        expect(bar.props("value")).toBeGreaterThanOrEqual(0);
-        expect(bar.props("value")).toBeLessThanOrEqual(1);
-      }
+    for (const bar of bars) {
+      expect(bar.props("tone")).toBe("accent");
+      expect(bar.props("value")).toBeGreaterThanOrEqual(0);
+      expect(bar.props("value")).toBeLessThanOrEqual(100);
     }
   });
 

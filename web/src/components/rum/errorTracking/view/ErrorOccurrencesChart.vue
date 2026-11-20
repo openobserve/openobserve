@@ -32,18 +32,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton
         v-for="index in 24"
         :key="index"
-        variant="button"
+        shape="block"
         class="flex-1"
         :style="{ height: `${20 + ((index * 13) % 70)}%` }"
       />
     </div>
 
-    <div
-      v-else-if="!hasData"
-      class="flex h-32 items-center justify-center"
-      data-test="rum-error-occurrences-empty"
-    >
-      <p class="text-text-muted">{{ t("rum.noErrorsInWindow") }}</p>
+    <div v-else-if="!hasData" class="h-32" data-test="rum-error-occurrences-empty">
+      <OEmptyState size="compact" icon="bar-chart" :title="t('rum.noErrorsInWindow')" />
     </div>
 
     <div v-else class="h-32" data-test="rum-error-occurrences-canvas">
@@ -58,6 +54,7 @@ import { format } from "date-fns";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { addCommasToNumber } from "@/utils/formatters";
 import type { OccurrenceBucket } from "@/composables/rum/useErrorDetail";
 

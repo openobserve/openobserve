@@ -83,22 +83,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="absolute -top-2.5 left-1 z-10 flex max-w-[calc(100%-2.25rem)] flex-wrap items-center gap-1"
       >
-        <OBadge
+        <OButton
           v-if="showHttpBadge"
-          variant="blue-soft"
+          variant="secondary"
           size="xs"
           icon="webhook"
-          clickable
           class="nodrag"
           data-test="workflow-trigger-http-badge"
+          :label="t('workflow.http.nodeBadge')"
           @click.stop="openHttpPanel"
-        >
-          {{ t("workflow.http.nodeBadge") }}
-        </OBadge>
+        />
         <OBadge
           v-if="isDisabled"
-          variant="default"
-          size="xs"
+          tone="neutral"
+          size="sm"
           :data-test="`workflow-node-${data?.node_type}-disabled-badge`"
         >
           {{ t("workflow.node.disabledBadge") }}
@@ -110,16 +108,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              open, unlike the placeholder badge above. -->
         <OBadge
           v-if="unwiredHandles.length"
-          variant="default"
-          size="xs"
+          tone="neutral"
+          size="sm"
           data-test="workflow-node-branch-unwired-badge"
         >
           {{ t("workflow.node.unwiredBadge") }}
         </OBadge>
         <OBadge
           v-if="isIncomplete"
-          variant="warning"
-          size="xs"
+          tone="warn"
+          size="sm"
           :data-test="`workflow-node-${data?.node_type}-incomplete-badge`"
         >
           {{ t("workflow.node.incompleteBadge") }}
@@ -130,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`workflows-node-comment-indicator`"
         >
           <OIcon name="note-add" size="xs" />
-          <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
+          <OTooltip side="top">
             <template #content>
               <div class="p-2 text-left text-xs whitespace-pre-wrap">{{ commentText }}</div>
             </template>
@@ -148,9 +146,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Disable / enable toggle (T6) — one click mutes or restores the step
              without opening the config drawer. Sibling to the delete button. -->
         <OButton
+          icon-only
           variant="ghost"
-          size="icon"
-          class="rounded-default! bg-surface-overlay/95! h-5! w-5! min-w-5! border! p-0!"
+          size="xs"
+          class="rounded-default! bg-surface-overlay/95! border!"
           :class="
             isDisabled
               ? 'border-status-positive! text-status-positive!'
@@ -163,14 +162,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip
             :content="isDisabled ? t('workflow.node.enable') : t('workflow.node.disable')"
             side="top"
-            align="center"
-            :side-offset="8"
           />
         </OButton>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon"
-          class="rounded-default! bg-surface-overlay/95! border-status-negative! text-status-negative! h-5! w-5! min-w-5! border! p-0!"
+          size="xs"
+          class="rounded-default! bg-surface-overlay/95! border-status-negative! text-status-negative! border!"
           :data-test="`workflow-node-${data?.node_type}-delete-btn`"
           @click.stop="requestDeleteNode(id)"
         >
@@ -180,12 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                tooltip div: reka-ui/Floating UI handles the Vue Flow node's
                transformed ancestor, so it can't drift the way a bare `fixed`
                element does. -->
-          <OTooltip
-            :content="t('workflow.deleteNodeTitle')"
-            side="top"
-            align="center"
-            :side-offset="8"
-          />
+          <OTooltip :content="t('workflow.deleteNodeTitle')" side="top" />
         </OButton>
       </div>
 
@@ -200,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop="openResult"
       >
         <OIcon name="warning" size="xs" />
-        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
+        <OTooltip side="top">
           <template #content>
             <div class="p-2 text-left text-xs">
               {{ t(dirtyReasonKey) }}
@@ -216,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop="openResult"
       >
         <OIcon name="check" size="xs" />
-        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
+        <OTooltip side="top">
           <template #content>
             <div class="p-2 text-left text-xs">
               {{ t("workflow.test.stepResult.viewHint") }}
@@ -234,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop="openResult"
       >
         <OIcon name="science" size="xs" />
-        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
+        <OTooltip side="top">
           <template #content>
             <div class="p-2 text-left text-xs">
               {{ t("workflow.test.rehearsalOnly") }}
@@ -250,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop="openResult"
       >
         <OIcon name="remove" size="xs" />
-        <OTooltip side="top" align="center" :side-offset="8" max-width="20rem">
+        <OTooltip side="top">
           <template #content>
             <div class="p-2 text-left text-xs">
               {{ t(skippedReasonKey) }}
@@ -269,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-if="errorCount > 1" class="wf-test-count text-status-negative bg-white">{{
           errorCount
         }}</span>
-        <OTooltip side="top" align="center" :side-offset="8" max-width="22.5rem">
+        <OTooltip side="top">
           <template #content>
             <div class="flex flex-col gap-1 p-2 text-left">
               <div v-for="(m, i) in errorMessages" :key="i" class="text-xs leading-[1.35]">
@@ -554,8 +547,8 @@ const openResult = () => {
   height: 0.9375rem;
   padding: 0 0.1875rem;
   border-radius: 0.5rem;
-  font-size: 0.625rem;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: var(--font-semibold);
   line-height: 0.9375rem;
   text-align: center;
 }

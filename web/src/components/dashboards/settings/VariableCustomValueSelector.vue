@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSelect
       v-model="selectedValue"
       :label="variableItem?.label || variableItem?.name"
-      label-position="inside"
+      variant="filter"
       :options="variableItem?.options || []"
       labelKey="label"
       valueKey="value"

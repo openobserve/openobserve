@@ -1,34 +1,34 @@
 <template>
   <OButtonGroup data-test="dashboard-sort-by-btn-group">
     <OButton
+      icon-only
       :aria-label="t('dashboard.sortByClear')"
-      :active="!fieldObj.sortBy"
-      variant="outline"
-      size="icon-xs"
+      :pressed="!fieldObj.sortBy"
+      variant="secondary"
       @click="updateSortOption(null)"
       data-test="dashboard-sort-by-item-clear"
     >
-      <template #icon-left><OIcon name="block" size="sm" /></template>
+      <template #icon><OIcon name="block" size="sm" /></template>
     </OButton>
     <OButton
+      icon-only
       :aria-label="t('dashboard.sortByAsc')"
-      :active="fieldObj.sortBy === 'ASC'"
-      variant="outline"
-      size="icon-xs"
+      :pressed="fieldObj.sortBy === 'ASC'"
+      variant="secondary"
       @click="updateSortOption('ASC')"
       data-test="dashboard-sort-by-item-asc"
     >
-      <template #icon-left><AscSort /></template>
+      <template #icon><AscSort /></template>
     </OButton>
     <OButton
+      icon-only
       :aria-label="t('dashboard.sortByDesc')"
-      :active="fieldObj.sortBy === 'DESC'"
-      variant="outline"
-      size="icon-xs"
+      :pressed="fieldObj.sortBy === 'DESC'"
+      variant="secondary"
       @click="updateSortOption('DESC')"
       data-test="dashboard-sort-by-item-desc"
     >
-      <template #icon-left><DescSort /></template>
+      <template #icon><DescSort /></template>
     </OButton>
   </OButtonGroup>
 </template>

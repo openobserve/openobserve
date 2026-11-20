@@ -279,7 +279,7 @@ describe("AlertCalibrationDigests", () => {
     expect(row.text()).toContain("Pending");
     expect(row.text()).not.toContain("None found");
     const badge = wrapper.findAllComponents(OBadge).find((b) => b.text() === "Pending");
-    expect(badge?.props("variant")).toBe("warning-soft");
+    expect(badge?.props("tone")).toBe("warn");
     wrapper.unmount();
   });
 });

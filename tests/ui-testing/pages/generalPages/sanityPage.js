@@ -16,7 +16,7 @@ export class SanityPage {
         this.quickModeToggleButton = page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
         this.allFieldsButton = page.locator('[data-test="logs-all-fields-btn"]');
         this.interestingJobFieldButton = page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]');
-        this.sqlModeToggleButton = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
+        this.sqlModeToggleButton = page.locator('[data-test="logs-search-bar-query-mode-sql"]');
         this.queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
 
         // ============================================================
@@ -111,7 +111,8 @@ export class SanityPage {
         // Stream search input on Streams page; OInput auto-generates `-field` variant.
         this.searchStreamInputField = page.locator('[data-test="streams-search-stream-input-field"]');
         // Stream delete button per row (data-test added in LogStream.vue this pass).
-        this.streamDeleteFirstRowBtn = page.locator('[data-test="log-stream-delete-btn"]').first();
+        this.streamRowMoreBtn = page.locator('[data-test="log-stream-row-more-actions"]').first();
+        this.streamDeleteFirstRowBtn = page.locator('[data-test="log-stream-delete-btn-menu"]').first();
         // Stream delete confirmation dialog primary button.
         this.streamDeleteDialogPrimary = page.locator('[data-test="log-stream-delete-dialog"] [data-test="o-dialog-primary-btn"]');
 
@@ -151,11 +152,10 @@ export class SanityPage {
         // ============================================================
         // Schema Pagination locators
         // ============================================================
-        this.schemaLastPageButton = page.locator('[data-test="logs-page-fields-list-pagination-lastpage-button"]');
-        this.schemaFirstPageButton = page.locator('[data-test="logs-page-fields-list-pagination-firstpage-button"]');
-        this.schemaPage2Button = page.locator('[data-test="logs-page-fields-list-pagination-page-2-button"]');
-        this.schemaPage3Button = page.locator('[data-test="logs-page-fields-list-pagination-page-3-button"]');
-        this.schemaPage4Button = page.locator('[data-test="logs-page-fields-list-pagination-page-4-button"]');
+        // OPagination: no numbered buttons; its root carries data-test-page / data-test-page-count.
+        this.schemaPagination = page.locator('[data-test="logs-page-fields-list-pagination"]');
+        this.schemaPrevPageButton = page.locator('[data-test="logs-page-fields-list-pagination-prev"]');
+        this.schemaNextPageButton = page.locator('[data-test="logs-page-fields-list-pagination-next"]');
         // OSelect (multiple) renders the wrapper div with the consumer-supplied
         // data-test and the clickable PopoverTrigger as `${parent}-trigger`.
         // Click the `-trigger` to actually open the popover.
@@ -248,9 +248,7 @@ export class SanityPage {
     // Histogram Methods
     // ================================================================
     async clickHistogramToggle() {
-        // Histogram has an inline toolbar button at normal viewport widths
-        // (data-test="logs-search-bar-histogram-btn"). It moves into the
-        // utilities ("More") menu only at narrow viewports (shouldMoveButtonsToMenu).
+        // The histogram toggle is a ⋯ item; a toolbar copy exists only when the user pinned it.
         const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
         const isInline = await inlineBtn.isVisible({ timeout: 1000 }).catch(() => false);
         if (isInline) {
@@ -269,20 +267,14 @@ export class SanityPage {
         await this.page.waitForTimeout(100);
     }
 
-    // Returns true when the histogram OSwitch is currently ON.
-    // OSwitch surfaces its state via a nested `role="switch"` element carrying
-    // `aria-checked="true|false"`. At normal viewport widths the histogram button
-    // is inline; at narrow widths it lives inside the utilities menu.
+    // Returns true when the histogram is ON: a pinned toolbar copy reports aria-pressed,
+    // the ⋯ item's OSwitch reports aria-checked on its role="switch".
     async isHistogramOn() {
-        // Check the inline histogram button first (normal viewport).
         const inlineBtn = this.page.locator('[data-test="logs-search-bar-histogram-btn"]');
         const isInline = await inlineBtn.isVisible({ timeout: 1000 }).catch(() => false);
         if (isInline) {
-            const switchControl = inlineBtn.locator('[role="switch"]');
-            const aria = await switchControl.getAttribute('aria-checked');
-            return aria === 'true';
+            return (await inlineBtn.getAttribute('aria-pressed')) === 'true';
         }
-        // Narrow-viewport fallback: read state from the menu item OSwitch.
         const menuHistogramBtn = this.page.locator('[data-test="logs-search-bar-menu-histogram-btn"]');
         const isMenuItemVisible = await menuHistogramBtn.isVisible({ timeout: 500 }).catch(() => false);
         if (!isMenuItemVisible) {
@@ -333,6 +325,13 @@ export class SanityPage {
      */
     async _clickSqlModeToggle() {
         await expect(this.queryEditor).toBeVisible({ timeout: 10000 });
+        // Turn SQL on through the toolbar tray when it is shown; idempotent, so a second call is safe.
+        if (await this.sqlModeToggleButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+            if ((await this.sqlModeToggleButton.getAttribute('data-state')) !== 'on') {
+                await this.sqlModeToggleButton.click();
+                await expect(this.sqlModeToggleButton).toHaveAttribute('data-state', 'on', { timeout: 10000 });
+            }
+        }
         const monacoHelper = new MonacoEditorHelper(this.page);
         await monacoHelper.setContentVerified(this.queryEditor, 'SELECT * FROM "e2e_automate"');
         await this.page.waitForTimeout(200);
@@ -680,7 +679,8 @@ export class SanityPage {
         // register clicks immediately after the list re-renders from the search filter.
         await this.page.waitForTimeout(1500);
 
-        // Click the per-row delete button.
+        // Delete lives in the row's more menu.
+        await this.streamRowMoreBtn.click();
         await this.streamDeleteFirstRowBtn.click();
 
         // Confirm via any visible primary dialog button (ODialog teleports content to body,
@@ -821,48 +821,28 @@ export class SanityPage {
         await this.refreshButton.click({ timeout: 10000 });
         await this.page.waitForLoadState('networkidle', { timeout: 25000 }).catch(() => {});
 
-        // Wait for pagination to be visible (wait for the first page button as indicator)
+        // Wait for the field-list pager to be visible
         testLogger.debug('Waiting for schema pagination to be visible');
-        await this.page.waitHelpers.waitForElementVisible(this.schemaFirstPageButton, {
-            description: 'schema pagination first page button',
+        await this.page.waitHelpers.waitForElementVisible(this.schemaPagination, {
+            description: 'schema pagination',
             timeout: 30000
         });
-        testLogger.debug('Schema pagination is now visible');
+        await expect(this.schemaPagination).toHaveAttribute('data-test-page', '1');
+        const pageCount = Number(await this.schemaPagination.getAttribute('data-test-page-count'));
+        expect(pageCount, '70 ingested fields must span at least 4 schema pages').toBeGreaterThanOrEqual(4);
+        testLogger.info(`Schema pagination is visible with ${pageCount} pages`);
 
-        // Verify last page button is visible
-        testLogger.debug('Verifying schema last page button is visible');
-        await this.page.waitHelpers.waitForElementVisible(this.schemaLastPageButton, {
-            description: 'schema pagination last page button'
-        });
-        testLogger.info('Schema last page button verified as visible');
-
-        // Click page 2 button
-        testLogger.debug('Navigating to page 2 of schema fields');
-        await this.page.waitHelpers.waitForElementClickable(this.schemaPage2Button, {
-            description: 'schema pagination page 2 button'
-        });
-        await this.schemaPage2Button.click({ timeout: 10000 });
-
-        // Click page 3 button
-        testLogger.debug('Navigating to page 3 of schema fields');
-        await this.page.waitHelpers.waitForElementClickable(this.schemaPage3Button, {
-            description: 'schema pagination page 3 button'
-        });
-        await this.schemaPage3Button.click({ timeout: 10000 });
-
-        // Click page 4 button
-        testLogger.debug('Navigating to page 4 of schema fields');
-        await this.page.waitHelpers.waitForElementClickable(this.schemaPage4Button, {
-            description: 'schema pagination page 4 button'
-        });
-        await this.schemaPage4Button.click({ timeout: 10000 });
-
-        // Click first page button
-        testLogger.debug('Navigating back to first page of schema fields');
-        await this.page.waitHelpers.waitForElementClickable(this.schemaFirstPageButton, {
-            description: 'schema pagination first page button'
-        });
-        await this.schemaFirstPageButton.click({ timeout: 10000 });
+        // Step forward to page 4, then back to page 1
+        for (const pageNumber of [2, 3, 4]) {
+            testLogger.debug(`Navigating to page ${pageNumber} of schema fields`);
+            await this.schemaNextPageButton.click({ timeout: 10000 });
+            await expect(this.schemaPagination).toHaveAttribute('data-test-page', String(pageNumber));
+        }
+        for (const pageNumber of [3, 2, 1]) {
+            testLogger.debug(`Navigating back to page ${pageNumber} of schema fields`);
+            await this.schemaPrevPageButton.click({ timeout: 10000 });
+            await expect(this.schemaPagination).toHaveAttribute('data-test-page', String(pageNumber));
+        }
 
         testLogger.info('Schema pagination test completed successfully');
     }

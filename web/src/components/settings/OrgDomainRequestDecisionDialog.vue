@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     data-test="settings-org-domain-request-decision-dialog"
     v-model:open="dialogOpen"
-    persistent
     size="sm"
     :form-id="FORM_ID"
     :title="
@@ -26,10 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ? t('settings.orgDomainMapping.approveTitle')
         : t('settings.orgDomainMapping.rejectTitle')
     "
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="
-      approve ? t('settings.orgDomainMapping.approve') : t('settings.orgDomainMapping.reject')
-    "
+    :secondary="{ label: t('common.cancel') }"
+    :primary="{
+      label: approve
+        ? t('settings.orgDomainMapping.approve')
+        : t('settings.orgDomainMapping.reject'),
+    }"
     @click:secondary="dialogOpen = false"
   >
     <OForm :id="FORM_ID" :form="form" class="flex flex-col gap-5">

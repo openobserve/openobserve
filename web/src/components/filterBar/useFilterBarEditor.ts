@@ -83,6 +83,8 @@ export interface FilterBarEditorOptions {
   t: TranslateFn;
   commit: (next: FilterGroup) => void;
   submit: () => void;
+  /** Hosts that run a query on Enter; a form keeps chaining to the next field instead. */
+  submitOnEnter?: Ref<boolean>;
 }
 
 const MAX_ROWS = 100;
@@ -147,6 +149,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
 
   let valueTimer: ReturnType<typeof setTimeout> | undefined;
   let valueRequest = 0;
+  let commitCount = 0;
 
   const advanced = computed(
     () => config.value.connectors !== "and-only" && config.value.connectors !== "any-of-groups",
@@ -492,7 +495,18 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     pendingConnector.value = "AND";
     reset();
     options.commit(next);
+    commitCount++;
     open.value = !wasEditing;
+  }
+
+  // Enter that completes a condition runs it and closes the menu, so the bar's "Press Enter to run" holds.
+  function submitIfCommitted(apply: () => void) {
+    if (!options.submitOnEnter?.value) return apply();
+    const before = commitCount;
+    apply();
+    if (commitCount === before) return;
+    open.value = false;
+    options.submit();
   }
 
   // A new condition keeps the chip's value when it still takes one.
@@ -570,6 +584,13 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   }
 
   function select(key: string, event: MouseEvent | KeyboardEvent) {
+    if (event instanceof KeyboardEvent && event.key === "Enter") {
+      return submitIfCommitted(() => selectKey(key, event));
+    }
+    selectKey(key, event);
+  }
+
+  function selectKey(key: string, event: MouseEvent | KeyboardEvent) {
     armedId.value = null;
     if (extraRows.value.some((row) => row.key === key)) {
       open.value = false;
@@ -582,8 +603,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
 
   function onEnter() {
     if (step.value === "value") {
-      if (text.value.trim()) return addValue(text.value.trim());
-      if (multiValue.value && draft.value?.values.length) return commitDraft();
+      if (text.value.trim()) return submitIfCommitted(() => addValue(text.value.trim()));
+      if (multiValue.value && draft.value?.values.length) return submitIfCommitted(commitDraft);
       return;
     }
     if (step.value === "field" && !text.value.trim() && !draft.value) {

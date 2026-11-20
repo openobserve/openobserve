@@ -63,7 +63,7 @@ export const confirmForcedSignOutDiscard = (
     title: t("common.editorDraft.leaveTitle"),
     message: t("common.editorDraft.leaveMessageForcedUnnamed"),
     confirmLabel: t("common.editorDraft.discard"),
-    confirmVariant: "destructive",
+    kind: "destructive",
     confirmOnly: true,
   });
 

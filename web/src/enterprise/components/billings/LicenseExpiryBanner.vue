@@ -1,5 +1,12 @@
 <template>
-  <OBanner v-if="visible" bar variant="warning" icon="schedule" data-test="license-expiry-banner">
+  <OBanner
+    v-if="visible"
+    tone="warn"
+    icon="schedule"
+    dismissible
+    data-test="license-expiry-banner"
+    @dismiss="dismiss"
+  >
     <div>
       <div>{{ message }}</div>
       <div v-if="outcome" data-test="license-expiry-outcome" aria-live="polite">
@@ -11,27 +18,15 @@
       <div class="flex flex-wrap items-center gap-3">
         <OButton
           v-if="expiry.kind === 'expiring' && expiry.online && canUpdate"
-          variant="banner-dismiss"
-          size="sm"
+          variant="link"
           :loading="refreshing"
           data-test="license-expiry-refresh"
           @click="refreshNow"
           >{{ t("about.refresh_now") }}</OButton
         >
-        <OButton
-          variant="banner-dismiss"
-          size="sm"
-          data-test="license-expiry-details"
-          @click="openDetails"
-          >{{ t("about.banner_details") }}</OButton
-        >
-        <OButton
-          variant="banner-dismiss"
-          size="sm"
-          data-test="license-expiry-dismiss"
-          @click="dismiss"
-          >{{ t("about.banner_dismiss") }}</OButton
-        >
+        <OButton variant="link" data-test="license-expiry-details" @click="openDetails">{{
+          t("about.banner_details")
+        }}</OButton>
       </div>
     </template>
   </OBanner>

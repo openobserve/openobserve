@@ -45,7 +45,6 @@
         v-for="opt in kindOptions"
         :key="opt.value"
         :value="opt.value"
-        size="sm"
         :data-test="`slos-sloalertcondition-kind-${opt.value}`"
       >
         <template v-if="opt.icon" #icon-left>
@@ -109,14 +108,14 @@
           <OSelect
             v-model="model.operator"
             :options="operatorOptions"
-            width="xs"
+            width="s"
             data-test="slos-sloalertcondition-operator"
           />
           <OInput
             v-model.number="model.critical"
             type="number"
             step="0.1"
-            width="xs"
+            width="s"
             :error="!!errors?.critical"
             :error-message="errors?.critical || undefined"
             data-test="slos-sloalertcondition-critical"
@@ -125,10 +124,10 @@
           <OInput
             v-model.number="longHours"
             type="number"
-            width="xs"
+            width="s"
             suffix="h"
-            :label="t('slos.alert.long')"
-            label-position="inside"
+            :prefix="t('slos.alert.long')"
+            :aria-label="t('slos.alert.long')"
             :error="!!errors?.long"
             :error-message="errors?.long || undefined"
             data-test="slos-sloalertcondition-long"
@@ -136,10 +135,10 @@
           <OInput
             v-model.number="shortMinutes"
             type="number"
-            width="xs"
+            width="s"
             suffix="min"
-            :label="t('slos.alert.short')"
-            label-position="inside"
+            :prefix="t('slos.alert.short')"
+            :aria-label="t('slos.alert.short')"
             :error="!!errors?.short"
             :error-message="errors?.short || undefined"
             data-test="slos-sloalertcondition-short"
@@ -156,7 +155,7 @@
             v-model.number="model.warning"
             type="number"
             step="0.1"
-            width="xs"
+            width="s"
             :placeholder="t('slos.alert.none')"
             data-test="slos-sloalertcondition-warning"
           />
@@ -182,14 +181,14 @@
           <OSelect
             v-model="model.operator"
             :options="operatorOptions"
-            width="xs"
+            width="s"
             data-test="slos-sloalertcondition-operator"
           />
           <OInput
             v-model.number="model.critical"
             type="number"
             step="1"
-            width="xs"
+            width="s"
             suffix="%"
             :error="!!errors?.critical"
             :error-message="errors?.critical || undefined"
@@ -204,7 +203,7 @@
             v-model.number="model.warning"
             type="number"
             step="1"
-            width="xs"
+            width="s"
             suffix="%"
             :placeholder="t('slos.alert.none')"
             data-test="slos-sloalertcondition-warning"

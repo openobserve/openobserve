@@ -81,7 +81,7 @@ describe("OAccessBoundary table no-access state", () => {
       ],
       "alert_folders",
     );
-    expect(forbidden.find('[data-test="access-lock-icon"]').exists()).toBe(true);
+    expect(forbidden.find('[data-test="o2-empty-state-icon"]').exists()).toBe(true);
     expect(forbidden.text()).toContain("You can't view alert folders");
     expect(forbidden.text()).toContain(
       "Your role is missing the List permission on Alert folders.",
@@ -94,7 +94,7 @@ describe("OAccessBoundary table no-access state", () => {
       viewDenial("templates", "list"),
       viewDenial("destinations", "list"),
     ]);
-    expect(forbidden.find('[data-test="access-lock-icon"]').exists()).toBe(true);
+    expect(forbidden.find('[data-test="o2-empty-state-icon"]').exists()).toBe(true);
     expect(forbidden.text()).toContain("You don't have access");
     expect(forbidden.text()).not.toContain("Copy details");
   });

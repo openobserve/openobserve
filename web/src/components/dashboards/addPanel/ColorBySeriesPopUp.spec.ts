@@ -37,34 +37,34 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
     "formId",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test="o-dialog-stub"
       :data-open="String(open)"
       :data-title="title"
       :data-width="width"
-      :data-primary-label="primaryButtonLabel"
-      :data-neutral-label="neutralButtonLabel"
-      :data-primary-disabled="String(primaryButtonDisabled)"
+      :data-primary-label="primary?.label"
+      :data-neutral-label="extra?.label"
+      :data-primary-disabled="String(primary?.disabled)"
     >
       <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot name="header" />
@@ -72,13 +72,13 @@ const ODialogStub = {
       <slot name="footer" />
       <button
         data-test="o-dialog-stub-primary"
-        :disabled="primaryButtonDisabled"
+        :disabled="primary?.disabled"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-neutral"
-        @click="$emit('click:neutral')"
-      >{{ neutralButtonLabel }}</button>
+        @click="$emit('click:extra')"
+      >{{ extra?.label }}</button>
       <button
         data-test="o-dialog-stub-close"
         @click="$emit('update:open', false)"
@@ -155,13 +155,13 @@ describe("ColorBySeriesPopUp", () => {
 
   it("renders the configured neutral and primary button labels", () => {
     const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("neutralButtonLabel")).toBe("+ Add a new color");
-    expect(dialog.props("primaryButtonLabel")).toBe("Save");
+    expect(dialog.props("extra")?.label).toBe("+ Add a new color");
+    expect(dialog.props("primary")?.label).toBe("Save");
   });
 
-  it("uses outline variant for the neutral button", () => {
+  it("uses the secondary variant for the neutral button", () => {
     const dialog = wrapper.findComponent(ODialogStub);
-    expect(dialog.props("neutralButtonVariant")).toBe("outline");
+    expect(dialog.props("extra")?.variant).toBe("secondary");
   });
 
   it("initializes with one default empty series when no colorBySeries provided", () => {
@@ -192,7 +192,7 @@ describe("ColorBySeriesPopUp", () => {
 
   it("adds a new color series when the neutral button is clicked", async () => {
     const dialog = wrapper.findComponent(ODialogStub);
-    await dialog.vm.$emit("click:neutral");
+    await dialog.vm.$emit("click:extra");
     await flushPromises();
 
     expect(wrapper.vm.editColorBySeries).toHaveLength(2);
@@ -350,7 +350,7 @@ describe("ColorBySeriesPopUp", () => {
   it("keeps the Save button enabled (R3) and wires form-id (R4)", () => {
     const dialog = wrapper.findComponent(ODialogStub);
     // Save is never disabled by validity now — the schema gates submit.
-    expect(dialog.props("primaryButtonDisabled")).toBeFalsy();
+    expect(dialog.props("primary")?.disabled).toBeFalsy();
     expect(dialog.props("formId")).toBe("color-by-series-form");
     expect(wrapper.find("#color-by-series-form").exists()).toBe(true);
   });

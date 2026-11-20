@@ -21,28 +21,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   where the attribute that names the agent is configured.
 -->
 <template>
-  <div class="px-page-edge pt-2">
-    <OBanner
-      variant="info"
-      icon="info-outline"
-      inline-actions
-      dense
-      :data-test="`${dataTest}-no-agent-identity`"
-    >
-      <span class="font-medium">{{ t("aiObservability.scope.noAgentIdentity") }}.</span>
-      {{ t("aiObservability.scope.noAgentIdentityDescription") }}
-      <template #actions>
-        <OButton
-          variant="outline"
-          size="sm"
-          :data-test="`${dataTest}-no-agent-identity-mapping`"
-          @click="openMapping"
-        >
-          {{ t("aiObservability.scope.noAgentIdentityAction") }}
-        </OButton>
-      </template>
-    </OBanner>
-  </div>
+  <OBanner tone="info" :data-test="`${dataTest}-no-agent-identity`">
+    <span class="font-medium">{{ t("aiObservability.scope.noAgentIdentity") }}.</span>
+    {{ t("aiObservability.scope.noAgentIdentityDescription") }}
+    <template #actions>
+      <OButton
+        variant="secondary"
+        :data-test="`${dataTest}-no-agent-identity-mapping`"
+        @click="openMapping"
+      >
+        {{ t("aiObservability.scope.noAgentIdentityAction") }}
+      </OButton>
+    </template>
+  </OBanner>
 </template>
 
 <script setup lang="ts">

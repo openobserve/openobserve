@@ -215,7 +215,6 @@ const mountExplorer = (
       stubs: {
         OPageHeader: true,
         DateTimePickerDashboard: true,
-        AutoRefreshInterval: true,
         MetricCard: true,
         PrefixFilterPanel: true,
         LabelFilterBar: true,
@@ -224,11 +223,13 @@ const mountExplorer = (
         OButton: true,
         OIcon: true,
         OCheckbox: true,
-        // Renders its icon-right slot: the no-data scope toggle lives INSIDE the
-        // search field (as the dashboard list's folder scope does), so a stub that
-        // drops slots hides the control under test entirely.
+        // Renders its scope options: the no-data scope switch lives INSIDE the
+        // search field, so a stub that drops them hides the control under test.
         OSearchInput: {
-          template: '<div><slot name="icon-right" /></div>',
+          props: ["scopeOptions", "scope"],
+          emits: ["update:scope"],
+          template:
+            '<div><button v-for="o in scopeOptions" :key="o.value" :data-test="o.dataTest" @click="$emit(\'update:scope\', o.value)">{{ o.label }}</button></div>',
         },
         OSpinner: true,
         OTooltip: true,
@@ -463,22 +464,33 @@ describe("MetricsExplorer wiring", () => {
   });
 
   describe("the toolbar refresh control", () => {
-    it("is a labeled 'Refresh' button, not an icon-only control", () => {
-      // Icon-only refresh was easy to miss next to the date picker; the control
-      // now carries its label like the other toolbar actions.
-      const wrapper = mountExplorer({
-        OButton: {
-          template: '<button v-bind="$attrs"><slot /></button>',
-        },
-      });
+    it("is the shared refresh button with the data age, as on Logs and Traces", () => {
+      const wrapper = mountExplorer();
 
-      const btn = wrapper.find('[data-test="metrics-explorer-refresh"]');
-      expect(btn.exists()).toBe(true);
-      // t() is mocked to echo the key — the label must come from i18n.
-      expect(btn.text()).toContain("metrics.explorer.refresh");
-      expect(btn.attributes("size")).toBe("sm-toolbar");
-      // Same treatment as the logs/traces Run Query button.
-      expect(btn.attributes("variant")).toBe("primary");
+      const refresh = wrapper.findComponent({ name: "ORefreshButton" });
+      expect(refresh.exists()).toBe(true);
+      expect(refresh.props("dataTest")).toBe("metrics-explorer-refresh");
+      expect(refresh.props("shortcut")).toBe("metricsRefresh");
+      expect(wrapper.find('[data-test="metrics-explorer-more-btn"]').exists()).toBe(true);
+    });
+
+    it("carries auto-refresh in its own menu, with no separate Auto button", async () => {
+      const wrapper = mountExplorer();
+      const refresh = wrapper.findComponent({ name: "ORefreshButton" });
+      expect(refresh.props("autoRefresh")).toBe(0);
+      expect(wrapper.find('[data-test="metrics-auto-refresh"]').exists()).toBe(false);
+
+      refresh.vm.$emit("update:autoRefresh", 30);
+      await flushPromises();
+      expect((wrapper.vm as any).refreshInterval).toBe(30);
+      expect(wrapper.findComponent({ name: "ORefreshButton" }).props("autoRefresh")).toBe(30);
+    });
+
+    it("stays in Visualize, where auto-refresh still re-runs the chart", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).setMode("visualize");
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "ORefreshButton" }).exists()).toBe(true);
     });
   });
 
@@ -612,7 +624,7 @@ describe("MetricsExplorer wiring", () => {
             OTooltip: { template: "<div><slot /></div>" },
             OButton: {
               props: { disabled: Boolean },
-              template: '<button :disabled="disabled"><slot name="icon-left" /><slot /></button>',
+              template: '<button :disabled="disabled"><slot name="icon" /><slot /></button>',
             },
             OIcon: { template: "<i />" },
           },
@@ -2219,7 +2231,8 @@ describe("MetricsExplorer wiring", () => {
 
       stale.value = true;
       await wrapper.vm.$nextTick();
-      expect(wrapper.find(RUN).attributes("variant")).toBe("pending");
+      expect(wrapper.find(RUN).attributes("variant")).toBe("primary");
+      expect(wrapper.find(RUN).attributes("stale")).toBe("true");
       expect(wrapper.find(RUN).attributes("aria-label")).toBe("search.runQueryPendingLabel");
       expect(wrapper.find(RUN).attributes("data-run-pending")).toBe("true");
       expect((wrapper.vm as any).visualizeRunTooltip).toBe("search.autoRunPendingDot");
@@ -2270,13 +2283,13 @@ describe("MetricsExplorer wiring", () => {
       );
     });
 
-    it("Visualize shows Run but no Refresh button; the refresh shortcut still re-runs without recording", async () => {
+    it("Visualize keeps Refresh after Run for its auto-refresh menu; refresh re-runs without recording", async () => {
       const wrapper = withButtons();
       (wrapper.vm as any).setMode("visualize");
       await wrapper.vm.$nextTick();
 
       expect(wrapper.find(RUN).exists()).toBe(true);
-      expect(wrapper.find('[data-test="metrics-explorer-refresh"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="metrics-explorer-refresh"]').exists()).toBe(true);
       shortcuts.handlers.metricsRefresh();
       expect(visualizeRunQuery).toHaveBeenCalledTimes(1);
       expect(visualizeOnUserRun).not.toHaveBeenCalled();
@@ -2479,13 +2492,9 @@ describe("MetricsExplorer wiring", () => {
       for (const stub of stubs) expect(stub.attributes("quiet")).toBeUndefined();
       const slots = wrapper.findAll('[data-test="metrics-explorer-card-placeholder"]');
       expect(slots).toHaveLength(1);
-      const slotLine = slots[0].findComponent({ name: "LoadingProgress" });
-      expect(slotLine.props()).toMatchObject({
-        loading: true,
-        loadingProgressPercentage: 0,
-        indeterminate: false,
-      });
-      expect(wrapper.findAllComponents({ name: "LoadingProgress" })).toHaveLength(1);
+      const slotLine = slots[0].findComponent({ name: "OLoadingLine" });
+      expect(slotLine.props("active")).toBe(true);
+      expect(wrapper.findAllComponents({ name: "OLoadingLine" })).toHaveLength(1);
     });
 
     it("a time change keeps the drawn charts: the grid is told the window changed, not wiped", async () => {

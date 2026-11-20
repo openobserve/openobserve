@@ -50,8 +50,7 @@ describe("OnCallWhatFired", () => {
       expect.arrayContaining(["whitespace-pre-wrap", "wrap-anywhere"]),
     );
     expect(value.element.textContent).toBe(sql);
-    const item = wrapper.find('[data-test="oncall-what-fired-condition-item"]');
-    expect(item.classes()).toContain("flex-col");
+    expect(wrapper.find("dl").attributes("data-layout")).toBe("stacked");
     expect(wrapper.find('[data-test="oncall-what-fired-warning"]').exists()).toBe(false);
   });
 
@@ -65,8 +64,7 @@ describe("OnCallWhatFired", () => {
         },
       },
     });
-    const item = wrapper.find('[data-test="oncall-what-fired-condition-item"]');
-    expect(item.classes()).not.toContain("flex-col");
+    expect(wrapper.find("dl").attributes("data-layout")).toBe("auto");
     for (const key of ["condition", "warning"]) {
       const value = wrapper.find(`[data-test="oncall-what-fired-${key}"]`);
       expect(value.classes()).not.toContain("break-all");

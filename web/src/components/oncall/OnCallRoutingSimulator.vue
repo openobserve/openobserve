@@ -23,10 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('oncall.simulatorStartFrom')"
       :options="startOptions"
       :placeholder="t('oncall.ruleEditorStartPlaceholder')"
-      size="sm"
       searchable
       icon-key="icon"
-      :dropdown-style="START_PICKER_DROPDOWN_STYLE"
       data-test="oncall-simulator-start"
       @update:model-value="startFrom"
     >
@@ -70,8 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :model-value="priority"
       :label="t('oncall.priority')"
       :options="priorityOptions"
-      size="sm"
-      width="xs"
+      width="s"
       data-test="oncall-simulator-priority"
       @update:model-value="(v: unknown) => (priority = v === null ? 'P1' : String(v))"
     />
@@ -185,19 +182,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <span v-if="preview.team_id" class="flex" data-test="oncall-simulator-send-test-wrap">
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="notifications-active"
+          :disabled-reason="testUnavailable || undefined"
+          variant="secondary"
+          icon="notifications-active"
           :loading="sending"
           :disabled="!canConfigure || !!testUnavailable"
-          :focusable-unavailable="!!testUnavailable"
           data-test="oncall-simulator-send-test"
           @click="sendTest(preview.team_id)"
         >
           {{ t("oncall.simulatorSendTest") }}
-          <template v-if="testUnavailable" #unavailable-reason>{{ testUnavailable }}</template>
         </OButton>
-        <OTooltip v-if="testUnavailable" side="bottom" :content="testUnavailable" />
       </span>
 
       <div
@@ -265,7 +259,6 @@ import { licenseDeniedFeatures } from "@/utils/featureGate";
 import { formatMicrosDuration } from "@/utils/formatters";
 import {
   SERVICE_DIMENSION,
-  START_PICKER_DROPDOWN_STYLE,
   claimableDimensions,
   dimensionsOfPath,
   fieldLabel,

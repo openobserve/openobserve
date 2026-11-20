@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="border-border-default flex shrink-0 items-center justify-end gap-2 border-b px-4 py-2"
       >
-        <div class="w-48"><OSkeleton class="h-8" /></div>
-        <div class="w-24"><OSkeleton class="h-8" /></div>
-        <div class="w-8"><OSkeleton class="h-8" /></div>
+        <div class="w-48"><OSkeleton shape="block" class="h-8" /></div>
+        <div class="w-24"><OSkeleton shape="block" class="h-8" /></div>
+        <div class="w-8"><OSkeleton shape="block" class="h-8" /></div>
       </div>
       <div class="min-h-0 flex-1 overflow-hidden p-4">
         <div class="grid h-full grid-cols-1 gap-4 md:grid-cols-2">
@@ -37,10 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="rounded-default border-border-default flex min-h-40 flex-col gap-3 border p-4"
           >
             <div class="flex items-center justify-between">
-              <div class="w-40"><OSkeleton class="h-4" /></div>
-              <div class="w-4"><OSkeleton class="h-4" /></div>
+              <div class="w-40"><OSkeleton shape="block" class="h-4" /></div>
+              <div class="w-4"><OSkeleton shape="block" class="h-4" /></div>
             </div>
-            <OSkeleton class="min-h-24 flex-1" />
+            <OSkeleton shape="block" class="min-h-24 flex-1" />
           </div>
         </div>
       </div>
@@ -52,7 +52,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DateTimePickerDashboard
           v-if="selectedDate"
           ref="dateTimePicker"
-          size="sm"
           v-model="selectedDate"
           calendar-presets
           @hide="setTime"
@@ -68,9 +67,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The tooltip would only repeat the visible label, so it shows on phones alone. -->
         <OTooltip :content="t('common.refresh')" :disabled="!isMobile">
           <OButton
+            :icon-only="isMobile"
             variant="primary"
-            :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
-            icon-left="refresh"
+            icon="refresh"
             :aria-label="t('common.refresh')"
             data-test="pinned-dashboard-refresh-btn"
             @click="refreshData"

@@ -104,19 +104,18 @@ const ODrawerStub = {
     "size",
     "showClose",
     "title",
-    "width",
     "persistent",
     "formId",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:secondary", "click:extra"],
   template: `<div class="o-drawer-stub">
     <slot />
-    <button v-if="neutralButtonLabel" data-test="o-drawer-neutral-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
-    <button v-if="secondaryButtonLabel" data-test="o-drawer-secondary-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-    <button v-if="primaryButtonLabel" data-test="o-drawer-primary-btn" type="submit" form="stream-node-form">{{ primaryButtonLabel }}</button>
+    <button v-if="extra?.label" data-test="o-drawer-neutral-btn" @click="$emit('click:extra')">{{ extra.label }}</button>
+    <button v-if="secondary?.label" data-test="o-drawer-secondary-btn" @click="$emit('click:secondary')">{{ secondary.label }}</button>
+    <button v-if="primary?.label" data-test="o-drawer-primary-btn" type="submit" form="stream-node-form">{{ primary.label }}</button>
   </div>`,
 };
 
@@ -739,7 +738,7 @@ describe("Stream Component", () => {
       await flushPromises();
       wrapper.vm.openDeleteDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Delete Node");
+      expect(wrapper.vm.dialog.title).toBe("Delete node");
       expect(wrapper.vm.dialog.message).toBe("Are you sure you want to delete stream association?");
     });
 

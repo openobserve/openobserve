@@ -1,24 +1,24 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 //
-// Form-aware wrapper around the DateTime range picker (@/components/DateTime.vue).
-// DateTime is a composite that takes its value via ONCE-READ `default-*` props
+// Form-aware wrapper around the ODateTimeRange range picker (ODateTimeRange).
+// ODateTimeRange is a composite that takes its value via ONCE-READ `default-*` props
 // and emits `on:date-change` (it has no reactive v-model), so this wrapper:
 //   • seeds default-type / default-absolute-time / default-relative-time from the
 //     field's current value,
 //   • translates each `on:date-change` into the form's timerange object via
 //     `field.handleChange`,
-//   • REMOUNTS the inner DateTime (via `:key`) when the field value changes from
+//   • REMOUNTS the inner ODateTimeRange (via `:key`) when the field value changes from
 //     an EXTERNAL source (form.reset / async edit-prefill) so the picker re-reads
-//     the new value — but NOT on the user's own changes (DateTime already
+//     the new value — but NOT on the user's own changes (ODateTimeRange already
 //     reflects those), which would otherwise cause a remount loop.
 //
-// Errors are rendered only with `show-error`: DateTime has no label/required
+// Errors are rendered only with `show-error`: ODateTimeRange has no label/required
 // affordance and most callers validate the timerange cross-field in the form
 // schema (surfaced via the step jump), mirroring the other composite controls.
 
 import { inject, ref, watch } from "vue";
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { useVisibleFieldError } from "@/lib/forms/Form/fieldError";
 import { raw } from "@/types/i18n";
@@ -48,7 +48,7 @@ const valueAtName = (values: any, name: string): unknown => {
 };
 
 // Remount key — bumped only when the field value changes from outside this
-// wrapper (reset/prefill), so DateTime re-reads its once-read `default-*` props.
+// wrapper (reset/prefill), so ODateTimeRange re-reads its once-read `default-*` props.
 const renderKey = ref(0);
 let lastEmitted = "";
 
@@ -67,7 +67,7 @@ if (form) {
   );
 }
 
-// Translate DateTime's event shape → the form's { type, from, to, period }
+// Translate ODateTimeRange's event shape → the form's { type, from, to, period }
 // timerange object.
 const toTimerange = (dt: any): DateTimeRangeValue => ({
   type: dt.valueType === "relative-custom" ? "relative" : dt.valueType,
@@ -90,7 +90,7 @@ const onDateChange = (field: any, dt: any) => {
       <div v-if="props.label || props.description" class="mb-2">
         <div
           v-if="props.label && $slots['label-append']"
-          class="text-input-label-text flex items-center gap-1 text-sm font-bold"
+          class="text-input-label-text text-compact flex items-center gap-1 font-medium"
         >
           <span
             >{{ props.label
@@ -98,7 +98,7 @@ const onDateChange = (field: any, dt: any) => {
           >
           <slot name="label-append" />
         </div>
-        <div v-else-if="props.label" class="text-input-label-text text-sm font-bold">
+        <div v-else-if="props.label" class="text-input-label-text text-compact font-medium">
           {{ props.label }}<span v-if="props.required" class="text-input-error-text"> *</span>
         </div>
         <div v-if="props.description" class="text-xs">
@@ -106,7 +106,7 @@ const onDateChange = (field: any, dt: any) => {
         </div>
       </div>
       <div v-if="$slots.above" class="mb-2"><slot name="above" /></div>
-      <DateTime
+      <ODateTimeRange
         :key="renderKey"
         v-bind="$attrs"
         :default-type="field.state.value?.type ?? 'relative'"
@@ -120,7 +120,7 @@ const onDateChange = (field: any, dt: any) => {
       />
       <p
         v-if="props.showError && shown(field).message !== undefined"
-        class="text-input-error-text mt-1 text-xs leading-snug"
+        class="text-input-error-text mt-1 text-xs leading-4"
         :data-test="$attrs['data-test'] ? `${$attrs['data-test']}-error` : undefined"
       >
         {{ raw(shown(field).message) }}

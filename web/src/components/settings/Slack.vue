@@ -22,7 +22,7 @@ import config from "@/aws-exports";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSaveBar from "@/lib/forms/SaveBar/OSaveBar.vue";
 import { confirmLeave, releaseLeave, useLeaveGuard } from "@/lib/forms/SaveBar/useLeaveGuard";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -224,8 +224,7 @@ const openDialog = (mode: DialogMode): void => {
       >
         <OButton
           v-if="adding"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           data-test="slack-add-workspace-cancel"
           @click="adding = false"
         >
@@ -233,8 +232,7 @@ const openDialog = (mode: DialogMode): void => {
         </OButton>
         <OButton
           v-else
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="readOnly"
           data-test="slack-add-workspace"
           @click="leaveWorkspace(() => (adding = true))"
@@ -262,20 +260,22 @@ const openDialog = (mode: DialogMode): void => {
     </Teleport>
     <!-- Keyed by org: every step, ticket and popup below belongs to the org it started in. -->
     <div v-if="slackState.enabled" :key="org" class="flex flex-col gap-6">
-      <div v-if="installations.isPending.value || pageSettling" class="flex justify-center py-16">
-        <OSpinner size="md" />
+      <div v-if="installations.isPending.value || pageSettling" class="flex flex-col gap-6">
+        <OSkeleton shape="block" class="h-24" />
+        <OSkeleton shape="block" class="h-48" />
       </div>
       <OEmptyState
         v-else-if="forbidden"
-        size="hero"
-        preset="no-access"
-        :description="t('slackApp.workspaces.noAccess')"
+        kind="denied"
+        :title="t('emptyState.noAccess.title')"
+        :text="t('slackApp.workspaces.noAccess')"
         data-test="slack-no-access"
       />
       <OEmptyState
         v-else-if="installations.isError.value"
-        size="block"
-        preset="load-error"
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="t('emptyState.loadError.description')"
         data-test="slack-load-error"
         @action="installations.refetch()"
       />
@@ -305,7 +305,7 @@ const openDialog = (mode: DialogMode): void => {
                   {{ raw(inst.team_name) }}
                   <OTag
                     v-if="inst.scope === 'instance'"
-                    variant="primary-soft"
+                    tone="accent"
                     size="sm"
                     :label="t('slackApp.card.instanceTag')"
                   />

@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ row.value }}
         <span v-if="row.total" class="text-text-secondary">/ {{ row.total }}</span>
       </span>
-      <OProgressBar v-if="row.ratio !== null" size="xs" variant="neutral" :value="row.ratio" />
+      <OProgressBar v-if="row.ratio !== null" :value="row.ratio * 100" />
       <span v-else />
     </template>
   </div>

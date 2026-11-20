@@ -370,7 +370,7 @@ const SCREENS = [
             await pinBillingState(page, { expiry: Date.now() * 1000 + 2.5 * DAY_US, provider: 'stripe' });
             await page.goto(`${base()}/web/billings?org_identifier=${getOrgIdentifier()}`);
             await page.waitForURL(/\/billings\/usage/, { timeout: 30000 });
-            await expect(page.locator('[data-test="trial-period-container"]')).toHaveAttribute('data-tone', 'warning');
+            await expect(page.locator('[data-test="trial-period-container"]')).toHaveAttribute('data-tone', 'warn');
         },
     },
     {

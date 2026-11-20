@@ -121,7 +121,7 @@ function onZoom(range: { start: number; end: number }) {
 
 <template>
   <div class="relative h-full min-h-0 w-full" :data-test="dataTest">
-    <OSkeleton v-if="loading && !hasData" class="h-full w-full" />
+    <OSkeleton v-if="loading && !hasData" shape="block" class="h-full w-full" />
     <ChartRenderer v-else :data="{ options }" class="h-full w-full" @updated:data-zoom="onZoom" />
   </div>
 </template>

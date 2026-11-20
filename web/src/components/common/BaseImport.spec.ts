@@ -64,9 +64,10 @@ const globalConfig = {
       props: ["modelValue", "placeholder"],
     },
     OFile: {
+      name: "OFile",
       template:
-        '<div class="o-file-stub" :data-test="$attrs[\'data-test\']"><slot /><slot name="prepend" /><slot name="append" /><slot name="hint" /></div>',
-      props: ["modelValue", "label", "accept", "multiple", "bottomSlots"],
+        '<div class="o-file-stub" :data-test="$attrs[\'data-test\']"><slot name="hint" /></div>',
+      props: ["modelValue", "accept", "multiple", "validate", "variant"],
     },
     OIcon: {
       template: '<i :data-test="$attrs[\'data-test\']" :class="name" />',
@@ -179,6 +180,16 @@ describe("BaseImport.vue", () => {
       expect(wrapper.emitted("back")).toBeTruthy();
     });
 
+    it("labels the back link with the given parent and runs its handler instead of emitting", async () => {
+      const onClick = vi.fn();
+      wrapper = createWrapper({ back: { label: "Alerts", onClick } });
+      const link = wrapper.find('[data-test="dashboard-import-back-btn"]');
+      expect(link.text()).toContain("Alerts");
+      await link.trigger("click");
+      expect(onClick).toHaveBeenCalled();
+      expect(wrapper.emitted("back")).toBeFalsy();
+    });
+
     it("emits 'cancel' when cancel button is clicked", async () => {
       wrapper = createWrapper();
       await wrapper.find('[data-test="dashboard-import-cancel-btn"]').trigger("click");
@@ -212,6 +223,15 @@ describe("BaseImport.vue", () => {
       wrapper = createWrapper({ defaultActiveTab: "import_json_file" });
       // When file tab is active, OFile component is rendered with its data-test
       expect(wrapper.find('[data-test="dashboard-import-json-file-input"]').exists()).toBe(true);
+    });
+
+    it("gives the file picker a drop zone that validates JSON", async () => {
+      wrapper = createWrapper({ defaultActiveTab: "import_json_file" });
+      const picker = wrapper.findComponent({ name: "OFile" });
+      expect(picker.props("variant")).toBeUndefined();
+      const validate = picker.props("validate") as (file: File) => Promise<string | null>;
+      expect(await validate(new File(["[1]"], "ok.json"))).toBe(null);
+      expect(await validate(new File(["{"], "bad.json"))).not.toBe(null);
     });
 
     it("shows URL import section when activeTab is import_json_url", async () => {

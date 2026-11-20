@@ -188,7 +188,7 @@ describe("OForm validate-on-leave", () => {
         field: `<OFormDateTimeRange name="v" show-error />`,
         defaultValue: { type: "relative", period: "15m" },
         invalidValue: null,
-        leave: (w: VueWrapper) => w.findComponent({ name: "DateTime" }).vm.$emit("hide"),
+        leave: (w: VueWrapper) => w.findComponent({ name: "ODateTimeRange" }).vm.$emit("hide"),
       },
     ];
     const anyValue = z.object({
@@ -205,7 +205,7 @@ describe("OForm validate-on-leave", () => {
               <div data-row="v">${c.field}</div>
             </OForm>`,
         }),
-        { global: { stubs: { DateTime: { name: "DateTime", template: "<div />" } } } },
+        { global: { stubs: { ODateTimeRange: { name: "ODateTimeRange", template: "<div />" } } } },
       );
       const form = (w.findComponent(OForm).vm as any).form;
       form.setFieldValue("v", c.invalidValue);

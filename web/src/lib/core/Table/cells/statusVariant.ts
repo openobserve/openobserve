@@ -1,28 +1,27 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // statusVariant — the single source of truth that maps a raw status/state
-// string (from any table, any feature) onto a semantic OBadge variant + a
+// string (from any table, any feature) onto a chip tone + a
 // human label. One map so that "active"/"paused"/"failed" look identical
 // everywhere instead of every table inventing its own colours.
 //
 // Usage:
 //   const { variant, label, dot } = statusVariant("paused", "pipeline");
-//   <OBadge :variant="variant" :dot="dot">{{ label }}</OBadge>
+//   <OTag :tone="variant" :dot="dot">{{ label }}</OTag>
 
 import { raw, type I18nText } from "@/types/i18n";
 
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 
-/** Semantic tone — the calm, low-chroma "soft" badge family reads best at
- *  table density. Each tone maps to one variant. */
+/** Semantic status of a raw value; each maps to one chip tone. */
 export type StatusTone = "success" | "warning" | "error" | "info" | "neutral";
 
-const TONE_VARIANT: Record<StatusTone, BadgeVariant> = {
-  success: "success-soft",
-  warning: "warning-soft",
-  error: "error-soft",
-  info: "blue-soft",
-  neutral: "default-soft",
+const TONE_VARIANT: Record<StatusTone, ChipTone> = {
+  success: "ok",
+  warning: "warn",
+  error: "err",
+  info: "info",
+  neutral: "neutral",
 };
 
 /**
@@ -130,7 +129,7 @@ const DOMAIN_TONE: Record<string, Record<string, StatusTone>> = {
 };
 
 export interface StatusVariantResult {
-  variant: BadgeVariant;
+  variant: ChipTone;
   tone: StatusTone;
   label: I18nText;
   dot: boolean;
@@ -146,7 +145,7 @@ export function humanizeStatus(value: string): string {
 }
 
 /**
- * Resolve a raw status value to a badge variant + label.
+ * Resolve a raw status value to a chip tone + label.
  * @param value  raw status string (case-insensitive) — also accepts booleans.
  * @param domain optional feature key for overrides ("invoice"|"eval"|"service"|"node"|…).
  */

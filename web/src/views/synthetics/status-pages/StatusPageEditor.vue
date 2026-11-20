@@ -27,21 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       bleed
       :title="t('statusPages.editTitle')"
-      :subtitle="pageName ? raw(pageName) : undefined"
       :back="{ label: t('statusPages.back'), onClick: cancel, dataTest: 'status-page-editor-back' }"
-      title-overflow="truncate"
     >
       <template #actions>
-        <OButton
-          variant="outline-destructive"
-          size="sm-action"
-          data-test="status-page-editor-cancel"
-          @click="cancel"
-          >{{ t("common.cancel") }}</OButton
-        >
+        <OButton variant="danger-ghost" data-test="status-page-editor-cancel" @click="cancel">{{
+          t("common.cancel")
+        }}</OButton>
         <OButton
           variant="primary"
-          size="sm-action"
           type="submit"
           :form="FORM_ID"
           :loading="isSubmitting"
@@ -51,15 +44,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Loading / not-found guards -->
-      <div v-if="loading" class="flex h-full items-center justify-center">
-        <OSpinner />
+      <div v-if="loading" class="grid h-full grid-cols-2 gap-4 p-4">
+        <div class="flex flex-col gap-3">
+          <OSkeleton v-for="row in 6" :key="row" class="h-control-md" />
+        </div>
+        <OSkeleton shape="block" class="h-full" />
       </div>
-      <div
+      <OEmptyState
         v-else-if="!page"
-        class="text-text-secondary flex h-full items-center justify-center text-sm"
-      >
-        {{ t("statusPages.loadFailed") }}
-      </div>
+        kind="error"
+        :text="t('statusPages.loadFailed')"
+        data-test="status-page-editor-load-error"
+        @action="load"
+      />
 
       <!-- Two-pane split: config (left) | live preview (right) -->
       <OSplitter
@@ -81,17 +78,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   publicUrl
                 }}</OTruncatedText>
                 <OButton
-                  variant="outline"
-                  size="sm"
-                  icon-left="content-copy"
+                  variant="secondary"
+                  icon="content-copy"
                   data-test="status-page-editor-copy-url"
                   @click="copyUrl"
                   >{{ t("statusPages.copyUrl") }}</OButton
                 >
                 <OButton
-                  variant="outline"
-                  size="sm"
-                  icon-left="refresh"
+                  variant="secondary"
+                  icon="refresh"
                   :loading="rotating"
                   data-test="status-page-editor-rotate-slug"
                   @click="rotateSlug"
@@ -105,9 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormSection :title="t('statusPages.sections.details')">
                 <div class="flex flex-col gap-5">
                   <OFormInput name="name" :label="t('statusPages.fields.name')" required />
-                  <OFormInput
+                  <OFormTextarea
                     name="description"
-                    type="textarea"
                     :rows="3"
                     :label="t('statusPages.fields.description')"
                   />
@@ -167,21 +161,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormSection :title="t('statusPages.sections.visibility')">
                 <div class="flex flex-col gap-5">
                   <OFormToggleGroup name="visibility" :label="t('statusPages.fields.visibility')">
-                    <OToggleGroupItem
-                      value="draft"
-                      size="sm"
-                      data-test="status-page-visibility-draft"
-                      >{{ t("statusPages.visibility.draft") }}</OToggleGroupItem
-                    >
-                    <OToggleGroupItem
-                      value="public"
-                      size="sm"
-                      data-test="status-page-visibility-public"
-                      >{{ t("statusPages.visibility.public") }}</OToggleGroupItem
-                    >
+                    <OToggleGroupItem value="draft" data-test="status-page-visibility-draft">{{
+                      t("statusPages.visibility.draft")
+                    }}</OToggleGroupItem>
+                    <OToggleGroupItem value="public" data-test="status-page-visibility-public">{{
+                      t("statusPages.visibility.public")
+                    }}</OToggleGroupItem>
                     <OToggleGroupItem
                       value="password"
-                      size="sm"
                       data-test="status-page-visibility-password"
                       >{{ t("statusPages.visibility.password") }}</OToggleGroupItem
                     >
@@ -233,13 +220,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OFormInput
                     name="confirm_failures"
                     type="number"
-                    width="xs"
+                    width="s"
                     :label="t('statusPages.fields.confirmFailures')"
                   />
                   <OFormInput
                     name="confirm_recovery"
                     type="number"
-                    width="xs"
+                    width="s"
                     :label="t('statusPages.fields.confirmRecovery')"
                   />
                   <p class="text-input-hint text-xs">
@@ -255,9 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormSection :title="t('statusPages.sections.components')">
                 <template #actions>
                   <OButton
-                    variant="outline"
-                    size="sm"
-                    icon-left="add"
+                    variant="secondary"
                     data-test="status-page-add-component"
                     @click="addComponent"
                     >{{ t("statusPages.components.add") }}</OButton
@@ -265,9 +250,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <div class="flex flex-col gap-3">
-                  <p v-if="components.length === 0" class="text-text-secondary text-sm">
-                    {{ t("statusPages.components.empty") }}
-                  </p>
+                  <OEmptyState
+                    v-if="components.length === 0"
+                    size="compact"
+                    :title="t('statusPages.components.empty')"
+                  />
 
                   <div
                     v-for="(comp, idx) in components"
@@ -286,9 +273,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </div>
                       <OButton
-                        variant="ghost-destructive"
-                        size="icon-sm"
-                        icon-left="delete"
+                        icon-only
+                        variant="danger-ghost"
+                        icon="delete"
                         class="mt-6"
                         :data-test="`status-page-component-remove-${idx}`"
                         @click="removeComponent(idx)"
@@ -339,6 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -346,6 +334,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormColor from "@/lib/forms/Color/OFormColor.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
@@ -355,7 +344,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
@@ -436,7 +426,6 @@ const orgLogoImg = computed<string>(() =>
 
 const loading = ref(true);
 const page = ref<StatusPageListItem | null>(null);
-const pageName = ref("");
 const rotating = ref(false);
 const currentSlug = ref("");
 const splitPct = ref(58);
@@ -614,7 +603,6 @@ async function load() {
     const res = await statusPagesService.get(orgIdentifier.value, id);
     const p = res.data as StatusPageListItem;
     page.value = p;
-    pageName.value = p.name;
     currentSlug.value = p.slug;
     form.reset(defaultsFromPage(p));
     components.value = ((res.data as any).components ?? []).map((c: any) => ({
@@ -724,14 +712,19 @@ async function rotateSlug() {
   }
 }
 
-function goBack() {
+function statusPagesListRoute() {
   const ctx = syntheticsNavContextFromRoute(route);
   if (!ctx.orgIdentifier && orgIdentifier.value) ctx.orgIdentifier = orgIdentifier.value;
-  router.push(syntheticsListRoute(ctx, { section: "status-pages" }));
+  return syntheticsListRoute(ctx, { section: "status-pages" });
 }
 
+function goBack() {
+  router.push(statusPagesListRoute());
+}
+
+const { goBack: backToList } = useSmartBack(statusPagesListRoute);
 async function cancel() {
-  if (await statusPageDraft.confirmLeave()) goBack();
+  if (await statusPageDraft.confirmLeave()) backToList();
 }
 
 // The images the page loaded with, so an unchanged one is left out of the draft.

@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <OTag
-          :variant="parts.chip.variant"
+          :tone="parts.chip.variant"
           size="sm"
           :label="parts.chip.label"
           :data-test="`insight-block-${parts.id}-chip`"
@@ -60,10 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-h-8 flex-wrap items-center gap-x-2 gap-y-1 pt-1">
         <OButton
           v-if="parts.cta"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           class="min-w-0"
-          :icon-left="parts.cta.locked ? 'lock' : undefined"
+          :icon="parts.cta.locked ? 'lock' : undefined"
           :disabled="!!parts.cta.locked"
           :loading="pending"
           :title="parts.cta.label"
@@ -74,9 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="canAsk"
-          variant="ghost-primary"
-          size="sm"
-          icon-left="auto-awesome"
+          variant="accent-ghost"
+          icon="auto-awesome"
           :data-test="`insight-block-${parts.id}-ask-ai`"
           @click="ask"
         >
@@ -84,8 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="parts.dismissable"
-          variant="ghost-muted"
-          size="sm"
+          variant="ghost"
           :data-test="`insight-block-${parts.id}-dismiss`"
           @click="emit('dismiss')"
         >
@@ -93,10 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="hasDetails"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           class="ms-auto shrink-0"
-          :icon-right="open ? 'expand-less' : 'expand-more'"
+          :icon-end="open ? 'expand-less' : 'expand-more'"
           :aria-expanded="open"
           :aria-controls="detailsId"
           :data-test="`insight-block-${parts.id}-details-toggle`"
@@ -157,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-for="fact in parts.facts"
           :key="fact.label"
-          :variant="fact.variant"
+          :tone="fact.variant"
           size="sm"
           :label="fact.label"
         >
@@ -169,9 +166,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="hasActions" class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <OButton
           v-if="!card && parts.cta && !hideCta"
-          variant="outline"
-          size="sm"
-          :icon-left="parts.cta.locked ? 'lock' : undefined"
+          variant="secondary"
+          :icon="parts.cta.locked ? 'lock' : undefined"
           :disabled="!!parts.cta.locked"
           :loading="pending"
           :data-test="`insight-block-${parts.id}-cta`"
@@ -181,9 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="!card && canAsk"
-          variant="ghost-primary"
+          variant="accent-ghost"
           :size="actionSize"
-          icon-left="auto-awesome"
+          icon="auto-awesome"
           :data-test="`insight-block-${parts.id}-ask-ai`"
           @click.stop="ask"
         >
@@ -192,8 +188,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-for="action in parts.secondary"
           :key="action.key"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :data-test="`insight-block-${parts.id}-secondary-${action.key}`"
           @click.stop="emit('secondary', action)"
         >
@@ -201,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="!card && parts.dismissable"
-          variant="ghost-muted"
+          variant="ghost"
           :size="actionSize"
           :data-test="`insight-block-${parts.id}-dismiss`"
           @click.stop="emit('dismiss')"
@@ -280,7 +276,7 @@ const detailsId = `insight-details-${useId()}`;
 const open = ref(false);
 const card = computed(() => props.variant === "card");
 // Under a table row that shows the CTA itself, the actions take the row's size.
-const actionSize = computed(() => (props.hideCta ? "xs" : "sm"));
+const actionSize = computed(() => (props.hideCta ? "sm" : "md"));
 
 const detailWhy = computed(() =>
   card.value ? props.parts.whyDetail : (props.parts.whyDetail ?? props.parts.why),

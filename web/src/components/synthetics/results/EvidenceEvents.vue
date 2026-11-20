@@ -279,14 +279,10 @@ function rowTitle(e: EvidenceEvent): string {
     pagination="client"
     :page-size="isPanel ? 20 : 10"
     sorting="client"
-    :show-global-filter="false"
-    :dense="true"
     :wrap="wrap"
     :cell-overflow-tooltip="false"
-    :bordered="true"
     :default-columns="false"
     :fill-height="false"
-    :frame="false"
     :get-row-status-color="rowStatusColor"
     expansion="multiple"
     horizontal-scroll
@@ -309,7 +305,7 @@ function rowTitle(e: EvidenceEvent): string {
     <!-- Category, not severity — see KIND_LABEL. One neutral variant for all four
          kinds, so the badge never contradicts the rail beside it. -->
     <template #cell-type="{ row }">
-      <OBadge variant="default-soft" size="sm" data-test="synthetics-evidence-events-type">
+      <OBadge tone="neutral" size="sm" data-test="synthetics-evidence-events-type">
         {{ kindLabel(row) }}
       </OBadge>
     </template>
@@ -376,12 +372,16 @@ function rowTitle(e: EvidenceEvent): string {
 
     <template #empty>
       <OEmptyState
-        size="inline"
         icon="search"
-        :filtered="filtered"
+        :kind="filtered ? 'filtered' : 'first-run'"
+        :text="
+          filtered
+            ? t('emptyState.filtered.description', { noun: t('emptyState.filtered.fallbackNoun') })
+            : undefined
+        "
         :title="t('synthetics.evidence.noEvents')"
         data-test="synthetics-evidence-events-empty"
-        @action="(id?: string) => id === 'clear-filters' && emit('clear-filters')"
+        @action="emit('clear-filters')"
       />
     </template>
   </OTable>

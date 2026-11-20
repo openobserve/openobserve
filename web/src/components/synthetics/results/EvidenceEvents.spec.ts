@@ -149,7 +149,7 @@ describe("EvidenceEvents", () => {
     // be wrong on one of them. Severity is the rail and the status text.
     const w = mountEvents({ events: [ev({ kind: "pageerror" }), ev({ status: 200 })] });
     const [bad, fine] = w.findAllComponents(OBadge);
-    expect(bad.props("variant")).toBe("default-soft");
+    expect(bad.props("tone")).toBe("neutral");
     expect(fine.props("variant")).toBe(bad.props("variant"));
   });
 
@@ -203,8 +203,8 @@ describe("EvidenceEvents", () => {
   it("offers a filtered empty state that can clear the filter", async () => {
     const w = mountEvents({ events: [], mode: "panel", filtered: true });
     const empty = w.findComponent(OEmptyState);
-    expect(empty.props("filtered")).toBe(true);
-    empty.vm.$emit("action", "clear-filters");
+    expect(empty.props("kind")).toBe("filtered");
+    empty.vm.$emit("action");
     await w.vm.$nextTick();
     expect(w.emitted("clear-filters")).toBeTruthy();
   });

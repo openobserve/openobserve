@@ -18,11 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="open"
     :title="t('oncall.awayTitle')"
-    :primary-button-label="t('oncall.awaySave')"
-    :secondary-button-label="t('oncall.cancel')"
+    :primary="{
+      label: t('oncall.awaySave'),
+      loading: saving,
+      dataTest: 'oncall-members-away-save',
+    }"
+    :secondary="{ label: t('oncall.cancel') }"
     :form-id="FORM_ID"
-    :primary-button-loading="saving"
-    primary-button-data-test="oncall-members-away-save"
     data-test="oncall-members-away-dialog"
     @click:secondary="open = false"
   >
@@ -78,8 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-for="preset in PRESETS"
                 :key="preset.key"
-                :variant="activePreset === preset.key ? 'outline-primary' : 'outline'"
-                size="xs"
+                :pressed="activePreset === preset.key"
+                variant="secondary"
+                size="sm"
                 :aria-pressed="activePreset === preset.key"
                 :data-test="`oncall-members-away-preset-${preset.key}`"
                 @click="applyPreset(preset.key)"

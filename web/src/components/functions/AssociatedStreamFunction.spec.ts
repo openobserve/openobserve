@@ -111,8 +111,8 @@ describe("AssociatedStreamFunction", () => {
   const ODrawerStub = {
     name: "ODrawer",
     inheritAttrs: false,
-    props: ["open", "size", "persistent", "title", "subTitle", "showClose", "width"],
-    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+    props: ["open", "size", "persistent", "title", "subtitle", "showClose", "width"],
+    emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
     template: '<div data-test="o-drawer-stub" :data-open="open" :data-size="size"><slot /></div>',
   };
 
@@ -202,7 +202,7 @@ describe("AssociatedStreamFunction", () => {
 
       const drawer = wrapper.find('[data-test="o-drawer-stub"]');
       expect(drawer.exists()).toBe(true);
-      expect(drawer.attributes("data-size")).toBe("lg");
+      expect(drawer.attributes("data-size")).toBe("md");
     });
 
     it("should bind ODrawer open state to showIndexSchemaDialog (closed by default)", async () => {

@@ -21,7 +21,7 @@ import { useRemoveRequest } from "./useCollectorActions";
 
 const DialogStub = {
   name: "ODialog",
-  props: ["open", "title", "primaryButtonLabel", "primaryButtonVariant"],
+  props: ["open", "title", "primary", "primary"],
   emits: ["click:primary", "click:secondary", "update:open"],
   template: '<div v-if="open" data-test="dialog"><slot /></div>',
 };

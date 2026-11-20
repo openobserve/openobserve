@@ -2,8 +2,6 @@
 
 import type { I18nText } from "@/types/i18n";
 
-export type SliderSize = "sm" | "md" | "lg";
-
 export interface SliderProps {
   /** Current numeric value */
   modelValue?: number;
@@ -29,8 +27,6 @@ export interface SliderProps {
   disabled?: boolean;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
   required?: boolean;
-  /** Control size */
-  size?: SliderSize;
   /** HTML id */
   id?: string;
   /** HTML name */

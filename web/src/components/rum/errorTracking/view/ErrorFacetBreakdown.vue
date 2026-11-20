@@ -29,22 +29,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <small class="mb-2 block">{{ t("rum.errorDetail.breakdownHint") }}</small>
 
     <div v-if="loading" class="flex flex-col gap-3" data-test="rum-error-facet-breakdown-loading">
-      <OSkeleton v-for="index in 4" :key="index" variant="text" />
+      <OSkeleton v-for="index in 4" :key="index" shape="block" />
     </div>
 
-    <p
+    <OEmptyState
       v-else-if="!populatedFacets.length"
-      class="text-text-muted"
+      size="compact"
+      :title="t('rum.errorDetail.breakdownEmpty')"
       data-test="rum-error-facet-breakdown-empty"
-    >
-      {{ t("rum.errorDetail.breakdownEmpty") }}
-    </p>
+    />
 
     <template v-else>
-      <OBanner
+      <OInlineNotice
         v-if="dominant"
-        variant="error-soft"
-        dense
+        tone="err"
         icon="lightbulb"
         class="mb-3"
         data-test="rum-error-facet-breakdown-insight"
@@ -56,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             value: dominant.value.value,
           })
         }}
-      </OBanner>
+      </OInlineNotice>
 
       <dl class="m-0 flex flex-col gap-3">
         <div
@@ -81,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ percentLabel(entry.share) }}</span
                 >
               </div>
-              <OProgressBar :value="entry.share" size="xs" variant="danger" />
+              <OProgressBar :value="entry.share * 100" tone="err" />
             </div>
           </dd>
         </div>
@@ -93,9 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { FacetKey, FacetValue } from "@/utils/rum/errorDetailQueries";
 

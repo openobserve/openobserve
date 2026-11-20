@@ -27,7 +27,6 @@ import OStatCard from "@/lib/data/StatStrip/OStatCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import OTime from "@/lib/forms/Time/OTime.vue";
-import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import { raw } from "@/types/i18n";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -125,18 +124,8 @@ describe("visible neutral hover (item 1)", () => {
 });
 
 describe("primary ink on the accent fills (item 1)", () => {
-  const PRIMARY_INK: ButtonVariant[] = [
-    "ghost-primary",
-    "ghost-muted",
-    "panel-collapse",
-    "outline-primary",
-    "pricing-chip",
-  ];
-  const HOVER_FILLS = [
-    "enabled:hover:bg-",
-    "enabled:active:bg-",
-    "group-hover/row:enabled:hover:not-active:bg-",
-  ];
+  const PRIMARY_INK: ButtonVariant[] = ["accent-ghost"];
+  const HOVER_FILLS = ["hover:bg-", "active:bg-", "group-hover/row:hover:not-active:bg-"];
 
   const isColor = (token: string) => resolveColor(token, THEMES.light) !== null;
   const tokensAfter = (classes: string[], prefix: string) =>
@@ -151,7 +140,7 @@ describe("primary ink on the accent fills (item 1)", () => {
     const classes = wrapper.get("button").classes();
     wrapper.unmount();
     const restInk = tokensAfter(classes, "text-")[0];
-    const hoverInk = tokensAfter(classes, "enabled:hover:text-")[0] ?? restInk;
+    const hoverInk = tokensAfter(classes, "hover:text-")[0] ?? restInk;
     if (!hoverInk) throw new Error(`${variant} has no label colour`);
     const pairs: [string, string][] = [];
     for (const bg of tokensAfter(classes, "bg-")) pairs.push([restInk ?? hoverInk, bg]);
@@ -205,8 +194,8 @@ describe("labels on the accent fills under every preset and its semantic colours
     "--color-table-row-action-hover-bg",
   ];
   // Status inks are left out: they sit on their own status tints, never on these fills.
+  // So is the ghost's rest ink: hover and press lift it to heading ink before a fill appears.
   const INKS = [
-    "--color-button-ghost-text",
     "--color-button-outline-text",
     "--color-button-secondary-foreground",
     "--color-button-ghost-primary-hover-text",
@@ -215,7 +204,7 @@ describe("labels on the accent fills under every preset and its semantic colours
     "--color-accent-on-tint",
     "--color-text-heading",
   ];
-  const NEUTRAL: ButtonVariant[] = ["secondary", "outline", "ghost", "sidebar-toggle"];
+  const NEUTRAL: ButtonVariant[] = ["secondary", "ghost"];
   const PRESETS = PREDEFINED_THEMES.flatMap((t) =>
     BOTH.map((mode) => [t.name, mode, t[mode].themeColor, t[mode].semanticColors] as const),
   );
@@ -236,13 +225,11 @@ describe("labels on the accent fills under every preset and its semantic colours
         .filter((c) => c.startsWith(prefix))
         .map((c) => `--color-${c.slice(prefix.length)}`)
         .filter((t) => resolveColor(t, THEMES.light) !== null);
-    const ink = token("enabled:hover:text-")[0] ?? token("text-")[0];
+    const ink = token("hover:text-")[0] ?? token("text-")[0];
     if (!ink) throw new Error(`${variant} has no label colour`);
-    return [
-      "enabled:hover:bg-",
-      "enabled:active:bg-",
-      "group-hover/row:enabled:hover:not-active:bg-",
-    ].flatMap((prefix) => token(prefix).map((bg) => [ink, bg] as [string, string]));
+    return ["hover:bg-", "active:bg-", "group-hover/row:hover:not-active:bg-"].flatMap((prefix) =>
+      token(prefix).map((bg) => [ink, bg] as [string, string]),
+    );
   };
 
   it.each(NEUTRAL)("finds the hover and pressed fills of the %s button", (variant) => {
@@ -301,27 +288,34 @@ describe("segmented control (item 3)", () => {
   const MAIN: Record<Theme, [string, string][]> = {
     light: [
       ["--color-toggle-item-text", "--color-text-body"],
-      ["--color-toggle-item-active-bg", "--color-surface-accent-active"],
-      ["--color-toggle-item-active-text", "--color-primary-700"],
-      ["--color-toggle-item-active-border", "--color-primary-600"],
+      ["--color-toggle-item-active-bg", "--color-surface-base"],
+      ["--color-toggle-item-active-text", "--color-text-heading"],
+      ["--color-toggle-item-active-border", "--color-border-default"],
       ["--color-toggle-item-hover-bg", "--color-grey-150"],
+      ["--color-toggle-track-bg", "--color-surface-subtle"],
     ],
     dark: [
-      ["--color-toggle-item-active-bg", "--color-primary-900"],
-      ["--color-toggle-item-active-text", "--color-white"],
-      ["--color-toggle-item-active-border", "--color-primary-400"],
+      ["--color-toggle-item-active-bg", "--color-surface-base"],
+      ["--color-toggle-item-active-text", "--color-text-heading"],
+      ["--color-toggle-item-active-border", "--color-border-default"],
+      ["--color-toggle-track-bg", "--color-surface-subtle"],
     ],
   };
 
-  it.each(BOTH)("keeps main's segment text, fill, edge and hover in %s", (theme) => {
+  it.each(BOTH)("keeps the segment text, fill, tray and hover in %s", (theme) => {
     for (const [token, main] of MAIN[theme]) expect(same(token, main, theme), token).toBe(true);
   });
 
-  it.each(BOTH)("keeps the selected-segment edge at 3:1 on its fill in %s", (theme) => {
-    expect(
-      ratio("--color-toggle-item-active-border", "--color-toggle-item-active-bg", theme),
-    ).toBeGreaterThanOrEqual(NON_TEXT_MIN);
-  });
+  it.each(PREDEFINED_THEMES.flatMap((t) => BOTH.map((mode) => [t.name, mode, t[mode].themeColor])))(
+    "keeps the selected segment's ink at 4.5:1 on its fill under %s %s",
+    (_name, mode, themeColor) => {
+      const scope = themed(themeColor as string, mode as Theme);
+      const page = resolveColor("--color-surface-base", scope)!;
+      const fill = composite(resolveColor("--color-toggle-item-active-bg", scope)!, page);
+      const ink = composite(resolveColor("--color-toggle-item-active-text", scope)!, fill);
+      expect(contrastRatio(ink, fill)).toBeGreaterThanOrEqual(TEXT_MIN);
+    },
+  );
 
   it.each(BOTH)("keeps inactive text readable on the track and the hover in %s", (theme) => {
     for (const bg of ["--color-toggle-track-bg", "--color-toggle-item-hover-bg"]) {
@@ -335,7 +329,7 @@ describe("segmented control (item 3)", () => {
 
 describe("stat strip filter chips", () => {
   const badgeFill = (tone: "error" | "neutral", value: number) =>
-    tone === "error" && value > 0 ? "--color-badge-error-soft-bg" : "--color-surface-subtle";
+    tone === "error" && value > 0 ? "--color-badge-error-soft-bg" : "--color-surface-base";
 
   const tileToken = (part: "value" | "label", tone: "error" | "neutral", value: number) => {
     const wrapper = mount(OStatCard, {
@@ -377,7 +371,7 @@ describe("stat strip filter chips", () => {
       const fill =
         part === "value"
           ? badgeFill(tone as "error" | "neutral", value as number)
-          : "--color-surface-base";
+          : "--color-surface-subtle";
       expect(ratio(token, fill, theme)).toBeGreaterThanOrEqual(TEXT_MIN);
     },
   );
@@ -435,7 +429,7 @@ describe("readable text tiers (item 11)", () => {
   });
 });
 
-/** Text inks the time segments, Close and range tabs paint straight on the picker popup. */
+/** Text inks the time segments and Close paint straight on the picker popup. */
 async function pickerAccentInks(): Promise<[string, string][]> {
   const inks = (where: string, el: Element): [string, string][] =>
     [...el.classList]
@@ -457,13 +451,6 @@ async function pickerAccentInks(): Promise<[string, string][]> {
     ...inks("OTime Close", timePopup.querySelector('[data-test="otime-close"]')!),
   ];
   time.unmount();
-
-  const range = mount(ODateTimeRange, { attachTo: document.body });
-  await range.find('[data-test="datetimerange-trigger"]').trigger("click");
-  await flushPromises();
-  const tabs = document.body.querySelectorAll('[data-test="datetimerange-tabs"] button');
-  found.push(...[...tabs].flatMap((b) => inks("ODateTimeRange tab", b)));
-  range.unmount();
   return found;
 }
 
@@ -508,7 +495,7 @@ describe("dark selected fills (item 12)", () => {
   );
 
   it.each(FILLS)("keeps %s readable under the O2 Signature dark accent", (fill, text) => {
-    const signature = PREDEFINED_THEMES.find((theme) => theme.dark.themeColor === "#8B8DF0");
+    const signature = PREDEFINED_THEMES.find((theme) => theme.name === "O2 Signature");
     expect(signature).toBeDefined();
     const scope = themed(signature!.dark.themeColor, "dark");
     const page = resolveColor("--color-surface-base", scope)!;

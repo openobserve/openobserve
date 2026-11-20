@@ -1,32 +1,60 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import type { FileProps, FileEmits, FileSlots, FileValue } from "./OFile.types";
-import { computed, ref, useAttrs, useId } from "vue";
+import type {
+  FileEmits,
+  FileProps,
+  FileRejection,
+  FileSlots,
+  FileSource,
+  FileValue,
+} from "./OFile.types";
+import { computed, reactive, ref, useAttrs, useId, watch } from "vue";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.types";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
-import { useI18nTyped } from "@/types/i18n";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+interface UploadState {
+  progress: number;
+  status: "uploading" | "done" | "error";
+  error?: I18nText;
+}
+
+interface FileRow {
+  key: string;
+  file: File;
+  error?: I18nText;
+  upload?: UploadState;
+  rejection?: FileRejection;
+  index?: number;
+}
+
+const SOURCE_ICONS: Record<FileSource, IconName> = {
+  file: "upload",
+  url: "link",
+  paste: "content-paste",
+};
 
 const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
-
-// Forward tabindex to the real file input; keep it off the wrapper (avoids a double tab-stop).
-const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
-const wrapperAttrs = computed(() => {
-  const { tabindex: _tabindex, ...rest } = $attrs;
-  return rest;
-});
+const testId = (suffix: string) => `${parentDataTest.value ?? "o-file"}-${suffix}`;
 
 const props = withDefaults(defineProps<FileProps>(), {
   multiple: false,
-  size: "md",
+  variant: "zone",
+  sources: () => ["file"],
   disabled: false,
-  dropZone: false,
 });
 
 const emit = defineEmits<FileEmits>();
@@ -39,6 +67,10 @@ const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
 const inputRef = ref<HTMLInputElement | null>(null);
 const isDragging = ref(false);
+const rejections = ref<FileRejection[]>([]);
+const uploads = reactive(new Map<File, UploadState>());
+let dragDepth = 0;
+let lastEmitted: FileValue | undefined;
 
 const files = computed<File[]>(() => {
   const v = props.modelValue;
@@ -49,161 +81,280 @@ const files = computed<File[]>(() => {
 const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
 
-const heightClasses: Record<NonNullable<FileProps["size"]>, string> = {
-  sm: "h-6 text-xs",
-  md: "h-8 text-sm",
-};
+// ── Sources ────────────────────────────────────────────────────────────────
+const localSource = ref<FileSource>(props.source ?? props.sources[0] ?? "file");
+const activeSource = computed<FileSource>(() => props.source ?? localSource.value);
+const switchable = computed(() => props.variant === "zone" && props.sources.length > 1);
+const localUrl = ref(props.url ?? "");
+const localText = ref(props.text ?? "");
+watch(
+  () => props.url,
+  (v) => (localUrl.value = v ?? ""),
+);
+watch(
+  () => props.text,
+  (v) => (localText.value = v ?? ""),
+);
 
-function emitFiles(fileList: FileList | File[] | null) {
-  let list = fileList ? Array.from(fileList) : [];
+function setSource(value: unknown) {
+  if (typeof value !== "string" || !props.sources.includes(value as FileSource)) return;
+  localSource.value = value as FileSource;
+  emit("update:source", value as FileSource);
+}
+function setUrl(value: string | number) {
+  localUrl.value = String(value ?? "");
+  emit("update:url", localUrl.value);
+}
+function setText(value: string) {
+  localText.value = value;
+  emit("update:text", value);
+}
+function sourceLabel(source: FileSource): I18nText {
+  if (source === "url") return t("components.file.sourceUrl");
+  if (source === "paste") return t("components.file.sourcePaste");
+  return t("components.file.sourceFile");
+}
 
-  // Filter by accept before anything else — enforces the restriction for both
-  // the native file picker and drag-and-drop sources.
-  if (list.length > 0 && props.accept) {
-    const accepted = filterByAccept(list, props.accept);
-    const rejected = list.filter((f) => !accepted.includes(f));
+// ── Constraints ────────────────────────────────────────────────────────────
+const acceptTokens = computed(() =>
+  (props.accept ?? "")
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean),
+);
+const acceptLabel = computed(() => raw(acceptTokens.value.join(", ")));
+const fileLimit = computed(() => props.maxFiles ?? (props.multiple ? Infinity : 1));
 
-    if (rejected.length > 0) {
-      const names = rejected.map((f) => f.name).join(", ");
-      const allowed = props.accept
-        .split(",")
-        .map((t) => t.trim())
-        .join(", ");
-      toast({
-        message: t("toastMessages.File.isNotASupportedFileType", {
-          fileName: names,
-          allowed: allowed,
-        }),
-        variant: "error",
-      });
-      emit("type-error", rejected);
-    }
+function formatSize(bytes: number): I18nText {
+  if (bytes < 1024) return raw(`${bytes} B`);
+  if (bytes < 1024 * 1024) return raw(`${(bytes / 1024).toFixed(1)} KB`);
+  return raw(`${(bytes / (1024 * 1024)).toFixed(1)} MB`);
+}
 
-    list = accepted;
+const constraints = computed(() => {
+  const parts: I18nText[] = [];
+  if (acceptTokens.value.length) parts.push(acceptLabel.value);
+  if (props.maxSize !== undefined) {
+    const size = formatSize(props.maxSize);
+    parts.push(
+      props.multiple
+        ? t("components.file.upToSizeEach", { size })
+        : t("components.file.upToSize", { size }),
+    );
   }
+  if (!props.multiple) parts.push(t("components.file.oneFile"));
+  else if (Number.isFinite(fileLimit.value))
+    parts.push(t("components.file.upToFiles", { count: fileLimit.value }));
+  return raw(parts.join(" · "));
+});
 
-  if (list.length === 0) {
-    emit("update:modelValue", null);
-    emit("change", null);
-    return;
+function matchesAccept(file: File): boolean {
+  const mime = file.type.toLowerCase();
+  const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
+  return acceptTokens.value.some((entry) => {
+    const token = entry.toLowerCase();
+    if (token.startsWith(".")) return ext === token;
+    if (token.endsWith("/*")) return mime.startsWith(token.slice(0, -1));
+    return mime === token;
+  });
+}
+
+async function checkFile(file: File): Promise<I18nText | null> {
+  if (acceptTokens.value.length && !matchesAccept(file)) {
+    return t("components.file.typeRejected", { allowed: acceptLabel.value });
   }
-
-  if (props.maxFileSize !== undefined) {
-    const tooBig = list.filter((f) => f.size > props.maxFileSize!);
-    if (tooBig.length > 0) {
-      emit("size-error", tooBig);
-      return;
-    }
+  if (props.maxSize !== undefined && file.size > props.maxSize) {
+    return t("components.file.sizeRejected", {
+      size: formatSize(file.size),
+      max: formatSize(props.maxSize),
+    });
   }
+  return (await props.validate?.(file)) ?? null;
+}
 
-  const next: FileValue = props.multiple ? list : list[0];
+// ── Selection ──────────────────────────────────────────────────────────────
+async function takeFiles(fileList: FileList | File[] | null) {
+  const picked = fileList ? Array.from(fileList) : [];
+  if (picked.length === 0) return;
+  const rejected: FileRejection[] = [];
+  let accepted: File[] = [];
+  for (const file of picked) {
+    const reason = await checkFile(file);
+    if (reason) rejected.push({ file, reason });
+    else accepted.push(file);
+  }
+  const limit = fileLimit.value;
+  if (accepted.length > limit) {
+    const reason = t("components.file.countRejected", { count: limit }, limit);
+    accepted.slice(limit).forEach((file) => rejected.push({ file, reason }));
+    accepted = accepted.slice(0, limit);
+  }
+  rejections.value = rejected;
+  uploads.clear();
+  if (rejected.length) emit("rejected", rejected);
+  const next: FileValue = accepted.length === 0 ? null : props.multiple ? accepted : accepted[0];
+  setValue(next);
+  if (props.upload) accepted.forEach(startUpload);
+}
+
+function setValue(next: FileValue) {
+  lastEmitted = next;
   emit("update:modelValue", next);
   emit("change", next);
 }
 
+async function startUpload(file: File) {
+  uploads.set(file, { progress: 0, status: "uploading" });
+  try {
+    await props.upload!(file, (fraction) => {
+      const state = uploads.get(file);
+      if (state) state.progress = Math.min(1, Math.max(0, fraction));
+    });
+    uploads.set(file, { progress: 1, status: "done" });
+  } catch (err) {
+    const error = typeof err === "string" && err ? raw(err) : t("components.file.uploadFailed");
+    uploads.set(file, { progress: 0, status: "error", error });
+  }
+}
+
 function handleChange(event: Event) {
   const target = event.target as HTMLInputElement;
-  emitFiles(target.files);
-  // Reset the native input so picking the *same* file again still fires
-  // `change`. Browsers suppress the event when the selected path is unchanged;
-  // the component's state lives entirely in `modelValue`, so clearing the raw
-  // input here is safe and keeps re-selection working after an external clear.
+  void takeFiles(target.files);
+  // The browser skips `change` for the same path; clearing lets a re-pick fire again.
   target.value = "";
 }
 
-function handleClear(event?: Event) {
-  event?.stopPropagation();
+function removeFile(index: number) {
+  const removed = files.value[index];
+  if (removed) uploads.delete(removed);
+  const next = files.value.filter((_, i) => i !== index);
+  if (next.length === 0) {
+    clearAll();
+    return;
+  }
+  setValue(props.multiple ? next : next[0]);
+}
+
+function clearAll() {
   if (inputRef.value) inputRef.value.value = "";
+  uploads.clear();
+  lastEmitted = null;
   emit("update:modelValue", null);
   emit("clear");
 }
 
-function removeFile(index: number, event?: Event) {
-  event?.stopPropagation();
-  const next = files.value.filter((_, i) => i !== index);
-  if (next.length === 0) {
-    handleClear();
+function removeRow(row: FileRow) {
+  if (row.rejection) {
+    rejections.value = rejections.value.filter((r) => r !== row.rejection);
     return;
   }
-  const value: FileValue = props.multiple ? next : next[0];
-  emit("update:modelValue", value);
-  emit("change", value);
+  if (row.index !== undefined) removeFile(row.index);
 }
+
+// An outside reset (form reset, tab switch) also drops the error rows of the last pick.
+watch(
+  () => props.modelValue,
+  (value) => {
+    if (value === lastEmitted) return;
+    if (!value || (Array.isArray(value) && value.length === 0)) rejections.value = [];
+  },
+);
 
 function openPicker() {
   if (isDisabled.value) return;
   inputRef.value?.click();
 }
 
-function onDragOver(event: DragEvent) {
-  if (isDisabled.value || !props.dropZone) return;
+// ── Drag and drop ──────────────────────────────────────────────────────────
+// A depth counter, because dragleave fires each time the pointer crosses a child.
+function onDragEnter(event: DragEvent) {
   event.preventDefault();
+  if (isDisabled.value) return;
+  dragDepth += 1;
   isDragging.value = true;
 }
-
-function onDragLeave(event: DragEvent) {
-  if (!props.dropZone) return;
-  // `dragleave` fires every time the pointer crosses into a child element
-  // (file chip, upload icon). If we cleared `isDragging` unconditionally,
-  // the active-border state would flicker on/off as the user drags across
-  // the drop zone. Only clear when leaving the wrapper itself — i.e. the
-  // event's `relatedTarget` (the element being entered) is outside the
-  // wrapper or null (dragged out of the window).
-  const wrapper = event.currentTarget as HTMLElement | null;
-  const related = event.relatedTarget as Node | null;
-  if (wrapper && related && wrapper.contains(related)) return;
+function onDragOver(event: DragEvent) {
   event.preventDefault();
-  isDragging.value = false;
+  if (event.dataTransfer) event.dataTransfer.dropEffect = isDisabled.value ? "none" : "copy";
 }
-
-function filterByAccept(files: File[], accept: string): File[] {
-  const tokens = accept
-    .split(",")
-    .map((t) => t.trim().toLowerCase())
-    .filter(Boolean);
-  return files.filter((file) => {
-    const mime = file.type.toLowerCase();
-    const ext = "." + (file.name.split(".").pop() ?? "").toLowerCase();
-    return tokens.some((token) => {
-      if (token.startsWith(".")) return ext === token;
-      if (token.endsWith("/*")) return mime.startsWith(token.slice(0, -1));
-      return mime === token;
-    });
-  });
+function onDragLeave() {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) isDragging.value = false;
 }
-
 function onDrop(event: DragEvent) {
-  if (isDisabled.value || !props.dropZone) return;
   event.preventDefault();
+  dragDepth = 0;
   isDragging.value = false;
-  const dropped = event.dataTransfer?.files ?? null;
-  emitFiles(dropped);
+  if (isDisabled.value) return;
+  void takeFiles(event.dataTransfer?.files ?? null);
 }
 
-function formatSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+// ── Rows ───────────────────────────────────────────────────────────────────
+const rows = computed<FileRow[]>(() => [
+  ...files.value.map((file, index) => {
+    const upload = uploads.get(file);
+    return { key: `f-${index}-${file.name}`, file, index, upload, error: upload?.error };
+  }),
+  ...rejections.value.map((rejection, index) => ({
+    key: `r-${index}-${rejection.file.name}`,
+    file: rejection.file,
+    rejection,
+    error: rejection.reason,
+  })),
+]);
+
+function rowIcon(row: FileRow): IconName {
+  if (row.error) return "error-outline";
+  if (row.upload?.status === "done") return "check-circle";
+  return "attach-file";
 }
 
-const wrapperClasses = computed(() => [
-  "relative flex items-center gap-2 w-full rounded-default border px-3 py-1 transition-[color,background-color,border-color,box-shadow] duration-150",
-  "ring-offset-1 ring-offset-surface-base",
-  heightClasses[props.size ?? "md"],
+function rowIconClass(row: FileRow) {
+  if (row.error) return "text-status-error-text";
+  if (row.upload?.status === "done") return "text-status-success-text";
+  return "text-text-muted";
+}
+
+const compactSummary = computed(() => raw(files.value.map((f) => f.name).join(", ")));
+const compactSize = computed(() => formatSize(files.value.reduce((sum, f) => sum + f.size, 0)));
+const compactError = computed(() => rejections.value[0]?.reason ?? null);
+const bottomError = computed<I18nText | null>(() => {
+  const own = effectiveError.value;
+  if (own && own.trim()) return raw(own);
+  return props.variant === "compact" ? compactError.value : null;
+});
+
+const zoneClasses = computed(() => [
+  "flex flex-col items-center justify-center gap-2 rounded-surface border border-dashed p-4 text-center text-compact transition-colors duration-(--duration-control) ease-(--ease-control)",
+  switchable.value && "h-full",
   isDragging.value
-    ? "bg-file-drag-bg border-file-drag-border"
-    : hasError.value
-      ? "bg-file-bg border-file-error-border"
-      : "bg-file-bg border-file-border hover:border-file-hover-border",
-  isDisabled.value
-    ? "bg-file-disabled-bg border-file-disabled-border opacity-60 cursor-not-allowed"
-    : "cursor-pointer",
-  "focus-within:border-file-focus-border focus-within:ring-2 focus-within:ring-file-focus-ring",
+    ? "border-file-drag-border bg-file-drag-bg text-text-body"
+    : isDisabled.value
+      ? "border-border-default bg-surface-subtle text-text-disabled cursor-not-allowed"
+      : hasError.value
+        ? "border-file-error-border bg-status-error-bg text-text-secondary"
+        : "border-border-strong bg-surface-subtle text-text-secondary hover:border-file-hover-border",
+]);
+
+const compactBoxClasses = computed(() => [
+  "flex h-control-md min-w-0 flex-1 items-center gap-2 rounded-default border ps-2.5 pe-1 text-compact transition-colors duration-(--duration-control) ease-(--ease-control)",
+  isDragging.value
+    ? "border-file-drag-border bg-file-drag-bg"
+    : isDisabled.value
+      ? "border-input-disabled-border bg-input-disabled-bg cursor-not-allowed border-dashed"
+      : hasError.value || compactError.value
+        ? "border-file-error-border bg-input-bg"
+        : "border-input-border bg-input-bg",
 ]);
 </script>
 
 <template>
-  <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
+  <div
+    v-bind="$attrs"
+    class="flex w-full min-w-0 flex-col gap-1"
+    :data-variant="variant"
+    :data-dragging="isDragging || undefined"
+  >
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
@@ -221,143 +372,216 @@ const wrapperClasses = computed(() => [
       /></OIcon>
     </label>
 
+    <input
+      :id="inputId"
+      ref="inputRef"
+      type="file"
+      tabindex="-1"
+      :data-test="parentDataTest ? `${parentDataTest}-field` : 'o-file-field'"
+      :name="name"
+      :multiple="multiple"
+      :accept="accept"
+      :disabled="isDisabled"
+      :aria-required="required || undefined"
+      :aria-invalid="hasError || undefined"
+      class="sr-only"
+      @change="handleChange"
+    />
+
     <div
-      :class="wrapperClasses"
-      @click="openPicker"
+      v-if="variant === 'compact'"
+      class="flex min-w-0 items-center gap-2"
+      @dragenter="onDragEnter"
       @dragover="onDragOver"
       @dragleave="onDragLeave"
       @drop="onDrop"
     >
-      <input
-        :id="inputId"
-        ref="inputRef"
-        type="file"
-        :data-test="parentDataTest ? `${parentDataTest}-field` : 'o-file-field'"
-        :name="name"
-        :multiple="multiple"
-        :accept="accept"
-        :disabled="isDisabled"
-        :tabindex="inputTabindex"
-        class="sr-only"
-        :aria-invalid="hasError || undefined"
-        @change="handleChange"
-      />
-
-      <!-- Upload icon -->
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 16 16"
-        fill="currentColor"
-        class="text-file-icon size-4 shrink-0"
-        aria-hidden="true"
-      >
-        <path
-          d="M7.293 1.5a1 1 0 0 1 1.414 0l3.5 3.5a1 1 0 0 1-1.414 1.414L9 4.621V10a1 1 0 1 1-2 0V4.621L4.207 6.414A1 1 0 0 1 2.793 5L7.293 1.5Z"
-        />
-        <path
-          d="M2 12a1 1 0 0 1 2 0v1.5h8V12a1 1 0 0 1 2 0v2a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 2 14v-2Z"
-        />
-      </svg>
-
-      <!-- Selected files / placeholder -->
-      <OTruncatedText v-if="files.length === 0" as="div" class="text-file-placeholder flex-1">
-        {{
-          placeholder ||
-          (dropZone
-            ? t("common.dropFilesHint")
-            : multiple
-              ? t("common.chooseFiles")
-              : t("common.chooseAFile"))
-        }}
-      </OTruncatedText>
-
-      <div
-        v-else
-        class="o-file-chips flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-x-auto"
-      >
-        <span
-          v-for="(file, i) in files"
-          :key="`${file.name}-${i}`"
-          class="rounded-default bg-file-chip-bg text-file-chip-text inline-flex max-w-48 shrink-0 items-center gap-1 px-2 py-0.5 text-xs"
-          :data-test="`o-file-chip-${i}`"
-        >
-          <OTruncatedText>{{ file.name }}</OTruncatedText>
-          <span class="text-3xs shrink-0 opacity-70">
-            {{ formatSize(file.size) }}
-          </span>
-          <button
-            v-if="!isDisabled"
-            type="button"
-            tabindex="-1"
-            :aria-label="t('components.file.removeFile')"
-            :data-test="`o-file-chip-${i}-remove-btn`"
-            class="text-file-chip-remove flex items-center hover:opacity-80"
-            @click.stop="removeFile(i, $event)"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 12 12"
-              fill="currentColor"
-              class="size-2.5"
-              aria-hidden="true"
-            >
-              <path
-                d="M2.72 2.72a.75.75 0 0 1 1.06 0L6 4.94l2.22-2.22a.75.75 0 1 1 1.06 1.06L7.06 6l2.22 2.22a.75.75 0 1 1-1.06 1.06L6 7.06 3.78 9.28a.75.75 0 0 1-1.06-1.06L4.94 6 2.72 3.78a.75.75 0 0 1 0-1.06Z"
-              />
-            </svg>
-          </button>
-        </span>
-      </div>
-
-      <button
-        v-if="files.length > 0 && !isDisabled"
-        type="button"
-        tabindex="-1"
-        :aria-label="t('components.file.clearAll')"
-        class="text-file-icon flex shrink-0 items-center hover:opacity-80"
-        @click.stop="handleClear($event)"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 16 16"
-          fill="currentColor"
-          class="size-3.5"
-          aria-hidden="true"
-        >
-          <path
-            d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"
+      <div :class="compactBoxClasses" :data-test="testId('box')">
+        <OTruncatedText v-if="files.length === 0" class="text-input-placeholder min-w-0 flex-1">
+          {{ placeholder || t("components.file.noFileChosen") }}
+        </OTruncatedText>
+        <template v-else>
+          <OTruncatedText class="text-input-text min-w-0 flex-1">{{
+            compactSummary
+          }}</OTruncatedText>
+          <span class="text-text-muted shrink-0 text-xs tabular-nums">{{ compactSize }}</span>
+          <OButton
+            icon-only
+            variant="ghost"
+            size="xs"
+            icon="close"
+            :aria-label="t('components.file.removeNamed', { name: compactSummary })"
+            :disabled="isDisabled"
+            data-test="o-file-chip-0-remove-btn"
+            @click="clearAll"
           />
-        </svg>
-      </button>
+        </template>
+      </div>
+      <OButton
+        icon="upload"
+        :disabled="isDisabled"
+        :disabled-reason="disabledReason"
+        :data-test="testId('choose-btn')"
+        @click="openPicker"
+      >
+        {{
+          multiple ? t("components.file.chooseFilesButton") : t("components.file.chooseFileButton")
+        }}
+      </OButton>
     </div>
 
-    <div v-if="effectiveError || helpText" class="flex items-center justify-between gap-2">
+    <div v-else class="flex min-w-0 flex-col gap-2">
+      <OToggleGroup
+        v-if="switchable"
+        :model-value="activeSource"
+        type="single"
+        size="sm"
+        class="self-start"
+        :aria-label="t('components.file.sourceLabel')"
+        :disabled="isDisabled"
+        :data-test="testId('source')"
+        @update:model-value="setSource"
+      >
+        <OToggleGroupItem
+          v-for="source in sources"
+          :key="source"
+          :value="source"
+          :icon-left="SOURCE_ICONS[source]"
+          :data-test="testId(`source-${source}`)"
+        >
+          {{ sourceLabel(source) }}
+        </OToggleGroupItem>
+      </OToggleGroup>
+
+      <div :class="switchable ? 'h-43 min-h-0' : ''">
+        <div
+          v-if="activeSource === 'file'"
+          :class="zoneClasses"
+          :data-test="testId('zone')"
+          @dragenter="onDragEnter"
+          @dragover="onDragOver"
+          @dragleave="onDragLeave"
+          @drop="onDrop"
+        >
+          <OIcon name="cloud-upload" size="md" class="text-text-muted" />
+          <span v-if="isDragging">{{ t("components.file.dropToUpload") }}</span>
+          <span v-else-if="isDisabled && disabledReason">{{ disabledReason }}</span>
+          <slot v-else name="hint">
+            <i18n-t
+              :keypath="
+                multiple ? 'components.file.dropPromptMultiple' : 'components.file.dropPrompt'
+              "
+              tag="span"
+            >
+              <template #choose>
+                <OButton
+                  variant="link"
+                  :disabled="isDisabled"
+                  :data-test="testId('choose-btn')"
+                  @click="openPicker"
+                  >{{
+                    multiple ? t("components.file.chooseFiles") : t("components.file.chooseAFile")
+                  }}</OButton
+                >
+              </template>
+            </i18n-t>
+          </slot>
+          <span v-if="constraints && !isDragging" class="text-text-muted text-xs tabular-nums">{{
+            constraints
+          }}</span>
+        </div>
+
+        <div v-else-if="activeSource === 'url'" class="flex h-full flex-col justify-center gap-1">
+          <OInput
+            type="url"
+            :model-value="localUrl"
+            :placeholder="urlPlaceholder || t('components.file.urlPlaceholder')"
+            :aria-label="t('components.file.sourceUrl')"
+            :disabled="isDisabled"
+            :data-test="testId('url')"
+            @update:model-value="setUrl"
+          />
+          <span class="text-text-muted text-xs">{{ t("components.file.urlHelp") }}</span>
+        </div>
+
+        <OTextarea
+          v-else
+          fill
+          class="font-mono"
+          :model-value="localText"
+          :placeholder="textPlaceholder || t('components.file.textPlaceholder')"
+          :aria-label="t('components.file.sourcePaste')"
+          :disabled="isDisabled"
+          :data-test="testId('paste')"
+          @update:model-value="setText"
+        />
+      </div>
+
+      <ul v-if="activeSource === 'file' && rows.length" class="flex flex-col gap-1.5">
+        <li
+          v-for="(row, i) in rows"
+          :key="row.key"
+          :data-test="`o-file-chip-${i}`"
+          :data-state="row.error ? 'error' : (row.upload?.status ?? 'ready')"
+          :class="[
+            'rounded-default text-compact flex h-11 min-w-0 items-center gap-3 border ps-3 pe-1',
+            row.error
+              ? 'border-file-error-border bg-status-error-bg'
+              : 'border-border-default bg-surface-base',
+          ]"
+        >
+          <OIcon :name="rowIcon(row)" size="sm" :class="['shrink-0', rowIconClass(row)]" />
+          <OTruncatedText class="text-text-heading min-w-0 font-medium">{{
+            row.file.name
+          }}</OTruncatedText>
+          <OTruncatedText v-if="row.error" class="text-status-error-text min-w-0 flex-1 text-xs">{{
+            row.error
+          }}</OTruncatedText>
+          <template v-else>
+            <span class="text-text-muted shrink-0 text-xs tabular-nums">{{
+              formatSize(row.file.size)
+            }}</span>
+            <template v-if="row.upload?.status === 'uploading'">
+              <OProgressBar
+                class="min-w-10 flex-1"
+                :value="Math.round(row.upload.progress * 100)"
+                :label="raw(row.file.name)"
+              />
+              <span class="text-text-muted shrink-0 text-xs tabular-nums">{{
+                raw(`${Math.round(row.upload.progress * 100)}%`)
+              }}</span>
+            </template>
+            <span v-else-if="row.upload?.status === 'done'" class="text-text-muted flex-1 text-xs">
+              {{ t("components.file.uploaded") }}
+            </span>
+            <span v-else class="flex-1" />
+          </template>
+          <OButton
+            icon-only
+            variant="ghost"
+            size="xs"
+            icon="close"
+            :aria-label="t('components.file.removeNamed', { name: raw(row.file.name) })"
+            :disabled="isDisabled"
+            :data-test="`o-file-chip-${i}-remove-btn`"
+            @click="removeRow(row)"
+          />
+        </li>
+      </ul>
+    </div>
+
+    <div v-if="bottomError || helpText" class="flex items-center justify-between gap-2">
       <span
-        v-if="effectiveError && effectiveError.trim()"
+        v-if="bottomError"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
-        class="text-file-error-text text-xs leading-none"
+        class="text-file-error-text text-xs leading-4"
         role="alert"
       >
-        {{ effectiveError }}
+        {{ bottomError }}
       </span>
-      <span v-else-if="helpText" class="text-file-label text-xs leading-none">
+      <span v-else-if="helpText" class="text-file-label text-xs leading-4">
         {{ helpText }}
       </span>
     </div>
   </div>
 </template>
-
-<style scoped>
-/* keep(scrollbar): single-line file chips — keep horizontal scrolling but hide
-   the scrollbar so the row stays a clean one-line input regardless of how many
-   files are chosen. `scrollbar-width`/`-ms-overflow-style` and the
-   `::-webkit-scrollbar` pseudo-element are native-control surfaces with no
-   Tailwind utility equivalent. */
-.o-file-chips {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge legacy */
-}
-.o-file-chips::-webkit-scrollbar {
-  display: none; /* Chrome/Safari */
-}
-</style>

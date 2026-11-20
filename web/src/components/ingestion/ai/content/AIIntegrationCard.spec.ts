@@ -49,9 +49,9 @@ const mountCard = (content: string) =>
       stubs: {
         OTag: { template: "<span><slot /></span>" },
         OCodeBlock: { template: "<pre />", props: ["code", "lang"] },
-        OBanner: {
+        OInlineNotice: {
           template: '<div :data-test="$attrs[`data-test`]" />',
-          props: ["variant", "content"],
+          props: ["tone", "message"],
         },
       },
     },

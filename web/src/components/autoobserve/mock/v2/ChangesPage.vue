@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ stat.label }}
           </dt>
           <dd
-            class="text-3xl leading-none font-semibold tracking-tight tabular-nums"
+            class="text-2xl leading-none font-semibold tracking-tight tabular-nums"
             :class="
               stat.id === 'worked' && stat.value
                 ? 'from-badge-success-soft-text to-badge-teal-soft-text bg-linear-to-br bg-clip-text text-transparent'
@@ -72,7 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="f in CHANGE_FILTERS"
           :key="f"
           :value="f"
-          size="sm"
           class="rounded-full! px-3!"
           :data-test="`autoobserve2-activity-filter-${f}`"
         >
@@ -116,13 +115,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </section>
       </div>
 
-      <p
+      <OEmptyState
         v-if="!dayGroups.length"
-        class="text-text-secondary py-6 text-center text-sm"
+        kind="filtered"
         data-test="autoobserve2-activity-filter-empty"
-      >
-        {{ t("autoobserve2.activityPage.empty.filter") }}
-      </p>
+        @action="filter = 'all'"
+      />
     </template>
   </div>
 </template>
@@ -130,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";

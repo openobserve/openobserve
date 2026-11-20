@@ -55,13 +55,13 @@ describe("OnboardingStepTraces", () => {
         option(w, id).find(".text-compact").text(),
       ]),
     ).toEqual([
-      ["Logs and Metrics", "Cluster health and container logs. One command."],
+      ["Logs and metrics", "Cluster health and container logs. One command."],
       [
         "Add Traces With eBPF",
         "No code changes, any language. Needs Linux kernel 5.8+ on your nodes.",
       ],
       [
-        "Add Traces With Language Libraries",
+        "Add traces with language libraries",
         "More detail per app. Pick your languages, then restart your apps once.",
       ],
     ]);
@@ -91,7 +91,7 @@ describe("OnboardingStepTraces", () => {
       .map((c) => c.element.closest("label")!.textContent!.trim());
     expect(labels).toEqual(["Java", ".NET", "Node.js", "Python"]);
     expect(w.find('[data-test="onboarding-step-traces-continue"]').text()).toBe(
-      "Continue to Setup",
+      "Continue to setup",
     );
     expect(w.emitted("pick")).toBeUndefined();
     await option(w, "library").trigger("click");
@@ -126,14 +126,14 @@ describe("OnboardingStepTraces", () => {
     expect(panel(w).exists()).toBe(true);
     expect(language(w, "python").attributes("aria-checked")).toBe("true");
     expect(language(w, "java").attributes("aria-checked")).toBe("false");
-    expect(panelTitle(w)).toBe("Add Traces With Language Libraries");
+    expect(panelTitle(w)).toBe("Add traces with language libraries");
   });
 
   it("keeps Kubernetes events out of the option name and chips: they arrive as logs", () => {
     const w = mountTraces();
     const labels = w.findAll('[data-test^="onboarding-preview-signal-"]').map((c) => c.text());
     expect(labels).toEqual(["Logs", "Metrics"]);
-    expect(option(w, "off").find(".text-sm").text()).toBe("Logs and Metrics");
+    expect(option(w, "off").find(".text-sm").text()).toBe("Logs and metrics");
     expect(w.text()).toContain("Kubernetes events as logs");
     expect(w.findAll(".row-start-1 li").map((li) => li.text())).not.toContain("Events");
   });
@@ -144,13 +144,13 @@ describe("OnboardingStepTraces", () => {
       w
         .findAll('[data-test^="onboarding-preview-signal-"]')
         .map((c) => c.attributes("data-test")!.replace("onboarding-preview-signal-", ""));
-    expect([kind(w), panelTitle(w)]).toEqual(["infrastructure", "Logs and Metrics"]);
+    expect([kind(w), panelTitle(w)]).toEqual(["infrastructure", "Logs and metrics"]);
     expect(chips()).toEqual(["logs", "metrics"]);
     await option(w, "ebpf").trigger("mouseenter");
     expect([kind(w), panelTitle(w)]).toEqual(["backend", "Add Traces With eBPF"]);
     expect(chips()).toEqual(["logs", "metrics", "traces"]);
     await option(w, "library").trigger("focus");
-    expect([kind(w), panelTitle(w)]).toEqual(["backend", "Add Traces With Language Libraries"]);
+    expect([kind(w), panelTitle(w)]).toEqual(["backend", "Add traces with language libraries"]);
   });
 
   it("makes Skip to App quiet while the library list is open", async () => {

@@ -138,6 +138,21 @@ describe("QueryFilterBar", () => {
     expect(rowKeys()).toContain("status");
   });
 
+  it("with submit-on-enter, the Enter that completes a chip closes the list and runs", async () => {
+    const onSubmit = vi.fn();
+    const state = mountBar({ submitOnEnter: true, onSubmit });
+    await openBar();
+    await type("lev");
+    await press("Enter");
+    await press("Enter");
+    expect(onSubmit).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(rowKeys()).toContain("error"));
+    await press("Enter");
+    expect(sql(state)).toBe("level = 'error'");
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(rows()).toEqual([]);
+  });
+
   it("opens the picker when the user types at the caret", async () => {
     mountBar();
     await type("s");
@@ -387,16 +402,13 @@ describe("QueryFilterBar", () => {
       expect(sql(state)).toBe("level = 'a' OR level = 'b'");
     });
 
-    it("toggles a connector from the keyboard", async () => {
+    it("toggles a connector from a native button, so Enter and Space work", async () => {
       const state = mountBar({ modelValue: parseSqlFilter("level = 'a' AND level = 'b'")! });
       const connector = wrapper!.find('[data-test="query-filter-bar-connector-1"]');
       expect(connector.element.tagName).toBe("BUTTON");
-      await connector.trigger("keydown", { key: "Enter" });
+      expect(connector.attributes("type")).toBe("button");
+      await connector.trigger("click");
       expect(sql(state)).toBe("level = 'a' OR level = 'b'");
-      await wrapper!
-        .find('[data-test="query-filter-bar-connector-1"]')
-        .trigger("keydown", { key: " " });
-      expect(sql(state)).toBe("level = 'a' AND level = 'b'");
     });
 
     it("sets the next connector by typing or, and Backspace puts it back to AND", async () => {

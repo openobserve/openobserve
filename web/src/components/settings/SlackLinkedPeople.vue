@@ -108,9 +108,9 @@ const confirmUnlink = (): void => {
 <template>
   <ODrawer
     :open="open"
-    size="xl"
+    size="lg"
     :title="t('slackApp.people.title')"
-    :sub-title="t('slackApp.people.description')"
+    :subtitle="t('slackApp.people.description')"
     @update:open="emit('update:open', $event)"
   >
     <div class="flex h-full min-h-0 flex-col gap-3">
@@ -119,11 +119,9 @@ const confirmUnlink = (): void => {
         :columns="columns"
         row-key="id"
         pagination="none"
-        :show-global-filter="false"
         :loading="links.isPending.value"
         :error="loadError"
         :forbidden="forbidden"
-        dense
         class="min-h-0 flex-1"
       >
         <template #cell-default_org="{ row }">
@@ -152,9 +150,9 @@ const confirmUnlink = (): void => {
         <template #cell-actions="{ row }">
           <div class="flex items-center justify-end">
             <OButton
-              variant="ghost-destructive"
-              size="icon-sm"
-              icon-left="link-off"
+              icon-only
+              variant="danger-ghost"
+              icon="link-off"
               class="max-md:hidden"
               :aria-label="t('slackApp.people.unlink')"
               :disabled="readOnly"
@@ -171,18 +169,19 @@ const confirmUnlink = (): void => {
             <ODropdown side="bottom" align="end">
               <template #trigger>
                 <OButton
-                  icon-left="more-vert"
+                  icon-only
+                  icon="more-vert"
                   :aria-label="t('dashboard.moreActions')"
                   variant="ghost"
-                  size="icon-xs-sq"
+                  size="sm"
                   class="md:hidden"
                   :data-test="`slack-people-${row.id}-menu`"
                   @click.stop
                 />
               </template>
               <ODropdownItem
-                icon-left="link-off"
-                variant="destructive"
+                icon="link-off"
+                tone="danger"
                 :disabled="readOnly"
                 :data-test="`slack-people-unlink-${row.id}-menu`"
                 @select="askUnlink(row)"
@@ -194,21 +193,20 @@ const confirmUnlink = (): void => {
         </template>
         <template #error>
           <OEmptyState
-            size="compact"
-            preset="load-error"
-            :backdrop="false"
+            kind="error"
+            :title="t('emptyState.loadError.title')"
+            :text="t('emptyState.loadError.description')"
             data-test="slack-people-error"
             @action="links.refetch()"
           />
         </template>
         <template #empty>
-          <OEmptyState size="compact" preset="no-slack-linked-people" :backdrop="false" />
+          <OEmptyState icon="group" :title="t('emptyState.noSlackLinkedPeople.title')" />
         </template>
       </OTable>
       <OButton
         v-if="links.hasNextPage.value"
-        variant="outline"
-        size="sm-action"
+        variant="secondary"
         class="w-fit self-center"
         :loading="links.isFetchingNextPage.value"
         data-test="slack-people-more"
@@ -223,8 +221,7 @@ const confirmUnlink = (): void => {
       message-keypath="slackApp.people.unlinkMessage"
       :message-name="pending?.user_email"
       :ok-label="t('slackApp.people.unlinkConfirm')"
-      ok-variant="destructive"
-      focus-cancel
+      kind="destructive"
       @update:ok="confirmUnlink"
     />
   </ODrawer>

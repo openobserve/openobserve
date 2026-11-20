@@ -226,12 +226,6 @@ describe("AlertCalibrationApplyDialog", () => {
 
   describe("a prompt closed while its folder lookup is pending", () => {
     const closeBy: Record<string, () => Promise<void>> = {
-      "the close button": async () => inDialog("o-dialog-close-btn")!.click(),
-      Escape: async () => {
-        document.activeElement?.dispatchEvent(
-          new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-        );
-      },
       "the parent (an outside click)": async () => {
         await wrapper!.setProps({ open: false });
       },
@@ -276,6 +270,24 @@ describe("AlertCalibrationApplyDialog", () => {
       expect(byTest("alert-calibration-apply-dialog")).not.toBeNull();
     };
 
+    // A busy dialog cannot be dismissed, so the user's ✕ and Escape wait for the lookup.
+    it("keeps the prompt open while its lookup is pending: the close button and Escape do nothing", async () => {
+      const answer = pendingLookup();
+      vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({ data: liveAlert() } as never);
+      await mountDialog();
+      inDialog("alert-calibration-apply-continue")!.click();
+      await nextTick();
+      expect(inDialog("alert-calibration-apply-continue")?.getAttribute("aria-busy")).toBe("true");
+      inDialog("o-dialog-close-btn")!.click();
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+      await flushPromises();
+      expect(wrapper!.props("open")).toBe(true);
+      answer.resolve(OPS_LIST);
+      await flushPromises();
+    });
+
     for (const [route, close] of [...Object.entries(closeBy), ["Cancel", "Cancel"] as const]) {
       for (const [outcome, answerWith] of Object.entries(settle)) {
         it(`closed by ${route}, then reopened, opens nothing when the lookup is ${outcome}`, async () => {
@@ -300,7 +312,10 @@ describe("AlertCalibrationApplyDialog", () => {
       const answer = pendingLookup();
       vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({ data: liveAlert() } as never);
       await mountDialog();
-      await closeAndReopen(closeBy["the close button"], "alert-calibration-apply-continue");
+      await closeAndReopen(
+        closeBy["the parent (an outside click)"],
+        "alert-calibration-apply-continue",
+      );
 
       inDialog("alert-calibration-apply-continue")!.click();
       answer.resolve(OPS_LIST);
@@ -322,7 +337,10 @@ describe("AlertCalibrationApplyDialog", () => {
           data: liveAlert({ pending_period_sec: 300 }),
         } as never);
         await mountDialog();
-        await closeAndReopen(closeBy["the close button"], "alert-calibration-apply-review");
+        await closeAndReopen(
+          closeBy["the parent (an outside click)"],
+          "alert-calibration-apply-review",
+        );
 
         answerWith(answer);
         await flushPromises();
@@ -361,7 +379,7 @@ describe("AlertCalibrationApplyDialog", () => {
     await mountDialog();
 
     const stale = inDialog("alert-calibration-apply-stale");
-    expect(stale?.getAttribute("data-severity")).toBe("warning");
+    expect(stale?.getAttribute("data-severity")).toBe("warn");
     expect(stale?.textContent).toContain("Hold for is now 5 minutes");
     expect(stale?.textContent).toContain("based on 1 minute");
     expect(inDialog("alert-calibration-apply-continue")).toBeNull();
@@ -374,7 +392,7 @@ describe("AlertCalibrationApplyDialog", () => {
     const get = vi.mocked(alertsService.get_by_alert_id);
     get.mockRejectedValue(httpError(403));
     await mountDialog();
-    expect(inDialog("alert-calibration-apply-denied")?.getAttribute("data-severity")).toBe("error");
+    expect(inDialog("alert-calibration-apply-denied")?.getAttribute("data-severity")).toBe("err");
     expect(inDialog("alert-calibration-apply-continue")).toBeNull();
     expect(get).toHaveBeenCalledWith("default", "a1", undefined, { silentForbidden: true });
     wrapper!.unmount();
@@ -382,14 +400,14 @@ describe("AlertCalibrationApplyDialog", () => {
     get.mockRejectedValue(httpError(404));
     await mountDialog();
     expect(inDialog("alert-calibration-apply-deleted")?.getAttribute("data-severity")).toBe(
-      "default",
+      "neutral",
     );
     expect(inDialog("alert-calibration-apply-continue")).toBeNull();
     wrapper!.unmount();
 
     get.mockRejectedValue(httpError(500));
     await mountDialog();
-    expect(inDialog("alert-calibration-apply-failed")?.getAttribute("data-severity")).toBe("error");
+    expect(inDialog("alert-calibration-apply-failed")?.getAttribute("data-severity")).toBe("err");
     get.mockResolvedValue({ data: liveAlert() } as never);
     inDialog("alert-calibration-apply-retry")!.click();
     await flushPromises();

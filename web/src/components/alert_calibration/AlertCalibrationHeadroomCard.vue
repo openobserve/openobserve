@@ -14,22 +14,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <template>
-  <OCard v-if="view" class="mt-4" data-test="alert-calibration-headroom-card">
-    <OCardSection role="body">
-      <h3 class="text-text-heading mb-3 text-lg">{{ t("alertCalibration.headroom.title") }}</h3>
-      <div class="flex items-start gap-2">
-        <OIcon name="info" size="sm" class="text-text-secondary mt-0.5 shrink-0" />
-        <div class="text-text-body flex min-w-0 flex-col gap-1 text-sm">
-          <p data-test="alert-calibration-headroom-sentence">{{ view.sentence }}</p>
-          <p v-if="view.edited" data-test="alert-calibration-headroom-edited">
-            {{ view.edited }}
-          </p>
-          <OText variant="meta" as="p" data-test="alert-calibration-headroom-source">
-            {{ view.source }}
-          </OText>
-        </div>
+  <OCard
+    v-if="view"
+    :title="t('alertCalibration.headroom.title')"
+    class="mt-4"
+    data-test="alert-calibration-headroom-card"
+  >
+    <div class="flex items-start gap-2">
+      <OIcon name="info" size="sm" class="text-text-secondary mt-0.5 shrink-0" />
+      <div class="text-text-body flex min-w-0 flex-col gap-1 text-sm">
+        <p data-test="alert-calibration-headroom-sentence">{{ view.sentence }}</p>
+        <p v-if="view.edited" data-test="alert-calibration-headroom-edited">
+          {{ view.edited }}
+        </p>
+        <OText variant="meta" as="p" data-test="alert-calibration-headroom-source">
+          {{ view.source }}
+        </OText>
       </div>
-    </OCardSection>
+    </div>
   </OCard>
 </template>
 
@@ -37,7 +39,6 @@
 import { computed } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { useOrgId } from "@/composables/query";

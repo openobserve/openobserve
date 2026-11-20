@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     id="tracePage"
     style="min-height: auto"
   >
+    <OPageHeader :title="t('menu.traces')" title-data-test="traces-page-title" />
     <FirstDataPanel
       v-if="firstDataArrival"
       signal="traces"
@@ -78,6 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:searchMode="onSearchModeChange"
               @apply-saved-view="onApplySavedView"
               @recent-restore="onRecentRestore"
+              :service-graph-last-run-at="serviceGraphRef?.lastRunAt ?? null"
+              :service-graph-loading="!!serviceGraphRef?.loading"
               @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
               @filter-builder-growth="filterBuilderGrowth = $event"
@@ -205,17 +208,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     >
                       <OEmptyState
-                        preset="no-query-applied"
-                        size="hero"
+                        kind="filtered"
+                        :title="t('emptyState.noQueryApplied.title')"
+                        :text="t('emptyState.noQueryApplied.description')"
                         data-test="traces-search-not-started-text"
+                        :action-label="t('emptyState.noQueryApplied.action')"
                         @action="() => searchData()"
                       />
                     </div>
                     <div v-else-if="searchCancelled && !searchObj.loading">
                       <OEmptyState
-                        preset="search-cancelled"
-                        size="hero"
+                        kind="filtered"
+                        :title="t('emptyState.searchCancelled.title')"
+                        :text="t('emptyState.searchCancelled.description')"
                         data-test="traces-search-cancelled-state"
+                        :action-label="t('emptyState.searchCancelled.action')"
                         @action="() => searchData()"
                       />
                     </div>
@@ -233,7 +240,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @shareLink="(range: any) => copyTracesUrl(t, range)"
                         @metrics:editor-filter-set="onMetricsEditorFilterSet"
                         @metrics:editor-filter-run="onMetricsEditorFilterRun"
-                        @run-query="searchData()"
                         @remove-filter="onRemoveTracesFilter"
                         @jump-to-stream-data="onJumpToTracesStreamData"
                         @error-only-toggled="onErrorOnlyToggled"
@@ -275,17 +281,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </ODrawer>
 
-    <ODialog
-      v-model:open="streamChangeDialog.show"
+    <ConfirmDialog
+      v-model="streamChangeDialog.show"
       :title="t('traces.index.changeStreamTitle')"
-      size="sm"
-      :primary-button-label="t('traces.index.switchStream')"
-      :secondary-button-label="t('traces.index.cancel')"
-      @click:primary="applyStreamChange(streamChangeDialog.pendingStream)"
-      @click:secondary="streamChangeDialog.show = false"
-    >
-      <p>{{ t("traces.index.changeStreamMessage") }}</p>
-    </ODialog>
+      :message="t('traces.index.changeStreamMessage')"
+      :ok-label="t('traces.index.switchStream')"
+      :cancel-label="t('traces.index.cancel')"
+      @update:ok="applyStreamChange(streamChangeDialog.pendingStream)"
+      @update:cancel="streamChangeDialog.show = false"
+    />
     <div class="sr-only" aria-live="polite" aria-atomic="true" data-test="traces-row-nav-live">
       {{ tracesRowNavAnnouncement }}
     </div>
@@ -356,7 +360,7 @@ import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isRangeSelectionCurrent } from "@/plugins/traces/metrics/latencyHeatmap";
 import { isLLMTrace } from "@/utils/llmUtils";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
@@ -364,6 +368,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import AnomalyOriginBanner from "@/components/alerts/AnomalyOriginBanner.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
@@ -372,6 +377,7 @@ import { resolveTraceStream } from "@/utils/traces/streamSelection";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { usePrimaryQueryFocus } from "@/composables/usePrimaryQueryFocus";
 import { recordPageLoad, recordPageRequest, type PageLoadReason } from "@/utils/pageCrossing";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { useRecentSearches } from "@/composables/queryHistory/useRecentSearches";
@@ -557,6 +563,23 @@ let stopUrlSync = syncUrlViewState();
 // A page's stream can open with an empty batch, so only an actual write may end the replace phase.
 const tracesRequestState: Record<string, { hasWritten: boolean; isPartial?: boolean }> = {};
 const searchCancelled = ref(false);
+
+// Here, not in the async SearchResult, so a run that settles before it mounts still dates its data;
+// a failed run leaves the age where it was, so kept rows never read as fresh.
+watch(
+  () => searchObj.loading,
+  (loading, wasLoading) => {
+    if (
+      wasLoading &&
+      !loading &&
+      searchObj.searchApplied &&
+      !searchObj.meta.refreshFailedAt &&
+      !searchObj.data.errorMsg?.trim()?.length
+    ) {
+      searchObj.meta.lastRunAt = Date.now();
+    }
+  },
+);
 
 const selectedStreamName = computed(() => searchObj.data.stream.selectedStream.value);
 
@@ -1224,7 +1247,7 @@ async function getQueryData(
             // Markup + an English "TraceID:" label on purpose: useQueryError reads
             // the id back out of this string with /TraceID:\s*([a-f0-9A-F-]+)/i, so a
             // translated label would stop QueryErrorState from finding the trace id.
-            errorMsg += raw(` <br><span class='text-base font-medium'>TraceID: ${trace_id}</span>`);
+            errorMsg += raw(` <br><span class='text-sm font-medium'>TraceID: ${trace_id}</span>`);
           }
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";
@@ -2742,16 +2765,6 @@ const tracesShortcuts = [
     },
   },
   {
-    id: "tracesFocusQuery",
-    handler: () => {
-      // The traces query editor is Monaco — focus its inner textarea.
-      const el = document.querySelector<HTMLElement>(
-        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea',
-      );
-      el?.focus();
-    },
-  },
-  {
     id: "tracesCopyUrl",
     // The shortcut copies without the Share button, so it applies the button's gate itself.
     handler: () => {
@@ -2776,6 +2789,7 @@ const tracesShortcuts = [
   },
 ];
 useShortcuts(tracesShortcuts, undefined, { active: pageActive });
+usePrimaryQueryFocus("tracesFocusQuery", [], { active: pageActive });
 </script>
 
 <style scoped>

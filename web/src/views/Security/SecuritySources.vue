@@ -7,14 +7,17 @@ import { useMutation, useQuery } from "@tanstack/vue-query";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { SelectOption, SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -62,6 +65,7 @@ interface Row {
 const { t } = useI18nTyped();
 const store = useStore();
 const secSources = useSecuritySources();
+const sourceSearch = ref("");
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 // Attaching writes a function and pipeline (authoring); including is triage; detaching or excluding weakens coverage (admin).
 const { canAuthor, canAdmin } = useSecurityAccess();
@@ -240,6 +244,9 @@ function showRefusal(err: unknown, stream: string, fallback: I18nText) {
   };
 }
 
+const lastRunAt = ref<number | null>(null);
+const loadFailed = computed(() => !!secSources.error.value && !rows.value.length);
+
 async function reload() {
   if (!orgId.value) return;
   // Stale warnings must not survive a reload or an org switch.
@@ -247,6 +254,7 @@ async function reload() {
   await secSources.load(orgId.value);
   // Awaits the cached access answer, which a first load can reach before the reactive flag has it.
   await secSources.migrateIncludes((await loadSecurityAccess(orgId.value)).triage);
+  if (!secSources.error.value) lastRunAt.value = Date.now();
 }
 
 /** The stream whose attach plan is shown; nothing is written until it is confirmed. */
@@ -425,22 +433,50 @@ onMounted(reload);
 
 <template>
   <OPageLayout
-    :title="t('siem.sources.title')"
-    :subtitle="t('siem.sources.subtitle')"
-    icon="cloud-upload"
+    :title="t('siem.nav.sources')"
+    :about="t('siem.sources.subtitle')"
+    bleed
     data-test="security-sources"
   >
-    <SecurityNotices :notices="notices" data-test="security-sources-notices" />
+    <template #actions>
+      <ORefreshButton
+        :last-run-at="lastRunAt"
+        :loading="secSources.loading.value"
+        data-test="security-sources-refresh"
+        @click="reload"
+      />
+    </template>
+    <SecurityNotices
+      :notices="notices"
+      class="mx-page-edge mt-2"
+      data-test="security-sources-notices"
+    />
+    <SecurityLoadError
+      v-if="loadFailed"
+      :what="t('siem.sources.whatSources')"
+      :hint="t('siem.sources.loadFailedHint')"
+      @retry="reload"
+    />
     <OTable
+      v-else
       :data="rows"
       :columns="columns"
       row-key="name"
       :loading="secSources.loading.value && !rows.length"
       pagination="client"
-      :show-global-filter="true"
+      :global-filter="sourceSearch"
+      :error="loadFailed ? secSources.error.value || 'x' : null"
       class="min-h-0 flex-1"
       data-test="security-sources-table"
     >
+      <template #toolbar>
+        <OSearchInput
+          v-model="sourceSearch"
+          width="list"
+          class="max-md:min-w-40"
+          data-test="security-sources-search"
+        />
+      </template>
       <template #cell-sourceType="{ row }">
         <div class="flex min-w-0 flex-col gap-1" :data-test="`security-sources-type-${row.name}`">
           <OSelect
@@ -468,25 +504,11 @@ onMounted(reload);
             class="text-text-secondary inline-flex items-center gap-1.5 text-xs"
             data-test="security-sources-attaching"
           >
-            <OSpinner size="xs" />{{ t("siem.sources.attaching") }}
+            <OSpinner size="sm" />{{ t("siem.sources.attaching") }}
           </span>
-          <OTag v-else-if="row.state === 'mapped'" variant="teal-soft" shape="rounded" size="xs">{{
-            row.label
-          }}</OTag>
-          <OTag
-            v-else-if="row.state === 'included'"
-            variant="blue-soft"
-            shape="rounded"
-            size="xs"
-            >{{ row.label }}</OTag
-          >
-          <OTag
-            v-else-if="row.state === 'excluded'"
-            variant="warning-soft"
-            shape="rounded"
-            size="xs"
-            >{{ row.label }}</OTag
-          >
+          <OTag v-else-if="row.state === 'mapped'" tone="neutral" size="sm">{{ row.label }}</OTag>
+          <OTag v-else-if="row.state === 'included'" tone="neutral" size="sm">{{ row.label }}</OTag>
+          <OTag v-else-if="row.state === 'excluded'" tone="warn" size="sm">{{ row.label }}</OTag>
           <span v-else class="text-text-secondary">{{ row.label }}</span>
           <OTooltip v-if="row.lastChange" :content="row.lastChange" />
         </span>
@@ -495,8 +517,7 @@ onMounted(reload);
         <div v-if="canAuthor || canAdmin" class="flex items-center justify-end gap-2">
           <OButton
             v-if="row.detachPack && canAdmin"
-            size="sm"
-            variant="outline"
+            variant="secondary"
             :loading="busy"
             data-test="security-sources-detach"
             @click="onDetach(row)"
@@ -505,7 +526,6 @@ onMounted(reload);
           </OButton>
           <OButton
             v-else-if="!row.detachPack && row.pack && canAuthor"
-            size="sm"
             variant="primary"
             :loading="attachingStream === row.name"
             :disabled="busy"
@@ -516,7 +536,6 @@ onMounted(reload);
           </OButton>
           <OButton
             v-if="!row.included && canAuthor"
-            size="sm"
             variant="ghost"
             data-test="security-sources-include"
             @click="setIncluded(row, true)"
@@ -525,7 +544,6 @@ onMounted(reload);
           </OButton>
           <OButton
             v-else-if="row.included && row.state !== 'mapped' && canAdmin"
-            size="sm"
             variant="ghost"
             data-test="security-sources-exclude"
             @click="setIncluded(row, false)"
@@ -537,12 +555,18 @@ onMounted(reload);
       <template #cell-name="{ row }">
         <span class="text-text-heading truncate font-medium">{{ raw(row.name) }}</span>
       </template>
+      <template #error>
+        <SecurityLoadError
+          :what="t('siem.sources.whatSources')"
+          :hint="t('siem.sources.loadFailedHint')"
+          @retry="reload"
+        />
+      </template>
       <template #empty>
         <OEmptyState
-          size="inline"
           icon="cloud-upload"
-          :title="t('siem.sources.title')"
-          :description="t('siem.sources.empty')"
+          :title="t('siem.overview.noSources')"
+          :text="t('siem.sources.empty')"
         />
       </template>
     </OTable>
@@ -556,30 +580,31 @@ onMounted(reload);
           stream: previewStream,
         })
       "
-      :sub-title="t('siem.sources.previewSubtitle')"
-      :primary-button-label="t('siem.sources.confirmAttach')"
-      :secondary-button-label="t('siem.sources.cancel')"
-      :primary-button-disabled="!plan || !canAuthor"
-      :primary-button-loading="attachMutation.isPending.value"
-      primary-button-data-test="security-sources-attach-confirm"
+      :subtitle="t('siem.sources.previewSubtitle')"
+      :primary="{
+        label: t('siem.sources.confirmAttach'),
+        disabled: !plan || !canAuthor,
+        loading: attachMutation.isPending.value,
+        dataTest: 'security-sources-attach-confirm',
+      }"
+      :secondary="{ label: t('siem.sources.cancel') }"
       data-test="security-sources-attach-preview"
       @update:open="(v: boolean) => !v && closePreview()"
       @click:secondary="closePreview"
       @click:primary="confirmAttach"
     >
-      <OBanner
+      <OInlineNotice
         v-if="plan && attachingStream === previewStream"
-        variant="info"
+        tone="info"
         icon="hourglass-empty"
-        dense
         class="mb-3"
         data-test="security-sources-attach-progress"
       >
         {{ t("siem.sources.attachingHint") }}
-      </OBanner>
-      <OBanner v-if="!plan" variant="info" icon="hourglass-empty" dense>
+      </OInlineNotice>
+      <OInlineNotice v-if="!plan" tone="info" icon="hourglass-empty">
         {{ t("siem.sources.previewLoading") }}
-      </OBanner>
+      </OInlineNotice>
       <dl v-else class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
         <template v-for="r in planRows" :key="r.key">
           <dt class="text-text-secondary">{{ r.label }}</dt>

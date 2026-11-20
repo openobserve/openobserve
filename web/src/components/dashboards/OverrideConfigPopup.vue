@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODialog
+    size="lg"
     data-test="override-config-popup-dialog"
     :open="open"
     @update:open="
@@ -26,12 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="
       isChartMode ? t('dashboard.seriesFormattingTitle') : t('dashboard.columnFormattingTitle')
     "
-    :sub-title="
+    :subtitle="
       isChartMode
         ? t('dashboard.seriesFormattingSubtitle')
         : t('dashboard.columnFormattingSubtitle')
     "
-    :width="80"
   >
     <div
       data-test="override-config-accordion"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @keydown.space.prevent="selectedSeriesIdx = idx"
             >
               <span
-                class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
+                class="text-2xs rounded-default shrink-0 px-1.25 py-0.5 font-semibold tracking-[0.05em] uppercase"
                 :class="badgeClass(draft.matchBy === 'name')"
                 :data-test="`series-override-row-${idx}-badge`"
               >
@@ -79,9 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ seriesRowLabel(draft) }}
               </OTruncatedText>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs"
-                icon-left="close"
+                icon="close"
                 :title="t('common.remove')"
                 :data-test="`series-override-remove-${idx}`"
                 class="absolute! top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
@@ -89,18 +89,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div
+          <OEmptyState
             v-else
-            class="flex flex-1 flex-col items-center justify-center gap-1.5 p-4 text-center"
-          >
-            <OIcon name="format-color-text" size="lg" class="text-text-secondary" />
-            <div class="text-sm font-semibold">
-              {{ t("dashboard.seriesFormattingNoneAdded") }}
-            </div>
-            <div class="text-text-secondary text-xs leading-[1.4]">
-              {{ t("dashboard.seriesFormattingNoneAddedHint") }}
-            </div>
-          </div>
+            size="compact"
+            icon="tune"
+            :title="t('dashboard.seriesFormattingNoneAdded')"
+            :text="t('dashboard.seriesFormattingNoneAddedHint')"
+          />
         </div>
 
         <template v-if="selectedSeries">
@@ -121,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-border-strong/18 flex min-w-0 flex-col gap-2 overflow-y-auto border-s p-3"
           >
             <div
-              class="text-3xs text-text-secondary flex items-center gap-1.25 font-bold tracking-[0.06em] uppercase"
+              class="text-2xs text-text-secondary flex items-center gap-1.25 font-semibold tracking-[0.06em] uppercase"
             >
               <OIcon name="visibility" size="xs" />
               <span>{{ t("dashboard.inlinePreview") }}</span>
@@ -151,22 +146,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <div
-          v-else
-          class="col-start-2 col-end-4 flex items-center justify-center p-6 max-[56.25rem]:col-end-3"
-        >
+        <div v-else class="col-start-2 col-end-4 max-[56.25rem]:col-end-3">
           <OEmptyState
-            size="block"
             :title="t('dashboard.seriesFormattingEmptyTitle')"
-            :description="t('dashboard.seriesFormattingEmptyHint')"
+            :text="t('dashboard.seriesFormattingEmptyHint')"
+            icon="tune"
           >
-            <template #illustration>
-              <div
-                class="rounded-default text-text-secondary bg-border-strong/8 flex h-18 w-18 items-center justify-center"
-              >
-                <OIcon name="tune" size="xl" />
-              </div>
-            </template>
             <template #actions>
               <SeriesAddMenu
                 variant="primary"
@@ -184,11 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else>
         <!-- Left: add-field dropdown + list of added fields -->
         <div class="border-border-strong/18 flex min-w-0 flex-col gap-2.5 border-e p-3">
-          <ODropdown
-            v-model:open="addOpenLeft"
-            align="start"
-            content-class="min-w-(--reka-popper-anchor-width)!"
-          >
+          <ODropdown v-model:open="addOpenLeft" align="start">
             <template #trigger>
               <button
                 type="button"
@@ -208,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span class="flex items-center gap-2">
                   <span
-                    class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
+                    class="text-2xs rounded-default shrink-0 px-1.25 py-0.5 font-semibold tracking-[0.05em] uppercase"
                     :class="badgeClass(opt.isNumeric)"
                   >
                     {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
@@ -239,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @keydown.space.prevent="selectedIdx = idx"
             >
               <span
-                class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
+                class="text-2xs rounded-default shrink-0 px-1.25 py-0.5 font-semibold tracking-[0.05em] uppercase"
                 :class="badgeClass(isNumericColumn(col))"
               >
                 {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
@@ -248,9 +229,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ getFieldLabel(col.field) || t("dashboard.columnFormattingPick") }}
               </OTruncatedText>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-xs"
-                icon-left="close"
+                icon="close"
                 :title="t('common.remove')"
                 :data-test="`dashboard-addpanel-config-delete-column-${idx}`"
                 class="absolute! top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
@@ -258,18 +239,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <div
+          <OEmptyState
             v-else
-            class="flex flex-1 flex-col items-center justify-center gap-1.5 p-4 text-center"
-          >
-            <OIcon name="format-color-text" size="lg" class="text-text-secondary" />
-            <div class="text-sm font-semibold">
-              {{ t("dashboard.columnFormattingNoFields") }}
-            </div>
-            <div class="text-text-secondary text-xs leading-[1.4]">
-              {{ t("dashboard.columnFormattingNoFieldsHint") }}
-            </div>
-          </div>
+            size="compact"
+            icon="tune"
+            :title="t('dashboard.columnFormattingNoFields')"
+            :text="t('dashboard.columnFormattingNoFieldsHint')"
+          />
         </div>
 
         <!-- Detail: controls + live preview for the selected field -->
@@ -281,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-border-strong/18 flex min-w-0 flex-col gap-2 overflow-y-auto border-s p-3"
           >
             <div
-              class="text-3xs text-text-secondary flex items-center gap-1.25 font-bold tracking-[0.06em] uppercase"
+              class="text-2xs text-text-secondary flex items-center gap-1.25 font-semibold tracking-[0.06em] uppercase"
             >
               <OIcon name="visibility" size="xs" />
               <span>{{ t("dashboard.inlinePreview") }}</span>
@@ -304,34 +280,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <!-- Empty state: nothing added yet -->
-        <div
-          v-else
-          class="col-start-2 col-end-4 flex items-center justify-center p-6 max-[56.25rem]:col-end-3"
-        >
+        <div v-else class="col-start-2 col-end-4 max-[56.25rem]:col-end-3">
           <OEmptyState
-            size="block"
             :title="t('dashboard.columnFormattingEmptyTitle')"
-            :description="t('dashboard.columnFormattingEmptyHint')"
+            :text="t('dashboard.columnFormattingEmptyHint')"
+            icon="tune"
           >
-            <template #illustration>
-              <div
-                class="rounded-default text-text-secondary bg-border-strong/8 flex h-18 w-18 items-center justify-center"
-              >
-                <OIcon name="tune" size="xl" />
-              </div>
-            </template>
             <template #actions>
-              <ODropdown
-                v-model:open="addOpenCenter"
-                align="start"
-                content-class="min-w-(--reka-popper-anchor-width)!"
-              >
+              <ODropdown v-model:open="addOpenCenter" align="start">
                 <template #trigger>
-                  <OButton
-                    variant="primary"
-                    icon-left="add"
-                    data-test="dashboard-addpanel-config-add-column-empty"
-                  >
+                  <OButton variant="primary" data-test="dashboard-addpanel-config-add-column-empty">
                     {{ t("dashboard.columnFormattingAddField") }}
                   </OButton>
                 </template>
@@ -344,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <span class="flex items-center gap-2">
                       <span
-                        class="text-3xs rounded-default shrink-0 px-1.25 py-0.5 font-bold tracking-[0.05em] uppercase"
+                        class="text-2xs rounded-default shrink-0 px-1.25 py-0.5 font-semibold tracking-[0.05em] uppercase"
                         :class="badgeClass(opt.isNumeric)"
                       >
                         {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
@@ -370,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex w-full items-center justify-between">
         <span class="text-text-secondary text-xs">{{ footerSummary }}</span>
         <div class="flex gap-2">
-          <OButton variant="outline" data-test="override-config-popup-cancel" @click="closePopup">
+          <OButton variant="secondary" data-test="override-config-popup-cancel" @click="closePopup">
             {{ t("dashboard.cancel") }}
           </OButton>
           <OButton variant="primary" data-test="override-config-popup-save" @click="saveOverrides">

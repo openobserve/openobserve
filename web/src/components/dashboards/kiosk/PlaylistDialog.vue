@@ -19,18 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="md"
     :title="t('dashboard.playlist.title')"
-    :neutral-button-label="t('common.cancel')"
-    neutral-button-variant="outline"
-    :secondary-button-label="
-      copied ? t('dashboard.playlist.copied') : t('dashboard.playlist.copyLink')
-    "
-    secondary-button-variant="outline"
-    :secondary-button-disabled="!items.length"
-    :primary-button-label="t('dashboard.playlist.open')"
-    :primary-button-disabled="!items.length"
+    :extra="{ label: t('common.cancel'), variant: 'secondary' }"
+    :secondary="{
+      label: copied ? t('dashboard.playlist.copied') : t('dashboard.playlist.copyLink'),
+      variant: 'secondary',
+      disabled: !items.length,
+    }"
+    :primary="{ label: t('dashboard.playlist.open'), disabled: !items.length }"
     data-test="dashboard-playlist-dialog"
     @update:open="(value) => emit('update:open', value)"
-    @click:neutral="emit('update:open', false)"
+    @click:extra="emit('update:open', false)"
     @click:secondary="copyLink"
     @click:primary="openPlaylist"
   >
@@ -66,19 +64,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-playlist-results"
         >
           <div v-if="search.isLoading.value" class="flex flex-col gap-2 p-2">
-            <OSkeleton v-for="n in 3" :key="n" type="text" class="h-4" />
+            <OSkeleton v-for="n in 3" :key="n" class="h-4" />
           </div>
-          <div
+          <OEmptyState
             v-else-if="search.isError.value"
-            class="text-status-error-text flex items-center gap-2 px-2 py-1.5 text-sm"
+            size="compact"
+            kind="error"
+            :title="t('dashboard.playlist.searchFailed')"
+            class="px-2"
             data-test="dashboard-playlist-search-error"
           >
-            <OIcon name="error" size="sm" class="shrink-0" />
-            <span class="flex-1">{{ t("dashboard.playlist.searchFailed") }}</span>
-            <OButton variant="outline" size="xs" @click="search.refetch()">
-              {{ t("common.retry") }}
-            </OButton>
-          </div>
+            <template #actions>
+              <OButton variant="secondary" size="sm" @click="search.refetch()">
+                {{ t("common.retry") }}
+              </OButton>
+            </template>
+          </OEmptyState>
           <template v-else-if="results.length">
             <div
               v-for="hit in results"
@@ -88,14 +89,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="dashboard" size="sm" class="text-text-secondary shrink-0" />
               <OTruncatedText class="min-w-0 flex-1 text-sm">{{ hit.title }}</OTruncatedText>
-              <OBadge variant="default-soft" size="sm" icon="folder" class="max-w-40 shrink-0">
+              <OBadge tone="neutral" size="sm" icon="folder" class="max-w-40 shrink-0">
                 <OTruncatedText>{{ hit.folderName }}</OTruncatedText>
               </OBadge>
               <OButton
                 v-if="isAdded(hit)"
-                variant="ghost-success"
-                size="xs"
-                icon-left="check"
+                variant="ghost"
+                size="sm"
+                icon="check"
                 disabled
                 class="shrink-0"
               >
@@ -103,9 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-else
-                variant="ghost-primary"
-                size="xs"
-                icon-left="add"
+                variant="accent-ghost"
+                size="sm"
                 class="shrink-0"
                 :disabled="full"
                 :data-test="`dashboard-playlist-add-${hit.dashboardId}`"
@@ -115,9 +115,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </template>
-          <p v-else class="text-text-secondary px-2 py-1.5 text-sm">
-            {{ t("dashboard.playlist.noMatches", { query: searchTerm }) }}
-          </p>
+          <OEmptyState
+            v-else
+            size="compact"
+            kind="filtered"
+            :title="t('dashboard.playlist.noMatches', { query: searchTerm })"
+            class="px-2"
+          />
         </div>
 
         <div class="mt-3 flex items-center justify-between gap-2">
@@ -176,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTruncatedText>
             <OBadge
               v-if="describe(item).missing"
-              variant="warning-soft"
+              tone="warn"
               size="sm"
               class="shrink-0"
               :data-test="`dashboard-playlist-missing-${index}`"
@@ -185,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OBadge>
             <OBadge
               v-else-if="describe(item).folderName"
-              variant="default-soft"
+              tone="neutral"
               size="sm"
               icon="folder"
               class="max-w-40 shrink-0 max-md:hidden"
@@ -193,9 +197,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTruncatedText>{{ describe(item).folderName }}</OTruncatedText>
             </OBadge>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs-sq"
-              icon-left="keyboard-arrow-up"
+              size="sm"
+              icon="keyboard-arrow-up"
               :disabled="index === 0"
               :aria-label="t('dashboard.playlist.moveUp')"
               :data-test="`dashboard-playlist-up-${index}`"
@@ -204,9 +209,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('dashboard.playlist.moveUp')" />
             </OButton>
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-xs-sq"
-              icon-left="keyboard-arrow-down"
+              size="sm"
+              icon="keyboard-arrow-down"
               :disabled="index === items.length - 1"
               :aria-label="t('dashboard.playlist.moveDown')"
               :data-test="`dashboard-playlist-down-${index}`"
@@ -215,9 +221,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('dashboard.playlist.moveDown')" />
             </OButton>
             <OButton
-              variant="ghost-muted"
-              size="icon-xs-sq"
-              icon-left="close"
+              icon-only
+              variant="ghost"
+              size="sm"
+              icon="close"
               :aria-label="t('dashboard.playlist.remove')"
               :data-test="`dashboard-playlist-remove-${index}`"
               @click="items.splice(index, 1)"
@@ -228,10 +235,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ol>
         <OEmptyState
           v-else
-          size="inline"
+          size="compact"
           icon="tv"
           :title="t('dashboard.playlist.emptyTitle')"
-          :description="t('dashboard.playlist.emptyDescription')"
+          :text="t('dashboard.playlist.emptyDescription')"
           data-test="dashboard-playlist-empty"
         />
       </section>
@@ -241,7 +248,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.playlist.showEachFor')"
           :model-value="intervalSeconds"
           :options="intervalOptions"
-          size="md"
           :searchable="false"
           data-test="dashboard-playlist-interval"
           @update:model-value="onIntervalChange"
@@ -254,7 +260,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.playlist.timeRange')"
           :model-value="period ?? OWN_DEFAULT"
           :options="periodOptions"
-          size="md"
           :searchable="false"
           data-test="dashboard-playlist-period"
           @update:model-value="onPeriodChange"
@@ -275,7 +280,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="option in themeOptions"
             :key="option.value"
             :value="option.value"
-            size="sm"
             :data-test="`dashboard-playlist-theme-${option.value}`"
           >
             {{ option.label }}

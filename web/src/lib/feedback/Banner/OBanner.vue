@@ -1,216 +1,90 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-import type { I18nText } from "@/types/i18n";
-import { computed, useSlots, type CSSProperties } from "vue";
-
+import { computed, provide, ref, useAttrs } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { BUTTON_GROUP_SIZE, type ButtonSize } from "@/lib/core/Button/OButton.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-export interface Props {
-  variant?: "default" | "info" | "success" | "warning" | "error" | "error-soft" | "promo";
-  content?: I18nText;
-  icon?: string;
-  dense?: boolean;
-  inlineActions?: boolean;
-  /**
-   * Full-bleed strip instead of an inset block — square corners, no border, the
-   * message on the left and its actions pinned right. For an app-wide bar spanning
-   * the whole viewport, where an inset card with soft corners would read as
-   * floating debris, and where centering each row independently leaves a stack of
-   * banners visibly ragged.
-   */
-  bar?: boolean;
-  /**
-   * Bar mode: centre the message and its actions as one group rather than
-   * pinning actions to the right edge. For a short promotional line, where a
-   * left-aligned message with the action stranded across the viewport reads as
-   * two unrelated things.
-   */
-  center?: boolean;
-  /**
-   * Overrides the role derived from `variant`. Only for a bar that is part of
-   * the page's furniture rather than a notification.
-   */
-  role?: "status" | "alert" | "banner";
-  dataTest?: string;
-  /**
-   * Wrap the content instead of overflowing — preserves newlines/spaces and
-   * lets a long unbroken run (a raw error message, JSON) break. Off by
-   * default: every existing caller keeps its current layout unless it opts
-   * in, since forcing this everywhere would change banners that intentionally
-   * stay on one line.
-   */
-  preserveWhitespace?: boolean;
-  /** Text scale for the message and actions; unset keeps the layout's own. */
-  textSize?: "small" | "medium" | "large";
-  /** Runtime-chosen background and text colour, painted instead of the variant's tokens. */
-  colors?: { background: string; text: string };
-}
+import { NOTICE_TONE_CLASS, NOTICE_TONE_ICON, noticeRole } from "../InlineNotice/noticeTone";
+import { useI18nTyped } from "@/types/i18n";
+import type { BannerEmits, BannerProps, BannerSlots } from "./OBanner.types";
 
-const props = withDefaults(defineProps<Props>(), {
-  variant: "default",
-  dense: false,
-  inlineActions: false,
-  bar: false,
-  center: false,
-  preserveWhitespace: false,
+const props = withDefaults(defineProps<BannerProps>(), {
+  tone: "info",
+  message: undefined,
+  icon: undefined,
+  dismissible: false,
+  actionLabel: undefined,
+  actionVariant: "secondary",
+  actionDataTest: undefined,
 });
 
-const slots = useSlots();
+const emit = defineEmits<BannerEmits>();
+const slots = defineSlots<BannerSlots>();
 
-// Medium is the bar's own default scale, so a banner with no size set looks the same as before sizes existed.
-const TEXT_SIZE_CLASS = {
-  small: "text-xs",
-  medium: "text-compact",
-  large: "text-base",
-} as const;
+const { t } = useI18nTyped();
+const attrs = useAttrs();
 
-// The colour is data, so it travels as the custom token's value rather than a literal style property.
-const colorStyle = computed<CSSProperties | undefined>(() =>
-  props.colors
-    ? {
-        "--color-banner-custom-bg": props.colors.background,
-        "--color-banner-custom-text": props.colors.text,
-      }
-    : undefined,
-);
+// The banner is 36 high, so the one action in it is the 28-high button.
+provide(BUTTON_GROUP_SIZE, ref<ButtonSize>("sm"));
 
-const ariaRole = computed(
-  () =>
-    props.role ?? (props.variant === "error" || props.variant === "warning" ? "alert" : "status"),
-);
-
-const hasDefaultSlot = computed(() => !!slots.default);
-const hasIconSlot = computed(() => !!slots.icon);
-const hasMetaSlot = computed(() => !!slots.meta);
-const hasFooterSlot = computed(() => !!slots.footer);
-const showContentProp = computed(() => !hasDefaultSlot.value && !!props.content);
-const showIconArea = computed(() => !!props.icon || hasIconSlot.value);
-
-const variantClass = computed(() => {
-  switch (props.variant) {
-    case "info":
-      return "bg-banner-info-bg border border-banner-info-border text-banner-info-text";
-    case "success":
-      return "bg-banner-success-bg border border-banner-success-border text-banner-success-text";
-    case "warning":
-      return "bg-banner-warning-bg border border-banner-warning-border border-s-4 border-s-banner-warning-border text-banner-warning-text";
-    case "error":
-      return "bg-banner-error-bg text-banner-error-text";
-    // Marketing gold, shared with the standalone webinar bar so the two match.
-    case "promo":
-      return "bg-promo-webinar-accent text-promo-webinar-text";
-    // Tinted error for hints/insights — solid `error` stays for hard failures.
-    case "error-soft":
-      return "bg-banner-error-soft-bg border border-banner-error-soft-border border-s-4 border-s-banner-error-soft-border text-banner-error-soft-text";
-    default:
-      return "bg-banner-default-bg text-banner-default-text";
-  }
-});
-
-/**
- * Bar mode carries the fill and the text colour but none of the borders.
- * An inset card's 1px box and 4px left accent become a hairline down the
- * viewport edge and a stub in the corner once the banner spans the screen —
- * and, because only some variants carry them, a stack of bars ends up with
- * rows of different heights.
- */
-const barVariantClass = computed(() => {
-  switch (props.variant) {
-    case "info":
-      return "bg-banner-info-bg text-banner-info-text";
-    case "success":
-      return "bg-banner-success-bg text-banner-success-text";
-    case "warning":
-      return "bg-banner-warning-bg text-banner-warning-text";
-    case "error":
-      return "bg-banner-error-bg text-banner-error-text";
-    case "error-soft":
-      return "bg-banner-error-soft-bg text-banner-error-soft-text";
-    case "promo":
-      return "bg-promo-webinar-accent text-promo-webinar-text";
-    default:
-      return "bg-banner-default-bg text-banner-default-text";
-  }
-});
+const glyph = computed(() => props.icon ?? NOTICE_TONE_ICON[props.tone]);
+// Named after the banner so two banners keep distinct hooks; a function, since attrs are not reactive.
+const dismissTest = () => {
+  const own = attrs["data-test"];
+  return typeof own === "string" && own ? `${own}-dismiss` : "o-banner-dismiss";
+};
 </script>
 
 <template>
   <div
-    :role="ariaRole"
-    :data-test="dataTest"
-    :style="colorStyle"
+    :role="noticeRole(tone)"
+    :data-tone="tone"
     :class="[
-      textSize ? TEXT_SIZE_CLASS[textSize] : '',
-      'flex',
-      bar ? 'w-full flex-row flex-wrap items-center gap-3 px-4' : '',
-      bar ? (dense ? 'py-1' : 'py-2') : '',
-      bar ? (center ? 'justify-center' : 'justify-between') : '',
-      bar ? '' : 'rounded-default',
-      bar ? '' : inlineActions ? 'flex-row items-center gap-3 max-md:flex-wrap' : 'flex-col gap-2',
-      bar ? '' : dense ? 'p-2' : 'p-4',
-      colors ? 'bg-banner-custom-bg text-banner-custom-text' : bar ? barVariantClass : variantClass,
+      'min-h-control-lg text-compact px-page-edge flex w-full items-center gap-3 border-b py-1.5 leading-5',
+      NOTICE_TONE_CLASS[tone],
     ]"
   >
-    <!-- `inlineActions` is the one-line layout — the outer row already centres,
-         so the icon centres against the whole content block with it. Stacked
-         banners keep `items-start`, where the icon belongs beside the first
-         line of a paragraph rather than halfway down it. -->
-    <div
-      :class="[
-        'flex flex-row gap-3',
-        bar
-          ? center
-            ? 'min-w-0 items-center'
-            : 'min-w-0 flex-1 items-center max-md:min-w-48'
-          : inlineActions
-            ? 'min-w-0 flex-1 items-center max-md:min-w-48'
-            : preserveWhitespace
-              ? 'min-w-0 items-start'
-              : 'items-start',
-      ]"
-    >
-      <!-- Aligned to the FIRST LINE of the content, not the top of the box:
-           `items-start` anchored a 1rem icon to the top of a 1.25rem line box,
-           which reads as the icon sitting a hair high beside its own label.
-           `min-h-5` is that line box, so a taller slotted icon still grows the
-           wrapper and keeps its old top alignment instead of overflowing. -->
-      <div
-        v-if="showIconArea"
-        :class="['flex shrink-0', bar ? 'items-center' : 'min-h-5 items-center']"
-      >
-        <slot name="icon">
-          <OIcon :name="icon" :size="textSize === 'large' ? 'md' : 'sm'" />
-        </slot>
-      </div>
-
-      <div
-        :class="[
-          bar ? '' : inlineActions ? 'min-w-0 flex-1' : 'flex-1',
-          textSize ? '' : bar ? 'text-compact' : 'text-sm',
-          // The base `p` rule sets its own colour, which would beat the variant's text colour.
-          '[&_p]:text-inherit',
-          preserveWhitespace ? 'min-w-0 wrap-break-word whitespace-pre-wrap' : '',
-        ]"
-      >
-        <slot />
-        <template v-if="showContentProp">{{ content }}</template>
-        <div v-if="hasFooterSlot" class="mt-1" data-test="o-banner-footer">
-          <slot name="footer" />
-        </div>
-      </div>
-
-      <div v-if="hasMetaSlot" class="shrink-0" data-test="o-banner-meta">
-        <slot name="meta" />
-      </div>
+    <OIcon :name="glyph" size="sm" class="shrink-0" aria-hidden="true" />
+    <!-- The base `p` rule sets its own colour, which would beat the tone's text colour. -->
+    <div class="min-w-0 flex-1 [&_p]:text-inherit" data-test="o-banner-message">
+      <slot>{{ message }}</slot>
     </div>
-
-    <!-- A phone keeps the message at least 12rem wide; past that the actions wrap under it, end-aligned. -->
-    <div
-      v-if="$slots.actions"
-      :class="[
-        'flex flex-wrap items-center gap-2',
-        bar ? 'shrink-0' : inlineActions ? 'max-md:ms-auto' : '',
-      ]"
-    >
-      <slot name="actions" />
+    <div v-if="slots.actions || actionLabel" class="flex shrink-0 items-center">
+      <slot name="actions">
+        <OButton
+          :variant="actionVariant"
+          :data-test="actionDataTest ?? 'o-banner-action'"
+          @click="emit('action', $event)"
+        >
+          {{ actionLabel }}
+        </OButton>
+      </slot>
     </div>
+    <OButton
+      v-if="dismissible"
+      variant="ghost"
+      size="xs"
+      icon="close"
+      icon-only
+      class="shrink-0"
+      :label="t('common.dismiss')"
+      :data-test="dismissTest()"
+      @click="emit('dismiss')"
+    />
   </div>
 </template>

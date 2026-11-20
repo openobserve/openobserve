@@ -104,7 +104,7 @@ describe("rumReactNativeCard builder", () => {
     it("uses the same provider.name as the browser card so the title is stable across platforms", () => {
       const card = buildCard();
 
-      expect(card.provider.name).toBe("Real User Monitoring");
+      expect(card.provider.name).toBe("Real user monitoring");
     });
 
     it("names the React Native runtime rather than the browser one", () => {
@@ -133,7 +133,7 @@ describe("rumReactNativeCard builder", () => {
         "Views",
         "Errors",
         "Crashes",
-        "Session Replay",
+        "Session replay",
       ]);
     });
 

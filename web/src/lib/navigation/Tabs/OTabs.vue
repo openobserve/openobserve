@@ -1,10 +1,26 @@
 <script setup lang="ts">
-import type { OTabsProps, OTabsEmits, OTabsSlots } from "./OTabs.types";
-import { computed, provide, reactive, ref, onMounted, onUnmounted, watch, nextTick } from "vue";
-import { TABS_CONTEXT_KEY } from "./OTabs.types";
+import type { OTabsProps, OTabsEmits, OTabsSlots, TabsOverflowItem } from "./OTabs.types";
+import {
+  Comment,
+  Fragment,
+  computed,
+  getCurrentInstance,
+  h,
+  provide,
+  reactive,
+  ref,
+  onMounted,
+  onUnmounted,
+  watch,
+  nextTick,
+  type VNode,
+} from "vue";
+import { TABS_CONTEXT_KEY, TABS_MAX_VISIBLE } from "./OTabs.types";
 import type { TabsContext } from "./OTabs.types";
 import { TabsRoot, TabsList } from "reka-ui";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTab from "./OTab.vue";
+import OTabsMore from "./OTabsMore.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 
 const { lgUp } = useBreakpoint();
@@ -31,8 +47,7 @@ function handleFocusin(event: FocusEvent): void {
 
 const props = withDefaults(defineProps<OTabsProps>(), {
   orientation: "horizontal",
-  align: "left",
-  dense: false,
+  size: "page",
   bordered: false,
   reorderable: false,
   collapseLabels: false,
@@ -40,11 +55,11 @@ const props = withDefaults(defineProps<OTabsProps>(), {
 
 const emit = defineEmits<OTabsEmits>();
 
-defineSlots<OTabsSlots>();
+const slots = defineSlots<OTabsSlots>();
 
 const isVertical = computed(() => props.orientation === "vertical");
 
-/** Called by ORouteTab and forwarded from TabsRoot's update:modelValue */
+/** Called by route tabs and forwarded from TabsRoot's update:modelValue */
 function onTabClick(name: string | number): void {
   emit("update:modelValue", name);
   emit("change", name);
@@ -157,7 +172,7 @@ function playFlip(): void {
   void tablistRef.value?.offsetWidth;
   requestAnimationFrame(() => {
     for (const el of moved) {
-      el.style.transition = "transform 250ms cubic-bezier(0.2, 0, 0, 1)";
+      el.style.transition = "transform var(--duration-indicator) var(--ease-control)";
       el.style.transform = "";
     }
   });
@@ -177,12 +192,12 @@ function onTabDragEnd(): void {
   clearDrag();
 }
 
-/** Provide context to OTab / ORouteTab descendants */
+/** Provide context to OTab descendants */
 const context = computed<TabsContext>(() => ({
   modelValue: props.modelValue,
   onTabClick,
   isVertical: isVertical.value,
-  dense: props.dense,
+  size: props.size,
   reorderable: props.reorderable,
   draggingName: draggingName.value,
   dropTargetName: dropTargetName.value,
@@ -339,12 +354,63 @@ watch(
   },
 );
 
-// ── CSS classes ────────────────────────────────────────────────────────────
-const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
-  left: "justify-start",
-  center: "justify-center",
-  right: "justify-end",
-  justify: "justify-stretch",
+// ── More ▾ ─────────────────────────────────────────────────────────────────
+// Past six tabs the rest fold into one "More ▾" tab, so the row never wraps (guideline N2).
+// Reorderable strips hold user-made tabs and keep every tab inline.
+// The app's router, read from the instance so a strip without route tabs never needs one.
+const instance = getCurrentInstance();
+
+function flattenNodes(nodes: unknown): VNode[] {
+  if (!Array.isArray(nodes)) return [];
+  const out: VNode[] = [];
+  for (const node of nodes as VNode[]) {
+    if (!node || node.type === Comment) continue;
+    if (node.type === Fragment) out.push(...flattenNodes(node.children));
+    else out.push(node);
+  }
+  return out;
+}
+
+function toOverflowItem(node: VNode): TabsOverflowItem {
+  const p = (node.props ?? {}) as Record<string, any>;
+  const disabled = p.disabled;
+  return {
+    name: p.name,
+    label: p.label,
+    icon: p.icon,
+    disabled: disabled === "" || Boolean(disabled),
+    to: p.to,
+    count: p.count,
+    dataTest: p["data-test"],
+  };
+}
+
+function selectOverflow(item: TabsOverflowItem): void {
+  if (item.disabled) return;
+  onTabClick(item.name);
+  if (item.to !== undefined) instance?.proxy?.$router?.push(item.to as never);
+}
+
+const TabStrip = (): VNode[] => {
+  const nodes = flattenNodes(slots.default?.());
+  const tabs = nodes.filter((node) => node.type === OTab);
+  const overflow = tabs.slice(TABS_MAX_VISIBLE);
+  const canFold =
+    !isVertical.value &&
+    !props.reorderable &&
+    overflow.length > 0 &&
+    overflow.every((node) => Boolean(node.props?.label));
+  if (!canFold) return nodes;
+  const folded = new Set(overflow);
+  return [
+    ...nodes.filter((node) => !folded.has(node)),
+    h(OTabsMore, {
+      items: overflow.map(toOverflowItem),
+      activeName: props.modelValue,
+      size: props.size,
+      onSelect: selectOverflow,
+    }),
+  ];
 };
 </script>
 
@@ -362,8 +428,7 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
       <div
         ref="tablistRef"
         :class="[
-          'o-tabs relative flex flex-col gap-0.5 py-1',
-          alignClasses[align],
+          'o-tabs relative flex flex-col justify-start gap-0.5 py-1',
           { 'border-card-glass-border border-b border-solid': bordered },
         ]"
         @dragstart="onTabDragStart"
@@ -413,7 +478,7 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
         <TabsList as-child :loop="true">
           <div
             ref="tablistRef"
-            :class="['o-tabs relative flex flex-row px-0.75', alignClasses[align]]"
+            class="o-tabs relative flex flex-row justify-start px-0.75"
             @focusin="handleFocusin"
             @dragstart="onTabDragStart"
             @dragover="onTabDragOver"
@@ -428,13 +493,17 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
               aria-hidden="true"
               data-test="otabs-active-indicator"
               class="bg-tabs-indicator pointer-events-none absolute bottom-0 left-0 z-10 h-0.5 rounded-full"
-              :class="indicatorReady ? 'transition-[transform,width] duration-300 ease-out' : ''"
+              :class="
+                indicatorReady
+                  ? 'transition-[transform,width] duration-(--duration-indicator) ease-(--ease-control)'
+                  : ''
+              "
               :style="{
                 transform: `translateX(${indicator.left}px)`,
                 width: `${indicator.width}px`,
               }"
             />
-            <slot />
+            <TabStrip />
           </div>
         </TabsList>
       </div>

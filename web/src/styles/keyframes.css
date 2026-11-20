@@ -39,6 +39,17 @@
   }
 }
 
+/* Indeterminate fill of OProgressBar and OLoadingLine: a third-width segment
+   crosses the track (translateX is relative to the segment, so 300% clears it). */
+@keyframes o2-indeterminate {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(310%);
+  }
+}
+
 /* Shared by OTableLoading.vue and TenstackTable.vue (see above). */
 @keyframes o2-skel-row-in {
   from {

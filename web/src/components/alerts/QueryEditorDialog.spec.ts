@@ -481,11 +481,11 @@ describe("QueryEditorDialog - ODrawer Migration", () => {
     expect(drawer.props("open")).toBe(false);
   });
 
-  it('renders ODrawer with size="full"', async () => {
+  it('renders ODrawer at the widest fixed size, "xl" (960)', async () => {
     const w = await mountWithDrawerStub();
     await flushPromises();
     const drawer = w.findComponent(ODrawerStub);
-    expect(drawer.props("size")).toBe("full");
+    expect(drawer.props("size")).toBe("xl");
   });
 
   it('renders ODrawer with :show-close="false"', async () => {

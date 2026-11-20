@@ -104,7 +104,7 @@ const fixRoute = computed(() =>
     <span v-else class="text-text-secondary italic" data-test="llm-cost-cell-unknown">{{
       t("llmDataTrust.cost.unknown")
     }}</span>
-    <OTooltip hoverable max-width="18rem">
+    <OTooltip hoverable>
       <template #content>
         <div class="flex flex-col gap-1">
           <span>{{ raw(tooltip) }}</span>

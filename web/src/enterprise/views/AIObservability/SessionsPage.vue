@@ -18,8 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AiPageShell
     data-test="ai-sessions"
     :title="t('aiObservability.nav.sessions')"
-    :subtitle="t('aiObservability.subtitle.sessions')"
-    icon="forum"
+    :about="t('aiObservability.subtitle.sessions')"
     :date-state="dateState"
     :last-run-at="sessionsLastRunAt"
     :is-loading="isLoading"

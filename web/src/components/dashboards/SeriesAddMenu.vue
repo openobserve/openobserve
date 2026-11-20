@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODropdown v-model:open="open" align="start" content-class="min-w-(--reka-popper-anchor-width)!">
+  <ODropdown v-model:open="open" align="start">
     <template #trigger>
       <!-- Native button: no OButton variant matches the column dialog's dashed Add field trigger. -->
       <button
@@ -27,20 +27,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="add" size="sm" />
         {{ t("dashboard.seriesFormattingAddSeries") }}
       </button>
-      <OButton v-else variant="primary" icon-left="add" :data-test="`${dataTest}-trigger`">
+      <OButton v-else variant="primary" :data-test="`${dataTest}-trigger`">
         {{ t("dashboard.seriesFormattingAddSeries") }}
       </OButton>
     </template>
     <div class="flex w-64 max-w-[calc(100vw-1.5rem)] flex-col" :data-test="`${dataTest}-menu`">
       <div class="p-1.5">
         <OSearchInput
+          size="sm"
           ref="searchRef"
           v-model="search"
           :placeholder="t('dashboard.seriesFormattingSearchSeries')"
           :data-test="`${dataTest}-search`"
         />
       </div>
-      <ODropdownItem icon-left="code" :data-test="`${dataTest}-regex`" @select="emit('add-regex')">
+      <ODropdownItem icon="code" :data-test="`${dataTest}-regex`" @select="emit('add-regex')">
         {{ t("dashboard.seriesFormattingMatchByRegex") }}
       </ODropdownItem>
       <ODropdownSeparator />

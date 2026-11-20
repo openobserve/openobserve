@@ -23,8 +23,8 @@ import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -287,14 +287,14 @@ const defaultHint = computed<{ text: I18nText; info: boolean } | null>(() => {
   return { text, info: true };
 });
 
-const channelTag = computed<{ label: I18nText; variant: "warning-soft" } | null>(() => {
+const channelTag = computed<{ label: I18nText; variant: "warn" } | null>(() => {
   if (needsOncall.value && channelChanged.value) {
-    return { label: t("slackApp.destination.oncallTag"), variant: "warning-soft" };
+    return { label: t("slackApp.destination.oncallTag"), variant: "warn" };
   }
   if (isShared.value) {
     return {
       label: t("slackApp.destination.sharedTag", { product: SLACK }),
-      variant: "warning-soft",
+      variant: "warn",
     };
   }
   return null;
@@ -477,13 +477,11 @@ const onChannelSearch = (q: string) => {
 
 <template>
   <section class="flex w-full flex-col gap-4" data-test="slack-app-destination-form">
-    <div v-if="installations.isPending.value" class="flex justify-center py-10">
-      <OSpinner size="md" />
-    </div>
+    <OSkeleton v-if="installations.isPending.value" preset="tableRows" :rows="3" />
 
-    <OBanner
+    <OInlineNotice
       v-else-if="noWorkspace && isCloud"
-      variant="info"
+      tone="info"
       icon="forum"
       data-test="slack-app-dest-connect-banner"
     >
@@ -498,7 +496,6 @@ const onChannelSearch = (q: string) => {
       <template #actions>
         <OButton
           variant="primary"
-          size="sm-action"
           :loading="connecting"
           data-test="slack-app-dest-connect"
           @click="connectSlack"
@@ -506,32 +503,29 @@ const onChannelSearch = (q: string) => {
           {{ t("alert_destinations.slackOAuth.connectSlack") }}
         </OButton>
       </template>
-    </OBanner>
+    </OInlineNotice>
 
-    <OBanner
+    <OInlineNotice
       v-else-if="noWorkspace"
-      variant="info"
-      dense
+      tone="info"
       icon="forum"
-      inline-actions
       data-test="slack-app-dest-self-hosted"
     >
       {{ t("alert_destinations.slackOAuth.selfHostedApp") }}
       <template #actions>
         <OButton
-          as="a"
           :href="slackSettingsHref"
           target="_blank"
           rel="noopener noreferrer"
-          variant="ghost-primary"
-          size="xs"
-          icon-right="open-in-new"
+          variant="accent-ghost"
+          size="sm"
+          icon-end="open-in-new"
           data-test="slack-app-dest-settings-link"
         >
           {{ t("alert_destinations.slackOAuth.openSlackSettings") }}
         </OButton>
       </template>
-    </OBanner>
+    </OInlineNotice>
 
     <OForm v-else :id="FORM_ID" :form="form" class="flex max-w-240 flex-col gap-5">
       <div class="grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2">
@@ -555,6 +549,7 @@ const onChannelSearch = (q: string) => {
 
       <div class="flex flex-col gap-1">
         <OFormSelect
+          searchable
           name="channel_id"
           :label="t('slackApp.destination.channel')"
           :options="channelOptions"
@@ -569,7 +564,7 @@ const onChannelSearch = (q: string) => {
             <span class="flex min-w-0 flex-1 items-center justify-between gap-2">
               <span class="truncate">{{ raw(`#${channelName}`) }}</span>
               <OTag
-                :variant="channelTag.variant"
+                :tone="channelTag.variant"
                 size="sm"
                 :label="channelTag.label"
                 data-test="slack-app-dest-channel-tag"
@@ -700,12 +695,10 @@ const onChannelSearch = (q: string) => {
         data-test="slack-app-dest-template"
       />
 
-      <OBanner
+      <OInlineNotice
         v-if="refusal"
-        variant="error"
-        dense
-        icon="error"
-        :content="refusal"
+        tone="err"
+        :message="refusal"
         data-test="slack-app-dest-refusal"
       />
 
@@ -719,9 +712,8 @@ const onChannelSearch = (q: string) => {
 
       <div class="flex flex-wrap items-center justify-between gap-2">
         <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="send"
+          variant="secondary"
+          icon="send"
           :loading="testing"
           :disabled="!canTest"
           data-test="slack-app-dest-test"
@@ -730,15 +722,10 @@ const onChannelSearch = (q: string) => {
           {{ t("slackApp.destination.sendTest") }}
         </OButton>
         <div class="flex gap-2">
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="slack-app-dest-cancel"
-            @click="emit('cancel')"
-          >
+          <OButton variant="secondary" data-test="slack-app-dest-cancel" @click="emit('cancel')">
             {{ t("alerts.cancel") }}
           </OButton>
-          <OButton variant="primary" size="sm-action" type="submit" data-test="slack-app-dest-save">
+          <OButton variant="primary" type="submit" data-test="slack-app-dest-save">
             {{ t("alerts.save") }}
           </OButton>
         </div>

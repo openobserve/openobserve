@@ -34,7 +34,7 @@ describe("OAvatarGroup", () => {
     const wrapper = mount(OAvatarGroup, { props: { people, max: 3 } });
     const chip = wrapper.findComponent({ name: "OBadge" });
     expect(chip.exists()).toBe(true);
-    expect(chip.classes()).toContain("ring-1");
+    expect(chip.classes()).toContain("border");
     expect(chip.attributes("tabindex")).toBe("0");
     expect(chip.attributes("aria-label")).toBe("+2: D Person (d@o2.ai), E Person (e@o2.ai)");
   });

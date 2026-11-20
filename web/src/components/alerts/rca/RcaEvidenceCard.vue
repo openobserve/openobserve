@@ -24,12 +24,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-border-default bg-surface-base flex items-center gap-2 border-b px-3 py-2"
     >
       <span
-        class="rounded-default border-border-control text-3xs inline-grid h-5 min-w-5.5 place-items-center border px-1 font-mono font-semibold"
+        class="rounded-default border-border-control text-2xs inline-grid h-5 min-w-5.5 place-items-center border px-1 font-mono font-semibold"
       >
         {{ entry.number }}
       </span>
       <OIcon :name="rcaEvidenceKindIcon(entry.kind)" size="sm" class="text-icon-color" />
-      <span class="text-text-secondary text-3xs font-mono font-bold uppercase">
+      <span class="text-text-secondary text-2xs font-mono font-semibold uppercase">
         {{ entry.kind }}
       </span>
       <span class="text-text-heading text-compact min-w-0 flex-1 font-semibold">
@@ -94,8 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OTooltip v-if="link && linkLocked" :content="lockedReason(link.page)">
         <span class="inline-flex">
-          <OButton data-test="rca-evidence-open" variant="ghost-primary" size="sm" disabled>
-            <template #icon-left>
+          <OButton data-test="rca-evidence-open" variant="accent-ghost" disabled>
+            <template #icon>
               <OIcon
                 name="lock"
                 class="text-icon-locked"
@@ -110,9 +110,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else-if="link"
         data-test="rca-evidence-open"
-        variant="ghost-primary"
-        size="sm"
-        icon-left="open-in-new"
+        variant="accent-ghost"
+        icon="open-in-new"
         @click="router.push(link.route)"
       >
         {{ openLabel }}
@@ -120,9 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="query"
         data-test="rca-evidence-copy"
-        variant="ghost-muted"
-        size="sm"
-        icon-left="content-copy"
+        variant="ghost"
+        icon="content-copy"
         @click="copyQuery"
       >
         {{ t("alerts.incidents.rcaSummary.copyQuery") }}

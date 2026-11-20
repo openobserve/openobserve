@@ -26,11 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="loading && !tableRows.length"
       :streaming="loading && tableRows.length > 0"
       :empty-message="t('panel.dataViewEmpty')"
-      :show-global-filter="false"
       pagination="none"
       virtual-scroll
       window-row-model
-      :row-height="22"
+      density="compact"
       horizontal-scroll
       :data-test="`${dataTestPrefix}-data-view-table`"
     />

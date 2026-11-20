@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).start
           }}</span>
-          <span class="text-3xs opacity-60">{{ t("latencyInsights.arrowSeparator") }}</span>
+          <span class="text-2xs opacity-60">{{ t("latencyInsights.arrowSeparator") }}</span>
           <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).end
           }}</span>
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               selectedTimeRangeDisplay!.endTime,
             ).start
           }}</span>
-          <span class="text-3xs opacity-70">{{ t("latencyInsights.arrowSeparator") }}</span>
+          <span class="text-2xs opacity-70">{{ t("latencyInsights.arrowSeparator") }}</span>
           <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(
               selectedTimeRangeDisplay!.startTime,
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Additional filter info -->
-        <span v-if="filterMetadata" class="text-3xs ms-1 opacity-60">
+        <span v-if="filterMetadata" class="text-2xs ms-1 opacity-60">
           {{ filterMetadata }}
         </span>
       </div>
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleDimensionSelector"
         >
           <OIcon name="expand-all" size="sm" class="mt-2.5 rotate-90 text-xl" />
-          <div class="text-xs font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
+          <div class="text-xs font-semibold [text-orientation:mixed] [writing-mode:vertical-rl]">
             {{ t("traces.tracesAnalysisDashboard.dimensions") }}
           </div>
         </div>
@@ -124,10 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("traces.tracesAnalysisDashboard.dimensions")
                   }}</span>
                   <OButton
-                    variant="outline"
-                    size="icon-xs-sq"
+                    icon-only
+                    variant="ghost"
+                    size="sm"
                     class="rotate-90"
-                    icon-left="unfold-less"
+                    icon="unfold-less"
                     :title="t('traces.tracesAnalysisDashboard.collapseDimensions')"
                     data-test="dimension-selector-collapse-btn"
                     @click="toggleDimensionSelector"
@@ -138,7 +139,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OSearchInput
                     v-model="dimensionSearchText"
                     :placeholder="t('search.searchDimension')"
-                    clearable
                     class="w-full"
                     data-test="dimension-search-input"
                   />
@@ -158,7 +158,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OCheckbox
                           :model-value="selectedDimensions.includes(dimension.value)"
                           @update:model-value="toggleDimension(dimension.value)"
-                          size="xs"
                           :data-test="`dimension-checkbox-${dimension.value}`"
                         />
                       </div>
@@ -180,9 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ul>
 
                   <!-- No results message -->
-                  <div v-else class="text-text-muted p-4 text-center">
-                    {{ t("search.noResult") }}
-                  </div>
+                  <OEmptyState v-else size="compact" kind="filtered" class="px-3" />
                 </div>
 
                 <!-- Selected Count Footer -->
@@ -195,9 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #separator>
-            <div
-              class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors duration-300"
-            ></div>
+            <div class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors"></div>
           </template>
 
           <!-- RIGHT: Dashboard Charts -->
@@ -205,57 +200,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="h-full">
               <div class="relative-position h-full w-full overflow-auto">
                 <!-- Loading State -->
-                <div v-if="loading" class="flex h-full flex-col items-center justify-center py-20">
-                  <OSpinner
-                    size="lg"
-                    class="mb-4"
-                    data-test="traces-analysis-dashboard-loading-indicator"
+                <div
+                  v-if="loading"
+                  class="grid grid-cols-1 gap-3 p-3 md:grid-cols-2"
+                  data-test="traces-analysis-dashboard-loading-indicator"
+                >
+                  <OSkeleton
+                    v-for="panel in Math.max(selectedDimensions.length, 2)"
+                    :key="panel"
+                    shape="block"
+                    class="h-60"
                   />
-                  <div class="text-base">
-                    {{ t("latencyInsights.analyzingDimensions") }}
-                  </div>
-                  <div class="text-text-secondary mt-2 text-xs">
-                    {{
-                      t("latencyInsights.computingDistributions", {
-                        count: selectedDimensions.length,
-                      })
-                    }}
-                  </div>
                 </div>
 
                 <!-- Error State -->
-                <div
+                <OEmptyState
                   v-else-if="error"
+                  kind="error"
+                  :title="t('latencyInsights.failedToLoad')"
+                  :text="isRawHttpText(error) ? t('emptyState.loadError.description') : raw(error)"
                   data-test="traces-analysis-dashboard-error"
-                  class="flex h-full flex-col items-center justify-center py-20"
                 >
-                  <OIcon
-                    name="error-outline"
-                    class="mb-4"
-                    style="width: 3.75rem; height: 3.75rem"
-                  />
-                  <div class="mb-2 text-base">
-                    {{ t("latencyInsights.failedToLoad") }}
-                  </div>
-                  <div class="text-text-secondary text-sm">{{ error }}</div>
-                  <OButton
-                    variant="outline"
-                    size="sm-action"
-                    class="mt-4"
-                    data-test="traces-analysis-dashboard-retry-btn"
-                    @click="loadAnalysis"
-                  >
-                    {{ t("latencyInsights.retryButton") }}
-                  </OButton>
-                </div>
+                  <template #actions>
+                    <OButton data-test="traces-analysis-dashboard-retry-btn" @click="loadAnalysis">
+                      {{ t("latencyInsights.retryButton") }}
+                    </OButton>
+                  </template>
+                </OEmptyState>
 
                 <!-- Every dimension removed (sidebar or panel X) -->
                 <OEmptyState
                   v-else-if="selectedDimensions.length === 0"
-                  size="hero"
-                  illustration="wave-bars"
+                  icon="bar-chart"
                   :title="t('latencyInsights.noDimensionsSelected')"
-                  :description="t('latencyInsights.noDimensionsSelectedDesc')"
+                  :text="t('latencyInsights.noDimensionsSelectedDesc')"
                   data-test="traces-analysis-dashboard-no-dimensions"
                 />
 
@@ -314,8 +292,9 @@ import {
   COMPARISON_COLORS,
 } from "@/composables/useLatencyInsightsDashboard";
 import { selectDimensionsFromData } from "@/composables/useDimensionSelector";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";

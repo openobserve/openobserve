@@ -145,7 +145,7 @@ async function multistreamselect(page) {
 
     // Verify common fields group header is present.
     // When applyFieldGrouping is active (semantic grouping), the header renders as
-    // "Common" or "Common (N)"; legacy path renders "Common Group Fields".
+    // "Common" or "Common (N)"; legacy path renders "Common group fields".
     const cell = await pageManager.logsPage.getCellByName(/^Common/);
     const cellText = await cell.textContent();
     expect(cellText).toMatch(/Common/);

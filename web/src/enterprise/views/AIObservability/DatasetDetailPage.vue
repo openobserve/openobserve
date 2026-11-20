@@ -26,16 +26,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="ai-dataset-detail-page"
     :back="backTarget"
     :title="raw(dataset?.name) || t('aiObservability.datasets.detail.fallbackTitle')"
-    :subtitle="metaSubtitle"
-    icon="table-chart"
     bleed
     :scroll="false"
   >
+    <template v-if="dataset" #status>
+      <OTag tone="neutral" size="sm" :label="meta" data-test="ai-dataset-detail-meta" />
+    </template>
     <template #actions>
       <OButton
         v-if="activeTab === 'experiments'"
         variant="primary"
-        size="sm"
         :disabled="!dataset"
         data-test="ai-dataset-detail-new-experiment"
         @click="openCreateExperiment"
@@ -44,9 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <div v-else class="flex items-center gap-2">
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="play-arrow"
+          variant="secondary"
+          icon="play-arrow"
           :disabled="!dataset"
           data-test="ai-dataset-detail-try-playground"
           @click="openPlayground"
@@ -54,8 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("aiObservability.datasets.detail.tryInPlayground") }}
         </OButton>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :disabled="!dataset"
           data-test="ai-dataset-detail-upload-csv"
           @click="openCsvImport"
@@ -64,7 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           variant="primary"
-          size="sm"
           :disabled="!dataset"
           data-test="ai-dataset-detail-add-item"
           @click="openAddItem"
@@ -98,9 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :loading="loading"
-            show-index
             :global-filter="search"
-            :show-global-filter="false"
             pagination="server"
             :current-page="currentPage"
             :total-count="totalItems"
@@ -110,23 +105,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :enable-column-resize="true"
             :persist-columns="true"
             table-id="ai-dataset-items"
-            width="100%"
             class="h-full w-full"
             @update:current-page="onPageChange"
             @update:page-size="onPageSizeChange"
             @row-click="openItemDetail"
           >
             <template #toolbar-trailing>
-              <OButton
-                variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
+              <ORefreshButton
+                :last-run-at="loadedAt"
                 :loading="loading"
                 data-test="ai-dataset-detail-refresh-btn"
                 @click="refresh(true)"
-              >
-                <OTooltip side="bottom" :content="t('common.refresh')" />
-              </OButton>
+              />
             </template>
 
             <template #toolbar>
@@ -135,20 +125,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="min-w-0 flex-1"
                 :placeholder="t('aiObservability.datasets.detail.searchPlaceholder')"
                 data-test="ai-dataset-detail-search-input"
-                clearable
               />
             </template>
 
             <template #empty>
-              <div class="flex items-center justify-center py-8">
-                <OEmptyState
-                  size="hero"
-                  preset="no-dataset-items"
-                  :filtered="Boolean(search)"
-                  data-test="ai-dataset-detail-empty-state"
-                  @action="openAddItem"
-                />
-              </div>
+              <OEmptyState
+                :kind="search ? 'filtered' : 'first-run'"
+                :title="
+                  search
+                    ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.datasetItems') })
+                    : t('emptyState.noDatasetItems.title')
+                "
+                :text="
+                  search
+                    ? t('emptyState.filtered.description', {
+                        noun: t('emptyState.nouns.datasetItems'),
+                      })
+                    : t('emptyState.noDatasetItems.description')
+                "
+                data-test="ai-dataset-detail-empty-state"
+                :action-label="search ? undefined : t('emptyState.noDatasetItems.action')"
+                @action="search ? (search = '') : openAddItem()"
+              />
             </template>
 
             <!-- Show the message CONTENT; the role envelope is kept in the stored
@@ -172,20 +170,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-source="{ row }">
-              <OTag :variant="sourceVariant(row.source)" shape="rounded" class="shrink-0">
+              <OTag :tone="sourceVariant(row.source)" class="shrink-0">
                 {{ t(`aiObservability.datasets.source.${row.source}`) }}
               </OTag>
             </template>
 
             <template #cell-tags="{ row }">
               <div v-if="row.tags.length" class="flex flex-wrap items-center gap-1">
-                <OTag
-                  v-for="tag in row.tags"
-                  :key="tag"
-                  variant="default-soft"
-                  shape="rounded"
-                  class="shrink-0"
-                >
+                <OTag v-for="tag in row.tags" :key="tag" tone="neutral" class="shrink-0">
                   {{ tag }}
                 </OTag>
               </div>
@@ -199,9 +191,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-actions="{ row }">
               <div class="actions-container flex items-center justify-center">
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-sm"
-                  icon-left="edit"
+                  icon="edit"
                   class="max-md:hidden"
                   :data-test="`ai-dataset-detail-item-edit-${row.id}`"
                   @click.stop="openEditItem(row)"
@@ -209,9 +201,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip side="bottom" :content="t('common.edit')" />
                 </OButton>
                 <OButton
-                  variant="ghost-destructive"
-                  size="icon-sm"
-                  icon-left="delete"
+                  icon-only
+                  variant="danger-ghost"
+                  icon="delete"
                   class="max-md:hidden"
                   :data-test="`ai-dataset-detail-item-delete-${row.id}`"
                   @click.stop="removeItem(row)"
@@ -221,17 +213,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
                     <OButton
+                      icon-only
                       :aria-label="t('common.moreActions')"
-                      icon-left="more-vert"
+                      icon="more-vert"
                       variant="ghost"
-                      size="icon-xs-sq"
+                      size="sm"
                       class="md:hidden"
                       data-test="ai-dataset-detail-row-more-actions"
                       @click.stop
                     />
                   </template>
                   <ODropdownItem
-                    icon-left="edit"
+                    icon="edit"
                     class="md:hidden"
                     :data-test="`ai-dataset-detail-item-edit-${row.id}-menu`"
                     @select="openEditItem(row)"
@@ -239,8 +232,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("common.edit") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="delete"
-                    variant="destructive"
+                    icon="delete"
+                    tone="danger"
                     class="md:hidden"
                     :data-test="`ai-dataset-detail-item-delete-${row.id}-menu`"
                     @select="removeItem(row)"
@@ -286,12 +279,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODrawer
       v-model:open="importOpen"
       side="right"
-      size="lg"
+      size="md"
       :title="t('aiObservability.datasets.detail.csvImport.title')"
-      :primary-button-label="t('aiObservability.datasets.detail.csvImport.button')"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-disabled="!importFile"
-      :primary-button-loading="isImporting"
+      :primary="{
+        label: t('aiObservability.datasets.detail.csvImport.button'),
+        disabled: !importFile,
+        loading: isImporting,
+      }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="ai-dataset-detail-import-drawer"
       @click:primary="importCsv"
       @click:secondary="closeCsvImport"
@@ -303,14 +298,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OFile
           v-model="importFile"
           :label="t('aiObservability.datasets.detail.csvImport.fileLabel')"
-          :placeholder="t('aiObservability.datasets.detail.csvImport.placeholder')"
           :help-text="t('aiObservability.datasets.detail.csvImport.help')"
-          :max-file-size="DATASET_IMPORT_MAX_FILE_SIZE"
+          :max-size="DATASET_IMPORT_MAX_FILE_SIZE"
           accept=".csv,text/csv"
-          drop-zone
           required
           data-test="ai-dataset-detail-import-file"
-          @size-error="showCsvSizeError"
         />
       </div>
     </ODrawer>
@@ -319,16 +311,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODrawer
       v-model:open="itemOpen"
       side="right"
-      size="lg"
+      size="md"
       :title="
         editingItemId
           ? t('aiObservability.datasets.detail.addItem.editTitle')
           : t('aiObservability.datasets.detail.addItem.title')
       "
       form-id="dataset-item-form"
-      :primary-button-label="t('common.save')"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-loading="isItemSubmitting"
+      :primary="{ label: t('common.save'), loading: isItemSubmitting }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="ai-dataset-detail-item-drawer"
       @click:secondary="itemOpen = false"
     >
@@ -398,12 +389,12 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { formatDistanceToNowStrict } from "date-fns";
-import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -461,6 +452,7 @@ const dataset = ref<LlmDataset | null>(null);
 const items = ref<LlmDatasetItem[]>([]);
 const experiments = ref<LlmExperiment[]>([]);
 const loading = ref(false);
+const loadedAt = ref<number | null>(null);
 const search = ref("");
 const activeTab = ref<"items" | "experiments">("items");
 
@@ -474,16 +466,12 @@ const pageSizeOptions = [20, 50, DATASET_ITEMS_MAX_PAGE_SIZE];
  *  item detail drawer. */
 const versionLabel = (version: number) => raw(`v${version}`);
 
-const { goBack: backToDatasets } = useSmartBack(() => ({
-  name: "aiDatasets",
-  query: { org_identifier: orgId.value },
-}));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.datasets"),
-  onClick: backToDatasets,
+  to: { name: "aiDatasets", query: { org_identifier: orgId.value } },
 }));
 
-const metaSubtitle = computed(() => {
+const meta = computed(() => {
   if (!dataset.value) return raw("");
   const updated = dataset.value.updatedAt
     ? formatDistanceToNowStrict(new Date(dataset.value.updatedAt), { addSuffix: true })
@@ -553,8 +541,8 @@ const columns = computed(() => [
   },
 ]);
 
-function sourceVariant(source: LlmDatasetItemSource): BadgeVariant {
-  return source === "trace" ? "blue-soft" : source === "annotation" ? "purple-soft" : "orange-soft";
+function sourceVariant(source: LlmDatasetItemSource): ChipTone {
+  return source === "trace" ? "neutral" : source === "annotation" ? "neutral" : "warn";
 }
 
 async function refresh(force = false) {
@@ -572,6 +560,7 @@ async function refresh(force = false) {
     items.value = page.items;
     totalItems.value = page.total;
     await refreshExperiments(force);
+    loadedAt.value = Date.now();
   } catch {
     toast({ variant: "error", message: t("aiObservability.datasets.detail.loadError") });
   } finally {
@@ -647,14 +636,6 @@ function closeCsvImport() {
   if (isImporting.value) return;
   importOpen.value = false;
   importFile.value = null;
-}
-
-function showCsvSizeError() {
-  importFile.value = null;
-  toast({
-    variant: "error",
-    message: t("aiObservability.datasets.detail.csvImport.sizeError"),
-  });
 }
 
 async function importCsv() {
@@ -768,7 +749,7 @@ async function removeItem(row: LlmDatasetItem): Promise<boolean> {
     message: t("aiObservability.datasets.detail.deleteItemMessage"),
     confirmLabel: t("common.delete"),
     cancelLabel: t("common.cancel"),
-    confirmVariant: "destructive",
+    kind: "destructive",
   });
   if (!ok) return false;
   try {

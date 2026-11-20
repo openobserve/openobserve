@@ -16,21 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
+    :title="
+      destination
+        ? raw(`${t('alert_destinations.updateTitle')} - ${destination.name}`)
+        : t('alert_destinations.addTitle')
+    "
+    title-data-test="pipeline-destination-editor-title"
     :back="{
       label: t('pipeline_destinations.header'),
       onClick: () => emit('cancel'),
     }"
     bleed
   >
-    <template #title>
-      <span data-test="pipeline-destination-editor-title">
-        <template v-if="destination"
-          >{{ t("alert_destinations.updateTitle") }} - {{ destination.name }}</template
-        >
-        <template v-else>{{ t("alert_destinations.addTitle") }}</template>
-      </span>
-    </template>
-
     <CreateDestinationForm
       fill
       :destination="destination"
@@ -42,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import CreateDestinationForm from "./NodeForm/CreateDestinationForm.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 

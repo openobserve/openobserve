@@ -16,7 +16,6 @@
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import OFailedPill from "./OFailedPill.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 
 const stubs = {
   OTooltip: {
@@ -43,10 +42,10 @@ describe("OFailedPill", () => {
       expect.arrayContaining([
         "rounded-default",
         "border",
-        "border-status-error-text",
-        "bg-status-error-bg",
-        "text-status-error-text",
-        "h-6",
+        "border-banner-error-soft-border",
+        "bg-banner-error-soft-bg",
+        "text-banner-error-soft-text",
+        "h-control-xs",
         "ps-2",
         "text-xs",
       ]),
@@ -54,7 +53,7 @@ describe("OFailedPill", () => {
     expect(pill.classes()).not.toContain("pe-2");
     expect(wrapper.findComponent({ name: "OIcon" }).props("name")).toBe("error-outline");
     expect(wrapper.findComponent({ name: "OTruncatedText" }).text()).toBe(SENTENCE);
-    expect(pill.find(".bg-status-error-text.w-px").attributes("aria-hidden")).toBe("true");
+    expect(pill.find(".bg-banner-error-soft-text.w-px").attributes("aria-hidden")).toBe("true");
     const retry = wrapper.get('[data-test="pill-retry"]');
     expect(retry.element.tagName).toBe("BUTTON");
     expect(retry.text()).toBe("Retry");
@@ -83,33 +82,5 @@ describe("OFailedPill", () => {
     expect(pill.classes()).toContain("pe-2");
     expect(pill.find(".w-px").exists()).toBe(false);
     expect(wrapper.find("button").exists()).toBe(false);
-  });
-
-  it("matches the failed refresh button Traces restyles in place: box, type, icons and divider", () => {
-    const failedAt = Date.UTC(2026, 10, 1, 5, 17, 2);
-    const pill = mountPill({ dataTest: "pill" });
-    const button = mount(ORefreshButton, {
-      props: { layout: "inline", ageFormat: "clock", lastRunAt: failedAt - 300_000, failedAt },
-      global: { stubs },
-    });
-    const box = button.get("button");
-    const icons = (w: any) =>
-      w
-        .findAll(".align-middle")
-        .map((el: any) => el.classes().filter((c: string) => c.startsWith("size-")));
-    for (const [pillClass, buttonClass] of [
-      ["h-6", "h-6!"],
-      ["border-status-error-text", "border-status-error-text!"],
-      ["bg-status-error-bg", "bg-status-error-bg!"],
-      ["text-xs", "text-xs"],
-    ]) {
-      expect(pill.get('[data-test="pill"]').classes()).toContain(pillClass);
-      expect(box.classes()).toContain(buttonClass);
-    }
-    expect(icons(button)).toEqual(icons(pill));
-    expect(box.get(".w-px").classes()).toEqual(pill.get(".w-px").classes());
-    expect(box.get('[data-test="refresh-button-failed"]').classes()).toEqual(
-      expect.arrayContaining(["text-status-error-text", "font-normal", "text-xs"]),
-    );
   });
 });

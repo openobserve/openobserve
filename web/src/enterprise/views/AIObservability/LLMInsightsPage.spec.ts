@@ -33,7 +33,7 @@ vi.mock("@/types/i18n", async (importOriginal) => {
   return { ...actual, useI18nTyped: () => ({ t: (key: string) => key }) };
 });
 
-// Like DateTime: the picker seeds itself from `dateState` in its own onMounted, which runs
+// Like ODateTimeRange: the picker seeds itself from `dateState` in its own onMounted, which runs
 // before the page's, and replays that window as a date-change.
 const pickerSeed: { value: Record<string, unknown> | null } = { value: null };
 vi.mock("@/enterprise/components/AIObservability/AiPageShell.vue", () => ({

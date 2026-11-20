@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <h2
       v-if="!graded"
       data-test="rca-verdict-headline"
-      class="text-text-heading m-0 max-w-215 text-base leading-normal font-bold [text-wrap:pretty]"
+      class="text-text-heading m-0 max-w-215 text-sm leading-5 font-semibold [text-wrap:pretty]"
     >
       <RcaInlineText :text="headline" />
     </h2>
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rca-verdict-band"
         :data-band="card?.band ?? 'none'"
         :type="unverifiedCount > 0 ? 'button' : undefined"
-        class="text-text-heading inline-flex items-center gap-2 border-none bg-transparent p-0 font-bold"
+        class="text-text-heading inline-flex items-center gap-2 border-none bg-transparent p-0 font-semibold"
         :class="{ 'cursor-pointer hover:underline': unverifiedCount > 0 }"
         @click="unverifiedCount > 0 && $emit('show-unverified')"
       >
@@ -183,12 +183,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- The run is paused for an answer; the deadline is local time. -->
-    <OBanner
+    <OInlineNotice
       v-else-if="cardState === 'investigating' && waitingInput"
       data-test="rca-paused-banner"
-      variant="warning"
+      tone="warn"
       icon="pause-circle-filled"
-      inline-actions
     >
       <p data-test="rca-paused-title" class="text-banner-warning-text m-0 text-sm font-semibold">
         {{
@@ -215,17 +214,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="canSteer"
           data-test="rca-paused-tell-agent-btn"
-          variant="outline"
-          size="sm"
-          icon-left="chat"
+          variant="secondary"
+          icon="chat"
           @click="$emit('tell-agent')"
         >
           {{ t("alerts.incidents.rcaSteer.paused.tellAgent") }}
         </OButton>
         <OTooltip v-if="connectToolsetRoute && toolsetsLocked" :content="toolsetsLockedReason">
           <span class="inline-flex">
-            <OButton data-test="rca-paused-connect-btn" variant="outline" size="sm" disabled>
-              <template #icon-left>
+            <OButton data-test="rca-paused-connect-btn" variant="secondary" disabled>
+              <template #icon>
                 <OIcon
                   name="lock"
                   class="lock-chip"
@@ -240,23 +238,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-else-if="connectToolsetRoute"
           data-test="rca-paused-connect-btn"
-          variant="outline"
-          size="sm"
-          icon-left="link"
+          variant="secondary"
+          icon="link"
           @click="openConnectToolset"
         >
           {{ t("alerts.incidents.rcaSummary.fix.connectToolset") }}
         </OButton>
       </template>
-    </OBanner>
+    </OInlineNotice>
 
     <!-- Stale live run; it can still be cancelled. -->
-    <OBanner
+    <OInlineNotice
       v-else-if="cardState === 'investigating' && stale"
       data-test="rca-stale-banner"
-      variant="warning"
-      icon="warning"
-      inline-actions
+      tone="warn"
     >
       <p data-test="rca-stale-message" class="text-banner-warning-text m-0 text-sm">
         {{ t("alerts.incidents.rcaRun.stale", { time: staleSince }) }}
@@ -264,58 +259,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <OButton
           data-test="rca-stale-cancel-btn"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :loading="cancelling"
           @click="$emit('cancel')"
         >
           {{ t("alerts.incidents.rcaRun.cancelRun") }}
         </OButton>
       </template>
-    </OBanner>
+    </OInlineNotice>
 
     <!-- A re-run of an analyzed incident, or a resumed run, is live. -->
-    <OBanner
+    <OInlineNotice
       v-else-if="cardState === 'investigating' && (hasEarlierReport || liveResumeStep)"
       data-test="rca-reanalyzing-banner"
-      variant="info"
-      inline-actions
+      tone="info"
     >
-      <template #icon>
-        <OSpinner size="xs" />
-      </template>
-      <p data-test="rca-reanalyzing-message" class="text-banner-info-text m-0 text-sm font-medium">
+      <p
+        data-test="rca-reanalyzing-message"
+        class="text-banner-info-text m-0 flex items-center gap-2 text-sm font-medium"
+      >
         {{ reanalyzingText }}
+        <OSpinner />
       </p>
       <template #actions>
         <OButton
           data-test="rca-follow-thread-btn"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           @click="$emit('follow-thread')"
         >
           {{ t("alerts.incidents.rcaRun.followInThread") }}
         </OButton>
         <OButton
           data-test="rca-banner-cancel-btn"
-          variant="outline"
-          size="sm"
+          variant="secondary"
           :loading="cancelling"
           @click="$emit('cancel')"
         >
           {{ t("alerts.incidents.rcaCancel") }}
         </OButton>
       </template>
-    </OBanner>
+    </OInlineNotice>
 
     <!-- The latest run failed; the reason leads, details stay collapsed. -->
-    <OBanner
-      v-else-if="cardState === 'failed'"
-      data-test="rca-error-banner"
-      variant="error-soft"
-      icon="error-outline"
-      inline-actions
-    >
+    <OInlineNotice v-else-if="cardState === 'failed'" data-test="rca-error-banner" tone="err">
       <p data-test="rca-error-reason" class="text-banner-error-soft-text m-0 text-sm font-medium">
         {{ error?.reason || t("alerts.incidents.rcaFailed") }}
       </p>
@@ -347,9 +333,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-if="canResume"
           data-test="rca-resume-btn"
-          variant="outline"
-          size="sm"
-          icon-left="play-arrow"
+          variant="secondary"
+          icon="play-arrow"
           :loading="resuming"
           :disabled="triggering"
           @click="$emit('resume')"
@@ -360,8 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="rca-retry-btn"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               :loading="triggering"
               :disabled="resuming"
             >
@@ -384,8 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="inline-flex">
             <OButton
               data-test="rca-retry-btn"
-              variant="outline"
-              size="sm"
+              variant="secondary"
               :loading="triggering"
               :disabled="resuming || !!startLockedReason"
               @click="$emit('retry', { buildOnPrevious: false })"
@@ -401,15 +384,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </OTooltip>
       </template>
-    </OBanner>
+    </OInlineNotice>
 
     <!-- The latest run was cancelled; its partial thread stays readable. -->
-    <OBanner
+    <OInlineNotice
       v-else-if="cardState === 'cancelled'"
       data-test="rca-cancelled-banner"
-      variant="error-soft"
-      icon="cancel"
-      inline-actions
+      tone="err"
     >
       <p data-test="rca-cancelled-message" class="text-banner-error-soft-text m-0 text-sm">
         {{ cancelledText }}
@@ -417,9 +398,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="canResume" #actions>
         <OButton
           data-test="rca-resume-btn"
-          variant="outline"
-          size="sm"
-          icon-left="play-arrow"
+          variant="secondary"
+          icon="play-arrow"
           :loading="resuming"
           :disabled="triggering"
           @click="$emit('resume')"
@@ -427,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.incidents.rcaResume.button") }}
         </OButton>
       </template>
-    </OBanner>
+    </OInlineNotice>
   </section>
 </template>
 
@@ -437,7 +417,7 @@ import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";

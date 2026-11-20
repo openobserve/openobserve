@@ -23,13 +23,13 @@ export class AlertTemplatesPage {
         this.templateNameInputField = '[data-test="add-template-name-input-field"]';
         this.templateEditor = '[data-test="add-template-editor"]';
         this.templateSubmitButton = '[data-test="add-template-submit-btn"]';
-        this.templateSuccessMessage = 'Template Saved Successfully.';
+        this.templateSuccessMessage = 'Template saved successfully.';
         
         // Template management locators
-        this.templateSearchInput = 'Search Template';
+        this.templateSearchInput = 'Search template';
         this.templateDeleteButton = '[data-test="alert-template-list-{templateName}-delete-template"]';
         this.templateUpdateButton = '[data-test="alert-template-list-{templateName}-update-template"]';
-        this.deleteConfirmText = 'Delete Template';
+        this.deleteConfirmText = 'Delete template';
         this.confirmButton = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
         this.confirmDialog = '[data-test="confirm-dialog"]';
         this.templateDeletedMessage = 'Template %s deleted successfully';
@@ -295,7 +295,7 @@ export class AlertTemplatesPage {
     async _getSearchInput() {
         // Try multiple strategies to find the template search input
         const strategies = [
-            // Strategy 1: placeholder text match (this.templateSearchInput = 'Search Template')
+            // Strategy 1: placeholder text match (this.templateSearchInput = 'Search template')
             () => this.page.getByPlaceholder(this.templateSearchInput),
             // Strategy 2: data-test selector for template search
             () => this.page.locator('[data-test="alert-template-search-input"]'),
@@ -824,7 +824,7 @@ export class AlertTemplatesPage {
             // Try import button selectors (avoiding overly broad selectors that click wrong elements)
             const importBtnFallbackLocators = [
                 this.templateImportButton,
-                'button:has-text("Import Template")',
+                'button:has-text("Import template")',
                 '[data-test*="template-import"]',
                 'button:has-text("Import")',
                 'table button:has-text("Import")',

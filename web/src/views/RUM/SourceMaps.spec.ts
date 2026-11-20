@@ -133,16 +133,16 @@ const buildGlobalConfig = (store: any, router: any, i18n: any) => ({
         "open",
         "width",
         "title",
-        "subTitle",
+        "subtitle",
         "showClose",
         "persistent",
         "size",
-        "primaryButtonLabel",
-        "secondaryButtonLabel",
-        "neutralButtonLabel",
-        "primaryButtonVariant",
+        "primary",
+        "secondary",
+        "extra",
+        "primary",
       ],
-      emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+      emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
       template:
         '<div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-size="size"><slot /></div>',
     },
@@ -365,7 +365,7 @@ describe("SourceMaps.vue", () => {
   // -------------------------------------------------------------------------
   // Apply filters / fetch with params
   // -------------------------------------------------------------------------
-  describe("Apply Filters", () => {
+  describe("Apply filters", () => {
     it("re-fetches source maps with all selected filters as params", async () => {
       wrapper = await mountComponent();
       listSourceMapsMock.mockClear();
@@ -453,15 +453,15 @@ describe("SourceMaps.vue", () => {
   // Delete dialog (ODialog migration)
   // -------------------------------------------------------------------------
   describe("Delete confirmation dialog (ODialog)", () => {
-    it("renders ODialog closed by default with xs size", async () => {
+    it("renders ODialog closed by default with sm size", async () => {
       wrapper = await mountComponent();
 
       const dialog = wrapper.findComponent({ name: "ODialog" });
       expect(dialog.exists()).toBe(true);
       expect(dialog.props("open")).toBe(false);
-      expect(dialog.props("size")).toBe("xs");
-      expect(dialog.props("primaryButtonLabel")).toBe("OK");
-      expect(dialog.props("secondaryButtonLabel")).toBe("Cancel");
+      expect(dialog.props("size")).toBe("sm");
+      expect(dialog.props("primary")?.label).toBe("OK");
+      expect(dialog.props("secondary")?.label).toBe("Cancel");
     });
 
     it("confirmDeleteSourceMap opens dialog and populates title/message/data", async () => {
@@ -479,8 +479,8 @@ describe("SourceMaps.vue", () => {
 
       const dialog = wrapper.findComponent({ name: "ODialog" });
       expect(dialog.props("open")).toBe(true);
-      expect(dialog.props("title")).toBe("Delete Source Maps");
-      expect(dialog.props("primaryButtonVariant")).toBe("destructive");
+      expect(dialog.props("title")).toBe("Delete source maps");
+      expect(dialog.props("primary")?.variant).toBe("danger");
       const name = dialog.find('[data-test="delete-source-maps-dialog-name"]');
       expect(name.text()).toBe("svc-a");
       expect(name.classes()).toContain("font-semibold");

@@ -420,6 +420,44 @@ export async function parseSQL(query: string, streamType: string = "logs"): Prom
   }
 }
 
+// The builder writes an alias unquoted in GROUP BY and ORDER BY, so only a lowercase identifier survives the round trip.
+const SQL_ALIAS = /^[a-z_][a-z0-9_]*$/;
+const TIME_FIELD = "_timestamp";
+
+/** The alias the user wrote; extractFields falls back to the column when there is none. */
+function userAliasOf(field: ParsedField): string | null {
+  return field.alias && field.alias !== field.column ? field.alias : null;
+}
+
+// A time bucket the user left unnamed keeps the generated alias: a guessed name could shadow a column in GROUP BY.
+function fieldAlias(field: ParsedField, generated: string): string {
+  const user = userAliasOf(field);
+  if (user) return user;
+  if (field.type === "raw") return generated;
+  const fn = field.aggregationFunction?.toLowerCase();
+  if (!fn) return field.column;
+  if (TIME_FUNCTIONS.has(fn)) return generated;
+  return field.column === TIME_FIELD ? fn : `${fn}_${field.column}`;
+}
+
+function uniqueAlias(wanted: string, generated: string, used: Set<string>): string {
+  const cleaned = wanted.toLowerCase().replace(/[^a-z0-9_]+/g, "_");
+  const base = SQL_ALIAS.test(cleaned) && cleaned !== TIME_FIELD ? cleaned : generated;
+  let alias = base;
+  for (let n = 2; used.has(alias); n++) alias = `${base}_${n}`;
+  used.add(alias);
+  return alias;
+}
+
+/** The axis title and legend name: what the user's SELECT called the field. */
+function fieldLabel(field: ParsedField): string {
+  const user = userAliasOf(field);
+  if (user) return user;
+  const fn = field.aggregationFunction?.toLowerCase();
+  if (!fn || TIME_FUNCTIONS.has(fn)) return field.column;
+  return `${fn}(${fn === "count" && field.column === TIME_FIELD ? "*" : field.column})`;
+}
+
 /**
  * Convert parsed query to dashboard panel data format
  * @param parsed The parsed query
@@ -437,6 +475,7 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
   /** True if table chart should be used (e.g., more than 2 GROUP BY fields) */
   useTableChart: boolean;
 } {
+  const usedAliases = new Set<string>();
   const sortFor = (field: ParsedField, axis: string) =>
     parsed.hasOrderBy
       ? (field.sortBy ?? null)
@@ -445,15 +484,14 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
         : null;
 
   const mapFieldToPanel = (field: ParsedField, index: number, axis: string) => {
-    // Always use sequential alias (e.g., x_axis_1, y_axis_1, z_axis_1)
-    // '_timestamp' is not allowed as an alias
     const generatedAlias = `${axis}_axis_${index + 1}`;
+    const alias = uniqueAlias(fieldAlias(field, generatedAlias), generatedAlias, usedAliases);
 
     // Check if this is a raw field (e.g., CASE/WHEN expression)
     if (field.type === "raw" && field.rawQuery) {
       return {
-        label: generatedAlias,
-        alias: generatedAlias,
+        label: userAliasOf(field) ?? generatedAlias,
+        alias,
         column: "",
         color: null,
         type: "raw",
@@ -466,8 +504,8 @@ export function parsedQueryToPanelFields(parsed: ParsedQuery): {
 
     // Field structure must match dashboard builder format with functionName and args
     const baseField: any = {
-      label: field.column,
-      alias: generatedAlias,
+      label: fieldLabel(field),
+      alias,
       column: field.column,
       color: null,
       type: "build",

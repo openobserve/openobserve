@@ -60,28 +60,29 @@ const ODialogStub = {
     "</div>",
   props: [
     "open",
+    "dirty",
     "side",
     "persistent",
     "size",
     "width",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "seamless",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 const mockStore = createStore({
@@ -194,7 +195,7 @@ describe("MoveAcrossFolders.vue", () => {
 
     const drawer = wrapper.findComponent(ODialogStub);
     expect(drawer.exists()).toBe(true);
-    expect(drawer.props("title")).toBe("Move Pipelines To Another Folder");
+    expect(drawer.props("title")).toBe("Move Pipelines to another folder");
   });
 
   // Test 4: Current folder name displayed via OInput modelValue
@@ -224,7 +225,7 @@ describe("MoveAcrossFolders.vue", () => {
   });
 
   // Test 6: Primary button disabled when source and destination folders are same
-  it("should pass primaryButtonDisabled=true when source and destination folders are same", async () => {
+  it("should pass primary?.disabled=true when source and destination folders are same", async () => {
     wrapper = createWrapper({
       activeFolderId: "folder1",
       type: "alerts",
@@ -235,11 +236,11 @@ describe("MoveAcrossFolders.vue", () => {
     await nextTick();
 
     const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("primaryButtonDisabled")).toBe(true);
+    expect(drawer.props("primary")?.disabled).toBe(true);
   });
 
   // Test 7: Primary button enabled when folders are different
-  it("should pass primaryButtonDisabled=false when source and destination folders differ", async () => {
+  it("should pass primary?.disabled=false when source and destination folders differ", async () => {
     wrapper = createWrapper({
       activeFolderId: "folder1",
       type: "alerts",
@@ -251,7 +252,22 @@ describe("MoveAcrossFolders.vue", () => {
     await nextTick();
 
     const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("primaryButtonDisabled")).toBe(false);
+    expect(drawer.props("primary")?.disabled).toBeFalsy();
+  });
+
+  it("asks before closing only after the user picked a folder, not when the picker settles", async () => {
+    wrapper = createWrapper({ activeFolderId: "folder1", type: "alerts" });
+    const selectDropdown = wrapper.findComponent({ name: "SelectFolderDropDown" });
+    const dialog = () => wrapper.findComponent(ODialogStub);
+
+    await selectDropdown.vm.$emit("folder-selected", { value: "default", label: "Default Folder" });
+    await nextTick();
+    expect(dialog().props("dirty")).toBe(false);
+
+    window.dispatchEvent(new Event("pointerdown"));
+    await selectDropdown.vm.$emit("folder-selected", { value: "folder2", label: "Test Folder 2" });
+    await nextTick();
+    expect(dialog().props("dirty")).toBe(true);
   });
 
   // Test 8: getModuleName function for alerts
@@ -274,8 +290,8 @@ describe("MoveAcrossFolders.vue", () => {
 
   it("keeps the folder wording for alerts", async () => {
     wrapper = createWrapper({ activeFolderId: "folder1", moduleId: ["a1"], type: "alerts" });
-    expect(wrapper.findComponent(ODialogStub).props("title")).toBe("Move Alerts To Another Folder");
-    expect(wrapper.text()).toContain("Current Folder");
+    expect(wrapper.findComponent(ODialogStub).props("title")).toBe("Move Alerts to another folder");
+    expect(wrapper.text()).toContain("Current folder");
     wrapper.vm.selectedFolder = { label: "Folder 2", value: "folder2" };
     mockMoveModuleToAnotherFolder.mockResolvedValue(true);
 
@@ -435,24 +451,24 @@ describe("MoveAcrossFolders.vue", () => {
   });
 
   // Test 22: Cancel surface — ODrawer renders the secondary (cancel) button via prop
-  it("should wire the cancel surface through ODrawer secondaryButtonLabel", async () => {
+  it("should wire the cancel surface through ODrawer secondary?.label", async () => {
     wrapper = createWrapper();
 
     const drawer = wrapper.findComponent(ODialogStub);
     // The migrated component drives the cancel action through click:secondary,
     // and the listener calls emit('update:open', false). The listener itself
     // is bound at the template level — we assert the surface is configured.
-    expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
+    expect(drawer.props("secondary")?.label).toBe("Cancel");
     // The listener should be registered on the drawer instance
     expect(drawer.vm.$attrs).toBeDefined();
   });
 
   // Test 23: ODrawer renders with correct migrated props (close button surface)
-  it('should pass secondaryButtonLabel "Cancel" to ODrawer', () => {
+  it('should pass secondary?.label "Cancel" to ODrawer', () => {
     wrapper = createWrapper();
 
     const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
+    expect(drawer.props("secondary")?.label).toBe("Cancel");
   });
 
   // Test 24: Drawer renders with correct body section
@@ -483,7 +499,7 @@ describe("MoveAcrossFolders.vue", () => {
   });
 
   // Test 27: Primary button loading state
-  it("should pass primaryButtonLoading=true when onSubmit is loading", async () => {
+  it("should pass primary?.loading=true when onSubmit is loading", async () => {
     mockUseLoading.mockImplementation((fn: any) => ({
       execute: vi.fn().mockImplementation(async () => fn && (await fn())),
       isLoading: { value: true },
@@ -492,7 +508,7 @@ describe("MoveAcrossFolders.vue", () => {
     wrapper = createWrapper();
 
     const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("primaryButtonLoading")).toBe(true);
+    expect(drawer.props("primary")?.loading).toBe(true);
     expect(wrapper.vm.onSubmit.isLoading.value).toBe(true);
   });
 
@@ -657,7 +673,7 @@ describe("MoveAcrossFolders.vue", () => {
     expect(wrapper.vm.selectedFolder).toEqual(newFolder);
   });
 
-  // Test 40: primaryButtonDisabled with null selectedFolder value
+  // Test 40: primary?.disabled with null selectedFolder value
   // Inverted deliberately. This asserted that a null destination ENABLES Move —
   // which submits `dst_folder_id: null`. "Not the active folder" is not the same
   // as "somewhere to move to", and the empty destination the dialog now opens in
@@ -675,13 +691,13 @@ describe("MoveAcrossFolders.vue", () => {
 
     const drawer = wrapper.findComponent(ODialogStub);
     // Unset on open — nothing has been chosen yet.
-    expect(drawer.props("primaryButtonDisabled")).toBe(true);
+    expect(drawer.props("primary")?.disabled).toBe(true);
 
     const selectDropdown = wrapper.findComponent({ name: "SelectFolderDropDown" });
     await selectDropdown.vm.$emit("folder-selected", { value: null, label: "None" });
     await nextTick();
 
-    expect(drawer.props("primaryButtonDisabled")).toBe(true);
+    expect(drawer.props("primary")?.disabled).toBe(true);
   });
 
   // Test 41: Handles API error gracefully when move fails
@@ -766,7 +782,7 @@ describe("MoveAcrossFolders.vue", () => {
     });
 
     const initialFolder = wrapper.vm.selectedFolder;
-    const newFolder = { value: "folder2", label: "New Folder" };
+    const newFolder = { value: "folder2", label: "New folder" };
 
     const selectComponent = wrapper.findComponent({ name: "SelectFolderDropDown" });
     await selectComponent.vm.$emit("folder-selected", newFolder);
@@ -803,8 +819,8 @@ describe("MoveAcrossFolders.vue", () => {
     wrapper = createWrapper();
 
     const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("primaryButtonLabel")).toBe("Move");
-    expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
+    expect(drawer.props("primary")?.label).toBe("Move");
+    expect(drawer.props("secondary")?.label).toBe("Cancel");
   });
 
   // Test 50: ODrawer open propagation

@@ -76,7 +76,7 @@ describe("AlertCalibrationLastRun", () => {
     });
     const banner = wrapper.find('[data-test="alert-calibration-last-run-failed"]');
     expect(banner.text()).toContain("ingestion token is disabled");
-    expect(banner.classes()).toContain("bg-banner-error-bg");
+    expect(banner.classes()).toContain("bg-banner-error-soft-bg");
     expect(banner.classes().some((c) => c.includes("warning"))).toBe(false);
     expect(banner.attributes("role")).toBe("alert");
     wrapper.unmount();
@@ -91,7 +91,7 @@ describe("AlertCalibrationLastRun", () => {
     });
     const banner = wrapper.find('[data-test="alert-calibration-last-run-failed"]');
     expect(banner.text()).toContain("ingestion token is not active yet");
-    expect(banner.classes()).toContain("bg-banner-error-bg");
+    expect(banner.classes()).toContain("bg-banner-error-soft-bg");
     expect(banner.classes().some((c) => c.includes("warning"))).toBe(false);
     expect(banner.attributes("role")).toBe("alert");
     wrapper.unmount();

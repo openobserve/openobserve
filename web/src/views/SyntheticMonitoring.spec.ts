@@ -22,6 +22,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
+import { fillField } from "@/test/unit/helpers/fillField";
+import { byTest, pressEscape } from "@/test/unit/helpers/draftDom";
 import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 const $t = (key: string) => key;
@@ -207,22 +209,13 @@ const baseStubs = {
   },
   ODialog: {
     template: '<div v-if="open"><slot /></div>',
-    props: [
-      "open",
-      "size",
-      "title",
-      "subTitle",
-      "primaryButtonLabel",
-      "secondaryButtonLabel",
-      "primaryButtonDisabled",
-      "primaryButtonVariant",
-    ],
+    props: ["open", "size", "title", "subtitle", "primary", "secondary", "primary", "primary"],
     emits: ["click:primary", "click:secondary", "update:open"],
   },
   OButton: {
     template:
-      '<button :data-test="$attrs[\'data-test\']"><slot name="icon-left" /><slot name="icon-right" /><slot /></button>',
-    props: ["variant", "size", "class", "loading", "title", "iconLeft"],
+      '<button :data-test="$attrs[\'data-test\']"><slot name="icon" /><slot name="icon-end" /><slot /></button>',
+    props: ["variant", "size", "class", "loading", "title", "icon"],
     inheritAttrs: true,
   },
   OSelect: {
@@ -976,6 +969,39 @@ describe("SyntheticMonitoring", () => {
       expect(mockServiceCreate).not.toHaveBeenCalled();
     });
 
+    it("asks before Escape drops an edited name in the real dialog", async () => {
+      wrapper = mount(SyntheticMonitoring, {
+        attachTo: document.body,
+        global: { plugins: [store], stubs: { ...baseStubs, ODialog: false } },
+      });
+      await flushPromises();
+      await openDuplicate();
+      await fillField("synthetic-monitoring-duplicate-name-input", "Checkout flow v2");
+
+      pressEscape();
+      await flushPromises();
+
+      expect(byTest("o-dialog-discard-row")).not.toBeNull();
+      expect((wrapper.vm as any).showDuplicateDialog).toBe(true);
+    });
+
+    it("closes on Escape when only the folder picker settled after the dialog opened", async () => {
+      wrapper = mount(SyntheticMonitoring, {
+        attachTo: document.body,
+        global: { plugins: [store], stubs: { ...baseStubs, ODialog: false } },
+      });
+      await flushPromises();
+      await openDuplicate();
+      findFolderSelect().vm.$emit("folder-selected", { label: "Default", value: "default" });
+      await flushPromises();
+
+      pressEscape();
+      await flushPromises();
+
+      expect(byTest("o-dialog-discard-row")).toBeNull();
+      expect((wrapper.vm as any).showDuplicateDialog).toBe(false);
+    });
+
     it("creates the copy in the folder chosen in the dropdown", async () => {
       wrapper = mountPage();
       await flushPromises();
@@ -1482,7 +1508,7 @@ describe("SyntheticMonitoring", () => {
         expect.objectContaining({
           messageKeypath: "synthetics.dialog.deleteSingleBody",
           messageName: "checkout-flow",
-          confirmVariant: "destructive",
+          kind: "destructive",
         }),
       );
       expect(mockServiceDelete).not.toHaveBeenCalled();
@@ -1498,7 +1524,7 @@ describe("SyntheticMonitoring", () => {
         expect.objectContaining({
           messageKeypath: "statusPages.dialog.deleteBody",
           messageName: "Public status",
-          confirmVariant: "destructive",
+          kind: "destructive",
         }),
       );
     });
@@ -1510,13 +1536,13 @@ describe("SyntheticMonitoring", () => {
       await flushPromises();
 
       const dialog = wrapper.find('[data-test="synthetic-monitoring-delete-location-dialog"]');
-      const name = dialog.find('[data-test="synthetic-monitoring-delete-location-name"]');
+      const name = dialog.find('[data-test="confirm-dialog-name"]');
       expect(name.text()).toBe("eu-west-agents");
       expect(name.classes()).toContain("font-semibold");
       const stub = wrapper
         .findAllComponents(baseStubs.ODialog)
         .find((d) => d.attributes("data-test") === "synthetic-monitoring-delete-location-dialog");
-      expect(stub?.props("primaryButtonVariant")).toBe("destructive");
+      expect(stub?.props("primary")?.variant).toBe("danger");
     });
   });
 });

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <DrawerSection :title="t('autoobserve.analysis.verdict')">
         <template v-if="unconfirmed" #aside>
           <OTag
-            variant="warning-soft"
+            tone="warn"
             size="sm"
             icon="hourglass-empty"
             :label="t('autoobserve.analysis.unconfirmed')"
@@ -66,13 +66,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-for="(chip, i) in issue.analysis.impact"
             :key="i"
-            :variant="tone.tag"
+            :tone="tone.tag"
             size="sm"
             :label="chip"
           />
           <OTag
             v-if="issue.analysis.duration"
-            variant="default-soft"
+            tone="neutral"
             size="sm"
             icon="schedule"
             :label="issue.analysis.duration"
@@ -80,8 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-for="svc in issue.services"
             :key="svc"
-            variant="default-soft"
-            shape="rounded"
+            tone="neutral"
             size="sm"
             :label="raw(svc)"
           />
@@ -243,18 +242,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #aside>
           <div class="ms-auto flex items-center gap-1">
             <OButton
-              variant="ghost-muted"
-              size="sm"
-              icon-left="content-copy"
+              variant="ghost"
+              icon="content-copy"
               data-test="autoobserve-analysis-copy"
               @click="notInDemo"
             >
               {{ t("alerts.incidents.rcaCopy") }}
             </OButton>
             <OButton
-              variant="ghost-muted"
-              size="sm"
-              icon-left="download"
+              variant="ghost"
+              icon="download"
               data-test="autoobserve-analysis-download"
               @click="notInDemo"
             >
@@ -285,8 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div v-if="entry.status === 'awaiting'" class="flex items-center gap-2">
             <OButton
-              variant="outline"
-              size="sm"
+              variant="secondary"
               data-test="autoobserve-analysis-reject"
               @click="emit('reject')"
             >
@@ -294,7 +290,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               variant="primary"
-              size="sm"
               data-test="autoobserve-analysis-approve"
               @click="emit('approve')"
             >
@@ -303,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OTag
             v-else
-            :variant="LEDGER_STATUS[entry.status].variant"
+            :tone="LEDGER_STATUS[entry.status].variant"
             size="sm"
             :label="t(LEDGER_STATUS[entry.status].key)"
           />
@@ -316,11 +311,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="autoobserve-analysis-report"
     >
       <OCollapsible
-        v-model="reportOpen"
-        icon="description"
-        :label="t('autoobserve.analysis.fullReport')"
-        :caption="t('autoobserve.analysis.fullReportHint')"
-        trigger-class="px-4 py-3 rounded-none"
+        v-model:open="reportOpen"
+        :title="t('autoobserve.analysis.fullReport')"
+        :summary="t('autoobserve.analysis.fullReportHint')"
       >
         <div class="flex flex-col p-4 pt-0">
           <slot name="report" />
@@ -339,7 +332,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import DrawerSection from "@/components/autoobserve/v2/DrawerSection.vue";
 import {
@@ -383,11 +376,11 @@ const { t } = useI18nTyped();
 const CARD =
   "bg-surface-base border-border-default rounded-surface flex flex-col border p-4 shadow-xs";
 
-const SEVERITY_TONE: Record<Severity, { bar: string; ink: string; tag: BadgeVariant }> = {
-  p1: { bar: "bg-status-error-text", ink: "text-status-error-text", tag: "error-soft" },
-  p2: { bar: "bg-status-error-text", ink: "text-status-error-text", tag: "error-soft" },
-  p3: { bar: "bg-status-warning-text", ink: "text-status-warning-text", tag: "warning-soft" },
-  p4: { bar: "bg-border-strong", ink: "text-text-heading", tag: "default-soft" },
+const SEVERITY_TONE: Record<Severity, { bar: string; ink: string; tag: ChipTone }> = {
+  p1: { bar: "bg-status-error-text", ink: "text-status-error-text", tag: "err" },
+  p2: { bar: "bg-status-error-text", ink: "text-status-error-text", tag: "err" },
+  p3: { bar: "bg-status-warning-text", ink: "text-status-warning-text", tag: "warn" },
+  p4: { bar: "bg-border-strong", ink: "text-text-heading", tag: "neutral" },
 };
 
 const VERDICT: Record<HypothesisVerdict, { icon: IconName; circle: string; ink: string }> = {

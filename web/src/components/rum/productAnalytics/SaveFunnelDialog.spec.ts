@@ -20,12 +20,12 @@ import SaveFunnelDialog from "./SaveFunnelDialog.vue";
 
 const ODialogStub = {
   name: "ODialog",
-  props: ["open", "title", "primaryButtonLabel", "secondaryButtonLabel", "formId"],
+  props: ["open", "title", "primary", "secondary", "formId"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `<div v-if="open" data-test-stub="o-dialog" :data-title="title" :data-form-id="formId">
     <slot />
-    <button data-test="o-dialog-secondary-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-    <button data-test="o-dialog-primary-btn" type="submit" :form="formId">{{ primaryButtonLabel }}</button>
+    <button data-test="o-dialog-secondary-btn" @click="$emit('click:secondary')">{{ secondary?.label }}</button>
+    <button data-test="o-dialog-primary-btn" type="submit" :form="formId">{{ primary?.label }}</button>
   </div>`,
 };
 

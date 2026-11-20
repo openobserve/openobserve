@@ -16,18 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OPageLayout
-    icon="domain"
     :title="t('settings.orgDomainMapping.tabLabel')"
-    :subtitle="t('settings.orgDomainMapping.pageSubtitle')"
+    :about="t('settings.orgDomainMapping.pageSubtitle')"
     data-test="settings-org-domain-management"
-    tabs-below
     bleed
   >
     <template #header-tabs>
       <OTabs
         :model-value="activeTab"
-        dense
-        align="left"
+        size="compact"
         data-test="settings-org-domain-management-tabs"
         @update:model-value="setTab"
       >
@@ -59,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-if="activeTab === 'linked'"
         variant="primary"
-        size="sm"
         data-test="settings-org-domain-management-link-btn"
         @click="linkedDomains?.openLink()"
       >
@@ -68,7 +64,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         v-else-if="activeTab === 'mappings'"
         variant="primary"
-        size="sm"
         :disabled="settings.isPending.value || settings.isError.value"
         data-test="settings-org-domain-management-add-mapping-btn"
         @click="mappings?.openAdd()"
@@ -89,12 +84,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else-if="activeTab === 'requests' && isMetaOrg">
         <OrgDomainRequests :key="`requests-${orgId}`" :org-id="orgId" />
       </template>
-      <div v-else-if="settings.isPending.value" class="flex justify-center py-8">
-        <OSpinner />
+      <div v-else-if="settings.isPending.value" class="px-page-edge pt-3">
+        <OSkeleton preset="tableRows" :rows="6" />
       </div>
       <OEmptyState
         v-else-if="settings.isError.value"
-        preset="load-error"
+        kind="error"
+        :title="t('emptyState.loadError.title')"
+        :text="t('emptyState.loadError.description')"
         data-test="settings-org-domain-management-load-error"
         @action="settings.refetch()"
       />
@@ -126,7 +123,7 @@ import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import { useOrgId } from "@/composables/query";

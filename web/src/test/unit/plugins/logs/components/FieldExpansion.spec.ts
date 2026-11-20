@@ -45,16 +45,16 @@ const OCollapsibleStub = {
   name: "OCollapsible",
   template: `
     <div class="o-collapsible-stub">
-      <div class="collapsible-trigger" @click="$emit('update:modelValue', !modelValue)">
+      <div class="collapsible-trigger" @click="$emit('update:open', !open)">
         <slot name="trigger" />
       </div>
-      <div v-if="modelValue" class="collapsible-content">
+      <div v-if="open" class="collapsible-content">
         <slot />
       </div>
     </div>
   `,
-  props: ["modelValue"],
-  emits: ["update:modelValue"],
+  props: ["open"],
+  emits: ["update:open"],
 };
 
 describe("FieldExpansion.vue", () => {

@@ -23,10 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-left>
       <OButton
-        variant="outline"
-        size="sm"
+        variant="secondary"
         class="min-w-0 flex-1"
-        :icon-right="sqlExpanded ? 'expand-less' : 'expand-more'"
+        :icon-end="sqlExpanded ? 'expand-less' : 'expand-more'"
         :aria-expanded="sqlExpanded"
         data-test="query-plan-sql-toggle"
         @click="sqlExpanded = !sqlExpanded"
@@ -45,16 +44,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="query-plan-mode"
         @update:model-value="onMode"
       >
-        <OToggleGroupItem value="plan" size="sm" data-test="query-plan-mode-plan">{{
+        <OToggleGroupItem value="plan" data-test="query-plan-mode-plan">{{
           t("search.queryProfile.modePlan")
         }}</OToggleGroupItem>
-        <OToggleGroupItem value="text" size="sm" data-test="query-plan-mode-text">{{
+        <OToggleGroupItem value="text" data-test="query-plan-mode-text">{{
           t("search.queryProfile.modeText")
         }}</OToggleGroupItem>
-        <OToggleGroupItem value="analyze" size="sm" data-test="query-plan-mode-analyze">
+        <OToggleGroupItem value="analyze" data-test="query-plan-mode-analyze">
           {{ t("search.queryProfile.modeAnalyze") }}
           <span v-if="analyzeBusy" class="ms-1.5 inline-flex items-center gap-1">
-            <OSpinner size="xs" />
+            <OSpinner />
             <span
               class="text-2xs font-mono tabular-nums"
               data-test="query-plan-mode-analyze-elapsed"
@@ -91,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default bg-surface-base max-h-[30vh] shrink-0 overflow-auto border-b px-4 py-3"
         data-test="query-plan-sql-full"
       >
-        <OCodeBlock :code="sqlQuery" lang="sql" wrap padded data-test="query-plan-sql-code" />
+        <OCodeBlock :code="sqlQuery" lang="sql" wrap data-test="query-plan-sql-code" />
       </div>
 
       <div class="min-h-0 flex-1">
@@ -109,12 +108,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :warning="runWarning !== undefined"
               @rerun="runAnalyze"
             />
-            <OBanner
+            <OInlineNotice
               v-if="runWarning !== undefined"
-              variant="warning"
-              icon="warning"
+              tone="warn"
               class="shrink-0"
-              :content="raw(runWarning) || t('search.queryProfile.analyzePartial')"
+              :message="raw(runWarning) || t('search.queryProfile.analyzePartial')"
               data-test="query-plan-analyze-warning"
             />
             <div class="relative min-h-0 flex-1">
@@ -168,18 +166,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div
+        <OSkeleton
           v-else-if="planLoading"
-          class="flex h-full flex-col items-center justify-center gap-3 p-6"
+          preset="tableRows"
+          :rows="6"
           data-test="query-plan-loading"
-        >
-          <OSpinner variant="dots" size="lg" />
-          <div class="text-text-secondary text-sm">{{ t("search.loadingPlan") }}</div>
-        </div>
+        />
 
-        <div v-else-if="planError" class="p-4" data-test="query-plan-error">
-          <OBanner variant="error" icon="error" :content="raw(planError)" />
-        </div>
+        <OEmptyState
+          v-else-if="planError"
+          kind="error"
+          :text="isRawHttpText(planError) ? undefined : raw(planError)"
+          data-test="query-plan-error"
+          @action="fetchExplainPlan"
+        />
 
         <QueryPlanView
           v-else-if="mode === 'plan' && planModel"
@@ -194,13 +194,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :analyze-rows="analyzeRows"
         />
 
-        <div
+        <OEmptyState
           v-else
-          class="text-text-secondary px-4 py-6 text-center text-sm"
+          icon="account-tree"
+          :title="t('search.noPhysicalPlan')"
           data-test="query-plan-empty"
-        >
-          {{ t("search.noPhysicalPlan") }}
-        </div>
+        />
       </div>
     </div>
   </ODialog>
@@ -212,10 +211,13 @@ import { isAxiosError } from "axios";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -389,12 +391,12 @@ const analyzeNotice = computed<AnalyzeNotice | null>(() => {
       stoppedAfterMs.value >= TICK_MS
         ? t("search.queryProfile.cancelledAfter", { elapsed })
         : t("search.queryProfile.cancelledNow");
-    return { variant: "info", text };
+    return { tone: "info", text };
   }
   if (analyzeState.value !== "failed") return null;
   const message = analyzeError.value.replace(/[.\s]+$/, "");
   return {
-    variant: "error",
+    tone: "err",
     text: stoppedAfterMs.value
       ? t("search.queryProfile.failedAfter", { elapsed, message })
       : t("search.queryProfile.failedNow", { message }),

@@ -274,7 +274,11 @@ export class RumProductAnalyticsPage {
     async pickOption(dataTest, { label = null, value = null, search = null } = {}) {
         await this.page.locator(`[data-test="${dataTest}-trigger"]`).click();
         if (search !== null) {
-            await this.page.locator(`[data-test="${dataTest}-search"]`).fill(search);
+            // OSelect renders its search box only past eight options; a short list shows every row.
+            await this.page.locator(`[data-test="${dataTest}-popover"] [data-test-value]`).first()
+                .waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
+            const searchBox = this.page.locator(`[data-test="${dataTest}-search"]`);
+            if (await searchBox.count()) await searchBox.fill(search);
         }
         const option = label !== null
             ? this.page.locator(`[data-test="${dataTest}-option"][data-test-label="${label}"]`)

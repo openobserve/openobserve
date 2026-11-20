@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { Severity } from "../aoTypes";
 import type { LookKind } from "./changes";
 
@@ -32,7 +32,7 @@ export interface RequestCopy {
   label: I18nText;
   headline: I18nText;
   why: I18nText | null;
-  tags: { label: I18nText; variant: BadgeVariant; hint?: I18nText }[];
+  tags: { label: I18nText; variant: ChipTone; hint?: I18nText }[];
   look: LookKind;
 }
 

@@ -46,16 +46,10 @@ const mountChrome = (props: Record<string, unknown> = {}, slots: Record<string, 
   });
 
 describe("DbmPageChrome", () => {
-  /**
-   * What made seven headers one header: the database icon, the tab row BELOW
-   * the title, and a bleeding body. Drop `tabs-below` and the strip climbs into
-   * the title row; drop `bleed` and every table gains a gutter its rows do not.
-   */
-  it("is the tabs-below, bleeding, database-iconed page layout", () => {
+  // Drop `bleed` and every table gains a gutter its rows do not.
+  it("is a bleeding page layout", () => {
     const layout = mountChrome().findComponent(OPageLayout);
 
-    expect(layout.props("icon")).toBe("database");
-    expect(layout.props("tabsBelow")).toBe(true);
     expect(layout.props("bleed")).toBe(true);
   });
 
@@ -64,7 +58,7 @@ describe("DbmPageChrome", () => {
     const layout = mountChrome().findComponent(OPageLayout);
 
     expect(layout.props("title")).toBe("Databases");
-    expect(layout.props("subtitle")).toBe("Query performance and health across your databases");
+    expect(layout.props("about")).toBe("Query performance and health across your databases");
     expect(layout.props("titleDataTest")).toBe("dbm-deadlocks-title");
   });
 

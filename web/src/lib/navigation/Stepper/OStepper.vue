@@ -120,9 +120,9 @@ const isHorizontal = computed(() => props.orientation !== "vertical");
 function indicatorClasses(step: StepRegistration): string {
   const base = [
     "flex items-center justify-center",
-    "size-8 rounded-full shrink-0",
-    "text-sm font-semibold leading-none",
-    "transition-colors duration-150",
+    "size-control-md rounded-full shrink-0",
+    "text-compact font-semibold leading-none",
+    "transition-colors duration-(--duration-control) ease-(--ease-control)",
   ].join(" ");
 
   if (step.error) {
@@ -138,16 +138,16 @@ function indicatorClasses(step: StepRegistration): string {
 }
 
 function titleClasses(step: StepRegistration): string {
-  if (step.name === props.modelValue) return "text-xs font-medium text-stepper-title-active";
-  if (step.done) return "text-xs font-medium text-stepper-title-done";
-  return "text-xs font-medium text-stepper-title-default";
+  if (step.name === props.modelValue) return "text-compact font-medium text-stepper-title-active";
+  if (step.done) return "text-compact font-medium text-stepper-title-done";
+  return "text-compact font-medium text-stepper-title-default";
 }
 
 function triggerClasses(step: StepRegistration): string {
   const base = [
     "flex flex-row items-center gap-2 px-2 py-1.5",
     "rounded-default outline-none select-none",
-    "transition-colors duration-150",
+    "transition-colors duration-(--duration-control) ease-(--ease-control)",
   ].join(" ");
   if (canNavigateTo(step)) {
     return [

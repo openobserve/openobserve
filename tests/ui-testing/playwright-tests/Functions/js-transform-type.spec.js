@@ -239,8 +239,8 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       // JS radio visibility in a non-meta org is EDITION-dependent (see file header):
       //   OSS      -> JS is _meta-only, so the radio is shown LOCKED (lock icon) here.
       //   ENT/cloud-> JS is offered in every org, so the radio is VISIBLE here.
-      // We detect the edition at runtime from the header edition button label
-      // (data-test="upgrade-to-enterprise-btn"), which is driven by the SAME
+      // We detect the edition at runtime from the edition entry's label (top bar on OSS,
+      // Help menu on ENT/cloud; data-test="upgrade-to-enterprise-btn"), which is driven by the SAME
       // build-time flags (config.isEnterprise/isCloud via @/aws-exports) that gate
       // the JS radio — so it's the exact source of truth, no CI env var needed.
       // Step 2 (VRL create in a non-meta org) is edition-agnostic and always runs.

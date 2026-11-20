@@ -83,7 +83,7 @@ const stubs = {
   },
   OEmptyState: {
     name: "OEmptyState",
-    props: ["description", "hideAction"],
+    props: ["text"],
     emits: ["action"],
     template: "<button @click=\"$emit('action')\" />",
   },
@@ -91,15 +91,14 @@ const stubs = {
   // invents one lets a dialog that can never open test green.
   ODialog: {
     name: "ODialog",
-    props: ["open", "primaryButtonLabel", "primaryButtonDisabled", "primaryButtonDataTest"],
+    props: ["open", "primary", "primary", "primary"],
     emits: ["click:primary", "update:open"],
     template: `<div v-if='open'><slot /><slot name='footer' />
-      <button v-if="primaryButtonLabel" :data-test="primaryButtonDataTest" :disabled="primaryButtonDisabled" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+      <button v-if="primary?.label" :data-test="primary?.dataTest" :disabled="primary?.disabled" @click="$emit('click:primary')">{{ primary?.label }}</button>
     </div>`,
   },
   OUserCell: { name: "OUserCell", props: ["value"], template: "<span>{{ value }}</span>" },
   OCard: { name: "OCard", template: "<div><slot /></div>" },
-  OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OTooltip: {
     name: "OTooltip",
@@ -287,9 +286,8 @@ describe("OnCallMembers", () => {
     const empty = render({ members: [], canConfigure: false });
     await flushPromises();
     const state = empty.findComponent({ name: "OEmptyState" });
-    expect(state.props("hideAction")).toBe(true);
-    await state.vm.$emit("action");
-    await flushPromises();
+    expect(state.props("actionLabel")).toBeUndefined();
+    expect(state.find('[data-test="o2-empty-state-action"]').exists()).toBe(false);
     expect(empty.find('[data-test="oncall-members-user-select"]').exists()).toBe(false);
     expect(memberPickerFocus).not.toHaveBeenCalled();
 
@@ -621,7 +619,7 @@ describe("OnCallMembers", () => {
       const confirm = wrapper.findComponent({ name: "ConfirmDialog" });
 
       expect(confirm.props("okLabel")).toBe("Remove");
-      expect(confirm.props("okVariant")).toBe("destructive");
+      expect(confirm.props("kind")).toBe("destructive");
     });
 
     // After the remove, who is on call now per rotation, read back from the server.
@@ -839,7 +837,7 @@ describe("OnCallMembers", () => {
     const confirm = wrapper.findComponent({ name: "ConfirmDialog" });
     expect(confirm.props("modelValue")).toBe(true);
     expect(confirm.props("title")).toBe("Remove Ana Sharma from Payments?");
-    expect(confirm.props("okVariant")).toBe("destructive");
+    expect(confirm.props("kind")).toBe("destructive");
 
     confirm.vm.$emit("update:cancel");
     await flushPromises();

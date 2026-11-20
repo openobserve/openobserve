@@ -35,7 +35,7 @@ vi.mock("vue-router", () => ({
 }));
 
 // Resolve translation keys against the real app locale so serviceHealth
-// labels and other text ("Healthy", "View Related", ...) come through instead
+// labels and other text ("Healthy", "View related", ...) come through instead
 // of raw key paths.
 vi.mock("vue-i18n", async () => {
   const enLocaleFull = (await import("@/locales/languages/en-US.json")).default as Record<
@@ -177,15 +177,15 @@ const ODrawerStub = {
     "modal",
     "portalTarget",
     "title",
-    "subTitle",
+    "subtitle",
     "size",
     "showClose",
     "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       v-if="open"
@@ -506,7 +506,7 @@ describe("ServiceGraphSidePanel.vue", () => {
       wrapper = createWrapper();
       const btn = wrapper.find('[data-test="service-graph-node-panel-view-related-btn"]');
       expect(btn.exists()).toBe(true);
-      expect(btn.text()).toContain("View Related");
+      expect(btn.text()).toContain("View related");
     });
   });
 

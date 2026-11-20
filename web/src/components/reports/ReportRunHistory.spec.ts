@@ -21,7 +21,7 @@ import { withQueryClient } from "@/test/unit/helpers/queryClient";
 import reports from "@/services/reports";
 import { rememberManualRun } from "@/utils/reports/reportRun";
 import type { ReportRunHit } from "@/services/reports";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import ReportRunHistory from "./ReportRunHistory.vue";
 
 const replace = vi.fn();
@@ -415,7 +415,7 @@ describe("ReportRunHistory", () => {
     expect(w.find('[data-test="reports-reportrundrawer-scheduled-for"]').text()).toMatch(
       / \(UTC\)$/,
     );
-    expect(w.findAllComponents(OBanner)).toHaveLength(0);
+    expect(w.findAllComponents(OInlineNotice)).toHaveLength(0);
   });
 
   it("does not fetch the report when the page passes it", async () => {

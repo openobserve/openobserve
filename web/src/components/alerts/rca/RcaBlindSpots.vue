@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section data-test="rca-blind-spots" :aria-labelledby="headingId" class="flex flex-col">
     <div class="mb-2.5 flex flex-wrap items-baseline gap-2">
-      <h3 :id="headingId" class="text-text-heading m-0 text-base font-bold">
+      <h3 :id="headingId" class="text-text-heading m-0 text-sm font-semibold">
         {{ t("alerts.incidents.rcaSummary.blindSpots") }}
       </h3>
       <span class="text-text-secondary text-xs">{{ blindSpots.length }}</span>
@@ -61,11 +61,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="rca-blind-spot-action"
                 :data-fix="spot.fix"
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 disabled
               >
-                <template #icon-left>
+                <template #icon>
                   <OIcon
                     name="lock"
                     class="lock-chip"
@@ -82,9 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rca-blind-spot-action"
             :data-fix="spot.fix"
             class="shrink-0"
-            variant="outline"
-            size="sm"
-            :icon-left="actions[spot.id]!.icon"
+            variant="secondary"
+            :icon="actions[spot.id]!.icon"
             @click="router.push(actions[spot.id]!.route)"
           >
             {{ actions[spot.id]!.label }}
@@ -94,9 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="rca-blind-spot-action"
             data-fix="resume_run"
             class="shrink-0"
-            variant="outline"
-            size="sm"
-            icon-left="play-arrow"
+            variant="secondary"
+            icon="play-arrow"
             :loading="resuming"
             :disabled="triggering"
             @click="$emit('resume')"

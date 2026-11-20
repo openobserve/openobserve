@@ -165,11 +165,13 @@ export function useSlackAppSwitch() {
       return switched;
     }
     const [first] = failures;
+    const summary = t("slackApp.switchAll.summary", { switched, count: failures.length });
     toast({
       variant: switched ? "warning" : "error",
-      title: t("slackApp.switchAll.summary", { switched, count: failures.length }),
-      // One line each: server reasons can themselves contain ";".
-      message: raw(failures.map(({ name, failure }) => failureLine(name, failure)).join("\n")),
+      // One line each: server reasons can themselves contain ";". The toast cuts the line and shows all on hover.
+      message: raw(
+        [summary, ...failures.map(({ name, failure }) => failureLine(name, failure))].join("\n"),
+      ),
       ...(failures.length === 1
         ? reviewAction(first.name, first.failure.refusal, installationId)
         : {}),

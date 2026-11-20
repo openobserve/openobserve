@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButton
     v-if="enabled"
-    variant="outline"
-    size="icon-toolbar"
-    icon-left="manage-search"
+    icon-only
+    variant="ghost"
+    icon="manage-search"
     :aria-label="t('recentSearches.title')"
     :data-test="dataTest"
     @click="emit('view-all', null)"

@@ -60,7 +60,7 @@ describe("PatternCard", () => {
   };
   const OButtonStub = {
     name: "OButton",
-    props: ["variant", "size", "iconLeft", "iconRight", "disabled", "title"],
+    props: ["variant", "size", "icon", "iconEnd", "disabled", "title"],
     // Do NOT declare "click" in emits — VTU then treats the parent's @click.stop
     // as a native DOM listener on the root element, which fires on trigger("click").
     emits: [],
@@ -148,7 +148,7 @@ describe("PatternCard", () => {
     });
   });
 
-  describe("Anomaly Detection", () => {
+  describe("Anomaly detection", () => {
     it("should display anomaly badge when pattern is an anomaly", async () => {
       await wrapper.setProps({
         pattern: { ...mockPattern, is_anomaly: true },
@@ -157,7 +157,7 @@ describe("PatternCard", () => {
 
       const anomalyBadge = wrapper.find('[data-test="pattern-card-0-anomaly-badge"]');
       expect(anomalyBadge.exists()).toBe(true);
-      expect(anomalyBadge.text()).toContain("Rare Pattern");
+      expect(anomalyBadge.text()).toContain("Rare pattern");
     });
 
     it("should not display anomaly badge when pattern is not an anomaly", () => {

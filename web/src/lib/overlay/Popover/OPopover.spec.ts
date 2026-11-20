@@ -187,4 +187,36 @@ describe("OPopover", () => {
     expect(wrapper.emitted("focus-outside")?.[0]).toEqual([focus]);
     expect(down.defaultPrevented).toBe(false);
   });
+  describe("v2 sizes", () => {
+    const openWith = (props: Record<string, unknown>, slots: Record<string, string> = {}) =>
+      mount(OPopover, {
+        props: { open: true, ...props },
+        slots: { trigger: "<button>Open</button>", default: "<p>Body</p>", ...slots },
+      });
+    const surface = (w: ReturnType<typeof mount>) => w.find("[data-o-popover-content]");
+
+    it.each([
+      ["sm", "w-65"],
+      ["md", "w-80"],
+      ["lg", "w-110"],
+    ])("draws size %s at one fixed width", (size, cls) => {
+      expect(surface(openWith({ size })).classes()).toContain(cls);
+    });
+
+    it("defaults to md 320", () => {
+      expect(surface(openWith({})).classes()).toContain("w-80");
+    });
+
+    it("draws an optional head and foot around a padded body", () => {
+      const w = openWith({ title: "About streams" }, { footer: "<button>Close</button>" });
+      expect(w.find('[data-test="o-popover-title"]').text()).toBe("About streams");
+      expect(surface(w).attributes("aria-label")).toBe("About streams");
+      expect(w.text()).toContain("Close");
+    });
+
+    it("reserves the tallest state's height so switching content never resizes it (O4)", () => {
+      const w = openWith({ reserveHeight: "20rem" });
+      expect(w.find('[style*="min-height: 20rem"]').exists()).toBe(true);
+    });
+  });
 });

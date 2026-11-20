@@ -14,21 +14,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- A pane title bar inside a shared panel. Tall enough for a back button and a group-by toggle, so drilling in never moves the content below. -->
+<!-- The 40 px panel header of a usage pane; a fixed height so drilling in never moves the content below. -->
 <template>
   <div
-    class="border-border-default flex min-h-10 w-full flex-nowrap items-center gap-2 border-b px-2 py-1"
+    class="border-border-subtle flex h-10 w-full shrink-0 flex-nowrap items-center gap-2 border-b ps-3 pe-1.5"
   >
     <slot name="leading" />
     <div class="flex min-w-0 items-baseline gap-2">
-      <span class="text-compact text-text-heading shrink-0 font-medium tracking-[0.02em]">
+      <span class="text-compact text-text-heading shrink-0 font-semibold">
         {{ title }}
       </span>
-      <span v-if="subtitle" class="text-text-secondary text-2xs truncate leading-normal">
+      <span v-if="subtitle" class="text-text-muted truncate text-xs">
         {{ subtitle }}
       </span>
     </div>
-    <div v-if="$slots.actions" class="ms-auto flex shrink-0 items-center gap-2">
+    <div v-if="$slots.actions" class="ms-auto flex shrink-0 items-center gap-1.5">
       <slot name="actions" />
     </div>
   </div>

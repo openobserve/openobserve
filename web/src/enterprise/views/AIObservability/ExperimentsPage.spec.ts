@@ -105,7 +105,7 @@ beforeEach(() => {
 });
 
 describe("ExperimentsPage empty state", () => {
-  it("renders the no-experiments preset and creates from it", async () => {
+  it("renders the first-run empty state and creates from it", async () => {
     const service = (await import("@/services/llm-experiments.service")).default;
     (service.list as any).mockResolvedValueOnce([]);
     route.query = {};
@@ -116,8 +116,8 @@ describe("ExperimentsPage empty state", () => {
           OPageLayout: { template: `<main><slot name="actions" /><slot /></main>` },
           ExperimentBrowser: true,
           OEmptyState: {
-            props: ["preset"],
-            template: `<div data-test="ai-experiments-empty" :data-preset="preset"
+            props: ["kind", "title"],
+            template: `<div data-test="ai-experiments-empty" :data-kind="kind ?? 'first-run'"
               @click="$emit('action')"></div>`,
           },
         },
@@ -127,7 +127,7 @@ describe("ExperimentsPage empty state", () => {
 
     const empty = wrapper.find('[data-test="ai-experiments-empty"]');
     expect(empty.exists()).toBe(true);
-    expect(empty.attributes("data-preset")).toBe("no-experiments");
+    expect(empty.attributes("data-kind")).toBe("first-run");
 
     await empty.trigger("click");
     expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "aiExperimentCreate" }));

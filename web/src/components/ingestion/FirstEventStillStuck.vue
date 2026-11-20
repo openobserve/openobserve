@@ -49,8 +49,8 @@ const onAskAi = () => {
     {{ t("ingestion.firstEvent.stillStuck") }}
     <template v-if="showAskAi">
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         class="text-text-link inline-flex"
         data-test="first-event-diagnosis-ask-ai-btn"
         @click="onAskAi"

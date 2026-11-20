@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Global variables sit above the tab bar: they apply dashboard-wide, not to the active tab. -->
         <VariablesValueSelector
-          v-if="globalVariables.length > 0 || dashboardData?.variables?.showDynamicFilters"
+          v-if="showGlobalVariablesRow"
           :scope="'global'"
           :tabId="selectedTabId"
           :variablesConfig="{ list: globalVariables }"
@@ -74,7 +74,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :layoutMode="layoutMode"
           @refresh="refreshDashboard"
           @layoutChange="$emit('layoutChange')"
-        />
+        >
+          <template #end>
+            <div class="flex items-center gap-3">
+              <VariablesValueSelector
+                v-if="filterInTabRow"
+                :scope="'global'"
+                :tabId="selectedTabId"
+                :variablesConfig="{ list: globalVariables }"
+                :variablesManager="variablesManager"
+                :selectedTimeDate="currentTimeObj['__global']"
+                :initialVariableValues="initialVariableValues"
+                class="global-variables-selector"
+                data-test="global-variables-selector"
+              />
+              <slot name="tab_end" />
+            </div>
+          </template>
+        </TabList>
 
         <!-- Tab-scoped Variables (for active tab, if using manager) -->
         <VariablesValueSelector
@@ -320,17 +337,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- view panel dialog -->
       <ODialog
+        size="full"
         data-test="render-dashboard-charts-view-panel-dialog"
         v-model:open="showViewPanel"
-        :width="98"
         :show-close="false"
       >
-        <!-- Explicit height wrapper: fills the dialog body's available space
-             (90vh − body padding) so ViewPanel can use height:100% and
-             flex:1 works all the way down without causing a body scrollbar. -->
-        <div
-          class="view-panel-height-wrapper -my-dialog-content-py -mx-dialog-content-px flex h-[calc(90vh-var(--spacing-dialog-content-py)*2)] flex-col overflow-hidden"
-        >
+        <!-- ViewPanel sizes itself with height:100%, so the full-screen body hands it the whole height. -->
+        <div class="view-panel-height-wrapper flex h-full flex-col overflow-hidden">
           <ViewPanel
             :folderId="folderId"
             :dashboardId="dashboardData.dashboardId"
@@ -689,6 +702,20 @@ export default defineComponent({
       );
     });
 
+    // Dynamic filters alone are one icon: they ride the tab row instead of taking a band of their own.
+    const filterInTabRow = computed(
+      () =>
+        !props.kiosk &&
+        !!props.showTabs &&
+        selectedTabId.value !== null &&
+        globalVariables.value.length === 0 &&
+        !!props.dashboardData?.variables?.showDynamicFilters,
+    );
+    const showGlobalVariablesRow = computed(
+      () =>
+        !filterInTabRow.value &&
+        (globalVariables.value.length > 0 || !!props.dashboardData?.variables?.showDynamicFilters),
+    );
     const kioskHasTabs = computed(() => (props.dashboardData?.tabs?.length ?? 0) > 1);
 
     const kioskControlsVisible = computed(
@@ -1991,6 +2018,8 @@ export default defineComponent({
     return {
       KIOSK_VARIABLES_CLASS,
       kioskHasTabs,
+      filterInTabRow,
+      showGlobalVariablesRow,
       kioskControlsVisible,
       store,
       dashboardScrollRef,

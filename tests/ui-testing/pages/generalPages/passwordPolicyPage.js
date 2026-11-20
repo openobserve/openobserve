@@ -87,10 +87,10 @@ export class PasswordPolicyPage {
     if (await visibleWithin(this.notAdminEmptyState)) {
       throw new Error("Password Policy page denied access (not-admin state)");
     }
-    // Skip only on a confirmed OSS build: the gated route redirected to the enterprise-locked page.
+    // Skip only on a confirmed OSS build: the gated route shows its lock in place.
     if (
-      this.page.url().includes("enterprise-locked?feature=passwordPolicy") &&
-      (await visibleWithin('[data-test="enterprise-feature-locked"]'))
+      this.page.url().includes("password_policy") &&
+      (await visibleWithin('[data-test="feature-lock-inline"]'))
     ) {
       return false;
     }

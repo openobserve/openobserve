@@ -142,8 +142,16 @@ export class UserPage {
     }
 
 
-    async deleteUser(email) {
+    /** Delete renders in the row's ⋯ menu (a portal), so open the menu before clicking it. */
+    async clickDeleteUser(email) {
+        const row = this.page.locator('tr', { hasText: email });
+        await row.hover();
+        await row.locator('[data-test="user-list-row-more-actions"]').click();
         await this.getDeleteUserButton(email).click();
+    }
+
+    async deleteUser(email) {
+        await this.clickDeleteUser(email);
         // User delete confirmation is rendered by ODialog — use its built-in
         // primary button rather than matching by visible text, which is
         // ambiguous when other "OK" buttons exist on the page.
@@ -152,7 +160,7 @@ export class UserPage {
 
     async deleteUserCancel(email) {
         // Logic to simulate unauthorized deletion
-        await this.getDeleteUserButton(email).click();
+        await this.clickDeleteUser(email);
         await this.userDeleteDialogCancel.click();
     }
 
@@ -217,7 +225,7 @@ export class UserPage {
 
 
     async addNewPassword(password) {
-        // Ensure the "Change Password" toggle is checked.
+        // Ensure the "Change password" toggle is checked.
         // AddUser.vue initialises `change_password = false` whenever the drawer
         // opens (lines 252 + 352), so we know the switch is OFF on entry.
         // Click once to enable; the new-password OInput is mounted under

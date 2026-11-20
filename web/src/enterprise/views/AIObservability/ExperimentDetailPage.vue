@@ -4,22 +4,18 @@
   <OPageLayout
     data-test="ai-experiment-detail-page"
     :title="raw(detail?.experiment.name ?? '')"
-    icon="science"
     :back="backTarget"
     bleed
   >
-    <template #actions>
-      <OTag
-        v-if="detail"
-        size="sm"
-        :variant="statusVariant(detail.experiment.status, 'eval').variant"
-      >
+    <template v-if="detail" #status>
+      <OTag size="sm" :tone="statusVariant(detail.experiment.status, 'eval').variant">
         {{ statusVariant(detail.experiment.status, "eval").label }}
       </OTag>
+    </template>
+    <template #actions>
       <OButton
         v-if="detail?.experiment.executionStatus === 'running'"
-        size="sm"
-        variant="outline"
+        variant="secondary"
         :disabled="acting"
         data-test="ai-experiment-detail-cancel"
         @click="cancelExperiment"
@@ -28,8 +24,7 @@
       </OButton>
       <OButton
         v-else-if="detail?.experiment.executionStatus === 'failed' || failedSlotCount > 0"
-        size="sm"
-        variant="outline"
+        variant="secondary"
         :disabled="acting || slotRetryActive"
         data-test="ai-experiment-detail-retry"
         @click="retryExperiment"
@@ -38,8 +33,7 @@
       </OButton>
       <OButton
         v-if="detail?.experiment.task.type === 'inline_prompt'"
-        size="sm"
-        variant="outline"
+        variant="secondary"
         data-test="ai-experiment-detail-save-prompt"
         @click="savePromptOpen = true"
       >
@@ -47,16 +41,14 @@
       </OButton>
       <OButton
         v-else-if="detail?.experiment.task.type === 'prompt_ref'"
-        size="sm"
-        variant="outline"
+        variant="secondary"
         data-test="ai-experiment-detail-open-prompt"
         @click="openManagedPrompt"
       >
         {{ t("aiObservability.experiments.detail.openPrompt") }}
       </OButton>
       <OButton
-        size="sm"
-        variant="outline"
+        variant="secondary"
         :disabled="!detail"
         data-test="ai-experiment-detail-compare"
         @click="comparePickerOpen = true"
@@ -64,14 +56,53 @@
         {{ t("aiObservability.experiments.detail.compare") }}
       </OButton>
       <OButton
-        size="sm"
-        variant="outline"
+        variant="secondary"
         :disabled="acting || !detail"
         data-test="ai-experiment-detail-clone"
         @click="cloneExperiment"
       >
         {{ t("aiObservability.experiments.clone") }}
       </OButton>
+    </template>
+
+    <template v-if="failureBanner" #banner>
+      <OBanner tone="err" data-test="ai-experiment-detail-failure-banner">
+        <div class="flex min-w-0 flex-col gap-0.5">
+          <span class="font-semibold" data-test="ai-experiment-detail-failure-title">
+            {{
+              t("aiObservability.experiments.detail.failureBanner.title", {
+                failed: failureBanner.failed,
+                total: failureBanner.total,
+                cause: failureBanner.kindLabel,
+              })
+            }}
+          </span>
+          <span class="text-xs break-words" data-test="ai-experiment-detail-failure-cause">
+            {{
+              t("aiObservability.experiments.detail.failureBanner.cause", {
+                count: failureBanner.count,
+                message: failureBanner.message,
+              })
+            }}
+            <template v-if="failureBanner.moreCauses > 0">
+              {{
+                t("aiObservability.experiments.detail.failureBanner.moreCauses", {
+                  count: failureBanner.moreCauses,
+                })
+              }}
+            </template>
+          </span>
+        </div>
+        <template v-if="failureBanner.providerTask" #actions>
+          <OButton
+            variant="secondary"
+            data-test="ai-experiment-detail-failure-open-providers"
+            @click="router.push({ name: 'llmProviders' })"
+          >
+            {{ t("aiObservability.experiments.detail.failureBanner.openProviders") }}
+          </OButton>
+        </template>
+      </OBanner>
     </template>
 
     <template v-if="detail" #subnav>
@@ -126,51 +157,6 @@
     </template>
 
     <div class="flex h-full min-h-0 flex-col">
-      <OBanner
-        v-if="failureBanner"
-        variant="error-soft"
-        icon="error-outline"
-        inline-actions
-        class="mx-page-edge mt-2.5 shrink-0"
-        data-test="ai-experiment-detail-failure-banner"
-      >
-        <div class="flex min-w-0 flex-col gap-0.5">
-          <span class="font-semibold" data-test="ai-experiment-detail-failure-title">
-            {{
-              t("aiObservability.experiments.detail.failureBanner.title", {
-                failed: failureBanner.failed,
-                total: failureBanner.total,
-                cause: failureBanner.kindLabel,
-              })
-            }}
-          </span>
-          <span class="text-xs break-words" data-test="ai-experiment-detail-failure-cause">
-            {{
-              t("aiObservability.experiments.detail.failureBanner.cause", {
-                count: failureBanner.count,
-                message: failureBanner.message,
-              })
-            }}
-            <template v-if="failureBanner.moreCauses > 0">
-              {{
-                t("aiObservability.experiments.detail.failureBanner.moreCauses", {
-                  count: failureBanner.moreCauses,
-                })
-              }}
-            </template>
-          </span>
-        </div>
-        <template v-if="failureBanner.providerTask" #actions>
-          <OButton
-            size="sm"
-            variant="outline"
-            data-test="ai-experiment-detail-failure-open-providers"
-            @click="router.push({ name: 'llmProviders' })"
-          >
-            {{ t("aiObservability.experiments.detail.failureBanner.openProviders") }}
-          </OButton>
-        </template>
-      </OBanner>
       <KpiCardRow v-if="metricCards.length" class="px-page-edge shrink-0 py-2.5">
         <KpiCard
           v-for="card in metricCards"
@@ -190,7 +176,7 @@
           @click="handleMetricCardClick(card)"
         >
           <template #value>
-            <span class="text-text-secondary text-2xl leading-none font-bold">
+            <span class="text-text-secondary text-2xl leading-none font-semibold">
               {{ raw(card.value) }}
             </span>
             <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
@@ -198,7 +184,7 @@
             </span>
           </template>
           <template v-if="card.footer" #footer>
-            <span class="text-3xs text-text-secondary font-medium">{{ raw(card.footer) }}</span>
+            <span class="text-2xs text-text-secondary font-medium">{{ raw(card.footer) }}</span>
           </template>
         </KpiCard>
       </KpiCardRow>
@@ -210,13 +196,11 @@
           row-key="rowKey"
           :loading="loading || rowsLoading"
           :loading-reset-key="experimentId"
-          :show-global-filter="false"
           :default-columns="false"
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="ai-experiment-detail-rows"
           pagination="client"
-          width="100%"
           class="h-full w-full"
           data-test="ai-experiment-detail-table"
           @row-click="openRow"
@@ -239,7 +223,7 @@
               <OSelect
                 v-model="statusFilter"
                 class="shrink-0 max-md:w-36"
-                width="sm"
+                width="s"
                 :options="statusOptions"
                 :placeholder="t('aiObservability.experiments.detail.statusFilterAll')"
                 :searchable="false"
@@ -249,10 +233,9 @@
               <OButton
                 v-if="isMultiTrial"
                 class="shrink-0"
-                size="sm-toolbar"
-                variant="outline"
-                icon-left="swap-vert"
-                :active="sortByDispersion"
+                variant="secondary"
+                icon="swap-vert"
+                :pressed="sortByDispersion"
                 :aria-pressed="sortByDispersion"
                 data-test="ai-experiment-detail-sort-dispersion"
                 @click="toggleDispersionSort"
@@ -263,22 +246,18 @@
           </template>
 
           <template #toolbar-trailing>
-            <OButton
-              variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+            <ORefreshButton
+              :last-run-at="loadedAt"
               :loading="loading"
               data-test="ai-experiment-detail-refresh"
               @click="refresh"
-            >
-              <OTooltip side="bottom" :content="t('common.refresh')" />
-            </OButton>
+            />
           </template>
 
           <template #cell-slotStatus="{ row }: { row: any }">
             <OTag
               size="sm"
-              :variant="statusVariant(row.status, 'eval').variant"
+              :tone="statusVariant(row.status, 'eval').variant"
               :label="statusVariant(row.status, 'eval').label"
               :data-test="`ai-experiment-row-status-${row.rowKey}`"
             />
@@ -302,7 +281,7 @@
             <OTag
               v-if="row.highDispersion"
               size="sm"
-              variant="warning"
+              tone="warn"
               :label="
                 raw(
                   `${t('aiObservability.experiments.detail.highDispersionBadge')} · ${row.dispersionLabel}`,
@@ -335,7 +314,7 @@
             <OTag
               v-if="row.violations[id]"
               size="sm"
-              variant="error"
+              tone="err"
               :label="raw(row[`score:${id}`])"
               :data-test="`ai-experiment-score-violation-${row.rowKey}-${id}`"
             />
@@ -343,9 +322,11 @@
           </template>
 
           <template #empty>
-            <div class="flex items-center justify-center py-8">
-              <OEmptyState size="hero" preset="no-experiments" />
-            </div>
+            <OEmptyState
+              :title="t('emptyState.noExperiments.title')"
+              :text="t('emptyState.noExperiments.description')"
+              icon="query-stats"
+            />
           </template>
         </OTable>
       </div>
@@ -388,10 +369,9 @@ import { computed, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { gt, raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -457,6 +437,7 @@ const orgId = computed<string>(() => store.state.selectedOrganization?.identifie
 const experimentId = computed<string>(() => String(route.params.id ?? ""));
 const detail = ref<ExperimentDetail | null>(null);
 const loading = ref(false);
+const loadedAt = ref<number | null>(null);
 const rowsLoading = ref(false);
 const acting = ref(false);
 const comparePickerOpen = ref(false);
@@ -485,14 +466,9 @@ const SLOT_RETRY_POLL_INTERVAL_MS = 2_000;
 let slotRetryPollTimer: ReturnType<typeof setTimeout> | null = null;
 let slotRetryPollGeneration = 0;
 
-// Real browser back when there's history to pop — returns to the Experiments
-// list with whatever filter (e.g. a dataset) the user actually arrived
-// through, not just the bare list. The fallback only fires with no history
-// to pop (direct link / reload).
-const { goBack: backToExperiments } = useSmartBack(() => aiExperimentsRoute(orgId.value));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.experiments"),
-  onClick: backToExperiments,
+  to: aiExperimentsRoute(orgId.value),
 }));
 const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) > 1);
 
@@ -1014,6 +990,7 @@ async function refresh() {
     ]);
     detail.value = nextDetail;
     resultRows.value = rows;
+    loadedAt.value = Date.now();
   } catch (error: any) {
     showLoadError(error);
   } finally {
@@ -1131,6 +1108,7 @@ async function pollSlotRetry(rowId: string, generation: number) {
 
     detail.value = nextDetail;
     resultRows.value = rows;
+    loadedAt.value = Date.now();
     if (nextRowDetail && selectedRowDetail.value?.rowId === rowId) {
       selectedRowDetail.value = nextRowDetail;
     }

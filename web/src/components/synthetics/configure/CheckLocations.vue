@@ -28,7 +28,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { formatTimeAgoUs } from "@/utils/synthetics/format";
 import { locationLiveStatus as liveStatus } from "@/utils/synthetics/locationLiveStatus";
 import SuggestedChip from "../prefill/SuggestedChip.vue";
@@ -122,10 +122,9 @@ interface StatusInfo {
   message: string;
   /** Color of the always-visible message line under the row. */
   messageClass: string;
-  badgeVariant:
-    "success-outline" | "info-outline" | "warning-outline" | "error-outline" | "default-outline";
+  badgeVariant: "outline" | "info" | "err";
   actionLabel: string;
-  actionVariant: "outline";
+  actionVariant: "secondary";
 }
 
 function getStatusInfo(location: SyntheticsLocation): StatusInfo {
@@ -139,9 +138,9 @@ function getStatusInfo(location: SyntheticsLocation): StatusInfo {
       iconClass: "text-status-success-text",
       message: "",
       messageClass: "",
-      badgeVariant: "success-outline",
+      badgeVariant: "outline",
       actionLabel: t("synthetics.locations.addAgent"),
-      actionVariant: "outline",
+      actionVariant: "secondary",
     };
   }
 
@@ -155,9 +154,9 @@ function getStatusInfo(location: SyntheticsLocation): StatusInfo {
       iconClass: "text-text-muted",
       message: t("synthetics.locations.unknownMessage"),
       messageClass: "text-text-secondary",
-      badgeVariant: "default-outline",
+      badgeVariant: "outline",
       actionLabel: t("synthetics.locations.addAgent"),
-      actionVariant: "outline",
+      actionVariant: "secondary",
     };
   }
 
@@ -169,9 +168,9 @@ function getStatusInfo(location: SyntheticsLocation): StatusInfo {
       iconClass: "text-status-info-text",
       message: t("synthetics.locations.connectingMessage"),
       messageClass: "text-text-secondary",
-      badgeVariant: "info-outline",
+      badgeVariant: "info",
       actionLabel: t("synthetics.locations.installAgent"),
-      actionVariant: "outline",
+      actionVariant: "secondary",
     };
   }
 
@@ -183,9 +182,9 @@ function getStatusInfo(location: SyntheticsLocation): StatusInfo {
       iconClass: "text-status-error-text",
       message: t("synthetics.locations.downMessage"),
       messageClass: "text-status-error-text",
-      badgeVariant: "error-outline",
+      badgeVariant: "err",
       actionLabel: t("synthetics.locations.addAgent"),
-      actionVariant: "outline",
+      actionVariant: "secondary",
     };
   }
 
@@ -196,9 +195,9 @@ function getStatusInfo(location: SyntheticsLocation): StatusInfo {
     iconClass: "text-status-error-text",
     message: t("synthetics.locations.offlineMessage"),
     messageClass: "text-status-warning-text",
-    badgeVariant: "warning-outline",
+    badgeVariant: "outline",
     actionLabel: t("synthetics.locations.addAgent"),
-    actionVariant: "outline",
+    actionVariant: "secondary",
   };
 }
 
@@ -345,7 +344,7 @@ const selectedLocations = computed({
   <div class="rounded-default border-border-default mb-4 border">
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
       <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
-      <h3 class="text-text-heading text-base font-semibold">
+      <h3 class="text-text-heading text-sm font-semibold">
         {{ t("synthetics.locations.title") }}
       </h3>
     </div>
@@ -363,9 +362,8 @@ const selectedLocations = computed({
         />
         <OButton
           :aria-label="t('common.refresh')"
-          variant="outline"
-          size="sm"
-          icon-left="refresh"
+          variant="secondary"
+          icon="refresh"
           :loading="loadingLocations"
           data-test="synthetics-check-locations-refresh-btn"
           @click="emit('refresh-locations')"
@@ -379,8 +377,8 @@ const selectedLocations = computed({
         data-test="synthetics-check-locations-loading"
       >
         <div v-for="i in 4" :key="'skel-' + i" class="flex items-center gap-2 py-1">
-          <SkeletonBox width="1rem" height="1rem" variant="custom" :rounded="true" />
-          <SkeletonBox width="60%" height="0.875rem" variant="text" />
+          <OSkeleton shape="block" class="h-4 w-4 shrink-0" />
+          <OSkeleton class="h-3.5 w-3/5 shrink-0" />
         </div>
       </div>
 
@@ -394,11 +392,10 @@ const selectedLocations = computed({
         <!-- ── Search matched nothing anywhere ──────────────────────────────── -->
         <OEmptyState
           v-if="allNoMatches"
-          size="inline"
+          size="compact"
           icon="search-off"
           :title="t('synthetics.locations.noSearchResults')"
           :action-label="allowPrivate ? t('synthetics.locations.newPrivateLocation') : undefined"
-          action-icon="add"
           data-test="synthetics-check-locations-no-results"
           @action="emit('new-location')"
         />
@@ -447,7 +444,7 @@ const selectedLocations = computed({
           <!-- ── Search matched no public locations (private still has hits) ── -->
           <OEmptyState
             v-if="publicNoMatches"
-            size="inline"
+            size="compact"
             icon="search-off"
             :title="t('synthetics.locations.noPublicMatches')"
             data-test="synthetics-check-locations-public-no-results"
@@ -466,7 +463,7 @@ const selectedLocations = computed({
               </p>
               <OButton
                 variant="primary"
-                size="xs"
+                size="sm"
                 data-test="synthetics-check-locations-new-location-btn"
                 @click="emit('new-location')"
               >
@@ -500,8 +497,8 @@ const selectedLocations = computed({
                         />
                         {{ locationDisplayName(location) }}
                         <OBadge
-                          :variant="status.badgeVariant"
-                          size="xs"
+                          :tone="status.badgeVariant"
+                          size="sm"
                           :data-test="`synthetics-check-locations-status-badge-${location.id}`"
                         >
                           {{ status.label }}
@@ -523,8 +520,8 @@ const selectedLocations = computed({
                           :content="raw(agents.allNames.join(', '))"
                         >
                           <OBadge
-                            variant="default"
-                            size="xs"
+                            tone="neutral"
+                            size="sm"
                             class="ms-2"
                             :data-test="`synthetics-check-locations-extra-agents-${location.id}`"
                           >
@@ -551,7 +548,7 @@ const selectedLocations = computed({
                 </OCheckbox>
                 <OButton
                   :variant="status.actionVariant"
-                  size="xs"
+                  size="sm"
                   :data-test="`synthetics-check-locations-add-agent-${location.id}`"
                   @click="emit('add-agent', location.id)"
                 >
@@ -563,7 +560,7 @@ const selectedLocations = computed({
             <!-- ── Search matched no private locations (public still has hits) ── -->
             <OEmptyState
               v-else-if="privateNoMatches"
-              size="inline"
+              size="compact"
               icon="search-off"
               :title="t('synthetics.locations.noPrivateMatches')"
               data-test="synthetics-check-locations-private-no-results"
@@ -578,9 +575,7 @@ const selectedLocations = computed({
             >
               <span>{{ t("synthetics.locations.privateEmptyBody") }}</span>
               <OButton
-                variant="outline"
-                size="sm"
-                icon-left="add"
+                variant="secondary"
                 data-test="synthetics-check-locations-private-empty-cta"
                 @click="emit('new-location')"
               >
@@ -591,13 +586,13 @@ const selectedLocations = computed({
         </OCheckboxGroup>
 
         <!-- ── No locations at all ──────────────────────────────────────────── -->
-        <div
+        <OEmptyState
           v-else
-          class="rounded-default border-border-default text-text-secondary flex items-center justify-center border border-dashed px-3 py-3 text-sm"
+          size="compact"
+          icon="location-on"
+          :title="t('synthetics.locations.empty')"
           data-test="synthetics-check-locations-empty"
-        >
-          {{ t("synthetics.locations.empty") }}
-        </div>
+        />
 
         <p
           v-if="prefillView?.unconfirmed.locations"

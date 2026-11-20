@@ -267,9 +267,9 @@ describe("LiveIssueBody", () => {
       const blast = w
         .findAllComponents(OTag)
         .filter((c) => c.find(sel("autoobserve-live-issue-blast-stream")).exists());
-      expect(blast.map((b) => [b.text(), b.props("variant")])).toEqual([
-        ["pay_api", "error-soft"],
-        ["b", "default-soft"],
+      expect(blast.map((b) => [b.text(), b.props("tone")])).toEqual([
+        ["pay_api", "err"],
+        ["b", "neutral"],
       ]);
       expect(w.find('[role="meter"]').exists()).toBe(false);
       expect(w.get(sel("autoobserve-issue-chart-note")).text()).toBe(
@@ -561,7 +561,7 @@ describe("LiveIssueBody", () => {
       );
       expect(reason({ alert_kind: "internal", correlation_reason: "alert_id" })).toBeNull();
       expect(reason({ alert_kind: "internal", correlation_reason: "service_discovery" })).toBe(
-        "Service Discovery",
+        "Service discovery",
       );
     });
 

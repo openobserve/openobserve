@@ -53,34 +53,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</OTruncatedText>
         <OBadge
           v-if="badge"
-          size="xs"
-          shape="rounded"
-          :variant="badge.variant"
+          size="sm"
+          :tone="badge.variant"
           :data-test="`query-profile-card-${op.id}-badge`"
           >{{ badge.text }}</OBadge
         >
       </div>
       <div class="text-text-secondary flex min-w-0 items-center gap-1.5 text-xs tabular-nums">
         <OTruncatedText :class="model.planOnly ? 'font-mono' : ''">{{ subline }}</OTruncatedText>
-        <OBadge v-if="tag" size="xs" shape="rounded" variant="default-soft" class="shrink-0">{{
-          tag
-        }}</OBadge>
+        <OBadge v-if="tag" size="sm" tone="neutral" class="shrink-0">{{ tag }}</OBadge>
       </div>
       <template v-if="!model.planOnly">
         <ProfileNodeBars v-if="bars" :bars="bars" />
         <OProgressBar
           v-else
-          size="xs"
-          :value="Math.max(0.015, share)"
-          :variant="SHARE_BAR[shareTone(share)]"
+          :value="Math.max(0.015, share) * 100"
+          :tone="SHARE_BAR[shareTone(share)]"
         />
       </template>
     </div>
     <div v-if="refold" class="absolute end-2 top-0 -translate-y-1/2">
       <OButton
-        variant="outline"
-        size="xs"
-        icon-left="compress"
+        variant="secondary"
+        size="sm"
+        icon="compress"
         :aria-label="t('search.queryProfile.foldBackLabel', { op: label })"
         :data-test="`query-profile-card-${op.id}-refold`"
         @click.stop="emit('fold', 'refold')"
@@ -89,9 +85,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-if="branch" class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2">
       <OButton
-        variant="outline"
-        size="icon-xs-circle"
-        :icon-left="branch === 'open' ? 'remove' : 'add'"
+        icon-only
+        variant="ghost"
+        size="xs"
+        :icon="branch === 'open' ? 'remove' : 'add'"
         :aria-label="
           branch === 'open'
             ? t('search.queryProfile.collapseBranch', { op: label })
@@ -159,7 +156,7 @@ const stacked = computed(() => !!props.op.stageId && props.op.samples.length > 1
 const badge = computed(() => {
   if (stage.value) {
     return {
-      variant: "default-soft" as const,
+      variant: "neutral" as const,
       text: t("search.queryProfile.stage", { index: stage.value.index }),
     };
   }

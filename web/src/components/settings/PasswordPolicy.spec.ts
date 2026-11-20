@@ -140,7 +140,7 @@ describe("PasswordPolicy", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-test="settings-password-policy-min-length"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="settings-password-policy-save-btn"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="settings-password-policy-save-btn"]').exists()).toBe(false);
   });
 
   it("renders the not-admin empty state on a plain 403, with no form", async () => {
@@ -166,12 +166,11 @@ describe("PasswordPolicy", () => {
     );
   });
 
-  it("keeps Save disabled until something changes", async () => {
+  it("shows no save bar until something changes", async () => {
     const wrapper = mountPage();
     await flushPromises();
 
-    const save = wrapper.find('[data-test="settings-password-policy-save-btn"]');
-    expect(save.attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="settings-password-policy-save-btn"]').exists()).toBe(false);
   });
 
   it("confirms before writing and makes no request when cancelled", async () => {

@@ -89,7 +89,7 @@ export interface K8sBanner {
   id: string;
   key: I18nKey;
   params?: Record<string, string>;
-  variant: "warning" | "info";
+  tone: "warn" | "info";
 }
 
 interface SqlRequest {
@@ -787,7 +787,7 @@ export function useKubernetesInventory(
           id: `usage-${QUERY_STREAM[id]}`,
           key: "infra.k8s2.usageMissing",
           params: { stream: QUERY_STREAM[id] },
-          variant: "warning",
+          tone: "warn",
         });
       }
     }
@@ -796,17 +796,17 @@ export function useKubernetesInventory(
         id: `no-cluster-${family}`,
         key: "infra.k8s2.noClusterLabelScoped",
         params: { family },
-        variant: "warning",
+        tone: "warn",
       });
     }
     if (failed.value.size > 0) {
-      out.push({ id: "partial-failure", key: "infra.k8s2.partialFailure", variant: "warning" });
+      out.push({ id: "partial-failure", key: "infra.k8s2.partialFailure", tone: "warn" });
     }
     if (warnings.value.truncated) {
       out.push({
         id: "warnings-truncated",
         key: "infra.k8s2.warningsIncomplete",
-        variant: "warning",
+        tone: "warn",
       });
     }
     const kind = LIST_VIEW_KIND[s.view];
@@ -815,7 +815,7 @@ export function useKubernetesInventory(
       out.push({
         id: "objects-not-observed",
         key: "infra.k8s2.objectsNotObserved",
-        variant: "info",
+        tone: "info",
       });
     }
     return [...new Map(out.map((b) => [b.id, b])).values()];

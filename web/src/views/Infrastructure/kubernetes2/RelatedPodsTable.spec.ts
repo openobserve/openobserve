@@ -42,7 +42,6 @@ const OTableStub = defineComponent({
     columns: Array,
     maxHeight: String,
     virtualScroll: Boolean,
-    dense: Boolean,
   },
   setup(props, { slots }) {
     return () =>
@@ -109,13 +108,12 @@ describe("RelatedPodsTable", () => {
     ]);
   });
 
-  it("is a dense, virtualized, sortable, resizable table capped at 70vh", () => {
+  it("is a virtualized, sortable, resizable table capped at 70vh", () => {
     const table = mountTable().findComponent(OTableStub);
     expect(table.props("maxHeight")).toBe("70vh");
     expect(table.attributes("sorting")).toBe("client");
     expect(table.attributes("enable-column-resize")).toBeDefined();
     expect(table.props("virtualScroll")).toBe(true);
-    expect(table.props("dense")).toBe(true);
     expect((table.props("columns") as any[]).map((c) => c.id)).toEqual([
       "name",
       "warn",
@@ -134,17 +132,15 @@ describe("RelatedPodsTable", () => {
     expect(plain.findAllComponents(OProgressBar)).toHaveLength(0);
     const bars = mountTable({ allocatable: { cpu: 2, memory: 4 * 1024 ** 3 } });
     const cpuBar = cell(bars, "web-2", "cpu").findComponent(OProgressBar);
-    expect(cpuBar.props("value")).toBeCloseTo(0.75);
+    expect(cpuBar.props("value")).toBeCloseTo(75);
     expect(cell(bars, "web-1", "memory").findComponent(OProgressBar).props("value")).toBeCloseTo(
-      0.25,
+      25,
     );
   });
 
   it("shows the status as a tone pill and links name and node", async () => {
     const wrapper = mountTable();
-    expect(cell(wrapper, "web-1", "status").findComponent(OTag).props("variant")).toBe(
-      "error-soft",
-    );
+    expect(cell(wrapper, "web-1", "status").findComponent(OTag).props("tone")).toBe("err");
     await cell(wrapper, "web-1", "node").find("button").trigger("click");
     await cell(wrapper, "web-1", "name").find("button").trigger("click");
     expect(wrapper.emitted("open")).toEqual([

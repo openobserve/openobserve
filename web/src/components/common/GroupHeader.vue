@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex items-center gap-2">
     <img class="size-6" v-if="showIcon" :src="icon" :alt="t('components.groupHeader.icon')" />
-    <span data-test="common-group-header-title" class="text-base leading-6 font-bold">
+    <span data-test="common-group-header-title" class="text-sm leading-5 font-semibold">
       {{ title }}
     </span>
     <span class="flex-1">

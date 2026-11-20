@@ -22,38 +22,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <OPageHeader
-      :back="{ onClick: () => router.back(), dataTest: 'back-button' }"
-      title-overflow="visible"
+      :title="errorType"
+      title-data-test="error-header-error-type"
+      :back="{ label: t('rum.errorTracking'), to: errorListRoute, dataTest: 'back-button' }"
     >
-      <template #title>
-        <span class="flex min-w-0 items-center gap-2">
-          <OTruncatedText data-test="error-header-error-type">{{ errorType }}</OTruncatedText>
-          <OTag
-            v-if="error.error_handling"
-            :label="raw(error.error_handling)"
-            :variant="isUnhandled ? 'error' : 'warning-outline'"
-            size="xs"
-            shape="rounded"
-            class="shrink-0 uppercase"
-            data-test="error-header-handling-badge"
-          />
-          <OTag
-            v-if="error.source"
-            :label="raw(error.source)"
-            variant="default-soft"
-            size="xs"
-            shape="rounded"
-            class="shrink-0"
-            data-test="error-header-source-badge"
-          />
-        </span>
+      <template #status>
+        <OTag
+          v-if="error.error_handling"
+          :label="raw(error.error_handling)"
+          :tone="isUnhandled ? 'err' : 'outline'"
+          size="sm"
+          data-test="error-header-handling-badge"
+        />
+        <OTag
+          v-if="error.source"
+          :label="raw(error.source)"
+          tone="neutral"
+          size="sm"
+          data-test="error-header-source-badge"
+        />
       </template>
 
       <template #actions>
         <OButton
-          variant="outline"
-          size="sm-toolbar"
-          icon-left="content-copy"
+          variant="secondary"
+          icon="content-copy"
           :disabled="!error.error_id"
           data-test="error-header-copy-id-btn"
           @click="copyErrorId"
@@ -64,8 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ShareButton
           data-test="error-header-share-link-btn"
           :url="shareUrl"
-          variant="outline"
-          size="icon-toolbar"
+          variant="secondary"
           :tooltip="t('rum.errorDetail.copyLinkHint')"
         />
       </template>
@@ -77,15 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         rather than a line of body text: it is the first thing read and the thing
         pasted into a ticket.
       -->
-      <OBanner
-        variant="error-soft"
-        dense
-        icon="error-outline"
-        role="alert"
-        data-test="error-header-message"
-      >
+      <OInlineNotice tone="err" data-test="error-header-message">
         <span class="font-mono break-words">{{ messageText }}</span>
-      </OBanner>
+      </OInlineNotice>
 
       <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
         <span class="text-text-secondary flex items-center gap-1">
@@ -112,13 +98,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { computed } from "vue";
-import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 import { routeFromUrl } from "@/utils/rum/errorIssueUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
@@ -127,6 +112,7 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
+import { useOrgId } from "@/composables/query/useOrgId";
 import analytics from "@/services/product_analytics";
 
 const props = defineProps<{
@@ -134,8 +120,13 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18nTyped();
-const router = useRouter();
+const orgId = useOrgId();
 const { shareUrl } = useRum();
+
+const errorListRoute = computed(() => ({
+  name: "ErrorTracking",
+  query: { org_identifier: orgId.value },
+}));
 
 // "handled" is the only safe state — treat missing/other values as unhandled.
 const isUnhandled = computed(() => props.error.error_handling !== "handled");

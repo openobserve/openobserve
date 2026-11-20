@@ -23,13 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="ai-queues-page"
     :title="t('aiObservability.nav.queues')"
-    :subtitle="t('aiObservability.subtitle.queues')"
-    icon="fact-check"
+    :about="t('aiObservability.subtitle.queues')"
     bleed
     :scroll="false"
   >
     <template #actions>
-      <OButton variant="primary" size="sm" data-test="ai-queues-new-btn" @click="openCreate">
+      <OButton variant="primary" data-test="ai-queues-new-btn" @click="openCreate">
         {{ t("aiObservability.queues.newButton") }}
       </OButton>
     </template>
@@ -37,27 +36,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="bg-card-glass-bg flex h-full min-h-0 flex-col" data-test="ai-queues-list-page">
       <OTable
         data-test="ai-queues-list-table"
-        :data="numberedRows"
+        :data="queues"
         :columns="columns"
         row-key="id"
         :loading="loading"
         :forbidden="forbidden"
         :global-filter="search"
-        :show-global-filter="false"
         :page-size="20"
         :page-size-options="[20, 50, 100, 250, 500]"
         :default-columns="false"
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="ai-queues-list"
-        width="100%"
         class="h-full w-full"
         @row-click="openDetail"
       >
         <template #toolbar-trailing>
           <ORefreshButton
-            layout="inline"
-            variant="outline"
             :last-run-at="lastUpdatedAt"
             :loading="fetching"
             data-test="ai-queues-refresh-btn"
@@ -71,20 +66,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="min-w-0 flex-1"
             :placeholder="t('aiObservability.queues.searchPlaceholder')"
             data-test="ai-queues-list-search-input"
-            clearable
           />
         </template>
 
         <template #empty>
-          <div class="flex items-center justify-center py-8">
-            <OEmptyState
-              size="hero"
-              preset="no-queues"
-              :filtered="Boolean(search)"
-              data-test="ai-queues-empty-state"
-              @action="openCreate"
-            />
-          </div>
+          <OEmptyState
+            :kind="search ? 'filtered' : 'first-run'"
+            :title="
+              search
+                ? t('emptyState.filtered.title', { noun: t('emptyState.filtered.fallbackNoun') })
+                : t('emptyState.noQueues.title')
+            "
+            :text="
+              search
+                ? t('emptyState.filtered.description', {
+                    noun: t('emptyState.filtered.fallbackNoun'),
+                  })
+                : t('emptyState.noQueues.description')
+            "
+            :icon="search ? undefined : 'database'"
+            data-test="ai-queues-empty-state"
+            :action-label="search ? undefined : t('emptyState.noQueues.action')"
+            @action="search ? (search = '') : openCreate()"
+          />
         </template>
 
         <template #cell-description="{ row }">
@@ -101,8 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               v-for="cfg in row.scoreConfigs"
               :key="cfg.scoreConfigId"
-              :variant="isStale(cfg) ? 'orange-soft' : 'default-soft'"
-              shape="rounded"
+              :tone="isStale(cfg) ? 'warn' : 'neutral'"
               class="shrink-0"
             >
               {{ scorerLabel(cfg) }}
@@ -140,11 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ percent(row) }}%
               </span>
             </div>
-            <OProgressBar
-              :value="fraction(row)"
-              :variant="isCleared(row) ? 'success' : 'default'"
-              size="sm"
-            />
+            <OProgressBar :value="fraction(row) * 100" :tone="isCleared(row) ? 'ok' : 'accent'" />
           </div>
         </template>
 
@@ -154,19 +153,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #cell-actions="{ row }">
           <div class="flex justify-end">
-            <OTag
-              v-if="isCleared(row)"
-              variant="success-soft"
-              icon="check-circle"
-              data-test="ai-queues-cleared"
-            >
+            <OTag v-if="isCleared(row)" tone="ok" icon="check-circle" data-test="ai-queues-cleared">
               {{ t("aiObservability.queues.cleared") }}
             </OTag>
             <OButton
               v-else
-              variant="outline"
-              size="sm-toolbar"
-              icon-left="play-arrow"
+              variant="secondary"
+              icon="play-arrow"
               data-test="ai-queues-review-btn"
               @click.stop="startReviewing(row)"
             >
@@ -180,12 +173,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODrawer
       v-model:open="createOpen"
       side="right"
-      size="lg"
+      size="md"
       :title="t('aiObservability.queues.create.title')"
       form-id="new-queue-form"
-      :primary-button-label="t('common.save')"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-loading="isSubmitting"
+      :primary="{ label: t('common.save'), loading: isSubmitting }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="ai-queues-create-drawer"
       @click:secondary="createOpen = false"
     >
@@ -216,10 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}<span aria-hidden="true"> *</span>
               </span>
               <OIcon name="info-outline" size="sm" class="text-text-secondary">
-                <OTooltip
-                  :content="t('aiObservability.queues.create.scoreConfigsHint')"
-                  max-width="20rem"
-                />
+                <OTooltip :content="t('aiObservability.queues.create.scoreConfigsHint')" />
               </OIcon>
             </span>
 
@@ -248,16 +237,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="versionOptions(cfg.scoreConfigId)"
                   label-key="label"
                   value-key="value"
-                  width="xs"
+                  width="s"
                   :searchable="false"
                   class="shrink-0"
                   data-test="ai-queues-create-config-version"
                   @update:model-value="(v: unknown) => setConfigVersion(i, Number(v))"
                 />
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-sm"
-                  icon-left="close"
+                  icon="close"
                   :aria-label="t('common.remove')"
                   data-test="ai-queues-create-config-remove"
                   @click="removeConfig(i)"
@@ -320,10 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 t("common.optional")
               }}</span>
               <OIcon name="info-outline" size="sm" class="text-text-secondary">
-                <OTooltip
-                  :content="t('aiObservability.queues.create.targetDatasetHint')"
-                  max-width="20rem"
-                />
+                <OTooltip :content="t('aiObservability.queues.create.targetDatasetHint')" />
               </OIcon>
             </span>
             <OSelect
@@ -372,7 +358,6 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { forbiddenState } from "@/utils/featureGate";
-import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import llmQueuesService, {
   type LlmQueue,
   type LlmQueueBinding,
@@ -413,8 +398,6 @@ const forbidden = computed(() => {
 });
 const search = ref("");
 
-const numberedRows = useNumberedRows(queues);
-
 // Counts come straight off the list row — no client-side sweep of Queue Items.
 function isCleared(row: LlmQueue): boolean {
   return row.totalCount > 0 && row.reviewedCount >= row.totalCount;
@@ -434,14 +417,6 @@ function isStale(cfg: LlmQueueBinding): boolean {
 }
 
 const columns = computed<OTableColumnDef[]>(() => [
-  {
-    id: "#",
-    header: raw("#"),
-    accessorKey: "#",
-    sortable: false,
-    size: 56,
-    meta: { align: "left" },
-  },
   {
     id: "name",
     header: t("aiObservability.queues.columns.name"),

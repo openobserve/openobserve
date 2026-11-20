@@ -216,7 +216,7 @@ describe("RemoteTaskDetailPage", () => {
       expect.objectContaining({
         messageKeypath: "aiObservability.remoteTasks.detail.discardDraftMessage",
         messageName: "summarizer",
-        confirmVariant: "destructive",
+        kind: "destructive",
       }),
     );
     expect(discardDraft).toHaveBeenCalledWith("acme", "head-1");

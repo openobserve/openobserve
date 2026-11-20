@@ -28,9 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="xl"
+    size="lg"
     :title="drawerTitle"
-    :sub-title="drawerSubtitle"
+    :subtitle="drawerSubtitle"
     title-data-test="alert-library-drawer-title"
     data-test="alert-library-drawer"
     @update:open="emit('update:open', $event)"
@@ -44,12 +44,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-library-drawer-severity"
         />
         <OTag
-          variant="default-soft"
+          tone="neutral"
           :label="queryTypeLabelText"
           data-test="alert-library-drawer-query-type"
         />
         <OTag
-          :variant="availability.variant"
+          :tone="availability.variant"
           :icon="availability.icon"
           :label="availability.label"
           data-test="alert-library-drawer-availability"
@@ -67,21 +67,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Stated before the query, not after: an alert that cannot fire is the
            first thing worth knowing about it. -->
-      <OBanner
+      <OInlineNotice
         v-if="availability.callout"
-        variant="warning"
+        tone="warn"
         icon="sensors-off"
-        dense
-        :content="availability.callout"
+        :message="availability.callout"
         data-test="alert-library-drawer-needs-data"
       />
 
-      <OBanner
+      <OInlineNotice
         v-if="loadFailed"
-        variant="error"
-        icon="warning-amber"
-        dense
-        :content="t('alert_library.drawer.loadFailed')"
+        tone="err"
+        :message="t('alert_library.drawer.loadFailed')"
         data-test="alert-library-drawer-load-failed"
       />
 
@@ -91,17 +88,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="alert-library-drawer-loading"
       >
         <span class="sr-only">{{ t("alert_library.drawer.loading") }}</span>
-        <OSkeleton type="rect" class="rounded-default h-24 w-full" />
-        <OSkeleton type="rect" class="rounded-default h-32 w-full" />
+        <OSkeleton shape="block" class="h-24 w-full" />
+        <OSkeleton shape="block" class="h-32 w-full" />
       </div>
 
       <!-- Anomaly alerts have no threshold to tune and nothing to preview before they train. -->
       <template v-else-if="file && isAnomaly">
-        <OBanner
-          variant="info"
+        <OInlineNotice
+          tone="info"
           icon="query-stats"
-          dense
-          :content="t('alert_library.drawer.anomalyTrainingNote')"
+          :message="t('alert_library.drawer.anomalyTrainingNote')"
           data-test="alert-library-drawer-anomaly-note"
         />
         <section>
@@ -169,8 +165,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ t("alerts.preview") }}</span>
             <template v-if="evaluation">
               <OTag
-                :variant="evaluation.wouldTrigger ? 'error-soft' : 'success-soft'"
-                size="xs"
+                :tone="evaluation.wouldTrigger ? 'err' : 'ok'"
+                size="sm"
                 :label="
                   evaluation.wouldTrigger
                     ? t('alert_library.drawer.wouldTrigger')
@@ -209,9 +205,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The editor prefill speaks the scheduled alert shape only. -->
         <OButton
           v-if="!isAnomaly"
-          variant="outline"
-          size="sm-action"
-          icon-left="edit"
+          variant="secondary"
+          icon="edit"
           :disabled="!file"
           :title="t('alert_library.drawer.customizeHint')"
           data-test="alert-library-drawer-customize"
@@ -221,8 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           variant="primary"
-          size="sm-action"
-          icon-left="download"
+          icon="download"
           :disabled="!file"
           data-test="alert-library-drawer-install"
           @click="install"
@@ -244,7 +238,7 @@ import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import type { AlertLibraryEntry, AlertLibraryFile, StreamDataState } from "@/types/alertLibrary";
@@ -461,7 +455,7 @@ const availability = computed(() => {
 
   if (state === "missing") {
     return {
-      variant: "default-soft" as const,
+      variant: "neutral" as const,
       icon: "sensors-off",
       label: t("alert_library.drawer.streamNotFound"),
       callout: t("alert_library.drawer.needsDataCallout", { stream }),
@@ -469,7 +463,7 @@ const availability = computed(() => {
   }
   if (state === "never") {
     return {
-      variant: "default-soft" as const,
+      variant: "neutral" as const,
       icon: "sensors-off",
       label: t("alert_library.drawer.neverIngested"),
       callout: t("alert_library.drawer.neverIngestedCallout", { stream }),
@@ -477,7 +471,7 @@ const availability = computed(() => {
   }
   if (state === "stale") {
     return {
-      variant: "warning-quiet" as const,
+      variant: "warn" as const,
       icon: "schedule",
       label: t("alert_library.drawer.lastData", { when: lastIngestedLabel.value }),
       callout: t("alert_library.drawer.staleCallout", {
@@ -487,7 +481,7 @@ const availability = computed(() => {
     };
   }
   return {
-    variant: "success-soft" as const,
+    variant: "ok" as const,
     icon: "check-circle",
     label: t("alert_library.drawer.dataAvailable"),
     callout: null,

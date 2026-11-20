@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @submit.prevent="submit"
   >
     <div class="flex items-baseline gap-2">
-      <label :for="textareaId" class="text-text-heading text-compact font-bold">
+      <label :for="textareaId" class="text-text-heading text-compact font-semibold">
         {{
           waitingInput
             ? t("alerts.incidents.rcaSteer.composerTitlePaused")
@@ -108,8 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rca-steer-send-btn"
         type="submit"
         variant="primary"
-        size="sm"
-        icon-left="send"
+        icon="send"
         :disabled="!canSend"
         :loading="sending"
       >

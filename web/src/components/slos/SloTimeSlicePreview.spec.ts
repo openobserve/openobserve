@@ -148,14 +148,14 @@ describe("SloTimeSlicePreview", () => {
   });
 
   describe("states", () => {
-    it("titles the panel with the shared PanelBar, so it carries the header tint", async () => {
+    it("titles the panel with the shared 40 px PanelBar", async () => {
       // Regression guard: this bar was a hand-copied class string and silently
       // missed the header tint when it was introduced.
       wrapper = await createWrapper();
 
       const bar = wrapper.findComponent({ name: "PanelBar" });
       expect(bar.exists()).toBe(true);
-      expect(bar.classes()).toContain("bg-panel-bar-bg");
+      expect(bar.classes()).toContain("min-h-10");
     });
 
     it("shows the empty state when the range holds no slices", async () => {

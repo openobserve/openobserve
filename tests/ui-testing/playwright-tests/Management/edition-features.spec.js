@@ -61,7 +61,7 @@ async function validateEditionDialog(page, pm, editionConfig) {
       .toContain(feature.expectedPath);
   }
 
-  // 5. Hero panel link buttons (external links only — "Get Free License" stays
+  // 5. Hero panel link buttons (external links only — "Get free license" stays
   //    unclicked because it switches the active org to the meta org)
   for (const heroLink of editionConfig.heroLinkButtons) {
     testLogger.step(`Verifying hero button link: ${heroLink.label}`);
@@ -95,15 +95,14 @@ test.describe('Edition Features Documentation Validation', () => {
     await validateEditionDialog(page, pm, {
       buttonLabel: 'Get OpenObserve Enterprise (Free)',
       hero: {
-        heroTitle: 'Get Enterprise Edition',
+        heroTitle: 'Get Enterprise edition',
         badgePattern: /Free up to \d+GB \/ day/,
-        primaryButtonText: 'Download Now',
-        featuresTitle: 'Unlock All Enterprise Features',
+        primaryButtonText: 'Download now',
         hasLearnMore: true,
       },
       heroLinkButtons: [
         {
-          label: 'Download Now',
+          label: 'Download now',
           locator: (ef) => ef.primaryButton,
           expectedPath: HERO_LINKS.download_resources.expectedPath,
         },
@@ -125,20 +124,19 @@ test.describe('Edition Features Documentation Validation', () => {
     test.skip(edition !== 'enterprise', `Runs only on Enterprise build (detected: ${edition})`);
     test.setTimeout(360000); // 21 external link navigations
 
-    // Asserts the no-license dialog variant ("Get Free License") — the CI/dev
+    // Asserts the no-license dialog variant ("Get free license") — the CI/dev
     // enterprise environment runs without a license. A licensed environment
-    // shows "Manage License" + "Contact Sales" and will fail here loudly.
+    // shows "Manage license" + "Contact Sales" and will fail here loudly.
     await validateEditionDialog(page, pm, {
       buttonLabel: 'Edition: Enterprise',
       hero: {
-        heroTitle: 'Enterprise Features',
+        heroTitle: 'Enterprise features',
         badgePattern: /Free up to \d+GB \/ day/,
-        primaryButtonText: 'Get Free License',
-        featuresTitle: 'Available Enterprise Features',
+        primaryButtonText: 'Get free license',
         hasLearnMore: true,
       },
       heroLinkButtons: [
-        // "Get Free License" intentionally not clicked: it switches the active
+        // "Get free license" intentionally not clicked: it switches the active
         // org to the meta org and navigates to the license page (mutates state).
         {
           label: 'Learn More',

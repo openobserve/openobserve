@@ -104,7 +104,7 @@ function toggle(browserId: string, deviceId: string) {
   >
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
       <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
-      <h3 class="text-text-heading text-base font-semibold">
+      <h3 class="text-text-heading text-sm font-semibold">
         {{ t("synthetics.browserDevices.title") }}
       </h3>
     </div>
@@ -130,7 +130,6 @@ function toggle(browserId: string, deviceId: string) {
         <div v-for="device in activeDevices" :key="device.id" class="w-20">
           <OCheckbox
             :model-value="isChecked(browser.id, device.id)"
-            size="md"
             :data-test="`synthetics-check-browser-devices-cell-${browser.id}-${device.id}`"
             @update:model-value="toggle(browser.id, device.id)"
           />

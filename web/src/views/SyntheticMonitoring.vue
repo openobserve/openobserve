@@ -18,15 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="relative"
     :title="t('synthetics.pageTitle')"
-    :subtitle="t('synthetics.pageSubtitle')"
-    icon="radar"
+    :about="t('synthetics.pageSubtitle')"
     bleed
-    tabs-below
   >
     <template #actions>
       <OButton
         v-if="activeSection === 'checks'"
-        size="sm"
         variant="primary"
         data-test="synthetic-monitoring-new-check-btn"
         :aria-label="
@@ -46,7 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-else-if="activeSection === 'status-pages'"
-        size="sm"
         variant="primary"
         data-test="status-pages-new-btn"
         @click="showCreateStatusPage = true"
@@ -55,7 +51,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-else-if="activeSection === 'variables'"
-        size="sm"
         variant="primary"
         data-test="synthetic-monitoring-add-variable-btn"
         @click="variablesTabRef?.addVariable()"
@@ -64,7 +59,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-else
-        size="sm"
         variant="primary"
         data-test="synthetic-monitoring-setup-agent-btn"
         @click="openSetupDrawer()"
@@ -76,11 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-tabs>
       <!-- Section navigation stays live on a license-locked page; the actions inside each section stay locked. -->
       <FeatureLockExempt class="contents">
-        <OTabs
-          :model-value="activeSection"
-          align="left"
-          @change="activeSection = $event as SyntheticsSection"
-        >
+        <OTabs :model-value="activeSection" @change="activeSection = $event as SyntheticsSection">
           <OTab name="checks">
             <OIcon name="radar" size="sm" />
             <span>{{ t("synthetics.tabs.checks") }}</span>
@@ -120,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="privateLocationsEnabled && activeSection === 'private'"
         :locations="privateLocations"
         :loading="locationsLoading"
+        :last-run-at="locationsLoadedAt"
         :forbidden="locationsForbidden"
         @refresh="loadPrivateLocations"
         @copy-setup="openSetupDrawer"
@@ -198,7 +189,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="tab in typeTabs"
                   :key="tab.key"
                   :value="tab.key"
-                  size="sm"
                   :icon-left="tab.icon"
                   :title="lgUp ? undefined : tab.label"
                 >
@@ -221,8 +211,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="synthetic-monitoring-search-input"
                   class="w-full"
                 >
-                  <template #icon-right>
+                  <template #icon-end>
                     <OToggleGroup
+                      size="sm"
                       :model-value="searchAcrossFolders ? 'all' : 'this'"
                       @update:model-value="
                         (v) => {
@@ -232,7 +223,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OToggleGroupItem
                         value="this"
-                        size="xs"
                         icon-left="folder-outline"
                         data-test="synthetic-monitoring-search-this-folder-btn"
                         :title="isMobile ? t('synthetics.search.thisFolder') : undefined"
@@ -241,7 +231,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OToggleGroupItem>
                       <OToggleGroupItem
                         value="all"
-                        size="xs"
                         icon-left="search"
                         data-test="synthetic-monitoring-search-all-folders-btn"
                         :title="isMobile ? t('synthetics.search.allFolders') : undefined"
@@ -271,8 +260,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #toolbar-trailing>
             <ORefreshButton
-              layout="inline"
-              variant="outline"
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
               data-test="synthetic-monitoring-refresh-btn"
@@ -287,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="activeSection === 'status-pages'"
         :pages="statusPages"
         :loading="statusPagesLoading"
+        :last-run-at="statusPagesLoadedAt"
         :forbidden="statusPagesForbidden"
         :timezone="store.state.timezone"
         @refresh="loadStatusPages"
@@ -302,12 +290,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Duplicate check dialog -->
     <ODialog
       v-model:open="showDuplicateDialog"
-      persistent
       size="sm"
       :title="t('synthetics.dialog.duplicateTitle')"
-      :primary-button-label="t('common.save')"
-      :secondary-button-label="t('common.cancel')"
-      :primary-button-disabled="isDuplicating || !duplicateName.trim() || !duplicateSource"
+      :dirty="isDuplicateFormChanged"
+      :primary="{
+        label: t('common.save'),
+        disabled: isDuplicating || !duplicateName.trim() || !duplicateSource,
+        loading: isDuplicating,
+      }"
+      :secondary="{ label: t('common.cancel') }"
       data-test="synthetic-monitoring-duplicate-dialog"
       @click:primary="saveDuplicate"
       @click:secondary="showDuplicateDialog = false"
@@ -335,28 +326,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <!-- Bulk delete confirmation dialog -->
-    <ODialog
-      v-model:open="showBulkDeleteConfirm"
-      size="sm"
+    <ConfirmDialog
+      v-model="showBulkDeleteConfirm"
+      kind="destructive"
       :title="t('synthetics.dialog.bulkDeleteTitle')"
-      :primary-button-label="t('synthetics.table.delete')"
-      :secondary-button-label="t('common.cancel')"
-      primary-button-variant="destructive"
+      :message="t('synthetics.dialog.bulkDeleteBody', { count: bulkDeleteCount })"
+      :ok-label="t('synthetics.table.delete')"
+      :cancel-label="t('common.cancel')"
       data-test="synthetic-monitoring-bulk-delete-dialog"
-      @click:primary="bulkDeleteMonitors"
-      @click:secondary="showBulkDeleteConfirm = false"
-    >
-      <p class="py-2">
-        {{ t("synthetics.dialog.bulkDeleteBody", { count: bulkDeleteCount }) }}
-      </p>
-    </ODialog>
+      @update:ok="bulkDeleteMonitors"
+      @update:cancel="showBulkDeleteConfirm = false"
+    />
 
     <!-- Delete blocked: other checks reference this one (or, in bulk, one outside the selection). -->
     <ODialog
       v-model:open="blockedDeleteOpen"
       size="sm"
       :title="blockedDelete?.title ?? raw('')"
-      :primary-button-label="t('common.ok')"
+      :primary="{ label: t('common.ok') }"
       data-test="synthetic-monitoring-blocked-delete-dialog"
       @click:primary="blockedDelete = null"
     >
@@ -398,27 +385,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Delete location confirmation -->
-    <ODialog
-      v-model:open="showDeleteLocation"
-      size="sm"
+    <ConfirmDialog
+      v-model="showDeleteLocation"
+      kind="destructive"
       :title="t('synthetics.privateLocations.deleteTitle')"
-      :primary-button-label="t('synthetics.table.delete')"
-      :secondary-button-label="t('common.cancel')"
-      primary-button-variant="destructive"
+      message-keypath="synthetics.privateLocations.deleteBody"
+      :message-name="locationToDelete?.label"
+      :ok-label="t('synthetics.table.delete')"
+      :cancel-label="t('common.cancel')"
       data-test="synthetic-monitoring-delete-location-dialog"
-      @click:primary="deleteLocation"
-      @click:secondary="showDeleteLocation = false"
-    >
-      <i18n-t keypath="synthetics.privateLocations.deleteBody" tag="p" class="py-2">
-        <template #name>
-          <span
-            data-test="synthetic-monitoring-delete-location-name"
-            class="text-text-heading font-semibold break-all"
-            >{{ locationToDelete?.label }}</span
-          >
-        </template>
-      </i18n-t>
-    </ODialog>
+      @update:ok="deleteLocation"
+      @update:cancel="showDeleteLocation = false"
+    />
 
     <!-- Move checks dialog -->
     <MoveAcrossFolders
@@ -510,12 +488,14 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import { useUnsavedChanges } from "@/lib/forms/Form/unsavedEdits";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import MonitorTable from "@/components/synthetic-monitoring/MonitorTable.vue";
 import PrivateLocations from "@/views/synthetics/PrivateLocations.vue";
@@ -1069,6 +1049,11 @@ const duplicateSource = ref<any>(null);
 // "browser" | "http" | "tcp" | "tls" | "ssh" — picks the mapper/payload builder.
 const duplicateSourceType = ref<string>("browser");
 const isDuplicating = ref(false);
+// A stray dismiss asks before dropping an edit (V5); the folder picker settling after open is none.
+const { dirty: isDuplicateFormChanged } = useUnsavedChanges(
+  () => [duplicateName.value, duplicateFolder.value],
+  () => showDuplicateDialog.value,
+);
 
 const openBulkDeleteConfirm = () => {
   bulkDeleteCount.value = selectedMonitorIds.value.length;
@@ -1168,6 +1153,7 @@ const onTabChange = (v: unknown) => {
 // ── Private locations tab ──────────────────────────────────────────────
 const privateLocations = ref<SyntheticLocation[]>([]);
 const locationsLoading = ref(false);
+const locationsLoadedAt = ref<number | null>(null);
 const showSetupDrawer = ref(false);
 const setupInstall = ref<string | null>(null);
 const setupLocationName = ref<string | null>(null);
@@ -1185,6 +1171,7 @@ async function loadPrivateLocations() {
     const res = await syntheticsService.getLocations(orgIdentifier.value);
     const all: SyntheticLocation[] = (res.data as any).locations ?? [];
     privateLocations.value = all.filter((l) => l.kind === "private");
+    locationsLoadedAt.value = Date.now();
   } catch (err) {
     locationsForbidden.value = forbiddenState(err);
     console.error("[synthetics] failed to load private locations", err);
@@ -1238,6 +1225,7 @@ async function deleteLocation() {
 // ── Status pages tab ───────────────────────────────────────────────────
 const statusPages = ref<StatusPageListItem[]>([]);
 const statusPagesLoading = ref(false);
+const statusPagesLoadedAt = ref<number | null>(null);
 const statusPagesForbidden = ref<ForbiddenState>(false);
 const showCreateStatusPage = ref(false);
 
@@ -1248,6 +1236,7 @@ async function loadStatusPages() {
   try {
     const res = await statusPagesService.list(orgIdentifier.value);
     statusPages.value = (res.data as any).pages ?? [];
+    statusPagesLoadedAt.value = Date.now();
   } catch (err) {
     statusPagesForbidden.value = forbiddenState(err);
     console.error("[status-pages] failed to load", err);
@@ -1334,7 +1323,7 @@ const confirmDeleteStatusPage = async (page: StatusPageListItem) => {
     title: t("statusPages.dialog.deleteTitle"),
     messageKeypath: "statusPages.dialog.deleteBody",
     messageName: page.name,
-    confirmVariant: "destructive",
+    kind: "destructive",
   });
   if (!ok) return;
   const dismiss = toast({
@@ -1908,7 +1897,7 @@ async function deleteMonitor(m: any) {
     title: t("synthetics.dialog.deleteSingleTitle"),
     messageKeypath: "synthetics.dialog.deleteSingleBody",
     messageName: m.name,
-    confirmVariant: "destructive",
+    kind: "destructive",
   });
   if (!ok) return;
 

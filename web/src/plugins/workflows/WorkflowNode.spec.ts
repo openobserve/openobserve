@@ -309,7 +309,7 @@ describe("WorkflowNode", () => {
   describe("#body — node label", () => {
     it("shows the trigger's type title (never a config detail)", () => {
       wrapper = mountNode("t1", TRIGGER.data);
-      expect(wrapper.text()).toContain("Alert Trigger");
+      expect(wrapper.text()).toContain("Alert trigger");
     });
 
     it("shows a configured condition's rule preview as the label", () => {

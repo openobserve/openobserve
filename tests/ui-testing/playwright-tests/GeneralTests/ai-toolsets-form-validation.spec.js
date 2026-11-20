@@ -107,7 +107,7 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
         testLogger.info('Testing CLI command required validation');
 
         // Switch kind to CLI Tool
-        await pm.aiToolsetsFormValidation.selectKind('CLI Tool');
+        await pm.aiToolsetsFormValidation.selectKind('CLI tool');
         await pm.aiToolsetsFormValidation.fillName('ai_toolset_fv_cli_test');
         // Leave command empty and submit
         await pm.aiToolsetsFormValidation.clickSave();
@@ -123,7 +123,7 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
     }, async ({ page }) => {
         testLogger.info('Testing both name and CLI command errors on empty CLI form submit');
 
-        await pm.aiToolsetsFormValidation.selectKind('CLI Tool');
+        await pm.aiToolsetsFormValidation.selectKind('CLI tool');
         await pm.aiToolsetsFormValidation.clickSave();
 
         await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toBeVisible();

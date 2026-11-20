@@ -20,7 +20,7 @@ import { useStore } from "vuex";
 import useIngestion from "@/composables/useIngestion";
 import { basicIngestToken } from "@/composables/useCredentialSnippet";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { parseCard } from "./parseCard";
 import { renderCardSegments, safeHttpUrl, type CardSubstitutions } from "./renderMarkdown";
@@ -75,11 +75,11 @@ const renderedSections = computed(() =>
 </script>
 
 <template>
-  <OBanner
+  <OInlineNotice
     v-if="passcodeForbidden && contentNeedsPasscode"
-    variant="warning"
+    tone="warn"
     data-test="ai-integration-card-passcode-forbidden"
-    :content="t('ingestion.passcodeForbiddenMessage')"
+    :message="t('ingestion.passcodeForbiddenMessage')"
   />
   <div v-else class="o2-card min-w-0" data-test="ai-integration-card">
     <div class="o2-card-inner min-w-0">
@@ -102,11 +102,11 @@ const renderedSections = computed(() =>
       </header>
 
       <!-- Callouts (e.g. codex "logs, not traces") -->
-      <OBanner
+      <OInlineNotice
         v-for="(w, i) in warnings"
         :key="`warn-${i}`"
-        variant="warning"
-        :content="raw(w)"
+        tone="warn"
+        :message="raw(w)"
         class="mb-5"
       />
 
@@ -129,7 +129,7 @@ const renderedSections = computed(() =>
 
       <!-- Documentation link — identical markup to the legacy ingestion cards
            (AIIntegrationDetail.vue) so it looks the same across all sections. -->
-      <div v-if="docUrl" class="pt-6 pb-2 font-bold">
+      <div v-if="docUrl" class="pt-6 pb-2 font-semibold">
         {{ t("ingestion.docLinkClick") }}
         <a
           :href="safeHttpUrl(docUrl)"
@@ -167,7 +167,7 @@ const renderedSections = computed(() =>
 }
 
 .o2-section-title {
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: 600;
   margin: 0 0 0.5rem;
   letter-spacing: 0.01em;

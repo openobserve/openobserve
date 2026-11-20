@@ -87,7 +87,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     await pm.dashboardSetting.addVariable(
-      "Query Values",
+      "Query values",
       variableName,
       "logs",
       "e2e_automate",
@@ -159,7 +159,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     await pm.dashboardSetting.addVariable(
-      "Query Values",
+      "Query values",
       variableName,
       "logs",
       "e2e_automate",
@@ -235,7 +235,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     await pm.dashboardSetting.addVariable(
-      "Query Values",
+      "Query values",
       variableName,
       "logs",
       "e2e_automate",
@@ -293,7 +293,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     await pm.dashboardSetting.addVariable(
-      "Query Values",
+      "Query values",
       variableName,
       "logs",
       "e2e_automate",
@@ -362,7 +362,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     await pm.dashboardSetting.addVariable(
-      "Query Values",
+      "Query values",
       variableName,
       "logs",
       "e2e_automate",
@@ -421,7 +421,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     await pm.dashboardSetting.addVariable(
-      "Query Values",
+      "Query values",
       variableName,
       "logs",
       "e2e_automate",
@@ -471,7 +471,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.openVariables();
     await pm.dashboardSetting.addVariable(
-      "Query Values",
+      "Query values",
       variableName,
       "logs",
       "e2e_automate",

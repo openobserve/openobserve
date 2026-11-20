@@ -29,14 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div data-test="alert-library-page" class="flex h-full flex-col">
-    <OPageLayout
-      bleed
-      :title="t('alerts.header')"
-      icon="shield-alert-outline"
-      title-data-test="alert-library-title"
-      :subtitle="t('alerts.subtitle')"
-      tabs-below
-    >
+    <OPageLayout bleed :title="t('alerts.header')" title-data-test="alert-library-title">
       <template #header-tabs>
         <AlertSectionTabs />
       </template>
@@ -51,9 +44,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #actions-overflow>
         <OButton
-          variant="outline"
-          size="sm"
-          icon-left="open-in-new"
+          variant="secondary"
+          icon="open-in-new"
           data-test="alert-library-contribute"
           @click="openContribute"
         >
@@ -75,10 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <ODrawer
+          size="xl"
           v-if="isMobile"
           v-model:open="mobileFiltersOpen"
           side="left"
-          :width="80"
           bleed
           :title="t('common.filters')"
           anchor='[data-test="alert-library-toolbar"]'
@@ -101,14 +93,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                reads as "there is nothing here", which is a different claim. -->
           <OEmptyState
             v-if="loadFailed"
-            size="hero"
-            variant="error"
-            illustration="broken-panel"
+            kind="error"
             class="min-h-0 flex-1"
             :title="t('alert_library.loadFailedTitle')"
-            :description="errorDescription"
-            :action-label="t('alert_library.retry')"
-            action-icon="refresh"
+            :text="errorDescription"
             data-test="alert-library-error"
             @action="refresh"
           />
@@ -117,13 +105,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Selection shares the search row: its own row would push the grid down.
                  Only the search field and the chips' scroll box give up width to it. -->
             <div
-              class="border-border-default px-page-edge flex shrink-0 flex-wrap items-center gap-3 border-b py-2"
+              class="border-border-default px-page-edge flex shrink-0 flex-wrap items-center gap-2 border-b py-2"
               data-test="alert-library-toolbar"
             >
               <OButton
-                variant="outline"
-                size="icon-toolbar"
-                icon-left="filter-list"
+                icon-only
+                variant="ghost"
+                icon="filter-list"
                 class="md:hidden"
                 data-test="alert-library-mobile-filters-btn"
                 @click="mobileFiltersOpen = true"
@@ -132,7 +120,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OSearchInput
                 v-model="search"
-                size="sm"
                 class="min-w-0 flex-1 md:min-w-48"
                 :debounce="200"
                 :placeholder="t('alert_library.searchPlaceholder')"
@@ -153,7 +140,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="item in alertTypeOptions"
                   :key="item.id"
                   :value="item.id"
-                  size="sm"
                   :data-test="`alert-library-alert-type-${item.id}`"
                 >
                   {{ item.label }}
@@ -199,8 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                   </span>
                   <OButton
-                    variant="outline"
-                    size="sm"
+                    variant="secondary"
                     data-test="alert-library-clear-selection"
                     @click="clearSelection"
                   >
@@ -208,7 +193,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <OButton
                     variant="primary"
-                    size="sm"
                     data-test="alert-library-add-selected"
                     @click="addSelected"
                   >
@@ -220,7 +204,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OCheckbox
                   v-if="!isBusy && visibleEntries.length > 0"
                   ref="selectAllBox"
-                  size="sm"
                   :model-value="viewSelectionState"
                   :disabled="selectableVisible.length === 0"
                   :title="
@@ -248,42 +231,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-library-grid"
             >
               <div v-if="isBusy" class="grid gap-3 py-1 md:grid-cols-2 xl:grid-cols-3">
-                <OSkeleton
-                  v-for="index in 6"
-                  :key="index"
-                  type="rect"
-                  class="rounded-surface h-32 w-full"
-                />
+                <OSkeleton v-for="index in 6" :key="index" shape="block" class="h-32 w-full" />
               </div>
 
-              <!-- A catalog that loaded but holds nothing is not a filter
-                   problem, and "try another category" is not advice when there
-                   are no categories. Offering Clear filters there would be a
-                   button that changes nothing. -->
+              <!-- An empty catalog is not a filter problem: Clear filters there
+                   would be a button that changes nothing. -->
               <OEmptyState
                 v-else-if="entries.length === 0"
-                size="block"
-                class="py-8"
-                illustration="no-results"
-                variant="no-results"
                 :title="t('alert_library.emptyLibraryTitle')"
-                :description="t('alert_library.emptyLibraryDescription')"
+                :text="t('alert_library.emptyLibraryDescription')"
                 :action-label="t('alert_library.retry')"
-                action-icon="refresh"
                 data-test="alert-library-empty-catalog"
                 @action="refresh"
               />
 
               <OEmptyState
                 v-else-if="groupedEntries.length === 0"
-                size="block"
-                class="py-8"
-                illustration="no-results"
-                variant="no-results"
+                kind="filtered"
                 :title="t('alert_library.noMatchesTitle')"
-                :description="t('alert_library.noMatchesDescription')"
+                :text="t('alert_library.noMatchesDescription')"
                 :action-label="hasActiveFilters ? t('alert_library.clearFilters') : undefined"
-                action-icon="filter-list"
                 data-test="alert-library-no-results"
                 @action="clearFilters"
               />
@@ -308,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="groupedEntries.length > 1 && group.selectable.length > 0"
                       :id="`alert-library-select-group-id-${group.id}`"
                       variant="ghost"
-                      size="xs"
+                      size="sm"
                       class="ms-auto"
                       :aria-labelledby="`alert-library-select-group-id-${group.id} alert-library-group-heading-${group.id}`"
                       :data-test="`alert-library-select-group-${group.id}`"

@@ -18,8 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OButton
     v-if="showAcknowledge"
     variant="primary"
-    size="sm-action"
-    icon-left="check"
+    icon="check"
     :disabled="actions.pending.value"
     data-test="alerts-alertdetail-ack"
     @click="onAcknowledge"
@@ -29,19 +28,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- A sibling, not a child: inside the button it would anchor to the icon alone. -->
   <OTooltip v-if="showAcknowledge && acknowledgeHint" :content="acknowledgeHint" />
 
-  <template v-if="muteEnabled">
-    <template v-if="downtime?.end_here">
-      <ODropdown align="end">
-        <template #trigger>
-          <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="hourglass-empty"
-            data-test="alerts-alertdetail-extend"
-          >
-            {{ t("alerts.downtimes.actions.extend") }}
-          </OButton>
-        </template>
+  <!-- Mute, its extensions and the ack follow-ups live in one ⋯, so the header keeps two secondaries (H3). -->
+  <ODropdown v-if="hasMenu" align="end">
+    <template #trigger>
+      <OButton
+        icon-only
+        variant="ghost"
+        icon="more-horiz"
+        :label="t('alerts.moreActions')"
+        data-test="alerts-alertdetail-more"
+      />
+    </template>
+    <template v-if="muteEnabled">
+      <template v-if="downtime?.end_here">
         <MuteMenuItems
           labels="extend"
           until-clear
@@ -50,70 +49,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @until-clear="onExtend({ untilClear: true })"
           @until="extendUntilOpen = true"
         />
-      </ODropdown>
-      <OButton
-        variant="outline"
-        size="sm-action"
-        :disabled="actions.pending.value"
-        data-test="alerts-alertdetail-end-mute"
-        @click="onEndMute"
-      >
-        {{ t("alerts.downtimes.mute.endMute") }}
-      </OButton>
-    </template>
-    <OButton
-      v-else-if="downtime"
-      variant="outline"
-      size="sm-action"
-      icon-left="open-in-new"
-      data-test="alerts-alertdetail-muted-by"
-      @click="openDowntime"
-    >
-      {{ t("alerts.downtimes.mute.mutedBy", { name: downtime.name }) }}
-    </OButton>
-    <ODropdown v-else align="end">
-      <template #trigger>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          icon-left="notifications-paused"
-          icon-right="arrow-drop-down"
-          data-test="alerts-alertdetail-mute"
+        <ODropdownItem
+          icon="notifications-active"
+          :disabled="actions.pending.value"
+          data-test="alerts-alertdetail-end-mute"
+          @select="onEndMute"
         >
-          {{ t("alerts.downtimes.mute.bulk") }}
-        </OButton>
+          {{ t("alerts.downtimes.mute.endMute") }}
+        </ODropdownItem>
       </template>
+      <ODropdownItem
+        v-else-if="downtime"
+        icon="open-in-new"
+        data-test="alerts-alertdetail-muted-by"
+        @select="openDowntime"
+      >
+        {{ t("alerts.downtimes.mute.mutedBy", { name: downtime.name }) }}
+      </ODropdownItem>
       <MuteMenuItems
+        v-else
         until-clear
         data-test-prefix="alerts-alertdetail-mute"
         @preset="(secs) => onMute({ minutes: secs / 60 })"
         @until-clear="onMute({ untilClear: true })"
         @until="muteDialogOpen = true"
       />
-    </ODropdown>
-  </template>
-
-  <ODropdown v-if="ack" align="end">
-    <template #trigger>
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="more-vert"
-        :aria-label="t('alerts.moreActions')"
-        data-test="alerts-alertdetail-ack-menu"
-      />
     </template>
-    <ODropdownItem icon-left="person" data-test="alerts-alertdetail-unack" @select="onUnack">
-      {{ t("alerts.ack.unacknowledge") }}
-    </ODropdownItem>
-    <ODropdownItem
-      v-if="ack.acked_by !== actions.me.value"
-      icon-left="person"
-      data-test="alerts-alertdetail-take-over"
-      @select="onTakeOver"
-    >
-      {{ t("alerts.ack.takeOver") }}
-    </ODropdownItem>
+    <template v-if="ack">
+      <ODropdownSeparator v-if="muteEnabled" />
+      <ODropdownItem icon="person" data-test="alerts-alertdetail-unack" @select="onUnack">
+        {{ t("alerts.ack.unacknowledge") }}
+      </ODropdownItem>
+      <ODropdownItem
+        v-if="ack.acked_by !== actions.me.value"
+        icon="person"
+        data-test="alerts-alertdetail-take-over"
+        @select="onTakeOver"
+      >
+        {{ t("alerts.ack.takeOver") }}
+      </ODropdownItem>
+    </template>
   </ODropdown>
 
   <QuickMuteDialog
@@ -152,6 +127,7 @@ import {
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import MuteMenuItems from "./downtimes/MuteMenuItems.vue";
 import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
@@ -197,6 +173,8 @@ const isMulti = computed(() => props.unackedGroups !== null);
 const showAcknowledge = computed(() =>
   isMulti.value ? (props.unackedGroups ?? 0) > 0 : props.firing && !props.ack,
 );
+
+const hasMenu = computed(() => props.muteEnabled || !!props.ack);
 
 const acknowledgeHint = computed(() => {
   const count = props.unackedGroups ?? 0;

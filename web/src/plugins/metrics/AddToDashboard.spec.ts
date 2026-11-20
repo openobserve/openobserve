@@ -111,24 +111,24 @@ const ODialogStub = {
     "size",
     "width",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "seamless",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
     "formId",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 // ---------------------------------------------------------------------------
@@ -775,14 +775,14 @@ describe("AddToDashboard — ODrawer surface", () => {
     const wrapper = createWrapper();
     await flushPromises();
     const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("primaryButtonLabel")).toBe("metrics.add");
+    expect(drawer.props("primary")?.label).toBe("metrics.add");
   });
 
   it("passes a secondary button label (Cancel) to ODrawer", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("secondaryButtonLabel")).toBe("metrics.addToDashboardPage.cancel");
+    expect(drawer.props("secondary")?.label).toBe("metrics.addToDashboardPage.cancel");
   });
 
   it("passes the configured size (md) to ODialog", async () => {
@@ -798,14 +798,14 @@ describe("AddToDashboard — ODrawer surface", () => {
     const wrapper = createWrapper();
     await flushPromises();
     const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("primaryButtonDisabled")).toBeFalsy();
+    expect(drawer.props("primary")?.disabled).toBeFalsy();
   });
 
-  it("does not bind primaryButtonLoading (Save spinner is automatic)", async () => {
+  it("does not bind primary?.loading (Save spinner is automatic)", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("primaryButtonLoading")).toBeFalsy();
+    expect(drawer.props("primary")?.loading).toBeFalsy();
   });
 
   it("invokes onSubmit when OForm emits submit", async () => {

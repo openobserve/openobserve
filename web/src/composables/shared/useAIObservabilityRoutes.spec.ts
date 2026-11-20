@@ -82,6 +82,14 @@ describe("useAIObservabilityRouteChildren — tab titles", () => {
     });
   });
 
+  it("titles a tab's own route by its rail item, as its header is", () => {
+    const titleOf = (name: string) => children.find((r) => r.name === name)!.meta?.titleKey;
+    expect(titleOf("aiUsers")).toBe("aiObservability.nav.costUsage");
+    expect(titleOf("aiAgentBehavior")).toBe("aiObservability.nav.agents");
+    expect(titleOf("aiRemoteTasks")).toBe("aiObservability.nav.experiments");
+    expect(titleOf("aiSessions")).toBe("aiObservability.nav.sessions");
+  });
+
   it("gives a route that only one rail item uses no per-tab titles", () => {
     expect(children.find((r) => r.name === "aiExperiments")!.meta?.titleKeyByTab).toBeUndefined();
   });

@@ -10,9 +10,7 @@
           message
         }}</span>
         <br />
-        <span class="text-text-body text-base leading-(--leading-md) font-normal">{{
-          subtitle
-        }}</span>
+        <span class="text-text-body text-sm font-normal">{{ subtitle }}</span>
       </div>
     </div>
   </div>

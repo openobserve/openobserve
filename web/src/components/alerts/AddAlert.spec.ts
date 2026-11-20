@@ -555,6 +555,29 @@ describe("AddAlert (OForm owner)", () => {
   // payload. Every other setter goes through setF(); updateWorkflows must too.
   // This merged CLEANLY (the two sides never touched the same lines), so nothing
   // but a test can catch it.
+  describe("Save on an empty form (V6)", () => {
+    it("stays enabled and, when clicked, flags the errors instead of saving", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const save = wrapper.findComponent('[data-test="add-alert-submit-btn"]');
+      expect(save.props("disabled")).toBe(false);
+
+      await wrapper.vm.handleSave();
+      await flushPromises();
+
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+    });
+
+    it("offers Start from a template on a new alert, pointing at the library", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      expect(wrapper.vm.showTemplateLink).toBe(true);
+      expect(wrapper.vm.alertLibraryRoute).toMatchObject({ name: "alertLibrary" });
+    });
+  });
+
   describe("workflows link survives to the payload (read-view write guard)", () => {
     it("updateWorkflows WRITES THROUGH to the form (not to the read-view)", async () => {
       wrapper = mountAlert();
@@ -1583,20 +1606,20 @@ describe("AddAlert (OForm owner)", () => {
       });
 
       await clickSave();
-      expect(dialogEl("dialog")?.textContent).toContain("Choose Query Mode");
+      expect(dialogEl("dialog")?.textContent).toContain("Choose query mode");
       expect(dialogEl("lead")?.textContent?.trim()).toBe(
         "Builder is selected but empty. SQL is set up.",
       );
       expect(dialogEl("dialog")?.textContent).not.toContain("-line query");
       // The dialog opens on the mode selected in the form; only a click changes it.
       expect(dialogEl("option-custom")?.getAttribute("data-state")).toBe("on");
-      expect(dialogButton("primary")?.textContent).toContain("Save with Builder Mode");
+      expect(dialogButton("primary")?.textContent).toContain("Save with Builder mode");
       expect(dialogEl("warning")?.textContent).toContain("No filters, so every row in");
       expect(noteText()).toBe("Only Builder mode runs. SQL mode is not used.");
 
       dialogEl("option-sql")!.click();
       await flushPromises();
-      expect(dialogButton("primary")?.textContent).toContain("Save with SQL Mode");
+      expect(dialogButton("primary")?.textContent).toContain("Save with SQL mode");
       // SQL holds a query, so the picked mode needs no warning.
       expect(dialogEl("warning")).toBeNull();
       expect(noteText()).toBe("Only SQL mode runs.");
@@ -1657,7 +1680,7 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       expect(noteText()).toBe("Only Builder mode runs. SQL mode is not used.");
       expect(dialogEl("dialog")?.textContent).not.toContain("filter condition");
-      expect(dialogButton("primary")?.textContent).toContain("Save with Builder Mode");
+      expect(dialogButton("primary")?.textContent).toContain("Save with Builder mode");
 
       await clickDialog("primary");
 

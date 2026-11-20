@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex min-w-0 flex-col" data-test="rum-analytics-funnel-trend">
     <OEmptyState
       v-if="issue"
-      preset="no-search-results"
-      size="block"
+      kind="filtered"
+      :text="t('emptyState.noSearchResults.description')"
       :title="
         issue === 'tooShort'
           ? t('rum.analytics.funnel.trendTooShort')
@@ -36,10 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OEmptyState
         v-if="empty"
-        preset="no-search-results"
-        size="block"
+        kind="filtered"
         :title="t('rum.analytics.funnel.trendEmpty', { unit: unitNoun })"
-        :description="t('rum.analytics.funnel.trendEmptyDescription', { step: pair.a })"
+        :text="t('rum.analytics.funnel.trendEmptyDescription', { step: pair.a })"
         data-test="rum-analytics-funnel-trend-empty"
       />
       <template v-else-if="periods">
@@ -62,9 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="id"
             pagination="none"
             sorting="none"
-            dense
-            :show-global-filter="false"
-            :frame="false"
           >
             <template #cell-bucket="{ row }">
               <span
@@ -77,8 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-for="tag in row.tags" :key="tag.id">
                   <OTag
                     :label="tag.label"
-                    variant="default-soft"
-                    size="xs"
+                    tone="neutral"
+                    size="sm"
                     :data-test="`${rowTest(row)}-${tag.id}`"
                   />
                   <OTooltip v-if="tag.tip" :content="tag.tip" />

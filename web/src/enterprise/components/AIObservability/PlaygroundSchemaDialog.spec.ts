@@ -11,17 +11,10 @@ vi.mock("@/types/i18n", async () => {
 import PlaygroundSchemaDialog from "./PlaygroundSchemaDialog.vue";
 
 const ODialog = {
-  props: [
-    "open",
-    "size",
-    "title",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "primaryButtonDisabled",
-  ],
+  props: ["open", "size", "title", "primary", "secondary", "primary"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template:
-    '<div class="o-dialog" :data-primary-disabled="primaryButtonDisabled">' +
+    '<div class="o-dialog" :data-primary-disabled="primary?.disabled">' +
     '<button class="primary" @click="$emit(\'click:primary\')" /><slot /></div>',
 };
 const OCheckbox = {
@@ -36,7 +29,7 @@ const OTextarea = {
   template:
     '<textarea :data-disabled="disabled" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
 };
-const OBanner = {
+const OInlineNotice = {
   props: ["variant", "dataTest"],
   template: '<div :data-test="dataTest"><slot /></div>',
 };
@@ -46,7 +39,7 @@ function mountDialog(
 ) {
   return mount(PlaygroundSchemaDialog, {
     props: { open: true, schema: null, ...props },
-    global: { stubs: { ODialog, OCheckbox, OTextarea, OBanner } },
+    global: { stubs: { ODialog, OCheckbox, OTextarea, OInlineNotice } },
   });
 }
 

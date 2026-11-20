@@ -17,37 +17,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-wrap items-center gap-4" data-test="rum-errors-filter-bar">
     <OToggleGroup
+      size="sm"
       :model-value="status"
       type="single"
       :label="t('rum.statusColumn')"
       label-position="left"
       @update:model-value="(v: any) => v && emit('update:status', v)"
     >
-      <OToggleGroupItem value="all" size="xs" data-test="rum-errors-filter-status-all">{{
+      <OToggleGroupItem value="all" data-test="rum-errors-filter-status-all">{{
         t("rum.all")
       }}</OToggleGroupItem>
-      <OToggleGroupItem value="new" size="xs" data-test="rum-errors-filter-status-new"
+      <OToggleGroupItem value="new" data-test="rum-errors-filter-status-new"
         >{{ t("rum.statusNew") }} · {{ counts.new }}</OToggleGroupItem
       >
-      <OToggleGroupItem value="ongoing" size="xs" data-test="rum-errors-filter-status-ongoing"
+      <OToggleGroupItem value="ongoing" data-test="rum-errors-filter-status-ongoing"
         >{{ t("rum.statusOngoing") }} · {{ counts.ongoing }}</OToggleGroupItem
       >
     </OToggleGroup>
 
     <OToggleGroup
+      size="sm"
       :model-value="type"
       type="single"
       :label="t('rum.type')"
       label-position="left"
       @update:model-value="(v: any) => v && emit('update:type', v)"
     >
-      <OToggleGroupItem value="all" size="xs" data-test="rum-errors-filter-type-all">{{
+      <OToggleGroupItem value="all" data-test="rum-errors-filter-type-all">{{
         t("rum.all")
       }}</OToggleGroupItem>
-      <OToggleGroupItem value="unhandled" size="xs" data-test="rum-errors-filter-type-unhandled"
+      <OToggleGroupItem value="unhandled" data-test="rum-errors-filter-type-unhandled"
         >{{ t("rum.unhandled") }} · {{ counts.unhandled }}</OToggleGroupItem
       >
-      <OToggleGroupItem value="handled" size="xs" data-test="rum-errors-filter-type-handled"
+      <OToggleGroupItem value="handled" data-test="rum-errors-filter-type-handled"
         >{{ t("rum.handled") }} · {{ counts.handled }}</OToggleGroupItem
       >
     </OToggleGroup>
@@ -60,7 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         id="rum-errors-filter-service"
         :model-value="service || ALL_SERVICES"
         :options="serviceOptions"
-        size="sm"
         class="min-w-36"
         data-test="rum-errors-filter-service-select"
         @update:model-value="onServiceSelect"

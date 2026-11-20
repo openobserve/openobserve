@@ -28,7 +28,6 @@ const props = withDefaults(defineProps<OptionGroupProps>(), {
   type: "radio",
   orientation: "vertical",
   disabled: false,
-  size: "md",
 });
 
 const emit = defineEmits<OptionGroupEmits>();
@@ -106,7 +105,6 @@ function handleCheckbox(val: (string | number)[]) {
         :value="opt.value"
         :label="opt.label"
         :disabled="isDisabled || opt.disabled"
-        :size="size"
       />
     </ORadioGroup>
 
@@ -125,7 +123,6 @@ function handleCheckbox(val: (string | number)[]) {
           :value="opt.value as string"
           :label="opt.label"
           :disabled="isDisabled || opt.disabled"
-          :size="size"
         />
       </div>
     </OCheckboxGroup>

@@ -73,10 +73,9 @@ export function useLeaveGuard(
     const leave = await confirm({
       title: t("common.leaveGuard.title"),
       message: count ? t("common.leaveGuard.message", count) : t("common.unsavedMessage"),
+      kind: "discard",
       confirmLabel: t("common.discardChanges"),
       cancelLabel: t("common.leaveGuard.keepEditing"),
-      confirmVariant: "destructive",
-      focusCancel: true,
     });
     if (leave) options.onDiscard?.();
     return leave;

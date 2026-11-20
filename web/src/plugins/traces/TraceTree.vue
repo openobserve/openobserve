@@ -176,11 +176,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <!-- shrink-0 + a cap, not plain shrink: flex shrinks in proportion to width, so a long operation name would eat a short service name first. -->
                       <OTruncatedText
-                        class="me-2 max-w-[50%] shrink-0 text-sm font-bold font-medium"
+                        class="me-2 max-w-[50%] shrink-0 text-sm font-semibold"
                         :class="{
-                          'bg-table-highlight-bg text-table-highlight-text font-bold':
+                          'bg-table-highlight-bg text-table-highlight-text font-semibold':
                             isHighlighted((spans as any[])[virtualRow.index].spanId),
-                          'bg-table-highlight-bg text-status-error-text font-bold':
+                          'bg-table-highlight-bg text-status-error-text font-semibold':
                             currentSelectedValue === (spans as any[])[virtualRow.index].spanId,
                         }"
                         :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"
@@ -249,8 +249,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <span v-if="logsLocked" class="inline-flex">
                         <OButton
-                          variant="outline"
-                          size="icon"
+                          icon-only
+                          variant="ghost"
+                          size="xs"
                           disabled
                           :aria-label="t('traces.viewLogs')"
                           :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
@@ -261,8 +262,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                       <OButton
                         v-else
-                        variant="outline"
-                        size="icon"
+                        icon-only
+                        variant="ghost"
+                        size="xs"
                         :title="t('traces.viewLogs')"
                         @click.stop="viewSpanLogs((spans as any[])[virtualRow.index])"
                         :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
@@ -299,15 +301,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          than on the error variant's red alone. -->
                     <OBadge
                       v-if="getEventSummary((spans as any[])[virtualRow.index]).total > 0"
-                      size="xs"
-                      shape="square"
-                      :variant="
+                      size="sm"
+                      :tone="
                         getEventSummary((spans as any[])[virtualRow.index]).errors > 0
-                          ? 'error-outline'
-                          : 'default-outline'
+                          ? 'outline'
+                          : 'outline'
                       "
                       icon="event-note"
-                      class="me-1 rounded!"
+                      class="me-1"
                       :title="getEventCountLabel((spans as any[])[virtualRow.index])"
                       data-test="span-event-count-badge"
                       :data-test-span="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"

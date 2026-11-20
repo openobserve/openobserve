@@ -25,7 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="step.kind === 'p'">
       <OInput
         type="number"
-        size="sm"
         :min="0"
         :max="MAX_STEP_MS / 1000"
         :label="t('rum.analytics.funnel.filterMinTime')"
@@ -59,14 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             :model-value="d.t"
             :options="condTypes"
-            size="sm"
             class="w-32 shrink-0"
             :data-test="`rum-analytics-funnel-step-${index}-cond-${i}-type`"
             @update:model-value="(v) => setDraft(i, { t: v === 'ref' ? 'ref' : 'param' })"
           />
           <OInput
             v-if="d.t === 'param'"
-            size="sm"
             class="w-28 shrink-0"
             :model-value="d.key"
             :placeholder="t('rum.analytics.funnel.condParam')"
@@ -74,7 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(v) => setDraft(i, { key: String(v ?? '') })"
           />
           <OInput
-            size="sm"
             class="min-w-0 flex-1"
             :class="compact ? 'order-last basis-full' : ''"
             :model-value="d.values"
@@ -89,9 +85,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(v) => setDraft(i, { values: String(v ?? '') })"
           />
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="close"
+            icon="close"
             :aria-label="t('rum.analytics.funnel.removeCond')"
             :data-test="`rum-analytics-funnel-step-${index}-cond-${i}-remove`"
             @click="removeRow(i)"
@@ -100,9 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <span>
           <OButton
-            variant="ghost-primary"
-            size="xs"
-            icon-left="add"
+            variant="accent-ghost"
+            size="sm"
+            icon="add"
             :disabled="drafts.length >= MAX_VIEW_CONDS"
             :data-test="`rum-analytics-funnel-step-${index}-cond-add`"
             @click="addRow"
@@ -131,7 +127,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="fieldOptions(d.field)"
               :placeholder="t('rum.analytics.funnel.propertyField')"
               searchable
-              size="sm"
               :data-test="`rum-analytics-funnel-step-${index}-prop-${i}-field`"
               @update:model-value="(v) => setProp(i, { field: String(v ?? ''), values: [] })"
             />
@@ -140,15 +135,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSelect
               :model-value="d.cond"
               :options="propConds(d.cond)"
-              size="sm"
               :data-test="`rum-analytics-funnel-step-${index}-prop-${i}-op`"
               @update:model-value="(v) => setProp(i, { cond: condId(v) })"
             />
           </span>
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            icon-left="close"
+            icon="close"
             :aria-label="t('rum.analytics.funnel.propertyRemove')"
             :data-test="`rum-analytics-funnel-step-${index}-prop-${i}-remove`"
             @click="removeProp(i)"
@@ -160,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="v in d.values"
             :key="v"
             :label="valueLabel(d.field, v)"
-            variant="primary-outline"
+            tone="outline"
             size="sm"
             removable
             :data-test="`rum-analytics-funnel-step-${index}-prop-${i}-value-${v}`"
@@ -173,8 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="values.field === d.field && values.status === 'loading'"
             searchable
             creatable
-            size="sm"
-            width="sm"
+            width="s"
             :disabled="d.values.length >= MAX_FILTER_VALUES"
             :data-test="`rum-analytics-funnel-step-${index}-prop-${i}-add-value`"
             @open="emit('filter-values', d.field)"
@@ -197,9 +190,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       <span>
         <OButton
-          variant="ghost-primary"
-          size="xs"
-          icon-left="add"
+          variant="accent-ghost"
+          size="sm"
+          icon="add"
           :disabled="propRows.length >= MAX_STEP_PROP_CONDS || !fields.length"
           :data-test="`rum-analytics-funnel-step-${index}-prop-add`"
           @click="addProp"

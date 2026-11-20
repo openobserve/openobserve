@@ -35,11 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :pagination="showPagination ? 'client' : 'none'"
       :page-size="effectivePageSize"
       :horizontal-scroll="true"
-      :row-height="tableRowHeight(density)"
+      :density="tableDensity(density)"
       :virtual-scroll="virtualizeRows"
       :window-row-model="virtualizeRows"
       :default-columns="false"
-      :show-global-filter="false"
       :enable-column-filter="enableFiltering"
       :enable-column-format="enableColumnFormat"
       @format-column="onFormatColumn"
@@ -155,8 +154,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-hover-actions="{ row, column, value }">
         <OButton
           v-if="isCopyableCellValue(value)"
+          icon-only
           variant="ghost"
-          size="icon-xs-circle"
+          size="xs"
           :data-test="`dashboard-table-cell-copy-${column.id}`"
           :data-copied="copiedCellKey === cellKey(column, row) ? 'true' : undefined"
           @click.stop="copyCellValue(value, column, row)"
@@ -169,8 +169,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="isCellDrillable(column.id)"
+          icon-only
           variant="ghost"
-          size="icon-xs-circle"
+          size="xs"
           :data-test="`dashboard-table-cell-drilldown-${column.id}`"
           @click.stop="onCellDrilldown({ columnId: column.id, row, value })"
         >
@@ -185,38 +186,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #empty>
         <slot name="empty">
           <OEmptyState
-            size="inline"
+            size="compact"
             icon="bar-chart"
-            :title="t('panel.noData')"
-            :backdrop="false"
+            :title="t('panel.noDataInRange')"
             data-test="no-data"
+            class="px-3"
           />
         </slot>
       </template>
 
-      <!-- Pagination footer: forward parent's #bottom slot or show default pagination controls -->
+      <!-- A parent's #bottom replaces the footer; otherwise the one pager, or the row count with paging off. -->
       <template #pagination-bar="scope">
         <slot name="bottom" v-bind="scope">
-          <!-- This replaces OTable's built-in bar, so it carries its own separator and padding; with pagination off it shows the row count alone and drops that chrome. -->
           <div
-            class="flex w-full items-center"
+            v-if="scope.totalRows > 0"
+            class="flex w-full items-center justify-end"
             :class="showPagination ? 'border-border-default min-h-10 border-t px-3 py-1' : 'pe-2'"
             data-test="dashboard-table-pagination"
           >
-            <div class="flex-1" />
-            <TablePaginationControls
-              :show-pagination="showPagination"
-              :pagination="{ page: scope.currentPage, rowsPerPage: scope.pageSize }"
-              :total-rows="scope.totalRows"
-              :pages-number="scope.totalPages"
-              :is-first-page="scope.isFirstPage"
-              :is-last-page="scope.isLastPage"
-              @update:rows-per-page="scope.setPageSize"
-              @first-page="scope.firstPage()"
-              @prev-page="scope.prevPage()"
-              @next-page="scope.nextPage()"
-              @last-page="scope.lastPage()"
+            <OPagination
+              v-if="showPagination"
+              :page="scope.currentPage"
+              :page-count="scope.totalPages"
+              :page-size="scope.pageSize"
+              :page-sizes="[20, 50, 100]"
+              :total="scope.totalRows"
+              :test-ids="DASHBOARD_TABLE_PAGER_TEST_IDS"
+              @update:page="scope.goToPage"
+              @update:page-size="scope.setPageSize"
             />
+            <span
+              v-else
+              class="text-text-secondary text-xs tabular-nums"
+              data-test="dashboard-table-row-count"
+              >{{
+                t("components.pagination.range", {
+                  from: 1,
+                  to: scope.totalRows.toLocaleString(),
+                  total: scope.totalRows.toLocaleString(),
+                })
+              }}</span
+            >
           </div>
         </slot>
       </template>
@@ -232,11 +242,15 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
-import { parseSparklineValue, tableRowHeight } from "@/utils/dashboard/tableOptions";
+import {
+  DASHBOARD_TABLE_PAGER_TEST_IDS,
+  parseSparklineValue,
+  tableDensity,
+} from "@/utils/dashboard/tableOptions";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import { isColorDark } from "@/utils/dashboard/chartColorUtils";
@@ -297,7 +311,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
-    TablePaginationControls,
+    OPagination,
     JsonFieldRenderer,
     ODataBarCell,
     OSparkline,
@@ -801,7 +815,8 @@ export default defineComponent({
       barGaugeColumns,
       sparklineColumns,
       parseSparklineValue,
-      tableRowHeight,
+      tableDensity,
+      DASHBOARD_TABLE_PAGER_TEST_IDS,
       linkFieldColumns,
       getHttpUrl,
       formatCellValue,
@@ -876,7 +891,7 @@ export default defineComponent({
 
 /* Pivot table styles */
 .table-wrapper :deep(.pivot-total-row) {
-  font-weight: bold;
+  font-weight: var(--font-semibold);
   background-color: var(--color-table-row-striped-bg);
 }
 
@@ -894,12 +909,12 @@ export default defineComponent({
 
 .table-wrapper :deep(.pivot-value-header) {
   font-weight: 500;
-  font-size: 0.85em;
+  font-size: var(--text-2xs);
 }
 
 /* Sticky total row */
 .table-wrapper :deep(.pivot-sticky-total-row) {
-  font-weight: bold;
+  font-weight: var(--font-semibold);
 }
 
 .table-wrapper :deep(.pivot-sticky-total-row td) {

@@ -110,7 +110,7 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
     const stillEmpty = async () => {
       if ((await noDataElement.count()) === 0) return false;
       const text = (await noDataElement.first().textContent().catch(() => "")) || "";
-      return text.trim() === "No Data";
+      return text.trim() === "No data";
     };
 
     for (let attempt = 1; attempt <= 4 && (await stillEmpty()); attempt++) {
@@ -121,7 +121,7 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
     }
 
     const noDataText = await noDataElement.textContent({ timeout: 5000 }).catch(() => "");
-    expect(noDataText.trim()).not.toBe("No Data");
+    expect(noDataText.trim()).not.toBe("No data");
   }
 
   /**
@@ -252,7 +252,7 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
     const noDataText = await noDataElement.textContent({ timeout: 5000 }).catch(() => "");
 
     // Either chart renders (count returns 0) or "No Data" is shown - both are valid
-    const isValidState = chartVisible || noDataText.trim() === "No Data";
+    const isValidState = chartVisible || noDataText.trim() === "No data";
     expect(isValidState).toBeTruthy();
 
     testLogger.info("Metric panel correctly handles empty/zero result", {

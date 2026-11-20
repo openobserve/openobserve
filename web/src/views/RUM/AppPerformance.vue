@@ -38,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="tab.value"
             :value="tab.value"
             :icon-left="tab.icon"
-            size="sm"
             :data-test="`rum-performance-tab-${tab.value}`"
           >
             {{ tab.label }}
@@ -82,9 +81,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="!isMobile && !isAutoRunOn && !isVariablesChanged"
           >
             <OButton
-              :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
-              :variant="isVariablesChanged ? 'warning' : 'primary'"
-              :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
+              :icon-only="isMobile"
+              :stale="isVariablesChanged"
+              :icon="isAutoRunOn ? 'autorenew' : 'refresh'"
+              variant="primary"
               :aria-label="t('dashboard.refresh')"
               data-test="rum-performance-refresh"
               @click="refreshData"
@@ -95,24 +95,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
             <template #trigger>
               <OButton
-                :variant="isVariablesChanged ? 'warning' : 'primary'"
-                size="icon-toolbar"
-                class="w-5"
+                icon-only
+                :stale="isVariablesChanged"
+                variant="primary"
                 :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
                 data-test="rum-performance-refresh-options-btn"
-                icon-left="arrow-drop-down"
+                icon="arrow-drop-down"
               />
             </template>
             <ODropdownItem
               data-test="rum-performance-refresh-item"
-              icon-left="refresh"
+              icon="refresh"
               @select="refreshData"
             >
               {{ t("dashboard.refresh") }}
             </ODropdownItem>
             <ODropdownSeparator />
             <ODropdownItem data-test="rum-performance-auto-run-toggle-btn" @select="toggleAutoRun">
-              <template #icon-left>
+              <template #icon>
                 <OIcon
                   :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
                   size="sm"
@@ -133,8 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ShareButton
           data-test="rum-performance-share-link-btn"
           :url="shareUrl"
-          variant="outline"
-          size="icon-toolbar"
+          variant="secondary"
         />
       </div>
     </div>

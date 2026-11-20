@@ -31,11 +31,11 @@ export class LlmProvidersPage {
 
         // The API-key "required" `*` marker is a conditional span with no data-test.
         // It renders only in create mode for openai/deepseek/anthropic. It lives in
-        // the API Key label (label.o-input-label containing the "API Key" text),
+        // the API Key label (label.o-input-label containing the "API key" text),
         // so scope the `*` span to that label. (Recommended upstream fix: give it
         // data-test="provider-form-api-key-required"; fallback selector used here.)
         this.apiKeyRequiredMarker =
-            'label.o-input-label:has-text("API Key") span.select-none';
+            'label.o-input-label:has-text("API key") span.select-none';
 
         // ── Toast notifications (same audit pattern as the settings POM) ─────
         this.toastSuccess = '[data-test-variant="success"]';
@@ -170,20 +170,28 @@ export class LlmProvidersPage {
         await this.page.locator(this.formTitle).waitFor({ state: 'visible', timeout: 10000 });
     }
 
+    /** Delete renders in the row's ⋯ menu (a portal), so open the menu before clicking it. */
+    async clickDeleteProvider(name) {
+        const editBtn = this.page.locator(`[data-test="llm-providers-${name}-edit-btn"]`);
+        await editBtn.waitFor({ state: 'visible', timeout: 10000 });
+        const row = this.page.locator('tr').filter({ has: editBtn });
+        await row.hover();
+        await row.locator('[data-test="llm-providers-row-more-actions"]').click();
+        await this.page.locator(`[data-test="llm-providers-${name}-delete-btn"]`).click();
+    }
+
     /**
      * Delete a provider via the list row's delete action + confirm dialog.
      * Best-effort cleanup helper — callers wrap it in try/catch.
      */
     async deleteProvider(name) {
         await this.navigateToLlmProviders();
-        const deleteBtn = this.page.locator(`[data-test="llm-providers-${name}-delete-btn"]`);
-        await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
-        await deleteBtn.click();
+        await this.clickDeleteProvider(name);
         const okBtn = this.page.locator(`${this.confirmDialog} ${this.confirmDialogOkBtn}`);
         await okBtn.waitFor({ state: 'visible', timeout: 5000 });
         await okBtn.click();
         await this.page
-            .locator(`[data-test="llm-providers-${name}-delete-btn"]`)
+            .locator(`[data-test="llm-providers-${name}-edit-btn"]`)
             .waitFor({ state: 'hidden', timeout: 10000 })
             .catch(() => {});
     }

@@ -4,7 +4,15 @@ import { afterAll, beforeAll, describe, it, expect } from "vitest";
 import type { RouteRecordRaw } from "vue-router";
 import config from "@/aws-exports";
 import useRoutes from "@/composables/shared/router";
-import { groupNavLinks, NAV_GROUPS, NAV_SUBNAV, GATE_PREDICATES } from "./navGroups";
+import { useAIObservabilityRouteChildren } from "@/composables/shared/useAIObservabilityRoutes";
+import {
+  groupNavLinks,
+  moduleRailForRoute,
+  MODULE_RAILS,
+  NAV_GROUPS,
+  NAV_SUBNAV,
+  GATE_PREDICATES,
+} from "./navGroups";
 import type { NavGateContext } from "./ONavbar.types";
 import type { NavItem, RailEntry } from "./ONavbar.types";
 
@@ -95,6 +103,40 @@ describe("NAV_GROUPS against the real route table", () => {
       expect(feature).toBe(routeFeatures.get(name));
     },
   );
+
+  it.each(MODULE_RAILS.map((m) => [m.name]))("module rail %s names a real route", (name) => {
+    const aiNames = useAIObservabilityRouteChildren().map((r) => r.name);
+    expect(routeFeatures.has(name) || aiNames.includes(name)).toBe(true);
+  });
+});
+
+describe("MODULE_RAILS", () => {
+  const paths: Record<string, string> = {
+    settings: "/settings",
+    iam: "/iam",
+    aiObservability: "/ai",
+  };
+  const childPath = (name: string) => paths[name] ?? null;
+
+  it.each([
+    ["/settings/correlation/services", "settings"],
+    ["/iam", "iam"],
+    ["/iam/users", "iam"],
+    ["/ai/model-pricing", "aiObservability"],
+  ])("puts %s in the %s module", (path, name) => {
+    expect(moduleRailForRoute({ path }, childPath)?.name).toBe(name);
+  });
+
+  it.each(["/logs", "/aiobs", "/settingsx", "/security/overview"])(
+    "leaves %s outside every module",
+    (path) => {
+      expect(moduleRailForRoute({ path }, childPath)).toBeNull();
+    },
+  );
+
+  it("skips a module whose route is not registered", () => {
+    expect(moduleRailForRoute({ path: "/iam/users" }, () => null)).toBeNull();
+  });
 });
 
 describe("groupNavLinks", () => {

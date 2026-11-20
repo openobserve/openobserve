@@ -22,7 +22,7 @@ const { t } = useI18nTyped();
 </script>
 
 <template>
-  <OBadge variant="primary-soft" size="xs" data-test="synthetics-prefill-suggested-chip">
+  <OBadge tone="accent" size="sm" data-test="synthetics-prefill-suggested-chip">
     {{ t("synthetics.prefill.suggested") }}
   </OBadge>
 </template>

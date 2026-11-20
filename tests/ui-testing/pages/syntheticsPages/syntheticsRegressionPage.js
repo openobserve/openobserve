@@ -443,7 +443,7 @@ export class SyntheticsRegressionPage {
   async setPageSize(tableName, size) {
     const trigger = this.table(tableName).locator(this.locators.pageSizeTrigger);
     const option = this.page.locator(`${this.locators.pageSizeOption}[data-test-value="${size}"]`);
-    const sizeText = new RegExp(`^\\s*${size}\\s*$`);
+    const sizeText = new RegExp(`^\\s*${size} per page\\s*$`);
     // A table re-render (after a sort, or while runs load) can swallow the opening click or rebuild the open list under the option.
     for (let attempt = 0; attempt < 5; attempt++) {
       if (!(await option.isVisible())) await this.table(tableName).locator(this.locators.pageSizeSelect).click();
@@ -462,10 +462,10 @@ export class SyntheticsRegressionPage {
   async expectTableState(tableName, { sortColumn, sortDirection, pageSize, from, to, total, names }) {
     const table = this.table(tableName);
     await expect(table.locator(this.locators.paginationInfo), 'the restored page and page size').toHaveText(
-      new RegExp(`\\b${from}\\s*-\\s*${to}\\s+\\S+\\s+${total}\\s*$`),
+      new RegExp(`\\b${from}\\s*[-–]\\s*${to}\\s+of\\s+${total}\\s*$`),
       { timeout: 30000 },
     );
-    await expect(table.locator(this.locators.pageSizeTrigger), 'the restored page size').toHaveText(new RegExp(`^\\s*${pageSize}\\s*$`));
+    await expect(table.locator(this.locators.pageSizeTrigger), 'the restored page size').toHaveText(new RegExp(`^\\s*${pageSize} per page\\s*$`));
     await expect(
       this.columnHeader(tableName, sortColumn).locator(this.activeSortIcon(sortDirection)),
       `the restored ${sortDirection} sort on ${sortColumn}`,

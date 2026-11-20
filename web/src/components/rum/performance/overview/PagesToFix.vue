@@ -17,8 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div class="flex items-center gap-1">
-      <h2 class="text-text-heading text-base font-bold">{{ t("rum.overviewPage.pagesTitle") }}</h2>
+      <h2 class="text-text-heading text-sm font-semibold">
+        {{ t("rum.overviewPage.pagesTitle") }}
+      </h2>
       <OPopover
+        size="lg"
         v-model:open="aboutOpen"
         side="bottom"
         align="start"
@@ -27,23 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #trigger>
           <OButton
             variant="ghost"
-            size="xs"
-            icon-left="info-outline"
+            size="sm"
+            icon="info-outline"
             data-test="rum-overview-pages-about"
           >
             <span class="max-md:sr-only">{{ t("rum.overviewPage.pagesAbout") }}</span>
           </OButton>
         </template>
-        <p
-          class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
-          data-test="rum-overview-pages-hint"
-        >
+        <p class="p-3 leading-5" data-test="rum-overview-pages-hint">
           <OText variant="meta">{{ t("rum.overviewPage.pagesHint") }}</OText>
         </p>
       </OPopover>
       <router-link
         :to="allPagesLink"
-        class="text-text-link ms-auto text-sm font-bold"
+        class="text-text-link ms-auto text-sm font-semibold"
         :aria-label="t('rum.overviewPage.pagesAllLinkAria')"
         data-test="rum-overview-pages-all-link"
       >
@@ -58,8 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         row-key="path"
         pagination="none"
         sorting="none"
-        :show-global-filter="false"
-        :frame="false"
         data-test="rum-overview-pages-table"
       >
         <template #cell-path="{ row, index }">
@@ -116,7 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="pages.length > LIMIT" class="mt-2">
       <OButton
         variant="ghost"
-        size="sm"
         :aria-expanded="expanded"
         data-test="rum-overview-pages-toggle"
         @click="expanded = !expanded"

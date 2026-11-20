@@ -9,8 +9,10 @@ import { TOOLTIP_TRIGGER_ATTR } from "@/lib/overlay/Tooltip/OTooltip.types";
 function mountItem(
   itemProps: Record<string, unknown> = {},
   slots: Record<string, () => ReturnType<typeof h>> = {},
+  groupProps: Record<string, unknown> = {},
 ) {
   return mount(OToggleGroup, {
+    props: groupProps,
     slots: {
       default: { render: () => h(OToggleGroupItem, itemProps, slots) },
     },
@@ -149,18 +151,39 @@ describe("OToggleGroupItem", () => {
     wrapper.unmount();
   });
 
-  it("applies md size classes by default", () => {
+  it("takes the md group size by default: 28 px segment, 13 px text", () => {
     const wrapper = mountItem({ value: "x" });
     const classes = wrapper.find("button").classes().join(" ");
-    expect(classes).toContain("h-9");
-    expect(classes).toContain("px-3");
+    expect(classes).toContain("h-control-sm");
+    expect(classes).toContain("px-2.5");
+    expect(classes).toContain("text-compact");
+    expect(classes).toContain("font-medium");
   });
 
-  it('applies xs size classes when size="xs"', () => {
-    const wrapper = mountItem({ value: "x", size: "xs" });
+  it('takes the size from its group: size="sm" gives a 24 px segment', () => {
+    const wrapper = mountItem({ value: "x" }, {}, { size: "sm" });
     const classes = wrapper.find("button").classes().join(" ");
-    expect(classes).toContain("h-5");
-    expect(classes).toContain("px-1.5");
+    expect(classes).toContain("h-control-xs");
+    expect(classes).toContain("px-2");
     expect(classes).toContain("text-xs");
+  });
+
+  it("renders a tabular count after the label", () => {
+    const wrapper = mountItem(
+      { value: "x", count: 12, "data-test": "seg-logs" },
+      { default: () => h("span", "Logs") },
+    );
+    const count = wrapper.find('[data-test="seg-logs-count"]');
+    expect(count.exists()).toBe(true);
+    expect(count.text()).toBe("12");
+    expect(count.classes()).toContain("tabular-nums");
+  });
+
+  it("makes an icon-only segment square and names it by its tooltip", () => {
+    const wrapper = mountItem({ value: "list", iconLeft: "list", tooltip: "List view" });
+    const button = wrapper.find("button");
+    expect(button.classes()).toContain("w-control-sm");
+    expect(button.classes()).not.toContain("px-2.5");
+    expect(button.attributes("aria-label")).toBe("List view");
   });
 });

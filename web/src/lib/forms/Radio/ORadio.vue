@@ -13,7 +13,7 @@
 import type { RadioProps, RadioSlots } from "./ORadio.types";
 import { RADIO_VALUE_MAP_KEY } from "./ORadio.types";
 import { RadioGroupItem, RadioGroupIndicator } from "reka-ui";
-import { computed, inject, useAttrs, watchEffect } from "vue";
+import { computed, inject, useAttrs, useSlots, watchEffect } from "vue";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
 
 defineOptions({ inheritAttrs: false });
@@ -29,19 +29,19 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 const parentDataTestValue = computed(() => $attrs["data-test-value"] as string | undefined);
 
 const props = withDefaults(defineProps<RadioProps>(), {
-  size: "md",
   disabled: false,
   value: undefined,
-  val: undefined,
   variant: "default",
 });
 
 defineSlots<RadioSlots>();
+const slots = useSlots();
+const hasText = computed(() => Boolean(slots.label || props.label || props.description));
 
 const isDisabled = useLockedDisabled(() => props.disabled);
 
 const valueMap = inject(RADIO_VALUE_MAP_KEY, null);
-const resolvedValue = computed(() => props.value ?? props.val);
+const resolvedValue = computed(() => props.value);
 
 watchEffect(() => {
   if (resolvedValue.value !== undefined) {
@@ -49,31 +49,17 @@ watchEffect(() => {
   }
 });
 
-const circleSize: Record<"xs" | "sm" | "md", string> = {
-  xs: "size-3",
-  sm: "size-3.5",
-  md: "size-4",
-};
-
-const dotSize: Record<"xs" | "sm" | "md", string> = {
-  xs: "size-1",
-  sm: "size-1.5",
-  md: "size-2",
-};
-
-const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
-
 const surfaceClasses = computed(() => [
-  "inline-flex gap-2",
+  "inline-flex items-start gap-2",
   props.variant === "card"
     ? [
         "w-full items-start rounded-surface border border-border-default bg-surface-base p-4",
-        "transition-[color,background-color,border-color,box-shadow] duration-150",
-        "hover:border-input-border-hover",
+        "transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)",
+        "hover:border-accent",
         "has-[[data-state=checked]]:border-input-border-focus",
         "has-[[data-state=checked]]:ring-2 has-[[data-state=checked]]:ring-accent/20",
       ]
-    : "items-center",
+    : "",
   isDisabled.value ? "cursor-not-allowed opacity-60" : "cursor-pointer",
 ]);
 </script>
@@ -103,10 +89,11 @@ const surfaceClasses = computed(() => [
       :data-test-value="parentDataTestValue"
       :class="[
         'flex shrink-0 items-center justify-center rounded-full border-2',
-        'transition-[color,background-color,border-color,box-shadow] duration-150',
+        'transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)',
         'ring-offset-surface-base ring-offset-1 outline-none',
         'focus-visible:ring-radio-focus-ring focus-visible:ring-2',
-        circleSize[resolvedSize],
+        'size-4',
+        hasText && 'mt-0.5',
         'bg-radio-bg border-radio-border',
         'enabled:hover:border-radio-hover-border',
         'data-[state=checked]:border-radio-checked-border',
@@ -116,20 +103,26 @@ const surfaceClasses = computed(() => [
         'data-disabled:cursor-not-allowed',
       ]"
     >
-      <RadioGroupIndicator :class="['bg-radio-checked-dot rounded-full', dotSize[resolvedSize]]" />
+      <RadioGroupIndicator class="bg-radio-checked-dot size-2 rounded-full" />
     </RadioGroupItem>
 
     <span
-      v-if="$slots.label || props.label"
-      :class="[
-        'o-input-label text-compact leading-tight select-none',
-        props.variant === 'card' ? 'min-w-0 flex-1' : '',
-        isDisabled
-          ? 'text-input-label-text-disabled font-normal'
-          : 'text-input-label-text font-medium',
-      ]"
+      v-if="hasText"
+      :class="['flex flex-col', props.variant === 'card' ? 'min-w-0 flex-1' : '']"
     >
-      <slot name="label">{{ props.label }}</slot>
+      <span
+        v-if="$slots.label || props.label"
+        :class="[
+          'o-input-label text-compact leading-5 select-none',
+          props.variant === 'card' ? 'font-medium' : 'font-normal',
+          isDisabled ? 'text-input-label-text-disabled' : 'text-input-label-text',
+        ]"
+      >
+        <slot name="label">{{ props.label }}</slot>
+      </span>
+      <span v-if="props.description" class="text-text-muted text-xs leading-4">{{
+        props.description
+      }}</span>
     </span>
   </label>
 </template>

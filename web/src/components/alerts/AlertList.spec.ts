@@ -145,18 +145,9 @@ const O_OVERLAY_PROPS = {
   persistent: { type: Boolean, default: false },
   showClose: { type: Boolean, default: true },
   width: { type: [String, Number], default: undefined },
-  primaryButtonLabel: { type: String, default: undefined },
-  secondaryButtonLabel: { type: String, default: undefined },
-  neutralButtonLabel: { type: String, default: undefined },
-  primaryButtonVariant: { type: String, default: undefined },
-  secondaryButtonVariant: { type: String, default: undefined },
-  neutralButtonVariant: { type: String, default: undefined },
-  primaryButtonDisabled: { type: Boolean, default: false },
-  secondaryButtonDisabled: { type: Boolean, default: false },
-  neutralButtonDisabled: { type: Boolean, default: false },
-  primaryButtonLoading: { type: Boolean, default: false },
-  secondaryButtonLoading: { type: Boolean, default: false },
-  neutralButtonLoading: { type: Boolean, default: false },
+  primary: { type: Object, default: undefined },
+  secondary: { type: Object, default: undefined },
+  extra: { type: Object, default: undefined },
 };
 
 const ODialogStub = {
@@ -169,7 +160,7 @@ const ODialogStub = {
     '<slot name="footer" />' +
     "</div>",
   props: O_OVERLAY_PROPS,
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 const ODrawerStub = {
@@ -177,7 +168,7 @@ const ODrawerStub = {
   template:
     '<div class="o-drawer-stub" :data-open="open"><slot name="header" /><slot /><slot name="footer" /></div>',
   props: O_OVERLAY_PROPS,
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 // Test data builders
@@ -264,7 +255,7 @@ async function mountAlertList({ renderTable = true, realFolders = false, keepRou
         ODrawer: ODrawerStub,
         ConfirmDialog: {
           name: "ConfirmDialog",
-          props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
+          props: ["modelValue", "title", "message", "messageKeypath", "messageName", "kind"],
           emits: ["update:ok", "update:cancel", "update:modelValue"],
           template: '<div class="confirm-dialog-stub" :data-open="modelValue"></div>',
         },
@@ -609,7 +600,7 @@ describe("AlertList - data fetching and columns", () => {
     const texts = wrapper
       .findAll('[data-test="o2-table-cell-frequency"]')
       .map((c: any) => c.text());
-    expect(texts).toEqual(["15 Mins", "*/10 * * * *", "--"]);
+    expect(texts).toEqual(["15 min", "*/10 * * * *", "--"]);
   });
 
   it("states a zero firing count in the groups cell when no group fires", async () => {
@@ -630,6 +621,55 @@ describe("AlertList - data fetching and columns", () => {
       "0 firing",
     );
     expect(cell.text()).toContain("of 28 groups");
+  });
+
+  it("shows the firing first in the State column, with a failed delivery beside it", async () => {
+    alertsDB = [
+      makeAlert(1, { name: "undelivered", enabled: true }),
+      makeAlert(2, { name: "stopped", enabled: false }),
+    ];
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.filteredResults = wrapper.vm.filteredResults.map((row: any) => ({
+      ...row,
+      last_outcome: row.name === "undelivered" ? "notify_failed" : "firing",
+      level: "critical",
+    }));
+    await flushPromises();
+
+    expect(wrapper.vm.columns.find((c: any) => c.id === "last_outcome").header).toBe("State");
+    expect(wrapper.find('[data-test="alert-list-undelivered-last-outcome"]').text()).toBe("Firing");
+    const delivery = wrapper.findComponent('[data-test="alert-list-undelivered-delivery-failed"]');
+    expect(delivery.text()).toBe("Delivery failed");
+    expect(delivery.props("tone")).toBe("warn");
+    // A paused alert keeps its old outcome, so it says Paused rather than Firing.
+    expect(wrapper.find('[data-test="alert-list-stopped-last-outcome"]').text()).toBe("Paused");
+    expect(wrapper.find('[data-test="alert-list-stopped-delivery-failed"]').exists()).toBe(false);
+  });
+
+  it("keeps two inline row icons, Pause and Edit, and puts Clone in the ⋯ (B7)", async () => {
+    alertsDB = [makeAlert(1, { name: "running", enabled: true })];
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const cell = wrapper
+      .find('[data-test="alert-list-running-update-alert"]')
+      .element.closest(".actions-container");
+    const inline = [...cell.querySelectorAll("[data-row-action]")]
+      .filter((el: any) => !el.classList.contains("hidden"))
+      .map((el: any) => el.getAttribute("data-row-action"));
+    expect(inline).toEqual(["pause", "edit"]);
+    const duplicate = cell.querySelector('[data-row-action="duplicate"]');
+    duplicate.click();
+    await flushPromises();
+    expect(wrapper.vm.showForm).toBe(true);
+  });
+
+  it("draws Pause as a plain ghost icon, not a red one (R9)", async () => {
+    alertsDB = [makeAlert(1, { name: "running", enabled: true })];
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const pause = wrapper.findComponent('[data-test="alert-list-running-pause-start-alert"]');
+    expect(pause.props("variant")).toBe("ghost");
   });
 
   // Feature 2 (PT-3/PT-6): the columns that REPLACED them.
@@ -723,8 +763,39 @@ describe("AlertList - data fetching and columns", () => {
     // The KpiCards inside must actually render their content — guards against
     // the components being imported but not registered (renders as empty
     // unknown elements, which the exists() check alone would not catch).
-    expect(wrapper.find('[data-test="alert-summary-active"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-summary-paused"]').exists()).toBe(true);
     expect(summary.text()).toContain(String(wrapper.vm.stateCounts.total));
+    // Running is the norm, so it has no chip; a failed anomaly brings its own.
+    expect(wrapper.find('[data-test="alert-summary-active"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="alert-summary-failed"]').text()).toContain("Training failed");
+  });
+
+  it("drops the training chip where nothing trains, and colours delivery as a warning", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.filteredResults = [{ enabled: true, name: "a", is_real_time: false }];
+    await wrapper.vm.$nextTick();
+    const keys = wrapper.vm.summaryStats.map((s: any) => s.key);
+    expect(keys).not.toContain("failed");
+    expect(keys).not.toContain("active");
+    expect(keys.slice(0, 2)).toEqual(["firing", "acknowledged"]);
+    const delivery = wrapper.vm.summaryStats.find((s: any) => s.key === "notify_failed");
+    expect(delivery.tone).toBe("warning");
+  });
+
+  it("rails only the exceptions: a firing in red, an acknowledged one in amber, a pause in grey", () => {
+    return mountAlertList().then(async (wrapper: any) => {
+      await waitData(wrapper);
+      const rail = (row: any) => wrapper.vm.alertRowStyle(row).boxShadow ?? "";
+      expect(rail({ enabled: true, last_outcome: "normal" })).toBe("");
+      expect(rail({ enabled: true, last_outcome: "firing", level: "critical" })).toContain(
+        "--color-error-500",
+      );
+      expect(
+        rail({ enabled: true, last_outcome: "firing", ack: { groups_acked: 1 } as any }),
+      ).toContain("--color-warning-500");
+      expect(rail({ enabled: false, last_outcome: "firing" })).toContain("--color-grey-400");
+    });
   });
 
   it("counts and filters firing alerts the same way the Last outcome badge shows them", async () => {
@@ -894,8 +965,11 @@ describe("AlertList - row actions", () => {
     await waitData(wrapper);
 
     const row = wrapper.vm.filteredResults[0];
-    const btn = wrapper.find(`[data-test="alert-list-${row.name}-clone-alert"]`);
-    await btn.trigger("click");
+    // Clone lives in the row ⋯ (B7); its hidden proxy runs the same handler as the menu item.
+    const proxies = wrapper.findAll('[data-row-action="duplicate"]');
+    expect(proxies.length).toBeGreaterThan(0);
+    expect(wrapper.find(`[data-test="alert-list-${row.name}-clone-alert"]`).exists()).toBe(false);
+    wrapper.vm.duplicateAlert(row);
     await flushPromises();
 
     // The dialog should be visible through showForm
@@ -974,7 +1048,7 @@ describe("AlertList - row actions", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     const row = wrapper.vm.filteredResults[0];
-    await wrapper.find(`[data-test="alert-list-${row.name}-clone-alert"]`).trigger("click");
+    wrapper.vm.duplicateAlert(row);
     await flushPromises();
     wrapper.vm.toBeCloneAlertName = `${row.name} - Copy`;
     wrapper.vm.toBeClonestreamType = "logs";
@@ -1074,7 +1148,7 @@ describe("AlertList - row actions", () => {
       .findAllComponents({ name: "ConfirmDialog" })
       .find((c: any) => c.props("messageKeypath") === "alerts.deleteAlertMessage");
     expect(dialog.props("messageName")).toBe(row.name);
-    expect(dialog.props("okVariant")).toBe("destructive");
+    expect(dialog.props("kind")).toBe("destructive");
 
     (alertsSvc.listByFolderId as any).mockClear();
     await wrapper.vm.deleteAlertByAlertId();
@@ -1103,7 +1177,7 @@ describe("AlertList - row actions", () => {
     const dialog = wrapper
       .findAllComponents({ name: "ConfirmDialog" })
       .find((c: any) => c.props("title") === i18n.global.t("alerts.deleteAlertsTitle"));
-    expect(dialog.props("okVariant")).toBe("destructive");
+    expect(dialog.props("kind")).toBe("destructive");
   });
 
   it("edit action navigates to update route (sets query action=update)", async () => {
@@ -1505,10 +1579,12 @@ describe("AlertList - row actions keep the view", () => {
     expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7"]);
     expect(toggleBtn(wrapper, "Alert 6").attributes("aria-busy")).toBeUndefined();
     expect(toggleBtn(wrapper, "Alert 6").attributes("data-row-action")).toBe("resume");
-    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "success", message: "Alert 6 paused" }),
+    );
   });
 
-  it("announces a row leaving the filter once, politely, with no toast", async () => {
+  it("announces a row leaving the filter once, politely, beside the Undo toast", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       const wrapper = await mountOnPageTwo();
@@ -1527,7 +1603,10 @@ describe("AlertList - row actions keep the view", () => {
       expect(
         document.querySelector('[data-test="region-announcer"]')?.getAttribute("aria-live"),
       ).toBe("polite");
-      expect(toast).not.toHaveBeenCalled();
+      expect(toast).toHaveBeenCalledTimes(1);
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: "success", message: "Alert 6 paused" }),
+      );
     } finally {
       vi.useRealTimers();
     }
@@ -1845,7 +1924,7 @@ describe("AlertList - row actions keep the view", () => {
     expect(wrapper.vm.selectedAlertIds).toEqual(["alert-6", "alert-7"]);
   });
 
-  it("shows no toast when the whole bulk pause lands", async () => {
+  it("offers Undo when the whole bulk pause lands, and Undo resumes those rows", async () => {
     const wrapper = await mountOnPageTwo(null);
     wrapper.vm.selectedAlertIds = ["alert-6"];
     await flushPromises();
@@ -1855,8 +1934,44 @@ describe("AlertList - row actions keep the view", () => {
     await wrapper.vm.bulkToggleAlerts("pause");
     await flushPromises();
     expect(errorToasts()).toHaveLength(0);
-    expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     expect(wrapper.vm.selectedAlertIds).toEqual([]);
+    const offer = (toast as any).mock.calls.find(([o]: any[]) => o?.variant === "success")?.[0];
+    expect(offer.message).toBe("Alert 6 paused");
+    expect(offer.action.label).toBe("Undo");
+
+    alertsSvc.bulkToggleState.mockResolvedValueOnce({
+      data: { successful: ["alert-6"], unsuccessful: [] },
+    });
+    offer.action.handler();
+    await flushPromises();
+    expect(alertsSvc.bulkToggleState).toHaveBeenLastCalledWith(
+      expect.anything(),
+      true,
+      { ids: ["alert-6"], names: ["Alert 6"] },
+      "default",
+    );
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+  });
+
+  it("offers Undo on a row's pause and Undo resumes it without a second offer", async () => {
+    const wrapper = await mountOnPageTwo(null);
+    (toast as any).mockClear();
+    await toggleBtn(wrapper, "Alert 6").trigger("click");
+    await flushPromises();
+    const offer = (toast as any).mock.calls[0][0];
+    expect(offer).toMatchObject({ variant: "success", message: "Alert 6 paused" });
+    expect(offer.action.label).toBe("Undo");
+
+    offer.action.handler();
+    await flushPromises();
+    expect(alertsSvc.toggle_state_by_alert_id).toHaveBeenLastCalledWith(
+      expect.anything(),
+      "alert-6",
+      true,
+      expect.anything(),
+    );
+    expect(wrapper.vm.filteredResults.find((r: any) => r.name === "Alert 6").enabled).toBe(true);
+    expect((toast as any).mock.calls).toHaveLength(1);
   });
 
   it("keeps a row paused and tagged when a refresh already in flight answers after the write", async () => {
@@ -2182,6 +2297,9 @@ describe("AlertList - row actions keep the view", () => {
     expect(wrapper.vm.filteredResults.find((r: any) => r.alert_id === "alert-6").enabled).toBe(
       false,
     );
+    // The scope lives in the URL; letting its write land here keeps it out of the next test.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await flushPromises();
   });
 
   it("holds the other bulk actions inactive while a bulk pause runs, so Resume can't overlap it", async () => {
@@ -2238,10 +2356,9 @@ describe("AlertList - row actions keep the view", () => {
     expect(wrapper.vm.selectedAlertIds).toEqual(["alert-7", "alert-9"]);
   });
 
-  it("keeps the refresh button's age while the table keeps rows, and spins only when it does not", async () => {
+  it("keeps the rows and swaps the refresh glyph for a spinner while it refreshes", async () => {
     const wrapper = await mountOnPageTwo(null);
     const refresh = () => wrapper.findComponent({ name: "ORefreshButton" });
-    expect(refresh().props("spinner")).toBe(true);
     const read = deferred<any>();
     alertsSvc.listByFolderId.mockImplementationOnce(() => read.promise);
 
@@ -2249,19 +2366,16 @@ describe("AlertList - row actions keep the view", () => {
     await flushPromises();
     expect(wrapper.vm.oTableRef.keepingRows).toBe(true);
     expect(refresh().props("loading")).toBe(true);
-    expect(refresh().props("spinner")).toBe(false);
     const button = wrapper.find('[data-test="alert-list-refresh-btn"]');
     expect(button.attributes("aria-busy")).toBe("true");
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    expect(button.find(".animate-spin").exists()).toBe(false);
+    expect(button.find(".animate-spin").exists()).toBe(true);
     expect(button.html()).not.toContain("text-transparent");
-    expect(button.text()).toContain("just now");
 
     read.resolve({ data: { list: alertsDB } });
     await done;
     await flushPromises();
     expect(wrapper.vm.oTableRef.keepingRows).toBe(false);
-    expect(refresh().props("spinner")).toBe(true);
+    expect(refresh().props("loading")).toBe(false);
   });
 
   it("drops a selected alert that a refresh no longer returns", async () => {
@@ -2318,12 +2432,17 @@ describe("AlertList - filters from the Overview links", () => {
   });
 
   it("starts without the saved search when the link carries a state or level", async () => {
-    Object.assign(useListViewState("alerts", {}), { searchQuery: "saved", filterQuery: "f=1" });
+    const save = () =>
+      Object.assign(useListViewState("alerts", {}), { searchQuery: "saved", filterQuery: "f=1" });
+    save();
     const linked = await withQuery({ state: "firing" });
     expect(linked.vm.searchQuery).toBe("");
     expect(linked.vm.filterQuery).toBe("");
+    save();
     expect((await withQuery({ level: "critical" })).vm.searchQuery).toBe("");
+    save();
     expect((await withQuery({ all_folders: "true" })).vm.searchQuery).toBe("");
+    save();
     expect((await withQuery({ state: ALERT_LIST_ALL_STATES })).vm.filterQuery).toBe("");
   });
 
@@ -2436,7 +2555,7 @@ describe("AlertList - filters from the Overview links", () => {
       const errorState = wrapper
         .findAllComponents({ name: "OEmptyState" })
         .find((c: any) => c.attributes("data-test") === "alert-list-empty-status-error");
-      expect(errorState?.props("variant")).toBe("warning");
+      expect(errorState?.props("kind")).toBe("error");
       expect(wrapper.find('[data-test="alert-list-empty-no-firing"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="alert-list-status-unavailable"]').exists()).toBe(false);
       expect(wrapper.vm.summaryStats.find((s: any) => s.key === "firing").value).toBe("—");
@@ -2605,9 +2724,16 @@ describe("AlertList - filters from the Overview links", () => {
     replace.mockRestore();
   });
 
-  it("restores the saved search on a later mount without the param", async () => {
+  it("drops the saved search for good once a link replaces it, so the URL never shows a search the box does not", async () => {
     Object.assign(useListViewState("alerts", {}), { searchQuery: "saved", filterQuery: "f=1" });
     await withQuery({ state: "firing" });
+    const again = await withQuery({});
+    expect(again.vm.searchQuery).toBe("");
+    expect(again.vm.filterQuery).toBe("");
+  });
+
+  it("restores the saved search on a later mount without a link", async () => {
+    Object.assign(useListViewState("alerts", {}), { searchQuery: "saved", filterQuery: "f=1" });
     const again = await withQuery({});
     expect(again.vm.searchQuery).toBe("saved");
     expect(again.vm.filterQuery).toBe("f=1");
@@ -2616,10 +2742,17 @@ describe("AlertList - filters from the Overview links", () => {
   it("starts a linked filter inside the current folder unless the link asks for every folder", async () => {
     Object.assign(useListViewState("alerts", {}), { searchAcrossFolders: true });
     expect((await withQuery({ state: "firing" })).vm.searchAcrossFolders).toBe(false);
+    Object.assign(useListViewState("alerts", {}), { searchAcrossFolders: true });
     expect((await withQuery({})).vm.searchAcrossFolders).toBe(true);
     const everywhere = await withQuery({ state: "firing", all_folders: "true" });
     expect(everywhere.vm.searchAcrossFolders).toBe(true);
     expect(alertsSvc.listByFolderId.mock.lastCall[6]).toBe("");
+  });
+
+  it("reads a search across folders from the URL, as the Jump to Show all link writes it", async () => {
+    const wrapper = await withQuery({ "v.search": "cpu", "v.all": "true" });
+    expect(wrapper.vm.searchQuery).toBe("cpu");
+    expect(wrapper.vm.searchAcrossFolders).toBe(true);
   });
 
   it("says what pressing the level chip does", async () => {
@@ -2694,6 +2827,8 @@ describe("AlertList - search behaviors", () => {
   it("clearSearchHistory resets searchQuery and filteredResults", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
+    // The URL write for "abc" would otherwise hang on the guards and land in a later spec's route.
+    vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
 
     wrapper.vm.searchAcrossFolders = true;
     wrapper.vm.searchQuery = "abc";
@@ -3121,7 +3256,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(cloneDialog.exists()).toBe(true);
     expect(cloneDialog.props("open")).toBe(true);
     // Migration metadata
-    expect(cloneDialog.props("persistent")).toBe(true);
+    expect(cloneDialog.props("persistent")).toBe(false);
     expect(cloneDialog.props("size")).toBe("sm");
   });
 
@@ -3138,13 +3273,13 @@ describe("AlertList - ODialog/ODrawer migration", () => {
 
     const cloneDialog = wrapper.findComponent({ name: "ODialog" });
     expect(cloneDialog.props("title")).toBeDefined();
-    expect(cloneDialog.props("primaryButtonLabel")).toBeDefined();
-    expect(cloneDialog.props("secondaryButtonLabel")).toBeDefined();
-    expect(cloneDialog.props("primaryButtonDisabled")).toBe(false);
+    expect(cloneDialog.props("primary")?.label).toBeDefined();
+    expect(cloneDialog.props("secondary")?.label).toBeDefined();
+    expect(cloneDialog.props("primary")?.disabled).toBeFalsy();
 
     wrapper.vm.isSubmitting = true;
     await wrapper.vm.$nextTick();
-    expect(cloneDialog.props("primaryButtonDisabled")).toBe(true);
+    expect(cloneDialog.props("primary")?.disabled).toBe(true);
 
     // #14627: a whitespace-only name is refused too. Neither clone endpoint
     // rejects a blank name, and the resulting row cannot be searched, toggled
@@ -3152,7 +3287,7 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     wrapper.vm.isSubmitting = false;
     wrapper.vm.toBeCloneAlertName = "   ";
     await wrapper.vm.$nextTick();
-    expect(cloneDialog.props("primaryButtonDisabled")).toBe(true);
+    expect(cloneDialog.props("primary")?.disabled).toBe(true);
   });
 
   it("keeps clone Save disabled until the alert being cloned has loaded", async () => {
@@ -3177,12 +3312,12 @@ describe("AlertList - ODialog/ODrawer migration", () => {
       await flushPromises();
       const cloneDialog = wrapper.findComponent({ name: "ODialog" });
       expect(wrapper.vm.toBeCloneAlertName.trim()).not.toBe("");
-      expect(cloneDialog.props("primaryButtonDisabled")).toBe(true);
+      expect(cloneDialog.props("primary")?.disabled).toBe(true);
 
       releaseAlert();
       await cloning;
       await flushPromises();
-      expect(cloneDialog.props("primaryButtonDisabled")).toBe(false);
+      expect(cloneDialog.props("primary")?.disabled).toBeFalsy();
     } finally {
       queryClient.removeQueries({ queryKey: key, exact: true });
     }
@@ -4478,15 +4613,17 @@ describe("AlertList - first run and the alert library", () => {
   const emptyState = (wrapper: any) =>
     wrapper
       .findAllComponents({ name: "OEmptyState" })
-      .find((c: any) => c.props("preset") === "no-alerts");
+      .find((c: any) => c.attributes("data-test") === "o2-empty-state");
 
-  it("puts an Alert library button in the header that opens the library", async () => {
+  it("leaves the Alert library to its tab, so the header names it only once", async () => {
     const wrapper: any = await mountList();
-    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    expect(wrapper.find('[data-test="alert-list-alert-library-btn"]').exists()).toBe(false);
+  });
 
-    const button = wrapper.find('[data-test="alert-list-alert-library-btn"]');
-    expect(button.text()).toContain("Alert library");
-    await button.trigger("click");
+  it("opens the library from the first-run Alert library button", async () => {
+    const wrapper: any = await mountEmpty();
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
+    await wrapper.find('[data-test="alert-list-empty-alert-library"]').trigger("click");
 
     expect(push).toHaveBeenCalledWith({
       name: "alertLibrary",
@@ -4494,15 +4631,15 @@ describe("AlertList - first run and the alert library", () => {
     });
   });
 
-  it("shows the first-run empty state at block size with New alert, Alert library and Import", async () => {
+  it("shows the first-run region empty state with Alert library and New alert", async () => {
     const wrapper = await mountEmpty();
     const state = emptyState(wrapper);
-    expect(state.props("size")).toBe("block");
+    expect(state.props("size")).toBe("region");
     expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').text()).toContain("New alert");
     expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').text()).toContain(
       "Alert library",
     );
-    expect(wrapper.find('[data-test="alert-list-empty-import"]').text()).toContain("Import alert");
+    expect(wrapper.find('[data-test="alert-list-empty-import"]').exists()).toBe(false);
   });
 
   const emptyActions = (wrapper: any) =>
@@ -4515,12 +4652,11 @@ describe("AlertList - first run and the alert library", () => {
         size: b.props("size"),
       }));
 
-  it("leads the first-run actions with the library, at lg size, when the library is shown", async () => {
+  it("leads the first-run actions with the library when the library is shown", async () => {
     const wrapper = await mountEmpty();
     expect(emptyActions(wrapper)).toEqual([
-      { id: "alert-list-empty-alert-library", variant: "primary", size: "lg" },
-      { id: "alert-list-empty-import", variant: "outline", size: "lg" },
-      { id: "alert-list-empty-new-alert", variant: "outline", size: "lg" },
+      { id: "alert-list-empty-alert-library", variant: "primary", size: undefined },
+      { id: "alert-list-empty-new-alert", variant: "secondary", size: undefined },
     ]);
   });
 
@@ -4528,8 +4664,8 @@ describe("AlertList - first run and the alert library", () => {
     (store.state as any).zoConfig.custom_hide_menus = "alertLibrary";
     const wrapper = await mountEmpty();
     expect(emptyActions(wrapper)).toEqual([
-      { id: "alert-list-empty-new-alert", variant: "primary", size: "lg" },
-      { id: "alert-list-empty-import", variant: "outline", size: "lg" },
+      { id: "alert-list-empty-new-alert", variant: "primary", size: undefined },
+      { id: "alert-list-empty-import", variant: "secondary", size: undefined },
     ]);
   });
 
@@ -4557,6 +4693,7 @@ describe("AlertList - first run and the alert library", () => {
   });
 
   it("opens the import dialog from the empty state, as the header's Import does", async () => {
+    (store.state as any).zoConfig.custom_hide_menus = "alertLibrary";
     const wrapper = await mountEmpty();
     const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined);
     await wrapper.find('[data-test="alert-list-empty-import"]').trigger("click");
@@ -4572,13 +4709,13 @@ describe("AlertList - first run and the alert library", () => {
     wrapper.vm.filterQuery = "nothing-matches";
     await flushPromises();
 
-    expect(emptyState(wrapper).props("filtered")).toBe(true);
+    expect(emptyState(wrapper).props("kind")).toBe("filtered");
     expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="alert-list-empty-alert-library"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="alert-list-empty-import"]').exists()).toBe(false);
     expect(emptyState(wrapper).text()).toContain("Clear filters");
 
-    emptyState(wrapper).vm.$emit("action", "clear-filters");
+    emptyState(wrapper).vm.$emit("action");
     await flushPromises();
     expect(wrapper.vm.filterQuery).toBe("");
   });
@@ -4586,16 +4723,19 @@ describe("AlertList - first run and the alert library", () => {
   it("names an empty Firing tile by scope, shows all alerts from it, and keeps first run for an empty folder", async () => {
     router.currentRoute.value.query = {};
     const wrapper = await mountList();
+    const shown = () => wrapper.findComponent({ name: "OEmptyState" });
     expect(wrapper.vm.stateFilters).toEqual(["firing"]);
-    expect(emptyState(wrapper).attributes("data-test")).toBe("alert-list-empty-no-firing");
+    expect(shown().attributes("data-test")).toBe("alert-list-empty-no-firing");
     expect(wrapper.find('[data-test="alert-list-empty-status-error"]').exists()).toBe(false);
-    const folderTitle = emptyState(wrapper).props("title");
+    const folderTitle = shown().props("title");
     expect(folderTitle).toBeTruthy();
     expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(false);
 
+    // The URL write for All folders would otherwise land in a later spec's route.
+    vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
     wrapper.vm.searchAcrossFolders = true;
     await flushPromises();
-    expect(emptyState(wrapper).props("title")).not.toBe(folderTitle);
+    expect(shown().props("title")).not.toBe(folderTitle);
 
     await wrapper.get('[data-test="alert-list-empty-show-all"]').trigger("click");
     expect(wrapper.vm.stateFilters).toEqual([]);
@@ -4604,7 +4744,7 @@ describe("AlertList - first run and the alert library", () => {
     wrapper.vm.allAlerts = [];
     wrapper.vm.filteredResults = [];
     await flushPromises();
-    expect(emptyState(wrapper).props("filtered")).toBe(false);
+    expect(shown().props("kind")).toBe("first-run");
     expect(wrapper.find('[data-test="alert-list-empty-new-alert"]').exists()).toBe(true);
   });
 

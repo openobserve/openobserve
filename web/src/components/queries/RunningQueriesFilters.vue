@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="emit('update:tab', $event as QueryTab)"
       data-test="running-queries-query-type-tabs"
     >
-      <OToggleGroupItem v-for="item in tabs" :key="item.value" :value="item.value" size="sm">
+      <OToggleGroupItem v-for="item in tabs" :key="item.value" :value="item.value">
         {{ item.label }}
       </OToggleGroupItem>
     </OToggleGroup>

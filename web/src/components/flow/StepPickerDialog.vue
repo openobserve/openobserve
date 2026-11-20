@@ -58,7 +58,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="searchRef"
             v-model="search"
             :placeholder="raw(placeholderText)"
-            clearable
             class="w-full"
             :data-test="testPrefix + '-search'"
           />

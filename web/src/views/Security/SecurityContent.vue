@@ -5,11 +5,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, shallowRef, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -19,6 +21,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import SecurityLoadError from "@/components/security/SecurityLoadError.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
@@ -133,6 +136,10 @@ const accessDenials = computed<AccessDenial[]>(() => [
     : []),
 ]);
 
+// Axios status text is not a reason a reader can act on (K6).
+const errorReason = (message: string) =>
+  isRawHttpText(message) ? t("emptyState.loadError.description") : message;
+
 const notices = computed<SecurityNotice[]>(() => {
   const out: SecurityNotice[] = [];
   if (streamsError.value) {
@@ -143,11 +150,13 @@ const notices = computed<SecurityNotice[]>(() => {
       dataTest: "security-content-streams-error",
     });
   }
-  if (catalogQuery.error.value) {
+  if (catalogQuery.error.value && !catalogFailed.value) {
     out.push({
       key: "catalog-error",
       tone: "error",
-      text: t("siem.content.catalogError", { reason: catalogQuery.error.value.message }),
+      text: t("siem.content.catalogError", {
+        reason: errorReason(catalogQuery.error.value.message),
+      }),
       dataTest: "security-content-catalog-error",
     });
   }
@@ -201,6 +210,19 @@ async function loadStreams() {
         .filter((row) => row.source_type)
         .map((row) => [row.name, row.source_type]),
     );
+    // One failed match means the endpoint is down; the other streams skip it instead of repeating the request.
+    let matchDown = false;
+    let firstMatch: Promise<unknown> | null = null;
+    const matchOnce = async (fields: string[]) => {
+      if (firstMatch) await firstMatch;
+      if (matchDown) return null;
+      const request = fetchSourceMatch(org, fields).catch(() => {
+        matchDown = true;
+        return null;
+      });
+      firstMatch ??= request;
+      return request;
+    };
     const list = await Promise.all(
       (res.data?.list ?? []).map(async (s: any) => {
         const fields: string[] = (s.schema ?? []).map((f: any) => String(f.name));
@@ -211,8 +233,7 @@ async function loadStreams() {
             .map((f: any) => [String(f.name), String(f.type)]),
         );
         const stored = storedType.get(String(s.name));
-        const match =
-          !stored && fields.length ? await fetchSourceMatch(org, fields).catch(() => null) : null;
+        const match = !stored && fields.length ? await matchOnce(fields) : null;
         return {
           name: String(s.name),
           fields,
@@ -229,7 +250,8 @@ async function loadStreams() {
     if (isForbiddenError(e)) streamsRefusal.value = e;
     else
       streamsError.value =
-        e?.response?.data?.message ?? e?.message ?? t("siem.content.streamsError");
+        e?.response?.data?.message ??
+        (e?.message && !isRawHttpText(e.message) ? e.message : t("siem.content.streamsError"));
   } finally {
     if (mine === streamsSeq) streamsLoading.value = false;
   }
@@ -246,10 +268,13 @@ const catalogQuery = useQuery(() => ({
   enabled: !!orgId.value,
 }));
 
+const lastRunAt = ref<number | null>(null);
 function refresh() {
-  void loadDetections(orgId.value);
-  void loadStreams();
-  void catalogQuery.refetch();
+  void Promise.allSettled([
+    loadDetections(orgId.value),
+    loadStreams(),
+    catalogQuery.refetch(),
+  ]).then(() => (lastRunAt.value = Date.now()));
 }
 onMounted(refresh);
 watch(orgId, refresh);
@@ -431,6 +456,10 @@ function clearRuleFilters() {
   logsourceFilter.value = null;
 }
 
+// A failed catalog load reads "—" and one error with Retry, never zero counts or "No rules" (R8).
+const catalogFailed = computed(() => !!catalogQuery.error.value && !catalog.value.length);
+const dashIfFailed = (n: number) => (catalogFailed.value ? "—" : n);
+
 const ruleStats = computed<StatItem[]>(() => [
   {
     key: "ready",
@@ -438,7 +467,7 @@ const ruleStats = computed<StatItem[]>(() => [
     sub: t("siem.content.stat.readyHint"),
     subIcon: "info-outline",
     value:
-      streamsLoading.value || installPending.value || checksLoading.value
+      streamsLoading.value || installPending.value || checksLoading.value || catalogFailed.value
         ? "—"
         : ruleCounts.value.ready,
     icon: "lightbulb",
@@ -449,7 +478,7 @@ const ruleStats = computed<StatItem[]>(() => [
   {
     key: "installed",
     label: t("siem.content.stat.installed"),
-    value: installPending.value ? "—" : ruleCounts.value.installed,
+    value: installPending.value || catalogFailed.value ? "—" : ruleCounts.value.installed,
     icon: "verified-user",
     tone: "success",
     max: ruleRows.value.length,
@@ -460,7 +489,7 @@ const ruleStats = computed<StatItem[]>(() => [
     label: t("siem.content.stat.applies"),
     sub: t("siem.content.stat.appliesHint"),
     subIcon: "info-outline",
-    value: streamsLoading.value ? "—" : ruleCounts.value.applies,
+    value: streamsLoading.value || catalogFailed.value ? "—" : ruleCounts.value.applies,
     icon: "database",
     tone: "primary",
     max: ruleRows.value.length,
@@ -469,7 +498,7 @@ const ruleStats = computed<StatItem[]>(() => [
   {
     key: "all",
     label: t("siem.content.stat.allRules"),
-    value: ruleRows.value.length,
+    value: dashIfFailed(ruleRows.value.length),
     icon: "menu-book",
     tone: "neutral",
     dataTest: "security-content-stat-all",
@@ -628,7 +657,10 @@ const sourceStats = computed<StatItem[]>(() => [
   {
     key: "detected",
     label: t("siem.content.stat.detected"),
-    value: streamsLoading.value ? "—" : sourceRows.value.filter((r) => r.streams.length).length,
+    value:
+      streamsLoading.value || catalogFailed.value
+        ? "—"
+        : sourceRows.value.filter((r) => r.streams.length).length,
     icon: "database",
     tone: "success",
     max: sourceRows.value.length,
@@ -637,7 +669,7 @@ const sourceStats = computed<StatItem[]>(() => [
   {
     key: "all",
     label: t("siem.content.stat.supported"),
-    value: sourceRows.value.length,
+    value: dashIfFailed(sourceRows.value.length),
     icon: "category",
     tone: "neutral",
     dataTest: "security-content-stat-supported",
@@ -934,44 +966,39 @@ function openInEvents(stream: string) {
   });
 }
 
-const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft" | "default-soft"> =
-  {
-    stable: "success-soft",
-    test: "blue-soft",
-    experimental: "amber-soft",
-  };
+const STATUS_VARIANT: Record<string, "ok" | "neutral" | "warn" | "neutral"> = {
+  stable: "ok",
+  test: "neutral",
+  experimental: "warn",
+};
 </script>
 
 <template>
   <OPageLayout
     :title="t('siem.content.title')"
-    :subtitle="t('siem.content.subtitle')"
-    icon="menu-book"
+    :about="t('siem.content.subtitle')"
     bleed
     :resizable="false"
     :sidebar-width="tab === 'rules' ? 256 : undefined"
     title-data-test="security-content-title"
   >
     <template #actions>
-      <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
+      <ORefreshButton
+        :last-run-at="lastRunAt"
         :loading="streamsLoading || rulesLoading || catalogQuery.isPending.value"
         data-test="security-content-refresh"
         @click="refresh"
-      >
-        <OTooltip :content="t('siem.content.refresh')" />
-      </OButton>
+      />
     </template>
 
-    <template #subnav>
+    <template #header-tabs>
       <OTabs v-model="tab" data-test="security-content-tabs">
         <OTab name="rules" data-test="security-content-tab-rules">
           <span class="flex items-center gap-1.5">
             <OIcon name="rule" size="sm" />{{ t("siem.content.tab.rules") }}
             <span
               class="bg-surface-subtle text-text-secondary text-2xs rounded-full px-1.5 font-semibold tabular-nums"
+              v-if="!catalogFailed"
               >{{ catalog.length }}</span
             >
           </span>
@@ -981,6 +1008,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             <OIcon name="database" size="sm" />{{ t("siem.content.tab.sources") }}
             <span
               class="bg-surface-subtle text-text-secondary text-2xs rounded-full px-1.5 font-semibold tabular-nums"
+              v-if="!catalogFailed"
               >{{ sourceTypes.length }}</span
             >
           </span>
@@ -988,7 +1016,34 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
       </OTabs>
     </template>
 
-    <template v-if="tab === 'rules'" #sidebar>
+    <template v-if="unfinished && canAuthor" #banner>
+      <OBanner tone="warn" data-test="security-content-bulk-resume">
+        {{
+          t(
+            "siem.content.bulk.resumeText",
+            { n: unfinished.pending.length },
+            unfinished.pending.length,
+          )
+        }}
+        <template #actions>
+          <OButton
+            variant="ghost"
+            data-test="security-content-bulk-discard"
+            @click="discardInstall"
+            >{{ t("siem.content.bulk.discard") }}</OButton
+          >
+          <OButton
+            variant="secondary"
+            :disabled="!resumeReady"
+            data-test="security-content-bulk-resume-run"
+            @click="resumeInstall"
+            >{{ t("siem.content.bulk.resume") }}</OButton
+          >
+        </template>
+      </OBanner>
+    </template>
+
+    <template v-if="tab === 'rules' && !catalogFailed" #sidebar>
       <nav
         class="flex min-h-0 flex-1 flex-col overflow-y-auto py-2"
         data-test="security-content-logsources"
@@ -1014,7 +1069,9 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             @keydown.space.prevent="logsourceFilter = null"
           >
             <span class="min-w-0 flex-1 truncate">{{ t("siem.content.allLogsources") }}</span>
-            <span class="text-text-secondary text-2xs tabular-nums">{{ catalog.length }}</span>
+            <span class="text-text-secondary text-2xs tabular-nums">{{
+              catalogFailed ? "—" : catalog.length
+            }}</span>
           </li>
           <li
             v-for="group in logsourceGroups"
@@ -1045,47 +1102,18 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         class="mx-page-edge mt-2"
         data-test="security-content-notices"
       />
-      <OBanner
-        v-if="unfinished && canAuthor"
-        variant="warning"
-        icon="warning-amber"
-        dense
-        inline-actions
-        class="mx-page-edge mt-2"
-        data-test="security-content-bulk-resume"
-      >
-        {{
-          t(
-            "siem.content.bulk.resumeText",
-            { n: unfinished.pending.length },
-            unfinished.pending.length,
-          )
-        }}
-        <template #actions>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="security-content-bulk-discard"
-            @click="discardInstall"
-            >{{ t("siem.content.bulk.discard") }}</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm"
-            :disabled="!resumeReady"
-            data-test="security-content-bulk-resume-run"
-            @click="resumeInstall"
-            >{{ t("siem.content.bulk.resume") }}</OButton
-          >
-        </template>
-      </OBanner>
 
       <SecurityAccessLock
         v-if="accessDenials.length"
         :denials="accessDenials"
         :reason="raw(forbiddenReason(streamsRefusal))"
-        size="hero"
         data-test="security-content-access-lock"
+      />
+      <SecurityLoadError
+        v-else-if="catalogFailed"
+        :what="t('siem.content.whatRules')"
+        :hint="t('siem.content.loadFailedHint')"
+        @retry="refresh"
       />
       <OTable
         v-else-if="tab === 'rules'"
@@ -1094,7 +1122,6 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         row-key="id"
         :page-size="50"
         :page-size-options="[50, 100, 250]"
-        :show-global-filter="false"
         :persist-columns="true"
         table-id="security-content-rules"
         :enable-column-resize="true"
@@ -1102,30 +1129,31 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         :selection="canAuthor ? 'multiple' : 'none'"
         v-model:selected-ids="selectedRuleIds"
         :is-row-selectable="canBulkInstall"
+        :error="catalogFailed ? catalogQuery.error.value?.message || 'x' : null"
         class="min-h-0 flex-1"
         ref="rulesTable"
         data-test="security-content-rules-table"
+        @retry="refresh"
         @sort-change="() => nextTick(syncIndexes)"
         @row-click="(row: RuleRow) => showRule(row.id)"
       >
         <template #toolbar>
           <div class="contents">
-            <div class="w-40 shrink-0">
-              <OSelect
-                :aria-label="t('siem.aria.severityFilter')"
-                :model-value="ruleLevel"
-                :options="levelOptions"
-                :placeholder="t('siem.content.anyLevel')"
-                clearable
-                data-test="security-content-level"
-                @update:model-value="(v: unknown) => (ruleLevel = v ? String(v) : null)"
-              />
-            </div>
             <OSearchInput
               v-model="ruleSearch"
               class="min-w-0 flex-1 md:min-w-48"
               :placeholder="t('siem.content.searchRules')"
               data-test="security-content-search-rules"
+            />
+            <OSelect
+              variant="filter"
+              :label="t('siem.common.severity')"
+              :aria-label="t('siem.aria.severityFilter')"
+              :model-value="ruleLevel"
+              :options="levelOptions"
+              clearable
+              data-test="security-content-level"
+              @update:model-value="(v: unknown) => (ruleLevel = v ? String(v) : null)"
             />
             <OStatStrip
               compact-values
@@ -1141,9 +1169,8 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             />
             <OButton
               v-if="canAuthor"
-              variant="outline"
-              size="sm"
-              icon-left="check-box"
+              variant="secondary"
+              icon="check-box"
               :disabled="installPending || checksLoading || !ruleCounts.ready"
               data-test="security-content-select-runnable"
               @click="selectRunnable"
@@ -1156,8 +1183,6 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         <template #selection-actions>
           <OButton
             variant="primary"
-            size="sm"
-            icon-left="add"
             :disabled="!bulkRules.length"
             data-test="security-content-install-selected"
             @click="bulkOpen = true"
@@ -1169,7 +1194,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             type="severity"
             :value="severityTagValue(row.tone)"
             :label="t(toneLabelKey(row.tone))"
-            size="xs"
+            size="sm"
           />
         </template>
         <template #cell-title="{ row }">
@@ -1180,14 +1205,9 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         </template>
         <template #cell-techniques="{ row }">
           <div class="flex min-w-0 gap-1 overflow-hidden">
-            <OTag
-              v-for="tech in row.techniques.slice(0, 2)"
-              :key="tech"
-              variant="purple-soft"
-              shape="rounded"
-              size="xs"
-              >{{ tech }}</OTag
-            >
+            <OTag v-for="tech in row.techniques.slice(0, 2)" :key="tech" tone="neutral" size="sm">{{
+              tech
+            }}</OTag>
             <span v-if="row.techniques.length > 2" class="text-text-secondary text-xs"
               >+{{ row.techniques.length - 2 }}</span
             >
@@ -1195,17 +1215,14 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
           </div>
         </template>
         <template #cell-status="{ row }">
-          <OTag
-            v-if="row.status"
-            :variant="STATUS_VARIANT[row.status] ?? 'default-soft'"
-            size="xs"
-            >{{ translatedOr(`siem.content.status.${row.status}`, row.status) }}</OTag
-          >
+          <OTag v-if="row.status" :tone="STATUS_VARIANT[row.status] ?? 'neutral'" size="sm">{{
+            translatedOr(`siem.content.status.${row.status}`, row.status)
+          }}</OTag>
           <span v-else class="text-text-secondary">—</span>
         </template>
         <template #cell-streams="{ row }">
           <span v-if="streamsLoading" class="text-text-secondary">—</span>
-          <OTag v-else-if="row.streams.length" variant="primary-soft" icon="database" size="xs">{{
+          <OTag v-else-if="row.streams.length" tone="accent" icon="database" size="sm">{{
             t("siem.content.streamCount", row.streams.length)
           }}</OTag>
           <span v-else class="text-text-secondary text-xs">{{
@@ -1214,10 +1231,10 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         </template>
         <template #cell-installed="{ row }">
           <span v-if="installPending" class="text-text-secondary">—</span>
-          <OTag v-else-if="row.installed" variant="success-soft" icon="check-circle" size="xs">{{
+          <OTag v-else-if="row.installed" tone="ok" icon="check-circle" size="sm">{{
             t("siem.content.installed")
           }}</OTag>
-          <OTag v-else-if="row.matched.length" variant="warning-soft" icon="lightbulb" size="xs">{{
+          <OTag v-else-if="row.matched.length" tone="warn" icon="lightbulb" size="sm">{{
             t("siem.content.readyToInstall")
           }}</OTag>
           <span
@@ -1225,7 +1242,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             class="inline-flex"
             :data-test="`security-content-other-source-${row.id}`"
           >
-            <OTag variant="default-soft" icon="info-outline" size="xs">{{
+            <OTag tone="neutral" icon="info-outline" size="sm">{{
               t("siem.content.otherSourceOnly")
             }}</OTag>
             <OTooltip
@@ -1239,20 +1256,33 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             class="inline-flex"
             :data-test="`security-content-not-runnable-${row.id}`"
           >
-            <OTag variant="default-soft" icon="hourglass-empty" size="xs">{{
+            <OTag tone="neutral" icon="hourglass-empty" size="sm">{{
               t("siem.content.notRunnableYet")
             }}</OTag>
             <OTooltip v-if="row.blocked" :content="row.blocked" />
           </span>
           <span v-else class="text-text-secondary">—</span>
         </template>
+        <template #error>
+          <SecurityLoadError
+            :what="t('siem.content.whatRules')"
+            :hint="t('siem.content.loadFailedHint')"
+            @retry="refresh"
+          />
+        </template>
         <template #empty>
           <OEmptyState
-            size="block"
             icon="search-off"
+            :kind="ruleFiltersActive ? 'filtered' : 'first-run'"
+            :text="
+              ruleFiltersActive
+                ? t('emptyState.filtered.description', {
+                    noun: t('emptyState.filtered.fallbackNoun'),
+                  })
+                : undefined
+            "
             :title="t('siem.content.noRules')"
-            :filtered="ruleFiltersActive"
-            @action="(id?: string) => id === 'clear-filters' && clearRuleFilters()"
+            @action="clearRuleFilters()"
           />
         </template>
       </OTable>
@@ -1263,15 +1293,16 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         :columns="sourceColumns"
         row-key="id"
         :loading="streamsLoading && !streams.length"
+        :error="catalogFailed ? catalogQuery.error.value?.message || 'x' : null"
         :page-size="50"
         :page-size-options="[50, 100]"
-        :show-global-filter="false"
         :persist-columns="true"
         table-id="security-content-sources"
         :get-row-status-color="(row: SourceRow) => (row.streams.length ? DETECTED_RAIL : undefined)"
         class="min-h-0 flex-1"
         ref="sourcesTable"
         data-test="security-content-sources-table"
+        @retry="refresh"
         @sort-change="() => nextTick(syncIndexes)"
         @row-click="(row: SourceRow) => showSource(row.id)"
       >
@@ -1299,7 +1330,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         <template #cell-label="{ row }">
           <div class="flex min-w-0 items-center gap-1.5">
             <span class="text-text-heading truncate font-medium">{{ row.label }}</span>
-            <OTag v-if="row.telemetryOnly" variant="default-soft" size="xs">{{
+            <OTag v-if="row.telemetryOnly" tone="neutral" size="sm">{{
               t("siem.content.telemetryOnly")
             }}</OTag>
           </div>
@@ -1319,10 +1350,10 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             <OTag
               v-for="s in row.streams.slice(0, 2)"
               :key="s"
-              variant="success-soft"
+              tone="ok"
+              mono
               icon="database"
-              size="xs"
-              class="font-mono"
+              size="sm"
               >{{ s }}</OTag
             >
             <span v-if="row.streams.length > 2" class="text-text-secondary text-xs"
@@ -1333,20 +1364,25 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             t("siem.content.notDetected")
           }}</span>
         </template>
+        <template #error>
+          <SecurityLoadError
+            :what="t('siem.content.whatRules')"
+            :hint="t('siem.content.loadFailedHint')"
+            @retry="refresh"
+          />
+        </template>
         <template #empty>
           <OEmptyState
-            size="block"
-            icon="search-off"
-            :title="t('siem.content.noSources')"
-            :filtered="!!sourceSearch || !!sourceFacet"
-            @action="
-              (id?: string) => {
-                if (id === 'clear-filters') {
-                  sourceSearch = '';
-                  sourceFacet = null;
-                }
-              }
+            :kind="!!sourceSearch || !!sourceFacet ? 'filtered' : 'first-run'"
+            :text="
+              !!sourceSearch || !!sourceFacet
+                ? t('emptyState.filtered.description', {
+                    noun: t('emptyState.filtered.fallbackNoun'),
+                  })
+                : undefined
             "
+            :title="t('siem.content.noSources')"
+            @action="((sourceSearch = ''), (sourceFacet = null))"
           />
         </template>
       </OTable>
@@ -1380,14 +1416,14 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         />
         <OTag
           v-if="openRule.status"
-          :variant="STATUS_VARIANT[openRule.status] ?? 'default-soft'"
+          :tone="STATUS_VARIANT[openRule.status] ?? 'neutral'"
           size="sm"
           >{{ translatedOr(`siem.content.status.${openRule.status}`, openRule.status) }}</OTag
         >
-        <OTag v-if="openRule.installed" variant="success-soft" icon="check-circle" size="sm">{{
+        <OTag v-if="openRule.installed" tone="ok" icon="check-circle" size="sm">{{
           t("siem.content.installed")
         }}</OTag>
-        <OTag v-if="openRule.streams.length" variant="primary-soft" icon="database" size="sm">{{
+        <OTag v-if="openRule.streams.length" tone="accent" icon="database" size="sm">{{
           t("siem.content.streamCount", openRule.streams.length)
         }}</OTag>
       </template>
@@ -1401,7 +1437,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             t("siem.common.mitre")
           }}</span>
           <div class="flex flex-wrap gap-1.5">
-            <OTag v-for="tac in ruleTactics" :key="tac" variant="primary-soft" size="sm">{{
+            <OTag v-for="tac in ruleTactics" :key="tac" tone="accent" size="sm">{{
               t(`siem.mitre.tactics.${tac}`)
             }}</OTag>
           </div>
@@ -1409,13 +1445,12 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             <OButton
               v-for="tech in openRule.techniques"
               :key="tech"
-              as="a"
               :href="techniqueUrl(tech)"
               target="_blank"
               rel="noopener"
-              variant="ghost-primary"
-              size="xs"
-              icon-right="open-in-new"
+              variant="accent-ghost"
+              size="sm"
+              icon-end="open-in-new"
               :data-test="`security-content-rule-technique-${tech}`"
               >{{ tech }}</OButton
             >
@@ -1444,13 +1479,12 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
           <OButton
             v-for="(ref_, i) in openRule.rule.references"
             :key="ref_"
-            as="a"
             :href="ref_"
             target="_blank"
             rel="noopener"
-            variant="ghost-primary"
-            size="xs"
-            icon-right="open-in-new"
+            variant="accent-ghost"
+            size="sm"
+            icon-end="open-in-new"
             class="justify-start truncate"
             :data-test="`security-content-rule-reference-${i}`"
             >{{ ref_ }}</OButton
@@ -1461,10 +1495,9 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
       <template #tab-streams>
         <OEmptyState
           v-if="!ruleStreamChecks.length"
-          size="inline"
           icon="database"
           :title="t('siem.content.noStreamsForRule')"
-          :description="t('siem.content.noStreamsForRuleHint', { logsource: openRule.logsource })"
+          :text="t('siem.content.noStreamsForRuleHint', { logsource: openRule.logsource })"
         />
         <div
           v-for="check in ruleStreamChecks"
@@ -1477,12 +1510,12 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             <span class="text-text-heading font-mono text-sm font-semibold">{{
               check.stream
             }}</span>
-            <OTag variant="default-soft" size="xs">{{ check.source.label }}</OTag>
+            <OTag tone="neutral" size="sm">{{ check.source.label }}</OTag>
             <div class="flex-1" />
             <OTag
-              :variant="check.compiled?.runnable ? 'success-soft' : 'warning-soft'"
+              :tone="check.compiled?.runnable ? 'ok' : 'warn'"
               :icon="check.compiled?.runnable ? 'check-circle' : 'warning-amber'"
-              size="xs"
+              size="sm"
               >{{
                 check.compiled?.runnable
                   ? t("siem.content.runnable")
@@ -1503,17 +1536,16 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
           <div class="flex justify-end gap-2">
             <OButton
               variant="ghost"
-              size="xs"
-              icon-left="manage-search"
+              size="sm"
+              icon="manage-search"
               :data-test="`security-content-rule-stream-events-${check.stream}`"
               @click="openInEvents(check.stream)"
               >{{ t("siem.content.openInEvents") }}</OButton
             >
             <OButton
               v-if="check.compiled?.runnable && canAuthor"
-              variant="outline"
-              size="xs"
-              icon-left="add"
+              variant="secondary"
+              size="sm"
               :data-test="`security-content-rule-stream-install-${check.stream}`"
               @click="install(openRule.id, check.stream, check.source.id)"
               >{{ t("siem.content.installHere") }}</OButton
@@ -1529,9 +1561,8 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
       <template #footer>
         <OButton
           v-if="installedDetection"
-          variant="outline"
-          size="sm-action"
-          icon-left="shield-alert-outline"
+          variant="secondary"
+          icon="shield-alert-outline"
           data-test="security-content-rule-view-detection"
           @click="viewDetection"
         >
@@ -1539,8 +1570,6 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
         </OButton>
         <OButton
           variant="primary"
-          size="sm-action"
-          icon-left="add"
           :disabled="!canAuthor"
           data-test="security-content-rule-install"
           @click="installDefault(openRule)"
@@ -1572,7 +1601,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
     >
       <template #chips>
         <OTag
-          :variant="openSource.streams.length ? 'success-soft' : 'default-soft'"
+          :tone="openSource.streams.length ? 'ok' : 'neutral'"
           :icon="openSource.streams.length ? 'check-circle' : 'help'"
           size="sm"
           >{{
@@ -1581,7 +1610,7 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
               : t("siem.content.notDetected")
           }}</OTag
         >
-        <OTag v-if="openSource.telemetryOnly" variant="default-soft" size="sm">{{
+        <OTag v-if="openSource.telemetryOnly" tone="neutral" size="sm">{{
           t("siem.content.telemetryOnly")
         }}</OTag>
       </template>
@@ -1589,10 +1618,9 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
       <template #tab-streams>
         <OEmptyState
           v-if="!openSource.streams.length"
-          size="inline"
           icon="cloud-upload"
           :title="t('siem.content.noStreamsForSource')"
-          :description="
+          :text="
             t('siem.content.noStreamsForSourceHint', {
               fields: (openSource.source.required ?? []).join(', '),
             })
@@ -1609,9 +1637,9 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
             s
           }}</span>
           <OButton
-            variant="outline"
-            size="xs"
-            icon-left="manage-search"
+            variant="secondary"
+            size="sm"
+            icon="manage-search"
             :data-test="`security-content-source-stream-events-${s}`"
             @click="openInEvents(s)"
             >{{ t("siem.content.openInEvents") }}</OButton
@@ -1622,7 +1650,6 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
       <template #tab-rules>
         <OEmptyState
           v-if="!sourceRulesList.length"
-          size="inline"
           icon="rule"
           :title="t('siem.content.noRulesForSource')"
         />
@@ -1642,16 +1669,12 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
               type="severity"
               :value="severityTagValue(toneOfSigmaLevel(rule.level))"
               :label="t(toneLabelKey(toneOfSigmaLevel(rule.level)))"
-              size="xs"
+              size="sm"
             />
             <span class="text-text-heading min-w-0 flex-1 truncate text-sm">{{ rule.title }}</span>
-            <OTag
-              v-if="installed.has(rule.id ?? '')"
-              variant="success-soft"
-              icon="check-circle"
-              size="xs"
-              >{{ t("siem.content.installed") }}</OTag
-            >
+            <OTag v-if="installed.has(rule.id ?? '')" tone="ok" icon="check-circle" size="sm">{{
+              t("siem.content.installed")
+            }}</OTag>
             <OIcon name="chevron-right" size="sm" class="text-text-secondary" />
           </li>
         </ul>

@@ -27,24 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex items-center gap-2">
         <OIcon name="forum" size="sm" class="text-accent" />
-        <h2 class="text-text-heading m-0 text-sm font-bold">
+        <h2 class="text-text-heading m-0 text-sm font-semibold">
           {{ t("alerts.incidents.rcaThread.title") }}
         </h2>
-        <OBadge
-          v-if="runLive"
-          data-test="rca-thread-live-pill"
-          variant="success-soft"
-          size="xs"
-          dot
-        >
+        <OBadge v-if="runLive" data-test="rca-thread-live-pill" tone="ok" size="sm" dot>
           {{ t("alerts.incidents.rcaThread.live") }}
         </OBadge>
-        <OBadge
-          v-else-if="thread"
-          data-test="rca-thread-saved-pill"
-          variant="default-soft"
-          size="xs"
-        >
+        <OBadge v-else-if="thread" data-test="rca-thread-saved-pill" tone="neutral" size="sm">
           {{ t("alerts.incidents.rcaThread.saved") }}
         </OBadge>
         <span class="flex-1" />
@@ -75,31 +64,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rca-thread-loading"
         class="text-text-secondary text-compact m-0 flex items-center gap-2"
       >
-        <OSpinner size="xs" />
+        <OSpinner />
         {{ t("alerts.incidents.rcaThread.loading") }}
       </p>
 
-      <div
+      <OEmptyState
         v-else-if="emptyMessage"
+        size="compact"
+        :kind="threadFailed ? 'error' : 'first-run'"
+        :icon="threadFailed ? undefined : 'info'"
+        :title="emptyMessage"
         data-test="rca-thread-empty"
-        class="text-text-secondary text-compact flex flex-col items-start gap-2"
       >
-        <p class="m-0 flex items-start gap-2">
-          <OIcon name="info" size="sm" class="mt-0.5 shrink-0" />
-          {{ emptyMessage }}
-        </p>
         <!-- A live run retries on its own poll; a finished run needs the user. -->
-        <OButton
-          v-if="status === 'unavailable' && !runLive"
-          data-test="rca-thread-retry-btn"
-          variant="outline"
-          size="sm"
-          icon-left="refresh"
-          @click="$emit('retry')"
-        >
-          {{ t("common.retry") }}
-        </OButton>
-      </div>
+        <template v-if="status === 'unavailable' && !runLive" #actions>
+          <OButton
+            data-test="rca-thread-retry-btn"
+            variant="secondary"
+            size="sm"
+            @click="$emit('retry')"
+          >
+            {{ t("common.retry") }}
+          </OButton>
+        </template>
+      </OEmptyState>
 
       <p
         v-else-if="!thread && runLive"
@@ -107,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         role="status"
         class="text-text-secondary text-compact m-0 flex items-center gap-2"
       >
-        <OSpinner size="xs" />
+        <OSpinner />
         {{ t("alerts.incidents.rcaThread.working") }}
       </p>
 
@@ -131,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
           <div class="flex min-w-0 flex-col gap-1">
             <div class="flex min-w-0 items-baseline gap-2">
-              <span class="text-text-heading text-compact shrink-0 font-bold">
+              <span class="text-text-heading text-compact shrink-0 font-semibold">
                 {{ t("alerts.incidents.rcaThread.analysisStarted") }}
               </span>
               <span
@@ -149,10 +137,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="thread.started.prompt">
               <OButton
                 data-test="rca-thread-start-prompt-toggle"
-                variant="ghost-muted"
-                size="xs"
+                variant="ghost"
+                size="sm"
                 class="self-start"
-                :icon-right="promptOpen ? 'expand-less' : 'expand-more'"
+                :icon-end="promptOpen ? 'expand-less' : 'expand-more'"
                 :aria-expanded="promptOpen"
                 :aria-controls="promptId"
                 @click="promptOpen = !promptOpen"
@@ -176,10 +164,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="contextSummary">
               <OButton
                 data-test="rca-thread-context-toggle"
-                variant="ghost-neutral"
-                size="xs"
+                variant="ghost"
+                size="sm"
                 class="self-start"
-                :icon-left="contextOpen ? 'expand-less' : 'expand-more'"
+                :icon="contextOpen ? 'expand-less' : 'expand-more'"
                 :aria-expanded="contextOpen"
                 :aria-controls="contextPanelId"
                 @click="contextOpen = !contextOpen"
@@ -192,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="rca-thread-context"
                 class="rounded-default border-border-default bg-surface-base flex flex-col gap-1.5 border px-3 py-2.5"
               >
-                <OBadge variant="default-outline" size="xs" class="self-start">
+                <OBadge tone="outline" size="sm" class="self-start">
                   {{ t("alerts.incidents.rcaThread.leadsNotEvidence") }}
                 </OBadge>
                 <p
@@ -234,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-tint-warning flex min-w-0 flex-col gap-1 px-3 py-2"
             >
               <div class="flex min-w-0 items-baseline gap-2">
-                <span class="text-text-heading text-compact min-w-0 flex-1 font-bold">
+                <span class="text-text-heading text-compact min-w-0 flex-1 font-semibold">
                   {{ t("alerts.incidents.rcaSteer.needsInput") }}
                 </span>
                 <span
@@ -250,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <p
                 v-if="questionStatus(entry.question)"
                 data-test="rca-thread-question-status"
-                class="text-text-heading m-0 text-xs font-bold"
+                class="text-text-heading m-0 text-xs font-semibold"
               >
                 {{ questionStatus(entry.question) }}
               </p>
@@ -268,27 +256,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex max-w-full flex-wrap items-center justify-end gap-1.5">
               <OBadge
                 data-test="rca-thread-steer-pill"
-                :variant="steerPillVariant(entry.item)"
-                size="xs"
+                :tone="steerPillVariant(entry.item)"
+                size="sm"
               >
                 {{ rcaSteerStatusLabel(entry.item) }}
               </OBadge>
               <OBadge
                 v-if="entry.item.kind === 'answer'"
                 data-test="rca-thread-steer-lead"
-                variant="default-outline"
-                size="xs"
+                tone="outline"
+                size="sm"
               >
                 {{ t("alerts.incidents.rcaSteer.pill.leadNotEvidence") }}
               </OBadge>
-              <span class="text-text-heading truncate text-xs font-bold">
+              <span class="text-text-heading truncate text-xs font-semibold">
                 {{ userLocalPart(entry.item.author_email) }}
               </span>
               <span class="text-text-secondary text-2xs shrink-0 font-mono">
                 {{ clock(entry.item.created_at) }}
               </span>
               <span
-                class="bg-surface-tint-accent text-accent text-3xs inline-flex size-5 shrink-0 items-center justify-center rounded-full font-bold uppercase"
+                class="bg-surface-tint-accent text-accent text-2xs inline-flex size-5 shrink-0 items-center justify-center rounded-full font-semibold uppercase"
                 aria-hidden="true"
               >
                 {{ initials(entry.item.author_email) }}
@@ -313,9 +301,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="canReanalyze && rcaSteerOffersReanalyze(entry.item)"
               data-test="rca-thread-steer-reanalyze"
-              variant="outline"
-              size="sm"
-              icon-left="refresh"
+              variant="secondary"
+              icon="refresh"
               @click="$emit('reanalyze-with', entry.item.text)"
             >
               {{ t("alerts.incidents.rcaSteer.reanalyzeWithMessage") }}
@@ -329,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="rca-thread-working"
           class="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-2.5"
         >
-          <span class="flex h-5 items-center justify-center"><OSpinner size="xs" /></span>
+          <span class="flex h-5 items-center justify-center"><OSpinner /></span>
           <p class="text-text-secondary text-compact m-0" role="status">
             {{ t("alerts.incidents.rcaThread.working") }}
           </p>
@@ -349,9 +336,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </p>
         <OButton
           data-test="rca-thread-steering-retry-btn"
-          variant="outline"
-          size="sm"
-          icon-left="refresh"
+          variant="secondary"
+          icon="refresh"
           @click="$emit('retry')"
         >
           {{ t("common.retry") }}
@@ -368,9 +354,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-start gap-2">
         <p class="text-status-error-text m-0 min-w-0 flex-1 text-xs">{{ refusal.message }}</p>
         <OButton
+          icon-only
           data-test="rca-thread-refusal-dismiss"
           variant="ghost"
-          size="icon-xs"
           :aria-label="t('common.close')"
           @click="refusal = null"
         >
@@ -387,9 +373,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="canReanalyze"
         data-test="rca-thread-refusal-reanalyze"
         class="self-start"
-        variant="outline"
-        size="sm"
-        icon-left="refresh"
+        variant="secondary"
+        icon="refresh"
         @click="reanalyzeRefused"
       >
         {{ t("alerts.incidents.rcaSteer.reanalyzeWithMessage") }}
@@ -426,6 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, nextTick, ref, useId, watch } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
@@ -456,7 +442,7 @@ import {
   rcaSteerStatusLabel,
   rcaSteeredCount,
 } from "@/utils/incidents/rcaSteering";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import RcaSteerComposer from "./RcaSteerComposer.vue";
 import RcaThreadStep from "./RcaThreadStep.vue";
 
@@ -563,6 +549,9 @@ const conclusionStep = computed<RcaStep | null>(() => {
   return thread.steps.at(-1) ?? null;
 });
 
+const threadFailed = computed(
+  () => !props.noTranscript && ["unavailable", "missing", "unsupported"].includes(props.status),
+);
 const emptyMessage = computed<I18nText | null>(() => {
   if (props.noTranscript) return t("alerts.incidents.rcaThread.noTranscript");
   // A live run's session is created after the run starts, so "expired" is only a race there.
@@ -643,16 +632,16 @@ const unfinishedSteps = computed(() => {
   return new Set(thread.steps.filter((step, idx) => !isFinishedStep(thread, step, idx)));
 });
 
-const STEER_PILL_VARIANT: Record<RcaSteerRecord["status"], BadgeVariant> = {
-  queued: "default-outline",
-  delivered: "default-outline",
-  read: "primary-outline",
-  applied: "success-soft",
-  declined: "warning-soft",
-  not_read: "warning-soft",
-  rejected: "error-soft",
+const STEER_PILL_VARIANT: Record<RcaSteerRecord["status"], ChipTone> = {
+  queued: "outline",
+  delivered: "outline",
+  read: "outline",
+  applied: "ok",
+  declined: "warn",
+  not_read: "warn",
+  rejected: "err",
 };
-const steerPillVariant = (item: RcaSteerRecord): BadgeVariant => STEER_PILL_VARIANT[item.status];
+const steerPillVariant = (item: RcaSteerRecord): ChipTone => STEER_PILL_VARIANT[item.status];
 
 /** "a.rao@acme.io" → "AR". */
 const initials = (email: string): string =>

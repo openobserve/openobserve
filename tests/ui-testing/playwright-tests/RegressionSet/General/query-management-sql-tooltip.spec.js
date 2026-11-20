@@ -1,8 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Query Management ("Running Queries") is enterprise-only and meta-org-only:
-// an OSS build redirects /settings/query_management to the enterprise-locked
-// page, and an enterprise build redirects any non-meta org back to General
+// Query Management ("Running queries") is enterprise-only and meta-org-only:
+// an OSS build shows /settings/query_management with the lock in place
+// of the page, and an enterprise build redirects any non-meta org back to General
 // Settings. The page therefore has to be reached as `_meta` on an enterprise
 // build, and the landing tab is User Summary — the per-query rows (and their
 // Query List drawer) only exist under the All Queries tab.

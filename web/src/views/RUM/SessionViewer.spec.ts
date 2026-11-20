@@ -287,6 +287,7 @@ import SessionViewer from "./SessionViewer.vue";
 import store from "@/test/unit/helpers/store";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import searchService from "@/services/search";
 import i18n from "@/locales";
 import { ACTIVE_WINDOW_MS, LIVE_POLL_MS } from "@/utils/rum/sessionReplayLive";
@@ -409,6 +410,9 @@ function mountSessionViewer(router = createTestRouter()) {
   });
 }
 
+const sidebarDuration = (wrapper: VueWrapper) =>
+  wrapper.findComponent({ name: "PlayerEventsSidebar" }).props("sessionDetails").duration;
+
 // ---------------------------------------------------------------------------
 describe("SessionViewer.vue", () => {
   let wrapper: VueWrapper;
@@ -442,14 +446,6 @@ describe("SessionViewer.vue", () => {
     it('should render the "Go Back" navigation button', () => {
       const backBtn = wrapper.find('[data-test="session-viewer-back-btn"]');
       expect(backBtn.exists()).toBe(true);
-    });
-
-    it("should show Unknown User when session has no user email initially", () => {
-      // Default sessionDetails.user_email starts as "" before session load
-      vi.mocked(searchService.search).mockReturnValueOnce(new Promise(() => {}));
-      const pending = mountSessionViewer(router);
-      expect(pending.text()).toContain("Unknown User");
-      pending.unmount();
     });
   });
 
@@ -507,12 +503,15 @@ describe("SessionViewer.vue", () => {
 
   // -------------------------------------------------------------------------
   describe("navigation", () => {
-    it("should call router.back() when Go Back button is clicked", async () => {
-      const backSpy = vi.spyOn(router, "back");
+    it("goes back through history when there is one", async () => {
+      const state = vi.spyOn(window.history, "state", "get");
+      state.mockReturnValue({ back: "/rum/sessions" });
+      const backSpy = vi.spyOn(router, "back").mockImplementation(() => undefined);
       const backBtn = wrapper.find('[data-test="session-viewer-back-btn"]');
       expect(backBtn.exists()).toBe(true);
       await backBtn.trigger("click");
       expect(backSpy).toHaveBeenCalledTimes(1);
+      state.mockRestore();
     });
   });
 
@@ -525,20 +524,6 @@ describe("SessionViewer.vue", () => {
       expect(shareButton.props("url")).toBe(
         `${window.location.origin}/rum/sessions/session-abc?start_time=1692884313968000&end_time=1692884769270000`,
       );
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  describe("session details header", () => {
-    it("should render the IP address info section", () => {
-      const sections = wrapper.findAll(".truncate");
-      expect(sections.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it("should render at least 5 info sections in the header", () => {
-      // ip, date, user, location, browser/os
-      const sections = wrapper.findAll(".truncate");
-      expect(sections.length).toBeGreaterThanOrEqual(5);
     });
   });
 
@@ -632,9 +617,9 @@ describe("SessionViewer.vue", () => {
       ];
       await wrapper.vm.$nextTick();
 
-      const summaryText = wrapper.find('[data-test="frustration-summary-text"]');
-      expect(summaryText.exists()).toBe(true);
-      expect(summaryText.text()).toBe("1 Frustration");
+      const summary = wrapper.find('[data-test="session-viewer-frustration-summary"]');
+      expect(summary.exists()).toBe(true);
+      expect(summary.text()).toBe("1 frustration");
     });
 
     it('should display plural "Frustrations" when frustration count is greater than 1', async () => {
@@ -654,12 +639,12 @@ describe("SessionViewer.vue", () => {
       ];
       await wrapper.vm.$nextTick();
 
-      const summaryText = wrapper.find('[data-test="frustration-summary-text"]');
-      expect(summaryText.exists()).toBe(true);
-      expect(summaryText.text()).toBe("2 Frustrations");
+      const summary = wrapper.find('[data-test="session-viewer-frustration-summary"]');
+      expect(summary.exists()).toBe(true);
+      expect(summary.text()).toBe("2 frustrations");
     });
 
-    it("should display singular title tooltip when frustration count is 1", async () => {
+    it("should display singular tooltip when frustration count is 1", async () => {
       (wrapper.vm as any).segmentEvents = [
         {
           id: "1",
@@ -670,11 +655,13 @@ describe("SessionViewer.vue", () => {
       ];
       await wrapper.vm.$nextTick();
 
-      const summary = wrapper.find('[data-test="session-viewer-frustration-summary"]');
-      expect(summary.attributes("title")).toBe("1 frustration signal detected");
+      const summary = wrapper.findComponent('[data-test="session-viewer-frustration-summary"]');
+      expect(summary.findComponent(OTooltip).props("content")).toBe(
+        "1 frustration signal detected",
+      );
     });
 
-    it("should display plural title tooltip when frustration count is greater than 1", async () => {
+    it("should display plural tooltip when frustration count is greater than 1", async () => {
       (wrapper.vm as any).segmentEvents = [
         {
           id: "1",
@@ -691,8 +678,10 @@ describe("SessionViewer.vue", () => {
       ];
       await wrapper.vm.$nextTick();
 
-      const summary = wrapper.find('[data-test="session-viewer-frustration-summary"]');
-      expect(summary.attributes("title")).toBe("2 frustration signals detected");
+      const summary = wrapper.findComponent('[data-test="session-viewer-frustration-summary"]');
+      expect(summary.findComponent(OTooltip).props("content")).toBe(
+        "2 frustration signals detected",
+      );
     });
   });
 
@@ -1698,9 +1687,9 @@ describe("SessionViewer.vue — segment manifest and windowed fetch", () => {
     wrapper.unmount();
   });
 
-  it("shows the session duration in the header", async () => {
+  it("hands the session duration to the events sidebar", async () => {
     const wrapper = await mountLoaded();
-    expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("7m 35s");
+    expect(sidebarDuration(wrapper)).toBe("7m 35s");
     wrapper.unmount();
   });
 
@@ -2934,7 +2923,7 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     const liveBadge = live
       .findAllComponents(OBadge)
       .find((badge) => badge.attributes("data-test") === "session-viewer-live-badge");
-    expect(liveBadge?.props("variant")).toBe("success");
+    expect(liveBadge?.props("tone")).toBe("ok");
     live.unmount();
 
     const ended = await mountLive(NOW - ACTIVE_WINDOW_MS - 1);
@@ -4563,7 +4552,7 @@ describe("SessionViewer.vue — events-only view for a session with no replay (A
 
   it("shows the session duration after a reload, when the store holds no row to copy it from", async () => {
     const wrapper = await mountEventsOnly();
-    expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("7m 35s");
+    expect(sidebarDuration(wrapper)).toBe("7m 35s");
     wrapper.unmount();
   });
 
@@ -4571,7 +4560,7 @@ describe("SessionViewer.vue — events-only view for a session with no replay (A
     seededSession.extra = { time_spent: 123_000, session_id: "session-events" };
     try {
       const wrapper = await mountEventsOnly();
-      expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("2m 3s");
+      expect(sidebarDuration(wrapper)).toBe("2m 3s");
       wrapper.unmount();
     } finally {
       seededSession.extra = {};
@@ -4582,7 +4571,7 @@ describe("SessionViewer.vue — events-only view for a session with no replay (A
     seededSession.extra = { time_spent: 123_000, session_id: "session-other" };
     try {
       const wrapper = await mountEventsOnly();
-      expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("7m 35s");
+      expect(sidebarDuration(wrapper)).toBe("7m 35s");
       wrapper.unmount();
     } finally {
       seededSession.extra = {};
@@ -4738,9 +4727,13 @@ describe("SessionViewer.vue — opened from a funnel (AC-18)", () => {
 
   it("Back returns to the analytics view with router.back", async () => {
     const { wrapper, router } = await mountFromFunnel();
+    const state = vi.spyOn(window.history, "state", "get").mockReturnValue({
+      back: "/product-analytics/funnels",
+    });
     const back = vi.spyOn(router, "back").mockImplementation(() => undefined);
     await wrapper.find('[data-test="session-viewer-analytics-back-btn"]').trigger("click");
     expect(back).toHaveBeenCalled();
+    state.mockRestore();
     wrapper.unmount();
   });
 

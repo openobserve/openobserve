@@ -27,7 +27,7 @@ export class SDRPatternsPage {
     this.patternNameInput = page.locator('[data-test="add-regex-pattern-name-input-field"]');
     this.patternDescriptionInput = page.locator('[data-test="add-regex-pattern-description-input-field"]');
     this.patternInput = page.locator('[data-test="add-regex-pattern-input-field"]');
-    this.testInputButton = page.getByRole('button', { name: 'Test Input' });
+    this.testInputButton = page.getByRole('button', { name: 'Test input' });
     // ODrawer teleports panel to <body> via DialogPortal; compound selectors across that
     // boundary can be unreliable in Playwright. Use direct selectors — only one drawer
     // is ever open at a time during these tests so there is no ambiguity.
@@ -161,8 +161,12 @@ export class SDRPatternsPage {
     await this.addPatternTitle.waitFor({ state: 'visible' });
   }
 
+  // Delete renders in the row's ⋯ menu (a portal), so open the menu before clicking it.
   async clickDeletePattern(patternId) {
     testLogger.info(`Clicking delete button for pattern ID: ${patternId}`);
+    const row = this.page.locator('tr').filter({ has: await this.getPatternUpdateButton(patternId) });
+    await row.hover();
+    await row.locator('[data-test="regex-pattern-list-row-more-actions"]').click();
     const deleteButton = await this.getPatternDeleteButton(patternId);
     await deleteButton.click();
   }
@@ -254,7 +258,7 @@ export class SDRPatternsPage {
     // Verify Import Pattern dialog is visible
     await expect(this.page.getByText('Import Pattern')).toBeVisible();
 
-    // Click "File Upload / JSON" tab to reveal the file input
+    // Click "File upload / JSON" tab to reveal the file input
     const fileTab = this.page.locator('[data-test="tab-import_json_file"]');
     await expect(fileTab).toBeVisible();
     await fileTab.click();
@@ -497,13 +501,14 @@ export class SDRPatternsPage {
   async getPatternIdByName(patternName) {
     testLogger.info(`Getting pattern ID for: ${patternName}`);
 
+    // The inline edit button carries the id; Delete exists only inside an open ⋯ menu.
     const patternId = await this.page.evaluate((name) => {
-      const deleteButtons = Array.from(document.querySelectorAll('[data-test*="delete-regex-pattern"]'));
-      for (const btn of deleteButtons) {
+      const editButtons = Array.from(document.querySelectorAll('[data-test$="-update-regex-pattern"]'));
+      for (const btn of editButtons) {
         const row = btn.closest('tr');
         if (row && row.textContent.includes(name)) {
           const testAttr = btn.getAttribute('data-test');
-          return testAttr.match(/regex-pattern-list-(\d+)-delete/)?.[1];
+          return testAttr.match(/regex-pattern-list-(.+)-update-regex-pattern/)?.[1];
         }
       }
       return null;

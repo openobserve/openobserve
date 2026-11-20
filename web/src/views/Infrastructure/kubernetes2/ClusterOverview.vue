@@ -380,7 +380,13 @@ function onAlertsTile() {
       />
     </div>
 
-    <OEmptyState v-if="forbidden" preset="no-access" data-test="k8s2-overview-forbidden" />
+    <OEmptyState
+      v-if="forbidden"
+      kind="denied"
+      :title="t('emptyState.noAccess.title')"
+      :text="t('emptyState.noAccess.description')"
+      data-test="k8s2-overview-forbidden"
+    />
 
     <template v-else>
       <div class="grid grid-cols-2 gap-3 lg:grid-cols-4" data-test="k8s2-overview-kpis">
@@ -468,16 +474,19 @@ function onAlertsTile() {
                 class="ms-auto"
                 data-test="k8s2-overview-chart-toggle"
               >
-                <OToggleGroupItem value="cpu" size="sm">{{
-                  t("infra.k8s2.overviewCpu")
-                }}</OToggleGroupItem>
-                <OToggleGroupItem value="memory" size="sm">{{
+                <OToggleGroupItem value="cpu">{{ t("infra.k8s2.overviewCpu") }}</OToggleGroupItem>
+                <OToggleGroupItem value="memory">{{
                   t("infra.k8s2.overviewMemory")
                 }}</OToggleGroupItem>
               </OToggleGroup>
             </div>
             <div class="h-60 min-w-0" data-test="k8s2-overview-chart">
-              <OSkeleton v-if="awaiting" class="h-full" data-test="k8s2-overview-chart-loading" />
+              <OSkeleton
+                v-if="awaiting"
+                shape="block"
+                class="h-full"
+                data-test="k8s2-overview-chart-loading"
+              />
               <PanelSchemaRenderer
                 v-else-if="hasStream(USAGE[resource].stream)"
                 :key="`${resource}-${refreshNonce}`"
@@ -489,8 +498,8 @@ function onAlertsTile() {
               />
               <OEmptyState
                 v-else
-                size="inline"
-                preset="no-data"
+                size="compact"
+                :text="t('emptyState.noData.description')"
                 :title="t('infra.k8s2.overviewMetricsUnavailable')"
               />
             </div>
@@ -512,16 +521,21 @@ function onAlertsTile() {
             <OSkeleton
               v-for="n in 3"
               :key="n"
+              shape="block"
               class="h-32"
               data-test="k8s2-overview-side-loading"
             />
           </template>
           <section
             v-else-if="!hasNodes"
-            class="bg-surface-panel border-border-default rounded-surface flex min-w-0 items-center justify-center border p-3"
+            class="bg-surface-panel border-border-default rounded-surface flex min-w-0 border p-3"
             data-test="k8s2-overview-no-nodes"
           >
-            <OEmptyState size="inline" preset="no-data" :title="t('infra.k8s2.overviewNoNodes')" />
+            <OEmptyState
+              size="compact"
+              :text="t('emptyState.noData.description')"
+              :title="t('infra.k8s2.overviewNoNodes')"
+            />
           </section>
           <template v-else>
             <OText
@@ -599,17 +613,13 @@ function onAlertsTile() {
           }}
         </OText>
         <div v-if="awaiting" class="flex flex-col gap-2" data-test="k8s2-overview-warnings-loading">
-          <OSkeleton v-for="n in 3" :key="n" type="text" class="h-6" />
+          <OSkeleton v-for="n in 3" :key="n" class="h-6" />
         </div>
         <OTable
           v-else
           :data="warningRows"
           :columns="columns"
           row-key="key"
-          dense
-          :row-height="32"
-          :frame="false"
-          :show-global-filter="false"
           pagination="none"
           :max-height="TABLE_MAX_HEIGHT"
           enable-column-resize
@@ -645,10 +655,8 @@ function onAlertsTile() {
           </template>
           <template #empty>
             <OEmptyState
-              size="inline"
-              preset="no-data"
               :title="t('infra.k8s2.overviewNoIssues')"
-              :description="t('infra.k8s2.overviewNoIssuesDesc')"
+              :text="t('infra.k8s2.overviewNoIssuesDesc')"
             />
           </template>
         </OTable>

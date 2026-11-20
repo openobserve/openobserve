@@ -2,8 +2,8 @@
   <div class="relative">
     <OButton
       v-if="showCopyButton"
+      icon-only
       variant="secondary"
-      size="icon-sm"
       class="absolute! top-0! right-0 z-10"
       :class="copyButtonClass"
       @click="copyToClipboard"
@@ -31,9 +31,9 @@
         <template #trigger>
           <OButton
             data-test="json-preview-field-dropdown-btn"
-            size="xs"
+            size="sm"
             variant="ghost"
-            class="ms-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
+            class="ms-2 w-5! min-w-5! p-0! align-middle"
             :aria-label="t('common.addIcon')"
           >
             <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />

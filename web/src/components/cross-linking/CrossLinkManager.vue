@@ -3,16 +3,14 @@
     <!-- Header -->
     <div class="mb-3 flex items-center justify-between">
       <div>
-        <div class="text-base font-bold">{{ resolvedTitle }}</div>
+        <div class="text-sm font-semibold">{{ resolvedTitle }}</div>
         <div v-if="subtitle" class="text-text-muted text-xs">
           {{ subtitle }}
         </div>
       </div>
       <OButton
         v-if="!readonly"
-        variant="outline"
-        size="sm-action"
-        icon-left="add"
+        variant="secondary"
         @click="onAddClick"
         data-test="add-cross-link-btn"
       >
@@ -33,7 +31,7 @@
             <!-- Name -->
             <OTruncatedText
               as="div"
-              class="text-text-heading text-sm font-bold font-medium"
+              class="text-text-heading text-sm font-semibold"
               :tooltip="raw(link.name)"
               :data-test="`cross-link-item-name-${idx}`"
             >
@@ -64,18 +62,18 @@
           <!-- Actions -->
           <div v-if="!readonly" class="ms-2 flex shrink-0 items-center gap-1">
             <OButton
+              icon-only
               :aria-label="t('common.edit')"
               variant="ghost"
-              size="icon-sm"
-              icon-left="edit"
+              icon="edit"
               @click="editLink(link)"
               :data-test="`cross-link-edit-${idx}`"
             />
             <OButton
+              icon-only
               :aria-label="t('common.delete')"
-              variant="ghost-destructive"
-              size="icon-sm"
-              icon-left="delete"
+              variant="danger-ghost"
+              icon="delete"
               @click="removeLink(idx)"
               :data-test="`cross-link-delete-${idx}`"
             />
@@ -84,10 +82,13 @@
       </div>
     </div>
 
-    <!-- Empty State -->
-    <div v-else class="text-text-muted py-4 text-center text-sm" data-test="cross-link-empty">
-      {{ t("crossLinks.emptyState", { addLabel: t("crossLinks.addCrossLink") }) }}
-    </div>
+    <OEmptyState
+      v-else
+      size="compact"
+      icon="link"
+      :title="t('crossLinks.emptyState', { addLabel: t('crossLinks.addCrossLink') })"
+      data-test="cross-link-empty"
+    />
 
     <!-- Add/Edit Dialog -->
     <CrossLinkDialog
@@ -106,6 +107,7 @@ import { useStore } from "vuex";
 import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
@@ -118,7 +120,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkManager",
-  components: { CrossLinkDialog, OButton, OTag, OTruncatedText },
+  components: { CrossLinkDialog, OButton, OEmptyState, OTag, OTruncatedText },
   props: {
     modelValue: {
       type: Array as PropType<CrossLink[]>,

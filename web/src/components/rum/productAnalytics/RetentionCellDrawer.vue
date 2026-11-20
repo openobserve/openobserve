@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODrawer
     :open="open"
-    size="lg"
+    size="md"
     :title="title"
-    :sub-title="subtitle"
+    :subtitle="subtitle"
     data-test="rum-analytics-retention-cell-drawer"
     @update:open="(v) => emit('update:open', v)"
   >
@@ -27,13 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="pa.usersUnit.value.partial"
         :label="pa.usersUnit.value.label"
-        variant="teal-soft"
+        tone="neutral"
         icon="person"
         size="sm"
         class="self-start"
         data-test="rum-analytics-retention-drawer-identity"
       />
-      <OTabs v-model="tab" align="left" dense>
+      <OTabs v-model="tab" size="compact">
         <OTab
           name="retained"
           :label="t('rum.analytics.retention.retained')"
@@ -63,8 +63,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="u"
           pagination="none"
           sorting="none"
-          :show-global-filter="false"
-          :frame="false"
         >
           <template #cell-u="{ row, index }">
             <span
@@ -81,8 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="inline-flex">
                 <OButton
                   variant="ghost"
-                  size="sm"
-                  icon-left="lock"
+                  icon="lock"
                   disabled
                   :data-test="`rum-analytics-retention-user-${index}-sessions-btn`"
                   >{{ t("rum.analytics.retention.viewInSessions") }}</OButton
@@ -92,8 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-else
               variant="ghost"
-              size="sm"
-              icon-right="arrow-forward"
+              icon-end="arrow-forward"
               :data-test="`rum-analytics-retention-user-${index}-sessions-btn`"
               @click="viewInSessions(row.u)"
               >{{ t("rum.analytics.retention.viewInSessions") }}</OButton

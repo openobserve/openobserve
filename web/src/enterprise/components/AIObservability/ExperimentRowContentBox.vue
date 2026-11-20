@@ -18,12 +18,12 @@
   >
     <div class="flex min-h-8 shrink-0 items-center gap-2">
       <h4 class="text-compact text-text-heading m-0 font-semibold">{{ label }}</h4>
-      <OTag v-if="tagLabel" size="sm" icon="" variant="default-soft" :label="tagLabel" />
+      <OTag v-if="tagLabel" size="sm" icon="" tone="neutral" :label="tagLabel" />
       <div class="grow" />
       <OButton
-        variant="outline"
-        size="icon-xs"
-        :icon-left="fullscreen ? 'fullscreen-exit' : 'fullscreen'"
+        icon-only
+        variant="ghost"
+        :icon="fullscreen ? 'fullscreen-exit' : 'fullscreen'"
         :title="
           fullscreen
             ? t('aiObservability.experiments.comparePage.rowDrawer.exitFullscreen')

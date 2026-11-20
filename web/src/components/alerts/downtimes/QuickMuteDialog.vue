@@ -18,22 +18,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="open"
     size="sm"
-    persistent
     :title="title"
     :form-id="FORM_ID"
-    :primary-button-label="primaryLabel"
-    :primary-button-disabled="primaryDisabled"
-    :secondary-button-label="
-      confirming24h
+    :primary="{ label: primaryLabel, disabled: primaryDisabled }"
+    :secondary="{
+      label: confirming24h
         ? t('alerts.downtimes.mute.confirm24h.useUntilClear')
-        : t('alerts.downtimes.form.cancel')
-    "
-    :neutral-button-label="confirming24h ? t('alerts.downtimes.form.cancel') : undefined"
-    neutral-button-variant="outline"
+        : t('alerts.downtimes.form.cancel'),
+    }"
+    :extra="{
+      label: confirming24h ? t('alerts.downtimes.form.cancel') : undefined,
+      variant: 'secondary',
+    }"
     data-test="quick-mute-dialog"
     @update:open="emit('update:open', $event)"
     @click:secondary="onSecondary"
-    @click:neutral="emit('update:open', false)"
+    @click:extra="emit('update:open', false)"
   >
     <OForm :id="FORM_ID" :form="form" class="flex flex-col gap-5">
       <p class="text-text-secondary text-sm wrap-break-word" data-test="quick-mute-help">
@@ -45,24 +45,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label-position="top"
         data-test="quick-mute-preset"
       >
-        <OToggleGroupItem
-          v-if="alert"
-          value="untilClear"
-          size="sm"
-          data-test="quick-mute-preset-untilClear"
-        >
+        <OToggleGroupItem v-if="alert" value="untilClear" data-test="quick-mute-preset-untilClear">
           {{ t("alerts.downtimes.mute.untilClear") }}
         </OToggleGroupItem>
         <OToggleGroupItem
           v-for="preset in QUICK_MUTE_PRESETS"
           :key="preset.key"
           :value="preset.key"
-          size="sm"
           :data-test="`quick-mute-preset-${preset.key}`"
         >
           {{ t(preset.labelKey) }}
         </OToggleGroupItem>
-        <OToggleGroupItem value="custom" size="sm" data-test="quick-mute-preset-custom">
+        <OToggleGroupItem value="custom" data-test="quick-mute-preset-custom">
           {{ t("alerts.downtimes.mute.presets.custom") }}
         </OToggleGroupItem>
       </OFormToggleGroup>
@@ -92,16 +86,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ endsIn }}
       </p>
 
-      <OBanner
-        v-if="confirming24h"
-        variant="warning"
-        icon="warning"
-        dense
-        data-test="quick-mute-confirm-24h"
-      >
+      <OInlineNotice v-if="confirming24h" tone="warn" data-test="quick-mute-confirm-24h">
         <span class="font-semibold">{{ t("alerts.downtimes.mute.confirm24h.title") }}</span>
         {{ t("alerts.downtimes.mute.confirm24h.message") }}
-      </OBanner>
+      </OInlineNotice>
 
       <div v-if="hasGroups" class="flex flex-col gap-2" data-test="quick-mute-groups">
         <OFormToggleGroup
@@ -110,10 +98,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           label-position="top"
           data-test="quick-mute-group-scope"
         >
-          <OToggleGroupItem value="this" size="sm" data-test="quick-mute-groups-this">
+          <OToggleGroupItem value="this" data-test="quick-mute-groups-this">
             {{ t("alerts.downtimes.mute.groupsThis") }}
           </OToggleGroupItem>
-          <OToggleGroupItem value="all" size="sm" data-test="quick-mute-groups-all">
+          <OToggleGroupItem value="all" data-test="quick-mute-groups-all">
             {{ t("alerts.downtimes.mute.groupsAll") }}
           </OToggleGroupItem>
         </OFormToggleGroup>
@@ -129,19 +117,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <OBanner
+      <OInlineNotice
         v-if="tooMany"
-        variant="error"
-        dense
-        :content="t('alerts.downtimes.mute.tooMany', { max: MAX_QUICK_MUTE_IDS })"
+        tone="err"
+        :message="t('alerts.downtimes.mute.tooMany', { max: MAX_QUICK_MUTE_IDS })"
         data-test="quick-mute-too-many"
       />
       <template v-if="!(alert && noFolder)">
-        <OBanner
+        <OInlineNotice
           v-if="noFolder"
-          variant="warning"
-          dense
-          :content="t('alerts.downtimes.noFolder')"
+          tone="warn"
+          :message="t('alerts.downtimes.noFolder')"
           data-test="quick-mute-no-folder"
         />
         <div v-else class="flex flex-wrap items-center gap-1 text-sm" data-test="quick-mute-folder">
@@ -194,7 +180,7 @@ import {
   type QuickMuteForm,
 } from "./QuickMuteDialog.schema";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";

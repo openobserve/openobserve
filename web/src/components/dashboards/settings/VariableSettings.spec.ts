@@ -99,8 +99,8 @@ vi.mock("../../ConfirmDialog.vue", () => ({
   default: {
     name: "ConfirmDialog",
     template:
-      '<div data-test="confirm-dialog-mock" v-if="modelValue" :data-keypath="messageKeypath" :data-variant="okVariant"><div>{{title}}</div><div>{{message}}</div><b data-test="confirm-dialog-mock-name">{{messageName}}</b></div>',
-    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
+      '<div data-test="confirm-dialog-mock" v-if="modelValue" :data-keypath="messageKeypath" :data-variant="kind"><div>{{title}}</div><div>{{message}}</div><b data-test="confirm-dialog-mock-name">{{messageName}}</b></div>',
+    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "kind"],
     emits: ["update:ok", "update:cancel"],
   },
 }));
@@ -197,8 +197,8 @@ describe("VariableSettings", () => {
             inheritAttrs: false,
             template:
               '<div v-if="open" data-test="o-dialog-stub" class="o-dialog"><div data-test="o-dialog-title">{{ title }}</div><slot /></div>',
-            props: ["open", "width", "title", "subTitle", "persistent", "size", "showClose"],
-            emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+            props: ["open", "width", "title", "subtitle", "persistent", "size", "showClose"],
+            emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
           },
         },
       },
@@ -272,7 +272,7 @@ describe("VariableSettings", () => {
     it("should display variable type labels correctly", async () => {
       const vm = wrapper.vm as any;
 
-      expect(vm.getVariableTypeLabel("query_values")).toBe("Query Values");
+      expect(vm.getVariableTypeLabel("query_values")).toBe("Query values");
       expect(vm.getVariableTypeLabel("constant")).toBe("Constant");
       expect(vm.getVariableTypeLabel("textbox")).toBe("Textbox");
       expect(vm.getVariableTypeLabel("custom")).toBe("Custom");
@@ -549,7 +549,7 @@ describe("VariableSettings", () => {
       const odialog = wrapper.find('[data-test="o-dialog-stub"]');
       expect(odialog.exists()).toBe(true);
       expect(wrapper.find('[data-test="o-dialog-title"]').text()).toBe(
-        "Variables Dependency Graph",
+        "Variables dependency graph",
       );
     });
 

@@ -20,11 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="open"
     size="sm"
     :title="t('oncall.removeRotationTitleNamed', { rotation: rotationName })"
-    :primary-button-label="t('oncall.laneDelete')"
-    primary-button-variant="destructive"
-    :primary-button-disabled="blocked"
-    :secondary-button-label="t('oncall.cancel')"
-    initial-focus="secondary"
+    :primary="{ label: t('oncall.laneDelete'), variant: 'danger', disabled: blocked }"
+    :secondary="{ label: t('oncall.cancel') }"
     data-test="oncall-remove-rotation-dialog"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:primary="emit('confirm')"
@@ -56,9 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </p>
         <OButton
-          variant="ghost-primary"
-          size="xs"
-          icon-left="arrow-forward"
+          variant="accent-ghost"
+          size="sm"
+          icon="arrow-forward"
           data-test="oncall-remove-rotation-open-policy"
           @click="emit('open-policy')"
         >

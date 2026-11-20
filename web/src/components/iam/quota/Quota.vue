@@ -19,10 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="quota-page text-left"
     :class="isDark ? 'dark-theme-page' : 'light-theme-page'"
-    :title="t('quota.header')"
+    :title="t('iam.quota')"
     title-data-test="user-title-text"
-    :subtitle="t('iam.quotaPage.subtitle')"
-    icon="speed"
+    :about="t('iam.quotaPage.subtitle')"
     bleed
   >
     <div :style="{ marginTop: 0 }" class="app-table-container flex min-h-0 flex-1 flex-col">
@@ -57,13 +56,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 v-if="!editTable"
                 data-test="edit-table-btn"
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 :disabled="activeTab == 'role-limits' && (rolesDenied || !expandedRow)"
                 @click="editTableWithInput"
               >
                 {{ t("iam.quotaPage.editQuota") }}
-                <template #icon-right>
+                <template #icon-end>
                   <OIcon name="edit" size="sm" class="opacity-70" style="font-weight: 200" />
                 </template>
               </OButton>
@@ -147,15 +145,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-quota-api-limits"
-          :show-global-filter="false"
         >
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-api-limits"
-              :filtered="!!searchQuery"
-              :hide-action="!searchQuery"
-              @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+              :kind="searchQuery ? 'filtered' : 'first-run'"
+              :title="
+                searchQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.apiLimits') })
+                  : t('emptyState.noApiLimits.title')
+              "
+              :text="
+                searchQuery
+                  ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.apiLimits') })
+                  : t('emptyState.noApiLimits.description')
+              "
+              @action="searchQuery = ''"
             />
           </template>
           <template
@@ -238,16 +242,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-quota-role-limits"
-          :show-global-filter="false"
           @update:expanded-ids="handleExpandedChange"
         >
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-role-limits"
-              :filtered="!!searchQuery"
-              :hide-action="!searchQuery"
-              @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+              :kind="searchQuery ? 'filtered' : 'first-run'"
+              :title="
+                searchQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.roleLimits') })
+                  : t('emptyState.noRoleLimits.title')
+              "
+              :text="
+                searchQuery
+                  ? t('emptyState.filtered.description', { noun: t('emptyState.nouns.roleLimits') })
+                  : t('emptyState.noRoleLimits.description')
+              "
+              @action="searchQuery = ''"
             />
           </template>
           <template #cell-role_name="{ row }">
@@ -307,9 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
             </template>
-            <div v-if="isRoleLimitsLoading" class="flex h-[50vh] items-center justify-center">
-              <OSpinner size="md" />
-            </div>
+            <OSkeleton v-if="isRoleLimitsLoading" preset="tableRows" :rows="6" />
           </template>
         </OTable>
       </div>
@@ -339,12 +347,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default bg-surface-base sticky top-0 bottom-0 z-1 ms-auto mt-auto flex w-full justify-end gap-2 border-t py-2 pe-3"
         v-if="editTable && activeType == 'table'"
       >
-        <OButton variant="outline" size="sm-action" @click="cancelChanges">
+        <OButton variant="secondary" @click="cancelChanges">
           {{ t("iam.quotaPage.cancel") }}
         </OButton>
         <OButton
           variant="primary"
-          size="sm-action"
           :disabled="Object.keys(changedValues).length === 0"
           @click="saveChanges"
         >
@@ -355,20 +362,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default bg-surface-base sticky top-0 bottom-0 z-1 ms-auto mt-auto flex w-full justify-end gap-2 border-t pe-3"
         v-if="editTable && activeType == 'json'"
       >
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="cancelJsonChanges"
-          :disabled="isSavingJson"
-        >
+        <OButton variant="secondary" @click="cancelJsonChanges" :disabled="isSavingJson">
           {{ t("iam.quotaPage.cancel") }}
         </OButton>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="saveJsonChanges"
-          :disabled="isSavingJson"
-        >
+        <OButton variant="primary" @click="saveJsonChanges" :disabled="isSavingJson">
           {{ isSavingJson ? t("iam.quotaPage.savingChanges") : t("iam.quotaPage.saveChanges") }}
         </OButton>
       </div>
@@ -432,7 +429,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 import useRateLimiter from "@/composables/useRateLimiter";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { featureState } from "@/utils/featureGate";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
@@ -452,7 +449,7 @@ export default defineComponent({
     ConfirmDialog,
     QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     OEmptyState,
-    OSpinner,
+    OSkeleton,
     OIcon,
     OTable,
   },

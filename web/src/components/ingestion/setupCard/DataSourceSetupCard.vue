@@ -43,7 +43,7 @@ import { useLicenseLock } from "@/composables/useFeatureLock";
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { SETUP_CARD_ONBOARDING, type CardSubstitutions, type IngestTokenState } from "./types";
 import type {
   FirstEventResult,
@@ -256,19 +256,19 @@ const onStepAction = async (actionId: string) => {
   <!-- Mirrors AIIntegrationDetail's wrapper padding so data-source cards and AI
        integration cards sit identically in their panels. -->
   <div class="p-2">
-    <OBanner
+    <OInlineNotice
       v-if="passcodeForbidden && content"
-      variant="warning"
+      tone="warn"
       data-test="data-source-setup-card-passcode-forbidden"
-      :content="t('ingestion.passcodeForbiddenMessage')"
+      :message="t('ingestion.passcodeForbiddenMessage')"
     />
     <template v-else-if="content">
-      <OBanner
+      <OInlineNotice
         v-if="tokenState === 'unavailable'"
-        variant="warning"
+        tone="warn"
         class="mb-2"
         data-test="data-source-setup-card-passcode-unavailable"
-        :content="t('ingestion.passcodeUnavailableMessage')"
+        :message="t('ingestion.passcodeUnavailableMessage')"
       />
       <SetupCardRenderer
         :content="content"

@@ -21,7 +21,7 @@
         :value="code"
         :dot="dot"
         :icon="icon"
-        clickable
+        toggle
         :data-test="testId"
         @click="open" /></span
     ><span v-if="subline" class="text-text-secondary text-2xs" data-test="svcver-verdict-subline">{{

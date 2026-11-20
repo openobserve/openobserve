@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      first-record preview and the test-or-real outcome; this links to it instead of repeating it. -->
 <template>
   <div
-    class="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 flex flex-col gap-4 p-5 motion-safe:duration-300 max-md:p-4"
+    class="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:animation-duration-(--duration-page-in) flex flex-col gap-4 p-5 max-md:p-4"
     data-test="onboarding-first-data"
   >
     <div class="flex items-center gap-3.5">
@@ -48,8 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-wrap items-center gap-2">
       <OButton
         variant="primary"
-        size="sm"
-        icon-right="arrow-forward"
+        icon-end="arrow-forward"
         class="max-md:w-full"
         data-test="onboarding-first-data-open"
         @click="openData"
@@ -57,8 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ openLabel }}
       </OButton>
       <OButton
-        variant="outline"
-        size="sm"
+        variant="secondary"
         class="max-md:flex-1"
         data-test="onboarding-first-data-another"
         @click="go('recommended')"

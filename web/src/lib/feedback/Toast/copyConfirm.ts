@@ -34,7 +34,7 @@ const BUBBLE_HEIGHT_REM = 1.75;
 const BUBBLE_CHAR_REM = 0.45;
 const BUBBLE_CHROME_REM = 2.5;
 // OTooltip's side offset plus its arrow.
-const BUBBLE_GAP_REM = 0.5625;
+const BUBBLE_GAP_REM = 0.6875;
 
 export type CopyConfirmTone = "success" | "error";
 export type CopyConfirmSide = "top" | "right" | "bottom" | "left";

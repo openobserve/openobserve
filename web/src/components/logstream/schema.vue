@@ -16,12 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="lg"
     data-test="schema-drawer"
     :open="open"
-    :width="60"
+    :dirty="formDirtyFlag"
     :title="indexData.name"
     :title-data-test="'schema-title-text'"
-    :sub-title="t('logStream.schemaHeader')"
+    :subtitle="t('logStream.schemaHeader')"
     @update:open="$emit('update:open', $event)"
   >
     <!-- Timeline / time-range chip sits at the right of the header, next to the
@@ -39,13 +40,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div class="flex items-center gap-1.5">
           <span
-            class="text-3xs rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5 font-medium"
+            class="text-2xs rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5 font-medium"
           >
             {{ displayTimezone }}
           </span>
           <div class="text-text-body text-xs font-semibold">
             {{ indexData.stats.doc_time_min }}
-            <span class="text-base leading-none">→</span>
+            <span class="text-sm leading-none">→</span>
             {{ indexData.stats.doc_time_max }}
           </div>
         </div>
@@ -55,9 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="indexData.schema" class="h-full">
       <div class="m-0 h-full p-0">
         <div class="h-full" @submit.prevent="onSubmit">
-          <!-- we will show loading state here -->
-          <div v-if="loadingState" class="flex h-full w-full items-center justify-center">
-            <OSpinner size="md" />
+          <div v-if="loadingState" class="flex flex-col gap-2 p-3">
+            <OSkeleton preset="statStrip" />
+            <OSkeleton preset="tableRows" :rows="10" />
           </div>
           <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
           <div v-else class="indexDetailsContainer flex h-full min-h-0 w-full flex-col">
@@ -73,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
                   <div class="tile-header flex items-start justify-between">
-                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
+                    <div class="tile-title text-text-secondary text-left text-xs font-semibold">
                       {{ t("common.events") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -95,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
                   <div class="tile-header flex items-start justify-between">
-                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
+                    <div class="tile-title text-text-secondary text-left text-xs font-semibold">
                       {{ t("logStream.storageSize") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -117,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
                   <div class="tile-header flex items-start justify-between">
-                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
+                    <div class="tile-title text-text-secondary text-left text-xs font-semibold">
                       {{ t("logStream.compressedSize") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -139,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="tile-content rounded-default bg-surface-base border-border-default flex h-20 flex-col justify-between border p-3 text-center"
                 >
                   <div class="tile-header flex items-start justify-between">
-                    <div class="tile-title text-text-secondary text-left text-xs font-bold">
+                    <div class="tile-title text-text-secondary text-left text-xs font-semibold">
                       {{ t("logStream.indexSize") }}
                     </div>
                     <div class="tile-icon opacity-80">
@@ -164,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div>
                   <!-- min-w-0/max-w-full let OTabs' own arrow-scroller engage instead of clipping silently. -->
                   <div class="flex justify-start max-md:max-w-full max-md:min-w-0">
-                    <OTabs v-model="activeMainTab" dense>
+                    <OTabs v-model="activeMainTab" size="compact">
                       <!-- Schema Settings Tab with conditional class -->
                       <OTab
                         name="schemaSettings"
@@ -233,11 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :model-value="activeTab"
                             @update:model-value="updateActiveTab"
                           >
-                            <OToggleGroupItem
-                              v-if="hasUserDefinedSchema"
-                              value="schemaFields"
-                              size="sm"
-                            >
+                            <OToggleGroupItem v-if="hasUserDefinedSchema" value="schemaFields">
                               <template #icon-left
                                 ><OIcon name="verified-user" size="sm"
                               /></template>
@@ -247,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 })
                               }}
                             </OToggleGroupItem>
-                            <OToggleGroupItem value="allFields" size="sm">
+                            <OToggleGroupItem value="allFields">
                               <template #icon-left
                                 ><OIcon name="format-list-bulleted" size="sm"
                               /></template>
@@ -281,51 +278,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <OButton
                           v-if="isSchemaUDSEnabled"
+                          icon-only
                           data-test="schema-add-fields-title"
                           :disabled="isDialogOpen"
-                          variant="outline"
-                          size="icon-sm"
+                          variant="ghost"
                           @click.stop="openDialog"
                           :title="t('logStream.addFieldsTitle')"
-                          icon-left="add"
+                          icon="add"
                         />
                       </div>
                     </div>
 
                     <div class="mb-3" v-if="isDialogOpen">
-                      <OCard class="flex w-screen max-w-full flex-col">
-                        <!-- Header Section -->
-                        <OCardSection class="p-0" style="padding: 0.25rem 1rem 0.25rem 1rem">
-                          <div class="flex items-center justify-between">
-                            <div class="text-xl font-semibold">
-                              {{ t("logStream.addFieldsTitle") }}
-                            </div>
-                            <div>
-                              <OButton
-                                :aria-label="t('common.close')"
-                                data-test="add-stream-cancel-btn"
-                                variant="ghost"
-                                size="icon-sm"
-                                @click="closeDialog"
-                                icon-left="close"
-                              />
-                            </div>
-                          </div>
-                        </OCardSection>
-                        <!-- Main Content (Scrollable if necessary) -->
-                        <OCardSection class="mb-0.5 flex-1 overflow-y-auto px-4 py-0">
-                          <OForm :form="newSchemaFieldsForm" @keyup="onAddFieldsKeyup">
-                            <StreamFieldsInputs
-                              form-field-name="newSchemaFields"
-                              :showHeader="false"
-                              :visibleInputs="{
-                                name: true,
-                                data_type: true,
-                                index_type: false,
-                              }"
-                            />
-                          </OForm>
-                        </OCardSection>
+                      <OCard :title="t('logStream.addFieldsTitle')" class="w-screen max-w-full">
+                        <template #actions>
+                          <OButton
+                            icon-only
+                            :aria-label="t('common.close')"
+                            data-test="add-stream-cancel-btn"
+                            variant="ghost"
+                            size="sm"
+                            @click="closeDialog"
+                            icon="close"
+                          />
+                        </template>
+                        <OForm :form="newSchemaFieldsForm" @keyup="onAddFieldsKeyup">
+                          <StreamFieldsInputs
+                            form-field-name="newSchemaFields"
+                            :showHeader="false"
+                            :visibleInputs="{
+                              name: true,
+                              data_type: true,
+                              index_type: false,
+                            }"
+                          />
+                        </OForm>
                       </OCard>
                     </div>
 
@@ -346,9 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         pagination="client"
                         :page-size="selectedPerPage"
                         :page-size-options="perPageOptionsList"
-                        :show-global-filter="false"
                         :default-columns="false"
-                        dense
                         class="o2-schema-table"
                         :style="{ height: '100%', width: '100%' }"
                       >
@@ -402,7 +387,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="text-compact"
                               multiple
                               clearable
-                              size="sm"
                               :data-test="`schema-field-${row.name}-index-type-select`"
                               style="width: 11.875rem"
                               @update:model-value="
@@ -598,10 +582,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-model="partitionTimeLevel"
                             @update:model-value="formDirtyFlag = true"
                           >
-                            <OToggleGroupItem value="hourly" size="sm">
+                            <OToggleGroupItem value="hourly">
                               {{ t("logStream.partitionTimeLevelHourly") }}
                             </OToggleGroupItem>
-                            <OToggleGroupItem value="daily" size="sm">
+                            <OToggleGroupItem value="daily">
                               {{ t("logStream.partitionTimeLevelDaily") }}
                             </OToggleGroupItem>
                           </OToggleGroup>
@@ -641,8 +625,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mt-2 flex min-h-0 flex-1 flex-col">
                       <div class="mt-2 flex items-center text-center">
                         <div class="flex items-center">
-                          <span class="font-bold"> {{ t("logStream.selectDate") }}</span>
-                          <DateTime
+                          <span class="font-semibold"> {{ t("logStream.selectDate") }}</span>
+                          <ODateTimeRange
                             class="mx-2"
                             @on:date-change="dateChangeValue"
                             disable-relative
@@ -651,7 +635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :minDate="minDate ?? undefined"
                           />
                         </div>
-                        <span class="font-bold"> {{ t("logStream.utcTimezone") }} </span>
+                        <span class="font-semibold"> {{ t("logStream.utcTimezone") }} </span>
                       </div>
 
                       <div class="mt-2 flex min-h-0 flex-1 flex-col">
@@ -667,9 +651,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           pagination="client"
                           :page-size="selectedPerPage"
                           :page-size-options="perPageOptionsList"
-                          :show-global-filter="false"
                           :default-columns="false"
-                          dense
                           :style="{ height: '100%' }"
                         />
                       </div>
@@ -725,8 +707,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         v-if="isSchemaUDSEnabled && activeMainTab == 'schemaSettings'"
                         data-test="schema-add-field-button"
-                        variant="outline"
-                        size="sm-action"
+                        variant="secondary"
                         :disabled="!selectedFields.length || hasUDSFieldInSelection"
                         @click="updateDefinedSchemaFields"
                       >
@@ -749,10 +730,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-if="activeMainTab != 'configuration' && activeMainTab != 'crossLinking'"
                         :disabled="!selectedFields.length && !selectedDateFields.length"
                         data-test="schema-delete-button"
-                        variant="outline"
-                        size="sm-action"
+                        variant="secondary"
                         @click="openDeleteConfirm"
-                        icon-left="delete"
+                        icon="delete"
                       >
                         {{ t("logStream.delete") }}
                       </OButton>
@@ -760,8 +740,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex justify-end gap-2">
                       <OButton
                         data-test="schema-cancel-button"
-                        variant="outline"
-                        size="sm-action"
+                        variant="secondary"
                         @click="$emit('close')"
                       >
                         {{ t("logStream.cancel") }}
@@ -770,7 +749,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disabled="!formDirtyFlag"
                         data-test="schema-update-settings-button"
                         variant="primary"
-                        size="sm-action"
                         @click="onSubmit"
                       >
                         {{ t("logStream.updateSettings") }}
@@ -789,9 +767,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </ODrawer>
   <ODrawer
+    size="lg"
     data-test="schema-pattern-association-drawer"
     v-model:open="patternAssociationDialog.show"
-    :width="60"
     :show-close="false"
   >
     <AssociatedRegexPatterns
@@ -807,8 +785,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #footer>
       <div class="flex items-center justify-end gap-2">
         <OButton
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           data-test="schema-pattern-association-cancel-btn"
           @click="patternAssociationDialog.show = false"
         >
@@ -816,7 +793,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           variant="primary"
-          size="sm-action"
           data-test="schema-pattern-association-update-btn"
           :disabled="!assocPatternsRef?.isFormDirty"
           @click="assocPatternsRef?.updateRegexPattern()"
@@ -830,7 +806,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="t('logStream.deleteActionTitle', deleteConfirmCount)"
     :message="t('logStream.deleteActionMessage', { count: deleteConfirmCount })"
-    ok-variant="destructive"
+    kind="destructive"
     @update:ok="deleteFields()"
     @update:cancel="confirmQueryModeChangeDialog = false"
     v-model="confirmQueryModeChangeDialog"
@@ -838,7 +814,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConfirmDialog
     :title="t('logStream.deleteDatesTitle')"
     :message="t('logStream.deleteDatesMessage', { count: deleteConfirmCount })"
-    ok-variant="destructive"
+    kind="destructive"
     @update:ok="deleteDates()"
     @update:cancel="confirmDeleteDatesDialog = false"
     v-model="confirmDeleteDatesDialog"
@@ -891,17 +867,16 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
-import DateTime from "@/components/DateTime.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 
 import AssociatedRegexPatterns from "./AssociatedRegexPatterns.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -946,21 +921,20 @@ export default defineComponent({
     OToggleGroupItem,
     OTable,
     OTag,
-    DateTime,
+    ODateTimeRange,
     AssociatedRegexPatterns,
     ODrawer,
     PerformanceFieldsDialog,
     CrossLinkManager,
     OButton,
     OIcon,
-    OSpinner,
+    OSkeleton,
     OInput,
     OSearchInput,
     OSelect,
     OSwitch,
     OTooltip,
     OCard,
-    OCardSection,
     OForm,
   },
   setup({ modelValue }: { modelValue: Record<string, unknown> }) {

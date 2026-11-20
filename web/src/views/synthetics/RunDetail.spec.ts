@@ -186,11 +186,7 @@ vi.mock("@/services/synthetics", async (importOriginal) => {
 
 const stubs = {
   OCard: {
-    template: '<div class="ocard-stub"><slot /></div>',
-  },
-  OCardSection: {
-    template: '<div class="ocardsection-stub"><slot /></div>',
-    props: ["role"],
+    template: '<div class="ocard-stub"><slot name="header" /><slot /></div>',
   },
   OSeparator: {
     template: '<div class="oseparator-stub" />',
@@ -198,7 +194,7 @@ const stubs = {
   OButton: {
     template:
       '<button class="obutton-stub" @click="$emit(\'click\')"><slot /><slot name="prefix" /><slot name="suffix" /></button>',
-    props: ["disabled", "iconLeft"],
+    props: ["disabled", "icon"],
   },
   OIcon: {
     template: '<span class="oicon-stub" />',
@@ -256,11 +252,11 @@ describe("RunDetail", () => {
     expect(wrapper.find('[data-test="synthetics-run-detail-status-badge"]').exists()).toBe(true);
   });
 
-  it("should render the info bar with 5 chips", () => {
+  it("should render the info bar with 6 chips, the run's time among them on the page", () => {
     const infoBar = wrapper.find('[data-test="synthetics-run-detail-info-bar"]');
     expect(infoBar.exists()).toBe(true);
     const chips = infoBar.findAll(":scope > div");
-    expect(chips.length).toBe(5);
+    expect(chips.length).toBe(6);
   });
 
   it("should render prev/next navigation buttons", () => {

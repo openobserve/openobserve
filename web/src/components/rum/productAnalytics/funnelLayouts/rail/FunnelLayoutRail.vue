@@ -80,25 +80,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #separator>
         <div class="group flex h-full w-8 cursor-col-resize justify-center">
           <div
-            class="bg-border-default group-hover:bg-splitter-hover h-full w-px transition-colors duration-300 group-hover:w-0.5"
+            class="bg-border-default group-hover:bg-splitter-hover h-full w-px transition-colors group-hover:w-0.5"
           />
         </div>
       </template>
       <template #after>
         <div class="h-full min-w-0 lg:overflow-y-auto lg:py-3">
-          <OCard
-            variant="outlined"
-            class="rounded-surface flex min-w-0 flex-col"
-            data-test="rum-analytics-funnel-card"
-          >
+          <OCard flush data-test="rum-analytics-funnel-card">
             <div
               class="border-border-default flex flex-col gap-2 border-b px-4 py-2.5"
               data-test="rum-analytics-funnel-toolbar"
             >
               <div class="flex items-center gap-2">
                 <OButton
-                  variant="outline"
-                  size="icon-xs-sq"
+                  icon-only
+                  variant="secondary"
+                  size="sm"
                   class="max-lg:hidden"
                   :aria-label="collapseLabel"
                   :aria-expanded="!collapsed"
@@ -113,16 +110,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OButton>
                 <slot name="header" />
                 <OPopover
+                  size="lg"
                   v-model:open="adding"
                   align="end"
-                  content-class="p-3 w-96 max-w-[calc(100vw-1.5rem)]"
+                  content-class="p-3"
                   :aria-label="t('rum.analytics.funnel.addStep')"
                 >
                   <template #trigger>
                     <OButton
-                      variant="outline"
-                      size="sm"
-                      icon-left="add"
+                      variant="secondary"
+                      icon="add"
                       class="shrink-0"
                       data-test="rum-analytics-funnel-add-step-btn"
                       >{{ t("rum.analytics.funnel.addStep") }}</OButton

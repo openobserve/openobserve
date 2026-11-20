@@ -18,15 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OFormSection variant="plain" class="max-w-5xl" :title="title">
     <template #actions>
       <OTag
-        :variant="TAG_VARIANT[health]"
+        :tone="TAG_VARIANT[health]"
         size="sm"
         :label="tagLabel"
         data-test="telephony-card-status"
       />
       <OButton
-        variant="outline"
-        size="sm-action"
-        icon-left="fact-check"
+        variant="secondary"
+        icon="fact-check"
         :loading="status.isFetching.value"
         data-test="telephony-card-check"
         @click="checkAccount"
@@ -40,18 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ meta }}
       </span>
 
-      <OBanner
-        v-if="problem"
-        variant="error-soft"
-        icon="error-outline"
-        data-test="telephony-card-problem"
-      >
+      <OInlineNotice v-if="problem" tone="err" data-test="telephony-card-problem">
         {{ problem }}
         <template v-if="updatable" #actions>
           <OButton
-            variant="outline"
-            size="sm-action"
-            icon-left="edit"
+            variant="secondary"
+            icon="edit"
             :disabled="readOnly"
             data-test="telephony-card-problem-update"
             @click="emit('update')"
@@ -59,20 +52,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("telephony.update") }}
           </OButton>
         </template>
-      </OBanner>
+      </OInlineNotice>
 
-      <OBanner
+      <OInlineNotice
         v-if="live?.state === 'unavailable'"
-        variant="warning"
-        dense
+        tone="warn"
         data-test="telephony-card-unchecked"
       >
         {{ t("telephony.uncheckedNow", { provider: PROVIDER }) }}
-      </OBanner>
+      </OInlineNotice>
 
-      <OBanner v-if="ok?.trial" variant="info" icon="info" data-test="telephony-card-trial">
+      <OInlineNotice v-if="ok?.trial" tone="info" data-test="telephony-card-trial">
         {{ t("telephony.trial", { provider: PROVIDER }) }}
-      </OBanner>
+      </OInlineNotice>
 
       <div class="border-border-default grid grid-cols-1 gap-2 border-t pt-4">
         <TelephonyPress4Row v-if="callsWork" :available="press4Available" />
@@ -105,11 +97,11 @@ import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { telephonyStatusQuery } from "@/services/oncall.queries";
 import type { I18nText } from "@/types/i18n";
@@ -123,11 +115,11 @@ import {
   type TelephonyHealth,
 } from "./telephony";
 
-const TAG_VARIANT: Record<TelephonyHealth, BadgeVariant> = {
-  checking: "default-soft",
-  ok: "success-soft",
-  broken: "error-soft",
-  unchecked: "warning-soft",
+const TAG_VARIANT: Record<TelephonyHealth, ChipTone> = {
+  checking: "neutral",
+  ok: "ok",
+  broken: "err",
+  unchecked: "warn",
 };
 
 defineProps<{

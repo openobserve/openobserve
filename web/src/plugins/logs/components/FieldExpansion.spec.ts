@@ -74,8 +74,8 @@ function createWrapper(props = {}) {
         OCollapsible: {
           name: "OCollapsible",
           template: '<div class="o-expansion-item-stub"><slot name="trigger" /><slot /></div>',
-          props: ["modelValue", "label", "dense", "hideExpandIcon"],
-          emits: ["before-show", "before-hide", "update:modelValue"],
+          props: ["open"],
+          emits: ["update:open"],
         },
         OButton: {
           name: "OButton",
@@ -130,12 +130,9 @@ describe("FieldExpansion", () => {
       expect(headerDiv.text()).toContain(defaultField.name);
     });
 
-    it("renders expand icon when field has dataType and is not expanded", () => {
+    it("leaves the chevron to the collapsible and starts it closed", () => {
       const wrapper = createWrapper();
-      // The chevron_right icon is shown when not expanded
-      const icons = wrapper.findAll(".OIcon-stub");
-      const expandIcon = icons.find((i) => i.attributes("data-name") === "chevron-right");
-      expect(expandIcon).toBeDefined();
+      expect(wrapper.findComponent({ name: "OCollapsible" }).props("open")).toBe(false);
     });
   });
 
@@ -301,11 +298,7 @@ describe("FieldExpansion", () => {
   describe("Expand/Collapse behavior", () => {
     it("starts in collapsed state (isExpanded = false)", () => {
       const wrapper = createWrapper();
-      // The expansion item stub gets modelValue from isExpanded ref
-      // We verify the chevron_right icon is shown (not expanded)
-      const icons = wrapper.findAll(".OIcon-stub");
-      const chevronIcon = icons.find((i) => i.attributes("data-name") === "chevron-right");
-      expect(chevronIcon).toBeDefined();
+      expect(wrapper.findComponent({ name: "OCollapsible" }).props("open")).toBe(false);
     });
 
     it("renders FieldValuesPanel inside card section", () => {

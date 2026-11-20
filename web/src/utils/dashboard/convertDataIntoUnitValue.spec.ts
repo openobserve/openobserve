@@ -2004,8 +2004,8 @@ describe("Dashboard Data Conversion Utils", () => {
         ],
       };
       const errors = [];
-      validateSQLPanelFields(gt, panelData, 0, "First Column", "Other Columns", errors, true);
-      expect(errors).toContain("Add at least one field on First Column or Other Columns");
+      validateSQLPanelFields(gt, panelData, 0, "First column", "Other columns", errors, true);
+      expect(errors).toContain("Add at least one field on First column or Other columns");
     });
 
     it("should handle filter conditions with group type", () => {
@@ -2073,14 +2073,14 @@ describe("Dashboard Data Conversion Utils", () => {
                     filterType: "condition",
                     type: "condition",
                     column: "status",
-                    operator: "Is Null",
+                    operator: "Is null",
                     value: null,
                   },
                   {
                     filterType: "condition",
                     type: "condition",
                     column: "status2",
-                    operator: "Is Not Null",
+                    operator: "Is not null",
                     value: null,
                   },
                 ],
@@ -2151,8 +2151,8 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(gt, panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
-      // Should use "First Column" as label
-      expect(errors).toContain("Add at least one field on First Column or Other Columns");
+      // Should use "First column" as label
+      expect(errors).toContain("Add at least one field on First column or Other columns");
     });
 
     it("should handle table chart for currentYLabel calculation", () => {
@@ -2173,8 +2173,8 @@ describe("Dashboard Data Conversion Utils", () => {
       };
       const errors = [];
       validatePanel(gt, panelData, errors, true, [], "dashboard", mockStore, checkTimestampAlias);
-      // Should use "Other Columns" as label - this is covered by the error message
-      expect(errors).toContain("Add at least one field on First Column or Other Columns");
+      // Should use "Other columns" as label - this is covered by the error message
+      expect(errors).toContain("Add at least one field on First column or Other columns");
     });
 
     it("should handle validateDashboardJson with panel validation exception", () => {

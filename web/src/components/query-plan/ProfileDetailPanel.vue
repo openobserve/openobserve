@@ -52,13 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="t('search.queryProfile.perNode')"
               @update:model-value="onRemoteTab"
             >
-              <OToggleGroupItem
-                value="returned"
-                size="sm"
-                data-test="query-profile-remote-returned"
-                >{{ t("search.queryProfile.returnedToLeader") }}</OToggleGroupItem
-              >
-              <OToggleGroupItem value="read" size="sm" data-test="query-profile-remote-read">{{
+              <OToggleGroupItem value="returned" data-test="query-profile-remote-returned">{{
+                t("search.queryProfile.returnedToLeader")
+              }}</OToggleGroupItem>
+              <OToggleGroupItem value="read" data-test="query-profile-remote-read">{{
                 t("search.queryProfile.readFromStorage")
               }}</OToggleGroupItem>
             </OToggleGroup>
@@ -70,9 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="id"
             tree
             pagination="none"
-            :show-global-filter="false"
             :fill-height="false"
-            dense
             data-test="query-profile-remote-nodes"
             @row-click="onRemoteRow"
           >
@@ -131,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               formatPercent(share)
             }}</span>
           </div>
-          <OProgressBar size="sm" :value="share" :variant="SHARE_BAR[shareTone(share)]" />
+          <OProgressBar :value="share * 100" :tone="SHARE_BAR[shareTone(share)]" />
         </div>
 
         <section v-if="nodeRows.length > 1">
@@ -143,9 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="id"
             tree
             pagination="none"
-            :show-global-filter="false"
             :fill-height="false"
-            dense
             data-test="query-profile-op-nodes"
             @row-click="onOpRow"
           >
@@ -196,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <section>
         <ProfileSectionTitle :title="t('search.queryProfile.raw')" />
-        <OCodeBlock :code="op.detail" wrap padded data-test="query-profile-detail-raw" />
+        <OCodeBlock :code="op.detail" wrap data-test="query-profile-detail-raw" />
       </section>
     </div>
   </div>

@@ -15,12 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    :title="t('iam.invitations')"
-    :subtitle="t('iam.invitationList.subtitle')"
-    icon="mail"
-    bleed
-  >
+  <OPageLayout :title="t('iam.invitations')" bleed>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
@@ -29,17 +24,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           row-key="token"
           :loading="loading"
           :forbidden="forbidden"
+          :error="loadError"
           v-model:global-filter="filterQuery"
-          :show-global-filter="false"
           pagination="client"
           :page-size="20"
           sorting="client"
           filter-mode="client"
           :default-columns="false"
-          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-invitations-list"
+          @retry="fetchPendingInvitations"
         >
           <template #toolbar>
             <div class="flex flex-1 items-center gap-2 max-md:contents">
@@ -52,28 +47,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
-              variant="outline"
-              size="icon-toolbar"
-              icon-left="refresh"
+            <ORefreshButton
+              :last-run-at="lastUpdatedAt"
               :loading="loading"
+              shortcut="iamInvitationsRefresh"
               data-test="invitation-list-refresh-btn"
               @click="fetchPendingInvitations"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="iamInvitationsRefresh"
-              />
-            </OButton>
+            />
           </template>
           <template #empty>
             <OEmptyState
-              size="hero"
-              preset="no-invitations"
-              :filtered="!!filterQuery"
-              :hide-action="!filterQuery"
-              @action="(id) => id === 'clear-filters' && (filterQuery = '')"
+              :kind="filterQuery ? 'filtered' : 'first-run'"
+              :title="
+                filterQuery
+                  ? t('emptyState.filtered.title', { noun: t('emptyState.nouns.invitations') })
+                  : t('emptyState.noInvitations.title')
+              "
+              :text="
+                filterQuery
+                  ? t('emptyState.filtered.description', {
+                      noun: t('emptyState.nouns.invitations'),
+                    })
+                  : t('emptyState.noInvitations.description')
+              "
+              :icon="filterQuery ? undefined : 'group'"
+              @action="filterQuery = ''"
             />
           </template>
           <template #cell-role="{ row }">
@@ -95,7 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-2">
               <OButton
                 variant="primary"
-                size="sm"
                 class="max-md:hidden"
                 @click="acceptInvitation(row)"
                 :data-test="`accept-invitation-${row.token}`"
@@ -104,7 +101,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 variant="secondary"
-                size="sm"
                 class="max-md:hidden"
                 @click="rejectInvitation(row)"
                 :data-test="`reject-invitation-${row.token}`"
@@ -114,10 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    icon-only
                     :aria-label="t('common.moreActions')"
-                    icon-left="more-vert"
+                    icon="more-vert"
                     variant="ghost"
-                    size="icon-xs-sq"
+                    size="sm"
                     class="md:hidden"
                     data-test="invitation-list-row-more-actions"
                     @click.stop
@@ -144,27 +141,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <ODialog
+    <ConfirmDialog
+      v-model="confirmAccept"
       data-test="invitation-list-accept-dialog"
-      v-model:open="confirmAccept"
-      size="xs"
       :title="t('invitation.confirmAcceptHead')"
-      :secondary-button-label="t('invitation.cancel')"
-      :primary-button-label="t('invitation.accept')"
-      @click:secondary="confirmAccept = false"
-      @click:primary="confirmAcceptInvitation"
-    >
-      <p>{{ t("invitation.confirmAcceptMsg", { org: selectedInvitation?.org_name }) }}</p>
-    </ODialog>
+      :message="t('invitation.confirmAcceptMsg', { org: selectedInvitation?.org_name })"
+      :ok-label="t('invitation.accept')"
+      :cancel-label="t('invitation.cancel')"
+      @update:ok="confirmAcceptInvitation"
+      @update:cancel="confirmAccept = false"
+    />
 
     <ODialog
       data-test="invitation-list-reject-dialog"
       v-model:open="confirmReject"
-      size="xs"
+      size="sm"
       :title="t('invitation.confirmRejectHead')"
-      :secondary-button-label="t('invitation.cancel')"
-      :primary-button-label="t('invitation.reject')"
-      primary-button-variant="destructive"
+      :secondary="{ label: t('invitation.cancel') }"
+      :primary="{ label: t('invitation.reject'), variant: 'danger' }"
       @click:secondary="confirmReject = false"
       @click:primary="confirmRejectInvitation"
     >
@@ -186,13 +180,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, onMounted } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -204,7 +199,7 @@ import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { forbiddenState, type ForbiddenState } from "@/utils/featureGate";
+import { forbiddenState, loadErrorText, type ForbiddenState } from "@/utils/featureGate";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -228,13 +223,14 @@ export default defineComponent({
     OPageLayout,
     OEmptyState,
     OButton,
+    ORefreshButton,
     ODropdown,
     ODropdownItem,
-    OTooltip,
     OTag,
     OTimeCell,
     OUserCell,
     ODialog,
+    ConfirmDialog,
     OTable,
     OSearchInput,
   },
@@ -308,7 +304,10 @@ export default defineComponent({
       },
     ];
     const loading = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref<ForbiddenState>(false);
+    // A failed read with no rows on screen is the table's error state, never the first-run one (K5).
+    const loadError = ref<string | null>(null);
 
     onMounted(() => {
       fetchPendingInvitations();
@@ -323,6 +322,7 @@ export default defineComponent({
 
       loading.value = true;
       forbidden.value = false;
+      loadError.value = null;
       try {
         const response = await usersService.getPendingInvites();
 
@@ -330,12 +330,15 @@ export default defineComponent({
           ...invitation,
           expiry: formatExpiry(invitation.expires_at),
         }));
+        lastUpdatedAt.value = Date.now();
         dismiss();
       } catch (error) {
         const e = error as { response?: { status?: number; data?: { message?: string } } };
         dismiss();
         forbidden.value = forbiddenState(e);
-        if (!forbidden.value) {
+        if (!invitations.value.length) {
+          loadError.value = loadErrorText(e, t("emptyState.loadError.description"));
+        } else if (!forbidden.value) {
           toast({
             message: raw(e.response?.data?.message || t("iam.invitationList.failedLoadPending")),
             variant: "error",
@@ -475,6 +478,8 @@ export default defineComponent({
       filterQuery,
       columns,
       loading,
+      loadError,
+      lastUpdatedAt,
       forbidden,
       confirmAccept,
       confirmReject,

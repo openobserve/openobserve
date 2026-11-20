@@ -16,18 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- an empty passcode would substitute into a valid-looking but non-functional snippet -->
-  <OBanner
+  <OInlineNotice
     v-if="passcodeForbidden && contentNeedsPasscode"
-    variant="warning"
+    tone="warn"
     data-test="copy-content-passcode-forbidden"
-    :content="t('ingestion.passcodeForbiddenMessage')"
+    :message="t('ingestion.passcodeForbiddenMessage')"
   />
   <div v-else class="rounded-default copy-content-block bg-surface-subtle relative overflow-hidden">
     <div class="absolute top-2 right-2 z-10">
       <OButton
+        icon-only
         data-test="rum-copy-btn"
         variant="ghost"
-        size="icon-xs-sq"
+        size="sm"
         @click="copyToClipboardFn()"
       >
         <OIcon name="content-copy" size="sm" />
@@ -53,13 +54,13 @@ import { maskText, b64EncodeStandard } from "../utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 
 const PASSCODE_PLACEHOLDERS = ["[PASSCODE]", "[BASIC_PASSCODE]"];
 
 export default defineComponent({
   name: "CopyContent",
-  components: { OButton, OIcon, OTooltip, OBanner },
+  components: { OButton, OIcon, OTooltip, OInlineNotice },
   props: {
     content: {
       type: String as unknown as PropType<I18nText>,

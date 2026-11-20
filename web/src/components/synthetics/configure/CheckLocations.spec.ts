@@ -109,10 +109,9 @@ const OIconStub = {
 // bubble normally. `click` must NOT be a declared emit: declaring it strips the
 // parent's onClick from $attrs, so v-bind="$attrs" would never attach it.
 const OButtonStub = {
-  props: ["variant", "size", "icon", "iconLeft", "loading"],
+  props: ["variant", "size", "icon", "loading"],
   inheritAttrs: false,
-  template:
-    '<button v-bind="$attrs" :data-variant="variant" :data-icon="icon" :data-icon-left="iconLeft"><slot /></button>',
+  template: '<button v-bind="$attrs" :data-variant="variant" :data-icon="icon"><slot /></button>',
 };
 
 const OInputStub = {
@@ -122,8 +121,8 @@ const OInputStub = {
     '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
 };
 
-const SkeletonBoxStub = {
-  props: ["width", "height", "variant", "rounded"],
+const OSkeletonStub = {
+  props: ["shape"],
   template: '<div v-bind="$attrs" class="skeleton-stub" />',
 };
 
@@ -133,8 +132,8 @@ const OTooltipStub = {
 };
 
 const OBadgeStub = {
-  props: ["variant", "size", "shape", "icon", "dot"],
-  template: '<span v-bind="$attrs" :data-variant="variant"><slot /></span>',
+  props: ["tone", "size", "icon", "dot"],
+  template: '<span v-bind="$attrs" :data-variant="tone"><slot /></span>',
 };
 
 const OEmptyStateStub = {
@@ -151,7 +150,7 @@ const STUBS = {
   OIcon: OIconStub,
   OButton: OButtonStub,
   OInput: OInputStub,
-  SkeletonBox: SkeletonBoxStub,
+  OSkeleton: OSkeletonStub,
   OTooltip: OTooltipStub,
   OBadge: OBadgeStub,
   OEmptyState: OEmptyStateStub,
@@ -208,8 +207,8 @@ describe("CheckLocations", () => {
     it("should render the refresh button with refresh icon", () => {
       const btn = wrapper.find('[data-test="synthetics-check-locations-refresh-btn"]');
       expect(btn.exists()).toBe(true);
-      expect(btn.attributes("data-variant")).toBe("outline");
-      expect(btn.attributes("data-icon-left")).toBe("refresh");
+      expect(btn.attributes("data-variant")).toBe("secondary");
+      expect(btn.attributes("data-icon")).toBe("refresh");
     });
 
     it("should render the checkbox group", () => {
@@ -459,7 +458,7 @@ describe("CheckLocations", () => {
         '[data-test="synthetics-check-locations-add-agent-private-mumbai-1"]',
       );
       expect(onlineBtn.exists()).toBe(true);
-      expect(onlineBtn.attributes("data-variant")).toBe("outline");
+      expect(onlineBtn.attributes("data-variant")).toBe("secondary");
       expect(onlineBtn.text()).toContain("synthetics.locations.addAgent");
 
       // Pending → "Install agent"
@@ -467,7 +466,7 @@ describe("CheckLocations", () => {
         '[data-test="synthetics-check-locations-add-agent-private-pending-1"]',
       );
       expect(pendingBtn.exists()).toBe(true);
-      expect(pendingBtn.attributes("data-variant")).toBe("outline");
+      expect(pendingBtn.attributes("data-variant")).toBe("secondary");
       expect(pendingBtn.text()).toContain("synthetics.locations.installAgent");
     });
   });
@@ -498,7 +497,7 @@ describe("CheckLocations", () => {
         '[data-test="synthetics-check-locations-status-badge-private-mumbai-1"]',
       );
       expect(readyBadge.exists()).toBe(true);
-      expect(readyBadge.attributes("data-variant")).toBe("success-outline");
+      expect(readyBadge.attributes("data-variant")).toBe("outline");
       expect(readyBadge.text()).toContain("synthetics.locations.statusReady");
 
       // Connecting
@@ -506,7 +505,7 @@ describe("CheckLocations", () => {
         '[data-test="synthetics-check-locations-status-badge-private-pending-1"]',
       );
       expect(connectingBadge.exists()).toBe(true);
-      expect(connectingBadge.attributes("data-variant")).toBe("info-outline");
+      expect(connectingBadge.attributes("data-variant")).toBe("info");
       expect(connectingBadge.text()).toContain("synthetics.locations.statusConnecting");
 
       // Down
@@ -514,7 +513,7 @@ describe("CheckLocations", () => {
         '[data-test="synthetics-check-locations-status-badge-private-down-1"]',
       );
       expect(downBadge.exists()).toBe(true);
-      expect(downBadge.attributes("data-variant")).toBe("error-outline");
+      expect(downBadge.attributes("data-variant")).toBe("err");
       expect(downBadge.text()).toContain("synthetics.locations.statusDown");
 
       // Offline
@@ -522,7 +521,7 @@ describe("CheckLocations", () => {
         '[data-test="synthetics-check-locations-status-badge-private-offline-1"]',
       );
       expect(offlineBadge.exists()).toBe(true);
-      expect(offlineBadge.attributes("data-variant")).toBe("warning-outline");
+      expect(offlineBadge.attributes("data-variant")).toBe("outline");
       expect(offlineBadge.text()).toContain("synthetics.locations.statusOffline");
     });
 
@@ -591,7 +590,7 @@ describe("CheckLocations", () => {
       const badge = wrapper.find(
         '[data-test="synthetics-check-locations-status-badge-private-remote-1"]',
       );
-      expect(badge.attributes("data-variant")).toBe("default-outline");
+      expect(badge.attributes("data-variant")).toBe("outline");
       expect(badge.text()).toContain("synthetics.locations.statusUnknown");
     });
 
@@ -627,7 +626,7 @@ describe("CheckLocations", () => {
       const badge = wrapper.find(
         '[data-test="synthetics-check-locations-status-badge-private-pending-1"]',
       );
-      expect(badge.attributes("data-variant")).toBe("info-outline");
+      expect(badge.attributes("data-variant")).toBe("info");
       expect(wrapper.text()).not.toContain("synthetics.locations.statusUnknown");
     });
   });

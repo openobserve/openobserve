@@ -27,14 +27,13 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OText from "@/lib/core/Typography/OText.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import DateTime from "@/components/DateTime.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODateTimeRange from "@/lib/forms/DateTimeRange/ODateTimeRange.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import type { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
@@ -491,7 +490,7 @@ const jumpLabel = computed(() =>
       }),
 );
 
-const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
+const dateTimeRef = ref<InstanceType<typeof ODateTimeRange> | null>(null);
 
 const jumpToLatestData = () => {
   const target = jumpTarget.value;
@@ -704,10 +703,10 @@ watch(
 </script>
 
 <template>
-  <OPageLayout :title="t(manifest.titleKey)" :icon="manifest.icon" bleed>
+  <OPageLayout :title="t(manifest.titleKey)" bleed>
     <template #actions>
       <div class="flex items-center gap-2">
-        <DateTime
+        <ODateTimeRange
           v-if="showRangeControls"
           ref="dateTimeRef"
           auto-apply
@@ -719,8 +718,6 @@ watch(
         />
         <!-- Below lg an absolute range label leaves no room for the age, so the button drops to icon-only. -->
         <ORefreshButton
-          layout="inline"
-          variant="outline"
           :loading="refreshing"
           :last-run-at="compactHeaderOnTablet && !lgUp ? null : checkedAtMs"
           data-test="curated-refresh"
@@ -731,12 +728,11 @@ watch(
 
     <OEmptyState
       v-if="!hasPack"
-      size="hero"
-      illustration="board"
       class="min-h-0 flex-1"
       data-test="curated-pack-unavailable"
+      icon="dashboard"
       :title="t('infra.curated.packUnavailable')"
-      :description="t('infra.curated.packUnavailableHint')"
+      :text="t('infra.curated.packUnavailableHint')"
       :action-label="t('infra.curated.buildOwnDashboard')"
       @action="openDashboardsList"
     />
@@ -744,82 +740,70 @@ watch(
     <!-- `unknown` + loadError is the lists-failed state, never an endless spinner. -->
     <OEmptyState
       v-else-if="face === 'unknown' && loadError"
-      preset="load-error"
-      size="hero"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
       class="min-h-0 flex-1"
       data-test="curated-error"
-      :description="t('infra.curated.pageError')"
+      :text="t('infra.curated.pageError')"
       @action="runRefresh(true)"
     />
 
     <div
       v-else-if="face === 'unknown'"
-      class="flex min-h-60 flex-col items-center justify-center gap-2"
-      data-test="curated-spinner"
+      class="px-page-edge flex min-h-0 flex-1 flex-col gap-3"
+      data-test="curated-loading"
     >
-      <OSpinner size="lg" />
       <OText variant="meta" data-test="curated-checking">{{
         t("infra.curated.checking", { workload: t(manifest.titleKey) })
       }}</OText>
+      <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <OSkeleton v-for="panel in 4" :key="panel" shape="block" class="h-60" />
+      </div>
     </div>
 
-    <div v-else-if="face === 'undetected'" class="px-page-edge min-h-0 flex-1 overflow-y-auto">
-      <div
-        class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
+    <div v-else-if="face === 'undetected'" class="min-h-0 flex-1 overflow-y-auto">
+      <OEmptyState
+        icon="dashboard"
+        :title="t('infra.workload.setupHeadline')"
         data-test="curated-setup-state"
       >
-        <div class="flex flex-col gap-1 px-3">
-          <OText data-test="curated-setup-lead">{{ t("infra.workload.setupHeadline") }}</OText>
-          <OText v-if="showPartialTelemetry" variant="meta" data-test="curated-partial-telemetry">{{
-            t(partialTelemetryKey)
-          }}</OText>
-        </div>
-        <DataSourceSetupCard
-          v-if="setupDoor?.kind === 'card'"
-          :slug="setupDoor.slug"
-          @detected="runRefresh(true)"
-        />
-        <div v-else-if="setupDoor?.kind === 'route'">
-          <OButton
-            variant="primary"
-            size="sm-action"
-            icon-left="cloud"
-            data-test="curated-setup-route-cta"
-            @click="openSetupRoute"
-          >
+        <template v-if="showPartialTelemetry" #text>
+          <span data-test="curated-partial-telemetry">{{ t(partialTelemetryKey) }}</span>
+        </template>
+        <template v-if="setupDoor?.kind === 'route'" #actions>
+          <OButton variant="primary" data-test="curated-setup-route-cta" @click="openSetupRoute">
             {{ t("infra.workload.awsSetupCta") }}
           </OButton>
-        </div>
-      </div>
+        </template>
+        <template v-if="setupDoor?.kind === 'card'" #extra>
+          <div class="w-full max-w-3xl min-w-0 text-start">
+            <DataSourceSetupCard :slug="setupDoor.slug" @detected="runRefresh(true)" />
+          </div>
+        </template>
+      </OEmptyState>
     </div>
 
     <!-- Streams exist but stopped reporting, so this names the outage and offers no setup CTA. -->
     <div
       v-else-if="face === 'dormant'"
-      class="flex min-h-0 flex-1 flex-col justify-center-safe overflow-y-auto"
+      class="flex min-h-0 flex-1 flex-col overflow-y-auto"
       data-test="curated-dormant-state"
     >
       <!-- shrink-0: an overflow-hidden flex child shrinks to the pane and clips its own content. -->
       <OEmptyState
-        illustration="hourglass"
         class="shrink-0"
+        icon="hourglass-empty"
         :title="t('infra.curated.dormantHeadline', { workload: t(manifest.titleKey) })"
-        :description="t('infra.curated.dormantBody')"
+        :text="t('infra.curated.dormantBody')"
       >
-        <template #actions>
-          <EmptyStateActionCard
-            v-if="jumpTarget"
-            icon="schedule"
-            :label="t('traces.noEvents.jumpToData')"
-            :sublabel="jumpLabel"
-            data-test="curated-jump-to-data"
-            @click="jumpToLatestData"
-          />
+        <template v-if="jumpTarget" #actions>
+          <OButton data-test="curated-jump-to-data" @click="jumpToLatestData">
+            {{ t("traces.noEvents.jumpToData") }}
+            <OTooltip :content="jumpLabel" />
+          </OButton>
         </template>
         <template #extra>
-          <ul
-            class="border-border-default divide-border-default rounded-surface flex w-full max-w-3xl flex-col divide-y border text-start"
-          >
+          <ul class="divide-border-default flex w-full max-w-3xl flex-col divide-y text-start">
             <li
               v-for="hidden in dormantGroups"
               :key="hidden.group.id"
@@ -844,12 +828,6 @@ watch(
                       >{{ hidden.detail }}</OText
                     >
                   </span>
-                  <OIcon
-                    name="expand-more"
-                    size="sm"
-                    class="text-text-secondary shrink-0 transition-transform duration-200"
-                    :class="open ? 'rotate-180' : 'rotate-0'"
-                  />
                 </template>
                 <p class="px-2 pb-2 leading-5 break-words">
                   <OText variant="meta" data-test="curated-dormant-stream-detail-full">{{
@@ -883,50 +861,44 @@ watch(
         <template #before_panels>
           <div class="flex flex-col gap-2 pt-2">
             <!-- One banner per outage: a stack of near-identical warnings buries the panels it qualifies. -->
-            <OBanner
+            <OInlineNotice
               v-if="staleDurations.length > 0"
-              variant="warning"
-              dense
-              inline-actions
+              tone="warn"
               data-test="curated-stale-banner"
             >
               {{ staleBannerText }}
-              <!-- Always passed: OBanner reads its slots once, so a slot that appears later never renders. -->
+
               <template #actions>
                 <OButton
                   v-if="showStaleJump"
-                  variant="outline"
-                  size="sm"
-                  icon-left="schedule"
+                  variant="secondary"
+                  icon="schedule"
                   data-test="curated-stale-jump-to-data"
                   @click="jumpToLatestData"
                 >
                   {{ t("traces.noEvents.jumpToData") }}
                 </OButton>
               </template>
-            </OBanner>
+            </OInlineNotice>
 
-            <OBanner
+            <OInlineNotice
               v-for="warning in probeWarnings"
               :key="warning.key"
-              variant="info"
-              dense
+              tone="info"
               data-test="curated-warning-probe"
-              :content="t('infra.curated.warnBanner.probe', { label: warning.label })"
+              :message="t('infra.curated.warnBanner.probe', { label: warning.label })"
             />
-            <OBanner
+            <OInlineNotice
               v-if="defaultFieldNamesWarning"
-              variant="info"
-              dense
+              tone="info"
               data-test="curated-warning-defaultFieldNames"
-              :content="t('infra.curated.warnBanner.defaultFieldNames')"
+              :message="t('infra.curated.warnBanner.defaultFieldNames')"
             />
-            <OBanner
+            <OInlineNotice
               v-if="statsWarning"
-              variant="info"
-              dense
+              tone="info"
               data-test="curated-warning-stats"
-              :content="t('infra.curated.warnBanner.stats')"
+              :message="t('infra.curated.warnBanner.stats')"
             />
 
             <!-- data-test only with a strip: the note alone is not the hidden-panels strip. -->
@@ -938,10 +910,9 @@ watch(
               <div class="flex min-w-0 items-center gap-2">
                 <OButton
                   v-if="hasStrip"
-                  variant="outline"
-                  size="sm"
+                  variant="secondary"
                   class="max-w-full min-w-0"
-                  :icon-right="stripExpanded ? 'expand-less' : 'expand-more'"
+                  :icon-end="stripExpanded ? 'expand-less' : 'expand-more'"
                   :aria-expanded="stripExpanded"
                   aria-controls="curated-strip-list"
                   data-test="curated-strip-toggle"
@@ -952,6 +923,7 @@ watch(
                 <!-- The caveats are reference, not news: one line opens them instead of a paragraph above every panel. -->
                 <div v-if="sectionNoteKey" class="shrink-0">
                   <OPopover
+                    size="lg"
                     v-model:open="noteOpen"
                     side="bottom"
                     align="start"
@@ -961,17 +933,14 @@ watch(
                       <!-- Icon-only on phones so the hidden-panels strip keeps the row; sr-only keeps the button named. -->
                       <OButton
                         variant="ghost"
-                        size="xs"
-                        icon-left="info-outline"
+                        size="sm"
+                        icon="info-outline"
                         data-test="curated-section-note-trigger"
                       >
                         <span class="max-md:sr-only">{{ t("infra.curated.aboutNumbers") }}</span>
                       </OButton>
                     </template>
-                    <p
-                      class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
-                      data-test="curated-section-note"
-                    >
+                    <p class="p-3 leading-5" data-test="curated-section-note">
                       <OText variant="meta">{{ t(sectionNoteKey) }}</OText>
                     </p>
                   </OPopover>
@@ -1008,12 +977,6 @@ watch(
                               >{{ row.lines[0].text }}</OText
                             >
                           </span>
-                          <OIcon
-                            name="expand-more"
-                            size="sm"
-                            class="text-text-secondary shrink-0 transition-transform duration-200"
-                            :class="open ? 'rotate-180' : 'rotate-0'"
-                          />
                         </template>
                         <div class="flex flex-col gap-1 px-2 pb-2">
                           <p
@@ -1032,8 +995,7 @@ watch(
                       </OCollapsible>
                       <OButton
                         v-if="row.canSetUp"
-                        variant="outline"
-                        size="sm-action"
+                        variant="secondary"
                         class="mt-1.5 shrink-0"
                         data-test="curated-strip-setup"
                         @click="onStripSetup(row.group)"

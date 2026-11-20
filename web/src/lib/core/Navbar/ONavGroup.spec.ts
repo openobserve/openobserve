@@ -1008,30 +1008,62 @@ describe("ONavGroup", () => {
     expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).not.toContain("mt-3");
   });
 
-  // Regression: clicking the tile used to close() the flyout while the pointer
-  // was still inside the tile — mouseenter could never re-fire, so the submenu
-  // was unreachable until the user moved the mouse away and back.
-  it("keeps the flyout open when the tile is clicked (link mode)", async () => {
+  // The click lands on the group's page, so a flyout left open would cover it (N1).
+  it("closes the flyout when the tile is clicked (link mode)", async () => {
     wrapper = mountGroup();
     await hoverOpen();
     expect(flyout().exists()).toBe(true);
 
     click(wrapper.find('[data-test="tile"]').element, 1);
     await flushPromises();
+    expect(flyout().exists()).toBe(false);
+  });
+
+  it("does not open from a hover still running when the tile is clicked", async () => {
+    wrapper = mountGroup();
+    await wrapper.trigger("mouseenter");
+    vi.advanceTimersByTime(OPEN_DELAY / 2);
+    click(wrapper.find('[data-test="tile"]').element, 1);
+    vi.advanceTimersByTime(OPEN_DELAY * 2);
     await flushPromises();
+    expect(flyout().exists()).toBe(false);
+  });
+
+  it("opens on hover again only after the pointer has left the clicked tile", async () => {
+    wrapper = mountGroup();
+    click(wrapper.find('[data-test="tile"]').element, 1);
+    await hoverOpen();
+    expect(flyout().exists()).toBe(false);
+
+    await wrapper.trigger("mouseleave");
+    vi.advanceTimersByTime(CLOSE_DELAY);
+    await hoverOpen();
     expect(flyout().exists()).toBe(true);
   });
 
-  it("opens the flyout immediately when the tile is clicked during the hover delay", async () => {
+  it("still opens on the next hover after Enter on the tile", async () => {
     wrapper = mountGroup();
-    await wrapper.trigger("mouseenter");
-    // Click lands before the 120ms hover debounce elapses.
-    vi.advanceTimersByTime(OPEN_DELAY / 2);
+    click(wrapper.find('[data-test="tile"]').element, 0);
+    await hoverOpen();
+    expect(flyout().exists()).toBe(true);
+  });
+
+  it("closes when the page changes under an open flyout", async () => {
+    wrapper = mountGroup();
+    await hoverOpen();
+    expect(flyout().exists()).toBe(true);
+
+    await wrapper.vm.$router.push("/pipelines");
     await flushPromises();
     expect(flyout().exists()).toBe(false);
+  });
 
-    click(wrapper.find('[data-test="tile"]').element, 1);
-    await flushPromises();
+  it("stays open when only the page's query changes", async () => {
+    wrapper = mountGroup();
+    await wrapper.vm.$router.push("/streams");
+    await hoverOpen();
+
+    await wrapper.vm.$router.replace("/streams?v.q=app");
     await flushPromises();
     expect(flyout().exists()).toBe(true);
   });
@@ -1464,7 +1496,11 @@ describe("ONavGroup", () => {
       await tileEl.trigger("pointerdown");
       click(tileEl.element, 1);
       await flushPromises();
-      expect(flyoutEl().exists()).toBe(true);
+      // A mouse choice keeps hover from reopening the flyout; a keyboard choice would not.
+      await w.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      expect(flyoutEl().exists()).toBe(false);
     });
 
     it("still lets the UNLOCKED sibling child navigate normally", async () => {
@@ -2129,7 +2165,7 @@ describe("ONavGroup", () => {
       expect(document.activeElement).not.toBe(tile());
     });
 
-    it("Space on the link tile clicks nothing, so a later programmatic tile click keeps the flyout open", async () => {
+    it("Space on the link tile clicks nothing, so a later programmatic tile click is a mouse choice", async () => {
       wrapper = mountGroup(true);
       await hoverOpen();
       const tileEl = wrapper.find('[data-test="tile"]');
@@ -2138,7 +2174,9 @@ describe("ONavGroup", () => {
       vi.advanceTimersByTime(0);
       click(tileEl.element, 1);
       await flushPromises();
-      expect(flyout().exists()).toBe(true);
+      // A mouse choice keeps hover from reopening the flyout; a keyboard choice would not.
+      await hoverOpen();
+      expect(flyout().exists()).toBe(false);
     });
 
     it("an Enter whose keyup lands elsewhere without a click does not mark the next click as keyboard", async () => {

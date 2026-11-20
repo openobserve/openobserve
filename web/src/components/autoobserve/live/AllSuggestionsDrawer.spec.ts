@@ -350,10 +350,10 @@ describe("AllSuggestionsDrawer: a monitor that notifies no one (demo bug 4)", ()
     await flushPromises();
     const kind = wrapper.findComponent('[data-test="autoobserve2-suggestions-kind-silent"]');
     expect(kind.text()).toBe("Notifies no one");
-    expect(kind.props("variant")).toBe("amber-soft");
+    expect(kind.props("tone")).toBe("warn");
     expect(
-      wrapper.findComponent('[data-test="autoobserve2-suggestions-kind-gap"]').props("variant"),
-    ).toBe("amber-soft");
+      wrapper.findComponent('[data-test="autoobserve2-suggestions-kind-gap"]').props("tone"),
+    ).toBe("warn");
     expect(wrapper.get('[data-test="autoobserve2-suggestions-note-silent"]').text()).toBe(
       "svc-no-data would notice svc-y stopping, but it notifies no one. Give it a destination.",
     );
@@ -426,7 +426,7 @@ describe("AllSuggestionsDrawer: Next step and the row's Details (test 15)", () =
       `[data-test="autoobserve2-suggestions-kind-${NOT_WORKING_ID}"]`,
     );
     expect(kind.text()).toBe("Not working");
-    expect(kind.props("variant")).toBe("error-soft");
+    expect(kind.props("tone")).toBe("err");
     expect(
       wrapper.get(`[data-test="autoobserve2-suggestions-next-${NOT_WORKING_ID}"]`).text(),
     ).toBe("Review alert");

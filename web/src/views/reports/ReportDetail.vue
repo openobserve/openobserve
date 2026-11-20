@@ -17,17 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="notFound ? t('reports.history.notFoundTitle') : raw(report?.name || '')"
-    icon="description"
-    :subtitle="subtitle"
     :back="backTarget"
     title-data-test="reports-reportdetail-title"
     bleed
-    tabs-below
   >
-    <template #title-trail>
-      <div v-if="report" class="flex items-center gap-2">
+    <template #status>
+      <template v-if="report">
         <OTag
-          :variant="report.enabled ? 'success-soft' : 'default-soft'"
+          :tone="report.enabled ? 'ok' : 'neutral'"
           :label="report.enabled ? t('reports.history.enabled') : t('reports.history.paused')"
           data-test="reports-reportdetail-enabled"
         />
@@ -37,15 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           value="overdue"
           data-test="reports-reportdetail-overdue"
         />
-      </div>
+      </template>
     </template>
 
     <template #actions>
       <OButton
         v-if="report"
         variant="primary"
-        size="sm-action"
-        icon-left="send"
+        icon="send"
         :loading="running"
         data-test="reports-reportdetail-run-now"
         @click="runNowOpen = true"
@@ -54,9 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-if="report"
-        variant="outline"
-        size="sm-action"
-        icon-left="edit"
+        variant="secondary"
+        icon="edit"
         data-test="reports-reportdetail-edit"
         @click="editReport()"
       >
@@ -65,23 +60,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #header-tabs>
-      <OTabs
-        :model-value="activeTab"
-        align="left"
-        data-test="reports-reportdetail-tabs"
-        @change="onTabChange"
-      >
+      <OTabs :model-value="activeTab" data-test="reports-reportdetail-tabs" @change="onTabChange">
         <OTab name="history" :label="t('reports.history.tab')" icon="history" />
         <OTab name="configuration" :label="t('reports.history.configurationTab')" icon="settings" />
       </OTabs>
     </template>
 
-    <OContent v-if="notFound" class="py-6">
+    <OContent v-if="notFound">
       <OEmptyState
-        size="hero"
         :title="t('reports.history.notFoundTitle')"
-        :description="t('reports.history.notFoundDescription')"
-        hide-action
+        :text="t('reports.history.notFoundDescription')"
         data-test="reports-reportdetail-not-found"
       />
     </OContent>
@@ -110,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODescriptionItem :label="t('reports.history.configTimezone')">
             <template v-if="report.timezone">{{ report.timezone }}</template>
           </ODescriptionItem>
-          <ODescriptionItem :label="t('reports.history.colRecipients')" stacked>
+          <ODescriptionItem :label="t('reports.history.colRecipients')">
             <template v-if="recipients.length">{{ recipients.join(", ") }}</template>
             <template v-else>{{ t("reports.history.noRecipients") }}</template>
           </ODescriptionItem>
@@ -129,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
           </ODescriptionItem>
+          <ODescriptionItem :label="t('reports.history.nextRun')" :value="nextRunText" />
         </ODescriptionList>
       </OContent>
     </template>
@@ -225,26 +214,10 @@ const frequencyText = computed<I18nText>(() => {
   }
 });
 
-const subtitle = computed<I18nText>(() => {
+const nextRunText = computed<string>(() => {
   const r = report.value;
-  if (!r) return raw("");
-  const tz = r.timezone || "UTC";
-  const parts: string[] = [`${frequencyText.value} (${tz})`];
-  if (r.next_run_at && r.enabled) {
-    parts.push(
-      t("reports.history.nextRunAt", {
-        time: raw(formatTimestampInTimezone(r.next_run_at, RUN_TIME_FORMAT, tz)),
-      }),
-    );
-  }
-  const dashboards = r.dashboards?.length ?? 0;
-  parts.push(t("reports.history.dashboardCount", { count: dashboards }, dashboards));
-  if (!isCached.value) {
-    const count = recipients.value.length;
-    parts.push(t("reports.history.recipientCount", { count }, count));
-  }
-  if (attachmentType.value) parts.push(attachmentType.value.toUpperCase());
-  return raw(parts.join(" · "));
+  if (!r?.next_run_at || !r.enabled) return "";
+  return formatTimestampInTimezone(r.next_run_at, RUN_TIME_FORMAT, r.timezone || "UTC");
 });
 
 const backTarget = computed(() => ({

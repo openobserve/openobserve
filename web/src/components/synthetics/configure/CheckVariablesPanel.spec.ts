@@ -58,7 +58,7 @@ const OSwitchStub = {
 };
 
 const OButtonStub = {
-  props: ["iconLeft", "iconOnly", "variant", "size", "ariaLabel"],
+  props: ["icon", "iconOnly", "variant", "size", "ariaLabel"],
   emits: ["click"],
   template: `<button v-bind="$attrs" :aria-label="ariaLabel" @click="$emit('click')"><slot /></button>`,
 };
@@ -87,20 +87,13 @@ const OEmptyStateStub = {
 };
 
 const ODialogStub = {
-  props: [
-    "open",
-    "size",
-    "title",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "primaryButtonVariant",
-  ],
+  props: ["open", "size", "title", "primary", "secondary", "primary"],
   emits: ["update:open", "click:primary", "click:secondary"],
   template: `<div v-if="open" v-bind="$attrs" class="o-dialog-stub">
     <h2 class="dialog-title">{{ title }}</h2>
     <slot />
-    <button class="dialog-primary" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
-    <button class="dialog-secondary" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+    <button class="dialog-primary" @click="$emit('click:primary')">{{ primary?.label }}</button>
+    <button class="dialog-secondary" @click="$emit('click:secondary')">{{ secondary?.label }}</button>
   </div>`,
 };
 
@@ -214,8 +207,8 @@ describe("CheckVariablesPanel", () => {
         .find((b) => b.attributes("data-test") === "synthetics-check-variables-panel-close-btn");
       expect(close).toBeDefined();
       expect(close!.props("variant")).toBe("ghost");
-      expect(close!.props("size")).toBe("icon-xs-sq");
-      expect(close!.props("iconLeft")).toBe("close");
+      expect(close!.props("size")).toBe("sm");
+      expect(close!.props("icon")).toBe("close");
       expect(close!.attributes("aria-label")).toBe("Close variables");
       const headerRow = close!.element.parentElement!;
       expect(headerRow.querySelector("h3")).not.toBeNull();
@@ -492,7 +485,7 @@ describe("CheckVariablesPanel", () => {
       expect(dialog.find("p").text()).toBe(
         "The BASE_URL variable will be removed from this check. It is referenced by 2 steps, which will no longer resolve.",
       );
-      expect(wrapper.findComponent(ODialogStub).props("primaryButtonVariant")).toBe("destructive");
+      expect(wrapper.findComponent(ODialogStub).props("primary")?.variant).toBe("danger");
     });
 
     it("should not warn for a variable referenced only by a superstring token", async () => {

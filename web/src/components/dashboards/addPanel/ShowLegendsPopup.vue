@@ -28,12 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("dashboard.totalLegends", { count: legends.length }) }}
         </span>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           @click.stop="copyAllLegends"
           data-test="dashboard-show-legends-copy-all"
         >
-          <template #icon-left
+          <template #icon
             ><OIcon :name="isAllCopied ? 'check' : 'content-copy'" size="sm"
           /></template>
           {{ isAllCopied ? t("common.copied") : t("common.copyAll") }}
@@ -44,12 +43,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Legends List -->
     <div data-test="dashboard-show-legends-popup">
       <div class="scroll max-h-100 overflow-y-auto py-0.75">
-        <div
+        <OEmptyState
           v-if="legends.length === 0"
-          class="flex min-h-25 items-center justify-center p-3 text-center"
-        >
-          {{ t("dashboard.noLegendsAvailable") }}
-        </div>
+          size="compact"
+          class="px-3"
+          :title="t('dashboard.noLegendsAvailable')"
+        />
         <div v-else class="flex flex-col">
           <div
             v-for="(legend, index) in legends"
@@ -69,14 +68,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ legend.name }}
               </div>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon"
+                size="xs"
                 class="ms-1 shrink-0 opacity-0 transition-opacity duration-200 ease-in-out group-hover:opacity-100 max-md:opacity-100"
                 data-test="dashboard-legend-copy-btn"
                 :data-copied="isLegendCopied(Number(index)) ? 'true' : undefined"
                 @click.stop="copyLegend(legend.name, Number(index))"
               >
-                <template #icon-left
+                <template #icon
                   ><OIcon
                     :name="isLegendCopied(Number(index)) ? 'check' : 'content-copy'"
                     size="sm"
@@ -104,6 +104,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { useTheme } from "@/composables/useTheme";
 import { getSeriesColor, getColorPalette } from "@/utils/dashboard/colorPalette";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -114,7 +115,7 @@ const DEFAULT_LEGEND_COLOR = "var(--color-brand-indigo)";
 
 export default defineComponent({
   name: "ShowLegendsPopup",
-  components: { OButton, ODialog, OIcon, OTooltip },
+  components: { OButton, ODialog, OEmptyState, OIcon, OTooltip },
   props: {
     open: {
       type: Boolean,

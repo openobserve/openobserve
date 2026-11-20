@@ -23,25 +23,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="autoobserve2-nav-search"
     >
       <label :for="SEARCH_ID" class="sr-only">{{ t("autoobserve2.nav.searchLabel") }}</label>
-      <OInput
+      <OSearchInput
         :id="SEARCH_ID"
         v-model="search"
-        size="sm"
         class="w-44"
         :placeholder="t('autoobserve2.nav.searchPlaceholder')"
         data-test="autoobserve2-nav-search-input"
         @keydown.enter="submit"
         @blur="collapse"
       >
-        <template #icon-left>
-          <OIcon name="search" size="sm" class="text-text-secondary" />
-        </template>
-      </OInput>
+      </OSearchInput>
     </div>
     <OButton
       v-if="!searchOpen"
-      variant="ghost-muted"
-      size="icon-sm"
+      icon-only
+      variant="ghost"
       class="sm:hidden"
       :aria-label="t('autoobserve2.nav.searchLabel')"
       data-test="autoobserve2-nav-search-open"
@@ -50,17 +46,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="search" size="sm" />
     </OButton>
     <OButton
-      variant="ghost-muted"
-      size="sm"
-      icon-left="history"
+      variant="ghost"
+      icon="history"
       data-test="autoobserve2-nav-history"
       @click="emit('open', 'history')"
     >
       {{ t("autoobserve2.nav.history") }}
     </OButton>
     <OButton
-      variant="ghost-muted"
-      size="icon-sm"
+      icon-only
+      variant="ghost"
       :aria-label="t('autoobserve2.nav.settings')"
       data-test="autoobserve2-nav-settings"
       @click="emit('open', 'settings')"
@@ -69,8 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTooltip :content="t('autoobserve2.nav.settings')" />
     </OButton>
     <OButton
-      variant="ghost-muted"
-      size="icon-sm"
+      icon-only
+      variant="ghost"
       :aria-label="t('autoobserve2.nav.howItWorks')"
       data-test="autoobserve2-nav-how-it-works"
       @click="emit('open', 'howItWorks')"
@@ -86,7 +81,7 @@ import { nextTick, ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ViewSwitch from "./ViewSwitch.vue";
 

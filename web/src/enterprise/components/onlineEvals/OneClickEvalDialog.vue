@@ -22,21 +22,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="
       agentLabel ? t('oneClickEval.title', { agent: agentLabel }) : t('oneClickEval.titleAll')
     "
-    :sub-title="t('oneClickEval.subtitle')"
-    :primary-button-label="t('oneClickEval.start')"
-    :primary-button-disabled="!canStart"
-    :primary-button-loading="creating"
-    primary-button-data-test="one-click-eval-start"
-    :neutral-button-label="t('oneClickEval.fullForm')"
+    :subtitle="t('oneClickEval.subtitle')"
+    :primary="{
+      label: t('oneClickEval.start'),
+      disabled: !canStart,
+      loading: creating,
+      dataTest: 'one-click-eval-start',
+    }"
+    :extra="{ label: t('oneClickEval.fullForm') }"
     data-test="one-click-eval-dialog"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:primary="start"
-    @click:neutral="openFullForm"
+    @click:extra="openFullForm"
   >
     <div class="flex flex-col gap-3">
       <section class="flex flex-col gap-1.5">
         <span class="text-compact text-text-heading font-medium">{{ t("oneClickEval.what") }}</span>
-        <OSkeleton v-if="loading" type="text" class="h-16 w-full" />
+        <OSkeleton v-if="loading" class="h-16 w-full" />
         <span v-else-if="!judges.length" class="text-2xs text-text-error">
           {{ t("oneClickEval.catalogFailed") }}
         </span>
@@ -59,13 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ provider.name }} · {{ provider.defaultModel ?? provider.default_model ?? "" }}
           </span>
           <OBadge
-            :variant="
-              providerStatus === 'ok'
-                ? 'success-soft'
-                : providerStatus === 'failed'
-                  ? 'error-soft'
-                  : 'default-soft'
-            "
+            :tone="providerStatus === 'ok' ? 'ok' : providerStatus === 'failed' ? 'err' : 'neutral'"
             size="sm"
           >
             {{ t(`oneClickEval.provider.${providerStatus}`) }}
@@ -73,12 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div v-else-if="!loading" class="flex items-center gap-2">
           <span class="text-2xs text-text-secondary">{{ t("oneClickEval.noProvider") }}</span>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="one-click-eval-add-provider"
-            @click="addProvider"
-          >
+          <OButton variant="secondary" data-test="one-click-eval-add-provider" @click="addProvider">
             {{ t("oneClickEval.addProvider") }}
           </OButton>
         </div>
@@ -123,15 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </span>
       <!-- An unpriced judge call costs nothing the budget can see, so the budget never pauses the job. -->
-      <OBanner
-        v-if="judgeUnpriced"
-        variant="warning"
-        icon="warning"
-        dense
-        inline-actions
-        text-size="small"
-        data-test="one-click-eval-unpriced"
-      >
+      <OInlineNotice v-if="judgeUnpriced" tone="warn" data-test="one-click-eval-unpriced">
         {{
           t("evalSpend.oneClick.unpriced", {
             model: judgeModel,
@@ -140,15 +123,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
         <template #actions>
           <OButton
-            variant="outline"
-            size="xs"
+            variant="secondary"
+            size="sm"
             data-test="one-click-eval-set-price"
             @click="setPrice"
           >
             {{ t("evalSpend.cost.setPrice") }}
           </OButton>
         </template>
-      </OBanner>
+      </OInlineNotice>
 
       <section class="flex flex-col gap-0.5">
         <span class="text-compact text-text-heading font-medium">{{
@@ -176,7 +159,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import modelPricing from "@/services/model_pricing";
 import { exactModelPattern } from "@/components/settings/unpricedModelPricing";
 import { toast } from "@/lib/feedback/Toast/useToast";

@@ -27,10 +27,10 @@ const tab = ref<string | number>("allowlists");
 <template>
   <ODrawer
     :open="open"
-    size="lg"
+    size="md"
     bleed
     :title="t('siem.tuning.title')"
-    :sub-title="t('siem.tuning.subtitle')"
+    :subtitle="t('siem.tuning.subtitle')"
     data-test="security-tuning-drawer"
     @update:open="emit('update:open', $event)"
   >

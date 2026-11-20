@@ -103,17 +103,17 @@ describe("WorkflowHttpRotatePopover", () => {
 
   it("a blocked rotate is disabled with the tooltip", async () => {
     const w = mountPopover({ disabled: true });
-    // focusable-unavailable keeps the reason reachable by keyboard, so the state is aria-disabled.
+    // disabledReason keeps the reason reachable by keyboard, so the state is aria-disabled.
     expect(byTest(w, "workflow-http-rotate").attributes("aria-disabled")).toBe("true");
-    expect(byTest(w, "workflow-http-rotate-blocked-tooltip").attributes("data-content")).toBe(
-      t("workflow.http.rotateBlocked"),
-    );
+    expect(
+      byTest(w, "workflow-http-rotate").find("[data-content]").attributes("data-content"),
+    ).toBe(t("workflow.http.rotateBlocked"));
     await byTest(w, "workflow-http-rotate").trigger("click");
     expect(byTest(w, "workflow-http-rotate-popover").exists()).toBe(false);
     const signed = mountPopover({ disabled: true, mode: "signature" });
-    expect(byTest(signed, "workflow-http-rotate-blocked-tooltip").attributes("data-content")).toBe(
-      t("workflow.http.rotateBlockedSigned"),
-    );
+    expect(
+      byTest(signed, "workflow-http-rotate").find("[data-content]").attributes("data-content"),
+    ).toBe(t("workflow.http.rotateBlockedSigned"));
   });
 
   it("a never-used token says so in the lead", async () => {

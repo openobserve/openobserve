@@ -43,7 +43,7 @@ These are produced by three files — learn which one owns each surface:
 | Flat top-level list (the rail items)   | `web/src/layouts/MainLayout.vue` → `linksList` ref            |
 | Reshaping flat list → groups + flyouts | `web/src/lib/core/Navbar/navGroups.ts` → `NAV_GROUPS`         |
 | Settings sub-nav                       | `web/src/components/settings/index.vue` → `settingsItems`     |
-| IAM sub-nav                            | `web/src/views/IdentityAccessManagement.vue` → sections array |
+| IAM sub-nav                            | `web/src/composables/iam/useIamSections.ts` → `sectionGroups` |
 | Routes (by domain)                     | the router composables in [§1](#1-register-the-route)         |
 
 > The rail renderer is `web/src/lib/core/Navbar/ONavbar.vue` (+ `ONavGroup.vue` in
@@ -64,7 +64,7 @@ what the page _is_:
 | A top-level product area (its own concern, reached often) | a **plain rail item**                           | `MainLayout.vue` `linksList` + a route         |
 | One of several related data destinations                  | a **flyout child** under an existing rail group | `navGroups.ts` `NAV_GROUPS` + a route          |
 | An admin / configuration screen                           | a **sub-page under Settings**                   | `settings/index.vue` `settingsItems` + a route |
-| An access-control screen                                  | a **sub-page under IAM**                        | `IdentityAccessManagement.vue` + a route       |
+| An access-control screen                                  | a **sub-page under IAM**                        | `useIamSections.ts` + a route                  |
 
 A new page **always** needs step 1 (a route). It then needs **exactly one** of
 2a / 2b / 2c to be reachable from navigation. Don't register it in two surfaces.
@@ -76,7 +76,7 @@ A new page **always** needs step 1 (a route). It then needs **exactly one** of
 Routes are split by domain across composables, merged in
 `web/src/router/index.ts` (which also picks OSS vs cloud/enterprise route sets
 and installs the global `beforeEach` that sets `document.title` from
-`meta.title`). Add your route to the composable that owns its domain:
+`meta.titleKey`). Add your route to the composable that owns its domain:
 
 | Domain                                                                       | Composable file                                                            | Owns                         |
 | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------- |
@@ -93,14 +93,15 @@ and installs the global `beforeEach` that sets `document.title` from
   path: "logs",
   name: "logs",                          // unique; referenced by nav + hasRoute gating
   component: () => import("@/plugins/logs/Index.vue"),  // lazy — always
-  meta: { keepAlive: true, title: "Logs" },            // title → browser tab
+  meta: { keepAlive: true, titleKey: "menu.search" },  // browser tab = the nav label's key
   beforeEnter(to, from, next) { routeGuard(to, from, next); },  // authed pages
 }
 ```
 
 - **Always lazy-load** the component (`() => import(...)`), never a static import.
-- Set `meta.title` (browser tab) and `meta.keepAlive` (whether `<keep-alive>`
-  caches the view between visits).
+- Set `meta.titleKey` (browser tab, resolved per navigation) to the **same key** the
+  nav entry and the page header's `:title` use (H7), and `meta.keepAlive` (whether
+  `<keep-alive>` caches the view between visits).
 - Add `beforeEnter: routeGuard` for pages behind auth. For environment-only
   redirects, a `beforeEnter` can check `store.state.zoConfig.build_type` etc.
 - Nested sub-pages (e.g. a `/pipelines/add` under `/pipelines`) go in the
@@ -174,7 +175,8 @@ into `sectionGroups`). Item shape:
 `SectionRail` filters on `item.visible !== false`, so a gated section is hidden by
 setting `visible` to the same predicate the route uses.
 
-**IAM** (`web/src/views/IdentityAccessManagement.vue`) uses the identical
+**IAM** (`web/src/composables/iam/useIamSections.ts`, read by both the IAM shell and the
+Jump to palette, so the two cannot drift) uses the identical
 `SectionRail` pattern (users, service accounts, tokens, groups, roles, quota, …).
 
 **To add a Settings sub-page:**
@@ -321,11 +323,19 @@ strings in `navGroups.ts` (flyout children may also use feature namespaces like
 - [ ] Reachable from exactly **one** nav surface.
 - [ ] Gate expressed identically across route + nav entry (+ SectionRail
       `visible` / flyout `gate`).
-- [ ] <a id="icon-parity"></a>**Icon parity** — the `icon` on the page's
-      `OPageLayout`/`OPageHeader` is the SAME `IconName` string as the nav
-      entry's (`navGroups.ts`, `linksList`, `settingsItems`, or the section
-      rail). The rail is how a user learns what the module's mark means; a
-      different glyph in the header reads as a different place. SLOs drifted
-      this way — `navGroups.ts` said `target` while every SLO view said
-      `track-changes`. Grep the nav entry for the route `name` and copy its
-      `icon` verbatim; if a page needs a different mark, change BOTH.
+- [ ] <a id="name-parity"></a>**Name parity** (guideline H7) — the page has one
+      name in the rail entry (`navGroups.ts`, `linksList`, `settingsItems`, or the
+      section rail), the header's context line, the header title and the browser
+      tab. "BYOB" in the rail and "Bring Your Own Bucket" in the header read as
+      two places. Point all three at one i18n key, in sentence case (T5). The
+      header carries **no icon** (H2): the rail already shows the area's mark, so
+      the icon lives on the nav entry only.
+- [ ] **The header's context line comes from this model** (H4). `OPageHeader`
+      derives it from the route: `railGroupForRoute()` in `navGroups.ts` matches the
+      route against each `NAV_GROUPS` group's children (exact name, `tab`,
+      `activeOnRoutes`, then the deepest path prefix, the same match that lights
+      the rail) and keeps only the groups MainLayout's links actually emit
+      (`providePageNavContext`). A grouped page shows the group's label; an
+      ungrouped one leaves the line empty (never the org). So a new page needs no header wiring: register
+      it in the right group and the line follows. A drill-down page passes
+      `:back="{ label, to }"` instead, where `label` is the parent's own title key.

@@ -58,7 +58,6 @@
       <OButton
         v-else
         variant="primary"
-        size="sm"
         :loading="loading"
         data-test="alerts-anomalypointpopover-open"
         @click="emit('open-bucket')"

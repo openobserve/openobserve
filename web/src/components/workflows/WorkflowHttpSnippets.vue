@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col gap-2">
-    <OTabs v-model="lang" dense>
+    <OTabs v-model="lang" size="compact">
       <OTab
         v-for="tab in TABS"
         :key="tab.lang"
@@ -30,9 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :code="code"
       :code-masked="masked"
       :lang="LANG_IDS[lang]"
-      padded
-      :reveal-tooltip="t('ingestion.setupCard.revealToken')"
-      :hide-tooltip="t('ingestion.setupCard.hideToken')"
       wrap
       data-test="workflow-http-snippet"
       data-o2-privacy="mask"
@@ -42,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw } from "@/types/i18n";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
@@ -61,8 +58,6 @@ const props = defineProps<{
   displayPrefix: string;
   sampleBody: string;
 }>();
-
-const { t } = useI18nTyped();
 
 const TABS: { lang: SnippetLang; label: ReturnType<typeof raw> }[] = [
   { lang: "curl", label: raw("curl") },

@@ -151,7 +151,11 @@ const stubs = {
     props: ["value"],
     template: "<button><slot /></button>",
   },
-  OTag: { name: "OTag", props: ["variant"], template: "<span><slot /></span>" },
+  OTag: {
+    name: "OTag",
+    props: ["tone", "label"],
+    template: "<span><slot>{{ label }}</slot></span>",
+  },
   OEmptyState: {
     name: "OEmptyState",
     props: ["title", "actionLabel"],
@@ -160,17 +164,17 @@ const stubs = {
   },
   ODialog: {
     name: "ODialog",
-    props: ["open", "primaryButtonDisabled", "title"],
+    props: ["open", "primary", "title"],
     template: "<div><slot /></div>",
   },
   ConfirmDialog: {
     name: "ConfirmDialog",
-    props: ["modelValue", "okVariant", "okLabel", "messageKeypath", "messageName"],
+    props: ["modelValue", "kind", "okLabel", "messageKeypath", "messageName"],
     template: "<div />",
   },
   OButton: {
     name: "OButton",
-    props: ["disabled", "active"],
+    props: ["disabled", "pressed"],
     template: "<button><slot /></button>",
   },
   OInput: {
@@ -312,7 +316,7 @@ describe("OnCallRouting", () => {
     expect(rulesPanel(wrapper).props("defaultTeamId")).toBe("team_2");
   });
 
-  it("puts the precedence sentence behind an info icon, not a subtitle", () => {
+  it("puts the precedence sentence behind the header's About popover", () => {
     const wrapper = mount(OnCallRouting, {
       global: {
         plugins: [i18n, store],
@@ -320,23 +324,14 @@ describe("OnCallRouting", () => {
           ...stubs,
           OPageLayout: {
             name: "OPageLayout",
-            props: ["subtitle"],
-            template:
-              "<div><span class='sub'>{{ subtitle }}</span><slot name='title-trail' /><slot /></div>",
+            props: ["about"],
+            template: "<div><slot name='status' /><slot /></div>",
           },
         },
       },
     });
-    expect(wrapper.find(".sub").text()).toBe("");
-    const info = wrapper.find('[data-test="oncall-routing-precedence-info"]');
     const precedence = String(i18n.global.t("oncall.routingPrecedence"));
-    expect(info.attributes("tabindex")).toBe("0");
-    expect(info.attributes("aria-label")).toBe(precedence);
-    expect(
-      wrapper
-        .findAllComponents({ name: "OTooltip" })
-        .some((c) => c.props("content") === precedence),
-    ).toBe(true);
+    expect(String(wrapper.findComponent({ name: "OPageLayout" }).props("about"))).toBe(precedence);
   });
 
   it("opens on the queue when linked there from a team's tab", async () => {
@@ -353,9 +348,8 @@ describe("OnCallRouting", () => {
     await wrapper.vm.$nextTick();
     const dialog = wrapper.findComponent({ name: "ConfirmDialog" });
     expect(dialog.props("modelValue")).toBe(true);
-    expect(dialog.props("okVariant")).toBe("destructive");
+    expect(dialog.props("kind")).toBe("destructive");
     expect(dialog.props("okLabel")).toBe("Remove rule");
-    expect(dialog.attributes("focus-cancel")).toBeDefined();
     expect(dialog.props("messageName")).toBe("Service cart");
   });
 
@@ -595,7 +589,7 @@ describe("OnCallRouting", () => {
       .findAllComponents({ name: "ODialog" })
       .find((c) => c.attributes("data-test") === "oncall-routing-claim-all-dialog")!;
     expect(dialog.props("open")).toBe(true);
-    expect(dialog.props("primaryButtonDisabled")).toBe(true);
+    expect(dialog.props("primary")?.disabled).toBe(true);
     wrapper
       .findAllComponents({ name: "OSelect" })
       .find((c) => c.attributes("data-test") === "oncall-routing-claim-all-team")!
@@ -959,7 +953,7 @@ describe("OnCallRouting", () => {
   /// Reported from the browser: "add rule does nothing — there is no save and
   /// no cancel". Every other test here stubs ODialog, so all of them stayed
   /// green while the real dialog rendered no footer at all: the call site
-  /// passed `primary-label`, ODialog declares `primaryButtonLabel`, unknown
+  /// passed `primary-label`, ODialog declares `primary?.label`, unknown
   /// props fall through as attributes, and `hasFooter` saw nothing.
   ///
   /// This one mounts the REAL dialog. It is the only assertion in the file

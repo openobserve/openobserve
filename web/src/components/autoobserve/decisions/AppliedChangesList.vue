@@ -47,15 +47,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OTag
         v-if="entry.view.state === 'undone'"
-        variant="default"
+        tone="neutral"
         size="sm"
         :label="t('insight.decisions.applied.undone')"
         data-test="autoobserve-applied-undone"
       />
       <OButton
         v-else
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         :loading="route.isUndoing(entry.view.decision_id)"
         data-test="autoobserve-applied-undo"
         @click="undo(entry)"

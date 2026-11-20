@@ -3,10 +3,10 @@
   <ODrawer
     :open="open"
     side="right"
-    size="lg"
+    size="md"
     :title="t('aiObservability.promptManagement.promptSettings')"
-    :primary-button-label="ready ? t('aiObservability.promptManagement.saveSettings') : undefined"
-    :secondary-button-label="t('aiObservability.promptManagement.cancel')"
+    :primary="{ label: ready ? t('aiObservability.promptManagement.saveSettings') : undefined }"
+    :secondary="{ label: t('aiObservability.promptManagement.cancel') }"
     form-id="prompt-settings-form"
     data-test="prompt-settings-drawer"
     @update:open="requestClose"
@@ -16,13 +16,13 @@
       <span class="text-text-secondary text-sm">{{
         t("aiObservability.promptManagement.settingsLoading")
       }}</span>
-      <OSkeleton class="h-12" /><OSkeleton class="h-24" />
+      <OSkeleton shape="block" class="h-12" /><OSkeleton shape="block" class="h-24" />
     </div>
     <OEmptyState
       v-else-if="loadError"
-      preset="load-error"
-      size="block"
-      :description="loadError"
+      kind="error"
+      :title="t('emptyState.loadError.title')"
+      :text="loadError"
       @action="load"
     />
     <OForm v-else-if="ready" id="prompt-settings-form" :form="form" class="flex flex-col gap-5">

@@ -13,17 +13,14 @@
          how this drifted to four different values. `searchClass` remains as an
          escape hatch for a panel that genuinely needs to differ. -->
     <div v-if="showSearch" class="px-page-edge shrink-0 py-1.5" :class="searchClass">
-      <OInput
+      <OSearchInput
         :model-value="searchModel"
         data-test="o-field-list-search"
+        :shortcut="searchShortcut"
         :placeholder="searchPlaceholder ?? t('common.searchFields')"
-        clearable
         @update:model-value="onSearchChange"
       >
-        <template #icon-left>
-          <OIcon name="search" size="sm" class="o-field-list__search-icon" />
-        </template>
-      </OInput>
+      </OSearchInput>
     </div>
 
     <!-- Scrollable field list body -->
@@ -62,7 +59,7 @@
           <!-- Field row -->
           <div
             v-else
-            class="o-field-list__row group px-page-edge rounded-default relative mt-1 flex min-h-6 w-full cursor-pointer items-center text-xs leading-[0.8rem]"
+            class="o-field-list__row group px-page-edge rounded-default relative mt-1 flex min-h-6 w-full cursor-pointer items-center text-xs leading-4"
             :class="{
               'o-field-list__row--draggable': draggable,
               'focus-visible:ring-focus-ring-accent outline-none focus-visible:ring-2 focus-visible:ring-inset':
@@ -137,7 +134,7 @@
 <script setup lang="ts">
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { computed, ref, watch } from "vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFieldRow from "./OFieldRow.vue";
 import OFieldLabel from "./OFieldLabel.vue";
@@ -149,6 +146,8 @@ const props = withDefaults(
     fields: FieldItem[];
     search?: string;
     searchPlaceholder?: I18nText;
+    /** Off where the page sends "/" to its own query, so the search shows no key hint it would not answer. */
+    searchShortcut?: boolean;
     /** Extra classes for the search block — see the template note on gutters. */
     searchClass?: string;
     loading?: boolean;
@@ -167,6 +166,7 @@ const props = withDefaults(
   }>(),
   {
     search: "",
+    searchShortcut: undefined,
     // No default here — a withDefaults default is evaluated at module scope, which
     // would freeze the locale. The template falls back to t() at render time.
     searchClass: "",

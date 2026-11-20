@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <button
         ref="titleEl"
         type="button"
-        class="text-text-heading focus-visible:ring-focus-ring-accent rounded-default self-start text-start text-base leading-snug font-semibold text-pretty focus-visible:ring-2 focus-visible:outline-none"
+        class="text-text-heading focus-visible:ring-focus-ring-accent rounded-default self-start text-start text-sm leading-5 font-semibold text-pretty focus-visible:ring-2 focus-visible:outline-none"
         data-test="autoobserve2-paged-sentence"
         @click.stop="open"
       >
@@ -69,14 +69,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <div class="flex h-5 min-w-0 items-center gap-1.5">
         <OBadge
-          :variant="RCA_BADGE_VARIANT[row.analysis.tone]"
+          :tone="RCA_BADGE_VARIANT[row.analysis.tone]"
           size="sm"
           class="shrink-0"
           :data-tone="row.analysis.tone"
           data-test="autoobserve2-paged-analysis"
         >
           <template v-if="row.analysis.spinner" #icon>
-            <OSpinner size="xs" />
+            <OSpinner />
           </template>
           {{ row.analysis.label }}
         </OBadge>

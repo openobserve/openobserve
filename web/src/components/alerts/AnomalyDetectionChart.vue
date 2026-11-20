@@ -43,7 +43,7 @@
     />
 
     <div class="flex items-center justify-between gap-2">
-      <span class="text-compact text-text-heading font-bold">
+      <span class="text-compact text-text-heading font-semibold">
         {{ t("alerts.anomaly.detectionCharts") }}
       </span>
       <OToggleGroup
@@ -55,7 +55,6 @@
           v-for="option in rangeOptions"
           :key="option.value"
           :value="option.value"
-          size="sm"
           :data-test="`alerts-anomalydetectionchart-range-${option.value}`"
         >
           {{ option.label }}
@@ -83,31 +82,30 @@
         </span>
       </PanelBar>
       <div class="relative h-100 w-full">
-        <div
+        <OSkeleton
           v-if="!kindColumnsReady || metricLoading"
-          class="flex h-full items-center justify-center"
+          preset="chart"
+          class="h-full p-4"
           data-test="alerts-anomalydetectionchart-metric-loading"
-        >
-          <OSpinner size="md" />
-        </div>
-        <div
-          v-else-if="!metricQuery || metricError"
-          class="flex h-full items-center justify-center px-4 text-center"
+        />
+        <OEmptyState
+          v-else-if="metricError"
+          kind="error"
+          data-test="alerts-anomalydetectionchart-metric-error"
+          @action="loadMetric"
+        />
+        <OEmptyState
+          v-else-if="!metricQuery"
+          icon="bar-chart"
+          :title="t('alerts.groups.chartUnavailable')"
           data-test="alerts-anomalydetectionchart-metric-empty"
-        >
-          <span class="text-text-secondary text-sm">
-            {{ metricError || t("alerts.groups.chartUnavailable") }}
-          </span>
-        </div>
-        <div
+        />
+        <OEmptyState
           v-else-if="!metricRows.length"
-          class="flex h-full items-center justify-center px-4 text-center"
+          icon="bar-chart"
+          :title="t('alerts.anomaly.noDetectionResults')"
           data-test="alerts-anomalydetectionchart-metric-nodata"
-        >
-          <span class="text-text-secondary text-sm">
-            {{ t("alerts.anomaly.noDetectionResults") }}
-          </span>
-        </div>
+        />
         <!-- ChartRenderer, not PanelSchemaRenderer: the point popover needs the chart click,
              which the schema renderer does not forward. -->
         <ChartRenderer
@@ -136,7 +134,7 @@
     </div>
 
     <OCollapsible
-      :label="t('alerts.anomaly.detectorInternals')"
+      :title="t('alerts.anomaly.detectorInternals')"
       data-test="alerts-anomalydetectionchart-internals"
     >
       <div class="flex flex-col gap-3 pt-2">
@@ -151,13 +149,12 @@
             <span class="text-text-secondary text-2xs font-normal">{{ panel.hint }}</span>
           </PanelBar>
           <div class="h-62.5 w-full">
-            <div
+            <OSkeleton
               v-if="!kindColumnsReady"
-              class="flex h-full items-center justify-center"
+              preset="chart"
+              class="h-full p-4"
               :data-test="`alerts-anomalydetectionchart-${panel.key}-loading`"
-            >
-              <OSpinner size="md" />
-            </div>
+            />
             <PanelSchemaRenderer
               v-else-if="panel.schema"
               :height="5"
@@ -169,15 +166,12 @@
               searchType="ui"
               :data-test="`alerts-anomalydetectionchart-${panel.key}-panel`"
             />
-            <div
+            <OEmptyState
               v-else
-              class="flex h-full items-center justify-center px-4 text-center"
+              icon="bar-chart"
+              :title="t('alerts.groups.chartUnavailable')"
               :data-test="`alerts-anomalydetectionchart-${panel.key}-empty`"
-            >
-              <span class="text-text-secondary text-sm">
-                {{ t("alerts.groups.chartUnavailable") }}
-              </span>
-            </div>
+            />
           </div>
         </div>
       </div>
@@ -193,7 +187,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import PanelBar from "@/components/common/PanelBar.vue";

@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</strong>
         <span class="text-text-secondary text-xs">{{ percent }}</span>
       </div>
-      <OProgressBar :value="session.fraction.value" size="sm" />
+      <OProgressBar :value="session.fraction.value * 100" />
       <span class="text-text-secondary text-xs" data-test="sample-data-progress-dock-counts">{{
         t("sampleData.progress.counts", {
           logs: raw(session.counts.logs.toLocaleString()),
@@ -39,8 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }}</span>
       <div class="flex justify-end">
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="sample-data-progress-dock-details"
           @click="session.openWelcome()"
         >
@@ -56,8 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           t("sampleData.toast.loadFailed")
         }}</strong>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
           :aria-label="t('common.close')"
           data-test="sample-data-progress-dock-close"
           @click="dismissed = true"
@@ -74,12 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}</span
       >
       <div v-if="!session.forbidden.value" class="flex justify-end">
-        <OButton
-          variant="primary"
-          size="sm"
-          data-test="sample-data-progress-dock-retry"
-          @click="retry"
-        >
+        <OButton variant="primary" data-test="sample-data-progress-dock-retry" @click="retry">
           {{ t("common.retry") }}
         </OButton>
       </div>
@@ -92,8 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           t("sampleData.welcome.ready.title")
         }}</strong>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-sm"
           :aria-label="t('common.close')"
           data-test="sample-data-progress-dock-close"
           @click="dismissed = true"
@@ -102,12 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div class="flex justify-end">
-        <OButton
-          variant="primary"
-          size="sm"
-          data-test="sample-data-progress-dock-tour"
-          @click="startTour"
-        >
+        <OButton variant="primary" data-test="sample-data-progress-dock-tour" @click="startTour">
           {{ t("sampleData.welcome.ready.startTour") }}
         </OButton>
       </div>

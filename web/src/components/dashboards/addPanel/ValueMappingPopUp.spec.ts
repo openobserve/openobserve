@@ -26,33 +26,33 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       :data-test="$attrs['data-test'] || 'o-dialog-stub'"
       :data-open="String(open)"
       :data-title="title"
       :data-width="width"
-      :data-neutral-label="neutralButtonLabel"
-      :data-neutral-variant="neutralButtonVariant"
-      :data-primary-label="primaryButtonLabel"
+      :data-neutral-label="extra?.label"
+      :data-neutral-variant="extra?.variant"
+      :data-primary-label="primary?.label"
     >
       <span data-test="o-dialog-stub-title">{{ title }}</span>
       <slot name="header" />
@@ -63,11 +63,11 @@ const ODialogStub = {
       <button
         data-test="o-dialog-stub-primary"
         @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
+      >{{ primary?.label }}</button>
       <button
         data-test="o-dialog-stub-neutral"
-        @click="$emit('click:neutral')"
-      >{{ neutralButtonLabel }}</button>
+        @click="$emit('click:extra')"
+      >{{ extra?.label }}</button>
       <button
         data-test="o-dialog-stub-close"
         @click="$emit('update:open', false)"
@@ -129,7 +129,7 @@ describe("ValueMappingPopUp", () => {
     it("should forward title to ODialog", () => {
       wrapper = createWrapper();
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("title")).toBe("Value Mappings");
+      expect(dialog.props("title")).toBe("Value mappings");
     });
 
     it("should forward open=true to ODialog when open prop is true", () => {
@@ -153,19 +153,19 @@ describe("ValueMappingPopUp", () => {
     it("should pass the Add-new mapping label as the neutral button label", () => {
       wrapper = createWrapper();
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("neutralButtonLabel")).toBe("+ Add a new mapping");
+      expect(dialog.props("extra")?.label).toBe("+ Add a new mapping");
     });
 
     it("should pass outline as the neutral button variant", () => {
       wrapper = createWrapper();
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("neutralButtonVariant")).toBe("outline");
+      expect(dialog.props("extra")?.variant).toBe("secondary");
     });
 
     it("should pass the Apply label as the primary button label", () => {
       wrapper = createWrapper();
       const dialog = wrapper.findComponent(ODialogStub);
-      expect(dialog.props("primaryButtonLabel")).toBe("Apply");
+      expect(dialog.props("primary")?.label).toBe("Apply");
     });
 
     it("should render the draggable container", () => {
@@ -616,7 +616,7 @@ describe("ValueMappingPopUp", () => {
       wrapper = createWrapper({ valueMapping: [] });
       const initialLength = wrapper.vm.editedValueMapping.length;
       const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:neutral");
+      await dialog.vm.$emit("click:extra");
       expect(wrapper.vm.editedValueMapping.length).toBe(initialLength + 1);
     });
 
@@ -638,7 +638,7 @@ describe("ValueMappingPopUp", () => {
     it("should NOT emit save when the neutral button is clicked", async () => {
       wrapper = createWrapper();
       const dialog = wrapper.findComponent(ODialogStub);
-      await dialog.vm.$emit("click:neutral");
+      await dialog.vm.$emit("click:extra");
       expect(wrapper.emitted("save")).toBeFalsy();
     });
 

@@ -38,7 +38,7 @@
 <template>
   <div class="flex flex-col gap-2" data-test="alerts-alertgroupchart">
     <div class="flex items-center justify-between gap-2">
-      <span class="text-compact text-text-heading font-bold">
+      <span class="text-text-heading text-sm font-semibold">
         {{ t("alerts.groups.evaluation") }}
       </span>
       <OToggleGroup
@@ -46,48 +46,73 @@
         data-test="alerts-alertgroupchart-range"
         @update:model-value="onRangeChange"
       >
-        <OToggleGroupItem
-          v-for="option in rangeOptions"
-          :key="option.value"
-          :value="option.value"
-          size="sm"
-        >
+        <OToggleGroupItem v-for="option in rangeOptions" :key="option.value" :value="option.value">
           {{ option.label }}
         </OToggleGroupItem>
       </OToggleGroup>
     </div>
 
-    <div :class="compact ? 'h-52' : 'h-62.5'" class="relative w-full">
-      <!-- The renderer's own line only starts once a schema exists, so this one covers the alert GET and generate_sql. -->
-      <LoadingProgress :loading="pending" :loading-progress-percentage="0" />
-      <PanelSchemaRenderer
-        v-if="chartData"
-        :height="5"
-        :width="5"
-        :panelSchema="chartData"
-        :selectedTimeObj="selectedTimeObj"
-        :variablesData="{}"
-        searchType="ui"
-        data-test="alerts-alertgroupchart-panel"
+    <div
+      :class="collapsed ? 'h-8' : compact ? 'h-52' : 'h-62.5'"
+      class="relative w-full overflow-hidden"
+    >
+      <!-- The renderer's own line only starts once a schema exists, so this one covers generate_sql on a rebuild. -->
+      <OLoadingLine
+        :active="pending && (!!chartData || collapsed)"
+        class="absolute inset-x-0 top-0 z-10"
       />
-      <PanelChartPlaceholder v-else-if="pending" data-test="alerts-alertgroupchart-placeholder" />
+      <!-- Stays mounted while collapsed, so a range change re-queries it without growing the page first. -->
       <div
-        v-else-if="chartError"
-        class="flex h-full flex-col items-center justify-center gap-2"
+        v-if="chartData"
+        :class="[compact ? 'h-52' : 'h-62.5', collapsed ? 'invisible' : '']"
+        class="absolute inset-x-0 top-0"
+      >
+        <PanelSchemaRenderer
+          ref="rendererRef"
+          :height="5"
+          :width="5"
+          :panelSchema="chartData"
+          :selectedTimeObj="selectedTimeObj"
+          :variablesData="{}"
+          searchType="ui"
+          force-load
+          data-test="alerts-alertgroupchart-panel"
+          @loading-state-change="onRendererLoading"
+        />
+      </div>
+      <OEmptyState
+        v-if="collapsed && chartError"
+        kind="error"
+        size="compact"
+        :text="isRawHttpText(chartError) ? undefined : raw(chartError)"
         data-test="alerts-alertgroupchart-error"
-      >
-        <OIcon size="md" name="warning" />
-        <span class="text-text-secondary text-sm">{{ chartError }}</span>
-      </div>
-      <div
-        v-else
-        class="flex h-full items-center justify-center"
+        @action="build"
+      />
+      <OEmptyState
+        v-else-if="collapsed"
+        size="compact"
+        icon="bar-chart"
+        :title="chartData ? t('panel.noDataInRange') : t('alerts.groups.chartUnavailable')"
         data-test="alerts-alertgroupchart-empty"
-      >
-        <span class="text-text-secondary text-sm">
-          {{ t("alerts.groups.chartUnavailable") }}
-        </span>
-      </div>
+      />
+      <template v-else-if="!chartData">
+        <PanelChartPlaceholder v-if="pending" data-test="alerts-alertgroupchart-placeholder" />
+        <OEmptyState
+          v-else-if="chartError"
+          kind="error"
+          :size="compact ? 'compact' : 'region'"
+          :text="isRawHttpText(chartError) ? undefined : raw(chartError)"
+          data-test="alerts-alertgroupchart-error"
+          @action="buildChart"
+        />
+        <OEmptyState
+          v-else
+          :size="compact ? 'compact' : 'region'"
+          icon="bar-chart"
+          :title="t('alerts.groups.chartUnavailable')"
+          data-test="alerts-alertgroupchart-empty"
+        />
+      </template>
     </div>
   </div>
 </template>
@@ -96,11 +121,12 @@
 import { toZonedTime } from "date-fns-tz";
 import { cloneDeep } from "lodash-es";
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
-import LoadingProgress from "@/components/common/LoadingProgress.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
@@ -123,6 +149,13 @@ const props = defineProps<{
   firingSinceUs?: number;
   /** Shorter plot for a side panel. */
   compact?: boolean;
+  /** Shrinks to one line when the range holds no points, so what follows moves up. */
+  collapseEmpty?: boolean;
+}>();
+
+const emit = defineEmits<{
+  /** After each build has loaded; `collapsed` says whether the chart shrank to its one-line state. */
+  settled: [collapsed: boolean];
 }>();
 
 const { t } = useI18nTyped();
@@ -131,11 +164,37 @@ const store = useStore();
 const chartData = ref<any>(null);
 const chartError = ref<string | null>(null);
 const selectedTimeObj = ref<any>(null);
-const range = ref<string>("1h");
+const range = defineModel<string>("range", { default: "1h" });
 // A count, not a flag: an earlier build settling must not end a newer build's line.
 const buildsInFlight = ref(0);
 // The page mounts this before the alert GET lands, so a missing alert is still loading.
 const pending = computed(() => !props.alert || buildsInFlight.value > 0);
+
+// Loads the renderer finished for the current chart; until one has, "no points" is not an answer yet.
+const rendererRuns = ref(0);
+const buildsDone = ref(0);
+const rendererRef = ref<{ noData?: string } | null>(null);
+const onRendererLoading = (busy: boolean) => {
+  if (!busy) rendererRuns.value++;
+};
+const settled = computed(
+  () =>
+    buildsDone.value > 0 &&
+    buildsInFlight.value === 0 &&
+    (!chartData.value || rendererRuns.value > 0),
+);
+// Changes only when a load settles, so a range change keeps the current height while it runs.
+const collapsed = ref(false);
+watch(
+  settled,
+  (done) => {
+    if (!done) return;
+    const empty = !!chartError.value || !chartData.value || !!rendererRef.value?.noData;
+    collapsed.value = !!props.collapseEmpty && empty;
+    emit("settled", collapsed.value);
+  },
+  { immediate: true },
+);
 
 const rangeOptions = computed(() => [
   { value: "1h", label: t("alerts.groups.range1h") },
@@ -155,15 +214,18 @@ const aggregation = computed(() => queryCondition.value?.aggregation);
 const onRangeChange = (value: unknown) => {
   if (!value) return;
   range.value = String(value);
-  build();
 };
+
+watch(range, () => build());
 
 const build = async () => {
   buildsInFlight.value++;
+  rendererRuns.value = 0;
   try {
     await buildChart();
   } finally {
     buildsInFlight.value--;
+    buildsDone.value++;
   }
 };
 

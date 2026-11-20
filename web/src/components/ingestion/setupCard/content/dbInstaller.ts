@@ -96,7 +96,7 @@ const stepInputs = (opts: DbQuickInstallOptions): RichCardInput[] => [
     labelKey: "ingestion.setupCard.portLabel",
     default: opts.defaultPort,
     placeholder: raw(opts.defaultPort),
-    width: "sm",
+    width: "s",
   },
   ...(opts.defaultUser !== undefined
     ? [

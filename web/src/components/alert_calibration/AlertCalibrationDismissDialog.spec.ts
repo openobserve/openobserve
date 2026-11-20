@@ -153,7 +153,7 @@ describe("AlertCalibrationDismissDialog", () => {
     expect(notice()?.textContent).toMatch(
       /^\s*Hidden for everyone in default Organization until \w{3} \d{1,2}, \d{4}, then shown again if it still fails\. Recorded with your name and reason\. Undo from Dismissed\.\s*$/,
     );
-    expect(notice()?.getAttribute("data-severity")).toBe("default");
+    expect(notice()?.getAttribute("data-severity")).toBe("neutral");
     expect(byTest("alert-calibration-dismiss-ends")?.textContent).toContain("Hidden until");
     await chooseReason("other");
     await submit();
@@ -185,7 +185,7 @@ describe("AlertCalibrationDismissDialog", () => {
       },
     ]);
     expect(wrapper?.props("open")).toBe(true);
-    expect(notice()?.getAttribute("data-severity")).toBe("error");
+    expect(notice()?.getAttribute("data-severity")).toBe("err");
     expect(notice()?.textContent).toContain(t("alertCalibration.dismiss.error.failed"));
     expect(notice()?.textContent).not.toContain("Alert not found.");
     expect(noteValue()).toBe("Owned by ingest");
@@ -235,7 +235,7 @@ describe("AlertCalibrationDismissDialog", () => {
     await fillField("alert-calibration-dismiss-note", "kept");
     await submit();
 
-    expect(notice()?.getAttribute("data-severity")).toBe("warning");
+    expect(notice()?.getAttribute("data-severity")).toBe("warn");
     expect(notice()?.textContent).toContain(t("alertCalibration.dismiss.error.changed"));
     expect(refresh).toHaveBeenCalledTimes(1);
     expect(alertCalibration.listDismissals).toHaveBeenCalledTimes(1);
@@ -249,7 +249,7 @@ describe("AlertCalibrationDismissDialog", () => {
     await mountDialog();
     await chooseReason("false_positive");
     await submit();
-    expect(notice()?.getAttribute("data-severity")).toBe("error");
+    expect(notice()?.getAttribute("data-severity")).toBe("err");
     expect(notice()?.textContent).toContain(t("alertCalibration.dismiss.error.gone"));
     expect(refresh).toHaveBeenCalledTimes(1);
   });

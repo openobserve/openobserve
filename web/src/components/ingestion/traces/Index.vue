@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <DataSourceSidebarLayout v-model="ingestiontabs" :splitter-width="200">
     <template #tabs>
-      <ORouteTab
+      <OTab
         name="openTelemetry"
         :to="{
           name: 'tracesOTLP',
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
         :label="t('ingestion.openTelemetryTabLabel')"
       />
-      <ORouteTab
+      <OTab
         name="ingestTracesFromOtel"
         :to="{
           name: 'ingestTracesFromOtel',
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
         :label="t('ingestion.otelCollectorTabLabel')"
       />
-      <ORouteTab
+      <OTab
         name="datadogAgentTraces"
         data-test="ingestion-traces-tab-datadogagent"
         :to="{
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onMounted, onUpdated } from "vue";
@@ -84,7 +84,7 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 export default defineComponent({
   name: "IngestTraces",
   components: {
-    ORouteTab,
+    OTab,
     DataSourceSidebarLayout,
   },
   data() {

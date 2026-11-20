@@ -23,8 +23,12 @@ import type { DeliveryRecord, OnCallPosition } from "@/ts/interfaces/oncall";
 import { formatTimestampInTimezone } from "@/utils/date";
 
 const stubs = {
-  OCard: { name: "OCard", template: "<div><slot /></div>" },
-  OCardSection: { name: "OCardSection", template: "<div><slot /></div>" },
+  OCard: {
+    name: "OCard",
+    props: ["title"],
+    template:
+      '<div><h3>{{ title }}</h3><slot name="header" /><slot name="actions" /><slot /></div>',
+  },
   OTag: { name: "OTag", template: "<span><slot /></span>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
   OTimeCell: { name: "OTimeCell", props: ["value"], template: `<span>{{ value }}</span>` },

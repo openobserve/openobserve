@@ -43,7 +43,6 @@ const wrapperAttrs = computed(() => {
 
 const props = withDefaults(defineProps<DateProps>(), {
   size: "md",
-  labelPosition: "outside",
   disabled: false,
   readonly: false,
   clearable: false,
@@ -58,7 +57,6 @@ const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
 
 // Inside-label mode: the label floats inside the field border, like OInput's
-const isInsideLabel = computed(() => props.labelPosition === "inside" && !!props.label);
 
 const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
@@ -129,29 +127,25 @@ function onFocusOut(e: FocusEvent) {
 }
 
 const heightClasses: Record<NonNullable<DateProps["size"]>, string> = {
-  sm: "h-6 text-sm",
-  md: "h-8.5 text-sm",
+  sm: "h-control-sm text-compact",
+  md: "h-control-md text-compact",
 };
 
 const wrapperClasses = computed(() => [
-  "flex items-center w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
-  "ring-offset-1 ring-offset-surface-base",
+  "flex items-center w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control)",
   "bg-datepicker-bg",
   hasError.value
-    ? "border-datepicker-error-border"
-    : "border-datepicker-border hover:border-datepicker-hover-border",
-  "focus-within:border-datepicker-focus-border",
-  "focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
+    ? "border-datepicker-error-border focus-within:ring-3 focus-within:ring-control-error-halo"
+    : "border-datepicker-border hover:not-focus-within:border-datepicker-hover-border focus-within:border-datepicker-focus-border focus-within:ring-3 focus-within:ring-control-focus-halo",
   isDisabled.value ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
   heightClasses[props.size ?? "md"],
-  isInsideLabel.value ? "relative" : "",
 ]);
 </script>
 
 <template>
   <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
     <label
-      v-if="($slots.label || label || $slots.tooltip) && !isInsideLabel"
+      v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
       :class="[
         'o-input-label text-compact flex items-center gap-1 leading-tight',
@@ -190,15 +184,12 @@ const wrapperClasses = computed(() => [
         @focusin="onFocusIn"
         @focusout="onFocusOut"
       >
-        <!-- Inside label: floating mini-label at the top of the border, above the date text -->
-        <label
-          v-if="isInsideLabel"
-          :for="inputId"
-          class="text-2xs text-text-secondary pointer-events-none absolute start-9 end-3 top-1 overflow-hidden leading-none font-medium text-ellipsis whitespace-nowrap select-none"
-          >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></label
+        <span
+          v-if="prefix"
+          class="text-input-addon-text shrink-0 ps-3 whitespace-nowrap select-none"
+          :data-test="parentDataTest ? `${parentDataTest}-prefix` : undefined"
+          >{{ prefix }}</span
         >
-
-        <!-- Calendar trigger (calendar icon) -->
         <DatePickerTrigger
           class="text-datepicker-icon flex shrink-0 cursor-pointer items-center ps-3 outline-none disabled:cursor-not-allowed"
           :aria-label="t('components.date.openCalendar')"
@@ -214,7 +205,7 @@ const wrapperClasses = computed(() => [
             'flex min-w-0 flex-1 items-center gap-px ps-2 outline-none',
             clearable ? 'pe-2' : 'pe-3',
             // Inside-label: push the date down to leave room for the floating mini-label
-            isInsideLabel ? 'h-8.5 pt-3 pb-0.5 text-xs font-semibold' : heightClasses[size ?? 'md'],
+            'h-full',
           ]"
         >
           <template #default="{ segments }">
@@ -260,12 +251,12 @@ const wrapperClasses = computed(() => [
       <DatePickerContent
         :side-offset="4"
         align="start"
-        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-10001 border p-3 shadow-md"
+        class="rounded-default bg-datepicker-popup-bg shadow-overlay border-border-default z-10001 border p-3"
       >
         <DatePickerCalendar v-slot="{ weekDays, grid }">
           <DatePickerHeader class="mb-3 flex items-center justify-between">
             <DatePickerPrev
-              class="rounded-default ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-datepicker-focus-ring flex size-7 items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2"
+              class="rounded-default ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-datepicker-focus-ring flex size-7 items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-2"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -282,10 +273,10 @@ const wrapperClasses = computed(() => [
               </svg>
             </DatePickerPrev>
 
-            <DatePickerHeading class="text-datepicker-heading-text text-sm font-medium" />
+            <DatePickerHeading class="text-datepicker-heading-text text-compact font-medium" />
 
             <DatePickerNext
-              class="rounded-default ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-datepicker-focus-ring flex size-7 items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2"
+              class="rounded-default ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-datepicker-focus-ring flex size-7 items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-2"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -326,7 +317,7 @@ const wrapperClasses = computed(() => [
                   <DatePickerCellTrigger
                     :day="date"
                     :month="month.value"
-                    class="rounded-default ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text flex size-8 cursor-pointer items-center justify-center text-xs ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 data-today:border data-unavailable:cursor-not-allowed data-unavailable:hover:bg-transparent"
+                    class="rounded-default ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text flex size-8 cursor-pointer items-center justify-center text-xs ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none focus-visible:ring-2 data-today:border data-unavailable:cursor-not-allowed data-unavailable:hover:bg-transparent"
                   >
                     {{ date.day }}
                   </DatePickerCellTrigger>
@@ -344,7 +335,7 @@ const wrapperClasses = computed(() => [
           <button
             type="button"
             :disabled="isDisabled"
-            class="rounded-default bg-datepicker-day-selected-bg text-datepicker-day-selected-text ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-xs font-medium ring-offset-1 transition-[box-shadow] duration-150 outline-none hover:opacity-90 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+            class="rounded-default bg-datepicker-day-selected-bg text-datepicker-day-selected-text ring-offset-surface-base focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-xs font-medium ring-offset-1 transition-[box-shadow] duration-(--duration-control) ease-(--ease-control) outline-none hover:opacity-90 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
             @click="handleApply"
           >
             {{ t("common.apply") }}

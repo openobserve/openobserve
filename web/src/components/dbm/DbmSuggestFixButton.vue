@@ -30,13 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OTooltip v-if="aiLock.locked.value" :content="aiLock.lockedReason.value">
     <span class="inline-flex shrink-0">
-      <OButton
-        variant="ghost"
-        :size="size"
-        disabled
-        icon-left="lock"
-        :data-test="`${dataTest}-locked`"
-      >
+      <OButton variant="ghost" :size="size" disabled icon="lock" :data-test="`${dataTest}-locked`">
         {{ label }}
       </OButton>
     </span>
@@ -45,14 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-else-if="aiEnabled"
     variant="ghost"
     :size="size"
-    class="group text-ai-accent! hover:shadow-glow-md hover:shadow-ai-accent/35 dark:shadow-glow-md dark:shadow-ai-accent/20 dark:hover:shadow-glow-md dark:hover:shadow-ai-accent/35 shrink-0 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:[background:var(--color-gradient-ai)]! dark:text-white!"
+    class="group text-ai-accent! hover:shadow-glow-md hover:shadow-ai-accent/35 dark:shadow-glow-md dark:shadow-ai-accent/20 dark:hover:shadow-glow-md dark:hover:shadow-ai-accent/35 shrink-0 [background:var(--color-gradient-ai-subtle)]! [transition:background_var(--duration-control)_var(--ease-control),box-shadow_var(--duration-control)_var(--ease-control),color_var(--duration-control)_var(--ease-control)] hover:text-white! hover:[background:var(--color-gradient-ai)]! dark:text-white!"
     :data-test="dataTest"
     @click.stop="emit('click')"
   >
-    <template #icon-left>
+    <template #icon>
       <img
         :src="aiIconSrc"
-        class="h-4 w-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
+        class="h-4 w-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_var(--duration-control)_var(--ease-control)]"
         alt=""
       />
     </template>
@@ -81,7 +75,7 @@ withDefaults(
     size?: ButtonSize;
     dataTest?: string;
   }>(),
-  { tooltip: null, size: "sm", dataTest: "dbm-suggest-fix" },
+  { tooltip: null, size: "md", dataTest: "dbm-suggest-fix" },
 );
 
 const emit = defineEmits<{ (e: "click"): void }>();

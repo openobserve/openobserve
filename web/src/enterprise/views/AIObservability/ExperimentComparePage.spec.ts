@@ -66,7 +66,7 @@ function mountPage(realPanel = false) {
     global: {
       stubs: {
         OPageLayout: {
-          template: `<main><slot name="title-trail" /><slot name="actions" /><slot name="subnav" /><slot /></main>`,
+          template: `<main><slot name="actions" /><slot name="subnav" /><slot /></main>`,
         },
         OSeparator: true,
         OIcon: true,

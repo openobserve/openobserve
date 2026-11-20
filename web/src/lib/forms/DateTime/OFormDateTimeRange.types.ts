@@ -10,11 +10,11 @@ export interface DateTimeRangeValue {
   to?: number;
 }
 
-/** OFormDateTimeRange props — all other DateTime attrs pass through via $attrs. */
+/** OFormDateTimeRange props — all other ODateTimeRange attrs pass through via $attrs. */
 export interface FormDateTimeRangeProps {
   /** Field name — must match a key in the parent OForm's defaultValues */
   name: string;
-  /** Optional header label rendered above the picker (DateTime has none of its own). */
+  /** Optional header label rendered above the picker (ODateTimeRange has none of its own). */
   label?: I18nText;
   /** Render the required `*` after the label (never hardcode the asterisk). */
   required?: boolean;

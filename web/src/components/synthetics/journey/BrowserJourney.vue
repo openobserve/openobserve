@@ -43,6 +43,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1207,10 +1208,10 @@ function missingVariablesFor(row: BrowserStep): string[] {
   return child ? undefinedPlaceholders(child, props.definedNames ?? []) : [];
 }
 
-function stepBadgeForRow(row: BrowserStep): { label: string; variant: "default" | "error" } | null {
+function stepBadgeForRow(row: BrowserStep): { label: string; variant: "neutral" | "err" } | null {
   if (row.action !== "subtest") return null;
   if (isChildRefused(row)) {
-    return { label: t("synthetics.journey.subtest.noAccessBadge"), variant: "error" };
+    return { label: t("synthetics.journey.subtest.noAccessBadge"), variant: "err" };
   }
   const child = childFor(row);
   if (!child) return null;
@@ -1220,7 +1221,7 @@ function stepBadgeForRow(row: BrowserStep): { label: string; variant: "default" 
       { count: child.steps.length },
       child.steps.length,
     ),
-    variant: "default",
+    variant: "neutral",
   };
 }
 
@@ -1534,7 +1535,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <!-- Select-all — visibility:hidden during replay to preserve layout -->
         <OCheckbox
           :model-value="allSelected || undefined"
-          size="sm"
           :class="{ invisible: isRecording || readonly }"
           data-test="synthetics-journey-select-all"
           @update:model-value="toggleSelectAll()"
@@ -1560,18 +1560,17 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <OInput
           v-model="filterQuery"
           :placeholder="t('synthetics.journey.filterSteps')"
-          size="xs"
+          size="sm"
           class="w-52 max-md:w-auto max-md:min-w-0 max-md:flex-1"
           data-test="synthetics-journey-filter-input"
         >
-          <template #icon-right>
+          <template #icon-end>
             <OShortcut id="syntheticsJourneyFocusSearch" />
           </template>
         </OInput>
         <OButton
-          variant="outline"
-          size="xs"
-          icon-left="add"
+          variant="secondary"
+          size="sm"
           :disabled="addDisabled"
           class="max-md:hidden"
           data-test="synthetics-journey-add-step-btn"
@@ -1599,8 +1598,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <!-- Run replay / Re-run — positionally stable, same slot as Stop -->
         <OButton
           v-if="replayPhase === 'idle' || isReplayTerminal"
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           :disabled="replayDisabled"
           class="max-md:hidden"
           data-test="synthetics-journey-replay-btn"
@@ -1614,57 +1613,57 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         </OButton>
         <OButton
           v-else-if="replayPhase === 'running'"
-          variant="destructive"
-          size="xs"
+          variant="danger"
+          size="sm"
           data-test="synthetics-journey-stop-replay-btn"
           @click="emit('stop-replay')"
-          icon-left="stop"
+          icon="stop"
         >
           {{ t("synthetics.journey.stop") }}
         </OButton>
         <!-- Stop sent but unconfirmed: disabled so a second click cannot queue another stopReplay. -->
         <OButton
           v-else-if="isReplayStopping"
-          variant="destructive"
-          size="xs"
+          variant="danger"
+          size="sm"
           loading
           disabled
           data-test="synthetics-journey-stopping-replay-btn"
-          icon-left="stop"
+          icon="stop"
         >
           {{ t("synthetics.journey.stopping") }}
         </OButton>
 
         <OButton
           v-if="isRecording"
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           data-test="synthetics-journey-cancel-btn"
           @click="cancelRecording"
-          icon-left="close"
+          icon="close"
         >
           {{ t("synthetics.journey.cancel") }}
         </OButton>
 
         <OButton
           v-if="isRecording"
-          variant="destructive"
-          size="xs"
+          variant="danger"
+          size="sm"
           data-test="synthetics-journey-stop-btn"
           @click="stopRecording"
-          icon-left="stop"
+          icon="stop"
         >
           {{ t("synthetics.journey.stop") }}
         </OButton>
         <OButton
           v-else
           variant="primary"
-          size="xs"
+          size="sm"
           :disabled="readonly || isRecording || isReplayLocked || isRestoring"
           class="max-md:hidden"
           data-test="synthetics-journey-record-btn"
           @click="onRecordButtonClick"
-          icon-left="smart-display"
+          icon="smart-display"
         >
           {{ t("synthetics.journey.record") }}
         </OButton>
@@ -1674,8 +1673,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           <template #trigger>
             <OButton
               variant="ghost"
-              size="xs"
-              icon-left="more-vert"
+              size="sm"
+              icon="more-vert"
               class="md:hidden"
               :aria-label="t('synthetics.journey.moreActions')"
               data-test="synthetics-journey-toolbar-menu"
@@ -1686,7 +1685,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           <ODropdownItem
             v-for="item in addMenuItems"
             :key="item.key"
-            :icon-left="item.icon"
+            :icon="item.icon"
             :disabled="item.disabled"
             :data-test="item.dataTest"
             @select="item.onSelect"
@@ -1696,11 +1695,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
               <span class="text-text-secondary text-xs">{{ item.hint }}</span>
             </span>
           </ODropdownItem>
-          <ODropdownItem
-            icon-left="replay"
-            disabled
-            data-test="synthetics-journey-toolbar-menu-replay"
-          >
+          <ODropdownItem icon="replay" disabled data-test="synthetics-journey-toolbar-menu-replay">
             <span class="flex flex-col">
               <span>{{ t("synthetics.journey.replay") }}</span>
               <span class="text-text-secondary text-xs">{{
@@ -1709,7 +1704,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
             </span>
           </ODropdownItem>
           <ODropdownItem
-            icon-left="smart-display"
+            icon="smart-display"
             disabled
             data-test="synthetics-journey-toolbar-menu-record"
           >
@@ -1750,7 +1745,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
            as a failing step. The exit has to be here, where the author is. -->
       <OButton
         variant="ghost"
-        size="xs"
+        size="sm"
         data-test="synthetics-journey-restore-cancel-btn"
         @click="onCancelRestore"
       >
@@ -1792,7 +1787,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <OButton
           v-if="canRecordFromFailure"
           variant="primary"
-          size="sm"
           data-test="synthetics-journey-prefix-failed-record-btn"
           @click="onRecordFromFailure"
         >
@@ -1800,7 +1794,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         </OButton>
         <OButton
           variant="ghost"
-          size="sm"
           data-test="synthetics-journey-prefix-failed-cancel-btn"
           @click="onDismissRestoreFailure"
         >
@@ -1837,7 +1830,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       <div class="flex items-center gap-2">
         <OButton
           variant="primary"
-          size="sm"
           data-test="synthetics-journey-incognito-retry-btn"
           @click="onIncognitoRetry"
         >
@@ -1845,7 +1837,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         </OButton>
         <OButton
           variant="ghost"
-          size="sm"
           data-test="synthetics-journey-incognito-dismiss-btn"
           @click="onIncognitoDismiss"
         >
@@ -1855,8 +1846,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <!-- The setup dialog's incognito task IS the walkthrough — reopen it
              if the author dismissed the auto-opened one. -->
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="synthetics-journey-incognito-setup-btn"
           @click="
             extensionSetup = {
@@ -1912,7 +1902,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       <div class="flex items-center gap-2">
         <OButton
           variant="primary"
-          size="sm"
           data-test="synthetics-journey-preflight-retry-btn"
           @click="requestReplay()"
         >
@@ -1920,7 +1909,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         </OButton>
         <OButton
           variant="ghost"
-          size="sm"
           data-test="synthetics-journey-preflight-dismiss-btn"
           @click="emit('clear-results')"
         >
@@ -1993,7 +1981,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       <OButton
         :aria-label="t('synthetics.journey.clearResults')"
         variant="ghost"
-        size="xs"
+        size="sm"
         data-test="synthetics-journey-clear-results-btn"
         @click="emit('clear-results')"
       >
@@ -2022,16 +2010,16 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           }}</span>
           <div class="flex items-center gap-2 pt-1">
             <OButton
-              variant="outline"
-              size="xs"
+              variant="secondary"
+              size="sm"
               data-test="synthetics-journey-failed-change-secret-btn"
               @click="emit('edit-secrets', firstFailedIndex + 1)"
             >
               {{ t("synthetics.journey.replaySecrets.changeValue") }}
             </OButton>
             <OButton
-              variant="outline"
-              size="xs"
+              variant="secondary"
+              size="sm"
               data-test="synthetics-journey-failed-rerun-btn"
               @click="requestReplay()"
             >
@@ -2043,7 +2031,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       <OButton
         :aria-label="t('synthetics.journey.clearResults')"
         variant="ghost"
-        size="xs"
+        size="sm"
         data-test="synthetics-journey-clear-results-btn"
         @click="emit('clear-results')"
       >
@@ -2067,8 +2055,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       }}</span>
       <span class="flex-1" />
       <OButton
-        variant="outline"
-        size="xs"
+        variant="secondary"
+        size="sm"
         data-test="synthetics-journey-stopped-retry-btn"
         @click="requestReplay()"
       >
@@ -2077,7 +2065,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       <OButton
         :aria-label="t('synthetics.journey.clearResults')"
         variant="ghost"
-        size="xs"
+        size="sm"
         data-test="synthetics-journey-clear-results-btn"
         @click="emit('clear-results')"
       >
@@ -2192,23 +2180,15 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
 
     <!-- Normal step list (shown when not recording) -->
     <!-- Empty state -->
-    <div
+    <OEmptyState
       v-else-if="modelValue.length === 0"
-      class="flex flex-col items-center justify-center gap-4 py-16 text-center"
-    >
-      <OIcon name="open-in-browser" size="xl" class="text-text-muted" aria-hidden="true" />
-      <h3 class="text-text-heading m-0 text-base font-semibold">
-        {{ t("synthetics.journey.noSteps") }}
-      </h3>
-      <div class="flex items-center gap-3">
-        <OButton variant="primary" size="sm" @click="onRecordButtonClick">{{
-          t("synthetics.journey.recordJourney")
-        }}</OButton>
-        <OButton variant="outline" size="sm" @click="addStep">{{
-          t("synthetics.journey.addStepManually")
-        }}</OButton>
-      </div>
-    </div>
+      icon="open-in-browser"
+      :title="t('synthetics.journey.noSteps')"
+      :action-label="t('synthetics.journey.recordJourney')"
+      :secondary-action-label="t('synthetics.journey.addStepManually')"
+      @action="onRecordButtonClick"
+      @secondary-action="addStep"
+    />
 
     <!-- JourneySteps — draggable/selectable/expandable as mode permits -->
     <JourneySteps
@@ -2311,8 +2291,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           }}
           <OButton
             v-if="variablesPanelOpen !== undefined"
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             data-test="synthetics-journey-subtest-add-variable"
             @click="emit('toggle-variables-panel')"
           >
@@ -2333,6 +2313,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           </p>
           <OSkeleton
             v-if="isChildLoading(row as BrowserStep)"
+            preset="tableRows"
             :rows="3"
             data-test="synthetics-journey-subtest-loading"
           />
@@ -2373,7 +2354,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
             <span class="flex-1">{{ t("synthetics.journey.subtest.loadFailed") }}</span>
             <OButton
               variant="ghost"
-              size="xs"
+              size="sm"
               data-test="synthetics-journey-subtest-retry"
               @click="retryChildLoad(row as BrowserStep)"
             >
@@ -2385,14 +2366,14 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
               <span class="text-text-heading text-xs font-semibold">
                 {{ t("synthetics.journey.subtest.previewLabel") }}
               </span>
-              <OBadge variant="default" size="sm" data-test="synthetics-journey-subtest-count">
+              <OBadge tone="neutral" size="sm" data-test="synthetics-journey-subtest-count">
                 {{ childFor(row as BrowserStep)!.steps.length }}
               </OBadge>
               <span class="flex-1" />
               <OButton
                 variant="ghost"
-                size="xs"
-                icon-right="open-in-new"
+                size="sm"
+                icon-end="open-in-new"
                 data-test="synthetics-journey-subtest-open-child"
                 @click="emit('open-child', childFor(row as BrowserStep)!)"
               >
@@ -2424,7 +2405,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       :title="t('synthetics.journey.deleteStep')"
       :message="deleteConfirmMessage"
       :ok-label="t('common.ok')"
-      ok-color="danger"
       @update:ok="confirmDelete"
       @update:cancel="cancelDelete"
     />

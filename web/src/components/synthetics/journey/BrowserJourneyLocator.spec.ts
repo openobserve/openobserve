@@ -104,9 +104,9 @@ describe("BrowserJourneyLocator", () => {
         { kind: "css", value: "#built", origin: "composite" },
       ],
     });
-    const variants = wrapper.findAllComponents({ name: "OBadge" }).map((c) => c.props("variant"));
-    expect(variants).toContain("primary-outline");
-    expect(variants).toContain("info-outline");
+    const tones = wrapper.findAllComponents({ name: "OBadge" }).map((c) => c.props("tone"));
+    expect(tones).toContain("neutral");
+    expect(tones).toContain("outline");
   });
 });
 

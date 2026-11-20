@@ -465,8 +465,10 @@ describe("proPlan.vue price block", () => {
 
   it("keeps the seven subgrid rows as the card's direct children, priced or not", () => {
     expect(mountPlan().classes()).toContain("grid-rows-subgrid");
-    expect(mountPlan({ pricingOptions }).element.children).toHaveLength(7);
-    expect(mountPlan().element.children).toHaveLength(7);
+    const rows = (w: ReturnType<typeof mountPlan>) =>
+      w.get('[data-test="o-card-body"]').element.children;
+    expect(rows(mountPlan({ pricingOptions }))).toHaveLength(7);
+    expect(rows(mountPlan())).toHaveLength(7);
   });
 
   it("renders no price block without pricing options", () => {

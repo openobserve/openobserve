@@ -119,7 +119,7 @@ describe("RemoteTasksPage", () => {
     expect(list).toHaveBeenCalledWith("acme");
     // The real OTable virtualizes its body, so the page-level assertion is that
     // it mounted and fetched; row rendering is asserted against the stub below.
-    expect(wrapper.text()).toContain("New Task");
+    expect(wrapper.text()).toContain("New task");
   });
 
   it("renders the task name in the table", async () => {
@@ -150,7 +150,7 @@ describe("RemoteTasksPage", () => {
     const labels = ["published", "draft", "failed", "retired"].map((id) =>
       wrapper.get(`[data-test="ai-remote-tasks-state-${id}"]`).text(),
     );
-    expect(labels).toEqual(["Published", "Draft", "Test Failed", "Retired"]);
+    expect(labels).toEqual(["Published", "Draft", "Test failed", "Retired"]);
   });
 
   it("shows no version for a draft, because it has none to pin", async () => {
@@ -214,7 +214,7 @@ describe("RemoteTasksPage", () => {
       expect.objectContaining({
         messageKeypath: "aiObservability.remoteTasks.delete.message",
         messageName: "summarizer",
-        confirmVariant: "destructive",
+        kind: "destructive",
       }),
     );
 
@@ -242,7 +242,7 @@ describe("RemoteTasksPage", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-test="ai-remote-tasks-new-draft-dot"]').exists()).toBe(true);
-    expect(newButton.attributes("aria-label")).toBe("New Task · unsaved draft");
+    expect(newButton.attributes("aria-label")).toBe("New task · unsaved draft");
     expect(wrapper.find('[data-test="ai-remote-tasks-head-2-draft-dot"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="ai-remote-tasks-head-1-draft-dot"]').exists()).toBe(false);
   });

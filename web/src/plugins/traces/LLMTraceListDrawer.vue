@@ -18,12 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="open"
     side="right"
-    size="xl"
+    size="lg"
     :title="title"
-    :sub-title="subtitle"
-    :primary-button-label="canFilter ? t('llmInsightsDrill.filterToThis') : undefined"
-    primary-button-data-test="llm-trace-list-filter"
-    :secondary-button-label="t('traces.openInTraces')"
+    :subtitle="subtitle"
+    :primary="{
+      label: canFilter ? t('llmInsightsDrill.filterToThis') : undefined,
+      dataTest: 'llm-trace-list-filter',
+    }"
+    :secondary="{ label: t('traces.openInTraces') }"
     data-test="llm-trace-list-drawer"
     @update:open="(v: boolean) => emit('update:open', v)"
     @click:primary="emit('filter', selection?.seriesValue ?? '')"
@@ -35,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="trace_id"
         :loading="loading"
-        :show-global-filter="false"
         :fill-height="false"
         pagination="none"
         :empty-message="failed ? t('llmInsightsDrill.loadFailed') : t('llmInsightsDrill.empty')"

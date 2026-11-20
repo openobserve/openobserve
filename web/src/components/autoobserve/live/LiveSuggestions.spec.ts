@@ -206,7 +206,9 @@ describe("LiveSuggestions rail (OSS-11, OSS-9)", () => {
       rail(0, 0, { status: "error", failure: "failed", detail: raw("upstream timed out") }),
     );
     const error = wrapper.find('[data-test="autoobserve2-suggestions-error"]');
-    expect(error.find(".o2-empty-state__inline-icon").classes()).toContain("bg-status-error-bg");
+    expect(error.find('[data-test="o2-empty-state-icon"]').classes()).toContain(
+      "text-status-error-text",
+    );
     const details = wrapper.find('[data-test="autoobserve2-suggestions-error-details"]');
     expect(details.exists()).toBe(true);
     expect(wrapper.text()).not.toContain("upstream timed out");
@@ -507,7 +509,7 @@ describe("LiveSuggestions rail: a Not working alert acts (tests 10-14)", () => {
     const invalidate = vi.spyOn(queryClient, "invalidateQueries");
     const card = await dismissFromRail();
     const notice = byTest("alert-calibration-dismiss-notice");
-    expect(notice?.getAttribute("data-severity")).toBe("error");
+    expect(notice?.getAttribute("data-severity")).toBe("err");
     expect(notice?.textContent).toContain("You don't have permission to dismiss findings.");
     expect(toast).not.toHaveBeenCalled();
     expect(invalidate).not.toHaveBeenCalledWith({

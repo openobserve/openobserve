@@ -48,8 +48,8 @@ vi.mock("@/composables/useDashboardGallery", () => ({
   getCategoryInfo: (d: { name: string }) => {
     const n = d.name.toLowerCase();
     if (n.includes("kubernetes"))
-      return { icon: "hub", variant: "indigo-soft", category: "kubernetes" };
-    if (n.includes("aws")) return { icon: "cloud", variant: "orange-soft", category: "aws" };
+      return { icon: "hub", variant: "neutral", category: "kubernetes" };
+    if (n.includes("aws")) return { icon: "cloud", variant: "warn", category: "aws" };
     return { icon: "dashboard", variant: "gray-soft", category: "networking" };
   },
 }));
@@ -80,30 +80,30 @@ const ODialogStub = {
     "size",
     "width",
     "title",
-    "subTitle",
+    "subtitle",
     "showClose",
     "persistent",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   template: `
     <div
       data-test-stub="o-dialog"
       :data-open="open"
       :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
+      :data-primary-label="primary?.label"
+      :data-secondary-label="secondary?.label"
     >
       <slot name="header" />
       <slot />

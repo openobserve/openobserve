@@ -11,7 +11,11 @@
     "bannerMessage": "Questa funzionalità è bloccata. Richiede la funzionalità {feature} nella tua licenza.",
     "bannerMessageGeneric": "Questa pagina richiede una funzionalità non inclusa nella tua licenza.",
     "headerLocked": "Bloccata: richiede {feature}",
-    "availableInEnterprise": "Disponibile in OpenObserve Enterprise: {feature}"
+    "availableInEnterprise": "Disponibile in OpenObserve Enterprise: {feature}",
+    "turnedOffTitle": "Disattivato per questa organizzazione",
+    "enterpriseTitle": "Disponibile in Enterprise",
+    "readDocs": "Leggi la documentazione",
+    "rbacOff": "RBAC è disattivato per questa organizzazione. Un amministratore lo attiva impostando {env} su true nella configurazione del server."
   },
   "emptyState": {
     "illustrations": {
@@ -52,6 +56,7 @@
         "ariaLabel": "In attesa di dati"
       }
     },
+    "requestId": "Richiesta {id}",
     "createFirstItem": "Crea il tuo primo elemento",
     "newBrowserCheck": "Nuovo controllo browser",
     "allCaughtUp": "Sei aggiornato",
@@ -79,10 +84,6 @@
       "title": "Nessun pattern trovato",
       "description": "Prova ad aumentare l'intervallo di tempo o a selezionare uno stream diverso con più dati di log. L'estrazione dei pattern funziona meglio con almeno 1.000 log.",
       "logsAnalyzed": "Sono stati analizzati solo {count} log."
-    },
-    "noStreamSelected": {
-      "title": "Seleziona uno stream per iniziare",
-      "description": "Scegli uno stream, quindi esegui la query per esplorarne i dati. Perfeziona i risultati con filtri e un intervallo di tempo personalizzato."
     },
     "noQueryApplied": {
       "title": "Esegui una query per visualizzare i risultati",
@@ -200,22 +201,6 @@
       "action": "Nuova chiave di cifratura",
       "actionDesc": "Genera una chiave di cifratura"
     },
-    "noSlackChannelDefaults": {
-      "title": "Nessun canale ha ancora un'organizzazione predefinita",
-      "description": "Le domande poste in un canale senza predefinita vanno all'organizzazione predefinita di ciascuna persona (può essere cambiata con /o2 org)."
-    },
-    "noSlackLinkedPeople": {
-      "title": "Nessuno in questa organizzazione ha ancora collegato Slack"
-    },
-    "slackNotConnected": {
-      "title": "Collega uno spazio di lavoro Slack"
-    },
-    "noAnnouncementBanners": {
-      "title": "Ancora nessun banner",
-      "description": "I banner mostrano un avviso nella parte superiore dell'app alle organizzazioni che scegli.",
-      "action": "Aggiungi banner",
-      "actionDesc": "Scrivi un avviso e pianificalo"
-    },
     "noAiToolsets": {
       "title": "Non ci sono ancora set di strumenti di intelligenza artificiale",
       "description": "I set di strumenti di intelligenza artificiale collegano la tua organizzazione a funzionalità di intelligenza artificiale esterne.",
@@ -329,7 +314,6 @@
     "noStreams": {
       "title": "Collega una fonte per creare il tuo primo stream",
       "description": "Gli stream vengono creati automaticamente nel momento in cui arrivano i dati. Configura l'inserimento dalla tua app, agente o raccoglitore per iniziare.",
-      "action": "Configura l'ingestione",
       "actionDesc": "Connetti una fonte di dati",
       "createAction": "Nuovo stream",
       "createActionDesc": "Definire manualmente uno schema di stream"
@@ -469,7 +453,9 @@
       "description": "Nessun {noun} corrisponde ai filtri o alla ricerca correnti. Prova a regolarli o cancellarli.",
       "action": "Cancella filtri",
       "actionDesc": "Reimposta tutti i filtri e cerca",
-      "fallbackNoun": "risultati"
+      "fallbackNoun": "risultati",
+      "noMatches": "Nessuna corrispondenza",
+      "noMatchesText": "Nulla corrisponde alla ricerca o ai filtri attuali."
     },
     "nouns": {
       "logs": "log",
@@ -652,6 +638,26 @@
     "noOncallUnrouted": {
       "title": "Niente richiede un proprietario",
       "description": "Ogni avviso attivato ha raggiunto un team."
+    },
+    "noSlackChannelDefaults": {
+      "title": "Nessun canale ha ancora un'organizzazione predefinita",
+      "description": "Le domande poste in un canale senza predefinita vanno all'organizzazione predefinita di ciascuna persona (può essere cambiata con /o2 org)."
+    },
+    "noSlackLinkedPeople": {
+      "title": "Nessuno in questa organizzazione ha ancora collegato Slack"
+    },
+    "slackNotConnected": {
+      "title": "Collega uno spazio di lavoro Slack"
+    },
+    "noAnnouncementBanners": {
+      "title": "Ancora nessun banner",
+      "description": "I banner mostrano un avviso nella parte superiore dell'app alle organizzazioni che scegli.",
+      "action": "Aggiungi banner",
+      "actionDesc": "Scrivi un avviso e pianificalo"
+    },
+    "pageError": {
+      "title": "Impossibile caricare questa pagina",
+      "description": "Nessun dato di questa pagina è stato caricato. Riprova ora o tra un minuto."
     }
   },
   "accessBoundary": {
@@ -800,7 +806,15 @@
       "logs": "log",
       "charts": "grafici"
     },
+    "saveBar": {
+      "noChanges": "Nessuna modifica da salvare",
+      "unsavedChanges": "{n} modifica non salvata | {n} modifiche non salvate",
+      "changesShort": "{n} modifica | {n} modifiche",
+      "fixFields": "Correggi {n} campo | Correggi {n} campi",
+      "discard": "Scarta"
+    },
     "dismiss": "Ignora",
+    "undo": "Annulla",
     "exitFullscreen": "Esci da schermo intero",
     "moreActions": "Altre azioni",
     "moreOptions": "Altre opzioni",
@@ -1194,18 +1208,6 @@
     "boolFalse": "Falso",
     "browserTimeWithZone": "Ora del browser ({zone})",
     "poweredBy": "Con tecnologia",
-    "saveBar": {
-      "noChanges": "Nessuna modifica da salvare",
-      "unsavedChanges": "{n} modifica non salvata | {n} modifiche non salvate",
-      "changesShort": "{n} modifica | {n} modifiche",
-      "fixFields": "Correggi {n} campo | Correggi {n} campi",
-      "discard": "Scarta"
-    },
-    "leaveGuard": {
-      "title": "Uscire con modifiche non salvate?",
-      "message": "Hai {n} modifica non salvata in questa pagina. Andrà persa se esci. | Hai {n} modifiche non salvate in questa pagina. Andranno perse se esci.",
-      "keepEditing": "Continua a modificare"
-    },
     "editorDraft": {
       "restoreTitle": "Bozza non salvata",
       "restoreTitleInBrowser": "Modifiche locali non salvate",
@@ -1276,7 +1278,8 @@
         "remote_task": "remote task",
         "eval_job": "evaluation job",
         "eval_scorer": "scorer",
-        "fleet_config": "configurazione del collector"
+        "fleet_config": "configurazione del collector",
+        "workflow": "workflow"
       },
       "signOutTitle": "Sign out and discard drafts?",
       "signOutMessage": "You have {count} unsaved draft in this browser. Signing out discards it. | You have {count} unsaved drafts in this browser. Signing out discards them.",
@@ -1286,100 +1289,11 @@
       "leaveMessageInBrowser": "Salva {entity}, conserva le modifiche in questo browser oppure scartale.",
       "retentionInBrowser": "Le modifiche vengono conservate in questo browser per {days} giorni o fino a quando non esci. Vengono conservate solo le {max} più recenti di ciascun tipo.",
       "dotUndated": "Unsaved draft"
-    }
-  },
-  "filterBar": {
-    "ariaLabel": "Filtra per campo",
-    "placeholder": "Filtra per campo oppure digita campo=valore. Premi Invio per eseguire",
-    "addFilter": "Aggiungi filtro",
-    "searchFields": "Cerca campi",
-    "searchLabels": "Cerca etichette",
-    "searchOperators": "Cerca condizioni",
-    "searchValue": "Cerca o digita un valore",
-    "searchValues": "Cerca valori",
-    "textField": "Testo",
-    "useValue": "Usa \"{value}\"",
-    "useField": "Usa il campo \"{field}\"",
-    "useLabel": "Usa l'etichetta \"{field}\"",
-    "searchText": "Cerca \"{text}\" in tutto il testo",
-    "emptyValue": "(vuoto)",
-    "loadingFields": "Caricamento campi…",
-    "noFields": "Nessun campo corrispondente",
-    "noValues": "Nessun suggerimento. Digita un valore e premi Invio",
-    "noOperators": "Nessuna condizione corrispondente",
-    "removeFilter": "Rimuovi filtro",
-    "clearAll": "Cancella tutti i filtri",
-    "toggleConnector": "Alterna tra AND e OR",
-    "selectedCount": "Nessun valore selezionato | {count} valore selezionato | {count} valori selezionati",
-    "query": "Query",
-    "builderTooltip": "Crea filtri scegliendo campi, condizioni e valori",
-    "queryTooltip": "Scrivi tu stesso la query",
-    "queryNotParsableShort": "Il generatore di filtri non può mostrare questa query:",
-    "clearAndBuild": "Cancella e crea",
-    "clearQueryTitle": "Cancellare la query?",
-    "clearQueryMessage": "La query viene rimossa e il generatore parte vuoto.",
-    "where": "Dove",
-    "addCondition": "Aggiungi condizione",
-    "addGroup": "Aggiungi gruppo",
-    "startGroup": "Inizia un gruppo",
-    "addBelow": "Aggiungi condizione sotto",
-    "ungroup": "Annulla raggruppamento",
-    "collapseGroup": "Comprimi gruppo",
-    "expandGroup": "Espandi gruppo",
-    "moreInGroup": "{count} altri",
-    "groupHasIssues": "Qualcosa in questo gruppo deve essere corretto",
-    "chooseField": "Scegli un campo",
-    "chooseValue": "Scegli un valore",
-    "lockedFilter": "Questo filtro non può essere modificato qui. Resta come salvato; rimuovilo per eliminarlo",
-    "limits": {
-      "conditions": "Fino a {count} filtro | Fino a {count} filtri",
-      "values": "Fino a {count} valore | Fino a {count} valori"
     },
-    "validation": {
-      "incomplete": "Completa questo filtro o rimuovilo",
-      "required": "Aggiungi almeno un filtro",
-      "uniqueField": "{field} ha già un filtro; modifica quello o rimuovi questo",
-      "oneUsageCondition": "Un livello accetta una condizione di utilizzo; trasforma questa in una regola o rimuovila",
-      "rumField": "Usa un campo predefinito o una colonna di lettere minuscole, cifre e caratteri di sottolineatura, fino a 128 caratteri",
-      "valueLength": "Ogni valore deve avere da 1 a {max} caratteri",
-      "regexLength": "Usa al massimo {max} caratteri nel pattern.",
-      "regexInvalid": "Questo pattern non è valido o non è supportato. Non è possibile usare lookahead, lookbehind e riferimenti all'indietro."
-    },
-    "operatorNames": {
-      "containsIgnoreCase": "Contiene (ignora maiuscole/minuscole)",
-      "notStartsWith": "Non inizia con",
-      "notEndsWith": "Non termina con",
-      "isEmpty": "È vuoto",
-      "isNotEmpty": "Non è vuoto"
-    },
-    "types": {
-      "string": "Testo",
-      "number": "Numero",
-      "boolean": "Booleano"
-    },
-    "operators": {
-      "eq": "è",
-      "neq": "non è",
-      "gt": "maggiore di",
-      "gte": "maggiore o uguale",
-      "lt": "minore di",
-      "lte": "minore o uguale",
-      "contains": "contiene",
-      "containsIgnoreCase": "contiene, ignorando maiuscole/minuscole",
-      "notContains": "non contiene",
-      "startsWith": "inizia con",
-      "notStartsWith": "non inizia con",
-      "endsWith": "termina con",
-      "notEndsWith": "non termina con",
-      "in": "è uno di",
-      "notIn": "non è nessuno di",
-      "regex": "corrisponde alla regex",
-      "notRegex": "non corrisponde alla regex",
-      "isNull": "non ha valore",
-      "isNotNull": "ha un valore",
-      "isEmpty": "è vuoto o non ha valore",
-      "isNotEmpty": "ha un valore non vuoto",
-      "matchAll": "corrisponde al testo"
+    "leaveGuard": {
+      "title": "Uscire con modifiche non salvate?",
+      "message": "Hai {n} modifica non salvata in questa pagina. Andrà persa se esci. | Hai {n} modifiche non salvate in questa pagina. Andranno perse se esci.",
+      "keepEditing": "Continua a modificare"
     }
   },
   "flow": {
@@ -1489,11 +1403,9 @@
     "patternNavPrevious": "Precedente",
     "patternNavNext": "Prossimo",
     "patternNoValuesAvailable": "Nessun valore disponibile",
-    "sqlModeLabel": "Modalità SQL",
     "nlpModeLabel": "Modalità linguaggio naturale",
     "quickModeLabel": "Modalità rapida",
     "menuMore": "Altro",
-    "menuGroupSetOnce": "Imposta una volta",
     "menuGroupHistory": "Cronologia",
     "menuGroupDownloads": "Download",
     "menuGroupSchedule": "Pianificazione",
@@ -1867,7 +1779,6 @@
     "viewDeletedSuccessfully": "Visualizzazione eliminata con successo.",
     "viewCreatedSuccessfully": "Visualizzazione creata con successo.",
     "viewUpdatedSuccessfully": "Visualizzazione aggiornata con successo.",
-    "linkCopiedSuccessfully": "Link copiato con successo!",
     "errorCopyingLink": "Errore durante la copia del link.",
     "errorShorteningLink": "Errore durante l'abbreviazione del link.",
     "webUrlNotConfigured": "L'URL di condivisione è disabilitato finché ZO_WEB_URL non viene configurato dall'amministratore.",
@@ -2069,7 +1980,24 @@
     "freeTextNoTextFields": "Questo stream non ha campi di testo da cercare.",
     "freeTextNoTextFieldsNamed": "Non cercati: {streams} (nessun campo di testo).",
     "freeTextBuildNotice": "Questo filtro contiene una ricerca testuale; modificalo in SQL.",
-    "filterNotChartableNotice": "Questo filtro non può essere rappresentato in un grafico nel builder. Il filtro di ricerca è invariato; passa a {custom} per visualizzarlo."
+    "filterNotChartableNotice": "Questo filtro non può essere rappresentato in un grafico nel builder. Il filtro di ricerca è invariato; passa a {custom} per visualizzarlo.",
+    "queryModeLabel": "Linguaggio di query",
+    "queryModeFilter": "Filtro",
+    "queryModeSql": "SQL",
+    "queryModeFilterTooltip": "Restringi i log per campo e valore",
+    "queryModeSqlTooltip": "Scrivi una query SQL completa, con aggregazioni e join",
+    "sqlModeNeedsOneStream": "L’SQL in questa vista accetta un solo stream",
+    "menuGroupViewOptions": "Opzioni di visualizzazione",
+    "histogramHiddenForAggregates": "Questa query restituisce gruppi, non eventi nel tempo, quindi non c’è un istogramma. Visualizza crea il grafico del risultato.",
+    "linkCopied": "Link copiato",
+    "linkCopiedFixedTime": "Link copiato · intervallo fisso {from} – {to}",
+    "linkCopiedRelativeTime": "Link copiato · {period}, a partire dall’apertura",
+    "recordsChipRows": "{total} riga | {total} righe",
+    "histogramTitleRows": "{total} riga in {took} ms. | {total} righe in {took} ms.",
+    "histogramTitleRowsWithScan": "{total} riga in {took} ms. ({scanLabel}: {scanSize}) | {total} righe in {took} ms. ({scanLabel}: {scanSize})",
+    "pickStreamFirst": "Scegli prima uno stream",
+    "autoRefreshPausedInVisualize": "L'aggiornamento automatico aggiorna i risultati della ricerca. Si mette in pausa mentre visualizzi.",
+    "histogramNoTimeAxis": "I risultati raggruppati non hanno un asse temporale"
   },
   "menu": {
     "alertCalibration": "Calibrazione avvisi",
@@ -2103,6 +2031,14 @@
     "workflows": "Workflow",
     "language": "Lingua",
     "keyboardShortcuts": "Scelte rapide da tastiera",
+    "searchOrJumpTo": "Cerca o vai a…",
+    "jumpToTitle": "Vai a",
+    "addData": "Aggiungi dati",
+    "jumpToPlaceholder": "Cerca pagine, avvisi, dashboard e stream",
+    "jumpToPlaceholderPages": "Cerca pagine e azioni",
+    "jumpToPages": "Pagine",
+    "jumpToShowAll": "Mostra tutto in {page}",
+    "jumpToSearchLogs": "Cerca \"{text}\" nei log",
     "synthetic": "Synthetics",
     "experience": "Esperienza",
     "slos": "SLO",
@@ -4183,7 +4119,8 @@
       },
       "error_messages": {
         "not_authorized_manage_license": "Non sei autorizzato a gestire la licenza."
-      }
+      },
+      "usageTitle": "Ingestione giornaliera"
     },
     "value_sso_requires_ha": "✅ Richiede la modalità HA",
     "value_rbac_requires_ha": "✅ Richiede la modalità HA",
@@ -4352,7 +4289,9 @@
     "revokeInvitationMsg": "Sei sicuro di voler revocare l'invito per {email}?",
     "deleteUsersTitle": "Elimina utenti",
     "deleteUsersMsg": "Sei sicuro di voler eliminare {count} utente? | Sei sicuro di voler eliminare {count} utenti?",
-    "deleteUsersBlockNote": "Di questi, {count} hanno effettuato l'accesso tramite il tuo dominio verificato e verranno bloccati anziché eliminati."
+    "deleteUsersBlockNote": "Di questi, {count} hanno effettuato l'accesso tramite il tuo dominio verificato e verranno bloccati anziché eliminati.",
+    "roleHint": "Admin gestisce l'organizzazione, Editor modifica dati e impostazioni, Viewer può solo leggere.",
+    "customRolesNeedRbac": "I ruoli personalizzati richiedono RBAC, che è disattivato per questa organizzazione."
   },
   "invitation": {
     "pendingInvitations": "Inviti in sospeso",
@@ -5205,6 +5144,7 @@
   },
   "organization": {
     "searchByNameOrId": "Cerca per nome o ID",
+    "currentLabel": "Organizzazione: {name}",
     "noOrganizationsFound": "Nessuna organizzazione trovata",
     "header": "Organizzazioni",
     "orgBeingDeletedSwitching": "Questa organizzazione è in fase di eliminazione. Ti stiamo reindirizzando a un'altra organizzazione.",
@@ -5313,6 +5253,7 @@
     "timezone": "Fuso orario",
     "deleteActionMessage": "Sei sicuro di voler eliminare {count} campo? Questa azione non può essere annullata. | Sei sicuro di voler eliminare {count} campi? Questa azione non può essere annullata.",
     "deleteDatesMessage": "Sei sicuro di voler eliminare {count} intervallo di date? Questa azione non può essere annullata. | Sei sicuro di voler eliminare {count} intervalli di date? Questa azione non può essere annullata.",
+    "summaryAllTypes": "Stream (tutti i tipi)",
     "labelLogs": "Log",
     "labelMetrics": "Metriche",
     "labelTraces": "Tracce",
@@ -7924,7 +7865,17 @@
       "metricsSketch": "Le distribuzioni vengono memorizzate come bucket di istogramma e i percentili vengono stimati da questi bucket. Un valore più alto di ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA produce bucket più fini e percentili più precisi, al costo di più righe memorizzate."
     },
     "gpu": "GPU",
-    "gpuExporter": "Esportatore GPU"
+    "gpuExporter": "Esportatore GPU",
+    "rotationNote": "I token non vengono ruotati sul posto. Per ruotare, crea un nuovo token, sposta le tue sorgenti su di esso e poi disattiva quello vecchio.",
+    "rotateAction": "Ruota…",
+    "rotateTitle": "Ruota {name}",
+    "rotateStep1": "Crea un nuovo token.",
+    "rotateStep2": "Sposta le tue sorgenti sul nuovo token.",
+    "rotateStep3": "Quando nulla usa più {name}, disattivalo dal menu della sua riga.",
+    "rotateNever": "Nulla viene disattivato automaticamente. Il vecchio token continua a funzionare finché non lo disattivi.",
+    "rotateCreateNew": "Crea nuovo token",
+    "rotateNewName": "{name}-nuovo",
+    "rotateDescription": "Sostituisce {name}"
   },
   "dashboard": {
     "panelDraft": {
@@ -9558,6 +9509,9 @@
       "addClause": "Aggiungi clausola"
     },
     "viewDashboard": {
+      "apply": "Applica",
+      "lastDataSeen": "Ultimi dati {when}",
+      "jumpToLatest": "Vai agli ultimi",
       "refreshToApplyVariables": "Aggiorna per applicare le ultime modifiche alle variabili",
       "refresh": "Aggiorna",
       "refreshCacheReload": "Aggiorna cache e ricarica",
@@ -10303,9 +10257,16 @@
       "noPanels": "Nessun pannello",
       "panelsDeletedHint": "I suoi pannelli sono stati eliminati, quindi al momento non viene disegnato su alcun pannello. Seleziona i pannelli, oppure scegli Seleziona tutto, per risolvere il problema.",
       "blankFiltersHint": "Le condizioni senza valore vengono ignorate."
+    },
+    "inlineCreate": {
+      "folderName": "Nome della nuova cartella",
+      "createFolder": "Crea cartella",
+      "tabName": "Nome della nuova scheda",
+      "createTab": "Crea scheda"
     }
   },
   "panel": {
+    "noDataInRange": "Nessun dato nell'intervallo",
     "saveAndStay": "Salva e continua a modificare",
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
@@ -10586,12 +10547,32 @@
     "hoursAgo": "{count} h fa",
     "daysAgo": "{count} g fa",
     "cards": {
-      "openIncidents": "Incidenti aperti"
+      "firingAlerts": "Avvisi attivi",
+      "failingRules": "Regole in errore",
+      "openIncidents": "Incidenti aperti",
+      "pipelineErrors": "Errori delle pipeline",
+      "pipelinesOf": "di {enabled} abilitate",
+      "quietStreams": "Stream inattivi",
+      "firingNone": "Nessuno attivo",
+      "noAlertRules": "Nessuna regola di avviso",
+      "noEnabledRules": "Nessuna regola abilitata",
+      "failingNone": "Nessuna in errore",
+      "failingNote": "Errore nell'ultima valutazione",
+      "incidentsNone": "Nessuno aperto",
+      "noPipelines": "Nessuna pipeline",
+      "noStreams": "Nessuno stream",
+      "quietNote": "Nessuna scrittura negli ultimi 7 giorni",
+      "criticalUnit": "{count} a livello critico",
+      "deliveryFailures": "Errori di consegna degli avvisi",
+      "deliveryCount": "{count} consegna di avviso non riuscita | {count} consegne di avvisi non riuscite",
+      "deliveryNote": "Avvisi attivati ma non notificati",
+      "oldestFiring": "Il più vecchio attivo da {age}"
     },
     "state": {
       "tileForbidden": "Nessun accesso",
       "tileLocked": "Bloccato",
       "tileError": "Impossibile caricare",
+      "tileUnavailable": "Non disponibile",
       "sectionLocked": "Disponibile con una licenza enterprise",
       "sectionForbidden": "Il tuo ruolo non può vedere questi dati. Chiedi l'accesso a un amministratore dell'organizzazione."
     },
@@ -10715,6 +10696,39 @@
     "dataAsOf": "Dati aggiornati a {time}",
     "timeRange": {
       "heading": "Nell'intervallo di tempo selezionato"
+    },
+    "firingNow": {
+      "title": "Attivi ora",
+      "byLevel": "{critical} critici · {warning} avvertenze",
+      "allQuiet": "Tutto tranquillo",
+      "watching": "{count} regola di avviso attiva, nessuna scattata | {count} regole di avviso attive, nessuna scattata",
+      "noRules": "Ancora nessuna regola di avviso",
+      "browseLibrary": "Sfoglia la libreria degli avvisi",
+      "notifyFailed": "Notifica non riuscita",
+      "loadError": "Impossibile caricare gli avvisi attivi",
+      "unavailable": "Gli stati degli avvisi non sono leggibili al momento"
+    },
+    "health": {
+      "subtitle": "Ultimi dati ricevuti, per tipo",
+      "lastData": "Ultimi dati {age} fa",
+      "justNow": "Ultimi dati proprio ora",
+      "noDataIn": "Nessun dato nelle ultime {range}",
+      "noRecords": "Ancora nessun record",
+      "loadError": "Impossibile leggere i tuoi stream"
+    },
+    "start": {
+      "text": "Non sono ancora arrivati dati. Invia dati, guarda quelli che hai o configura un avviso.",
+      "addData": "Aggiungi dati",
+      "createAlert": "Crea avviso"
+    },
+    "summary": {
+      "loadError": "Impossibile caricare il riepilogo dell'organizzazione",
+      "loadErrorRest": "Impossibile caricare il resto del riepilogo",
+      "denied": "Nessun accesso al riepilogo dell'organizzazione. Chiedi a un amministratore."
+    },
+    "events": {
+      "runFailed": "Esecuzione non riuscita",
+      "timesInRange": "{count} volta nell'intervallo selezionato | {count} volte nell'intervallo selezionato"
     }
   },
   "chatHistory": {
@@ -10895,7 +10909,8 @@
       "taglineAnd": "e ti guiderà attraverso log, tracce, metriche e incidenti.",
       "signedInAs": "Ha effettuato l'accesso come",
       "role": "Ruolo",
-      "tryOneOfThese": "Oppure prova uno di questi"
+      "tryOneOfThese": "Oppure prova uno di questi",
+      "panelText": "Chiedi dei tuoi log, tracce, metriche e incidenti, oppure fatti aiutare a scrivere una query."
     },
     "capabilities": {
       "query": {
@@ -12005,13 +12020,21 @@
     }
   },
   "alerts": {
-    "rowAction": {
-      "leftFilter": "Non corrisponde più al filtro",
-      "pausedLeftFilter": "{name} sospeso. Non corrisponde più al filtro | {count} avvisi sospesi. Non corrispondono più al filtro",
-      "resumedLeftFilter": "{name} ripreso. Non corrisponde più al filtro | {count} avvisi ripresi. Non corrispondono più al filtro",
-      "bulkPauseFailed": "Impossibile sospendere {failed} di {total} avviso | Impossibile sospendere {failed} di {total} avvisi",
-      "bulkResumeFailed": "Impossibile riprendere {failed} di {total} avviso | Impossibile riprendere {failed} di {total} avvisi"
+    "detail": {
+      "openInLogs": "Apri nei log",
+      "openInTraces": "Apri nelle tracce",
+      "openInMetrics": "Apri nelle metriche",
+      "evidenceFiringTip": "Apre {stream} con il filtro di questo avviso, dall'inizio di questo scatto a ora",
+      "evidenceWindowTip": "Apre {stream} con il filtro di questo avviso negli ultimi {window}",
+      "threshold": "Soglia",
+      "noIncident": "Ancora nessun incidente",
+      "conditionLabel": "Condizione dell'avviso",
+      "allRows": "Ogni riga",
+      "viewIncidents": "Visualizza incidenti"
     },
+    "summaryTrainingFailed": "Addestramento non riuscito",
+    "columnState": "Stato",
+    "startFromTemplate": "Inizia da un modello",
     "moreActions": "Altre azioni",
     "promRuleMode": "Modalità regola",
     "promRulePreview": "{count} serie restituite corrispondono ora. Ogni serie deve completare il periodo di attesa prima di attivarsi.",
@@ -13445,7 +13468,8 @@
       "condition": "Condizione",
       "result": "Risultato",
       "anomalies": "Anomalie",
-      "forGroup": "per {group}"
+      "forGroup": "per {group}",
+      "errorFrom": "{status} da {destination}"
     },
     "continue": "Continua",
     "wouldTrigger": "INNESCHEREBBE",
@@ -15009,7 +15033,8 @@
         "mute": "Non puoi silenziarlo.",
         "onCall": "In reperibilità: {people}",
         "canAct": "Possono intervenire anche: {people}",
-        "people": "In reperibilità: {onCall}. Possono intervenire anche: {canAct}"
+        "people": "In reperibilità: {onCall}. Possono intervenire anche: {canAct}",
+        "withPeople": "{reason} {people}"
       },
       "errors": {
         "notFiring": "Questo avviso non è attivo, quindi non c'è nulla da prendere in carico.",
@@ -15067,6 +15092,17 @@
     "siemDetection": {
       "notice": "Questo avviso è un rilevamento di Sicurezza. La sua query è compilata dalla regola Sigma, quindi regola, stream e pianificazione si modificano in Sicurezza, che mantiene allineate regola e query.",
       "open": "Modifica in Sicurezza"
+    },
+    "newAlertTitle": "Nuovo avviso",
+    "newAnomalyTitle": "Nuovo rilevamento anomalie",
+    "rowAction": {
+      "leftFilter": "Non corrisponde più al filtro",
+      "pausedLeftFilter": "{name} sospeso. Non corrisponde più al filtro | {count} avvisi sospesi. Non corrispondono più al filtro",
+      "resumedLeftFilter": "{name} ripreso. Non corrisponde più al filtro | {count} avvisi ripresi. Non corrispondono più al filtro",
+      "bulkPauseFailed": "Impossibile sospendere {failed} di {total} avviso | Impossibile sospendere {failed} di {total} avvisi",
+      "bulkResumeFailed": "Impossibile riprendere {failed} di {total} avviso | Impossibile riprendere {failed} di {total} avvisi",
+      "paused": "{name} in pausa | {count} alert in pausa",
+      "resumed": "{name} ripreso | {count} alert ripresi"
     }
   },
   "alert_dependencies": {
@@ -17937,7 +17973,13 @@
       "partial": "Alcuni span di questa traccia non possono essere letti. Il waterfall potrebbe essere incompleto.",
       "truncated": "Mostrando il primo span di questa traccia, in ordine di ora di inizio. Gli span successivi non sono ancora caricati. | Mostrando i primi {count} span di questa traccia, in ordine di ora di inizio. Gli span successivi non sono ancora caricati.",
       "loadMore": "Carica lo span successivo | Carica i prossimi {size} span",
-      "loadMoreFailed": "Non è stato possibile caricare altri span di questa traccia"
+      "loadMoreFailed": "Non è stato possibile caricare altri span di questa traccia",
+      "notFoundTitle": "Nessuna trace con questo ID tra {from} e {to}",
+      "notFoundText": "La trace {traceId} non ha span nello stream {stream} in questo intervallo. Potrebbe essere più vecchia o più recente, in un altro stream o non raccolta.",
+      "searchWiderRange": "Cerca in un intervallo più ampio",
+      "searchSpansInRange": "Cerca span in questo intervallo",
+      "loadFailedTitle": "Impossibile caricare questa trace",
+      "loadFailedText": "Impossibile leggere la trace {traceId}. Riprova tra un momento."
     },
     "traceTree": {
       "clickToExpand": "Clicca per espandere",
@@ -19865,7 +19907,7 @@
       "streamHint": "Questa versione dell'agente invia tracce a {count} stream. Viene mostrato quello usato da più tempo, a meno che tu non ne scelga un altro.",
       "agentIdHint": "ID agente: {ids}",
       "noAgentIdentity": "Nessuna identità agente trovata",
-      "noAgentIdentityDescription": "Questi span LLM non contengono il nome dell'agente, quindi sono mostrati per stream. Mappa l'attributo che identifica il tuo agente per visualizzarli per agente.",
+      "noAgentIdentityDescription": "Questi span LLM non contengono il nome dell'agente, quindi sono mostrati per stream.",
       "noAgentIdentityAction": "Apri mappatura agenti"
     },
     "agentGraph": {
@@ -21477,53 +21519,6 @@
       "description": "I provider LLM memorizzano i dettagli di connessione (URL di base + credenziali) per i modelli linguistici chiamati dai tuoi valutatori LLM Judge. Aggiungine uno per iniziare a eseguire valutazioni basate su LLM Judge."
     }
   },
-  "genAiAgentMapping": {
-    "tabLabel": "Mappatura agenti",
-    "title": "Mappatura agenti",
-    "subtitle": "Come l'identità degli agenti, l'attribuzione dei costi e i titoli delle sessioni vengono letti dalla telemetria",
-    "identity": {
-      "title": "Campi identità agente",
-      "help": "Come OpenObserve assegna un nome a ciascun agente e legge il suo ambiente e la versione. Legge prima l'attributo standard. Quando uno span non lo contiene, viene usato il primo campo di fallback presente nello span.",
-      "agentName": "Nome agente",
-      "agentId": "ID agente",
-      "env": "Ambiente",
-      "version": "Versione"
-    },
-    "agentNameFields": "Campi di fallback per il nome agente",
-    "agentNameHelp": "Attributi in ingresso da usare come fallback per gen_ai.agent.name.",
-    "agentNameInfo": "Verificato solo quando l'attributo standard gen_ai.agent.name è mancante o vuoto. Aggiungi un attributo di telemetria in ingresso per riga.",
-    "agentIdFields": "Campi di fallback per l'ID agente",
-    "agentIdHelp": "Attributi in ingresso da usare come fallback per gen_ai.agent.id.",
-    "agentIdInfo": "Verificato solo quando l'attributo standard gen_ai.agent.id è mancante o vuoto. Aggiungi un attributo di telemetria in ingresso per riga.",
-    "envFields": "Campi di fallback per l'ambiente",
-    "envHelp": "Attributi in ingresso da usare come ambiente dell'agente.",
-    "envInfo": "Verificato solo quando l'attributo standard deployment.environment.name è mancante o vuoto. Aggiungi un attributo di telemetria in ingresso per riga.",
-    "versionFields": "Campi di fallback per la versione",
-    "versionHelp": "Attributi in ingresso da usare come versione dell'agente.",
-    "versionInfo": "Verificato solo quando l'attributo standard gen_ai.agent.version è mancante o vuoto. Aggiungi un attributo di telemetria in ingresso per riga.",
-    "alwaysAppliedStandard": "Standard (verificato per primo):",
-    "coverageValue": "· nel {percent}% delle tracce, nelle ultime 24 ore",
-    "fallbacksNote": "Inserisci i campi di fallback separati da virgole, nell'ordine da verificare.",
-    "fallbackInvalid": "Usa nomi di campo separati da virgole. Solo lettere, numeri e . _ - : / {'@'}.",
-    "sessions": {
-      "title": "Visualizzazione sessioni",
-      "help": "Come vengono intitolate le sessioni e quale testo wrapper viene nascosto.",
-      "noAgents": "Nessun agente ancora. Aggiungi un agente per nasconderne il testo wrapper."
-    },
-    "applyDefaults": "Applica valori predefiniti",
-    "resetToEmpty": "Reimposta a vuoto",
-    "clearRegistry": "Svuota registro",
-    "clearRegistryTitle": "Svuotare il registro agenti?",
-    "clearRegistryDescription": "Questo elimina tutte le righe del registro agenti GenAI rilevate per questa organizzazione. Le nuove tracce corrispondenti ripopoleranno il registro durante l'ingestione.",
-    "clearRegistryConfirm": "Svuota registro",
-    "saved": "Mappatura agenti salvata",
-    "unsavedConfirm": "Le modifiche alla mappatura agenti non sono state salvate. Vuoi scartarle?",
-    "clearRegistrySuccess": "Registro agenti GenAI svuotato. Eliminati {deletedCount} agenti memorizzati e {bufferCount} osservazioni in coda.",
-    "saveFailed": "Impossibile salvare la mappatura agenti",
-    "clearRegistryFailed": "Impossibile svuotare il registro agenti GenAI",
-    "defaultsLoadFailed": "Impossibile caricare i valori predefiniti della mappatura agenti",
-    "defaultsFetchFailed": "Impossibile recuperare i valori predefiniti ({status})"
-  },
   "logs": {
     "noData": {
       "title": "Inizia a inviare dati a {product}",
@@ -21539,7 +21534,6 @@
     },
     "noStream": {
       "title": "Scegli uno stream per iniziare a esplorare",
-      "description": "Scegli uno stream, quindi premi <strong>Esegui query</strong>. Puoi perfezionare con filtri, una funzione VRL e un intervallo di tempo personalizzato una volta arrivati i risultati.",
       "selectStream": "Seleziona uno stream",
       "selectStreamDesc": "Sfoglia gli stream di log, tracce, metriche e RUM",
       "queryGuide": "Leggi la guida alle domande",
@@ -21591,7 +21585,18 @@
     "detailTable": {
       "noDataAvailable": "Nessun dato disponibile.",
       "addIcon": "Aggiungi icona",
-      "sendToAiChat": "Invia alla chat AI"
+      "sendToAiChat": "Invia alla chat AI",
+      "openTrace": "Apri traccia",
+      "noTraceTitle": "Nessuna traccia collegata a questo log",
+      "noRelatedLogsTitle": "Nessun log correlato trovato",
+      "noRelatedMetricsTitle": "Nessuna metrica correlata trovata",
+      "noServiceText": "Non è stato possibile associare alcun servizio a questo log, quindi i dati correlati non possono essere trovati automaticamente.",
+      "searchTracesAround": "Cerca tracce intorno a questo momento",
+      "searchAroundTip": "Carica gli eventi registrati subito prima e dopo questo.",
+      "noOfEventsTip": "Quanti eventi caricare intorno a questo.",
+      "severityTip": "Livello di log rilevato. Selezionalo per vedere come è stato rilevato.",
+      "traceId": "ID trace",
+      "spanId": "ID span"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "La query SELECT * non è supportata per la visualizzazione.",
@@ -21883,6 +21888,7 @@
     "showDetail": "Mostra dettagli",
     "hideDetail": "Nascondi dettagli",
     "runAs": "Esegui come",
+    "runSuggestion": "Esegui {query}",
     "searchTextFor": "Cerca il testo \"{text}\"",
     "searchTextDesc": "Cerca l'intero input come un'unica frase",
     "explain": {
@@ -21947,7 +21953,19 @@
     "dataStale": "I dati sono obsoleti",
     "lastRefreshed": "Ultimo aggiornamento: {time}",
     "refresh": "Aggiorna",
-    "refreshWithAge": "Aggiorna, ultimo aggiornamento {age}"
+    "refreshWithAge": "Aggiorna, ultimo aggiornamento {age}",
+    "refreshing": "Aggiornamento in corso",
+    "failed": "Non riuscito",
+    "autoRefresh": "Aggiornamento automatico",
+    "autoOn": "Auto · {interval}",
+    "every": "Ogni {interval}",
+    "interval": {
+      "10s": "10 s",
+      "30s": "30 s",
+      "1m": "1 min",
+      "5m": "5 min",
+      "15m": "15 min"
+    }
   },
   "synthetics": {
     "variables": {
@@ -22741,11 +22759,6 @@
       "disabling": "Disabilitazione in corso…",
       "editTitle": "Modifica località",
       "empty": "Nessuna località disponibile",
-      "emptyState": {
-        "title": "Nessuna posizione ancora",
-        "description": "Una posizione è un luogo da cui i tuoi monitor sintetici eseguono i controlli, ad esempio una regione cloud.",
-        "actionDesc": "Aggiungi un luogo da cui eseguire i controlli"
-      },
       "enable": "Abilita",
       "enabled": "Abilitata",
       "enabledSuccess": "Località abilitata",
@@ -22813,7 +22826,12 @@
       "noPrivateMatches": "Nessuna posizione privata corrisponde alla tua ricerca",
       "newPrivateLocation": "Nuova posizione privata",
       "publicSubtitle": "Regioni cloud, sempre disponibili",
-      "privateSubtitle": "La posizione è pronta quando almeno uno dei suoi agenti è attivo"
+      "privateSubtitle": "La posizione è pronta quando almeno uno dei suoi agenti è attivo",
+      "emptyState": {
+        "title": "Nessuna posizione ancora",
+        "description": "Una posizione è un luogo da cui i tuoi monitor sintetici eseguono i controlli, ad esempio una regione cloud.",
+        "actionDesc": "Aggiungi un luogo da cui eseguire i controlli"
+      }
     },
     "prefill": {
       "pageTitle": "Nuovo controllo sintetico · HTTP",
@@ -23845,6 +23863,7 @@
     },
     "actions": {
       "openCheatsheet": "Apri il cheatsheet delle scorciatoie da tastiera",
+      "searchOrJumpTo": "Cerca o vai a una pagina",
       "closeDialog": "Chiudi qualsiasi finestra di dialogo, cassetto o modale",
       "focusSearch": "Barra di ricerca Focus",
       "focusQuery": "Editor di query Focus",
@@ -23994,7 +24013,10 @@
       "tokenLinkTooltip": "Scegli quale token di ingestione usano gli snippet",
       "copiedWithToken": "Copiato con il token org {name}",
       "tokenIncludedHint": "La copia include il token di ingestione dell'organizzazione, che resta nascosto qui.",
-      "maskedSelectionWarning": "Il token nascosto è stato copiato come punti. Usa Copia oppure rivelalo prima."
+      "maskedSelectionWarning": "Il token nascosto è stato copiato come punti. Usa Copia oppure rivelalo prima.",
+      "wrapLines": "Vai a capo",
+      "showAll": "Mostra tutte {count} riga | Mostra tutte {count} righe",
+      "showLess": "Mostra meno"
     },
     "spinner": {
       "loading": "Caricamento"
@@ -24003,14 +24025,6 @@
       "steps": "Passaggi",
       "stepOf": "Passo {current} di {total}",
       "swipeHint": "scorri per vedere il resto"
-    },
-    "statStrip": {
-      "filters": "Filtri",
-      "showOnly": "Mostra solo {label}",
-      "alsoShow": "Mostra anche {label}",
-      "stopShowing": "Non mostrare più {label}",
-      "scrollBack": "Mostra i filtri precedenti",
-      "scrollForward": "Mostra altri filtri"
     },
     "attributeValueCell": {
       "addIcon": "Aggiungi icona"
@@ -24049,7 +24063,10 @@
       "moreInfo": "Maggiori informazioni"
     },
     "dialog": {
-      "closeDialog": "Chiudi finestra di dialogo"
+      "closeDialog": "Chiudi finestra di dialogo",
+      "discardChanges": "Annullare le modifiche?",
+      "keepEditing": "Continua a modificare",
+      "discard": "Annulla modifiche"
     },
     "drawer": {
       "closeDrawer": "Chiudi pannello"
@@ -24072,6 +24089,32 @@
       "clear": "Cancella"
     },
     "file": {
+      "removeNamed": "Rimuovi {name}",
+      "sourceLabel": "Importa da",
+      "sourceFile": "File",
+      "sourceUrl": "URL",
+      "sourcePaste": "Incolla",
+      "dropPrompt": "Trascina un file qui o {choose}",
+      "dropPromptMultiple": "Trascina i file qui o {choose}",
+      "chooseAFile": "scegli un file",
+      "chooseFiles": "scegli i file",
+      "chooseFileButton": "Scegli file",
+      "chooseFilesButton": "Scegli file",
+      "noFileChosen": "Nessun file scelto",
+      "dropToUpload": "Rilascia per caricare",
+      "upToSize": "fino a {size}",
+      "upToSizeEach": "fino a {size} ciascuno",
+      "oneFile": "un file",
+      "upToFiles": "fino a {count} file",
+      "typeRejected": "Sono accettati solo file {allowed}",
+      "sizeRejected": "{size} supera il limite di {max}",
+      "countRejected": "Solo {count} file alla volta | Solo {count} file alla volta",
+      "uploadFailed": "Caricamento non riuscito",
+      "uploaded": "Caricato",
+      "urlPlaceholder": "URL del file",
+      "urlHelp": "Lo scarichiamo una volta quando importi.",
+      "textPlaceholder": "Incolla qui il contenuto",
+      "invalidJson": "JSON non valido: {detail}",
       "removeFile": "Rimuovi file",
       "clearAll": "Cancella tutto"
     },
@@ -24086,7 +24129,14 @@
     "pagination": {
       "pagination": "Paginazione",
       "previousPage": "Pagina precedente",
-      "nextPage": "Pagina successiva"
+      "nextPage": "Pagina successiva",
+      "onFirstPage": "Sei già alla prima pagina",
+      "onLastPage": "Sei già all'ultima pagina",
+      "range": "{from}–{to} di {total}",
+      "rangeOfMany": "{from}–{to} di molti",
+      "pageOf": "Pagina {page} di {pages}",
+      "perPage": "{size} per pagina",
+      "pageSize": "Righe per pagina"
     },
     "select": {
       "more": "altro",
@@ -24096,6 +24146,10 @@
       "noOptionsFound": "Nessuna opzione trovata",
       "multiSelect": "Selezione multipla",
       "singleSelect": "Selezione singola",
+      "any": "Qualsiasi",
+      "noMatches": "Nessuna corrispondenza per \"{term}\"",
+      "clearSearch": "Cancella ricerca",
+      "addOption": "Aggiungi \"{value}\"",
       "moreInfoAbout": "Maggiori informazioni su {field}",
       "moreInfo": "Maggiori informazioni"
     },
@@ -24138,7 +24192,10 @@
       "removeColumnAria": "Rimuovi colonna",
       "formatColumnAria": "Formatta colonna",
       "selectedOfTotal": "{selected} di {total} selezionati",
-      "selectedCount": "{selected} selezionati"
+      "selectedCount": "{selected} selezionati",
+      "clearSelection": "Cancella",
+      "rowActions": "Azioni della riga",
+      "moreRowActions": "Altre azioni"
     },
     "predefinedThemes": {
       "title": "Tema",
@@ -24289,7 +24346,7 @@
         "ok": "OK",
         "normal": "Normale",
         "firing": "Attivo",
-        "notifyfailed": "Notifica fallita",
+        "notifyfailed": "Consegna non riuscita",
         "flapping": "Oscillante",
         "anomaly": "Anomalia",
         "succeeded": "Riuscito",
@@ -24512,6 +24569,26 @@
     },
     "chartPlaceholder": {
       "loading": "Caricamento grafico"
+    },
+    "jsonViewer": {
+      "include": "Filtra per questo valore",
+      "exclude": "Escludi questo valore",
+      "copyValue": "Copia valore",
+      "fieldCount": "{count} campo | {count} campi",
+      "itemCount": "{count} elemento | {count} elementi"
+    },
+    "tabs": {
+      "more": "Altro",
+      "unsaved": "Modifiche non salvate",
+      "locked": "Bloccato"
+    },
+    "statStrip": {
+      "filters": "Filtri",
+      "showOnly": "Mostra solo {label}",
+      "alsoShow": "Mostra anche {label}",
+      "stopShowing": "Non mostrare più {label}",
+      "scrollBack": "Mostra i filtri precedenti",
+      "scrollForward": "Mostra altri filtri"
     }
   },
   "functions": {
@@ -25824,6 +25901,7 @@
       "packUnavailableHint": "I contenuti curati per questo workload non sono ancora stati rilasciati. Nel frattempo, crea una dashboard per rappresentarli.",
       "partialTelemetryKubernetes": "Abbiamo trovato stream Kubernetes, ma non le metriche necessarie a questa pagina (kubeletstats o cluster receiver). Controlla i receiver del tuo collector.",
       "partialTelemetryHosts": "Abbiamo trovato stream host, ma non le metriche necessarie a questa pagina. Controlla il receiver hostmetrics del tuo collector.",
+      "hostMetricsMissingTitle": "Nessuna metrica host trovata",
       "hiddenSummary": "{capabilities}",
       "hiddenSummaryMore": "{first} e altri {count}",
       "hiddenFootnote": "Anche le origini dei dati a cui non hai accesso compaiono qui.",
@@ -26608,7 +26686,8 @@
         "p95": "La coda lenta — 1 chiamata su 20 ha impiegato almeno questo tempo. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
         "p99": "Il peggior 1% delle chiamate ha impiegato almeno questo tempo. Misurato dalle chiamate completate nelle tracce della tua applicazione.",
         "load": "Tempo totale che le tue app hanno impiegato in chiamate a questo database, misurato dalle tracce della tua applicazione. Mostra quanto traffico questo database ha servito per le tue app.",
-        "attention": "Quanto questa istanza è vicina a un limite pubblicato dal suo motore — oggi, connessioni rispetto a max_connections. Il peggior rapporto, non un punteggio misto. Ordinato dal più alto al più basso, con le istanze la cui salute non può essere letta in cima, perché una che non puoi vedere non è una che sai essere sana. Misurato sul server del database, quindi non è confrontabile con il tempo database accanto."
+        "attention": "Quanto questa istanza è vicina a un limite pubblicato dal suo motore — oggi, connessioni rispetto a max_connections. Il peggior rapporto, non un punteggio misto. Ordinato dal più alto al più basso, con le istanze la cui salute non può essere letta in cima, perché una che non puoi vedere non è una che sai essere sana. Misurato sul server del database, quindi non è confrontabile con il tempo database accanto.",
+        "calls": "Quante volte le tue app hanno chiamato questo database, misurato dalle tracce della tua applicazione."
       },
       "failedChip": "{count} non riuscite",
       "columnSubLabels": {
@@ -27049,7 +27128,8 @@
         "tableHealthHint": "Dimensioni delle tabelle, bloat e stato del vacuum. Bloat e vacuum sono solo per PostgreSQL.",
         "deadlocksLocked": "I deadlock sono una funzionalità Enterprise. Esegui l'upgrade per vedere quali query sono entrate in deadlock tra loro e perché. Le altre schede database funzionano su ogni piano.",
         "blockedLocked": "Le query bloccate sono una funzionalità Enterprise. Esegui l'upgrade per vedere quali sessioni sono in attesa di un lock e cosa lo detiene. Le altre schede database funzionano su ogni piano.",
-        "tableHealthLocked": "La salute delle tabelle è una funzionalità Enterprise. Esegui l'upgrade per monitorare dimensioni, bloat e stato del vacuum delle tabelle. Le altre schede database funzionano su ogni piano."
+        "tableHealthLocked": "La salute delle tabelle è una funzionalità Enterprise. Esegui l'upgrade per monitorare dimensioni, bloat e stato del vacuum delle tabelle. Le altre schede database funzionano su ogni piano.",
+        "queriesHintServer": "Tipi di query segnalati dai tuoi database in questo intervallo, contati all'interno del database."
       }
     },
     "metrics": {
@@ -28274,6 +28354,7 @@
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Sopprimi la notifica",
     "savePolicyFailed": "Non è stato possibile salvare la policy",
+    "savePolicyFailedReason": "Criterio non salvato. {reason}",
     "state_triggered": "Attivato",
     "state_triaged": "In triage",
     "state_acknowledged": "Preso in carico",
@@ -29958,423 +30039,6 @@
         "noData": "AutoObserve non ha ancora cronologia per {stream}, quindi non ha un livello usuale.",
         "approximate": "Il livello usuale è approssimativo: parte della sua cronologia è mancante."
       }
-    }
-  },
-  "autoobserveLive": {
-    "where": "{cluster} / {namespace}",
-    "lessThan": "<{value}",
-    "topbar": {
-      "checked": "Controllato {ago}",
-      "firstCheck": "Primo controllo in corso"
-    },
-    "retry": "Riprova",
-    "classes": {
-      "errors": "Errori",
-      "latency": "Latenza",
-      "saturation": "Saturazione",
-      "absence": "Smette di inviare",
-      "external_probe": "Controllo sintetico",
-      "workload_health": "Riavvii",
-      "node": "Nodi"
-    },
-    "classesInline": {
-      "errors": "errori",
-      "latency": "latenza",
-      "saturation": "saturazione",
-      "absence": "assenza",
-      "external_probe": "sonde esterne",
-      "workload_health": "integrità del workload",
-      "node": "integrità del nodo"
-    },
-    "states": {
-      "covered": "Monitorato",
-      "weak": "Debole",
-      "silent": "Silenzioso",
-      "blind": "Cieco",
-      "unmapped": "Non mappato",
-      "none": "Nessuno"
-    },
-    "monitorKinds": {
-      "alert": "Avviso",
-      "anomaly_detector": "Rilevatore di anomalie",
-      "slo": "SLO",
-      "synthetic": "Sintetico"
-    },
-    "coverage": {
-      "summaryWatched": "{watched} di {total} monitorati · {pct}%",
-      "summaryWatchedShare": "{watched} di {total} monitorati · {pct}",
-      "splitLabel": "{watched} monitorati, {gaps} con una lacuna di copertura",
-      "stateWatched": "Monitorato",
-      "stateGap": "Lacuna di copertura",
-      "columns": {
-        "where": "Dove",
-        "state": "Stato",
-        "lastChecked": "Ultimo controllo"
-      },
-      "loading": "Caricamento copertura",
-      "loaded": "Copertura caricata",
-      "sentence": {
-        "allWatched": "Sto monitorando il tuo servizio. | Sto monitorando tutti i tuoi {total} servizi.",
-        "allGaps": "Il tuo servizio ha una lacuna di copertura. | Tutti i tuoi {total} servizi hanno una lacuna di copertura.",
-        "watching": "Sto monitorando {watched} dei tuoi {total} servizi.",
-        "gaps": "{count} ha una lacuna di copertura. | {count} hanno una lacuna di copertura.",
-        "mixed": "{watching} {gaps}"
-      },
-      "gapAdded": "Aggiunto un avviso per {checks}. AutoObserve lo conta al prossimo controllo. | Aggiunti avvisi per {checks}. AutoObserve li conta al prossimo controllo.",
-      "gapNone": "Nessun avviso monitora {checks}",
-      "searchPlaceholder": "Cerca servizio, cluster o namespace",
-      "labelNamespace": "{name} · {namespace}",
-      "labelPlace": "{name} · {cluster} · {namespace}",
-      "noNamespace": "nessun namespace",
-      "noCluster": "nessun cluster",
-      "noMatch": "Nessun servizio, cluster o namespace corrisponde a “{query}”",
-      "showAll": "Mostra tutto",
-      "bucketThree": "3 o più",
-      "bucketTwo": "2",
-      "bucketOne": "1",
-      "filterHides": "Nessun servizio è {state}",
-      "filterHidesSearch": "{count} servizio corrisponde a “{query}”, ma non è {state} | {count} servizi corrispondono a “{query}”, ma nessuno è {state}"
-    },
-    "cell": {
-      "noClass": "AutoObserve non controlla ancora questo segnale",
-      "tipNoClass": "{signal}: AutoObserve non lo controlla ancora",
-      "gap": {
-        "weak": "{signal}: solo {monitor}, un avviso generico, potrebbe notare un problema; non è limitato a questo servizio | {signal}: solo {monitor}, avvisi generici, potrebbero notare un problema; non sono limitati a questo servizio",
-        "silent": "{signal}: {monitor} corrisponde, ma non notifica nessuno | {signal}: {monitor} corrispondono, ma non notificano nessuno",
-        "blind": "{signal}: {monitor} corrisponde, ma non riesce a vedere i suoi dati | {signal}: {monitor} corrispondono, ma non riescono a vedere i loro dati",
-        "unmapped": "{signal}: {monitor} potrebbe corrispondere, ma il suo ambito non può essere collegato a un servizio | {signal}: {monitor} potrebbero corrispondere, ma il loro ambito non può essere collegato a un servizio",
-        "none": "{signal}: nessun avviso controlla questo"
-      },
-      "added": "Aggiunto"
-    },
-    "drawer": {
-      "moreChecks": "Altri controlli",
-      "chartNoData": "Grafico non ancora disponibile",
-      "monitors": "Avvisi",
-      "monitorLine": "{kind} · {state}",
-      "noMonitor": "Nessun avviso corrisponde"
-    },
-    "charts": {
-      "empty1h": "Nessun dato da {service} nell'ultima ora",
-      "empty24h": "Nessun dato da {service} nelle ultime 24 ore",
-      "empty7d": "Nessun dato da {service} negli ultimi 7 giorni",
-      "emptyPartial1h": "Nessun dato da {service} nella parte analizzata dell'ultima ora",
-      "emptyPartial24h": "Nessun dato da {service} nella parte analizzata delle ultime 24 ore",
-      "emptyPartial7d": "Nessun dato da {service} nella parte analizzata degli ultimi 7 giorni",
-      "noSpanStatus": "Nessuno stato dello span in {stream}",
-      "noLevel": "Nessun livello di log in {stream}",
-      "noDuration": "Nessun campo di durata in {stream}",
-      "noTraces": "La latenza è rappresentata dalle tracce. {service} non ne invia nessuna.",
-      "noMatch": "Impossibile associare questo servizio ai suoi stream",
-      "failedQuery": "Impossibile caricare questo grafico da {stream}",
-      "failedMatch": "Impossibile cercare gli stream di {service}",
-      "partial": "Dati parziali",
-      "wide": "Include altri servizi che condividono questo stream",
-      "loading": "Caricamento di {metric}",
-      "summary": "{metric}, {value} ora",
-      "summaryNone": "{metric}, nulla misurato nel bucket più recente"
-    },
-    "suggestions": {
-      "serviceMeta": "{where}, circa {traffic} eventi all'ora",
-      "trafficOnly": "Circa {traffic} eventi all'ora",
-      "kinds": {
-        "coverage_gap": "Lacuna di copertura",
-        "no_absence_check": "Avviso mancante",
-        "silent_coverage": "Non notifica nessuno",
-        "coverage_lost": "Copertura persa",
-        "blind_guardrail": "Non funzionante",
-        "discovery_unusable": "Qualità dei dati",
-        "alert_no_destination": "Non notifica nessuno",
-        "alert_notify_failed": "Notifica non riuscita",
-        "other": "Altro"
-      },
-      "severity": {
-        "high": "Alta",
-        "medium": "Media"
-      },
-      "confidence": {
-        "sufficient": "Evidenza solida",
-        "suggestive": "Evidenza parziale",
-        "insufficient": "Evidenza debole"
-      },
-      "body": {
-        "coverageGap": "Nessuno monitora {service}",
-        "noAbsenceNone": "Nessun avviso se {service} smette di inviare dati",
-        "noAbsenceWeak": "Solo un avviso generico rileverebbe se {service} smette di inviare dati",
-        "noAbsenceSilent": "Il controllo che rileverebbe se {service} smette di inviare dati non notifica nessuno",
-        "noAbsenceBlind": "Il controllo che rileverebbe se {service} smette di inviare dati non vede i suoi dati",
-        "silentCoverage": "{monitor} monitora {classes} su {count} servizio ma non notifica nessuno | {monitor} monitora {classes} su {count} servizi ma non notifica nessuno",
-        "silentWhy": "{monitor} rileverebbe l'interruzione di {services}, ma non notifica nessuno.",
-        "silentWhyNoNames": "{monitor} rileverebbe l'interruzione di un servizio, ma non notifica nessuno.",
-        "silentNext": "Imposta una destinazione.",
-        "undeliverable": "{monitor} non riesce a raggiungere {destination}",
-        "undeliverableWhy": "{destination} accetta ticket, non avvisi. | {destination} accettano ticket, non avvisi.",
-        "undeliverableNext": "Aggiungi un webhook o un'email accanto; {destination} resta. | Aggiungi un webhook o un'email accanto; {destination} restano.",
-        "coverageLost": "{service} ha perso il proprio avviso {classes} il {day}",
-        "blindStreamMissing": "{monitor} legge {detail}, che non esiste",
-        "blindNoData": "{monitor} legge {detail}, che non ha dati recenti",
-        "blindEmptyScope": "{monitor} filtra righe che non arrivano mai",
-        "blindUnknownField": "{monitor} filtra su {field}, un campo che il suo stream non ha",
-        "blindIgnoredMatcher": "{monitor} cerca corrispondenze su {label}, un'etichetta che nessuna serie ha, quindi monitora tutte le serie",
-        "discovery": "Solo {good} dei {active} servizi rilevati sono utilizzabili, quindi le classifiche delle lacune sono parziali",
-        "alertSyntax": "{monitor} ha una query che non può essere analizzata",
-        "alertTimeout": "{monitor} va ripetutamente in timeout prima di terminare",
-        "alertMemory": "{monitor} esaurisce ripetutamente la memoria",
-        "alertOtherError": "{monitor} continua a fallire con un errore",
-        "alertNotWorkingGeneric": "{monitor} non funziona",
-        "alertNoDestination": "{monitor} si è attivato e non notifica nessuno",
-        "alertNotifyFailed": "{monitor} si è attivato e {failed} notifica su {tried} non è riuscita. | {monitor} si è attivato e {failed} notifiche su {tried} non sono riuscite.",
-        "alertNotifyFailedNoCounts": "{monitor} si è attivato e le sue notifiche non sono riuscite.",
-        "alertStreamGone": "{monitor} continua a fallire perché il suo stream non esiste",
-        "alertFieldGone": "{monitor} continua a fallire perché un campo che usa non esiste",
-        "other": "Ho trovato qualcosa che questa pagina non può ancora mostrare"
-      },
-      "detail": {
-        "cell": "{check}: {state}",
-        "cells": "Cosa ha trovato il motore: {cells}.",
-        "services": "I servizi corrispondenti includono {services}.",
-        "text": "Dettaglio motore: {detail}",
-        "quality": "Il rilevamento è in esecuzione in modalità {mode}.",
-        "none": "Il motore non ha inviato altri dettagli.",
-        "joined": "{first} {rest}"
-      },
-      "analysedAt": "Dalla calibrazione {ago}",
-      "neverFired": "Mai attivato",
-      "lastFired": "Ultima attivazione {time}",
-      "accept": "Accetta",
-      "dismiss": "Ignora…",
-      "accepted": "Accettato in questa anteprima; non è stato inviato nulla",
-      "dismissed": "Ignorato in questa anteprima; non è stato inviato nulla",
-      "loading": "Caricamento suggerimenti",
-      "loaded": "Suggerimenti caricati",
-      "more": "e altri {count} | e altri {count}",
-      "moreNames": "altri {count} | altri {count}",
-      "whyNext": "{why} {next}",
-      "seeAll": "Vedi tutti",
-      "drawerTitle": "Suggerimenti",
-      "drawerLine": "Ordinati per importanza: prima ciò che conta di più. Apri una riga per vedere cosa ho trovato.",
-      "focusGone": "Questo suggerimento non è più aperto.",
-      "clearKind": "Mostra tutti i suggerimenti",
-      "kindEmptyTitle": "Nessun suggerimento aperto del tipo {kind}",
-      "kindEmptyDesc": "{count} altro suggerimento è aperto. | {count} altri suggerimenti sono aperti.",
-      "folder": "Cartella {folder}",
-      "columns": {
-        "suggestion": "Suggerimento",
-        "where": "Dove",
-        "kind": "Tipo",
-        "severity": "Gravità"
-      }
-    },
-    "notice": {
-      "offTitle": "AutoObserve non è attivo",
-      "details": "Dettagli",
-      "refreshFailed": "Aggiornamento non riuscito alle {failedAt} · mostro {what} del {dataAt}",
-      "what": {
-        "coverage": "copertura",
-        "suggestions": "suggerimenti",
-        "incidents": "segnalazioni notificate",
-        "issues": "problemi",
-        "history": "cronologia"
-      },
-      "coverage": {
-        "deniedTitle": "Non hai l'autorizzazione per vedere la copertura",
-        "deniedDesc": "La copertura conteggia i monitor in ogni cartella, quindi richiede l'autorizzazione a visualizzare tutti gli avvisi di questa organizzazione, non solo quelli di alcune cartelle. Richiedila a un amministratore dell'organizzazione.",
-        "offDesc": "Un amministratore la attiva per questa distribuzione. La copertura compare qui dopo il primo controllo.",
-        "unavailableTitle": "La copertura è temporaneamente non disponibile",
-        "unavailableDesc": "AutoObserve non risponde in questo momento. Di solito si risolve entro un minuto o due.",
-        "failedTitle": "Impossibile caricare la copertura",
-        "failedDesc": "Si è verificato un errore durante il caricamento. Riprova tra un momento.",
-        "noPassTitle": "Nessun controllo è terminato nell'ultimo giorno",
-        "noPassDesc": "La copertura compare qui al termine del mio prossimo controllo dei tuoi servizi. Se AutoObserve è appena stato attivato, il primo controllo può richiedere un po' di tempo.",
-        "noPassAction": "Come controllo la copertura",
-        "noServicesTitle": "Nessun servizio trovato finora",
-        "noServicesDesc": "Il mio ultimo controllo, {when}, non ha trovato servizi. I servizi compaiono qui quando inviano log, metriche o tracce che indicano un servizio.",
-        "noServicesAction": "Come trovo i servizi"
-      },
-      "suggestions": {
-        "deniedTitle": "Non hai l'autorizzazione per vedere i suggerimenti",
-        "deniedDesc": "Per vederli serve l'autorizzazione a visualizzare gli avvisi in questa organizzazione. Richiedila a un amministratore dell'organizzazione.",
-        "offDesc": "I suggerimenti compaiono qui dopo che un amministratore li attiva per questa distribuzione.",
-        "unavailableTitle": "I suggerimenti sono temporaneamente non disponibili",
-        "unavailableDesc": "AutoObserve non risponde in questo momento. Di solito si risolve entro un minuto o due.",
-        "failedTitle": "Impossibile caricare i suggerimenti",
-        "failedDesc": "Si è verificato un errore durante il caricamento. Riprova tra un momento.",
-        "emptyTitle": "Nessun suggerimento al momento",
-        "emptyDesc": "Ne aggiungerò uno qui quando troverò una lacuna nella copertura dei tuoi monitor.",
-        "pageEmptyTitle": "I suggerimenti principali sono già stati gestiti",
-        "pageEmptyDesc": "Apri l'elenco completo per quelli ancora in attesa."
-      },
-      "history": {
-        "deniedTitle": "Non hai l'autorizzazione per vedere la cronologia",
-        "deniedDesc": "La cronologia elenca gli incidenti aperti da AutoObserve, quindi per vederla serve l'autorizzazione a elencare gli incidenti in questa organizzazione. Richiedila a un amministratore dell'organizzazione.",
-        "offDesc": "La cronologia appare qui dopo che un amministratore l'ha attivata per questa distribuzione.",
-        "unavailableTitle": "La cronologia è temporaneamente non disponibile",
-        "unavailableDesc": "AutoObserve non risponde in questo momento. Di solito si risolve entro un minuto o due.",
-        "failedTitle": "Impossibile caricare la cronologia",
-        "failedDesc": "Si è verificato un errore durante il caricamento. Riprova tra un momento."
-      },
-      "incidents": {
-        "deniedTitle": "Non hai l'autorizzazione per vedere le segnalazioni con notifica",
-        "deniedDesc": "Le segnalazioni con notifica aprono incidenti, quindi per vederle serve l'autorizzazione a elencare gli incidenti in questa organizzazione. Richiedila a un amministratore dell'organizzazione.",
-        "offDesc": "Le segnalazioni con notifica appaiono qui dopo che un amministratore l'ha attivata per questa distribuzione.",
-        "unavailableTitle": "Le segnalazioni con notifica sono temporaneamente non disponibili",
-        "unavailableDesc": "AutoObserve non risponde in questo momento. Di solito si risolve entro un minuto o due.",
-        "failedTitle": "Impossibile caricare le segnalazioni con notifica",
-        "failedDesc": "Si è verificato un errore durante il caricamento. Riprova tra un momento."
-      },
-      "issues": {
-        "deniedTitle": "Non hai l'autorizzazione per vedere le problematiche",
-        "deniedDesc": "Le problematiche sono incidenti aperti da AutoObserve, quindi per vederle serve l'autorizzazione a elencare gli incidenti in questa organizzazione. Richiedila a un amministratore dell'organizzazione.",
-        "offDesc": "Le problematiche appaiono qui dopo che un amministratore l'ha attivata per questa distribuzione.",
-        "unavailableTitle": "Le problematiche sono temporaneamente non disponibili",
-        "unavailableDesc": "AutoObserve non risponde in questo momento. Di solito si risolve entro un minuto o due.",
-        "failedTitle": "Impossibile caricare le problematiche",
-        "failedDesc": "Si è verificato un errore durante il caricamento. Riprova tra un momento."
-      }
-    },
-    "time": {
-      "justNow": "adesso",
-      "ago": "{time} fa"
-    },
-    "history": {
-      "incident": "Incidente aperto: {title}",
-      "dismissed": "{actor} ha ignorato {title}",
-      "accepted": "{actor} ha contrassegnato {title} come segnalazione intenzionale",
-      "changed": "{actor} ha modificato {title}",
-      "denied": {
-        "incidents": "Gli incidenti non sono elencati: non hai l'autorizzazione per vederli.",
-        "decisions": "Le decisioni non sono elencate: non hai l'autorizzazione per vederle."
-      },
-      "untitled": "un suggerimento",
-      "openIncident": "Apri incidente",
-      "newest": "Visualizzati i {count} più recenti. Gli incidenti meno recenti sono nella pagina Problemi.",
-      "loading": "Caricamento cronologia",
-      "loaded": "Cronologia caricata"
-    },
-    "incidents": {
-      "title": "Segnalazioni con notifica",
-      "subtitle": "Segnalazioni che hanno aperto un incidente per il team di reperibilità, con la relativa analisi.",
-      "pagingNote": "Le notifiche sono disattivate per questa organizzazione, quindi AutoObserve non apre incidenti.",
-      "sharedFor": "{label}: {reason}",
-      "finding": {
-        "stream_silence": "{stream} ({type}) ha smesso di inviare dati",
-        "stream_drop": "Il volume di {stream} ({type}) è calato bruscamente",
-        "stream_rise": "Il volume di {stream} ({type}) è aumentato bruscamente"
-      },
-      "opened": "Incidente aperto {when}",
-      "openIncident": "Apri incidente",
-      "viewAnalysis": "Visualizza analisi",
-      "newFindings": "{count} nuova segnalazione | {count} nuove segnalazioni",
-      "showNew": "Mostra",
-      "more": "Visualizzati i {count} più recenti",
-      "seeAll": "Vedi tutti gli incidenti",
-      "seeAllIssues": "Vedi tutte le problematiche",
-      "failedDetail": {
-        "status": "La richiesta non è riuscita con stato {status} alle {time}.",
-        "noResponse": "La richiesta non ha ricevuto risposta alle {time}."
-      },
-      "analysis": {
-        "notRunDetail": "Nessuna analisi è stata avviata. Apri l'incidente per avviarne una.",
-        "disabledDetail": "L'analisi AI è disattivata per questa distribuzione.",
-        "offOther": "L'analisi automatica non è stata eseguita per questo incidente.",
-        "failedDetail": "L'analisi si è interrotta prima di concludersi. Visualizzala per i dettagli."
-      },
-      "empty": {
-        "title": "Nessuno ha ricevuto notifiche",
-        "desc": "Quando uno stream si arresta o il suo volume cambia bruscamente, il relativo incidente e l'analisi compaiono qui."
-      },
-      "emptyOff": {
-        "title": "Le notifiche sono disattivate",
-        "desc": "AutoObserve registra i risultati degli stream per questa organizzazione ma non apre incidenti. È un amministratore ad attivare le notifiche."
-      },
-      "loading": "Caricamento dei risultati notificati…",
-      "loaded": "Risultati notificati caricati",
-      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
-      "routing": "Set up on-call routing"
-    },
-    "issues": {
-      "searchPlaceholder": "Cerca cosa è successo o uno stream",
-      "columns": {
-        "incident": "Cosa è successo",
-        "severity": "Gravità",
-        "status": "Stato",
-        "stream": "Stream",
-        "opened": "Aperto",
-        "analysis": "Analisi",
-        "page": "Chi ha ricevuto la notifica"
-      },
-      "count": "Nessun problema | {count} problema | {count} problemi",
-      "capNote": "Visualizzazione dei {count} problemi più recenti. Restringi l'intervallo per vedere quelli meno recenti.",
-      "emptyRange": "Nessun problema {within}",
-      "streamType": "stream di {type}",
-      "streamMore": "{stream} +{count}",
-      "filterOpen": "Aperti",
-      "loading": "Caricamento dei problemi…",
-      "loaded": "Problemi caricati",
-      "page": {
-        "unrouted": "Nessuno notificato",
-        "failed": "Notifica non riuscita",
-        "pending": "Non ancora confermato"
-      },
-      "today": "Oggi",
-      "yesterday": "Ieri",
-      "shared": {
-        "rcaDisabled": "L'analisi AI era disattivata quando questi incidenti sono stati aperti.",
-        "aiUnavailable": "L'analisi AI non era disponibile quando questi incidenti sono stati aperti.",
-        "quotaExceeded": "L'organizzazione aveva raggiunto il limite di analisi AI quando questi incidenti sono stati aperti.",
-        "coolingDown": "Un'analisi era appena stata eseguita, quindi non ne è stata avviata una nuova per questi incidenti.",
-        "startFailed": "Non è stato possibile avviare le analisi.",
-        "offOther": "L'analisi automatica non è stata eseguita per questi incidenti.",
-        "disabled": "L'analisi AI è disattivata per questa distribuzione.",
-        "notRun": "Nessuna analisi è stata avviata. Apri un incidente per avviarne una.",
-        "failed": "Queste analisi si sono interrotte prima di concludersi. Visualizzane una per i dettagli."
-      }
-    },
-    "surfaces": {
-      "changes": {
-        "title": "Nessuna modifica per ora",
-        "desc": "AutoObserve suggerisce correzioni ma non ha modificato alcun avviso o impostazione. Quando effettua una modifica, questa compare qui con l'indicazione se ha funzionato. Per ora, esamina i suoi suggerimenti e applica quelli che desideri.",
-        "action": "Esamina i suggerimenti"
-      },
-      "history": {
-        "title": "Nessuna cronologia per ora",
-        "desc": "Ciò che AutoObserve rileva, ciò che modifica e ciò che decidi tu sarà elencato qui, dal più recente. Oggi i suoi risultati aprono incidenti, che si trovano nella pagina Problemi.",
-        "action": "Apri i problemi"
-      },
-      "scenario": {
-        "tag": "Dati live",
-        "text": "Stai visualizzando i dati live di questa organizzazione. Gli scenari di esempio non sono mostrati qui.",
-        "action": "Come funziona"
-      },
-      "settings": {
-        "title": "Niente da impostare qui per ora",
-        "desc": "Un amministratore attiva AutoObserve e le relative notifiche per questa installazione. Chi viene notificato e quanto agisce in autonomia saranno impostati qui una volta che questi controlli esisteranno.",
-        "action": "Come funziona"
-      }
-    },
-    "paging": {
-      "title": "Paging",
-      "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
-      "routing": "On-call routing",
-      "unavailable": "Paging is turned off for this deployment.",
-      "denied": "{denied} {askAdmin}",
-      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
-      "deniedTitle": "Non hai l'autorizzazione per vedere l'impostazione delle notifiche",
-      "deniedDesc": "Le notifiche vengono impostate una volta per l'intera organizzazione. Chiedi l'accesso a un amministratore dell'organizzazione.",
-      "failedTitle": "Impossibile caricare l'impostazione delle notifiche",
-      "failedDesc": "Si è verificato un errore durante il caricamento. Riprova tra poco.",
-      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
-    },
-    "learning": {
-      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
-      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
-      "emptyTitle": "Learning your streams",
-      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
-      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
-      "until": "Learning until {date} · {streams}",
-      "streams": "Learning {count} stream | Learning {count} streams",
-      "streamUntil": "until {date}"
     }
   },
   "autoobserve2": {
@@ -33081,6 +32745,520 @@
     "deletedQuery": "Eliminata {query}",
     "undo": "Annulla"
   },
+  "filterBar": {
+    "ariaLabel": "Filtra per campo",
+    "placeholder": "Filtra per campo oppure digita campo=valore. Premi Invio per eseguire",
+    "addFilter": "Aggiungi filtro",
+    "searchFields": "Cerca campi",
+    "searchLabels": "Cerca etichette",
+    "searchOperators": "Cerca condizioni",
+    "searchValue": "Cerca o digita un valore",
+    "searchValues": "Cerca valori",
+    "textField": "Testo",
+    "useValue": "Usa \"{value}\"",
+    "useField": "Usa il campo \"{field}\"",
+    "useLabel": "Usa l'etichetta \"{field}\"",
+    "searchText": "Cerca \"{text}\" in tutto il testo",
+    "emptyValue": "(vuoto)",
+    "loadingFields": "Caricamento campi…",
+    "noFields": "Nessun campo corrispondente",
+    "noValues": "Nessun suggerimento. Digita un valore e premi Invio",
+    "noOperators": "Nessuna condizione corrispondente",
+    "removeFilter": "Rimuovi filtro",
+    "clearAll": "Cancella tutti i filtri",
+    "toggleConnector": "Alterna tra AND e OR",
+    "selectedCount": "Nessun valore selezionato | {count} valore selezionato | {count} valori selezionati",
+    "query": "Query",
+    "validation": {
+      "incomplete": "Completa questo filtro o rimuovilo",
+      "required": "Aggiungi almeno un filtro",
+      "uniqueField": "{field} ha già un filtro; modifica quello o rimuovi questo",
+      "oneUsageCondition": "Un livello accetta una condizione di utilizzo; trasforma questa in una regola o rimuovila",
+      "rumField": "Usa un campo predefinito o una colonna di lettere minuscole, cifre e caratteri di sottolineatura, fino a 128 caratteri",
+      "valueLength": "Ogni valore deve avere da 1 a {max} caratteri",
+      "regexLength": "Usa al massimo {max} caratteri nel pattern.",
+      "regexInvalid": "Questo pattern non è valido o non è supportato. Non è possibile usare lookahead, lookbehind e riferimenti all'indietro."
+    },
+    "operatorNames": {
+      "containsIgnoreCase": "Contiene (ignora maiuscole/minuscole)",
+      "notStartsWith": "Non inizia con",
+      "notEndsWith": "Non termina con",
+      "isEmpty": "È vuoto",
+      "isNotEmpty": "Non è vuoto"
+    },
+    "types": {
+      "string": "Testo",
+      "number": "Numero",
+      "boolean": "Booleano"
+    },
+    "operators": {
+      "eq": "è",
+      "neq": "non è",
+      "gt": "maggiore di",
+      "gte": "maggiore o uguale",
+      "lt": "minore di",
+      "lte": "minore o uguale",
+      "contains": "contiene",
+      "containsIgnoreCase": "contiene, ignorando maiuscole/minuscole",
+      "notContains": "non contiene",
+      "startsWith": "inizia con",
+      "notStartsWith": "non inizia con",
+      "endsWith": "termina con",
+      "notEndsWith": "non termina con",
+      "in": "è uno di",
+      "notIn": "non è nessuno di",
+      "regex": "corrisponde alla regex",
+      "notRegex": "non corrisponde alla regex",
+      "isNull": "non ha valore",
+      "isNotNull": "ha un valore",
+      "isEmpty": "è vuoto o non ha valore",
+      "isNotEmpty": "ha un valore non vuoto",
+      "matchAll": "corrisponde al testo"
+    },
+    "queryTooltip": "Modifica il filtro come testo",
+    "queryNotParsableShort": "Il generatore di filtri non può mostrare questa query:",
+    "clearAndBuild": "Cancella e crea",
+    "clearQueryTitle": "Cancellare la query?",
+    "clearQueryMessage": "La query viene rimossa e il generatore parte vuoto.",
+    "where": "Dove",
+    "addCondition": "Aggiungi condizione",
+    "addGroup": "Aggiungi gruppo",
+    "startGroup": "Inizia un gruppo",
+    "addBelow": "Aggiungi condizione sotto",
+    "ungroup": "Annulla raggruppamento",
+    "collapseGroup": "Comprimi gruppo",
+    "expandGroup": "Espandi gruppo",
+    "moreInGroup": "{count} altri",
+    "groupHasIssues": "Qualcosa in questo gruppo deve essere corretto",
+    "chooseField": "Scegli un campo",
+    "chooseValue": "Scegli un valore",
+    "lockedFilter": "Questo filtro non può essere modificato qui. Resta come salvato; rimuovilo per eliminarlo",
+    "limits": {
+      "conditions": "Fino a {count} filtro | Fino a {count} filtri",
+      "values": "Fino a {count} valore | Fino a {count} valori"
+    },
+    "builderTooltip": "Modifica il filtro con il builder",
+    "editorModeLabel": "Editor dei filtri",
+    "modeBuilder": "Builder",
+    "modeText": "Testo"
+  },
+  "autoobserveLive": {
+    "where": "{cluster} / {namespace}",
+    "lessThan": "<{value}",
+    "topbar": {
+      "checked": "Controllato {ago}",
+      "firstCheck": "Primo controllo in corso"
+    },
+    "retry": "Riprova",
+    "classes": {
+      "errors": "Errori",
+      "latency": "Latenza",
+      "saturation": "Saturazione",
+      "absence": "Smette di inviare",
+      "external_probe": "Controllo sintetico",
+      "workload_health": "Riavvii",
+      "node": "Nodi"
+    },
+    "classesInline": {
+      "errors": "errori",
+      "latency": "latenza",
+      "saturation": "saturazione",
+      "absence": "assenza",
+      "external_probe": "sonde esterne",
+      "workload_health": "integrità del workload",
+      "node": "integrità del nodo"
+    },
+    "states": {
+      "covered": "Monitorato",
+      "weak": "Debole",
+      "silent": "Silenzioso",
+      "blind": "Cieco",
+      "unmapped": "Non mappato",
+      "none": "Nessuno"
+    },
+    "monitorKinds": {
+      "alert": "Avviso",
+      "anomaly_detector": "Rilevatore di anomalie",
+      "slo": "SLO",
+      "synthetic": "Sintetico"
+    },
+    "coverage": {
+      "summaryWatched": "{watched} di {total} monitorati · {pct}%",
+      "summaryWatchedShare": "{watched} di {total} monitorati · {pct}",
+      "splitLabel": "{watched} monitorati, {gaps} con una lacuna di copertura",
+      "stateWatched": "Monitorato",
+      "stateGap": "Lacuna di copertura",
+      "columns": {
+        "where": "Dove",
+        "state": "Stato",
+        "lastChecked": "Ultimo controllo"
+      },
+      "loading": "Caricamento copertura",
+      "loaded": "Copertura caricata",
+      "sentence": {
+        "allWatched": "Sto monitorando il tuo servizio. | Sto monitorando tutti i tuoi {total} servizi.",
+        "allGaps": "Il tuo servizio ha una lacuna di copertura. | Tutti i tuoi {total} servizi hanno una lacuna di copertura.",
+        "watching": "Sto monitorando {watched} dei tuoi {total} servizi.",
+        "gaps": "{count} ha una lacuna di copertura. | {count} hanno una lacuna di copertura.",
+        "mixed": "{watching} {gaps}"
+      },
+      "gapAdded": "Aggiunto un avviso per {checks}. AutoObserve lo conta al prossimo controllo. | Aggiunti avvisi per {checks}. AutoObserve li conta al prossimo controllo.",
+      "gapNone": "Nessun avviso monitora {checks}",
+      "searchPlaceholder": "Cerca servizio, cluster o namespace",
+      "labelNamespace": "{name} · {namespace}",
+      "labelPlace": "{name} · {cluster} · {namespace}",
+      "noNamespace": "nessun namespace",
+      "noCluster": "nessun cluster",
+      "noMatch": "Nessun servizio, cluster o namespace corrisponde a “{query}”",
+      "showAll": "Mostra tutto",
+      "bucketThree": "3 o più",
+      "bucketTwo": "2",
+      "bucketOne": "1",
+      "filterHides": "Nessun servizio è {state}",
+      "filterHidesSearch": "{count} servizio corrisponde a “{query}”, ma non è {state} | {count} servizi corrispondono a “{query}”, ma nessuno è {state}"
+    },
+    "cell": {
+      "noClass": "AutoObserve non controlla ancora questo segnale",
+      "tipNoClass": "{signal}: AutoObserve non lo controlla ancora",
+      "gap": {
+        "weak": "{signal}: solo {monitor}, un avviso generico, potrebbe notare un problema; non è limitato a questo servizio | {signal}: solo {monitor}, avvisi generici, potrebbero notare un problema; non sono limitati a questo servizio",
+        "silent": "{signal}: {monitor} corrisponde, ma non notifica nessuno | {signal}: {monitor} corrispondono, ma non notificano nessuno",
+        "blind": "{signal}: {monitor} corrisponde, ma non riesce a vedere i suoi dati | {signal}: {monitor} corrispondono, ma non riescono a vedere i loro dati",
+        "unmapped": "{signal}: {monitor} potrebbe corrispondere, ma il suo ambito non può essere collegato a un servizio | {signal}: {monitor} potrebbero corrispondere, ma il loro ambito non può essere collegato a un servizio",
+        "none": "{signal}: nessun avviso controlla questo"
+      },
+      "added": "Aggiunto"
+    },
+    "drawer": {
+      "moreChecks": "Altri controlli",
+      "chartNoData": "Grafico non ancora disponibile",
+      "monitors": "Avvisi",
+      "monitorLine": "{kind} · {state}",
+      "noMonitor": "Nessun avviso corrisponde"
+    },
+    "charts": {
+      "empty1h": "Nessun dato da {service} nell'ultima ora",
+      "empty24h": "Nessun dato da {service} nelle ultime 24 ore",
+      "empty7d": "Nessun dato da {service} negli ultimi 7 giorni",
+      "emptyPartial1h": "Nessun dato da {service} nella parte analizzata dell'ultima ora",
+      "emptyPartial24h": "Nessun dato da {service} nella parte analizzata delle ultime 24 ore",
+      "emptyPartial7d": "Nessun dato da {service} nella parte analizzata degli ultimi 7 giorni",
+      "noSpanStatus": "Nessuno stato dello span in {stream}",
+      "noLevel": "Nessun livello di log in {stream}",
+      "noDuration": "Nessun campo di durata in {stream}",
+      "noTraces": "La latenza è rappresentata dalle tracce. {service} non ne invia nessuna.",
+      "noMatch": "Impossibile associare questo servizio ai suoi stream",
+      "failedQuery": "Impossibile caricare questo grafico da {stream}",
+      "failedMatch": "Impossibile cercare gli stream di {service}",
+      "partial": "Dati parziali",
+      "wide": "Include altri servizi che condividono questo stream",
+      "loading": "Caricamento di {metric}",
+      "summary": "{metric}, {value} ora",
+      "summaryNone": "{metric}, nulla misurato nel bucket più recente"
+    },
+    "suggestions": {
+      "serviceMeta": "{where}, circa {traffic} eventi all'ora",
+      "trafficOnly": "Circa {traffic} eventi all'ora",
+      "kinds": {
+        "coverage_gap": "Lacuna di copertura",
+        "no_absence_check": "Avviso mancante",
+        "silent_coverage": "Non notifica nessuno",
+        "coverage_lost": "Copertura persa",
+        "blind_guardrail": "Non funzionante",
+        "discovery_unusable": "Qualità dei dati",
+        "alert_no_destination": "Non notifica nessuno",
+        "alert_notify_failed": "Notifica non riuscita",
+        "other": "Altro"
+      },
+      "severity": {
+        "high": "Alta",
+        "medium": "Media"
+      },
+      "confidence": {
+        "sufficient": "Evidenza solida",
+        "suggestive": "Evidenza parziale",
+        "insufficient": "Evidenza debole"
+      },
+      "body": {
+        "coverageGap": "Nessuno monitora {service}",
+        "noAbsenceNone": "Nessun avviso se {service} smette di inviare dati",
+        "noAbsenceWeak": "Solo un avviso generico rileverebbe se {service} smette di inviare dati",
+        "noAbsenceSilent": "Il controllo che rileverebbe se {service} smette di inviare dati non notifica nessuno",
+        "noAbsenceBlind": "Il controllo che rileverebbe se {service} smette di inviare dati non vede i suoi dati",
+        "silentCoverage": "{monitor} monitora {classes} su {count} servizio ma non notifica nessuno | {monitor} monitora {classes} su {count} servizi ma non notifica nessuno",
+        "silentWhy": "{monitor} rileverebbe l'interruzione di {services}, ma non notifica nessuno.",
+        "silentWhyNoNames": "{monitor} rileverebbe l'interruzione di un servizio, ma non notifica nessuno.",
+        "silentNext": "Imposta una destinazione.",
+        "undeliverable": "{monitor} non riesce a raggiungere {destination}",
+        "undeliverableWhy": "{destination} accetta ticket, non avvisi. | {destination} accettano ticket, non avvisi.",
+        "undeliverableNext": "Aggiungi un webhook o un'email accanto; {destination} resta. | Aggiungi un webhook o un'email accanto; {destination} restano.",
+        "coverageLost": "{service} ha perso il proprio avviso {classes} il {day}",
+        "blindStreamMissing": "{monitor} legge {detail}, che non esiste",
+        "blindNoData": "{monitor} legge {detail}, che non ha dati recenti",
+        "blindEmptyScope": "{monitor} filtra righe che non arrivano mai",
+        "blindUnknownField": "{monitor} filtra su {field}, un campo che il suo stream non ha",
+        "blindIgnoredMatcher": "{monitor} cerca corrispondenze su {label}, un'etichetta che nessuna serie ha, quindi monitora tutte le serie",
+        "discovery": "Solo {good} dei {active} servizi rilevati sono utilizzabili, quindi le classifiche delle lacune sono parziali",
+        "alertSyntax": "{monitor} ha una query che non può essere analizzata",
+        "alertTimeout": "{monitor} va ripetutamente in timeout prima di terminare",
+        "alertMemory": "{monitor} esaurisce ripetutamente la memoria",
+        "alertOtherError": "{monitor} continua a fallire con un errore",
+        "alertNotWorkingGeneric": "{monitor} non funziona",
+        "alertNoDestination": "{monitor} si è attivato e non notifica nessuno",
+        "alertNotifyFailed": "{monitor} si è attivato e {failed} notifica su {tried} non è riuscita. | {monitor} si è attivato e {failed} notifiche su {tried} non sono riuscite.",
+        "alertNotifyFailedNoCounts": "{monitor} si è attivato e le sue notifiche non sono riuscite.",
+        "alertStreamGone": "{monitor} continua a fallire perché il suo stream non esiste",
+        "alertFieldGone": "{monitor} continua a fallire perché un campo che usa non esiste",
+        "other": "Ho trovato qualcosa che questa pagina non può ancora mostrare"
+      },
+      "detail": {
+        "cell": "{check}: {state}",
+        "cells": "Cosa ha trovato il motore: {cells}.",
+        "services": "I servizi corrispondenti includono {services}.",
+        "text": "Dettaglio motore: {detail}",
+        "quality": "Il rilevamento è in esecuzione in modalità {mode}.",
+        "none": "Il motore non ha inviato altri dettagli.",
+        "joined": "{first} {rest}"
+      },
+      "analysedAt": "Dalla calibrazione {ago}",
+      "neverFired": "Mai attivato",
+      "lastFired": "Ultima attivazione {time}",
+      "accept": "Accetta",
+      "dismiss": "Ignora…",
+      "accepted": "Accettato in questa anteprima; non è stato inviato nulla",
+      "dismissed": "Ignorato in questa anteprima; non è stato inviato nulla",
+      "loading": "Caricamento suggerimenti",
+      "loaded": "Suggerimenti caricati",
+      "more": "e altri {count} | e altri {count}",
+      "moreNames": "altri {count} | altri {count}",
+      "whyNext": "{why} {next}",
+      "seeAll": "Vedi tutti",
+      "drawerTitle": "Suggerimenti",
+      "drawerLine": "Ordinati per importanza: prima ciò che conta di più. Apri una riga per vedere cosa ho trovato.",
+      "focusGone": "Questo suggerimento non è più aperto.",
+      "clearKind": "Mostra tutti i suggerimenti",
+      "kindEmptyTitle": "Nessun suggerimento aperto del tipo {kind}",
+      "kindEmptyDesc": "{count} altro suggerimento è aperto. | {count} altri suggerimenti sono aperti.",
+      "folder": "Cartella {folder}",
+      "columns": {
+        "suggestion": "Suggerimento",
+        "where": "Dove",
+        "kind": "Tipo",
+        "severity": "Gravità"
+      }
+    },
+    "notice": {
+      "offTitle": "AutoObserve non è attivo",
+      "details": "Dettagli",
+      "refreshFailed": "Aggiornamento non riuscito alle {failedAt} · mostro {what} del {dataAt}",
+      "what": {
+        "coverage": "copertura",
+        "suggestions": "suggerimenti",
+        "incidents": "segnalazioni notificate",
+        "issues": "problemi",
+        "history": "cronologia"
+      },
+      "coverage": {
+        "deniedTitle": "Non hai l'autorizzazione per vedere la copertura",
+        "deniedDesc": "La copertura conteggia i monitor in ogni cartella, quindi richiede l'autorizzazione a visualizzare tutti gli avvisi di questa organizzazione, non solo quelli di alcune cartelle. Richiedila a un amministratore dell'organizzazione.",
+        "offDesc": "Un amministratore la attiva per questa distribuzione. La copertura compare qui dopo il primo controllo.",
+        "unavailableTitle": "La copertura è temporaneamente non disponibile",
+        "unavailableDesc": "AutoObserve non risponde in questo momento. Di solito si risolve entro un minuto o due.",
+        "failedTitle": "Impossibile caricare la copertura",
+        "failedDesc": "Si è verificato un errore durante il caricamento. Riprova tra un momento.",
+        "noPassTitle": "Nessun controllo è terminato nell'ultimo giorno",
+        "noPassDesc": "La copertura compare qui al termine del mio prossimo controllo dei tuoi servizi. Se AutoObserve è appena stato attivato, il primo controllo può richiedere un po' di tempo.",
+        "noPassAction": "Come controllo la copertura",
+        "noServicesTitle": "Nessun servizio trovato finora",
+        "noServicesDesc": "Il mio ultimo controllo, {when}, non ha trovato servizi. I servizi compaiono qui quando inviano log, metriche o tracce che indicano un servizio.",
+        "noServicesAction": "Come trovo i servizi"
+      },
+      "suggestions": {
+        "deniedTitle": "Non hai l'autorizzazione per vedere i suggerimenti",
+        "deniedDesc": "Per vederli serve l'autorizzazione a visualizzare gli avvisi in questa organizzazione. Richiedila a un amministratore dell'organizzazione.",
+        "offDesc": "I suggerimenti compaiono qui dopo che un amministratore li attiva per questa distribuzione.",
+        "unavailableTitle": "I suggerimenti sono temporaneamente non disponibili",
+        "unavailableDesc": "AutoObserve non risponde in questo momento. Di solito si risolve entro un minuto o due.",
+        "failedTitle": "Impossibile caricare i suggerimenti",
+        "failedDesc": "Si è verificato un errore durante il caricamento. Riprova tra un momento.",
+        "emptyTitle": "Nessun suggerimento al momento",
+        "emptyDesc": "Ne aggiungerò uno qui quando troverò una lacuna nella copertura dei tuoi monitor.",
+        "pageEmptyTitle": "I suggerimenti principali sono già stati gestiti",
+        "pageEmptyDesc": "Apri l'elenco completo per quelli ancora in attesa."
+      },
+      "history": {
+        "deniedTitle": "Non hai l'autorizzazione per vedere la cronologia",
+        "deniedDesc": "La cronologia elenca gli incidenti aperti da AutoObserve, quindi per vederla serve l'autorizzazione a elencare gli incidenti in questa organizzazione. Richiedila a un amministratore dell'organizzazione.",
+        "offDesc": "La cronologia appare qui dopo che un amministratore l'ha attivata per questa distribuzione.",
+        "unavailableTitle": "La cronologia è temporaneamente non disponibile",
+        "unavailableDesc": "AutoObserve non risponde in questo momento. Di solito si risolve entro un minuto o due.",
+        "failedTitle": "Impossibile caricare la cronologia",
+        "failedDesc": "Si è verificato un errore durante il caricamento. Riprova tra un momento."
+      },
+      "incidents": {
+        "deniedTitle": "Non hai l'autorizzazione per vedere le segnalazioni con notifica",
+        "deniedDesc": "Le segnalazioni con notifica aprono incidenti, quindi per vederle serve l'autorizzazione a elencare gli incidenti in questa organizzazione. Richiedila a un amministratore dell'organizzazione.",
+        "offDesc": "Le segnalazioni con notifica appaiono qui dopo che un amministratore l'ha attivata per questa distribuzione.",
+        "unavailableTitle": "Le segnalazioni con notifica sono temporaneamente non disponibili",
+        "unavailableDesc": "AutoObserve non risponde in questo momento. Di solito si risolve entro un minuto o due.",
+        "failedTitle": "Impossibile caricare le segnalazioni con notifica",
+        "failedDesc": "Si è verificato un errore durante il caricamento. Riprova tra un momento."
+      },
+      "issues": {
+        "deniedTitle": "Non hai l'autorizzazione per vedere le problematiche",
+        "deniedDesc": "Le problematiche sono incidenti aperti da AutoObserve, quindi per vederle serve l'autorizzazione a elencare gli incidenti in questa organizzazione. Richiedila a un amministratore dell'organizzazione.",
+        "offDesc": "Le problematiche appaiono qui dopo che un amministratore l'ha attivata per questa distribuzione.",
+        "unavailableTitle": "Le problematiche sono temporaneamente non disponibili",
+        "unavailableDesc": "AutoObserve non risponde in questo momento. Di solito si risolve entro un minuto o due.",
+        "failedTitle": "Impossibile caricare le problematiche",
+        "failedDesc": "Si è verificato un errore durante il caricamento. Riprova tra un momento."
+      }
+    },
+    "time": {
+      "justNow": "adesso",
+      "ago": "{time} fa"
+    },
+    "history": {
+      "incident": "Incidente aperto: {title}",
+      "dismissed": "{actor} ha ignorato {title}",
+      "accepted": "{actor} ha contrassegnato {title} come segnalazione intenzionale",
+      "changed": "{actor} ha modificato {title}",
+      "denied": {
+        "incidents": "Gli incidenti non sono elencati: non hai l'autorizzazione per vederli.",
+        "decisions": "Le decisioni non sono elencate: non hai l'autorizzazione per vederle."
+      },
+      "untitled": "un suggerimento",
+      "openIncident": "Apri incidente",
+      "newest": "Visualizzati i {count} più recenti. Gli incidenti meno recenti sono nella pagina Problemi.",
+      "loading": "Caricamento cronologia",
+      "loaded": "Cronologia caricata"
+    },
+    "incidents": {
+      "title": "Segnalazioni con notifica",
+      "subtitle": "Segnalazioni che hanno aperto un incidente per il team di reperibilità, con la relativa analisi.",
+      "pagingNote": "Le notifiche sono disattivate per questa organizzazione, quindi AutoObserve non apre incidenti.",
+      "sharedFor": "{label}: {reason}",
+      "finding": {
+        "stream_silence": "{stream} ({type}) ha smesso di inviare dati",
+        "stream_drop": "Il volume di {stream} ({type}) è calato bruscamente",
+        "stream_rise": "Il volume di {stream} ({type}) è aumentato bruscamente"
+      },
+      "opened": "Incidente aperto {when}",
+      "openIncident": "Apri incidente",
+      "viewAnalysis": "Visualizza analisi",
+      "newFindings": "{count} nuova segnalazione | {count} nuove segnalazioni",
+      "showNew": "Mostra",
+      "more": "Visualizzati i {count} più recenti",
+      "seeAll": "Vedi tutti gli incidenti",
+      "seeAllIssues": "Vedi tutte le problematiche",
+      "failedDetail": {
+        "status": "La richiesta non è riuscita con stato {status} alle {time}.",
+        "noResponse": "La richiesta non ha ricevuto risposta alle {time}."
+      },
+      "analysis": {
+        "notRunDetail": "Nessuna analisi è stata avviata. Apri l'incidente per avviarne una.",
+        "disabledDetail": "L'analisi AI è disattivata per questa distribuzione.",
+        "offOther": "L'analisi automatica non è stata eseguita per questo incidente.",
+        "failedDetail": "L'analisi si è interrotta prima di concludersi. Visualizzala per i dettagli."
+      },
+      "empty": {
+        "title": "Nessuno ha ricevuto notifiche",
+        "desc": "Quando uno stream si arresta o il suo volume cambia bruscamente, il relativo incidente e l'analisi compaiono qui."
+      },
+      "emptyOff": {
+        "title": "Le notifiche sono disattivate",
+        "desc": "AutoObserve registra i risultati degli stream per questa organizzazione ma non apre incidenti. È un amministratore ad attivare le notifiche."
+      },
+      "loading": "Caricamento dei risultati notificati…",
+      "loaded": "Risultati notificati caricati",
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "issues": {
+      "searchPlaceholder": "Cerca cosa è successo o uno stream",
+      "columns": {
+        "incident": "Cosa è successo",
+        "severity": "Gravità",
+        "status": "Stato",
+        "stream": "Stream",
+        "opened": "Aperto",
+        "analysis": "Analisi",
+        "page": "Chi ha ricevuto la notifica"
+      },
+      "count": "Nessun problema | {count} problema | {count} problemi",
+      "capNote": "Visualizzazione dei {count} problemi più recenti. Restringi l'intervallo per vedere quelli meno recenti.",
+      "emptyRange": "Nessun problema {within}",
+      "streamType": "stream di {type}",
+      "streamMore": "{stream} +{count}",
+      "filterOpen": "Aperti",
+      "loading": "Caricamento dei problemi…",
+      "loaded": "Problemi caricati",
+      "page": {
+        "unrouted": "Nessuno notificato",
+        "failed": "Notifica non riuscita",
+        "pending": "Non ancora confermato"
+      },
+      "today": "Oggi",
+      "yesterday": "Ieri",
+      "shared": {
+        "rcaDisabled": "L'analisi AI era disattivata quando questi incidenti sono stati aperti.",
+        "aiUnavailable": "L'analisi AI non era disponibile quando questi incidenti sono stati aperti.",
+        "quotaExceeded": "L'organizzazione aveva raggiunto il limite di analisi AI quando questi incidenti sono stati aperti.",
+        "coolingDown": "Un'analisi era appena stata eseguita, quindi non ne è stata avviata una nuova per questi incidenti.",
+        "startFailed": "Non è stato possibile avviare le analisi.",
+        "offOther": "L'analisi automatica non è stata eseguita per questi incidenti.",
+        "disabled": "L'analisi AI è disattivata per questa distribuzione.",
+        "notRun": "Nessuna analisi è stata avviata. Apri un incidente per avviarne una.",
+        "failed": "Queste analisi si sono interrotte prima di concludersi. Visualizzane una per i dettagli."
+      }
+    },
+    "surfaces": {
+      "changes": {
+        "title": "Nessuna modifica per ora",
+        "desc": "AutoObserve suggerisce correzioni ma non ha modificato alcun avviso o impostazione. Quando effettua una modifica, questa compare qui con l'indicazione se ha funzionato. Per ora, esamina i suoi suggerimenti e applica quelli che desideri.",
+        "action": "Esamina i suggerimenti"
+      },
+      "history": {
+        "title": "Nessuna cronologia per ora",
+        "desc": "Ciò che AutoObserve rileva, ciò che modifica e ciò che decidi tu sarà elencato qui, dal più recente. Oggi i suoi risultati aprono incidenti, che si trovano nella pagina Problemi.",
+        "action": "Apri i problemi"
+      },
+      "scenario": {
+        "tag": "Dati live",
+        "text": "Stai visualizzando i dati live di questa organizzazione. Gli scenari di esempio non sono mostrati qui.",
+        "action": "Come funziona"
+      },
+      "settings": {
+        "title": "Niente da impostare qui per ora",
+        "desc": "Un amministratore attiva AutoObserve e le relative notifiche per questa installazione. Chi viene notificato e quanto agisce in autonomia saranno impostati qui una volta che questi controlli esisteranno.",
+        "action": "Come funziona"
+      }
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "deniedTitle": "Non hai l'autorizzazione per vedere l'impostazione delle notifiche",
+      "deniedDesc": "Le notifiche vengono impostate una volta per l'intera organizzazione. Chiedi l'accesso a un amministratore dell'organizzazione.",
+      "failedTitle": "Impossibile caricare l'impostazione delle notifiche",
+      "failedDesc": "Si è verificato un errore durante il caricamento. Riprova tra poco.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
+    }
+  },
   "insight": {
     "targets": {
       "origin": "Creato da un suggerimento di AutoObserve per {service} il {date}.",
@@ -34462,5 +34640,60 @@
       },
       "noHighConfidence": "Nessun nome ad alta confidenza"
     }
+  },
+  "pageHeader": {
+    "about": "Informazioni su questa pagina"
+  },
+  "genAiAgentMapping": {
+    "tabLabel": "Mappatura agenti",
+    "title": "Mappatura agenti",
+    "subtitle": "Come l'identità degli agenti, l'attribuzione dei costi e i titoli delle sessioni vengono letti dalla telemetria",
+    "identity": {
+      "title": "Campi identità agente",
+      "help": "Come OpenObserve assegna un nome a ciascun agente e legge il suo ambiente e la versione. Legge prima l'attributo standard. Quando uno span non lo contiene, viene usato il primo campo di fallback presente nello span.",
+      "agentName": "Nome agente",
+      "agentId": "ID agente",
+      "env": "Ambiente",
+      "version": "Versione"
+    },
+    "agentNameFields": "Campi di fallback per il nome agente",
+    "agentNameHelp": "Attributi in ingresso da usare come fallback per gen_ai.agent.name.",
+    "agentNameInfo": "Verificato solo quando l'attributo standard gen_ai.agent.name è mancante o vuoto. Aggiungi un attributo di telemetria in ingresso per riga.",
+    "agentIdFields": "Campi di fallback per l'ID agente",
+    "agentIdHelp": "Attributi in ingresso da usare come fallback per gen_ai.agent.id.",
+    "agentIdInfo": "Verificato solo quando l'attributo standard gen_ai.agent.id è mancante o vuoto. Aggiungi un attributo di telemetria in ingresso per riga.",
+    "envFields": "Campi di fallback per l'ambiente",
+    "envHelp": "Attributi in ingresso da usare come ambiente dell'agente.",
+    "envInfo": "Verificato solo quando l'attributo standard deployment.environment.name è mancante o vuoto. Aggiungi un attributo di telemetria in ingresso per riga.",
+    "versionFields": "Campi di fallback per la versione",
+    "versionHelp": "Attributi in ingresso da usare come versione dell'agente.",
+    "versionInfo": "Verificato solo quando l'attributo standard gen_ai.agent.version è mancante o vuoto. Aggiungi un attributo di telemetria in ingresso per riga.",
+    "alwaysAppliedStandard": "Standard (verificato per primo):",
+    "coverageValue": "· nel {percent}% delle tracce, nelle ultime 24 ore",
+    "fallbacksNote": "Inserisci i campi di fallback separati da virgole, nell'ordine da verificare.",
+    "fallbackInvalid": "Usa nomi di campo separati da virgole. Solo lettere, numeri e . _ - : / {'@'}.",
+    "sessions": {
+      "title": "Visualizzazione sessioni",
+      "help": "Come vengono intitolate le sessioni e quale testo wrapper viene nascosto.",
+      "noAgents": "Nessun agente ancora. Aggiungi un agente per nasconderne il testo wrapper."
+    },
+    "applyDefaults": "Applica valori predefiniti",
+    "resetToEmpty": "Reimposta a vuoto",
+    "clearRegistry": "Svuota registro",
+    "clearRegistryTitle": "Svuotare il registro agenti?",
+    "clearRegistryDescription": "Questo elimina tutte le righe del registro agenti GenAI rilevate per questa organizzazione. Le nuove tracce corrispondenti ripopoleranno il registro durante l'ingestione.",
+    "clearRegistryConfirm": "Svuota registro",
+    "saved": "Mappatura agenti salvata",
+    "unsavedConfirm": "Le modifiche alla mappatura agenti non sono state salvate. Vuoi scartarle?",
+    "clearRegistrySuccess": "Registro agenti GenAI svuotato. Eliminati {deletedCount} agenti memorizzati e {bufferCount} osservazioni in coda.",
+    "saveFailed": "Impossibile salvare la mappatura agenti",
+    "clearRegistryFailed": "Impossibile svuotare il registro agenti GenAI",
+    "defaultsLoadFailed": "Impossibile caricare i valori predefiniti della mappatura agenti",
+    "defaultsFetchFailed": "Impossibile recuperare i valori predefiniti ({status})"
+  },
+  "copyButton": {
+    "copy": "Copia",
+    "copied": "Copiato",
+    "failed": "Copia bloccata · premi Ctrl C"
   }
 }

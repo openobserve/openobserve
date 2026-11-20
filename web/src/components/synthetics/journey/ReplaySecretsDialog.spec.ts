@@ -35,23 +35,17 @@ const ODialogStub = defineComponent({
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "formId",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "secondaryButtonVariant",
-    "neutralButtonLabel",
-    "neutralButtonVariant",
-    "primaryButtonLoading",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
+    "primary",
+    "secondary",
+    "extra",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
   methods: {
-    primary() {
+    onPrimary() {
       const root = this.$el as HTMLElement;
       const form = this.formId ? root.querySelector(`form[id="${this.formId}"]`) : null;
       if (form) form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
@@ -62,9 +56,9 @@ const ODialogStub = defineComponent({
     <div v-if="open" class="dialog-stub">
       <h2 data-test="dialog-stub-title">{{ title }}</h2>
       <slot />
-      <button v-if="neutralButtonLabel" data-test="dialog-stub-neutral" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
-      <button v-if="secondaryButtonLabel" data-test="dialog-stub-secondary" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-      <button v-if="primaryButtonLabel" data-test="dialog-stub-primary" :disabled="primaryButtonDisabled" @click="primary">{{ primaryButtonLabel }}</button>
+      <button v-if="extra?.label" data-test="dialog-stub-neutral" @click="$emit('click:extra')">{{ extra?.label }}</button>
+      <button v-if="secondary?.label" data-test="dialog-stub-secondary" @click="$emit('click:secondary')">{{ secondary?.label }}</button>
+      <button v-if="primary?.label" data-test="dialog-stub-primary" :disabled="primary?.disabled" @click="onPrimary">{{ primary?.label }}</button>
     </div>`,
 });
 const OIconStub = { props: ["name", "size"], template: '<i :data-icon="name" />' };

@@ -21,6 +21,7 @@ import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
 import { defineComponent, h, ref } from "vue";
 import HostsPage from "./HostsPage.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import i18n from "@/locales";
 import analytics from "@/services/product_analytics";
 
@@ -115,11 +116,11 @@ const passthrough = (name: string) =>
     },
   });
 
-// Mirrors DateTime.vue's exposed refresh(): the page re-anchors a relative
+// Mirrors ODateTimeRange's exposed refresh(): the page re-anchors a relative
 // range by calling it, so the stub has to expose a spy rather than a no-op.
 const dateTimeRefreshSpy = vi.fn();
 const dateTimeStub = defineComponent({
-  name: "DateTime",
+  name: "ODateTimeRange",
   emits: ["on:date-change"],
   setup(_p, { expose }) {
     expose({ refresh: dateTimeRefreshSpy });
@@ -209,7 +210,7 @@ describe("HostsPage", () => {
           OTable: OTableStub,
           OPageLayout: passthrough("OPageLayout"),
           OPageHeader: passthrough("OPageHeader"),
-          DateTime: dateTimeStub,
+          ODateTimeRange: dateTimeStub,
           HostDetailDrawer: drawerStub,
           DataSourceSetupCard: setupCardStub,
           HostsDependenciesView: depsStub,
@@ -465,14 +466,14 @@ describe("HostsPage", () => {
     it("gives the bar the same threshold semantics as the number", async () => {
       wrapper = await mountPage();
       const hot = wrapper.findComponent({ name: "OProgressBar" });
-      expect(hot.props("variant")).toBe("danger");
+      expect(hot.props("tone")).toBe("err");
 
       const warnCell = wrapper.find('[data-test="hosts-cell-memory-web-01"]');
-      expect(warnCell.findComponent({ name: "OProgressBar" }).props("variant")).toBe("warning");
+      expect(warnCell.findComponent({ name: "OProgressBar" }).props("tone")).toBe("warn");
       expect(warnCell.find("span.tabular-nums").classes()).toContain("text-warning");
 
       const coolCell = wrapper.find('[data-test="hosts-cell-cpu-web-02"]');
-      expect(coolCell.findComponent({ name: "OProgressBar" }).props("variant")).toBe("default");
+      expect(coolCell.findComponent({ name: "OProgressBar" }).props("tone")).toBe("accent");
       expect(coolCell.find("span.tabular-nums").classes()).not.toContain("text-warning");
     });
 
@@ -737,7 +738,7 @@ describe("HostsPage", () => {
       wrapper = await mountPage();
       hostsListState.refresh.mockClear();
       wrapper
-        .findComponent({ name: "DateTime" })
+        .findComponent({ name: "ODateTimeRange" })
         .vm.$emit("on:date-change", { startTime: 111, endTime: 222 });
       await flushPromises();
       expect(hostsListState.refresh).toHaveBeenCalled();
@@ -747,9 +748,9 @@ describe("HostsPage", () => {
       wrapper = await mountPage();
       hostsListState.refresh.mockClear();
       vi.mocked(analytics.track).mockClear();
-      // DateTime.vue contract: the mount emit is stamped programmatic — "do not fetch".
+      // ODateTimeRange contract: the mount emit is stamped programmatic — "do not fetch".
       wrapper
-        .findComponent({ name: "DateTime" })
+        .findComponent({ name: "ODateTimeRange" })
         .vm.$emit("on:date-change", { startTime: 111, endTime: 222, userChangedValue: false });
       await flushPromises();
       expect(hostsListState.refresh).not.toHaveBeenCalled();
@@ -763,7 +764,7 @@ describe("HostsPage", () => {
       wrapper = await mountPage();
       vi.mocked(analytics.track).mockClear();
       wrapper
-        .findComponent({ name: "DateTime" })
+        .findComponent({ name: "ODateTimeRange" })
         .vm.$emit("on:date-change", { startTime: 1, endTime: 2, valueType: "absolute" });
       await flushPromises();
       expect(analytics.track).toHaveBeenCalledWith("infra_time_range_changed", {
@@ -777,7 +778,7 @@ describe("HostsPage", () => {
       wrapper = await mountPage();
       hostsListState.refresh.mockClear();
       wrapper
-        .findComponent({ name: "DateTime" })
+        .findComponent({ name: "ODateTimeRange" })
         .vm.$emit("on:date-change", { startTime: 111, endTime: 222, userChangedValue: true });
       await flushPromises();
       expect(hostsListState.refresh).not.toHaveBeenCalled();
@@ -806,7 +807,7 @@ describe("HostsPage", () => {
       // The re-anchor fallback must not become a second way past the detection gate.
       dateTimeRefreshSpy.mockImplementation(() => {
         wrapper
-          .findComponent({ name: "DateTime" })
+          .findComponent({ name: "ODateTimeRange" })
           .vm.$emit("on:date-change", { startTime: 900, endTime: 1000, userChangedValue: false });
       });
       workloadStates.value = { ...workloadStates.value, hosts: "undetected" };
@@ -824,7 +825,7 @@ describe("HostsPage", () => {
       const advanced = { startTime: 900, endTime: 1000 };
       dateTimeRefreshSpy.mockImplementation(() => {
         wrapper
-          .findComponent({ name: "DateTime" })
+          .findComponent({ name: "ODateTimeRange" })
           .vm.$emit("on:date-change", { ...advanced, userChangedValue: false });
       });
       wrapper = await mountPage();
@@ -930,10 +931,7 @@ describe("HostsPage", () => {
 
     it("spins the page's Refresh while the map reloads", async () => {
       wrapper = await mountPage({ view: "dependencies" });
-      const refresh = () =>
-        wrapper
-          .findAllComponents({ name: "OButton" })
-          .find((b) => b.attributes("data-test") === "hosts-refresh")!;
+      const refresh = () => wrapper.findComponent(ORefreshButton);
       deps().vm.$emit("loading", true);
       await flushPromises();
       expect(refresh().props("loading")).toBe(true);
@@ -999,7 +997,7 @@ describe("HostsPage", () => {
 
     it("reloads the map on a time change and on Refresh, not on the picker's mount replay", async () => {
       wrapper = await mountPage({ view: "dependencies" });
-      const picker = wrapper.findComponent({ name: "DateTime" });
+      const picker = wrapper.findComponent({ name: "ODateTimeRange" });
       picker.vm.$emit("on:date-change", { startTime: 1, endTime: 2, userChangedValue: false });
       await flushPromises();
       expect(deps().props("refreshNonce")).toBe(0);
@@ -1018,7 +1016,7 @@ describe("HostsPage", () => {
       expect(hostsListState.refresh).toHaveBeenCalledTimes(1);
       expect(deps().props("knownHosts")).toEqual(["web-01", "web-02", "db-01"]);
       hostsListState.refresh.mockClear();
-      const picker = wrapper.findComponent({ name: "DateTime" });
+      const picker = wrapper.findComponent({ name: "ODateTimeRange" });
       picker.vm.$emit("on:date-change", { startTime: 3, endTime: 4, valueType: "absolute" });
       await flushPromises();
       deps().vm.$emit("refresh");

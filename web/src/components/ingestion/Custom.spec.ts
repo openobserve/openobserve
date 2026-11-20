@@ -67,7 +67,7 @@ describe("Custom Component", () => {
             template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
           },
           OTabs: true,
-          ORouteTab: true,
+          OTab: true,
           "router-view": true,
         },
       },
@@ -88,7 +88,7 @@ describe("Custom Component", () => {
         global: {
           plugins: [i18n],
           provide: { store },
-          stubs: { ORouteTab: true, "router-view": true },
+          stubs: { OTab: true, "router-view": true },
         },
       });
     };
@@ -100,7 +100,7 @@ describe("Custom Component", () => {
 
     it("marks the Profiles tab with a lock when profiling is locked", () => {
       const w = mountWith({ continuous_profiling: "locked" });
-      expect(profilesTab(w).attributes("suffix-icon")).toBe("lock");
+      expect(profilesTab(w).attributes("locked")).toBe("true");
       w.unmount();
     });
 
@@ -115,7 +115,7 @@ describe("Custom Component", () => {
     it("shows the Profiles tab without a lock when profiling is enabled", () => {
       const w = mountWith({ continuous_profiling: "enabled" });
       expect(profilesTab(w).exists()).toBe(true);
-      expect(profilesTab(w).attributes("suffix-icon")).toBeUndefined();
+      expect(profilesTab(w).attributes("locked")).toBe("false");
       w.unmount();
     });
   });
@@ -176,7 +176,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -198,7 +198,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -220,7 +220,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -242,7 +242,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -275,7 +275,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -302,7 +302,7 @@ describe("Custom Component", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
 
       expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -323,7 +323,7 @@ describe("Custom Component", () => {
       }
 
       expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -376,7 +376,7 @@ describe("Custom Component", () => {
                 template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
               },
               OTabs: true,
-              ORouteTab: true,
+              OTab: true,
               "router-view": true,
             },
           },
@@ -400,7 +400,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -442,7 +442,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -465,7 +465,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -488,7 +488,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -511,7 +511,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -534,7 +534,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -561,7 +561,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -588,7 +588,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -615,7 +615,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -641,7 +641,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -664,7 +664,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -687,7 +687,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -710,7 +710,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -733,7 +733,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -756,7 +756,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -779,7 +779,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -805,7 +805,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -841,7 +841,7 @@ describe("Custom Component", () => {
               template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
             OTabs: true,
-            ORouteTab: true,
+            OTab: true,
             "router-view": true,
           },
         },
@@ -862,7 +862,7 @@ describe("Custom Component", () => {
     });
   });
 
-  describe("Product Analytics", () => {
+  describe("Product analytics", () => {
     it("should track analytics with correct parameters for different routes", async () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockResolvedValue(true);
@@ -919,7 +919,7 @@ describe("Custom Component", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
 
       expect(copyToClipboard).toHaveBeenCalledWith("", expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -936,7 +936,7 @@ describe("Custom Component", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
 
       expect(copyToClipboard).toHaveBeenCalledWith(null, expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -951,7 +951,7 @@ describe("Custom Component", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
 
       expect(copyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Function), {
-        successMessage: "Content Copied Successfully!",
+        successMessage: "Content copied successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });

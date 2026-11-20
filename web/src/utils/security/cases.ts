@@ -4,7 +4,7 @@
 
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { securityTime } from "@/utils/security/time";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import type { SeverityTone } from "./severity";
 
 export type CaseStatus = "open" | "acknowledged" | "resolved";
@@ -26,10 +26,10 @@ export function toneOfPriority(priority: string | null | undefined): SeverityTon
   }
 }
 
-export const STATUS_VARIANT: Record<CaseStatus, BadgeVariant> = {
-  open: "error-soft",
-  acknowledged: "warning-soft",
-  resolved: "success-soft",
+export const STATUS_VARIANT: Record<CaseStatus, ChipTone> = {
+  open: "err",
+  acknowledged: "warn",
+  resolved: "ok",
 };
 
 /** Transitions offered from each status; mirrors the server's status enum. */

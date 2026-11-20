@@ -89,8 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex shrink-0 items-center ps-2">
       <OButton
-        variant="ghost-muted"
-        size="xs"
+        variant="ghost"
+        size="sm"
         data-test="dbm-queries-insight-hide"
         @click="emit('dismissAll')"
       >

@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="fill && 'flex min-h-0 flex-1 flex-col'"
       v-slot="{ isSubmitting }"
     >
-      <div :class="fill && 'min-h-0 flex-1 overflow-auto px-4 pt-3'">
+      <div :class="fill && 'px-page-edge min-h-0 flex-1 overflow-auto pt-3'">
         <div class="w-full max-w-5xl">
           <!-- When the type is forced (step 1 skipped), the stepper is effectively a
              single step, so hide its header — the progress bar would just be noise. -->
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else
                       :name="destType.icon"
                       size="lg"
-                      class="card-icon text-icon-color group-[.selected]:text-card-glass-border mb-2 [transition:color_0.3s_ease]"
+                      class="card-icon text-icon-color group-[.selected]:text-card-glass-border mb-2 [transition:color_var(--duration-control)_var(--ease-control)]"
                     />
                     <div
                       class="card-label text-compact text-text-body group-[.selected]:text-text-body mt-1 text-center leading-[1.3] font-medium"
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Destination-specific Metadata Section -->
                 <div v-if="showMetadataFields" class="mt-4 flex flex-col gap-4">
-                  <div class="text-input-label w-full text-sm font-bold">
+                  <div class="text-input-label w-full text-sm font-semibold">
                     {{ t("alert_destinations.metadataConfigurationTitle") }}
                   </div>
 
@@ -311,22 +311,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div class="headers-btns w-1/6">
                         <OButton
+                          icon-only
                           :data-test="`add-destination-header-${header['key']}-delete-btn`"
                           variant="ghost"
-                          size="icon-xs-sq"
-                          :aria-label="t('common.delete')"
-                          :title="t('common.delete')"
+                          size="sm"
+                          :label="t('common.delete')"
                           @click="deleteApiHeader(index)"
-                          icon-left="delete"
+                          icon="delete"
                         />
                       </div>
                     </div>
                     <div>
                       <OButton
                         data-test="add-destination-add-header-btn"
-                        variant="outline"
-                        size="sm-action"
-                        icon-left="add"
+                        variant="secondary"
                         @click="addApiHeader()"
                       >
                         {{ t("alert_destinations.addHeader") }}
@@ -346,37 +344,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Connection Notes Card -->
-                <OCard
-                  class="connection-notes-card rounded-default border-banner-info-border bg-banner-info-bg! mt-4 border"
-                >
-                  <OCardSection role="body">
-                    <div class="mb-2 flex items-center">
-                      <OIcon name="info" size="md" class="me-2" />
-                      <div class="text-sm font-medium">
-                        {{ connectionNotes.title }}
-                      </div>
-                    </div>
-                    <div class="text-sm">
-                      <ol class="mb-0 ps-3 leading-[1.8]">
-                        <li
-                          v-for="(stepText, index) in connectionNotes.steps"
-                          :key="index"
-                          class="mb-2"
-                        >
-                          {{ stepText }}
-                        </li>
-                      </ol>
-                      <div
-                        v-if="connectionNotes.example"
-                        class="rounded-default text-compact bg-surface-base mt-2 p-2"
+                <OCard class="connection-notes-card mt-4" :title="connectionNotes.title">
+                  <div class="text-sm">
+                    <ol class="mb-0 ps-3 leading-[1.8]">
+                      <li
+                        v-for="(stepText, index) in connectionNotes.steps"
+                        :key="index"
+                        class="mb-2"
                       >
-                        <strong>{{ t("alert_destinations.exampleLabel") }}</strong>
-                        <code class="text-text-link ms-1 bg-transparent p-0 font-mono">{{
-                          connectionNotes.example
-                        }}</code>
-                      </div>
+                        {{ stepText }}
+                      </li>
+                    </ol>
+                    <div
+                      v-if="connectionNotes.example"
+                      class="rounded-default text-compact bg-surface-base mt-2 p-2"
+                    >
+                      <strong>{{ t("alert_destinations.exampleLabel") }}</strong>
+                      <code class="text-text-link ms-1 bg-transparent p-0 font-mono">{{
+                        connectionNotes.example
+                      }}</code>
                     </div>
-                  </OCardSection>
+                  </div>
                 </OCard>
               </OFormSection>
             </OStep>
@@ -388,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="step === 1"
         mode="create"
         :submit="false"
-        :class="fill ? 'shrink-0 px-4' : 'mt-4'"
+        :class="fill ? 'px-page-edge shrink-0' : 'mt-4'"
         :save-label="t('alerts.continue')"
         :save-disabled="!canProceedStep1"
         save-data-test="step1-continue-btn"
@@ -399,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSaveBar
         v-else
         mode="create"
-        :class="fill ? 'shrink-0 px-4' : 'mt-4'"
+        :class="fill ? 'px-page-edge shrink-0' : 'mt-4'"
         :save-label="t('alerts.save')"
         save-data-test="add-destination-submit-btn"
         cancel-data-test="add-destination-cancel-btn"
@@ -408,8 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="!forcedType" #actions>
           <OButton
             data-test="step3-back-btn"
-            variant="outline"
-            size="sm-action"
+            variant="secondary"
             :disabled="isSubmitting"
             @click="prevStep"
           >
@@ -427,7 +414,6 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
 import { ref, computed, watch } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";

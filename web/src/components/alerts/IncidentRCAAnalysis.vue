@@ -39,25 +39,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @retry="$emit('trigger-rca', { buildOnPrevious: false })"
       @open-analysis="$emit('open-analysis')"
     />
-    <section
+    <OEmptyState
       v-else
+      icon="auto-awesome"
+      :title="t('alerts.incidents.rcaRun.noAnalysisTitle')"
+      :text="t('alerts.incidents.rcaRun.noAnalysisText')"
       data-test="rca-trigger-section"
-      class="rounded-default border-border-default bg-surface-base flex max-w-215 flex-col items-start gap-2 border p-6"
     >
-      <h2 class="text-text-heading m-0 text-base font-bold">
-        {{ t("alerts.incidents.rcaRun.noAnalysisTitle") }}
-      </h2>
-      <p class="text-text-body text-compact m-0">
-        {{ t("alerts.incidents.rcaRun.noAnalysisText") }}
-      </p>
-      <div class="flex flex-wrap items-center gap-2">
+      <template #actions>
         <OTooltip :content="startLockedReason" :disabled="canStart" side="right">
           <span class="inline-flex">
             <OButton
               data-test="trigger-rca-btn"
               variant="primary"
-              size="sm"
-              :icon-left="canStart ? 'auto-awesome' : 'lock'"
+              :icon="canStart ? undefined : 'lock'"
               :disabled="!canStart"
               :loading="triggering"
               @click="$emit('trigger-rca', { buildOnPrevious: false })"
@@ -66,15 +61,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </span>
         </OTooltip>
-        <span
-          v-if="analyzeCreditCost && canStart"
-          data-test="rca-credit-cost"
-          class="text-text-secondary text-xs"
-        >
+      </template>
+      <template v-if="analyzeCreditCost && canStart" #extra>
+        <span data-test="rca-credit-cost" class="text-text-secondary text-xs">
           {{ t("alerts.incidents.rcaCreditCost", { cost: analyzeCreditCost }, analyzeCreditCost) }}
         </span>
-      </div>
-    </section>
+      </template>
+    </OEmptyState>
   </div>
 
   <div
@@ -105,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       role="status"
       class="text-text-secondary m-0 flex items-center gap-2 text-sm"
     >
-      <OSpinner variant="dots" size="xs" />
+      <OSpinner />
       {{ t("alerts.incidents.rcaRun.loadingReport") }}
     </p>
     <RcaReportLoadError v-else-if="ownReportFailed && !ownReport" @retry="$emit('retry-report')" />
@@ -142,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : t("alerts.incidents.rcaRun.state.investigating")
         }}
       </RcaPill>
-      <h2 class="text-text-heading m-0 text-base font-bold">
+      <h2 class="text-text-heading m-0 text-sm font-semibold">
         {{
           cardState === "investigating"
             ? t("alerts.incidents.rcaRun.reportAfterRun")
@@ -158,9 +151,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
       <OButton
         data-test="rca-report-follow-thread"
-        variant="outline"
-        size="sm"
-        icon-left="forum"
+        variant="secondary"
+        icon="forum"
         @click="$emit('open-analysis')"
       >
         {{
@@ -316,9 +308,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OButton
             data-test="rca-open-report-tab"
-            variant="ghost-primary"
-            size="sm"
-            icon-right="arrow-forward"
+            variant="accent-ghost"
+            icon-end="arrow-forward"
             @click="$emit('open-report')"
           >
             {{ t("alerts.incidents.rcaRun.readFullReport") }}
@@ -330,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rca-summary-loading"
         class="text-text-secondary m-0 flex items-center gap-2 text-sm"
       >
-        <OSpinner variant="dots" size="xs" />
+        <OSpinner />
         {{ t("alerts.incidents.rcaSummary.loading") }}
       </p>
 
@@ -340,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="rca-report-loading"
           class="text-text-secondary m-0 flex items-center gap-2 text-sm"
         >
-          <OSpinner variant="dots" size="xs" />
+          <OSpinner />
           {{ t("alerts.incidents.rcaRun.loadingReport") }}
         </p>
         <RcaReportLoadError
@@ -406,6 +397,7 @@ import { computed, nextTick, onUnmounted, ref, toRef, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

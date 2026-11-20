@@ -19,12 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="tableEl"
     :data="shown"
     :columns="columns"
-    :frame="false"
     row-key="id"
     :pagination="notice ? 'none' : 'client'"
     keep-page-on-data-change
     :page-size="PAGE_SIZE"
-    :show-global-filter="false"
     :loading="loading"
     :row-section="(row: IssueRow) => row.day"
     :row-rail-tone="(row: IssueRow) => row.tone"
@@ -43,25 +41,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="flex min-w-[12rem] flex-1 items-center sm:max-w-[22rem]">
           <label :for="SEARCH_ID" class="sr-only">{{ copy.searchLabel }}</label>
-          <OInput
+          <OSearchInput
             :id="SEARCH_ID"
             v-model="query"
-            size="sm"
-            clearable
             class="w-full"
             :placeholder="copy.searchPlaceholder"
             data-test="autoobserve-live-issues-search"
             @keydown.esc="clearSearch"
           >
-            <template #icon-left>
-              <OIcon name="search" size="sm" class="text-text-secondary" />
-            </template>
-          </OInput>
+          </OSearchInput>
           <span class="sr-only" role="status" data-test="autoobserve-live-issues-search-status">{{
             announcement
           }}</span>
         </div>
         <OToggleGroup
+          size="sm"
           :model-value="priority"
           :aria-label="copy.priorityLabel"
           data-test="autoobserve-live-issues-priority"
@@ -71,7 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="option in PRIORITY_FILTERS"
             :key="option"
             :value="option"
-            size="xs"
             :disabled="!settled || (!counts[option] && option !== priority)"
             :data-test="`autoobserve-live-issues-priority-${option}`"
           >
@@ -86,19 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="autoobserve-live-issues-filter"
           @update:model-value="(v) => (filter = v as StatusFilter)"
         >
-          <OToggleGroupItem
-            value="open"
-            size="sm"
-            data-test="autoobserve-live-issues-filter-open"
-            >{{ copy.open }}</OToggleGroupItem
-          >
-          <OToggleGroupItem
-            value="resolved"
-            size="sm"
-            data-test="autoobserve-live-issues-filter-resolved"
-            >{{ copy.resolved }}</OToggleGroupItem
-          >
-          <OToggleGroupItem value="all" size="sm" data-test="autoobserve-live-issues-filter-all">{{
+          <OToggleGroupItem value="open" data-test="autoobserve-live-issues-filter-open">{{
+            copy.open
+          }}</OToggleGroupItem>
+          <OToggleGroupItem value="resolved" data-test="autoobserve-live-issues-filter-resolved">{{
+            copy.resolved
+          }}</OToggleGroupItem>
+          <OToggleGroupItem value="all" data-test="autoobserve-live-issues-filter-all">{{
             copy.allStatuses
           }}</OToggleGroupItem>
         </OToggleGroup>
@@ -127,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OSkeleton
           v-else-if="loading"
-          animation="none"
+          shape="block"
           class="h-3 w-40"
           data-test="autoobserve-live-issues-count-skeleton"
         />
@@ -212,20 +199,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="openIncident(row, 'analysis')"
             >
               <OBadge
-                :variant="RCA_BADGE_VARIANT[row.analysis.tone]"
+                :tone="RCA_BADGE_VARIANT[row.analysis.tone]"
                 size="sm"
                 :data-tone="row.analysis.tone"
                 data-test="autoobserve-live-issues-analysis"
               >
                 <template v-if="row.analysis.spinner" #icon>
-                  <OSpinner size="xs" />
+                  <OSpinner />
                 </template>
                 {{ row.analysis.label }}
               </OBadge>
             </button>
             <OBadge
               v-else
-              :variant="RCA_BADGE_VARIANT[row.analysis.tone]"
+              :tone="RCA_BADGE_VARIANT[row.analysis.tone]"
               size="sm"
               :data-tone="row.analysis.tone"
               data-test="autoobserve-live-issues-analysis"
@@ -266,9 +253,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-for="name in row.streams.slice(0, STREAM_CHIPS)"
           :key="name"
-          variant="default-soft"
-          shape="rounded"
-          size="xs"
+          tone="neutral"
+          size="sm"
           class="min-w-0"
         >
           <OTruncatedText as="span" data-test="autoobserve-live-issues-stream-text">{{
@@ -277,9 +263,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTag>
         <OTag
           v-if="row.streams.length > STREAM_CHIPS"
-          variant="default-soft"
-          shape="rounded"
-          size="xs"
+          tone="neutral"
+          size="sm"
           class="shrink-0"
           data-test="autoobserve-live-issues-stream-more"
           >{{ row.streamsMore }}</OTag
@@ -312,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <LiveNoticeState
         v-if="notice"
         :notice="notice"
-        size="block"
+        size="region"
         :detail="state.detail"
         :busy="state.busy"
         :data-test="NOTICE_TEST[notice.failure]"
@@ -322,8 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="!settled" aria-hidden="true" data-test="autoobserve-live-issues-pending" />
       <OEmptyState
         v-else-if="term"
-        size="block"
-        illustration="no-results"
+        icon="search-off"
         :title="issuesNoMatch(t, term)"
         :action-label="copy.clearSearch"
         data-test="autoobserve-live-issues-no-match"
@@ -332,23 +316,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <LiveNoticeState
         v-else-if="!rows.length && !issues.paging.value"
         :notice="pagingOffNotice"
-        size="block"
+        size="region"
         data-test="autoobserve-live-issues-empty-off"
       />
       <OEmptyState
         v-else-if="!rows.length"
-        size="block"
-        illustration="check"
+        icon="task-alt"
         :title="issuesEmptyTitle(t, range)"
-        :description="copy.emptyDesc"
+        :text="copy.emptyDesc"
         data-test="autoobserve-live-issues-empty"
       />
       <OEmptyState
         v-else
-        size="block"
-        illustration="check"
+        icon="task-alt"
         :title="copy.filterEmptyTitle"
-        :description="copy.filterEmptyDesc"
+        :text="copy.filterEmptyDesc"
         data-test="autoobserve-live-issues-filter-empty"
       />
     </template>
@@ -368,7 +350,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";

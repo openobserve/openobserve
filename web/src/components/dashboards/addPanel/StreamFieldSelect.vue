@@ -5,7 +5,7 @@
       :model-value="selectValue"
       :options="flatOptions"
       :label="t('dashboard.streamFieldSelect.selectField')"
-      label-position="inside"
+      variant="filter"
       searchable
       data-test="stream-field-select"
       class="o2-custom-select-dashboard"

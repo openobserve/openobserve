@@ -658,7 +658,7 @@ describe("PublicLinksTable", () => {
     expect(confirm).toHaveBeenLastCalledWith(
       expect.objectContaining({
         title: 'Revoke and delete "Orphan"?',
-        confirmVariant: "destructive",
+        kind: "destructive",
       }),
     );
     expect(admin.revoke).toHaveBeenCalledWith("default", "dash-1", "l3");
@@ -767,7 +767,7 @@ describe("PublicLinksTable", () => {
     const empty = find(w, "dashboards-public-links-empty");
     expect(empty.text()).toContain("No public links found");
 
-    await w.findAllComponents({ name: "OEmptyState" })[0].vm.$emit("action", "clear-filters");
+    await w.findAllComponents({ name: "OEmptyState" })[0].vm.$emit("action");
     await flushPromises();
     expect(rows(w)).toHaveLength(1);
   });

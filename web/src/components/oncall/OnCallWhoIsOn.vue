@@ -30,131 +30,125 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   why the count of rows is the count of people who would be paged.
 -->
 <template>
-  <OCard variant="glass" data-test="oncall-who-is-on">
-    <OCardSection role="header" dense>
-      <OText variant="card-title">{{ t("oncall.onCallDetails") }}</OText>
-    </OCardSection>
-
-    <OCardSection role="body" dense>
-      <!-- The roster comes from a separate call than the record itself, so an
+  <OCard :title="t('oncall.onCallDetails')" data-test="oncall-who-is-on">
+    <!-- The roster comes from a separate call than the record itself, so an
            empty list is ambiguous mid-fetch — this tells "still loading" apart
            from "resolved to nobody" before either read that as the same row. -->
-      <div
-        v-if="loading && !positions.length && !teamDeleted"
-        class="flex flex-col gap-2"
-        data-test="oncall-who-is-on-loading"
-      >
-        <OSkeleton type="text" class="h-4 w-1/3" />
-        <OSkeleton type="text" class="h-4 w-2/3" />
-      </div>
+    <div
+      v-if="loading && !positions.length && !teamDeleted"
+      class="flex flex-col gap-2"
+      data-test="oncall-who-is-on-loading"
+    >
+      <OSkeleton class="h-4 w-1/3" />
+      <OSkeleton class="h-4 w-2/3" />
+    </div>
 
-      <!-- An unstaffed rotation is an emergency while a page is open and a
+    <!-- An unstaffed rotation is an emergency while a page is open and a
            plain fact once it is closed, so the colour follows the state. -->
-      <p
-        v-else-if="!positions.length || teamDeleted"
-        class="text-sm"
-        :class="closed || teamDeleted ? 'text-text-secondary' : 'text-status-error-text'"
-        data-test="oncall-who-is-on-nobody"
-      >
-        {{ nobodyLine }}
-      </p>
+    <p
+      v-else-if="!positions.length || teamDeleted"
+      class="text-sm"
+      :class="closed || teamDeleted ? 'text-text-secondary' : 'text-status-error-text'"
+      data-test="oncall-who-is-on-nobody"
+    >
+      {{ nobodyLine }}
+    </p>
 
-      <template v-else>
-        <!-- The roster first, and only the roster: a reach tag pinned to the
+    <template v-else>
+      <!-- The roster first, and only the roster: a reach tag pinned to the
              right edge gives every person the same two columns to read, which
              a tag trailing the address never does. -->
-        <ODescriptionList dense label-width="narrow">
-          <ODescriptionItem :label="closed ? t('oncall.onCallThen') : t('oncall.onCallNow')">
-            <span class="flex w-full items-center gap-2">
-              <OnCallPersonName
-                class="min-w-0 truncate font-medium"
-                :email="primary.user_email"
-                data-test="oncall-who-is-on-primary"
-              />
-              <OTag
-                v-if="reachOf(primary.user_email)"
-                :variant="reachOf(primary.user_email) === 'landed' ? 'success-soft' : 'error-soft'"
-                size="sm"
-                class="ms-auto shrink-0"
-                data-test="oncall-who-is-on-primary-reach"
-              >
-                {{ reachLabel(primary.user_email) }}
-              </OTag>
-            </span>
-          </ODescriptionItem>
+      <ODescriptionList>
+        <ODescriptionItem :label="closed ? t('oncall.onCallThen') : t('oncall.onCallNow')">
+          <span class="flex w-full items-center gap-2">
+            <OnCallPersonName
+              class="min-w-0 truncate font-medium"
+              :email="primary.user_email"
+              data-test="oncall-who-is-on-primary"
+            />
+            <OTag
+              v-if="reachOf(primary.user_email)"
+              :tone="reachOf(primary.user_email) === 'landed' ? 'ok' : 'err'"
+              size="sm"
+              class="ms-auto shrink-0"
+              data-test="oncall-who-is-on-primary-reach"
+            >
+              {{ reachLabel(primary.user_email) }}
+            </OTag>
+          </span>
+        </ODescriptionItem>
 
-          <!-- Every other staffed rotation, named by the ROTATION rather than
+        <!-- Every other staffed rotation, named by the ROTATION rather than
                called "backup": a team may staff three, and two of them called
                backup is a card that cannot be read. -->
-          <ODescriptionItem
-            v-for="entry in others"
-            :key="entry.rotation_id"
-            :label="raw(entry.rotation_name)"
-          >
-            <span class="flex w-full items-center gap-2">
-              <OnCallPersonName
-                class="min-w-0 truncate"
-                :email="entry.user_email"
-                :data-test="`oncall-who-is-on-person-${entry.rotation_id}`"
-              />
-              <OTag
-                v-if="reachOf(entry.user_email)"
-                :variant="reachOf(entry.user_email) === 'landed' ? 'success-soft' : 'error-soft'"
-                size="sm"
-                class="ms-auto shrink-0"
-                :data-test="`oncall-who-is-on-reach-${entry.user_email}`"
-              >
-                {{ reachLabel(entry.user_email) }}
-              </OTag>
-            </span>
-          </ODescriptionItem>
-        </ODescriptionList>
+        <ODescriptionItem
+          v-for="entry in others"
+          :key="entry.rotation_id"
+          :label="raw(entry.rotation_name)"
+        >
+          <span class="flex w-full items-center gap-2">
+            <OnCallPersonName
+              class="min-w-0 truncate"
+              :email="entry.user_email"
+              :data-test="`oncall-who-is-on-person-${entry.rotation_id}`"
+            />
+            <OTag
+              v-if="reachOf(entry.user_email)"
+              :tone="reachOf(entry.user_email) === 'landed' ? 'ok' : 'err'"
+              size="sm"
+              class="ms-auto shrink-0"
+              :data-test="`oncall-who-is-on-reach-${entry.user_email}`"
+            >
+              {{ reachLabel(entry.user_email) }}
+            </OTag>
+          </span>
+        </ODescriptionItem>
+      </ODescriptionList>
 
-        <!-- Below the rule is the schedule around those people, not more
+      <!-- Below the rule is the schedule around those people, not more
              people — the two were one run of rows, and a separator between
              them read as a boundary the roster and its own handover don't
              have. `next_user_email` used to get its own row ("Up next"), but
              it names the same person `handoverTo` does, so the row was a
              second copy of this one rather than a second fact. -->
-        <ODescriptionList v-if="!closed && handoverAt" dense label-width="narrow">
-          <!-- When the pager changes hands. A page still open at handover is one
+      <ODescriptionList v-if="!closed && handoverAt">
+        <!-- When the pager changes hands. A page still open at handover is one
                the next person inherits without being told, unless a screen says
                so before it happens. -->
-          <ODescriptionItem :label="t('oncall.shiftHandover')">
-            <span
-              class="flex w-full flex-wrap items-center gap-x-1 gap-y-1"
-              data-test="oncall-who-is-on-handover"
-            >
-              <span class="whitespace-nowrap" data-test="oncall-who-is-on-handover-at">
-                {{ raw(handoverAtLabel) }}
-              </span>
-              <span class="text-text-secondary text-xs whitespace-nowrap">
-                {{ raw(`(${handoverInLabel})`) }}
-              </span>
-              <template v-if="handoverTo">
-                <span class="text-text-secondary" aria-hidden="true">{{ raw("→") }}</span>
-                <OnCallPersonName
-                  class="min-w-0"
-                  :email="handoverTo"
-                  data-test="oncall-who-is-on-handover-to"
-                />
-              </template>
+        <ODescriptionItem :label="t('oncall.shiftHandover')">
+          <span
+            class="flex w-full flex-wrap items-center gap-x-1 gap-y-1"
+            data-test="oncall-who-is-on-handover"
+          >
+            <span class="whitespace-nowrap" data-test="oncall-who-is-on-handover-at">
+              {{ raw(handoverAtLabel) }}
             </span>
-          </ODescriptionItem>
-        </ODescriptionList>
-      </template>
+            <span class="text-text-secondary text-xs whitespace-nowrap">
+              {{ raw(`(${handoverInLabel})`) }}
+            </span>
+            <template v-if="handoverTo">
+              <span class="text-text-secondary" aria-hidden="true">{{ raw("→") }}</span>
+              <OnCallPersonName
+                class="min-w-0"
+                :email="handoverTo"
+                data-test="oncall-who-is-on-handover-to"
+              />
+            </template>
+          </span>
+        </ODescriptionItem>
+      </ODescriptionList>
+    </template>
 
-      <!-- Who acked it — the one fact about the ack this card still owns, now
+    <!-- Who acked it — the one fact about the ack this card still owns, now
            that its timing rides the stat strip above the fold. -->
-      <template v-if="ackedBy">
-        <OSeparator class="my-3" />
-        <ODescriptionList dense label-width="narrow">
-          <ODescriptionItem :label="t('oncall.ackedBy')">
-            <OnCallPersonName truncate :email="ackedBy" data-test="oncall-who-is-on-acked-by" />
-          </ODescriptionItem>
-        </ODescriptionList>
-      </template>
-    </OCardSection>
+    <template v-if="ackedBy">
+      <OSeparator class="my-3" />
+      <ODescriptionList>
+        <ODescriptionItem :label="t('oncall.ackedBy')">
+          <OnCallPersonName truncate :email="ackedBy" data-test="oncall-who-is-on-acked-by" />
+        </ODescriptionItem>
+      </ODescriptionList>
+    </template>
   </OCard>
 </template>
 
@@ -165,9 +159,7 @@ import { useStore } from "vuex";
 import OnCallPersonName from "@/components/oncall/OnCallPersonName.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OText from "@/lib/core/Typography/OText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";

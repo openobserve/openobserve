@@ -1,97 +1,70 @@
 // Copyright 2026 OpenObserve Inc.
 
-import type { I18nText } from "@/types/i18n";
+/** Control height: md 32 in toolbars (default), sm 28 in compact rows (guideline S1). */
+export type DateTimeRangeSize = "sm" | "md";
 
-export type DateTimeMode = "relative" | "absolute";
-export type RelativeUnit = "seconds" | "minutes" | "hours" | "days" | "weeks" | "months";
+export type DateTimeRangeType = "relative" | "absolute";
+
+export type DateTimeRangeMenuAlign = "center" | "start" | "end";
+
+/** Payload of `on:date-change`; times are epoch microseconds. */
+export interface DateTimeRangeChange {
+  startTime: number;
+  endTime: number;
+  /** `15m`, `2h` or a calendar token while relative; null for an absolute range. */
+  relativeTimePeriod: string | null;
+  selectedDate?: { from: string; to: string };
+  selectedTime?: { startTime: string; endTime: string };
+  /** `relative`, `relative-custom` or `absolute`. */
+  valueType?: string;
+  /** False when the parent set the range (mount replay, setters), so it must not refetch. */
+  userChangedValue?: boolean;
+}
 
 export interface DateTimeRangeProps {
-  // ── Absolute mode values ──────────────────────────────────────
-  /** ISO date string `YYYY-MM-DD` for start */
-  startDate?: string;
-  /** Time string `HH:MM` or `HH:MM:SS` for start */
-  startTime?: string;
-  /** ISO date string `YYYY-MM-DD` for end */
-  endDate?: string;
-  /** Time string `HH:MM` or `HH:MM:SS` for end */
-  endTime?: string;
-
-  // ── Mode ──────────────────────────────────────────────────────
-  /** Active mode; drives the trigger label */
-  mode?: DateTimeMode;
-
-  // ── Relative mode values ──────────────────────────────────────
-  /** Relative period unit */
-  relativeUnit?: RelativeUnit;
-  /** Relative period amount (0 = no selection) */
-  relativeAmount?: number;
-
-  // ── Behaviour ─────────────────────────────────────────────────
-  /** Show seconds segments in time fields */
-  withSeconds?: boolean;
-  /** Emit immediately on every change (no Apply button needed) */
+  /** Tab the picker opens on; read once at mount. */
+  defaultType?: DateTimeRangeType;
+  /** `{ startTime, endTime }` in micro- or milliseconds; read once at mount. */
+  defaultAbsoluteTime?: { startTime?: number; endTime?: number } | null;
+  /** Relative period such as `15m`; read once at mount. */
+  defaultRelativeTime?: string;
+  /** Emit on every change instead of on Apply. */
   autoApply?: boolean;
-  /** Hide the Relative tab; force absolute-only mode */
-  disableRelative?: boolean;
-  /** Hide Start/End time inputs in the Absolute tab */
-  hideTime?: boolean;
-  /** Show the timezone selector (hidden by default) */
-  showTimezone?: boolean;
-
-  // ── Restrictions ──────────────────────────────────────────────
-  /** Minimum selectable date `YYYY-MM-DD` */
-  minDate?: string;
-  /** Maximum selectable date `YYYY-MM-DD` */
-  maxDate?: string;
-  /** Disable relative options that exceed this many hours */
-  maxHours?: number;
-
-  // ── Timezone ──────────────────────────────────────────────────
-  /** IANA timezone string; empty string = browser local time */
-  timezone?: string;
-
-  // ── Field metadata ────────────────────────────────────────────
-  label?: I18nText;
-  helpText?: I18nText;
-  errorMessage?: I18nText;
+  /** Apply a relative preset chip on click even without `autoApply`. */
+  applyPresets?: boolean;
+  initialTimezone?: string | null;
   disabled?: boolean;
-  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
-  required?: boolean;
-  placeholder?: I18nText;
+  size?: DateTimeRangeSize;
+  queryRangeRestrictionMsg?: string;
+  queryRangeRestrictionInHour?: number;
+  dataTestName?: string;
+  /** Date-only picker: no Relative tab and no rail. */
+  disableRelative?: boolean;
+  hideRelativeTime?: boolean;
+  hideRelativeTimezone?: boolean;
+  /** Keeps zone changes local to this picker instead of writing the app's timezone. */
+  pickerTimezone?: string;
+  hideClipboard?: boolean;
+  hideRangeShift?: boolean;
+  disablePrevShift?: boolean;
+  /** First pickable day (`yyyy/MM/dd`), date-only pickers. */
+  minDate?: string;
+  /** Last pickable day (`yyyy/MM/dd`); absent means today. */
+  maxDate?: string;
+  menuAlign?: DateTimeRangeMenuAlign;
+  /** Offers Today … Last year in the rail. */
+  calendarPresets?: boolean;
+  /** Sizes the trigger like a form field (full width, field border). */
+  fieldAppearance?: boolean;
+  defaultOpen?: boolean;
+  hideSeconds?: boolean;
+  /** Replaces the trigger's range text; empty keeps the picker's own label. */
+  triggerText?: string;
 }
-
-export interface DateTimeRangeAbsoluteValue {
-  type: "absolute";
-  startDate: string;
-  startTime: string;
-  endDate: string;
-  endTime: string;
-  timezone: string;
-}
-
-export interface DateTimeRangeRelativeValue {
-  type: "relative";
-  unit: RelativeUnit;
-  amount: number;
-  timezone: string;
-}
-
-export type DateTimeRangeValue = DateTimeRangeAbsoluteValue | DateTimeRangeRelativeValue;
 
 export interface DateTimeRangeEmits {
-  (_e: "update:startDate", _value: string): void;
-  (_e: "update:startTime", _value: string): void;
-  (_e: "update:endDate", _value: string): void;
-  (_e: "update:endTime", _value: string): void;
-  (_e: "update:mode", _value: DateTimeMode): void;
-  (_e: "update:timezone", _value: string): void;
-  (_e: "update:relativeUnit", _value: RelativeUnit): void;
-  (_e: "update:relativeAmount", _value: number): void;
-  (_e: "change", _value: DateTimeRangeValue): void;
-}
-
-export interface DateTimeRangeSlots {
-  label?: () => unknown;
-  /** Tooltip content — renders an info icon in the label row when provided */
-  tooltip?: () => unknown;
+  (e: "on:date-change", value: DateTimeRangeChange): void;
+  (e: "on:timezone-change", zone: string): void;
+  (e: "hide"): void;
+  (e: "show"): void;
 }

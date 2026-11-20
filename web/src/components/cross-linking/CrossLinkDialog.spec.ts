@@ -16,7 +16,7 @@ describe("CrossLinkDialog Component", () => {
   };
 
   const existingLink = {
-    name: "View Trace",
+    name: "View trace",
     url: "https://example.com/trace/${trace_id}",
     fields: [{ name: "trace_id" }, { name: "span_id" }],
   };
@@ -43,10 +43,10 @@ describe("CrossLinkDialog Component", () => {
               "title",
               "showClose",
               "formId",
-              "primaryButtonLabel",
-              "secondaryButtonLabel",
+              "primary",
+              "secondary",
             ],
-            emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+            emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
           },
           // OFormCombobox (chip-builder scratch input) renders REAL so the
           // newFieldName form-field binding + forwarded clear() are exercised.
@@ -145,7 +145,7 @@ describe("CrossLinkDialog Component", () => {
       await flushPromises();
 
       const form = getForm(wrapper);
-      expect(form.state.values.name).toBe("View Trace");
+      expect(form.state.values.name).toBe("View trace");
       expect(form.state.values.url).toBe("https://example.com/trace/${trace_id}");
       expect(fieldsVal(wrapper)).toEqual([{ name: "trace_id" }, { name: "span_id" }]);
     });
@@ -374,13 +374,13 @@ describe("CrossLinkDialog Component", () => {
     it("renders the editing title when link has a name", () => {
       wrapper = createWrapper({ link: existingLink });
       const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.props("title")).toBe("Edit Cross-Link");
+      expect(dialog.props("title")).toBe("Edit cross-link");
     });
 
     it("renders the add title when link is null", () => {
       wrapper = createWrapper({ link: null });
       const dialog = wrapper.findComponent({ name: "ODialog" });
-      expect(dialog.props("title")).toBe("Add Cross-Link");
+      expect(dialog.props("title")).toBe("Add cross-link");
     });
 
     it("syncs open prop with modelValue", () => {

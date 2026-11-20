@@ -798,7 +798,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         if (patternsWithAnomalyBadge > 0) {
             testLogger.info(`✅ Anomaly detection active: ${patternsWithAnomalyBadge} badges rendered`);
 
-            // Verify badge contains expected text (e.g., "Rare Pattern" or warning emoji)
+            // Verify badge contains expected text (e.g., "Rare pattern" or warning emoji)
             const firstBadge = anomalyBadgeInfo[0];
             expect(firstBadge.text.length).toBeGreaterThan(0);
             testLogger.info(`Anomaly badge text verified: "${firstBadge.text}"`);

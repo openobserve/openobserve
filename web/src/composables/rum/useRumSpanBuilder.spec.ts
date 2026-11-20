@@ -1066,7 +1066,7 @@ describe("useRumSpanBuilder", () => {
       expect(viewSpan!.operation_name).toBe("View: HomePage");
     });
 
-    it("should use 'Unknown Page' when both view_url and view_name are absent", () => {
+    it("should use 'Unknown page' when both view_url and view_name are absent", () => {
       const view = makeViewEvent({ view_url: undefined, view_name: undefined });
       const traced = makeTracedResource();
       const { formatRumEventsAsSpans } = buildComposable();
@@ -1074,7 +1074,7 @@ describe("useRumSpanBuilder", () => {
       const spans = formatRumEventsAsSpans([traced], [view], [], [makeResourceEvent()]);
 
       const viewSpan = spans.find((s) => s.rum_event_type === "view");
-      expect(viewSpan!.operation_name).toBe("View: Unknown Page");
+      expect(viewSpan!.operation_name).toBe("View: Unknown page");
     });
 
     it("should attach trace_id from the first traced resource to view spans", () => {

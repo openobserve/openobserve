@@ -1,11 +1,11 @@
 <template>
   <ODialog
+    size="lg"
     data-test="query-inspector"
     :open="open"
     @update:open="$emit('update:open', $event)"
     :title="t('dashboard.queryInspector.title')"
-    :sub-title="t('dashboard.queryInspector.subTitle', { dataTitle, totalQueries })"
-    :width="50"
+    :subtitle="t('dashboard.queryInspector.subTitle', { dataTitle, totalQueries })"
   >
     <!-- search input: sits left of the close button via #header-right -->
     <template #header-right>
@@ -14,19 +14,16 @@
           v-model="searchQuery"
           :placeholder="t('dashboard.queryInspector.searchKeywords')"
           data-test="query-inspector-search"
-          size="xs"
+          size="sm"
         />
       </div>
     </template>
 
-    <!-- Body -->
-    <div
+    <OEmptyState
       v-if="queryData.length === 0"
-      class="text-text-muted flex h-64 flex-col items-center justify-center"
-    >
-      <OIcon class="h-12 w-12" name="info" />
-      <p class="mt-2">{{ t("dashboard.queryInspector.noQueries") }}</p>
-    </div>
+      icon="query-stats"
+      :title="t('dashboard.queryInspector.noQueries')"
+    />
 
     <div v-else class="space-y-4">
       <div
@@ -39,13 +36,13 @@
           class="bg-theme-body-bg-primary border-card-glass-border flex items-start justify-start gap-3 border-b p-2"
         >
           <span
-            class="rounded-default text-sm font-bold"
+            class="rounded-default text-sm font-semibold"
             :data-test="`query-inspector-query-name-${index}`"
           >
             {{ query.tabName || t("dashboard.queryInspector.queryN", { n: index + 1 }) }}
           </span>
           <span
-            class="bg-theme-body-bg-primary border-card-glass-border text-text-secondary text-3xs rounded-default border px-2 py-0.5 font-bold"
+            class="bg-theme-body-bg-primary border-card-glass-border text-text-secondary text-2xs rounded-default border px-2 py-0.5 font-semibold"
           >
             {{ getQueryTypeDisplay(query.queryType) }}
           </span>
@@ -65,21 +62,19 @@
               <span :data-test="`query-inspector-stat-${stat.key}-${index}`">{{ stat.text }}</span>
             </template>
           </div>
-          <OBanner
+          <OInlineNotice
             v-if="index === 0 && seriesLimit"
-            variant="warning"
+            tone="warn"
             icon="stacked-line-chart"
-            dense
             :data-test="`query-inspector-notice-series-cap-${index}`"
           >
             {{ seriesLimitBody }}
-          </OBanner>
-          <OBanner
+          </OInlineNotice>
+          <OInlineNotice
+            class="wrap-anywhere whitespace-pre-line"
             v-if="diagnosticsFor(index)?.serverPartial"
-            variant="warning"
+            tone="warn"
             icon="sync-problem"
-            dense
-            preserve-whitespace
             :data-test="`query-inspector-notice-partial-${index}`"
           >
             <div>{{ t("dashboard.panelErrorButtons.partialBody") }}</div>
@@ -90,13 +85,11 @@
             >
               {{ reason }}
             </div>
-          </OBanner>
-          <OBanner
+          </OInlineNotice>
+          <OInlineNotice
+            class="wrap-anywhere whitespace-pre-line"
             v-if="diagnosticsFor(index)?.functionErrors?.length"
-            variant="error-soft"
-            icon="error-outline"
-            dense
-            preserve-whitespace
+            tone="err"
             :data-test="`query-inspector-notice-function-error-${index}`"
           >
             <div class="font-semibold">
@@ -109,18 +102,17 @@
             >
               {{ message }}
             </div>
-          </OBanner>
+          </OInlineNotice>
           <!-- Original Query -->
           <div v-if="query.originalQuery">
             <div class="flex items-center justify-between">
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.originalQuery")
               }}</label>
               <OButton
-                variant="ghost-primary"
-                size="sm"
+                variant="accent-ghost"
                 @click="copyText(query.originalQuery)"
-                icon-left="content-copy"
+                icon="content-copy"
               >
                 {{ t("dashboard.queryInspector.copy") }}
               </OButton>
@@ -142,15 +134,10 @@
           <!-- Executed Query -->
           <div>
             <div class="flex items-center justify-between">
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.executedQuery")
               }}</label>
-              <OButton
-                variant="ghost-primary"
-                size="sm"
-                @click="copyText(query.query)"
-                icon-left="content-copy"
-              >
+              <OButton variant="accent-ghost" @click="copyText(query.query)" icon="content-copy">
                 {{ t("dashboard.queryInspector.copy") }}
               </OButton>
             </div>
@@ -171,7 +158,7 @@
           <!-- Time Metadata -->
           <div class="border-card-glass-border grid grid-cols-2 gap-4 border-t pt-2">
             <div class="space-y-1" :data-test="`dashboard-query-inspector-start-time-${index}`">
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.startTime")
               }}</label>
               <div class="text-text-secondary flex items-center gap-2 text-xs font-medium">
@@ -180,7 +167,7 @@
               </div>
             </div>
             <div class="space-y-1" :data-test="`dashboard-query-inspector-end-time-${index}`">
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.endTime")
               }}</label>
               <div class="text-text-secondary flex items-center gap-2 text-xs font-medium">
@@ -194,7 +181,7 @@
           <div class="border-card-glass-border space-y-3 border-t">
             <!-- Standard Variables -->
             <div class="pt-2">
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.variables")
               }}</label>
               <div class="mt-1 flex flex-wrap gap-2">
@@ -204,7 +191,7 @@
                     :key="v.name"
                     class="rounded-default border-card-glass-border bg-card-glass-bg flex items-center gap-2 border p-1 text-xs"
                   >
-                    <span class="text-text-label font-bold">{{ v.name }}</span>
+                    <span class="text-text-label font-semibold">{{ v.name }}</span>
                     <span class="text-text-muted">:</span>
                     <span class="text-text-secondary italic">{{ v.value }}</span>
                   </div>
@@ -215,7 +202,7 @@
 
             <!-- Fixed Variables -->
             <div>
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.fixedVariables")
               }}</label>
               <div class="mt-1 flex flex-wrap gap-2">
@@ -225,7 +212,7 @@
                     :key="v.name"
                     class="rounded-default border-card-glass-border bg-card-glass-bg flex items-center gap-2 border p-1 text-xs"
                   >
-                    <span class="text-text-label font-bold">{{ v.name }}</span>
+                    <span class="text-text-label font-semibold">{{ v.name }}</span>
                     <span class="text-text-muted">:</span>
                     <span class="text-text-secondary italic">{{ v.value }}</span>
                   </div>
@@ -236,7 +223,7 @@
 
             <!-- Dynamic Variables -->
             <div>
-              <label class="text-xs font-bold tracking-wider">{{
+              <label class="text-xs font-semibold tracking-wider">{{
                 t("dashboard.queryInspector.dynamicVariables")
               }}</label>
               <div class="mt-1 flex flex-wrap gap-2">
@@ -246,7 +233,7 @@
                     :key="v.name"
                     class="rounded-default border-card-glass-border bg-card-glass-bg flex items-center gap-2 border p-1 text-xs"
                   >
-                    <span class="text-text-label font-bold">{{ v.name }}</span>
+                    <span class="text-text-label font-semibold">{{ v.name }}</span>
                     <span class="text-text-muted">{{ v.operator }}</span>
                     <span class="text-text-secondary italic">{{ v.value }}</span>
                   </div>
@@ -268,10 +255,11 @@ import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import DOMPurify from "dompurify";
 import { copyToClipboard } from "@/utils/clipboard";
 import {
@@ -301,7 +289,7 @@ interface QueryInspectorQuery {
 export default defineComponent({
   name: "QueryInspector",
   emits: ["update:open"],
-  components: { OBanner, OButton, ODialog, OSearchInput, OIcon },
+  components: { OInlineNotice, OButton, ODialog, OEmptyState, OSearchInput, OIcon },
   props: {
     open: {
       type: Boolean,

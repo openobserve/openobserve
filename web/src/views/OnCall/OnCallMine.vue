@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- The reader's own on-call: their shifts, how pages reach them, and what has been sent to them. -->
 <template>
-  <OPageLayout bleed data-test="oncall-mine-page" :title="t('oncall.mineTitle')" icon="person">
-    <template #title-trail>
+  <OPageLayout bleed data-test="oncall-mine-page" :title="t('oncall.mineTitle')">
+    <template #status>
       <BetaBadge class="shrink-0" />
     </template>
     <template #actions>
@@ -25,8 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Away only takes someone off a team's rotation, so a reader on no team has nothing to mark. -->
       <OButton
         v-if="!unavailable && !licenseDenied && (!loaded || (mine?.teams ?? []).length)"
-        variant="outline"
-        size="sm"
+        variant="secondary"
         :disabled="!loaded"
         data-test="oncall-mine-away"
         @click="openAway"
@@ -35,8 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-if="!unavailable && !licenseDenied && myAway"
-        variant="outline"
-        size="sm"
+        variant="secondary"
         :loading="awayClearing"
         data-test="oncall-mine-clear-away"
         @click="clearAway"
@@ -47,9 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ORefreshButton
         v-if="!unavailable && !licenseDenied"
         class="md:min-w-23"
-        layout="inline"
-        size="header"
-        variant="outline"
         :last-run-at="lastFetchedAt"
         :loading="refreshing || !loaded"
         data-test="oncall-mine-refresh"
@@ -59,10 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OEmptyState
       v-if="unavailable"
-      size="hero"
       icon="cloud-off"
       :title="t('oncall.notAvailableTitle')"
-      :description="t('oncall.notAvailableDescription')"
+      :text="t('oncall.notAvailableDescription')"
       data-test="oncall-mine-unavailable"
     />
 
@@ -89,10 +83,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OText variant="card-title" as="h2" data-test="oncall-mine-shift-headline">
               {{ t("oncall.mineShiftsTitle") }}
             </OText>
-            <OSkeleton v-if="!loaded" class="h-5 w-16 rounded-full" />
+            <OSkeleton v-if="!loaded" shape="block" class="h-5 w-16" />
             <OTag
               v-else-if="loadError === null && (mine?.teams ?? []).length"
-              :variant="mine?.on_call_now ? 'success-soft' : 'default-soft'"
+              :tone="mine?.on_call_now ? 'ok' : 'neutral'"
               size="sm"
               data-test="oncall-mine-on-call"
             >
@@ -105,22 +99,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OEmptyState
             v-if="loadError !== null"
-            size="inline"
-            variant="error"
+            size="compact"
+            class="px-4"
+            kind="error"
             :title="t('oncall.mineTeamsLoadFailed')"
-            :description="raw(loadError)"
-            :action-label="t('oncall.retry')"
+            :text="
+              isRawHttpText(loadError) ? t('emptyState.loadError.description') : raw(loadError)
+            "
             data-test="oncall-mine-teams-error"
             @action="refreshPage"
           />
 
           <OEmptyState
             v-else-if="loaded && !shiftRows.length"
-            size="inline"
+            size="compact"
+            class="px-4"
             icon="group"
             :title="t('oncall.mineNoTeams')"
             :action-label="t('oncall.mineOpenTeams')"
-            action-icon="group"
             data-test="oncall-mine-no-teams"
             @action="openTeams"
           />
@@ -132,8 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="n"
                 class="border-border-default flex flex-col gap-2 border-t px-4 py-3"
               >
-                <OSkeleton class="h-4 w-40" />
-                <OSkeleton class="h-3 w-28" />
+                <OSkeleton shape="block" class="h-4 w-40" />
+                <OSkeleton shape="block" class="h-3 w-28" />
               </div>
             </template>
             <div
@@ -152,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTruncatedText class="block">{{ raw(row.team_name) }}</OTruncatedText>
                   </router-link>
                   <OTag
-                    :variant="seatVariant(row)"
+                    :tone="seatVariant(row)"
                     size="sm"
                     class="shrink-0"
                     :data-test="`oncall-mine-duty-${row.team_id}`"
@@ -195,23 +191,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown v-if="canCover(row)" side="bottom" align="end">
                 <template #trigger>
                   <OButton
+                    icon-only
                     variant="ghost"
-                    size="icon-sm"
-                    icon-left="more-vert"
+                    icon="more-vert"
                     :loading="coverLoadingId === row.team_id || testingId === row.team_id"
                     :aria-label="t('oncall.moreActions')"
                     :data-test="`oncall-mine-row-menu-${row.team_id}`"
                   />
                 </template>
                 <ODropdownItem
-                  icon-left="person-add"
+                  icon="person-add"
                   :data-test="`oncall-mine-cover-${row.team_id}-menu`"
                   @select="openCover(row)"
                 >
                   {{ t("oncall.mineCoverShift") }}
                 </ODropdownItem>
                 <ODropdownItem
-                  icon-left="campaign"
+                  icon="campaign"
                   :data-test="`oncall-mine-test-page-${row.team_id}-menu`"
                   @select="askTestPage(row.team_id)"
                 >
@@ -220,8 +216,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
               <OButton
                 v-else
+                icon-only
                 variant="ghost"
-                size="icon-sm"
                 :loading="testingId === row.team_id"
                 :aria-label="t('oncall.mineTestTeam', { team: raw(row.team_name) })"
                 :data-test="`oncall-mine-test-page-${row.team_id}`"
@@ -244,10 +240,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data="shiftRows"
               :columns="shiftColumns"
               row-key="team_id"
-              :frame="false"
               :loading="!loaded"
               :skeleton-rows="SHIFTS_SKELETON_ROWS"
-              :show-global-filter="false"
               pagination="none"
               table-id="oncall-mine-shifts"
               data-test="oncall-mine-shifts-table"
@@ -265,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #cell-seat="{ row }">
                 <span class="flex flex-wrap items-center gap-1">
                   <OTag
-                    :variant="seatVariant(row)"
+                    :tone="seatVariant(row)"
                     size="sm"
                     :data-test="`oncall-mine-duty-${row.team_id}`"
                   >
@@ -309,8 +303,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex items-center justify-center">
                   <OButton
                     v-if="canCover(row)"
+                    icon-only
                     variant="ghost"
-                    size="icon-sm"
                     :loading="coverLoadingId === row.team_id"
                     :aria-label="t('oncall.mineCoverShift')"
                     :data-test="`oncall-mine-cover-${row.team_id}`"
@@ -321,8 +315,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                   <span v-else class="size-8 shrink-0" aria-hidden="true" />
                   <OButton
+                    icon-only
                     variant="ghost"
-                    size="icon-sm"
                     :loading="testingId === row.team_id"
                     :aria-label="t('oncall.mineTestTeam', { team: raw(row.team_name) })"
                     :data-test="`oncall-mine-test-page-${row.team_id}`"
@@ -340,9 +334,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="oncall-mine-shifts-more"
             >
               <OTag
-                variant="default"
+                tone="neutral"
                 size="sm"
-                shape="pill"
                 icon="expand-more"
                 class="shadow-xs"
                 :label="t('oncall.mineShiftsMore', { count: shiftsBelow }, shiftsBelow)"
@@ -367,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTruncatedText class="text-text-body text-sm">{{ raw(viewerEmail) }}</OTruncatedText>
             </template>
             <template #status>
-              <OTag variant="success-soft" size="sm">{{ t("oncall.reachAlwaysOn") }}</OTag>
+              <OTag tone="ok" size="sm">{{ t("oncall.reachAlwaysOn") }}</OTag>
             </template>
           </OnCallReachRow>
           <OnCallPhoneCard
@@ -463,24 +456,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <OButton variant="outline" size="sm-action" @click="awayOpen = false">
+          <OButton variant="secondary" @click="awayOpen = false">
             {{ t("oncall.cancel") }}
           </OButton>
           <OButton
+            :disabled-reason="t('oncall.mineAwayPickTimes')"
             variant="primary"
-            size="sm-action"
             :loading="awaySaving"
             :disabled="!awayValid"
-            :focusable-unavailable="!awayValid"
             data-test="oncall-mine-away-save"
             @click="saveAway"
           >
             {{ t("oncall.mineAwaySave") }}
-            <template v-if="!awayValid" #unavailable-reason>{{
-              t("oncall.mineAwayPickTimes")
-            }}</template>
           </OButton>
-          <OTooltip v-if="!awayValid" :content="t('oncall.mineAwayPickTimes')" />
         </div>
       </template>
     </ODialog>
@@ -509,6 +497,7 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -691,9 +680,9 @@ function onShiftsScroll(event: Event) {
   shiftsBelow.value = rows.filter((tr) => tr.offsetTop + tr.offsetHeight / 2 > fold).length;
 }
 
-function seatVariant(row: ShiftRow): "success-soft" | "default-soft" | "amber-soft" {
-  if (row.on_call_now === true) return "success-soft";
-  return row.on_call_now === false ? "default-soft" : "amber-soft";
+function seatVariant(row: ShiftRow): "ok" | "neutral" | "warn" {
+  if (row.on_call_now === true) return "ok";
+  return row.on_call_now === false ? "neutral" : "warn";
 }
 
 /// Only a shift the reader holds now, with a known end, has a window to hand over.

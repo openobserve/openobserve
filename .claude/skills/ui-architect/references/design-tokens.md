@@ -42,8 +42,10 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
   covers the v4 shorthand `bg-(--color-x)` — same rule, use `bg-x`.
   > **Retired aliases** (CI-banned, `retiredTextAlias`): `text-text-primary` →
   > `text-text-heading`, `text-text-caption` → `text-text-secondary`.
-- **Text colour — pick by SEMANTIC role, never by eye.** The hierarchy is
-  heading / body / secondary / label / muted, and each has exactly one job.
+- **Text colour — pick by SEMANTIC role, never by eye.** The guidelines' four
+  colours (T3) map onto the tokens as strong → `heading`, default → `body`,
+  secondary → `secondary` / `label`, tertiary → `muted`, plus `disabled`; each has
+  exactly one job.
   Using the wrong tier is a bug even though CI can't catch it: `muted` on a real
   value reads as "turned off", and a label in `body` fails to recede.
   - `text-text-heading` — titles, section headings, and the emphasized primary
@@ -55,11 +57,10 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
     NOT muted.**
   - `text-text-label` — a form field's own label (the `OForm*` controls render
     it for you; reach for it directly only for a bare field label).
-  - `text-text-muted` — the faintest tier, reserved for INACTIVE / disabled /
-    absent content ONLY: a disabled control, an em-dash / "not measured" / "none"
-    placeholder, a value nobody supplied. Never a label, never body text.
-    (`text-text-disabled` is the dedicated disabled-control token when a
-    component needs a distinct one.)
+  - `text-text-muted` — the guidelines' **tertiary** tier (T3): timestamps, hints,
+    placeholders, and absent content (an em-dash / "not measured" / "none", a
+    value nobody supplied, C4). Never a label, never body text, never a live
+    value. (`text-text-disabled` is the dedicated disabled-control token.)
   - To make text quieter, drop ONE tier on this ladder (+ size/weight) — never a
     raw `opacity` and never a lighter palette colour.
 - **Arbitrary `[var(--color-x)]` in a class now FAILS CI** (`rawVarInTemplate`,
@@ -107,22 +108,77 @@ set. The legacy **`--o2-*`** set is banned (see the bottom of this file).
   token (`text-text-secondary`, `bg-accent`). `gray-*` is Tailwind's un-themed default and
   is banned (`rawPalette`).
 
-## Corner radius — two tiers + circle
+## Corner radius — four tiers by role + circle
 
-Radius is a token too, and it has exactly **three** app-facing values. Pick by role;
-never eyeball an arbitrary radius.
+Radius is a token too. Pick the tier by the element's role; never eyeball an
+arbitrary radius. An O* component already carries its own tier.
 
-| Utility           | Token              | Value | Use for                                                                |
-| ----------------- | ------------------ | ----- | ---------------------------------------------------------------------- |
-| `rounded-default` | `--radius-default` | 4px   | controls — buttons, inputs, chips, small icon buttons                  |
-| `rounded-surface` | `--radius-surface` | 12px  | surfaces — dialogs, drawers, cards, panels, the app-shell content area |
-| `rounded-full`    | `--radius-full`    | ∞     | pills, avatars, status dots                                            |
+| Utility           | Token              | Value | Use for                                                     |
+| ----------------- | ------------------ | ----- | ----------------------------------------------------------- |
+| `rounded-chip`    | `--radius-chip`    | 4     | chips, badges, kbd, checkbox                                |
+| `rounded-default` | `--radius-default` | 6     | buttons, inputs, selects, segmented controls, every control |
+| `rounded-menu`    | `--radius-menu`    | 8     | menus, popovers, tooltips                                   |
+| `rounded-surface` | `--radius-surface` | 10    | dialogs, drawers, cards, panels, the content frame (L1)     |
+| `rounded-full`    | `--radius-full`    | ∞     | pills, avatars, status dots                                 |
 
 Per-corner variants use the same names (`rounded-t-surface`, `rounded-s-default`).
 **Banned (all CI-enforced):** bare `rounded`, arbitrary `rounded-[10px]`, and the
 retired `rounded-{sm,md,lg,xl}` / `var(--radius-{sm,md,lg,xl})` — they were five names
-for one value and were deleted (`sm`/`md` → `default`, `lg`/`xl` → `surface`). Change
-`--radius-default` or `--radius-surface` in `base.css` to retune a whole tier at once.
+for one value and were deleted. Change a tier in `base.css` to retune it everywhere.
+The old `rounded-checkbox` alias is deleted; a checkbox box is `rounded-chip` (S9).
+
+## Control heights — four tokens (S1, S2)
+
+| Utility (also `min-h-*`, `size-*`) | Token                  | Value | Use for                                                |
+| ---------------------------------- | ---------------------- | ----- | ------------------------------------------------------ |
+| `h-control-xs`                     | `--spacing-control-xs` | 24    | chips, filter chips, in-row icon buttons               |
+| `h-control-sm`                     | `--spacing-control-sm` | 28    | compact density, panel headers, table footer controls  |
+| `h-control-md`                     | `--spacing-control-md` | 32    | **default**: every input, select, button, toggle, date |
+| `h-control-lg`                     | `--spacing-control-lg` | 36    | sign-in and empty-state call to action only            |
+
+Defined and registered in `semantic.css`. Every O* control maps its `size` prop
+(`xs`/`sm`/`md`/`lg`) to these, so a size name is one height everywhere (S1) and
+controls in one row share a size (S2). A call site never sets a control's height
+with a class: `local/o2-control-height` flags `h-*`, `!h-*`, `size-*` and
+`[&_…]:h-*` on O* controls and buttons. Bespoke chrome that must line up with a
+control uses `h-control-*`, never a raw step such as `h-8`.
+
+## Control edge and focus (S2)
+
+Every bordered control in a row shares one edge, so a toolbar reads as one set: inputs,
+search, selects, textareas, the date-range group, `OFile`'s box, `secondary` buttons
+(refresh, column toggle, any bordered icon button), the `OToggleGroup` tray and the
+`OStatCard` filter chip. The component tokens (`--color-input-border`,
+`--color-select-border`, `--color-button-outline-border`, `--color-toggle-border`, …)
+all resolve to these semantic tokens, registered in `semantic.css`:
+
+| Utility                                 | Token                             | Light / dark               | Use for                                    |
+| --------------------------------------- | --------------------------------- | -------------------------- | ------------------------------------------ |
+| `border-control-border`                 | `--color-control-border`          | grey-350 `#c5cad6` (1.6:1) / `--d-border` (2:1) | every bordered control at rest             |
+| `hover:border-control-border-hover`     | `--color-control-border-hover`    | the 3:1 `--color-border-control` | the same edge under the pointer       |
+| `border-control-border-selected`        | `--color-control-border-selected` | primary-300 / primary-700  | a pressed `secondary` (with the accent fill) |
+| `focus-within:border-control-border-focus` | `--color-control-border-focus` | primary-500                | an input-like control's focused edge       |
+| `focus-within:ring-3 focus-within:ring-control-focus-halo` | `--color-control-focus-halo` | primary-500 at 18% | the 3 px outer halo outside that edge |
+| `ring-3 ring-control-error-halo`        | `--color-control-error-halo`      | error-500 at 16%           | the same halo on an invalid field          |
+
+Focus on an input-like control is the canvas `.input:focus-within`: a 1 px accent-500 edge
+plus a 3 px outer halo, never an opaque or inset ring. An invalid field keeps its red edge
+and takes the red halo. Hover is gated with `hover:not-focus-within:` so the pointer never
+greys a focused edge. Ghost buttons stay borderless in `text-text-secondary`.
+
+The resting edge is deliberately below the 3:1 of SC 1.4.11: the review found grey-400 too
+heavy for a toolbar of inputs. It is an accepted exemption, recorded in
+`contrast-manifest.ts`, because the edge is never the only cue: every control carries its
+label, value or placeholder at 4.5:1, hover lifts the edge to the 3:1 `--color-border-control`
+and focus adds the accent edge and halo. Do not darken it back without a review.
+
+## Type roles (T1)
+
+`text-compact` (13) is the UI text of every O* control, menu, table cell and label.
+`text-sm` (14) is reading text only: descriptions, dialog bodies, empty-state text,
+notices; semibold, it is the section, card and panel title. Titles rank 18 (page,
+`text-lg`, OPageHeader) › 15 (dialog, drawer, `text-title`) › 14 (section). The full role table is in [SKILL.md § rule 3](../SKILL.md) and
+[guidelines § 3](guidelines.md#3-type-and-text-colour).
 
 ## Enforced by CI (it will fail the build)
 

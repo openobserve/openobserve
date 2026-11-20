@@ -14,76 +14,32 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import SelectFolderDropdown from "./SelectFolderDropdown.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
+import { createFolder } from "@/utils/commons";
 
-// Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so we
-// can assert on the props the component forwards + emit the click events
-// the component listens to.
-const ODialogStub = {
-  name: "ODialog",
-  props: [
-    "open",
-    "size",
-    "title",
-    "subTitle",
-    "persistent",
-    "showClose",
-    "width",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
-    "primaryButtonVariant",
-    "secondaryButtonVariant",
-    "neutralButtonVariant",
-    "primaryButtonDisabled",
-    "secondaryButtonDisabled",
-    "neutralButtonDisabled",
-    "primaryButtonLoading",
-    "secondaryButtonLoading",
-    "neutralButtonLoading",
-    "formId",
-  ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-  template: `
-    <div
-      data-test="o-dialog-stub"
-      :data-open="String(open)"
-      :data-width="width"
-      :data-title="title"
-      :data-primary-label="primaryButtonLabel"
-      :data-secondary-label="secondaryButtonLabel"
-    >
-      <slot name="header" />
-      <slot />
-      <slot name="footer" />
-      <button
-        data-test="o-dialog-stub-primary"
-        @click="$emit('click:primary')"
-      >{{ primaryButtonLabel }}</button>
-      <button
-        data-test="o-dialog-stub-secondary"
-        @click="$emit('click:secondary')"
-      >{{ secondaryButtonLabel }}</button>
-    </div>
-  `,
-};
+vi.mock("@/utils/commons", () => ({ createFolder: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+const notify = vi.hoisted(() => ({ positive: vi.fn(), error: vi.fn() }));
+vi.mock("@/composables/useNotifications", () => ({
+  default: () => ({
+    showPositiveNotification: notify.positive,
+    showErrorNotification: notify.error,
+  }),
+}));
 
-// Stub AddFolder so we don't pull in its dependencies and we can spy on
-// `submit()` (which the SelectFolderDropdown calls via a template ref when
-// the ODrawer primary button is clicked).
-const addFolderSubmitSpy = vi.fn();
-const AddFolderStub = {
-  name: "AddFolder",
-  props: ["editMode"],
+// The real list renders its after-options only while open; the stub always renders them.
+const closeSpy = vi.fn();
+const OSelectStub = {
+  name: "OSelect",
+  props: ["modelValue", "options", "label", "disabled"],
   emits: ["update:modelValue"],
-  template: `<div data-test="add-folder-stub"></div>`,
+  template: `<div data-test="index-dropdown-stream_type"><slot name="icon" /><slot name="after-options" /></div>`,
   setup() {
-    return { submit: addFolderSubmitSpy };
+    return { close: closeSpy };
   },
 };
 
@@ -92,10 +48,7 @@ const createWrapper = (props: Record<string, any> = {}, store: any, router: any)
     props,
     global: {
       plugins: [i18n, store, router],
-      stubs: {
-        ODialog: ODialogStub,
-        AddFolder: AddFolderStub,
-      },
+      stubs: { OSelect: OSelectStub },
     },
   });
 
@@ -104,7 +57,7 @@ describe("SelectFolderDropdown", () => {
   let router: any;
 
   beforeEach(() => {
-    addFolderSubmitSpy.mockReset();
+    vi.clearAllMocks();
 
     store = createStore({
       state: {
@@ -132,45 +85,23 @@ describe("SelectFolderDropdown", () => {
     router.push("/dashboards");
   });
 
-  it("should render the component", () => {
-    const wrapper = createWrapper({}, store, router);
-    expect(wrapper.exists()).toBe(true);
-  });
-
   it("should render folder dropdown", () => {
     const wrapper = createWrapper({}, store, router);
-
-    const dropdown = wrapper.find('[data-test="index-dropdown-stream_type"]');
-    expect(dropdown.exists()).toBe(true);
+    expect(wrapper.find('[data-test="index-dropdown-stream_type"]').exists()).toBe(true);
   });
 
-  it("should render add folder button", () => {
+  it("offers New folder inside the folder select", () => {
     const wrapper = createWrapper({}, store, router);
-
-    const addButton = wrapper.find('[data-test="dashboard-folder-move-new-add"]');
-    expect(addButton.exists()).toBe(true);
-  });
-
-  it("should open add folder dialog when add button is clicked", async () => {
-    const wrapper = createWrapper({}, store, router);
-
-    expect(wrapper.vm.showAddFolderDialog).toBe(false);
-
-    const addButton = wrapper.find('[data-test="dashboard-folder-move-new-add"]');
-    await addButton.trigger("click");
-
-    expect(wrapper.vm.showAddFolderDialog).toBe(true);
+    const select = wrapper.find('[data-test="index-dropdown-stream_type"]');
+    expect(select.find('[data-test="dashboard-folder-move-new-add"]').exists()).toBe(true);
   });
 
   it("should emit folder-selected when selectedFolder changes", async () => {
     const wrapper = createWrapper({}, store, router);
 
-    // selectedFolder is now a primitive string id; the watcher emits the
-    // backward-compatible {label, value} object to listeners.
     wrapper.vm.selectedFolder = "folder1";
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.emitted("folder-selected")).toBeTruthy();
     expect(wrapper.emitted("folder-selected")!.at(-1)).toEqual([
       { label: "Folder 1", value: "folder1" },
     ]);
@@ -178,198 +109,127 @@ describe("SelectFolderDropdown", () => {
 
   it("should select default folder initially", () => {
     const wrapper = createWrapper({}, store, router);
-
-    // selectedFolder is a primitive id string, not an option object.
     expect(wrapper.vm.selectedFolder).toBe("default");
   });
 
   it("should select active folder if provided", () => {
     const wrapper = createWrapper({ activeFolderId: "folder1" }, store, router);
-
     expect(wrapper.vm.selectedFolder).toBe("folder1");
-  });
-
-  it("should update folder list after adding new folder", async () => {
-    const wrapper = createWrapper({}, store, router);
-
-    const newFolder = {
-      data: { name: "New Folder", folderId: "newFolder123" },
-    };
-    await wrapper.vm.updateFolderList(newFolder);
-
-    expect(wrapper.vm.showAddFolderDialog).toBe(false);
-    expect(wrapper.vm.selectedFolder).toBe("newFolder123");
-  });
-
-  it("should handle null newFolder data gracefully", async () => {
-    const wrapper = createWrapper({}, store, router);
-
-    const currentFolder = wrapper.vm.selectedFolder;
-    await wrapper.vm.updateFolderList(null);
-
-    expect(wrapper.vm.showAddFolderDialog).toBe(false);
-    expect(wrapper.vm.selectedFolder).toEqual(currentFolder);
-  });
-
-  it("should show folder options from store", () => {
-    createWrapper({}, store, router);
-
-    const folders = store.state.organizationData.folders;
-    expect(folders).toHaveLength(3);
-    expect(folders[0].name).toBe("default");
   });
 
   it("should handle activeFolderId as null", () => {
     const wrapper = createWrapper({ activeFolderId: null }, store, router);
-
     expect(wrapper.vm.selectedFolder).toBe("default");
   });
 
-  // ── ODrawer migration coverage ─────────────────────────────────────────
-
-  describe("ODrawer Prop Forwarding", () => {
-    it("should render the ODrawer wrapper", () => {
-      const wrapper = createWrapper({}, store, router);
-      const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.exists()).toBe(true);
-    });
-
-    it("should forward open=false to ODrawer initially", () => {
-      const wrapper = createWrapper({}, store, router);
-      const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("open")).toBe(false);
-    });
-
-    it("should forward open=true to ODrawer when the add folder button is clicked", async () => {
-      const wrapper = createWrapper({}, store, router);
-
+  describe("inline new folder", () => {
+    const startNew = async (wrapper: any) => {
       await wrapper.find('[data-test="dashboard-folder-move-new-add"]').trigger("click");
+    };
 
-      const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("open")).toBe(true);
+    it("closes the list and shows the name field in place, with no dialog", async () => {
+      const wrapper = createWrapper({}, store, router);
+      expect(wrapper.find('[data-test="dashboard-folder-new-inline"]').exists()).toBe(false);
+
+      await startNew(wrapper);
+
+      expect(closeSpy).toHaveBeenCalled();
+      expect(wrapper.find('[data-test="dashboard-folder-new-inline"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "ODialog" }).exists()).toBe(false);
     });
 
-    it("should forward the localized title to ODrawer", () => {
-      const wrapper = createWrapper({}, store, router);
-      const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("title")).toBe(i18n.global.t("common.addFolder"));
-    });
-
-    it("should forward size=sm to ODialog", () => {
-      const wrapper = createWrapper({}, store, router);
-      const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("size")).toBe("sm");
-    });
-
-    it("should forward the localized save label to ODrawer primary button", () => {
-      const wrapper = createWrapper({}, store, router);
-      const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("primaryButtonLabel")).toBe(i18n.global.t("dashboard.save"));
-    });
-
-    it("should forward the localized cancel label to ODrawer secondary button", () => {
-      const wrapper = createWrapper({}, store, router);
-      const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("secondaryButtonLabel")).toBe(i18n.global.t("dashboard.cancel"));
-    });
-
-    it("should attach the data-test attribute on the ODrawer", () => {
-      const wrapper = createWrapper({}, store, router);
-      const drawer = wrapper.find('[data-test="dashboard-folder-move-dialog"]');
-      expect(drawer.exists()).toBe(true);
-    });
-  });
-
-  describe("ODrawer Event Wiring", () => {
-    it("should close the drawer when ODrawer emits click:secondary", async () => {
-      const wrapper = createWrapper({}, store, router);
-
-      // open it first
-      await wrapper.find('[data-test="dashboard-folder-move-new-add"]').trigger("click");
-      expect(wrapper.vm.showAddFolderDialog).toBe(true);
-
-      const drawer = wrapper.findComponent(ODialogStub);
-      await drawer.vm.$emit("click:secondary");
-
-      expect(wrapper.vm.showAddFolderDialog).toBe(false);
-    });
-
-    it("should pass form-id to ODialog for native form submission", async () => {
-      const wrapper = createWrapper({}, store, router);
-
-      // open the drawer so the AddFolder ref is mounted
-      await wrapper.find('[data-test="dashboard-folder-move-new-add"]').trigger("click");
-
-      const drawer = wrapper.findComponent(ODialogStub);
-      expect(drawer.props("formId")).toBe("add-folder-dashboards-form");
-    });
-
-    it("should safely handle click:primary when the AddFolder ref is null (optional chaining)", async () => {
-      const wrapper = createWrapper({}, store, router);
-
-      // Force the ref to null to simulate the closed-drawer state. The
-      // component uses `addFolderRef?.submit()` so this must not throw.
-      wrapper.vm.addFolderRef = null;
-      await wrapper.vm.$nextTick();
-
-      const drawer = wrapper.findComponent(ODialogStub);
-      expect(() => drawer.vm.$emit("click:primary")).not.toThrow();
-    });
-  });
-
-  describe("Drawer slot content", () => {
-    it("should render the AddFolder component inside the drawer with edit-mode=false", () => {
-      const wrapper = createWrapper({}, store, router);
-      const addFolder = wrapper.findComponent(AddFolderStub);
-      expect(addFolder.exists()).toBe(true);
-      expect(addFolder.props("editMode")).toBe(false);
-    });
-
-    it("should call updateFolderList when AddFolder emits update:modelValue", async () => {
-      const wrapper = createWrapper({}, store, router);
-
-      // ensure drawer is open
-      wrapper.vm.showAddFolderDialog = true;
-      await wrapper.vm.$nextTick();
-
-      const addFolder = wrapper.findComponent(AddFolderStub);
-      await addFolder.vm.$emit("update:modelValue", {
-        data: { name: "Brand New", folderId: "brand-new" },
+    it("creates the folder and selects it", async () => {
+      vi.mocked(createFolder).mockResolvedValueOnce({
+        data: { name: "Brand new", folderId: "brand-new" },
       });
+      const wrapper = createWrapper({}, store, router);
+      await startNew(wrapper);
 
-      expect(wrapper.vm.showAddFolderDialog).toBe(false);
+      await wrapper.find('[data-test="dashboard-folder-add-name"] input').setValue(" Brand new ");
+      await wrapper.find('[data-test="dashboard-folder-add-create"]').trigger("click");
+      await flushPromises();
+
+      expect(createFolder).toHaveBeenCalledWith(expect.anything(), {
+        name: "Brand new",
+        description: "",
+        icon: null,
+      });
       expect(wrapper.vm.selectedFolder).toBe("brand-new");
+      expect(notify.positive).toHaveBeenCalled();
+      expect(wrapper.find('[data-test="dashboard-folder-new-inline"]').exists()).toBe(false);
+    });
+
+    it("Enter in the name field creates the folder rather than submitting the host form", async () => {
+      vi.mocked(createFolder).mockResolvedValueOnce({
+        data: { name: "Keyed", folderId: "keyed" },
+      });
+      const wrapper = createWrapper({}, store, router);
+      await startNew(wrapper);
+
+      const input = wrapper.find('[data-test="dashboard-folder-add-name"] input');
+      await input.setValue("Keyed");
+      await input.trigger("keydown", { key: "Enter" });
+      await flushPromises();
+
+      expect(createFolder).toHaveBeenCalledTimes(1);
+      expect(wrapper.vm.selectedFolder).toBe("keyed");
+    });
+
+    it("refuses an empty name with an error under the field", async () => {
+      const wrapper = createWrapper({}, store, router);
+      await startNew(wrapper);
+
+      await wrapper.find('[data-test="dashboard-folder-add-create"]').trigger("click");
+      await flushPromises();
+
+      expect(createFolder).not.toHaveBeenCalled();
+      expect(wrapper.vm.newFolderError).toBe(i18n.global.t("dashboard.nameRequired"));
+    });
+
+    it("keeps the field and says so when the create fails", async () => {
+      vi.mocked(createFolder).mockRejectedValueOnce(new Error("Folder already exists"));
+      const wrapper = createWrapper({}, store, router);
+      await startNew(wrapper);
+
+      await wrapper.find('[data-test="dashboard-folder-add-name"] input').setValue("Taken");
+      await wrapper.find('[data-test="dashboard-folder-add-create"]').trigger("click");
+      await flushPromises();
+
+      expect(notify.error).toHaveBeenCalledWith("Folder already exists", { timeout: 2000 });
+      expect(wrapper.find('[data-test="dashboard-folder-new-inline"]').exists()).toBe(true);
+      expect(wrapper.vm.selectedFolder).toBe("default");
+    });
+
+    it("Cancel hides the field without creating anything", async () => {
+      const wrapper = createWrapper({}, store, router);
+      await startNew(wrapper);
+
+      await wrapper.find('[data-test="dashboard-folder-add-cancel"]').trigger("click");
+
+      expect(createFolder).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="dashboard-folder-new-inline"]').exists()).toBe(false);
     });
   });
 
   describe("disabled prop", () => {
-    it("locks the folder select and the new-folder button when disabled", () => {
+    it("locks the folder select and offers no new folder when disabled", () => {
       const wrapper = createWrapper({ disabled: true }, store, router);
 
-      expect(wrapper.findComponent(OSelect).props("disabled")).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-folder-move-new-add"]').attributes("disabled"),
-      ).toBeDefined();
+      expect(wrapper.findComponent({ name: "OSelect" }).props("disabled")).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-folder-move-new-add"]').exists()).toBe(false);
     });
 
-    it("leaves both controls enabled by default", () => {
+    it("leaves the select enabled by default", () => {
       const wrapper = createWrapper({}, store, router);
-
-      expect(wrapper.findComponent(OSelect).props("disabled")).toBe(false);
-      expect(
-        wrapper.find('[data-test="dashboard-folder-move-new-add"]').attributes("disabled"),
-      ).toBeUndefined();
+      expect(wrapper.findComponent({ name: "OSelect" }).props("disabled")).toBe(false);
     });
   });
 
   describe("Reactive folder list", () => {
     it("should refresh selectedFolder when the store folders list changes and current id no longer exists", async () => {
       const wrapper = createWrapper({ activeFolderId: "folder1" }, store, router);
-
       expect(wrapper.vm.selectedFolder).toBe("folder1");
 
-      // mutate folders so 'folder1' is no longer present — should fall back
-      // to the default placeholder.
       store.state.organizationData.folders = [{ name: "Folder 2", folderId: "folder2" }];
       await wrapper.vm.$nextTick();
 

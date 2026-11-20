@@ -31,8 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ doneText }}
       </span>
       <OButton
-        variant="ghost-primary"
-        size="xs"
+        variant="accent-ghost"
+        size="sm"
         class="-my-0.5 shrink-0"
         :data-test="`autoobserve2-request-undo-${testId}`"
         @click="onUndo"
@@ -51,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div v-if="inline" class="flex flex-wrap items-center gap-x-2 gap-y-1">
         <OTag
-          variant="warning-soft"
-          size="xs"
+          tone="warn"
+          size="sm"
           :label="t('autoobserve2.needs.needsOk')"
           :data-test="`autoobserve2-request-needs-ok-${testId}`"
         />
@@ -112,8 +112,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTag
           v-for="tag in request.copy.tags"
           :key="tag.label"
-          :variant="tag.variant"
-          size="xs"
+          :tone="tag.variant"
+          size="sm"
           :label="tag.label"
         />
       </div>
@@ -129,13 +129,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-text-secondary">· {{ t(entryKey("on")) }}</span>
         </p>
         <span class="flex flex-wrap gap-1.5">
-          <OTag variant="default-soft" size="xs" :label="t(copyKey('cost'))" />
-          <OTag
-            variant="default-soft"
-            size="xs"
-            icon="undo"
-            :label="t('autoobserve2.needs.canUndo')"
-          />
+          <OTag tone="neutral" size="sm" :label="t(copyKey('cost'))" />
+          <OTag tone="neutral" size="sm" icon="undo" :label="t('autoobserve2.needs.canUndo')" />
         </span>
       </div>
       <!-- Live findings have no decision route yet, so a click would only change local state. -->
@@ -146,7 +141,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OButton
           variant="primary"
-          size="sm"
           :class="inline ? '' : 'flex-1'"
           :data-test="`autoobserve2-request-yes-${testId}`"
           @click="onDecide('yes')"
@@ -154,8 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(request.yes) }}
         </OButton>
         <OButton
-          variant="ghost-muted"
-          size="sm"
+          variant="ghost"
           class="shrink-0"
           :data-test="`autoobserve2-request-no-${testId}`"
           @click="onDecide('no')"

@@ -24,13 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="relative" aria-busy="true" data-test="metrics-breakdown-pending">
         <div class="pointer-events-none absolute inset-x-0 top-0 isolate h-0.5">
-          <LoadingProgress
-            :loading="true"
-            :loading-progress-percentage="0"
-            indeterminate
-            :label="chartsLoadingLabel"
-            data-test="metrics-progress-line"
-          />
+          <OLoadingLine active :aria-label="chartsLoadingLabel" data-test="metrics-progress-line" />
         </div>
         <div class="grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-md:grid-cols-1">
           <div
@@ -39,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="border-border-default rounded-surface flex h-56 flex-col overflow-hidden border"
           >
             <PanelBar class="min-w-0 gap-2">
-              <OSkeleton type="text" animation="none" class="h-3 w-24" aria-hidden="true" />
+              <OSkeleton class="h-3 w-24" aria-hidden="true" />
             </PanelBar>
             <div class="min-h-0 flex-1"><PanelChartPlaceholder /></div>
           </div>
@@ -49,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OEmptyState
       v-else-if="!labels.length"
-      size="inline"
+      size="compact"
       icon="label"
       :title="t('metrics.explorer.detail.breakdown.noLabels')"
       data-test="metrics-breakdown-no-labels"
@@ -59,8 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex min-w-0 items-center gap-3">
         <OButton
           variant="ghost"
-          size="sm"
-          icon-left="arrow-back"
+          icon="arrow-back"
           class="shrink-0"
           data-test="metrics-breakdown-back"
           @click="$emit('update:selectedLabel', null)"
@@ -102,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="truncate">{{ focusedTitle }}</span>
           <OTag
             v-if="topkByLabel[activeLabel] || (heatmap && heatmapStats.size > TOPK)"
-            variant="default-outline"
+            tone="outline"
             size="sm"
             class="shrink-0"
             data-test="metrics-breakdown-topk"
@@ -122,11 +115,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="inline-flex shrink-0">
               <OButton
                 variant="ghost"
-                size="xs"
+                size="sm"
                 disabled
                 data-test="metrics-breakdown-add-to-dashboard"
               >
-                <template #icon-left>
+                <template #icon>
                   <OIcon
                     name="lock"
                     class="lock-chip"
@@ -141,8 +134,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-else
             variant="ghost"
-            size="xs"
-            icon-left="dashboard-customize"
+            size="sm"
+            icon="dashboard-customize"
             class="shrink-0"
             :disabled="focused.status !== 'done' || (heatmap && selectedValue === null)"
             data-test="metrics-breakdown-add-to-dashboard"
@@ -201,6 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <div class="flex-1" />
           <OToggleGroup
+            size="sm"
             v-if="!heatmap"
             v-model="rowSortModel"
             type="single"
@@ -209,14 +203,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OToggleGroupItem
               value="avg"
-              size="xs"
               :title="t('metrics.explorer.detail.breakdown.sortAvgTitle')"
               data-test="metrics-breakdown-sort-avg"
               >{{ t("metrics.explorer.detail.breakdown.sortAvg") }}</OToggleGroupItem
             >
             <OToggleGroupItem
               value="outlying"
-              size="xs"
               :title="t('metrics.explorer.detail.breakdown.sortOutlyingTitle')"
               data-test="metrics-breakdown-sort-outlying"
               >{{ t("metrics.explorer.detail.breakdown.sortOutlying") }}</OToggleGroupItem
@@ -225,12 +217,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </PanelBar>
 
         <div class="p-2">
-          <OBanner
+          <OInlineNotice
             v-if="activeCounts.failed"
-            variant="error-soft"
-            dense
-            inline-actions
-            :content="
+            tone="err"
+            :message="
               t('metrics.explorer.detail.breakdown.countsFailed', {
                 error: raw(activeCounts.error),
               })
@@ -239,42 +229,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #actions>
               <OButton
-                variant="ghost-primary"
-                size="xs"
+                variant="accent-ghost"
+                size="sm"
                 data-test="metrics-breakdown-values-retry"
                 @click="retryCounts"
               >
                 {{ t("metrics.explorer.retry") }}
               </OButton>
             </template>
-          </OBanner>
+          </OInlineNotice>
 
           <OSkeleton
             v-else-if="!activeCounts.ready"
+            shape="block"
             class="h-16"
-            animation="wave"
             data-test="metrics-breakdown-values-loading"
           />
 
-          <p
+          <OEmptyState
             v-else-if="!rows.length"
-            class="text-text-secondary px-1 text-xs"
+            size="compact"
+            class="px-1"
+            :title="t('metrics.explorer.noData')"
             data-test="metrics-breakdown-values-empty"
-          >
-            {{ t("metrics.explorer.noData") }}
-          </p>
+          />
 
           <OTable
             v-else
             :data="rows"
             :columns="columns"
             row-key="value"
-            :frame="false"
             :fill-height="false"
             pagination="none"
             sorting="none"
-            :show-global-filter="false"
-            dense
             :key="heatmap ? 'heatmap' : 'line'"
             :row-class="heatmap ? heatmapRowClass : undefined"
             data-test="metrics-breakdown-table"
@@ -292,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                 <OTag
                   v-if="row.outlier"
-                  variant="warning-outline"
+                  tone="outline"
                   size="sm"
                   class="shrink-0"
                   :data-test="`metrics-breakdown-outlier-${activeLabel}-${row.value}`"
@@ -305,6 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div :data-test="`metrics-breakdown-trend-${activeLabel}-${row.value}`">
                 <OSkeleton
                   v-if="statsLoading"
+                  shape="block"
                   class="h-3 w-full"
                   data-test="metrics-breakdown-stat-loading"
                 />
@@ -348,9 +336,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-actions="{ row }">
               <div class="flex items-center justify-end gap-1">
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-xs"
-                  icon-left="add-circle-outline"
+                  icon="add-circle-outline"
                   :aria-label="
                     t('metrics.explorer.detail.breakdown.addToFilterAria', {
                       label: activeLabel,
@@ -363,9 +351,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip :content="t('metrics.explorer.detail.breakdown.addToFilter')" />
                 </OButton>
                 <OButton
+                  icon-only
                   variant="ghost"
-                  size="icon-xs"
-                  icon-left="block"
+                  icon="block"
                   :aria-label="
                     t('metrics.explorer.detail.breakdown.excludeAria', {
                       label: activeLabel,
@@ -385,25 +373,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-else>
-      <OBanner
+      <OInlineNotice
         v-if="headError"
-        variant="error-soft"
-        dense
-        inline-actions
-        :content="t('metrics.explorer.detail.breakdown.countsFailed', { error: raw(headError) })"
+        tone="err"
+        :message="t('metrics.explorer.detail.breakdown.countsFailed', { error: raw(headError) })"
         data-test="metrics-breakdown-counts-error"
       >
         <template #actions>
           <OButton
-            variant="ghost-primary"
-            size="xs"
+            variant="accent-ghost"
+            size="sm"
             data-test="metrics-breakdown-counts-retry"
             @click="retryCounts"
           >
             {{ t("metrics.explorer.retry") }}
           </OButton>
         </template>
-      </OBanner>
+      </OInlineNotice>
 
       <div class="flex min-h-6 items-center">
         <p class="text-text-secondary text-xs">
@@ -446,7 +432,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
               <OTag
                 v-if="topkByLabel[label]"
-                variant="default-outline"
+                tone="outline"
                 size="sm"
                 class="shrink-0"
                 :data-test="`metrics-breakdown-topk-${label}`"
@@ -454,9 +440,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
               <div class="flex-1" />
               <OButton
-                variant="ghost-primary"
-                size="xs"
-                icon-left="open-in-full"
+                variant="accent-ghost"
+                size="sm"
+                icon="open-in-full"
                 class="shrink-0"
                 :aria-label="t('metrics.explorer.detail.breakdown.drillDownAria', { label })"
                 :data-test="`metrics-breakdown-select-${label}`"
@@ -506,10 +492,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OValue from "@/lib/data/Value/OValue.vue";
-import LoadingProgress from "@/components/common/LoadingProgress.vue";
+import OLoadingLine from "@/lib/feedback/LoadingLine/OLoadingLine.vue";
 import { loadingText } from "@/lib/feedback/RegionStatus/regionText";
 import type { TileFailure } from "./MetricChartTile.vue";
 import PanelChartPlaceholder from "@/components/dashboards/PanelChartPlaceholder.vue";
@@ -660,10 +646,10 @@ export default defineComponent({
     OIcon,
     OTag,
     OEmptyState,
-    OBanner,
+    OInlineNotice,
     OSkeleton,
     OValue,
-    LoadingProgress,
+    OLoadingLine,
     PanelChartPlaceholder,
     OTooltip,
     OTable,

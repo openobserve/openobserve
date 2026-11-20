@@ -1,11 +1,13 @@
 import type { I18nText } from "@/types/i18n";
+import type { IconName } from "../../core/Icon/OIcon.icons";
 
 export interface DropdownSubProps {
   open?: boolean;
-  textValue: I18nText;
+  /** The trigger row's label; also its typeahead text. */
+  label: I18nText;
+  icon?: IconName;
   /** Secondary line under the trigger label, linked as its accessible description. */
   description?: I18nText | null;
-  descriptionId?: string;
 }
 
 export interface DropdownSubEmits {
@@ -13,8 +15,10 @@ export interface DropdownSubEmits {
 }
 
 export interface DropdownSubSlots {
-  trigger(): unknown;
-  "icon-left"(): unknown;
-  "icon-right"(): unknown;
+  /** A custom leading glyph in place of `icon`, matching the menu's other rows. */
+  icon?(): unknown;
+  /** Trailing content before the chevron. */
+  end?(): unknown;
+  /** The submenu's items; a submenu never holds another submenu (guideline O1). */
   default(): unknown;
 }

@@ -37,18 +37,18 @@ describe("OContextMenuItem", () => {
     expect(wrapper.text()).toContain("Copy value");
   });
 
-  it("renders icon-left slot", async () => {
+  it("renders the icon slot", async () => {
     const wrapper = await mountItemInMenu(
       {},
-      { "icon-left": () => h("span", { "data-testid": "icon-left" }, "←") },
+      { icon: () => h("span", { "data-testid": "icon-left" }, "←") },
     );
     expect(wrapper.find('[data-testid="icon-left"]').exists()).toBe(true);
   });
 
-  it("renders icon-right slot", async () => {
+  it("renders the end slot", async () => {
     const wrapper = await mountItemInMenu(
       {},
-      { "icon-right": () => h("span", { "data-testid": "icon-right" }, "→") },
+      { end: () => h("span", { "data-testid": "icon-right" }, "→") },
     );
     expect(wrapper.find('[data-testid="icon-right"]').exists()).toBe(true);
   });
@@ -60,7 +60,7 @@ describe("OContextMenuItem", () => {
 
   it("keeps an unavailable reason reachable without selecting", async () => {
     const wrapper = await mountItemInMenu(
-      { disabled: true, focusableUnavailable: true, description: "Run the query first" },
+      { disabled: true, disabledReason: "Run the query first" },
       { default: () => h("span", "Copy link") },
     );
     const item = wrapper.findComponent(OContextMenuItem);
@@ -87,7 +87,7 @@ describe("OContextMenuItem", () => {
 
   it("applies destructive variant classes", async () => {
     const wrapper = await mountItemInMenu(
-      { variant: "destructive" },
+      { tone: "danger" },
       { default: () => h("span", "Delete") },
     );
     expect(wrapper.find(".text-dropdown-item-destructive-text").exists()).toBe(true);

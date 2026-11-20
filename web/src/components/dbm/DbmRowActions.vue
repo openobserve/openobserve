@@ -33,9 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTooltip v-if="action.lockedReason" side="left" :content="action.lockedReason">
         <span class="inline-flex max-md:hidden">
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            icon-left="lock"
+            size="sm"
+            icon="lock"
             disabled
             :aria-label="action.label"
             :data-test="`${dataTest}-${action.id}`"
@@ -44,9 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTooltip>
       <OButton
         v-else
+        icon-only
         variant="ghost"
-        size="icon-xs-sq"
-        :icon-left="action.icon"
+        size="sm"
+        :icon="action.icon"
         class="max-md:hidden"
         :data-test="`${dataTest}-${action.id}`"
         @click.stop="emit('action', action.id)"
@@ -58,10 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODropdown side="bottom" align="end">
       <template #trigger>
         <OButton
+          icon-only
           :aria-label="t('common.moreActions')"
-          icon-left="more-vert"
+          icon="more-vert"
           variant="ghost"
-          size="icon-xs-sq"
+          size="sm"
           class="md:hidden"
           :data-test="moreTest"
           @click.stop
@@ -70,10 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODropdownItem
         v-for="action in actions"
         :key="action.id"
-        :icon-left="action.lockedReason ? 'lock' : action.icon"
+        :icon="action.lockedReason ? 'lock' : action.icon"
         :disabled="!!action.lockedReason"
-        :focusable-unavailable="!!action.lockedReason"
-        :description="action.lockedReason"
+        :disabled-reason="action.lockedReason"
         class="md:hidden"
         :data-test="`${dataTest}-${action.id}-menu`"
         @select="emit('action', action.id)"

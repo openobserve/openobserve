@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <OBanner v-if="items.length" variant="warning" data-test="fleet-token-expiry-banner">
+  <OInlineNotice v-if="items.length" tone="warn" data-test="fleet-token-expiry-banner">
     <p class="font-medium">
       {{ t("fleet.tokenExpiry.title", { count: items.length }, items.length) }}
     </p>
@@ -36,8 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-for="c in item.collectors.slice(0, MAX_NAMES)"
           :key="c.id"
-          variant="ghost-primary"
-          size="xs"
+          variant="accent-ghost"
+          size="sm"
           :data-test="`fleet-token-expiry-collector-${c.id}`"
           @click="emit('open-collector', c)"
         >
@@ -50,20 +50,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ul>
     <template #actions>
       <OButton
-        variant="outline"
-        size="sm"
+        variant="secondary"
         data-test="fleet-token-expiry-manage"
         @click="emit('open-tokens', items[0].token.fleetId)"
       >
         {{ t("fleet.tokenExpiry.manage") }}
       </OButton>
     </template>
-  </OBanner>
+  </OInlineNotice>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18nTyped } from "@/types/i18n";
 import {

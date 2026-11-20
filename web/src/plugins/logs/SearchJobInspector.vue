@@ -18,16 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="bg-surface-base"
     :title="t('logs.searchJobInspector.title')"
+    title-data-test="inspector-title"
     :back="{
-      label: t('logs.searchJobInspector.title'),
-      onClick: goBack,
+      label: t('menu.search'),
+      to: logsRoute,
       dataTest: 'inspector-close-button',
     }"
     bleed
   >
-    <template #title>
-      <span data-test="inspector-title">{{ t("logs.searchJobInspector.title") }}</span>
-    </template>
     <template #actions>
       <div
         v-if="profileData && !hasNoData"
@@ -49,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </svg>
         <div class="flex items-center gap-1.5">
           <span
-            class="text-3xs font-small rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5"
+            class="text-2xs font-small rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5"
           >
             {{ store.state.timezone || "UTC" }}
           </span>
@@ -71,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base max-md:hidden">
+                <div class="font-small text-text-label text-sm max-md:hidden">
                   {{ t("logs.searchJobInspector.results") }}
                 </div>
                 <div
@@ -90,11 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
                 <div
-                  class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm"
+                  class="text-text-body text-2xl font-semibold max-md:max-w-full max-md:truncate max-md:text-sm"
                 >
                   {{ hasNoData ? raw("NA") : (profileData?.data_records || 0).toLocaleString() }}
                 </div>
-                <div class="text-3xs text-text-secondary max-md:hidden">
+                <div class="text-2xs text-text-secondary max-md:hidden">
                   {{ t("logs.searchJobInspector.returnedFromQuery") }}
                 </div>
               </div>
@@ -107,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base max-md:hidden">
+                <div class="font-small text-text-label text-sm max-md:hidden">
                   {{ t("logs.searchJobInspector.scannedEvents") }}
                 </div>
                 <div
@@ -126,11 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
                 <div
-                  class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm"
+                  class="text-text-body text-2xl font-semibold max-md:max-w-full max-md:truncate max-md:text-sm"
                 >
                   {{ hasNoData ? raw("NA") : (profileData?.scan_records || 0).toLocaleString() }}
                 </div>
-                <div class="text-3xs text-text-secondary max-md:hidden">
+                <div class="text-2xs text-text-secondary max-md:hidden">
                   {{ t("logs.searchJobInspector.scannedEventsForQuery") }}
                 </div>
               </div>
@@ -143,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base max-md:hidden">
+                <div class="font-small text-text-label text-sm max-md:hidden">
                   {{ t("logs.searchJobInspector.timeTaken") }}
                 </div>
                 <div
@@ -168,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
                 <div
-                  class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm"
+                  class="text-text-body text-2xl font-semibold max-md:max-w-full max-md:truncate max-md:text-sm"
                 >
                   {{
                     hasNoData
@@ -177,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </div>
                 <div
-                  class="text-3xs max-md:hidden"
+                  class="text-2xs max-md:hidden"
                   :class="
                     hasNoData
                       ? 'text-text-secondary'
@@ -202,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base max-md:hidden">
+                <div class="font-small text-text-label text-sm max-md:hidden">
                   {{ t("logs.searchJobInspector.traceId") }}
                 </div>
                 <div
@@ -290,11 +288,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Error Message -->
-      <OBanner
+      <OInlineNotice
         v-if="errorMessage"
-        variant="error"
-        icon="error"
-        :content="raw(errorMessage)"
+        tone="err"
+        :message="raw(errorMessage)"
         class="mb-2.5 shrink-0"
         data-test="inspector-error-banner"
       />
@@ -311,7 +308,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="id"
             :loading="loading"
             pagination="none"
-            :show-global-filter="false"
             tree
             tree-column-id="index"
             :default-columns="false"
@@ -361,14 +357,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="search-job-inspector-sql-drawer"
       bleed
       v-model:open="showSqlDialog"
-      size="lg"
+      size="md"
       :title="t('logs.searchJobInspector.sqlQuery')"
     >
       <template #header-right>
         <OButton
           v-if="profileData?.sql"
+          icon-only
           variant="ghost"
-          size="icon-sm"
           :class="[
             'border',
             copiedSql ? 'text-status-positive border-status-positive' : 'border-border-default',
@@ -407,11 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ traceId }}
         </div>
-        <OButton
-          :aria-label="t('common.copyToClipboard')"
-          variant="primary"
-          size="sm-action"
-          @click="copyTraceId"
+        <OButton :aria-label="t('common.copyToClipboard')" variant="primary" @click="copyTraceId"
           ><OIcon name="content-copy" size="sm" class="me-1"
         /></OButton>
       </div>
@@ -432,7 +424,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
@@ -483,7 +475,7 @@ export default defineComponent({
     OButton,
     ODrawer,
     ODialog,
-    OBanner,
+    OInlineNotice,
     OTooltip,
     OTruncatedText,
     OIcon,
@@ -507,6 +499,10 @@ export default defineComponent({
     const orgIdentifier = computed(
       () => (route.query.org_identifier as string) || store.state.selectedOrganization?.identifier,
     );
+    const logsRoute = computed(() => ({
+      name: "logs",
+      query: { org_identifier: orgIdentifier.value },
+    }));
     const startTime = computed(() =>
       route.query.start_time ? parseInt(route.query.start_time as string) : undefined,
     );
@@ -750,10 +746,6 @@ export default defineComponent({
       { flush: "sync" },
     );
 
-    const goBack = () => {
-      router.back();
-    };
-
     const copyTraceId = () => {
       copyToClipboard(traceId.value, t, {
         errorMessage: t("logs.searchJobInspector.failedToCopyTraceId"),
@@ -799,7 +791,7 @@ export default defineComponent({
       formatDuration,
       formatTimeRange,
       getResponseTimeLabel,
-      goBack,
+      logsRoute,
       showSqlDialog,
       showTraceIdDialog,
       copiedTraceId,

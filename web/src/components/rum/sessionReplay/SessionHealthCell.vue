@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="errorCount > 0 || frustrationCount > 0">
       <OTag
         v-if="errorCount > 0"
-        variant="error-soft"
+        tone="err"
         icon="error-outline"
         size="sm"
         :title="t('rum.errorCountTooltip', { count: errorCount })"
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       <OTag
         v-if="frustrationCount > 0"
-        variant="warning-soft"
+        tone="warn"
         icon="sentiment-very-dissatisfied"
         size="sm"
         :title="t('rum.frustrationCountTooltip', { count: frustrationCount })"
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <OTag
       v-else
-      variant="success-soft"
+      tone="ok"
       icon="check-circle-outline"
       size="sm"
       :title="t('rum.cleanTooltip')"

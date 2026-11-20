@@ -1,15 +1,22 @@
 ﻿<template>
+  <!-- Docked beside a page it is a second content plane, with the same edge and hairline as the page. -->
   <div
     ref="chatRoot"
-    class="chat-container rounded-surface text-text-body bg-card-glass-solid shadow-hover-shadow flex h-full w-full flex-col overflow-hidden shadow-md"
-    :class="[{ 'chat-open': isOpen }]"
+    class="chat-container text-text-body flex h-full w-full flex-col overflow-hidden"
+    :class="[
+      { 'chat-open': isOpen },
+      docked
+        ? 'bg-surface-base border-border-subtle rounded-ss-surface border-s border-t'
+        : 'rounded-surface bg-card-glass-solid shadow-hover-shadow shadow-md',
+    ]"
   >
     <div v-if="isOpen" class="chat-content-wrapper flex h-full flex-col bg-transparent">
       <div
-        class="chat-header border-separator bg-surface-base z-2 flex shrink-0 items-end justify-between border-b px-3 pt-0 pb-1"
-        :style="{ height: headerHeight ? headerHeight + 'px' : '' }"
+        class="chat-header border-separator bg-surface-base z-2 flex shrink-0 items-center justify-between border-b px-3"
+        :class="docked ? 'h-14' : ''"
+        :style="!docked && headerHeight ? { height: headerHeight + 'px' } : undefined"
       >
-        <div class="chat-title flex w-full items-center justify-between font-bold">
+        <div class="chat-title flex w-full items-center justify-between font-semibold">
           <div class="flex min-w-0 items-center gap-2">
             <div class="inline-flex h-6 w-6 shrink-0 overflow-hidden rounded-full">
               <img alt="" :src="o2AiTitleLogo" class="h-full w-full object-cover" />
@@ -17,19 +24,13 @@
 
             <ODropdown @update:open="(v) => v && loadHistory()">
               <template #trigger>
-                <OButton
-                  variant="ghost"
-                  size="sm"
-                  class="chat-title-dropdown rounded-default hover:bg-interactive-hover-bg flex h-8 min-h-8 max-w-40 min-w-0 items-center overflow-hidden px-3 py-1.5 transition-colors duration-200"
-                >
-                  <div class="flex min-w-0 items-center gap-2">
-                    <OTruncatedText
-                      class="chat-title-text text-text-body block text-sm font-medium"
-                    >
-                      {{ displayedTitle || t("common.newChat") }}
-                    </OTruncatedText>
-                    <OIcon name="arrow-drop-down" size="md" class="flex-shrink-0" />
-                  </div>
+                <OButton variant="ghost" size="sm" class="chat-title-dropdown max-w-40 min-w-0">
+                  <OTruncatedText class="chat-title-text text-text-heading font-semibold">
+                    {{ displayedTitle || t("common.newChat") }}
+                  </OTruncatedText>
+                  <template #icon-end>
+                    <OIcon name="arrow-drop-down" size="sm" class="shrink-0" />
+                  </template>
                 </OButton>
               </template>
               <O2AIChatHistoryMenu
@@ -47,37 +48,35 @@
           <div class="chat-header-actions flex shrink-0 items-center gap-1">
             <OButton
               v-if="currentChatId"
+              icon-only
+              icon="edit"
               variant="ghost"
-              size="icon-sm"
-              :aria-label="t('aiAssistant.editTitleTooltip')"
+              size="sm"
+              :label="t('aiAssistant.editTitleTooltip')"
               @click.stop="openEditTitleDialog"
-            >
-              <OIcon name="edit" size="sm" />
-              <OTooltip :content="t('aiAssistant.editTitleTooltip')" />
-            </OButton>
+            />
             <OButton
               v-if="canShareCurrentChat"
+              icon-only
+              icon="share"
               variant="ghost"
-              size="icon-sm"
+              size="sm"
               data-test="o2-ai-chat-share-btn"
-              :aria-label="t('aiChatShare.share')"
+              :label="t('aiChatShare.share')"
               @click.stop="shareCurrentChat"
-            >
-              <OIcon name="share" size="sm" />
-              <OTooltip :content="t('aiChatShare.share')" />
-            </OButton>
+            />
             <OButton
+              icon-only
+              icon="add"
               variant="ghost"
-              size="icon-sm"
-              :aria-label="t('common.newChat')"
+              size="sm"
+              :label="t('common.newChat')"
               @click="addNewChat"
-            >
-              <OIcon name="add" size="sm" />
-              <OTooltip :content="t('common.newChat')" />
-            </OButton>
+            />
             <OButton
+              icon-only
               variant="ghost"
-              size="icon-sm"
+              size="sm"
               data-test="ai-chat-expand-btn"
               :aria-label="store.state.isAiChatExpanded ? t('common.collapse') : t('common.expand')"
               @click="toggleExpand"
@@ -98,13 +97,14 @@
               />
             </OButton>
             <OButton
+              icon-only
+              icon="close"
               variant="ghost"
-              size="icon-sm"
-              :aria-label="t('common.close')"
+              size="sm"
+              data-test="o2-ai-chat-close-btn"
+              :label="t('common.close')"
               @click="$emit('close')"
-            >
-              <OIcon name="close" size="sm" />
-            </OButton>
+            />
           </div>
         </div>
       </div>
@@ -140,8 +140,8 @@
         v-model:open="showEditTitleDialog"
         size="sm"
         :title="t('aiAssistant.editChatTitle')"
-        :secondary-button-label="t('common.cancel')"
-        :primary-button-label="t('common.save')"
+        :secondary="{ label: t('common.cancel') }"
+        :primary="{ label: t('common.save') }"
         @click:secondary="showEditTitleDialog = false"
         @click:primary="saveEditedTitle"
       >
@@ -165,10 +165,8 @@
         v-model:open="showDeleteChatConfirmDialog"
         size="sm"
         :title="t('aiAssistant.deleteChat')"
-        :primary-button-label="t('common.delete')"
-        primary-button-variant="destructive"
-        :secondary-button-label="t('common.cancel')"
-        initial-focus="secondary"
+        :primary="{ label: t('common.delete'), variant: 'danger' }"
+        :secondary="{ label: t('common.cancel') }"
         data-test="o2-ai-chat-delete-chat-dialog"
         @click:primary="
           showDeleteChatConfirmDialog = false;
@@ -199,7 +197,8 @@
         v-model="showClearAllConfirmDialog"
         :title="t('aiAssistant.clearAllConversationsTitle')"
         :message="t('aiAssistant.clearAllConversationsMessage')"
-        ok-variant="destructive"
+        kind="destructive"
+        :ok-label="t('aiAssistant.clearAllConversations')"
         @update:ok="confirmClearAllConversations"
         @update:cancel="showClearAllConfirmDialog = false"
       />
@@ -229,50 +228,42 @@
           ref="messagesContainer"
           @scroll="checkIfShouldAutoScroll"
         >
-          <OBanner
+          <OInlineNotice
             v-if="forkedFromShare"
-            variant="info"
+            tone="info"
             icon="fork-right"
-            dense
-            :content="t('aiChatShare.forkedFromShareBanner', { title: displayedTitle })"
+            :message="t('aiChatShare.forkedFromShareBanner', { title: displayedTitle })"
             data-test="o2-ai-chat-forked-banner"
           />
-          <OBanner
+          <OInlineNotice
             v-if="historyUnavailable"
-            variant="warning"
-            icon="error"
-            dense
-            inline-actions
-            :content="t('aiAssistant.historyUnavailable')"
+            tone="warn"
+            :message="t('aiAssistant.historyUnavailable')"
             data-test="o2-ai-chat-history-unavailable"
           >
             <template #actions>
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 data-test="o2-ai-chat-history-unavailable-retry"
                 @click="reloadCurrentChat"
               >
                 {{ t("common.retry") }}
               </OButton>
             </template>
-          </OBanner>
+          </OInlineNotice>
           <div
             v-if="chatMessages.length === 0"
             class="welcome-section rounded-default mb-0 flex flex-1 items-center justify-center bg-transparent p-0"
           >
             <O2AIHomeWelcome v-if="centeredStart" @select-prompt="selectWelcomePrompt" />
-            <div v-else class="flex h-full w-full flex-col items-center justify-center">
-              <div class="flex flex-col items-center gap-2">
-                <img alt="" :src="o2AiTitleLogo" />
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-[600]">{{
-                    t("aiAssistant.welcome.taglineHighlight")
-                  }}</span>
-                  <BetaBadge />
-                </div>
-              </div>
-            </div>
+            <OEmptyState
+              v-else
+              class="self-stretch"
+              icon="auto-awesome"
+              :title="t('aiAssistant.welcome.taglineHighlight')"
+              :text="t('aiAssistant.welcome.panelText')"
+              data-test="o2-ai-chat-welcome"
+            />
           </div>
           <O2AIChatMessage
             v-for="(message, index) in processedMessages"
@@ -299,82 +290,60 @@
           />
           <div
             v-if="isLoading && !activeToolCall"
-            class="tool-call-indicator rounded-default border-border-default my-2 flex items-center border px-4 py-3 [background:var(--color-chat-bubble-user)]"
+            class="tool-call-indicator text-text-secondary text-compact flex items-center gap-2 px-1 py-2"
           >
-            <div class="tool-call-content flex w-full items-center gap-3">
-              <OSpinner variant="dots" size="xs" />
-              <span class="tool-call-message text-text-secondary text-sm font-semibold">{{
-                currentAnalyzingMessage
-              }}</span>
-            </div>
+            <OSpinner size="sm" />
+            <span class="tool-call-message">{{ currentAnalyzingMessage }}</span>
           </div>
         </div>
 
         <div
           v-show="showScrollToBottom"
-          class="scroll-to-bottom-container pointer-events-none absolute bottom-2.5 left-1/2 z-1000 -translate-x-1/2 [transition:all_0.3s_ease]"
+          class="scroll-to-bottom-container pointer-events-none absolute bottom-2.5 left-1/2 z-1000 -translate-x-1/2"
         >
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-sm"
-            class="scroll-to-bottom-btn border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! pointer-events-auto border-2! shadow-sm [backdrop-filter:blur(0.5rem)] transition-all duration-300 hover:scale-110 hover:shadow-md active:scale-100"
+            class="scroll-to-bottom-btn border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! pointer-events-auto border-2! shadow-sm [backdrop-filter:blur(0.5rem)] transition-[color,background-color,border-color,box-shadow,opacity,scale] hover:scale-110 hover:shadow-md active:scale-100"
             :aria-label="t('aiAssistant.scrollToBottom')"
             @click="scrollToBottomSmooth"
           >
             <OIcon name="arrow-downward" size="sm" />
-            <OTooltip side="top" align="center" :content="t('aiAssistant.scrollToBottom')" />
+            <OTooltip side="top" :content="t('aiAssistant.scrollToBottom')" />
           </OButton>
         </div>
       </div>
 
       <div
         v-if="(isLoading || activeToolCall) && showScrollToBottom"
-        class="fixed-analyzing-indicator rounded-default border-border-default mx-4 mb-2 flex items-center justify-center border px-4 py-3 shadow-sm [background:var(--color-chat-bubble-user)]"
+        class="fixed-analyzing-indicator text-text-secondary text-compact border-border-default mx-auto flex w-full max-w-225 items-center gap-2 border-t px-3 py-2"
       >
-        <div
-          v-if="activeToolCall"
-          class="analyzing-content flex w-full max-w-225 items-center gap-3"
-        >
-          <OSpinner variant="dots" size="xs" />
-          <span class="analyzing-message text-theme-accent text-sm font-medium">{{
-            activeToolCall.message
-          }}</span>
-        </div>
-        <div
-          v-else-if="isLoading"
-          class="analyzing-content flex w-full max-w-225 items-center gap-3"
-        >
-          <OSpinner variant="dots" size="xs" />
-          <span class="analyzing-message text-theme-accent text-sm font-medium">{{
-            currentAnalyzingMessage
-          }}</span>
-        </div>
+        <OSpinner size="sm" />
+        <OTruncatedText class="analyzing-message">{{
+          activeToolCall ? activeToolCall.message : currentAnalyzingMessage
+        }}</OTruncatedText>
       </div>
 
       <div class="chat-input-container relative mx-auto my-2 w-full max-w-225 shrink-0 px-2">
-        <OBanner
+        <OInlineNotice
           v-if="turnLimitError"
-          variant="error-soft"
-          icon="error"
-          dense
-          inline-actions
+          tone="err"
           class="mb-2"
-          :content="t('aiAssistant.turnLimitReached')"
+          :message="t('aiAssistant.turnLimitReached')"
           data-test="o2-ai-chat-turn-limit"
         >
           <template #actions>
             <div class="flex items-center gap-2">
               <OButton
-                variant="outline"
-                size="sm"
+                variant="secondary"
                 data-test="o2-ai-chat-turn-limit-retry"
                 @click="sendMessage"
               >
                 {{ t("common.retry") }}
               </OButton>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-sm"
                 data-test="o2-ai-chat-turn-limit-dismiss"
                 :aria-label="t('common.close')"
                 @click="turnLimitError = false"
@@ -383,7 +352,7 @@
               </OButton>
             </div>
           </template>
-        </OBanner>
+        </OInlineNotice>
         <O2AIConfirmDialog
           :visible="pendingConfirmation !== null"
           :confirmation="pendingConfirmation"
@@ -477,13 +446,13 @@ import { useTypewriter } from "@/composables/useTypewriter";
 import { abortBackgroundStreams, useChatStream } from "@/composables/useChatStream";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import OButton from "@/lib/core/Button/OButton.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -527,7 +496,7 @@ export default defineComponent({
   components: {
     AiChatShareDialog,
     OButton,
-    BetaBadge,
+    OEmptyState,
     ConfirmDialog,
     O2AIConfirmDialog,
     O2AIPaidUsageConsent,
@@ -541,7 +510,7 @@ export default defineComponent({
     ODrawer,
     ODialog,
     OSpinner,
-    OBanner,
+    OInlineNotice,
     OIcon,
     OTooltip,
     OTruncatedText,
@@ -555,6 +524,11 @@ export default defineComponent({
     headerHeight: {
       type: Number,
       default: 0,
+    },
+    /** Docked beside a page: a flat plane with a 56 px header aligned to the page header (H1). */
+    docked: {
+      type: Boolean,
+      default: false,
     },
     aiChatInputContext: {
       type: String,

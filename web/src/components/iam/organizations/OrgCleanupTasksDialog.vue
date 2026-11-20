@@ -33,12 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}
           </span>
           <OBadge
-            :variant="
-              overallStatus === 'completed'
-                ? 'success-soft'
-                : overallStatus === 'failed'
-                  ? 'error-soft'
-                  : 'primary-soft'
+            :tone="
+              overallStatus === 'completed' ? 'ok' : overallStatus === 'failed' ? 'err' : 'accent'
             "
             size="sm"
           >
@@ -57,18 +53,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}
           </OBadge>
         </div>
-        <OProgressBar :value="progressValue" :variant="progressBarVariant" size="sm" />
+        <OProgressBar :value="progressValue * 100" :tone="progressBarVariant" />
       </div>
 
-      <!-- Loading -->
-      <div v-if="loading && !tasks.length" class="text-text-secondary py-8 text-center text-sm">
-        {{ t("iam.orgCleanupTasksDialog.loading") }}
+      <div v-if="loading && !tasks.length" class="flex flex-col gap-1.5">
+        <OSkeleton v-for="n in 4" :key="n" shape="block" class="h-9" />
       </div>
 
-      <!-- Empty -->
-      <div v-else-if="!tasks.length" class="text-text-secondary py-8 text-center text-sm">
-        {{ t("iam.orgCleanupTasksDialog.noTasks") }}
-      </div>
+      <OEmptyState
+        v-else-if="!tasks.length"
+        size="compact"
+        :title="t('iam.orgCleanupTasksDialog.noTasks')"
+      />
 
       <!-- Task rows -->
       <div v-else class="space-y-1.5">
@@ -118,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
 
               <!-- Group status badge -->
-              <OBadge :variant="badgeVariant(row.status)" size="sm" class="whitespace-nowrap">
+              <OBadge :tone="badgeVariant(row.status)" size="sm" class="whitespace-nowrap">
                 {{ row.status }}
               </OBadge>
             </button>
@@ -152,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ child.attempts }}{{ t("iam.orgCleanupTasksDialog.attemptsMultiplier") }}
                   </span>
-                  <OBadge :variant="badgeVariant(child.status)" size="sm" class="whitespace-nowrap">
+                  <OBadge :tone="badgeVariant(child.status)" size="sm" class="whitespace-nowrap">
                     {{ child.status }}
                   </OBadge>
                 </div>
@@ -200,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
 
               <!-- Status badge -->
-              <OBadge :variant="badgeVariant(row.task.status)" size="sm" class="whitespace-nowrap">
+              <OBadge :tone="badgeVariant(row.task.status)" size="sm" class="whitespace-nowrap">
                 {{ row.task.status }}
               </OBadge>
             </div>
@@ -230,10 +226,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <template #footer>
-      <OButton variant="outline" size="sm" @click="$emit('update:open', false)">
+      <OButton variant="secondary" @click="$emit('update:open', false)">
         {{ t("iam.orgCleanupTasksDialog.close") }}
       </OButton>
-      <OButton variant="ghost" size="sm" :disabled="loading" @click="refreshTasks">
+      <OButton variant="ghost" :disabled="loading" @click="refreshTasks">
         <OIcon name="refresh" size="sm" />
         {{ t("iam.orgCleanupTasksDialog.refresh") }}
       </OButton>
@@ -254,7 +250,9 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 
 interface CleanupTask {
   id: string;
@@ -271,7 +269,16 @@ interface CleanupTask {
 
 export default defineComponent({
   name: "OrgCleanupTasksDialog",
-  components: { ODialog, OButton, OBadge, OIcon, OProgressBar, OTruncatedText },
+  components: {
+    ODialog,
+    OButton,
+    OBadge,
+    OIcon,
+    OProgressBar,
+    OTruncatedText,
+    OEmptyState,
+    OSkeleton,
+  },
   props: {
     open: { type: Boolean, required: true },
     orgId: { type: String, required: true },
@@ -361,11 +368,9 @@ export default defineComponent({
       return "in_progress";
     });
 
-    const progressBarVariant = computed<"default" | "warning" | "danger">(() => {
-      if (overallStatus.value === "completed") return "default";
-      if (overallStatus.value === "failed") return "danger";
-      return "default";
-    });
+    const progressBarVariant = computed<"accent" | "err">(() =>
+      overallStatus.value === "failed" ? "err" : "accent",
+    );
 
     // Per-row left accent tint by status — gives a quick visual scan.
     const rowAccentClass = (status: string): string => {
@@ -441,16 +446,16 @@ export default defineComponent({
       return step.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     };
 
-    const badgeVariant = (status: string): BadgeVariant => {
+    const badgeVariant = (status: string): ChipTone => {
       switch (status) {
         case "done":
-          return "success";
+          return "ok";
         case "running":
-          return "primary";
+          return "accent";
         case "failed":
-          return "error";
+          return "err";
         default:
-          return "default-outline"; // pending
+          return "outline"; // pending
       }
     };
 

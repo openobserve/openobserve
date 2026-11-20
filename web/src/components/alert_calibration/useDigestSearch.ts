@@ -54,6 +54,7 @@ export function useLatestRead<T>(read: () => Promise<T>) {
   const data = shallowRef<T | null>(null);
   const loading = ref(false);
   const error = shallowRef<unknown>(null);
+  const loadedAt = ref<number | null>(null);
   let generation = 0;
 
   async function load() {
@@ -62,7 +63,10 @@ export function useLatestRead<T>(read: () => Promise<T>) {
     error.value = null;
     try {
       const result = await read();
-      if (mine === generation) data.value = result;
+      if (mine === generation) {
+        data.value = result;
+        loadedAt.value = Date.now();
+      }
     } catch (e) {
       if (mine !== generation || isAbort(e)) return;
       error.value = e;
@@ -71,5 +75,5 @@ export function useLatestRead<T>(read: () => Promise<T>) {
     }
   }
 
-  return { data, loading, error, load };
+  return { data, loading, error, loadedAt, load };
 }

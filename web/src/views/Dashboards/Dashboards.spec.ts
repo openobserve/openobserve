@@ -262,21 +262,21 @@ const buildGlobalConfig = (
         "open",
         "width",
         "title",
-        "subTitle",
+        "subtitle",
         "showClose",
         "persistent",
         "size",
-        "primaryButtonLabel",
-        "secondaryButtonLabel",
-        "neutralButtonLabel",
-        "primaryButtonVariant",
-        "secondaryButtonVariant",
-        "neutralButtonVariant",
-        "primaryButtonDisabled",
-        "secondaryButtonDisabled",
-        "primaryButtonLoading",
+        "primary",
+        "secondary",
+        "extra",
+        "primary",
+        "secondary",
+        "extra",
+        "primary",
+        "secondary",
+        "primary",
       ],
-      emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+      emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
       template:
         '<div data-test-stub="o-drawer" :data-open="open" :data-title="title"><slot /></div>',
     },
@@ -286,16 +286,16 @@ const buildGlobalConfig = (
         "open",
         "width",
         "title",
-        "subTitle",
+        "subtitle",
         "showClose",
         "persistent",
         "size",
-        "primaryButtonLabel",
-        "secondaryButtonLabel",
-        "neutralButtonLabel",
+        "primary",
+        "secondary",
+        "extra",
         "formId",
       ],
-      emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+      emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
       template:
         '<div data-test-stub="o-dialog" :data-open="open" :data-title="title"><slot /></div>',
     },
@@ -434,6 +434,38 @@ describe("Dashboards.vue", () => {
       wrapper.vm.updateActiveFolderId("folder2");
       await nextTick();
       expect(table().vm.$attrs["loading-reset-key"]).toBe("folder2");
+    });
+
+    it("keeps an all-folders search when the folder comes from the URL, and drops it on a click", async () => {
+      // The list's URL sync only runs on a named route.
+      router = createRouter({
+        history: createWebHistory(),
+        routes: [
+          { path: "/dashboards", name: "dashboards", component: { template: "<div>D</div>" } },
+        ],
+      });
+      resetListViewState();
+      await router.push({
+        path: "/dashboards",
+        query: { folder: "default", "v.search": "cpu", "v.all": "true" },
+      });
+      wrapper = shallowMount(Dashboards, { global: buildGlobalConfig(store, router, i18n) });
+      await flushPromises();
+      expect(wrapper.vm.searchAcrossFolders).toBe(true);
+
+      await router.push({
+        path: "/dashboards",
+        query: { folder: "folder1", "v.search": "cpu", "v.all": "true" },
+      });
+      wrapper.vm.updateActiveFolderId("folder1");
+      await flushPromises();
+      expect(wrapper.vm.searchAcrossFolders).toBe(true);
+      expect(wrapper.vm.searchQuery).toBe("cpu");
+      expect(wrapper.vm.filterQuery).toBe("");
+
+      wrapper.vm.updateActiveFolderId("folder2");
+      await flushPromises();
+      expect(wrapper.vm.searchAcrossFolders).toBe(false);
     });
   });
 
@@ -908,7 +940,7 @@ describe("Dashboards.vue", () => {
       expect(dialog.props()).toMatchObject({
         messageKeypath: "dashboard.deleteDashboardConfirmMsg",
         messageName: "cpu-overview",
-        okVariant: "destructive",
+        kind: "destructive",
       });
     });
 
@@ -919,7 +951,7 @@ describe("Dashboards.vue", () => {
       const dialog = wrapper
         .findAllComponents({ name: "ConfirmDialog" })
         .find((c: any) => c.vm.$attrs["data-test"] === "dashboard-confirm-bulk-delete-dialog");
-      expect(dialog.props("okVariant")).toBe("destructive");
+      expect(dialog.props("kind")).toBe("destructive");
     });
   });
 

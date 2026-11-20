@@ -195,6 +195,37 @@ describe("OToastProvider", () => {
 
     expect(toastRecords).toHaveLength(0);
   });
+
+  const bottomWithBar = async (top: number, bottom: number) => {
+    const bar = document.createElement("div");
+    bar.setAttribute("data-toast-avoid", "");
+    document.body.appendChild(bar);
+    const box = { top, bottom, width: 800, height: bottom - top };
+    vi.spyOn(bar, "getBoundingClientRect").mockReturnValue(box as DOMRect);
+    const wrapper = mount(OToastProvider, { attachTo: document.body });
+    try {
+      toast({ variant: "success", message: "3 alerts paused", timeout: 0 });
+      await nextTick();
+      await nextTick();
+      const viewport = document.body.querySelector<HTMLElement>('[data-test="o-toast-viewport"]');
+      return { className: viewport?.className ?? "", bottom: viewport?.style.bottom ?? "" };
+    } finally {
+      wrapper.unmount();
+      bar.remove();
+    }
+  };
+
+  it("stacks toasts at the bottom centre, above a bar docked at the bottom edge", async () => {
+    const shown = await bottomWithBar(innerHeight - 48, innerHeight);
+    expect(shown.className).toContain("left-1/2");
+    expect(shown.bottom).toContain("48px");
+    expect(shown.bottom).toContain("1rem");
+  });
+
+  it("ignores a marked bar that is not at the bottom edge", async () => {
+    const shown = await bottomWithBar(100, 148);
+    expect(shown.bottom).not.toContain("48px");
+  });
 });
 
 describe("copy confirmation bubble placement and colours", () => {

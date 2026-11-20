@@ -566,7 +566,7 @@ describe("ReportList Component", () => {
         .findAllComponents({ name: "ConfirmDialog" })
         .find((c) => c.props("messageKeypath") === "reports.deleteReportNamedMessage");
       expect(dialog.props("messageName")).toBe(report.name);
-      expect(dialog.props("okVariant")).toBe("destructive");
+      expect(dialog.props("kind")).toBe("destructive");
       expect(wrapper.vm.deleteDialog.data).toEqual({
         report_id: report.report_id,
         name: report.name,
@@ -637,7 +637,7 @@ describe("ReportList Component", () => {
         .findAllComponents({ name: "ConfirmDialog" })
         .find((c) => c.props("messageKeypath") === "reports.deleteReportNamedMessage");
       expect(dialog.props("messageName")).toBe("Test Report 1");
-      expect(dialog.props("okVariant")).toBe("destructive");
+      expect(dialog.props("kind")).toBe("destructive");
     });
   });
 

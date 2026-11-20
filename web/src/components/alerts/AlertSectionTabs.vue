@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <FeatureLockExempt class="contents">
     <OTabs
       :model-value="activeSectionKey"
-      align="left"
       reorderable
       data-test="alert-section-tabs"
       @change="navigateToSection"

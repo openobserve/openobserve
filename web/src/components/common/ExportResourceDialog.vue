@@ -30,7 +30,7 @@ import { computed, defineAsyncComponent, ref, watch } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -135,19 +135,18 @@ function download() {
 <template>
   <ODialog
     :open="open"
-    size="xl"
+    size="lg"
     :title="title"
-    :sub-title="subTitle"
-    :primary-button-label="t('common.download')"
-    :primary-button-disabled="!hasCode"
-    :neutral-button-label="t('common.close')"
+    :subtitle="subTitle"
+    :primary="{ label: t('common.download'), disabled: !hasCode }"
+    :extra="{ label: t('common.close') }"
     :data-test="dataTest"
     @update:open="emit('update:open', $event)"
     @click:primary="download"
-    @click:neutral="emit('update:open', false)"
+    @click:extra="emit('update:open', false)"
   >
     <div class="flex flex-col gap-3">
-      <OTabs v-model="format" dense bordered :data-test="`${dataTest}-tabs`">
+      <OTabs v-model="format" size="compact" bordered :data-test="`${dataTest}-tabs`">
         <OTab
           name="json"
           :label="raw('JSON')"
@@ -166,29 +165,23 @@ function download() {
       </OTabs>
 
       <template v-if="isTerraform">
-        <OBanner
+        <OInlineNotice
           v-if="!hasCode"
-          variant="warning"
-          icon="warning-amber"
-          dense
-          :content="t('common.exportTerraformEmpty')"
+          tone="warn"
+          :message="t('common.exportTerraformEmpty')"
           :data-test="`${dataTest}-terraform-empty`"
         />
         <template v-else>
-          <OBanner
+          <OInlineNotice
             v-if="skippedNames"
-            variant="warning"
-            icon="warning-amber"
-            dense
-            :content="t('common.exportTerraformSkipped', { names: skippedNames })"
+            tone="warn"
+            :message="t('common.exportTerraformSkipped', { names: skippedNames })"
             :data-test="`${dataTest}-terraform-skipped`"
           />
-          <OBanner
+          <OInlineNotice
             v-if="terraform.droppedFields.length"
-            variant="info"
-            icon="info-outline"
-            dense
-            :content="
+            tone="info"
+            :message="
               t('common.exportTerraformDropped', { fields: terraform.droppedFields.join(', ') })
             "
             :data-test="`${dataTest}-terraform-dropped`"
@@ -213,9 +206,10 @@ function download() {
           <span class="font-mono text-xs font-semibold opacity-75">{{ fileName }}</span>
           <div class="flex-1" />
           <OButton
+            icon-only
             variant="ghost"
-            size="icon-xs-sq"
-            icon-left="content-copy"
+            size="sm"
+            icon="content-copy"
             :aria-label="t('common.copy')"
             :data-test="`${dataTest}-copy-btn`"
             @click="copy"

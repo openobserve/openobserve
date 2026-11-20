@@ -298,7 +298,11 @@ export class ReportFoldersPage {
       .catch(() => {});
 
     // The option list is virtualised, so a destination past the rendered window is not in the DOM until the search narrows the list.
-    await this.page.locator('[data-test="reports-index-dropdown-stream_type-search"]').fill(folderName);
+    // OSelect renders that search box only past eight options; a short list shows every row.
+    await this.moveFolderSelectPopover.locator('[data-test-value]').first()
+      .waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    const folderSearch = this.page.locator('[data-test="reports-index-dropdown-stream_type-search"]');
+    if (await folderSearch.count()) await folderSearch.fill(folderName);
 
     // Click the option by data-test-value matching the resolved folderId.
     const option = this.page.locator(

@@ -78,14 +78,14 @@ const ODialogStub = {
     "open",
     "size",
     "title",
-    "subTitle",
+    "subtitle",
     "persistent",
     "showClose",
     "width",
     "formId",
-    "primaryButtonLabel",
-    "secondaryButtonLabel",
-    "neutralButtonLabel",
+    "primary",
+    "secondary",
+    "extra",
     "primaryVariant",
     "secondaryVariant",
     "neutralVariant",
@@ -96,7 +96,7 @@ const ODialogStub = {
     "secondaryLoading",
     "neutralLoading",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:extra"],
 };
 
 const makeStore = (overrides = {}) =>
@@ -179,8 +179,8 @@ describe("AddStream", () => {
       const drawer = wrapper.findComponent(ODialogStub);
       expect(drawer.exists()).toBe(true);
       expect(drawer.props("title")).toBeTruthy();
-      expect(drawer.props("secondaryButtonLabel")).toBeTruthy();
-      expect(drawer.props("primaryButtonLabel")).toBeTruthy();
+      expect(drawer.props("secondary")?.label).toBeTruthy();
+      expect(drawer.props("primary")?.label).toBeTruthy();
     });
 
     it("should associate the dialog footer with the form via form-id", async () => {

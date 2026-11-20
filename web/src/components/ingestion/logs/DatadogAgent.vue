@@ -43,10 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OText variant="meta" as="p" data-test="ingestion-datadogagent-profiling-note">
         {{ t("ingestion.datadogAgent.profilingBody") }}
       </OText>
-      <OBanner
+      <OInlineNotice
         v-if="passcodeIsNotOrgToken"
-        variant="warning"
-        icon="warning"
+        tone="warn"
         data-test="ingestion-datadogagent-token-note"
       >
         <div class="flex flex-col gap-1">
@@ -61,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("ingestion.datadogAgent.tokenLink") }}
           </router-link>
         </div>
-      </OBanner>
+      </OInlineNotice>
     </section>
 
     <section class="flex flex-col gap-2" data-test="ingestion-datadogagent-logs">
@@ -142,7 +141,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { getEndPoint } from "../../../utils/zincutils";
 import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 
 defineProps<{ currOrgIdentifier?: string; currUserEmail?: string }>();

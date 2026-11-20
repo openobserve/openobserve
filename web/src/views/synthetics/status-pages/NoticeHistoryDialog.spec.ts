@@ -81,7 +81,7 @@ function makeNotice(overrides: Partial<StatusPageNotice> = {}): StatusPageNotice
 
 const ODialogStub = {
   template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
-  props: ["open", "size", "title", "secondaryButtonLabel"],
+  props: ["open", "size", "title", "secondary"],
 };
 
 const OButtonStub = {
@@ -221,7 +221,7 @@ describe("NoticeHistoryDialog", () => {
         expect.objectContaining({
           messageKeypath: "statusPages.notices.deleteBody",
           messageName: "Elevated error rates",
-          confirmVariant: "destructive",
+          kind: "destructive",
         }),
       );
     });

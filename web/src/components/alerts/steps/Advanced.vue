@@ -25,9 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="step-content rounded-default bg-surface-overlay border-border-default border">
         <!-- Section header -->
         <div class="section-header border-border-default flex items-center border-b px-3 py-2.5">
-          <div
-            class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
-          />
           <span class="section-header-title text-compact text-text-heading font-semibold">{{
             t("alerts.additional_settings")
           }}</span>
@@ -42,8 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("alerts.template") }}</span>
               <OButton
                 data-test="advanced-template-info-btn"
-                variant="ghost-primary"
-                size="xs"
+                variant="accent-ghost"
+                size="sm"
                 class="gap-1 font-medium"
                 @click="openHelp('template')"
               >
@@ -64,8 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #empty>{{ t("alerts.advanced.noTemplatesAvailable") }}</template>
               </OFormSelect>
               <OButton
+                icon-only
                 variant="ghost"
-                size="icon-circle-sm"
+                size="sm"
                 :title="t('alerts.advanced.refreshTemplates')"
                 @click="$emit('refresh:templates')"
               >
@@ -82,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("alerts.additionalVariables") }}</span>
               <OButton
                 data-test="advanced-variables-info-btn"
-                variant="ghost-primary"
-                size="xs"
+                variant="accent-ghost"
+                size="sm"
                 class="gap-1 font-medium"
                 @click="openHelp('variables')"
               >
@@ -92,12 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
             <template v-if="!variableRows.length">
-              <OButton
-                data-test="alert-variables-add-btn"
-                variant="outline"
-                size="sm"
-                @click="addVariable"
-              >
+              <OButton data-test="alert-variables-add-btn" variant="secondary" @click="addVariable">
                 <span>{{ t("alerts.advanced.addVariable") }}</span>
               </OButton>
             </template>
@@ -129,20 +122,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="min-w-50"
                 />
                 <OButton
+                  icon-only
                   data-test="alert-variables-delete-variable-btn"
                   variant="ghost"
-                  size="icon-circle-sm"
+                  size="sm"
                   :aria-label="t('common.delete')"
                   @click="removeVariable(index)"
                 >
                   <OIcon name="delete-outline" size="sm" />
                 </OButton>
                 <OButton
+                  v-if="index === variableRows.length - 1"
+                  icon-only
                   :aria-label="t('common.add')"
                   data-test="alert-variables-add-variable-btn"
-                  v-if="index === variableRows.length - 1"
                   variant="ghost"
-                  size="icon-circle-sm"
+                  size="sm"
                   @click="addVariable"
                 >
                   <OIcon name="add" size="sm" />
@@ -167,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="priorityOptions"
                 :searchable="false"
                 clearable
-                width="xs"
+                width="s"
                 :placeholder="
                   oncallEnabled ? t('alerts.priorityUnsetPagesAs') : t('alerts.priorityUnset')
                 "
@@ -196,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="t('alerts.oncallTeam')"
                 :options="oncallTeamOptions"
                 clearable
-                width="md"
+                width="m"
                 :placeholder="t('alerts.oncallTeamPlaceholder')"
                 data-test="alert-oncall-team-select"
               >
@@ -244,8 +239,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>{{ t("alerts.row") }}</span>
                 <OButton
                   data-test="add-alert-row-input-info-btn"
-                  variant="ghost-primary"
-                  size="xs"
+                  variant="accent-ghost"
+                  size="sm"
                   class="gap-1 font-medium"
                   @click="openHelp('rowTemplate')"
                 >
@@ -261,11 +256,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="add-alert-row-template-type-toggle"
                   name="row_template_type"
                 >
-                  <OToggleGroupItem value="String" size="sm">
+                  <OToggleGroupItem value="String">
                     <template #icon-left><OIcon name="title" size="sm" /></template>
                     {{ t("alerts.advanced.templateTypeString") }}
                   </OToggleGroupItem>
-                  <OToggleGroupItem value="Json" size="sm">
+                  <OToggleGroupItem value="Json">
                     <template #icon-left><OIcon name="data-object" size="sm" /></template>
                     {{ t("alerts.advanced.templateTypeJson") }}
                   </OToggleGroupItem>

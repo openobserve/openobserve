@@ -54,7 +54,7 @@ export class JoinHelper {
   }
 
   /**
-   * Select the stream to join with (the "On Stream")
+   * Select the stream to join with (the "On stream")
    * @param {string} streamName - Name of the stream to join
    */
   async selectJoinStream(streamName) {

@@ -83,22 +83,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OButtonGroup
                 class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
-                radius="sm"
-                :divided="true"
                 :draggable="isDragArmed('x-' + index)"
                 @dragstart="onFieldDragStart($event, itemX, 'x', Number(index))"
                 @drop="onDrop($event, 'x', Number(index))"
                 @dragenter="onDragEnter($event, 'x', index)"
               >
                 <OButton
+                  icon-only
                   :aria-label="t('common.dragToReorder')"
                   variant="ghost"
-                  size="icon-chip"
-                  class="!w-4 !cursor-grab"
+                  size="xs"
+                  class="!cursor-grab"
                   @mousedown="armDrag('x-' + index)"
                   :data-test="`dashboard-x-item-${itemX?.alias}-drag`"
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
                   </template>
                 </OButton>
@@ -106,12 +105,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trigger>
                     <OButton
                       variant="ghost"
-                      size="chip-12"
+                      size="xs"
                       class="!ps-1 !pe-1"
                       :data-test="`dashboard-x-item-${itemX?.alias}`"
                     >
                       <AxisFieldChipLabel :label="xLabel[index]" />
-                      <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                      <template #icon-end><OIcon name="arrow-drop-down" size="sm" /></template>
                     </OButton>
                   </template>
                   <div
@@ -142,14 +141,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </ODropdown>
                 <OButton
+                  icon-only
                   :aria-label="t('common.remove')"
                   variant="ghost"
-                  size="icon-chip"
-                  class="!w-4"
+                  size="xs"
                   :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
                   @click="removeXAxisItemByIndex(Number(index))"
                 >
-                  <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
+                  <template #icon><OIcon name="close" size="xs" class="!size-2.5" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
@@ -202,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ></span>
             {{ currentBreakdownLabel }}
             <OIcon name="info-outline" size="sm" class="ms-1" />
-            <OTooltip side="top" align="center">
+            <OTooltip side="top">
               <template #content>
                 <span v-if="dashboardPanelData.data.type == 'table'">{{
                   t("panel.pivotFieldTooltip")
@@ -275,22 +274,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OButtonGroup
                 class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
-                radius="sm"
-                :divided="true"
                 :draggable="isDragArmed('breakdown-' + index)"
                 @dragstart="onFieldDragStart($event, itemB, 'breakdown', Number(index))"
                 @drop="onDrop($event, 'breakdown', Number(index))"
                 @dragenter="onDragEnter($event, 'breakdown', index)"
               >
                 <OButton
+                  icon-only
                   :aria-label="t('common.dragToReorder')"
                   variant="ghost"
-                  size="icon-chip"
-                  class="!w-4 !cursor-grab"
+                  size="xs"
+                  class="!cursor-grab"
                   @mousedown="armDrag('breakdown-' + index)"
                   :data-test="`dashboard-b-item-${itemB?.alias}-drag`"
                 >
-                  <template #icon-left>
+                  <template #icon>
                     <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
                   </template>
                 </OButton>
@@ -298,12 +296,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #trigger>
                     <OButton
                       variant="ghost"
-                      size="chip-12"
+                      size="xs"
                       class="!ps-1 !pe-1"
                       :data-test="`dashboard-b-item-${itemB?.alias}`"
                     >
                       <AxisFieldChipLabel :label="bLabel[index]" />
-                      <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                      <template #icon-end><OIcon name="arrow-drop-down" size="sm" /></template>
                     </OButton>
                   </template>
                   <div
@@ -334,14 +332,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </ODropdown>
                 <OButton
+                  icon-only
                   :aria-label="t('common.remove')"
                   variant="ghost"
-                  size="icon-chip"
-                  class="!w-4"
+                  size="xs"
                   :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
                   @click="removeBreakdownItemByIndex(Number(index))"
                 >
-                  <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
+                  <template #icon><OIcon name="close" size="xs" class="!size-2.5" /></template>
                 </OButton>
               </OButtonGroup>
             </div>
@@ -412,22 +410,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <OButtonGroup
             class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
-            radius="sm"
-            :divided="true"
             :draggable="isDragArmed('y-' + index)"
             @dragstart="onFieldDragStart($event, itemY, 'y', Number(index))"
             @drop="onDrop($event, 'y', Number(index))"
             @dragenter="onDragEnter($event, 'y', index)"
           >
             <OButton
+              icon-only
               :aria-label="t('common.dragToReorder')"
               variant="ghost"
-              size="icon-chip"
-              class="!w-4 cursor-grab"
+              size="xs"
+              class="cursor-grab"
               @mousedown="armDrag('y-' + index)"
               :data-test="`dashboard-y-item-${itemY?.alias}-drag`"
             >
-              <template #icon-left>
+              <template #icon>
                 <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
               </template>
             </OButton>
@@ -435,12 +432,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #trigger>
                 <OButton
                   variant="ghost"
-                  size="chip-12"
+                  size="xs"
                   class="!ps-1 !pe-1"
                   :data-test="`dashboard-y-item-${itemY?.alias}`"
                 >
                   <AxisFieldChipLabel :label="yLabel[index]" />
-                  <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                  <template #icon-end><OIcon name="arrow-drop-down" size="sm" /></template>
                 </OButton>
               </template>
               <div
@@ -473,14 +470,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </ODropdown>
             <OButton
+              icon-only
               :aria-label="t('common.remove')"
               variant="ghost"
-              size="icon-chip"
-              class="!w-4"
+              size="xs"
               :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
               @click="removeYAxisItemByIndex(Number(index))"
             >
-              <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
+              <template #icon><OIcon name="close" size="xs" class="!size-2.5" /></template>
             </OButton>
           </OButtonGroup>
         </div>
@@ -550,22 +547,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <OButtonGroup
               class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel overflow-hidden border border-s-2 [&_button:focus-visible]:-outline-offset-2! [&>*:not(:first-child)]:!border-s"
-              radius="sm"
-              :divided="true"
               :draggable="isDragArmed('z-' + index)"
               @dragstart="onFieldDragStart($event, itemZ, 'z', Number(index))"
               @drop="onDrop($event, 'z', Number(index))"
               @dragenter="onDragEnter($event, 'z', index)"
             >
               <OButton
+                icon-only
                 :aria-label="t('common.dragToReorder')"
                 variant="ghost"
-                size="icon-chip"
-                class="!w-4 cursor-grab"
+                size="xs"
+                class="cursor-grab"
                 @mousedown="armDrag('z-' + index)"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-drag`"
               >
-                <template #icon-left>
+                <template #icon>
                   <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
                 </template>
               </OButton>
@@ -573,12 +569,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #trigger>
                   <OButton
                     variant="ghost"
-                    size="chip-12"
+                    size="xs"
                     class="!ps-1 !pe-1"
                     :data-test="`dashboard-z-item-${itemZ?.alias}`"
                   >
                     <AxisFieldChipLabel :label="zLabel[index]" />
-                    <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
+                    <template #icon-end><OIcon name="arrow-drop-down" size="sm" /></template>
                   </OButton>
                 </template>
                 <div
@@ -609,14 +605,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </ODropdown>
               <OButton
+                icon-only
                 :aria-label="t('common.remove')"
                 variant="ghost"
-                size="icon-chip"
-                class="!w-4"
+                size="xs"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
                 @click="removeZAxisItemByIndex(Number(index))"
               >
-                <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
+                <template #icon><OIcon name="close" size="xs" class="!size-2.5" /></template>
               </OButton>
             </OButtonGroup>
           </div>

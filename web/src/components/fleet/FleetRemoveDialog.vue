@@ -19,11 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :open="!!request"
     size="md"
     :title="title"
-    :primary-button-label="t('fleet.collectors.remove')"
-    primary-button-variant="destructive"
-    :secondary-button-label="t('common.cancel')"
-    initial-focus="secondary"
-    persistent
+    :primary="{ label: t('fleet.collectors.remove'), variant: 'danger' }"
+    :secondary="{ label: t('common.cancel') }"
     data-test="fleet-remove-dialog"
     @click:primary="answer(true)"
     @click:secondary="answer(false)"
@@ -39,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <OCollapsible
         v-else
-        :label="t('fleet.uninstall.howTo')"
+        :title="t('fleet.uninstall.howTo')"
         data-test="fleet-remove-dialog-uninstall"
       >
         <FleetUninstallCommand v-model:platform="platform" v-model:role="role" show-platforms />

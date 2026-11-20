@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <FeatureLockExempt class="contents">
     <OTabs
       :model-value="activeSectionKey"
-      align="left"
       data-test="pipeline-section-tabs"
       @change="navigateToSection"
     >
@@ -43,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span :class="s.key === activeSectionKey ? '' : 'max-md:hidden'">{{ s.label }}</span>
         <span
           v-if="s.count != null"
-          class="text-2xs rounded-full px-1.5 py-1 leading-none font-bold"
+          class="text-2xs rounded-full px-1.5 py-1 leading-none font-semibold"
           :class="
             s.key === activeSectionKey
               ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'

@@ -57,7 +57,7 @@ function mountTable(props: Record<string, unknown> = {}) {
       columns,
       rowKey: "id",
       virtualScroll: true,
-      rowHeight: 20,
+      density: "compact",
       pagination: "none",
       sorting: "none",
       ...props,

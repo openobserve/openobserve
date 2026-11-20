@@ -16,19 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    size="xl"
     :open="open"
-    :width="85"
     :title="liveTitle"
-    :sub-title="liveSubTitle"
+    :subtitle="liveSubTitle"
     bleed
     data-test="autoobserve-issue-drawer"
     @update:open="(v) => emit('update:open', v)"
   >
     <template v-if="liveItem" #header-right>
       <OButton
-        variant="outline"
-        size="sm"
-        icon-left="open-in-new"
+        variant="secondary"
+        icon="open-in-new"
         data-test="autoobserve-issue-open-incident"
         @click="openIncidentPage"
       >

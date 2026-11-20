@@ -368,7 +368,7 @@ describe("ExplorerSavedViews", () => {
     expect(wrapper.findComponent({ name: "ConfirmDialog" }).props()).toMatchObject({
       messageKeypath: "metrics.explorer.views.deleteMessage",
       messageName: "errors by job",
-      okVariant: "destructive",
+      kind: "destructive",
     });
 
     await (wrapper.vm as any).deleteActive();

@@ -298,7 +298,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await switchToAggregateMode(page, pm);
     const aggAfter = pm.dashboardPanelConfigs.tableAggregations;
     await pm.dashboardPanelConfigs.scrollSidebarToElement(aggAfter);
-    await expect(aggAfter).toContainText("+1 more");
+    await expect(aggAfter.locator('[data-test="o-select-overflow-chip"]')).toHaveText("+1");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

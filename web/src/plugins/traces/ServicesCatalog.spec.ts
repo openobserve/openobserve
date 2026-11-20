@@ -2632,8 +2632,8 @@ describe("ServicesCatalog", () => {
             props: ["data", "columns", "loading"],
           },
           ServiceCatalogBarCell: {
-            template: `<span data-test="latency-cell" :data-tooltip="tooltip" :data-variant="variant" />`,
-            props: ["value", "max", "label", "tooltip", "variant"],
+            template: `<span data-test="latency-cell" :data-tooltip="tooltip" :data-tone="tone" />`,
+            props: ["value", "max", "label", "tooltip", "tone"],
           },
         },
       });
@@ -2644,8 +2644,8 @@ describe("ServicesCatalog", () => {
 
       const cell = (name: string) =>
         wrapper.find(`[data-test="latency-row-${name}"] [data-test="latency-cell"]`);
-      expect(cell("slow").attributes("data-variant")).toBe("warning");
-      expect(cell("fast").attributes("data-variant")).toBe("default");
+      expect(cell("slow").attributes("data-tone")).toBe("warn");
+      expect(cell("fast").attributes("data-tone")).toBe("accent");
       expect(cell("slow").attributes("data-tooltip")).toBe(`${(1_500_000).toLocaleString()} µs`);
     });
 
@@ -2681,7 +2681,7 @@ describe("ServicesCatalog", () => {
           },
           ServiceCatalogBarCell: {
             template: `<span data-test="latency-cell">{{ label }}</span>`,
-            props: ["value", "max", "label", "tooltip", "variant"],
+            props: ["value", "max", "label", "tooltip", "tone"],
           },
         },
       });
@@ -3852,7 +3852,7 @@ describe("ServicesCatalog Env and Deploy verdict filters", () => {
     expect(view.get('[data-test="services-catalog-type-all"]').text()).toContain("0");
     expect(view.find('[data-test="services-catalog-empty"]').exists()).toBe(false);
     expect(view.find('[data-test="services-catalog-type-datastore"]').exists()).toBe(true);
-    await view.get('[data-test="o2-empty-state-action-clear-filters"]').trigger("click");
+    await view.get('[data-test="o2-empty-state-action"]').trigger("click");
     await flushPromises();
     expect(view.find('[data-test="services-catalog-filter-empty"]').exists()).toBe(false);
   });
@@ -3867,7 +3867,7 @@ describe("ServicesCatalog Env and Deploy verdict filters", () => {
     expect(empty.text()).toContain(
       catalogFilterEmptyText({ env: "", verdict: "", search: "zzzz", locale: "en" }, gt),
     );
-    await view.get('[data-test="o2-empty-state-action-clear-filters"]').trigger("click");
+    await view.get('[data-test="o2-empty-state-action"]').trigger("click");
     await flushPromises();
     expect((view.vm as any).filterText).toBe("");
   });

@@ -49,8 +49,7 @@
       </div>
     </div>
     <OButton
-      variant="outline"
-      size="sm"
+      variant="secondary"
       @click="addNewMarkLine"
       data-test="dashboard-addpanel-config-markline-add-btn"
       >{{ t("dashboard.markLineAdd") }}</OButton

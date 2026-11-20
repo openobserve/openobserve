@@ -56,7 +56,7 @@ describe("RcaBlindSpots (03 VE8, VE34, VE37)", () => {
     const wrapper = mountSpots(rcaRunSummary().blind_spots);
 
     expect(spots(wrapper)).toEqual([
-      ["Feature-flag history", "Connect AI Toolset"],
+      ["Feature-flag history", "Connect AI toolset"],
       ["payments-worker logs are sampled", "Open pipeline"],
     ]);
     // The button sits beside the row's toggle, not inside it.
@@ -74,7 +74,7 @@ describe("RcaBlindSpots (03 VE8, VE34, VE37)", () => {
   });
 
   it.each([
-    ["connect_toolset", "Connect AI Toolset", "aiToolsets"],
+    ["connect_toolset", "Connect AI toolset", "aiToolsets"],
     ["ingest_data", "Ingest data", "ingestion"],
     ["open_pipeline", "Open pipeline", "pipelines"],
     ["sampling_rules", "Sampling rules", "pipelines"],

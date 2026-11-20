@@ -38,13 +38,7 @@ describe("SearchBar — toolbar controls are spaced only by the row gap", () => 
 
   beforeEach(() => {
     resetLogsAutoRunForTests(store);
-    for (const key of [
-      "histogram",
-      "sqlMode",
-      "quickMode",
-      "savedViews",
-      "syntaxGuide",
-    ] as ToolbarPinKey[]) {
+    for (const key of ["histogram", "quickMode", "savedViews", "syntaxGuide"] as ToolbarPinKey[]) {
       if (!isPinned(key)) {
         togglePin(key);
         pinnedByTest.push(key);
@@ -89,16 +83,18 @@ describe("SearchBar — toolbar controls are spaced only by the row gap", () => 
     expect(left.classList).toContain("gap-2");
     expect(collapsible.classList).toContain("gap-2");
 
+    const right = wrapper.vm.$refs.toolbarRightRef as HTMLElement;
+    expect(right.classList).toContain("gap-2");
     const more = wrapper.get('[data-test="logs-search-bar-utilities-menu-btn"]');
     expect(marginClassesOf(more.element)).toEqual([]);
-    expect(more.classes()).toContain("max-md:ms-auto");
+    expect(right.contains(more.element)).toBe(true);
 
-    const controls = [...collapsible.children, ...[...left.children].slice(1)];
+    const controls = [...collapsible.children];
     for (const dataTest of [
       "logs-logs-toggle",
       "logs-search-bar-reset-filters-btn",
       "logs-search-bar-histogram-btn",
-      "logs-search-bar-sql-mode-pinned-btn",
+      "logs-search-bar-query-mode",
       "logs-search-bar-quick-mode-pinned-btn",
       "logs-search-bar-saved-views-pinned",
     ]) {
@@ -109,8 +105,8 @@ describe("SearchBar — toolbar controls are spaced only by the row gap", () => 
         ),
       ).toBe(true);
     }
-    expect(controls.length).toBeGreaterThanOrEqual(8);
-    for (const control of controls) {
+    expect(controls.length).toBeGreaterThanOrEqual(7);
+    for (const control of [...controls, ...right.children]) {
       expect(marginClassesOf(control), control.outerHTML.slice(0, 120)).toEqual([]);
     }
   });
@@ -133,6 +129,11 @@ describe("SearchBar — toolbar controls are spaced only by the row gap", () => 
         global: { provide: { store }, plugins: [i18n, router], stubs: { QueryEditor: true } },
       },
     );
+    await flushPromises();
+    // With no stream, Run is disabled and drops the fill, so the fill is checked with one picked.
+    (wrapper.findComponent(SearchBar).vm as any).searchObj.data.stream.selectedStream = [
+      "app_logs",
+    ];
     await flushPromises();
     const run = wrapper.get('[data-test="logs-search-bar-refresh-btn"]');
     expect(run.classes()).toContain(fill);

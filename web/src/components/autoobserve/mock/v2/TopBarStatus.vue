@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-if="checked.kind !== 'none'">
         <span aria-hidden="true">·</span>
-        <OSkeleton v-if="checked.kind === 'loading'" animation="none" class="h-3 w-28" />
+        <OSkeleton v-if="checked.kind === 'loading'" shape="block" class="h-3 w-28" />
         <span v-else>{{ checked.text }}</span>
       </template>
     </span>

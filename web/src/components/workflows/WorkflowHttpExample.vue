@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :code="code"
       lang="bash"
       sensitive
-      padded
       wrap
       :copyable="false"
       class="my-0!"
@@ -43,8 +42,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <OButton
           v-if="canReveal && active"
+          icon-only
           variant="ghost"
-          size="icon-xs-sq"
+          size="sm"
           :loading="revealing === active.id"
           :aria-label="revealLabel"
           data-test="workflow-http-example-reveal"
@@ -54,8 +54,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="revealLabel" side="top" />
         </OButton>
         <OButton
+          icon-only
           variant="ghost"
-          size="icon-xs-sq"
+          size="sm"
           :aria-label="t('common.copy')"
           data-test="workflow-http-example-copy"
           @click="onCopy"

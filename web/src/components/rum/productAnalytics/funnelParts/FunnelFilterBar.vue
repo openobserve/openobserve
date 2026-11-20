@@ -33,10 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onChange"
       />
       <template v-if="notice">
-        <OBanner
-          variant="warning"
-          dense
-          :content="
+        <OInlineNotice
+          tone="warn"
+          :message="
             t('rum.analytics.funnel.filterNotice', {
               kept: raw(addCommasToNumber(notice.kept)),
               opened: raw(addCommasToNumber(notice.opened)),
@@ -48,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #actions>
             <OButton
               variant="ghost"
-              size="xs"
+              size="sm"
               data-test="rum-analytics-funnel-filter-notice-break-down"
               @click="emit('break-down', notice.field)"
               >{{
@@ -61,18 +60,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</OButton
             >
           </template>
-        </OBanner>
+        </OInlineNotice>
         <span>
           <OPopover
+            size="md"
             align="start"
-            content-class="p-3 w-80 max-w-[calc(100vw-1.5rem)]"
+            content-class="p-3"
             :aria-label="t('rum.analytics.funnel.filterNoticeWhy')"
           >
             <template #trigger>
               <OButton
-                variant="ghost-primary"
-                size="xs"
-                icon-left="info-outline"
+                variant="accent-ghost"
+                size="sm"
+                icon="info-outline"
                 data-test="rum-analytics-funnel-filter-notice-why"
                 >{{ t("rum.analytics.funnel.filterNoticeWhy") }}</OButton
               >
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import FunnelSectionRow from "@/components/rum/productAnalytics/funnelParts/FunnelSectionRow.vue";
 import {

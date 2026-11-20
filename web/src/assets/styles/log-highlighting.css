@@ -9,9 +9,9 @@
 }
 
 /* Syntax highlighting classes */
+/* Keys are labels, not values or errors, so they take the secondary text colour in both themes (C2, T3). */
 .log-key {
-  color: #B71C1C;
-
+  color: var(--color-text-secondary);
 }
 .log-string {
   color: #047857;
@@ -92,10 +92,6 @@
 }
 
 /* Dark theme variants - colors from keyValueParser.ts */
-.dark .log-key {
-  color: #f67a7aff; /* Lighter red for dark mode */
-
-}
 .dark .log-string {
   color: #6EE7B7; /* Soft mint green */
 

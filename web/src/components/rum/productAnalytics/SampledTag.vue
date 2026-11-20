@@ -15,19 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPopover
-    v-model:open="open"
-    side="bottom"
-    align="end"
-    content-class="p-3 w-80 max-w-[calc(100vw-1.5rem)]"
-  >
+  <OPopover size="md" v-model:open="open" side="bottom" align="end" content-class="p-3">
     <template #trigger>
       <OTag
         :label="exact ? t('rum.analytics.exact') : t('rum.analytics.sampled', { ratio })"
-        :variant="exact ? 'default-outline' : 'info-outline'"
         :icon="exact ? '' : 'filter-alt'"
-        size="sm"
-        clickable
+        toggle
+        :pressed="open"
         data-test="rum-analytics-sampled-tag"
       />
     </template>
@@ -38,8 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p class="text-text-secondary text-xs">{{ t("rum.analytics.sampledRule") }}</p>
       <template v-if="exact">
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="rum-analytics-use-sampling-btn"
           @click="toggle(false)"
           >{{ t("rum.analytics.useSampling") }}</OButton
@@ -48,8 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else>
         <p class="text-text-secondary text-xs">{{ t("rum.analytics.runExactWarning") }}</p>
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           data-test="rum-analytics-run-exact-btn"
           @click="toggle(true)"
           >{{ t("rum.analytics.runExact") }}</OButton

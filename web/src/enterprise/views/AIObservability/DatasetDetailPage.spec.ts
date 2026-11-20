@@ -75,7 +75,6 @@ vi.mock("@/lib/core/PageLayout/OPageLayout.vue", () => ({
     name: "OPageLayout",
     props: ["back"],
     template: `<div class="o-page-layout">
-      <button v-if="back" data-test="app-page-header-back" @click="back.onClick?.()" />
       <slot name="actions" /><slot />
     </div>`,
   },
@@ -164,16 +163,14 @@ beforeEach(() => {
 });
 
 describe("DatasetDetailPage navigation", () => {
-  it("uses real browser back when there's history to pop, instead of the bare Datasets list", async () => {
-    window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+  // The header's back link does the smart back; the page names the parent it falls back to.
+  it("links back to the Datasets list of this org", async () => {
     const wrapper = await mountPage();
-    mockRouterPush.mockClear();
 
-    await wrapper.get('[data-test="app-page-header-back"]').trigger("click");
-
-    expect(mockRouterBack).toHaveBeenCalledTimes(1);
-    expect(mockRouterPush).not.toHaveBeenCalled();
-    window.history.replaceState(null, "");
+    expect(wrapper.findComponent({ name: "OPageLayout" }).props("back")).toEqual({
+      label: "aiObservability.nav.datasets",
+      to: { name: "aiDatasets", query: { org_identifier: "test-org" } },
+    });
   });
 });
 
@@ -336,8 +333,6 @@ describe("DatasetDetailPage item detail", () => {
     await state.deleteFromDetail(state.items[0]);
     await flushPromises();
 
-    expect(mockConfirm).toHaveBeenCalledWith(
-      expect.objectContaining({ confirmVariant: "destructive" }),
-    );
+    expect(mockConfirm).toHaveBeenCalledWith(expect.objectContaining({ kind: "destructive" }));
   });
 });

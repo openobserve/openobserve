@@ -2,26 +2,16 @@
   <OPageLayout
     bleed
     data-test="oncall-team-detail-page"
-    :subtitle="subtitle"
-    icon="group-work"
-    title-overflow="visible"
-    tabs-below
+    :title="team ? raw(team.name) : t('oncall.teamDetail')"
+    title-data-test="oncall-team-detail-title"
     :back="{
-      label: t('oncall.backToTeams'),
+      label: t('oncall.teamsTitle'),
       to: { name: 'onCallTeams', query: { org_identifier: orgId } },
     }"
   >
-    <!-- Team names are free text and can run long; truncate so it never
-         crowds the actions on the right. -->
-    <template #title>
-      <OTruncatedText class="block" data-test="oncall-team-detail-title">{{
-        team ? raw(team.name) : t("oncall.teamDetail")
-      }}</OTruncatedText>
-    </template>
-
     <!-- Whether a page would reach anybody is the team's headline fact, so it
          rides the title instead of sitting in a card below it. -->
-    <template #title-trail>
+    <template #status>
       <span v-if="loaded" class="inline-flex">
         <OTag
           type="oncallCoverage"
@@ -36,9 +26,6 @@
     <template #actions>
       <ORefreshButton
         v-if="loaded"
-        layout="inline"
-        size="header"
-        variant="outline"
         :last-run-at="lastFetchedAt"
         :loading="refreshing"
         data-test="oncall-team-refresh"
@@ -52,9 +39,8 @@
            picker, which is a dead end rather than an action. -->
       <OButton
         v-if="members.length && canConfigure"
-        variant="outline"
-        size="sm"
-        icon-left="person-add"
+        variant="secondary"
+        icon="person-add"
         data-test="oncall-team-override-btn"
         @click="openTakeOverride"
       >
@@ -63,9 +49,8 @@
       <!-- `loaded` stays true after a refresh finds the team gone, so the failure flags are checked too. -->
       <OButton
         v-if="canConfigure && loaded && !teamNotFound && loadError === null"
-        variant="outline"
-        size="sm"
-        icon-left="edit"
+        variant="secondary"
+        icon="edit"
         data-test="oncall-team-detail-edit-btn"
         @click="openTeamEdit"
       >
@@ -75,7 +60,7 @@
 
     <!-- Attached to the header, as on the Incident page; only once there is a team to show. -->
     <template v-if="loaded && !oncallUnavailable && !teamNotFound && !loadError" #header-tabs>
-      <OTabs v-model="activeTab" align="left" class="flex-1" data-test="oncall-team-tabs">
+      <OTabs v-model="activeTab" class="flex-1" data-test="oncall-team-tabs">
         <OTab
           name="overview"
           :label="t('oncall.teamOverview')"
@@ -139,12 +124,11 @@
     <!-- A failed load must not fall through to the page below: with nothing
          fetched it renders a team with no members, no schedule and no policy —
          the exact look of a team somebody forgot to configure. -->
-    <OContent v-if="oncallUnavailable" y>
+    <OContent v-if="oncallUnavailable">
       <OEmptyState
-        size="hero"
         icon="cloud-off"
         :title="t('oncall.notAvailableTitle')"
-        :description="t('oncall.notAvailableDescription')"
+        :text="t('oncall.notAvailableDescription')"
         data-test="oncall-team-detail-not-available"
       />
     </OContent>
@@ -155,23 +139,19 @@
       data-test="oncall-team-detail-license-denied"
     />
 
-    <OContent v-else-if="teamNotFound" y>
+    <OContent v-else-if="teamNotFound">
       <OEmptyState
-        size="hero"
         :title="t('oncall.teamNotFoundTitle')"
-        :description="t('oncall.teamNotFoundDescription')"
+        :text="t('oncall.teamNotFoundDescription')"
         data-test="oncall-team-detail-not-found"
       />
     </OContent>
 
-    <OContent v-else-if="loadError" y>
+    <OContent v-else-if="loadError">
       <OEmptyState
-        size="hero"
-        variant="error"
-        illustration="broken-panel"
+        kind="error"
         :title="t('oncall.loadTeamFailed')"
-        :description="raw(loadError)"
-        :action-label="t('oncall.retry')"
+        :text="isRawHttpText(loadError) ? t('emptyState.loadError.description') : raw(loadError)"
         data-test="oncall-team-detail-error"
         @action="refreshPage"
       />
@@ -205,9 +185,9 @@
                   {{ t("oncall.teamCoverage", { days: COVERAGE_DAYS }) }}
                 </OText>
                 <OButton
-                  variant="ghost-primary"
-                  size="xs"
-                  icon-left="calendar-month"
+                  variant="accent-ghost"
+                  size="sm"
+                  icon="calendar-month"
                   class="ms-auto"
                   data-test="oncall-team-open-schedule"
                   @click="activeTab = 'schedule'"
@@ -417,8 +397,8 @@
       :open="!!clearingAway"
       size="sm"
       :title="t('oncall.awayClear')"
-      :primary-button-label="t('oncall.awayClearConfirm')"
-      :secondary-button-label="t('oncall.cancel')"
+      :primary="{ label: t('oncall.awayClearConfirm') }"
+      :secondary="{ label: t('oncall.cancel') }"
       data-test="oncall-away-clear-confirm"
       @update:open="(isOpen: boolean) => !isOpen && (awayToClear = null)"
       @click:primary="confirmClearAway"
@@ -441,8 +421,8 @@
       v-model:open="testPageOpen"
       size="sm"
       :title="t('oncall.testPageConfirmTitle')"
-      :primary-button-label="t('oncall.ladderSendTest')"
-      :secondary-button-label="t('oncall.cancel')"
+      :primary="{ label: t('oncall.ladderSendTest') }"
+      :secondary="{ label: t('oncall.cancel') }"
       data-test="oncall-team-test-page-dialog"
       @click:primary="sendTestPage"
       @click:secondary="testPageOpen = false"
@@ -544,9 +524,9 @@ import {
   swappableRuns,
 } from "@/components/oncall/resolvedShifts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { isRawHttpText } from "@/lib/core/EmptyState/emptyStateCopy";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -800,28 +780,13 @@ const routeTab = computed(() => {
   return (TEAM_TABS as readonly string[]).includes(tab) ? tab : null;
 });
 
-/// The counts come from the overview, which counts alert rules routed here in
-/// the database. Falls back to what the page already knows when that call has
-/// not answered — a header that waits on a second request reads as broken.
-/// The server's count when it has answered, otherwise what the page already
-/// knows — a header that waits on a second request reads as broken.
+/// The overview's server count once it answers, else the roster already loaded,
+/// so the tab's count never waits on a second request.
 const memberCount = computed(() => overview.value?.members ?? members.value.length);
 
 /// `null` until the roster has been read: an empty array on a page still
 /// loading would announce "this team has nobody in it" about every team.
 const hasMembers = computed<boolean | null>(() => (loaded.value ? members.value.length > 0 : null));
-
-const subtitle = computed(() => {
-  if (!team.value) return undefined;
-  const rules = ruleCount.value;
-  const base = t(
-    "oncall.teamSubtitle",
-    { tz: team.value.timezone, count: memberCount.value },
-    memberCount.value,
-  );
-  if (rules === null) return base;
-  return raw(`${base} · ${t("oncall.teamOwnsRules", { count: rules }, rules)}`);
-});
 
 /// Pages this team was woken by, inside the activity window.
 const recentPages = computed(() => {

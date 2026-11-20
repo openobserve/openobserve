@@ -31,7 +31,7 @@ import type {
 import { ALL_AGENTS_VALUE } from "@/plugins/traces/llmAgentFilter";
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 import type { AiDrawerTrace } from "@/plugins/traces/AiTraceDrawer.types";
-import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
+import type { ProgressBarTone } from "@/lib/data/ProgressBar/OProgressBar.types";
 
 /** A list row joined with the Score Config fields the API does not return. */
 export interface QualityRow extends QualityConfigSummary {
@@ -69,11 +69,11 @@ export function unhealthyShare(row: Pick<QualityConfigSummary, "total" | "unheal
 }
 
 /** Bar colour for an unhealthy share, banded on the percent the cell shows: under 25 green, under 75 orange, else red; null without a share. */
-export function unhealthyTone(share: number | null): ProgressBarVariant | null {
+export function unhealthyTone(share: number | null): ProgressBarTone | null {
   if (share == null) return null;
   const percent = Number((share * 100).toFixed(1));
-  if (percent < 25) return "success";
-  return percent < 75 ? "warning" : "danger";
+  if (percent < 25) return "ok";
+  return percent < 75 ? "warn" : "err";
 }
 
 /** Default sort: status rank first, then the higher unhealthy share. */

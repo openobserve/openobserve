@@ -253,8 +253,8 @@ export class SettingsFormValidationPage {
     }
 
     /**
-     * Click the "Add Domain" button inside DomainManagement.
-     * The button is adjacent to the domain input and has text "Add Domain".
+     * Click the "Add domain" button inside DomainManagement.
+     * The button is adjacent to the domain input and has text "Add domain".
      */
     async clickAddDomainBtn() {
         await this.page.locator(this.addDomainBtn).click();

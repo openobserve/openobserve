@@ -43,12 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template v-if="contact && state && !loadFailed" #status>
-        <OTag
-          v-if="state === 'verified'"
-          variant="success-soft"
-          size="sm"
-          data-test="oncall-phone-state"
-        >
+        <OTag v-if="state === 'verified'" tone="ok" size="sm" data-test="oncall-phone-state">
           {{ t("oncall.phoneVerified") }}
           <OTooltip
             :content="
@@ -59,19 +54,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OTag>
         <OnCallHint v-else-if="state === 'changed'" :hint="t('oncall.phoneChangedHint')">
-          <OTag variant="amber-soft" size="sm" data-test="oncall-phone-state">
+          <OTag tone="warn" size="sm" data-test="oncall-phone-state">
             {{ t("oncall.phoneNotVerified") }}
           </OTag>
         </OnCallHint>
         <OTag
           v-else-if="state === 'codeSent'"
-          variant="default-soft"
+          tone="neutral"
           size="sm"
           data-test="oncall-phone-state"
         >
           {{ t("oncall.phoneNotVerified") }}
         </OTag>
-        <OTag v-else variant="default-soft" size="sm" data-test="oncall-phone-state">
+        <OTag v-else tone="neutral" size="sm" data-test="oncall-phone-state">
           {{ t("oncall.reachNotSetUp") }}
         </OTag>
       </template>
@@ -79,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="contact && state && !loadFailed" #action>
         <OButton
           v-if="state === 'noProvider' && admin"
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           data-test="oncall-phone-telephony-link"
           @click="openTelephony"
         >
@@ -94,9 +89,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OButton
           v-if="state === 'verified' || state === 'codeSent'"
+          icon-only
           variant="ghost"
-          size="icon-sm"
-          icon-left="edit"
+          icon="edit"
           :aria-label="t('oncall.phoneChangeAction')"
           data-test="oncall-phone-change"
           @click="startChange"
@@ -106,9 +101,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- A saved number can always be taken off, verified or not, provider or not; while editing, Cancel is the way back. -->
         <OButton
           v-if="contact.phone && !editing"
-          variant="ghost-destructive"
-          size="icon-sm"
-          icon-left="delete"
+          icon-only
+          variant="danger-ghost"
+          icon="delete"
           :loading="removing"
           :aria-label="t('oncall.phoneRemoveAction')"
           data-test="oncall-phone-remove"
@@ -127,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OInput
           v-model="draftPhone"
           type="tel"
-          width="md"
+          width="m"
           autocomplete="tel"
           :placeholder="PHONE_EXAMPLE"
           :error="!!formatError"
@@ -137,7 +132,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OButton
           variant="primary"
-          size="sm-action"
           :disabled="!draftPhone.trim() || sendWaiting"
           :loading="sending"
           data-test="oncall-phone-send"
@@ -151,8 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="editing && contact.phone"
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           data-test="oncall-phone-cancel"
           @click="cancelChange"
         >
@@ -163,14 +156,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span v-if="state === 'codeSent'" class="flex flex-wrap items-center gap-2 md:ps-31">
         <OInput
           v-model="code"
-          width="xs"
+          width="s"
           autocomplete="one-time-code"
           :placeholder="CODE_EXAMPLE"
           data-test="oncall-phone-code"
         />
         <OButton
           variant="primary"
-          size="sm-action"
           :loading="confirming"
           data-test="oncall-phone-confirm"
           @click="confirmCode"
@@ -178,8 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("oncall.phoneConfirm") }}
         </OButton>
         <OButton
-          variant="outline"
-          size="sm-action"
+          variant="secondary"
           :disabled="resendLeft > 0"
           :loading="sending"
           data-test="oncall-phone-resend"
@@ -217,8 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('oncall.phoneRemoveTitle')"
       :message="t('oncall.phoneRemoveMessage')"
       :ok-label="t('oncall.phoneRemove')"
-      ok-variant="destructive"
-      focus-cancel
+      kind="destructive"
       @update:ok="removePhone"
       @update:cancel="removeOpen = false"
     />

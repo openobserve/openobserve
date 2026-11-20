@@ -109,8 +109,8 @@ const baseStubs = {
   // is silently dropped — which is exactly the bug this stub must surface.
   OButton: {
     template:
-      '<button :data-test="$attrs[\'data-test\']" :disabled="disabled"><slot name="icon-left" /><slot /><slot name="icon-right" /></button>',
-    props: ["variant", "size", "disabled", "loading", "class", "iconLeft"],
+      '<button :data-test="$attrs[\'data-test\']" :disabled="disabled"><slot name="icon" /><slot /><slot name="icon-end" /></button>',
+    props: ["variant", "size", "disabled", "loading", "class", "icon"],
     inheritAttrs: true,
   },
   // Renders an identifiable marker per icon name so slot placement is assertable.
@@ -120,7 +120,7 @@ const baseStubs = {
   },
   ODialog: {
     template: '<div v-if="open" :data-test="$attrs[\'data-test\']"><slot /></div>',
-    props: ["open", "size", "title", "primaryButtonLabel", "secondaryButtonLabel"],
+    props: ["open", "size", "title", "primary", "secondary"],
     emits: ["click:primary", "click:secondary", "update:open"],
     inheritAttrs: true,
   },

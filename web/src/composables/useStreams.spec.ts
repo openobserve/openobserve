@@ -21,6 +21,8 @@ import useStreams from "@/composables/useStreams";
 import { orgHasUserData, useOrgHasUserData } from "@/composables/useOrgHasUserData";
 import StreamService from "@/services/stream";
 import { queryClient } from "@/composables/query/queryClient";
+import { SHARED_READ_MS, streamNameListQuery } from "@/services/stream.queries";
+import { streamKeys } from "@/services/stream.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import i18nInstance from "@/locales";
 const t = (i18nInstance.global as any).t;
@@ -313,11 +315,59 @@ describe("useStreams Composable", () => {
       await flushPromises();
       await orgHasUserData("test-org");
       vi.mocked(StreamService.nameList).mockResolvedValue(answer(after));
+      const later = Date.now() + SHARED_READ_MS + 1;
+      const clock = vi.spyOn(Date, "now").mockReturnValue(later);
 
       const result: any = await streamsInstance.getStreams("logs", false, false);
 
+      clock.mockRestore();
       expect(result.list.map((s: any) => s.name)).toEqual(after);
       probe.unmount();
+    });
+
+    // the header's probe and the page's list ask for the same list as a page loads
+    it("answers a page's list from the probe's read made a moment ago, without a request", async () => {
+      queryClient.clear();
+      vi.mocked(StreamService.nameList).mockResolvedValue({
+        data: { list: [{ name: "a", stream_type: "logs" }] },
+      } as any);
+      await queryClient.fetchQuery({
+        ...streamNameListQuery("test-org", "logs"),
+        queryKey: streamKeys.hasDataProbe("test-org", "logs"),
+      });
+
+      const result: any = await streamsInstance.getStreams("logs", false, false);
+
+      expect(StreamService.nameList).toHaveBeenCalledTimes(1);
+      expect(result.list.map((s: any) => s.name)).toEqual(["a"]);
+    });
+
+    it("shares the probe's request while it is in flight, and a forced read asks again", async () => {
+      queryClient.clear();
+      let release: (v: any) => void = () => {};
+      vi.mocked(StreamService.nameList).mockReturnValueOnce(
+        new Promise((r) => (release = r)) as any,
+      );
+      vi.mocked(StreamService.nameList).mockResolvedValue({
+        data: { list: [{ name: "b", stream_type: "logs" }] },
+      } as any);
+      const probe = queryClient.fetchQuery({
+        ...streamNameListQuery("test-org", "logs"),
+        queryKey: streamKeys.hasDataProbe("test-org", "logs"),
+      });
+
+      const page = streamsInstance.getStreams("logs", false, false);
+      await flushPromises();
+      release({ data: { list: [{ name: "a", stream_type: "logs" }] } });
+      await probe;
+      const result: any = await page;
+
+      expect(StreamService.nameList).toHaveBeenCalledTimes(1);
+      expect(result.list.map((s: any) => s.name)).toEqual(["a"]);
+
+      const forced: any = await streamsInstance.getStreams("logs", false, false, true);
+      expect(StreamService.nameList).toHaveBeenCalledTimes(2);
+      expect(forced.list.map((s: any) => s.name)).toEqual(["b"]);
     });
 
     it("rejects with the CancelledError itself when the fetch is cancelled", async () => {

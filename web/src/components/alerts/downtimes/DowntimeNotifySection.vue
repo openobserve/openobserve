@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :placeholder="t('alerts.downtimes.scheduleForm.durationPlaceholder')"
       :help-text="t('alerts.downtimes.notify.leadHelp')"
       :disabled="!hasDestinations"
-      width="sm"
+      width="s"
       data-test="downtime-notify-lead"
     />
 

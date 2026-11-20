@@ -86,7 +86,7 @@ function onSeverityChange(v: unknown) {
         @update:model-value="onSeverityChange"
       />
     </div>
-    <OSeparator vertical class="mx-1 h-5" />
+    <OSeparator vertical class="h-5" />
     <div class="w-48 shrink-0">
       <OSelect
         :aria-label="t('siem.aria.filterField')"
@@ -120,9 +120,7 @@ function onSeverityChange(v: unknown) {
       />
     </div>
     <OButton
-      variant="outline"
-      size="sm"
-      icon-left="add"
+      variant="secondary"
       :disabled="!builderField || !builderValue"
       data-test="security-events-builder-add"
       @click="commitFilter"

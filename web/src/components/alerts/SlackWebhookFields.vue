@@ -4,7 +4,7 @@
 import { ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -42,11 +42,11 @@ defineExpose({ focusWebhook });
         autocomplete="new-password"
         :help-text="t('alerts.prebuiltDestinations.slackWebhookUrlHelp')"
       >
-        <template #icon-right>
+        <template #icon-end>
           <OButton
+            icon-only
             data-test="slack-webhook-toggle-visibility"
-            variant="ghost-muted"
-            size="icon-sm"
+            variant="ghost"
             :aria-label="
               revealed
                 ? t('alert_destinations.slackOAuth.hideWebhook')
@@ -70,14 +70,13 @@ defineExpose({ focusWebhook });
       />
     </div>
 
-    <OBanner
+    <OInlineNotice
       v-if="showSecretNote"
-      variant="warning"
-      dense
+      tone="warn"
       icon="lock"
       data-test="slack-webhook-secret-note"
     >
       {{ t("alert_destinations.slackOAuth.webhookSecretNote") }}
-    </OBanner>
+    </OInlineNotice>
   </div>
 </template>

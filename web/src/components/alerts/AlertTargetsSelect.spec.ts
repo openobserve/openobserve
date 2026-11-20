@@ -28,7 +28,7 @@ import AlertTargetsSelect from "./AlertTargetsSelect.vue";
 
 const OSelectStub = {
   name: "OSelect",
-  props: ["modelValue", "options", "multiple", "error", "collapsibleGroups", "pinSelectedInGroups"],
+  props: ["modelValue", "options", "multiple", "error", "collapsibleGroups"],
   emits: ["update:modelValue"],
   template: `<div class="o-select" :data-error="String(error)" :data-multiple="String(multiple)">
     <span class="o-select-empty"><slot name="empty" /></span>
@@ -289,15 +289,6 @@ describe("AlertTargetsSelect", () => {
     });
   });
 
-  describe("selected-first ordering", () => {
-    it("floats the selection to the top of each group on open", () => {
-      // The stub declares untyped props, so a bare boolean attribute arrives as "".
-      expect(
-        select(createWrapper({ workflowsEnabled: true })).props("pinSelectedInGroups"),
-      ).not.toBe(undefined);
-    });
-  });
-
   describe("error state", () => {
     it("is not in error by default", () => {
       const wrapper = createWrapper();
@@ -319,7 +310,7 @@ describe("AlertTargetsSelect", () => {
 
     it("enterprise: says no destinations OR workflows are available", () => {
       const wrapper = createWrapper({ workflowsEnabled: true });
-      expect(wrapper.find(".o-select-empty").text()).toBe("No Destinations Or Workflows Available");
+      expect(wrapper.find(".o-select-empty").text()).toBe("No destinations or workflows available");
     });
   });
 

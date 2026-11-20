@@ -46,7 +46,7 @@ import { isFrameworkGeneratedId, isPositionalSelector } from "@/utils/synthetics
 import { deriveLocatorKind } from "@/utils/synthetics/deriveLocatorKind";
 import type { CompositePart } from "@/utils/synthetics/composeLocator";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -117,13 +117,13 @@ function originOf(candidate: LocatorCandidate): string {
  * word. Recorded is the quiet default — it is most of the list — while a row the
  * author put there reads as theirs without having to be read.
  */
-const ORIGIN_VARIANTS: Record<string, BadgeVariant> = {
-  recorded: "default",
-  authored: "primary-outline",
-  composite: "info-outline",
+const ORIGIN_VARIANTS: Record<string, ChipTone> = {
+  recorded: "neutral",
+  authored: "outline",
+  composite: "outline",
 };
 
-function originVariant(candidate: LocatorCandidate): BadgeVariant {
+function originVariant(candidate: LocatorCandidate): ChipTone {
   return ORIGIN_VARIANTS[originOf(candidate)] ?? "default";
 }
 
@@ -283,9 +283,6 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
         :show-header="false"
         :pagination="'none'"
         :sorting="'none'"
-        :show-global-filter="false"
-        :dense="true"
-        :bordered="true"
         :default-columns="false"
         :fill-height="false"
         :enable-row-reorder="true"
@@ -318,7 +315,7 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
             class="flex min-w-0 items-center gap-2"
             data-test="synthetics-journey-step-locator-row"
           >
-            <OBadge variant="default" size="sm">
+            <OBadge tone="neutral" size="sm">
               {{ t(`synthetics.journey.locatorKind.${row.kind}`) }}
             </OBadge>
             <OTruncatedText class="text-text-body flex-1 font-mono text-xs">
@@ -365,7 +362,7 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
             >
               {{ t("synthetics.journey.locatorTriedFirst") }}
             </span>
-            <OBadge :variant="originVariant(row)" size="sm">
+            <OBadge :tone="originVariant(row)" size="sm">
               {{ t(`synthetics.journey.locatorOrigin.${originOf(row)}`) }}
             </OBadge>
           </div>
@@ -375,9 +372,9 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
           <OButton
             :aria-label="t('common.delete')"
             variant="ghost"
-            size="xs"
+            size="sm"
             data-test="synthetics-journey-step-locator-delete-btn"
-            icon-left="delete"
+            icon="delete"
             @click="remove(row)"
           />
         </template>
@@ -390,8 +387,8 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
           {{ t("synthetics.journey.locatorSelectedCount", { count: selectedParts.length }) }}
         </span>
         <OButton
-          variant="outline"
-          size="xs"
+          variant="secondary"
+          size="sm"
           data-test="synthetics-journey-step-locator-combine"
           @click="combineOpen = true"
         >
@@ -420,7 +417,7 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
            parse it, so a picker that only set `kind` would store a contradiction. -->
         <OTooltip :content="t('synthetics.journey.locatorDerivedKindHelp')">
           <OBadge
-            variant="default"
+            tone="neutral"
             size="sm"
             :class="!draft.trim() ? 'invisible!' : ''"
             data-test="synthetics-journey-step-locator-derived-kind"
@@ -452,11 +449,9 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
         />
 
         <OButton
-          variant="outline"
-          size="sm"
+          variant="secondary"
           class="mt-5 shrink-0"
           :disabled="!draft.trim()"
-          icon-left="add"
           :aria-label="t('synthetics.journey.locatorOverrideApply')"
           data-test="synthetics-journey-step-locator-add"
           @click="addOwn"

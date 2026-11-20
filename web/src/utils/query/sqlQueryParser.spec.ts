@@ -337,14 +337,55 @@ describe("sqlQueryParser", () => {
       const result = parsedQueryToPanelFields(parsed);
 
       const xField = result.x[0];
-      expect(xField.label).toBe("timestamp");
-      expect(xField.alias).toBe("x_axis_1");
+      expect(xField.label).toBe("time");
+      expect(xField.alias).toBe("time");
       expect(xField.column).toBe("timestamp");
       expect(xField.functionName).toBe("histogram");
       expect(xField.sortBy).toBe("ASC");
       expect(xField.args).toEqual([
         { type: "field", value: { field: "timestamp", streamAlias: null } },
       ]);
+    });
+
+    it("names fields after the user's columns instead of x_axis_1 / y_axis_1", () => {
+      const result = parsedQueryToPanelFields({
+        stream: "app_logs",
+        streamType: "logs",
+        xFields: [],
+        yFields: [{ column: "_timestamp", alias: "_timestamp", aggregationFunction: "count" }],
+        breakdownFields: [{ column: "service", alias: "service", aggregationFunction: null }],
+        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        customQuery: false,
+        rawQuery: 'SELECT service, count(*) FROM "app_logs" GROUP BY service',
+      });
+
+      expect(result.x[0]).toMatchObject({ alias: "service", label: "service" });
+      expect(result.y[0]).toMatchObject({ alias: "count", label: "count(*)" });
+    });
+
+    it("keeps an unnamed time bucket on the generated alias and dedupes derived names", () => {
+      const result = parsedQueryToPanelFields({
+        stream: "app_logs",
+        streamType: "logs",
+        xFields: [{ column: "_timestamp", alias: "_timestamp", aggregationFunction: "histogram" }],
+        yFields: [
+          { column: "duration_ms", alias: "duration_ms", aggregationFunction: "avg" },
+          { column: "duration_ms", alias: "duration_ms", aggregationFunction: "avg" },
+          { column: "x", alias: "Total Count", aggregationFunction: "sum" },
+        ],
+        breakdownFields: [],
+        filters: { filterType: "group" as const, logicalOperator: "AND", conditions: [] },
+        customQuery: false,
+        rawQuery: "",
+      });
+
+      expect(result.x[0]).toMatchObject({ alias: "x_axis_1", label: "_timestamp" });
+      expect(result.y.map((f: { alias: string }) => f.alias)).toEqual([
+        "avg_duration_ms",
+        "avg_duration_ms_2",
+        "total_count",
+      ]);
+      expect(result.y[2].label).toBe("Total Count");
     });
 
     it("should handle empty fields arrays", () => {
@@ -547,7 +588,7 @@ describe("sqlQueryParser", () => {
       expect(result.breakdown[0].rawQuery).toBe(
         "CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END",
       );
-      expect(result.breakdown[0].alias).toBe("z_axis_1");
+      expect(result.breakdown[0].alias).toBe("breakdown_1");
       expect(result.breakdown[0].column).toBe("");
     });
 
@@ -653,7 +694,7 @@ describe("sqlQueryParser", () => {
         ),
       );
       const sql = builderSql(first, "table");
-      expect(sql).toContain("ORDER BY x_axis_1 ASC, x_axis_2 ASC, x_axis_3 ASC");
+      expect(sql).toContain("ORDER BY service ASC, level ASC, host ASC");
 
       const reparsed = await parseWithRealParser(sql);
       expect(reparsed.customQuery).toBe(false);
@@ -670,7 +711,7 @@ describe("sqlQueryParser", () => {
       );
       first.y[0].sortBy = "DESC";
       const sql = builderSql(first, "bar");
-      expect(sql).toContain("ORDER BY x_axis_1 ASC, y_axis_1 DESC");
+      expect(sql).toContain("ORDER BY t ASC, c DESC");
 
       const reparsed = await parseWithRealParser(sql);
       expect(reparsed.customQuery).toBe(false);
