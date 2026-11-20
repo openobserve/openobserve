@@ -1297,19 +1297,54 @@ describe("round 14 review fixes", () => {
   });
 
   it.each([
-    ["calendar:month:-1", "last month"],
-    ["calendar:quarter:0", "this quarter"],
-    ["calendar:year:-1", "last year"],
-  ])("F69: %s keeps its name %s", async (token, name) => {
+    ["calendar:month:-1", "Last month"],
+    ["calendar:quarter:0", "This quarter"],
+    ["calendar:year:-1", "Last year"],
+    ["calendar:day:0", "Today"],
+    ["calendar:week:0", "This week"],
+  ])("F69/B8: %s keeps its sentence-case name %s", async (token, name) => {
     const r = await run("en-US", token, NOW, "Europe/Berlin");
     expect(r.state === "valid" && r.reading.name).toBe(name);
   });
 
-  it("F68: a token week from Monday carries no week name where the pack's week differs", async () => {
+  it("B8: typed calendar words still match in any case", async () => {
+    for (const text of ["this quarter", "THIS QUARTER", "This Quarter", "today", "TODAY"]) {
+      const r = await run("en-US", text, NOW, "Europe/Berlin");
+      expect(r.state === "valid" && r.reading.kind, text).toBe("calendar");
+    }
+  });
+
+  it.each([
+    ["en-US", "this week", "calendar:week:0"],
+    ["en-US", "last week", "calendar:week:-1"],
+    ["pt-PT", "esta semana", "calendar:week:0"],
+    ["ja-JP", "先週", "calendar:week:-1"],
+    ["de-DE", "letzte Woche", "calendar:week:-1"],
+  ])("B2: %s typed %s reads as the rail's %s", async (locale, text, token) => {
+    const typed = await run(locale, text, NOW, "Europe/Berlin");
+    const rail = await run(locale, token, NOW, "Europe/Berlin");
+    const pick = (r: TimeRangeParseResult) =>
+      r.state === "valid" && [r.reading.kind, r.reading.calendarToken, span(r.reading)];
+    expect(pick(typed)).toEqual(pick(rail));
+    expect(pick(typed)).toEqual(["calendar", token, expect.any(Array)]);
+  });
+
+  it.each(["en-US", "ja-JP", "de-DE"])(
+    "B2 %s: now/w starts on the rail's Monday",
+    async (locale) => {
+      const math = await run(locale, "now/w", NOW, "Europe/Berlin");
+      const rail = await run(locale, "calendar:week:0", NOW, "Europe/Berlin");
+      expect(math.state === "valid" && math.reading.startUs).toBe(
+        rail.state === "valid" ? rail.reading.startUs : NaN,
+      );
+    },
+  );
+
+  it("F68: a token week carries the same name as the typed week words", async () => {
     const en = await run("en-US", "calendar:week:-1", NOW, "Europe/Berlin");
     expect(en.state === "valid" && [en.reading.calendarToken, en.reading.name]).toEqual([
       "calendar:week:-1",
-      undefined,
+      "Last week",
     ]);
     const de = await run("de-DE", "calendar:week:-1", NOW, "Europe/Berlin");
     const typed = await run("de-DE", "letzte Woche", NOW, "Europe/Berlin");

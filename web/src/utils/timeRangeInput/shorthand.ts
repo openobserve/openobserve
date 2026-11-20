@@ -81,7 +81,7 @@ function chainDrafts(list: Part[], env: Env): Outcome {
 }
 
 function mathOutcome(text: string, env: Env): Outcome {
-  const math = scanDateMath(text, 0, env.nowUs, env.zone, env.pack.firstDay);
+  const math = scanDateMath(text, 0, env.nowUs, env.zone);
   if (math === undefined) return { t: "none" };
   if (math === null || math.end !== text.length) return { t: "invalid", reason: "unreadable" };
   const only = math.offsets.length === 1 ? math.offsets[0] : undefined;
@@ -114,7 +114,7 @@ function calendarOutcome(text: string, env: Env): Outcome {
   const drafts =
     unit === "d"
       ? singleDrafts([{ v: { p: "day", ...addDays(today(env), n), rel: true } }], env)
-      : spanDrafts(unit, n, env, 1);
+      : spanDrafts(unit, n, env);
   return { t: "drafts", drafts, form: "shorthand" };
 }
 

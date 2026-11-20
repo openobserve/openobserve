@@ -133,8 +133,8 @@ describe("pattern semantics against a reference", () => {
     };
     for (const text of ["2026-11-10", "2026-11-17", "nov 10", "monday", "11/16/2026"])
       expect(kindOf(text), text).toEqual(["absolute", undefined, undefined]);
-    expect(kindOf("yesterday")).toEqual(["calendar", "calendar:day:-1", "yesterday"]);
-    expect(kindOf("today")).toEqual(["calendar", "calendar:day:0", "today"]);
+    expect(kindOf("yesterday")).toEqual(["calendar", "calendar:day:-1", "Yesterday"]);
+    expect(kindOf("today")).toEqual(["calendar", "calendar:day:0", "Today"]);
   });
 
   it("clamps month subtraction to the month end and crosses a year boundary", async () => {

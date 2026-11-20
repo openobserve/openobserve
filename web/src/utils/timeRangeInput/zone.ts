@@ -75,10 +75,13 @@ export function offsetAtInstant(zone: string, us: number): number {
   return (wall - Math.floor(ms / 1000) * 1000) / 1000;
 }
 
+export function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
 export function offsetLabel(seconds: number): string {
   const sign = seconds < 0 ? "-" : "+";
   const abs = Math.abs(seconds);
-  const pad = (n: number): string => String(n).padStart(2, "0");
   const base = `${sign}${pad(Math.floor(abs / 3600))}:${pad(Math.floor((abs % 3600) / 60))}`;
   return abs % 60 === 0 ? base : `${base}:${pad(abs % 60)}`;
 }

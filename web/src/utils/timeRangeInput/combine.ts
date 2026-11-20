@@ -40,7 +40,7 @@ import type {
   UnitKey,
   ZoneNote,
 } from "./types";
-import { offsetLabel, resolveCivil, wallAt } from "./zone";
+import { offsetLabel, pad, resolveCivil, wallAt } from "./zone";
 
 export interface Env {
   nowUs: number;
@@ -74,10 +74,6 @@ const numberFormats = new Map<string, Intl.NumberFormat>();
 
 export function today(env: Env): Civil {
   return wallAt(env.zone, env.nowUs);
-}
-
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
 }
 
 function clockText(c: Civil): string {
@@ -494,19 +490,15 @@ export function rollingDrafts(n: number, unit: UnitKey, env: Env): Draft[] {
   }));
 }
 
-/** This/last week, month, quarter or year as calendar periods; weeks start on `firstDay`. */
-export function spanDrafts(
-  unit: SpanUnit,
-  offset: number,
-  env: Env,
-  firstDay = env.pack.firstDay,
-): Draft[] {
+/** This/last week, month, quarter or year as calendar periods. */
+export function spanDrafts(unit: SpanUnit, offset: number, env: Env): Draft[] {
   const now = today(env);
   const day = dayStart(now.y, now.mo, now.d);
   let start: Civil;
   let next: Civil;
   if (unit === "w") {
-    start = addDays(weekStartOf(day, firstDay), 7 * offset);
+    // Typed week words read as the rail's `calendar:week` token, which starts on Monday.
+    start = addDays(weekStartOf(day, 1), 7 * offset);
     next = addDays(start, 7);
   } else if (unit === "y") {
     start = dayStart(now.y + offset, 1, 1);
@@ -517,8 +509,7 @@ export function spanDrafts(
     next = addMonths(start, months);
   }
   const token = unit === "q" ? "quarter" : UNIT_NAMES[unit];
-  // The token's week is the ISO week, so a pack whose week starts on another day reads absolute.
-  const calendar = offset <= 0 && (unit !== "w" || firstDay === 1);
+  const calendar = offset <= 0;
   return [
     {
       startUs: dayInstant(start.y, start.mo, start.d, env),
@@ -526,11 +517,7 @@ export function spanDrafts(
       softEnd: true,
       kind: calendar ? "calendar" : "absolute",
       calendarToken: calendar ? `calendar:${token}:${offset}` : undefined,
-      // A token week from Monday is not what this pack's own week words name.
-      name:
-        unit !== "w" || firstDay === env.pack.firstDay
-          ? env.pack.autoNames[`${unit}${offset}`]
-          : undefined,
+      name: env.pack.autoNames[`${unit}${offset}`],
       notes: [],
     },
   ];

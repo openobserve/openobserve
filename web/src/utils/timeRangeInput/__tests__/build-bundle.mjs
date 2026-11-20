@@ -16,8 +16,8 @@
 // Builds the parser with Vite for specs that must run outside jsdom.
 // `chunks [check]` prints the browser chunks of the parse (or check-only) entry as JSON;
 // `ssr <dir>` writes a node bundle of index.ts to <dir>.
-import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
+import pako from "pako";
 import { build } from "vite";
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
@@ -49,7 +49,9 @@ async function chunks(entry) {
       name: c.name,
       isEntry: c.isEntry,
       size: c.code.length,
-      gzip: gzipSync(c.code, { level: 9 }).length,
+      // Node's bundled zlib differs by version (24 measured this core 104 B larger than 26), so
+      // pako, a fixed port of reference zlib, gives every machine the same gzip size.
+      gzip: pako.gzip(c.code, { level: 9 }).length,
       modules: Object.keys(c.modules),
       imports: c.imports,
     }));
