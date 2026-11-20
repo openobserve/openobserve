@@ -34462,5 +34462,30 @@
       },
       "noHighConfidence": "Nessun nome ad alta confidenza"
     }
+  },
+  "commandPalette": {
+    "title": "Cerca pagine, risorse e azioni",
+    "placeholder": "Cerca nomi e ID",
+    "all": "Tutti",
+    "moreTypes": "Altri tipi",
+    "pages": "Pagine",
+    "actions": "Crea",
+    "recent": "Visite recenti",
+    "localHistory": "Cronologia locale",
+    "clearRecent": "Cancella visite recenti",
+    "historyStorageUnavailable": "Impossibile salvare le visite",
+    "recentUnavailable": "Questo elemento non è disponibile",
+    "loading": "Ricerca…",
+    "showMore": "Mostra altro",
+    "continueSearch": "Continua con questo tipo",
+    "partial": "Alcuni risultati non sono disponibili",
+    "changed": "Le risorse sono cambiate. Ripeti la ricerca.",
+    "failed": "Impossibile completare la ricerca",
+    "offline": "Offline. Le visite recenti restano disponibili.",
+    "sourceUnavailable": "Questo tipo di risorsa non è disponibile",
+    "emptyHelp": "Inserisci un nome o ID per cercare",
+    "globalShortcut": "Apri ricerca globale",
+    "searchAgain": "Cerca di nuovo",
+    "resourceSearch": "Ricerca risorse"
   }
 }

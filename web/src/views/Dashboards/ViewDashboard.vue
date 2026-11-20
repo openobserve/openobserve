@@ -709,6 +709,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 // @ts-nocheck
 import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+  removeFailedRecentVisit,
+} from "@/components/commandPalette/useRecentlyViewed";
+import {
   defineComponent,
   ref,
   watch,
@@ -1319,6 +1324,9 @@ export default defineComponent({
         }
       }
 
+      const recentScope = captureRecentVisitScope();
+      const recentId = String(route.query.dashboard ?? "");
+      const recentFolder = String(route.query.folder ?? "default");
       let dashboard;
       try {
         dashboard = await getDashboard(
@@ -1334,6 +1342,7 @@ export default defineComponent({
           return;
         }
       } catch (error: any) {
+        removeFailedRecentVisit(recentScope, "dashboard", recentId, error?.response?.status);
         const missingReason = missingReasonFor(error?.response?.status);
         if (missingReason ? playlistReporters.missing(missingReason) : playlistReporters.error()) {
           return;
@@ -1345,6 +1354,12 @@ export default defineComponent({
 
       // Set the dashboard data - RenderDashboardCharts will initialize the variables manager
       currentDashboardData.data = dashboard;
+      recordResourceVisit(recentScope, {
+        type: "dashboard",
+        id: recentId,
+        name: dashboard.title,
+        route_ref: { dashboard_id: recentId, folder_id: recentFolder },
+      });
       applyOpeningRefresh(dashboard);
 
       // set selected tab from query params

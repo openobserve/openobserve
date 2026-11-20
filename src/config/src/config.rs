@@ -2762,6 +2762,8 @@ impl Common {
 
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Limit {
+    #[env_config(name = "ZO_RESOURCE_CATALOG_MAX_BYTES", default = 536870912)]
+    pub resource_catalog_max_bytes: usize,
     // no need set by environment
     pub cpu_num: usize,
     pub real_cpu_num: usize,

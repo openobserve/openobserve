@@ -76,6 +76,7 @@ pub mod quality;
 pub mod query_history;
 #[cfg(feature = "enterprise")]
 pub mod remote_tasks;
+pub mod resources;
 pub mod rum_analytics;
 pub mod sample_data;
 #[cfg(feature = "enterprise")]
