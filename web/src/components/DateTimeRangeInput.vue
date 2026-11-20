@@ -71,6 +71,8 @@ const props = defineProps<{
   units: RelativeUnit[];
   canCopy: boolean;
   spanLimit: string;
+  /** The longest rolling range the picker keeps for a reading over its cap, else null. */
+  capRolling?: (reading: TimeRangeReading) => TimeRangeReading | null;
 }>();
 
 const emit = defineEmits<{
@@ -99,7 +101,19 @@ const bar = useTimeRangeInput({
   }),
 });
 
-const result = computed<TimeRangeParseResult>(() => bar.result.value);
+const capOf = (reading: TimeRangeReading) => props.capRolling?.(reading) ?? null;
+
+// The picker cannot keep a rolling range over its cap, so it offers the capped range instead.
+const overCap = computed(() => {
+  const res = bar.result.value;
+  return res.state === "valid" ? capOf(res.reading) : null;
+});
+
+const result = computed<TimeRangeParseResult>(() => {
+  const res = bar.result.value;
+  if (res.state !== "valid" || !overCap.value) return res;
+  return { state: "blocked", reason: "max-span", reading: res.reading, fix: overCap.value };
+});
 const state = computed(() => result.value.state);
 
 const offsetLabel = (offset: string) => raw(`${props.zone} · UTC${offset}`);
@@ -117,12 +131,40 @@ const rangeOf = (startUs: number, endUs: number) =>
   formatRangeText(startUs, endUs, props.zone, props.intlLocale, bar.nowUs.value);
 
 const durationOf = (startUs: number, endUs: number) =>
-  formatSpan(endUs - startUs, props.intlLocale);
+  endUs > startUs ? formatSpan(endUs - startUs, props.intlLocale) : "";
 
 const instantText = (us: number) =>
   formatInstant(us, props.zone, props.intlLocale, bar.nowUs.value, true);
 
-const noteText = (note: ZoneNote): StatusNote | null => {
+// A window cut short at now no longer reaches the same distance on both sides of the stamp.
+const instantWindowText = (
+  note: Extract<ZoneNote, { kind: "instant-window" }>,
+  reading: TimeRangeReading,
+): StatusNote => {
+  const time = instantText(note.instantUs);
+  const before = note.instantUs - reading.startUs;
+  const after = reading.endUs - note.instantUs;
+  if (before === note.halfWidthUs && after === note.halfWidthUs)
+    return {
+      text: t("timeRangeInput.instantWindow", {
+        duration: formatSpan(note.halfWidthUs, props.intlLocale),
+        time,
+      }),
+      warn: true,
+    };
+  const duration = formatSpan(before, props.intlLocale);
+  if (after <= 0)
+    return { text: t("timeRangeInput.instantWindowBefore", { duration, time }), warn: true };
+  return {
+    text: t("timeRangeInput.instantWindowClipped", {
+      duration,
+      after: formatSpan(after, props.intlLocale),
+    }),
+    warn: true,
+  };
+};
+
+const noteText = (note: ZoneNote, reading: TimeRangeReading): StatusNote | null => {
   if (note.kind === "dst-gap")
     return {
       text: t("timeRangeInput.dstGap", { typed: note.typedLocal, readAs: note.readAsLocal }),
@@ -130,14 +172,7 @@ const noteText = (note: ZoneNote): StatusNote | null => {
     };
   if (note.kind === "converted")
     return { text: t("timeRangeInput.converted", { offset: note.fromOffset }), warn: false };
-  if (note.kind === "instant-window")
-    return {
-      text: t("timeRangeInput.instantWindow", {
-        duration: formatSpan(note.halfWidthUs, props.intlLocale),
-        time: instantText(note.instantUs),
-      }),
-      warn: true,
-    };
+  if (note.kind === "instant-window") return instantWindowText(note, reading);
   if (note.kind === "log-line") return { text: t("timeRangeInput.logLine"), warn: false };
   if (note.kind === "partial-retention")
     return {
@@ -151,7 +186,7 @@ const noteText = (note: ZoneNote): StatusNote | null => {
 const readingNote = (reading: TimeRangeReading): StatusNote | null => {
   const notes = reading.notes
     .filter((n) => n.kind !== "converted" || n.fromOffset !== reading.startOffset)
-    .map(noteText)
+    .map((n) => noteText(n, reading))
     .filter((n): n is StatusNote => n !== null);
   const note = notes.find((n) => n.warn) ?? notes[0];
   if (note) return note;
@@ -204,6 +239,10 @@ const rowLabel = (reading: TimeRangeReading, index: number, readings: TimeRangeR
   const res = result.value;
   if (res.state === "ambiguous" && res.reason === "day-month-order" && index < 2)
     return orderLabel(index);
+  if (res.state === "ambiguous" && res.reason === "zone-abbreviation") {
+    const note = reading.notes.find((n) => n.kind === "converted");
+    if (note?.kind === "converted") return raw(`UTC${note.fromOffset}`);
+  }
   if (res.state === "ambiguous" && res.reason === "repeated-hour") {
     const end = repeatedEnd(readings);
     const instant = typedInstant(reading);
@@ -232,7 +271,7 @@ const toRow = (
     range: label === range ? "" : range,
     duration: durationOf(reading.startUs, reading.endUs),
     hint,
-    blocked: reading.blocked,
+    blocked: reading.blocked ?? (capOf(reading) ? "max-span" : undefined),
   };
 };
 
@@ -243,13 +282,13 @@ const rows = computed<ReadingRow[]>(() => {
     return res.completions.map((r, i) => toRow(r, i, res.completions));
   if (res.state !== "blocked") return [];
   const list = [...(res.fix ? [res.fix] : []), ...(res.others ?? [])];
-  return list.map((r, i) =>
-    toRow(r, i, list, res.fix && i === 0 ? t("timeRangeInput.longestAllowed") : undefined),
-  );
+  const hint = res.reason === "max-span" ? t("timeRangeInput.longestAllowed") : undefined;
+  return list.map((r, i) => toRow(r, i, list, res.fix && i === 0 ? hint : undefined));
 });
 
 const blockedMessage = (res: Extract<TimeRangeParseResult, { state: "blocked" }>) => {
   const { reading } = res;
+  if (overCap.value) return t("timeRangeInput.overCap");
   if (res.reason === "max-span") return t("timeRangeInput.blockedSpan", { limit: props.spanLimit });
   if (res.reason === "future")
     return t("timeRangeInput.blockedFuture", {
@@ -282,6 +321,7 @@ const unitInText = () => [...bar.text.value].reverse().find((c) => c === "m" || 
 const ambiguousMessage = (res: Extract<TimeRangeParseResult, { state: "ambiguous" }>) => {
   if (res.reason === "unit-case") return t("timeRangeInput.ambiguousUnit", { unit: unitInText() });
   if (res.reason === "log-stamps") return t("timeRangeInput.ambiguousStamps");
+  if (res.reason === "zone-abbreviation") return t("timeRangeInput.ambiguousZone");
   if (res.reason === "repeated-hour" || res.reason === "am-pm") {
     const first = res.readings[0];
     const us =
@@ -575,6 +615,7 @@ defineExpose({
             ><bdi>{{ summary.range }}</bdi></span
           >
           <OBadge
+            v-if="summary.duration"
             variant="default-soft"
             size="sm"
             class="shrink-0"
@@ -664,7 +705,7 @@ defineExpose({
           <span v-if="row.hint" class="text-text-secondary text-2xs max-md:hidden">{{
             row.hint
           }}</span>
-          <OBadge variant="default-soft" size="sm">{{ row.duration }}</OBadge>
+          <OBadge v-if="row.duration" variant="default-soft" size="sm">{{ row.duration }}</OBadge>
         </span>
       </div>
     </div>

@@ -141,7 +141,7 @@ describe("DateTime step and zoom out", () => {
     await create({ defaultRelativeTime: "45m", queryRangeRestrictionInHour: 1 });
 
     expect(el<HTMLButtonElement>("date-time-zoom-out-btn")!.disabled).toBe(true);
-    expect(wrapper!.vm.zoomOutTooltip).toBe("Longer than this stream's 1 hour query limit.");
+    expect(wrapper!.vm.zoomOutTooltip).toBe("Longer than this stream's query limit of 1 hour.");
   });
 
   it("is disabled at the ten-year cap", async () => {

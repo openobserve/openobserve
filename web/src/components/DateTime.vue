@@ -62,6 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'md:min-w-71.5': !disableRelative && selectedType === 'absolute',
             'w-fit': disableRelative,
             'h-auto! rounded-none! border-0!': !hideRangeShift,
+            'md:px-2!': showRangeZoom,
             'border-select-border! enabled:hover:border-select-border-hover! w-full':
               fieldAppearance,
           }"
@@ -88,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="arrow-drop-down"
               size="sm"
               class="date-time-arrow ms-auto text-lg! transition-transform duration-250"
+              :class="showRangeZoom ? 'md:hidden' : ''"
           /></template>
         </OButton>
       </template>
@@ -110,6 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :units="rangeUnits"
           :can-copy="gateReason === null"
           :span-limit="spanLimitText"
+          :cap-rolling="capRolling"
           @apply="commitTypedReading"
           @dirty="rangeInputBlocksApply = $event"
           @valid="rangeInputValid = $event"
@@ -2024,6 +2027,17 @@ export default defineComponent({
       calendarToken.value = token;
     };
 
+    // The capped copy is what the picker can keep; null when the reading is within the cap.
+    const capRolling = (reading: TimeRangeReading): TimeRangeReading | null => {
+      if (reading.kind !== "rolling" || !reading.rolling) return null;
+      const { unit, value } = reading.rolling;
+      const cap = MAX_CUSTOM_RELATIVE_VALUE[unit];
+      if (cap === undefined || value <= cap) return null;
+      const startUs = rollingStartUs(cap, unit, reading.endUs);
+      if (Number.isNaN(startUs)) return null;
+      return { ...reading, rolling: { unit, value: cap }, startUs, name: undefined, notes: [] };
+    };
+
     const stageReading = (reading: TimeRangeReading) => {
       if (reading.kind === "rolling" && reading.rolling) {
         const { unit, value } = reading.rolling;
@@ -2055,7 +2069,9 @@ export default defineComponent({
       const res = await readPickerText(text, rangeContext());
       if (seq !== selectionSeq) return;
       const reading =
-        res.state === "valid" && !res.reading.notes.some((n) => n.kind === "instant-window")
+        res.state === "valid" &&
+        !res.reading.notes.some((n) => n.kind === "instant-window") &&
+        !capRolling(res.reading)
           ? res.reading
           : null;
       if (reading) {
@@ -2786,6 +2802,7 @@ export default defineComponent({
       appliedRange,
       prefetchRangeInput,
       commitTypedReading,
+      capRolling,
       onApplyClick,
       openFromShortcut,
       zone,

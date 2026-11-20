@@ -40,7 +40,7 @@ const NOW = new Date("2026-10-08T03:00:00Z");
 const micros = (iso: string) => Date.parse(iso) * 1000;
 const timeOf = (ms: number) => new Date(ms).toISOString().slice(11, 19);
 const HISTORY_KEY = timeRangeHistoryKey("default", "example@gmail.com");
-const SPAN_MESSAGE = "Longer than this stream's 3 days query limit.";
+const SPAN_MESSAGE = "Longer than this stream's query limit of 3 days.";
 
 describe("DateTime validity gate", () => {
   let wrapper: Picker | null = null;
