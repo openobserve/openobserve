@@ -25,7 +25,7 @@ interface Part {
 }
 
 const ORDER: UnitKey[] = ["y", "M", "w", "d", "h", "m", "s"];
-const ELAPSED_US: Partial<Record<UnitKey, number>> = {
+export const ELAPSED_US: Partial<Record<UnitKey, number>> = {
   w: 7 * US_PER_DAY,
   d: US_PER_DAY,
   h: US_PER_H,

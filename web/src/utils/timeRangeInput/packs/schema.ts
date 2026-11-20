@@ -86,6 +86,7 @@ export interface GeneratedTables {
   months: string[][];
   weekdays: string[][];
   meridiem: string[][];
+  h11: boolean;
   ago: Partial<Record<UnitKey, string[]>>;
   fixed: [string, number, string][];
   auto: [string, number, string][];
@@ -411,10 +412,12 @@ export function compilePack(hand: LocalePack, gen: GeneratedTables, en?: LocaleP
     ...(pack.weekdays ?? []).map((n, i) => [n, i] as const),
   ].forEach(([names, i]) => names.forEach((s) => weekdays.push({ s: fold(s), value: i })));
   const mods: Word<ClockMod>[] = [];
-  const am = [...gen.meridiem[0], ...(pack.meridiem?.am ?? [])];
-  const pm = [...gen.meridiem[1], ...(pack.meridiem?.pm ?? [])];
-  am.forEach((s) => mods.push({ s: fold(s), value: { from: 0, to: 12, shift: 0, ap: true } }));
-  pm.forEach((s) => mods.push({ s: fold(s), value: { from: 12, to: 24, shift: 0, ap: true } }));
+  const ap = gen.h11 ? 0 : 1;
+  [pack.meridiem?.am, pack.meridiem?.pm].forEach((hand, i) =>
+    [...gen.meridiem[i], ...(hand ?? [])].forEach((s) =>
+      mods.push({ s: fold(s), value: { from: 12 * i, to: 12 * i + 12, shift: 0, ap } }),
+    ),
+  );
   for (const [s, [from, to, shift]] of Object.entries(pack.dayParts ?? {})) {
     mods.push({ s: fold(s), value: { from, to, shift: shift ?? 0 } });
   }

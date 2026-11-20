@@ -32,6 +32,7 @@ const tables: GeneratedTables = {
     ["星期六", "週六"],
   ],
   meridiem: [["上午"], ["下午"]],
+  h11: false,
   ago: {
     s: ["{n} 秒前"],
     m: ["{n} 分鐘前"],

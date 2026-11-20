@@ -32,6 +32,7 @@ const tables: GeneratedTables = {
     ["Saturday", "Sat"],
   ],
   meridiem: [["AM"], ["PM"]],
+  h11: false,
   ago: {
     s: ["{n} second ago", "{n} seconds ago", "{n} sec. ago", "{n}s ago"],
     m: ["{n} minute ago", "{n} minutes ago", "{n} min. ago", "{n}m ago"],

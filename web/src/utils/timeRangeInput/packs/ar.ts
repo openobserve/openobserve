@@ -97,8 +97,10 @@ export const pack: LocalePack = {
   },
   meridiem: {
     am: ["صباحا", "صباحًا", "صباحاً", "صباح"],
-    pm: ["مساء", "مساءً", "مساءا", "ظهرا", "عصرا"],
+    pm: ["مساء", "مساءً", "مساءا"],
   },
+  // Noon and afternoon are day parts, not marks: they also take a 24-hour clock (`١٦:٣٠ عصرا`).
+  dayParts: { ظهرا: [12, 24], عصرا: [12, 24] },
   numberWords: {
     واحد: 1,
     واحدة: 1,

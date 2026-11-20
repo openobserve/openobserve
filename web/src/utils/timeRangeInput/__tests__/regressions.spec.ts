@@ -1525,3 +1525,71 @@ describe("typed-clock review fixes", () => {
     expect(spans(text).state).not.toBe("invalid");
   });
 });
+
+describe("typed-clock review fixes, round 2", () => {
+  const LATER = "2026-11-21T12:00:00Z";
+  const read = async (text: string, locale = "en-US") => {
+    const r = parseTimeRangeInput(baseContext(await packFor(locale), text, LATER, "UTC"));
+    if (r.state === "valid") return { state: r.state, span: [r.reading.startUs, r.reading.endUs] };
+    return { state: r.state };
+  };
+  const at = (from: string, to: string) => ({ state: "valid", span: [isoUs(from), isoUs(to)] });
+
+  it.each([
+    ["2026-11-20 9:30 PM", "2026-11-20T21:25:00Z", "2026-11-20T21:35:00Z"],
+    ["2026-11-20 9:30 pm", "2026-11-20T21:25:00Z", "2026-11-20T21:35:00Z"],
+    ["Nov 20 9:30 PM", "2026-11-20T21:25:00Z", "2026-11-20T21:35:00Z"],
+  ])("P1: a spaced pm after a dated clock is kept: %s", async (text, from, to) => {
+    expect(await read(text)).toEqual(at(from, to));
+  });
+
+  it.each(["2026-11-20 00:30 am", "2026-11-20 13:30 pm", "2026-11-20 09:30 - 13pm", "PM 13:30"])(
+    "P1/P3/P7: a refused mark is never dropped: %s is invalid",
+    async (text) => {
+      expect((await read(text)).state).toBe("invalid");
+    },
+  );
+
+  it("P2: an offset stamp with a space still ends on a bare clock", async () => {
+    expect(await read("2026-11-20 00:30+05:00 to 20:30")).toEqual(
+      at("2026-11-19T19:30:00Z", "2026-11-19T20:30:00Z"),
+    );
+  });
+
+  it.each([
+    ["昨日午後0:30", "2026-11-20T12:25:00Z", "2026-11-20T12:35:00Z"],
+    ["昨日午前0:30", "2026-11-20T00:25:00Z", "2026-11-20T00:35:00Z"],
+    ["昨日午後12:30", "2026-11-20T12:25:00Z", "2026-11-20T12:35:00Z"],
+  ])("P4: ja marks take the hour 0 that Intl prints: %s", async (text, from, to) => {
+    expect(await read(text, "ja-JP")).toEqual(at(from, to));
+  });
+
+  it("P5: an ar day-part word keeps a 24-hour clock", async () => {
+    expect(await read("أمس ١٦:٣٠ عصرا", "ar-SA")).toEqual(
+      at("2026-11-20T16:25:00Z", "2026-11-20T16:35:00Z"),
+    );
+  });
+
+  it.each(["2026-11-20 from 2026-10-02 to 2026-10-05", "Nov 20 from 2026-10-02 to 2026-10-05"])(
+    "P6: a leading day with no clock to land on is not dropped: %s",
+    async (text) => {
+      expect((await read(text)).state).not.toBe("valid");
+    },
+  );
+
+  it("property: an added date, mark or range end never leaves the reading unchanged", async () => {
+    const days = ["2026-11-20", "Nov 20", "2026/11/20", "11/20/2026"];
+    const bases: string[] = [];
+    for (const d of days)
+      for (const h of [1, 4, 9, 11]) for (const mi of ["00", "30"]) bases.push(`${d} ${h}:${mi}`);
+    bases.push("2026-10-02 to 2026-10-05", "Oct 2 to Oct 5", "yesterday 9:30");
+    for (const base of bases) {
+      const plain = await read(base);
+      for (const text of [`${base} pm`, `${base} PM`, `2026-11-19 ${base}`, `${base} - 13pm`]) {
+        const got = await read(text);
+        if (plain.state === "valid" && got.state === "valid")
+          expect({ text, span: got.span }).not.toEqual({ text, span: plain.span });
+      }
+    }
+  });
+});

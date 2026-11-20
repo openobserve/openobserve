@@ -32,6 +32,7 @@ const tables: GeneratedTables = {
     ["zaterdag", "za"],
   ],
   meridiem: [["a.m."], ["p.m."]],
+  h11: false,
   ago: {
     s: ["{n} seconde geleden", "{n} seconden geleden", "{n} sec. geleden", "{n} s geleden"],
     m: ["{n} minuut geleden", "{n} minuten geleden", "{n} min. geleden"],

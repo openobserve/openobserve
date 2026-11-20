@@ -32,6 +32,7 @@ const tables: GeneratedTables = {
     ["Cumartesi", "Cmt"],
   ],
   meridiem: [["ÖÖ"], ["ÖS"]],
+  h11: false,
   ago: {
     s: ["{n} saniye önce", "{n} sn. önce"],
     m: ["{n} dakika önce", "{n} dk. önce"],
