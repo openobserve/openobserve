@@ -1196,13 +1196,23 @@ export default class DashboardactionPage {
     return state;
   }
 
-  /**
-   * Stage names in the order they are drawn along the flow: top to bottom for a vertical funnel,
-   * left to right for a horizontal one.
-   */
+  /** Stage names as drawn: top to bottom when vertical, left to right when horizontal. */
   funnelDrawOrder(state) {
     const axis = state.orient === "horizontal" ? "x" : "y";
     return [...state.stages].sort((a, b) => a[axis] - b[axis]).map((stage) => stage.name);
+  }
+
+  /** Stage names ordered by value, largest first (smallest first with `ascending`). */
+  funnelNamesByValue(state, ascending = false) {
+    return [...state.stages]
+      .sort((a, b) => (ascending ? a.value - b.value : b.value - a.value))
+      .map((stage) => stage.name);
+  }
+
+  /** Rendered label text of the named funnel stage, or "" while it is not drawn. */
+  async getFunnelStageLabel(name) {
+    const state = await this.getFunnelState();
+    return state?.stages.find((stage) => stage.name === name)?.labelText ?? "";
   }
 
   // The largest stage is the widest, so it is the easiest real click target.

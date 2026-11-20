@@ -14,10 +14,6 @@ import {
 } from "./utils/configPanelHelpers.js";
 const testLogger = require("../utils/test-logger.js");
 
-// Funnel panel type (PR #15924): one stage per X value, sized by the Y value. Options: Stage order
-// (Largest first / Smallest first / Query order), Orientation (Vertical / Horizontal) and Show percent of
-// first stage. Every option offers "Default (…)", which drops the key from the saved panel.
-
 // The e2e_automate namespaces have clearly different log counts, so stage order is observable on the chart.
 const STAGE_FIELD = "kubernetes_namespace_name";
 // The namespace with the most logs in the fixture: always the largest stage.
@@ -38,12 +34,6 @@ const ONE_FIELD_ERROR = "Add one field for the";
 // Intercepted drilldown target, so the new tab never leaves the test network.
 const DRILLDOWN_HOST = "https://example.com";
 const DRILLDOWN_NAME = "Stage Drilldown";
-
-/** Stage names ordered by value, largest first (or smallest first with `ascending`). */
-const namesByValue = (state, ascending = false) =>
-  [...state.stages]
-    .sort((a, b) => (ascending ? a.value - b.value : b.value - a.value))
-    .map((stage) => stage.name);
 
 test.describe.configure({ mode: "parallel" });
 
@@ -75,7 +65,7 @@ test.describe("ConfigPanel — Funnel Settings", () => {
       expect(state.stages.length).toBeGreaterThan(1);
       expect(state.stages.map((s) => s.name)).toContain(LARGEST_STAGE);
       // Largest first: drawn top to bottom from the largest stage down.
-      expect(actions.funnelDrawOrder(state)).toEqual(namesByValue(state));
+      expect(actions.funnelDrawOrder(state)).toEqual(actions.funnelNamesByValue(state));
       expect(actions.funnelDrawOrder(state)[0]).toBe(LARGEST_STAGE);
 
       // Every option starts on Default, and each Default names the value it falls back to.
@@ -117,7 +107,7 @@ test.describe("ConfigPanel — Funnel Settings", () => {
       await actions.waitForChartToRender();
       await expect.poll(async () => (await actions.getFunnelState())?.sort).toBe("ascending");
       let state = await actions.waitForFunnel();
-      expect(actions.funnelDrawOrder(state)).toEqual(namesByValue(state, true));
+      expect(actions.funnelDrawOrder(state)).toEqual(actions.funnelNamesByValue(state, true));
       expect(actions.funnelDrawOrder(state).at(-1)).toBe(LARGEST_STAGE);
 
       // Query order: stages are drawn in the order the query returned them, not by size.
@@ -171,7 +161,7 @@ test.describe("ConfigPanel — Funnel Settings", () => {
       await expect.poll(async () => (await actions.getFunnelState())?.orient).toBe("horizontal");
       let state = await actions.waitForFunnel();
       // Still largest first, now read left to right.
-      expect(actions.funnelDrawOrder(state)).toEqual(namesByValue(state));
+      expect(actions.funnelDrawOrder(state)).toEqual(actions.funnelNamesByValue(state));
       const xs = state.stages.map((s) => s.x);
       const ys = state.stages.map((s) => s.y);
       // Stage centres spread along the width, not the height.
@@ -208,32 +198,30 @@ test.describe("ConfigPanel — Funnel Settings", () => {
       const configs = pm.dashboardPanelConfigs;
       const dashboardName = generateDashboardName();
 
-      const largestLabel = async () =>
-        (await actions.getFunnelState())?.stages.find((s) => s.name === LARGEST_STAGE)?.labelText ?? "";
 
       await setupFunnelPanelWithConfig(page, pm, dashboardName, { stageField: STAGE_FIELD });
       await actions.waitForFunnel();
-      await expect.poll(largestLabel).toContain(LARGEST_STAGE);
-      expect(await largestLabel()).not.toContain("%");
+      await expect.poll(() => actions.getFunnelStageLabel(LARGEST_STAGE)).toContain(LARGEST_STAGE);
+      expect(await actions.getFunnelStageLabel(LARGEST_STAGE)).not.toContain("%");
 
       await configs.setConfigToggle(configs.funnelShowPercent, true);
       await actions.applyDashboardBtn();
       await actions.waitForChartToRender();
       // Percents are of the largest stage, so the largest one reads 100%.
-      await expect.poll(largestLabel).toContain("(100%)");
+      await expect.poll(() => actions.getFunnelStageLabel(LARGEST_STAGE)).toContain("(100%)");
 
       await actions.savePanel();
       testLogger.info("Verifying Show percent = on persists after save");
       await reopenPanelConfig(page, pm);
       await configs.expectConfigToggle(configs.funnelShowPercent, true);
       await actions.waitForChartToRender();
-      await expect.poll(largestLabel).toContain("(100%)");
+      await expect.poll(() => actions.getFunnelStageLabel(LARGEST_STAGE)).toContain("(100%)");
 
       // Off is the default, so the key is dropped and the percent leaves the labels.
       await configs.setConfigToggle(configs.funnelShowPercent, false);
       await actions.applyDashboardBtn();
       await actions.waitForChartToRender();
-      await expect.poll(largestLabel).not.toContain("%");
+      await expect.poll(() => actions.getFunnelStageLabel(LARGEST_STAGE)).not.toContain("%");
       await actions.savePanel();
 
       await reopenPanelConfig(page, pm);
@@ -335,10 +323,7 @@ test.describe("ConfigPanel — Funnel Settings", () => {
       const actions = pm.dashboardPanelActions;
       const dashboardName = generateDashboardName();
 
-      await page.context().route(`${DRILLDOWN_HOST}/**`, (route) =>
-        route.fulfill({ status: 200, contentType: "text/html", body: "<html><body>drilldown</body></html>" })
-      );
-
+      await pm.dashboardDrilldown.stubDrilldownHost(DRILLDOWN_HOST);
       await setupFunnelPanelWithConfig(page, pm, dashboardName, { stageField: STAGE_FIELD });
       await pm.dashboardDrilldown.addDrilldownByURL(
         DRILLDOWN_NAME,
@@ -354,10 +339,7 @@ test.describe("ConfigPanel — Funnel Settings", () => {
       expect(clicked.name).toBe(LARGEST_STAGE);
       await expect(pm.dashboardDrilldown.drilldownMenu).toBeVisible({ timeout: 10000 });
 
-      const popupPromise = page.context().waitForEvent("page");
-      await pm.dashboardDrilldown.drilldownMenuItem(DRILLDOWN_NAME).click();
-      const popup = await popupPromise;
-      await popup.waitForURL(/example\.com/, { timeout: 15000 });
+      const popup = await pm.dashboardDrilldown.openDrilldownInNewTab(DRILLDOWN_NAME, /example\.com/);
       expect(new URL(popup.url()).searchParams.get("stage")).toBe(clicked.name);
       await popup.close();
 

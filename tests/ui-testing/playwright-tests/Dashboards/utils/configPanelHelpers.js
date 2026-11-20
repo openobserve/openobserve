@@ -380,9 +380,8 @@ export async function setupSunburstPanelWithConfig(page, pm, dashboardName, {
   testLogger.info("Sunburst panel with config ready", { dashboardName, panelName, groupFields, subGroupField });
 }
 
-// Funnel panel with the config sidebar open: one Stage field on X, Value keeps the seeded count. The editor
-// opens as a bar and seeds histogram(_timestamp) on X, which the switch to funnel keeps, so it is removed first.
-// Pass stageField = null to leave the X well empty (validation tests).
+// The editor opens as a bar with histogram(_timestamp) on X, which survives the switch to funnel, so drop it.
+// stageField = null leaves the X well empty for validation tests.
 export async function setupFunnelPanelWithConfig(page, pm, dashboardName, {
   panelName = "Test Panel",
   stageField = "kubernetes_namespace_name",
