@@ -44,6 +44,25 @@ describe("previewCaption", () => {
       "Plotted: x_total per second, one line per svc",
     ],
     [
+      "a histogram's average, in words",
+      { tab: "promql", query: "sum(rate(d_sum[10m])) / sum(rate(d_count[10m]))", measured: false },
+      "Plotted: average of d",
+    ],
+    [
+      "a histogram's count, as observations per second",
+      { tab: "promql", query: "sum(rate(d_count[10m]))", measured: false },
+      "Plotted: d_count per second",
+    ],
+    [
+      "a function of a counter's rate, in words",
+      {
+        tab: "promql",
+        query: "quantile_over_time(0.9, sum by (svc) (rate(x_total[5m]))[10m:1m])",
+        measured: false,
+      },
+      "Plotted: p90 of x_total per second, one line per svc",
+    ],
+    [
       "a PromQL percentile, in words and never per bucket bound",
       {
         tab: "promql",

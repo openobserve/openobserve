@@ -68,8 +68,20 @@ export interface IntentSlots {
   measure?: string;
   factor?: number;
   label?: string;
-  /** The builder function a gauge above a value reads, as step 2's function picker. */
+  /** The function the Watch row reads, as step 2's function picker names it, or `rate` for a counter. */
   agg?: string;
+  /** How the picked stream reads, so every reader of the picks describes the query the starter built. */
+  kind?: StreamKind;
+  histogram?: HistogramSiblings;
+}
+
+/** How a stream's values read: events, or a metric by its declared type and bucket label. */
+export type StreamKind = "events" | "gauge" | "counter" | "bucket";
+
+/** A histogram's `_sum` and `_count` series beside its buckets, when the org has them. */
+export interface HistogramSiblings {
+  sum?: string;
+  count?: string;
 }
 
 /** A metric stream of the org, as the stream list carries it. */
@@ -115,8 +127,15 @@ export const METRIC_INTENTS: readonly IntentId[] = [
   "unusualChange",
   "promql",
 ];
-// A histogram's bucket series only reads as a percentile; a share or a raw rate of its buckets means nothing.
-const BUCKET_INTENTS: readonly IntentId[] = ["percentile", "unusualChange", "promql"];
+// Every kind gets every starter; a histogram's buckets lead with the percentile they are made for.
+const BUCKET_INTENTS: readonly IntentId[] = ["percentile", ...METRIC_INTENTS];
+const PLAIN_METRIC_INTENTS: readonly IntentId[] = [
+  "metricAbove",
+  "percentile",
+  "ratio",
+  "unusualChange",
+  "promql",
+];
 const ANOMALY_INTENTS = new Set<IntentId>(["unusualVolume", "unusualChange"]);
 /** The label a histogram's bucket series carry (the Prometheus bucket bound). */
 export const BUCKET_LABEL = "le";
@@ -130,7 +149,7 @@ export const CARDS_FOLD_AT = 10;
 export const DEFAULT_FACTOR = 2;
 /** Anomaly histograms bucket by 5 minutes unless changed in section 2. */
 export const ANOMALY_BUCKET_MINUTES = 5;
-/** Step 2's functions for a measured value, in its order, less "total events": that is the Count chip. */
+/** Step 2's functions for a measured value, in its order, less "total events". */
 export const VALUE_AGGS = [
   "count",
   "avg",
@@ -144,6 +163,12 @@ export const VALUE_AGGS = [
   "p95",
   "p99",
 ] as const;
+/** Step 2's whole function list, as main's builder offers it on every stream. */
+export const ALL_FUNCTIONS = ["total_events", ...VALUE_AGGS] as const;
+/** A counter's own reading: its per-second rate. */
+export const RATE_FN = "rate";
+/** The rate a counter's window functions read at each step; wide enough for a one-minute scrape. */
+const INNER_RATE_MINUTES = 5;
 /** The quantile each percentile function reads, as the server's builder does. */
 export const QUANTILE_OF: Readonly<Record<string, number>> = {
   median: 0.5,
@@ -182,7 +207,7 @@ export function intentsFor(
   streamType: string,
   opts: { anomaly: boolean; howItChecks?: string; bucket?: boolean },
 ): IntentId[] {
-  const metrics = opts.bucket ? BUCKET_INTENTS : METRIC_INTENTS;
+  const metrics = opts.bucket ? BUCKET_INTENTS : PLAIN_METRIC_INTENTS;
   const all = streamType === "metrics" ? metrics : EVENT_INTENTS;
   return all
     .filter((id) => opts.anomaly || !ANOMALY_INTENTS.has(id))
@@ -346,6 +371,15 @@ const ranked = (fit: string[], candidates: readonly string[]): Ranked => ({
   fit,
   all: [...fit, ...candidates.filter((name) => !fit.includes(name))],
 });
+
+/** Moves names to the end of `all` and out of `fit`, e.g. the field another slot already holds. */
+export const demote = (r: Ranked, ...names: (string | undefined)[]): Ranked => {
+  const moved = r.all.filter((n) => names.includes(n));
+  return {
+    fit: r.fit.filter((n) => !names.includes(n)),
+    all: [...r.all.filter((n) => !names.includes(n)), ...moved],
+  };
+};
 
 /** Drops names from both lists, e.g. the field another slot already holds. */
 export const without = (r: Ranked, ...names: (string | undefined)[]): Ranked => ({
@@ -580,6 +614,15 @@ const groupAggregation = (
   multi_alert: !!groups?.length,
 });
 
+/** Main's "total events": a count of what matches, no aggregation and no grouping. */
+const countFill = (intent: IntentId, extra: Record<string, unknown> = {}): IntentFill => ({
+  intent,
+  howItChecks: "false",
+  aggregation: false,
+  vrl: false,
+  values: { ...extra, "query_condition.type": "custom", "query_condition.aggregation": null },
+});
+
 /** A logs/traces intent as the values it writes; value and per-group count thresholds stay empty for
  * the user to type, so nothing reads as firing at a number nobody chose. */
 export function buildEventFill(
@@ -594,6 +637,7 @@ export function buildEventFill(
     "query_condition.multi_time_range": [],
     "query_condition.vrl_function": null,
   };
+  if (intent === "percentile" && slots.agg === "total_events") return countFill(intent, filters);
   if (intent === "percentile") {
     const measure = slots.measure ?? "";
     return {
@@ -776,9 +820,80 @@ export function percentilePromql(
   return `histogram_quantile(${q}, sum by (${by}) (rate(${metric}[${window}])))`;
 }
 
+const sumBy = (groups: readonly string[] | undefined, inner: string) =>
+  groups?.length ? `sum by (${groups.join(", ")}) (${inner})` : `sum(${inner})`;
+
+/** A histogram's `_sum` and `_count` series, found by the Prometheus suffix beside its `_bucket` name. */
+export function histogramSiblings(bucket: string, metrics: readonly string[]): HistogramSiblings {
+  const base = bucket.replace(/_bucket$/, "");
+  if (base === bucket) return {};
+  const has = (name: string) => (metrics.includes(name) ? name : undefined);
+  return { sum: has(`${base}_sum`), count: has(`${base}_count`) };
+}
+
+/** A histogram function read from its own series: a percentile from the buckets, the average as sum over
+ * count, and count as observations per second; undefined where only main's builder reads it. */
+export function histogramPromql(
+  metric: string,
+  opts: {
+    agg: string;
+    groups?: readonly string[];
+    windowMinutes: number;
+    siblings?: HistogramSiblings;
+  },
+): string | undefined {
+  const window = `${Math.max(1, Math.round(opts.windowMinutes))}m`;
+  const { sum, count } = opts.siblings ?? {};
+  if (QUANTILE_OF[opts.agg] !== undefined) return percentilePromql(metric, opts);
+  if (opts.agg === "avg" && sum && count)
+    return `${sumBy(opts.groups, `rate(${sum}[${window}])`)} / ${sumBy(opts.groups, `rate(${count}[${window}])`)}`;
+  if (opts.agg === "count" && count) return sumBy(opts.groups, `rate(${count}[${window}])`);
+  return undefined;
+}
+
+/** A function of a counter's per-second rate over the window; undefined for a function with no such reading. */
+export function rateFunctionPromql(
+  metric: string,
+  opts: { agg: string; groups?: readonly string[]; windowMinutes: number },
+): string | undefined {
+  if (opts.agg === RATE_FN) return metricPromql(metric, { ...opts, counter: true });
+  const window = `${Math.max(1, Math.round(opts.windowMinutes))}m`;
+  const inner = metricPromql(metric, {
+    counter: true,
+    groups: opts.groups,
+    windowMinutes: INNER_RATE_MINUTES,
+  });
+  const range = `${inner}[${window}:1m]`;
+  const q = QUANTILE_OF[opts.agg];
+  if (q !== undefined) return `quantile_over_time(${q}, ${range})`;
+  return ["avg", "min", "max", "sum"].includes(opts.agg)
+    ? `${opts.agg}_over_time(${range})`
+    : undefined;
+}
+
+const HISTOGRAM_AVG =
+  /^sum(?: by \([^)]*\))?\s*\(rate\(\w+_sum\[\w+\]\)\) \/ sum(?: by \([^)]*\))?\s*\(rate\(\w+_count\[\w+\]\)\)$/;
+const RATE_SHAPE = /^(?:sum(?: by \([^)]*\))?\s*\()?rate\(\w+\[\w+\]\)\)?$/;
+
+/** The Watch function a starter's PromQL reads, `prefer` when it reads the same quantile. */
+export function promqlAgg(promql: unknown, intent: IntentId, prefer?: string): string | undefined {
+  const q = String(promql ?? "").trim();
+  const quantile = promqlQuantileAgg(q, prefer);
+  if (quantile) return quantile;
+  const over = /^(avg|min|max|sum)_over_time\(/.exec(q)?.[1];
+  if (over) return over;
+  if (intent === "percentile" && HISTOGRAM_AVG.test(q)) return "avg";
+  if (!RATE_SHAPE.test(q)) return undefined;
+  return intent === "percentile" ? "count" : intent === "metricAbove" ? RATE_FN : undefined;
+}
+
 /** The percentile function a histogram starter's query reads, `prefer` when it reads the same quantile. */
 export function promqlQuantileAgg(promql: unknown, prefer?: string): string | undefined {
-  const q = Number(/^\s*histogram_quantile\(\s*([\d.]+)\s*,/.exec(String(promql ?? ""))?.[1]);
+  const q = Number(
+    /^\s*(?:histogram_quantile|quantile_over_time)\(\s*([\d.]+)\s*,/.exec(
+      String(promql ?? ""),
+    )?.[1],
+  );
   if (!(q > 0)) return undefined;
   if (prefer && QUANTILE_OF[prefer] === q) return prefer;
   return Object.keys(QUANTILE_OF).find((fn) => QUANTILE_OF[fn] === q);
@@ -787,9 +902,28 @@ export function promqlQuantileAgg(promql: unknown, prefer?: string): string | un
 /** A metric intent as the values it writes. */
 export function buildMetricFill(
   intent: IntentId,
-  slots: IntentSlots & { metric: string; family?: MetricFamilyMember[]; counter?: boolean },
+  slots: IntentSlots & {
+    metric: string;
+    family?: MetricFamilyMember[];
+    counter?: boolean;
+    bucket?: boolean;
+    histogram?: HistogramSiblings;
+  },
   ctx: { periodMinutes: number },
 ): IntentFill {
+  const promqlFill = (promql: string): IntentFill => ({
+    intent,
+    howItChecks: "false",
+    aggregation: false,
+    vrl: false,
+    values: {
+      "query_condition.type": "promql",
+      "query_condition.promql": promql,
+      "query_condition.promql_condition": { column: "value", operator: ">", value: "" },
+      "query_condition.promql_multi_alert": !!slots.groups?.length,
+    },
+  });
+  const window = { groups: slots.groups, windowMinutes: ctx.periodMinutes };
   if (intent === "unusualChange") {
     return {
       intent,
@@ -805,73 +939,43 @@ export function buildMetricFill(
       },
     };
   }
-  if (intent === "percentile") {
-    return {
-      intent,
-      howItChecks: "false",
-      aggregation: false,
-      vrl: false,
-      values: {
-        "query_condition.type": "promql",
-        "query_condition.promql": percentilePromql(slots.metric, {
-          groups: slots.groups,
-          windowMinutes: ctx.periodMinutes,
-          agg: slots.agg,
-        }),
-        "query_condition.promql_condition": { column: "value", operator: ">", value: "" },
-        "query_condition.promql_multi_alert": !!slots.groups?.length,
-      },
-    };
-  }
-  if (intent === "promql" || (intent === "metricAbove" && slots.counter)) {
-    return {
-      intent,
-      howItChecks: "false",
-      aggregation: false,
-      vrl: false,
-      values: {
-        "query_condition.type": "promql",
-        "query_condition.promql": metricPromql(slots.metric, {
-          counter: !!slots.counter,
-          groups: slots.groups,
-          windowMinutes: ctx.periodMinutes,
-        }),
-        "query_condition.promql_condition": { column: "value", operator: ">", value: "" },
-        "query_condition.promql_multi_alert": !!slots.groups?.length,
-      },
-    };
-  }
+  if (intent === "promql")
+    return promqlFill(metricPromql(slots.metric, { ...window, counter: !!slots.counter }));
   if (intent === "ratio") {
-    return {
-      intent,
-      howItChecks: "false",
-      aggregation: false,
-      vrl: false,
-      values: {
-        "query_condition.type": "promql",
-        "query_condition.promql": ratioPromql({
-          members: slots.family?.length
-            ? slots.family
-            : [{ metric: slots.metric, labels: slots.label ? [slots.label] : [], whole: true }],
-          values: slots.values ?? [],
-          patterns: slots.patterns,
-          groups: slots.groups,
-          counter: slots.counter ?? true,
-          windowMinutes: ctx.periodMinutes,
-        }),
-        "query_condition.promql_condition": { column: "value", operator: ">", value: "" },
-        "query_condition.promql_multi_alert": !!slots.groups?.length,
-      },
-    };
+    return promqlFill(
+      ratioPromql({
+        members: slots.family?.length
+          ? slots.family
+          : [{ metric: slots.metric, labels: slots.label ? [slots.label] : [], whole: true }],
+        values: slots.values ?? [],
+        patterns: slots.patterns,
+        groups: slots.groups,
+        counter: slots.counter ?? true,
+        windowMinutes: ctx.periodMinutes,
+      }),
+    );
   }
+  const agg =
+    slots.agg || defaultAgg(intent, slots.bucket ? "bucket" : slots.counter ? "counter" : "gauge");
+  const own =
+    intent === "percentile" && slots.bucket
+      ? histogramPromql(slots.metric, { ...window, agg, siblings: slots.histogram })
+      : intent === "metricAbove" && slots.counter && !slots.bucket
+        ? rateFunctionPromql(slots.metric, { ...window, agg })
+        : undefined;
+  if (own) return promqlFill(own);
+  // A builder function replaces the starter's earlier PromQL, so Save never asks which of the two runs.
+  const noPromql = { "query_condition.promql": "" };
+  if (agg === "total_events") return countFill(intent, noPromql);
   return {
     intent,
     howItChecks: "false",
     aggregation: true,
     vrl: false,
     values: {
+      ...noPromql,
       "query_condition.type": "custom",
-      "query_condition.aggregation": groupAggregation(slots.agg || "avg", "value", slots.groups, {
+      "query_condition.aggregation": groupAggregation(agg, "value", slots.groups, {
         operator: ">",
         value: "",
       }),
@@ -879,12 +983,20 @@ export function buildMetricFill(
   };
 }
 
-/** The functions an intent's Watch row offers: a histogram's buckets only read as a percentile. */
-export function aggsFor(intent: IntentId, metrics: boolean): readonly string[] {
-  return intent === "percentile" && metrics ? Object.keys(QUANTILE_OF) : VALUE_AGGS;
+/** The functions an intent's Watch row offers: main's whole list everywhere, a counter's rate besides. */
+export function aggsFor(intent: IntentId, kind: StreamKind): readonly string[] {
+  return intent === "metricAbove" && kind === "counter"
+    ? [RATE_FN, ...ALL_FUNCTIONS]
+    : ALL_FUNCTIONS;
 }
 
-export const defaultAgg = (intent: IntentId): string => (intent === "percentile" ? "p95" : "avg");
+/** The suggested function: a percentile for a spread, a counter's rate, else the average. */
+export const defaultAgg = (intent: IntentId, kind: StreamKind = "events"): string =>
+  intent === "percentile"
+    ? "p95"
+    : intent === "metricAbove" && kind === "counter"
+      ? RATE_FN
+      : "avg";
 
 /** The picks a starter's query holds now, so step 1 shows what step 2 changed instead of its own copy. */
 export function slotsFromForm(
@@ -896,14 +1008,15 @@ export function slotsFromForm(
   if (type === "promql") {
     const promql = String(read("query_condition.promql") ?? "");
     const groups = promqlByLabels(promql).filter((g) => g !== BUCKET_LABEL);
-    const agg = promqlQuantileAgg(promql, prefer.agg);
-    return intent === "percentile" && agg ? { agg, groups } : { groups };
+    const agg = promqlAgg(promql, intent, prefer.agg);
+    return agg ? { agg, groups } : { groups };
   }
   if (type !== "custom") return {};
   const aggregation = read("query_condition.aggregation") as FormAggregation | null | undefined;
   const groups = (aggregation?.group_by ?? []).filter((g): g is string => !!g);
   if (intent === "countWhere") return { groups };
-  if (!aggregation) return {};
+  const measured = intent === "percentile" || intent === "metricAbove";
+  if (!aggregation) return measured ? { agg: "total_events", groups: [] } : {};
   if (intent === "percentile")
     return { agg: aggregation.function, measure: aggregation.having?.column || undefined, groups };
   return intent === "metricAbove" ? { agg: aggregation.function, groups } : {};
@@ -1090,7 +1203,11 @@ export function rankMetricGroup(
         b.values.length - a.values.length,
     )
     .map((p) => p.label);
-  return ranked(fit, labels);
+  // The bucket bound never leads, but stays a choice for the builder functions that read it.
+  return ranked(
+    fit,
+    profile.map((p) => p.label),
+  );
 }
 
 type GroupedAlertRow = {
@@ -1261,6 +1378,8 @@ export interface IntentDescription {
   /** The metric, the measured field, or the stream when nothing narrower is picked. */
   subject: string;
   agg?: string;
+  /** How a metric function reads besides "{agg} of {subject}": a histogram's average, or a per-second rate. */
+  reads?: "histogramAvg" | "rate" | "ofRate";
   groups: string[];
   factor?: number;
 }
@@ -1268,7 +1387,7 @@ export interface IntentDescription {
 export function describeIntent(
   intent: IntentId,
   slots: IntentSlots,
-  ctx: { stream: string; metrics: boolean },
+  ctx: { stream: string; metrics: boolean; kind?: StreamKind; histogram?: HistogramSiblings },
 ): IntentDescription {
   const shown = (slots.values ?? [])
     .filter((v) => v !== "")
@@ -1276,15 +1395,39 @@ export function describeIntent(
   const values = shown.filter(
     (v, i) => shown.findIndex((w) => w.toLowerCase() === v.toLowerCase()) === i,
   );
+  const kind = ctx.kind ?? slots.kind ?? (ctx.metrics ? "gauge" : "events");
+  const measured = intent === "percentile" || intent === "metricAbove";
+  const agg = measured ? slots.agg || defaultAgg(intent, kind) : slots.agg;
   const measure = intent === "percentile" && !ctx.metrics ? slots.measure : undefined;
+  const own = metricReading(intent, agg ?? "", kind, ctx.histogram ?? slots.histogram);
   return {
     intent,
     values,
-    subject: measure || ctx.stream,
-    agg: intent === "percentile" ? slots.agg || defaultAgg(intent) : slots.agg,
+    subject: own?.subject ?? (measure || ctx.stream),
+    agg,
+    reads: own?.reads,
     groups: (slots.groups ?? []).filter(Boolean),
     factor: intent === "compareLastWeek" ? (slots.factor ?? DEFAULT_FACTOR) : undefined,
   };
+}
+
+/** What a metric function reads when it is not main's builder over the metric's own values. */
+function metricReading(
+  intent: IntentId,
+  agg: string,
+  kind: StreamKind,
+  histogram: HistogramSiblings = {},
+): { reads: IntentDescription["reads"]; subject?: string } | undefined {
+  if (intent === "percentile" && kind === "bucket") {
+    if (agg === "avg" && histogram.sum && histogram.count)
+      return { reads: "histogramAvg", subject: histogram.sum.replace(/_sum$/, "") };
+    if (agg === "count" && histogram.count) return { reads: "rate", subject: histogram.count };
+  }
+  if (intent !== "metricAbove" || kind !== "counter") return undefined;
+  if (agg === RATE_FN) return { reads: "rate" };
+  return QUANTILE_OF[agg] !== undefined || ["avg", "min", "max", "sum"].includes(agg)
+    ? { reads: "ofRate" }
+    : undefined;
 }
 
 const NAME_NOUN: Record<string, string> = { logs: "log", traces: "span", metrics: "sample" };
@@ -1309,13 +1452,21 @@ export function intentAlertName(d: IntentDescription, streamType: string): strin
   const values = d.values.slice(0, MAX_NAMED_VALUES).map(slugWords).join("_or_");
   const per = d.groups.length ? `per_${d.groups.map(groupWord).join("_and_")}` : "";
   const subject = slugWords(d.subject);
+  const measured =
+    d.reads === "rate"
+      ? ["per_second"]
+      : d.reads === "ofRate"
+        ? [d.agg ?? "", "per_second"]
+        : d.agg === "total_events"
+          ? [noun, "count"]
+          : [d.agg ?? ""];
   const parts: Record<IntentId, string[]> = {
     countWhere: [values, noun, "count"],
-    percentile: [subject, d.agg ?? ""],
+    percentile: [subject, ...measured],
     anyEvent: values ? [values, noun] : [subject, "each", noun],
     unusualVolume: [values || subject, noun, "volume_unusual"],
     compareLastWeek: [values || subject, noun, `${d.factor ?? DEFAULT_FACTOR}x_last_week`],
-    metricAbove: [subject, d.agg ?? ""],
+    metricAbove: [subject, ...measured],
     ratio: [subject.split("_")[0], values, "error_rate"],
     unusualChange: [subject, "unusual_change"],
     promql: [subject, "promql"],

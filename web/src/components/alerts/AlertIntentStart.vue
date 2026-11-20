@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :model-value="shownAgg"
               :options="aggOptions"
               size="sm"
-              :searchable="false"
+              searchable
               :class="SLOT_FIELD"
               :aria-label="t('alerts.queryConfig.aggregationFunction')"
               :dropdown-style="SLOT_MENU"
@@ -491,8 +491,10 @@ import {
   dataNoun,
   durationWords,
   formatNumber,
+  functionWord,
   joinListMore,
   joinListOrMore,
+  suggestedTag,
 } from "@/utils/alerts/alertCopy";
 import {
   ANOMALY_BUCKET_MINUTES,
@@ -507,6 +509,8 @@ import {
   buildMetricFill,
   cardsFolded,
   defaultAgg,
+  demote,
+  describeIntent,
   errorRateValues,
   fieldsBySamplePresence,
   intentsFor,
@@ -534,13 +538,14 @@ import {
   thresholdPaths,
   withCaseVariants,
   hasCaseVariants,
-  without,
+  histogramSiblings,
   type IntentFill,
   type IntentId,
   type IntentSlots,
   type MetricFamilyMember,
   type MetricStreamInfo,
   type Ranked,
+  type StreamKind,
 } from "@/utils/alerts/alertIntents";
 import { entryFromSuggestion } from "@/utils/alerts/prefill/fromLibrary";
 import { getUUID } from "@/utils/zincutils";
@@ -652,6 +657,12 @@ const byPresence = (names: string[]) => {
 };
 const stringFields = computed(() => byPresence(slotFields(schemaFields.value, "string")));
 const numberFields = computed(() => byPresence(slotFields(schemaFields.value, "number")));
+// Step 2 filters, groups and counts on any field; text fields lead because the rankings read them.
+const anyFields = computed(() => [
+  ...stringFields.value,
+  ...numberFields.value,
+  ...byPresence(slotFields(schemaFields.value, "boolean")),
+]);
 const askedStrings = computed(() =>
   stringFields.value.filter((f) => carried.value.includes(f)).slice(0, SHAPE_STRING_CAP),
 );
@@ -670,23 +681,26 @@ const shapes = computed(() =>
 const categoriesFor = (id: IntentId | null): Ranked =>
   id === "unusualVolume"
     ? groupCandidates.value
-    : without(
+    : demote(
         isMetrics.value
           ? rankMetricCategory(profile.value, {
               groups: slots.groups,
               series: series.value[props.streamName],
               outcome: id === "ratio",
             })
-          : rankCategory(stringFields.value, shapes.value, id === "anyEvent" ? "variety" : "split"),
+          : rankCategory(anyFields.value, shapes.value, id === "anyEvent" ? "variety" : "split"),
         ...(slots.groups ?? []),
       );
 const categoryCandidates = computed(() => categoriesFor(props.active));
 const groupCandidates = computed<Ranked>(() =>
   isMetrics.value
     ? rankMetricGroup(profile.value, { metric: props.streamName, orgUse: orgUse.value })
-    : without(rankGroup(stringFields.value, shapes.value, orgUse.value), slots.field),
+    : demote(rankGroup(anyFields.value, shapes.value, orgUse.value), slots.field),
 );
-const measureCandidates = computed(() => rankMeasure(numberFields.value, shapes.value));
+// A count reads any field, as step 2's column picker allows; every other function a number.
+const measureCandidates = computed(() =>
+  rankMeasure(slots.agg === "count" ? anyFields.value : numberFields.value, shapes.value),
+);
 // Defaults come only from a ranking over the data, so a chip waits for its searches to answer.
 const rankingSettled = computed(() => {
   if (orgAlerts.isPending.value && orgAlerts.fetchStatus.value !== "idle") return false;
@@ -942,7 +956,10 @@ const valuesText = computed<I18nText>(() =>
     : t("alerts.intent.slots.valuePlaceholder"),
 );
 
-const offersGroup = computed(() => !!props.active && wantsGroup(props.active));
+// Main's "total events" has no group-by, so its sentence has no Per row either.
+const offersGroup = computed(
+  () => !!props.active && wantsGroup(props.active) && shownAgg.value !== "total_events",
+);
 const scoped = computed(() => props.active === "unusualVolume" && slots.field !== undefined);
 const wantsValueSlot = computed(() => !!props.active && (wantsValue(props.active) || scoped.value));
 // Only a type the metric declares turns "above a value" into a rate; an unknown one keeps the average.
@@ -963,11 +980,40 @@ const WATCH: Record<IntentId, I18nKey> = {
   unusualChange: "alerts.intent.rows.unusualChange",
   promql: "alerts.intent.promql.label",
 };
-const watchKey = computed<I18nKey>(() =>
-  props.active === "metricAbove" && isCounter.value
-    ? "alerts.intent.rows.perSecond"
-    : WATCH[props.active ?? "countWhere"],
+const streamKind = computed<StreamKind>(() =>
+  !isMetrics.value ? "events" : isBucket.value ? "bucket" : isCounter.value ? "counter" : "gauge",
 );
+const histogram = computed(() =>
+  isBucket.value
+    ? histogramSiblings(
+        props.streamName,
+        props.metricStreams.map((s) => s.name),
+      )
+    : {},
+);
+// The save line and the suggested name describe the query from the picks, so they carry how the stream reads.
+watch(
+  () =>
+    [props.streamType, props.streamName, streamKind.value, JSON.stringify(histogram.value)].join(
+      "\n",
+    ),
+  () => {
+    slots.kind = streamKind.value;
+    slots.histogram = histogram.value;
+  },
+  { immediate: true },
+);
+
+// A counter's window functions read its rate; "total events" counts what matches, so no field.
+const watchKey = computed<I18nKey>(() => {
+  const active = props.active ?? "countWhere";
+  if (active !== "percentile" && active !== "metricAbove") return WATCH[active];
+  if (describeIntent(active, slots, describeCtx.value).reads === "ofRate")
+    return "alerts.intent.rows.aggOfRate";
+  return isMetrics.value || shownAgg.value === "total_events"
+    ? "alerts.intent.rows.aggOf"
+    : WATCH[active];
+});
 const WINDOWED = new Set<IntentId>([
   "countWhere",
   "percentile",
@@ -985,9 +1031,11 @@ const SHORT: Partial<Record<IntentId, I18nKey>> = {
 };
 const fullLabel = (id: IntentId) =>
   id === "percentile" && isMetrics.value
-    ? t("alerts.intent.percentile.labelMetric")
+    ? t(isBucket.value ? "alerts.intent.percentile.labelMetric" : "alerts.intent.percentile.short")
     : t(`alerts.intent.${id}.label` as I18nKey, { noun: noun.value });
-const shortKey = (id: IntentId) => (id === "percentile" && isMetrics.value ? undefined : SHORT[id]);
+// A histogram's chip names its buckets in the tooltip; any other metric's percentile needs no more words.
+const shortKey = (id: IntentId) =>
+  id === "percentile" && isMetrics.value && !isBucket.value ? undefined : SHORT[id];
 const intentLabel = (id: IntentId) => {
   const short = shortKey(id);
   return short ? t(short, { noun: noun.value }) : fullLabel(id);
@@ -1004,6 +1052,7 @@ const fillFor = (id: IntentId): IntentFill =>
           metric: props.streamName,
           family: family.value,
           counter: id === "ratio" ? isCounterLike(pickedMetric.value) : isCounter.value,
+          bucket: isBucket.value,
         },
         { periodMinutes: props.periodMinutes },
       )
@@ -1018,7 +1067,7 @@ const missingSlotFor = (id: IntentId): "value" | "measure" | null =>
   (wantsValue(id) && (!valueSource.value || !slots.values?.length)) ||
   (id === "unusualVolume" && !!slots.field && !slots.values?.length)
     ? "value"
-    : id === "percentile" && !isMetrics.value && !slots.measure
+    : id === "percentile" && !isMetrics.value && !slots.measure && slots.agg !== "total_events"
       ? "measure"
       : null;
 const missingFor = (id: IntentId) => missingSlotFor(id) !== null;
@@ -1061,18 +1110,36 @@ const unitWord = computed(() =>
     ? dataNoun(props.streamType, "custom", Number(thresholdValue.value) === 1 ? 1 : 2, t)
     : (guide?.value?.unit.value ?? ""),
 );
-const shownAgg = computed(() => slots.agg ?? (props.active ? defaultAgg(props.active) : "avg"));
-const aggOptions = computed<SelectOption[]>(() =>
-  [
-    ...new Set<string>([
-      ...(props.active ? aggsFor(props.active, isMetrics.value) : []),
-      shownAgg.value,
-    ]),
-  ].map((fn) => ({
-    label: t(`alerts.queryConfig.functions.${fn}` as I18nKey),
-    value: fn,
-  })),
+const shownAgg = computed(
+  () => slots.agg ?? (props.active ? defaultAgg(props.active, streamKind.value) : "avg"),
 );
+const describeCtx = computed(() => ({
+  stream: props.streamName,
+  metrics: isMetrics.value,
+  kind: streamKind.value,
+  histogram: histogram.value,
+}));
+// Why the default function is the one to start from; a bucket's raw "above a value" has no such reason.
+const suggestedWhy = computed<I18nText | null>(() => {
+  if (props.active === "percentile")
+    return t(
+      isBucket.value ? "alerts.intent.suggestedWhy.histogram" : "alerts.intent.suggestedWhy.spread",
+    );
+  if (props.active !== "metricAbove" || isBucket.value) return null;
+  return t(
+    isCounter.value ? "alerts.intent.suggestedWhy.counter" : "alerts.intent.suggestedWhy.average",
+  );
+});
+const aggOptions = computed<SelectOption[]>(() => {
+  const active = props.active;
+  if (!active) return [];
+  const suggested = defaultAgg(active, streamKind.value);
+  return [...new Set<string>([...aggsFor(active, streamKind.value), shownAgg.value])].map((fn) => ({
+    label: functionWord(fn, props.streamType, t),
+    value: fn,
+    ...(fn === suggested && suggestedWhy.value ? suggestedTag(suggestedWhy.value, t) : {}),
+  }));
+});
 const typeThreshold = (path: string, value: unknown) => {
   guide?.value?.change(path, value);
   emit("threshold");
@@ -1090,6 +1157,7 @@ const apply = (id: IntentId) => {
 /** Fills empty slots with the first candidate that passes the slot's rule; grouping stays the user's pick. */
 const seedSlots = (id: IntentId) => {
   if (!wantsGroup(id)) slots.groups = undefined;
+  if (slots.agg && !aggsFor(id, streamKind.value).includes(slots.agg)) slots.agg = undefined;
   if (id === "percentile" && !isMetrics.value) slots.measure ??= measureCandidates.value.fit[0];
   if (id === "compareLastWeek") slots.factor ??= DEFAULT_FACTOR;
   if (!wantsValue(id)) return;
@@ -1311,7 +1379,9 @@ const addSpellings = () => {
 const setWindow = async (minutes: number | "") => {
   emit("update:period", minutes);
   const readsWindow =
-    props.active === "ratio" || (props.active === "metricAbove" && isCounter.value);
+    !!props.active &&
+    props.active !== "promql" &&
+    fillFor(props.active).values["query_condition.type"] === "promql";
   if (!readsWindow || !(Number(minutes) > 0)) return;
   await nextTick();
   reapply();

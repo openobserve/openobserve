@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
-import { joinList, measureWords } from "./alertCopy";
+import { functionWord, joinList, measureWords } from "./alertCopy";
 import { promqlQuantileAgg } from "./alertIntents";
 import { promqlByLabels } from "./queryGroupLabels";
 
@@ -56,7 +56,21 @@ export function previewCaption(input: PreviewCaptionInput, t: TranslateFn): I18n
 const PROMQL_QUANTILE =
   /^histogram_quantile\(\s*[\d.]+\s*,\s*sum by \([^)]*\)\s*\(rate\((\w+)\[\w+\]\)\)\s*\)$/;
 const PROMQL_SHARE = /^sum(?: by \([^)]*\))? \((?:rate\()?(\w+)\{.*\) \/ sum\b.*\* 100$/;
-const PROMQL_RATE = /^(?:sum by \([^)]*\)\s*\()?rate\((\w+)\[\w+\]\)\)?$/;
+const PROMQL_RATE = /^(?:sum(?: by \([^)]*\))?\s*\()?rate\((\w+)\[\w+\]\)\)?$/;
+const PROMQL_HISTOGRAM_AVG =
+  /^sum(?: by \([^)]*\))?\s*\(rate\((\w+)_sum\[\w+\]\)\) \/ sum(?: by \([^)]*\))?\s*\(rate\(\1_count\[\w+\]\)\)$/;
+const PROMQL_OF_RATE =
+  /^(avg|min|max|sum|quantile)_over_time\((?:([\d.]+),\s*)?(?:sum(?: by \([^)]*\))?\s*\()?rate\((\w+)\[\w+\]\)\)?\[\w+:\w*\]\)$/;
+
+/** A function of a counter's rate in words: "max of m per second", "p90 of m per second". */
+function ofRateWords(match: RegExpExecArray, t: TranslateFn): I18nText {
+  const [query, fn, , metric] = match;
+  const read = fn === "quantile" ? promqlQuantileAgg(query) : fn;
+  return t("alerts.verdict.ofRate", {
+    fn: functionWord(read ?? fn, "metrics", t),
+    metric: raw(metric),
+  });
+}
 
 /** The starters' PromQL shapes in words; any other query is shown as written. */
 function promqlCaption(query: string, t: TranslateFn): I18nText {
@@ -65,13 +79,19 @@ function promqlCaption(query: string, t: TranslateFn): I18nText {
   const quantile = bucket ? promqlQuantileAgg(q) : undefined;
   const share = PROMQL_SHARE.exec(q)?.[1];
   const rate = PROMQL_RATE.exec(q)?.[1];
+  const average = PROMQL_HISTOGRAM_AVG.exec(q)?.[1];
+  const ofRate = PROMQL_OF_RATE.exec(q);
   const what = quantile
     ? measureWords({ function: quantile, having: { column: bucket } }, [], "metrics", t)
     : share
       ? t("alerts.form.preview.shareOf", { metric: raw(share) })
       : rate
         ? t("alerts.intent.rows.perSecond", { metric: raw(rate) })
-        : null;
+        : average
+          ? t("alerts.verdict.histogramAvg", { metric: raw(average) })
+          : ofRate
+            ? ofRateWords(ofRate, t)
+            : null;
   if (!what) return t("alerts.form.preview.plots", { what: raw(query) });
   const groups = promqlByLabels(q);
   return groups.length

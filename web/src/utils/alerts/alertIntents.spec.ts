@@ -44,7 +44,6 @@ import {
   rankMetricGroup,
   orgGroupUse,
   pickedValues,
-  promqlQuantileAgg,
   spellingVariants,
   starterAlternative,
   ratioPromql,
@@ -67,9 +66,9 @@ describe("alertIntents", () => {
   it.each([
     ["logs", true, ["countWhere", "percentile", "anyEvent", "unusualVolume", "compareLastWeek"]],
     ["traces", false, ["countWhere", "percentile", "anyEvent", "compareLastWeek"]],
-    ["metrics", true, ["metricAbove", "ratio", "unusualChange", "promql"]],
-    ["metrics", false, ["metricAbove", "ratio", "promql"]],
-    ["metrics", true, ["percentile", "unusualChange", "promql"], true],
+    ["metrics", true, ["metricAbove", "percentile", "ratio", "unusualChange", "promql"]],
+    ["metrics", false, ["metricAbove", "percentile", "ratio", "promql"]],
+    ["metrics", true, ["percentile", "metricAbove", "ratio", "unusualChange", "promql"], true],
   ] as const)(
     "offers %s intents (anomaly %s): %j, histogram buckets %s",
     (type, anomaly, ids, bucket) => {
@@ -563,7 +562,11 @@ describe("alertIntents", () => {
   ] as const)(
     "$intent on a counter $counter per $groups reads $promql",
     ({ intent, counter, groups, promql }) => {
-      const fill = buildMetricFill(intent, { metric: "m", counter, groups }, { periodMinutes: 10 });
+      const fill = buildMetricFill(
+        intent,
+        { metric: "m", counter, groups, bucket: intent === "percentile" },
+        { periodMinutes: 10 },
+      );
       expect(fill.values).toMatchObject({
         "query_condition.type": "promql",
         "query_condition.promql": promql,
@@ -622,25 +625,98 @@ describe("alertIntents", () => {
     expect(builderSql(fill.values)).toContain(` ${expression} as zo_sql_val`);
   });
 
-  it.each([
-    ["median", "0.5"],
-    ["p50", "0.5"],
-    ["p75", "0.75"],
-    ["p90", "0.9"],
-    ["p95", "0.95"],
-    ["p99", "0.99"],
-  ])("a histogram's %s reads histogram_quantile(%s, …) and reads back as itself", (agg, q) => {
-    const promql = mt("percentile", { agg }).values["query_condition.promql"];
-    expect(promql).toBe(`histogram_quantile(${q}, sum by (le) (rate(m[10m])))`);
-    expect(promqlQuantileAgg(promql, agg)).toBe(agg);
-  });
-
-  it("offers every function step 2 offers for a measured value, and only percentiles for a histogram", () => {
-    const all = VALUE_FUNCTIONS.map(([fn]) => fn);
-    expect(aggsFor("percentile", false)).toEqual(all);
-    expect(aggsFor("metricAbove", true)).toEqual(all);
-    expect(aggsFor("percentile", true)).toEqual(["median", "p50", "p75", "p90", "p95", "p99"]);
-  });
+  // Every kind offers main's whole list; {q} is the function's quantile, null where main's builder reads it.
+  const W = "[10m:1m]";
+  const QUANTILES = [
+    ["median", 0.5],
+    ["p50", 0.5],
+    ["p75", 0.75],
+    ["p90", 0.9],
+    ["p95", 0.95],
+    ["p99", 0.99],
+  ] as const;
+  const histogramQuantiles = Object.fromEntries(
+    QUANTILES.map(([fn, q]) => [fn, `histogram_quantile(${q}, sum by (le) (rate(m_bucket[10m])))`]),
+  );
+  const ROWS: Record<string, Record<string, string | null>> = {
+    counter: {
+      rate: "rate(m[10m])",
+      ...Object.fromEntries(
+        ["avg", "min", "max", "sum"].map((fn) => [fn, `${fn}_over_time(rate(m[5m])${W})`]),
+      ),
+      ...Object.fromEntries(
+        QUANTILES.map(([fn, q]) => [fn, `quantile_over_time(${q}, rate(m[5m])${W})`]),
+      ),
+    },
+    bucket: {
+      ...histogramQuantiles,
+      avg: "sum(rate(m_sum[10m])) / sum(rate(m_count[10m]))",
+      count: "sum(rate(m_count[10m]))",
+    },
+    "bucket without _sum/_count": histogramQuantiles,
+  };
+  const kindFill = (kind: string, agg: string) =>
+    kind === "logs"
+      ? ev("percentile", { measure: "took", agg })
+      : kind === "gauge"
+        ? mt("metricAbove", { agg })
+        : kind === "counter"
+          ? mt("metricAbove", { agg, counter: true })
+          : kind === "bucket above a value"
+            ? buildMetricFill(
+                "metricAbove",
+                { metric: "m_bucket", agg, counter: true, bucket: true },
+                { periodMinutes: 10 },
+              )
+            : buildMetricFill(
+                "percentile",
+                {
+                  metric: "m_bucket",
+                  agg,
+                  bucket: true,
+                  histogram: kind === "bucket" ? { sum: "m_sum", count: "m_count" } : {},
+                },
+                { periodMinutes: 10 },
+              );
+  const MAIN_SQL = Object.fromEntries(VALUE_FUNCTIONS);
+  it.each(
+    [
+      "logs",
+      "gauge",
+      "counter",
+      "bucket",
+      "bucket without _sum/_count",
+      "bucket above a value",
+    ].flatMap((kind) => {
+      const intent =
+        kind === "gauge" || kind.includes("above") || kind === "counter"
+          ? "metricAbove"
+          : "percentile";
+      const own = ROWS[kind] ?? {};
+      const fns = aggsFor(
+        intent,
+        kind === "counter" ? "counter" : kind === "logs" ? "events" : "gauge",
+      );
+      return fns.map((fn) => [kind, fn, own[fn] ?? null] as const);
+    }),
+  )(
+    "%s offers %s, which reads %s (null: main's builder) and reads back as itself",
+    (kind, agg, promql) => {
+      const fill = kindFill(kind, agg);
+      const read = (path: string) => (fill.values as Record<string, unknown>)[path];
+      // A builder function on a metric clears the PromQL an earlier pick wrote, so Save runs one query.
+      if (kind !== "logs") expect(read("query_condition.promql")).toBe(promql ?? "");
+      if (promql) expect(read("query_condition.type")).toBe("promql");
+      else if (agg === "total_events") expect(read("query_condition.aggregation")).toBeNull();
+      else {
+        const column = kind === "logs" ? "took" : "value";
+        expect(builderSql(fill.values)).toContain(
+          ` ${MAIN_SQL[agg].replace("{c}", column)} as zo_sql_val`,
+        );
+      }
+      expect(slotsFromForm(fill.intent, read, { agg }).agg).toBe(agg);
+    },
+  );
 
   const HAVING = [
     "query_condition.aggregation.having.operator",
@@ -662,7 +738,8 @@ describe("alertIntents", () => {
     ["gauge above a value", mt("metricAbove", { counter: false }), HAVING],
     ["counter above a value", mt("metricAbove", { counter: true }), PROMQL],
     ["error-rate share", mt("ratio", { label: "code", values: ["5"] }), PROMQL],
-    ["histogram percentile", mt("percentile", {}), PROMQL],
+    ["histogram percentile", mt("percentile", { bucket: true }), PROMQL],
+    ["histogram total events", mt("percentile", { bucket: true, agg: "total_events" }), COUNT],
     ["as it happens", ev("anyEvent", {}), null],
     ["compare with last week", ev("compareLastWeek", {}), null],
     ["unusual volume", ev("unusualVolume", {}), null],
@@ -692,7 +769,11 @@ describe("alertIntents", () => {
   it.each([
     ["a builder's group-by", mt("metricAbove", { groups: ["host", "dc"] }), ["host", "dc"]],
     ["a count per group", ev("countWhere", { groups: ["svc", "pod"] }), ["svc", "pod"]],
-    ["a histogram's by (…) without le", mt("percentile", { groups: ["a", "b"] }), ["a", "b"]],
+    [
+      "a histogram's by (…) without le",
+      mt("percentile", { groups: ["a", "b"], bucket: true }),
+      ["a", "b"],
+    ],
     ["a share's by (…)", mt("ratio", { label: "c", values: ["5"], groups: ["x"] }), ["x"]],
     ["an ungrouped builder", mt("metricAbove", {}), []],
   ])("step 1 reads its Per back from %s", (_, fill, groups) => {
@@ -706,7 +787,7 @@ describe("alertIntents", () => {
       { __name__: "m", host: "a", cpu: "1", job: "x", le: "1" },
       { __name__: "m", host: "b", cpu: "2", le: "+Inf" },
     ]);
-    expect(rankMetricGroup(profile).all).toEqual(["cpu", "host", "job"]);
+    expect(rankMetricGroup(profile).all).toEqual(["cpu", "host", "job", "le"]);
   });
 
   it("groups a metric by the label naming its entity, then by what the org's alerts group by", () => {
@@ -834,6 +915,21 @@ describe("intentAlertName", () => {
       "node_cpu",
       "metrics",
       "node_cpu_max_per_host",
+    ],
+    ["metricAbove", { kind: "counter" }, "reqs_total", "metrics", "reqs_total_per_second"],
+    [
+      "metricAbove",
+      { kind: "counter", agg: "max" },
+      "reqs_total",
+      "metrics",
+      "reqs_total_max_per_second",
+    ],
+    [
+      "percentile",
+      { kind: "bucket", agg: "avg", histogram: { sum: "d_sum", count: "d_count" } },
+      "d_bucket",
+      "metrics",
+      "d_avg",
     ],
   ])("%s names what it watches", (intent, slots, stream, streamType, name) => {
     const d = describeIntent(intent as IntentId, slots, {

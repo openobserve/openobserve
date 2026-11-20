@@ -16,7 +16,7 @@
 import { getIntlLocale } from "@/locales";
 import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
 import { promqlByLabels, sqlGroupByLabels } from "./queryGroupLabels";
-import type { IntentDescription, IntentId } from "./alertIntents";
+import { RATE_FN, type IntentDescription, type IntentId } from "./alertIntents";
 
 const NOUN_BY_STREAM: Record<string, I18nKey> = {
   logs: "alerts.verdict.events",
@@ -186,19 +186,43 @@ const PHRASE_KEYS: Record<IntentId, [I18nKey, I18nKey]> = {
  * per service_name". */
 export function intentPhrase(d: IntentDescription, streamType: string, t: TranslateFn): I18nText {
   const [some, all] = PHRASE_KEYS[d.intent];
-  const what = t(d.values.length ? some : all, {
-    values: joinListOrMore(d.values, t),
-    noun: dataNoun(streamType, "custom", d.intent === "anyEvent" ? 1 : 2, t),
-    subject: raw(d.subject),
-    agg: d.agg
-      ? t(`alerts.queryConfig.functions.${d.agg}` as I18nKey)
-      : t("alerts.intent.phrase.value"),
-    factor: formatNumber(d.factor),
-  });
+  const metric = raw(d.subject);
+  const fn = d.agg ? functionWord(d.agg, streamType, t) : t("alerts.intent.phrase.value");
+  const what =
+    d.reads === "histogramAvg"
+      ? t("alerts.verdict.histogramAvg", { metric })
+      : d.reads === "rate"
+        ? t("alerts.intent.rows.perSecond", { metric })
+        : d.reads === "ofRate"
+          ? t("alerts.verdict.ofRate", { fn, metric })
+          : t(d.values.length ? some : all, {
+              values: joinListOrMore(d.values, t),
+              noun: dataNoun(streamType, "custom", d.intent === "anyEvent" ? 1 : 2, t),
+              subject: metric,
+              agg: fn,
+              factor: formatNumber(d.factor),
+            });
   return d.groups.length
     ? t("alerts.intent.phrase.per", { what, groups: joinListMore(d.groups, t) })
     : what;
 }
+
+/** A Watch function as its picker names it: step 2's label, "total events" by stream, a counter's rate. */
+export function functionWord(fn: string, streamType: string, t: TranslateFn): I18nText {
+  if (fn === RATE_FN) return t("alerts.intent.functionRate");
+  if (fn === "total_events")
+    return t("alerts.queryConfig.functions.totalEvents", {
+      noun: dataNoun(streamType, "custom", 2, t),
+    });
+  return t(`alerts.queryConfig.functions.${fn}` as I18nKey);
+}
+
+/** The neutral tag a suggested option carries in its list, its reason in the tag's tooltip. */
+export const suggestedTag = (reason: I18nText, t: TranslateFn) => ({
+  badge: String(t("alerts.intent.suggested")),
+  badgeTitle: String(reason),
+  badgeMuted: true,
+});
 
 /** A duration in sentences: "10 minutes", "2 hours". */
 export const durationWords = (minutes: number, t: TranslateFn): I18nText =>

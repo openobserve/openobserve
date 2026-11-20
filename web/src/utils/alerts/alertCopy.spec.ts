@@ -73,6 +73,23 @@ describe("intentPhrase", () => {
       "Each OOMKilled or Killing event",
     ],
     ["unusualVolume", {}, "app", "logs", "Unusual volume of events"],
+    [
+      "percentile",
+      { kind: "bucket", agg: "avg", histogram: { sum: "d_sum", count: "d_count" } },
+      "d_bucket",
+      "metrics",
+      "average of d",
+    ],
+    [
+      "percentile",
+      { kind: "bucket", agg: "count", histogram: { count: "d_count" } },
+      "d_bucket",
+      "metrics",
+      "d_count per second",
+    ],
+    ["metricAbove", { kind: "counter" }, "reqs", "metrics", "reqs per second"],
+    ["metricAbove", { kind: "counter", agg: "p90" }, "reqs", "metrics", "p90 of reqs per second"],
+    ["percentile", { agg: "total_events" }, "app", "logs", "total events of app"],
   ])("%s says what it watches", (intent, slots, stream, streamType, phrase) => {
     const d = describeIntent(intent as IntentId, slots, {
       stream,
