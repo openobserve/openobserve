@@ -91,6 +91,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t("metrics.runQuery") }}
               </OButton>
+              <OSelect
+                :model-value="userLabelOrder"
+                :options="userLabelOrderOptions"
+                :searchable="false"
+                :label="t('rum.userLabelOrder')"
+                label-position="inside"
+                size="sm"
+                width="md"
+                data-test="rum-app-sessions-user-label-order"
+                @update:model-value="setUserLabelOrder"
+              />
               <OTableColumnToggle
                 :columns="tableColumns"
                 :column-visibility="columnVisibility"
@@ -363,8 +374,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex min-w-0 items-center gap-2">
                     <div class="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
                       <OUserCell
-                        :value="row.user_email || unknownUserLabel"
+                        :value="row.userLabel"
                         class="truncate font-medium"
+                        data-test="rum-app-sessions-user-label"
                       />
                       <div class="text-text-secondary flex items-center gap-1.5 text-xs">
                         <span
@@ -541,6 +553,13 @@ import useSessionHeatmap from "@/composables/rum/useSessionHeatmap";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { useRumSessionUserLabelOrder } from "@/composables/rum/useRumSessionUserLabelOrder";
+import {
+  RUM_SESSION_USER_LABEL_ORDERS,
+  resolveRumSessionUserLabel,
+  rumSessionUserIdentitySelect,
+} from "@/utils/rum/sessionUserIdentity";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -602,6 +621,22 @@ const { sessionState } = useSession();
 const store = useStore();
 const isLoading = ref<boolean[]>([]);
 const { t } = useI18nTyped();
+const userLabelOrder = useRumSessionUserLabelOrder();
+const userLabelOrderOptions = computed(() => {
+  const fieldLabels: Record<string, I18nText> = {
+    name: t("common.name"),
+    email: t("user.email"),
+    id: t("user.id"),
+  };
+  return RUM_SESSION_USER_LABEL_ORDERS.map((value) => {
+    const [first, second, third] = value.split("-").map((field) => fieldLabels[field]);
+    return { value, label: t("rum.userLabelOrderOption", { first, second, third }) };
+  });
+});
+const setUserLabelOrder = (value: unknown) => {
+  const order = RUM_SESSION_USER_LABEL_ORDERS.find((order) => order === value);
+  if (order) userLabelOrder.value = order;
+};
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
@@ -725,6 +760,8 @@ const userDataSet = new Set([
   "source",
   "api",
   "usr_email",
+  "usr_name",
+  "usr_id",
   "session_id",
   "view_id",
   "view_url",
@@ -732,12 +769,6 @@ const userDataSet = new Set([
 ]);
 
 const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("rum-sessions-list");
-
-// Resolved once, then used for BOTH the rendered cell and the `session`
-// accessorFn. The accessor value is the table's global-filter search corpus
-// (OTable has no custom globalFilterFn), so display and corpus have to stay
-// the same string or users would search for what they see and match nothing.
-const unknownUserLabel = t("rum.unknown");
 
 const tableColumns = [
   {
@@ -751,7 +782,7 @@ const tableColumns = [
   {
     id: "session",
     header: t("rum.userSession"),
-    accessorFn: (row: any) => row["user_email"] || unknownUserLabel,
+    accessorFn: (row: { userLabel: string }) => row.userLabel,
     sortable: true,
     hideable: true,
     meta: { align: "left", autoWidth: true },
@@ -896,6 +927,8 @@ const getStreamFields = () => {
         const priorityFields = [
           "application_id",
           "usr_email",
+          "usr_name",
+          "usr_id",
           "env",
           "view_url",
           "resource_url",
@@ -904,6 +937,7 @@ const getStreamFields = () => {
         const priorityFieldsMap = new Map(priorityFields.map((field, index) => [field, index]));
 
         streamFields.value = [];
+        schemaMapping.value = {};
 
         stream.schema.forEach((field: any) => {
           if (fieldsToVerify.has(field.name)) schemaMapping.value[field.name] = field;
@@ -981,6 +1015,7 @@ const getSessions = () => {
   const loadController = new AbortController();
   inFlightLoad = loadController;
   const signal = loadController.signal;
+  const org = store.state.selectedOrganization.identifier;
 
   sessionState.data.sessions = {};
   sqlErrorRanges.value = [];
@@ -1021,9 +1056,7 @@ const getSessions = () => {
   if (schemaMapping.value["geo_info_country_iso_code"]) {
     geoFields += "min(geo_info_country_iso_code) as country_iso_code,";
   }
-  if (schemaMapping.value["usr_email"]) {
-    geoFields += "max(usr_email) as user_email,";
-  }
+  const identityFields = rumSessionUserIdentitySelect(schemaMapping.value).join(", ");
 
   // Build frustration count field with null check
   let frustrationCountField = "0 AS frustration_count";
@@ -1060,6 +1093,7 @@ const getSessions = () => {
       ${frustrationCountField},
       SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events,
       ${geoFields}
+      ${identityFields},
       ${hasReplayField},
       session_id
     FROM "_rumdata"
@@ -1075,7 +1109,7 @@ const getSessions = () => {
   const pageQuerySettled = searchService
     .search(
       {
-        org_identifier: store.state.selectedOrganization.identifier,
+        org_identifier: org,
         query: req,
         page_type: "logs",
         signal,
@@ -1109,7 +1143,10 @@ const getSessions = () => {
           error_count: hit.error_count,
           frustration_count: hit.frustration_count || 0,
           events: hit.events || 0,
+          identity_org: org,
           user_email: hit.user_email,
+          user_name: hit.user_name,
+          user_id: hit.user_id,
           country: hit.country,
           city: hit.city,
           country_iso_code: hit.country_iso_code?.toLowerCase(),
@@ -1657,19 +1694,24 @@ const openInsightInErrorTracking = (insight: SessionInsight) => {
 };
 
 const tableRows = computed(() =>
-  enrichedRows.value.filter((row: any) => {
-    if (healthSegment.value === "errors" && !((row.error_count || 0) > 0)) return false;
-    if (healthSegment.value === "frustrated" && !((row.frustration_count || 0) > 0)) return false;
-    if (
-      healthSegment.value === "clean" &&
-      ((row.error_count || 0) > 0 || (row.frustration_count || 0) > 0)
-    )
-      return false;
-    if (typeSegment.value === "bounced" && !row.is_bounce) return false;
-    if (typeSegment.value === "engaged" && row.is_bounce) return false;
-    if (deviceSegment.value !== "all" && row.device_type !== deviceSegment.value) return false;
-    return true;
-  }),
+  enrichedRows.value
+    .filter((row: any) => {
+      if (healthSegment.value === "errors" && !((row.error_count || 0) > 0)) return false;
+      if (healthSegment.value === "frustrated" && !((row.frustration_count || 0) > 0)) return false;
+      if (
+        healthSegment.value === "clean" &&
+        ((row.error_count || 0) > 0 || (row.frustration_count || 0) > 0)
+      )
+        return false;
+      if (typeSegment.value === "bounced" && !row.is_bounce) return false;
+      if (typeSegment.value === "engaged" && row.is_bounce) return false;
+      if (deviceSegment.value !== "all" && row.device_type !== deviceSegment.value) return false;
+      return true;
+    })
+    .map((row) => ({
+      ...row,
+      userLabel: resolveRumSessionUserLabel(row, userLabelOrder.value) ?? t("rum.unknown"),
+    })),
 );
 
 const hasSegmentFilteredOutAllRows = computed(
@@ -1791,7 +1833,10 @@ const sessionEndUs = (row: any): number | undefined => {
 
 const handleCellClick = (payload: any) => {
   if (payload.columnName !== "action_play") return;
-  sessionState.data.selectedSession = sessionState.data.sessions[payload.row.session_id];
+  sessionState.data.selectedSession = {
+    ...sessionState.data.sessions[payload.row.session_id],
+    identity_from_list: true,
+  };
   const start = sessionStartUs(payload.row);
   const end = sessionEndUs(payload.row);
   router.push({

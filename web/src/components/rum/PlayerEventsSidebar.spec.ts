@@ -123,7 +123,7 @@ describe("PlayerEventsSidebar", () => {
   ];
 
   const mockSessionDetails = {
-    user_email: "test@example.com",
+    user_label: "Replay user",
     date: "2024-01-01 10:00:00",
     browser: "Chrome 120",
     os: "Windows 10",
@@ -331,14 +331,14 @@ describe("PlayerEventsSidebar", () => {
       expect(wrapper.find('[data-test="event-metadata"]').exists()).toBe(true);
     });
 
-    it("should display user email text in metadata when sessionDetails has user_email", () => {
-      expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("test@example.com");
+    it("shows the session user label in metadata", () => {
+      expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("Replay user");
     });
 
-    it("should render mail icon in metadata when tags tab is active", () => {
+    it("shows the person icon for the session user", () => {
       const metadata = wrapper.find('[data-test="event-metadata"]');
 
-      expect(metadata.find('[data-test="OIcon"].mail').exists()).toBe(true);
+      expect(metadata.find('[data-test="OIcon"].person').exists()).toBe(true);
     });
 
     it("should display date text in metadata when sessionDetails has date", () => {
@@ -377,9 +377,9 @@ describe("PlayerEventsSidebar", () => {
       expect(wrapper.find('[data-test="event-metadata"]').text()).toContain("New York, USA");
     });
 
-    it("should display Unknown User when sessionDetails has null user_email", async () => {
+    it("shows Unknown User when there is no session user label", async () => {
       await wrapper.setProps({
-        sessionDetails: { ...mockSessionDetails, user_email: null },
+        sessionDetails: { ...mockSessionDetails, user_label: null },
       });
       await wrapper.vm.$nextTick();
 
@@ -677,7 +677,7 @@ describe("PlayerEventsSidebar", () => {
       await wrapper.vm.$nextTick();
 
       await wrapper.setProps({
-        sessionDetails: { ...mockSessionDetails, user_email: "updated@example.com" },
+        sessionDetails: { ...mockSessionDetails, user_label: "updated@example.com" },
       });
       await wrapper.vm.$nextTick();
 

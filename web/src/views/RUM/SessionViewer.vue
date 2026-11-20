@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex min-w-0 items-center gap-1.5 text-xs">
           <OIcon name="person" size="sm" />
           <OTruncatedText>{{
-            sessionDetails.user_email || t("common.unknownUser")
+            sessionDetails.user_label || t("common.unknownUser")
           }}</OTruncatedText>
         </div>
         <div class="flex min-w-0 items-center gap-1.5 text-xs">
@@ -308,7 +308,9 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
-import useSessionsReplay from "@/composables/useSessionReplay";
+import useSessionsReplay, {
+  createEmptySessionReplaySelection,
+} from "@/composables/useSessionReplay";
 import usePerformance from "@/composables/rum/usePerformance";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
@@ -324,6 +326,7 @@ import { sessionEventsProbeSql, type StepKind } from "@/utils/rum/productAnalyti
 import { MAX_KEY_LENGTH } from "@/utils/rum/productAnalyticsModel";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
+import { useRumSessionUserLabelOrder } from "@/composables/rum/useRumSessionUserLabelOrder";
 import useSessionHeatmap from "@/composables/rum/useSessionHeatmap";
 import analytics from "@/services/product_analytics";
 
@@ -335,6 +338,12 @@ import {
   getUUID,
 } from "@/utils/zincutils";
 import { sqlEquals, sqlIn } from "@/utils/query/sqlFilterBuilder";
+import {
+  RUM_SESSION_USER_IDENTITY_COLUMNS,
+  resolveRumSessionUserLabel,
+  rumSessionUserIdentitySelect,
+  type RumSessionUserIdentity,
+} from "@/utils/rum/sessionUserIdentity";
 import { collapseViewDocuments } from "@/utils/rum/viewDocuments";
 import { RUM_CORRELATION_TRACES_STREAM, normalizeTraceId, rumField } from "@/utils/rum/fields";
 import useCorrelatedTracesStream, {
@@ -641,16 +650,33 @@ const forwardToEventTime = computed(() => {
   return relativeTime;
 });
 
-const sessionDetails = ref({
+const sessionMetadata = ref({
   date: "",
   duration: "",
   browser: "",
   os: "",
   ip: "",
-  user_email: "",
   city: "",
   country: "",
   id: "",
+});
+const userLabelOrder = useRumSessionUserLabelOrder();
+const organizationIdentifier = computed(() => store.state.selectedOrganization.identifier);
+const selectedSessionInScope = () => {
+  const selected = sessionState.data.selectedSession;
+  if (
+    selected?.session_id === sessionId.value &&
+    selected.identity_org === organizationIdentifier.value
+  ) {
+    return selected;
+  }
+};
+const sessionDetails = computed(() => {
+  const identity = sessionMetadata.value.id ? selectedSessionInScope() : undefined;
+  return {
+    ...sessionMetadata.value,
+    user_label: resolveRumSessionUserLabel(identity ?? {}, userLabelOrder.value),
+  };
 });
 
 // The metadata bounds come first; the manifest's first start and last end stand in when they are missing.
@@ -842,19 +868,32 @@ async function ensureReplaySchema(): Promise<StreamLookup> {
 }
 
 async function rumColumns(): Promise<Record<string, boolean>> {
-  if (!performanceState.data.streams?._rumdata?.schema) await readStreamSchema("_rumdata");
-  const fields = performanceState.data.streams?._rumdata?.schema ?? {};
-  return Object.fromEntries(Object.keys(fields).map((f) => [f, true]));
+  try {
+    const stream = await getStream("_rumdata", "logs", true);
+    return Object.fromEntries(
+      (stream?.schema ?? []).map(({ name }: { name: string }) => [name, true]),
+    );
+  } catch {
+    return {};
+  }
 }
 
+const readUserIdentity = (hit: RumSessionUserIdentity) => ({
+  user_name: hit.user_name ?? null,
+  user_email: hit.user_email ?? null,
+  user_id: hit.user_id ?? null,
+});
+
 async function loadEventsOnlySession(): Promise<"found" | "missing" | "failed"> {
+  const org = organizationIdentifier.value;
   const schema = await rumColumns();
+  if (cancelled || organizationIdentifier.value !== org) return "missing";
   const range = routeRangeUs();
   isLoading.value.push(true);
   try {
     const res = await searchService.search(
       {
-        org_identifier: store.state.selectedOrganization.identifier,
+        org_identifier: org,
         query: {
           query: {
             sql: sessionEventsProbeSql(String(getSessionId.value), schema),
@@ -868,18 +907,19 @@ async function loadEventsOnlySession(): Promise<"found" | "missing" | "failed"> 
       },
       "RUM",
     );
+    if (cancelled || organizationIdentifier.value !== org) return "missing";
     const hit = res?.data?.hits?.[0];
     if (!hit || hit.start_time === null || hit.start_time === undefined) return "missing";
-    const stored = sessionState.data.selectedSession;
-    const existingSpent =
-      stored?.session_id === String(getSessionId.value) ? Number(stored?.time_spent) : 0;
+    const stored = selectedSessionInScope();
+    const existingSpent = Number(stored?.time_spent) || 0;
     sessionState.data.selectedSession = {
-      ...sessionState.data.selectedSession,
-      session_id: String(getSessionId.value),
+      ...(stored ?? createEmptySessionReplaySelection()),
+      session_id: sessionId.value,
+      identity_org: org,
       start_time: Number(hit.start_time),
       end_time: Number(hit.end_time),
       time_spent: existingSpent > 0 ? existingSpent : Number(hit.end_time) - Number(hit.start_time),
-      user_email: hit.user_email,
+      ...readUserIdentity(hit),
       source: hit.source,
       replay_start: null,
     };
@@ -892,6 +932,40 @@ async function loadEventsOnlySession(): Promise<"found" | "missing" | "failed"> 
   }
 }
 
+async function loadReplayUserIdentity(
+  id: string,
+  window: QueryWindow,
+  columns: ReturnType<typeof rumColumns>,
+): Promise<void> {
+  console.debug("Loading replay session user identity");
+  const org = organizationIdentifier.value;
+  try {
+    const schema = await columns;
+    if (
+      cancelled ||
+      organizationIdentifier.value !== org ||
+      !RUM_SESSION_USER_IDENTITY_COLUMNS.some((field) => schema[field])
+    )
+      return;
+    const fields = rumSessionUserIdentitySelect(schema).join(", ");
+    const sql = `SELECT ${fields} FROM "_rumdata" WHERE ${sqlEquals("session_id", id)}`;
+    const { hits, complete } = await runStreamQuery(buildSegmentRequest(sql, 0, 1, window), "logs");
+    const current = selectedSessionInScope();
+    if (cancelled || organizationIdentifier.value !== org || current?.session_id !== id) return;
+    if (!complete) {
+      console.warn("Replay session user identity search returned an incomplete result");
+      return;
+    }
+    // Streaming aggregates replace previous partitions with the cumulative value.
+    const hit = hits.at(-1);
+    if (hit) Object.assign(current, readUserIdentity(hit));
+  } catch (error) {
+    if (!cancelled) {
+      console.warn("Failed to load replay session user identity", { code: searchErrorCode(error) });
+    }
+  }
+}
+
 const failSessionLoad = () => {
   sessionNotFound.value = false;
   sessionLoadFailed.value = true;
@@ -901,12 +975,22 @@ const failSessionLoad = () => {
 };
 
 async function openSession(): Promise<void> {
+  const org = organizationIdentifier.value;
+  const isCurrent = () => !cancelled && organizationIdentifier.value === org;
+  const stored = selectedSessionInScope();
+  const hasCachedIdentity =
+    stored?.identity_from_list === true &&
+    ["user_name", "user_email", "user_id"].every((field) => Object.hasOwn(stored, field)) &&
+    !!resolveRumSessionUserLabel(stored, userLabelOrder.value);
+  if (stored) delete stored.identity_from_list;
   const replay = await ensureReplaySchema();
+  if (!isCurrent()) return;
   if (replay === "failed") return failSessionLoad();
   if (replay === "present") await getSession();
-  if (sessionLoadFailed.value) return;
+  if (!isCurrent() || sessionLoadFailed.value) return;
   if (replay === "missing" || sessionNotFound.value) {
     const found = await loadEventsOnlySession();
+    if (!isCurrent()) return;
     if (found === "failed") return failSessionLoad();
     segmentsLoading.value = false;
     if (found === "missing") {
@@ -920,10 +1004,13 @@ async function openSession(): Promise<void> {
     return;
   }
   // The events' window, so the Traces tab lists the calls the breadcrumbs show.
-  rumWindowUs.value = serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US);
+  const window = serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US);
+  rumWindowUs.value = window;
+  const columns = rumColumns();
   openEventSeek();
   getSessionSegments();
-  getSessionEvents();
+  getSessionEvents(columns);
+  if (!hasCachedIdentity) void loadReplayUserIdentity(sessionId.value, window, columns);
 }
 
 onBeforeMount(async () => {
@@ -932,13 +1019,12 @@ onBeforeMount(async () => {
 });
 
 const getSessionDetails = () => {
-  sessionDetails.value = {
+  sessionMetadata.value = {
     date: getFormattedDate(sessionState.data.selectedSession?.start_time),
     duration: formatSessionDuration(Number(sessionState.data.selectedSession?.time_spent)),
     browser: sessionState.data.selectedSession?.browser,
     os: sessionState.data.selectedSession?.os,
     ip: sessionState.data.selectedSession?.ip,
-    user_email: sessionState.data.selectedSession?.user_email || t("common.unknownUser"),
     city: sessionState.data.selectedSession?.city || t("common.unknown"),
     country: sessionState.data.selectedSession?.country || t("common.unknown"),
     id: sessionState.data.selectedSession?.session_id,
@@ -984,6 +1070,7 @@ const searchWithRetry = (req: any, options: RetryOptions = { isCancelled: () => 
 
 const getSession = async () => {
   let geoFields = "";
+  const org = organizationIdentifier.value;
 
   if (performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_city"]) {
     geoFields += "min(geo_info_city) as city,";
@@ -1020,6 +1107,7 @@ const getSession = async () => {
   isLoading.value.push(true);
   try {
     const res: any = await searchWithRetry(req, retryOptions());
+    if (cancelled || organizationIdentifier.value !== org) return;
     sessionLoadFailed.value = false;
     if (res.data.hits.length === 0) {
       sessionNotFound.value = true;
@@ -1029,9 +1117,11 @@ const getSession = async () => {
     }
 
     const hit = res.data.hits[0];
+    const stored = selectedSessionInScope();
     sessionState.data.selectedSession = {
-      ...sessionState.data.selectedSession,
+      ...(stored ?? createEmptySessionReplaySelection()),
       ...hit,
+      identity_org: org,
       type: hit.source,
       time_spent: hit.end_time - hit.start_time,
       timestamp: hit.zo_sql_timestamp,
@@ -1363,7 +1453,7 @@ const extendSessionEnd = (endMs: number) => {
   if (!session || !(endMs > (Number(session.end_time) || 0))) return;
   session.end_time = endMs;
   session.time_spent = endMs - Number(session.start_time);
-  sessionDetails.value.duration = formatSessionDuration(Number(session.time_spent));
+  sessionMetadata.value.duration = formatSessionDuration(Number(session.time_spent));
 };
 
 // A body is kept only if its id is in the manifest and not stored yet, so ties and duplicate rows are dropped.
@@ -1740,9 +1830,9 @@ const fetchEventPages = async (sql: string, window: QueryWindow) => {
 };
 
 // Mobile streams, and streams with no resources yet, lack these columns; that must not cost the other events.
-const fetchFailedRequests = async (window: QueryWindow) => {
+const fetchFailedRequests = async (window: QueryWindow, schema = rumColumns()) => {
   try {
-    const columns = await rumColumns();
+    const columns = await schema;
     if (!columns.resource_status_code || !columns.resource_type) return [];
     return await fetchEventPages(failedRequestsSql(), window);
   } catch (error) {
@@ -2140,20 +2230,14 @@ const publishEvents = () => {
 };
 
 // Paged in full, because the live cursor is the largest arrival time seen and a cut-off first page would skip the rest.
-const getSessionEvents = () => {
+const getSessionEvents = (columns = rumColumns()) => {
   isLoading.value.push(true);
   eventsLoading.value = true;
   Promise.all([
     fetchEventPages(rumEventsSql(), serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US)),
-    fetchFailedRequests(serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US)),
+    fetchFailedRequests(serverWindowUs(EVENTS_TAIL_US, EVENTS_TAIL_US), columns),
   ])
     .then(([hits, failed]: [any[], any[]]) => {
-      // Test the SOURCE field, not the rendered value: user_email is filled with
-      // t("common.unknownUser") when absent, so comparing it to the English
-      // literal stopped this backfill firing in every non-English locale.
-      if (!sessionState.data.selectedSession?.user_email)
-        sessionDetails.value.user_email = hits[0]?.usr_email;
-
       addRumEvents([...hits, ...failed]);
       publishEvents();
       void refreshServerStatuses();

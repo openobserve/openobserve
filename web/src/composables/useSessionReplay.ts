@@ -14,6 +14,36 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive } from "vue";
+import type { RumSessionUserIdentity } from "@/utils/rum/sessionUserIdentity";
+
+const defaultUserIdentity: RumSessionUserIdentity & {
+  identity_org?: string;
+  identity_from_list?: boolean;
+} = {
+  user_email: "",
+};
+
+export const createEmptySessionReplaySelection = () => ({
+  start_time: 0,
+  end_time: 0,
+  // Start of the first segment with a full snapshot, where playback can begin; null when none has one.
+  replay_start: null as number | null,
+  browser: "",
+  os: "",
+  ip: "",
+  ...defaultUserIdentity,
+  city: "",
+  country: "",
+  session_id: "",
+  timestamp: 0,
+  type: "",
+  time_spent: 0,
+  source: "",
+  application_id: "",
+  // Server receive-time bounds of the replay rows, in µs; later queries search between them.
+  min_ts: 0,
+  max_ts: 0,
+});
 
 const defaultObject = {
   loading: [],
@@ -81,27 +111,7 @@ const defaultObject = {
       relativeTimePeriod: "15m",
       valueType: "relative",
     },
-    selectedSession: {
-      start_time: 0,
-      end_time: 0,
-      // Start of the first segment with a full snapshot, where playback can begin; null when none has one.
-      replay_start: null as number | null,
-      browser: "",
-      os: "",
-      ip: "",
-      user_email: "",
-      city: "",
-      country: "",
-      session_id: "",
-      timestamp: 0,
-      type: "",
-      time_spent: 0,
-      source: "",
-      application_id: "",
-      // Server receive-time bounds of the replay rows, in µs; later queries search between them.
-      min_ts: 0,
-      max_ts: 0,
-    },
+    selectedSession: createEmptySessionReplaySelection(),
   },
 };
 

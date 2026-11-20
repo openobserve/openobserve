@@ -9,6 +9,7 @@ import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import ShareButton from "@/components/common/ShareButton.vue";
 import searchService from "@/services/search";
 import analytics from "@/services/product_analytics";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -143,6 +144,7 @@ describe("AppSessions.vue", () => {
         selectedOrganization: {
           identifier: "test-org-123",
         },
+        userInfo: { email: "viewer@example.com" },
         zoConfig: {
           timestamp_column: "_timestamp",
         },
@@ -212,7 +214,7 @@ describe("AppSessions.vue", () => {
           },
           OTable: {
             template:
-              '<div data-test="app-table" v-bind="$attrs"><slot name="empty" /><slot name="cell-frustration_count" :row="{ frustration_count: 0 }" /><slot name="cell-location" :row="{ geo_info_country: \'\', geo_info_city: \'\' }" /></div>',
+              '<div data-test="app-table" v-bind="$attrs"><slot name="empty" /><slot name="cell-frustration_count" :row="{ frustration_count: 0 }" /><slot name="cell-location" :row="{ geo_info_country: \'\', geo_info_city: \'\' }" /><template v-for="row in data" :key="row.session_id"><slot name="cell-session" :row="row" /></template></div>',
             props: ["data", "columns", "loading", "rowKey"],
           },
           DateTime: {
@@ -711,6 +713,88 @@ describe("AppSessions.vue", () => {
       expect(mainQuerySql).toContain('FROM "_rumdata"');
       for (const fragment of present) expect(mainQuerySql).toContain(fragment);
       for (const field of absent) expect(mainQuerySql).not.toContain(field);
+    });
+  });
+
+  describe("session user labels", () => {
+    const orderStorageKey = "o2:rumSessionUserLabelOrder:viewer%40example.com:test-org-123";
+
+    afterEach(() => localStorage.removeItem(orderStorageKey));
+
+    it("renders and sorts by the preferred identity without repeating the search", async () => {
+      const search = vi.mocked(searchService.search);
+      const originalSearch = search.getMockImplementation();
+      await flushPromises();
+      mockStreams.getStream.mockResolvedValueOnce({
+        schema: [
+          ...mockStreamData.schema,
+          { name: "usr_name", type: "UTF8" },
+          { name: "usr_id", type: "UTF8" },
+        ],
+      });
+      await wrapper.vm.getStreamFields();
+      expect(wrapper.vm.streamFields.map((field: { name: string }) => field.name)).toEqual(
+        expect.arrayContaining(["usr_name", "usr_email", "usr_id"]),
+      );
+      search.mockClear();
+      search.mockImplementation(async (request) => ({
+        data: {
+          hits: request.query.query.sql?.includes("GROUP BY session_id")
+            ? [
+                {
+                  session_id: "named-user",
+                  user_name: "Jane Doe",
+                  user_email: "jane@example.com",
+                  user_id: "user-1",
+                },
+                { session_id: "identified-user", user_name: "  ", user_id: "user-2" },
+                { session_id: "anonymous-user" },
+              ]
+            : [],
+        },
+      }));
+
+      try {
+        wrapper.vm.getSessions();
+        await flushPromises();
+
+        const userLabels = () =>
+          wrapper.findAll('[data-test="rum-app-sessions-user-label"]').map((cell) => cell.text());
+        const labelColumn = wrapper.vm.tableColumns.find(
+          (column: { id: string }) => column.id === "session",
+        );
+        const sortValues = () => wrapper.vm.tableRows.map(labelColumn.accessorFn);
+        const query = search.mock.calls[0][0].query.query.sql;
+        expect(query).toMatch(/\busr_name\b.*\buser_name\b/i);
+        expect(query).toMatch(/\busr_id\b.*\buser_id\b/i);
+        expect(userLabels()).toEqual(["Jane Doe", "user-2", "Unknown"]);
+        expect(sortValues()).toEqual(userLabels());
+
+        const order = wrapper.getComponent(OSelect);
+        const searchCount = search.mock.calls.length;
+        order.vm.$emit("update:modelValue", "email-name-id");
+        await flushPromises();
+
+        expect(userLabels()).toEqual(["jane@example.com", "user-2", "Unknown"]);
+        expect(sortValues()).toEqual(userLabels());
+        expect(search).toHaveBeenCalledTimes(searchCount);
+      } finally {
+        if (originalSearch) search.mockImplementation(originalSearch);
+      }
+    });
+
+    it("does not reference identity columns missing from the org schema", async () => {
+      const search = vi.mocked(searchService.search);
+      await flushPromises();
+      search.mockClear();
+      wrapper.vm.getSessions();
+      await flushPromises();
+
+      const sql = search.mock.calls[0][0].query.query.sql;
+      expect(sql).toMatch(/\busr_email\b.*\buser_email\b/i);
+      expect(sql).not.toMatch(/\busr_(name|id)\b/i);
+      expect(sql).toMatch(/NULL[^,]*\buser_name\b/i);
+      expect(sql).toMatch(/NULL[^,]*\buser_id\b/i);
     });
   });
 

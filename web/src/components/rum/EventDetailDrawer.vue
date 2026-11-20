@@ -49,7 +49,7 @@ defineProps({
   sessionDetails: {
     type: Object,
     default: () => ({
-      user_email: "",
+      user_label: null,
       date: "",
       browser: "",
       os: "",
