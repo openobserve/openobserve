@@ -25,7 +25,8 @@ on:
 
 concurrency:
   # A manual run gets its own group so it never cancels, or is cancelled by, a PR, queue or nightly run.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || (github.event_name == 'workflow_dispatch' && format('dispatch-{0}', github.run_id)) || github.ref }}
+  # A label that changes nothing here only mirrors results, so it must neither replace nor queue behind a real run.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || (github.event_name == 'workflow_dispatch' && format('dispatch-{0}', github.run_id)) || github.ref }}${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","e2e-full"]'), github.event.label.name)) && '-mirror' || '' }}
   # Only a new commit cancels: a cancelled same-SHA run leaves a failed required summary that a newer run cannot clear.
   cancel-in-progress: ${{ github.event_name != 'pull_request' || github.event.action == 'synchronize' }}
 
@@ -82,7 +83,8 @@ env:
 jobs:
   check_changes:
     # Runs on PRs carrying the 'ready-for-ci' label and on this repo's nightly schedule; the merge queue runs unit tests only (see docs/ci).
-    if: ${{ github.event_name != 'merge_group' && (github.event_name != 'schedule' || github.repository == 'openobserve/openobserve') && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) }}
+    # Other labels change nothing here, so they skip every paid job and playwright_summary mirrors the last real result.
+    if: ${{ github.event_name != 'merge_group' && (github.event_name != 'schedule' || github.repository == 'openobserve/openobserve') && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) && !(contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","e2e-full"]'), github.event.label.name)) }}
     timeout-minutes: 5
     name: check_changes
     runs-on: ubuntu-latest
@@ -1154,11 +1156,13 @@ jobs:
           fi
 
   playwright_summary:
-    timeout-minutes: 5
-    runs-on:
-      labels: eks-openobserve-standard-4
+    # A mirror may wait for the auto-merge placeholder, which only the full-matrix run completes.
+    timeout-minutes: ${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","e2e-full"]'), github.event.label.name)) && 190 || 5 }}
+    runs-on: ${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","e2e-full"]'), github.event.label.name)) && 'ubuntu-latest' || 'eks-openobserve-standard-4' }}
     permissions:
+      contents: read
       checks: write
+      actions: read
       pull-requests: read
     needs:
       [
@@ -1170,9 +1174,24 @@ jobs:
         ui_integration_tests,
       ]
     if: always() && github.event_name != 'merge_group' && (github.event_name != 'schedule' || github.repository == 'openobserve/openobserve') && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
+    env:
+      LABEL_NOISE: ${{ (contains(fromJSON('["labeled","unlabeled"]'), github.event.action) && !contains(fromJSON('["ready-for-ci","e2e-full"]'), github.event.label.name)) }}
     steps:
+      - name: Check out the mirror action
+        if: env.LABEL_NOISE == 'true'
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/actions/mirror-check-result
+          persist-credentials: false
+      - name: Mirror the last real result
+        if: env.LABEL_NOISE == 'true'
+        uses: ./.github/actions/mirror-check-result
+        with:
+          check-name: playwright_summary
+          poll-minutes: "180"
       - name: Check test results
         id: verdict
+        if: env.LABEL_NOISE != 'true'
         env:
           ALREADY_PASSED: ${{ needs.prior_pass.result == 'success' && needs.prior_pass.outputs.already_passed == 'true' }}
           PRIOR_RUN_URL: ${{ needs.prior_pass.outputs.run_url }}

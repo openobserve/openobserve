@@ -159,6 +159,15 @@ pub async fn save(
     }
 
     let initiator_id = user_email.user_id;
+    #[cfg(feature = "cloud")]
+    {
+        let email = service_account.email.trim().to_lowercase();
+        match users::cloud_service_account_refusal(&email, &initiator_id).await {
+            Ok(None) => {}
+            Ok(Some(reason)) => return MetaHttpResponse::bad_request(reason),
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        }
+    }
     let user = UserRequest {
         email: service_account.email.trim().to_string(),
         first_name: service_account.first_name.trim().to_string(),

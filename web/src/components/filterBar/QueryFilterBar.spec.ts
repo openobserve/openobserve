@@ -424,6 +424,72 @@ describe("QueryFilterBar", () => {
       expect(sql(state)).toBe("level = 'a' OR level = 'b'");
     });
 
+    describe("never mixes AND and OR in one group, so the query runs as the chips read", () => {
+      const logFields: FilterField[] = [
+        { name: "level", type: "string" },
+        { name: "svc_name", type: "string" },
+        { name: "code", type: "number" },
+      ];
+
+      it("groups the OR run before a condition added with AND", async () => {
+        const state = mountBar({
+          fields: logFields,
+          modelValue: parseSqlFilter("level = 'error' OR level = 'warn'")!,
+        });
+        await openBar();
+        await type("svc_name=alpha");
+        await press("Enter");
+        expect(sql(state, logFields)).toBe(
+          "(level = 'error' OR level = 'warn') AND svc_name = 'alpha'",
+        );
+        expect(wrapper!.find('[data-test="query-filter-bar-group-0"]').exists()).toBe(true);
+      });
+
+      it("groups what comes before a middle connector flipped to OR", async () => {
+        const state = mountBar({
+          fields: logFields,
+          modelValue: parseSqlFilter("svc_name = 'alpha' AND level = 'error' AND code = 500")!,
+        });
+        await wrapper!.find('[data-test="query-filter-bar-connector-1"]').trigger("click");
+        expect(sql(state, logFields)).toBe(
+          "(svc_name = 'alpha' OR level = 'error') AND code = 500",
+        );
+        expect(wrapper!.find('[data-test="query-filter-bar-group-0"]').exists()).toBe(true);
+      });
+
+      it("draws a loaded mix as SQL runs it and offers no ungroup that would change it", async () => {
+        const state = mountBar({
+          fields: logFields,
+          modelValue: parseSqlFilter("level = 'error' OR level = 'warn' AND code = 500")!,
+        });
+        expect(sql(state, logFields)).toBe("level = 'error' OR (level = 'warn' AND code = 500)");
+        expect(wrapper!.find('[data-test="query-filter-bar-group-1"]').exists()).toBe(true);
+        expect(wrapper!.find('[data-test="query-filter-bar-ungroup-1"]').exists()).toBe(false);
+      });
+
+      it("undoes its nesting when the same connector is flipped back", async () => {
+        const flat = "level = 'a' AND level = 'b' AND level = 'c' AND level = 'd'";
+        const state = mountBar({ fields: logFields, modelValue: parseSqlFilter(flat)! });
+        await wrapper!.find('[data-test="query-filter-bar-connector-2"]').trigger("click");
+        expect(sql(state, logFields)).toBe(
+          "((level = 'a' AND level = 'b') OR level = 'c') AND level = 'd'",
+        );
+        await wrapper!.find('[data-test="query-filter-bar-connector-0-1"]').trigger("click");
+        expect(sql(state, logFields)).toBe(flat);
+        expect(wrapper!.find('[data-test^="query-filter-bar-group-"]').exists()).toBe(false);
+      });
+
+      it("keeps a group the user made when a flip leaves it on the same connector", async () => {
+        const state = mountBar({
+          fields: logFields,
+          modelValue: parseSqlFilter("code = 1 AND (level = 'a' OR level = 'b')")!,
+        });
+        await wrapper!.find('[data-test="query-filter-bar-connector-1"]').trigger("click");
+        expect(sql(state, logFields)).toBe("code = 1 OR (level = 'a' OR level = 'b')");
+        expect(wrapper!.find('[data-test="query-filter-bar-group-1"]').exists()).toBe(true);
+      });
+    });
+
     it("joins with OR and groups with parentheses as they are typed", async () => {
       const state = mountBar();
       await openBar();
@@ -462,7 +528,10 @@ describe("QueryFilterBar", () => {
       await type("or ");
       await type("level=c");
       await press("Enter");
-      expect(sql(state)).toBe("level = 'c' OR level = 'a' AND level = 'b'");
+      expect(sql(state)).toBe("(level = 'c' OR level = 'a') AND level = 'b'");
+      await type("level=d");
+      await press("Enter");
+      expect(sql(state)).toBe("((level = 'c' AND level = 'd') OR level = 'a') AND level = 'b'");
     });
 
     it("puts the caret in a group whose box is pressed, so the next chip lands there", async () => {

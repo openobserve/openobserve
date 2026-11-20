@@ -685,6 +685,15 @@ describe("PublicLinksTable", () => {
     expect(admin.statusBatch).toHaveBeenCalledTimes(2);
   });
 
+  it("exposes the same refetch to its parent, for the refresh shortcut", async () => {
+    const w = build();
+    await flushPromises();
+    await (w.vm as unknown as { refreshLinks: () => Promise<unknown> }).refreshLinks();
+    await flushPromises();
+    expect(admin.listOrg).toHaveBeenCalledTimes(2);
+    expect(admin.statusBatch).toHaveBeenCalledTimes(2);
+  });
+
   it("asks the batch status for every link, in calls of at most 50", async () => {
     const many = Array.from({ length: 51 }, (_, i) => link({ id: `m${i}` }));
     vi.mocked(admin.listOrg).mockResolvedValue({ data: { list: many } } as never);

@@ -390,6 +390,7 @@ const toRow = (
       cluster: row.cluster,
       namespace: row.namespace,
       streams: row.streams ?? [],
+      trafficPerHour: row.traffic_per_hour ?? null,
     },
     status: watched
       ? { state: "watched", label: coverageWord(t, "watched") }

@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
+import zhCN from "@/locales/languages/zh-CN.json";
+import enUS from "@/locales/languages/en-US.json";
+import { createI18n } from "vue-i18n";
 // @ts-ignore
 import store from "@/test/unit/helpers/store";
 import config from "@/aws-exports";
@@ -406,6 +409,28 @@ describe("Schema Component Tests", () => {
 
       const indices = wrapper.vm.getFieldIndices(property, settings);
       expect(indices).toContain("hashPartition_16");
+    });
+
+    it("flags a search-time pattern the scan cannot enforce", () => {
+      const searchPattern = { field: "f", policy: "Redact", apply_at: "AtSearch" };
+      wrapper.vm.patternAssociations = {
+        msg: [searchPattern],
+        code: [searchPattern],
+        region: [searchPattern],
+        ingested: [{ ...searchPattern, apply_at: "AtIngestion" }],
+        observed: [{ ...searchPattern, policy: "Detect" }],
+      };
+
+      expect(wrapper.vm.sdrConflict({ name: "msg", type: "Utf8View" })).toBeUndefined();
+      expect(wrapper.vm.sdrConflict({ name: "code", type: "Int64" })).toBe(
+        i18n.global.t("logStream.sdrNonStringFieldWarning"),
+      );
+      expect(
+        wrapper.vm.sdrConflict({ name: "region", type: "Utf8", index_type: ["keyPartition"] }),
+      ).toBe(i18n.global.t("logStream.sdrPartitionKeyWarning"));
+      expect(wrapper.vm.sdrConflict({ name: "ingested", type: "Int64" })).toBeUndefined();
+      expect(wrapper.vm.sdrConflict({ name: "observed", type: "Int64" })).toBeUndefined();
+      expect(wrapper.vm.isStringFieldType("LargeUtf8")).toBe(true);
     });
 
     // Test 18: updateDefinedSchemaFields function - removing fields
@@ -3654,6 +3679,84 @@ describe("Schema Component Tests", () => {
 
       expect(result.length).toBe(2);
       expect(result.map((r: any) => r.name).sort()).toEqual(["message", "status"]);
+    });
+
+    describe("search box matches index type labels", () => {
+      const searchRows = () => [
+        { name: "_timestamp", type: "Int64", index_type: [] },
+        { name: "body", type: "Utf8", index_type: ["fullTextSearchKey"] },
+        { name: "message", type: "Utf8", index_type: ["fullTextSearchKey", "bloomFilterKey"] },
+        { name: "namespace", type: "Utf8", index_type: ["secondaryIndexKey", "keyPartition"] },
+        { name: "host", type: "Utf8", index_type: ["prefixPartition"] },
+        { name: "service", type: "Utf8", index_type: ["hashPartition_16"] },
+        { name: "bloom_hits", type: "Int64", index_type: [] },
+      ];
+      const search = async (term: string) => {
+        wrapper.vm.activeTab = "allFields";
+        wrapper.vm.indexData.schema = searchRows();
+        wrapper.vm.filterField = term;
+        await flushPromises();
+        return wrapper.vm.filteredSchemaData.map((r: any) => r.name).sort();
+      };
+
+      it("matches part of a label", async () => {
+        expect(await search("full text")).toEqual(["body", "message"]);
+      });
+
+      it("matches every partition kind with one word", async () => {
+        expect(await search("partition")).toEqual(["host", "namespace", "service"]);
+      });
+
+      it("matches a hash partition whatever its bucket count", async () => {
+        expect(await search("hash")).toEqual(["service"]);
+      });
+
+      it("lists a field with several index types under each of them", async () => {
+        expect(await search("secondary")).toEqual(["namespace"]);
+        expect(await search("partition")).toContain("namespace");
+      });
+
+      it("ignores case", async () => {
+        expect(await search("BLOOM FILTER")).toEqual(["message"]);
+      });
+
+      it("still matches the stored index type value", async () => {
+        expect(await search("fulltextsearchkey")).toEqual(["body", "message"]);
+      });
+
+      it("still matches field names alongside index types", async () => {
+        expect(await search("bloom")).toEqual(["bloom_hits", "message"]);
+      });
+
+      it("matches built-in index fields set by the server defaults", async () => {
+        const zoConfig = wrapper.vm.store.state.zoConfig;
+        const saved = [zoConfig.default_fts_keys, zoConfig.default_secondary_index_fields];
+        zoConfig.default_fts_keys = ["bloom_hits"];
+        zoConfig.default_secondary_index_fields = ["host"];
+        try {
+          expect(await search("full text")).toEqual(["bloom_hits", "body", "message"]);
+          expect(await search("secondary")).toEqual(["host", "namespace"]);
+        } finally {
+          [zoConfig.default_fts_keys, zoConfig.default_secondary_index_fields] = saved;
+        }
+      });
+
+      it("matches the label in the current locale", async () => {
+        // A separate i18n instance: switching the shared one re-renders every mounted wrapper.
+        const zhI18n = createI18n({
+          locale: "zh-cn",
+          fallbackLocale: "en-us",
+          messages: { "zh-cn": zhCN, "en-us": enUS },
+        });
+        const modelValue = wrapper.props("modelValue");
+        wrapper.unmount();
+        wrapper = mount(LogStream, {
+          props: { modelValue },
+          global: { provide: { store }, plugins: [zhI18n], stubs: { ODrawer: ODrawerStub } },
+        });
+        await flushPromises();
+        expect(await search("分区")).toEqual(["host", "namespace", "service"]);
+      });
     });
   });
 

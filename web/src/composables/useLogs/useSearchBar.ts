@@ -17,6 +17,7 @@ import { ref } from "vue";
 import { savedViewsQuery } from "@/services/saved_views.queries";
 import { viewTypeOf } from "@/services/saved_views";
 import { queryClient } from "@/composables/query/queryClient";
+import { queryFunctionsQuery } from "@/services/query_functions.queries";
 import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import { useStore } from "vuex";
 import type { TranslateFn } from "@/types/i18n";
@@ -50,6 +51,9 @@ import { noteGridQuery } from "@/composables/useLogs/useLogPermalink";
 import { getCachedSemanticGroups, loadSemanticGroups } from "@/utils/semanticGroupsCache";
 import config from "@/aws-exports";
 import { featureState, streamTypeFeature } from "@/utils/featureGate";
+
+// After a function catalog failure, how long SQL searches go before asking for it again.
+export const CATALOG_RETRY_INTERVAL = 60_000;
 
 let selectionToken = 0;
 
@@ -468,10 +472,11 @@ export const useSearchBar = (t: TranslateFn) => {
     }
     noteGridQuery(options.origin, options.generationId);
     const run = () => withQueryOrigin(options.origin, () => runQueryData(isPagination, options));
-    const groupsLoad = isPagination ? null : pendingFilterSemanticGroups();
+    const loads = isPagination ? [] : [pendingFilterSemanticGroups(), pendingQueryFunctions()];
+    const pending = loads.filter((load): load is Promise<unknown> => load !== null);
     // The origin only covers runQueryData's synchronous part, so the wait happens before it, never inside it.
-    if (!groupsLoad) return run();
-    return groupsLoad.then(() => {
+    if (!pending.length) return run();
+    return Promise.all(pending).then(() => {
       const superseded =
         options.generationId !== undefined &&
         !useLogsAutoRun().engine.isCurrent(options.generationId);
@@ -485,6 +490,22 @@ export const useSearchBar = (t: TranslateFn) => {
     if (!searchObj.data.query?.trim()) return null;
     const org = store.state.selectedOrganization.identifier;
     return getCachedSemanticGroups(org) ? null : loadSemanticGroups(org);
+  };
+
+  // hasAggregation reads aggregate names from the function catalog, so SQL runs wait for it once.
+  // A refetch puts a data-less query back to pending, so failure history, not status, ends the wait.
+  const pendingQueryFunctions = (): Promise<unknown> | null => {
+    if (!searchObj.meta.sqlMode) return null;
+    const catalog = queryFunctionsQuery(store.state.selectedOrganization.identifier);
+    const state = queryClient.getQueryState(catalog.queryKey);
+    if (state?.data) return null;
+    if (state?.errorUpdateCount) {
+      const retryDue = Date.now() - state.errorUpdatedAt > CATALOG_RETRY_INTERVAL;
+      if (state.fetchStatus === "idle" && retryDue)
+        void queryClient.prefetchQuery({ ...catalog, retry: false });
+      return null;
+    }
+    return queryClient.fetchQuery({ ...catalog, retry: false }).catch(() => undefined);
   };
 
   const runQueryData = async (isPagination: boolean, options: QueryDataOptions) => {

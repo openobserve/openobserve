@@ -11,7 +11,7 @@
       data-test="oncall-members-table"
     >
       <template #toolbar>
-        <div class="flex w-full flex-wrap items-center gap-2">
+        <div class="flex flex-1 flex-wrap items-center gap-2">
           <OSearchInput
             v-model="memberFilter"
             class="min-w-0 flex-1 max-md:min-w-40"

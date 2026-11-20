@@ -18,6 +18,7 @@ const http = require('http');
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { TIME_SHIFT_METRIC, seedTimeShiftMetric } = require('../utils/metrics-explore-seed.js');
 const { listAnomalyDetections, triggerAnomalyDetection, getAnomalyHistory, deleteDestination, deleteTemplate, createAnomalyViaApi, waitForAnomalyListed, createMockDestination, destinationExists, searchSql, seedAnomalyStream, waitForStream,
   triggerAnomalyTraining, waitForAnomalyTrained } = require('../utils/api-helper.js');
 
@@ -869,6 +870,97 @@ test.describe('Anomaly detection', () => {
             })
             .toBeGreaterThan(0);
         }
+      });
+    });
+
+    // The strip's data button and the banner it leads to (P1.9). A fresh config has
+    // no runs, so the endpoint links the last hour of the stream with the normal label.
+    test.describe('From the anomaly page to the data', () => {
+      const bannerParams = (url) =>
+        [...new URL(url).searchParams.keys()].filter((k) => k === 'from_anomaly' || k.startsWith('anomaly_'));
+
+      test('the data button opens Logs with the anomaly banner, which survives a refresh and leads back', {
+        tag: ['@anomaly', '@P1', '@functional', '@all'],
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'tologs');
+        await pm.anomalyDetectionPage.openDetail(name);
+        await pm.anomalyDetectionPage.waitForSummaryStrip();
+        await pm.anomalyDetectionPage.openDataFromSummaryStrip('/logs');
+
+        await expect(pm.anomalyDetectionPage.getOriginBannerLocator('logs')).toBeVisible({ timeout: 20000 });
+        await expect(pm.anomalyDetectionPage.getOriginBannerPartLocator('logs', 'title')).toContainText(name);
+        expect(bannerParams(page.url())).toContain('from_anomaly');
+
+        // A refresh re-reads the URL, and the Logs URL builder keeps the banner parameters.
+        await page.reload();
+        await expect(pm.anomalyDetectionPage.getOriginBannerLocator('logs')).toBeVisible({ timeout: 30000 });
+
+        await pm.anomalyDetectionPage.getOriginBannerPartLocator('logs', 'back').click();
+        await page.waitForURL(/\/alerts\/detail\//, { timeout: 30000 });
+        await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible({ timeout: 20000 });
+      });
+
+      // D18: Logs opens the detector's aggregate per bucket; the banner switches to the raw rows and back.
+      test('the Logs link opens the aggregate and the banner switches to raw rows and back', {
+        tag: ['@anomaly', '@P1', '@functional', '@all'],
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'aggregate');
+        await pm.anomalyDetectionPage.openDetail(name);
+        await pm.anomalyDetectionPage.waitForSummaryStrip();
+        await pm.anomalyDetectionPage.openDataFromSummaryStrip('/logs');
+
+        const banner = pm.anomalyDetectionPage;
+        await expect(banner.getOriginBannerLocator('logs')).toBeVisible({ timeout: 20000 });
+        expect(banner.urlQueryParamSql('query')).toMatch(/^SELECT histogram\(_timestamp, '[^']+'\) AS time_bucket, .+ AS value/);
+        const toggle = banner.getOriginBannerPartLocator('logs', 'switch-view');
+        await expect(toggle).toHaveText('Show raw rows');
+
+        await banner.switchLogsOriginView();
+        expect(banner.urlQueryParamSql('query')).toMatch(/^SELECT \* FROM "/);
+        await expect(toggle).toHaveText('Show aggregate', { timeout: 20000 });
+        await expect(banner.getOriginBannerLocator('logs')).toBeVisible();
+
+        // After a refresh the switch still works from the rebuilt URL.
+        await page.reload();
+        await expect(toggle).toHaveText('Show aggregate', { timeout: 30000 });
+        await banner.switchLogsOriginView();
+        expect(banner.urlQueryParamSql('query')).toMatch(/AS time_bucket/);
+        await expect(toggle).toHaveText('Show raw rows', { timeout: 20000 });
+      });
+
+      test('closing the Logs banner frees its slot and drops its URL parameters', {
+        tag: ['@anomaly', '@P2', '@functional', '@all'],
+      }, async ({ page }) => {
+        const name = await ownAnomaly(page, 'closebanner');
+        await pm.anomalyDetectionPage.openDetail(name);
+        await pm.anomalyDetectionPage.waitForSummaryStrip();
+        await pm.anomalyDetectionPage.openDataFromSummaryStrip('/logs');
+
+        const banner = pm.anomalyDetectionPage.getOriginBannerLocator('logs');
+        await expect(banner).toBeVisible({ timeout: 20000 });
+        await pm.anomalyDetectionPage.getOriginBannerPartLocator('logs', 'close').click();
+        await expect(banner).toHaveCount(0);
+        await expect.poll(() => bannerParams(page.url()), { timeout: 10000 }).toEqual([]);
+      });
+
+      test('the data button of a metrics detector opens Metrics with the anomaly banner', {
+        tag: ['@anomaly', '@P1', '@functional', '@all'],
+      }, async ({ page, request }) => {
+        await seedTimeShiftMetric(request);
+        const name = await ownAnomaly(page, 'tometrics', {
+          streamName: TIME_SHIFT_METRIC,
+          streamType: 'metrics',
+        });
+        await pm.anomalyDetectionPage.openDetail(name);
+        await pm.anomalyDetectionPage.waitForSummaryStrip();
+        await pm.anomalyDetectionPage.openDataFromSummaryStrip('/metrics');
+
+        await expect(pm.anomalyDetectionPage.getOriginBannerLocator('metrics')).toBeVisible({ timeout: 30000 });
+        await expect(pm.anomalyDetectionPage.getOriginBannerPartLocator('metrics', 'title')).toContainText(name);
+        // The /metrics guard folds the editor parameters into one blob and must keep the banner's.
+        expect(bannerParams(page.url())).toContain('from_anomaly');
+        // AC1.4: the seeded SQL and axes run, and the line chart draws.
+        await pm.metricsExplorerPage.expectChartDrawn();
       });
     });
   });

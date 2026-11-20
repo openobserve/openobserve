@@ -74,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-templates-list-table"
           :data="visibleRows"
           :columns="columns"
+          :column-visibility="columnVisibility"
           row-key="name"
           :loading="loading"
           :forbidden="forbidden"
@@ -96,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:current-page="onPageChange"
         >
           <template #toolbar>
-            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
+            <div class="flex flex-1 items-center gap-2 max-md:contents">
               <OToggleGroup
                 mobile-dropdown
                 :model-value="activeTab"
@@ -139,6 +140,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
+            <OTableColumnToggle
+              :columns="columns"
+              :column-visibility="columnVisibility"
+              :default-column-visibility="responsiveColumns"
+              data-test="template-list-column-toggle"
+              @update:column-visibility="setColumnVisibility"
+            />
             <ORefreshButton
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
@@ -427,6 +435,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -522,6 +532,36 @@ const columns: OTableColumnDef[] = [
     meta: { align: "center", actionCount: 4 },
   },
 ];
+// Below md the two 200px columns took the row and cut each name to a few letters.
+// An explicit map, not undefined, so the columns come back when the viewport grows.
+const { isMobile } = useBreakpoint();
+const responsiveColumns = computed<Record<string, boolean>>(() => ({
+  applies_to: !isMobile.value,
+  used_by: !isMobile.value,
+}));
+// Only the columns the user changed in the chooser, so a choice on one viewport
+// does not freeze the other column's default on the other viewport.
+const columnOverrides = ref<Record<string, boolean>>({});
+const columnVisibility = computed(() => ({
+  ...responsiveColumns.value,
+  ...columnOverrides.value,
+}));
+// A view back at this viewport's defaults (Reset, or the last change undone) clears every override.
+// Otherwise a changed column back at its default drops its override.
+const setColumnVisibility = (next: Record<string, boolean>) => {
+  const defaults = responsiveColumns.value;
+  if (Object.keys(defaults).every((id) => (next[id] ?? true) === defaults[id])) {
+    columnOverrides.value = {};
+    return;
+  }
+  const overrides = { ...columnOverrides.value };
+  for (const [id, visible] of Object.entries(next)) {
+    if (visible === (columnVisibility.value[id] ?? true)) continue;
+    if (visible === (responsiveColumns.value[id] ?? true)) delete overrides[id];
+    else overrides[id] = visible;
+  }
+  columnOverrides.value = overrides;
+};
 const showTemplateEditor = ref(false);
 const showImportTemplate = ref(false);
 const editingTemplate: Ref<TemplateData | null> = ref(null);

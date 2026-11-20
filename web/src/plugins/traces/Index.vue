@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mx-2.5 mt-2.5 shrink-0"
       @dismiss="firstDataArrival = null"
     />
+    <AnomalyOriginBanner class="mx-2.5 mt-2.5 shrink-0" data-test="traces-anomaly-origin-banner" />
     <div id="tracesSecondLevel" class="h-full min-h-0 flex-1">
       <OSplitter
         :class="[
@@ -324,7 +325,11 @@ import {
   generateTraceContext,
 } from "@/utils/zincutils";
 import { buildViewTracesFilter, normalizeViewTracesPayload } from "./viewTracesHandoff";
-import { tracesRunIsStaged, tracesSearchRunSignature } from "./tracesSearchBar.utils";
+import {
+  tracesQueryNotRun,
+  tracesRunIsStaged,
+  tracesSearchRunSignature,
+} from "./tracesSearchBar.utils";
 import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import analytics from "@/services/product_analytics";
@@ -344,6 +349,11 @@ import {
   type FieldGroupingConfig,
 } from "@/composables/useServiceCorrelation";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
+import {
+  isRequiredCondition,
+  mergeFilterTerm,
+  removeRequiredCondition,
+} from "@/utils/traces/filterUtils";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { tracesRowNavAnnouncement } from "./composables/tracesRowNav";
@@ -359,6 +369,7 @@ import QueryErrorState from "@/components/common/QueryErrorState.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import AnomalyOriginBanner from "@/components/alerts/AnomalyOriginBanner.vue";
 import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
@@ -1069,11 +1080,24 @@ async function getQueryData(
     // avoiding the costly full re-sort that `ORDER BY start_time` forces.
     const orderByCol =
       validSortCol === "start_time" ? store.state.zoConfig.timestamp_column : validSortCol;
+    // Pages are separate queries, so equal sort values need a stable order;
+    // the time sort stays single-key to keep the backend's time-ordered scan.
+    const tieBreaks =
+      orderByCol === store.state.zoConfig.timestamp_column
+        ? ""
+        : ["trace_id", "span_id"]
+            .filter(
+              (col) =>
+                col !== orderByCol &&
+                (schemaFieldNames.length === 0 || schemaFieldNames.includes(col)),
+            )
+            .map((col) => `, ${col} ASC`)
+            .join("");
 
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
       const whereClause = combinedFilter ? ` WHERE ${combinedFilter}` : "";
-      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${orderByCol} ${sortOrd}`;
+      const spansSql = `SELECT * FROM "${selectedStreamName.value}"${whereClause} ORDER BY ${orderByCol} ${sortOrd}${tieBreaks}`;
       return {
         query: {
           sql: b64EncodeUnicode(spansSql),
@@ -1913,6 +1937,8 @@ function restoreUrlQueryParams() {
 
   if (queryParams.query) {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+  } else if (queryParams.stream) {
+    searchObj.data.editorValue = "";
   }
 
   searchObj.meta.searchMode = supportedTraceSearchMode(queryParams.tab);
@@ -1994,14 +2020,15 @@ const onMetricsEditorFilterRun = (text: string) => {
   if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
-// Handler for Error Only toggle — only adds/removes span_status condition,
-// leaving all other filters (field sidebar, duration, etc.) intact.
 const onErrorOnlyToggled = (value: boolean) => {
-  if (value) {
-    searchBarRef.value?.applyFilters(["span_status = 'ERROR'"]);
-  } else {
-    searchBarRef.value?.removeFilterByField("span_status");
-  }
+  const filter = searchObj.data.editorValue ?? "";
+  // On ANDs onto the whole filter, so it holds under a top-level OR; off cuts only that condition, not the user's own.
+  const text = value
+    ? mergeFilterTerm("span_status = 'ERROR'", filter)
+    : removeRequiredCondition(filter, "span_status", "'ERROR'");
+  searchObj.data.editorValue = text;
+  searchBarRef.value?.setEditorValue?.(text);
+  if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
 // Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
@@ -2363,8 +2390,9 @@ const activeExcludeFilterValues = computed((): Record<string, string[]> => {
   return result;
 });
 
-const showErrorOnly = computed(
-  () => activeIncludeFilterValues.value["span_status"]?.includes("ERROR") ?? false,
+// Errors-only means every result is an error, so a span_status = 'ERROR' under an OR does not count.
+const showErrorOnly = computed(() =>
+  isRequiredCondition(searchObj.data.editorValue ?? "", "span_status", "'ERROR'"),
 );
 
 const searchData = (record = true) => {
@@ -2738,7 +2766,14 @@ const tracesShortcuts = [
   },
   {
     id: "tracesCopyUrl",
-    handler: () => copyTracesUrl(t),
+    // The shortcut copies without the Share button, so it applies the button's gate itself.
+    handler: () => {
+      if (tracesQueryNotRun(searchObj)) {
+        toast({ variant: "warning", message: t("search.autoRunPersistNeedsRun") });
+        return;
+      }
+      copyTracesUrl(t);
+    },
   },
   {
     id: "tracesNextRow",

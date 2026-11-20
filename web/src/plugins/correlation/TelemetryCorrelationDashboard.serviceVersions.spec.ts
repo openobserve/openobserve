@@ -7,6 +7,7 @@ import store from "@/test/unit/helpers/store";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import TelemetryCorrelationDashboard from "./TelemetryCorrelationDashboard.vue";
 import { correlationFixtures } from "./correlationVersions.fixtures";
+import { serviceKeySql } from "@/utils/serviceCount";
 
 const transport = vi.hoisted(() => ({
   get: vi.fn(),
@@ -36,12 +37,15 @@ vi.mock("@/composables/useStreamingSearch", () => ({
     cancelStreamQueryBasedOnRequestId: vi.fn(),
   }),
 }));
-vi.mock("@/composables/useServiceCorrelation", () => ({
-  useServiceCorrelation: () => ({
-    semanticGroups: { value: [{ id: "service", fields: ["service_name"] }] },
-    loadSemanticGroups: vi.fn(),
-  }),
-}));
+vi.mock("@/composables/useServiceCorrelation", async () => {
+  const { correlationFixtures } = await import("./correlationVersions.fixtures");
+  return {
+    useServiceCorrelation: () => ({
+      semanticGroups: { value: correlationFixtures.groups },
+      loadSemanticGroups: vi.fn(),
+    }),
+  };
+});
 vi.mock("@/plugins/traces/TraceDetails.vue", () => ({ default: { template: "<div />" } }));
 vi.mock("@/plugins/traces/components/TracesSearchResultList.vue", () => ({
   default: {
@@ -74,16 +78,20 @@ const props = {
   traceStreams: [
     { stream_name: "default", stream_type: "traces", filters: { service_name: "ingester" } },
   ],
+  sourceEvent: { timestamp: 1_500_000 },
   timeRange: { startTime: 1_000_000, endTime: 2_000_000 },
   mode: "dialog" as const,
 };
 let wrapper: VueWrapper | undefined;
-let schemaFields: string[] = correlationFixtures.traceFields.k8s;
+const stampedFields = [...correlationFixtures.traceFields.k8s, "o2_service_where"];
+let schemaFields: string[] = stampedFields;
 const $ = (id: string) => document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
 
 function serve(services: () => Promise<unknown>) {
   transport.get.mockImplementation(async (url: string) => {
     if (url.endsWith("/service_versions/_services")) return services();
+    if (url.endsWith("/service_streams/config/identity"))
+      return { data: correlationFixtures.identityConfig };
     if (url.startsWith("/api/default/streams/default/schema"))
       return correlationFixtures.traceSchema(schemaFields);
     return { data: {} };
@@ -111,6 +119,16 @@ async function render(overrides: Record<string, unknown> = {}) {
 type StreamRequest = { queryReq: { query?: { sql?: string }; filter?: string } };
 type StreamHandlers = { data: (a: unknown, r: unknown) => void; complete: () => void };
 let versionHits: Record<string, unknown>[] = versionRows;
+let traceHits: Record<string, unknown>[] = [];
+const traceHit = {
+  trace_id: "t1",
+  start_time: 1_500_000_000,
+  end_time: 1_500_100_000,
+  duration: 100,
+  spans: [1, 0],
+  first_event: { service_name: "ingester", operation_name: "GET /" },
+  service_name: [{ service_name: "ingester", count: 1, duration: 100 }],
+};
 const versionSearches = () =>
   stream.mock.calls
     .map(([request]: [StreamRequest]) => request.queryReq.query?.sql ?? "")
@@ -128,10 +146,11 @@ const lastTraceFilter = () =>
     .at(-1);
 
 beforeEach(() => {
-  schemaFields = correlationFixtures.traceFields.k8s;
+  schemaFields = stampedFields;
   Object.assign(route, reactive({ query: {} }));
   serve(async () => ({ data: { services: correlationFixtures.scopes, envs: [] } }));
   versionHits = versionRows;
+  traceHits = [];
   search.mockImplementation(async () => ({ data: { hits: [] } }));
   stream.mockImplementation(async (request: StreamRequest, handlers: StreamHandlers) => {
     if (request.queryReq.query?.sql?.includes("AS version"))
@@ -139,6 +158,8 @@ beforeEach(() => {
         type: "search_response_hits",
         content: { results: { hits: versionHits } },
       });
+    else if (traceHits.length)
+      handlers.data(request, { content: { results: { hits: traceHits } } });
     handlers.complete();
   });
 });
@@ -179,8 +200,6 @@ describe("correlation drawer service versions", () => {
         params: expect.objectContaining({ signal: "traces", service: "ingester" }),
       }),
     );
-    expect($("svcver-correlation-where")?.textContent).toContain("c1 · c1");
-    expect($("svcver-correlation-version")?.textContent).toContain("0.0.2");
     expect($("svcver-correlation-env-chip")).not.toBe(null);
   });
 
@@ -228,20 +247,36 @@ describe("correlation drawer service versions", () => {
     );
   });
 
-  it("shows the source pod's version and the versions-per-pods line", async () => {
-    const w = await render();
-    expect($("svcver-source-pod-version")?.textContent).toContain("c1-openobserve-ingester-7");
-    expect($("svcver-source-pod-version")?.textContent).toContain("v1.1.0-rc2");
-    await w.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "traces");
-    await flushPromises();
-    expect($("svcver-correlation-versions-line")?.textContent?.replace(/\s+/g, " ")).toContain(
-      "2 versions of ingester sent spans in this window:",
-    );
-    expect($("svcver-correlation-versions-line-v1.1.0-rc2")?.textContent).toContain("on 2 pods");
-    expect($("svcver-correlation-versions-line-v1.0.0")?.textContent).toContain("on 1 pod");
-  });
+  // The same pod name runs a newer version in another place, which must not reach this log's header.
+  it.each(["ingester", "Ingester"])(
+    "shows the version the spans of this log's applied dimensions run in its own place, titled %s",
+    async (display) => {
+      const pod = "c1-openobserve-ingester-7";
+      const applied = { stream_name: "default", stream_type: "traces", filters: { rack_id: pod } };
+      const podRows = [
+        { version: "v1.1.0-rc2", pod, last_seen: 30, where: "k8s:c1/c1" },
+        { version: "v9.0.0", pod, last_seen: 90, where: "k8s:c2/c1" },
+      ];
+      stream.mockImplementation(async (request: StreamRequest, handlers: StreamHandlers) => {
+        const sql = request.queryReq.query?.sql ?? "";
+        const pinned = (row: { where: string }) =>
+          !sql.includes("o2_service_where =") || sql.includes(`o2_service_where = '${row.where}'`);
+        const hits = sql.includes("o2_service_where =") ? podRows.filter(pinned) : versionRows;
+        if (sql.includes("AS version"))
+          handlers.data(request, { type: "search_response_hits", content: { results: { hits } } });
+        handlers.complete();
+      });
+      await render({ displayServiceName: display, traceStreams: [applied] });
+      expect($("svcver-correlation-version")?.textContent).toContain("v1.1.0-rc2");
+      expect($("svcver-correlation-version")?.textContent).not.toContain("0.0.2");
+      const instanceRead = versionSearches().find((sql) => sql.includes("o2_service_where ="));
+      expect(instanceRead).toContain(`"rack_id" = '${pod}'`);
+      expect(instanceRead).toContain(`${serviceKeySql("service_name")} = 'ingester'`);
+    },
+  );
 
   it("filters the traces tab on o2_service_version and keeps the service key in the query", async () => {
+    traceHits = [traceHit];
     const w = await render();
     await w.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "traces");
     await flushPromises();
@@ -260,11 +295,12 @@ describe("correlation drawer service versions", () => {
 
   it("reads the versions over the streaming search, never the one-shot search", async () => {
     await render();
-    expect(versionSearches()).toHaveLength(1);
+    // The versions list and the version of the log's own instance, each read once.
+    expect(versionSearches()).toHaveLength(2);
     expect(search).not.toHaveBeenCalled();
   });
 
-  it("hides the versions line when the streamed read comes back partial", async () => {
+  it("falls back to the service's version and offers no filter when the streamed read comes back partial", async () => {
     stream.mockImplementation(async (request: StreamRequest, handlers: StreamHandlers) => {
       if (request.queryReq.query?.sql?.includes("AS version")) {
         handlers.data(request, {
@@ -281,21 +317,19 @@ describe("correlation drawer service versions", () => {
     const w = await render();
     await w.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "traces");
     await flushPromises();
-    expect($("svcver-correlation-versions-line")).toBe(null);
-    expect($("svcver-source-pod-version")).toBe(null);
+    expect($("svcver-correlation-version")?.textContent).toContain("0.0.2");
+    expect(versionSelectOf(w)).toBeUndefined();
   });
 
   it("reads versions without a pod column when the trace stream has no Kubernetes attributes", async () => {
     schemaFields = correlationFixtures.traceFields.plain;
     versionHits = versionRows.map(({ version, last_seen }) => ({ version, last_seen }));
+    traceHits = [traceHit];
     const w = await render();
     expect(versionSearches()).toHaveLength(1);
     expect(versionSearches()[0]).not.toContain("pod");
     await w.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "traces");
     await flushPromises();
-    expect($("svcver-correlation-versions-line-v1.0.0")?.textContent).toContain("v1.0.0");
-    expect($("svcver-correlation-versions-line-v1.0.0")?.textContent).not.toContain("pod");
-    expect($("svcver-source-pod-version")).toBe(null);
     expect(versionSelectOf(w)).toBeDefined();
   });
 });
@@ -304,31 +338,15 @@ describe("correlation tabs in Source Details", () => {
   const embedded = { mode: "embedded-tabs" as const, externalActiveTab: "traces" };
 
   it("lists the correlated traces with a Version column", async () => {
-    const hit = {
-      trace_id: "t1",
-      start_time: 1_500_000_000,
-      end_time: 1_500_100_000,
-      duration: 100,
-      spans: [1, 0],
-      first_event: { service_name: "ingester", operation_name: "GET /" },
-      service_name: [{ service_name: "ingester", count: 1, duration: 100 }],
-    };
-    stream.mockImplementation(
-      async (
-        _request: unknown,
-        handlers: { data: (a: unknown, r: unknown) => void; complete: () => void },
-      ) => {
-        handlers.data(null, { content: { results: { hits: [hit] } } });
-        handlers.complete();
-      },
-    );
+    traceHits = [traceHit];
     const w = await render(embedded);
     const lists = w.findAllComponents({ name: "TracesSearchResultList" });
     expect(lists.length).toBeGreaterThan(0);
     expect(lists.map((list) => list.props("versionColumn"))).toEqual(lists.map(() => true));
   });
 
-  it("filters the traces on o2_service_version from the versions line and keeps the key", async () => {
+  it("filters the traces on o2_service_version from the list header and keeps the key", async () => {
+    traceHits = [traceHit];
     const w = await render(embedded);
     expect($("svcver-correlation-version-filter")).not.toBe(null);
     await versionSelectOf(w)!.vm.$emit("update:modelValue", "v1.0.0");

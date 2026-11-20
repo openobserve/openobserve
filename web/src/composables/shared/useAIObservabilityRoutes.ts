@@ -356,9 +356,9 @@ export const AI_OBSERVABILITY_SECTIONS: AiObservabilitySection[] = [
     requiresConfigFlag: "online_evals_enabled",
   },
   {
-    // Moved from Settings; listed, as there, while model pricing is on.
+    // Moved from Settings; listed, as there, while model pricing is on. Every edition prices traces.
     key: "modelPricing",
-    featureKey: "modelPricing",
+    featureKey: null,
     routeName: "modelPricing",
     path: "model-pricing",
     component: AIModelPricingPage,
@@ -391,7 +391,8 @@ export const AI_OBSERVABILITY_SECTIONS: AiObservabilitySection[] = [
  * an entity id).
  */
 interface AiObservabilitySubRoute {
-  featureKey: FeatureKey;
+  /** `null` = every edition, as for sections. */
+  featureKey: FeatureKey | null;
   routeName: string;
   path: string;
   component: () => Promise<unknown>;
@@ -403,7 +404,7 @@ interface AiObservabilitySubRoute {
 
 const AI_OBSERVABILITY_SUB_ROUTES: AiObservabilitySubRoute[] = [
   {
-    featureKey: "modelPricing",
+    featureKey: null,
     routeName: "modelPricingGaps",
     path: "model-pricing/gaps",
     component: AIModelPricingGapsPage,
@@ -411,7 +412,7 @@ const AI_OBSERVABILITY_SUB_ROUTES: AiObservabilitySubRoute[] = [
     after: "modelPricing",
   },
   {
-    featureKey: "modelPricing",
+    featureKey: null,
     routeName: "modelPricingEditor",
     path: "model-pricing/edit",
     component: AIModelPricingEditorPage,
@@ -555,9 +556,9 @@ export function useAIObservabilityRouteChildren(): RouteRecordRaw[] {
           ...sub.meta,
           titleKey: sub.metaTitleKey,
           keepAlive: false,
-          requiresOnlineEvals: !!ONLINE_EVAL_FEATURE_KEYS[sub.featureKey],
+          requiresOnlineEvals: !!sub.featureKey && !!ONLINE_EVAL_FEATURE_KEYS[sub.featureKey],
         },
-        beforeEnter: withFeatureGate(sub.featureKey, routeGuard),
+        ...(sub.featureKey ? { beforeEnter: withFeatureGate(sub.featureKey, routeGuard) } : {}),
       } as RouteRecordRaw);
     }
   }

@@ -217,6 +217,15 @@ export default class DashboardPanel {
     await this.goToLogs.click();
   }
 
+  // Go To Logs opens the Logs page in a new tab through a short URL that redirects to the full one.
+  async goToLogsInNewTab(panelName) {
+    const opened = this.page.context().waitForEvent("page");
+    await this.goToLogsPanel(panelName);
+    const logsTab = await opened;
+    await logsTab.waitForURL(/\/web\/logs\?.*query=/, { timeout: 30000 });
+    return logsTab;
+  }
+
   // Create Alert from panel dropdown menu
   async createAlertFromPanelMenu(panelName) {
     await this.page

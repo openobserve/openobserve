@@ -32,7 +32,7 @@ use tokio::sync::mpsc;
 use tracing::Instrument;
 
 use super::{
-    sorting::{TopKHeap, order_search_results},
+    sorting::order_search_results,
     utils::{calculate_progress_percentage, get_top_k_values},
 };
 use crate as SearchService;
@@ -143,30 +143,6 @@ pub async fn do_partitioned_search(
         );
     }
 
-    let non_ts_order_by_cols = partition_resp.non_ts_order_by_cols.clone();
-    let is_non_ts_order_by = !non_ts_order_by_cols.is_empty();
-    let original_from = req.query.from as usize;
-    let original_size = if req.query.size > 0 {
-        req.query.size as usize
-    } else {
-        0
-    };
-
-    // Incremental top-k heap for non-ts ORDER BY: fed one partition at a time so the
-    // heap never holds more than k = (from + size) elements regardless of partition count.
-    // When size == -1 (unlimited) fall back to the configured default limit.
-    let heap_k = if req.query.size > 0 {
-        original_from + original_size
-    } else {
-        config::get_config().limit.query_default_limit as usize
-    };
-    let mut topk_heap = if is_non_ts_order_by {
-        Some(TopKHeap::new(heap_k, &non_ts_order_by_cols))
-    } else {
-        None
-    };
-    let mut non_ts_has_partial = false;
-
     // The order by for the partitions is the same as the order by in the query
     // unless the query is a dashboard or histogram
     let mut partition_order_by = req_order_by;
@@ -213,21 +189,12 @@ pub async fn do_partitioned_search(
         req.query.start_time = start_time;
         req.query.end_time = end_time;
 
-        if is_non_ts_order_by {
-            // each partition fetches local top-(from+size); leader merges globally after all
-            // partitions. When size==-1 (unlimited) keep it as -1 so partition returns all data.
-            if req.query.size > 0 {
-                req.query.size = (original_from + original_size) as i64;
-            }
-            req.query.from = 0;
-        } else {
-            if req_size != -1 && !is_streaming_aggs {
-                req.query.size -= curr_res_size;
-            }
-            // increase size to fetch hits_to_skip + requested hits; start from partition beginning
-            req.query.size += *hits_to_skip;
-            req.query.from = 0;
+        if req_size != -1 && !is_streaming_aggs {
+            req.query.size -= curr_res_size;
         }
+        // increase size to fetch hits_to_skip + requested hits; start from partition beginning
+        req.query.size += *hits_to_skip;
+        req.query.from = 0;
 
         let trace_id = if partition_num == 1 {
             trace_id.to_string()
@@ -248,35 +215,31 @@ pub async fn do_partitioned_search(
 
         let mut total_hits = search_res.total as i64;
 
-        if !is_non_ts_order_by {
-            let skip_hits = std::cmp::min(*hits_to_skip, total_hits);
-            if skip_hits > 0 {
-                search_res.hits = search_res.hits[skip_hits as usize..].to_vec();
-                search_res.total = search_res.hits.len();
-                search_res.size = search_res.total as i64;
-                total_hits = search_res.total as i64;
-                *hits_to_skip -= skip_hits;
+        let skip_hits = std::cmp::min(*hits_to_skip, total_hits);
+        if skip_hits > 0 {
+            search_res.hits = search_res.hits[skip_hits as usize..].to_vec();
+            search_res.total = search_res.hits.len();
+            search_res.size = search_res.total as i64;
+            total_hits = search_res.total as i64;
+            *hits_to_skip -= skip_hits;
+            log::info!(
+                "[HTTP2_STREAM trace_id {trace_id}] Skipped {skip_hits} hits, remaining hits to skip: {hits_to_skip}, total hits for partition {idx}: {total_hits}",
+            );
+        }
+
+        if !is_streaming_aggs {
+            curr_res_size += total_hits;
+            if req_size > 0 && curr_res_size >= req_size {
                 log::info!(
-                    "[HTTP2_STREAM trace_id {trace_id}] Skipped {skip_hits} hits, remaining hits to skip: {hits_to_skip}, total hits for partition {idx}: {total_hits}",
+                    "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
                 );
-            }
-
-            if !is_streaming_aggs {
-                curr_res_size += total_hits;
-                if req_size > 0 && curr_res_size >= req_size {
-                    log::info!(
-                        "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), truncating results",
-                    );
-                    let allowed = (req_size - (curr_res_size - total_hits)) as usize;
-                    search_res.hits.truncate(allowed);
-                    search_res.total = search_res.hits.len();
-                }
+                let allowed = (req_size - (curr_res_size - total_hits)) as usize;
+                search_res.hits.truncate(allowed);
+                search_res.total = search_res.hits.len();
             }
         }
 
-        if !is_non_ts_order_by {
-            search_res = order_search_results(search_res, fallback_order_by_col.clone());
-        }
+        search_res = order_search_results(search_res, fallback_order_by_col.clone());
 
         // set took for this partition only (not cumulative)
         search_res.set_took(start_timer.elapsed().as_millis() as usize);
@@ -295,15 +258,7 @@ pub async fn do_partitioned_search(
         }
 
         // Accumulate the result
-        if is_non_ts_order_by {
-            // Feed directly into the heap — never stores more than k hits in memory
-            if search_res.is_partial {
-                non_ts_has_partial = true;
-            }
-            if let Some(ref mut heap) = topk_heap {
-                heap.push_hits(std::mem::take(&mut search_res.hits));
-            }
-        } else if is_streaming_aggs {
+        if is_streaming_aggs {
             // Only accumulate the results of the last partition
             if idx == partitions.len() - 1 {
                 accumulated_results.push(SearchResultType::Search(search_res.clone()));
@@ -335,18 +290,6 @@ pub async fn do_partitioned_search(
             let duration = instant.elapsed();
             log::debug!("Top k values for partition {idx} took {duration:?}");
         }
-        #[cfg(feature = "vectorscan")]
-        crate::cache::apply_regex_to_response(
-            &req,
-            org_id,
-            stream_name,
-            stream_type,
-            &mut search_res,
-            &trace_id,
-            "partitioned_search",
-        )
-        .await?;
-
         if is_result_array_skip_vrl {
             search_res.hits = crate::cache::apply_vrl_to_response(
                 backup_query_fn.clone(),
@@ -357,23 +300,19 @@ pub async fn do_partitioned_search(
             );
         }
 
-        // Send the cached response (skipped for non-ts ORDER BY — merged after all partitions
-        // complete)
-        if !is_non_ts_order_by {
-            let response = StreamResponses::SearchResponse {
-                results: search_res.clone(),
-                streaming_aggs: is_streaming_aggs,
-                streaming_id: partition_resp.streaming_id.clone(),
-                time_offset: TimeOffset {
-                    start_time,
-                    end_time,
-                },
-            };
+        let response = StreamResponses::SearchResponse {
+            results: search_res.clone(),
+            streaming_aggs: is_streaming_aggs,
+            streaming_id: partition_resp.streaming_id.clone(),
+            time_offset: TimeOffset {
+                start_time,
+                end_time,
+            },
+        };
 
-            if sender.send(Ok(response)).await.is_err() {
-                log::warn!("[trace_id {trace_id}] Sender is closed, stop sending response");
-                return Ok(());
-            }
+        if sender.send(Ok(response)).await.is_err() {
+            log::warn!("[trace_id {trace_id}] Sender is closed, stop sending response");
+            return Ok(());
         }
 
         // Send progress update
@@ -394,95 +333,22 @@ pub async fn do_partitioned_search(
                 return Ok(());
             }
         }
-        if !is_non_ts_order_by {
-            let stop_values_search = req_size != -1
-                && req_size != 0
-                && req.search_type == Some(SearchEventType::Values)
-                && curr_res_size >= req_size;
-            if stop_values_search {
-                log::info!(
-                    "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), stopping search",
-                );
-                break;
-            }
-            // Stop if reached the requested result size and it is not a streaming aggs query
-            if req_size != -1 && req_size != 0 && curr_res_size >= req_size && !is_streaming_aggs {
-                log::info!(
-                    "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), stopping search",
-                );
-                break;
-            }
-        }
-    }
-
-    // For non-ts ORDER BY: drain the heap (already bounded to k elements) into the final result
-    if is_non_ts_order_by {
-        let merged = topk_heap
-            .take()
-            .map(|h| h.into_sorted_vec(original_from))
-            .unwrap_or_default();
-
-        let mut final_res = Response::default();
-        final_res.hits = merged;
-        final_res.total = final_res.hits.len();
-        final_res.size = final_res.total as i64;
-
-        if non_ts_has_partial || !range_error.is_empty() {
-            final_res.is_partial = true;
-            if !range_error.is_empty() {
-                final_res.function_error = vec![range_error.clone()];
-                final_res.new_start_time = Some(modified_start_time);
-                final_res.new_end_time = Some(modified_end_time);
-            }
-        }
-
-        #[cfg(feature = "vectorscan")]
-        crate::cache::apply_regex_to_response(
-            req,
-            org_id,
-            stream_name,
-            stream_type,
-            &mut final_res,
-            trace_id,
-            "non_ts_order_by",
-        )
-        .await?;
-
-        if is_result_array_skip_vrl {
-            final_res.hits = crate::cache::apply_vrl_to_response(
-                backup_query_fn.clone(),
-                &mut final_res,
-                org_id,
-                stream_name,
-                trace_id,
+        let stop_values_search = req_size != -1
+            && req_size != 0
+            && req.search_type == Some(SearchEventType::Values)
+            && curr_res_size >= req_size;
+        if stop_values_search {
+            log::info!(
+                "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), stopping search",
             );
-            final_res.total = final_res.hits.len();
+            break;
         }
-
-        accumulated_results.push(SearchResultType::Search(final_res.clone()));
-
-        let response = StreamResponses::SearchResponse {
-            results: final_res,
-            streaming_aggs: false,
-            streaming_id: None,
-            time_offset: TimeOffset {
-                start_time: modified_start_time,
-                end_time: modified_end_time,
-            },
-        };
-        if sender.send(Ok(response)).await.is_err() {
-            log::warn!(
-                "[trace_id {trace_id}] Sender is closed, stop sending non-ts ORDER BY response"
+        // Stop if reached the requested result size and it is not a streaming aggs query
+        if req_size != -1 && req_size != 0 && curr_res_size >= req_size && !is_streaming_aggs {
+            log::info!(
+                "[HTTP2_STREAM trace_id {trace_id}] Reached requested result size ({req_size}), stopping search",
             );
-            return Ok(());
-        }
-        if sender
-            .send(Ok(StreamResponses::Progress { percent: 100 }))
-            .await
-            .is_err()
-        {
-            log::warn!("[trace_id {trace_id}] Sender is closed, stop sending progress");
-            return Ok(());
+            break;
         }
     }
 
@@ -909,18 +775,6 @@ pub async fn process_delta(
             search_res.total = hit_count as usize;
             search_res.hits = top_k_values;
         }
-        #[cfg(feature = "vectorscan")]
-        crate::cache::apply_regex_to_response(
-            &req,
-            org_id,
-            stream_name,
-            stream_type,
-            &mut search_res,
-            &trace_id,
-            "process_delta",
-        )
-        .await?;
-
         if is_result_array_skip_vrl {
             search_res.hits = crate::cache::apply_vrl_to_response(
                 backup_query_fn.clone(),
@@ -977,7 +831,6 @@ pub async fn process_delta(
                 org_id,
                 stream_name,
                 stream_type,
-                &req,
             )
             .await;
             break;
@@ -1053,7 +906,6 @@ async fn send_partial_search_resp(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    _req: &config::meta::search::Request,
 ) -> Result<(), infra::errors::Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
@@ -1070,17 +922,6 @@ async fn send_partial_search_resp(
         trace_id: trace_id.to_string(),
         ..Default::default()
     };
-    #[cfg(feature = "vectorscan")]
-    crate::cache::apply_regex_to_response(
-        _req,
-        org_id,
-        stream_name,
-        stream_type,
-        &mut s_resp,
-        trace_id,
-        "partial_search_resp",
-    )
-    .await?;
     if is_result_array_skip_vrl {
         s_resp.hits = crate::cache::apply_vrl_to_response(
             backup_query_fn.clone(),
@@ -1281,7 +1122,6 @@ mod tests {
             "test-org",
             "test-stream",
             StreamType::Logs,
-            &config::meta::search::Request::default(),
         )
         .await;
 
@@ -1320,7 +1160,6 @@ mod tests {
             "test-org",
             "test-stream",
             StreamType::Logs,
-            &config::meta::search::Request::default(),
         )
         .await;
 
@@ -1358,7 +1197,6 @@ mod tests {
             "test-org",
             "test-stream",
             StreamType::Logs,
-            &config::meta::search::Request::default(),
         )
         .await;
 

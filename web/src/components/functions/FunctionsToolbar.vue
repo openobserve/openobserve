@@ -13,6 +13,8 @@
     "
   >
     <template #title>
+      <!-- Embedded (workflow NDV) asks for the name at save time instead. Standalone, Enter saves like
+           the panel and alert titles: an unused function has no effect, so an early save is harmless. -->
       <OFormInlineEdit
         v-if="!embedded"
         name="name"

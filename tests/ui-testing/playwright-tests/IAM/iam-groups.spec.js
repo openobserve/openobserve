@@ -294,7 +294,7 @@ test.describe('IAM · User Groups', { tag: '@enterprise' }, () => {
     });
 
     // ---------------- GR-04 (B1 regression) ----------------
-    test.fixme(
+    test(
         'GR-04 · an empty group must not claim the org has no roles [o2-enterprise#2696]',
         { tag: ['@iam', '@iamGroups', '@P2', '@bug', '@all'] },
         async ({ page }, testInfo) => {
@@ -308,18 +308,16 @@ test.describe('IAM · User Groups', { tag: '@enterprise' }, () => {
             await pm.groupsPage.gotoGroups();
             await pm.groupsPage.openGroup(name);
 
-            // Default view is Selected with nothing selected. GroupRoles.vue drives
-            // OEmptyState's `filtered` off the SEARCH BOX only, so it falls through
-            // to the org-level `no-roles` preset and tells the user to create a role
-            // they already have.
-            const empty = pm.groupsPage.rolesTable.locator('..').getByText(/no roles/i);
+            const empty = pm.groupsPage.noneSelectedState('roles');
+            await expect(empty).toBeVisible({ timeout: 15000 });
+            await expect(empty).toContainText('No roles selected');
+            await expect(empty).toContainText(/switch to all/i);
             await expect(empty).not.toContainText('Create a custom role');
-            await expect(empty).toContainText(/selected|switch to all/i);
         },
     );
 
     // ---------------- GR-05 (B1, layout half) ----------------
-    test.fixme(
+    test(
         'GR-05 · the empty-state description is not clipped by the pagination bar [o2-enterprise#2696]',
         { tag: ['@iam', '@iamGroups', '@P2', '@bug', '@all'] },
         async ({ page }, testInfo) => {
@@ -330,14 +328,20 @@ test.describe('IAM · User Groups', { tag: '@enterprise' }, () => {
             await pm.groupsPage.gotoGroups();
             await pm.groupsPage.openGroup(name);
 
-            // The hero empty state renders inside a pane whose footer overlaps it;
-            // on pentest the copy ended mid-sentence at "...Create a custom role to control".
-            const desc = page.locator('[data-test="o2-empty-state-text"]').first();
-            await expect(desc).toBeVisible();
+            const desc = pm.groupsPage.noneSelectedDescription('roles');
+            await expect(desc).toBeVisible({ timeout: 15000 });
+            await expect(desc).toHaveText(/Switch to All to select one\.$/);
             const clipped = await desc.evaluate(
                 (el) => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1,
             );
             expect(clipped, 'empty-state description is visually truncated').toBe(false);
+            await expect(desc).toBeInViewport({ ratio: 1 });
+            // A footer drawn over the text leaves the scroll sizes unchanged, so only a hit test at the last line sees it.
+            const lastLineCovered = await desc.evaluate((el) => {
+                const r = el.getBoundingClientRect();
+                return !el.contains(document.elementFromPoint(r.left + r.width / 2, r.bottom - 2));
+            });
+            expect(lastLineCovered, 'a footer or clipping pane covers the last line of the description').toBe(false);
         },
     );
 

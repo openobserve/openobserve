@@ -755,6 +755,15 @@ describe("sessionReplayChangeFormat", () => {
       expect(nodeWithId(converter.snapshot()!.node, 1).attributes.value).toBe("literal");
     });
 
+    it("skips InputValue entries that are not arrays", () => {
+      const converter = createRecordConverter();
+      converter.convert(fullSnapshot([[ADD_NODE, [null, "#document"], [1, "INPUT"]]]));
+      const out = converter.convert(change(1100, [[INPUT_VALUE, null, 7, "x", [1, "kept"]]]));
+      expect(out).toEqual([
+        { type: 3, timestamp: 1100, data: { source: 5, id: 1, text: "kept", isChecked: false } },
+      ]);
+    });
+
     it("maps InputSelection on checkboxes and radios to isChecked, and skips anything else", () => {
       const converter = createRecordConverter();
       converter.convert(

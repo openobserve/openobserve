@@ -89,6 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="primary"
               size="sm"
+              :disabled="!canFilter"
+              :disabled-reason="filterBlockedTooltip"
               data-test="pattern-detail-include-btn"
               @click="onInclude"
             >
@@ -98,6 +100,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="danger-ghost"
               size="sm"
+              :disabled="!canFilter"
+              :disabled-reason="filterBlockedTooltip"
               data-test="pattern-detail-exclude-btn"
               @click="onExclude"
             >
@@ -129,6 +133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="primary"
               size="sm"
               icon="notifications"
+              :disabled="!canFilter"
+              :disabled-reason="filterBlockedTooltip"
               data-test="pattern-detail-create-alert-btn"
               @click="onCreateAlert"
             >
@@ -154,8 +160,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? t('logs.patternList.exactCountTooltip', {
                             count: volumeCount.toLocaleString(),
                           })
-                        : undefined
+                        : volumeUnavailableTitle
                     "
+                    data-test="pattern-detail-occurrences"
                   >
                     {{ occurrencesLabel }}
                   </div>
@@ -392,14 +399,23 @@ import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
 import analytics from "@/services/product_analytics";
 import { extractStatusFromTemplate } from "@/utils/logs/statusParser";
-import { compactCount } from "./patternUtils";
+import { compactCount, FILTER_BLOCKED_MESSAGE } from "./patternUtils";
 import { PATTERN_VOLUME_CACHE, type PatternVolumeCache } from "./usePatternVolume";
 
-const props = defineProps<{
-  modelValue: boolean;
-  selectedPattern: { pattern: any; index: number } | null;
-  totalPatterns: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean;
+    selectedPattern: { pattern: any; index: number } | null;
+    totalPatterns: number;
+    filterBlockedReason?: "none" | "shared" | null;
+  }>(),
+  { filterBlockedReason: null },
+);
+
+const canFilter = computed(() => !props.filterBlockedReason);
+const filterBlockedTooltip = computed(() =>
+  t(FILTER_BLOCKED_MESSAGE[props.filterBlockedReason ?? "none"]),
+);
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: boolean): void;
@@ -434,9 +450,15 @@ watch(
   { immediate: true },
 );
 
-const occurrencesLabel = computed(() =>
-  volumeCount.value !== null ? `~${compactCount(volumeCount.value)}` : "…",
-);
+const volumeUnavailableTitle = computed(() => {
+  const reason = volumeEntry.value?.unavailableReason;
+  return reason && volumeCount.value === null ? t(FILTER_BLOCKED_MESSAGE[reason]) : undefined;
+});
+
+const occurrencesLabel = computed(() => {
+  if (volumeCount.value !== null) return `~${compactCount(volumeCount.value)}`;
+  return volumeUnavailableTitle.value ? "—" : "…";
+});
 
 // Row-level actions now live in this side panel. Each fires the action and
 // closes the drawer (include/exclude switch to the logs view; create-alert
@@ -452,7 +474,7 @@ const onExclude = () => {
   emit("update:modelValue", false);
 };
 const onCreateAlert = () => {
-  if (!props.selectedPattern || alertsLocked.value) return;
+  if (!props.selectedPattern || alertsLocked.value || !canFilter.value) return;
   analytics.track("log_patterns_alert_started");
   emit("create-alert", props.selectedPattern.pattern);
   emit("update:modelValue", false);

@@ -28,9 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   router-view), `constrained` for a reading column, `scroll` when the whole body scrolls.
 -->
 <template>
-  <!-- Named container: the header's status compacts on the page's width, which the AI panel narrows without changing the viewport. -->
+  <!-- Named container: the header's status compacts on the page's width, which the AI panel narrows without changing the viewport.
+       Clipped on y so the body's entry slide never overflows MainLayout's scroll box and flashes its scrollbar. -->
   <div
-    class="@container/page flex h-full flex-col"
+    class="@container/page flex h-full flex-col overflow-y-clip"
     :data-o2-page-frame="showsOwnBody ? undefined : ''"
   >
     <div v-if="hasHeader" data-o2-page-shell :class="headerClass ?? 'shrink-0'">

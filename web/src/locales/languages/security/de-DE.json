@@ -312,7 +312,7 @@
       "source": "Quelle",
       "matchedRules": "{n} Erkennung stimmte überein | {n} Erkennungen stimmten überein",
       "openCase": "Fall eröffnen",
-      "openCaseHint": "Einen Fall zu diesem Ereignis eröffnen, mit vorausgefülltem Titel, Priorität und Entitäten",
+      "openCaseHint": "Öffnen Sie zu diesem Ereignis einen Fall, wobei Titel, Priorität und Entitäten bereits ausgefüllt sind.",
       "addToCase": "Zu Fall hinzufügen",
       "pickCase": "Zu einem offenen Fall hinzufügen",
       "caseOpened": "Fall eröffnet: {title}",
@@ -936,8 +936,8 @@
       "correlationWindow": "Durch die Zeitspanne der Korrelation festgelegt",
       "createForbidden": "Zum Erstellen einer Erkennung ist die Security-Berechtigung erforderlich",
       "preview": {
-        "run": "Vorschau auf Verlauf",
-        "hint": "Führt die Regel wie der Scheduler über den gewählten Zeitraum aus und zeigt, was ausgelöst worden wäre",
+        "run": "Vorschau im Verlauf",
+        "hint": "Führt die Regel wie der Scheduler über den gewählten Bereich aus und gibt an, was ausgelöst worden wäre.",
         "failed": "Die Abfrage ist fehlgeschlagen: {reason}",
         "time": "Zeit",
         "range": {
@@ -1111,7 +1111,7 @@
       "stat": {
         "ready": "Bereit zur Installation",
         "installed": "Installiert",
-        "applies": "Passen zu Ihren Quellen",
+        "applies": "Übereinstimmung mit Ihren Quellen",
         "readyHint": "Regeln, die auf mindestens einem Ihrer Streams laufen und noch nicht installiert sind",
         "appliesHint": "Regeln für eine Logquelle, die Sie haben, installiert oder nicht; umfasst jede installationsbereite Regel",
         "allRules": "Alle Regeln",
@@ -1720,7 +1720,7 @@
     },
     "audit": {
       "title": "Änderungsprotokoll",
-      "hint": "Wer Erkennungen, Quellen, Fälle und Security-Rollenzuweisungen geändert hat, solange das Änderungsprotokoll aufbewahrt wird",
+      "hint": "Wer Erkennungen, Quellen, Fälle und Zuweisungen von Sicherheitsrollen geändert hat, solange das Audit-Protokoll aufbewahrt wird",
       "includeReads": "Lesezugriffe einbeziehen",
       "when": "Wann",
       "who": "Geändert von",

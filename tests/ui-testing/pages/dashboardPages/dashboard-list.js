@@ -11,6 +11,40 @@ export default class DashboardListPage {
     // info span that renders "X–Y of Z".
     this.nextPageBtn = page.locator('[data-test="o2-table-next-page-btn"]');
     this.paginationInfo = page.locator('[data-test="o2-table-pagination-info"]');
+    this.dashboardTable = page.locator('[data-test="dashboard-table"]');
+    this.dashboardNotFoundToast = page
+      .locator('[data-test="o-toast-message"]')
+      .filter({ hasText: "Dashboard not found" });
+  }
+
+  async expectListInOrg(orgId) {
+    await expect(this.page).toHaveURL(
+      (url) =>
+        url.pathname.replace(/\/+$/, "").endsWith("/dashboards") &&
+        url.searchParams.get("org_identifier") === orgId,
+      { timeout: 20000 },
+    );
+    await expect(this.dashboardTable).toBeVisible({ timeout: 20000 });
+  }
+
+  /** Resolves when the org's dashboard list response arrives; start it before the action that loads the list. */
+  waitForListResponse(orgId) {
+    return this.page.waitForResponse(
+      (res) =>
+        res.request().method() === "GET" &&
+        new URL(res.url()).pathname === `/api/${orgId}/dashboards`,
+      { timeout: 30000 },
+    );
+  }
+
+  async expectNoDashboardNotFoundToast() {
+    await expect(this.dashboardNotFoundToast).toHaveCount(0);
+  }
+
+  // The list pushes its folder as a second entry, so one Back never reaches an old id; the Navigation API lists them all.
+  async expectNoHistoryEntryForDashboard(dashboardId) {
+    const entries = await this.page.evaluate(() => window.navigation.entries().map((entry) => entry.url));
+    expect(entries.filter((url) => url.includes(`dashboard=${dashboardId}`)), 'history entries holding the old dashboard id').toEqual([]);
   }
 
   // Duplicate dashboard

@@ -538,6 +538,7 @@ const statusHints = computed<Record<string, I18nText>>(() =>
 const fetching = computed(() => linksQuery.isFetching.value || statusQuery.isFetching.value);
 const refreshLinks = () =>
   Promise.all([linksQuery.refetch(), statusIds.value.length ? statusQuery.refetch() : null]);
+defineExpose({ refreshLinks });
 
 const pauseMutation = useMutation(() => setPublicLinkPausedMutation(orgId.value));
 const revokeMutation = useMutation(() => revokePublicLinkMutation(orgId.value));

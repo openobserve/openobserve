@@ -1352,4 +1352,94 @@ export class AlertTemplatesPage {
         await expect(this.page.locator(this.prebuiltBadge).first()).toBeVisible();
         return true;
     }
-} 
+
+    /** Type into the list's own search box, which filters rows client-side. */
+    async filterTemplateList(text) {
+        const input = this.page.locator('[data-test="template-list-search-input"] input').first();
+        await input.waitFor({ state: 'visible', timeout: 30000 });
+        await input.fill(text);
+        await expect(input).toHaveValue(text);
+    }
+
+    templateRow(templateName) {
+        return this.page.locator(`[data-test="alert-template-list-${templateName}-applies-to"]`);
+    }
+
+    async expectTemplateRowsShown(names) {
+        for (const name of names) {
+            await expect(this.templateRow(name)).toBeVisible({ timeout: 30000 });
+        }
+    }
+
+    async expectTemplateRowHidden(templateName) {
+        await expect(this.templateRow(templateName)).toHaveCount(0, { timeout: 10000 });
+    }
+
+    async selectAllShownTemplates(names) {
+        await this.page.locator(this.headerCheckbox).first().click();
+        for (const name of names) {
+            const row = this.page.getByRole('row').filter({ has: this.templateRow(name) });
+            await expect(row.getByRole('checkbox')).toBeChecked();
+        }
+    }
+
+    async bulkDeleteSelectedTemplates() {
+        await this.page.locator(this.bulkDeleteBtn).click();
+        await this.page.locator(this.confirmDialog).waitFor({ state: 'visible', timeout: 10000 });
+        const [request] = await Promise.all([
+            this.page.waitForRequest((r) => r.method() === 'DELETE' && r.url().includes('/alerts/templates/bulk')),
+            this.page.locator(this.confirmButton).click(),
+        ]);
+        expect(await request.response(), 'the bulk DELETE got an answer').not.toBeNull();
+        return (request.postDataJSON() || {}).ids || [];
+    }
+
+    async templateStatusViaApi(templateName) {
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const org = process.env.ORGNAME || 'default';
+        const url = `${baseUrl}/api/${org}/alerts/templates/${encodeURIComponent(templateName)}`;
+        return (await authedRequest(this.page, 'get', url)).status();
+    }
+
+    async templateAppliesToViaApi(templateName) {
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        const org = process.env.ORGNAME || 'default';
+        const url = `${baseUrl}/api/${org}/alerts/templates/${encodeURIComponent(templateName)}`;
+        const response = await authedRequest(this.page, 'get', url);
+        expect(response.status(), `template ${templateName} must load`).toBe(200);
+        return (await response.json()).applies_to || [];
+    }
+
+    /** Toggle Applies to kinds in the given order, then close the picker. */
+    async toggleAppliesToKinds(kinds) {
+        const popover = this.page.locator('[data-test="add-template-applies-to-select-popover"]');
+        await this.page.locator('[data-test="add-template-applies-to-select-trigger"]').click();
+        await popover.waitFor({ state: 'visible', timeout: 10000 });
+        for (const kind of kinds) {
+            await popover.locator(`[data-test="add-template-applies-to-select-option"][data-test-value="${kind}"]`).click();
+        }
+        await this.page.keyboard.press('Escape');
+        await popover.waitFor({ state: 'hidden', timeout: 10000 });
+    }
+
+    /** `kinds` in the form's kind order, as the trigger joins them. */
+    async expectAppliesToSelected(kinds) {
+        await expect(this.page.locator('[data-test="add-template-applies-to-select-trigger"]'))
+            .toHaveAttribute('data-test-selected-value', kinds.join(','), { timeout: 10000 });
+    }
+
+    async submitTemplateAndWaitForSave(templateName) {
+        const [response] = await Promise.all([
+            this.page.waitForResponse((r) => r.request().method() === 'PUT'
+                && r.url().includes(`/alerts/templates/${encodeURIComponent(templateName)}`)),
+            this.page.locator(this.templateSubmitButton).click(),
+        ]);
+        return response.status();
+    }
+
+    async expectAppliesToError(parts) {
+        const error = this.page.locator('[data-test="add-template-applies-to-select-error"]');
+        await expect(error).toBeVisible({ timeout: 10000 });
+        for (const part of parts) await expect(error).toContainText(part);
+    }
+}

@@ -16,6 +16,7 @@
 pub mod agent_signals;
 pub mod ai;
 pub mod alerts;
+pub mod anomaly_detection;
 pub mod autoobserve;
 pub mod cluster;
 pub mod correlation;
@@ -41,7 +42,6 @@ pub mod organization;
 pub mod otlp;
 pub mod pipeline;
 pub mod plan;
-pub mod projections;
 pub mod promql;
 pub mod public_dashboards;
 pub mod queue_store;

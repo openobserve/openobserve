@@ -356,13 +356,7 @@ async fn persist_alert_run_state_deferred(
             .unwrap_or(false)
         });
     if transition_changed || stale_to_fresh {
-        nudge_composite_parents(
-            &alert.org_id,
-            alert_id,
-            infra::table::alert_composites::ChildKind::Alert,
-            now,
-        )
-        .await;
+        nudge_composite_parents(&alert.org_id, alert_id, now).await;
     }
     Some(vec![])
 }
@@ -447,13 +441,7 @@ async fn persist_group_run_state(
             .unwrap_or(false)
         });
     if transition_changed || stale_to_fresh {
-        nudge_composite_parents(
-            &alert.org_id,
-            alert_id,
-            infra::table::alert_composites::ChildKind::Alert,
-            at,
-        )
-        .await;
+        nudge_composite_parents(&alert.org_id, alert_id, at).await;
     }
     Some(
         write
@@ -1298,16 +1286,11 @@ fn composite_stale_k() -> i64 {
 /// they observe (a level/outcome transition, or a stale-to-fresh return at the
 /// same level). Idempotent and coalesced: `next_run_at` is only ever pulled
 /// earlier, never pushed out.
-async fn nudge_composite_parents(
-    org: &str,
-    child_id: &str,
-    child_kind: infra::table::alert_composites::ChildKind,
-    now: i64,
-) {
+async fn nudge_composite_parents(org: &str, child_id: &str, now: i64) {
     let parents = match infra::table::alert_composites::list_parents(
         get_orm_client_ro().await,
         org,
-        child_kind,
+        infra::table::alert_composites::ChildKind::Alert,
         child_id,
     )
     .await
@@ -1354,6 +1337,30 @@ async fn nudge_composite_parents(
     }
 }
 
+/// Pauses a composite that references another composite; only legacy rows do, and none can run.
+async fn pause_if_nested(
+    composite: &infra::table::alert_composites::CompositeWithChildren,
+) -> Result<bool, anyhow::Error> {
+    use infra::table::alert_composites::ChildKind;
+
+    let Some(child) = composite
+        .children
+        .iter()
+        .find(|child| child.child_kind == ChildKind::Composite as i16)
+    else {
+        return Ok(false);
+    };
+    let definition = &composite.definition;
+    log::warn!(
+        "[COMPOSITE_ALERT] pausing {}/{}: child {} is a composite, which composites no longer reference",
+        definition.org,
+        definition.id,
+        child.child_alert_id
+    );
+    crate::alerts::composite::set_composite_enabled(&definition.org, &definition.id, false).await?;
+    Ok(true)
+}
+
 /// Composite jobs are routed explicitly by their append-only scheduler
 /// module. The definition/evaluation service is intentionally separate from
 /// the query-alert handler so a composite can never execute child queries.
@@ -1361,19 +1368,6 @@ async fn handle_composite_alert_trigger(
     trace_id: &str,
     mut trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
-        infra::scheduler::delete(
-            &trigger.org,
-            db::scheduler::TriggerModule::CompositeAlert,
-            &trigger.module_key,
-        )
-        .await?;
-        return Ok(());
-    }
     // Until a production database-backed evaluator can obtain the metadata
     // transaction used for state fencing, a missing/stale definition is
     // completed safely through the epoch-fenced scheduler seam. This path is
@@ -1397,6 +1391,9 @@ async fn handle_composite_alert_trigger(
             &trigger.module_key,
         )
         .await?;
+        return Ok(());
+    }
+    if pause_if_nested(&definition).await? {
         return Ok(());
     }
     let mut scheduled_data: config::meta::triggers::ScheduledTriggerData =
@@ -1423,7 +1420,6 @@ async fn handle_composite_alert_trigger(
     let resolved =
         infra::table::alert_composites::resolve_many(db, &trigger.org, &child_ids).await?;
     let stale_k = composite_stale_k();
-    let composite_sweep_seconds = composite_sweep_secs();
     let mut children = Vec::with_capacity(definition.children.len());
     for child in &definition.children {
         let state = states.get(&child.child_alert_id);
@@ -1457,18 +1453,9 @@ async fn handle_composite_alert_trigger(
                         stale_deadline,
                     )
                 }
-                Some(infra::table::alert_composites::Resolution::Composite(model)) => (
-                    model.name.clone(),
-                    "composite",
-                    model.enabled,
-                    composite_sweep_seconds,
-                    state.and_then(|state| state.level_at).and_then(|level_at| {
-                        composite_sweep_seconds
-                            .checked_mul(stale_k)
-                            .and_then(|seconds| seconds.checked_mul(1_000_000))
-                            .and_then(|window| level_at.checked_add(window))
-                    }),
-                ),
+                Some(infra::table::alert_composites::Resolution::Composite(_)) => {
+                    anyhow::bail!("composite child is not eligible")
+                }
                 _ => anyhow::bail!("composite child definition missing"),
             };
         children.push(crate::alerts::composite::CompositeStateInput {
@@ -1575,8 +1562,7 @@ async fn handle_composite_alert_trigger(
         let _ = infra::scheduler::complete_claim(trigger).await?;
         return Ok(());
     }
-    infra::table::alert_states::persist_update_in_transaction(&transaction, &update).await?;
-    transaction.commit().await?;
+    db::alerts::alert_states::persist_and_commit(transaction, &update).await?;
     if let Some(c) = crate::alerts::lifecycle::update_clear(
         previous.as_ref(),
         &update,
@@ -1849,31 +1835,6 @@ async fn handle_composite_alert_trigger(
         next_run_at: trigger.next_run_at,
         ..Default::default()
     });
-
-    let significant = previous.as_ref().is_none_or(|previous| {
-        previous.level != Some(evaluated.level)
-            || previous.last_outcome.as_ref() != Some(&outcome)
-            || previous.level_at.is_some_and(|level_at| {
-                // Composite staleness is measured against
-                // `ZO_ALERT_COMPOSITE_STALE_K * ZO_ALERT_COMPOSITE_SWEEP_SECS`.
-                // If the composite was stale before this run and just wrote a
-                // fresh `level_at`, its parent must re-evaluate even at an
-                // unchanged level.
-                let window = composite_stale_k()
-                    .saturating_mul(composite_sweep_secs())
-                    .saturating_mul(1_000_000);
-                now.saturating_sub(level_at) > window
-            })
-    });
-    if significant {
-        nudge_composite_parents(
-            &trigger.org,
-            &definition.definition.id,
-            infra::table::alert_composites::ChildKind::Composite,
-            now,
-        )
-        .await;
-    }
 
     // A list kept past the cycle would skip those destinations on the next firing.
     if delivery_retry_at.is_none() {
@@ -2837,6 +2798,7 @@ async fn trigger_rca_for_alert_firing(
             alert_name: Some(alert_name.clone()),
             stream: Some(stream_name.clone()),
             dimensions,
+            evidence: None,
         };
 
         // The turn's finalizer delivers the report to `oncall_subjects` or releases them.
@@ -6745,10 +6707,15 @@ async fn handle_backfill_triggers(
 
                 // Initiate deletion for all streams
                 let mut deletion_job_ids = Vec::new();
-                let mut failed = false;
-                let mut error_msg = String::new();
+                // every range is validated before any deletion is queued: a queued one stays
+                let (start, end) = (config.start_time, config.end_time);
+                let ranges =
+                    validated_deletion_ranges(&org_id, &destination_streams, start, end).await;
+                let mut error_msg = ranges.as_ref().err().cloned().unwrap_or_default();
+                let mut failed = ranges.is_err();
 
-                for (idx, stream) in destination_streams.iter().enumerate() {
+                let validated = destination_streams.iter().zip(ranges.unwrap_or_default());
+                for (idx, (stream, range)) in validated.enumerate() {
                     log::debug!(
                         "[BACKFILL trace_id {trace_id}] [job_id: {}] Initiating deletion for stream {}/{} ({}/{})",
                         job_id,
@@ -6758,14 +6725,7 @@ async fn handle_backfill_triggers(
                         destination_streams.len()
                     );
 
-                    match initiate_stream_deletion(
-                        &trigger.org,
-                        stream,
-                        config.start_time,
-                        config.end_time,
-                    )
-                    .await
-                    {
+                    match initiate_stream_deletion(&trigger.org, stream, &range).await {
                         Ok(deletion_job_id) => {
                             deletion_job_ids.push(deletion_job_id.clone());
                             log::debug!(
@@ -7594,40 +7554,66 @@ fn get_destination_stream_from_pipeline(
     }
 }
 
-/// Helper function to initiate stream deletion
+/// The deletion range of every destination, or the reason the first unsafe one is refused.
+async fn validated_deletion_ranges(
+    org_id: &str,
+    streams: &[StreamParams],
+    start_time: i64,
+    end_time: i64,
+) -> Result<Vec<(String, String)>, String> {
+    let mut ranges = Vec::with_capacity(streams.len());
+    for stream in streams {
+        let range = match crate::alerts::backfill::delete_covers_daily_days(
+            org_id, stream, start_time, end_time,
+        )
+        .await
+        {
+            Ok(whole_days) => deletion_range(start_time, end_time, whole_days),
+            Err(e) => Err(e),
+        };
+        ranges.push(range.map_err(|e| {
+            let msg = format!(
+                "Failed to initiate deletion for stream {}/{}: {e}",
+                stream.stream_type, stream.stream_name
+            );
+            log::error!("[BACKFILL] [org_id: {org_id}] {msg}");
+            msg
+        })?);
+    }
+    Ok(ranges)
+}
+
+/// Only a logs delete outside a daily day is sent by the hour; every other one is sent by date.
+fn deletion_range(
+    start_time: i64,
+    end_time: i64,
+    whole_days: bool,
+) -> Result<(String, String), anyhow::Error> {
+    use chrono::TimeZone;
+
+    let format = if whole_days {
+        "%Y-%m-%d"
+    } else {
+        "%Y-%m-%dT%H:00:00Z"
+    };
+    let formatted = |micros: i64, name: &str| {
+        Utc.timestamp_micros(micros)
+            .single()
+            .map(|ts| ts.format(format).to_string())
+            .ok_or_else(|| anyhow::anyhow!("Invalid {name}"))
+    };
+    Ok((
+        formatted(start_time, "start_time")?,
+        formatted(end_time, "end_time")?,
+    ))
+}
+
+/// Queues the deletion of one validated range.
 async fn initiate_stream_deletion(
     org_id: &str,
     stream: &StreamParams,
-    start_time: i64,
-    end_time: i64,
+    (time_range_start, time_range_end): &(String, String),
 ) -> Result<String, anyhow::Error> {
-    use chrono::TimeZone;
-    use config::meta::stream::StreamType;
-
-    // Convert microseconds to formatted time range strings
-    let time_range_start = {
-        let ts = Utc
-            .timestamp_micros(start_time)
-            .single()
-            .ok_or_else(|| anyhow::anyhow!("Invalid start_time"))?;
-        if stream.stream_type == StreamType::Logs {
-            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
-        } else {
-            ts.format("%Y-%m-%d").to_string()
-        }
-    };
-    let time_range_end = {
-        let ts = Utc
-            .timestamp_micros(end_time)
-            .single()
-            .ok_or_else(|| anyhow::anyhow!("Invalid end_time"))?;
-        if stream.stream_type == StreamType::Logs {
-            ts.format("%Y-%m-%dT%H:00:00Z").to_string()
-        } else {
-            ts.format("%Y-%m-%d").to_string()
-        }
-    };
-
     // Create deletion job using existing retention service
     let (key, _created) = crate::db::compact::retention::delete_stream(
         org_id,
@@ -10845,6 +10831,112 @@ mod tests {
         );
         handle_triggers("t", row).await.unwrap();
         assert!(infra::scheduler::get(&org, module, "engine").await.is_err());
+    }
+
+    /// Stores an enabled composite over `children` and returns its claimed scheduler job.
+    async fn claimed_composite(
+        org: &str,
+        id: &str,
+        expression: String,
+        children: &[(&str, infra::table::alert_composites::ChildKind)],
+    ) -> db::scheduler::Trigger {
+        use infra::table::entity::{alert_composite_children, alert_composites};
+        use sea_orm::{ActiveModelTrait, ActiveValue::Set};
+
+        let definition = alert_composites::Model {
+            id: id.to_string(),
+            org: org.to_string(),
+            folder_id: "default".to_string(),
+            name: id.to_string(),
+            expression,
+            destinations: serde_json::json!([]),
+            workflows: serde_json::json!([]),
+            enabled: true,
+            ..Default::default()
+        };
+        let rows = children
+            .iter()
+            .enumerate()
+            .map(
+                |(order, (child, kind))| alert_composite_children::ActiveModel {
+                    composite_id: Set(id.to_string()),
+                    child_alert_id: Set(child.to_string()),
+                    child_kind: Set(*kind as i16),
+                    display_order: Set(order as i32),
+                },
+            )
+            .collect();
+        infra::table::alert_composites::create_with_children(
+            infra::db::get_orm_client_rw().await,
+            alert_composites::ActiveModel::from(definition).reset_all(),
+            rows,
+        )
+        .await
+        .unwrap();
+        let module = db::scheduler::TriggerModule::CompositeAlert;
+        infra::scheduler::push(db::scheduler::Trigger {
+            org: org.to_string(),
+            module: module.clone(),
+            module_key: id.to_string(),
+            next_run_at: 1,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let status = db::scheduler::TriggerStatus::Processing;
+        infra::scheduler::update_status(org, module.clone(), id, status, 0, None)
+            .await
+            .unwrap();
+        infra::scheduler::get(org, module, id).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_composite_with_a_composite_child_is_paused_and_an_ordinary_one_evaluates() {
+        use config::meta::alerts::state::ROLLUP_GROUP_KEY;
+        use infra::table::alert_composites::ChildKind;
+        use svix_ksuid::KsuidLike;
+
+        let Some(alert) = stored_host_alert("composite_nesting", &[], 0).await else {
+            return;
+        };
+        let org = alert.org_id.as_str();
+        let child = alert.id.unwrap().to_string();
+        let new_id = || svix_ksuid::Ksuid::new(None, None).to_string();
+        let (plain, legacy) = (new_id(), new_id());
+
+        let job = claimed_composite(
+            org,
+            &plain,
+            format!("{{{child}}}"),
+            &[(&child, ChildKind::Alert)],
+        )
+        .await;
+        handle_composite_alert_trigger("t", job).await.unwrap();
+        let rollup = infra::table::alert_states::get(&plain, ROLLUP_GROUP_KEY).await;
+        assert!(rollup.unwrap().is_some(), "an ordinary composite evaluates");
+
+        let job = claimed_composite(
+            org,
+            &legacy,
+            format!("{{{plain}}} && {{{child}}}"),
+            &[(&plain, ChildKind::Composite), (&child, ChildKind::Alert)],
+        )
+        .await;
+        handle_composite_alert_trigger("t", job).await.unwrap();
+        let stored = infra::table::alert_composites::get_by_id(
+            infra::db::get_orm_client_rw().await,
+            org,
+            &legacy,
+        )
+        .await
+        .unwrap()
+        .expect("a paused composite is kept");
+        assert!(!stored.definition.enabled, "a nested composite is paused");
+        let module = db::scheduler::TriggerModule::CompositeAlert;
+        let job = infra::scheduler::get(org, module, &legacy).await;
+        assert!(job.is_err(), "a paused composite is never scheduled again");
+        let rollup = infra::table::alert_states::get(&legacy, ROLLUP_GROUP_KEY).await;
+        assert!(rollup.unwrap().is_none(), "a paused run writes no state");
     }
 
     /// 2026-11-16 at `h:m:s` UTC, in microseconds.

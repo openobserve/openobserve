@@ -47,12 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </Teleport>
 
-      <!-- Pipeline name for NEW pipelines, teleported into the shell header
-           (Functions.vue #o2-page-title-trail) next to the title — mirrors the
-           actions teleport above. Owned here, alongside savePipeline, which
-           validates it via the OForm schema. Rendered as inline-edited heading
-           text rather than a boxed field, matching the panel and alert editors;
-           the shell's own breadcrumb already carries "Pipelines ›". -->
+      <!-- No <form> owns this teleported field (savePipeline validates via the headless form),
+           so Enter only commits the name, unlike the panel and alert titles. -->
       <Teleport v-if="isCreatePipeline" defer to="#o2-page-title">
         <OFormInlineEdit
           name="name"

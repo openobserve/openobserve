@@ -32,6 +32,9 @@ export class RumPage {
         this.prettyLoadingText = page.getByText('Translating stack trace with source maps...');
         this.prettyUnavailableText = page.getByText('Source maps not available');
         this.prettyTranslateFailedText = page.getByText(/Unable to translate stack trace/i);
+        this.prettyMobileUnsupportedState = page.locator('[data-test="rum-pretty-stack-trace-mobile-unsupported"]');
+        this.prettyUploadSourceMapsBtn = this.prettyUnavailableState.getByRole('button', { name: 'Upload Source Maps' });
+        this.anyUploadSourceMapsBtn = page.getByRole('button', { name: 'Upload Source Maps' });
 
         this.traceCard = page.locator('[data-test="error-viewer-trace-correlation"]');
         this.traceCardViewDetailsBtn = page.locator('[data-test="trace-correlation-card-view-details-btn"]');
@@ -233,9 +236,8 @@ export class RumPage {
      * (?query= is base64, restored on mount) instead of typing into the Monaco
      * editor, which is racy while the editor boots.
      */
-    async gotoErrorsList({ service = null, period = '1h' } = {}) {
+    async gotoErrorsList({ service = null, period = '1h', org = process.env.ORGNAME || 'default' } = {}) {
         const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
-        const org = process.env.ORGNAME || 'default';
         let url = `${base}/web/rum/errors?period=${period}&org_identifier=${org}`;
         if (service) {
             const filter = Buffer.from(`service='${service}'`).toString('base64');
@@ -273,6 +275,17 @@ export class RumPage {
         const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
         await this.page.goto(`${base}/web/rum/errors/view/${errorId}?timestamp=${timestampUs}&org_identifier=${org}`);
         await this.page.waitForSelector(this.errorViewerContainer, { timeout: 30000 });
+    }
+
+    /** The error viewer's breadcrumb trail lists a row whose description is exactly `text`. */
+    async expectBreadcrumbDescription(text) {
+        const description = this.page.locator('[data-test="error-events-timeline"] [data-test="error-event-description-default"]');
+        await expect(description.filter({ hasText: new RegExp(`^\\s*${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`) }).first()).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectNoBreadcrumbDescriptionContaining(text) {
+        const description = this.page.locator('[data-test="error-events-timeline"] [data-test="error-event-description-default"]');
+        await expect(description.filter({ hasText: text })).toHaveCount(0);
     }
 
     /** Records the status of every backend-trace search the Distributed Trace card sends; returns the live list. */
@@ -377,6 +390,19 @@ export class RumPage {
     /** The translating spinner must be gone (not hung). */
     async expectPrettyLoadingResolved(timeoutMs = 30000) {
         await expect(this.prettyLoadingText).toHaveCount(0, { timeout: timeoutMs });
+    }
+
+    /** iOS and Android errors: JS source maps cannot help, so no upload is offered. */
+    async expectPrettyMobileUnsupported(timeoutMs = 30000) {
+        await expect(this.prettyMobileUnsupportedState).toBeVisible({ timeout: timeoutMs });
+        await expect(this.prettyMobileUnsupportedState).toContainText('Source maps do not apply to iOS and Android errors');
+        await expect(this.prettyUnavailableState).toHaveCount(0);
+        await expect(this.anyUploadSourceMapsBtn).toHaveCount(0);
+    }
+
+    async expectPrettyUploadOffered(timeoutMs = 30000) {
+        await expect(this.prettyUploadSourceMapsBtn).toBeVisible({ timeout: timeoutMs });
+        await expect(this.prettyMobileUnsupportedState).toHaveCount(0);
     }
 
 }

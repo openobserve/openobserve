@@ -150,7 +150,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <li
                       v-for="dimension in filteredDimensions"
                       :key="dimension.value"
-                      class="dimension-list-item hover:bg-interactive-hover-bg flex items-center gap-2 border-none! px-3 py-1"
+                      class="dimension-list-item hover:bg-interactive-hover-bg flex cursor-pointer items-center gap-2 border-none! px-3 py-1"
+                      :data-test="`dimension-row-${dimension.value}`"
+                      @click="toggleDimension(dimension.value)"
                     >
                       <div class="flex shrink-0 items-center">
                         <OCheckbox
@@ -231,6 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-else-if="selectedDimensions.length === 0"
                   icon="bar-chart"
                   :title="t('latencyInsights.noDimensionsSelected')"
+                  :text="t('latencyInsights.noDimensionsSelectedDesc')"
                   data-test="traces-analysis-dashboard-no-dimensions"
                 />
 
@@ -245,7 +248,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :allowAlertCreation="false"
                   :simplifiedPanelView="true"
                   :hideAddPanel="true"
-                  :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
+                  :searchType="
+                    props.embedded || props.streamType === 'logs' ? 'insights' : 'dashboards'
+                  "
                   @onDeletePanel="handlePanelDelete"
                   class="trace-analysis-dashboards p-[0.4rem]"
                 />
@@ -407,7 +412,11 @@ const getInitialDimensions = () => {
   }));
 
   // For LOGS: Use sample-based analysis if we have log data
-  if (streamType === "logs" && props.logSamples && props.logSamples.length >= 10) {
+  if (
+    (streamType === "logs" || props.embedded) &&
+    props.logSamples &&
+    props.logSamples.length >= 10
+  ) {
     return selectDimensionsFromData(props.logSamples, schemaFields, 6);
   }
 

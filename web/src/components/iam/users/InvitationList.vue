@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @retry="fetchPendingInvitations"
         >
           <template #toolbar>
-            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
+            <div class="flex flex-1 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('invitation.search')"

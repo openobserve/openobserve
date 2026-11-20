@@ -15,7 +15,7 @@
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createMemoryHistory } from "vue-router";
@@ -119,10 +119,12 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
   const originalIsCloud = config.isCloud;
   const originalZoConfig = { ...store.state.zoConfig };
 
+  const panelLoading = reactive({ searchRequestTraceIds: {} as Record<string, string[]> });
+
   const mountSearchBar = () =>
     mount(SearchBar, {
       global: {
-        provide: { store },
+        provide: { store, variablesAndPanelsDataLoadingState: panelLoading },
         plugins: [i18n, router],
         stubs: { QueryEditor: true },
       },
@@ -168,6 +170,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
 
   beforeEach(() => {
     resetLogsAutoRunForTests();
+    panelLoading.searchRequestTraceIds = {};
     toastMock.mockClear();
     scheduleSearch.mockReset();
     localStorage.clear();
@@ -406,6 +409,8 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       wrapper!.vm.fnSavedView();
       expect(dispatch).toHaveBeenCalledWith("setSavedViewDialog", true);
       dispatch.mockClear();
+      // A run still pending from mount would start and leave Search Around, which is correct behaviour.
+      await vi.waitFor(() => expect(wrapper!.vm.autoRun.engine.hasPendingRequest()).toBe(false));
       markExecuted();
       wrapper!.vm.autoRun.invalidateExecuted("search-around");
       await flushPromises();
@@ -657,6 +662,141 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(functionRuns()).toBe(1);
     });
 
+    const BUILD_SQL =
+      'SELECT histogram(_timestamp) AS "x_axis_1", count(_timestamp) AS "y_axis_1" FROM "default" GROUP BY x_axis_1';
+
+    const switchTab = async (tab: string, edit: (() => void) | null = null) => {
+      await wrapper!.vm.onLogsVisualizeToggleUpdate(tab);
+      edit?.();
+      await vi.advanceTimersByTimeAsync(3000);
+    };
+
+    const changeTime = () => {
+      wrapper!.vm.searchObj.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+    };
+
+    const buildRewritesQuery = () => {
+      const { searchObj } = wrapper!.vm;
+      searchObj.meta.sqlMode = true;
+      searchObj.meta.quickMode = !searchObj.meta.quickMode;
+      searchObj.data.query = BUILD_SQL;
+      searchObj.data.editorValue = BUILD_SQL;
+    };
+
+    const startTrip = async ({ liveMode = true, sqlMode = false } = {}) => {
+      config.isEnterprise = "true";
+      vi.useFakeTimers();
+      const { searchObj, logs } = await setup({ liveMode });
+      searchObj.meta.sqlMode = sqlMode;
+      if (sqlMode) searchObj.data.query = 'SELECT * FROM "default"';
+      markExecuted();
+      // Drains the date-change the mounted date picker emits, so it cannot land mid-trip.
+      await vi.advanceTimersByTimeAsync(3000);
+      logs.mockClear();
+      return logs;
+    };
+
+    const returnToLogs = async (
+      from: string,
+      change: "time" | "query" | null,
+      { to = "logs", liveMode = true } = {},
+    ) => {
+      const logs = await startTrip({ liveMode });
+      await switchTab(from, () => {
+        wrapper!.vm.searchObj.meta.logsVisualizeDirtyFlag = false;
+        if (change === "time") changeTime();
+        if (change === "query") wrapper!.vm.searchObj.data.query = 'SELECT count(*) FROM "app"';
+      });
+      logs.mockClear();
+      await switchTab(to);
+      return logs;
+    };
+
+    it.each(["visualize", "build", "patterns"])(
+      "re-runs Search on return from %s when the time changed there",
+      async (from) => {
+        const logs = await returnToLogs(from, "time");
+        expect(logs).toHaveBeenCalledTimes(1);
+        expect(logs.mock.calls[0][0]).toMatchObject({ reason: "tab", op: "full" });
+      },
+    );
+
+    it("re-runs Drill down on return from Visualize when the time changed there", async () => {
+      const logs = await returnToLogs("visualize", "time", { to: "drilldown" });
+      expect(logs).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(["visualize", "build", "patterns"])(
+      "keeps Search's rows on return from %s when nothing changed there",
+      async (from) => {
+        const logs = await returnToLogs(from, null);
+        expect(logs).not.toHaveBeenCalled();
+      },
+    );
+
+    it("re-runs Search on return from Patterns when a filter changed there", async () => {
+      const logs = await returnToLogs("patterns", "query");
+      expect(logs).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps Search's rows when Build only rewrote the query", async () => {
+      const logs = await returnToLogs("build", "query");
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("keeps Search's rows when Build flipped SQL mode, quick mode and the query", async () => {
+      const logs = await startTrip();
+      await switchTab("build", buildRewritesQuery);
+      await switchTab("logs");
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("keeps Search's rows after a SQL Build round trip followed by an unchanged Patterns visit", async () => {
+      const logs = await startTrip({ sqlMode: true });
+      await switchTab("build", buildRewritesQuery);
+      await switchTab("logs");
+      await switchTab("patterns");
+      await switchTab("logs");
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("keeps Search's rows when Build rewrote the query before a Patterns visit", async () => {
+      const logs = await startTrip({ sqlMode: true });
+      await switchTab("build", buildRewritesQuery);
+      await switchTab("patterns");
+      await switchTab("logs");
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("re-runs SQL Search on return from Build when the time changed there", async () => {
+      const logs = await startTrip({ sqlMode: true });
+      await switchTab("build", () => {
+        buildRewritesQuery();
+        changeTime();
+      });
+      await switchTab("logs");
+      expect(logs).toHaveBeenCalledTimes(1);
+      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "tab", op: "full" });
+    });
+
+    it("keeps Search's rows when only an unrun Search edit differs from the last run", async () => {
+      const logs = await startTrip();
+      wrapper!.vm.searchObj.data.query = 'level = "error"';
+      await switchTab("visualize");
+      await switchTab("logs");
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("keeps Search's rows after a time change elsewhere while Auto Run is off", async () => {
+      const logs = await returnToLogs("visualize", "time", { liveMode: false });
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("leaves stale rows alone when moving between Search and Drill down", async () => {
+      const logs = await returnToLogs("logs", "time", { to: "drilldown" });
+      expect(logs).not.toHaveBeenCalled();
+    });
+
     it("cancels the in-flight generation from the Cancel button in OSS too", async () => {
       (config as any).isEnterprise = "false";
       const { searchObj } = await setup();
@@ -674,6 +814,94 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       expect(generation.cancelled).toBe(true);
       expect(searchObj.loading).toBe(false);
     });
+  });
+
+  describe("Visualize and Build Run button after a scope change", () => {
+    const runGroup = () =>
+      wrapper!.find(
+        '[data-test="logs-search-bar-visualize-refresh-btn"], [data-test="logs-search-bar-visualize-cancel-btn"]',
+      ).element.parentElement as HTMLElement;
+    const separatorShown = () => !!runGroup().querySelector('[data-orientation="vertical"]');
+    const loadChartThenMoveTime = async (mode: string) => {
+      const { searchObj } = await setup();
+      searchObj.meta.logsVisualizeToggle = mode;
+      wrapper!.vm.autoRun.notePanelScopeApplied();
+      wrapper!.vm.autoRun.panelLoadingChanged(true, false);
+      wrapper!.vm.autoRun.panelLoadingChanged(false, false);
+      await flushPromises();
+      return searchObj;
+    };
+
+    it.each([
+      ["visualize", "true"],
+      ["build", "true"],
+      ["visualize", "false"],
+      ["build", "false"],
+    ])(
+      "%s (enterprise %s): turns Run pending once the time moves past the loaded chart",
+      async (mode, enterprise) => {
+        config.isEnterprise = enterprise;
+        const searchObj = await loadChartThenMoveTime(mode);
+        const run = () => wrapper!.find('[data-test="logs-search-bar-visualize-refresh-btn"]');
+        expect(run().attributes("data-run-pending")).toBeUndefined();
+        expect(run().attributes("data-o2-stale")).toBeUndefined();
+        expect(separatorShown()).toBe(true);
+
+        searchObj.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+        await flushPromises();
+        expect(run().attributes("data-run-pending")).toBe("true");
+        expect(run().attributes("data-o2-stale")).toBe("true");
+        expect(separatorShown()).toBe(false);
+
+        wrapper!.vm.autoRun.panelLoadingChanged(true, false);
+        wrapper!.vm.autoRun.panelLoadingChanged(false, false);
+        await flushPromises();
+        expect(run().attributes("data-run-pending")).toBe("true");
+
+        wrapper!.vm.autoRun.notePanelScopeApplied();
+        wrapper!.vm.autoRun.panelLoadingChanged(true, false);
+        wrapper!.vm.autoRun.panelLoadingChanged(false, false);
+        await flushPromises();
+        expect(run().attributes("data-run-pending")).toBeUndefined();
+        expect(separatorShown()).toBe(true);
+      },
+    );
+
+    it.each(["visualize", "build"])(
+      "%s: ignores pending flags left over from Search once the chart has loaded",
+      async (mode) => {
+        const searchObj = await loadChartThenMoveTime(mode);
+        searchObj.meta.runPending = true;
+        await flushPromises();
+        const run = wrapper!.find('[data-test="logs-search-bar-visualize-refresh-btn"]');
+        expect(run.attributes("data-run-pending")).toBeUndefined();
+        expect(wrapper!.vm.panelRunPending).toBe(false);
+      },
+    );
+
+    it.each(["visualize", "build"])(
+      "%s: shows Cancel, not pending, while the chart's query runs",
+      async (mode) => {
+        config.isEnterprise = "true";
+        panelLoading.searchRequestTraceIds = { panel: ["trace-1"] };
+        const searchObj = await loadChartThenMoveTime(mode);
+        searchObj.data.datetime = { type: "relative", relativeTimePeriod: "1h" };
+        await flushPromises();
+        expect(wrapper!.vm.panelRunPending).toBe(true);
+        expect(wrapper!.vm.visualizeRunPending).toBe(false);
+        expect(wrapper!.find('[data-test="logs-search-bar-visualize-cancel-btn"]').exists()).toBe(
+          true,
+        );
+        expect(wrapper!.find('[data-test="logs-search-bar-visualize-refresh-btn"]').exists()).toBe(
+          false,
+        );
+        const trigger = wrapper!.find(
+          '[data-test="logs-search-bar-refresh-cache-dropdown-trigger"]',
+        );
+        expect(trigger.classes()).not.toContain("border-s-0");
+        expect(separatorShown()).toBe(true);
+      },
+    );
   });
 
   describe("saved views and run-state hygiene (TRANSIENT_SEARCH_KEYS)", () => {

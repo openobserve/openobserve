@@ -25,4 +25,5 @@ pub use job::{
     generate_old_data_job_by_stream,
 };
 pub(crate) use job::{job_range, job_range_end, scheduling_level};
+pub(crate) use policy::MergeWindow;
 pub use stream::merge_by_stream;

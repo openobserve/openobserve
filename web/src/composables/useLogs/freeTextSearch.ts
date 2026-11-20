@@ -23,6 +23,7 @@ import {
   type PlanNode,
   planFilter,
   quoteFreeTextPhrase,
+  quoteReservedFieldNames,
   renderPlan,
   streamTextTarget,
   suggestRecovery,
@@ -283,8 +284,11 @@ export function freeTextWhereByStream(
 
 export function filterForParsing(raw: string, fieldNames: ReadonlySet<string>): string {
   const plan = planFilter(raw, fieldNames);
-  if (plan.kind !== "freeText") return plan.filter;
-  return renderPlan(plan, { mode: "fts", fields: ["_"] }, new Set()) ?? raw;
+  const filter =
+    plan.kind === "freeText"
+      ? (renderPlan(plan, { mode: "fts", fields: ["_"] }, new Set()) ?? raw)
+      : plan.filter;
+  return quoteReservedFieldNames(filter, fieldNames);
 }
 
 export function freeTextDecorations(

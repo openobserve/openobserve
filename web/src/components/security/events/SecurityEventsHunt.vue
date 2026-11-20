@@ -239,7 +239,7 @@ function onRow(row: HuntRow) {
     @row-click="onRow"
   >
     <template #toolbar>
-      <div class="flex w-full flex-wrap items-center gap-2">
+      <div class="flex flex-1 flex-wrap items-center gap-2">
         <div class="w-40 shrink-0">
           <OSelect
             :aria-label="t('siem.aria.huntKind')"

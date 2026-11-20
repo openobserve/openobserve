@@ -20,6 +20,15 @@ import { gt } from "@/types/i18n";
 import type { AutoObserveCoverageRow, AutoObserveSuggestion } from "@/services/autoobserve";
 import { insightOf, toRequests, toSuggestionRows } from "../live/liveAdapter";
 import type { InsightCta, InsightParts } from "./insightCopy";
+import { gapNoDataReview } from "./kindCopy";
+import { useRecentlyCreated, serviceKeyOf } from "./bulk/useRecentlyCreated";
+import {
+  applyExisting,
+  closeBulkReview,
+  openBulkReview,
+  toggleRow,
+  useBulkReview,
+} from "./bulk/useBulkReview";
 
 const NOW_MS = Date.UTC(2026, 10, 9, 12, 0);
 const HOUR_US = 3_600_000_000;
@@ -109,7 +118,7 @@ describe("coverage gap card (flagged surface 1)", () => {
     expect(target.request.rows.map((r) => [r.kind, r.scope.stream.name, r.usually])).toEqual([
       ["errors", "ingest_c", null],
       ["latency", "default", null],
-      ["no_data", "ingest_c", null],
+      ["no_data", "ingest_c", 47],
     ]);
   });
 
@@ -530,6 +539,93 @@ describe("many coverage gaps fold into one card (0, 1, a few, many)", () => {
       new Set(all.map((_, i) => `logs_${i}`)),
     );
   });
+
+  it("adds no-data alerts for the busiest gaps ten at a time, then the next ones", () => {
+    const rows = Array.from({ length: 12 }, (_, i) => gapRow(i));
+    const first = gapNoDataReview(gt, "demo-org", rows, rows, 10);
+    expect(first?.label).toBe("Add alert");
+    if (first?.target.type !== "bulk") throw new Error("expected bulk");
+    expect(first.target.request.rows.map((r) => r.key)).toEqual(
+      rows.slice(0, 10).map((r) => `${r.service_id}:no_data`),
+    );
+    const recently = useRecentlyCreated();
+    rows
+      .slice(0, 10)
+      .forEach((r) =>
+        recently.add(serviceKeyOf("demo-org", r.service_name, r.cluster, r.namespace), "no_data"),
+      );
+    const next = gapNoDataReview(gt, "demo-org", rows, rows, 10);
+    expect(next?.label).toBe(gt("autoobserve.coverageLive.verdict.next", { count: 2 }));
+    if (next?.target.type !== "bulk") throw new Error("expected bulk");
+    expect(next.target.request.rows.map((r) => r.key)).toEqual([
+      "svc-10:no_data",
+      "svc-11:no_data",
+    ]);
+    expect(gapNoDataReview(gt, "demo-org", rows, [], 10)).toBeNull();
+    rows.forEach((r) =>
+      recently.remove(serviceKeyOf("demo-org", r.service_name, r.cluster, r.namespace), "no_data"),
+    );
+  });
+
+  it("moves past drafts the review left unticked, keeps ticked ones, and starts a new round when all were passed", () => {
+    const rows = Array.from({ length: 12 }, (_, i) => gapRow(i));
+    const review = (gaps: AutoObserveCoverageRow[]) => {
+      const cta = gapNoDataReview(gt, "demo-org", rows, gaps, 10);
+      if (cta?.target.type !== "bulk") throw new Error("expected bulk");
+      return cta;
+    };
+    useBulkReview().state.org = "demo-org";
+    openBulkReview(review(rows).target.request);
+    rows.slice(1, 10).forEach((r) => toggleRow(`${r.service_id}:no_data`, false));
+    closeBulkReview();
+    // Another review closed twice with its row unticked neither resets nor fills this history.
+    for (let i = 0; i < 2; i++) {
+      openBulkReview({ kind: "no_data", rows: [{ ...review(rows).target.request.rows[1] }] });
+      toggleRow("svc-10:no_data", false);
+      closeBulkReview();
+    }
+    const next = review(rows);
+    expect(next.label).toBe(gt("autoobserve.coverageLive.verdict.next", { count: 3 }));
+    expect(next.target.request.rows.map((r) => r.key)).toEqual([
+      "svc-0:no_data",
+      "svc-10:no_data",
+      "svc-11:no_data",
+    ]);
+    openBulkReview(review(rows.slice(1)).target.request);
+    rows.slice(10).forEach((r) => toggleRow(`${r.service_id}:no_data`, false));
+    closeBulkReview();
+    const again = review(rows.slice(1)).target.request;
+    expect(again.rows).toHaveLength(10);
+    openBulkReview(again);
+    again.rows.forEach((r) => toggleRow(r.key, false));
+    closeBulkReview();
+    expect(review(rows.slice(1)).target.request.rows.map((r) => r.key)).toEqual(["svc-11:no_data"]);
+  });
+
+  it.each([
+    ["the existing-alert lookup", true],
+    ["the stream fields lookup", false],
+  ])(
+    "keeps drafts the review could not check because %s failed for the next review",
+    (_, built) => {
+      const rows = Array.from({ length: 12 }, (_, i) => gapRow(i));
+      const org = `transient-${built}`;
+      const review = () => {
+        const cta = gapNoDataReview(gt, org, rows, rows, 10);
+        if (cta?.target.type !== "bulk") throw new Error("expected bulk");
+        return cta.target.request;
+      };
+      useBulkReview().state.org = org;
+      openBulkReview(review());
+      const fields = ["_timestamp", "service_name", "k8s_cluster", "k8s_namespace_name"];
+      rows.forEach(
+        (r) => (useBulkReview().state.schemas[`logs/${r.streams[0].name}`] = built ? fields : null),
+      );
+      applyExisting("failed");
+      closeBulkReview();
+      expect(review().rows[0].key).toBe("svc-0:no_data");
+    },
+  );
 
   it("lists each service's drafts once when several gaps resolve to the same coverage row", () => {
     const gaps = [...Array.from({ length: 6 }, (_, i) => gap(i)), { ...gap(0), id: "gap-0-again" }];

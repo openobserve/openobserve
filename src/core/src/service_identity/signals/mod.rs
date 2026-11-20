@@ -27,6 +27,7 @@ pub mod metrics;
 pub mod processor;
 #[cfg(feature = "enterprise")]
 pub mod reads;
+pub mod record_services;
 #[cfg(feature = "enterprise")]
 pub mod rum_drill;
 #[cfg(feature = "enterprise")]

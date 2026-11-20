@@ -19,6 +19,7 @@ import { gt } from "@/types/i18n";
 import type { IncidentAlert, IncidentTopology } from "@/services/incidents";
 import {
   alertLiveState,
+  incidentAge,
   incidentFiringCounts,
   incidentLiveSummary,
   liveRowsOf,
@@ -98,7 +99,8 @@ describe("incidentUnfold", () => {
     const cards = alertCards({ triggers });
     expect(cards.map((c) => c.id)).toEqual(["alert-a", "alert-b"]);
     expect(cards[0].count).toBe(3);
-    expect(`${cards[0].at} → ${cards[0].until}`).toBe("15:15 → 15:24");
+    expect(`${cards[0].at} → ${cards[0].until}`).toBe("2026-11-11 15:15 → 15:24");
+    expect(cards[0].ago).toContain(incidentAge(min(9), min(30)));
     expect(cards[1].count).toBeUndefined();
     expect(cards[1].detail).toBe("Fired once");
   });
@@ -226,11 +228,11 @@ describe("incidentUnfold", () => {
     ];
     const now = min(9 * 60 + 30);
     const [a, , b] = alertCards({ triggers, now });
-    expect(a.at).toBe("Nov 11, 15:15");
-    expect(`${b.at} → ${b.until}`).toBe("Nov 11, 23:20 → 00:24");
+    expect(a.at).toBe("2026-11-11 15:15");
+    expect(`${b.at} → ${b.until}`).toBe("2026-11-11 23:20 → 2026-11-12 00:24");
     const later = alertCards({ triggers, now: min(4 * 24 * 60) });
-    expect(`${later[1].at} → ${later[1].until}`).toBe("Nov 11, 15:25 → Nov 14");
-    expect(panelOf({ triggers, now }, "b").times).toEqual(["Nov 11, 23:20", "00:24"]);
+    expect(`${later[1].at} → ${later[1].until}`).toBe("2026-11-11 15:25 → 2026-11-14 15:15");
+    expect(panelOf({ triggers, now }, "b").times).toEqual(["2026-11-11 23:20", "2026-11-12 00:24"]);
   });
 
   it("ends a closed incident's strips at its last firing, not at the resolve", () => {
@@ -291,19 +293,21 @@ describe("incidentUnfold", () => {
       const triggers = Array.from({ length: 9 }, (_, i) => firing("a", min(i * 2)));
       const timezone = "Asia/Kolkata";
       const few = alertCards({ triggers: triggers.slice(0, 2), timezone });
-      expect(`${few[0].at} → ${few[0].until}`).toBe("20:45 → 20:47");
-      expect(panelOf({ triggers: triggers.slice(0, 2), timezone }).times?.[0]).toBe("20:45");
+      expect(`${few[0].at} → ${few[0].until}`).toBe("2026-11-11 20:45 → 20:47");
+      expect(panelOf({ triggers: triggers.slice(0, 2), timezone }).times?.[0]).toBe(
+        "2026-11-11 20:45",
+      );
 
       const many = panelOf({ triggers, now: min(30), timezone });
       expect(many.histogram?.ticks[0]).toBe("20:45");
-      expect(many.histogram?.caption).toContain("Nov 11, 20:45");
+      expect(many.histogram?.caption).toContain("2026-11-11 20:45");
 
       const { cards } = incidentUnfold(
         input({ triggers: triggers.slice(0, 2), timezone, acknowledgedAt: min(3) }),
         gt,
       );
-      expect(cards.find((c) => c.id === "team-acknowledged")?.at).toBe("20:48");
-      expect(cards.find((c) => c.id === "team-open")?.detail).toBe("Open since 20:45");
+      expect(cards.find((c) => c.id === "team-acknowledged")?.at).toBe("2026-11-11 20:48");
+      expect(cards.find((c) => c.id === "team-open")?.detail).toBe("Open since 2026-11-11 20:45");
     } finally {
       process.env.TZ = zone;
     }
@@ -327,7 +331,7 @@ describe("incidentUnfold", () => {
     const resolvedAt = min(16 * 24 * 60);
     const { histogram } = panelOf({ triggers, status: "resolved", resolvedAt });
     expect(histogram?.ticks).toEqual(["Nov 11", "Nov 27"]);
-    expect(histogram?.caption).toBe("Firings per 3 hours, Nov 11, 15:15 to Nov 27, 15:15");
+    expect(histogram?.caption).toBe("Firings per 3 hours, 2026-11-11 15:15 to 2026-11-27 15:15");
   });
 
   describe("Your team lane", () => {
@@ -356,7 +360,7 @@ describe("incidentUnfold", () => {
         gt,
       ).cards.filter((c) => c.lane === null);
       expect(team.map((c) => c.outcome)).toEqual(["acknowledged", "resolved"]);
-      expect(team[0].at).toBe("15:17");
+      expect(team[0].at).toBe("2026-11-11 15:17");
       expect(team[0].detail).toBe("by priya");
       expect(team[0].after).toBe("alert-a");
       expect(team[1].tone).toBe("success");
@@ -390,8 +394,8 @@ describe("incidentUnfold", () => {
         gt,
       ).cards.filter((c) => c.lane === null);
       expect(team.map((c) => [c.outcome, c.at, c.detail])).toEqual([
-        ["acknowledged", "15:18", "by sam"],
-        ["resolved", "15:40", "by lee"],
+        ["acknowledged", "2026-11-11 15:18", "by sam"],
+        ["resolved", "2026-11-11 15:40", "by lee"],
       ]);
     });
 
@@ -662,7 +666,7 @@ describe("incidentUnfold", () => {
     expect(alerts["alert-a"].histogram?.points.length).toBeGreaterThan(0);
     const eight = panelOf({ triggers: many.slice(0, 8) });
     expect(eight.times).toHaveLength(8);
-    expect(eight.times?.[1]).toBe("15:17");
+    expect(eight.times?.[1]).toBe("2026-11-11 15:17");
     expect(eight.histogram).toBeUndefined();
     expect(alerts["alert-b"]).toMatchObject({ count: 1, groupedBy: "Same alert" });
     expect(alerts["alert-b"].medianInterval).toBeUndefined();

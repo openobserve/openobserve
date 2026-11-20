@@ -691,6 +691,12 @@ pub async fn create_org(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<OrgCreateRequest>,
 ) -> Response {
+    // Anyone can create an org on cloud, so the field must not place an account in a new org.
+    if cfg!(feature = "cloud") && req.service_account.is_some() {
+        return MetaHttpResponse::bad_request(
+            "Creating an organization with a service account is not available on OpenObserve Cloud",
+        );
+    }
     let mut org = Organization {
         identifier: req.identifier,
         name: req.name,
@@ -2107,6 +2113,21 @@ mod tests {
 
     fn q(key: &str, value: &str) -> HashMap<String, String> {
         HashMap::from([(key.to_string(), value.to_string())])
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn cloud_refuses_creating_an_org_for_a_service_account() {
+        let req: OrgCreateRequest = serde_json::from_value(serde_json::json!({
+            "name": "acme",
+            "service_account": "jane@company.com",
+        }))
+        .unwrap();
+        let caller = Headers(UserEmail {
+            user_id: "eve@company.com".to_string(),
+        });
+        let resp = create_org(caller, Json(req)).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
     #[test]

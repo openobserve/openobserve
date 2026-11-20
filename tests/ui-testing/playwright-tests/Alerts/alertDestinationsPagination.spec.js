@@ -94,4 +94,24 @@ test.describe("Alert Destinations Pagination Reset testcases", () => {
       testLogger.info("Test completed");
     },
   );
+  test(
+    "should count only the searched destinations in the pagination footer",
+    { tag: ["@destinations-pagination-reset", "@bug-525", "@all"] },
+    async ({ page }) => {
+      const seed = uniqueSeed();
+      const seeded = await pm.apiCleanup.seedAlertDestinations(3, seed, templateName);
+      // Decoys outside the search guarantee the org total differs from the match count, even in a clean org.
+      const decoys = await pm.apiCleanup.seedAlertDestinations(2, uniqueSeed(), templateName);
+      destinationNames = [...seeded, ...decoys].map((d) => d.name);
+      const orgTotal = (await pm.apiCleanup.fetchDestinationsWithTemplateMapping()).destinations.length;
+      expect(orgTotal, "the org must hold more destinations than the search matches").toBeGreaterThan(3);
+
+      await pm.alertDestinationsPage.navigateToDestinations();
+      await pm.alertDestinationsPage.waitForDestinationListReady();
+      await pm.alertDestinationsPage.searchDestinations(seed);
+
+      await pm.alertDestinationsPage.expectPaginationInfoToMatch(/^Showing 1 - 3 of 3\b/);
+      expect(await pm.alertDestinationsPage.getAllDestinationNames()).toHaveLength(3);
+    },
+  );
 });

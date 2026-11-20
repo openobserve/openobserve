@@ -635,8 +635,15 @@ export default defineComponent({
             });
           });
         });
+      } else if (dashboardPanelData.data.type === "treemap") {
+        selectedValues = [
+          { label: t("dashboard.seriesName"), value: "${series.__name}" },
+          { label: t("dashboard.seriesValue"), value: "${series.__value}" },
+          { label: t("dashboard.treemapTilePath"), value: "${series.__path}" },
+          ...variableListName,
+        ];
       } else if (
-        ["pie", "donut", "gauge", "bar-gauge", "treemap", "sunburst", "funnel", "boxplot"].includes(
+        ["pie", "donut", "gauge", "bar-gauge", "sunburst", "funnel", "boxplot"].includes(
           dashboardPanelData.data.type,
         )
       ) {

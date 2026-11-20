@@ -32,6 +32,16 @@
 -->
 <template>
   <div class="flex flex-col gap-3" data-test="alerts-anomalydetectionchart">
+    <AnomalySummaryStrip
+      :response="summary"
+      :loading="summaryLoading"
+      :failed="summaryFailed"
+      :config="alert"
+      :now-us="nowUs"
+      @retry="refreshSummary"
+      @open="openUrl"
+    />
+
     <div class="flex items-center justify-between gap-2">
       <span class="text-compact text-text-heading font-semibold">
         {{ t("alerts.anomaly.detectionCharts") }}
@@ -71,7 +81,7 @@
           </span>
         </span>
       </PanelBar>
-      <div class="h-100 w-full">
+      <div class="relative h-100 w-full">
         <OSkeleton
           v-if="!kindColumnsReady || metricLoading"
           preset="chart"
@@ -96,10 +106,29 @@
           :title="t('alerts.anomaly.noDetectionResults')"
           data-test="alerts-anomalydetectionchart-metric-nodata"
         />
+        <!-- ChartRenderer, not PanelSchemaRenderer: the point popover needs the chart click,
+             which the schema renderer does not forward. -->
         <ChartRenderer
           v-else
           :data="{ options: metricOptions }"
           data-test="alerts-anomalydetectionchart-metric-chart"
+          @click="onChartClick"
+        />
+        <span
+          ref="pointAnchor"
+          class="pointer-events-none absolute size-0"
+          :style="pointAnchorStyle"
+          aria-hidden="true"
+        />
+        <AnomalyPointPopover
+          v-model:open="pointOpen"
+          :anchor="pointAnchor"
+          :row="pointRow"
+          :bucket-ms="anomalyIntervalMs(interval)"
+          :current="pointIsCurrent"
+          :loading="pointLoading"
+          :stream-type="alert?.stream_type"
+          @open-bucket="openPointBucket"
         />
       </div>
     </div>
@@ -155,6 +184,7 @@ import { cloneDeep } from "lodash-es";
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -162,6 +192,13 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
+import AnomalyPointPopover from "@/components/alerts/AnomalyPointPopover.vue";
+import AnomalySummaryStrip from "@/components/alerts/AnomalySummaryStrip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { queryClient } from "@/composables/query/queryClient";
+import { anomalyExploreQuery } from "@/services/anomaly_detection.queries";
+import type { AnomalyExploreResponse } from "@/types/anomalyExplore";
+import { openAppUrl, pageModelVersion } from "@/utils/alerts/anomalyExploreView";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import { chartColor } from "@/utils/chartTheme";
 import { getDefaultDashboardPanelData } from "@/utils/alerts/aggregationPreviewQuery";
@@ -194,8 +231,16 @@ const ChartRenderer = defineAsyncComponent(
 
 const props = defineProps<{ alert: any; anomalyId: string }>();
 
+const emit = defineEmits<{
+  /** The page shows another model than the server: reload the config, and this chart follows. */
+  reload: [];
+  /** A forced summary read landed; a run since the last one may have changed the config's notice. */
+  refreshed: [];
+}>();
+
 const { t } = useI18nTyped();
 const store = useStore();
+const router = useRouter();
 
 // Semantic, not palette indices: the flagged series IS the error state and the
 // threshold IS the warning line, so a retheme of those carries to these.
@@ -266,6 +311,7 @@ async function loadKindColumns() {
       isPartialDrop: names.has("is_partial_drop"),
       expectedValue: names.has("expected_value"),
       expectedBounds: names.has("expected_lower") && names.has("expected_upper"),
+      judgedEnd: names.has("judged_end_us"),
     };
   } catch {
     kindColumns.value = { ...NO_KIND_COLUMNS };
@@ -470,6 +516,140 @@ async function loadMetric() {
   }
 }
 
+const loadedModel = computed(() => pageModelVersion(props.alert));
+const pointOpen = ref(false);
+const pointRow = ref<AnomalyBandRow | null>(null);
+const pointLoading = ref(false);
+const pointAnchor = ref<HTMLElement | null>(null);
+const pointAt = ref({ x: 0, y: 0 });
+// rem from the pixel offset ECharts reports, so the anchor follows the clicked point.
+const pointAnchorStyle = computed(() => ({
+  left: `${pointAt.value.x / 16}rem`,
+  top: `${pointAt.value.y / 16}rem`,
+}));
+const pointIsCurrent = computed(
+  () =>
+    loadedModel.value !== 0 &&
+    pointRow.value?.modelVersion !== null &&
+    pointRow.value?.modelVersion === loadedModel.value,
+);
+
+const summary = ref<AnomalyExploreResponse | null>(null);
+const summaryLoading = ref(true);
+const summaryFailed = ref(false);
+const nowUs = ref(Date.now() * 1000);
+let summarySeq = 0;
+
+// One reload per server model or stale page, so an edited detector still training cannot loop.
+const reloadedFor = new Set<string>();
+
+const statusOf = (e: unknown) => (e as { response?: { status?: number } })?.response?.status;
+
+function requestReload(reason: string) {
+  pointOpen.value = false;
+  if (reloadedFor.has(reason)) return;
+  reloadedFor.add(reason);
+  emit("reload");
+}
+
+async function loadSummary(force = false) {
+  const org = store.state.selectedOrganization?.identifier;
+  if (!org || !props.anomalyId) return;
+  const seq = ++summarySeq;
+  const options = anomalyExploreQuery(org, props.anomalyId);
+  summaryLoading.value = !summary.value && !summaryFailed.value;
+  try {
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const res = await queryClient.fetchQuery(options);
+    if (seq !== summarySeq) return;
+    summary.value = res;
+    summaryFailed.value = false;
+    nowUs.value = Date.now() * 1000;
+    if (force) emit("refreshed");
+    // Keyed by both models, so a second retrain to 0 is not taken for the first.
+    if (res.model_version !== loadedModel.value) {
+      requestReload(`model:${loadedModel.value}:${res.model_version}`);
+    }
+  } catch (e) {
+    if (seq !== summarySeq) return;
+    if (statusOf(e) === 409) requestReload(`stale:${loadedModel.value}`);
+    summaryFailed.value = true;
+  } finally {
+    if (seq === summarySeq) summaryLoading.value = false;
+  }
+}
+
+// Named handler: Retry must force the read, and `@retry="loadSummary"` would not.
+const refreshSummary = () => {
+  summaryLoading.value = true;
+  summaryFailed.value = false;
+  void loadSummary(true);
+};
+
+const openUrl = (url: string) => openAppUrl(router, url);
+
+let summaryTimer: ReturnType<typeof setInterval> | null = null;
+function armSummaryTimer() {
+  if (summaryTimer) clearInterval(summaryTimer);
+  summaryTimer = null;
+  const ms = anomalyIntervalMs(props.alert?.schedule_interval);
+  if (ms) summaryTimer = setInterval(() => void loadSummary(true), ms);
+}
+
+/** By timestamp, not dataIndex: gap rows shift the series indices. */
+function onChartClick(params: any) {
+  if (params?.seriesName !== t("alerts.anomaly.seriesAnomaly")) return;
+  const datum = Array.isArray(params.value) ? params.value : params.data;
+  const ts = Number(Array.isArray(datum) ? datum[0] : NaN);
+  const row = metricRows.value.find((r) => r.tsMs === ts);
+  if (!row || row.flagged === null) return;
+  pointRow.value = row;
+  pointAt.value = {
+    x: Number(params.event?.offsetX) || 0,
+    y: Number(params.event?.offsetY) || 0,
+  };
+  pointOpen.value = true;
+}
+
+async function openPointBucket() {
+  const row = pointRow.value;
+  const org = store.state.selectedOrganization?.identifier;
+  const bucketMs = anomalyIntervalMs(interval.value);
+  if (!row || !org || !bucketMs || row.modelVersion === null) return;
+  pointLoading.value = true;
+  try {
+    const options = anomalyExploreQuery(org, props.anomalyId, {
+      start: row.tsMs * 1000,
+      end: (row.tsMs + bucketMs) * 1000,
+      pad: 0,
+      model_version: row.modelVersion,
+    });
+    // Never from cache: the request must reach the server to get its stale-model 409.
+    await queryClient.invalidateQueries({
+      queryKey: options.queryKey,
+      exact: true,
+      refetchType: "none",
+    });
+    const res = await queryClient.fetchQuery(options);
+    pointOpen.value = false;
+    if (res.url) openUrl(res.url);
+  } catch (e) {
+    if (statusOf(e) === 409) {
+      requestReload(`stale:${loadedModel.value}`);
+      return;
+    }
+    toast({ variant: "error", message: t("alerts.anomaly.pointOpenFailed") });
+  } finally {
+    pointLoading.value = false;
+  }
+}
+
 // MICROSECONDS into `new Date(...)`, the convention every other alert chart
 // feeds the renderer — honest milliseconds draw an empty chart.
 function setTimeRange() {
@@ -487,19 +667,40 @@ const onRangeChange = (value: unknown) => {
   range.value = String(value);
   // The renderer watches `selectedTimeObj` and refetches itself.
   setTimeRange();
+  void loadSummary(true);
 };
 
 watch(
   () => props.anomalyId,
   () => {
+    summary.value = null;
+    summaryFailed.value = false;
     setTimeRange();
     loadKindColumns();
+    void loadSummary();
+  },
+);
+// A reloaded config is a new object: redraw every chart and re-read the strip for it.
+watch(
+  () => props.alert,
+  (next, prev) => {
+    if (!next || next === prev) return;
+    pointOpen.value = false;
+    setTimeRange();
+    loadKindColumns();
+    void loadSummary(true);
+    armSummaryTimer();
   },
 );
 watch([metricQuery, windowUs, kindColumnsReady], loadMetric);
 onMounted(() => {
   setTimeRange();
   loadKindColumns();
+  void loadSummary();
+  armSummaryTimer();
 });
-onBeforeUnmount(() => controller?.abort());
+onBeforeUnmount(() => {
+  controller?.abort();
+  if (summaryTimer) clearInterval(summaryTimer);
+});
 </script>

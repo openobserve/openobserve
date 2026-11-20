@@ -155,7 +155,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 //      status_page_notices.false_alarm_recovered_at.
 // 155: create the service version, identity, alias, deploy and verdict tables.
 // 156: add alert_incidents.last_detection_at, when a new detection joined a worked case.
-pub const DB_SCHEMA_VERSION: u64 = 156;
+// 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
+//      service_streams rows named by the metric-name label that list no trace stream.
+pub const DB_SCHEMA_VERSION: u64 = 157;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -189,6 +191,8 @@ pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
+/// Enterprise usage calculations need data at most this old, so publishing never waits longer.
+const ENTERPRISE_USAGE_PUBLISH_CAP_SECS: i64 = 10 * 60;
 
 #[inline]
 pub fn get_batch_size() -> usize {
@@ -2625,7 +2629,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_SDR_FAIL_CLOSED",
         default = false,
-        help = "Refuse rather than keep unredacted data when sensitive-data redaction cannot run. Logs and traces ingestion is rejected with 503 while the pattern manager is unavailable or a stream's ingestion pattern failed to build, and a search on a stream with search-time patterns errors when its redaction step cannot run. Off by default: data is stored and returned unredacted and the evidence row records a fail-open."
+        help = "Refuse rather than keep unredacted data when ingestion-time redaction cannot run. Logs and traces ingestion is rejected with 503 while the pattern manager is unavailable or a stream's ingestion pattern failed to build. Off by default: data is stored unredacted and the evidence row records a fail-open. Search-time redaction ignores this setting and always fails closed."
     )]
     pub sdr_fail_closed: bool,
     #[env_config(
@@ -2905,8 +2909,6 @@ pub struct Limit {
     pub query_partition_by_secs: usize,
     #[env_config(name = "ZO_QUERY_PARTITION_MAX_NUM", default = 100)] // max number of partitions
     pub query_partition_max_num: usize,
-    #[env_config(name = "ZO_DISABLE_PARTITIONS_FOR_NON_TS_ORDER_BY", default = false)]
-    pub disable_partitions_for_non_ts_order_by: bool,
     // Default Config: Run Query Recommendation Analysis for last one hour for every hour
     #[env_config(name = "ZO_QUERY_RECOMMENDATION_DURATION", default = 3600000000)] // microseconds
     pub query_recommendation_duration: i64,
@@ -3071,6 +3073,12 @@ pub struct Limit {
         help = "Per-user cap on alert-destination test-sends per minute. A test-send posts a real [TEST]-marked message to a real destination, so this bounds accidental or scripted spam of someone's channel/inbox. The cap is enforced PER PROCESS (in-memory, not cluster-shared) — a multi-node deployment's effective cap is N times this value, where N is the node count. 0 = unlimited."
     )]
     pub alert_test_send_per_minute: u32,
+    #[env_config(
+        name = "ZO_INCIDENTS_JOIN_WINDOW_MINUTES",
+        default = 240,
+        help = "How long after an incident's first alert another alert may still join it by matching dimensions, in minutes. Alerts already in the incident always rejoin it, and an incident without dimensions takes only its own alerts. 0 removes the time limit."
+    )]
+    pub incidents_join_window_minutes: i64,
     #[env_config(
         name = "ZO_ALERT_CHART_ENABLED",
         default = true,
@@ -5423,6 +5431,12 @@ fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.health_check.failed_times = 3;
     }
     Ok(())
+}
+
+/// `ZO_USAGE_PUBLISH_INTERVAL` as an enterprise build applies it.
+#[inline]
+pub fn enterprise_usage_publish_interval(cfg: &Config) -> i64 {
+    ENTERPRISE_USAGE_PUBLISH_CAP_SECS.min(cfg.common.usage_publish_interval)
 }
 
 #[inline]

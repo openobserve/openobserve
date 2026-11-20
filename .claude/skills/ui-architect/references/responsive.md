@@ -134,7 +134,7 @@ The recipe every list toolbar follows:
 ```vue
 <template #toolbar>
   <!-- max-md:contents lets the filter, the search and OTable's own controls share one row -->
-  <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+  <div class="flex flex-1 items-center gap-2 max-md:contents">
     <OToggleGroup v-model="typeFilter" mobile-dropdown data-test="channels-type-filter">
       <OToggleGroupItem value="all" data-test="channels-type-all">…</OToggleGroupItem>
       …
@@ -156,16 +156,18 @@ The recipe every list toolbar follows:
   unless you pass your own `min-w-*` (its input's intrinsic ~13rem floor is what used
   to push the column toggle and refresh onto a second row). A fixed `w-64` search
   becomes `w-64 max-md:w-auto max-md:flex-1`, never `max-md:w-full`.
-- **A `w-full` toolbar wrapper without `max-md:contents` always wraps.** Its width is
-  the whole row, so OTable's column toggle and refresh drop to a second line.
+- **A toolbar wrapper is `flex-1`, never `w-full`, and never `min-w-0`.** The OTable
+  toolbar wraps at every width: `w-full` takes the whole row and always pushes the
+  column toggle and refresh onto a second line, while `min-w-0` stops the row from ever
+  wrapping, so the filters slide under those controls once space runs out.
 - `ORefreshButton` drops its data age below 1024 px (icon only); do not re-add a text
   refresh button to a phone toolbar.
 - **Page toolbars** (Logs / Metrics / Traces style): the mode toggle becomes an
   `ODropdown` showing the current mode (see `MetricsExplorer.vue`),
   `AutoRefreshInterval :is-compact="isMobile"`, text buttons go icon-only, spacers
   that pin a cluster right are `max-md:hidden` and the cluster takes `max-md:ms-auto`.
-- An `OTable` toolbar wraps below md and right-aligns its own controls (column toggle,
-  `#toolbar-trailing`) automatically.
+- An `OTable` toolbar wraps whenever its content does not fit and right-aligns its own
+  controls (column toggle, `#toolbar-trailing`) automatically.
 
 ## Tables and row actions
 

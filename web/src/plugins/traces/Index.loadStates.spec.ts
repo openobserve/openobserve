@@ -667,9 +667,8 @@ describe("Traces page load states", () => {
 
     describe("recorded no_results", () => {
       const recordedResult = async (stream: (handlers: any) => void) => {
-        setRouteQuery({ stream: "default" });
+        setRouteQuery({ stream: "default", query: btoa("span_status = 'ERROR'") });
         mockTakeLanding.mockReturnValueOnce({ run: true });
-        searchObj.data.editorValue = "span_status = 'ERROR'";
         mountKeptAlive();
         await waitFor(() => expect(callsOfType("main")).toHaveLength(1));
         const handlers = lastCall("main")[1];

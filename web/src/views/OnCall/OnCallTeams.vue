@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- Search, columns and refresh have nothing to act on until a team exists. -->
       <template v-if="showToolbar" #toolbar>
-        <div class="flex w-full items-center gap-2 max-md:contents">
+        <div class="flex flex-1 items-center gap-2 max-md:contents">
           <OSearchInput
             v-model="search"
             class="flex-1"

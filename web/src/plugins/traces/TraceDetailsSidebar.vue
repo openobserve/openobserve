@@ -1201,7 +1201,11 @@ import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import llmPromptsService from "@/services/llm-prompts.service";
 import { aiPromptsRoute } from "@/views/AIObservability/promptRoutes";
 import searchService from "@/services/search";
-import { quoteSqlIdentifier, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
+import {
+  correlationWindow,
+  quoteSqlIdentifier,
+  quoteSqlLiteral,
+} from "@/utils/telemetryCorrelation";
 import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamNameListQuery, streamSchemaQuery } from "@/services/stream.queries";
@@ -1367,7 +1371,6 @@ export default defineComponent({
     "close",
     "view-logs",
     "select-span",
-    "open-trace",
     "show-correlation",
     "add-filter",
     "apply-filter-immediately",
@@ -2473,8 +2476,6 @@ export default defineComponent({
           name: "traceDetails",
           query,
         });
-
-        emit("open-trace");
       }
     };
 
@@ -2690,6 +2691,7 @@ export default defineComponent({
           "traces",
           5, // 5 minute time window
           props.streamName,
+          correlationWindow(convertTimeFromNsToUs(props.span.start_time)),
         );
         if (isStale()) return;
 

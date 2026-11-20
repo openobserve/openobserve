@@ -19,7 +19,7 @@ use config::meta::{service_identity::WhereSummaryRecord, stream::StreamType};
 
 use crate::{
     auth::check_permissions,
-    authz::{QuerySource, authorize_query_sources},
+    authz::{QuerySource, active_checker, authorize_query_sources, readable_streams},
 };
 
 pub struct ReadableStreams {
@@ -29,20 +29,27 @@ pub struct ReadableStreams {
 
 impl ReadableStreams {
     pub async fn load(org: &str, user: &str, summaries: &[WhereSummaryRecord]) -> Self {
-        let streams: HashSet<_> = summaries
+        let traces: HashSet<String> = summaries
             .iter()
             .filter(|row| row.signal == "traces")
             .map(|row| row.source_stream.clone())
             .collect();
-        let mut traces = HashSet::new();
-        for name in streams {
-            if readable(org, user, &name, StreamType::Traces).await {
-                traces.insert(name);
-            }
-        }
-        Self {
-            traces,
-            rum: readable(org, user, "_rumdata", StreamType::Logs).await,
+        let rum = (StreamType::Logs, "_rumdata".to_string());
+        let wanted = traces
+            .iter()
+            .map(|name| (StreamType::Traces, name.clone()))
+            .chain([rum.clone()])
+            .collect();
+        let checker = active_checker();
+        match readable_streams(checker.as_ref(), user, org, wanted).await {
+            None => Self { traces, rum: true },
+            Some(readable) => Self {
+                rum: readable.contains(&rum),
+                traces: traces
+                    .into_iter()
+                    .filter(|name| readable.contains(&(StreamType::Traces, name.clone())))
+                    .collect(),
+            },
         }
     }
 
@@ -244,5 +251,78 @@ mod tests {
             .await
         );
         assert!(!evidence(org, user, &["allowed".into()], false, true).await);
+    }
+
+    fn row(org: &str, signal: &str, stream: &str) -> WhereSummaryRecord {
+        WhereSummaryRecord {
+            signal: signal.into(),
+            source_stream: stream.into(),
+            summary_key: String::new(),
+            org_id: org.into(),
+            service_name: "svc".into(),
+            where_key: "env:prod".into(),
+            scope_key: String::new(),
+            k8s_cluster: String::new(),
+            k8s_namespace: String::new(),
+            env: "prod".into(),
+            env_source: config::meta::service_identity::EnvSource::Attribute,
+            env_source_value: String::new(),
+            envs: Vec::new(),
+            newest_version: "v1".into(),
+            newest_version_key: String::new(),
+            newest_first_seen: 0,
+            has_version: true,
+            first_seen: 0,
+            last_seen: 0,
+            purged_versions: 0,
+            updated_at: 0,
+        }
+    }
+
+    #[tokio::test]
+    async fn an_org_wide_traces_grant_opens_every_trace_stream_and_not_rum() {
+        let org = "issue3592_wide_traces";
+        let user = "issue3592-wide-traces@example.com";
+        let checker = fake_checker();
+        checker.grant_read_all(user, org, StreamType::Traces);
+        let summaries = [
+            row(org, "traces", "t1"),
+            row(org, "traces", "t2"),
+            row(org, "rum", "_rumdata"),
+        ];
+        let readable = ReadableStreams::load(org, user, &summaries).await;
+        assert!(readable.contains(&summaries[0]) && readable.contains(&summaries[1]));
+        assert!(!readable.contains(&summaries[2]));
+
+        let calls = checker.calls(user);
+        assert_eq!(calls.streams, 1, "only _rumdata needs its own Check");
+        assert_eq!(calls.org_wide.len(), 1);
+        let asked: HashSet<_> = calls.org_wide[0].iter().copied().collect();
+        assert_eq!(asked, HashSet::from([StreamType::Traces, StreamType::Logs]));
+    }
+
+    #[tokio::test]
+    async fn a_failed_org_wide_question_falls_back_to_stream_checks() {
+        let org = "issue3592_failed_wide";
+        let user = "issue3592-failed-wide@example.com";
+        let checker = fake_checker();
+        checker.grant_read_all(user, org, StreamType::Traces);
+        checker.fail_org_wide_once(user);
+        let summaries = [row(org, "traces", "t1"), row(org, "traces", "t2")];
+        let readable = ReadableStreams::load(org, user, &summaries).await;
+        assert!(summaries.iter().all(|row| readable.contains(row)));
+        assert_eq!(checker.calls(user).streams, 3, "t1, t2 and _rumdata");
+    }
+
+    #[tokio::test]
+    async fn with_no_trace_rows_only_logs_is_asked_org_wide() {
+        let org = "issue3592_no_traces";
+        let user = "issue3592-no-traces@example.com";
+        let checker = fake_checker();
+        let summaries = [row(org, "rum", "_rumdata")];
+        let readable = ReadableStreams::load(org, user, &summaries).await;
+        assert!(!readable.rum && readable.traces.is_empty());
+        assert_eq!(checker.calls(user).org_wide, [vec![StreamType::Logs]]);
+        assert_eq!(checker.calls(user).streams, 1);
     }
 }

@@ -30,6 +30,8 @@ use crate::{
 
 pub const PARTIAL_ERROR_RESPONSE_MESSAGE: &str =
     "Please be aware that the response is based on partial data";
+/// The scan-level redaction function; the scanning node recognises its own projection by it.
+pub const SDR_REDACT_UDF_NAME: &str = "sdr_redact";
 
 /// To represent the query start and end time based of partition or cache
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -728,13 +730,6 @@ pub struct SearchPartitionResponse {
     pub streaming_id: Option<String>,
     #[serde(default)]
     pub is_histogram_eligible: bool,
-    /// ORDER BY columns when the primary sort is a non-timestamp column.
-    /// Non-empty means this is a non-ts ORDER BY query; empty means timestamp sort (normal path).
-    /// Each entry is (column_name, is_descending). The heap honors all columns in order so
-    /// that ties on the primary column are broken correctly by secondary columns.
-    /// Skipped from serialization — internal leader use only, not exposed to callers.
-    #[serde(skip)]
-    pub non_ts_order_by_cols: Vec<(String, bool)>,
 }
 
 /// Request parameters for querying search history

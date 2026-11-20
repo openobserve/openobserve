@@ -1,4 +1,4 @@
-// Logs with the filter builder on, the default the shared fixtures turn off for every other spec.
+// Logs with the filter builder turned on; every other spec runs on the default query editor.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -95,7 +95,16 @@ test.describe('Logs filter builder', () => {
 
         await page.locator(TO_BUILDER).click();
         await expect(banner).toBeVisible();
+        // Clear and build deletes the query, so it asks first; Cancel keeps the query.
+        const confirmDialog = page.locator('[data-test="confirm-dialog-provider"]');
         await page.locator(`[data-test="${PREFIX}-clear-and-build"]`).click();
+        await expect(confirmDialog).toBeVisible();
+        await confirmDialog.locator('[data-test="o-dialog-secondary-btn"]').click();
+        await expect(confirmDialog).toBeHidden();
+        await expect(banner).toBeVisible();
+
+        await page.locator(`[data-test="${PREFIX}-clear-and-build"]`).click();
+        await confirmDialog.locator('[data-test="o-dialog-primary-btn"]').click();
         await expect(banner).toBeHidden();
         await expect(builder.barInput).toBeVisible();
         await expect.poll(() => editorText(page, HOST)).toBe('');

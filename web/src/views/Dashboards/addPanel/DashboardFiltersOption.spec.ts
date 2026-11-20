@@ -71,14 +71,14 @@ const savedFilter = () => ({
       logicalOperator: "AND",
       filterType: "condition",
     },
-    leaf({ field: "service", streamAlias: "b" }, "=", "$service", "OR"),
+    leaf({ field: "service", streamAlias: "b" }, "=", "$service"),
     {
       filterType: "group",
       logicalOperator: "AND",
       conditions: [
         leaf({ field: "status" }, ">=", "500"),
         leaf({ field: "message" }, "str_match", "timeout", "OR"),
-        leaf({ field: "host" }, "Is Not Null", ""),
+        leaf({ field: "host" }, "Is Not Null", "", "OR"),
       ],
     },
     {
@@ -252,27 +252,39 @@ describe("DashboardFiltersOption", () => {
     await wrapper!.find('[data-test="dashboard-filter-builder-connector-1"]').trigger("click");
     await flushPromises();
     const conditions = panelData.data.queries[0].fields.filter.conditions;
-    expect(conditions).toHaveLength(5);
-    expect(conditions[4].column).toEqual({ field: "status" });
+    expect(conditions.at(-1).column).toEqual({ field: "status" });
   });
 
-  it("toggling the connector before a nested group changes only that group's operator", async () => {
+  it("toggling the connector before a nested group groups what precedes it and keeps the saved parts", async () => {
     await mountOption();
     await wrapper!.find('[data-test="dashboard-filter-builder-connector-2"]').trigger("click");
     await flushPromises();
-    const expected = savedFilter();
-    expected.conditions[2].logicalOperator = "OR";
-    expect(JSON.stringify(panelData.data.queries[0].fields.filter)).toBe(JSON.stringify(expected));
+    const saved = savedFilter();
+    const andRun = {
+      conditions: saved.conditions.slice(0, 2),
+      filterType: "group",
+      logicalOperator: "AND",
+    };
+    expect(panelData.data.queries[0].fields.filter).toEqual({
+      ...saved,
+      conditions: [
+        {
+          conditions: [andRun, { ...saved.conditions[2], logicalOperator: "OR" }],
+          filterType: "group",
+          logicalOperator: "AND",
+        },
+        saved.conditions[3],
+      ],
+    });
   });
 
-  it("toggling a connector inside a nested group reaches the SQL", async () => {
+  it("toggling a connector inside a nested group reaches the SQL, read left to right", async () => {
     await mountOption();
-    await wrapper!.find('[data-test="dashboard-filter-builder-connector-2-1"]').trigger("click");
+    await wrapper!.find('[data-test="dashboard-filter-builder-connector-2-2"]').trigger("click");
     await flushPromises();
     const group = panelData.data.queries[0].fields.filter.conditions[2];
-    expect(group.conditions[1].logicalOperator).toBe("AND");
     expect(buildCondition(group, { ...panelData, data: { queries: [query(null)] } })).toBe(
-      "(app_logs.status >= 500 AND str_match(app_logs.message, 'timeout') AND app_logs.host IS NOT NULL)",
+      "((app_logs.status >= 500 OR str_match(app_logs.message, 'timeout')) AND app_logs.host IS NOT NULL)",
     );
   });
 

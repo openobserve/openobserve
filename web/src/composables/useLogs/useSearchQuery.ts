@@ -106,6 +106,8 @@ export interface FilterFieldError {
 
 export interface ResolvedStreamFilters {
   perStream: Map<string, string>;
+  /** The arms whose WHERE differs from the typed filter (a semantic-group field, a _stream_name reference). */
+  armRewrites: Map<string, string>;
   excluded: StreamExclusion[];
   errors: FilterFieldError[];
   filterColumns: any[];
@@ -284,6 +286,7 @@ export function resolveFiltersForStreams(
   if (isHeldPlan(plan)) throw new HeldFilterError();
   const result: ResolvedStreamFilters = {
     perStream: new Map(),
+    armRewrites: new Map(),
     excluded: [],
     errors: [],
     filterColumns: [],
@@ -322,12 +325,13 @@ export function resolveFiltersForStreams(
       continue;
     }
     const mapping = check.mapping?.get(stream);
-    result.perStream.set(
-      stream,
-      mapping || referencesStreamName(where)
-        ? rewriteArmWhere(where, stream, mapping, fields)
-        : where,
-    );
+    if (!mapping && !referencesStreamName(where)) {
+      result.perStream.set(stream, where);
+      continue;
+    }
+    const rewritten = rewriteArmWhere(where, stream, mapping, fields);
+    result.perStream.set(stream, rewritten);
+    result.armRewrites.set(stream, rewritten);
   }
   return result;
 }
@@ -341,6 +345,7 @@ export const useSearchQuery = (t: TranslateFn) => {
     isDistinctQuery,
     isWithQuery,
     isLimitQuery,
+    getOuterLimit,
     addTransformToQuery,
     fnUnparsedSQL,
     checkTimestampAlias,
@@ -502,12 +507,13 @@ export const useSearchQuery = (t: TranslateFn) => {
       }
 
       // Don't apply LIMIT from SQL when patterns mode is enabled - we need the configured scan size for pattern extraction
+      const limit: any = getOuterLimit(parsedSQL);
       if (isLimitQuery(parsedSQL) && searchObj.meta.logsVisualizeToggle !== "patterns") {
-        queryReq.query.size = parsedSQL.limit.value[0].value;
+        queryReq.query.size = limit.value[0].value;
         searchObj.meta.resultGrid.showPagination = false;
 
-        if (parsedSQL.limit.separator == "offset") {
-          queryReq.query.from = parsedSQL.limit.value[1].value || 0;
+        if (limit.separator == "offset") {
+          queryReq.query.from = limit.value[1].value || 0;
         }
         delete queryReq.query.track_total_hits;
       }
@@ -768,11 +774,12 @@ export const useSearchQuery = (t: TranslateFn) => {
         return null;
       }
 
-      if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
-        req.query.size = parsedSQL.limit.value[0].value;
+      const limit: any = getOuterLimit(parsedSQL);
+      if (isLimitQuery(parsedSQL)) {
+        req.query.size = limit.value[0].value;
 
-        if (parsedSQL.limit.separator == "offset") {
-          req.query.from = parsedSQL.limit.value[1].value || 0;
+        if (limit.separator == "offset") {
+          req.query.from = limit.value[1].value || 0;
         }
 
         query = fnUnparsedSQL(parsedSQL);
@@ -968,18 +975,31 @@ export const useSearchQuery = (t: TranslateFn) => {
     return req;
   };
 
-  const validateFilterForMultiStream = (filter: string = searchObj.data.query): boolean => {
+  /** Resolves the filter for the selected streams as a normal-mode run does, and records its notices. */
+  const resolveFilterForStreams = (
+    filter: string = searchObj.data.query,
+  ): ResolvedStreamFilters | null => {
     searchObj.data.filterErrMsg = "";
     searchObj.data.missingStreamMessage = raw("");
     searchObj.data.stream.missingStreamMultiStreamFilter = [];
     const streams: string[] = searchObj.data.stream.selectedStream;
     try {
-      writeMultiStreamState(
-        resolveFiltersForStreams(filter, streams, filterContext(), multiStreamFields()),
+      const resolved = resolveFiltersForStreams(
+        filter,
+        streams,
+        filterContext(),
+        multiStreamFields(),
       );
+      writeMultiStreamState(resolved);
+      return resolved;
     } catch (e) {
       if (!(e instanceof NonSqlLimitError) && !(e instanceof HeldFilterError)) throw e;
+      return null;
     }
+  };
+
+  const validateFilterForMultiStream = (filter: string = searchObj.data.query): boolean => {
+    resolveFilterForStreams(filter);
     return searchObj.data.filterErrMsg === "";
   };
 
@@ -989,6 +1009,7 @@ export const useSearchQuery = (t: TranslateFn) => {
     getQueryReq,
     buildSearch,
     getSearchQueryPayload,
+    resolveFilterForStreams,
     validateFilterForMultiStream,
     extractFilterColumns,
   };

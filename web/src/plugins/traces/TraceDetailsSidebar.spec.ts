@@ -1498,11 +1498,22 @@ describe("TraceDetailsSidebar", async () => {
         expect(noLinksMsg.exists()).toBe(false);
       });
 
-      it("should emit open-trace when a different trace link is clicked", async () => {
-        const linkRow = wrapper.find('[data-test="trace-event-detail-link-0"]');
-        await linkRow.trigger("click");
+      it("should navigate without emitting when a different trace link is clicked", async () => {
+        const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
 
-        expect(wrapper.emitted("open-trace")).toBeTruthy();
+        await wrapper.find('[data-test="trace-event-detail-link-0"]').trigger("click");
+
+        expect(pushSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "traceDetails",
+            query: expect.objectContaining({
+              trace_id: JSON.parse(mockLinks)[0].context.traceId,
+              span_id: JSON.parse(mockLinks)[0].context.spanId,
+            }),
+          }),
+        );
+        expect(wrapper.emitted("open-trace")).toBeFalsy();
+        pushSpy.mockRestore();
       });
 
       it("should keep the originating search tab in the linked trace's URL", async () => {
@@ -3096,6 +3107,11 @@ describe("TraceDetailsSidebar — correlation license lock", () => {
     await flushPromises();
     expect(w.find(LOGS_TAB).attributes("locked")).toBe("false");
     expect(mockFindRelatedTelemetry).toHaveBeenCalled();
+    const spanStartUs = mockSpan.start_time / 1000;
+    expect(mockFindRelatedTelemetry.mock.calls[0][4]).toEqual({
+      start: spanStartUs - 300_000_000,
+      end: spanStartUs + 300_000_000,
+    });
     w.unmount();
   });
 });

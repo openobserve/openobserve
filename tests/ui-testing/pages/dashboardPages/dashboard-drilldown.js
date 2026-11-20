@@ -444,6 +444,11 @@ export default class DashboardDrilldownPage {
       .getByRole("tab", { selected: true });
   }
 
+  // Named entry in the drilldown menu that opens when a chart point is clicked.
+  drilldownMenuItem(name) {
+    return this.page.locator(`[data-test="drilldown-menu-item-${name}"]`);
+  }
+
   /**
    * Returns locator for the drilldown item at the given index in the config list.
    */

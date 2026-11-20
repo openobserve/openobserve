@@ -85,6 +85,7 @@ pub const COVERAGE: &[Coverage] = &[
     table("alert_eval_intervals", DB),
     table("alert_incident_alerts", DB),
     table("alert_incidents", DB),
+    table("alert_pair_verdicts", DB),
     table("alert_state_transitions", DB),
     table("alert_states", DB),
     table("alerts", DB),

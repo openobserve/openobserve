@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="autoobserve-coverage-added"
         >
           <OIcon name="arrow-upward" size="xs" />{{
-            t("autoobserve.coverage.addedThisWeek", { count: totals.added }, totals.added)
+            t("autoobserve.coverage.addedThisWeek", { count: num(totals.added) }, totals.added)
           }}
         </span>
         <span
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <span class="rounded-default size-3 shrink-0" :class="SWATCH[item.cls]" />
               <span>{{ item.label }}</span>
-              <span class="text-text-secondary tabular-nums">{{ item.count }}</span>
+              <span class="text-text-secondary tabular-nums">{{ num(item.count) }}</span>
             </OToggleGroupItem>
           </OToggleGroup>
         </template>
@@ -232,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="filter"
           :aria-label="t('autoobserve.coverage.filterLabel')"
           data-test="autoobserve-coverage-filter"
-          @update:model-value="(v) => v && (filter = v as CoverageFilter)"
+          @update:model-value="(v) => v && chooseFilter(v as CoverageFilter)"
         >
           <OToggleGroupItem
             v-for="option in filters"
@@ -242,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`autoobserve-coverage-filter-${option}`"
           >
             {{ filterLabel(option) }}
-            <span class="ms-1 tabular-nums">{{ counts[option] }}</span>
+            <span class="ms-1 tabular-nums">{{ num(counts[option]) }}</span>
           </OToggleGroupItem>
         </OToggleGroup>
       </div>
@@ -266,34 +266,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <CoverageHexMap
             :items="items"
             :label="mapLabel"
-            :selected="selected?.service ?? null"
-            :highlight="highlight"
+            :selected="selectedHex"
             :matches="matches"
-            @select="selectService"
+            @select="selectHex"
           />
+          <p
+            v-if="mapView.more"
+            class="text-text-secondary mt-3 flex flex-wrap items-center gap-x-2 text-xs tabular-nums"
+            data-test="autoobserve-coverage-map-more"
+          >
+            {{ t("autoobserve.coverage.mapMore", { count: num(mapView.more) }, mapView.more) }}
+            <OButton
+              variant="accent-ghost"
+              data-test="autoobserve-coverage-map-more-table"
+              @click="showAllInTable"
+            >
+              {{ t("autoobserve.coverage.showInTable") }}
+            </OButton>
+          </p>
         </div>
       </template>
 
       <template v-else>
         <OTable
-          :data="rows"
+          v-model:expanded-ids="expanded"
+          :data="tableRows"
           :columns="columns"
           row-key="service"
           pagination="none"
+          sorting="server"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          tree
           :row-rail-tone="railTone"
           :row-class="rowClass"
           class="min-h-0 flex-1"
           data-test="autoobserve-coverage-matrix"
+          @sort-change="onSort"
         >
           <template #cell-service="{ row }">
-            <span class="text-text-heading font-medium">{{ row.service }}</span>
+            <span class="text-text-heading font-medium">{{
+              isGroup(row) ? row.title : row.service
+            }}</span>
           </template>
           <template #cell-where="{ row }">
-            <span class="text-text-secondary">{{ row.where }}</span>
+            <span
+              v-if="isGroup(row)"
+              class="text-text-secondary tabular-nums"
+              :data-test="`autoobserve-coverage-group-${row.title}`"
+              :data-group-key="row.service"
+              >{{ groupWhere(row) }}</span
+            >
+            <span v-else class="text-text-secondary">{{ row.where }}</span>
+          </template>
+          <template #cell-traffic="{ row }">
+            <span
+              class="tabular-nums"
+              :class="trafficOf(row) == null ? 'text-text-muted' : 'text-text-body'"
+              >{{ trafficText(trafficOf(row)) }}</span
+            >
           </template>
           <template v-for="check in LIVE_CHECKS" :key="check" #[`cell-check-${check}`]="{ row }">
+            <span
+              v-if="isGroup(row)"
+              class="text-text-secondary flex items-center gap-1.5 text-xs tabular-nums"
+            >
+              <template v-if="groupGaps(row, check)">
+                <OTag tone="warn" size="sm" :label="t('autoobserve.coverageLive.gapChip')" />
+                {{
+                  t("autoobserve.coverage.groupOf", {
+                    count: num(groupGaps(row, check)),
+                    total: num(row.children.length),
+                  })
+                }}
+              </template>
+            </span>
             <OButton
-              v-if="row.checks"
+              v-else-if="row.checks"
               variant="ghost"
               class="text-text-body -ms-1.5 gap-1.5 px-1.5 font-normal"
               :pressed="isSelected(row.service, check)"
@@ -324,8 +373,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <template #cell-state="{ row }">
+            <span v-if="isGroup(row)" class="text-text-body text-xs tabular-nums">{{
+              groupState(row)
+            }}</span>
             <OTag
-              v-if="row.status"
+              v-else-if="row.status"
               :tone="STATE_TAG[row.status.state]"
               size="sm"
               :label="row.status.label"
@@ -333,7 +385,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #cell-lastScanned="{ row }">
-            <span class="text-text-secondary text-xs">{{ row.lastScanned }}</span>
+            <span v-if="!isGroup(row)" class="text-text-secondary text-xs">{{
+              row.lastScanned
+            }}</span>
           </template>
           <template #empty>
             <OEmptyState
@@ -342,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="filterHidesTitle"
               :action-label="t('autoobserveLive.coverage.showAll')"
               data-test="autoobserve-coverage-filter-hides"
-              @action="filter = 'all'"
+              @action="chooseFilter('all')"
             />
             <OEmptyState
               v-else-if="term"
@@ -359,7 +413,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="autoobserve-coverage-legend"
         >
           <span class="tabular-nums">{{
-            t("autoobserve.coverage.showing", { shown: rows.length, total: totals.total })
+            t("autoobserve.coverage.showing", { shown: num(rows.length), total: num(totals.total) })
+          }}</span>
+          <ODropdown align="start">
+            <template #trigger>
+              <OButton
+                variant="ghost"
+                size="sm"
+                icon-end="expand-more"
+                class="text-text-secondary -ms-1.5 font-normal tabular-nums"
+                data-test="autoobserve-coverage-grouped"
+                >{{ groupLine }}</OButton
+              >
+            </template>
+            <ODropdownItem
+              v-for="option in GROUP_PICKS"
+              :key="option"
+              role="menuitemradio"
+              :aria-checked="option === groupPick"
+              :data-test="`autoobserve-coverage-group-pick-${option}`"
+              @select="groupPick = option"
+            >
+              <span class="flex-1">{{ t(GROUP_PICK_LABEL[option]) }}</span>
+              <template #end>
+                <OIcon
+                  name="check"
+                  size="sm"
+                  :class="option === groupPick ? 'text-text-heading' : 'invisible'"
+                />
+              </template>
+            </ODropdownItem>
+          </ODropdown>
+          <span v-if="unknownShown" data-test="autoobserve-coverage-traffic-unknown">{{
+            t("autoobserve.coverage.trafficUnknown")
           }}</span>
           <ul
             class="ms-auto flex flex-wrap items-center gap-x-4 gap-y-1"
@@ -405,7 +491,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -417,9 +503,12 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { ChipTone } from "@/lib/core/Badge/OBadge.types";
-import type { OTableColumnDef, RowRailTone } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, OTableSortParams, RowRailTone } from "@/lib/core/Table/OTable.types";
+import { formatLargeNumber } from "@/utils/formatters";
 import CoverageHexMap, { type HexClass, type HexItem } from "./CoverageHexMap.vue";
 import CoverageServiceDrawer from "./CoverageServiceDrawer.vue";
 import {
@@ -432,6 +521,7 @@ import {
 } from "./aoTypes";
 import type { CoverageSource } from "./live/liveAdapter";
 import {
+  countText,
   coverageWord,
   detectorCountText,
   emptyCoverageNotice,
@@ -442,6 +532,7 @@ import {
   liveLoadText,
   liveLookWord,
   liveNotice,
+  percentText,
   type LiveCoverageState,
 } from "./live/liveCopy";
 import { useStore } from "vuex";
@@ -449,13 +540,35 @@ import { useLoadPhase } from "./live/liveModel";
 import { justAdded } from "./insight/coverageCta";
 import LiveNoticeState from "./live/LiveNoticeState.vue";
 import LiveRefreshFailed from "./live/LiveRefreshFailed.vue";
+import {
+  chooseCoverageGrouping,
+  coverageName,
+  coveragePlace,
+  SERVICE_RANK,
+  SORT_KEYS,
+  chooseMapGrouping,
+  groupCoverage,
+  groupPrefix,
+  groupWorst,
+  isGroup,
+  mapCoverage,
+  serviceState,
+  sortCoverage,
+  sortValue,
+  type CoverageGroup,
+  type CoverageGroupBy,
+  type CoverageGrouper,
+  type CoverageSortKey,
+  type CoverageTableRow,
+  type ServiceState,
+} from "./coverageTable";
 
-type CoverageFilter = "all" | "watched" | "partial" | "learning" | "gaps";
+type CoverageFilter = "needs" | "all" | "watched" | "partial" | "learning" | "gaps";
 type CoverageView = "map" | "table";
 type CoverageFill = "state" | "detectors" | "scanned";
-type ServiceState = "watched" | "partial" | "learning" | "gap";
 
 const { t, locale } = useI18nTyped();
+const num = (n: number) => countText(locale.value, n);
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -463,8 +576,18 @@ const router = useRouter();
 const SEARCH_ID = "autoobserve-coverage-search";
 const DRAWER_ANCHOR = "[data-autoobserve-coverage]";
 const MAP_SKELETON_HEXES = 18;
+// Past this many hexes the map stops being readable, so it draws groups and counts the rest.
+const MAP_HEX_CAP = 200;
+type GroupPick = "auto" | CoverageGroupBy;
+const GROUP_PICKS: GroupPick[] = ["auto", "service", "place", "none"];
+const GROUP_PICK_LABEL: Record<GroupPick, I18nKey> = {
+  auto: "autoobserve.coverage.groupPick.auto",
+  service: "autoobserve.coverage.groupPick.service",
+  place: "autoobserve.coverage.groupPick.place",
+  none: "autoobserve.coverage.groupPick.none",
+};
 // Learning shows only while some service learns.
-const FILTERS: CoverageFilter[] = ["all", "watched", "partial", "learning", "gaps"];
+const FILTERS: CoverageFilter[] = ["needs", "all", "watched", "partial", "learning", "gaps"];
 const VIEWS: CoverageView[] = ["map", "table"];
 const FILLS: CoverageFill[] = ["state", "detectors", "scanned"];
 const FILTER_WORD: Partial<Record<CoverageFilter, LiveCoverageState>> = {
@@ -480,7 +603,6 @@ const FILTER_ALIAS: Record<string, CoverageFilter> = {
 };
 // Partly watched and learning appear in the legend only while some service is in them.
 const OPTIONAL_STATES: ReadonlySet<HexClass> = new Set(["partial", "learning"]);
-const SERVICE_RANK: Record<ServiceState, number> = { gap: 0, partial: 1, learning: 2, watched: 3 };
 const STATE_TAG: Record<ServiceState, ChipTone> = {
   gap: "warn",
   partial: "outline",
@@ -559,11 +681,9 @@ const filters = computed(() =>
 
 const filterLabel = (option: CoverageFilter): I18nText => {
   const word = FILTER_WORD[option];
-  return word ? coverageWord(t, word) : t("autoobserve.coverage.all");
+  if (word) return coverageWord(t, word);
+  return option === "needs" ? t("autoobserve.coverage.needsAction") : t("autoobserve.coverage.all");
 };
-
-// The adapter states every live row; a row without one has no covered check.
-const serviceState = (row: CoverageRow): ServiceState => row.status?.state ?? "gap";
 
 const rank = (row: CoverageRow) => SERVICE_RANK[serviceState(row)];
 
@@ -576,10 +696,6 @@ const serviceStates = computed(() =>
   Object.fromEntries(allRows.value.map((r) => [r.service, serviceState(r)])),
 );
 
-const watchedPct = computed(() =>
-  totals.value.total ? Math.round((100 * totals.value.fullyWatched) / totals.value.total) : 0,
-);
-
 const split = computed(() => [
   { cls: "bg-badge-success-soft-text", count: totals.value.fullyWatched },
   { cls: "bg-ingest-accent-amber/50", count: totals.value.partial },
@@ -589,17 +705,17 @@ const split = computed(() => [
 
 const summaryText = computed(() => {
   const params = {
-    watched: totals.value.fullyWatched,
-    total: totals.value.total,
-    pct: watchedPct.value,
+    watched: num(totals.value.fullyWatched),
+    total: num(totals.value.total),
+    pct: percentText(t, locale.value, totals.value.fullyWatched, totals.value.total),
   };
-  return t("autoobserveLive.coverage.summaryWatched", params);
+  return t("autoobserveLive.coverage.summaryWatchedShare", params);
 });
 
 const splitLabel = computed(() =>
   t("autoobserveLive.coverage.splitLabel", {
-    watched: totals.value.fullyWatched,
-    gaps: totals.value.total - totals.value.fullyWatched,
+    watched: num(totals.value.fullyWatched),
+    gaps: num(totals.value.total - totals.value.fullyWatched),
   }),
 );
 
@@ -608,29 +724,92 @@ const pick = <T extends string>(value: unknown, options: T[], fallback: T): T =>
 
 const query = ref("");
 const term = computed(() => query.value.trim().toLowerCase());
-const filter = ref<CoverageFilter>(
-  pick(FILTER_ALIAS[String(route.query.filter)] ?? route.query.filter, FILTERS, "all"),
-);
+type Selection = { service: string; signal: Signal | LiveCheck | null };
+
+// Every setting the URL holds, read the same way on mount and on each later link or Back.
+const fromUrl = () => {
+  const q = route.query;
+  const service = typeof q.service === "string" ? q.service : null;
+  const signal = pick<Signal | LiveCheck | "">(q.signal, [...SIGNALS, "absence"], "") || null;
+  return {
+    filter: pick<CoverageFilter>(FILTER_ALIAS[String(q.filter)] ?? q.filter, FILTERS, "needs"),
+    view: pick<CoverageView>(q.cov, VIEWS, "table"),
+    fill: pick<CoverageFill>(q.fill, FILLS, "state"),
+    sortBy: pick<CoverageSortKey>(q.sort, SORT_KEYS, "traffic"),
+    sortOrder: pick<"asc" | "desc">(q.order, ["asc", "desc"], "desc"),
+    groupPick: pick<GroupPick>(q.group, GROUP_PICKS, "auto"),
+    selected: service ? ({ service, signal } as Selection) : null,
+  };
+};
+const linked = fromUrl();
+const filter = ref(linked.filter);
+const settled = computed(() => !props.skeleton && props.source.status === "ready");
 // Learning is only offered once a settled read holds a learning service, so a link's filter waits for it.
 watch(
-  () => !props.skeleton && props.source.status === "ready" && !filters.value.includes(filter.value),
+  () => settled.value && !filters.value.includes(filter.value),
   (gone) => {
     if (gone) filter.value = "all";
   },
   { immediate: true },
 );
-const view = ref<CoverageView>(pick(route.query.cov, VIEWS, "map"));
-const fill = ref<CoverageFill>(pick(route.query.fill, FILLS, "state"));
+// Needs action reads All while nothing needs action, and comes back when a later scan finds some.
+const needsFellBack = ref(false);
+watch(
+  [settled, () => totals.value.gaps + totals.value.partial, filter],
+  ([ready, needing]) => {
+    if (filter.value !== "all") needsFellBack.value = false;
+    if (!ready) return;
+    if (!needing && filter.value === "needs") {
+      needsFellBack.value = true;
+      filter.value = "all";
+    } else if (needing && needsFellBack.value) {
+      needsFellBack.value = false;
+      filter.value = "needs";
+    }
+  },
+  { immediate: true },
+);
+// A filter the reader or a link picks is theirs, even when it is the All a fallback already showed.
+const chooseFilter = (next: CoverageFilter) => {
+  needsFellBack.value = false;
+  filter.value = next;
+};
+const view = ref(linked.view);
+const fill = ref(linked.fill);
+const sortBy = ref(linked.sortBy);
+const sortOrder = ref(linked.sortOrder);
+const expanded = ref<string[]>([]);
+// Automatic regroups as a search or filter narrows the rows; a picked grouping stays put.
+const groupPick = ref(linked.groupPick);
+
+// OTable clears a column clicked while descending; traffic descending is the default, so there
+// the clear reverses it, and any other column's clear goes back to the default.
+const onSort = ({ column, order }: OTableSortParams) => {
+  if (!column && sortBy.value === "traffic" && sortOrder.value === "desc") {
+    sortOrder.value = "asc";
+    return;
+  }
+  sortBy.value = pick(column, SORT_KEYS, "traffic");
+  sortOrder.value = column && order === "asc" ? "asc" : "desc";
+};
 const highlight = ref<HexClass[]>([]);
 
-const initialService = typeof route.query.service === "string" ? route.query.service : null;
-const initialSignal = pick<Signal | LiveCheck | "">(
-  route.query.signal,
-  [...SIGNALS, "absence"],
-  "",
-);
-const selected = ref<{ service: string; signal: Signal | LiveCheck | null } | null>(
-  initialService ? { service: initialService, signal: initialSignal || null } : null,
+const selected = ref<Selection | null>(linked.selected);
+
+// The tab stays mounted across links and Back, so a URL change carries every setting it holds.
+watch(
+  () => JSON.stringify(fromUrl()),
+  () => {
+    const next = fromUrl();
+    chooseFilter(next.filter);
+    view.value = next.view;
+    fill.value = next.fill;
+    sortBy.value = next.sortBy;
+    sortOrder.value = next.sortOrder;
+    groupPick.value = next.groupPick;
+    if (JSON.stringify(selected.value) !== JSON.stringify(next.selected))
+      selected.value = next.selected;
+  },
 );
 
 const selectService = (service: string) => {
@@ -641,12 +820,17 @@ watch(fill, () => {
   highlight.value = [];
 });
 
-watch([view, fill, selected], () => {
+watch([view, fill, selected, filter, groupPick, sortBy, sortOrder], () => {
+  const sorted = sortBy.value !== "traffic" || sortOrder.value !== "desc";
   void router.replace({
     query: {
       ...route.query,
-      cov: view.value === "map" ? undefined : view.value,
+      cov: view.value === "table" ? undefined : view.value,
       fill: fill.value === "state" ? undefined : fill.value,
+      filter: filter.value === "needs" || needsFellBack.value ? undefined : filter.value,
+      group: groupPick.value === "auto" ? undefined : groupPick.value,
+      sort: sorted ? sortBy.value : undefined,
+      order: sorted ? sortOrder.value : undefined,
       service: selected.value?.service,
       signal: selected.value?.signal ?? undefined,
     },
@@ -654,6 +838,7 @@ watch([view, fill, selected], () => {
 });
 
 const inFilter = (row: CoverageRow, f: CoverageFilter) => {
+  if (f === "needs") return serviceState(row) === "gap" || serviceState(row) === "partial";
   if (f === "watched") return serviceState(row) === "watched";
   if (f === "partial") return serviceState(row) === "partial";
   if (f === "learning") return serviceState(row) === "learning";
@@ -673,7 +858,85 @@ const searched = computed(() =>
 const searchPlaceholder = computed(() => t("autoobserveLive.coverage.searchPlaceholder"));
 const rows = computed(() => searched.value.filter((r) => inFilter(r, filter.value)));
 
-const matches = computed(() => (term.value ? new Set(searched.value.map((r) => r.service)) : null));
+// A row with no place never folds by place, so no catch-all group hides the services outside one.
+const GROUPERS: Record<CoverageGroupBy, CoverageGrouper | null> = {
+  none: null,
+  service: { keyOf: coverageName, titleOf: coverageName },
+  place: { keyOf: coveragePlace, titleOf: (row) => coveragePlace(row) ?? row.service },
+};
+// The rows on screen pick their own grouping, so a search that leaves a few shows them flat.
+const group = computed(() =>
+  groupPick.value === "auto"
+    ? chooseCoverageGrouping(rows.value, coverageName, coveragePlace)
+    : groupPick.value,
+);
+watch(group, () => (expanded.value = []));
+
+const tableRows = computed(() => {
+  const grouper = GROUPERS[group.value];
+  return sortCoverage(
+    grouper
+      ? groupCoverage(rows.value, grouper.keyOf, grouper.titleOf, groupPrefix(allRows.value))
+      : rows.value,
+    sortBy.value,
+    sortOrder.value,
+  );
+});
+
+const trafficOf = (row: CoverageTableRow) => row.traffic ?? null;
+const unknownShown = computed(() => rows.value.some((r) => r.traffic == null));
+
+// Rows left apart for having no place are not places, so a place count skips them.
+const groupLines = (lines: CoverageTableRow[], by: CoverageGroupBy) =>
+  by === "place"
+    ? lines.filter((r) => isGroup(r) || coveragePlace(r) !== null).length
+    : lines.length;
+
+const groupLine = computed((): I18nText => {
+  if (group.value === "none") return t("autoobserve.coverage.groupedBy.none");
+  const lines = groupLines(tableRows.value, group.value);
+  return t(`autoobserve.coverage.groupedBy.${group.value}`, { count: num(lines) }, lines);
+});
+const trafficText = (value: number | null) =>
+  value == null ? raw("—") : raw(formatLargeNumber(Math.round(value)));
+
+const groupWhere = (row: CoverageGroup): I18nText => {
+  const count = row.children.length;
+  const places = new Set(row.children.map(coveragePlace).filter((p) => p !== null)).size;
+  if (group.value !== "service" || places !== count)
+    return t("autoobserve.coverage.groupServices", { count: num(count) }, count);
+  return t("autoobserve.coverage.groupPlaces", { count: num(places) }, places);
+};
+
+const groupGaps = (row: CoverageGroup, check: LiveCheck) =>
+  row.children.filter((c) => cellLook(c, check) === "gap").length;
+
+// Worst state first, so the count a reader acts on leads.
+const groupState = (row: CoverageGroup): I18nText =>
+  raw(
+    (["gap", "partial", "learning", "watched"] as const)
+      .filter((state) => row.counts[state])
+      .map((state) =>
+        t(
+          `autoobserve.coverage.groupCount.${state}`,
+          { count: num(row.counts[state]) },
+          row.counts[state],
+        ),
+      )
+      .join(" · "),
+  );
+
+// A group hex is drawn as its worst service, so it lights when any service in it matches.
+const matches = computed(() => {
+  const lit = highlight.value;
+  if (!term.value && !lit.length) return null;
+  const keys = new Set(
+    searched.value.filter((r) => !lit.length || lit.includes(fillClass(r))).map((r) => r.service),
+  );
+  for (const hex of mapView.value.items)
+    if (isGroup(hex) && hex.children.some((c) => keys.has(c.service))) keys.add(hex.service);
+  return keys;
+});
 
 const counts = computed(
   () =>
@@ -684,7 +947,7 @@ const counts = computed(
 
 const announcement = computed(() => {
   const count = view.value === "map" ? searched.value.length : rows.value.length;
-  return term.value ? t("autoobserve.coverage.matchCount", { count }, count) : "";
+  return term.value ? t("autoobserve.coverage.matchCount", { count: num(count) }, count) : "";
 });
 
 const noMatchTitle = computed(() =>
@@ -693,11 +956,19 @@ const noMatchTitle = computed(() =>
 
 const filterHidesTitle = computed(() => {
   const count = searched.value.length;
+  if (filter.value === "needs")
+    return term.value
+      ? t(
+          "autoobserve.coverage.needsNoneSearch",
+          { count: num(count), query: raw(term.value) },
+          count,
+        )
+      : t("autoobserve.coverage.needsNone");
   const state = filterLabel(filter.value);
   return term.value
     ? t(
         "autoobserveLive.coverage.filterHidesSearch",
-        { count, query: raw(term.value), state },
+        { count: num(count), query: raw(term.value), state },
         count,
       )
     : t("autoobserveLive.coverage.filterHides", { state });
@@ -742,8 +1013,99 @@ const toItem = (row: CoverageRow): HexItem => ({
   }),
 });
 
+const mapGroup = computed(() =>
+  chooseMapGrouping(
+    allRows.value,
+    MAP_HEX_CAP,
+    groupPick.value === "auto" ? null : groupPick.value,
+    coverageName,
+    coveragePlace,
+  ),
+);
+const searchedSet = computed(() => (term.value ? new Set(searched.value) : null));
+// Past the cap the selected service, then what the search and legend match, keep their hexes.
+const mapView = computed(() => {
+  const found = searchedSet.value;
+  const lit = highlight.value;
+  const chosen = selected.value?.service;
+  const rowRank = (r: CoverageRow) => {
+    if (r.service === chosen) return 0;
+    return (!found || found.has(r)) && (!lit.length || lit.includes(fillClass(r))) ? 1 : 2;
+  };
+  const rank =
+    found || lit.length || chosen
+      ? (hex: CoverageTableRow) =>
+          isGroup(hex)
+            ? hex.children.reduce((min, c) => Math.min(min, rowRank(c)), 2)
+            : rowRank(hex)
+      : null;
+  return mapCoverage(allRows.value, MAP_HEX_CAP, GROUPERS[mapGroup.value], rank);
+});
+
+// A group hex takes the look of its worst service, which sorts first inside it.
+const toGroupItem = (row: CoverageGroup): HexItem => {
+  const worst = row.children[0];
+  const count = row.children.length;
+  const state = groupState(row);
+  return {
+    key: row.service,
+    title: String(t("autoobserve.coverage.hexGroup", { name: raw(row.title), count: num(count) })),
+    cls: fillClass(worst),
+    stateCls: groupWorst(row),
+    state,
+    stream: "",
+    detectors: t("autoobserve.coverage.groupServices", { count: num(count) }, count),
+    name: t("autoobserve.coverage.hexGroupName", { name: raw(row.title), state }),
+  };
+};
+
+// A grouped map has no hex of the selected service's own, so its group's hex carries the selection.
+const selectedHex = computed(() => {
+  const service = selected.value?.service;
+  const hex = service
+    ? mapView.value.items.find((h) =>
+        isGroup(h) ? h.children.some((c) => c.service === service) : h.service === service,
+      )
+    : undefined;
+  return hex?.service ?? null;
+});
+
 // allRows already leads with problems: gaps, then learning, then A to Z.
-const items = computed(() => allRows.value.map(toItem));
+const items = computed(() =>
+  mapView.value.items.map((row) => (isGroup(row) ? toGroupItem(row) : toItem(row))),
+);
+
+// A group folds only with two rows shown, so a search or filter that hides more gives way.
+const showsGroup = (children: CoverageRow[], shown: CoverageRow[]) => {
+  const set = new Set(shown);
+  return children.filter((c) => set.has(c)).length > 1;
+};
+
+// The table takes the map's grouping, so the clicked group is a row it can open.
+const selectHex = async (key: string) => {
+  const hex = mapView.value.items.find((r) => r.service === key);
+  if (!hex || !isGroup(hex)) return selectService(key);
+  if (!showsGroup(hex.children, searched.value)) query.value = "";
+  if (!showsGroup(hex.children, rows.value)) chooseFilter("all");
+  if (group.value !== mapGroup.value) groupPick.value = mapGroup.value;
+  view.value = "table";
+  // Regrouping clears the open rows, so the group opens once that has run.
+  await nextTick();
+  // Keys stay unique per row set, so the table's copy of the group is found by what its rows share.
+  const opened = tableRows.value.find((r) => isGroup(r) && r.id === hex.id);
+  expanded.value = opened ? [opened.service] : [];
+  await nextTick();
+  [...document.querySelectorAll<HTMLElement>("[data-group-key]")]
+    .find((el) => el.dataset.groupKey === opened?.service)
+    ?.scrollIntoView?.({ block: "nearest" });
+};
+
+// The hexes past the cap include services Needs action or a search hides, so the table lists them all.
+const showAllInTable = () => {
+  query.value = "";
+  chooseFilter("all");
+  view.value = "table";
+};
 
 const legend = computed(() =>
   (fill.value === "state"
@@ -762,16 +1124,24 @@ const legend = computed(() =>
 
 const fillOptions = computed(() => FILLS.map((f) => ({ label: t(FILL_LABEL[f]), value: f })));
 
-const mapLabel = computed(() =>
-  t(
-    "autoobserve.coverage.mapLabel",
-    {
-      count: allRows.value.length,
-      fill: t(FILL_LABEL[fill.value]),
-    },
-    allRows.value.length,
-  ),
-);
+// A group hex stands for all its services, so the label counts services, and groups apart.
+const mapLabel = computed(() => {
+  const hexes = mapView.value.items;
+  const services = hexes.reduce((sum, h) => sum + (isGroup(h) ? h.children.length : 1), 0);
+  const fillText = t(FILL_LABEL[fill.value]);
+  const by = mapGroup.value;
+  if (by === "none")
+    return t("autoobserve.coverage.mapLabel", { count: num(services), fill: fillText }, services);
+  return t(`autoobserve.coverage.mapLabelGrouped.${by}`, {
+    services: t("autoobserve.coverage.groupServices", { count: num(services) }, services),
+    groups: t(
+      `autoobserve.coverage.mapGroupCount.${by}`,
+      { count: num(groupLines(hexes, by)) },
+      groupLines(hexes, by),
+    ),
+    fill: fillText,
+  });
+});
 
 const selectedRow = computed(() =>
   selected.value ? allRows.value.find((r) => r.service === selected.value?.service) : undefined,
@@ -786,14 +1156,15 @@ const RAIL_TONE: Record<ServiceState, RowRailTone | null> = {
   learning: "neutral",
   watched: null,
 };
-const railTone = (row: CoverageRow): RowRailTone | null => RAIL_TONE[serviceState(row)];
+const railTone = (row: CoverageTableRow): RowRailTone | null =>
+  RAIL_TONE[isGroup(row) ? groupWorst(row) : serviceState(row)];
 
-const rowClass = (row: CoverageRow) =>
+const rowClass = (row: CoverageTableRow) =>
   row.service === selected.value?.service ? "bg-table-row-selected-bg" : "";
 
 // The drawer returns focus to whatever opened it first; the hex selected last is the one to land on.
 const closeDrawer = () => {
-  const service = selected.value?.service;
+  const service = selectedHex.value;
   selected.value = null;
   requestAnimationFrame(() =>
     document
@@ -821,53 +1192,26 @@ const liveCellAria = (row: CoverageRow, check: LiveCheck) =>
     serviceState(row) === "learning",
   );
 
-const SERVICE_COLUMN: OTableColumnDef<CoverageRow> = {
-  id: "service",
-  header: t("autoobserve.coverage.service"),
-  accessorKey: "service",
-  size: 160,
+const column = (
+  id: CoverageSortKey,
+  header: I18nText,
+  size: number,
+  meta?: OTableColumnDef<CoverageTableRow>["meta"],
+): OTableColumnDef<CoverageTableRow> => ({
+  id,
+  header,
+  accessorFn: (row: CoverageTableRow) => sortValue(row, id),
+  size,
   sortable: true,
-};
+  ...(meta ? { meta } : {}),
+});
 
-// Sorting a check column puts the worst first: no monitor, then the ways one falls short, then covered.
-const CHECK_RANK: Record<string, number> = {
-  none: 0,
-  blind: 1,
-  unmapped: 2,
-  silent: 3,
-  weak: 4,
-  covered: 5,
-};
-
-const columns: OTableColumnDef<CoverageRow>[] = [
-  SERVICE_COLUMN,
-  {
-    id: "where",
-    header: t("autoobserveLive.coverage.columns.where"),
-    accessorFn: (row: CoverageRow) => row.where ?? "",
-    size: 170,
-    sortable: true,
-  },
-  ...LIVE_CHECKS.map((check) => ({
-    id: `check-${check}`,
-    header: liveCheckName(t, check),
-    accessorFn: (row: CoverageRow) => CHECK_RANK[row.checks?.[check].engine?.stateKey ?? "none"],
-    size: 130,
-    sortable: true,
-  })),
-  {
-    id: "state",
-    header: t("autoobserveLive.coverage.columns.state"),
-    accessorFn: (row: CoverageRow) => rank(row),
-    size: 130,
-    sortable: true,
-  },
-  {
-    id: "lastScanned",
-    header: t("autoobserveLive.coverage.columns.lastChecked"),
-    accessorFn: (row: CoverageRow) => row.scannedMinutes ?? Number.MAX_SAFE_INTEGER,
-    size: 130,
-    sortable: true,
-  },
+const columns: OTableColumnDef<CoverageTableRow>[] = [
+  column("service", t("autoobserve.coverage.service"), 220),
+  column("where", t("autoobserveLive.coverage.columns.where"), 170),
+  column("traffic", t("autoobserve.coverage.traffic"), 100, { align: "right" }),
+  ...LIVE_CHECKS.map((check) => column(`check-${check}`, liveCheckName(t, check), 130)),
+  column("state", t("autoobserveLive.coverage.columns.state"), 180),
+  column("lastScanned", t("autoobserveLive.coverage.columns.lastChecked"), 130),
 ];
 </script>

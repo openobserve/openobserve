@@ -867,6 +867,36 @@ export class DatabaseMonitoringPage {
   // Safety probes (hostile-input tests)
   // =======================================================================
 
+  /** Answers the Databases read with fixed `db_totals` rows, since real rows only appear after the 15-minute rollup. */
+  async serveDatabasesHits(hits) {
+    await this.page.route(/\/api\/[^/]+\/db_monitoring\/databases(\?|$)/, (route) => route.fulfill({
+      json: {
+        hits,
+        top_n_subset: false,
+        freshness: { data_through: Date.now() * 1000, live_tail: true, tail_covers_from: null, tail_through: null, tail_truncated: false, percentiles_estimated: false, traces_upper_bound: true },
+        breakdown: {},
+        breakdown_read_failed: false,
+      },
+    }));
+  }
+
+  /** Rendered Databases rows whose text names `instance`. */
+  async databasesRowsFor(instance) {
+    await expect(this.databasesTable).toBeVisible({ timeout: 30000 });
+    return this.databasesTable
+      .locator('tbody:not([data-test="o2-table-skeleton-body"]):not([data-test-stale]) tr')
+      .filter({ hasText: instance })
+      .count();
+  }
+
+  async expectDatabasesRowCount(count) {
+    await expect.poll(() => this.getRowCount(this.databasesTable), { timeout: 30000 }).toBe(count);
+  }
+
+  async expectSchemaCountText(text) {
+    await expect(this.page.locator('[data-test="dbm-databases-schema-count"]')).toHaveText(text, { timeout: 15000 });
+  }
+
   /** The page body's text, '' when empty — proves a route rendered SOMETHING. */
   async getBodyText() {
     return (await this.page.locator('body').textContent()) || '';

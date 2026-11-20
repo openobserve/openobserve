@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="@container flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4 [&>*]:shrink-0"
     data-test="autoobserve-live-issue-overview"
   >
-    <div class="flex flex-wrap items-center gap-2">
+    <div class="flex min-h-6 flex-wrap items-center gap-2">
       <OTag type="severity" :value="item.incident.severity" size="sm" />
       <OTag type="incidentStatus" :value="item.incident.status" size="sm" />
       <OTag v-for="name in chips.shown" :key="name" tone="neutral" size="sm" :label="raw(name)" />
@@ -30,6 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="chips.rest"
         :label="chips.more"
         data-test="autoobserve-live-issue-streams-more"
+      />
+      <OTag
+        v-if="badge"
+        :tone="badge.quiet ? 'err' : 'neutral'"
+        size="sm"
+        icon="shield"
+        :label="badge.label"
+        data-test="autoobserve-live-issue-security-source"
       />
     </div>
 
@@ -49,23 +57,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex flex-col gap-3">
             <p class="text-text-body text-sm" data-test="autoobserve-live-issue-why">{{ why }}</p>
             <p
-              v-if="!headline && causeNote"
+              v-if="!headline && causeNote && !flags.context"
               class="text-text-secondary -mt-2 text-xs"
               data-test="autoobserve-live-issue-no-cause"
             >
               {{ causeNote }}
             </p>
-            <div class="bg-surface-subtle rounded-surface flex flex-col gap-1.5 p-3">
-              <span class="text-text-body text-xs font-medium">{{
-                headline
-                  ? t("autoobserve.drawer.likelyCause")
-                  : t("autoobserve.issueLive.whatToCheck")
-              }}</span>
-              <p class="text-text-heading text-sm" data-test="autoobserve-live-issue-likely">
-                {{ headline ?? next }}
+            <CauseList
+              v-if="context"
+              :key="item.incident.id"
+              :context="context"
+              :recovered="recovered"
+              :now-ms="nowMs"
+              :step="stepSlot"
+            >
+              <NextStepLine v-if="stepShown" :context="context" :now-ms="nowMs" />
+              <IssueCheckSlot
+                v-else-if="stepSlot"
+                v-bind="check"
+                :band="band"
+                :reason="bandReason"
+              />
+            </CauseList>
+            <!-- An item the engine found no issue for may gain context on a later poll, so its block stays reserved. -->
+            <div
+              v-else-if="flags.context"
+              class="flex flex-col gap-3"
+              :class="stepSlot ? BLOCK_HEIGHT.step : BLOCK_HEIGHT.bare"
+              data-test="autoobserve-live-issue-context-held"
+            >
+              <IssueCheckSlot v-if="stepSlot" v-bind="check" :band="band" :reason="bandReason" />
+              <p
+                v-if="!headline && causeNote"
+                class="text-text-secondary text-xs"
+                data-test="autoobserve-live-issue-no-cause"
+              >
+                {{ causeNote }}
               </p>
             </div>
-            <AoConfidenceMeter v-if="band" :band="band" :reason="bandReason" />
+            <div
+              v-if="!stepSlot"
+              class="bg-surface-subtle rounded-surface flex flex-col gap-1.5 p-3"
+            >
+              <span class="text-text-body text-xs font-medium">{{ check.title }}</span>
+              <p class="text-text-heading text-sm" data-test="autoobserve-live-issue-likely">
+                {{ check.text }}
+              </p>
+            </div>
+            <AoConfidenceMeter v-if="band && !stepSlot" :band="band" :reason="bandReason" />
             <IssueSignal
               :stream="streams[0] ?? null"
               :anchor-us="item.finding.first_seen_at"
@@ -218,9 +257,14 @@ import type { AutoObserveIncidentItem } from "@/services/autoobserve";
 import type { RcaBand } from "@/services/incidents";
 import { pagedFindingCopy } from "../insight/kindCopy";
 import AoConfidenceMeter from "./AoConfidenceMeter.vue";
+import CauseList from "./CauseList.vue";
+import NextStepLine from "./NextStepLine.vue";
+import { BLOCK_HEIGHT, securityBadge } from "./causeCopy";
+import IssueCheckSlot from "./IssueCheckSlot.vue";
 import IssueSignal from "./IssueSignal.vue";
 import { issueEndUs, type IssueStreamInfo, type IssueTimelineView } from "./issueModel";
-import { useLiveZone } from "./liveModel";
+import { issueContextOf, showsNextStep } from "./liveAdapter";
+import { useContextFlags, useLiveZone } from "./liveModel";
 
 type NoticeTone = "neutral" | "warning" | "error";
 
@@ -275,6 +319,27 @@ const blast = computed(() => ({
   shown: props.streams.slice(0, BLAST_CHIPS),
   more: props.streams.length > BLAST_CHIPS ? more(props.streams.length - BLAST_CHIPS) : null,
 }));
+
+const flags = useContextFlags();
+
+const context = computed(() => (flags.value.context ? issueContextOf(props.item) : null));
+
+const recovered = computed(() => issueEndUs(props.item) !== null);
+
+// With its flag on, the Next step slot replaces the older check box and meter even when no step comes.
+const stepSlot = computed(() => flags.value.step);
+const stepShown = computed(() => !!context.value && stepSlot.value && showsNextStep(context.value));
+
+const check = computed(() => ({
+  title: props.headline
+    ? t("autoobserve.drawer.likelyCause")
+    : t("autoobserve.issueLive.whatToCheck"),
+  text: props.headline ?? props.next,
+}));
+
+const badge = computed(() =>
+  context.value ? securityBadge(t, context.value, recovered.value) : null,
+);
 
 const stillOut = computed(() => t("autoobserve.issueLive.stillOut"));
 const backText = computed(() => t("autoobserve.issueLive.back"));

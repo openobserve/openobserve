@@ -275,6 +275,7 @@ mod m20261218_000001_add_security_case_to_alert_incidents;
 mod m20261219_000001_add_historical_to_alert_incidents;
 mod m20261220_000001_create_service_identity_tables;
 mod m20261221_000001_add_last_detection_at_to_alert_incidents;
+mod m20261222_000001_incident_membership_and_catalog_cleanup;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -913,6 +914,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261111_000001_add_false_alarm_recovery_stamp::Migration),
             Box::new(m20261220_000001_create_service_identity_tables::Migration),
             Box::new(m20261221_000001_add_last_detection_at_to_alert_incidents::Migration),
+            Box::new(m20261222_000001_incident_membership_and_catalog_cleanup::Migration),
         ]
     }
 }
@@ -1046,6 +1048,10 @@ mod tests {
             156,
             "m20261221_000001_add_last_detection_at_to_alert_incidents",
         ),
+        (
+            157,
+            "m20261222_000001_incident_membership_and_catalog_cleanup",
+        ),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1167,6 +1173,14 @@ mod tests {
             (
                 "m20251204_000001_create_alert_incidents_table",
                 "m20261221_000001_add_last_detection_at_to_alert_incidents",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261222_000001_incident_membership_and_catalog_cleanup",
+            ),
+            (
+                "m20260326_000001_add_field_name_mapping_to_service_streams",
+                "m20261222_000001_incident_membership_and_catalog_cleanup",
             ),
             (
                 "m20260725_000001_create_alert_states_tables",

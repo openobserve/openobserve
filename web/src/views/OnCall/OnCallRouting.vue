@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @clear-search="clearSearch"
       >
         <template #toolbar>
-          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 max-md:contents">
+          <div class="flex flex-1 flex-wrap items-center gap-2 max-md:contents">
             <OToggleGroup
               :model-value="tab"
               type="single"
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @clear-search="clearSearch"
       >
         <template #toolbar>
-          <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 max-md:contents">
+          <div class="flex flex-1 flex-wrap items-center gap-2 max-md:contents">
             <OToggleGroup
               :model-value="tab"
               type="single"

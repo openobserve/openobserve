@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full min-h-0 w-full flex-col" data-test="metrics-explorer">
     <OPageHeader :title="t('menu.metrics')" title-data-test="metrics-explorer-title" />
+    <AnomalyOriginBanner class="mx-1.5 mt-1.5 shrink-0" data-test="metrics-anomaly-origin-banner" />
     <!-- items-center: LabelFilterBar wraps its own chips internally (flex-wrap),
          so the row keeps every control on one centred line rather than items-start. -->
     <div
@@ -856,6 +857,7 @@ import { STALE_DIM, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
 import { formatRangeLength, formatRefreshFailed } from "@/utils/formatters";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import AnomalyOriginBanner from "@/components/alerts/AnomalyOriginBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -952,6 +954,7 @@ export default defineComponent({
     OLoadingLine,
     PanelChartPlaceholder,
     FirstDataPanel,
+    AnomalyOriginBanner,
     DateTimePickerDashboard,
     OButton,
     OIcon,

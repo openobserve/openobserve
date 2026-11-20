@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar: type filter + search -->
             <template #toolbar>
-              <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
+              <div class="flex flex-1 items-center gap-2 max-md:contents">
                 <OToggleGroup
                   mobile-dropdown
                   :model-value="selectedFilter"

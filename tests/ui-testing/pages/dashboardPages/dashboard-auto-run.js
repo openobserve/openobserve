@@ -83,6 +83,11 @@ export default class DashboardAutoRun {
     await pinAutoQuery(this.page, enabled);
   }
 
+  // For surfaces that open an API-created dashboard outside setupDashboard, such as the pinned Home tab.
+  trackRuns() {
+    this.panelRuns = trackPanelRuns(this.page);
+  }
+
   // Dashboard and panels come from the API; the variables under test are created through the Settings UI.
   async setupDashboard({ name, panels, variable, multiSelect = false, variableOptions = {}, dependents = [], reloadAfterCreate = false }) {
     const id = await createDashboard(`${name}_${Date.now()}_${Math.floor(Math.random() * 1e4)}`, { panels });
@@ -129,6 +134,11 @@ export default class DashboardAutoRun {
       if (v === null) localStorage.removeItem(key);
       else localStorage.setItem(key, v);
     }, [AUTO_RUN_STORAGE_KEY, value]);
+  }
+
+  // Where auto_query_enabled, a live-preview run can start as Apply is clicked and turn that click into Cancel.
+  async disableAutoRun() {
+    await this.setStoredAutoRun("false");
   }
 
   async getStoredAutoRun() {

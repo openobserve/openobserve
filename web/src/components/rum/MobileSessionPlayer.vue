@@ -69,6 +69,7 @@ const props = withDefaults(
     speed?: number;
     skipInactivity?: boolean;
     intent?: ReplayIntent;
+    imageResources?: Map<string, string>;
   }>(),
   {
     events: () => [],
@@ -85,6 +86,7 @@ const props = withDefaults(
     speed: undefined,
     skipInactivity: undefined,
     intent: "pause",
+    imageResources: () => new Map(),
   },
 );
 
@@ -185,8 +187,12 @@ const canvasStyle = computed(() => ({
   "transform-origin": "top left",
 }));
 
+const failedResourceIds = ref(new Set<string>());
+
 function imageSrc(w: Wireframe): string | undefined {
-  return w.base64 ? `data:image/png;base64,${w.base64}` : undefined;
+  if (w.base64) return `data:image/png;base64,${w.base64}`;
+  if (!w.resourceId || failedResourceIds.value.has(w.resourceId)) return undefined;
+  return props.imageResources.get(w.resourceId);
 }
 
 // ---- event timeline markers (error highlight) ----------------------------
@@ -542,6 +548,7 @@ defineExpose({ seekTo, play, pause, togglePlay, playbackState });
               :style="wireframeStyle(wf)"
               :src="imageSrc(wf)"
               alt=""
+              @error="wf.resourceId && failedResourceIds.add(wf.resourceId)"
             />
             <!-- text/placeholder text is rendered as a text node (never v-html). -->
             <div v-else :style="wireframeStyle(wf)">

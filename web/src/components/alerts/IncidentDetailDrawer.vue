@@ -43,14 +43,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #status>
         <template v-if="incidentDetails && !isEditingTitle">
-          <span class="inline-flex cursor-default">
-            <OTag type="incidentStatus" :value="incidentDetails.status" />
-            <OTooltip
-              :content="
-                raw(t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status))
+          <!-- The header chips are the only status and severity controls, so they work on every tab. -->
+          <ODropdown v-model:open="statusMenuOpen" align="start">
+            <template #trigger>
+              <OTag
+                type="incidentStatus"
+                :value="incidentDetails.status"
+                toggle
+                :pressed="statusMenuOpen"
+                :disabled="updating"
+                :aria-label="
+                  t('alerts.incidents.overview.changeStatus', {
+                    status: getStatusLabel(incidentDetails.status),
+                  })
+                "
+                data-test="incident-detail-status-chip"
+                >{{ getStatusLabel(incidentDetails.status)
+                }}<OIcon name="expand-more" size="xs" aria-hidden="true"
+              /></OTag>
+            </template>
+            <ODropdownItem
+              v-for="option in statusOptions"
+              :key="option.value"
+              role="menuitemradio"
+              :aria-checked="editableStatus === option.value"
+              :description="option.help"
+              :data-test="`incident-status-menu-${option.value}`"
+              @select="
+                editableStatus !== option.value &&
+                handleStatusChange(option.value as 'open' | 'acknowledged' | 'resolved')
               "
-            />
-          </span>
+            >
+              <span :class="{ 'text-accent': editableStatus === option.value }">{{
+                option.label
+              }}</span>
+              <template #end>
+                <OIcon
+                  name="check"
+                  size="sm"
+                  class="ms-auto"
+                  :class="editableStatus === option.value ? 'text-accent' : 'invisible'"
+                />
+              </template>
+            </ODropdownItem>
+          </ODropdown>
 
           <span
             v-if="incidentDetails.acknowledged_by"
@@ -62,12 +98,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OUserCell :value="incidentDetails.acknowledged_by" />
           </span>
 
-          <span class="inline-flex cursor-default">
-            <OTag type="severity" :value="incidentDetails.severity" />
-            <OTooltip
-              :content="raw(t('alerts.incidents.severity') + ': ' + incidentDetails.severity)"
-            />
-          </span>
+          <ODropdown v-model:open="severityMenuOpen" align="start">
+            <template #trigger>
+              <OTag
+                type="severity"
+                :value="incidentDetails.severity"
+                toggle
+                :pressed="severityMenuOpen"
+                :disabled="updating"
+                :aria-label="
+                  t('alerts.incidents.overview.changeSeverity', {
+                    severity: incidentDetails.severity,
+                  })
+                "
+                data-test="incident-detail-severity-chip"
+                >{{ incidentDetails.severity
+                }}<OIcon name="expand-more" size="xs" aria-hidden="true"
+              /></OTag>
+            </template>
+            <ODropdownItem
+              v-for="option in severityOptions"
+              :key="option.value"
+              role="menuitemradio"
+              :aria-checked="editableSeverity === option.value"
+              :data-test="`incident-severity-menu-${option.value}`"
+              @select="
+                editableSeverity !== option.value &&
+                handleSeverityChange(option.value as 'P1' | 'P2' | 'P3' | 'P4')
+              "
+            >
+              <OTag type="severity" :value="option.value" size="sm" />
+              <span :class="{ 'text-accent': editableSeverity === option.value }">{{
+                option.word
+              }}</span>
+              <template #end>
+                <OIcon
+                  name="check"
+                  size="sm"
+                  class="ms-auto"
+                  :class="editableSeverity === option.value ? 'text-accent' : 'invisible'"
+                />
+              </template>
+            </ODropdownItem>
+          </ODropdown>
 
           <OTag type="countChip" value="alerts" data-test="incident-detail-firings-chip">{{
             firingsChip
@@ -85,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </span>
 
-          <!-- Last in the row, so its skeleton growing into the chip moves nothing after it. -->
+          <!-- Only the security badge follows, and it waits for the chip, so the skeleton's growth moves nothing. -->
           <OSkeleton
             v-if="liveChip === 'loading'"
             shape="block"
@@ -105,6 +178,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OTooltip v-if="liveChip.tooltip" :content="liveChip.tooltip" />
           </span>
+
+          <OTag
+            v-if="findingBadge && liveChip !== 'loading'"
+            :tone="findingBadge.quiet ? 'err' : 'neutral'"
+            icon="shield"
+            :label="findingBadge.label"
+            data-test="incident-detail-security-source"
+          />
         </template>
       </template>
 
@@ -112,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="incidentDetails">
           <OButton
             v-if="incidentDetails.status === 'open'"
-            variant="secondary"
+            variant="primary"
             :loading="updating"
             :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
             @click="acknowledgeIncident"
@@ -140,32 +221,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #header-tabs>
-        <OTabs v-model="activeTab" class="flex-1" reorderable @reorder="onTabReorder">
-          <OTab
-            v-for="tab in shownTabs"
-            :key="tab"
-            :name="tab"
-            :label="tab === 'alertTriggers' ? undefined : tabLabels[tab]"
-            :data-test="TAB_TEST_IDS[tab]"
-            :locked="isCorrelationTab(tab) && correlationLocked"
-            :tooltip="
-              isCorrelationTab(tab) && correlationLocked ? correlationLockedReason : undefined
-            "
-          >
-            <template v-if="tab === 'alertTriggers'" #default>
-              <div class="flex items-center gap-1.5">
-                <span>{{ tabLabels.alertTriggers }}</span>
-                <OTag
-                  v-if="!loading"
-                  type="countChip"
-                  value="neutral"
-                  data-test="incident-alert-triggers-count"
-                  >{{ triggerRowCount }}</OTag
-                >
-              </div>
-            </template>
-          </OTab>
-        </OTabs>
+        <div class="flex items-center">
+          <OTabs v-model="activeTab" class="min-w-0 flex-1" reorderable @reorder="onTabReorder">
+            <OTab
+              v-for="tab in shownTabs"
+              :key="tab"
+              :name="tab"
+              :label="tab === 'alertTriggers' ? undefined : tabLabels[tab]"
+              :data-test="TAB_TEST_IDS[tab]"
+              :locked="isCorrelationTab(tab) && correlationLocked"
+              :tooltip="
+                isCorrelationTab(tab) && correlationLocked ? correlationLockedReason : undefined
+              "
+            >
+              <template v-if="tab === 'alertTriggers'" #default>
+                <div class="flex items-center gap-1.5">
+                  <span>{{ tabLabels.alertTriggers }}</span>
+                  <OTag
+                    v-if="!loading"
+                    type="countChip"
+                    value="neutral"
+                    data-test="incident-alert-triggers-count"
+                    >{{ triggerRowCount }}</OTag
+                  >
+                </div>
+              </template>
+            </OTab>
+          </OTabs>
+        </div>
       </template>
 
       <!-- Content -->
@@ -194,6 +277,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Tab Content Container -->
         <div class="flex flex-1 overflow-hidden">
           <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+            <div
+              v-if="activeTab === 'incidentAnalysis' && findingCardShown"
+              class="max-h-[70%] shrink-0 overflow-auto px-7 pt-4"
+            >
+              <IssueContextCard
+                :key="incidentDetails?.id"
+                :item="findingItem"
+                :context="findingContext"
+                :held="findingHeld"
+                class="max-w-215"
+                @retry="findingItemQuery.refetch()"
+              />
+            </div>
             <!-- Incident Analysis tab: its own analysis column + thread column (02 E5) -->
             <IncidentRCAAnalysis
               v-if="activeTab === 'incidentAnalysis' || activeTab === 'report'"
@@ -246,396 +342,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else
               class="px-page-edge relative flex flex-1 flex-col overflow-hidden pt-4 pb-2"
             >
-              <!-- Overview Tab Content - REDESIGNED -->
-              <div v-if="activeTab === 'overview'" class="flex flex-1 flex-col overflow-hidden">
-                <!-- SECTION 1: Hero Metrics (100px height) -->
-                <div class="mb-3 flex h-25 gap-3">
-                  <!-- 1. Total Alerts Card -->
-                  <div
-                    class="border-card-glass-border rounded-default bg-card-glass-bg flex flex-1 cursor-pointer flex-col justify-between border p-3 transition-all duration-200"
-                  >
-                    <!-- Top: Title and Icon -->
-                    <div class="flex items-start justify-between">
-                      <div :class="'text-text-secondary'" class="text-sm font-medium">
-                        {{ t("alerts.incidents.totalAlerts") }}
-                      </div>
-                      <div
-                        class="rounded-default bg-badge-amber-soft-bg flex h-8 w-8 items-center justify-center"
-                      >
-                        <OIcon name="bolt" size="sm" class="text-badge-amber-soft-text" />
-                      </div>
-                    </div>
-
-                    <!-- Bottom: Large Number -->
-                    <div :class="'text-text-body'" class="text-2xl leading-none font-semibold">
-                      {{ triggers.length }}
-                    </div>
-                  </div>
-
-                  <!-- 2. Unique Alerts Card -->
-                  <div
-                    class="border-card-glass-border rounded-default bg-card-glass-bg flex flex-1 cursor-pointer flex-col justify-between border p-3 transition-all duration-200"
-                  >
-                    <!-- Top: Title and Icon -->
-                    <div class="flex items-start justify-between">
-                      <div :class="'text-text-secondary'" class="text-sm font-medium">
-                        {{ t("alerts.incidents.uniqueAlerts") }}
-                      </div>
-                      <div
-                        class="rounded-default bg-badge-blue-soft-bg flex h-8 w-8 items-center justify-center"
-                      >
-                        <OIcon
-                          name="notifications-active"
-                          size="sm"
-                          class="text-badge-blue-soft-text"
-                        />
-                      </div>
-                    </div>
-
-                    <!-- Bottom: Large Number -->
-                    <div :class="'text-text-body'" class="text-2xl leading-none font-semibold">
-                      {{ uniqueAlertsCount }}
-                    </div>
-                  </div>
-
-                  <!-- 3. Affected Services Card -->
-                  <div
-                    class="border-card-glass-border rounded-default bg-card-glass-bg flex flex-1 cursor-pointer flex-col justify-between border p-3 transition-all duration-200"
-                  >
-                    <!-- Top: Title and Icon -->
-                    <div class="flex items-start justify-between">
-                      <div :class="'text-text-secondary'" class="text-sm font-medium">
-                        {{ t("alerts.incidents.affectedServices") }}
-                      </div>
-                      <div
-                        class="rounded-default bg-badge-purple-soft-bg flex h-8 w-8 items-center justify-center"
-                      >
-                        <OIcon name="dns" size="sm" class="text-badge-purple-soft-text" />
-                      </div>
-                    </div>
-
-                    <!-- Bottom: Large Number -->
-                    <div :class="'text-text-body'" class="text-2xl leading-none font-semibold">
-                      {{ affectedServicesCount }}
-                    </div>
-                  </div>
-
-                  <!-- 4. Active Duration Card -->
-                  <div
-                    class="border-card-glass-border rounded-default bg-card-glass-bg flex flex-1 cursor-pointer flex-col justify-between border p-3 transition-all duration-200"
-                  >
-                    <!-- Top: Title and Icon -->
-                    <div class="flex items-start justify-between">
-                      <div :class="'text-text-secondary'" class="text-sm font-medium">
-                        {{ t("alerts.incidents.activeDuration") }}
-                      </div>
-                      <div
-                        class="rounded-default bg-badge-success-soft-bg flex h-8 w-8 items-center justify-center"
-                      >
-                        <OIcon name="schedule" size="sm" class="text-badge-success-soft-text" />
-                      </div>
-                    </div>
-
-                    <!-- Bottom: Large Number -->
-                    <div :class="'text-text-body'" class="text-2xl leading-none font-semibold">
-                      {{
-                        incidentDetails?.first_alert_at && incidentDetails?.last_alert_at
-                          ? calculateDuration(
-                              incidentDetails.first_alert_at,
-                              incidentDetails.last_alert_at,
-                            )
-                          : raw("N/A")
-                      }}
-                    </div>
-                  </div>
-
-                  <!-- 5. Alert Frequency Card -->
-                  <div
-                    class="border-card-glass-border rounded-default bg-card-glass-bg flex flex-1 cursor-pointer flex-col justify-between border p-3 transition-all duration-200"
-                  >
-                    <!-- Top: Title and Icon -->
-                    <div class="flex items-start justify-between">
-                      <div :class="'text-text-secondary'" class="text-sm font-medium">
-                        {{ t("alerts.incidents.alertFrequency") }}
-                      </div>
-                      <div
-                        class="rounded-default bg-badge-error-soft-bg flex h-8 w-8 items-center justify-center"
-                      >
-                        <OIcon name="show-chart" size="sm" class="text-badge-error-soft-text" />
-                      </div>
-                    </div>
-
-                    <!-- Bottom: Large Text -->
-                    <div :class="'text-text-body'" class="text-lg leading-tight font-semibold">
-                      {{ alertFrequency }}
-                    </div>
-                  </div>
-                </div>
-
-                <div class="flex h-[calc(100vh-23.75rem)] flex-1 gap-3">
-                  <!-- PART 1: Primary Content (66.67% width) -->
-                  <div class="flex w-2/3 flex-col gap-3">
-                    <!-- 2.1A: Top Row - Incident Details (2/3) + Incident Timeline (1/3) -->
-                    <div class="flex h-1/2 gap-3">
-                      <!-- Incident Timeline (33.33% width) -->
-                      <div
-                        class="border-card-glass-border rounded-default bg-card-glass-bg flex w-1/3 flex-col overflow-hidden border"
-                      >
-                        <!-- Header -->
-                        <div class="flex items-center justify-between px-4 py-3">
-                          <div :class="'text-text-heading'" class="text-sm font-semibold">
-                            {{ t("alerts.incidents.incidentTimeline") }}
-                          </div>
-                          <div
-                            class="rounded-default bg-surface-panel text-text-secondary px-2 py-0.5 text-xs font-medium"
-                          >
-                            {{ t("alerts.incidents.utc") }}
-                          </div>
-                        </div>
-
-                        <!-- Content with vertical timeline -->
-                        <div class="relative flex flex-col gap-6 overflow-y-auto px-4 py-2">
-                          <!-- Vertical line -->
-                          <div
-                            class="bg-surface-panel absolute top-5.25 bottom-5.25 left-5.25 w-0.5"
-                          ></div>
-
-                          <!-- First Alert Received -->
-                          <div class="relative flex items-start gap-3">
-                            <div
-                              class="bg-timeline-dot-success z-10 mt-2 h-2.5 w-2.5 flex-shrink-0 rounded-full"
-                            ></div>
-                            <div class="flex-1">
-                              <div :class="'text-text-heading'" class="mb-1 text-sm font-medium">
-                                {{ t("alerts.incidents.firstAlertReceived") }}
-                              </div>
-                              <div :class="'text-text-secondary'" class="text-xs">
-                                {{
-                                  incidentDetails?.first_alert_at
-                                    ? formatTimestampUTC(incidentDetails.first_alert_at)
-                                    : raw("N/A")
-                                }}
-                                <span :class="'text-text-muted'" class="mx-1.5">|</span>
-                                <span>{{ t("alerts.incidents.initialTrigger") }}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <!-- Peak Activity (if available) -->
-                          <div v-if="peakActivity" class="relative flex items-start gap-3">
-                            <div
-                              class="bg-status-warning-text z-10 mt-2 h-2.5 w-2.5 flex-shrink-0 rounded-full"
-                            ></div>
-                            <div class="flex-1">
-                              <div :class="'text-text-heading'" class="mb-1 text-sm font-medium">
-                                {{ t("alerts.incidents.peakActivity") }}
-                              </div>
-                              <div :class="'text-text-secondary'" class="text-xs">
-                                {{
-                                  peakActivity.timestamp
-                                    ? formatTimestampUTC(peakActivity.timestamp)
-                                    : raw("N/A")
-                                }}
-                                <span :class="'text-text-muted'" class="mx-1.5">|</span>
-                                <span
-                                  >{{ peakActivity.count }}
-                                  {{ t("alerts.incidents.alertsInFiveMins") }}</span
-                                >
-                              </div>
-                            </div>
-                          </div>
-
-                          <!-- Latest Alert -->
-                          <div class="relative flex items-start gap-3">
-                            <div
-                              class="z-10 mt-2 h-2.5 w-2.5 flex-shrink-0 rounded-full"
-                              :class="
-                                incidentDetails?.status === 'resolved'
-                                  ? 'bg-timeline-dot-success'
-                                  : 'bg-timeline-dot-destructive'
-                              "
-                            ></div>
-                            <div class="flex-1">
-                              <div :class="'text-text-heading'" class="mb-1 text-sm font-medium">
-                                {{ t("alerts.incidents.latestAlert") }}
-                              </div>
-                              <div :class="'text-text-secondary'" class="text-xs">
-                                {{
-                                  incidentDetails?.last_alert_at
-                                    ? formatTimestampUTC(incidentDetails.last_alert_at)
-                                    : raw("N/A")
-                                }}
-                                <span :class="'text-text-muted'" class="mx-1.5">|</span>
-                                <span>{{
-                                  incidentDetails?.status === "resolved"
-                                    ? t("common.resolved")
-                                    : t("common.stillOngoing")
-                                }}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <!-- Show Full Activity Button -->
-                        <div class="border-border-default flex justify-end border-t p-2">
-                          <OButton
-                            variant="accent-ghost"
-                            @click="activeTab = 'activity'"
-                            data-test="incident-timeline-show-full-activity"
-                            ><span class="text-xs">{{
-                              t("alerts.incidents.showFullActivity")
-                            }}</span></OButton
-                          >
-                        </div>
-                      </div>
-                      <!-- Incident Details (66.67% width) -->
-                      <div
-                        class="border-card-glass-border rounded-default bg-card-glass-bg flex w-2/3 flex-col overflow-hidden border"
-                      >
-                        <!-- Header -->
-                        <div class="px-4 pt-2 pb-1">
-                          <div :class="'text-text-heading'" class="text-sm font-semibold">
-                            {{ t("alerts.incidents.incidentDetails") }}
-                          </div>
-                        </div>
-
-                        <!-- Content -->
-                        <div class="flex flex-col gap-3 overflow-y-auto p-4">
-                          <!-- Incident ID -->
-                          <div class="grid grid-cols-[7.5rem_1fr] gap-2">
-                            <div :class="'text-text-secondary'" class="text-xs font-medium">
-                              {{ t("alerts.incidents.incidentId") }}
-                            </div>
-                            <div
-                              class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 font-mono text-xs"
-                            >
-                              <OTruncatedText class="flex-1">{{
-                                incidentDetails?.id || raw("N/A")
-                              }}</OTruncatedText>
-                              <OIcon
-                                :name="copiedField === 'incident_id' ? 'check' : 'content-copy'"
-                                size="sm"
-                                :class="
-                                  copiedField === 'incident_id'
-                                    ? 'text-status-positive'
-                                    : 'hover:text-text-link opacity-60 hover:opacity-100'
-                                "
-                                class="flex-shrink-0 cursor-pointer transition-all"
-                                @click="copyToClipboard(incidentDetails?.id, 'incident_id')"
-                              />
-                            </div>
-                          </div>
-
-                          <!-- Incident Name -->
-                          <div class="grid grid-cols-[7.5rem_1fr] gap-2">
-                            <div :class="'text-text-secondary'" class="text-xs font-medium">
-                              {{ t("alerts.incidents.incidentName") }}
-                            </div>
-                            <div
-                              class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
-                            >
-                              <OTruncatedText class="flex-1">{{
-                                incidentDetails?.title || raw("N/A")
-                              }}</OTruncatedText>
-                              <OIcon
-                                :name="copiedField === 'incident_title' ? 'check' : 'content-copy'"
-                                size="sm"
-                                :class="
-                                  copiedField === 'incident_title'
-                                    ? 'text-status-positive'
-                                    : 'hover:text-text-link opacity-60 hover:opacity-100'
-                                "
-                                class="flex-shrink-0 cursor-pointer transition-all"
-                                @click="copyToClipboard(incidentDetails?.title, 'incident_title')"
-                              />
-                            </div>
-                          </div>
-
-                          <!-- Correlated By -->
-                          <div class="grid grid-cols-[7.5rem_1fr] gap-2">
-                            <div :class="'text-text-secondary'" class="text-xs font-medium">
-                              {{ t("alerts.incidents.correlatedBy") }}
-                            </div>
-                            <div
-                              class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
-                            >
-                              <span class="min-w-0 flex-1 truncate">{{
-                                getCorrelationMethodLabel(incidentDetails?.key_type)
-                              }}</span>
-                              <OIcon
-                                :name="copiedField === 'key_type' ? 'check' : 'content-copy'"
-                                size="sm"
-                                :class="
-                                  copiedField === 'key_type'
-                                    ? 'text-status-positive'
-                                    : 'hover:text-text-link opacity-60 hover:opacity-100'
-                                "
-                                class="flex-shrink-0 cursor-pointer transition-all"
-                                @click="
-                                  copyToClipboard(
-                                    getCorrelationMethodLabel(incidentDetails?.key_type),
-                                    'key_type',
-                                  )
-                                "
-                              />
-                            </div>
-                          </div>
-
-                          <!-- Created At -->
-                          <div class="grid grid-cols-[7.5rem_1fr] gap-2">
-                            <div :class="'text-text-secondary'" class="text-xs font-medium">
-                              {{ t("alerts.createdAt") }}
-                            </div>
-                            <div :class="'text-text-body'" class="text-sm">
-                              {{
-                                incidentDetails?.created_at
-                                  ? formatTimestamp(incidentDetails.created_at)
-                                  : raw("N/A")
-                              }}
-                            </div>
-                          </div>
-
-                          <!-- Updated At -->
-                          <div class="grid grid-cols-[7.5rem_1fr] gap-2">
-                            <div :class="'text-text-secondary'" class="text-xs font-medium">
-                              {{ t("common.updated_at") }}
-                            </div>
-                            <div :class="'text-text-body'" class="text-sm">
-                              {{
-                                incidentDetails?.updated_at
-                                  ? formatTimestamp(incidentDetails.updated_at)
-                                  : raw("N/A")
-                              }}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <!-- alert activity -->
-                    <!-- 2.1B: Alert Activity Chart (50% height, full width) -->
-                    <div
-                      class="border-card-glass-border rounded-default bg-card-glass-bg flex h-1/2 flex-col overflow-hidden border"
-                    >
-                      <!-- Header -->
-                      <div class="px-4 pt-2 pb-1">
-                        <div :class="'text-text-heading'" class="text-sm font-semibold">
-                          {{ t("alerts.incidents.alertActivity") }}
-                        </div>
-                      </div>
-
-                      <!-- Chart Content -->
-                      <div class="flex-1 overflow-hidden p-2">
-                        <CustomChartRenderer
-                          v-if="alertActivityChartData"
-                          :data="alertActivityChartData"
-                          class="h-full w-full"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- PART 2: Sidebar Content (33.33% width) - 3 sections -->
-                  <div class="flex h-full w-1/3 flex-col gap-2">
+              <div
+                v-if="activeTab === 'overview'"
+                class="flex flex-1 flex-col gap-3 overflow-y-auto"
+                data-test="incident-overview"
+              >
+                <div class="flex shrink-0 gap-3 max-lg:flex-col">
+                  <IncidentOverviewTimeline
+                    class="min-w-0 lg:flex-2"
+                    :incident="incidentDetails"
+                    :triggers="triggers"
+                    :zone="zone"
+                    :now="nowMicros"
+                    :correlated-by="getCorrelationMethodLabel(incidentDetails.key_type)"
+                  />
+                  <div class="flex min-w-0 flex-col gap-3 lg:flex-1">
                     <!-- Who this incident woke. Absent entirely when it paged
                          nobody, which is also the OSS and on-call-disabled
                          case, so no feature flag is needed. -->
@@ -681,7 +402,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span class="text-text-secondary text-xs">
                             {{ t("alerts.incidents.onCallOpened") }}
                           </span>
-                          <OTimeCell :value="oncallResponse.opened_at" unit="us" />
+                          <OTimeCell
+                            :value="oncallResponse.opened_at"
+                            unit="us"
+                            :timezone="store.state.timezone"
+                          />
                         </div>
                         <!-- Who answered, and when. An unanswered page is the
                              fact worth a colour: it is still climbing. -->
@@ -707,7 +432,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span class="text-text-secondary text-xs">
                             {{ t("alerts.incidents.onCallSnoozedUntil") }}
                           </span>
-                          <OTimeCell :value="oncallResponse.snoozed_until" unit="us" />
+                          <OTimeCell
+                            :value="oncallResponse.snoozed_until"
+                            unit="us"
+                            :timezone="store.state.timezone"
+                          />
                         </div>
                         <div
                           v-if="oncallResponse.closed_at"
@@ -716,7 +445,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <span class="text-text-secondary text-xs">
                             {{ t("alerts.incidents.onCallResolved") }}
                           </span>
-                          <OTimeCell :value="oncallResponse.closed_at" unit="us" />
+                          <OTimeCell
+                            :value="oncallResponse.closed_at"
+                            unit="us"
+                            :timezone="store.state.timezone"
+                          />
                         </div>
                         <!-- The ladder ran a second time because the record
                              changed hands. Without it the timeline reads as one
@@ -771,198 +504,140 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
 
-                    <!-- 2.2A: Manage Panel (40% of available height after gaps) -->
-                    <div
-                      class="border-card-glass-border rounded-default bg-card-glass-bg flex h-[calc(35%-0.4rem)] flex-col overflow-hidden border"
+                    <OCard
+                      :title="t('alerts.incidents.stableDimensions')"
+                      data-test="incident-overview-dimensions"
                     >
-                      <!-- Header -->
-                      <div class="px-4 pt-2 pb-1">
-                        <div :class="'text-text-heading'" class="text-sm font-semibold">
-                          {{ t("alerts.incidents.manage") }}
-                        </div>
-                      </div>
-
-                      <!-- Content -->
-                      <div class="flex flex-col gap-3 overflow-y-auto p-3">
-                        <!-- Status Section -->
-                        <div class="flex flex-col gap-2">
-                          <div :class="'text-text-secondary'" class="text-xs font-semibold">
-                            {{ t("common.status") }}
-                          </div>
-                          <div class="flex flex-wrap gap-2">
-                            <button
-                              v-for="option in statusOptions"
-                              :key="option.value"
-                              type="button"
-                              @click="
-                                editableStatus !== option.value &&
-                                handleStatusChange(
-                                  option.value as 'open' | 'acknowledged' | 'resolved',
-                                )
-                              "
-                              class="rounded-full outline-none"
-                              :class="
-                                editableStatus === option.value
-                                  ? 'cursor-default'
-                                  : 'cursor-pointer'
-                              "
-                              :data-test="`incident-manage-status-${option.value}`"
+                      <dl
+                        v-if="services.length || overviewDimensions.length"
+                        class="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)]"
+                      >
+                        <template v-if="services.length">
+                          <dt
+                            class="text-text-secondary border-border-default border-b py-2 text-xs"
+                          >
+                            {{ t("alerts.incidents.overview.servicesAffected") }}
+                          </dt>
+                          <dd
+                            class="text-text-body border-border-default flex min-w-0 items-baseline gap-1.5 border-b py-2 text-sm"
+                            data-test="incident-overview-services"
+                          >
+                            <span class="text-text-heading font-semibold tabular-nums">{{
+                              services.length.toLocaleString(locale)
+                            }}</span>
+                            <span class="text-text-secondary">·</span>
+                            <span
+                              class="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5"
+                              data-test="incident-detail-dimension-service"
                             >
-                              <OTag
-                                :type="
-                                  editableStatus === option.value ? 'incidentStatus' : 'countChip'
-                                "
-                                :value="editableStatus === option.value ? option.value : 'neutral'"
-                                dot
-                                >{{ option.label }}</OTag
+                              <span
+                                v-for="(service, index) in shownServices"
+                                :key="service.key"
+                                class="min-w-0"
                               >
-                            </button>
-                          </div>
-                        </div>
-
-                        <!-- Severity Section -->
-                        <div class="flex flex-col gap-2">
-                          <div :class="'text-text-secondary'" class="text-xs font-semibold">
-                            {{ t("alerts.incidents.severity") }}
-                          </div>
-                          <div class="flex flex-wrap gap-2">
-                            <button
-                              v-for="option in severityOptions"
-                              :key="option.value"
-                              type="button"
-                              @click="
-                                editableSeverity !== option.value &&
-                                handleSeverityChange(option.value as 'P1' | 'P2' | 'P3' | 'P4')
-                              "
-                              class="rounded-full outline-none"
-                              :class="
-                                editableSeverity === option.value
-                                  ? 'cursor-default'
-                                  : 'cursor-pointer'
-                              "
-                              :data-test="`incident-manage-severity-${option.value}`"
-                            >
-                              <!-- Selected → semantic severity colour; unselected → neutral grey. -->
-                              <OTag
-                                :type="editableSeverity === option.value ? 'severity' : 'countChip'"
-                                :value="
-                                  editableSeverity === option.value ? option.value : 'neutral'
-                                "
-                                dot
-                                >{{ option.label }}</OTag
+                                <router-link
+                                  v-if="!tracesLocked"
+                                  :to="serviceRoute(service.key, 'services-catalog')"
+                                  class="text-accent hover:underline"
+                                  data-test="incident-overview-service-link"
+                                  ><ServiceNameLabel
+                                    :service-key="service.key"
+                                    :display-name="service.display"
+                                /></router-link>
+                                <ServiceNameLabel
+                                  v-else
+                                  :service-key="service.key"
+                                  :display-name="service.display"
+                                /><template v-if="index < shownServices.length - 1">,</template>
+                              </span>
+                              <OPopover
+                                v-if="moreServices.length"
+                                side="bottom"
+                                align="start"
+                                :aria-label="t('alerts.incidents.overview.servicesAffected')"
                               >
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- 2.2B: Dimensions Panel (35% when Alert Flow present, 60% when absent, or when no triggers) -->
-                    <div
-                      class="border-card-glass-border rounded-default bg-card-glass-bg flex min-h-0 shrink-0 flex-col overflow-hidden border"
-                      :class="
-                        sortedAlertsByTriggerCount?.length
-                          ? 'h-[calc(35%-0.35rem)]'
-                          : 'h-[calc(65%-0.125rem)]'
-                      "
-                    >
-                      <!-- Header -->
-                      <div class="px-4 pt-2 pb-1">
-                        <div :class="'text-text-heading'" class="text-sm font-semibold">
-                          {{ t("alerts.incidents.stableDimensions") }}
-                        </div>
-                      </div>
-
-                      <!-- Content -->
-                      <div class="flex min-h-0 flex-1 flex-col gap-0 overflow-y-auto p-3">
-                        <div
-                          v-if="
-                            incidentDetails?.group_values &&
-                            Object.keys(incidentDetails.group_values).length > 0
-                          "
-                          class="flex flex-col"
-                        >
-                          <div
-                            v-for="(dim, index) in dimensionRows"
-                            :key="dim.key"
-                            class="border-border-default flex gap-2 border-b py-2.5"
-                            :class="{ 'border-b-0': index === dimensionRows.length - 1 }"
+                                <template #trigger>
+                                  <OButton
+                                    variant="accent-ghost"
+                                    size="sm"
+                                    data-test="incident-overview-services-more"
+                                    >{{
+                                      t("alerts.incidents.overview.servicesMore", {
+                                        count: moreServices.length,
+                                      })
+                                    }}</OButton
+                                  >
+                                </template>
+                                <ul
+                                  class="flex max-h-64 max-w-80 flex-col gap-1 overflow-y-auto p-3 text-sm"
+                                  data-test="incident-overview-services-list"
+                                >
+                                  <li v-for="service in moreServices" :key="service.key">
+                                    <router-link
+                                      v-if="!tracesLocked"
+                                      :to="serviceRoute(service.key, 'services-catalog')"
+                                      class="text-accent hover:underline"
+                                      data-test="incident-overview-service-link"
+                                      ><ServiceNameLabel
+                                        :service-key="service.key"
+                                        :display-name="service.display"
+                                    /></router-link>
+                                    <ServiceNameLabel
+                                      v-else
+                                      :service-key="service.key"
+                                      :display-name="service.display"
+                                    />
+                                  </li>
+                                </ul>
+                              </OPopover>
+                              <OTooltip :content="tracesLockedReason" :disabled="!tracesLocked">
+                                <OButton
+                                  variant="accent-ghost"
+                                  size="sm"
+                                  :icon="tracesLocked ? 'lock' : undefined"
+                                  :aria-disabled="tracesLocked || undefined"
+                                  data-test="incident-overview-service-graph"
+                                  @click="openServiceGraph"
+                                  >{{ t("alerts.incidents.overview.serviceGraph") }}</OButton
+                                >
+                              </OTooltip>
+                            </span>
+                          </dd>
+                        </template>
+                        <template v-for="(dim, index) in overviewDimensions" :key="dim.key">
+                          <dt
+                            class="text-text-secondary border-border-default border-b py-2 text-xs"
+                            :class="{ 'border-b-0': index === overviewDimensions.length - 1 }"
                             data-test="incident-dimension-row"
                           >
-                            <div
-                              :class="'text-text-secondary'"
-                              class="min-w-fit text-xs font-medium capitalize"
-                            >
-                              {{ dim.label }}:
-                            </div>
-                            <div :class="'text-text-body'" class="flex-1 text-xs break-words">
-                              <span
-                                v-if="dim.key === 'service'"
-                                data-test="incident-detail-dimension-service"
-                                ><ServiceNameLabel
-                                  :service-key="incidentDetails.group_values[dim.key]"
-                                  :display-name="incidentDetails.group_values_display?.service"
-                              /></span>
-                              <template v-else>{{ dim.value }}</template>
-                            </div>
-                          </div>
-                        </div>
-                        <OEmptyState
-                          v-else
-                          size="compact"
-                          icon="label"
-                          :title="t('alerts.incidents.noDimensionsAvailable')"
-                        />
-                      </div>
-                    </div>
-
-                    <!-- 2.2C: Alert Flow Panel (25% of available height after gaps) - Conditional -->
-                    <div
-                      v-if="sortedAlertsByTriggerCount?.length"
-                      class="border-card-glass-border rounded-default bg-card-glass-bg flex h-[calc(30%-0.25rem)] flex-col overflow-hidden border"
-                    >
-                      <!-- Header -->
-                      <div class="px-4 pt-2 pb-1">
-                        <div :class="'text-text-heading'" class="text-sm font-semibold">
-                          {{ t("alerts.incidents.relatedAlerts") }}
-                        </div>
-                      </div>
-
-                      <!-- Content - Vertical list -->
-                      <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-                        <div class="flex flex-col gap-0">
-                          <div
-                            v-for="(alert, index) in sortedAlertsByTriggerCount"
-                            :key="alert.id"
-                            class="border-border-default border-b py-2.5"
-                            :class="{
-                              'border-b-0': index === sortedAlertsByTriggerCount.length - 1,
-                            }"
+                            {{ dim.label }}
+                          </dt>
+                          <dd
+                            class="text-text-body border-border-default border-b py-2 text-sm break-words"
+                            :class="{ 'border-b-0': index === overviewDimensions.length - 1 }"
+                            data-test="incident-dimension-value"
                           >
-                            <div
-                              :class="'text-text-heading'"
-                              class="flex items-center gap-2 text-xs"
-                            >
-                              <span :class="'text-text-muted'" class="flex-shrink-0 font-medium">
-                                {{ index + 1 }}.
-                              </span>
-                              <div class="min-w-0 flex-1">
-                                <OTruncatedText class="block font-medium">
-                                  {{ alert.name }}
-                                </OTruncatedText>
-                              </div>
-                              <div class="w-30 flex-shrink-0">
-                                <span :class="'text-text-secondary'">
-                                  {{ t("alerts.incidents.firedTimes", { count: alert.count }) }}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                            {{ dim.value }}
+                          </dd>
+                        </template>
+                      </dl>
+                      <OEmptyState
+                        v-else
+                        size="compact"
+                        icon="label"
+                        :title="t('alerts.incidents.noDimensionsAvailable')"
+                      />
+                    </OCard>
                   </div>
                 </div>
+                <IncidentOverviewAlerts
+                  :triggers="triggers"
+                  :definitions="incidentDetails.alerts ?? []"
+                  :rows="alertListRows"
+                  :zone="zone"
+                  :now="nowMicros"
+                  :open="incidentDetails.status !== 'resolved'"
+                />
               </div>
 
               <!-- Activity Tab Content -->
@@ -972,6 +647,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :incident-id="incidentDetails?.id || ''"
                 :visible="activeTab === 'activity'"
                 :refresh-trigger="timelineRefreshTrigger"
+                :format-time="momentOf"
               />
               <div v-if="activeTab === 'serviceGraph'" class="absolute inset-0 flex flex-col">
                 <IncidentUnfoldGraph :incident="incidentDetails" />
@@ -989,6 +665,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <IncidentAlertTriggersTable
                       :triggers="tableTriggers"
                       :isDarkMode="isDarkMode"
+                      :show-correlation-reason="false"
+                      hide-empty-columns
                       @row-click="handleTriggerRowClick"
                     />
                   </div>
@@ -1268,7 +946,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OEmptyState
                   v-else-if="!hasCorrelatedData || !hasAnyStreams"
                   icon="info-outline"
-                  :title="t('alerts.incidents.noCorrelatedLogs')"
+                  :title="telemetryEmptyText(t('alerts.incidents.noCorrelatedLogs'))"
                 />
 
                 <!-- Success State - CorrelatedLogsTable -->
@@ -1321,7 +999,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OEmptyState
                   v-else-if="!hasCorrelatedData || !hasAnyStreams"
                   icon="info-outline"
-                  :title="t('alerts.incidents.noCorrelatedMetrics')"
+                  :title="telemetryEmptyText(t('alerts.incidents.noCorrelatedMetrics'))"
                 />
 
                 <!-- Success State - TelemetryCorrelationDashboard -->
@@ -1393,7 +1071,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OEmptyState
                   v-else-if="!hasCorrelatedData || !hasAnyStreams"
                   icon="info-outline"
-                  :title="t('alerts.incidents.noCorrelatedTraces')"
+                  :title="telemetryEmptyText(t('alerts.incidents.noCorrelatedTraces'))"
                 />
 
                 <!-- Success State - TelemetryCorrelationDashboard -->
@@ -1437,7 +1115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
-import { formatWindowTime } from "@/utils/downtimes/schedule";
 import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -1455,7 +1132,6 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
 import useSmartBack from "@/composables/useSmartBack";
-import { formatToReadable } from "@/utils/date";
 import incidentsService, {
   Incident,
   IncidentWithAlerts,
@@ -1481,10 +1157,16 @@ import {
   incidentFiringCounts,
   incidentLiveSummary,
   incidentLiveWords,
+  incidentZone,
   unfoldDuration,
   liveRowsOf,
   maxOf,
 } from "@/utils/incidents/incidentUnfold";
+import {
+  incidentMoment,
+  incidentUntil,
+  servicesAffected,
+} from "@/utils/incidents/incidentOverview";
 import { getIntlLocale } from "@/locales";
 import { useOrgId } from "@/composables/query";
 import serviceStreamsApi, {
@@ -1498,9 +1180,15 @@ import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import IncidentUnfoldGraph from "./IncidentUnfoldGraph.vue";
 import IncidentRCAAnalysis from "./IncidentRCAAnalysis.vue";
 import IncidentTimeline from "./IncidentTimeline.vue";
+import IncidentOverviewAlerts from "./IncidentOverviewAlerts.vue";
+import IncidentOverviewTimeline from "./IncidentOverviewTimeline.vue";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
 import IncidentFindingDetails from "./IncidentFindingDetails.vue";
 import IssueLogsLink from "@/components/autoobserve/live/IssueLogsLink.vue";
+import IssueContextCard from "@/components/autoobserve/live/IssueContextCard.vue";
+import { securityBadge } from "@/components/autoobserve/live/causeCopy";
+import { issueContextOf } from "@/components/autoobserve/live/liveAdapter";
+import { useContextFlags } from "@/components/autoobserve/live/liveModel";
 import {
   logsForFinding,
   PAGED_LEAD_US,
@@ -1511,7 +1199,8 @@ import {
   issueLogsEndMs,
   issueLogStreams,
 } from "@/components/autoobserve/live/issueModel";
-import { autoobserveIncidentsPageQuery } from "@/services/autoobserve.queries";
+import { autoobserveIncidentItemQuery } from "@/services/autoobserve.queries";
+import { isLiveRca } from "@/utils/incidents/rcaCell";
 import {
   AUTOOBSERVE_TRIGGER_KIND,
   dimensionDisplay,
@@ -1520,21 +1209,23 @@ import {
   isFindingIncident,
   orderedDimensionKeys,
 } from "@/utils/incidents/findingDimensions";
-import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import { contextRegistry, createIncidentsContextProvider } from "@/composables/contextProviders";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { copyToClipboard as copyToClipboardUtil } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useIncidentRca } from "@/composables/useIncidentRca";
 import type { RcaAskPayload } from "@/utils/incidents/rcaAskAttachment";
@@ -1598,8 +1289,7 @@ function loadIncidentTabOrder(): IncidentTab[] {
   return [...DEFAULT_INCIDENT_TAB_ORDER];
 }
 
-// The newest page of AutoObserve incidents; an older incident falls back to its lead stream.
-const FINDING_LOOKUP_LIMIT = 100;
+const SHOWN_SERVICES = 3;
 
 export default defineComponent({
   name: "IncidentDetailDrawer",
@@ -1614,9 +1304,15 @@ export default defineComponent({
     IncidentAlertTriggersTable,
     IncidentFindingDetails,
     IssueLogsLink,
+    IssueContextCard,
     IncidentRCAAnalysis,
     IncidentTimeline,
-    CustomChartRenderer,
+    IncidentOverviewAlerts,
+    IncidentOverviewTimeline,
+    ODropdown,
+    OPopover,
+    ODropdownItem,
+    OCard,
     OButton,
     OEmptyState,
     OTooltip,
@@ -1644,24 +1340,6 @@ export default defineComponent({
     );
     const updateIncident = useMutation(() => updateIncidentMutation(incidentOrgId.value));
 
-    // Copy to clipboard state
-    const copiedField = ref<string | null>(null);
-
-    // Copy to clipboard function with visual feedback
-    const copyToClipboard = (text: string | undefined, fieldName: string) => {
-      if (!text) return;
-
-      copyToClipboardUtil(text, t).then((success) => {
-        if (success) {
-          copiedField.value = fieldName;
-          // Reset the icon after 2 seconds
-          setTimeout(() => {
-            copiedField.value = null;
-          }, 2000);
-        }
-      });
-    };
-
     const loading = ref(false);
     const licenseDenied = ref<string[] | null>(null);
     const updating = ref(false);
@@ -1674,7 +1352,6 @@ export default defineComponent({
       () => !!incidentDetails.value?.muted_by_downtime_id,
     );
 
-    const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
     const mutedBannerText = computed(() => {
       const id = incidentDetails.value?.muted_by_downtime_id;
       if (!id) return "";
@@ -1682,7 +1359,7 @@ export default defineComponent({
       return end
         ? t("alerts.downtimes.incident.bannerUntil", {
             name: nameOf(id),
-            end: formatWindowTime(end, viewerZone),
+            end: incidentUntil(t, zone.value, end, nowMicros.value),
           })
         : t("alerts.downtimes.incident.banner", { name: nameOf(id) });
     });
@@ -1774,6 +1451,11 @@ export default defineComponent({
             });
       return { ...words, tooltip };
     });
+
+    const zone = computed(() => incidentZone(store.state.timezone));
+    const momentOf = (us: number) => incidentMoment(t, zone.value, us, nowMicros.value);
+    const alertListRows = computed(() => liveRowsOf(alertRows.data.value));
+    const locale = getIntlLocale();
 
     /// Newest firing wins: an incident can page more than once, and the panel
     /// answers "who has it now". A failure leaves the panel hidden rather than
@@ -1881,6 +1563,8 @@ export default defineComponent({
     // Computed property to process alerts with formatted conditions upfront
     // Editable status and severity for Overview tab
     const editableStatus = ref<"open" | "acknowledged" | "resolved">("open");
+    const statusMenuOpen = ref(false);
+    const severityMenuOpen = ref(false);
     const editableSeverity = ref<"P1" | "P2" | "P3" | "P4">("P3");
 
     // Status and Severity options
@@ -1892,16 +1576,25 @@ export default defineComponent({
             ? t("alerts.ack.unacknowledge")
             : t("alerts.incidents.statusOpen"),
         value: "open",
+        help: t("alerts.incidents.overview.statusOpenHelp"),
       },
-      { label: t("alerts.incidents.statusAcknowledged"), value: "acknowledged" },
-      { label: t("alerts.incidents.statusResolved"), value: "resolved" },
+      {
+        label: t("alerts.incidents.statusAcknowledged"),
+        value: "acknowledged",
+        help: t("alerts.incidents.overview.statusAcknowledgedHelp"),
+      },
+      {
+        label: t("alerts.incidents.statusResolved"),
+        value: "resolved",
+        help: t("alerts.incidents.overview.statusResolvedHelp"),
+      },
     ]);
 
     const severityOptions = [
-      { label: t("alerts.incidents.severityP1"), value: "P1" },
-      { label: t("alerts.incidents.severityP2"), value: "P2" },
-      { label: t("alerts.incidents.severityP3"), value: "P3" },
-      { label: t("alerts.incidents.severityP4"), value: "P4" },
+      { word: t("components.badge.severity.critical"), value: "P1" },
+      { word: t("components.badge.severity.high"), value: "P2" },
+      { word: t("components.badge.severity.medium"), value: "P3" },
+      { word: t("components.badge.severity.low"), value: "P4" },
     ];
 
     const { locked: correlationLocked, lockedReason: correlationLockedReason } =
@@ -1939,14 +1632,32 @@ export default defineComponent({
 
     // The AutoObserve list names the incident's member streams, so this Logs tab says what its drawer says.
     const findingItemQuery = useQuery(() => ({
-      ...autoobserveIncidentsPageQuery(incidentOrgId.value, FINDING_LOOKUP_LIMIT, 0),
-      enabled: isFinding.value && !!incidentOrgId.value,
+      ...autoobserveIncidentItemQuery(incidentOrgId.value, incidentDetails.value?.id ?? ""),
+      enabled: isFinding.value && !!incidentOrgId.value && !!incidentDetails.value?.id,
     }));
-    const findingItem = computed(
-      () =>
-        findingItemQuery.data.value?.items.find(
-          (i) => i.incident.id === incidentDetails.value?.id,
-        ) ?? null,
+    const findingItem = computed(() => findingItemQuery.data.value?.item ?? null);
+    const contextFlags = useContextFlags();
+    const findingContext = computed(() =>
+      isFinding.value && contextFlags.value.context ? issueContextOf(findingItem.value) : null,
+    );
+    // Whether context comes is known only once the item loads, so the card holds its place throughout.
+    const findingCardShown = computed(() => isFinding.value && contextFlags.value.context);
+    const findingHeld = computed<{ failed: true } | { note: I18nText } | null>(() => {
+      const lookup = findingItemQuery.data.value;
+      if (findingContext.value) return null;
+      if (!lookup) return findingItemQuery.isError.value ? { failed: true } : null;
+      if (isLiveRca(rcaSummary.value)) return { note: t("autoobserve.issueLive.noCauseRunning") };
+      return {
+        note:
+          store.state.zoConfig?.incidents_rca_enabled === true
+            ? t("autoobserve.issueLive.noCause")
+            : t("autoobserve.issueLive.noCauseOff"),
+      };
+    });
+    const findingBadge = computed(() =>
+      findingContext.value && findingItem.value
+        ? securityBadge(t, findingContext.value, issueEndUs(findingItem.value) !== null)
+        : null,
     );
     const findingEndUs = computed(
       () =>
@@ -1996,6 +1707,67 @@ export default defineComponent({
         return { key, label: shown.label ?? getSemanticGroupDisplayName(key), value: shown.value };
       });
     });
+    const services = computed(() =>
+      servicesAffected(
+        incidentDetails.value?.group_values,
+        incidentDetails.value?.group_values_display,
+        incidentDetails.value?.topology_context,
+      ),
+    );
+    const shownServices = computed(() => services.value.slice(0, SHOWN_SERVICES));
+    const moreServices = computed(() => services.value.slice(SHOWN_SERVICES));
+    const { locked: tracesLocked, lockedReason: tracesLockedReason } = useLicenseLock("traces");
+    // The catalog keys a Kubernetes place as "k8s:<cluster>/<namespace>"; without both it picks the service's own.
+    const serviceWhere = computed(() => {
+      const values = incidentDetails.value?.group_values ?? {};
+      const cluster = values["k8s-cluster"] ?? values.k8s_cluster;
+      const namespace = values["k8s-namespace"] ?? values.k8s_namespace;
+      return cluster && namespace ? `k8s:${cluster}/${namespace}` : undefined;
+    });
+    // Computed properties for TelemetryCorrelationDashboard
+    const telemetryTimeRange = computed(() => {
+      if (!incidentDetails.value) {
+        return { startTime: 0, endTime: 0 };
+      }
+
+      // Expand time range to ensure we capture relevant telemetry
+      // If first_alert_at == last_alert_at (single alert), expand ±15 minutes
+      const FIFTEEN_MINUTES_MICROS = 15 * 60 * 1000000;
+      const startTime = incidentDetails.value.first_alert_at - FIFTEEN_MINUTES_MICROS;
+      const endTime = incidentDetails.value.last_alert_at + FIFTEEN_MINUTES_MICROS;
+
+      return {
+        startTime,
+        endTime,
+      };
+    });
+
+    const serviceRoute = (service: string, tab: "services-catalog" | "service-graph") => {
+      const { startTime: from, endTime } = telemetryTimeRange.value;
+      const to = incidentDetails.value?.status === "resolved" ? endTime : nowMicros.value;
+      return {
+        name: "traces",
+        query: {
+          org_identifier: store.state.selectedOrganization?.identifier,
+          tab,
+          panel: "operations",
+          panelSvc: service,
+          ...(serviceWhere.value && { panelWhere: serviceWhere.value }),
+          ...(from && to && { from: String(from), to: String(Math.max(from, to)) }),
+        },
+      };
+    };
+    const openServiceGraph = () => {
+      const [first] = services.value;
+      if (tracesLocked.value || !first) return;
+      void router.push(serviceRoute(first.key, "service-graph"));
+    };
+    // The service dimension is the Services affected row, so it is not listed twice.
+    const overviewDimensions = computed(() =>
+      services.value.length
+        ? dimensionRows.value.filter((row) => row.key !== "service")
+        : dimensionRows.value,
+    );
     // The server sends a finding's trigger with no labels; the finding's own dimensions are its labels.
     const tableTriggers = computed(() => {
       const labels = findingLabels(t, incidentDetails.value?.group_values);
@@ -2061,26 +1833,6 @@ export default defineComponent({
       computed(() => activeTab.value === "incidentAnalysis" || activeTab.value === "report"),
     );
 
-    // With no analysis to read, the page opens on the Alert Graph instead, once per incident and
-    // only while the viewer is still on the default tab and no `?tab=` asked for one.
-    // The incident a `?tab=` was opened for; another incident takes its own default.
-    const tabFromUrl = ref<string | null>(null);
-    const defaultTabSettledFor = ref("");
-    watch(
-      () => incidentDetails.value?.id,
-      (id) => {
-        if (!id || defaultTabSettledFor.value === id) return;
-        defaultTabSettledFor.value = id;
-        const onAnalysis = activeTab.value === "incidentAnalysis" || activeTab.value === "report";
-        const succeeded =
-          !!rcaReportRun.value || rcaHistory.value.some((run) => run.state === "completed");
-        const running = ["running", "waiting_input"].includes(rcaSummary.value?.state ?? "");
-        if (tabFromUrl.value !== id && activeTab.value === tabOrder.value[0] && onAnalysis) {
-          if (!succeeded && !running) activeTab.value = "serviceGraph";
-        }
-      },
-    );
-
     // J5: this routed page hands Ask to MainLayout; a new chat with the analysis attached.
     const askAboutRca = (payload: RcaAskPayload) => emit("sendToAiChat", payload);
 
@@ -2092,34 +1844,6 @@ export default defineComponent({
     // Dark mode via the single sanctioned JS seam
     const { isDark: isDarkMode } = useTheme();
 
-    // Computed properties for statistics
-    const affectedServicesCount = computed(() => {
-      if (!incidentDetails.value?.topology_context?.nodes) return 0;
-      return incidentDetails.value.topology_context.nodes.length;
-    });
-
-    const alertFrequency = computed(() => {
-      if (!incidentDetails.value || triggers.value.length === 0) return raw("N/A");
-
-      const durationMs =
-        (incidentDetails.value.last_alert_at - incidentDetails.value.first_alert_at) / 1000;
-      const durationSeconds = Math.floor(durationMs / 1000);
-
-      if (durationSeconds === 0) return t("alerts.incidents.frequencyImmediate");
-
-      const frequency = triggers.value.length / (durationSeconds / 60); // alerts per minute
-
-      if (frequency >= 1) {
-        return t("alerts.incidents.frequencyPerMinute", { rate: frequency.toFixed(1) });
-      } else if (frequency >= 1 / 60) {
-        const perHour = frequency * 60;
-        return t("alerts.incidents.frequencyPerHour", { rate: perHour.toFixed(1) });
-      } else {
-        const minutesBetween = Math.floor(durationSeconds / triggers.value.length / 60);
-        return t("alerts.incidents.frequencyOnePerMins", { minutes: minutesBetween });
-      }
-    });
-
     // Distinct external sources (Grafana, Alertmanager, etc.) that fed this
     // incident — empty when every contributing alert is an internal O2 alert.
     const externalSources = computed(() => {
@@ -2130,139 +1854,6 @@ export default defineComponent({
         }
       }
       return Array.from(sources);
-    });
-
-    // Helper: Get actual trigger count for a specific alert_id
-    const getTriggerCountForAlert = (alertId: string) => {
-      if (!triggers.value) return 0;
-      return triggers.value.filter((t) => t.alert_id === alertId).length;
-    };
-
-    // Computed property to extract unique alerts and their fire counts from triggers
-    const uniqueAlertsMap = computed(() => {
-      if (!triggers.value || triggers.value.length === 0) {
-        return new Map<string, number>();
-      }
-
-      const alertMap = new Map<string, number>();
-
-      triggers.value.forEach((trigger) => {
-        const alertId = trigger.alert_id;
-        alertMap.set(alertId, (alertMap.get(alertId) || 0) + 1);
-      });
-
-      return alertMap;
-    });
-
-    // Computed property for unique alerts count
-    const uniqueAlertsCount = computed(() => {
-      return uniqueAlertsMap.value.size;
-    });
-
-    // Computed: Alerts sorted by trigger count (descending) - derived from triggers
-    const sortedAlertsByTriggerCount = computed(() => {
-      if (!triggers.value || triggers.value.length === 0) return [];
-
-      // Group triggers by alert_id to get unique alerts with their counts
-      const alertsMap = new Map<string, { id: string; name: string; count: number }>();
-
-      triggers.value.forEach((trigger) => {
-        const alertId = trigger.alert_id;
-        const alertName = trigger.alert_name || t("common.unknown");
-
-        if (alertsMap.has(alertId)) {
-          alertsMap.get(alertId)!.count++;
-        } else {
-          alertsMap.set(alertId, {
-            id: alertId,
-            name: alertName,
-            count: 1,
-          });
-        }
-      });
-
-      // Convert map to array and sort by count (descending)
-      return Array.from(alertsMap.values()).sort((a, b) => b.count - a.count);
-    });
-
-    // Peak Alert Rate - find the highest concentration of alerts
-    const peakAlertRate = computed(() => {
-      if (!incidentDetails.value || triggers.value.length === 0) return raw("N/A");
-
-      // Sort triggers by timestamp
-      const sortedTriggers = [...triggers.value].sort(
-        (a, b) => a.alert_fired_at - b.alert_fired_at,
-      );
-
-      // Use a sliding window of 5 minutes to find peak
-      const windowMs = 5 * 60 * 1000 * 1000; // 5 minutes in microseconds
-      let maxCount = 0;
-
-      for (let i = 0; i < sortedTriggers.length; i++) {
-        const windowStart = sortedTriggers[i].alert_fired_at;
-        const windowEnd = windowStart + windowMs;
-
-        // Count alerts in this window
-        let count = 0;
-        for (
-          let j = i;
-          j < sortedTriggers.length && sortedTriggers[j].alert_fired_at < windowEnd;
-          j++
-        ) {
-          count++;
-        }
-
-        maxCount = Math.max(maxCount, count);
-      }
-
-      return maxCount > 1
-        ? t("alerts.incidents.peakAlertRateMany", { count: maxCount })
-        : t("alerts.incidents.peakAlertRateOne");
-    });
-
-    // Peak activity details for timeline
-    const peakActivity = computed(() => {
-      if (!incidentDetails.value || triggers.value.length <= 1) return null;
-
-      // Sort triggers by timestamp
-      const sortedTriggers = [...triggers.value].sort(
-        (a, b) => a.alert_fired_at - b.alert_fired_at,
-      );
-
-      // Use a sliding window of 5 minutes to find peak
-      const windowMs = 5 * 60 * 1000 * 1000; // 5 minutes in microseconds
-      let maxCount = 0;
-      let peakTimestamp = null;
-
-      for (let i = 0; i < sortedTriggers.length; i++) {
-        const windowStart = sortedTriggers[i].alert_fired_at;
-        const windowEnd = windowStart + windowMs;
-
-        // Count alerts in this window
-        let count = 0;
-        for (
-          let j = i;
-          j < sortedTriggers.length && sortedTriggers[j].alert_fired_at < windowEnd;
-          j++
-        ) {
-          count++;
-        }
-
-        if (count > maxCount) {
-          maxCount = count;
-          peakTimestamp = windowStart;
-        }
-      }
-
-      // Only show peak activity if there are at least 2 alerts in a 5-minute window
-      if (maxCount > 1) {
-        return {
-          count: maxCount,
-          timestamp: peakTimestamp,
-        };
-      }
-
-      return null;
     });
 
     // Correlation Type
@@ -2305,6 +1896,7 @@ export default defineComponent({
           org,
           incidentDetails.value,
           t,
+          { triggers: triggers.value, window: telemetryTimeRange.value },
         );
 
         // Check if correlation failed (null response or no data) — try fallback
@@ -2368,6 +1960,7 @@ export default defineComponent({
         const semanticGroups = semanticGroupsResponse.data;
 
         const filters: Record<string, string> = {};
+        const filterAliases: Record<string, string[]> = {};
 
         // Step 4: For each dimension, find the matching schema field
         for (const [dimId, dimValue] of Object.entries(groupValues)) {
@@ -2377,14 +1970,9 @@ export default defineComponent({
           const group = semanticGroups.find((g: any) => g.id === dimId);
 
           if (group && group.fields && group.fields.length > 0) {
-            // Check each field from semantic group
-            for (const fieldName of group.fields) {
-              const existsInSchema = schemaFields.has(fieldName);
-              if (existsInSchema && !matchedField) {
-                matchedField = fieldName;
-                // Don't break - keep logging all fields for debugging
-              }
-            }
+            const present = group.fields.filter((f: string) => schemaFields.has(f));
+            matchedField = present[0] ?? null;
+            if (present.length > 1) filterAliases[present[0]] = present.slice(1);
           } else {
             console.warn(`[Fallback Correlation] No semantic group found for: ${dimId}`);
           }
@@ -2425,6 +2013,7 @@ export default defineComponent({
           stream_type:
             streamType === "logs" ? "Logs" : streamType === "metrics" ? "Metrics" : "Traces",
           filters,
+          filter_aliases: filterAliases,
         };
 
         // Build correlation response with only the source stream type
@@ -2464,10 +2053,14 @@ export default defineComponent({
     // Returns the promise so callers (and specs) can await the refresh.
     const refreshCorrelation = () => fetchCorrelatedStreams(true);
 
-    // Lazy load correlation when user clicks telemetry tab for the first time
-    watch(activeTab, (newTab) => {
+    // `?tab=logs` sets the tab before the incident and its triggers load, so the lazy
+    // load waits for both; one boolean flips once, so the two changing never double-fetch.
+    const telemetryTabReady = computed(
+      () => isCorrelationTab(activeTab.value) && !!incidentDetails.value && !loading.value,
+    );
+    watch(telemetryTabReady, (ready) => {
       if (
-        (newTab === "logs" || newTab === "metrics" || newTab === "traces") &&
+        ready &&
         !findingLogsRoute.value &&
         !correlationData.value &&
         !correlationLoading.value &&
@@ -2496,23 +2089,11 @@ export default defineComponent({
       };
     });
 
-    // Computed properties for TelemetryCorrelationDashboard
-    const telemetryTimeRange = computed(() => {
-      if (!incidentDetails.value) {
-        return { startTime: 0, endTime: 0 };
-      }
-
-      // Expand time range to ensure we capture relevant telemetry
-      // If first_alert_at == last_alert_at (single alert), expand ±15 minutes
-      const FIFTEEN_MINUTES_MICROS = 15 * 60 * 1000000;
-      const startTime = incidentDetails.value.first_alert_at - FIFTEEN_MINUTES_MICROS;
-      const endTime = incidentDetails.value.last_alert_at + FIFTEEN_MINUTES_MICROS;
-
-      return {
-        startTime,
-        endTime,
-      };
-    });
+    // The three telemetry tabs say the same thing when the incident has nothing to correlate by.
+    const telemetryEmptyText = (noneFound: I18nText): I18nText =>
+      correlationData.value?.emptyReason === "no_service_dimensions"
+        ? t("alerts.incidents.noServiceDimensions")
+        : noneFound;
 
     const hasCorrelatedData = computed(() => {
       return !!correlationData.value;
@@ -2550,162 +2131,6 @@ export default defineComponent({
     const ftsFields = computed(() => {
       // FTS fields can be empty for now, as the log streams will determine this
       return [];
-    });
-
-    // Alert Activity Chart Data - groups triggers by day and creates a bar chart
-    const alertActivityChartData = computed(() => {
-      if (!triggers.value || triggers.value.length === 0) {
-        return {
-          chartType: "custom_chart",
-          title: {
-            text: t("alerts.incidents.noAlertActivityData"),
-            left: "center",
-            top: "center",
-            textStyle: {
-              fontSize: 14,
-              fontWeight: "normal",
-              color: isDarkMode.value ? "#B7B7B7" : "#72777B",
-            },
-          },
-        };
-      }
-
-      // Group triggers by day
-      const triggersByDay: Record<string, { total: number; byAlert: Record<string, number> }> = {};
-
-      triggers.value.forEach((trigger) => {
-        // Convert microseconds to milliseconds then to Date
-        const triggerDate = new Date(trigger.alert_fired_at / 1000);
-        const dayKey = triggerDate.toISOString().split("T")[0]; // YYYY-MM-DD format
-
-        if (!triggersByDay[dayKey]) {
-          triggersByDay[dayKey] = { total: 0, byAlert: {} };
-        }
-
-        triggersByDay[dayKey].total++;
-
-        const alertName = trigger.alert_name || t("common.unknown");
-        triggersByDay[dayKey].byAlert[alertName] =
-          (triggersByDay[dayKey].byAlert[alertName] || 0) + 1;
-      });
-
-      // Sort dates chronologically
-      const sortedDates = Object.keys(triggersByDay).sort();
-
-      // Get unique alert names for the legend
-      const alertNames = new Set<string>();
-      Object.values(triggersByDay).forEach((day) => {
-        Object.keys(day.byAlert).forEach((name) => alertNames.add(name));
-      });
-
-      // Create series data for each alert type
-      const seriesData = Array.from(alertNames).map((alertName, index) => {
-        const colors = [
-          "#5470C6",
-          "#91CC75",
-          "#FAC858",
-          "#EE6666",
-          "#73C0DE",
-          "#3BA272",
-          "#FC8452",
-          "#9A60B4",
-          "#EA7CCC",
-        ];
-        return {
-          name: alertName,
-          type: "bar",
-          stack: "total",
-          emphasis: {
-            focus: "series",
-          },
-          data: sortedDates.map((date) => triggersByDay[date].byAlert[alertName] || 0),
-          itemStyle: {
-            color: colors[index % colors.length],
-          },
-        };
-      });
-
-      // Format dates for display (show only day/month if within same year, otherwise show year too)
-      const formatDate = (dateStr: string) => {
-        const d = new Date(dateStr);
-        const now = new Date();
-        if (d.getFullYear() === now.getFullYear()) {
-          return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-        }
-        return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-      };
-
-      return {
-        chartType: "custom_chart",
-        tooltip: {
-          trigger: "axis",
-          axisPointer: {
-            type: "shadow",
-          },
-          backgroundColor: isDarkMode.value ? "#2B2C2D" : "#ffffff",
-          borderColor: isDarkMode.value ? "#444444" : "#E7EAEE",
-          textStyle: {
-            color: isDarkMode.value ? "#DCDCDC" : "#232323",
-          },
-        },
-        legend: {
-          type: "scroll",
-          orient: "horizontal",
-          bottom: 0,
-          data: Array.from(alertNames),
-          textStyle: {
-            color: isDarkMode.value ? "#DCDCDC" : "#232323",
-          },
-          pageButtonItemGap: 5,
-          pageButtonGap: 20,
-          pageIconColor: isDarkMode.value ? "#DCDCDC" : "#232323",
-          pageIconInactiveColor: isDarkMode.value ? "#666666" : "#CCCCCC",
-          pageTextStyle: {
-            color: isDarkMode.value ? "#DCDCDC" : "#232323",
-          },
-        },
-        grid: {
-          left: "3%",
-          right: "4%",
-          bottom: "50",
-          top: "40",
-          containLabel: true,
-        },
-        xAxis: {
-          type: "category",
-          data: sortedDates.map(formatDate),
-          axisLabel: {
-            color: isDarkMode.value ? "#B7B7B7" : "#72777B",
-            rotate: sortedDates.length > 10 ? 45 : 0,
-          },
-          axisLine: {
-            lineStyle: {
-              color: isDarkMode.value ? "#444444" : "#E7EAEE",
-            },
-          },
-        },
-        yAxis: {
-          type: "value",
-          name: t("alerts.incidents.alertCountAxis"),
-          nameTextStyle: {
-            color: isDarkMode.value ? "#B7B7B7" : "#72777B",
-          },
-          axisLabel: {
-            color: isDarkMode.value ? "#B7B7B7" : "#72777B",
-          },
-          axisLine: {
-            lineStyle: {
-              color: isDarkMode.value ? "#444444" : "#E7EAEE",
-            },
-          },
-          splitLine: {
-            lineStyle: {
-              color: isDarkMode.value ? "#3A3A3A" : "#F0F0F0",
-            },
-          },
-        },
-        series: seriesData,
-      };
     });
 
     const loadDetails = async (incidentId: string) => {
@@ -2766,7 +2191,6 @@ export default defineComponent({
             if (tab !== undefined) {
               if (isIncidentTab(tab)) {
                 activeTab.value = tab;
-                tabFromUrl.value = incidentIdFromUrl;
               }
               void router.replace({ query: restQuery });
             }
@@ -3253,46 +2677,6 @@ export default defineComponent({
       }
     };
 
-    const formatTimestamp = (timestamp: number) => {
-      // Backend sends microseconds
-      return formatToReadable(timestamp);
-    };
-
-    const formatTimestampUTC = (timestamp: number) => {
-      // Backend sends microseconds, format in UTC
-      const d = new Date(timestamp / 1000);
-      const year = d.getUTCFullYear();
-      const month = String(d.getUTCMonth() + 1).padStart(2, "0");
-      const day = String(d.getUTCDate()).padStart(2, "0");
-      const hours = String(d.getUTCHours()).padStart(2, "0");
-      const minutes = String(d.getUTCMinutes()).padStart(2, "0");
-      const seconds = String(d.getUTCSeconds()).padStart(2, "0");
-      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-    };
-
-    const calculateDuration = (startTimestamp: number, endTimestamp: number) => {
-      // Backend sends microseconds, convert to milliseconds
-      const durationMs = (endTimestamp - startTimestamp) / 1000;
-
-      const seconds = Math.floor(durationMs / 1000);
-      const minutes = Math.floor(seconds / 60);
-      const hours = Math.floor(minutes / 60);
-      const days = Math.floor(hours / 24);
-
-      if (days > 0) {
-        const remainingHours = hours % 24;
-        return `${days}d ${remainingHours}h`;
-      } else if (hours > 0) {
-        const remainingMinutes = minutes % 60;
-        return `${hours}h ${remainingMinutes}m`;
-      } else if (minutes > 0) {
-        const remainingSeconds = seconds % 60;
-        return `${minutes}m ${remainingSeconds}s`;
-      } else {
-        return `${seconds}s`;
-      }
-    };
-
     // Humanize key_type for display
     const getCorrelationMethodLabel = (keyType: string | undefined) => {
       switch (keyType?.toLowerCase()) {
@@ -3308,7 +2692,27 @@ export default defineComponent({
     };
 
     return {
+      statusMenuOpen,
+      severityMenuOpen,
+      findingItem,
+      findingContext,
+      findingCardShown,
+      findingHeld,
+      findingBadge,
       firingsChip,
+      zone,
+      nowMicros,
+      momentOf,
+      services,
+      shownServices,
+      moreServices,
+      tracesLocked,
+      tracesLockedReason,
+      serviceRoute,
+      openServiceGraph,
+      overviewDimensions,
+      alertListRows,
+      locale,
       triggerRowCount,
       liveChip,
       rcaAlertsNow,
@@ -3376,6 +2780,7 @@ export default defineComponent({
       correlationChipDimensions,
       correlationLoading,
       correlationError,
+      telemetryEmptyText,
       hasCorrelatedData,
       hasAnyStreams,
       telemetryTimeRange,
@@ -3384,18 +2789,9 @@ export default defineComponent({
       semanticGroups,
       ftsFields,
       incidentContextData,
-      affectedServicesCount,
-      alertFrequency,
       externalSources,
-      getTriggerCountForAlert,
-      uniqueAlertsMap,
-      uniqueAlertsCount,
-      sortedAlertsByTriggerCount,
-      peakAlertRate,
-      peakActivity,
       correlationType,
       correlationTooltip,
-      alertActivityChartData,
       getSemanticGroupDisplayName,
       refreshCorrelation,
       correlationLocked,
@@ -3432,12 +2828,7 @@ export default defineComponent({
       formatThreshold,
       formatSilence,
       formatCustomConditions,
-      formatTimestamp,
-      formatTimestampUTC,
       getCorrelationMethodLabel,
-      copyToClipboard,
-      copiedField,
-      calculateDuration,
       updateSeverity: handleSeverityChange,
     };
   },

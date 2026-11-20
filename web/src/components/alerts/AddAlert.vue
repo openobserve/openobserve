@@ -460,6 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :config="anomalyConfig"
                   :preview-sql="anomalyPreviewSql"
                   :stored-intervals="anomalyStoredIntervals"
+                  :stored-sql-function="anomalyStoredSqlFunction"
                 />
               </div>
 
@@ -739,6 +740,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
+import { childOptionsFrom } from "./composite/expression";
 import alertsService from "@/services/alerts";
 import { unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
 import { useOnCallSetup } from "@/composables/useOnCallSetup";
@@ -884,24 +886,7 @@ export default defineComponent({
           "all",
         );
         const rows = Array.isArray(response.data?.list) ? response.data.list : [];
-        availableCompositeChildren.value = rows
-          .filter((row: any) => {
-            const id = row.alert_id ?? row.id;
-            return (
-              id && id !== alertForm.formData.value.id && row.alert_type !== "anomaly_detection"
-            );
-          })
-          .map((row: any) => ({
-            alert_id: row.alert_id ?? row.id,
-            name: row.name,
-            alert_type: row.alert_type,
-            folder_id: row.folder_id,
-            folder_name: row.folder_name,
-            enabled: row.enabled,
-            level: row.level,
-            stale: row.stale,
-            accessible: true,
-          }));
+        availableCompositeChildren.value = childOptionsFrom(rows);
       } catch {
         availableCompositeChildren.value = [];
       }

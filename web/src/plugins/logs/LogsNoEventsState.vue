@@ -85,9 +85,9 @@ const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;
 const END_NUDGE_US = 1_000_000;
 
 const props = defineProps<{
+  /** Mode and query of the run whose results are shown, not the live editor. */
   sqlMode: boolean;
   query: string;
-  editorValue: string;
   relativeTimePeriod: string;
   dateType: string;
   aiEnabled: boolean;
@@ -110,7 +110,7 @@ const { t } = useI18nTyped();
 // --- filter detection -------------------------------------------------------
 
 const hasFilters = computed<boolean>(() => {
-  if (props.sqlMode) return /\bWHERE\b/i.test(props.editorValue || "");
+  if (props.sqlMode) return /\bWHERE\b/i.test(props.query || "");
   return (props.query || "").trim().length > 0;
 });
 

@@ -16,12 +16,6 @@
 use ::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta};
 use chrono::{TimeZone, Utc};
 use common::utils::http::get_work_group;
-#[cfg(feature = "vectorscan")]
-use config::meta::projections::ProjectionColumnMapping;
-#[cfg(any(feature = "vectorscan", test))]
-use config::meta::self_reporting::redaction::{
-    DataWindow, EvidenceScope, FailPosture, RedactionEvidence, is_self_reporting_stream,
-};
 use config::{
     TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -39,7 +33,7 @@ use config::{
         base64,
         hash::Sum64,
         json,
-        sql::{is_complex_query, is_eligible_for_histogram},
+        sql::{is_complex_query, is_eligible_for_histogram, is_time_splittable},
         time::{format_duration, now_micros, second_micros},
     },
 };
@@ -52,8 +46,6 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-#[cfg(feature = "vectorscan")]
-use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
@@ -75,55 +67,24 @@ pub mod result_utils;
 // v5 keys the histogram offset into the hash; older entries may carry shifted labels.
 const CACHE_VERSION: &str = "v5";
 
-/// The hits a search was about to return when redaction could not run on them.
-#[cfg(any(feature = "vectorscan", test))]
-struct SkippedHits<'a> {
-    org_id: &'a str,
-    stream_type: StreamType,
-    all_streams: &'a str,
-    hits: &'a [json::Value],
+/// How a search may use the result cache; only `ReadWrite` and `Refresh` ever write it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CacheMode {
+    Bypass,
+    ReadWrite,
+    /// `clear_cache`: skip the read, then replace the entry with this run's results.
+    Refresh,
 }
 
-#[cfg(any(feature = "vectorscan", test))]
-impl<'a> SkippedHits<'a> {
-    fn new(
-        org_id: &'a str,
-        stream_type: StreamType,
-        all_streams: &'a str,
-        hits: &'a [json::Value],
-    ) -> Self {
-        Self {
-            org_id,
-            stream_type,
-            all_streams,
-            hits,
+impl CacheMode {
+    pub fn from_request(req: &search::Request) -> Self {
+        if req.use_cache {
+            Self::ReadWrite
+        } else if req.clear_cache {
+            Self::Refresh
+        } else {
+            Self::Bypass
         }
-    }
-
-    /// One row per stream the query read, since a join exposes the fields of each.
-    fn evidence(&self, posture: FailPosture, reason: &str) -> Vec<RedactionEvidence> {
-        let data = DataWindow::from_timestamps(
-            self.hits
-                .iter()
-                .filter_map(|hit| hit.get(TIMESTAMP_COL_NAME).and_then(json::Value::as_i64)),
-        );
-        self.all_streams
-            .split(',')
-            .map(str::trim)
-            .filter(|stream| {
-                !stream.is_empty()
-                    && !is_self_reporting_stream(self.org_id, stream, self.stream_type)
-            })
-            .map(|stream| {
-                RedactionEvidence::search_scan_unavailable(
-                    &EvidenceScope::new(self.org_id, stream, self.stream_type),
-                    posture,
-                    self.hits.len() as u64,
-                    data,
-                    reason,
-                )
-            })
-            .collect()
     }
 }
 
@@ -143,11 +104,10 @@ pub async fn search(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
-    // result cache can be enable only when its from the start
-    let use_cache = if in_req.query.from == 0 {
-        in_req.use_cache && is_result_cache_allowed(stream_type)
-    } else {
-        false
+    let cache_mode = match CacheMode::from_request(in_req) {
+        // a streaming partition is cached as part of the merged page, never on its own
+        CacheMode::Refresh if is_http2_streaming => CacheMode::Bypass,
+        mode => mode,
     };
 
     let mut req = in_req.clone();
@@ -177,7 +137,7 @@ pub async fn search(
 
     // Result caching check start
     let (mut c_resp, should_exec_query) =
-        prepare_cache_response(trace_id, org_id, stream_type, &mut req, use_cache).await?;
+        prepare_cache_response(trace_id, org_id, stream_type, &mut req, cache_mode).await?;
     let file_path = c_resp.file_path.clone();
 
     // get the modified original sql from req
@@ -197,7 +157,7 @@ pub async fn search(
             delta_start_time: req.query.start_time,
             delta_end_time: req.query.end_time,
         });
-    } else if use_cache && c_resp.deltas.is_empty() {
+    } else if c_resp.cache_query_response && c_resp.deltas.is_empty() {
         log::info!("[trace_id {trace_id}] Query hit full cache");
     }
 
@@ -488,9 +448,8 @@ pub async fn search(
         res.new_end_time = Some(req.query.end_time);
     }
 
-    res.is_histogram_eligible = is_eligible_for_histogram(&req.query.sql, is_multi_stream_search)
-        .ok()
-        .map(|(is_eligible, _)| is_eligible);
+    res.is_histogram_eligible =
+        is_eligible_for_histogram(&req.query.sql, is_multi_stream_search).ok();
 
     // There are 3 types of partial responses:
     // 1. VRL error
@@ -501,7 +460,7 @@ pub async fn search(
     let should_cache_results = cfg.common.result_cache_enabled
         && !is_http2_streaming
         && should_exec_query
-        && c_resp.cache_query_response
+        && !file_path.is_empty()
         && res.new_start_time.is_none()
         && res.new_end_time.is_none()
         && res.function_error.is_empty()
@@ -511,16 +470,6 @@ pub async fn search(
         res.hits.len()
     );
     if should_cache_results && search_results_have_hits {
-        // Determine if this is a non-timestamp histogram query
-        // Note: write_res.order_by_metadata contains the same ORDER BY info
-        let is_histogram_non_ts_order = c_resp.histogram_interval > 0
-            && !res.order_by_metadata.is_empty()
-            && res
-                .order_by_metadata
-                .first()
-                .map(|(field, _)| field != &c_resp.ts_column)
-                .unwrap_or(false);
-
         write_results(
             trace_id,
             &c_resp.ts_column,
@@ -531,23 +480,10 @@ pub async fn search(
             is_complex_query,
             c_resp.is_descending,
             req.clear_cache,
-            is_histogram_non_ts_order,
         )
         .await;
     }
     // result cache save changes Ends
-
-    #[cfg(feature = "vectorscan")]
-    crate::cache::apply_regex_to_response(
-        &req,
-        org_id,
-        &all_streams,
-        stream_type,
-        &mut res,
-        trace_id,
-        "search_fn",
-    )
-    .await?;
 
     if is_result_array_skip_vrl {
         res.hits = apply_vrl_to_response(backup_query_fn, &mut res, org_id, &stream_name, trace_id);
@@ -563,7 +499,7 @@ pub async fn prepare_cache_response(
     org_id: &str,
     stream_type: StreamType,
     req: &mut search::Request,
-    use_cache: bool,
+    cache_mode: CacheMode,
 ) -> Result<(MultiCachedQueryResponse, bool), Error> {
     let mut origin_sql = req.query.sql.clone();
     let is_complex_query = is_complex_query(&origin_sql).unwrap_or(true);
@@ -645,10 +581,18 @@ pub async fn prepare_cache_response(
     if !req.clusters.is_empty() {
         hash_body.extend(req.clusters.clone());
     }
+    #[cfg(feature = "vectorscan")]
+    if let Some(digest) = crate::datafusion::physical_optimizer::sdr_redact::redaction_digest(
+        org_id,
+        stream_type,
+        &sql.stream_names,
+    ) {
+        hash_body.push(digest);
+    }
     let mut h = config::utils::hash::gxhash::new();
     let hashed_query = h.sum64(&hash_body.join(","));
 
-    let (mut ts_column, mut is_descending) =
+    let (mut ts_column, is_descending) =
         cacher::get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_complex_query).unwrap_or_default();
 
     // Refine ts_column for non-complex queries with SELECT * or missing _timestamp
@@ -672,7 +616,7 @@ pub async fn prepare_cache_response(
         }
     }
 
-    if !use_cache && sql.histogram_offset != Some(0) {
+    if cache_mode != CacheMode::ReadWrite && sql.histogram_offset != Some(0) {
         return Ok((
             MultiCachedQueryResponse {
                 ts_column,
@@ -689,48 +633,74 @@ pub async fn prepare_cache_response(
         sql.order_by = result_utils::normalize_ts_order_by(&sql.order_by, &ts_column, &sql.aliases);
     }
 
-    // Refine is_descending for histogram queries with non-timestamp ORDER BY
-    is_descending = cacher::refine_is_descending_for_histogram(&sql, &ts_column, is_descending);
+    let metadata = MultiCachedQueryResponse {
+        ts_column,
+        is_aggregate: is_complex_query,
+        is_descending,
+        order_by: sql.order_by.clone(),
+        limit: sql.limit,
+        ..Default::default()
+    };
+    if cache_mode == CacheMode::Bypass
+        || !is_result_cacheable(req, stream_type, &sql, &metadata.ts_column)
+    {
+        return Ok((metadata, true));
+    }
 
-    // Compute the complete file path once for both branches
     let base_file_path = format!("{org_id}/{stream_type}/{stream_name}/{hashed_query}");
     let file_path = cacher::compute_cache_file_path(
         &base_file_path,
         is_complex_query,
         sql.histogram_interval,
-        &ts_column,
+        &metadata.ts_column,
     );
+    if is_complex_query && sql.histogram_interval.is_some() {
+        // the query must run the SQL that was normalized and hashed above
+        req.query.sql = origin_sql.clone();
+    }
 
     let mut should_exec_query = true;
-
-    let resp = if use_cache {
-        // if cache is used, we need to check the cache
+    let resp = if cache_mode == CacheMode::ReadWrite {
         check_cache(
             trace_id,
             org_id,
             req,
-            &mut origin_sql,
             &file_path,
             is_complex_query,
             &sql,
-            &ts_column,
+            &metadata.ts_column,
             is_descending,
             &mut should_exec_query,
         )
         .await
     } else {
-        // if cache is not used, return the parsed metadata
         MultiCachedQueryResponse {
-            ts_column,
-            is_aggregate: is_complex_query,
-            is_descending,
-            order_by: sql.order_by,
-            limit: sql.limit,
             file_path,
-            ..Default::default()
+            histogram_interval: sql
+                .histogram_interval
+                .filter(|_| is_complex_query)
+                .unwrap_or(0),
+            ..metadata
         }
     };
     Ok((resp, should_exec_query))
+}
+
+/// The one eligibility rule for reading, writing and refreshing a result-cache entry.
+fn is_result_cacheable(
+    req: &search::Request,
+    stream_type: StreamType,
+    sql: &crate::Sql,
+    ts_column: &str,
+) -> bool {
+    req.query.from == 0
+        && !req.query.track_total_hits
+        && is_result_cache_allowed(stream_type)
+        && !ts_column.is_empty()
+        && sql.histogram_offset == Some(0)
+        // #16650: a top-N ranked by another field cannot be split or reused across time ranges
+        && !result_utils::is_ranked_by_non_timestamp(&sql.order_by, ts_column)
+        && is_time_splittable(&req.query.sql).unwrap_or(false)
 }
 
 /// Awaits every delta; with `drain` the first error, in any order, aborts the rest and waits.
@@ -1053,7 +1023,6 @@ pub async fn write_results(
     is_aggregate: bool,
     is_descending: bool,
     clear_cache: bool,
-    is_histogram_non_ts_order: bool,
 ) {
     if res.hits.is_empty() {
         return;
@@ -1106,12 +1075,8 @@ pub async fn write_results(
     }
 
     // 6. filter the records to the accept time range
-    // For histogram queries with non-timestamp ORDER BY, we need to scan all hits
-    // to find actual min/max timestamps, since results may not be time-ordered
     let mut res = deep_copy_response(res);
-    let is_time_ordered = !is_histogram_non_ts_order;
-    let (data_start_time, data_end_time) =
-        extract_timestamp_range(&res.hits, ts_column, is_time_ordered);
+    let (data_start_time, data_end_time) = extract_timestamp_range(&res.hits, ts_column);
     if data_start_time < accept_start_time || data_end_time > accept_end_time {
         res.hits.retain(|hit| {
             if let Some(hit_ts) = hit.get(ts_column)
@@ -1239,15 +1204,16 @@ pub fn apply_vrl_to_response(
             }
             Err(err) => {
                 log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
-                local_res.function_error.push(err.to_string());
-                local_res.is_partial = true;
+                res.function_error.push(err.to_string());
                 None
             }
         };
         match program {
             Some(program) => {
-                if apply_over_hits {
-                    let (ret_val, err) = transform::apply_vrl_fn(
+                let mut vrl_errors = transform::VrlRunErrors::default();
+                let out: Vec<serde_json::Value> = if apply_over_hits {
+                    let row_count = local_res.hits.len();
+                    let (ret_val, err) = transform::apply_vrl_fn_checked(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -1257,9 +1223,7 @@ pub fn apply_vrl_to_response(
                         org_id,
                         &[stream_name.to_string()],
                     );
-                    if let Some(e) = err {
-                        log::error!("Error applying vrl function: {e}");
-                    }
+                    vrl_errors.record_rows(row_count, err);
                     ret_val
                         .as_array()
                         .unwrap()
@@ -1267,12 +1231,11 @@ pub fn apply_vrl_to_response(
                         .filter_map(|v| super::flatten_vrl_result(v.clone()))
                         .collect()
                 } else {
-                    let mut error = "".to_string();
-                    let res = local_res
+                    local_res
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = transform::apply_vrl_fn(
+                            let (ret_val, err) = transform::apply_vrl_fn_checked(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
@@ -1282,17 +1245,16 @@ pub fn apply_vrl_to_response(
                                 org_id,
                                 &[stream_name.to_string()],
                             );
-                            if let Some(e) = err {
-                                error = e;
-                            }
+                            vrl_errors.record(err);
                             super::flatten_vrl_result(ret_val)
                         })
-                        .collect();
-                    if !error.is_empty() {
-                        log::error!("Error applying vrl function: {error}");
-                    }
-                    res
+                        .collect()
+                };
+                if let Some(msg) = vrl_errors.message() {
+                    log::error!("[trace_id {trace_id}] Error applying vrl function: {msg}");
+                    res.function_error.push(msg);
                 }
+                out
             }
             None => local_res.hits,
         }
@@ -1343,153 +1305,6 @@ fn deep_copy_response(res: &config::meta::search::Response) -> config::meta::sea
     serde_json::from_str(&serialized).expect("Failed to deserialize response")
 }
 
-#[cfg(feature = "vectorscan")]
-pub async fn apply_regex_to_response(
-    req: &config::meta::search::Request,
-    org_id: &str,
-    all_streams: &str,
-    stream_type: StreamType,
-    res: &mut config::meta::search::Response,
-    trace_id: &str,
-    ctx: &str,
-) -> Result<(), infra::errors::Error> {
-    if res.hits.is_empty() {
-        return Ok(());
-    }
-
-    let start = std::time::Instant::now();
-    let pattern_manager = match get_pattern_manager().await {
-        Ok(manager) => manager,
-        Err(e) => {
-            log::error!(
-                "[trace_id {trace_id}] SDR patterns application: pattern manager unavailable: {e}"
-            );
-            // Can't tell which streams have search-time patterns without the
-            // manager, so assume the worst case: fail closed treats this as
-            // "yes, redaction may have been skipped"; fail open (the default)
-            // returns unredacted hits rather than breaking search entirely.
-            return redaction_skipped(
-                config::get_config().common.sdr_fail_closed,
-                || true,
-                &SkippedHits::new(org_id, stream_type, all_streams, &res.hits),
-                &format!("pattern manager unavailable: {e}"),
-                usage_reporting::redaction_evidence::publish_search_scan_unavailable,
-            );
-        }
-    };
-    redaction_skipped(
-        config::get_config().common.sdr_fail_closed,
-        || {
-            any_stream(all_streams, |stream| {
-                pattern_manager.has_unbuilt_patterns(
-                    org_id,
-                    stream_type,
-                    stream,
-                    o2_enterprise::enterprise::re_patterns::ApplyTime::Search,
-                )
-            })
-        },
-        &SkippedHits::new(org_id, stream_type, all_streams, &res.hits),
-        "a configured pattern failed to build",
-        // Fail-open still redacts with the last block that built, so no hit leaves unredacted.
-        |_| {},
-    )?;
-
-    let query: proto::cluster_rpc::SearchQuery = req.query.clone().try_into()?;
-    let sql = match crate::sql::Sql::new(&query, org_id, stream_type, req.search_type).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("[trace_id {trace_id}] SDR patterns application: error parsing sql: {e}");
-            let at_ingestion =
-                infra::table::re_pattern_stream_map::ApplyPolicy::AtIngestion.to_string();
-            return redaction_skipped(
-                config::get_config().common.sdr_fail_closed,
-                || {
-                    all_streams.split(',').any(|stream| {
-                        pattern_manager
-                            .get_associations(org_id, stream_type, stream.trim())
-                            .iter()
-                            .any(|a| a.apply_at != at_ingestion)
-                    })
-                },
-                &SkippedHits::new(org_id, stream_type, all_streams, &res.hits),
-                &e.to_string(),
-                usage_reporting::redaction_evidence::publish_search_scan_unavailable,
-            );
-        }
-    };
-
-    let projections: std::collections::HashMap<String, Vec<ProjectionColumnMapping>> =
-        crate::datafusion::logical_plan::regex_projections::get_columns_from_projections(sql)
-            .await?;
-    if projections.is_empty() {
-        return Ok(());
-    }
-
-    let ret = match pattern_manager.process_at_search(
-        org_id,
-        stream_type,
-        &mut res.hits,
-        projections,
-    ) {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            log::error!(
-                "[trace_id {trace_id}] SDR patterns application: error in processing records for stream: {all_streams}: {e}"
-            );
-            Err(redaction_error(all_streams, &e.to_string()))
-        }
-    };
-    let took = start.elapsed().as_millis();
-    log::info!(
-        "[trace_id {trace_id}] SDR patterns application: context: {ctx}, took: {took} ms, processed: {} hits",
-        res.hits.len()
-    );
-    ret
-}
-
-/// Every stream a query reads, not only the first: a join exposes the fields of each.
-#[cfg(any(feature = "vectorscan", test))]
-fn any_stream(all_streams: &str, pred: impl Fn(&str) -> bool) -> bool {
-    all_streams.split(',').any(|stream| pred(stream.trim()))
-}
-
-/// Under `ZO_SDR_FAIL_CLOSED`, hits a search-time pattern applies to are never returned unredacted.
-#[cfg(any(feature = "vectorscan", test))]
-fn redaction_skipped(
-    fail_closed: bool,
-    has_search_patterns: impl FnOnce() -> bool,
-    skipped: &SkippedHits<'_>,
-    reason: &str,
-    publish: impl FnOnce(Vec<RedactionEvidence>),
-) -> Result<(), infra::errors::Error> {
-    if !has_search_patterns() {
-        return Ok(());
-    }
-    let posture = if fail_closed {
-        FailPosture::Closed
-    } else {
-        FailPosture::Open
-    };
-    publish(skipped.evidence(posture, reason));
-    if fail_closed {
-        // 503, not 400: the refusal is a server-side condition, not a fault in the query.
-        return Err(infra::errors::Error::ResourceError(format!(
-            "sensitive-data redaction could not run for {}: {reason}; refusing to return unredacted hits (ZO_SDR_FAIL_CLOSED)",
-            skipped.all_streams
-        )));
-    }
-    Ok(())
-}
-
-/// A redaction failure is the server's fault, so it is a 503, not a 400.
-#[cfg(any(feature = "vectorscan", test))]
-fn redaction_error(all_streams: &str, reason: &str) -> infra::errors::Error {
-    infra::errors::Error::ResourceError(format!(
-        "sensitive-data redaction failed for {all_streams}: {reason}; refusing to return unredacted hits"
-    ))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1517,7 +1332,7 @@ mod tests {
         ];
         for (offset, mixed_offsets) in cases {
             for (order, expected) in orders {
-                for use_cache in [false, true] {
+                for mode in [CacheMode::Bypass, CacheMode::ReadWrite, CacheMode::Refresh] {
                     let filter = if mixed_offsets {
                         " WHERE histogram(_timestamp, '1 hour', '+00:00') IS NOT NULL"
                     } else {
@@ -1540,7 +1355,7 @@ mod tests {
                         org_id,
                         StreamType::Logs,
                         &mut req,
-                        use_cache,
+                        mode,
                     )
                     .await
                     .unwrap();
@@ -1565,7 +1380,7 @@ mod tests {
                         .collect();
                     assert_eq!(
                         timestamps, expected,
-                        "offset={offset}, mixed={mixed_offsets}, order={order}, use_cache={use_cache}"
+                        "offset={offset}, mixed={mixed_offsets}, order={order}, mode={mode:?}"
                     );
                     assert_eq!(prepared.ts_column, "ts");
                     assert!(should_exec_query);
@@ -1583,6 +1398,312 @@ mod tests {
             .write()
             .await
             .remove(&format!("{org_id}/logs/t"));
+    }
+
+    #[tokio::test]
+    async fn test_prepare_skips_queries_not_ordered_by_time() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "ranked_order_eligibility";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org_id}/logs/t"),
+            SchemaCache::new(Schema::new(vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new("k", DataType::Utf8, true),
+            ])),
+        );
+        let histogram =
+            "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM t GROUP BY ts";
+        let cases = [
+            (format!("{histogram} ORDER BY c DESC LIMIT 3"), "ts", false),
+            (
+                format!("{histogram} ORDER BY count(*) DESC LIMIT 3"),
+                "ts",
+                false,
+            ),
+            (format!("{histogram} ORDER BY 2 DESC LIMIT 3"), "ts", false),
+            (
+                format!("{histogram} ORDER BY count(*) DESC, ts ASC"),
+                "ts",
+                false,
+            ),
+            (
+                format!("{histogram} ORDER BY ts ASC, count(*) DESC"),
+                "ts",
+                true,
+            ),
+            (
+                "SELECT * FROM t ORDER BY k".to_string(),
+                "_timestamp",
+                false,
+            ),
+            (
+                "SELECT * FROM t ORDER BY _timestamp DESC".to_string(),
+                "_timestamp",
+                true,
+            ),
+            (format!("{histogram} ORDER BY ts DESC"), "ts", true),
+            (format!("{histogram} ORDER BY ts ASC, c DESC"), "ts", true),
+            (format!("{histogram} ORDER BY 1 ASC, 2 DESC"), "ts", true),
+        ];
+        for (sql, ts_column, eligible) in cases {
+            for mode in [CacheMode::Bypass, CacheMode::ReadWrite, CacheMode::Refresh] {
+                let mut req = search::Request {
+                    query: search::Query {
+                        sql: sql.clone(),
+                        start_time: 1_735_689_600_000_000,
+                        end_time: 1_735_776_000_000_000,
+                        size: 100,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                let (prepared, should_exec_query) = prepare_cache_response(
+                    "ranked_order_eligibility",
+                    org_id,
+                    StreamType::Logs,
+                    &mut req,
+                    mode,
+                )
+                .await
+                .unwrap();
+                let case = format!("sql={sql}, mode={mode:?}");
+                assert!(should_exec_query, "{case}");
+                assert_eq!(prepared.ts_column, ts_column, "{case}");
+                assert_eq!(
+                    !prepared.file_path.is_empty(),
+                    eligible && mode != CacheMode::Bypass,
+                    "{case}"
+                );
+                assert_eq!(
+                    prepared.cache_query_response,
+                    eligible && mode == CacheMode::ReadWrite,
+                    "{case}"
+                );
+            }
+        }
+        STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .remove(&format!("{org_id}/logs/t"));
+    }
+
+    #[tokio::test]
+    async fn test_prepare_needs_time_column_and_time_splittable_sql() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "time_split_eligibility";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org_id}/logs/t"),
+            SchemaCache::new(Schema::new(vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new("k", DataType::Utf8, true),
+            ])),
+        );
+        // (sql, ts column, eligible)
+        let cases = [
+            (
+                "SELECT k, max(_timestamp) AS _timestamp, count(*) AS c FROM t GROUP BY k",
+                "",
+                false,
+            ),
+            (
+                "SELECT max(_timestamp) AS _timestamp, count(*) AS c FROM t",
+                "",
+                false,
+            ),
+            (
+                "SELECT k AS _timestamp, count(*) AS c FROM t GROUP BY k ORDER BY _timestamp DESC",
+                "",
+                false,
+            ),
+            (
+                "SELECT s._timestamp AS _timestamp, s.c FROM (SELECT max(_timestamp) AS _timestamp, count(*) AS c FROM t) s ORDER BY _timestamp DESC",
+                "",
+                false,
+            ),
+            (
+                "SELECT * FROM t ORDER BY _timestamp DESC LIMIT 10 OFFSET 5",
+                TIMESTAMP_COL_NAME,
+                false,
+            ),
+            (
+                "SELECT _timestamp AS ts, k FROM t WHERE k IN (SELECT k FROM t GROUP BY k HAVING count(*) > 1) ORDER BY ts DESC",
+                "ts",
+                false,
+            ),
+            (
+                "SELECT _timestamp AS ts, row_number() OVER () AS rn FROM t ORDER BY ts DESC",
+                "ts",
+                false,
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 hour') AS ts, sum(count(*)) OVER (ORDER BY histogram(_timestamp, '1 hour')) AS cum FROM t GROUP BY ts ORDER BY ts",
+                "ts",
+                false,
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM t GROUP BY ts",
+                "ts",
+                true,
+            ),
+            (
+                "SELECT * FROM t ORDER BY _timestamp DESC LIMIT 10 OFFSET 0",
+                TIMESTAMP_COL_NAME,
+                true,
+            ),
+        ];
+        for (sql, ts_column, eligible) in cases {
+            for mode in [CacheMode::Bypass, CacheMode::ReadWrite, CacheMode::Refresh] {
+                let mut req = search::Request {
+                    query: search::Query {
+                        sql: sql.to_string(),
+                        start_time: 1_735_689_600_000_000,
+                        end_time: 1_735_776_000_000_000,
+                        size: 100,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                let (prepared, should_exec_query) =
+                    prepare_cache_response(org_id, org_id, StreamType::Logs, &mut req, mode)
+                        .await
+                        .unwrap();
+                let case = format!("sql={sql}, mode={mode:?}");
+                assert!(should_exec_query, "{case}");
+                assert_eq!(prepared.ts_column, ts_column, "{case}");
+                assert_eq!(
+                    !prepared.file_path.is_empty(),
+                    eligible && mode != CacheMode::Bypass,
+                    "{case}"
+                );
+                assert_eq!(
+                    prepared.cache_query_response,
+                    eligible && mode == CacheMode::ReadWrite,
+                    "{case}"
+                );
+                assert!(prepared.cached_response.is_empty(), "{case}");
+            }
+        }
+        STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .remove(&format!("{org_id}/logs/t"));
+    }
+
+    #[test]
+    fn test_cache_mode_from_request() {
+        let cases = [
+            (true, false, CacheMode::ReadWrite),
+            (true, true, CacheMode::ReadWrite),
+            (false, true, CacheMode::Refresh),
+            (false, false, CacheMode::Bypass),
+        ];
+        for (use_cache, clear_cache, expected) in cases {
+            let req = search::Request {
+                use_cache,
+                clear_cache,
+                ..Default::default()
+            };
+            assert_eq!(CacheMode::from_request(&req), expected);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_prepare_writes_only_when_mode_and_query_allow_it() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "cache_mode_write_gate";
+        let schema = || {
+            SchemaCache::new(Schema::new(vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new("k", DataType::Utf8, true),
+            ]))
+        };
+        for stream_type in [StreamType::Logs, StreamType::EnrichmentTables] {
+            STREAM_SCHEMAS_LATEST
+                .write()
+                .await
+                .insert(format!("{org_id}/{stream_type}/t"), schema());
+        }
+        let rows = "SELECT * FROM t ORDER BY _timestamp DESC";
+        let histogram =
+            "SELECT histogram(_timestamp) AS ts, count(*) AS c FROM t GROUP BY ts ORDER BY ts";
+        // (case, sql, stream type, track_total_hits, from, eligible)
+        let cases = [
+            ("rows", rows, StreamType::Logs, false, 0, true),
+            ("histogram", histogram, StreamType::Logs, false, 0, true),
+            ("track_total_hits", rows, StreamType::Logs, true, 0, false),
+            ("later page", rows, StreamType::Logs, false, 10, false),
+            (
+                "enrichment",
+                rows,
+                StreamType::EnrichmentTables,
+                false,
+                0,
+                false,
+            ),
+            (
+                "ranked",
+                "SELECT * FROM t ORDER BY k",
+                StreamType::Logs,
+                false,
+                0,
+                false,
+            ),
+        ];
+        for (name, sql, stream_type, track_total_hits, from, eligible) in cases {
+            let mut prepared_sql = Vec::new();
+            for mode in [CacheMode::Bypass, CacheMode::ReadWrite, CacheMode::Refresh] {
+                let mut req = search::Request {
+                    query: search::Query {
+                        sql: sql.to_string(),
+                        start_time: 1_735_689_600_000_000,
+                        end_time: 1_735_776_000_000_000,
+                        size: 100,
+                        from,
+                        track_total_hits,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                let (prepared, should_exec_query) =
+                    prepare_cache_response(org_id, org_id, stream_type, &mut req, mode)
+                        .await
+                        .unwrap();
+                let case = format!("{name}, mode={mode:?}");
+                assert!(should_exec_query, "{case}");
+                assert_eq!(
+                    !prepared.file_path.is_empty(),
+                    eligible && mode != CacheMode::Bypass,
+                    "{case}"
+                );
+                assert_eq!(
+                    prepared.cache_query_response,
+                    eligible && mode == CacheMode::ReadWrite,
+                    "{case}"
+                );
+                if name == "histogram" {
+                    assert_eq!(
+                        prepared.histogram_interval > 0,
+                        mode != CacheMode::Bypass,
+                        "{case}"
+                    );
+                }
+                prepared_sql.push(req.query.sql);
+            }
+            // a refresh must store what a read would look up: the same normalized SQL
+            assert_eq!(prepared_sql[1], prepared_sql[2], "{name}");
+        }
+        for stream_type in [StreamType::Logs, StreamType::EnrichmentTables] {
+            STREAM_SCHEMAS_LATEST
+                .write()
+                .await
+                .remove(&format!("{org_id}/{stream_type}/t"));
+        }
     }
 
     #[test]
@@ -1628,106 +1749,6 @@ mod tests {
     }
 
     #[test]
-    fn test_any_stream_checks_every_joined_stream() {
-        assert!(any_stream("first, second", |stream| stream == "second"));
-        assert!(!any_stream("first,second", |stream| stream == "third"));
-    }
-
-    #[test]
-    fn test_redaction_error_is_a_503() {
-        let err = redaction_error("app_logs", "scan failed");
-        assert_eq!(err.http_status(), 503, "{err}");
-        assert!(err.to_string().contains("app_logs"), "{err}");
-    }
-
-    fn skip(
-        fail_closed: bool,
-        has_search_patterns: bool,
-        hits: &[json::Value],
-    ) -> (Result<(), infra::errors::Error>, Vec<RedactionEvidence>) {
-        let mut published = Vec::new();
-        let skipped = SkippedHits::new("org_a", StreamType::Logs, "app_logs, audit_logs", hits);
-        let ret = redaction_skipped(
-            fail_closed,
-            || has_search_patterns,
-            &skipped,
-            "parse error",
-            |rows| published = rows,
-        );
-        (ret, published)
-    }
-
-    #[test]
-    fn test_redaction_skipped_fails_open_by_default() {
-        assert!(skip(false, true, &[]).0.is_ok());
-    }
-
-    #[test]
-    fn test_redaction_skipped_fails_closed_only_with_search_patterns() {
-        let err = skip(true, true, &[])
-            .0
-            .expect_err("a stream with search-time patterns must not return unredacted hits");
-        assert!(err.to_string().contains("app_logs"), "{err}");
-        assert_eq!(err.http_status(), 503, "{err}");
-        assert!(skip(true, false, &[]).0.is_ok());
-    }
-
-    #[test]
-    fn test_fail_open_search_publishes_an_evidence_row_per_stream() {
-        let ts = TIMESTAMP_COL_NAME;
-        let hits = [
-            json::json!({ ts: 30, "card": "4111" }),
-            json::json!({ ts: 10, "card": "4222" }),
-            json::json!({ ts: 20, "card": "4333" }),
-        ];
-        let (ret, rows) = skip(false, true, &hits);
-        assert!(ret.is_ok());
-        let streams: Vec<&str> = rows.iter().map(|r| r.stream_name.as_str()).collect();
-        assert_eq!(streams, ["app_logs", "audit_logs"]);
-        for row in &rows {
-            assert_eq!(row.kind, "scan_unavailable");
-            assert_eq!(row.apply_time, "search");
-            assert_eq!(row.org_id, "org_a");
-            assert_eq!(row.stream_type, "logs");
-            assert_eq!(row.fail_posture.as_deref(), Some("open"));
-            assert_eq!(row.reason.as_deref(), Some("parse error"));
-            assert_eq!(row.records_scanned, 3);
-            assert_eq!((row.data_min_ts, row.data_max_ts), (Some(10), Some(30)));
-        }
-    }
-
-    #[test]
-    fn test_fail_closed_search_publishes_a_closed_row() {
-        let (ret, rows) = skip(true, true, &[]);
-        assert!(ret.is_err());
-        assert_eq!(rows.len(), 2);
-        assert!(
-            rows.iter()
-                .all(|r| r.fail_posture.as_deref() == Some("closed"))
-        );
-    }
-
-    #[test]
-    fn test_search_evidence_skips_self_reporting_streams() {
-        let skipped = SkippedHits::new("org_a", StreamType::Logs, "app_logs, usage", &[]);
-        let streams: Vec<String> = skipped
-            .evidence(FailPosture::Open, "pattern manager unavailable")
-            .into_iter()
-            .map(|row| row.stream_name)
-            .collect();
-        assert_eq!(streams, ["app_logs"]);
-    }
-
-    #[test]
-    fn test_search_without_search_patterns_publishes_nothing() {
-        for fail_closed in [false, true] {
-            let (ret, rows) = skip(fail_closed, false, &[]);
-            assert!(ret.is_ok());
-            assert!(rows.is_empty(), "{rows:?}");
-        }
-    }
-
-    #[test]
     fn test_apply_vrl_to_response_preserves_hits_on_compile_failure() {
         let mut response = config::meta::search::Response {
             hits: vec![json::json!({"nested": {"value": 42}})],
@@ -1761,6 +1782,105 @@ mod tests {
             "test",
         );
         assert_eq!(hits, vec![json::json!({"nested_value": 42})]);
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_reports_runtime_error_in_function_error() {
+        let mut response = config::meta::search::Response {
+            hits: vec![
+                json::json!({"m": "{\"a\":1}"}),
+                json::json!({"m": "not json"}),
+            ],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some(".x = parse_json!(.m)".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits.len(), 2);
+        assert_eq!(response.function_error.len(), 1);
+        assert!(
+            response.function_error[0].starts_with("Query function failed on 1 of 2 rows: "),
+            "{:?}",
+            response.function_error
+        );
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_reports_compile_error_to_caller() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"m": "x"})],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some(".x = not_a_function(.m)".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"m": "x"})]);
+        assert_eq!(response.function_error.len(), 1);
+        assert!(!response.function_error[0].is_empty());
+        assert!(!response.is_partial);
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_no_function_error_on_success() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"m": "{\"a\":1}"})],
+            ..Default::default()
+        };
+        apply_vrl_to_response(
+            Some(".x = parse_json!(.m)".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert!(response.function_error.is_empty());
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_result_array_runtime_error_fails_every_row() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"a": 1}), json::json!({"a": 2})],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some("#ResultArray#SkipVRL#\n. = parse_json!(\"not json\")".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"a": 1}), json::json!({"a": 2})]);
+        assert_eq!(response.function_error.len(), 1);
+        assert!(
+            response.function_error[0].starts_with("Query function failed on 2 of 2 rows: "),
+            "{:?}",
+            response.function_error
+        );
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_result_array_success_has_no_function_error() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"a": 1}), json::json!({"a": 2})],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some("#ResultArray#SkipVRL#\n. = [{\"x\": 1}]".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"x": 1})]);
+        assert!(response.function_error.is_empty());
     }
 
     #[test]
@@ -2069,7 +2189,7 @@ mod tests {
         );
         assert_eq!(alias_ts_of(&merged), vec![40, 30, 20, 10]);
         // write_results() takes the time range from the first and last hit
-        let (start, end) = result_utils::extract_timestamp_range(&merged.hits, "ts", true);
+        let (start, end) = result_utils::extract_timestamp_range(&merged.hits, "ts");
         assert_eq!((start, end), (10, 40));
     }
 }

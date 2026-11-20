@@ -114,7 +114,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :icon="filterQuery || roleFilters.length ? undefined : 'group'"
               :action-label="
-                filterQuery || roleFilters.length ? undefined : t('emptyState.noUsers.action')
+                filterQuery || roleFilters.length || (config.isCloud === 'true' && !canInvite)
+                  ? undefined
+                  : t('emptyState.noUsers.action')
               "
               @action="filterQuery || roleFilters.length ? clearFilters() : openAddFlow()"
             >
@@ -389,7 +391,8 @@ export default defineComponent({
 
     onActivated(() => {
       if (router.currentRoute.value.query.action == "add") {
-        addUser({}, false);
+        if (config.isCloud === "true") openAddFlow();
+        else addUser({}, false);
       } else {
         usersState.users.map((member: any) => {
           if (member.email == router.currentRoute.value.query.email) {
@@ -1473,8 +1476,8 @@ export default defineComponent({
 
     // Cloud adds people by invitation, so its add entry points open the invite dialog.
     const openAddFlow = () => {
-      if (config.isCloud === "true" && canInvite.value) openInviteDialog();
-      else addRoutePush({});
+      if (config.isCloud !== "true") addRoutePush({});
+      else if (canInvite.value) openInviteDialog();
     };
 
     const clearFilters = () => {

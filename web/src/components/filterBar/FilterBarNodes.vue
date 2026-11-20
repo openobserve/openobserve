@@ -84,7 +84,7 @@ const groupJoin = (index: number) => {
     >
     <span
       v-if="item.kind === 'group'"
-      class="rounded-default border-border-subtle bg-surface-subtle inline-flex max-w-full min-w-min flex-wrap items-center gap-1.5 border py-0.5 ps-1.5 pe-0.5"
+      class="rounded-default border-border-strong bg-surface-subtle inline-flex max-w-full min-w-min flex-wrap items-center gap-1.5 border py-0.5 ps-1.5 pe-0.5"
       :data-filter-group="item.id"
       :data-filter-index="index"
       :data-test="`${dataTest}-group-${pathOf(index)}`"

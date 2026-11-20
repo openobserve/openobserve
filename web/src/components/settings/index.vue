@@ -147,18 +147,23 @@ export default defineComponent({
           query: { org_identifier: store.state.selectedOrganization?.identifier },
         });
       };
-      // Nodes, License, Password policy, Query Management and Announcements are enterprise-only meta-org pages.
+      // License, Password policy, Query Management and Announcements are enterprise-only meta-org pages.
       const notMeta =
         store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
       if (
-        (name === "nodes" ||
-          name === "license" ||
+        (name === "license" ||
           name === "passwordPolicy" ||
           name === "query_management" ||
           name === "announcementBanners" ||
           name === "announcementBannerEditor") &&
         notMeta
       ) {
+        toGeneral();
+        return;
+      }
+      // Nodes is meta-org-only but NOT enterprise-only: OSS clusters too, and the
+      // node list API serves the _meta org in every edition.
+      if (name === "nodes" && store.state.zoConfig.meta_org && !isMetaOrg.value) {
         toGeneral();
         return;
       }

@@ -226,7 +226,7 @@ describe("FilterBuilder", () => {
   });
 
   describe("vertical layout (alerts engine tree)", () => {
-    const saved = v2(leaf("level", "error"), leaf("service", "api", "OR"), {
+    const saved = v2(leaf("level", "error"), leaf("service", "api", "AND"), {
       filterType: "group",
       logicalOperator: "AND",
       groupId: "g1",
@@ -236,7 +236,7 @@ describe("FilterBuilder", () => {
     it("draws one line per condition, Where only on the first line, groups as boxes with their own lines", () => {
       mountBuilder("alert", saved);
       expect(find("row-0").text()).toContain("Where");
-      expect(find("connector-1").text()).toBe("OR");
+      expect(find("connector-1").text()).toBe("AND");
       expect(find("group-2").exists()).toBe(true);
       expect(find("row-2-0").text()).not.toContain("Where");
       expect(find("connector-2-0").exists()).toBe(false);
@@ -277,6 +277,7 @@ describe("FilterBuilder", () => {
       expect(find("group-2").find(`[data-test="${DT}-draft-row"]`).exists()).toBe(true);
       expect(find("group-2").find(`[data-test="${DT}-input"]`).exists()).toBe(true);
       expect(document.body.querySelector(`[data-test="${DT}-search"]`)).toBeNull();
+      await type("or ");
       await addEq("level", "info");
       expect(state.value.conditions[2].conditions).toHaveLength(3);
       expect(state.value.conditions[2].conditions[2]).toMatchObject({
@@ -356,22 +357,24 @@ describe("FilterBuilder", () => {
       const state = mountBuilder("alert", saved);
       await click("add-group-2");
       await addEq("level", "debug");
-      expect(state.value.conditions[2].conditions[2].filterType).toBe("group");
-      expect(find("add-group-2-2").exists()).toBe(true);
-      // `AND (status OR service)` would read differently unbracketed, so it offers no ungroup.
-      expect(find("ungroup-2").exists()).toBe(false);
-      expect(find("ungroup-2-2").text()).toContain("Ungroup");
-      await click("ungroup-2-2");
+      // The new group joins with AND, so the `status OR service` before it gets a group of its own.
+      expect(state.value.conditions[2].conditions[0].filterType).toBe("group");
+      expect(state.value.conditions[2].conditions[1].filterType).toBe("group");
+      expect(find("add-group-2-1").exists()).toBe(true);
+      // `(status OR service) AND …` would read differently unbracketed, so it offers no ungroup.
+      expect(find("ungroup-2-0").exists()).toBe(false);
+      expect(find("ungroup-2-1").text()).toContain("Ungroup");
+      await click("ungroup-2-1");
       expect(state.value.conditions).toHaveLength(3);
-      expect(state.value.conditions[2].conditions).toHaveLength(3);
-      expect(state.value.conditions[2].conditions[2]).toMatchObject({
+      expect(state.value.conditions[2].conditions).toHaveLength(2);
+      expect(state.value.conditions[2].conditions[1]).toMatchObject({
         filterType: "condition",
         column: "level",
       });
     });
 
-    it("ungroups an all-AND group after an OR, since AND binds tighter", async () => {
-      const state = mountBuilder(
+    it("offers no ungroup for an AND group after an OR, since one group never mixes them", () => {
+      mountBuilder(
         "alert",
         v2(leaf("level", "error"), {
           filterType: "group",
@@ -380,12 +383,8 @@ describe("FilterBuilder", () => {
           conditions: [{ ...leaf("status", 500, "OR", ">=") }, leaf("service", "web", "AND")],
         }),
       );
-      await click("ungroup-1");
-      expect(state.value.conditions.map((c: any) => [c.column, c.logicalOperator])).toEqual([
-        ["level", "AND"],
-        ["status", "OR"],
-        ["service", "AND"],
-      ]);
+      expect(find("group-1").exists()).toBe(true);
+      expect(find("ungroup-1").exists()).toBe(false);
     });
 
     it("ungroups in a per-group downtime only when the AND/OR stays the same", async () => {
@@ -812,7 +811,7 @@ describe("FilterBuilder", () => {
         fourDeep([
           leaf("level", "warn"),
           leaf("service", "web"),
-          group("OR", leaf("status", 1)),
+          group("AND", leaf("status", 1)),
           leaf("status", 2),
         ]),
       );
@@ -820,7 +819,7 @@ describe("FilterBuilder", () => {
       expect(find("group-1-1").attributes("data-folded")).toBeUndefined();
       expect(find("group-1-1-1").attributes("data-folded")).toBeDefined();
       expect(find("row-1-1-1-0").exists()).toBe(false);
-      expect(find("summary-1-1-1").text()).toBe("level = warn AND service = web OR 2 more");
+      expect(find("summary-1-1-1").text()).toBe("level = warn AND service = web AND 2 more");
       expect(find("expand-1-1-1").attributes("aria-expanded")).toBe("false");
 
       await click("summary-1-1-1");
