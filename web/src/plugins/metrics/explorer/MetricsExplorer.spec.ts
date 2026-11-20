@@ -373,9 +373,14 @@ describe("MetricsExplorer wiring", () => {
         configurable: true,
         get: () => ({ value: { cards: [], placeholders: 8, emptyHeld: new Set() } }),
       });
-      const wrapper = mountExplorer();
-      expect(wrapper.find('[data-test="metrics-explorer-no-match-yet"]').exists()).toBe(false);
-      Object.defineProperty(grid, "displayed", displayed);
+      try {
+        const wrapper = mountExplorer();
+        expect(wrapper.find('[data-test="metrics-explorer-no-match-yet"]').exists()).toBe(false);
+        expect((wrapper.vm as any).gridVisible).toBe(true);
+        expect((wrapper.vm as any).rowsOfCards.flat()).toEqual(Array(8).fill(null));
+      } finally {
+        Object.defineProperty(grid, "displayed", displayed);
+      }
     });
 
     it("shows the final no-match once nothing is left to check", () => {

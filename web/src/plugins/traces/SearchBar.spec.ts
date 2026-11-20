@@ -1129,6 +1129,21 @@ describe("SearchBar", () => {
       searchObjInstance.data.queryResults.hits = hits;
     });
 
+    it("stays available on an empty page when the search total has matches", async () => {
+      applySearch();
+      const { hits, total } = searchObjInstance.data.queryResults;
+      searchObjInstance.data.queryResults.hits = [];
+      searchObjInstance.data.queryResults.total = 1200;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-test="insights-button"]').attributes("aria-disabled"),
+      ).toBeUndefined();
+      searchObjInstance.data.queryResults.hits = hits;
+      searchObjInstance.data.queryResults.total = total;
+    });
+
     it("should be hidden when the org has no trace streams", async () => {
       applySearch();
       searchObjInstance.data.stream.streamLists = [];

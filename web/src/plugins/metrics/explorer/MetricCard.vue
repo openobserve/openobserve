@@ -114,7 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTooltip>
         </OButton>
 
-        <!-- Below 48rem the age is its icon, so the metric name keeps the room that tells cards apart. -->
         <span
           class="inline-grid shrink-0 items-center justify-items-start"
           :data-test="`metrics-explorer-card-age-slot-${card.name}`"

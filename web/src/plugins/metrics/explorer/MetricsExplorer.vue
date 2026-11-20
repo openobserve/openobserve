@@ -655,9 +655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Every card checked so far is empty but candidates remain: not a verdict, so no remedies, just Show more below. -->
           <OEmptyState
-            v-else-if="
-              !visibleCards.length && grid.hasMore.value && !grid.displayed.value.placeholders
-            "
+            v-else-if="!gridItems.length && grid.hasMore.value"
             size="block"
             variant="no-results"
             illustration="no-results"
