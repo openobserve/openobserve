@@ -82,7 +82,8 @@
       "dashboard-3127-shortcut-behind-drawer.spec.js",
       "dashboard-16395-go-to-logs-aggregate-where.spec.js",
       "dashboard-16808-org-switch-by-id.spec.js",
-      "dashboard-16631-promql-table-drilldown-row.spec.js"
+      "dashboard-16631-promql-table-drilldown-row.spec.js",
+      "dashboard-16901-multi-query-empty-first.spec.js"
     ],
     "disabled": []
   },
