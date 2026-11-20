@@ -2341,7 +2341,7 @@
       "fileTypeZip": "Seuls les fichiers ZIP sont autorisés"
     },
     "emptyState": {
-      "webApp": "Instrumentez une application Web",
+      "webApp": "Instrumentez une application web",
       "webAppDesc": "Ajoutez le SDK RUM OpenObserve à toute application {product}",
       "sessionReplay": "Activer la relecture de session",
       "sessionReplayDesc": "Enregistrez et rejouez les sessions utilisateur pour résoudre les problèmes d'expérience utilisateur",
@@ -2424,7 +2424,7 @@
     "noReplayRecordedTitle": "Aucune relecture n'a été enregistrée pour cette session",
     "noReplayRecordedMessage": "La session {id} n'a aucun segment de relecture à lire.",
     "discoverSessionTitle": "Découvrez la relecture de session pour comprendre en détail les interactions des utilisateurs",
-    "discoverSessionMessage": "La relecture de session capture et rejoue les interactions des utilisateurs sur votre site Web ou votre application. Cela vous permet d'examiner visuellement la façon dont les utilisateurs naviguent, où ils cliquent, ce qu'ils saisissent et comment ils interagissent avec votre contenu",
+    "discoverSessionMessage": "La relecture de session capture et rejoue les interactions des utilisateurs sur votre site web ou votre application. Cela vous permet d'examiner visuellement la façon dont les utilisateurs naviguent, où ils cliquent, ce qu'ils saisissent et comment ils interagissent avec votre contenu",
     "loadingErrorDetails": "Veuillez patienter, nous récupérons les détails de l'erreur.",
     "eventID": "ID de l'événement",
     "noCorrelatedTraces": "Aucune trace corrélée trouvée pour cette session.",
@@ -3706,7 +3706,7 @@
     "rustRegistry": "Registre Rust",
     "agplFullName": "GNU Affero General Public License (AGPL)",
     "github": "GitHub",
-    "website": "Site Web",
+    "website": "Site web",
     "licenseAndUsage": "Licence et utilisation",
     "copyLicenseId": "Copier l'ID de licence",
     "editionLbl": "Édition",
@@ -4736,9 +4736,9 @@
       "presetSocAnalystDescription": "Trier les alertes et cas de sécurité, avec accès en lecture aux détections, aux flux sources de sécurité et aux listes de renseignement sur les menaces",
       "presetDetectionEngineerTitle": "Ingénieur détection",
       "presetDetectionEngineerDescription": "Créer, ajuster, activer et exécuter des détections, installer du contenu, rattacher des sources avec leurs fonctions et pipelines, et gérer les tables d'enrichissement comme les listes de renseignement sur les menaces, avec un accès en lecture à Sécurité, aux cas et aux flux",
-      "presetSecurityAdminTitle": "Administrateur Sécurité",
+      "presetSecurityAdminTitle": "Administrateur sécurité",
       "presetSecurityAdminDescription": "Gérer toute la Sécurité, y compris supprimer des détections et des cas et exclure des sources, avec les incidents, fonctions, pipelines, tables d'enrichissement et clés de chiffrement, et un accès en lecture aux flux",
-      "presetSecurityViewerTitle": "Lecteur Sécurité",
+      "presetSecurityViewerTitle": "Lecteur sécurité",
       "presetSecurityViewerDescription": "Consulter Sécurité, ses cas, ses détections et ses flux sources sans les modifier"
     },
     "rolesPage": {
@@ -6989,7 +6989,7 @@
     "securityLabel": "Sécurité",
     "devopsLabel": "DevOps",
     "networkingLabel": "Réseau",
-    "serverLabel": "Serveurs Web",
+    "serverLabel": "Serveurs web",
     "messageQueuesLabel": "Files d'attente de messages",
     "languagesLabel": "Langages/Frameworks",
     "otherLabel": "Autres",
