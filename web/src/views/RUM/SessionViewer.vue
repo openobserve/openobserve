@@ -439,10 +439,8 @@ const EVENTS_TAIL_US = 60_000_000;
 const DEFAULT_LOOKUP_US = 30 * DAY_US;
 // The SDK skips re-sending an image for 30 days, so a later session's image can sit that far back.
 const IMAGE_LOOKBACK_US = 31 * DAY_US;
-// The SDK checks its hash cache expiry only at startup, so a long-running app can reference an older image.
-const IMAGE_RETAINED_LOOKBACK_US = 3650 * DAY_US;
-// Image rows are stamped at receive time, which can trail the session by minutes, so the query ends at now.
-const IMAGE_END_SKEW_US = 60 * SECOND_US;
+// Image rows are stamped at receive time, so late uploads land shortly after the session's last row.
+const IMAGE_END_GRACE_US = 5 * 60 * SECOND_US;
 const IMAGE_ID_CHUNK = 100;
 // An image can be searchable only after the segment that references it, so unresolved ids are asked again.
 const IMAGE_RETRY_DELAYS_MS = [2000, 5000, 15000];
@@ -751,7 +749,6 @@ interface ImageLookup {
   dueAt: number;
 }
 const imageLookups = new Map<string, ImageLookup>();
-const imageWideDone = new Set<string>();
 let imageLoading = false;
 let imageReloadQueued = false;
 let imageRetryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1061,11 +1058,6 @@ const getSession = async () => {
 const imageResourcesSql = (applicationId: string, ids: string[]) =>
   `select resource_id, min(mime) as mime, min(image) as image from "${SESSION_REPLAY_RESOURCES_STREAM}" where ${sqlEquals("application_id", applicationId)} and ${sqlIn("resource_id", ids)} group by resource_id`;
 
-const imageWindowUs = (headUs: number): QueryWindow => ({
-  start: serverWindowUs(headUs, 0).start,
-  end: Date.now() * 1000 + IMAGE_END_SKEW_US,
-});
-
 const queryImages = async (applicationId: string, ids: string[], window: QueryWindow) => {
   const { hits } = await runStreamQuery(
     buildSegmentRequest(imageResourcesSql(applicationId, ids), 0, ids.length, window),
@@ -1083,14 +1075,9 @@ const addImages = (found: Map<string, string>) => {
   if (found.size > 0) imageResources.value = new Map([...imageResources.value, ...found]);
 };
 
-// An image can only be newer than the session, so the wide range is asked once per id.
 const loadImageChunk = async (applicationId: string, ids: string[]) => {
-  const found = await queryImages(applicationId, ids, imageWindowUs(IMAGE_LOOKBACK_US));
-  addImages(found);
-  const wide = ids.filter((id) => !found.has(id) && !imageWideDone.has(id));
-  if (wide.length === 0) return;
-  addImages(await queryImages(applicationId, wide, imageWindowUs(IMAGE_RETAINED_LOOKBACK_US)));
-  wide.forEach((id) => imageWideDone.add(id));
+  const window = serverWindowUs(IMAGE_LOOKBACK_US, IMAGE_END_GRACE_US);
+  addImages(await queryImages(applicationId, ids, window));
 };
 
 const imagePending = (id: string) =>
