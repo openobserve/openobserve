@@ -28,7 +28,6 @@ use hashbrown::{HashMap, HashSet};
 use parking_lot::RwLock;
 use svix_ksuid::KsuidLike;
 use tokio::sync::{Notify, OwnedRwLockReadGuard, RwLock as AsyncRwLock, Semaphore};
-use tokio_util::sync::CancellationToken;
 
 use super::{
     SearchError,
@@ -126,11 +125,9 @@ pub(super) struct Catalog {
     readers: Readers,
     max_pending: usize,
     builds: Arc<Semaphore>,
-    waiters: Arc<Semaphore>,
     pub scans: Arc<Semaphore>,
     changed: Arc<Notify>,
     work: Arc<Notify>,
-    stopped: CancellationToken,
     serial: AtomicU64,
     instance: String,
 }
@@ -146,19 +143,13 @@ impl Catalog {
             readers,
             max_pending: limits.max_pending,
             builds: Arc::new(Semaphore::new(2)),
-            waiters: Arc::new(Semaphore::new(32)),
             scans: Arc::new(Semaphore::new(4)),
             changed: Arc::new(Notify::new()),
             work: Arc::new(Notify::new()),
-            stopped: CancellationToken::new(),
             serial: AtomicU64::new(0),
             instance: svix_ksuid::Ksuid::new(None, None).to_string(),
         });
-        tokio::spawn(refresh_loop(
-            Arc::downgrade(&catalog),
-            catalog.work.clone(),
-            catalog.stopped.clone(),
-        ));
+        tokio::spawn(refresh_loop(Arc::downgrade(&catalog), catalog.work.clone()));
         catalog
     }
 
@@ -223,11 +214,6 @@ impl Catalog {
         if !loading() {
             return Ok(());
         }
-        let _waiter = self
-            .waiters
-            .clone()
-            .try_acquire_owned()
-            .map_err(|_| SearchError::Overloaded)?;
         let deadline = tokio::time::Instant::now() + COLD_WAIT;
         loop {
             let changed = self.changed.notified();
@@ -506,7 +492,8 @@ impl Catalog {
 
 impl Drop for Catalog {
     fn drop(&mut self) {
-        self.stopped.cancel();
+        // Wakes the refresh loop so it finds the catalog gone and exits.
+        self.work.notify_one();
     }
 }
 
@@ -700,13 +687,11 @@ impl Fetched {
     }
 }
 
-async fn refresh_loop(owner: Weak<Catalog>, work: Arc<Notify>, stopped: CancellationToken) {
+async fn refresh_loop(owner: Weak<Catalog>, work: Arc<Notify>) {
     loop {
-        tokio::select! { _ = stopped.cancelled() => return, _ = work.notified() => {} }
-        while let Some(owner) = owner.upgrade() {
-            let Some((key, token, dirty)) = owner.refresh_job() else {
-                break;
-            };
+        work.notified().await;
+        let Some(owner) = owner.upgrade() else { return };
+        while let Some((key, token, dirty)) = owner.refresh_job() {
             let result =
                 tokio::time::timeout(BUILD_TIMEOUT, owner.refresh_job_inner(&key, token, dirty))
                     .await;
@@ -737,6 +722,7 @@ mod tests {
 
     use config::meta::resources::{ResourceRoute, SearchResponse, SourceStatus};
     use parking_lot::Mutex;
+    use tokio_util::sync::CancellationToken;
 
     use super::*;
 
