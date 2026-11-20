@@ -69,6 +69,10 @@ use crate::{
 const MASKED_TOKEN: &str = "NOT_AVAILABLE";
 // API version and public dashboard route prefixes: such an org id makes `/api/<id>/` ambiguous.
 const RESERVED_ORG_IDS: [&str; 4] = ["v1", "v2", "v3", "public_dashboards"];
+#[cfg(feature = "cloud")]
+const INVITE_ROLE_REFUSED: &str = "Invitations can grant Admin, Editor, Viewer or User";
+#[cfg(feature = "cloud")]
+const INVITE_NO_LONGER_VALID: &str = "This invitation is no longer valid";
 
 /// Checks if a service account token should be masked
 /// Returns true if:
@@ -867,6 +871,30 @@ async fn refuse_inactive_invite_org(org_id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Refuses joining a free org when the user is already in the maximum number of free orgs.
+#[cfg(feature = "cloud")]
+async fn refuse_free_org_limit(org_id: &str, user_email: &str) -> Result<(), anyhow::Error> {
+    if get_billing_by_org_id(org_id).await?.is_some() {
+        return Ok(());
+    }
+    let max = o2_enterprise::enterprise::common::config::get_config()
+        .cloud
+        .max_free_orgs_allowed;
+    let mut free_org_count = 0;
+    for org in list_orgs_by_user(user_email).await? {
+        if get_billing_by_org_id(&org.identifier).await?.is_none() {
+            free_org_count += 1;
+        }
+    }
+    // Counting the org being joined, the user would be at count + 1.
+    if free_org_count >= max {
+        return Err(anyhow::anyhow!(
+            "User is already a part of {max} free organization. A user cannot join more than {max} free organizations."
+        ));
+    }
+    Ok(())
+}
+
 /// Checks if the org exists, otherwise creates the org. Does not associate any user
 /// with the org, only saves the org in the meta and creates org tuples.
 pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::Error> {
@@ -1119,11 +1147,19 @@ pub async fn delete_invite_by_token(org_id: &str, token: &str) -> Result<(), any
 pub async fn generate_invitation(
     org_id: &str,
     user_email: &str,
-    invites: OrganizationInvites,
+    mut invites: OrganizationInvites,
 ) -> Result<OrganizationInviteResponse, anyhow::Error> {
     use org_invites::{get_invite_email_body, get_invite_email_subject};
 
     use super::users::get_user;
+
+    if !invites.role.is_member_role() {
+        return Err(anyhow::anyhow!(INVITE_ROLE_REFUSED));
+    }
+    // Accept and decline look invitations up by the lowercased email.
+    for invitee in invites.invites.iter_mut() {
+        *invitee = invitee.trim().to_lowercase();
+    }
 
     let mut inviter_name = "".to_owned();
     let cfg = get_config();
@@ -1250,7 +1286,9 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
 
     use crate::db::org_users::get_cached_user_org;
 
-    let invite = org_invites::get_by_token_user(invite_token, &user_email.to_lowercase())
+    let user_email = user_email.to_lowercase();
+    let user_email = user_email.as_str();
+    let invite = org_invites::get_by_token_user(invite_token, user_email)
         .await
         .map_err(|e| {
             log::info!("error getting invite token for email {user_email} : {e}");
@@ -1262,6 +1300,11 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     if invite.expires_at < now {
         return Err(anyhow::anyhow!("Invalid token"));
     }
+    let invite_role = UserRole::from_str(&invite.role)
+        .map_err(|_| anyhow::anyhow!("Invalid role: {}", invite.role))?;
+    if !invite_role.is_member_role() {
+        return Err(anyhow::anyhow!(INVITE_ROLE_REFUSED));
+    }
     let org_id = invite.org_id.clone();
     refuse_inactive_invite_org(&org_id).await?;
 
@@ -1269,51 +1312,18 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
         Some(org) => org,
         None => return Err(anyhow::anyhow!("Organization doesn't exist")),
     };
+    refuse_free_org_limit(&org_id, user_email).await?;
 
-    if get_billing_by_org_id(&org_id).await?.is_none() {
-        // if the org user is joining is paid, no issues, we can just let them join
-        // if it is a free org, we must check that the orgs the joining user is already part
-        // of are all paid, as one user cannot be part of more than one free org.
-        let o2cfg = o2_enterprise::enterprise::common::config::get_config();
-        let mut free_org_count = 0;
-        let user_orgs = list_orgs_by_user(user_email).await?;
-        for org in user_orgs {
-            let billings = get_billing_by_org_id(&org.identifier).await?;
-            if billings.is_none() {
-                free_org_count += 1;
-            }
-        }
-        // if we allow the invite the potential count would be max+1 (after accepting)
-        // hence >= instead of >
-        if free_org_count >= o2cfg.cloud.max_free_orgs_allowed {
-            return Err(anyhow::anyhow!(
-                "User is already a part of {} free organization. A user cannot join more than {} free organizations.",
-                o2cfg.cloud.max_free_orgs_allowed,
-                o2cfg.cloud.max_free_orgs_allowed
-            ));
-        }
+    // The database decides: a declined, revoked, accepted or expired invitation changes no row.
+    if !org_invites::claim(invite_token, user_email, OrgInviteStatus::Accepted, now).await? {
+        return Err(anyhow::anyhow!(INVITE_NO_LONGER_VALID));
     }
 
-    // Check if user is already part of the org
     if get_cached_user_org(&org_id, user_email).is_some() {
-        // if already part of org, one way or other, mark as accepted
-        log::info!(
-            "user {user_email} is already part of {org_id} but tried to accept invite, marking it as accepted"
-        );
-        if let Err(e) = org_invites::update_invite_status(
-            invite_token,
-            &user_email.to_lowercase(),
-            OrgInviteStatus::Accepted,
-        )
-        .await
-        {
-            log::error!("Error updating the invite status in the db: {e}");
-        }
-        return Ok(()); // User is already part of the org
+        log::info!("user {user_email} is already part of {org_id}; invite marked accepted");
+        return Ok(());
     }
 
-    let invite_role = UserRole::from_str(&invite.role)
-        .map_err(|_| anyhow::anyhow!("Invalid role: {}", invite.role))?;
     org_users::add(
         &org_id,
         user_email,
@@ -1324,18 +1334,8 @@ pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(
     .await
     .map_err(|e| anyhow::anyhow!("Failed to add user to org : {e}"))?;
 
-    // Add to OFGA
     o2_openfga::authorizer::authz::add_user_to_org(&org_id, user_email, &invite.role).await;
 
-    if let Err(e) = org_invites::update_invite_status(
-        invite_token,
-        &user_email.to_lowercase(),
-        OrgInviteStatus::Accepted,
-    )
-    .await
-    {
-        log::error!("Error updating the invite status in the db: {e}");
-    }
     enqueue_cloud_event(CloudEvent {
         org_id: org.identifier.clone(),
         org_name: org.name.clone(),
@@ -1367,15 +1367,19 @@ pub async fn decline_invitation(
         return Err(anyhow::anyhow!("Invalid token"));
     }
 
-    if let Err(e) = org_invites::update_invite_status(
+    let claimed = org_invites::claim(
         token,
         &user_email.to_lowercase(),
         OrgInviteStatus::Rejected,
+        now,
     )
     .await
-    {
+    .map_err(|e| {
         log::error!("Error updating the invite status in the db: {e}");
-        return Err(anyhow::anyhow!("Error updating status"));
+        anyhow::anyhow!("Error updating status")
+    })?;
+    if !claimed {
+        return Err(anyhow::anyhow!(INVITE_NO_LONGER_VALID));
     }
 
     let invites = match db::user::list_user_invites(user_email).await {

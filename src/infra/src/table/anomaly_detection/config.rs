@@ -292,6 +292,20 @@ pub async fn delete<C: ConnectionTrait>(conn: &C, org_id: &str, anomaly_id: &str
     Ok(())
 }
 
+/// Deletes the config and the detector's Slack thread and watermark rows together, so a
+/// thread row never outlives its detector (an anomaly id is a KSUID, never an alert id).
+pub async fn delete_with_slack_rows<C: TransactionTrait + ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    anomaly_id: &str,
+) -> Result<()> {
+    let txn = conn.begin().await?;
+    delete(&txn, org_id, anomaly_id).await?;
+    crate::table::slack_alert_messages::delete_by_alert_with(&txn, org_id, anomaly_id).await?;
+    txn.commit().await?;
+    Ok(())
+}
+
 pub async fn delete_by_org<C: ConnectionTrait>(conn: &C, org_id: &str) -> Result<()> {
     anomaly_detection_config::Entity::delete_many()
         .filter(anomaly_detection_config::Column::OrgId.eq(org_id))

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { IncidentReachGap } from "@/utils/alerts/deliveryTarget";
+import { formatLargeNumber } from "@/utils/formatters";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { placeLabels } from "../../live/liveCopy";
 import { deniedLine } from "../insightCta";
@@ -77,11 +78,15 @@ const commonPeriod = (rows: ReviewRow[]): number | null => {
   return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 };
 
+/** Whether the list holds more than one kind of alert, so each row must name its own. */
+export const mixedKinds = (kind: BulkKind, rows: ReviewRow[]): boolean =>
+  rows.some((r) => (r.row.kind ?? kind) !== kind);
+
 /** The rule line under the title; the period is the one most rows use. */
 export const ruleOf = (t: TranslateFn, kind: BulkKind, rows: ReviewRow[]): I18nText => {
   const minutes = commonPeriod(rows);
   // A mixed list has no one rule; each row's own "Fires when" says it.
-  const mixed = rows.some((r) => (r.row.kind ?? kind) !== kind);
+  const mixed = mixedKinds(kind, rows);
   const rule = mixed
     ? ""
     : kind === "no_data" || kind === "source"
@@ -134,6 +139,7 @@ export const blockLine = (t: TranslateFn, row: ReviewRow, all: ReviewRow[] = [ro
   }
   if (block.code === "noMatch") return noMatchLine(t, row.stream.name, serviceLabel(t, row, all));
   if (block.code === "noBaseline") {
+    if (row.timedOut) return t("insight.threshold.timedOut");
     return t(`insight.threshold.${block.kind}Reason`, { service: serviceLabel(t, row, all) });
   }
   return t(`insight.bulk.block.noField.${block.part}`, {
@@ -144,15 +150,30 @@ export const blockLine = (t: TranslateFn, row: ReviewRow, all: ReviewRow[] = [ro
 
 const kindOf = (kind: BulkKind, row: ReviewRow): BulkKind => row.row.kind ?? kind;
 
-export const firesWhenOf = (t: TranslateFn, kind: BulkKind, row: ReviewRow): I18nText => {
+/** "traces · default", so a stream named like a folder still reads as a stream. */
+export const streamLabel = (row: ReviewRow): I18nText =>
+  raw(`${row.stream.type} · ${row.stream.name}`);
+
+// The alert compares against the exact threshold, so it is grouped like Usually but never rounded.
+const exact = (locale: string, value: number): string =>
+  new Intl.NumberFormat(locale, { maximumFractionDigits: 20 }).format(value);
+
+export const firesWhenOf = (
+  t: TranslateFn,
+  locale: string,
+  kind: BulkKind,
+  row: ReviewRow,
+): I18nText => {
   const minutes = row.prefill?.periodMinutes;
   if (!row.prefill || !minutes) return raw("");
   const own = kindOf(kind, row);
   if (own === "errors" && row.threshold) {
-    return t("insight.bulk.firesWhen.errors", { count: row.threshold });
+    return t("insight.bulk.firesWhen.errors", { count: exact(locale, row.threshold) });
   }
   if (own === "latency" && row.threshold) {
-    return t("insight.bulk.firesWhen.latency", { value: `${row.threshold} ms` });
+    return t("insight.bulk.firesWhen.latency", {
+      value: `${exact(locale, row.threshold)} ms`,
+    });
   }
   const key = row.stream.type === "traces" ? "noSpans" : "noRows";
   return t(`insight.bulk.firesWhen.${key}`, { duration: durationOf(t, minutes) });
@@ -175,9 +196,10 @@ export const usuallyOf = (
       ? t("insight.bulk.usually", { rate: level(locale, row.usual) })
       : t("insight.bulk.usuallyLatency", { value: number(locale, row.usual) });
   }
+  // The service's traffic, rounded as its suggestion card shows it.
   return row.row.usually === null
     ? raw("")
-    : t("insight.bulk.usually", { rate: number(locale, row.row.usually) });
+    : t("insight.bulk.usually", { rate: formatLargeNumber(Math.round(row.row.usually)) });
 };
 
 /** "Owner: ingest", "No owner yet", a folder name or a cluster. */
@@ -350,6 +372,17 @@ export const existsLine = (t: TranslateFn, row: ReviewRow): I18nText | null => {
     });
   }
   return block?.code === "existsFailed" ? t("insight.bulk.block.existsFailed") : null;
+};
+
+/** The footer while ticked rows still wait, which is why Add is off: "Measuring 2 of 3 alerts…". */
+export const waitingFooter = (t: TranslateFn, ticked: ReviewRow[]): I18nText | null => {
+  const checking = ticked.filter((r) => r.block?.code === "checking").length;
+  const measuring = ticked.filter((r) => r.block?.code === "measuring").length;
+  const count = ticked.length;
+  if (checking && measuring) return t("insight.bulk.waiting.both", { checking, measuring, count });
+  if (!checking && !measuring) return null;
+  const step = checking ? "checking" : "measuring";
+  return t(`insight.bulk.waiting.${step}`, { waiting: checking || measuring, count }, count);
 };
 
 /** The footer's first line while some rows can't be added until the user sets their threshold. */

@@ -1688,6 +1688,7 @@ fn service_route_table() -> Router {
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))
             .route("/{org_id}/anomaly_detection/{config_id}/train", delete(anomaly_detection::cancel_training))
             .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
+            .route("/{org_id}/anomaly_detection/{config_id}/explore", get(anomaly_detection::get_explore))
             .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history))
 
             .route("/v2/{org_id}/alerts/history/summary", get(alerts::history_summary::get_alert_history_summary));
@@ -6155,7 +6156,8 @@ mod tests {
     fn assistant_scope_is_exactly_these_router_routes() {
         use openobserve_api_common::auth::delegation::in_assistant_scope;
 
-        let expected = [
+        #[allow(unused_mut)]
+        let mut expected = vec![
             "GET /v2/{org_id}/alerts",
             "GET /v2/{org_id}/alerts/history",
             "GET /v2/{org_id}/alerts/incidents",
@@ -6223,6 +6225,11 @@ mod tests {
             "POST /{org_id}/prometheus/api/v1/query_range",
             "POST /{org_id}/{stream_name}/_around",
         ];
+        #[cfg(feature = "enterprise")]
+        expected.extend([
+            "GET /v2/{org_id}/autoobserve/incidents",
+            "GET /v2/{org_id}/autoobserve/suggestions",
+        ]);
         assert_eq!(scope_allows(in_assistant_scope), sorted(&expected));
     }
 

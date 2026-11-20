@@ -49,6 +49,8 @@ export const NO_TEAM = "__no_team__";
 export const COLLAPSE_ROWS = 50;
 const OPEN_GROUPS = 2;
 const SCHEMA_READS = 4;
+// A busy traces stream's 7-day read can run past a minute; past this the user types the threshold instead.
+export const MEASURE_TIMEOUT_MS = 20_000;
 
 export type BulkKind = "no_data" | "errors" | "latency" | "source";
 export type GroupBy = "team" | "folder" | "cluster";
@@ -73,8 +75,8 @@ export type ScopeMatches = Record<string, ScopeMatch | null>;
 /** Stream fields by `type/name`; null when they could not be read. */
 export type StreamSchemas = Record<string, string[] | null>;
 
-/** Each errors or latency row's usual level measured over 7 days by row key; null when the week showed none. */
-export type RowBaselines = Record<string, number | null>;
+/** Each errors or latency row's usual level measured over 7 days by row key; null when the week showed none, "timedOut" when the read was given up. */
+export type RowBaselines = Record<string, number | null | "timedOut">;
 
 /** Each stream's field data types by `type/name`, read with its fields. */
 export type StreamTypes = Record<string, Record<string, string>>;
@@ -111,6 +113,8 @@ export interface BulkReviewRequest {
   kind: BulkKind;
   rows: BulkRow[];
   title?: string;
+  /** The batched opener whose passed-over rows this review records; other reviews record none. */
+  batch?: string;
 }
 
 export interface FolderRef {
@@ -138,6 +142,8 @@ export interface ReviewRow {
   usual: number | null;
   /** The errors an hour or p95 in ms above which the alert fires. */
   threshold: number | null;
+  /** The 7-day read ran past MEASURE_TIMEOUT_MS, so the usual level is unknown rather than none. */
+  timedOut: boolean;
 }
 
 export interface ReviewGroup {
@@ -179,6 +185,11 @@ const state = reactive({
   existing: null as ExistingCheck,
   opener: null as HTMLElement | null,
 });
+
+// Rows a closed review left unticked or unbuildable, so a batched opener can offer the next ones.
+const passed = reactive(new Set<string>());
+const passKey = (org: string, batch: string, key: string): string =>
+  [org, batch, key].join("\u0000");
 
 // An older server has no such route: the rights stay unknown and the create itself refuses.
 const servedRights: RightsSource = (org) =>
@@ -269,10 +280,20 @@ interface RowContext {
 }
 
 /** A row still waiting for its fields or its measurement, which may yet be created. */
-const waiting = (block: RowBlock | null): boolean =>
+export const waiting = (block: RowBlock | null): boolean =>
   block?.code === "checking" || block?.code === "measuring";
 
-const positive = (value: number | null | undefined): number | null =>
+/** A no-data row's Usually is the service's traffic; errors and latency measure theirs when the list opens. */
+export const usuallyFor = (
+  kind: BulkKind,
+  trafficPerHour: number | null | undefined,
+): number | null => (kind === "no_data" ? (trafficPerHour ?? null) : null);
+
+// A failed read says nothing about the row, so a batched opener offers it again.
+const lookupFailed = (row: ReviewRow): boolean =>
+  row.block?.code === "existsFailed" || row.block?.code === "schemaFailed";
+
+const positive = (value: unknown): number | null =>
   typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 
 /** The threshold in the order the finding's evidence, the 7-day measurement, what the user typed, then any error. */
@@ -287,10 +308,11 @@ const levelOf = (
   if (usual) return { usual, threshold: measuredThreshold(kind, usual), measured: true };
   const measured = row.key in ctx.baselines;
   const typed = ctx.thresholds[row.key];
-  // The any-error default waits for the week's measurement, which may still find a usual level.
+  // The any-error default needs a week that showed none; an unfinished read may yet have found errors.
+  const none = measured && ctx.baselines[row.key] !== "timedOut";
   return {
     usual: null,
-    threshold: measured ? draftThreshold(kind, null, typed) : usableThreshold(kind, typed),
+    threshold: none ? draftThreshold(kind, null, typed) : usableThreshold(kind, typed),
     measured,
   };
 };
@@ -466,6 +488,7 @@ export const reviewRowsOf = (
       block,
       usual,
       threshold,
+      timedOut: ctx.baselines?.[row.key] === "timedOut",
     };
   });
 
@@ -598,6 +621,10 @@ const collapseDefaults = (): void => {
   );
 };
 
+/** Whether this session closed a review of `org`'s `batch` with the row unticked or unbuildable. */
+export const wasPassed = (org: string, batch: string, key: string): boolean =>
+  passed.has(passKey(org, batch, key));
+
 /** Opens the one review drawer; a no-op on builds without enterprise. */
 export const openBulkReview = (request: BulkReviewRequest): void => {
   if (config.isEnterprise !== "true" || request.rows.length === 0) return;
@@ -628,6 +655,17 @@ const stopLoads = (): void => {
 
 /** Closes the drawer and stops its loads, so no seven-day query runs for a review nobody sees. */
 export const closeBulkReview = (): void => {
+  const batch = state.request?.batch;
+  if (state.open && batch) {
+    const rows = reviewRows.value;
+    // A review of rows all passed before is a batch that started over, so a new round begins.
+    if (rows.every((row) => passed.has(passKey(state.org, batch, row.key))))
+      for (const key of passed)
+        if (key.startsWith(passKey(state.org, batch, ""))) passed.delete(key);
+    for (const row of rows)
+      if (!lookupFailed(row) && (!state.ticked.has(row.key) || !isAddable(row)))
+        passed.add(passKey(state.org, batch, row.key));
+  }
   state.open = false;
   stopLoads();
 };
@@ -780,7 +818,7 @@ const measureRows = async (org: string, load: number, signal: AbortSignal): Prom
     await Promise.all(
       rows.slice(i, i + SCHEMA_READS).map(async (row) => {
         const query = baselineRequestOf(row.kind ?? request.kind, row, ctx());
-        const value = query ? await measureBaseline(org, query, signal) : null;
+        const value = query ? await measureWithin(org, query, signal) : null;
         if (load !== contextLoad) return;
         state.baselines[row.key] = value;
         const now = reviewRows.value.find((r) => r.key === row.key);
@@ -789,6 +827,28 @@ const measureRows = async (org: string, load: number, signal: AbortSignal): Prom
     );
     if (load !== contextLoad) return;
   }
+};
+
+/** One row's measurement, given up and its query cancelled once it runs past MEASURE_TIMEOUT_MS. */
+const measureWithin = (
+  org: string,
+  query: BaselineRequest,
+  signal: AbortSignal,
+): Promise<number | null | "timedOut"> => {
+  const row = new AbortController();
+  const stop = () => row.abort();
+  signal.addEventListener("abort", stop, { once: true });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const cap = new Promise<"timedOut">((resolve) => {
+    timer = setTimeout(() => {
+      resolve("timedOut");
+      row.abort();
+    }, MEASURE_TIMEOUT_MS);
+  });
+  return Promise.race([measureBaseline(org, query, row.signal), cap]).finally(() => {
+    clearTimeout(timer);
+    signal.removeEventListener("abort", stop);
+  });
 };
 
 /** Sets what the user typed for a row the week gave no usual level (NaN when cleared), or null to go back to the default; a creatable row is ticked. */

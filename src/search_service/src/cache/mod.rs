@@ -33,7 +33,7 @@ use config::{
         base64,
         hash::Sum64,
         json,
-        sql::{is_complex_query, is_eligible_for_histogram},
+        sql::{is_complex_query, is_eligible_for_histogram, is_time_splittable},
         time::{format_duration, now_micros, second_micros},
     },
 };
@@ -448,9 +448,8 @@ pub async fn search(
         res.new_end_time = Some(req.query.end_time);
     }
 
-    res.is_histogram_eligible = is_eligible_for_histogram(&req.query.sql, is_multi_stream_search)
-        .ok()
-        .map(|(is_eligible, _)| is_eligible);
+    res.is_histogram_eligible =
+        is_eligible_for_histogram(&req.query.sql, is_multi_stream_search).ok();
 
     // There are 3 types of partial responses:
     // 1. VRL error
@@ -701,6 +700,7 @@ fn is_result_cacheable(
         && sql.histogram_offset == Some(0)
         // #16650: a top-N ranked by another field cannot be split or reused across time ranges
         && !result_utils::is_ranked_by_non_timestamp(&sql.order_by, ts_column)
+        && is_time_splittable(&req.query.sql).unwrap_or(false)
 }
 
 /// Awaits every delta; with `drain` the first error, in any order, aborts the rest and waits.
@@ -1204,15 +1204,16 @@ pub fn apply_vrl_to_response(
             }
             Err(err) => {
                 log::error!("[trace_id {trace_id}] search->vrl: compile err: {err:?}");
-                local_res.function_error.push(err.to_string());
-                local_res.is_partial = true;
+                res.function_error.push(err.to_string());
                 None
             }
         };
         match program {
             Some(program) => {
-                if apply_over_hits {
-                    let (ret_val, err) = transform::apply_vrl_fn(
+                let mut vrl_errors = transform::VrlRunErrors::default();
+                let out: Vec<serde_json::Value> = if apply_over_hits {
+                    let row_count = local_res.hits.len();
+                    let (ret_val, err) = transform::apply_vrl_fn_checked(
                         &mut runtime,
                         &config::meta::function::VRLResultResolver {
                             program: program.program.clone(),
@@ -1222,9 +1223,7 @@ pub fn apply_vrl_to_response(
                         org_id,
                         &[stream_name.to_string()],
                     );
-                    if let Some(e) = err {
-                        log::error!("Error applying vrl function: {e}");
-                    }
+                    vrl_errors.record_rows(row_count, err);
                     ret_val
                         .as_array()
                         .unwrap()
@@ -1232,12 +1231,11 @@ pub fn apply_vrl_to_response(
                         .filter_map(|v| super::flatten_vrl_result(v.clone()))
                         .collect()
                 } else {
-                    let mut error = "".to_string();
-                    let res = local_res
+                    local_res
                         .hits
                         .into_iter()
                         .filter_map(|hit| {
-                            let (ret_val, err) = transform::apply_vrl_fn(
+                            let (ret_val, err) = transform::apply_vrl_fn_checked(
                                 &mut runtime,
                                 &config::meta::function::VRLResultResolver {
                                     program: program.program.clone(),
@@ -1247,17 +1245,16 @@ pub fn apply_vrl_to_response(
                                 org_id,
                                 &[stream_name.to_string()],
                             );
-                            if let Some(e) = err {
-                                error = e;
-                            }
+                            vrl_errors.record(err);
                             super::flatten_vrl_result(ret_val)
                         })
-                        .collect();
-                    if !error.is_empty() {
-                        log::error!("Error applying vrl function: {error}");
-                    }
-                    res
+                        .collect()
+                };
+                if let Some(msg) = vrl_errors.message() {
+                    log::error!("[trace_id {trace_id}] Error applying vrl function: {msg}");
+                    res.function_error.push(msg);
                 }
+                out
             }
             None => local_res.hits,
         }
@@ -1492,6 +1489,110 @@ mod tests {
             .remove(&format!("{org_id}/logs/t"));
     }
 
+    #[tokio::test]
+    async fn test_prepare_needs_time_column_and_time_splittable_sql() {
+        use arrow_schema::{DataType, Field, Schema};
+        use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache};
+
+        let org_id = "time_split_eligibility";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org_id}/logs/t"),
+            SchemaCache::new(Schema::new(vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new("k", DataType::Utf8, true),
+            ])),
+        );
+        // (sql, ts column, eligible)
+        let cases = [
+            (
+                "SELECT k, max(_timestamp) AS _timestamp, count(*) AS c FROM t GROUP BY k",
+                "",
+                false,
+            ),
+            (
+                "SELECT max(_timestamp) AS _timestamp, count(*) AS c FROM t",
+                "",
+                false,
+            ),
+            (
+                "SELECT k AS _timestamp, count(*) AS c FROM t GROUP BY k ORDER BY _timestamp DESC",
+                "",
+                false,
+            ),
+            (
+                "SELECT s._timestamp AS _timestamp, s.c FROM (SELECT max(_timestamp) AS _timestamp, count(*) AS c FROM t) s ORDER BY _timestamp DESC",
+                "",
+                false,
+            ),
+            (
+                "SELECT * FROM t ORDER BY _timestamp DESC LIMIT 10 OFFSET 5",
+                TIMESTAMP_COL_NAME,
+                false,
+            ),
+            (
+                "SELECT _timestamp AS ts, k FROM t WHERE k IN (SELECT k FROM t GROUP BY k HAVING count(*) > 1) ORDER BY ts DESC",
+                "ts",
+                false,
+            ),
+            (
+                "SELECT _timestamp AS ts, row_number() OVER () AS rn FROM t ORDER BY ts DESC",
+                "ts",
+                false,
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 hour') AS ts, sum(count(*)) OVER (ORDER BY histogram(_timestamp, '1 hour')) AS cum FROM t GROUP BY ts ORDER BY ts",
+                "ts",
+                false,
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 hour') AS ts, count(*) AS c FROM t GROUP BY ts",
+                "ts",
+                true,
+            ),
+            (
+                "SELECT * FROM t ORDER BY _timestamp DESC LIMIT 10 OFFSET 0",
+                TIMESTAMP_COL_NAME,
+                true,
+            ),
+        ];
+        for (sql, ts_column, eligible) in cases {
+            for mode in [CacheMode::Bypass, CacheMode::ReadWrite, CacheMode::Refresh] {
+                let mut req = search::Request {
+                    query: search::Query {
+                        sql: sql.to_string(),
+                        start_time: 1_735_689_600_000_000,
+                        end_time: 1_735_776_000_000_000,
+                        size: 100,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                let (prepared, should_exec_query) =
+                    prepare_cache_response(org_id, org_id, StreamType::Logs, &mut req, mode)
+                        .await
+                        .unwrap();
+                let case = format!("sql={sql}, mode={mode:?}");
+                assert!(should_exec_query, "{case}");
+                assert_eq!(prepared.ts_column, ts_column, "{case}");
+                assert_eq!(
+                    !prepared.file_path.is_empty(),
+                    eligible && mode != CacheMode::Bypass,
+                    "{case}"
+                );
+                assert_eq!(
+                    prepared.cache_query_response,
+                    eligible && mode == CacheMode::ReadWrite,
+                    "{case}"
+                );
+                assert!(prepared.cached_response.is_empty(), "{case}");
+            }
+        }
+        STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .remove(&format!("{org_id}/logs/t"));
+    }
+
     #[test]
     fn test_cache_mode_from_request() {
         let cases = [
@@ -1681,6 +1782,105 @@ mod tests {
             "test",
         );
         assert_eq!(hits, vec![json::json!({"nested_value": 42})]);
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_reports_runtime_error_in_function_error() {
+        let mut response = config::meta::search::Response {
+            hits: vec![
+                json::json!({"m": "{\"a\":1}"}),
+                json::json!({"m": "not json"}),
+            ],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some(".x = parse_json!(.m)".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits.len(), 2);
+        assert_eq!(response.function_error.len(), 1);
+        assert!(
+            response.function_error[0].starts_with("Query function failed on 1 of 2 rows: "),
+            "{:?}",
+            response.function_error
+        );
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_reports_compile_error_to_caller() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"m": "x"})],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some(".x = not_a_function(.m)".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"m": "x"})]);
+        assert_eq!(response.function_error.len(), 1);
+        assert!(!response.function_error[0].is_empty());
+        assert!(!response.is_partial);
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_no_function_error_on_success() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"m": "{\"a\":1}"})],
+            ..Default::default()
+        };
+        apply_vrl_to_response(
+            Some(".x = parse_json!(.m)".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert!(response.function_error.is_empty());
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_result_array_runtime_error_fails_every_row() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"a": 1}), json::json!({"a": 2})],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some("#ResultArray#SkipVRL#\n. = parse_json!(\"not json\")".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"a": 1}), json::json!({"a": 2})]);
+        assert_eq!(response.function_error.len(), 1);
+        assert!(
+            response.function_error[0].starts_with("Query function failed on 2 of 2 rows: "),
+            "{:?}",
+            response.function_error
+        );
+    }
+
+    #[test]
+    fn test_apply_vrl_to_response_result_array_success_has_no_function_error() {
+        let mut response = config::meta::search::Response {
+            hits: vec![json::json!({"a": 1}), json::json!({"a": 2})],
+            ..Default::default()
+        };
+        let hits = apply_vrl_to_response(
+            Some("#ResultArray#SkipVRL#\n. = [{\"x\": 1}]".to_string()),
+            &mut response,
+            "default",
+            "test",
+            "test",
+        );
+        assert_eq!(hits, vec![json::json!({"x": 1})]);
+        assert!(response.function_error.is_empty());
     }
 
     #[test]

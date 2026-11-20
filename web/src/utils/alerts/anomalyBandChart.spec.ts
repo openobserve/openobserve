@@ -54,6 +54,7 @@ const row = (tsMs: number, over: Partial<AnomalyBandRow> = {}): AnomalyBandRow =
   upper: null,
   event: null,
   threshold: null,
+  modelVersion: null,
   ...over,
 });
 
@@ -73,6 +74,7 @@ describe("toAnomalyBandRows", () => {
         expected_upper: 11,
         event_value: null,
         threshold_value: 3.4,
+        model_version: 1700000000000000,
       },
     ]);
     expect(rows).toEqual([
@@ -85,6 +87,7 @@ describe("toAnomalyBandRows", () => {
         upper: 11,
         event: null,
         threshold: 3.4,
+        modelVersion: 1700000000000000,
       },
     ]);
   });
