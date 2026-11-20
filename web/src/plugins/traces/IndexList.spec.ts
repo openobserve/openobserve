@@ -268,6 +268,7 @@ function mountIndexList(props: Record<string, unknown> = {}) {
         },
         // FieldRow stub exposes the expansion slot so FieldExpansion renders
         FieldRow: {
+          name: "FieldRow",
           template: '<div class="field_list"><slot name="expansion" :field="field" /></div>',
           props: [
             "field",
@@ -276,7 +277,10 @@ function mountIndexList(props: Record<string, unknown> = {}) {
             "theme",
             "showQuickMode",
             "showVisibilityToggle",
+            "showGroupBy",
+            "grouped",
           ],
+          emits: ["group-by"],
         },
         FieldExpansion: {
           name: "FieldExpansion",
@@ -294,7 +298,10 @@ function mountIndexList(props: Record<string, unknown> = {}) {
             "showMultiSelect",
             "showQuickMode",
             "valueMapper",
+            "showGroupBy",
+            "grouped",
           ],
+          emits: ["group-by"],
         },
         OTable: {
           template: `<div data-test-stub='o-table' :data-test='$attrs["data-test"]'>
@@ -1383,6 +1390,84 @@ describe("IndexList Component", () => {
 
     it("input.max default should be 100000", () => {
       expect(wrapper.vm.duration.input.max).toBe(100000);
+    });
+  });
+
+  describe("Group by shortcut", () => {
+    const fieldList = [
+      { name: "Common", label: true },
+      { name: "_timestamp", showValues: false },
+      { name: "service_name", showValues: true },
+      { name: "http_method", showValues: false },
+    ];
+    const rowProps = (w: VueWrapper) =>
+      Object.fromEntries(
+        w
+          .findAllComponents({ name: "FieldRow" })
+          .map((row) => [
+            row.props("field").name,
+            [row.props("showGroupBy"), row.props("grouped")],
+          ]),
+      );
+
+    afterEach(() => {
+      mockSearchObj.meta.searchMode = "traces";
+      delete (mockSearchObj.meta as any).sqlMode;
+      delete (mockSearchObj.meta as any).groupBy;
+    });
+
+    it("is offered on field rows in the Spans view, but not on header rows or the timestamp", () => {
+      mockSearchObj.meta.searchMode = "spans";
+      (mockSearchObj.meta as any).groupBy = "service_name";
+      wrapper.unmount();
+      wrapper = mountIndexList({ fieldList });
+      expect(rowProps(wrapper)).toEqual({
+        Common: [false, false],
+        _timestamp: [false, false],
+        service_name: [true, true],
+        http_method: [true, false],
+      });
+      const expansions = Object.fromEntries(
+        wrapper
+          .findAllComponents({ name: "FieldExpansion" })
+          .map((e) => [e.props("field").name, [e.props("showGroupBy"), e.props("grouped")]]),
+      );
+      expect(expansions.service_name).toEqual([true, true]);
+      expect(expansions.Common).toEqual([false, false]);
+    });
+
+    it("is not offered in SQL mode or in the Traces view", () => {
+      mockSearchObj.meta.searchMode = "spans";
+      (mockSearchObj.meta as any).sqlMode = true;
+      wrapper.unmount();
+      wrapper = mountIndexList({ fieldList });
+      expect(Object.values(rowProps(wrapper)).every(([shown]) => !shown)).toBe(true);
+      (mockSearchObj.meta as any).sqlMode = false;
+      mockSearchObj.meta.searchMode = "traces";
+      wrapper.unmount();
+      wrapper = mountIndexList({ fieldList });
+      expect(Object.values(rowProps(wrapper)).every(([shown]) => !shown)).toBe(true);
+    });
+
+    it("passes a picked field up from a row and from a field with values", () => {
+      mockSearchObj.meta.searchMode = "spans";
+      wrapper.unmount();
+      wrapper = mountIndexList({ fieldList });
+      wrapper.findAllComponents({ name: "FieldRow" })[3].vm.$emit("group-by", "http_method");
+      wrapper.findAllComponents({ name: "FieldExpansion" })[2].vm.$emit("group-by", "service_name");
+      expect(wrapper.emitted("group-by")).toEqual([["http_method"], ["service_name"]]);
+    });
+
+    it("does nothing when the field already grouped is picked again", () => {
+      mockSearchObj.meta.searchMode = "spans";
+      (mockSearchObj.meta as any).groupBy = "service_name";
+      wrapper.unmount();
+      wrapper = mountIndexList({ fieldList });
+      wrapper.findAllComponents({ name: "FieldExpansion" })[2].vm.$emit("group-by", "service_name");
+      wrapper.findAllComponents({ name: "FieldRow" })[2].vm.$emit("group-by", "service_name");
+      expect(wrapper.emitted("group-by")).toBeUndefined();
+      wrapper.findAllComponents({ name: "FieldRow" })[3].vm.$emit("group-by", "http_method");
+      expect(wrapper.emitted("group-by")).toEqual([["http_method"]]);
     });
   });
 });

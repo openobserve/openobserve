@@ -3629,84 +3629,15 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
-  describe("Scope row under the query editor", () => {
-    const row = () => wrapper.find('[data-test="traces-search-bar-scope-row"]');
-    const select = () => wrapper.findComponent({ name: "TracesScopeSelect" });
-
-    it("holds the Scope select in the Spans view only", async () => {
+  describe("Scope and Group by", () => {
+    it("are not under the query editor; the results bar holds them", async () => {
       searchObjInstance.meta.searchMode = "spans";
-      wrapper = mountSearchBar();
-      await flushPromises();
-      expect(row().exists()).toBe(true);
-      expect(select().props()).toMatchObject({
-        modelValue: "all",
-        sqlMode: false,
-        hasParentColumn: false,
-      });
-
-      searchObjInstance.meta.searchMode = "traces";
-      await flushPromises();
-      expect(row().exists()).toBe(false);
-    });
-
-    it("sits under the query editor", async () => {
-      searchObjInstance.meta.searchMode = "spans";
-      wrapper = mountSearchBar();
-      await flushPromises();
-      const editor = wrapper.find('[data-test="code-query-editor-stub"]').element;
-      const position = editor.compareDocumentPosition(row().element);
-      expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    });
-
-    it("passes the stream's parent column to the select", async () => {
-      searchObjInstance.meta.searchMode = "spans";
-      searchObjInstance.data.stream.hasParentColumn = true;
-      wrapper = mountSearchBar();
-      await flushPromises();
-      expect(select().props()).toMatchObject({ sqlMode: false, hasParentColumn: true });
-    });
-
-    it("hides the row in SQL mode and shows it again when SQL turns off", async () => {
-      searchObjInstance.meta.searchMode = "spans";
-      searchObjInstance.meta.sqlMode = true;
-      wrapper = mountSearchBar();
-      await flushPromises();
-      expect(row().exists()).toBe(false);
       searchObjInstance.meta.sqlMode = false;
-      await flushPromises();
-      expect(row().exists()).toBe(true);
-    });
-
-    it("holds the Group by select after Scope, listing the stream's fields", async () => {
-      searchObjInstance.meta.searchMode = "spans";
       wrapper = mountSearchBar();
       await flushPromises();
-      const groupBy = wrapper.findComponent({ name: "TracesGroupBySelect" });
-      expect(groupBy.props()).toMatchObject({
-        modelValue: "",
-        sqlMode: false,
-        fields: ["timestamp", "trace_id", "span_id", "service_name"],
-      });
-      const position = select().element.compareDocumentPosition(groupBy.element);
-      expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    });
-
-    it("asks the page to apply a picked Group by", async () => {
-      searchObjInstance.meta.searchMode = "spans";
-      wrapper = mountSearchBar();
-      await flushPromises();
-      wrapper
-        .findComponent({ name: "TracesGroupBySelect" })
-        .vm.$emit("update:modelValue", "service_name");
-      expect(wrapper.emitted("update:groupBy")).toEqual([["service_name"]]);
-    });
-
-    it("asks the page to apply a picked scope", async () => {
-      searchObjInstance.meta.searchMode = "spans";
-      wrapper = mountSearchBar();
-      await flushPromises();
-      select().vm.$emit("update:modelValue", "root");
-      expect(wrapper.emitted("update:scope")).toEqual([["root"]]);
+      expect(wrapper.find('[data-test="traces-search-bar-scope-row"]').exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "TracesScopeSelect" }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "TracesGroupBySelect" }).exists()).toBe(false);
     });
   });
 

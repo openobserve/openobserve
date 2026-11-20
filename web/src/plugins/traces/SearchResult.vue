@@ -19,10 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="traces-search-result" class="h-full overflow-hidden">
     <div class="bg-card-glass-bg @container/results flex h-full flex-col overflow-hidden">
+      <!-- Scope and Group by need about 64rem on one row, so the bar splits into two rows sooner while they show. -->
       <div
         v-if="showHeader"
         data-test="traces-section-header"
-        class="border-border-default relative flex h-9 shrink-0 items-center border-b px-[0.4rem]! max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5 @max-[58rem]/results:h-auto @max-[58rem]/results:min-h-9 @max-[58rem]/results:flex-wrap @max-[58rem]/results:gap-y-1 @max-[58rem]/results:py-0.5"
+        class="border-border-default relative flex h-9 shrink-0 items-center border-b px-[0.4rem]! max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
+        :class="
+          spanControlsShown
+            ? '@max-[64rem]/results:h-auto @max-[64rem]/results:min-h-9 @max-[64rem]/results:flex-wrap @max-[64rem]/results:gap-y-1 @max-[64rem]/results:py-0.5'
+            : '@max-[58rem]/results:h-auto @max-[58rem]/results:min-h-9 @max-[58rem]/results:flex-wrap @max-[58rem]/results:gap-y-1 @max-[58rem]/results:py-0.5'
+        "
       >
         <!-- Field panel toggle — same style as logs page -->
         <OButton
@@ -132,13 +138,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="warning" size="sm" />
           <OTooltip :content="t('traces.sqlMode.partialResults')" side="top" align="center" />
         </span>
+        <div
+          v-if="spanControlsShown"
+          class="flex shrink-0 items-center gap-2"
+          data-test="traces-search-result-span-controls"
+        >
+          <span class="ms-2.5 flex h-4 items-center" aria-hidden="true">
+            <OSeparator vertical />
+          </span>
+          <TracesScopeSelect
+            :model-value="searchObj.meta.scope"
+            :has-parent-column="!!searchObj.data.stream.hasParentColumn"
+            @update:model-value="(scope) => $emit('update:scope', scope)"
+          />
+          <TracesGroupBySelect
+            :model-value="searchObj.meta.groupBy"
+            :fields="groupByFields"
+            :count="groupsShown ? groupsCount : null"
+            @update:model-value="(field) => $emit('update:groupBy', field)"
+          />
+        </div>
 
         <div
-          class="hidden basis-full @max-[58rem]/results:block"
+          class="hidden basis-full"
+          :class="spanControlsShown ? '@max-[64rem]/results:block' : '@max-[58rem]/results:block'"
           aria-hidden="true"
           data-test="traces-search-result-header-break"
         />
-        <div class="flex min-w-0 flex-1 items-center px-2 @max-[58rem]/results:flex-none">
+        <div
+          class="flex min-w-0 flex-1 items-center px-2"
+          :class="
+            spanControlsShown ? '@max-[64rem]/results:flex-none' : '@max-[58rem]/results:flex-none'
+          "
+        >
           <ORegionStatus
             :noun="regionNoun"
             :elapsed-seconds="region.elapsedSeconds.value"
@@ -147,7 +179,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="me-1 flex min-w-0 items-center justify-end @max-[58rem]/results:flex-1 @min-[58rem]/results:min-w-33"
+          class="me-1 flex min-w-0 items-center justify-end"
+          :class="
+            spanControlsShown
+              ? '@max-[64rem]/results:flex-1 @min-[64rem]/results:min-w-33'
+              : '@max-[58rem]/results:flex-1 @min-[58rem]/results:min-w-33'
+          "
           data-test="traces-search-result-data-age"
         >
           <div
@@ -300,6 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :wrap="searchObj.meta.resultGrid.wrapCells"
           @update:sort="(sort) => (searchObj.meta.groupsSort = sort)"
           @open-group="(term: string) => $emit('open-group', term)"
+          @update:count="(count: number | null) => (groupsCount = count)"
         />
         <TracesSearchResultList
           v-else
@@ -361,6 +399,9 @@ import { useRouter } from "vue-router";
 import TracesSearchResultList from "./components/TracesSearchResultList.vue";
 import TracesSqlResultTable from "./components/TracesSqlResultTable.vue";
 import TracesGroupsTable from "./components/TracesGroupsTable.vue";
+import TracesScopeSelect from "./components/TracesScopeSelect.vue";
+import TracesGroupBySelect from "./components/TracesGroupBySelect.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { buildGroupsColumns } from "./composables/tracesGroupsColumns";
 import { buildResultColumns, fillLastColumn } from "./composables/useTracesTableColumns";
 import {
@@ -415,6 +456,9 @@ export default defineComponent({
     TracesSearchResultList,
     TracesSqlResultTable,
     TracesGroupsTable,
+    TracesScopeSelect,
+    TracesGroupBySelect,
+    OSeparator,
     OEmptyState,
     EmptyStateActionCard,
     TracesMetricsPlaceholder,
@@ -473,6 +517,8 @@ export default defineComponent({
     "add-trace-id",
     "run-sql",
     "open-group",
+    "update:scope",
+    "update:groupBy",
   ],
   methods: {
     toggleErrorOnly() {
@@ -775,6 +821,22 @@ export default defineComponent({
         !searchObj.meta.sqlMode,
     );
 
+    // Scope and Group by narrow the filter's span list, so SQL mode and the Traces view have neither.
+    const spanControlsShown = computed(
+      () => searchObj.meta.searchMode === "spans" && !searchObj.meta.sqlMode,
+    );
+
+    // Field grouping adds header rows (label: true) between the fields; they name no column.
+    const groupByFields = computed(() => [
+      ...new Set(
+        (searchObj.data.stream.selectedStreamFields ?? [])
+          .filter((field: any) => !field.label && field.name)
+          .map((field: any) => String(field.name)),
+      ),
+    ]);
+
+    const groupsCount = ref<number | null>(null);
+
     const groupsColumns = computed(() => {
       if (!groupsShown.value) return [];
       const cols = buildGroupsColumns(searchObj.data.groupsRequest?.key ?? "", t);
@@ -966,6 +1028,9 @@ export default defineComponent({
       changeSortBy,
       rowsPerPageOptions,
       groupsShown,
+      spanControlsShown,
+      groupByFields,
+      groupsCount,
       groupsColumns,
       totalPages,
       openComparison,

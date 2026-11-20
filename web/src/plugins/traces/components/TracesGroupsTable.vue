@@ -205,6 +205,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   "update:sort": [sort: GroupsSort];
   "open-group": [term: string];
+  "update:count": [count: number | null];
 }>();
 
 const { t } = useI18nTyped();
@@ -302,6 +303,12 @@ const load = async () => {
 };
 
 watch(() => [props.request, props.sort], load, { immediate: true });
+// Past the row limit the table shows only the top groups, so the count is the distinct total.
+watch(
+  () => (loading.value || error.value ? null : Math.max(rows.value.length, distinct.value ?? 0)),
+  (count) => emit("update:count", count),
+  { immediate: true },
+);
 
 onBeforeUnmount(() => {
   loadSeq++;

@@ -175,7 +175,19 @@ const globalOptions = {
       name: "TracesGroupsTable",
       template: '<div data-test="traces-groups-stub"></div>',
       props: ["request", "sort", "columns", "wrap"],
-      emits: ["update:sort"],
+      emits: ["update:sort", "update:count"],
+    },
+    TracesScopeSelect: {
+      name: "TracesScopeSelect",
+      template: '<div data-test="traces-scope-stub"></div>',
+      props: ["modelValue", "hasParentColumn"],
+      emits: ["update:modelValue"],
+    },
+    TracesGroupBySelect: {
+      name: "TracesGroupBySelect",
+      template: '<div data-test="traces-group-by-stub"></div>',
+      props: ["modelValue", "fields", "count"],
+      emits: ["update:modelValue"],
     },
     TracesSqlResultTable: {
       name: "TracesSqlResultTable",
@@ -357,6 +369,99 @@ describe("SearchResult", () => {
       await flushPromises();
       expect(groups().exists()).toBe(false);
       (mockSearchObj.meta as any).sqlMode = false;
+    });
+  });
+
+  describe("Scope and Group by in the results bar", () => {
+    const scope = () => wrapper.findComponent({ name: "TracesScopeSelect" });
+    const groupBy = () => wrapper.findComponent({ name: "TracesGroupBySelect" });
+    const remount = async () => {
+      wrapper.unmount();
+      wrapper = mount(SearchResult, { global: globalOptions });
+      await flushPromises();
+    };
+
+    beforeEach(async () => {
+      mockSearchObj.meta.searchMode = "spans";
+      (mockSearchObj.meta as any).scope = "root";
+      (mockSearchObj.meta as any).groupBy = "";
+      (mockSearchObj.data.stream as any).hasParentColumn = true;
+      (mockSearchObj.data.stream as any).selectedStreamFields = [
+        { name: "Common", label: true },
+        { name: "service_name" },
+        { name: "http_method" },
+        { name: "service_name" },
+      ];
+      await remount();
+    });
+
+    afterEach(() => {
+      mockSearchObj.meta.searchMode = undefined;
+      (mockSearchObj.meta as any).sqlMode = false;
+      delete (mockSearchObj.meta as any).scope;
+      delete (mockSearchObj.meta as any).groupBy;
+      delete (mockSearchObj.data.stream as any).hasParentColumn;
+      delete (mockSearchObj.data.stream as any).selectedStreamFields;
+      (mockSearchObj.data as any).groupsRequest = null;
+    });
+
+    it("sit after the count chips in the Spans view, with the scope and the stream's fields", () => {
+      const header = wrapper.get('[data-test="traces-section-header"]');
+      const controls = wrapper.get('[data-test="traces-search-result-span-controls"]');
+      expect(header.element.contains(controls.element)).toBe(true);
+      const count = wrapper.get('[data-test="traces-count-badge"]').element;
+      expect(
+        count.compareDocumentPosition(controls.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(scope().props()).toMatchObject({ modelValue: "root", hasParentColumn: true });
+      expect(groupBy().props()).toMatchObject({
+        modelValue: "",
+        fields: ["service_name", "http_method"],
+        count: null,
+      });
+    });
+
+    it("are hidden in SQL mode and in the Traces view", async () => {
+      (mockSearchObj.meta as any).sqlMode = true;
+      await flushPromises();
+      expect(scope().exists()).toBe(false);
+      expect(groupBy().exists()).toBe(false);
+      (mockSearchObj.meta as any).sqlMode = false;
+      mockSearchObj.meta.searchMode = "traces";
+      await flushPromises();
+      expect(wrapper.find('[data-test="traces-search-result-span-controls"]').exists()).toBe(false);
+    });
+
+    it("split the header into two rows from a wider results pane while they show", async () => {
+      const header = () => wrapper.get('[data-test="traces-section-header"]');
+      const rowBreak = () => wrapper.get('[data-test="traces-search-result-header-break"]');
+      expect(header().classes()).toContain("@max-[64rem]/results:flex-wrap");
+      expect(rowBreak().classes()).toContain("@max-[64rem]/results:block");
+      (mockSearchObj.meta as any).sqlMode = true;
+      await flushPromises();
+      expect(header().classes()).toContain("@max-[58rem]/results:flex-wrap");
+      expect(header().classes()).not.toContain("@max-[64rem]/results:flex-wrap");
+      expect(rowBreak().classes()).toContain("@max-[58rem]/results:block");
+    });
+
+    it("ask the page to apply a picked scope or Group by", () => {
+      scope().vm.$emit("update:modelValue", "entrypoint");
+      groupBy().vm.$emit("update:modelValue", "http_method");
+      groupBy().vm.$emit("update:modelValue", "");
+      expect(wrapper.emitted("update:scope")).toEqual([["entrypoint"]]);
+      expect(wrapper.emitted("update:groupBy")).toEqual([["http_method"], [""]]);
+    });
+
+    it("pass the Groups table's count to the chip while the groups are shown", async () => {
+      (mockSearchObj.meta as any).groupBy = "service_name";
+      (mockSearchObj.data as any).groupsRequest = { key: "service_name", runId: 1 };
+      await flushPromises();
+      wrapper.findComponent({ name: "TracesGroupsTable" }).vm.$emit("update:count", 7);
+      await flushPromises();
+      expect(groupBy().props("count")).toBe(7);
+      (mockSearchObj.data as any).groupsRequest = null;
+      await flushPromises();
+      expect(groupBy().props("count")).toBe(null);
     });
   });
 
@@ -680,6 +785,8 @@ describe("SearchResult", () => {
         "add-trace-id",
         "run-sql",
         "open-group",
+        "update:scope",
+        "update:groupBy",
       ];
 
       expect(wrapper.vm.$options.emits).toEqual(expectedEmits);
@@ -1430,15 +1537,15 @@ describe("SearchResult header through a re-run (T-3)", () => {
     const dataAge = wrapper.find('[data-test="traces-search-result-data-age"]');
 
     expect(header.element.parentElement?.classList).toContain("@container/results");
-    expect(header.classes()).toContain("@max-[58rem]/results:flex-wrap");
+    expect(header.classes()).toContain("@max-[64rem]/results:flex-wrap");
     expect(rowBreak.classes()).toEqual(
-      expect.arrayContaining(["hidden", "basis-full", "@max-[58rem]/results:block"]),
+      expect.arrayContaining(["hidden", "basis-full", "@max-[64rem]/results:block"]),
     );
     expect(rowBreak.element.nextElementSibling?.classList).toContain(
-      "@max-[58rem]/results:flex-none",
+      "@max-[64rem]/results:flex-none",
     );
     expect(dataAge.classes()).toEqual(
-      expect.arrayContaining(["min-w-0", "@max-[58rem]/results:flex-1"]),
+      expect.arrayContaining(["min-w-0", "@max-[64rem]/results:flex-1"]),
     );
 
     (mockSearchObj.meta as any).refreshFailedAt = Date.UTC(2026, 10, 1, 10, 47);

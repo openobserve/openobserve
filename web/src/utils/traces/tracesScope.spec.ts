@@ -39,15 +39,15 @@ describe("scopePredicate", () => {
     expect(scopePredicate("root", false)).toBe("");
   });
 
-  it("takes server and consumer spans plus any root for Entrypoint spans", () => {
+  it("takes server and consumer spans plus any root for Entry-point spans", () => {
     expect(scopePredicate("entrypoint", true)).toBe(`(${KINDS} OR ${ROOT})`);
   });
 
-  it("uses the kind test alone for Entrypoint spans without reference_parent_span_id", () => {
+  it("uses the kind test alone for Entry-point spans without reference_parent_span_id", () => {
     expect(scopePredicate("entrypoint", false)).toBe(`(${KINDS})`);
   });
 
-  it("is the Services catalog request rule for Entrypoint spans", () => {
+  it("is the Services catalog request rule for Entry-point spans", () => {
     expect(scopePredicate("entrypoint", true)).toBe(entrypointPredicate(true));
     expect(scopePredicate("entrypoint", false)).toBe(entrypointPredicate(false));
   });

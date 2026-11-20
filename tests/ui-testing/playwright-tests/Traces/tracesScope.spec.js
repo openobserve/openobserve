@@ -1,5 +1,5 @@
 // tracesScope.spec.js
-// Scope select under the query editor in the Spans view, and the results Columns button.
+// Scope switch in the Spans view results bar, and the results Columns button.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -45,7 +45,7 @@ test.describe("Traces scope select testcases", () => {
   test("P1: Root spans narrows the list request, and the link restores the select", {
     tag: ['@tracesScope', '@traces', '@query', '@P1', '@all']
   }, async ({ page }) => {
-    await expect(pm.tracesPage.getScopeValue()).toHaveText('All spans');
+    await expect(pm.tracesPage.getScopeValue()).toHaveAttribute('aria-label', 'All spans');
     const capture = pm.tracesPage.captureSearchRequests();
 
     await pm.tracesPage.pickScope('root');
@@ -60,7 +60,7 @@ test.describe("Traces scope select testcases", () => {
 
     await page.reload();
     await pm.tracesPage.isStreamSelectVisible();
-    await expect(pm.tracesPage.getScopeValue()).toHaveText('Root spans', { timeout: 20000 });
+    await expect(pm.tracesPage.getScopeValue()).toHaveAttribute('aria-label', 'Root spans', { timeout: 20000 });
   });
 
   test("P2: Reset returns the scope to All spans and drops it from the link", {
@@ -71,7 +71,7 @@ test.describe("Traces scope select testcases", () => {
 
     await pm.tracesPage.resetAllFilters();
 
-    await expect(pm.tracesPage.getScopeValue()).toHaveText('All spans');
+    await expect(pm.tracesPage.getScopeValue()).toHaveAttribute('aria-label', 'All spans');
     await expect(page).not.toHaveURL(/[?&]scope=/, { timeout: 10000 });
   });
 
@@ -80,7 +80,7 @@ test.describe("Traces scope select testcases", () => {
   }, async () => {
     await pm.tracesPage.setQueryEditorValue('');
     await pm.tracesPage.pickScope('root');
-    await expect(pm.tracesPage.getScopeValue()).toHaveText('Root spans');
+    await expect(pm.tracesPage.getScopeValue()).toHaveAttribute('aria-label', 'Root spans');
 
     await pm.tracesPage.toggleSqlModeFromToolbar();
 

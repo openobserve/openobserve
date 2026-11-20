@@ -1445,6 +1445,7 @@
     "queryEditorLabel": "Query Editor:",
     "addFieldToTable": "Add field to table",
     "removeFieldFromTable": "Remove field from table",
+    "groupByThisField": "Group by this field",
     "rows": "rows",
     "resetFields": "Reset selected table fields",
     "metrics": "Metrics",
@@ -17329,8 +17330,9 @@
   "traces": {
     "groups": {
       "label": "Group by",
-      "none": "None",
-      "sqlModeDisabled": "Write GROUP BY in SQL mode",
+      "grouped": "Grouped by {field}",
+      "count": "{count} group | {count} groups",
+      "clear": "Clear Group by",
       "spans": "Spans",
       "errors": "Errors",
       "errorPct": "Error %",
@@ -17353,10 +17355,16 @@
       "allDesc": "Every span that matches the filter",
       "root": "Root spans",
       "rootDesc": "Spans with no parent, where each trace starts",
-      "entrypoint": "Entrypoint spans",
+      "entrypoint": "Entry-point spans",
       "entrypointDesc": "Server or consumer spans, plus any root span",
       "rootUnavailable": "This stream has no reference_parent_span_id field",
-      "sqlModeDisabled": "Put the scope condition in your SQL WHERE"
+      "allShort": "All",
+      "rootShort": "Root",
+      "entrypointShort": "Entry",
+      "allHint": "Every span in the time range",
+      "rootHint": "Only the first span of each trace",
+      "entrypointHint": "Server and consumer spans, plus roots",
+      "chip": "Scope: {scope}"
     },
     "sqlMode": {
       "indicator": "SQL",

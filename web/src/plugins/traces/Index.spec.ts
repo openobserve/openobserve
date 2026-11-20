@@ -2456,32 +2456,31 @@ describe("Index.vue (Main Traces Page)", () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
       const bar = wrapper.findComponent('[data-test="logs-search-bar"]');
-      // The Spans view adds its 40px scope row under the query.
       bar.vm.$emit("filterBuilderGrowth", 54);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 40 + 54);
+      expect(wrapper.vm.splitterModel).toBe(90 + 54);
       bar.vm.$emit("filterBuilderGrowth", null);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 40);
+      expect(wrapper.vm.splitterModel).toBe(90);
     });
 
-    it("should keep the reserved row slot when the builder changes in the same tick as leaving the Spans view", async () => {
+    it("should keep one pane height when the builder changes in the same tick as leaving the Spans view", async () => {
       wrapper = mountWithSearchBarStub();
       await flushPromises();
       const bar = wrapper.findComponent('[data-test="logs-search-bar"]');
       bar.vm.$emit("filterBuilderGrowth", 0);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 40);
+      expect(wrapper.vm.splitterModel).toBe(90);
       bar.vm.$emit("filterBuilderGrowth", 18);
       mockSearchObj.meta.searchMode = "traces";
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 40 + 18);
+      expect(wrapper.vm.splitterModel).toBe(90 + 18);
       bar.vm.$emit("filterBuilderGrowth", null);
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 40);
+      expect(wrapper.vm.splitterModel).toBe(90);
       mockSearchObj.meta.searchMode = "spans";
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(90 + 40);
+      expect(wrapper.vm.splitterModel).toBe(90);
     });
 
     it("should render the drill-down target in the search tab", async () => {
@@ -2663,8 +2662,7 @@ describe("Index.vue (Main Traces Page)", () => {
 
       await flushPromises();
 
-      // 90px for the search bar, plus 40px for the Scope row of the default Spans view.
-      expect(wrapper.vm.splitterModel).toBe(130);
+      expect(wrapper.vm.splitterModel).toBe(90);
     });
 
     it("should render the second-level container with full-height class", async () => {
@@ -5918,18 +5916,18 @@ describe("Index.vue (Main Traces Page)", () => {
         await flushPromises();
       };
       await showSql("a = 1\nAND b = 2\nAND c = 3", false);
-      expect(wrapper.vm.splitterModel).toBe(130);
+      expect(wrapper.vm.splitterModel).toBe(90);
       await showSql(`SELECT trace_id FROM "default"\nGROUP BY trace_id\nHAVING count(*) > 200`);
-      expect(wrapper.vm.splitterModel).toBe(130);
+      expect(wrapper.vm.splitterModel).toBe(90);
       await showSql(Array.from({ length: 13 }, (_, i) => `-- ${i}`).join("\n"));
-      expect(wrapper.vm.splitterModel).toBe(130);
+      expect(wrapper.vm.splitterModel).toBe(90);
       mockSearchObj.meta.sqlMode = false;
       mockSearchObj.meta.searchMode = "traces";
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(130);
+      expect(wrapper.vm.splitterModel).toBe(90);
       mockSearchObj.meta.searchMode = "spans";
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(130);
+      expect(wrapper.vm.splitterModel).toBe(90);
     });
 
     it("keeps a dragged pane height across SQL and view toggles", async () => {
@@ -5948,16 +5946,16 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(wrapper.vm.splitterModel).toBe(250);
     });
 
-    it("keeps the pane height when SQL turns on and off, giving the Scope row's space to the editor", async () => {
+    it("keeps the pane height when SQL turns on and off", async () => {
       await mountSql();
       mockSearchObj.data.editorValue = "SELECT 1";
-      expect(wrapper.vm.splitterModel).toBe(130);
+      expect(wrapper.vm.splitterModel).toBe(90);
       mockSearchObj.meta.sqlMode = true;
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(130);
+      expect(wrapper.vm.splitterModel).toBe(90);
       mockSearchObj.meta.sqlMode = false;
       await flushPromises();
-      expect(wrapper.vm.splitterModel).toBe(130);
+      expect(wrapper.vm.splitterModel).toBe(90);
 
       wrapper.vm.splitterModel = 220;
       mockSearchObj.meta.sqlMode = true;
@@ -6449,29 +6447,12 @@ describe("Index.vue (Main Traces Page)", () => {
       it("runs the Spans view again from page 1 when the scope is picked", async () => {
         await mountScoped("all");
         mockSearchObj.data.resultGrid.currentPage = 3;
-        wrapper.findComponent({ name: "search-bar" }).vm.$emit("update:scope", "root");
+        wrapper.findComponent(SearchResultStub).vm.$emit("update:scope", "root");
         await flushPromises();
         expect(mockSearchObj.meta.scope).toBe("root");
         expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
         const [request] = ownCalls().at(-1)!;
         expect(b64DecodeUnicode(request.queryReq.query.sql)).toContain(`WHERE ${ROOT}`);
-      });
-
-      it("reserves the Scope row slot only while the query editor is shown", async () => {
-        await mountSql();
-        expect(wrapper.vm.splitterModel).toBe(130);
-        mockSearchObj.meta.searchMode = "traces";
-        await flushPromises();
-        expect(wrapper.vm.splitterModel).toBe(130);
-        mockSearchObj.meta.showQuery = false;
-        await flushPromises();
-        expect(wrapper.vm.splitterModel).toBe(90);
-        mockSearchObj.meta.showQuery = true;
-        await flushPromises();
-        expect(wrapper.vm.splitterModel).toBe(130);
-        mockSearchObj.meta.searchMode = "spans";
-        await flushPromises();
-        expect(wrapper.vm.splitterModel).toBe(130);
       });
 
       it("reads whether the stream records reference_parent_span_id", async () => {
@@ -6561,17 +6542,27 @@ describe("Index.vue (Main Traces Page)", () => {
       it("runs at once from page 1 when a field is picked, and back to the list on None", async () => {
         await mountSql();
         mockSearchObj.data.resultGrid.currentPage = 2;
-        wrapper.findComponent({ name: "search-bar" }).vm.$emit("update:groupBy", "http_method");
+        wrapper.findComponent(SearchResultStub).vm.$emit("update:groupBy", "http_method");
         await flushPromises();
         expect(mockSearchObj.meta.groupBy).toBe("http_method");
         expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
         expect(mockSearchObj.data.groupsRequest?.key).toBe("http_method");
 
         mockFetchQueryDataWithHttpStream.mockClear();
-        wrapper.findComponent({ name: "search-bar" }).vm.$emit("update:groupBy", "");
+        wrapper.findComponent(SearchResultStub).vm.$emit("update:groupBy", "");
         await flushPromises();
         expect(mockSearchObj.data.groupsRequest).toBeNull();
         expect(ownSqls()[0]).toMatch(/^SELECT \* FROM "default"/);
+      });
+
+      it("groups by a field picked from the field list", async () => {
+        await mountSql();
+        mockSearchObj.data.resultGrid.currentPage = 2;
+        wrapper.findComponent({ name: "index-list" }).vm.$emit("group-by", "http_method");
+        await flushPromises();
+        expect(mockSearchObj.meta.groupBy).toBe("http_method");
+        expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
+        expect(mockSearchObj.data.groupsRequest?.key).toBe("http_method");
       });
 
       it("opening a group runs the filtered span list at once, even with auto-run off", async () => {

@@ -77,8 +77,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filters-reset="onFiltersReset"
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
-              @update:scope="onScopeChange"
-              @update:groupBy="onGroupByChange"
               @apply-saved-view="onApplySavedView"
               @recent-restore="onRecentRestore"
               :refresh-loading="activeHealthView?.loading ?? false"
@@ -150,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="h-full"
                       @update:changeStream="onChangeStream"
                       @update:selectedFields="updateFieldVisibility"
+                      @group-by="onGroupByChange"
                     />
                   </div>
                 </template>
@@ -318,6 +317,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @add-trace-id="onSqlAddTraceId"
                         @run-sql="onSqlRewriteRun"
                         @open-group="onOpenGroup"
+                        @update:scope="onScopeChange"
+                        @update:groupBy="onGroupByChange"
                       />
                     </div>
                   </div>
@@ -350,6 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="h-full"
           @update:changeStream="onChangeStream"
           @update:selectedFields="updateFieldVisibility"
+          @group-by="onGroupByChange"
         />
       </div>
     </ODrawer>
@@ -577,15 +579,7 @@ const activeHealthView = computed(() =>
       ? servicesCatalogRef.value
       : null,
 );
-const SCOPE_ROW_PX = 40;
-// Every view with the editor reserves the Scope row's height, so toggling SQL or the view never moves the results.
-const scopeRowSlotPx = () =>
-  searchObj.meta.showQuery &&
-  searchObj.meta.searchMode !== "service-graph" &&
-  searchObj.meta.searchMode !== "services-catalog"
-    ? SCOPE_ROW_PX
-    : 0;
-const splitterModel = ref(90 + scopeRowSlotPx());
+const splitterModel = ref(90);
 const fieldValues = ref({});
 
 const { isMobile, isTablet } = useBreakpoint();
@@ -595,12 +589,12 @@ watch(
   (mobile, wasMobile) => {
     if (mobile) {
       searchObj.config.splitterModel = 0;
-      splitterModel.value = 150 + scopeRowSlotPx();
+      splitterModel.value = 150;
     } else if (wasMobile) {
       if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
         searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
       }
-      splitterModel.value = 90 + scopeRowSlotPx();
+      splitterModel.value = 90;
     }
   },
   { immediate: true },
@@ -610,23 +604,13 @@ const filterBuilderGrowth = ref<number | null>(null);
 let autoSplitterHeight = 0;
 // The query pane grows with the builder and shrinks back, but never overrides a larger user-set height.
 watch([filterBuilderGrowth, isMobile], ([growth, mobile]) => {
-  const base = (mobile ? 150 : 90) + scopeRowSlotPx();
+  const base = mobile ? 150 : 90;
   const target = base + (growth ?? 0);
   if (splitterModel.value < target || splitterModel.value <= Math.max(base, autoSplitterHeight)) {
     splitterModel.value = target;
   }
   autoSplitterHeight = target;
 });
-// Sync: the builder watcher reads the new slot, so the heights it compares must already include it.
-watch(
-  scopeRowSlotPx,
-  (px, was) => {
-    splitterModel.value += px - was;
-    if (autoSplitterHeight) autoSplitterHeight += px - was;
-    onSplitterUpdate();
-  },
-  { flush: "sync" },
-);
 // md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
 let preTabletSplitter: number | null = null;
 watch(

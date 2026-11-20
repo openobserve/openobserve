@@ -76,8 +76,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :theme="store.state.theme"
             :show-quick-mode="false"
             :show-visibility-toggle="row.enableVisibility"
+            :show-group-by="groupByOffered(row)"
+            :grouped="groupByOffered(row) && searchObj.meta.groupBy === row.name"
             @add-to-filter="addToFilter(`${row.name}=''`)"
             @toggle-field="toggleField"
+            @group-by="groupByField"
           >
             <template #expansion="{ field }">
               <FieldExpansion
@@ -92,6 +95,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :show-visibility-toggle="row.enableVisibility"
                 :show-filter-icon="!searchObj.meta.sqlMode"
                 :show-quick-mode="false"
+                :show-group-by="groupByOffered(field)"
+                :grouped="groupByOffered(field) && searchObj.meta.groupBy === field.name"
                 :default-values-count="defaultValuesCount"
                 :value-mapper="getValueMapper(field.name)"
                 @add-to-filter="(val: string) => addSearchTerm(val)"
@@ -105,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @load-more-values="handleLoadMoreValues"
                 @before-show="openFilterCreator"
                 @before-hide="cancelFilterCreator"
+                @group-by="groupByField"
               >
                 <template v-if="field.name !== 'duration'" #caption>
                   <div
@@ -271,7 +277,7 @@ export default defineComponent({
     ),
     FieldExpansion: defineAsyncComponent(() => import("@/components/common/FieldExpansion.vue")),
   },
-  emits: ["update:changeStream", "update:selectedFields"],
+  emits: ["update:changeStream", "update:selectedFields", "group-by"],
   props: {
     fieldList: {
       type: Array,
@@ -398,6 +404,18 @@ export default defineComponent({
         enableVisibility: f.label === true ? false : !TRACES_LOCKED_FIELD_NAMES.has(f.name),
       })),
     );
+
+    // Group by runs on the filter's span list only, and a header row or the timestamp names no group.
+    const groupByOffered = (field: any) =>
+      searchObj.meta.searchMode === "spans" &&
+      !searchObj.meta.sqlMode &&
+      !field.isGroup &&
+      field.name !== store.state.zoConfig.timestamp_column;
+
+    // Re-picking the grouped field would re-run the same query for the same groups.
+    const groupByField = (name: string) => {
+      if (name !== searchObj.meta.groupBy) emit("group-by", name);
+    };
 
     const totalFieldsCount = computed(
       () => normalizedFieldList.value.filter((f: any) => !f.isGroup).length,
@@ -694,6 +712,8 @@ export default defineComponent({
       pagination,
       fieldListRef,
       totalFieldsCount,
+      groupByOffered,
+      groupByField,
       setPage,
       resetSelectedFields,
       // Field value fetching

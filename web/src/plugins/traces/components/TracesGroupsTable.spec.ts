@@ -176,6 +176,7 @@ describe("TracesGroupsTable", () => {
     expect(wrapper.find('[data-test="traces-groups-footer"]').text()).toBe(
       "Showing 50 of ~1.2K values",
     );
+    expect(wrapper.emitted("update:count")!.at(-1)).toEqual([1234]);
   });
 
   it("shows no footer when the count is not above 50", async () => {
@@ -199,6 +200,16 @@ describe("TracesGroupsTable", () => {
     expect(wrapper.findAll('[data-test="row"]')).toHaveLength(1);
     expect(wrapper.findComponent({ name: "OSparkline" }).props("points")).toEqual([]);
     expect(wrapper.findComponent({ name: "QueryErrorState" }).exists()).toBe(false);
+  });
+
+  it("reports how many groups it shows once they load, and none while loading or failed", async () => {
+    respond([hit("cart", 200, 10), hit(null, 5, 0)], []);
+    const wrapper = await mountTable();
+    expect(wrapper.emitted("update:count")).toEqual([[null], [2]]);
+    respond(new Error("boom"));
+    await wrapper.setProps({ request: request() });
+    await flushPromises();
+    expect(wrapper.emitted("update:count")!.at(-1)).toEqual([null]);
   });
 
   it("shows the error when the groups query fails", async () => {

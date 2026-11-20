@@ -4154,22 +4154,19 @@ export class TracesPage {
     return this.page.locator('[data-test="traces-sql-fix-suggestion-card"]');
   }
 
-  // ===== SCOPE SELECT =====
+  // ===== SCOPE SWITCH (results bar; the e2e viewport is wide enough for the switch) =====
 
   getScopeSelect() {
-    return this.page.locator('[data-test="traces-scope-select-trigger"]');
+    return this.page.locator('[data-test="traces-scope-switch"]');
   }
 
   getScopeValue() {
-    return this.page.locator('[data-test="traces-scope-select-value"]');
+    return this.page.locator('[data-test^="traces-scope-option-"][data-state="on"]');
   }
 
   // scope: all | root | entrypoint
   async pickScope(scope) {
-    await this.getScopeSelect().click();
-    await this.page
-      .locator(`[data-test="traces-scope-select-option"][data-test-value="${scope}"]`)
-      .click();
+    await this.page.locator(`[data-test="traces-scope-option-${scope}"]`).click();
   }
 
   getListHeaderCell(columnId) {
@@ -4179,23 +4176,24 @@ export class TracesPage {
   // ===== GROUP BY AND GROUPS TABLE =====
 
   getGroupBySelect() {
-    return this.page.locator('[data-test="traces-group-by-select-trigger"]');
+    return this.page.locator('[data-test="traces-group-by-chip-trigger"]');
   }
 
+  // "Group by" when ungrouped, "Grouped by <field> · N groups" when grouped
   getGroupByValue() {
-    return this.page.locator('[data-test="traces-group-by-select-value"]');
+    return this.page.locator('[data-test="traces-group-by-chip-value"]');
   }
 
-  // field: a stream field name, or null for None
+  // field: a stream field name, or null to clear Group by
   async pickGroupBy(field) {
-    await this.getGroupBySelect().click();
     if (field === null) {
-      await this.page.locator('[data-test="traces-group-by-select-option"]').first().click();
+      await this.page.locator('[data-test="traces-group-by-clear"]').click();
       return;
     }
-    await this.page.locator('[data-test="traces-group-by-select-search"]').fill(field);
+    await this.getGroupBySelect().click();
+    await this.page.locator('[data-test="traces-group-by-chip-search"]').fill(field);
     await this.page
-      .locator(`[data-test="traces-group-by-select-option"][data-test-value="${field}"]`)
+      .locator(`[data-test="traces-group-by-chip-option"][data-test-value="${field}"]`)
       .click();
   }
 

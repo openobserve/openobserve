@@ -15,45 +15,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="inline-flex shrink-0 items-center gap-2" data-test="traces-group-by-select-wrap">
-    <!-- First child, so the tooltip binds to the wrapper, not to the select that takes no pointer events. -->
-    <OTooltip v-if="sqlMode" :content="t('traces.groups.sqlModeDisabled')" />
-    <span class="text-text-secondary text-xs whitespace-nowrap">{{
-      t("traces.groups.label")
-    }}</span>
-    <div class="w-40">
-      <OSelect
-        :model-value="shown"
-        :options="options"
-        :aria-label="t('traces.groups.label')"
-        size="xs"
-        :searchable="true"
-        :disabled="sqlMode"
-        :class="{ 'pointer-events-none': sqlMode }"
-        data-test="traces-group-by-select"
-        @update:model-value="pick"
-      >
-        <template #trigger>
-          <span class="truncate" data-test="traces-group-by-select-value">{{
-            shown === NONE ? t("traces.groups.none") : shown
-          }}</span>
-        </template>
-      </OSelect>
-    </div>
-  </div>
+  <span
+    class="rounded-default inline-flex h-6 shrink-0 items-center gap-0.5 border ps-2 pe-0.5"
+    :class="
+      modelValue ? 'border-accent bg-accent/10' : 'border-button-outline-border border-dashed'
+    "
+    data-test="traces-group-by-chip-wrap"
+  >
+    <OSelect
+      :model-value="modelValue || null"
+      :options="options"
+      :aria-label="triggerLabel"
+      appearance="inline"
+      size="xs"
+      :searchable="true"
+      data-test="traces-group-by-chip"
+      @update:model-value="pick"
+    >
+      <template #trigger>
+        <span class="flex min-w-0 items-center gap-1" data-test="traces-group-by-chip-value">
+          <template v-if="modelValue">
+            <span
+              class="max-w-56 truncate"
+              :title="modelValue"
+              data-test="traces-group-by-chip-field"
+            >
+              {{ t("traces.groups.grouped", { field: raw(modelValue) }) }}
+            </span>
+            <span
+              v-if="countLabel"
+              class="hidden shrink-0 @min-[67rem]/results:inline"
+              data-test="traces-group-by-chip-count"
+            >
+              · {{ countLabel }}
+            </span>
+          </template>
+          <template v-else>{{ t("traces.groups.label") }}</template>
+        </span>
+      </template>
+    </OSelect>
+    <OButton
+      v-if="modelValue"
+      variant="ghost-neutral"
+      size="icon"
+      class="size-5!"
+      :aria-label="t('traces.groups.clear')"
+      data-test="traces-group-by-clear"
+      @click.stop="emit('update:modelValue', '')"
+    >
+      <OIcon name="close" size="xs" />
+    </OButton>
+  </span>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
+import { formatLargeNumber } from "@/utils/zincutils";
+import { GROUPS_LIMIT } from "@/utils/traces/tracesGroups";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
-const props = defineProps<{
-  modelValue: string;
-  sqlMode: boolean;
-  fields: string[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    modelValue: string;
+    fields: string[];
+    /** Groups found, or null until they load. */
+    count?: number | null;
+  }>(),
+  { count: null },
+);
 
 const emit = defineEmits<{
   "update:modelValue": [field: string];
@@ -61,18 +93,23 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-// OSelect reads "" as nothing picked (OSelect.vue selectedValues), while a null option is a real pick.
-const NONE = null;
+const options = computed(() => props.fields.map((field) => ({ label: raw(field), value: field })));
 
-const options = computed(() => [
-  { label: t("traces.groups.none"), value: NONE },
-  ...props.fields.map((field) => ({ label: raw(field), value: field })),
-]);
+// Above the row limit the count comes from approx_distinct, as the table footer marks.
+const countLabel = computed(() => {
+  if (!props.modelValue || props.count === null) return "";
+  const shown = `${props.count > GROUPS_LIMIT ? "~" : ""}${formatLargeNumber(props.count)}`;
+  return t("traces.groups.count", { count: shown }, props.count);
+});
 
-const shown = computed(() => (props.sqlMode || !props.modelValue ? NONE : props.modelValue));
+const triggerLabel = computed(() => {
+  if (!props.modelValue) return t("traces.groups.label");
+  const grouped = t("traces.groups.grouped", { field: raw(props.modelValue) });
+  return countLabel.value ? `${grouped} · ${countLabel.value}` : grouped;
+});
 
 const pick = (value: unknown) => {
   const field = typeof value === "string" ? value : "";
-  if (field !== props.modelValue) emit("update:modelValue", field);
+  if (field && field !== props.modelValue) emit("update:modelValue", field);
 };
 </script>
