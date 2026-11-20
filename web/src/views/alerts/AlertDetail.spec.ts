@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { reactive } from "vue";
+import { reactive, type Component } from "vue";
 
 vi.mock("@/services/alerts", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -30,6 +30,8 @@ vi.mock("@/services/alerts", async (importOriginal) => {
     },
   });
 });
+
+vi.mock("@/services/downtimes");
 
 vi.mock("@/services/anomaly_detection", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -66,6 +68,9 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import alertsService from "@/services/alerts";
 import anomalyService from "@/services/anomaly_detection";
+import downtimes from "@/services/downtimes";
+import appConfig from "@/aws-exports";
+import { axiosReply } from "@/test/unit/helpers/mockService";
 import { queryClient } from "@/composables/query/queryClient";
 import type { AlertGroupTransition } from "@/ts/interfaces/alert";
 
@@ -203,6 +208,7 @@ async function mountView({
   evaluations = [] as any[],
   groupsResponse = { list: [], capped: false, group_cap: 100 } as Record<string, any>,
   alertRequest = undefined as Promise<any> | undefined,
+  stubs = {} as Record<string, boolean | Component>,
 } = {}) {
   if (alertRequest) {
     vi.mocked(alertsService.get_by_alert_id).mockReturnValue(alertRequest);
@@ -248,6 +254,7 @@ async function mountView({
         AlertCalibrationHeadroomCard: true,
         AnomalyDetectionChart: true,
         AlertHeaderActions: true,
+        ...stubs,
       },
     },
   });
@@ -290,6 +297,71 @@ describe("AlertDetail — route reuse", () => {
     expect(wrapper.text()).toContain("New alert");
     expect(wrapper.text()).not.toContain("Stale alert");
   });
+
+  it.each(["open", "pending"] as const)(
+    "discards the previous anomaly's %s Extend until dialog",
+    async (state) => {
+      const enterprise = appConfig.isEnterprise;
+      const settings = store.state.zoConfig;
+      appConfig.isEnterprise = "true";
+      store.commit("setConfig", { ...settings, downtimes_enabled: true });
+      const mute = {
+        id: "mute-a",
+        name: "Mute for anomaly A",
+        folder_id: "default",
+        version: 3,
+        end_here: true,
+        ends_at: 4_102_444_800_000_000,
+      };
+      const reply = axiosReply({ ...mute, current_window: { start: 1, end: mute.ends_at } });
+      let finishRead: (() => void) | undefined;
+      try {
+        vi.mocked(alertsService.listByFolderId).mockResolvedValue(
+          axiosReply({
+            list: [{ alert_id: "alert-1", folder_id: "default", active_downtime: mute }],
+          }),
+        );
+        vi.mocked(alertsService.listAlertAcks).mockResolvedValue(axiosReply({ acks: [] }));
+        if (state === "pending") {
+          vi.mocked(downtimes.get).mockReturnValueOnce(
+            new Promise((resolve) => {
+              finishRead = () => resolve(reply);
+            }),
+          );
+        } else {
+          vi.mocked(downtimes.get).mockResolvedValueOnce(reply);
+        }
+
+        wrapper = await mountView({
+          alert: makeAnomalyAlert(),
+          stubs: {
+            ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+            RowMuteMenu: true,
+            ExtendDowntimeDialog: true,
+          },
+        });
+        const dialog = () => wrapper!.findComponent({ name: "ExtendDowntimeDialog" });
+        wrapper.findComponent({ name: "RowMuteMenu" }).vm.$emit("until");
+        await flushPromises();
+        expect(downtimes.get).toHaveBeenCalledWith(expect.anything(), mute.id, "default");
+        expect(dialog().props("open")).toBe(state === "open");
+
+        vi.mocked(alertsService.get_by_alert_id).mockResolvedValueOnce(
+          axiosReply({ ...makeAnomalyAlert(), id: "alert-2", name: "Anomaly B" }),
+        );
+        mockRouteParams.alert_id = "alert-2";
+        await flushPromises();
+        finishRead?.();
+        await flushPromises();
+        expect(wrapper.text()).toContain("Anomaly B");
+        expect(dialog().props("open")).toBe(false);
+        expect(dialog().props("downtime")).toBeNull();
+      } finally {
+        appConfig.isEnterprise = enterprise;
+        store.commit("setConfig", settings);
+      }
+    },
+  );
 
   it("keeps the page when a token refresh replaces the user info for the same user", async () => {
     wrapper = await mountView({ alert: makeSimpleAlert() });

@@ -958,6 +958,7 @@ const isCurrentDetailRequest = (request: ReturnType<typeof captureDetailRequest>
   request.subject === store.state.userInfo?.email;
 onBeforeUnmount(() => {
   detailGeneration++;
+  anomalyMuteActions.resetExtendUntil();
 });
 
 const fetchAlert = async () => {
@@ -1110,6 +1111,7 @@ watch(
   [orgId, alertId, routeFolderId, () => store.state.userInfo?.email],
   () => {
     detailGeneration++;
+    anomalyMuteActions.resetExtendUntil();
     alert.value = null;
     loadFailure.value = null;
     groupData.value = null;

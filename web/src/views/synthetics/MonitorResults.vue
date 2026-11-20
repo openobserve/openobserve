@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onEnvScopeChange(String($event))"
       />
       <DateTime
-        ref="dateTimeRef"
+        :key="checkIdentity"
         auto-apply
         menu-align="end"
         :default-type="timeState.valueType"
@@ -153,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBadge>
     </template>
     <RunDetail
+      :key="checkIdentity"
       :drawer-mode="true"
       :override-monitor-id="monitorId"
       :override-monitor-name="monitorName"
@@ -278,7 +279,6 @@ const timeState = ref<{
 });
 
 const timeRange = ref({ startTime: 0, endTime: 0 });
-const dateTimeRef = ref<any>(null);
 const runsRef = ref<any>(null);
 const isRefreshing = ref(false);
 
@@ -319,13 +319,17 @@ function onRunStatusUpdate(status: {
   drawerEnvironment.value = status.environment ?? "";
 }
 
+function clearDrawerDetails() {
+  drawerRunStatus.value = null;
+  drawerUrl.value = "";
+  drawerTimestamp.value = "";
+  drawerErrorRecord.value = null;
+  drawerEnvironment.value = "";
+}
+
 function onDrawerClose(open: boolean) {
   if (!open) {
-    drawerRunStatus.value = null;
-    drawerUrl.value = "";
-    drawerTimestamp.value = "";
-    drawerErrorRecord.value = null;
-    drawerEnvironment.value = "";
+    clearDrawerDetails();
     // Clear drawer query params
     const next = { ...route.query };
     delete next.run;
@@ -336,7 +340,7 @@ function onDrawerClose(open: boolean) {
 
 function applyRelative(period: string) {
   const range = getConsumableRelativeTime(period);
-  if (!range) return;
+  if (!range || !(range.startTime < range.endTime)) return false;
   timeRange.value = { startTime: range.startTime, endTime: range.endTime };
   timeState.value = {
     valueType: "relative",
@@ -344,6 +348,7 @@ function applyRelative(period: string) {
     startTime: range.startTime,
     endTime: range.endTime,
   };
+  return true;
 }
 
 function readFromUrl(): boolean {
@@ -366,12 +371,7 @@ function readFromUrl(): boolean {
     }
   }
 
-  if (typeof periodRaw === "string" && periodRaw) {
-    applyRelative(periodRaw);
-    return true;
-  }
-
-  return false;
+  return typeof periodRaw === "string" && applyRelative(periodRaw);
 }
 
 function writeToUrl() {
@@ -388,9 +388,16 @@ function writeToUrl() {
   router.replace({ query: next }).catch(() => {});
 }
 
-async function onDateChange(value: any) {
+async function onDateChange(value: {
+  valueType?: string;
+  relativeTimePeriod: string | null;
+  startTime: number;
+  endTime: number;
+  userChangedValue?: boolean;
+}) {
+  if (value.userChangedValue === false) return;
   const shouldRefresh = checkTypeReady.value;
-  if (value?.valueType === "relative" && value.relativeTimePeriod) {
+  if (value.valueType === "relative" && value.relativeTimePeriod) {
     applyRelative(value.relativeTimePeriod);
   } else {
     timeState.value = {
@@ -497,25 +504,10 @@ function openRunError(info: {
 }
 
 onMounted(() => {
-  // Always default to last 15 minutes; respect explicit URL params
-  if (!readFromUrl()) {
-    applyRelative(DEFAULT_RELATIVE);
-  }
-  const envQ = route.query.env;
-  if (typeof envQ === "string" && envQ) envScope.value = envQ;
-  writeToUrl();
   // Without the folder list the header subtitle falls back to the raw folder ID.
   getFoldersListByType(store, "synthetics").catch((err) =>
     console.error("[synthetics] failed to load folders", err),
   );
-  // Auto-open drawer if query params present
-  const runQ = route.query.run;
-  const execQ = route.query.exec;
-  if (typeof runQ === "string" && typeof execQ === "string" && runQ && execQ) {
-    selectedRunId.value = runQ;
-    selectedExecutionId.value = execQ;
-    drawerOpen.value = true;
-  }
 });
 
 let checkGeneration = 0;
@@ -544,10 +536,21 @@ watch(
     lastTriggeredAt.value = 0;
     retries.value = 0;
     envNames.value = [];
-    drawerOpen.value = false;
-    selectedRunId.value = "";
-    selectedExecutionId.value = "";
-    drawerErrorRecord.value = null;
+    clearDrawerDetails();
+    if (!readFromUrl()) applyRelative(DEFAULT_RELATIVE);
+
+    const { env, run, exec } = route.query;
+    envScope.value = typeof env === "string" && env ? env : ENV_SCOPE_ALL;
+    if (typeof run === "string" && run && typeof exec === "string" && exec) {
+      selectedRunId.value = run;
+      selectedExecutionId.value = exec;
+      drawerOpen.value = true;
+    } else {
+      selectedRunId.value = "";
+      selectedExecutionId.value = "";
+      drawerOpen.value = false;
+    }
+    writeToUrl();
     void fetchCheck();
   },
   { immediate: true },

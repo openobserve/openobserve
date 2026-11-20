@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { reactive } from "vue";
+import { reactive, shallowRef } from "vue";
 
 // ── Mocks (hoisted by Vitest) ──────────────────────────────────────────────
 
@@ -28,15 +28,14 @@ const mockRouterReplace = vi.fn();
 
 // Route query state — reset per test via beforeEach
 const routeParams = reactive({ id: "mon-1" });
-let routeQuery: Record<string, any> = {
-  name: "Test Monitor",
-  status: "healthy",
-};
+const routeQuery = shallowRef<Record<string, string | undefined>>({});
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({
     params: routeParams,
-    query: routeQuery,
+    get query() {
+      return routeQuery.value;
+    },
   }),
   useRouter: () => ({
     push: mockRouterPush,
@@ -220,7 +219,7 @@ describe("MonitorResults", () => {
 
     routeParams.id = "mon-1";
     // Default route state
-    routeQuery = {
+    routeQuery.value = {
       name: "Test Monitor",
       status: "healthy",
     };
@@ -272,6 +271,96 @@ describe("MonitorResults", () => {
     expect(mockFetchAll.mock.calls.filter(([id]) => id === "second-monitor")).toHaveLength(1);
     expect(wrapper.findComponent({ name: "SyntheticMonitorRuns" }).vm).not.toBe(firstChild);
   });
+
+  it.each([
+    {
+      description: "an explicit range, environment and run",
+      query: {
+        from: "1700100000000000",
+        to: "1700100900000000",
+        env: "staging",
+        run: "run-b",
+        exec: "exec-b",
+      },
+      range: { startTime: 1_700_100_000_000_000, endTime: 1_700_100_900_000_000 },
+      environment: "staging",
+    },
+    {
+      description: "no range, environment or run",
+      query: {},
+      range: { startTime: 1_700_000_000_000_000, endTime: 1_700_000_900_000_000 },
+      environment: undefined,
+    },
+  ])(
+    "initializes the next check from its URL with $description",
+    async ({ query, range, environment }) => {
+      routeQuery.value = {
+        from: "1699000000000000",
+        to: "1699000900000000",
+        env: "prod",
+        run: "run-a",
+        exec: "exec-a",
+      };
+      for (const name of ["First", "Second"]) {
+        mockSyntheticsServiceGet.mockResolvedValueOnce({
+          data: { name, environments: ["prod-id", "staging-id"] },
+        });
+        mockListEnvironments.mockResolvedValueOnce({
+          data: [
+            { id: "prod-id", name: "prod" },
+            { id: "staging-id", name: "staging" },
+          ],
+        });
+      }
+      wrapper = makeWrapper({
+        MonitorRuns: false,
+        ChartRenderer: true,
+        MonitorStatusTimeline: true,
+      });
+      await flushPromises();
+      expect(mockFetchAll).toHaveBeenLastCalledWith(
+        "mon-1",
+        1_699_000_000_000_000,
+        1_699_000_900_000_000,
+        "prod",
+        false,
+      );
+      const picker = () =>
+        wrapper.findComponent('[data-test="synthetic-monitor-results-date-time"]');
+      const firstPicker = picker().vm;
+
+      routeQuery.value = query;
+      routeParams.id = "second-monitor";
+      await flushPromises();
+
+      expect(mockFetchAll).toHaveBeenLastCalledWith(
+        "second-monitor",
+        range.startTime,
+        range.endTime,
+        environment,
+        environment === undefined,
+      );
+      expect(picker().vm).not.toBe(firstPicker);
+      expect(picker().props("defaultAbsoluteTime")).toEqual(range);
+      expect(picker().props("defaultType")).toBe(query.from ? "absolute" : "relative");
+      expect(wrapper.findComponent(".odrawer-stub").props("open")).toBe(Boolean(query.run));
+      const runDetail = wrapper.findComponent('[data-test="run-detail"]');
+      expect(runDetail.props("overrideRunId")).toBe(query.run ?? "");
+      expect(runDetail.props("overrideExecutionId")).toBe(query.exec ?? "");
+
+      mockRouterReplace.mockClear();
+      picker().vm.$emit("on:date-change", {
+        valueType: "absolute",
+        startTime: 1_699_000_000_000_000,
+        endTime: 1_699_000_900_000_000,
+        relativeTimePeriod: null,
+        userChangedValue: false,
+      });
+      await flushPromises();
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+      expect(mockFetchAll.mock.calls.filter(([id]) => id === "second-monitor")).toHaveLength(1);
+    },
+  );
 
   it("still loads the runs when the check itself fails to load", async () => {
     mockSyntheticsServiceGet.mockRejectedValueOnce({ response: { status: 500 } });
@@ -340,7 +429,7 @@ describe("MonitorResults", () => {
     });
 
     it("should restore the scope from ?env= and pass it to MonitorRuns", async () => {
-      routeQuery = { name: "Test Monitor", status: "healthy", env: "ap1" };
+      routeQuery.value = { name: "Test Monitor", status: "healthy", env: "ap1" };
       mockSyntheticsServiceGet.mockResolvedValueOnce({
         data: {
           name: "Test Monitor",
@@ -364,7 +453,7 @@ describe("MonitorResults", () => {
     });
 
     it("should drop a ?env= the check no longer runs in instead of filtering to nothing", async () => {
-      routeQuery = { name: "Test Monitor", status: "healthy", env: "deleted-env" };
+      routeQuery.value = { name: "Test Monitor", status: "healthy", env: "deleted-env" };
       mockSyntheticsServiceGet.mockResolvedValueOnce({
         data: {
           name: "Test Monitor",
@@ -517,7 +606,7 @@ describe("MonitorResults", () => {
 
   describe("auto-open drawer from URL query params", () => {
     it("should open drawer when route query has run and exec params", async () => {
-      routeQuery = {
+      routeQuery.value = {
         name: "Test Monitor",
         status: "healthy",
         run: "run-from-url",
@@ -527,15 +616,13 @@ describe("MonitorResults", () => {
       wrapper = makeWrapper();
       await flushPromises();
 
-      // The drawer opens by setting drawerOpen = true in onMounted
-      const drawer = wrapper.find('[data-test="synthetics-run-detail-drawer"]');
-      expect(drawer.exists()).toBe(true);
+      expect(wrapper.findComponent(".odrawer-stub").props("open")).toBe(true);
     });
   });
 
   describe("route query integration", () => {
     it("should use default status when no status in query", async () => {
-      routeQuery = { name: "Test Monitor" };
+      routeQuery.value = { name: "Test Monitor" };
       wrapper = makeWrapper();
       await flushPromises();
 
@@ -544,7 +631,7 @@ describe("MonitorResults", () => {
     });
 
     it("should handle missing name gracefully with default title", async () => {
-      routeQuery = {};
+      routeQuery.value = {};
       mockSyntheticsServiceGet.mockRejectedValueOnce(new Error("network"));
       wrapper = makeWrapper();
       await flushPromises();
@@ -558,7 +645,6 @@ describe("MonitorResults", () => {
     it("should forward edit event from MonitorRuns to editMonitor", async () => {
       wrapper = makeWrapper();
       await flushPromises();
-      mockRouterPush.mockClear(); // clear the writeToUrl call from onMounted
 
       const editBtn = wrapper.find('[data-test="trigger-edit"]');
       await editBtn.trigger("click");
