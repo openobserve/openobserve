@@ -559,22 +559,28 @@ import {
   RUM_SESSION_USER_LABEL_ORDERS,
   resolveRumSessionUserLabel,
   rumSessionUserIdentitySelect,
+  type RumSessionUserIdentity,
 } from "@/utils/rum/sessionUserIdentity";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
 
-interface Session {
-  timestamp: string;
-  type: string;
+interface Session extends RumSessionUserIdentity {
+  session_id: string;
+  zo_sql_timestamp: number;
   time_spent: number;
-  error_count: string;
+  error_count?: number;
   frustration_count?: number;
   events?: number;
+  start_time?: number;
   end_time?: number;
-  initial_view_name: string;
-  id: string;
+  rum_start_time?: number;
+  rum_end_time?: number;
+  source?: string;
+  os?: string;
+  device_family?: string;
+  has_replay: boolean;
 }
 
 type HealthSegment = "all" | "errors" | "frustrated" | "clean";
@@ -782,7 +788,7 @@ const tableColumns = [
   {
     id: "session",
     header: t("rum.userSession"),
-    accessorFn: (row: { userLabel: string }) => row.userLabel,
+    accessorKey: "userLabel",
     sortable: true,
     hideable: true,
     meta: { align: "left", autoWidth: true },
@@ -1545,7 +1551,7 @@ const classifySource = (source?: string): string => {
 const isMobilePlatform = (source?: string): boolean => isMobileReplaySource(source);
 
 const enrichedRows = computed(() =>
-  rows.value.map((row: any) => ({
+  rows.value.map((row) => ({
     ...row,
     is_bounce: (row.events ?? 0) <= 1 || (row.time_spent ?? 0) < BOUNCE_MAX_MS,
     is_active: isSessionLive(row.end_time ?? row.rum_end_time, Date.now()),
@@ -1695,7 +1701,7 @@ const openInsightInErrorTracking = (insight: SessionInsight) => {
 
 const tableRows = computed(() =>
   enrichedRows.value
-    .filter((row: any) => {
+    .filter((row) => {
       if (healthSegment.value === "errors" && !((row.error_count || 0) > 0)) return false;
       if (healthSegment.value === "frustrated" && !((row.frustration_count || 0) > 0)) return false;
       if (

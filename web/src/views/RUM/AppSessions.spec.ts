@@ -763,7 +763,8 @@ describe("AppSessions.vue", () => {
         const labelColumn = wrapper.vm.tableColumns.find(
           (column: { id: string }) => column.id === "session",
         );
-        const sortValues = () => wrapper.vm.tableRows.map(labelColumn.accessorFn);
+        const sortValues = () =>
+          wrapper.vm.tableRows.map((row: Record<string, unknown>) => row[labelColumn.accessorKey]);
         const query = search.mock.calls[0][0].query.query.sql;
         expect(query).toMatch(/\busr_name\b.*\buser_name\b/i);
         expect(query).toMatch(/\busr_id\b.*\buser_id\b/i);
