@@ -257,7 +257,7 @@
   --color-toggle-item-disabled: var(--color-text-disabled);
 
   /* Pager: the current page takes the selected recipe, never a solid fill. */
-  --color-pagination-item-text: var(--color-text-body);
+  --color-pagination-item-text: var(--color-text-secondary);
   --color-pagination-item-hover-bg: var(--color-surface-hover);
   --color-pagination-item-active-bg: var(--color-selected-bg);
   --color-pagination-item-active-text: var(--color-selected-fg);
