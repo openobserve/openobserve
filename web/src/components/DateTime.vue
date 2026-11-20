@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :z-index="10001"
       :aria-label="t('common.selectDateRange')"
       :collision-padding="POPOVER_COLLISION_PADDING"
+      :hide-when-detached="false"
       content-class="border-border-default! overflow-hidden p-0 shadow-lg!"
       @update:open="onMenuOpenChange"
       @open-auto-focus="onPopoverOpenAutoFocus"
@@ -517,6 +518,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 
 const MICROS_PER_SECOND = 1_000_000;
 const DAY_END_TIME = "23:59:59";
+// A trigger inside the top inset, as in a drawer header, reads as detached, so the picker keeps hiding off;
+// it closes on ancestor scroll instead.
 const POPOVER_COLLISION_PADDING = { top: 48, right: 8, bottom: 8, left: 8 };
 // Largest custom relative range per unit (~10 years), so a typo can't produce an absurd or overflowing range.
 const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
