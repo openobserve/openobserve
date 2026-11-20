@@ -934,7 +934,7 @@ describe("Dashboards.vue", () => {
         ),
       });
 
-    it("lists the reports the deleted dashboard takes with it", async () => {
+    it("lists only the reports left with no dashboard, not those that cover another one", async () => {
       reportsUsing(["d1", "d2"], ["d2"], ["d1"]);
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(store, router, i18n),
@@ -943,7 +943,7 @@ describe("Dashboards.vue", () => {
       await flushPromises();
 
       expect(findDialog("dashboard-confirm-dialog").props("warningMessage")).toBe(
-        "Deleting also deletes these 2 reports: report-0, report-2",
+        "Deleting also deletes this report: report-2",
       );
     });
 

@@ -1814,17 +1814,21 @@ export default defineComponent({
     };
 
     const deleteReportsWarning = (dashboardIds: string[]): I18nText | undefined => {
-      const names = new Map<string, string>();
+      const reports = new Map<string, { name: string; dashboards: string[] }>();
       for (const report of reportsForDelete.value) {
-        if (report.dashboards?.some((d) => dashboardIds.includes(d.dashboard))) {
-          names.set(report.report_id, report.name);
-        }
+        const entry = reports.get(report.report_id) ?? { name: report.name, dashboards: [] };
+        entry.dashboards.push(...(report.dashboards ?? []).map((d) => d.dashboard));
+        reports.set(report.report_id, entry);
       }
-      if (!names.size) return undefined;
+      // The server deletes a report only when every dashboard it covers is deleted; others just lose the link.
+      const names = [...reports.values()]
+        .filter((r) => r.dashboards.length && r.dashboards.every((d) => dashboardIds.includes(d)))
+        .map((r) => r.name);
+      if (!names.length) return undefined;
       return t(
         "dashboard.deleteDashboardReportsWarning",
-        { count: names.size, names: [...names.values()].join(", ") },
-        names.size,
+        { count: names.length, names: names.join(", ") },
+        names.length,
       );
     };
 
