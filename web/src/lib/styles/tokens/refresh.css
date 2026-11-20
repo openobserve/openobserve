@@ -251,15 +251,16 @@
   --color-toggle-border: var(--color-border-subtle);
   --color-toggle-item-text: var(--color-text-body);
   --color-toggle-item-hover-bg: var(--color-surface-subtle-hover);
-  --color-toggle-item-active-bg: var(--color-selected-bg);
-  --color-toggle-item-active-border: var(--color-selected-border);
-  --color-toggle-item-active-text: var(--color-selected-fg);
+  /* Calm selection, same as the sidebar: soft accent tint, no ring, body text; the accent glyph carries the state. */
+  --color-toggle-item-active-bg: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --color-toggle-item-active-border: transparent;
+  --color-toggle-item-active-text: var(--color-text-body);
   --color-toggle-item-disabled: var(--color-text-disabled);
 
   /* Pager: the current page takes the selected recipe, never a solid fill. */
   --color-pagination-item-text: var(--color-text-secondary);
   --color-pagination-item-hover-bg: var(--color-surface-hover);
-  --color-pagination-item-active-bg: var(--color-selected-bg);
+  --color-pagination-item-active-bg: color-mix(in srgb, var(--color-accent) 12%, transparent);
   --color-pagination-item-active-text: var(--color-selected-fg);
   --color-pagination-item-disabled-text: var(--color-text-disabled);
   --color-pagination-nav-text: var(--color-text-secondary);
@@ -328,8 +329,9 @@
   --color-field-list-label-text: var(--color-text-body);
   --color-field-list-row-hover-bg: var(--color-surface-hover);
   /* In-table field rows: neutral fill, no accent; weight and the eye icon also carry the state. */
-  --color-field-list-row-selected-bg: var(--color-surface-selected-neutral);
-  --color-field-list-row-selected-text: var(--color-text-heading);
+  /* Calm selection, same as the sidebar and tabs: soft accent tint, body text; the accent eye carries "in the table". */
+  --color-field-list-row-selected-bg: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --color-field-list-row-selected-text: var(--color-text-body);
   --color-field-list-expansion-bg: var(--color-surface-band);
   /* The field-row action strip takes the row's own fill, so it never reads as a second box. */
   --color-field-list-actions-bg: var(--field-row-bg, var(--color-interactive-hover-bg));
@@ -642,4 +644,16 @@
 /* Light mode: resting toolbar and header icons sit one step below the secondary text, so the heavier strokes do not read as black. */
 :root:not(.dark) :is(.toolbar-btn-rest, .header-utility-icons button:not([data-test="menu-link-slack-item"]), #date-time-button):not(:hover):not([aria-expanded="true"]) :is(span.inline-flex.shrink-0.align-middle, svg.text-text-secondary) {
   color: color-mix(in srgb, var(--color-text-secondary) 85%, var(--color-surface-raised)) !important;
+}
+:root [data-otoggle-value][data-state="on"] span.inline-flex.shrink-0.align-middle {
+  color: var(--color-selected-fg);
+}
+:root [aria-current="page"]:is(.o-pagination__btn, [class*="bg-pagination-item-active-bg"]) {
+  box-shadow: none !important;
+}
+:root .o-field-row--selected {
+  font-weight: var(--font-normal);
+}
+:root .o-field-row--selected .o-field-row__in-table {
+  color: var(--color-selected-fg);
 }
