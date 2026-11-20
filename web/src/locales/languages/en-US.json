@@ -2068,7 +2068,8 @@
     "freeTextNoFtsTitleMulti": "The selected streams have no full-text fields",
     "freeTextNoTextFields": "This stream has no text fields to search.",
     "freeTextNoTextFieldsNamed": "Not searched: {streams} (no text fields).",
-    "freeTextBuildNotice": "This filter has text search; edit it in SQL."
+    "freeTextBuildNotice": "This filter has text search; edit it in SQL.",
+    "filterNotChartableNotice": "This filter can't be charted in the builder. Your Search filter is unchanged; switch to {custom} to chart it."
   },
   "menu": {
     "alertCalibration": "Alert Calibration",
@@ -14334,6 +14335,7 @@
         "emptyQuery": "There is no query to create an alert from.",
         "noQueries": "This panel has no query to create an alert from.",
         "noConstants": "The selected patterns have no distinctive text to match on.",
+        "patternsShared": "{count} of the selected patterns share all their text with other patterns, so the alert filter leaves them out.",
         "sqlModeFilterDropped": "Your SQL query was not carried over — the alert matches only the selected patterns.",
         "patternsUnusable": "None of the patterns on this page have distinctive text to match on, so the alert uses your search only.",
         "dbmRollupLag": "Database numbers are aggregated every {minutes} minutes, so this alert can only fire that often — it is not a real-time page.",
@@ -21783,6 +21785,7 @@
       "excludeFromQuery": "Exclude",
       "createAlertAction": "Create alert",
       "noMatchTerms": "This pattern has no distinctive text to filter on.",
+      "noDistinctTextTooltip": "Every piece of fixed text in this pattern also appears in another pattern, so a filter would match their logs too.",
       "noStreamSelected": "No stream selected. Please select a stream before creating an alert.",
       "alertBroadMatch": "This pattern has no distinctive constant text — the alert query will match broadly. Consider adding manual filters."
     },

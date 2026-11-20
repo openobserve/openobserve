@@ -1642,6 +1642,9 @@
     "enableSqlModeOrSelectSingleStream": "Abilita la modalità SQL per visualizzare",
     "drillDown": "Approfondisci",
     "drillDownUnavailableInSqlMode": "L'approfondimento non è disponibile in modalità SQL",
+    "drillDownRunTitle": "Esegui una query per avviare il drill down",
+    "drillDownRunDescription": "Il drill down confronta i valori delle dimensioni tra gli eventi della tua ricerca. Esegui una query per caricarli.",
+    "patternsLogsOnly": "I pattern sono disponibili solo per gli stream di log",
     "buildQuery": "Visualizza",
     "nlpModeDisabledForVisualization": "La modalità Natural Language non può essere disabilitata durante la visualizzazione con più stream",
     "transformType": "Tipo di trasformazione",
@@ -2065,7 +2068,8 @@
     "freeTextNoFtsTitleMulti": "Gli stream selezionati non hanno campi full-text",
     "freeTextNoTextFields": "Questo stream non ha campi di testo da cercare.",
     "freeTextNoTextFieldsNamed": "Non cercati: {streams} (nessun campo di testo).",
-    "freeTextBuildNotice": "Questo filtro contiene una ricerca testuale; modificalo in SQL."
+    "freeTextBuildNotice": "Questo filtro contiene una ricerca testuale; modificalo in SQL.",
+    "filterNotChartableNotice": "Questo filtro non può essere rappresentato in un grafico nel builder. Il filtro di ricerca è invariato; passa a {custom} per visualizzarlo."
   },
   "menu": {
     "alertCalibration": "Calibrazione avvisi",
@@ -6610,6 +6614,7 @@
     "dashboardTitleVolume": "Analisi del volume",
     "dimensionsSelected": "Dimensioni selezionate",
     "noDimensionsSelected": "Seleziona una dimensione da analizzare",
+    "noDimensionsSelectedDesc": "Seleziona una dimensione a sinistra per confrontarne i valori",
     "durationLabel": "Durata:",
     "failedToLoad": "Impossibile caricare l'analisi",
     "panelDescErrorComparison": "Confronto della percentuale di errori per la dimensione: {dimension}. Barre selezionate più alte indicano che questo valore di dimensione presenta più errori nel periodo di picco degli errori.",
@@ -14332,6 +14337,7 @@
         "emptyQuery": "Non c'è alcuna query da cui creare un avviso.",
         "noQueries": "Questo pannello non ha una query da cui creare un avviso.",
         "noConstants": "I pattern selezionati non hanno un testo distintivo su cui basare la corrispondenza.",
+        "patternsShared": "{count} dei pattern selezionati condividono tutto il testo con altri pattern, quindi il filtro dell'avviso li esclude.",
         "sqlModeFilterDropped": "La tua query SQL non è stata trasferita — l'avviso corrisponde solo ai pattern selezionati.",
         "patternsUnusable": "Nessuno dei pattern in questa pagina ha un testo distintivo su cui basare la corrispondenza, quindi l'avviso usa solo la tua ricerca.",
         "dbmRollupLag": "I numeri del database vengono aggregati ogni {minutes} minuti, quindi questo avviso può scattare solo con quella frequenza — non è una notifica in tempo reale.",
@@ -21692,6 +21698,7 @@
       "noFunctionDefinition": "Nessuna definizione di funzione trovata.",
       "noStreamSaveView": "Nessuno stream disponibile per salvare la vista.",
       "viewAppliedSuccess": "Vista {name} applicata con successo.",
+      "viewAppliedRangeShortened": "Vista {name} applicata. L'intervallo di tempo è stato ridotto alle ultime {hours} ore dell'intervallo salvato, il massimo intervallo di query per questo stream.",
       "errorApplyingSavedView": "Errore durante l'applicazione della vista salvata.",
       "provideValidViewName": "Fornisci un nome valido per la vista.",
       "errorSavingView": "Errore durante il salvataggio della vista: {e}",
@@ -21780,6 +21787,7 @@
       "excludeFromQuery": "Escludi",
       "createAlertAction": "Crea avviso",
       "noMatchTerms": "Questo pattern non ha testo distintivo su cui filtrare.",
+      "noDistinctTextTooltip": "Ogni parte di testo fisso di questo pattern compare anche in un altro pattern, quindi un filtro corrisponderebbe anche ai loro log.",
       "noStreamSelected": "Nessuno stream selezionato. Seleziona uno stream prima di creare un avviso.",
       "alertBroadMatch": "Questo pattern non ha testo costante distintivo — la query dell'avviso corrisponderà ampiamente. Considera di aggiungere filtri manuali."
     },

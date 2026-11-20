@@ -1642,6 +1642,9 @@
     "enableSqlModeOrSelectSingleStream": "Bitte aktivieren Sie den SQL-Modus zur Visualisierung",
     "drillDown": "Drilldown",
     "drillDownUnavailableInSqlMode": "Drilldown ist im SQL-Modus nicht verfügbar",
+    "drillDownRunTitle": "Abfrage ausführen, um Drill-down zu starten",
+    "drillDownRunDescription": "Drill-down vergleicht Dimensionswerte über die Ereignisse Ihrer Suche hinweg. Führen Sie eine Abfrage aus, um sie zu laden.",
+    "patternsLogsOnly": "Muster sind nur für Logs-Streams verfügbar",
     "buildQuery": "Bauen",
     "nlpModeDisabledForVisualization": "Der Natural Language-Modus kann bei einer Visualisierung mit mehreren Streams nicht deaktiviert werden",
     "transformType": "Transformationstyp",
@@ -2065,7 +2068,8 @@
     "freeTextNoFtsTitleMulti": "Die ausgewählten Streams haben keine Volltextfelder",
     "freeTextNoTextFields": "Dieser Stream hat keine Textfelder zum Durchsuchen.",
     "freeTextNoTextFieldsNamed": "Nicht durchsucht: {streams} (keine Textfelder).",
-    "freeTextBuildNotice": "Dieser Filter enthält eine Textsuche; bearbeiten Sie ihn in SQL."
+    "freeTextBuildNotice": "Dieser Filter enthält eine Textsuche; bearbeiten Sie ihn in SQL.",
+    "filterNotChartableNotice": "Dieser Filter kann im Builder nicht als Diagramm dargestellt werden. Ihr Suchfilter bleibt unverändert; wechseln Sie zu {custom}, um ihn darzustellen."
   },
   "menu": {
     "alertCalibration": "Alarmkalibrierung",
@@ -6610,6 +6614,7 @@
     "dashboardTitleVolume": "Volumenanalyse",
     "dimensionsSelected": "Ausgewählte Abmessungen",
     "noDimensionsSelected": "Wählen Sie eine Dimension zur Analyse aus",
+    "noDimensionsSelectedDesc": "Aktivieren Sie links eine Dimension, um ihre Werte zu vergleichen",
     "durationLabel": "Dauer:",
     "failedToLoad": "Analyse konnte nicht geladen werden",
     "panelDescErrorComparison": "Fehlerprozentsatz-Vergleich für Dimension: {dimension}. Höhere ausgewählte Balken weisen darauf hin, dass dieser Dimensionswert im Fehleranstiegszeitraum mehr Fehler aufweist.",
@@ -14332,6 +14337,7 @@
         "emptyQuery": "Es gibt keine Abfrage, aus der ein Alarm erstellt werden kann.",
         "noQueries": "Dieses Panel hat keine Abfrage, aus der ein Alarm erstellt werden kann.",
         "noConstants": "Die ausgewählten Muster haben keinen markanten Text, mit dem abgeglichen werden kann.",
+        "patternsShared": "{count} der ausgewählten Muster teilen ihren gesamten Text mit anderen Mustern und fehlen deshalb im Alert-Filter.",
         "sqlModeFilterDropped": "Ihre SQL-Abfrage wurde nicht übernommen — der Alarm stimmt nur mit den ausgewählten Mustern überein.",
         "patternsUnusable": "Keines der Muster auf dieser Seite hat markanten Text, mit dem abgeglichen werden kann, daher verwendet der Alarm nur Ihre Suche.",
         "dbmRollupLag": "Datenbankkennzahlen werden alle {minutes} Minuten aggregiert, daher kann dieser Alarm nur so oft auslösen — er ist keine Echtzeit-Alarmierung.",
@@ -21692,6 +21698,7 @@
       "noFunctionDefinition": "Keine Funktionsdefinition gefunden.",
       "noStreamSaveView": "Kein Stream verfügbar, um die Ansicht zu speichern.",
       "viewAppliedSuccess": "{name} Ansicht erfolgreich angewendet.",
+      "viewAppliedRangeShortened": "{name}-Ansicht angewendet. Der Zeitbereich wurde auf die letzten {hours} Stunden des gespeicherten Bereichs gekürzt – den maximalen Abfragebereich für diesen Stream.",
       "errorApplyingSavedView": "Fehler beim Anwenden der gespeicherten Ansicht.",
       "provideValidViewName": "Bitte geben Sie einen gültigen Ansichtsnamen an.",
       "errorSavingView": "Fehler beim Speichern der Ansicht: {e}",
@@ -21780,6 +21787,7 @@
       "excludeFromQuery": "Ausschließen",
       "createAlertAction": "Alarm erstellen",
       "noMatchTerms": "Dieses Muster hat keinen unterscheidbaren Text zum Filtern.",
+      "noDistinctTextTooltip": "Jeder feste Text in diesem Muster kommt auch in einem anderen Muster vor, daher würde ein Filter auch deren Logs treffen.",
       "noStreamSelected": "Kein Stream ausgewählt. Bitte wählen Sie einen Stream aus, bevor Sie einen Alarm erstellen.",
       "alertBroadMatch": "Dieses Muster hat keinen unterscheidbaren konstanten Text – die Alarmabfrage wird weitgehend übereinstimmen. Erwägen Sie das Hinzufügen manueller Filter."
     },

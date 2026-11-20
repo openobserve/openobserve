@@ -1642,6 +1642,9 @@
     "enableSqlModeOrSelectSingleStream": "يرجى تفعيل SQL الوضع لاستخدام مخطط الوقت",
     "drillDown": "التعمق",
     "drillDownUnavailableInSqlMode": "التعمق غير متاح في وضع SQL",
+    "drillDownRunTitle": "شغّل استعلامًا لبدء التعمق",
+    "drillDownRunDescription": "يقارن التعمق قيم الأبعاد عبر أحداث بحثك. شغّل استعلامًا لتحميلها.",
+    "patternsLogsOnly": "الأنماط متاحة لتدفقات السجلات فقط",
     "buildQuery": "تصور",
     "nlpModeDisabledForVisualization": "لا يمكن تعطيل وضع اللغة الطبيعية أثناء الوضع على مخطط الوقت مع عدة تدفقات",
     "transformType": "نوع التحويل",
@@ -2065,7 +2068,8 @@
     "freeTextNoFtsTitleMulti": "لا تحتوي التدفقات المحددة على حقول نص كامل",
     "freeTextNoTextFields": "لا يحتوي هذا التدفق على حقول نصية للبحث.",
     "freeTextNoTextFieldsNamed": "لم يتم البحث: {streams} (لا توجد حقول نصية).",
-    "freeTextBuildNotice": "يحتوي هذا المُرشِّح على بحث نصي؛ حرّره في SQL."
+    "freeTextBuildNotice": "يحتوي هذا المُرشِّح على بحث نصي؛ حرّره في SQL.",
+    "filterNotChartableNotice": "لا يمكن رسم هذا الفلتر في المنشئ. فلتر البحث لديك لم يتغير؛ انتقل إلى {custom} لرسمه."
   },
   "menu": {
     "alertCalibration": "معايرة التنبيهات",
@@ -6610,6 +6614,7 @@
     "dashboardTitleVolume": "رؤى المجلد",
     "dimensionsSelected": "الأبعاد المختارة",
     "noDimensionsSelected": "اختر بُعدًا لتحليله",
+    "noDimensionsSelectedDesc": "حدّد بُعدًا على اليسار لمقارنة قيمه",
     "durationLabel": "المدة:",
     "failedToLoad": "فشل في تحميل التحليل",
     "panelDescErrorComparison": "مقارنة نسبة الخطأ للبعد: {dimension}. تشير الأشرطة المختارة الأعلى إلى أن قيمة البعد هذه تحتوي على أخطاء أكثر في فترة ارتفاع الخطأ.",
@@ -14332,6 +14337,7 @@
         "emptyQuery": "لا يوجد استعلام لإنشاء تنبيه منه.",
         "noQueries": "هذه اللوحة لا تحتوي على استعلام لإنشاء تنبيه منه.",
         "noConstants": "الأنماط المختارة لا تحتوي على نص مميز يمكن المطابقة عليه.",
+        "patternsShared": "{count} من الأنماط المختارة تشترك في كل نصها مع أنماط أخرى، لذلك يستثنيها مرشح التنبيه.",
         "sqlModeFilterDropped": "لم يتم نقل استعلامك SQL — فالتنبيه يتطابق فقط مع الأنماط المختارة.",
         "patternsUnusable": "لا تحتوي أي من الأنماط في هذه الصفحة على نص مميز لمطابقته، لذا يستخدم التنبيه بحثك فقط.",
         "dbmRollupLag": "يتم تجميع أرقام قواعد البيانات دوريًا (الفاصل بالدقائق: {minutes})، لذا يمكن أن يصدر هذا التنبيه فقط بشكل متكرر — فهو ليس صفحة في الوقت الحقيقي.",
@@ -21692,6 +21698,7 @@
       "noFunctionDefinition": "لم يتم العثور على تعريف للدالة.",
       "noStreamSaveView": "لا يوجد تدفق متاح لحفظ العرض.",
       "viewAppliedSuccess": "تم تطبيق {name} الرأي بنجاح.",
+      "viewAppliedRangeShortened": "تم تطبيق عرض {name}. تم تقصير النطاق الزمني إلى آخر {hours} ساعات من النطاق المحفوظ، وهو الحد الأقصى لنطاق الاستعلام لهذا التدفق.",
       "errorApplyingSavedView": "خطأ أثناء تطبيق العرض المحفوظ.",
       "provideValidViewName": "يرجى تقديم اسم العرض الصحيح.",
       "errorSavingView": "خطأ أثناء حفظ العرض: {e}",
@@ -21780,6 +21787,7 @@
       "excludeFromQuery": "استبعاد",
       "createAlertAction": "إنشاء تنبيه",
       "noMatchTerms": "هذا النمط لا يحتوي على نص مميز للتصفية.",
+      "noDistinctTextTooltip": "كل نص ثابت في هذا النمط يظهر أيضًا في نمط آخر، لذلك سيطابق المرشح سجلاته أيضًا.",
       "noStreamSelected": "لم يتم اختيار تدفق. يرجى اختيار تدفق قبل إنشاء تنبيه.",
       "alertBroadMatch": "هذا النمط لا يحتوي على نص ثابت مميز — استعلام التنبيه سيطابق بشكل واسع. ضع في اعتبارك إضافة فلاتر يدوية."
     },
