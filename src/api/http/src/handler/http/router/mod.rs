@@ -143,6 +143,8 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-sampling-priority"),
             X_O2_ASSISTANT_SESSION_ID,
             X_O2_ASSISTANT_TURN_ID,
+            // The assistant's turn tail resumes from it after a stop or a reload.
+            header::HeaderName::from_static("last-event-id"),
             // The public dashboard viewer polls conditionally.
             header::IF_NONE_MATCH,
         ])
@@ -5618,7 +5620,7 @@ mod tests {
             .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
             .header(
                 header::ACCESS_CONTROL_REQUEST_HEADERS,
-                "content-type,traceparent,x-o2-assistant-session-id,x-o2-assistant-turn-id",
+                "content-type,traceparent,x-o2-assistant-session-id,x-o2-assistant-turn-id,last-event-id",
             )
             .body(Body::empty())
             .unwrap();
@@ -5635,6 +5637,7 @@ mod tests {
             "traceparent",
             X_O2_ASSISTANT_SESSION_ID.as_str(),
             X_O2_ASSISTANT_TURN_ID.as_str(),
+            "last-event-id",
         ] {
             assert!(
                 allowed.split(',').any(|h| h.trim() == name),

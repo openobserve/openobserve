@@ -866,15 +866,23 @@ pub(super) fn turn_limit_response(refusal: TurnRefusal) -> Response {
         "org" => AiErrorCode::RunLimitOrg,
         _ => AiErrorCode::TurnLimit,
     };
-    let body = AiErrorEnvelope::new(
-        code,
-        "Too many AI responses are running at once; please wait for one to finish",
-    )
-    .legacy_code(TURN_LIMIT)
-    .with("scope", refusal.scope)
-    .with("limit", refusal.limit)
-    .with("active", refusal.active);
+    // `admission` is a contended cross-node lock, not a full cap; the turn may start a moment
+    // later.
+    let admission = refusal.scope == "admission";
+    let message = if admission {
+        "The assistant is busy starting another response; please retry in a moment"
+    } else {
+        "Too many AI responses are running at once; please wait for one to finish"
+    };
+    let body = AiErrorEnvelope::new(code, message)
+        .legacy_code(TURN_LIMIT)
+        .with("scope", refusal.scope)
+        .with("limit", refusal.limit)
+        .with("active", refusal.active);
     match refusal.retry_after_ms {
+        Some(wait) if admission => body
+            .with("retry_after_ms", wait)
+            .retry_after(Some(wait.div_ceil(1000))),
         Some(wait) => body.with("retry_after_ms", wait),
         None => body,
     }
@@ -2607,9 +2615,19 @@ async fn refresh_record(record: &mut TurnRecord) {
 
 /// The turn's last seq: its recorded end, else the seq before the chat's next recorded turn.
 async fn turn_end_seq(record: &TurnRecord) -> Option<i64> {
-    if record.end_seq.is_some() || record.status == TURN_RUNNING {
+    if record.end_seq.is_some() || ended_as(record).is_none() {
         return record.end_seq;
     }
+    // Read before the turn list, so a turn admitted in between is listed, not counted as ours.
+    let committed = if record.status == TURN_RUNNING {
+        ai_chat_sessions::get(&record.org_id, &record.session_id)
+            .await
+            .ok()
+            .flatten()
+            .map(|row| row.last_committed_seq)
+    } else {
+        None
+    };
     let records = match ai_chat_turns::list_for_session(&record.org_id, &record.session_id).await {
         Ok(records) => records,
         Err(e) => {
@@ -2623,7 +2641,7 @@ async fn turn_end_seq(record: &TurnRecord) -> Option<i64> {
             return record.start_seq.map(|start| start - 1);
         }
     };
-    next_turn_start(&records, record).map(|start| start - 1)
+    ended_turn_end(&records, record, committed)
 }
 
 /// `false` once the client is gone.
@@ -2645,6 +2663,22 @@ fn next_turn_start(records: &[TurnRecord], record: &TurnRecord) -> Option<i64> {
         .filter_map(|r| r.start_seq)
         .filter(|next| *next >= start)
         .min()
+}
+
+/// The last seq of an ended turn with no recorded end; `committed` is the chat's watermark now.
+fn ended_turn_end(
+    records: &[TurnRecord],
+    record: &TurnRecord,
+    committed: Option<i64>,
+) -> Option<i64> {
+    if let Some(start) = next_turn_start(records, record) {
+        return Some(start - 1);
+    }
+    // A dead `running` turn commits nothing more, so whatever commits later is the next turn's.
+    if record.status == TURN_RUNNING {
+        return committed.or(record.start_seq.map(|start| start - 1));
+    }
+    None
 }
 
 /// How the turn ended, if it did; a running record past the longest allowed turn died.
@@ -2910,6 +2944,22 @@ mod tests {
         let body = body_of(turn_limit_response(refusal("node", Some(15_000)))).await;
         assert_eq!(body["code"], "turn_limit");
         assert_eq!(body["scope"], "node");
+
+        let busy = turn_limit_response(refusal("admission", Some(1_000)));
+        assert_eq!(busy.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(busy.headers()["retry-after"], "1");
+        let body = body_of(busy).await;
+        assert_eq!(
+            (body["code"].as_str(), body["scope"].as_str()),
+            (Some("turn_limit"), Some("admission"))
+        );
+        assert_eq!(body["retry_after_ms"], 1_000);
+        assert!(
+            body["message"]
+                .as_str()
+                .unwrap()
+                .contains("retry in a moment")
+        );
     }
 
     #[tokio::test]
@@ -4211,6 +4261,29 @@ mod tests {
             next_turn_start(&records, &records[4]),
             None,
             "the newest turn is open-ended"
+        );
+    }
+
+    #[test]
+    fn an_interrupted_turn_without_an_end_stops_before_any_later_turn() {
+        let dead = record("dead", TURN_RUNNING, (Some(9), None), 45);
+        let next = record("next", TURN_RUNNING, (Some(14), None), 46);
+        assert_eq!(
+            ended_turn_end(&[dead.clone(), next], &dead, Some(20)),
+            Some(13)
+        );
+        assert_eq!(
+            ended_turn_end(std::slice::from_ref(&dead), &dead, Some(11)),
+            Some(11)
+        );
+        assert_eq!(
+            ended_turn_end(std::slice::from_ref(&dead), &dead, None),
+            Some(8)
+        );
+        let failed = record("failed", TURN_FAILED, (Some(9), None), 45);
+        assert_eq!(
+            ended_turn_end(std::slice::from_ref(&failed), &failed, None),
+            None
         );
     }
 
