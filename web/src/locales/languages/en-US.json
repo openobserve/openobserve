@@ -12202,7 +12202,24 @@
       "timeline": {
         "label": "What this looks like",
         "now": "Now",
-        "minutesAgo": "{count} min ago"
+        "minutesAgo": "{count} min ago",
+        "previous": "Previous check",
+        "latest": "Latest check",
+        "ago": "{span} ago",
+        "nowAt": "Now {time}",
+        "hoursMinutes": "{hours} h {minutes} min",
+        "readByBoth": "{span} read by both checks",
+        "readByNeither": "{span} read by neither check",
+        "backToBack": "Back to back · no gap, no overlap",
+        "newestOnly": "Newest value only · overlap doesn't apply",
+        "range": "{from} to {to}",
+        "rangeHours": "{from} to {count} hour | {from} to {count} hours",
+        "rangeMinutes": "{from} to {count} minute | {from} to {count} minutes",
+        "cronRuns": "Checks follow the cron schedule, {apart} apart. {reads}",
+        "cronOverlap": "Each check looks at the last {period}, so checks overlap by up to {minutes}.",
+        "cronGaps": "Each check looks at the last {period}, so up to {minutes} between checks is never read. | Each check looks at the last {period}, so up to {minutes} between checks are never read.",
+        "cronOverlapAndGaps": "Each check looks at the last {period}, so some checks overlap and up to {minutes} between checks is never read. | Each check looks at the last {period}, so some checks overlap and up to {minutes} between checks are never read.",
+        "rangeDays": "{from} to {count} day | {from} to {count} days"
       },
       "review": {
         "title": "Your alert so far",
@@ -12227,7 +12244,7 @@
         "checksCron": "Checks on the cron schedule {cron}, looking at the last {window}.",
         "minutes": "{count} minute | {count} minutes",
         "hours": "{count} hour | {count} hours",
-        "firesPromqlAny": "Fires when {count} or more series are {comparison} at any point in the last {window}.",
+        "firesPromqlAny": "Fires when {count} series is {comparison} at any point in the last {window}. | Fires when {count} series are {comparison} at any point in the last {window}.",
         "firesPromqlEach": "Fires for each series whose latest value is {comparison}.",
         "firesForecast": "Fires when a series is {trigger}, based on the last {window}.",
         "checksComposite": "Checks whenever one of its alerts changes state.",
@@ -12255,8 +12272,8 @@
         "compare": "Compared with the same window {offsets} earlier.",
         "compareFunction": "Compared with the same window {offsets} earlier, through a function.",
         "function": "Runs the results through a function before checking the threshold.",
-        "firesSomeGroupsCount": "Fires when at least {count} {groups} group has {condition} in the last {window}. | Fires when at least {count} {groups} groups have {condition} in the last {window}.",
-        "firesSomeGroupsValue": "Fires when {measure} is {comparison} for at least {count} {groups} group in the last {window}. | Fires when {measure} is {comparison} for at least {count} {groups} groups in the last {window}.",
+        "firesSomeGroupsCount": "Fires when {count} {groups} group has {condition} in the last {window}. | Fires when {count} {groups} groups have {condition} in the last {window}.",
+        "firesSomeGroupsValue": "Fires when {measure} is {comparison} for {count} {groups} group in the last {window}. | Fires when {measure} is {comparison} for {count} {groups} groups in the last {window}.",
         "weeks": "{count} week | {count} weeks",
         "months": "{count} month | {count} months",
         "firesCompare": "Fires when the count in the last {window} is more than {factor} times the same window {offsets} earlier.",
@@ -15713,7 +15730,12 @@
         "seriesOption": "Series",
         "totalPer": "total {noun} per",
         "switchedToCount": "Switched to count, so it counts {noun} per {field}",
-        "eachSeriesHelp": "One per series: each series over the threshold alerts on its own."
+        "eachSeriesHelp": "One per series: each series over the threshold alerts on its own.",
+        "fewerThan": "fewer than",
+        "oneForAll": "Send one alert for all of them instead",
+        "oneForAllWhen": "One alert for all of them when",
+        "oneForAllOff": "Back to one alert per group",
+        "groupsMatch": "group matches | groups match"
       },
       "editor": {
         "promql": "PromQL",
@@ -15895,7 +15917,12 @@
         "alertsHelp": "Pick 2 to 10",
         "empty": "Each alert gets a letter for the rule below",
         "insert": "Insert",
-        "staleLastState": "Stale: it has missed several checks in a row"
+        "staleLastState": "Stale: it has missed several checks in a row",
+        "staleHelp": {
+          "useLastState": "When it misses several checks in a row, its last state counts.",
+          "treatAsFalse": "When it misses several checks in a row, it counts as not firing.",
+          "treatAsTrue": "When it misses several checks in a row, it counts as firing."
+        }
       },
       "names": {
         "comparison": "Comparison",
@@ -15926,7 +15953,8 @@
         "thresholdAfter": "The threshold {threshold} is compared with {column} after the query runs.",
         "thresholdPerGroup": "The threshold {threshold} is compared with {column} for each group after the query runs.",
         "thresholdRows": "The threshold {threshold} is compared with the number of rows the query returns.",
-        "storedAs": "{value} ({stored})"
+        "storedAs": "{value} ({stored})",
+        "realtime": "Real-time alerts check each event against this query as it arrives, with no window or threshold."
       }
     },
     "copy": {
