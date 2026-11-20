@@ -613,7 +613,16 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
     else {
         return Err(DashboardError::DashboardNotFound);
     };
-    table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
+    let orphaned_reports =
+        table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
+    // Through the report service, so the report's scheduler trigger and ownership go too.
+    for report_id in orphaned_reports {
+        if let Err(e) = reports::delete_by_id(org_id, &report_id).await {
+            log::error!(
+                "[Dashboard] error deleting report {report_id} left without dashboards: {e}"
+            );
+        }
+    }
     // Keep the org's "pin to Home" setting from dangling on a deleted dashboard.
     reconcile_home_dashboard_on_delete(org_id, dashboard_id).await;
     // A public link must not outlive its dashboard; a failure shows it as "dashboard deleted".
