@@ -19,6 +19,10 @@
 // The models these pull in are named only from enterprise-gated bodies, so the
 // glob is genuinely unused on OSS. Keep the import (enterprise needs it) and
 // silence the OSS-only lint rather than splitting it behind a cfg.
+pub(crate) use openobserve_core::db_monitoring::views::RawDeadlockFallback;
+#[cfg(feature = "enterprise")]
+pub(crate) use openobserve_core::db_monitoring::views::build_raw_deadlock_presence_sql;
+
 #[cfg_attr(not(feature = "enterprise"), allow(unused_imports))]
 use super::{super::models::*, *};
 
@@ -65,74 +69,6 @@ async fn present_raw_deadlock_columns(
 }
 
 // ─── W2.3 · Activity read API ────────────────────────────────────────────────
-
-/// The A1 raw-deadlock widening, when it is active.
-///
-/// Carries the SCHEMA-GATED raw column set — the output of
-/// [`raw_deadlock_columns_in`], never a hardcoded list — because both halves of
-/// the widening (the projection and the marker predicate) name real columns, and
-/// naming an absent one fails the whole query.
-///
-/// A distinct type rather than a bare `HashSet` so the builder's other two
-/// callers cannot pass one by accident: blocking and activity share the builder
-/// and must be untouched in phase 1.
-///
-/// NOT `#[cfg]`-gated, unlike everything else A1 adds, because activity is an
-/// OSS-owned ungated page that calls the same builder — so the parameter's type
-/// has to exist in both builds. It is inert on OSS: nothing there constructs one
-/// (only the enterprise deadlocks body does), so every OSS caller passes `None`
-/// and the emitted SQL is byte-identical to before A1.
-pub(crate) struct RawDeadlockFallback {
-    /// Raw columns this stream can actually be queried for.
-    pub present: HashSet<String>,
-}
-
-impl RawDeadlockFallback {
-    /// The marker terms for the `WHERE`, restricted to marker columns the stream
-    /// HAS.
-    ///
-    /// Each marker is itself a column, so an ungated term is the same 400 as an
-    /// ungated projection entry — the half of the hazard that lives in the
-    /// predicate. A stream that never saw a MariaDB deadlock has no
-    /// `o2_maria_event` column, and naming it takes the page down.
-    ///
-    /// Values are the fixed `KIND_DEADLOCK` literal from `config`, not user
-    /// input, so there is nothing here to escape; the column names are a
-    /// compile-time whitelist for the same reason [`dbm_event_preds`] documents.
-    pub(super) fn marker_terms(&self) -> Vec<String> {
-        server_vantage::DEADLOCK_MARKERS
-            .into_iter()
-            .filter(|(col, _)| self.present.contains(*col))
-            .map(|(col, val)| format!("{col} = '{val}'"))
-            .collect()
-    }
-}
-
-/// SQL for ANY raw-marker deadlock row inside the window.
-///
-/// Schema-gated exactly like the widening it guards: each marker is a COLUMN,
-/// and naming one absent from the stream fails the WHOLE query with a 400 — so a
-/// probe that hardcodes all four markers takes the page down on precisely the
-/// deployments the fallback exists for.
-///
-/// `None` when the stream has no marker column at all: there is then no query to
-/// run, and no raw row can exist, so the caller reads that as "no raw rows" for
-/// free.
-#[cfg(feature = "enterprise")]
-pub(crate) fn build_raw_deadlock_presence_sql(
-    stream_name: &str,
-    raw: &RawDeadlockFallback,
-) -> Option<String> {
-    let markers = raw.marker_terms();
-    if markers.is_empty() {
-        return None;
-    }
-    Some(format!(
-        "SELECT _timestamp FROM \"{}\"\nWHERE ({})\nLIMIT 1",
-        escape_ident(stream_name),
-        markers.join(" OR "),
-    ))
-}
 
 /// Run both boundary probes concurrently and decide whether this window needs
 /// the raw widening.
