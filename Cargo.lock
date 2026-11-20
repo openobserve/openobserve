@@ -8124,6 +8124,7 @@ dependencies = [
  "infra",
  "ingestion-common",
  "log",
+ "md5",
  "o2_enterprise",
  "openobserve-api-common",
  "openobserve-core",
