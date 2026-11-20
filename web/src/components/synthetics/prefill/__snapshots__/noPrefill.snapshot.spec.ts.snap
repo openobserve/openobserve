@@ -10,14 +10,14 @@ exports[`synthetic check form without an AutoObserve prefill > renders the confi
     <h3 class="text-text-heading text-base font-semibold">synthetics.checkDetails.title</h3>
   </div>
   <div class="flex flex-col gap-4 px-3 py-2">
-    <o-input-stub modelvalue="HTTP Health Check" label="synthetics.checkDetails.name" errormessage="" placeholder="synthetics.checkDetails.namePlaceholder" type="text" error="false" clearable="false" revealable="false" disabled="false" required="true" autofocus="false" autogrow="false" rows="3" size="md" labelposition="outside" data-test="synthetics-check-details-name-input"></o-input-stub>
-    <o-select-stub label="synthetics.checkDetails.folder" options="[object Object]" errormessage="" placeholder="synthetics.checkDetails.folderPlaceholder" modelvalue="folder-1" multiple="false" searchable="true" searchdebounce="0" hideselected="false" collapsiblegroups="false" pinselectedingroups="false" selectall="false" creatable="false" labelkey="label" valuekey="value" required="false" error="false" clearable="false" disabled="false" size="md" appearance="field" labelposition="outside" loading="false" rowclicksingleselect="false" optiontooltip="false" data-test="synthetics-check-details-folder-select"></o-select-stub>
-    <o-switch-stub label="synthetics.checkDetails.enabled" modelvalue="true" labelposition="right" size="md" disabled="false" required="false" offtone="brand" statetext="false" data-test="synthetics-check-details-enabled-switch"></o-switch-stub>
+    <o-input-stub modelvalue="HTTP Health Check" label="synthetics.checkDetails.name" errormessage="" placeholder="synthetics.checkDetails.namePlaceholder" type="text" error="false" clearable="false" revealable="false" disabled="false" required="true" autofocus="false" autogrow="false" rows="3" size="sm" labelposition="outside" data-test="synthetics-check-details-name-input"></o-input-stub>
+    <o-select-stub label="synthetics.checkDetails.folder" options="[object Object]" errormessage="" placeholder="synthetics.checkDetails.folderPlaceholder" modelvalue="folder-1" multiple="false" searchable="true" searchdebounce="0" hideselected="false" collapsiblegroups="false" pinselectedingroups="false" selectall="false" creatable="false" labelkey="label" valuekey="value" required="false" error="false" clearable="false" disabled="false" size="sm" appearance="field" labelposition="outside" loading="false" rowclicksingleselect="false" optiontooltip="false" data-test="synthetics-check-details-folder-select"></o-select-stub>
+    <o-switch-stub label="synthetics.checkDetails.enabled" modelvalue="true" labelposition="right" size="md" disabled="false" required="false" statetext="false" data-test="synthetics-check-details-enabled-switch"></o-switch-stub>
     <o-template-input-stub modelvalue="https://example.com/health" label="synthetics.checkDetails.startingUrl" errormessage="" placeholder="synthetics.checkDetails.startingUrlPlaceholder" type="text" error="false" clearable="false" disabled="false" required="true" autofocus="false" autogrow="false" data-test="synthetics-check-details-url-input"></o-template-input-stub>
-    <o-input-stub modelvalue="Main endpoint health monitoring" label="synthetics.checkDetails.description" placeholder="synthetics.checkDetails.descriptionPlaceholder" type="textarea" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="md" labelposition="outside" data-test="synthetics-check-details-description-textarea"></o-input-stub>
+    <o-input-stub modelvalue="Main endpoint health monitoring" label="synthetics.checkDetails.description" placeholder="synthetics.checkDetails.descriptionPlaceholder" type="textarea" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="sm" labelposition="outside" data-test="synthetics-check-details-description-textarea"></o-input-stub>
     <div><label class="text-text-body mb-1 block text-sm font-medium">synthetics.checkDetails.tags</label>
       <div class="mb-2 flex items-center gap-2">
-        <o-input-stub modelvalue="" placeholder="synthetics.checkDetails.tagPlaceholder" type="text" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="md" labelposition="outside" data-test="synthetics-check-details-tag-input" class="flex-1"></o-input-stub>
+        <o-input-stub modelvalue="" placeholder="synthetics.checkDetails.tagPlaceholder" type="text" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="sm" labelposition="outside" data-test="synthetics-check-details-tag-input" class="flex-1"></o-input-stub>
         <o-button-stub variant="outline" size="sm" disabled="false" focusableunavailable="false" loading="false" spinner="true" active="false" type="button" block="false" aschild="false" as="button" data-test="synthetics-check-details-add-tag-btn"></o-button-stub>
       </div>
       <div class="flex flex-wrap gap-2">
@@ -34,7 +34,7 @@ exports[`synthetic check form without an AutoObserve prefill > renders the confi
   </div>
   <div class="flex flex-col gap-3 px-3 py-2">
     <div class="flex items-center gap-2">
-      <o-input-stub modelvalue="" placeholder="synthetics.locations.searchPlaceholder" type="search" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="md" labelposition="outside" class="flex-1" data-test="synthetics-check-locations-search"></o-input-stub>
+      <o-input-stub modelvalue="" placeholder="synthetics.locations.searchPlaceholder" type="search" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="sm" labelposition="outside" class="flex-1" data-test="synthetics-check-locations-search"></o-input-stub>
       <o-button-stub iconleft="refresh" variant="outline" size="sm" disabled="false" focusableunavailable="false" loading="false" spinner="true" active="false" type="button" block="false" aschild="false" as="button" aria-label="common.refresh" data-test="synthetics-check-locations-refresh-btn"></o-button-stub>
     </div>
     <o-checkbox-group-stub modelvalue="private-mumbai-1" disabled="false" data-test="synthetics-check-locations-group">
@@ -111,12 +111,12 @@ exports[`synthetic check form without an AutoObserve prefill > renders the confi
       </div>
     </div>
     <div class="flex flex-nowrap items-center gap-2"><label class="text-text-heading flex h-7 w-47.5 items-center font-semibold whitespace-nowrap">synthetics.scheduleAlert.alertedIfFails</label>
-      <o-input-stub modelvalue="3" placeholder="1" type="number" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="md" labelposition="outside" class="w-25!" data-test="synthetics-check-alerts-threshold-input"></o-input-stub><span class="text-text-body text-sm whitespace-nowrap">synthetics.scheduleAlert.alertedIfFailsSuffix</span>
+      <o-input-stub modelvalue="3" placeholder="1" type="number" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="sm" labelposition="outside" class="w-25!" data-test="synthetics-check-alerts-threshold-input"></o-input-stub><span class="text-text-body text-sm whitespace-nowrap">synthetics.scheduleAlert.alertedIfFailsSuffix</span>
     </div>
     <div class="flex items-center gap-2"><label class="text-text-heading flex h-7 w-47.5 items-center font-semibold">synthetics.scheduleAlert.cooldownPeriod</label>
       <div class="flex items-center">
         <div class="w-21.75">
-          <o-input-stub modelvalue="5" min="0" type="number" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="md" labelposition="outside" data-test="synthetics-check-alerts-cooldown-input"></o-input-stub>
+          <o-input-stub modelvalue="5" min="0" type="number" error="false" clearable="false" revealable="false" disabled="false" required="false" autofocus="false" autogrow="false" rows="3" size="sm" labelposition="outside" data-test="synthetics-check-alerts-cooldown-input"></o-input-stub>
         </div>
         <div class="text-text-body flex h-7 items-center justify-center ps-2 text-sm">synthetics.scheduleAlert.minutes</div>
       </div>

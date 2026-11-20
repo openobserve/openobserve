@@ -16,22 +16,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="border-card-glass-border bg-card-glass-bg w-full justify-between border-t px-1 py-px"
-    :class="showSchemaToggle || showQuickMode ? 'flex' : ''"
+    class="border-border-default bg-surface-panel m-0 box-border flex h-8 w-full shrink-0 items-center gap-1 border-t px-2 py-0.5"
   >
-    <!-- Schema Toggle Buttons -->
-    <div v-if="showSchemaToggle">
+    <div v-if="showSchemaToggle" class="flex shrink-0 items-center">
       <OToggleGroup
         :model-value="useUserDefinedSchemas"
         @update:model-value="$emit('toggle-schema', $event as string)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
-        class="schema-field-toggle mt-1 p-0"
+        class="min-h-0! shrink-0 border-0! bg-transparent! p-0!"
       >
         <OToggleGroupItem
           v-for="opt in schemaToggleOptions"
           :key="opt.value"
           :value="opt.value"
           size="sm"
+          class="size-6! shrink-0 gap-0! p-0!"
+          :aria-label="opt.slot === 'all_fields_slot' ? t('search.allFieldsLabel') : undefined"
           :data-test="
             opt.slot === 'all_fields_slot'
               ? `${dataTestPrefix}-all-fields-btn`
@@ -41,8 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template v-if="opt.slot === 'user_defined_slot'">
-            <OIcon name="person" size="xs" class="text-3xs!"></OIcon>
-            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
+            <OIcon name="person" size="sm"></OIcon>
             <OTooltip
               :content="t('search.userDefinedSchemaLabel')"
               max-width="18.75rem"
@@ -51,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template v-else-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
+            <OIcon name="schema" size="sm"></OIcon>
             <OTooltip max-width="18.75rem" side="right" align="center">
               <template #content>
                 <span class="font-bold">{{ t("search.allFieldsLabel") }}</span>
@@ -61,8 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTooltip>
           </template>
           <template v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode">
-            <OIcon name="info-outline" size="xs" class="text-3xs!" />
-            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
+            <OIcon name="info-outline" size="sm" />
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
@@ -75,19 +73,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OToggleGroup>
     </div>
 
-    <!-- Interesting Fields Toggle (when no user defined schema) -->
-    <div v-else-if="showQuickMode">
+    <div v-else-if="showQuickMode" class="flex shrink-0 items-center">
       <OToggleGroup
         :model-value="showOnlyInterestingFields"
         @update:model-value="$emit('toggle-interesting-fields', $event as boolean)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
-        class="schema-field-toggle"
+        class="min-h-0! shrink-0 border-0! bg-transparent! p-0!"
       >
         <OToggleGroupItem
           v-for="opt in interestingFieldsToggleOptions"
           :key="opt.value"
           :value="opt.value"
           size="xs"
+          class="size-6! shrink-0 gap-0! p-0!"
+          :aria-label="opt.slot === 'all_fields_slot' ? t('search.allFieldsLabel') : undefined"
           :data-test="
             opt.slot === 'all_fields_slot'
               ? `${dataTestPrefix}-all-fields-btn`
@@ -95,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template v-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
+            <OIcon name="schema" size="sm"></OIcon>
             <OTooltip max-width="18.75rem" side="right" align="center">
               <template #content>
                 <span class="font-bold">{{ t("search.allFieldsLabel") }}</span>
@@ -105,8 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTooltip>
           </template>
           <template v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode">
-            <OIcon name="info-outline" size="xs" class="text-3xs!" />
-            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
+            <OIcon name="info-outline" size="sm" />
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
@@ -119,10 +117,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OToggleGroup>
     </div>
 
-    <!-- Pagination and Reset Controls -->
-    <div class="flex items-center justify-end gap-1">
-      <!-- Pagination -->
-      <div v-if="pagesNumber > 1" class="flex h-7 items-start gap-0.5 pt-px">
+    <div class="ms-auto flex shrink-0 items-center justify-end gap-1">
+      <div v-if="pagesNumber > 1" class="flex h-6 items-center gap-0.5">
         <OTooltip
           :content="t('common.totalFields', { count: totalFieldsCount })"
           max-width="18.75rem"
@@ -130,8 +126,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           align="center"
         />
 
-        <!-- First page button -->
         <OButton
+          v-if="!allPagesVisible"
           :data-test="`${dataTestPrefix}-fields-list-pagination-firstpage-button`"
           variant="ghost"
           size="icon-chip"
@@ -142,11 +138,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="fast-rewind" size="xs" />
         </OButton>
 
-        <!-- Page number buttons (3 at a time) -->
         <template v-for="page in visiblePages" :key="page">
           <OButton
-            :variant="currentPage === page ? 'primary' : 'ghost'"
+            variant="ghost"
             size="icon-chip"
+            class="ring-1 ring-inset"
+            :class="
+              currentPage === page
+                ? 'bg-selected-bg! text-selected-fg! ring-selected-border'
+                : 'ring-transparent'
+            "
+            :aria-current="currentPage === page ? 'page' : undefined"
             :data-test="`${dataTestPrefix}-fields-list-pagination-page-${page}-button`"
             @click="$emit('set-page', page)"
           >
@@ -154,8 +156,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
 
-        <!-- Last page button -->
         <OButton
+          v-if="!allPagesVisible"
           :data-test="`${dataTestPrefix}-fields-list-pagination-lastpage-button`"
           variant="ghost"
           size="icon-chip"
@@ -167,22 +169,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <!-- Reset Fields Icon -->
-      <div class="flex items-center">
-        <OIcon
-          name="restart-alt"
-          size="sm"
-          :data-test="`${dataTestPrefix}-fields-list-reset-icon`"
-          class="cursor-pointer text-sm opacity-70 transition-opacity duration-200 hover:opacity-100!"
-          @click="$emit('reset-fields')"
-        />
+      <OButton
+        variant="ghost"
+        size="icon-chip"
+        :data-test="`${dataTestPrefix}-fields-list-reset-icon`"
+        :aria-label="t('search.resetFields')"
+        @click="$emit('reset-fields')"
+      >
+        <OIcon name="restart-alt" size="sm" class="text-text-secondary" />
         <OTooltip
           :content="t('search.resetFields')"
           max-width="18.75rem"
           side="left"
           align="center"
         />
-      </div>
+      </OButton>
     </div>
   </div>
 </template>
@@ -232,7 +233,6 @@ defineEmits<{
   "reset-fields": [];
 }>();
 
-// Get page numbers to display (3 at a time)
 const visiblePages = computed(() => {
   const pages: number[] = [];
   const { currentPage, pagesNumber } = props;
@@ -256,17 +256,7 @@ const visiblePages = computed(() => {
 
   return pages;
 });
+
+// First/last only help when some pages are off-screen.
+const allPagesVisible = computed(() => props.pagesNumber <= 3);
 </script>
-
-<style scoped>
-/* keep(complex-state): :deep overrides of the child toggle-group's [role=group] internals */
-.schema-field-toggle :deep([role="group"]) {
-  gap: 0.125rem;
-}
-
-.schema-field-toggle :deep([role="group"]) > * {
-  gap: 0.25rem;
-  height: 1.375rem;
-  min-height: unset;
-}
-</style>

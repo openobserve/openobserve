@@ -18,7 +18,7 @@ import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { formatDate, isTimeSeries } from "../../dateTimeUtils";
 import { getDataValue } from "../../aliasUtils";
 import { getFieldLabel } from "../../fieldLabel";
-import { chartAxisTextColor, chartColor } from "@/utils/chartTheme";
+import { chartAxisTextColor, chartColor, chartCrosshairLabel } from "@/utils/chartTheme";
 import { type SQLContext } from "../shared/types";
 import {
   HEATMAP_MAX_CELLS,
@@ -217,7 +217,7 @@ export function applyHeatmapChart(ctx: SQLContext): void {
       label: {
         fontsize: 12,
         precision: panelSchema.config?.decimals,
-        backgroundColor: chartColor("--color-chart-crosshair-bg"),
+        ...chartCrosshairLabel(),
       },
     }));
   if (panelSchema?.queries[0]?.customQuery == false) {

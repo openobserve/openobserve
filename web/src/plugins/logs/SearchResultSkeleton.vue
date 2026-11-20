@@ -22,29 +22,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="logs-search-result-loading-skeleton"
   >
     <div
-      class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
+      class="border-card-glass-border bg-card-glass-bg flex h-8 shrink-0 items-center border-b max-md:h-auto max-md:min-h-8 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       inert
     >
-      <OButton variant="outline" size="icon-xs-sq" class="ms-1.5 shrink-0">
+      <OButton variant="ghost" size="icon-toolbar" class="ms-1.5 shrink-0">
         <OIcon :name="collapseIcon" size="sm" />
       </OButton>
       <div class="min-w-0 flex-1 ps-2 max-md:min-w-32" />
       <div class="flex flex-none items-center justify-end gap-1 pe-2 max-md:ms-auto">
-        <OButton v-if="narrow" variant="outline" size="icon-chip">
+        <OButton v-if="narrow" variant="ghost" size="icon-toolbar">
           <OIcon name="more-horiz" size="sm" />
         </OButton>
         <template v-else>
-          <div
-            class="border-card-glass-border rounded-default inline-flex h-6 items-center overflow-hidden border px-1"
-          >
-            <ORefreshButton
-              :last-run-at="searchObj.meta.lastRunAt"
-              :loading="searchObj.loading || searchObj.loadingHistogram"
-              :disabled="searchObj.loading || searchObj.loadingHistogram"
-            />
-          </div>
+          <ORefreshButton
+            layout="inline"
+            variant="ghost"
+            class="gap-1.5! ps-2! pe-2! text-xs!"
+            :last-run-at="searchObj.meta.lastRunAt"
+            :loading="searchObj.loading || searchObj.loadingHistogram"
+            :disabled="searchObj.loading || searchObj.loadingHistogram"
+          />
           <div v-if="logsTab" class="inline-flex items-center gap-0.5">
-            <OButton variant="outline" size="icon-chip" :active="!!searchObj.meta.toggleSourceWrap">
+            <OButton
+              variant="outline"
+              :size="searchObj.meta.toggleSourceWrap ? 'sm-toolbar' : 'icon-toolbar'"
+              :active="!!searchObj.meta.toggleSourceWrap"
+            >
+              <OIcon v-if="searchObj.meta.toggleSourceWrap" name="check" size="sm" />
               <OIcon name="wrap-text" size="sm" />
             </OButton>
           </div>
@@ -66,7 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :model-value="1"
               :max="1"
               :max-pages="narrow ? 3 : 5"
-              class="paginator-section"
             />
           </span>
         </template>
@@ -136,43 +139,14 @@ onBeforeUnmount(() => observer?.disconnect());
 </script>
 
 <style scoped>
-/* keep(lib-override:opagination): sizes the OPagination/OSelect-rendered buttons, which expose no class hook */
-.paginator-section {
-  line-height: 1.5rem;
-  max-height: 2rem;
-  border-radius: 0.5rem;
-  padding: 0.125rem 0.25rem;
-  background: color-mix(in srgb, var(--color-white) 10%, transparent);
-  backdrop-filter: blur(0.625rem);
-  margin-top: 0;
-  overflow: visible;
-}
-
-.paginator-section :deep(.o-pagination__btn) {
-  padding: 0.125rem 0.25rem !important;
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
-  min-width: 1.5rem !important;
-  font-size: var(--text-xs) !important;
-  border-radius: 0.25rem !important;
-  line-height: 1rem !important;
-}
-
-.paginator-section :deep(.o-pagination__btn) svg {
-  width: 1rem !important;
-  height: 1rem !important;
-}
-
 .select-pagination {
   position: relative;
   width: 4rem !important;
-  height: 1.5rem !important;
   margin-top: 0;
 }
 
+/* keep(lib-override:oselect): the trigger keeps OSelect's 28px box but needs the toolbar's 12px text. */
 .select-pagination :deep(button) {
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
   font-size: var(--text-xs) !important;
   padding-inline: 0.5rem !important;
 }

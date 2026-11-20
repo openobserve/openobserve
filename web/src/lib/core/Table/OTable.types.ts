@@ -191,6 +191,8 @@ export interface OTableColumnMeta {
   headerTooltip?: I18nText;
   /** Additional class applied to the <td> */
   cellClass?: string;
+  /** Timestamp and ID columns: Geist Mono 12px so digits line up down the column. */
+  mono?: boolean;
   /**
    * Mark this as the primary "name" column. The record-name column renders at
    * weight 500 — enough to separate it from metadata columns (which stay 400 /

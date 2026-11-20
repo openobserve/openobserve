@@ -37,6 +37,7 @@ import {
   chartAxisLine,
   chartAxisTextColor,
   chartColor,
+  chartCrosshairLabel,
   chartNumber,
   dataZoomBrushStyle,
   CHART_SELECTION_FILL,
@@ -282,7 +283,7 @@ const layoutPromQLMetric = (
     style: {
       text,
       fontSize: calculateMetricFontSize(text, params?.coordSys?.cx * 2, params?.coordSys?.cy * 2),
-      fontWeight: 500,
+      fontWeight: 600,
       align: "center",
       verticalAlign: "middle",
       x: params?.coordSys?.cx,
@@ -845,7 +846,7 @@ export const convertPromQLData = async (
           fontSize: 12,
           precision: panelSchema.config?.decimals,
           show: true,
-          backgroundColor: chartColor("--color-chart-crosshair-bg"),
+          ...chartCrosshairLabel(),
           formatter: function (name: any) {
             if (name.axisDimension == "y")
               return formatUnitValue(
@@ -884,7 +885,7 @@ export const convertPromQLData = async (
       },
       axisLabel: {
         color: chartAxisTextColor(),
-        fontSize: 12,
+        fontSize: 11,
         // hide axis label if overlaps
         hideOverlap: true,
         // For time-based x-axis (type: "time"), rotation and truncation are not applicable
@@ -900,7 +901,7 @@ export const convertPromQLData = async (
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       axisLabel: {
         color: chartAxisTextColor(),
-        fontSize: 12,
+        fontSize: 11,
         // hide colliding tick labels instead of drawing them on top of each
         // other (short panels fit fewer labels than ECharts offers)
         hideOverlap: true,
@@ -1093,7 +1094,7 @@ export const convertPromQLData = async (
     panelSchema.type === "metric"
       ? {
           accent: chartColor("--color-accent"),
-          text: chartColor("--color-chart-metric-text"),
+          text: chartColor("--color-text-heading"),
           contrastThreshold: chartNumber("--chart-metric-contrast-threshold", 0.5),
         }
       : { accent: "", text: "", contrastThreshold: 0.5 };

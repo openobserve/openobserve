@@ -601,17 +601,17 @@ describe("DateTimePickerDashboard", () => {
       await flushPromises();
       const label = () => wrapper.find('[data-test="date-time-btn"]').text();
       const realPicker = wrapper.findComponent(DateTime);
-      expect(label()).toContain("2026/10/13 10:00:00 - 2026/10/13 10:30:00");
+      expect(label()).toContain("10/13 10:00 - 10:30");
 
       realPicker.vm.onMenuOpenChange(true);
       realPicker.vm.selectedTime = { startTime: "18:50:30", endTime: "18:25:22" };
       await flushPromises();
-      expect(label()).toContain("2026/10/13 18:50:30 - 2026/10/13 18:25:22");
+      expect(label()).toContain("10/13 18:50 - 18:25");
 
       realPicker.vm.onMenuOpenChange(false);
       await flushPromises();
 
-      expect(label()).toContain("2026/10/13 10:00:00 - 2026/10/13 10:30:00");
+      expect(label()).toContain("10/13 10:00 - 10:30");
       expect((wrapper.vm as any).gate.needsRefresh.value).toBe(false);
     });
 

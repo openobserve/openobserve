@@ -37,7 +37,7 @@ export interface ComboboxProps {
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
   required?: boolean;
   /** Input size */
-  size?: "sm" | "md";
+  size?: "xs" | "sm" | "md" | "lg";
   /** Whether the input is in an error state */
   error?: boolean;
   /** Error message shown below the input */

@@ -20,7 +20,7 @@
     <template #group-header="{ row, groupName }">
       <slot name="group-header" :row="row" :group-name="groupName">
         <div
-          class="-ms-page-edge px-page-edge bg-surface-subtle text-field-list-group-text flex h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-pointer items-center justify-between text-xs font-semibold"
+          class="-ms-page-edge px-page-edge bg-field-list-group-bg text-field-list-group-text flex h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-pointer items-center justify-between text-xs font-semibold"
           @click="toggleGroup(row.group)"
         >
           <div class="min-w-0 flex-1">
@@ -29,7 +29,10 @@
               :row="row"
               :group-name="groupName"
               :count="groupFieldCount[row.group] ?? 0"
-              >{{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})</slot
+              >{{ groupName }}
+              <span class="text-text-secondary font-normal"
+                >({{ groupFieldCount[row.group] ?? 0 }})</span
+              ></slot
             >
           </div>
           <OButton
@@ -38,11 +41,12 @@
             v-if="(groupFieldCount[row.group] ?? 0) > 0"
             variant="ghost"
             size="icon"
-            class="size-5! flex-shrink-0"
+            class="hover:bg-button-ghost-hover-bg! border! border-transparent! bg-transparent!"
           >
             <OIcon
               :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
               size="sm"
+              class="text-text-secondary! size-4!"
             />
           </OButton>
         </div>

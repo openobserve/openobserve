@@ -16,13 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col justify-center" data-test="trace-row-timestamp">
-    <span class="text-text-body font-mono text-xs" data-test="trace-row-timestamp-day">
+    <OTruncatedText
+      class="text-text-body font-mono text-xs not-italic tabular-nums"
+      data-test="trace-row-timestamp-day"
+    >
       {{ value }}
-    </span>
+    </OTruncatedText>
   </div>
 </template>
 
 <script setup lang="ts">
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+
 defineProps<{
   value: string;
 }>();

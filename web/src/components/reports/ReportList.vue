@@ -21,8 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('reports.header')"
       title-data-test="report-list-title"
       icon="description"
-      :subtitle="t('reports.subtitle')"
-      tabs-below
     >
       <template #header-tabs>
         <OTabs

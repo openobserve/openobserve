@@ -153,8 +153,9 @@ export type TracesToolbarStage = "full" | "compactButtons" | "iconToggle" | "res
 
 // Approximate rendered widths of the left-section items; the only width table the toolbar collapse reads.
 export const TRACES_TOOLBAR_WIDTHS = {
-  gap: 6,
-  buffer: 60,
+  // gap-2 between items; the buffer only absorbs rounding, so 1440 keeps the view-switch words.
+  gap: 8,
+  buffer: 24,
   toggle: { enterprise: { text: 422, icon: 150 }, oss: { text: 298, icon: 114 } },
   drillDown: { text: 97, icon: 36 },
   reset: { text: 72, icon: 36 },
@@ -171,7 +172,7 @@ export interface TracesToolbarInput {
   pinnedWidth: number;
 }
 
-const LABEL_STAGES: TracesToolbarStage[] = ["full", "compactButtons", "iconToggle"];
+const LABEL_STAGES: TracesToolbarStage[] = ["full", "compactButtons"];
 
 function tracesToolbarBaseWidth(input: TracesToolbarInput, stage: TracesToolbarStage): number {
   const w = TRACES_TOOLBAR_WIDTHS;
@@ -182,11 +183,12 @@ function tracesToolbarBaseWidth(input: TracesToolbarInput, stage: TracesToolbarS
     w.more,
   ];
   if (input.drillDown) widths.push(w.drillDown[label]);
-  if (input.reset && stage !== "resetInMenu") widths.push(w.reset[label]);
+  // Reset keeps its word label at every stage; an icon-only reset reads as "refresh".
+  if (input.reset && stage !== "resetInMenu") widths.push(w.reset.text);
   return widths.reduce((sum, x) => sum + x, 0) + (widths.length - 1) * w.gap;
 }
 
-/** Picks the collapse stage for a left-section width; labels shrink before a pinned group drops into More. */
+/** Picks the collapse stage for a left-section width; pinned groups drop into More before the view switch loses its words. */
 export function tracesToolbarLayout(input: TracesToolbarInput): {
   stage: TracesToolbarStage;
   pinnedBudget: number;
@@ -195,6 +197,10 @@ export function tracesToolbarLayout(input: TracesToolbarInput): {
     tracesToolbarBaseWidth(input, stage) + extra + TRACES_TOOLBAR_WIDTHS.buffer <= input.available;
   const stage: TracesToolbarStage =
     LABEL_STAGES.find((s) => fits(s, input.pinnedWidth)) ??
-    (fits("iconToggle", 0) || !input.reset ? "iconToggle" : "resetInMenu");
+    (fits("compactButtons", 0)
+      ? "compactButtons"
+      : fits("iconToggle", 0) || !input.reset
+        ? "iconToggle"
+        : "resetInMenu");
   return { stage, pinnedBudget: input.available - tracesToolbarBaseWidth(input, stage) };
 }

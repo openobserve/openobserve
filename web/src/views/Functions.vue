@@ -37,17 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          nothing here — their content components have their own headers. -->
       <OPageHeader
         :title="showPipelineActions ? t('menu.pipeline') : breadcrumbLabel"
-        :subtitle="
-          showPipelineActions
-            ? t('pipeline.subtitle')
-            : routeName === 'createPipeline'
-              ? breadcrumbLabel
-              : raw('')
-        "
         :title-overflow="routeName === 'createPipeline' ? 'visible' : 'truncate'"
         :icon="showPipelineActions ? 'lan' : undefined"
         :back="detailBack"
-        :tabs-below="showPipelineActions"
         class="border-border-default border-b"
       >
         <!-- Section switcher tabs (Stream Pipelines / Functions / …) next to the

@@ -204,24 +204,25 @@ export const addCommasToNumber = (number: number) => {
   return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
+// One unit per value with a space before it ("16.71 ms", "513 µs").
 export const formatTimeWithSuffix = (us: number) => {
   if (!us || us === 0) {
-    return "0us";
+    return "0 µs";
   }
 
   if (us >= 1000 * 1000 * 60) {
-    return `${(us / 1000 / 1000 / 60).toFixed(2)}m`;
+    return `${(us / 1000 / 1000 / 60).toFixed(2)} min`;
   }
 
   if (us >= 1000 * 1000) {
-    return `${(us / 1000 / 1000).toFixed(2)}s`;
+    return `${(us / 1000 / 1000).toFixed(2)} s`;
   }
 
   if (us >= 1000) {
-    return `${(us / 1000).toFixed(2)}ms`;
+    return `${(us / 1000).toFixed(2)} ms`;
   }
 
-  return `${us.toFixed(2)}us`;
+  return `${Number(us.toFixed(2))} µs`;
 };
 
 export function formatMs(ms: number | null): string {

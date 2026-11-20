@@ -116,7 +116,6 @@
     },
     "overview": {
       "title": "SOC 概覽",
-      "subtitle": "哪些已觸發、哪些尚未解決，以及您的來源是否仍在回報",
       "autoRefreshOn": "每分鐘自動重新整理已開啟",
       "autoRefreshOff": "自動重新整理已關閉",
       "historyError": "無法載入偵測歷程：{reason}",
@@ -165,7 +164,6 @@
     },
     "events": {
       "title": "安全事件",
-      "subtitle": "跨正規化安全遙測資料進行威脅狩獵",
       "run": "執行",
       "hideSidebar": "隱藏欄位",
       "showSidebar": "顯示欄位",
@@ -348,7 +346,6 @@
     },
     "alerts": {
       "title": "警示",
-      "subtitle": "每次偵測觸發的紀錄，以及其背後的證據",
       "eyebrow": "偵測觸發",
       "range": {
         "1h": "1h",
@@ -463,7 +460,6 @@
     },
     "cases": {
       "title": "案件",
-      "subtitle": "相關聯的觸發中警示，經分診後得出判定",
       "eyebrow": "案件",
       "search": "依標題、ID、指派對象或實體篩選此頁面",
       "refresh": "重新整理",
@@ -712,7 +708,6 @@
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
-      "subtitle": "您啟用的偵測涵蓋哪些技術，以及哪些已觸發",
       "summaryPartial": "此時間範圍的警示歷史超過單一摘要可容納的數量，因此觸發次數僅為下限；請選擇較短的時間範圍以取得完整數字。",
       "stat": {
         "firing": "觸發中的技術",
@@ -775,7 +770,6 @@
     },
     "detections": {
       "title": "偵測",
-      "subtitle": "以排程偵測形式在您的安全串流上執行的 Sigma 規則",
       "new": "新增偵測",
       "eyebrow": "偵測規則",
       "refresh": "重新整理偵測",
@@ -1073,7 +1067,6 @@
     },
     "content": {
       "title": "內容",
-      "subtitle": "SIEM 隨附的偵測規則與日誌來源，會與您的資料進行比對",
       "refresh": "重新整理",
       "streamsError": "無法載入您的串流，因此無法得知與您資料的相符情形",
       "tab": {
@@ -1219,7 +1212,6 @@
     },
     "entities": {
       "title": "實體",
-      "subtitle": "您的安全來源所提及的每個使用者、來源 IP 與主機",
       "view": {
         "table": "表格",
         "graph": "風險圖"
@@ -1339,7 +1331,6 @@
     },
     "ueba": {
       "title": "使用者行為分析",
-      "subtitle": "每位使用者與其自身近期行為相比",
       "windowHint": "最近 {current}，與其之前的 {baseline} 相比",
       "method": "風險分數採用啟發式方法：將每位使用者最近 {current} 的資料與其自身先前的 {baseline} 相比。每個標記都會顯示使其升高的數字。",
       "noSources": "沒有來源可識別使用者",
@@ -1438,7 +1429,6 @@
     },
     "intel": {
       "title": "威脅情報",
-      "subtitle": "已知的惡意指標，以及它們在您的安全資料中出現的每一處",
       "loadFailed": "無法載入指標清單",
       "add": "新增指標",
       "import": "匯入",
@@ -1607,7 +1597,6 @@
     "sources": {
       "title": "資料來源",
       "comingSoon": "搭配 OCSF 正規化範本的引導式上線流程即將推出。在此之前，請像一般串流一樣擷取安全日誌；事件頁面會自動識別並正規化它們。",
-      "subtitle": "附加 OCSF 套件以在擷取時正規化串流，或直接將其納為安全來源。",
       "colStream": "串流",
       "colSourceType": "來源類型",
       "colMapping": "對應",

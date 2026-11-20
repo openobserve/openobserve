@@ -1424,6 +1424,8 @@
     "selectOrganization": "조직을 선택하세요."
   },
   "search": {
+    "liveRefreshingEvery": "Live: refreshing every {interval}",
+    "rowsPerPageLabel": "{n} / page",
     "queryFailed": "쿼리 실패",
     "unknownError": "알 수 없는 오류",
     "selectedLabel": "선택됨",
@@ -2075,7 +2077,6 @@
   "menu": {
     "alertCalibration": "알림 캘리브레이션",
     "autoobserve": "AutoObserve",
-    "upgradeToProPlan": "PRO 플랜으로 업그레이드",
     "home": "홈",
     "about": "정보",
     "index": "스트림",
@@ -2134,7 +2135,6 @@
   },
   "profiles": {
     "title": "프로파일",
-    "subtitle": "함수별 CPU, 메모리 및 잠금 사용량 추적",
     "stream": "스트림",
     "dataSource": "데이터 소스",
     "service": "서비스",
@@ -2285,7 +2285,6 @@
     "from": "부터",
     "to": "까지",
     "title": "실제 사용자 모니터링",
-    "subtitle": "실제 사용자 세션, 오류 및 프론트엔드 성능 모니터링",
     "issueColumn": "이슈",
     "trendColumn": "트렌드",
     "usersColumn": "유저",
@@ -3325,7 +3324,6 @@
         "bulkDeleteMessage": "명명된 이벤트 {count}개를 삭제하시겠습니까? 이를 사용하는 퍼널에는 삭제된 단계 태그가 표시됩니다. | 명명된 이벤트 {count}개를 삭제하시겠습니까? 이를 사용하는 퍼널에는 삭제된 단계 태그가 표시됩니다.",
         "bulkDeleteInUseMessage": "명명된 이벤트 {count}개를 삭제하시겠습니까? 저장된 퍼널에 다음에 대한 삭제된 이벤트 단계가 표시됩니다: {names}. | 명명된 이벤트 {count}개를 삭제하시겠습니까? 저장된 퍼널에 다음에 대한 삭제된 이벤트 단계가 표시됩니다: {names}.",
         "notFound": "이 명명된 이벤트는 더 이상 존재하지 않습니다",
-        "editorApp": "앱: {app}",
         "details": "세부 정보",
         "opParam": "URL 매개변수",
         "opRef": "리퍼러 호스트",
@@ -4004,11 +4002,6 @@
     "license_downgrade_limit": "일일 한도가 {old}에서 {new}(으)로 변경됩니다",
     "license_downgrade_expiry": "만료일이 {old}에서 {new}(으)로 변경됩니다",
     "license_limit_per_day": "{gb} GB/일",
-    "header_button": {
-      "cloud_features": "{product} 기능",
-      "enterprise_edition": "에디션: 엔터프라이즈",
-      "get_enterprise_free": "오픈옵저브 엔터프라이즈 받기 (무료)"
-    },
     "enterprise_offer": {
       "cloud": {
         "hero_title": "엔터프라이즈 기능",
@@ -4203,7 +4196,14 @@
     "usageChartDate": "{month}월 {day}일",
     "usageChartDay": "{day}일차",
     "usageChartUsage": "사용량: {value}",
-    "startFreeTrial": "무료 체험 시작"
+    "startFreeTrial": "무료 체험 시작",
+    "header_button": {
+      "upgrade": "Upgrade",
+      "enterprise_tooltip": "About {product} — Enterprise edition",
+      "cloud_features": "{product} 기능",
+      "enterprise_edition": "에디션: 엔터프라이즈",
+      "get_enterprise_free": "오픈옵저브 엔터프라이즈 받기 (무료)"
+    }
   },
   "login": {
     "lockedOut": "로그인 시도 실패 횟수가 너무 많습니다. {duration} 후에 다시 시도하거나 관리자에게 문의하세요.",
@@ -4379,7 +4379,6 @@
     "nameInvalid": "소문자, 숫자, 하이픈 사용 ({max}자까지)",
     "createFailed": "서비스 계정 생성에 실패했습니다. 다시 시도해 주세요.",
     "updateFailed": "서비스 계정 업데이트에 실패했습니다. 다시 시도해 주세요.",
-    "headerSubtitle": "API용 프로그래밍 액세스 토큰",
     "search": "서비스 계정 검색",
     "rotate": "토큰 교체",
     "deleteServiceAccount": "서비스 계정 삭제",
@@ -4472,7 +4471,6 @@
     "mcpServerLabel": "MCP 서버",
     "mcpServerDesc": "AI 클라이언트를 {product}를 통해 연결하세요",
     "mcpServerHeader": "MCP 서버",
-    "mcpServerHeaderSubtitle": "Claude, Cursor, VS Code 및 기타 AI 클라이언트를 이 조직에 연결합니다.",
     "invitationsDesc": "보류 중인 구성원 초대 및 보낸 구성원 초대",
     "groupsDesc": "사용자를 그룹화하여 역할을 할당합니다.",
     "rolesDesc": "권한 및 액세스 정책 정의",
@@ -4901,7 +4899,6 @@
       "other": "기타"
     },
     "invitationList": {
-      "subtitle": "보류 중 및 전송된 멤버 초대",
       "loadingPending": "보류 중인 초대 로드 중...",
       "failedLoadPending": "보류 중인 초대 로드 실패",
       "accepting": "초대 수락 중...",
@@ -4955,7 +4952,6 @@
       "errorCreating": "그룹 생성 중 오류"
     },
     "quotaPage": {
-      "subtitle": "역할별 사용량 제한 적용",
       "selectOrganization": "조직 선택",
       "editQuota": "할당량 편집",
       "selectApiCategory": "API 카테고리 선택",
@@ -5082,7 +5078,6 @@
       "brand": "선명한 파랑"
     },
     "list": {
-      "subtitle": "모든 조직에 표시되거나 선택한 조직에만 표시되는 앱 상단의 공지입니다.",
       "liveNow": "현재 게시 중",
       "liveNowEmpty": "현재 표시 중인 배너가 없습니다.",
       "liveOnlyFor": "{orgs}에만 표시",
@@ -5276,7 +5271,6 @@
     },
     "deleteField": "필드 삭제",
     "header": "스트림",
-    "subtitle": "인덱스 관리 및 스트림 구성",
     "streamNameHelpText": "영숫자, 밑줄 및 콜론만 사용하십시오.",
     "search": "스트림 검색",
     "emptyOr": "또는:",
@@ -5367,7 +5361,6 @@
   },
   "workflow": {
     "header": "워크플로우",
-    "subtitle": "트리거, 로직 및 대상으로 액션 자동화",
     "create": "새 워크플로우",
     "createSuccess": "워크플로우가 생성되었습니다",
     "name": "워크플로우 이름",
@@ -6279,7 +6272,6 @@
     "functionName": "함수 이름",
     "remoteDestination": "원격 대상",
     "failedToLoadPipeline": "파이프라인을 불러오지 못했습니다.",
-    "subtitle": "이동 중 데이터 변환, 강화 및 라우팅",
     "deleteNode": "삭제",
     "addPipeline": "파이프라인 추가",
     "deletePipeline": "파이프라인 삭제",
@@ -6526,7 +6518,6 @@
     "order": "순서",
     "applyBeforeFlattening": "플래트닝 전에 적용",
     "header": "함수",
-    "subtitle": "파이프라인에 적용된 재사용 가능한 VRL 함수",
     "clickTestFunctionHint": "이벤트를 보려면 [함수 테스트] 를 클릭하십시오.",
     "add": "새 함수 생성",
     "search": "함수 검색",
@@ -6550,7 +6541,6 @@
     "enterFunctionPrompt": "함수 생성 프롬프트 입력",
     "associatedFunctionHeader": "관련 함수",
     "enrichmentTables": "보강 테이블",
-    "enrichmentTablesSubtitle": "수집된 데이터를 강화하는 룩업 테이블",
     "addEnrichmentTable": "새 보강 테이블",
     "updateEnrichmentTable": "보강 테이블 업데이트",
     "searchEnrichmentTable": "보강 테이블 검색",
@@ -10147,7 +10137,6 @@
     "publicLinks": {
       "panelTitle": "공개 링크",
       "pageTitle": "공개 대시보드",
-      "pageSubtitle": "이 조직의 모든 공개 링크",
       "panelTitleFor": "공개 링크 — {name}",
       "intro": "공개 링크를 가진 사람은 로그인하지 않고도 이 대시보드를 볼 수 있습니다.",
       "editNote": "링크 주소는 그대로 유지됩니다. 변경 사항은 다음 업데이트 시 공개 페이지에 반영됩니다.",
@@ -10534,7 +10523,6 @@
     "tabOverview": "개요",
     "tabUsage": "사용량",
     "removeHomeDashboard": "홈 대시보드 제거",
-    "subtitle": "옵저버빌리티 워크스페이스 한 눈에 보기",
     "resources": "리소스",
     "explore": "탐색"
   },
@@ -11476,7 +11464,6 @@
   },
   "alertCalibration": {
     "title": "알림 캘리브레이션",
-    "subtitle": "알림이 자체 실행 기록을 기준으로 어떻게 동작하는지 보여줍니다",
     "configure": "구성",
     "runNow": "지금 실행",
     "runNowHint": "다음 실행을 기다리지 않고 지금 실행을 요청합니다. 이미 실행 예정이거나 진행 중인 경우에는 해당 요청에 응답합니다.",
@@ -11898,7 +11885,6 @@
     "detail": {
       "title": "{time}의 다이제스트",
       "titleLoading": "다이제스트",
-      "subtitle": "{start}부터 {end}까지 포함, {time}에 생성됨",
       "back": "다이제스트",
       "unavailableTitle": "다이제스트를 사용할 수 없음",
       "noRecords": "이 실행에 대한 레코드를 찾을 수 없습니다.",
@@ -12707,7 +12693,6 @@
       "commentPlaceholder": "댓글 작성...",
       "sendComment": "댓글 보내기",
       "title": "인시던트",
-      "subtitle": "인시던트 관리 및 추적",
       "search": "인시던트 검색...",
       "status": "상태",
       "severity": "심각도",
@@ -14158,7 +14143,6 @@
       "firingTotal": "발생 중",
       "observedTotal": "그룹",
       "nOfMFiring": "{firing} / {observed} 그룹 발생 중",
-      "groupedBy": "{columns}별로 그룹화됨",
       "groupBy": "그룹화 기준",
       "criticalCondition": "치명적 조건",
       "warningCondition": "경고 조건",
@@ -14506,7 +14490,6 @@
         "startDateRequired": "첫날을 선택하세요."
       },
       "title": "다운타임",
-      "subtitle": "알림, 이상 탐지, Synthetics 검사는 계속 실행하되 알림 전송을 중지하는 예약된 기간",
       "newDowntime": "새 다운타임",
       "filterAll": "전체",
       "filterOnce": "일회성",
@@ -15416,7 +15399,6 @@
   },
   "alert_sources": {
     "header": "외부 알림 소스",
-    "subtitle": "Grafana, Prometheus Alertmanager 또는 웹훅을 호출할 수 있는 모든 도구에서 알림을 보내세요 — 여기에 표시되고 자동으로 인시던트로 연관됩니다.",
     "acceptsAnyFormat": "모든 웹훅 형식 허용",
     "revealToken": "전체 URL 표시",
     "hideToken": "전체 URL 숨기기",
@@ -16504,11 +16486,7 @@
     "modelPricingEditor": {
       "copySuffix": " (복사)"
     },
-    "modelPricingList": {
-      "subtitle": "LLM 모델 비용 구성"
-    },
     "orgStorageSettings": {
-      "subtitle": "조직별 스토리지 구성",
       "awsCredentials": "AWS 자격 증명",
       "azureCredentials": "Azure 자격 증명",
       "awsRoleArn": "AWS 역할 ARN"
@@ -16541,11 +16519,7 @@
       "settingsUpdated": "조직 설정이 성공적으로 업데이트되었습니다.",
       "settingsSaveError": "조직 설정 저장 중 오류가 발생했습니다."
     },
-    "aiToolsetsPage": {
-      "subtitle": "AI 도구 통합 구성"
-    },
     "cipherKeysPage": {
-      "subtitle": "민감한 필드용 암호화 키",
       "delete": "삭제",
       "deleteCipherKeyTitle": "암호화 키 삭제",
       "deleteCipherKeyMessage": "{name} 암호화 키를 삭제하시겠습니까?",
@@ -16560,15 +16534,11 @@
       "bulkDeleteFailed": "암호화 키 {count}개를 삭제하지 못했습니다 | 암호화 키 {count}개를 삭제하지 못했습니다",
       "bulkDeleteError": "암호화 키 삭제 중 오류가 발생했습니다."
     },
-    "correlationSettingsPage": {
-      "subtitle": "원격 측정 상관 관계 구성"
-    },
     "licensePage": {
       "unexpectedError": "예상치 못한 오류",
       "daysRemaining": "라이선스 만료까지 {days}일 남았습니다."
     },
     "nodesPage": {
-      "subtitle": "클러스터 노드 및 상태",
       "to": "~",
       "name": "이름",
       "loadingData": "데이터를 로드하는 동안 기다려 주세요...",
@@ -16656,7 +16626,6 @@
       "processingTrialExtension": "평가판 기간 연장 요청을 처리하는 동안 기다려 주세요...",
       "trialExtendedSuccess": "평가판 기간이 성공적으로 연장되었습니다.",
       "extendTrialError": "평가판 기간 연장에 실패했습니다. 다시 시도해 주세요.",
-      "subtitle": "조직 생성 및 관리",
       "addContract": "계약 추가",
       "extendTrialTitle": "{name}의 평가판 연장",
       "extendTrialSubtitle": "새 평가판 연장 기간을 설정하세요.",
@@ -16776,7 +16745,6 @@
       "sourceBuiltIn": "내장"
     },
     "regexPatternList": {
-      "subtitle": "편집에 사용할 재사용 가능한 정규식 패턴",
       "exportTitle": "정규식 패턴 내보내기",
       "delete": "삭제",
       "bulkDeleteTitle": "정규식 패턴 삭제",
@@ -16870,7 +16838,6 @@
         "valueMismatch": "TXT 레코드를 찾았지만 값이 일치하지 않습니다",
         "dnsFailed": "DNS 조회에 실패했습니다"
       },
-      "pageSubtitle": "이메일 도메인을 연결하고, 해당 사용자를 조직에 매핑하고, 참여할 수 있는 사용자를 제어하세요.",
       "linkedTab": "연결된 도메인",
       "mappingsTab": "매핑",
       "accessTab": "차단된 사용자",
@@ -16993,7 +16960,6 @@
       "lastRun": "마지막 실행",
       "lastRunAt": "실행 시각",
       "nextRun": "다음 실행",
-      "nextRunAt": "다음 실행 {time}",
       "acceptedTooltip": "메일 서버가 수락함",
       "cachedTooltip": "대시보드 캐시를 미리 채웠습니다. 이메일은 보내지 않습니다",
       "unrecordedTooltip": "최근 실행 결과가 기록되지 않았습니다. 이전 실행은 기록에서 확인할 수 있습니다.",
@@ -17067,9 +17033,7 @@
       "everyHours": "매시간 | {count}시간마다",
       "everyDays": "매일 | {count}일마다",
       "everyWeeks": "매주 | {count}주마다",
-      "everyMonths": "매월 | {count}개월마다",
-      "dashboardCount": "대시보드 {count}개 | 대시보드 {count}개",
-      "recipientCount": "수신자 {count}명 | 수신자 {count}명"
+      "everyMonths": "매월 | {count}개월마다"
     },
     "frequencyUnits": {
       "days": "일",
@@ -17097,7 +17061,6 @@
     "never": "안 함",
     "startDate": "시작 날짜",
     "header": "보고서",
-    "subtitle": "정기 보고서 및 내보내기",
     "searchThisFolder": "이 폴더",
     "searchAllFolders": "모든 폴더",
     "reloadReports": "보고서 다시 로드",
@@ -18741,7 +18704,6 @@
     },
     "unpriced": {
       "title": "가격 공백",
-      "subtitle": "수집 시점에 가격이 없거나 대략적인 가격만 있었던 LLM 트레이스의 모델",
       "banner": "수집 시점에 {count}개 모델에 가격이 없거나 대략적인 가격만 있었습니다. 기록된 비용이 불완전할 수 있습니다. | 수집 시점에 {count}개 모델에 가격이 없거나 대략적인 가격만 있었습니다. 기록된 비용이 불완전할 수 있습니다.",
       "bannerTruncated": "트레이스의 모델 {total}개는 수집 시점에 가격이 없거나 대략적인 가격만 있었습니다. 비용이 잘못되었을 수 있습니다. 토큰 기준 상위 {shown}개를 표시합니다.",
       "streamLabel": "스트림",
@@ -18862,7 +18824,6 @@
       "tools": "도구"
     },
     "promptManagement": {
-      "subtitle": "재사용 가능한 프롬프트를 생성하고 버전을 관리하며 릴리스합니다.",
       "promptSubtitle": "{type} 프롬프트",
       "prompt": "프롬프트",
       "promptId": "프롬프트 ID",
@@ -19302,7 +19263,6 @@
         }
       },
       "workbench": {
-        "subtitle": "{reviewed} 중 {total} 검토됨",
         "itemCounter": "검토할 항목 {index} / {total}",
         "prev": "이전 항목",
         "next": "다음 항목",
@@ -19782,7 +19742,6 @@
       },
       "detail": {
         "fallbackTitle": "데이터셋",
-        "meta": "{count}개 항목 · 업데이트됨 {updated}",
         "loadError": "데이터셋을 불러오지 못했습니다",
         "tryInPlayground": "플레이그라운드에서 사용해 보기",
         "tabs": {
@@ -20746,7 +20705,6 @@
       "backTo": "공급자",
       "createTitle": "LLM 공급자 생성",
       "editTitle": "LLM 공급자 편집",
-      "subtitle": "LLM 심사자 스코어러가 사용하는 모델 엔드포인트를 구성합니다.",
       "sectionTitle": "공급자",
       "nameLabel": "이름",
       "typeLabel": "공급자 유형",
@@ -22705,9 +22663,7 @@
       "usedBy": {
         "aria": "이 테스트를 사용하는 테스트",
         "help": "이들은 자체 페이지에서 이 단계들을 실행합니다. 이 테스트의 시작 URL, 환경 및 시크릿은 여기서 사용되지 않습니다.",
-        "viewAll": "{count}개 테스트 모두 보기",
-        "subtitle": "{folder} · {count}개 테스트에서 사용 | {folder} · {count}개 테스트에서 사용",
-        "subtitleNoFolder": "{count}개 테스트에서 사용 | {count}개 테스트에서 사용"
+        "viewAll": "{count}개 테스트 모두 보기"
       },
       "recordingIn": "{environment}에서 기록 중",
       "needsDesktopRecorder": "데스크톱 레코더 확장 프로그램 필요",
@@ -22918,7 +22874,6 @@
       "folder": "폴더",
       "willBeCreatedIn": "다음 위치에 생성됨"
     },
-    "pageSubtitle": "전 세계 위치에서 가동 시간, 성능 및 사용자 여정을 사전 예방적으로 모니터링",
     "pageTitle": "Synthetics",
     "protocolConfig": {
       "http": {
@@ -24947,7 +24902,6 @@
     "title": "SLO",
     "notFound": "SLO를 찾을 수 없음",
     "notFoundDescription": "이 SLO는 더 이상 존재하지 않거나 액세스 권한이 없습니다. 삭제되었을 수 있습니다.",
-    "subtitle": "서비스 수준 목표: 목표, 오류 예산, 소진율 알림",
     "new": "새 SLO",
     "newTitle": "새 SLO",
     "editTitle": "SLO 편집",
@@ -24965,7 +24919,6 @@
     "totalSlos": "총 SLO",
     "noGrouping": "없음 (단일 전체 시리즈)",
     "newAlert": "새 알림",
-    "overRolling": "롤링 {window} 동안",
     "searchPlaceholder": "SLO 또는 태그 검색, 예: team:payments",
     "loadFailed": "SLO를 불러올 수 없습니다",
     "requestFailed": "요청 실패 ({code})",
@@ -26075,7 +26028,6 @@
       "groupWorkloads": "워크로드",
       "groupStorage": "스토리지",
       "groupAutoscaling": "오토스케일링",
-      "subtitle": "클러스터, 워크로드, 리소스 모니터링",
       "clusterPickerLabel": "클러스터",
       "clusterPickerLoading": "클러스터 로드 중…",
       "clusterPickerTrigger": "클러스터: {name}",
@@ -26533,8 +26485,7 @@
       "actions": "작업"
     },
     "header": {
-      "title": "데이터베이스",
-      "subtitle": "데이터베이스 전반의 쿼리 성능 및 상태"
+      "title": "데이터베이스"
     },
     "ai": {
       "suggestFix": "AI에게 수정 방법 묻기",
@@ -27799,7 +27750,6 @@
     "fromRotation": "{name} 소속",
     "ownershipMatch": "일치",
     "ownershipSpecificity": "차원",
-    "teamSubtitle": "{tz} · {count}명 | {tz} · {count}명",
     "statOnCallNow": "현재 온콜",
     "statRotations": "로테이션",
     "statRoutingRules": "라우팅 규칙",
@@ -28800,7 +28750,6 @@
     "teamOpenInOnCall": "온콜에서 모두 보기",
     "teamCoverage": "향후 {days}일 커버리지",
     "teamCoverageHint": "여기서 봐야 할 것은 공백뿐입니다.",
-    "teamOwnsRules": "{count}개의 라우팅 규칙 보유 | {count}개의 라우팅 규칙 보유",
     "teamCoveredNow": "현재 담당 중",
     "teamOverview": "개요",
     "teamAnsweredBy": "응답자",
@@ -29493,7 +29442,6 @@
       "allClearNone": "조치가 필요한 항목이 없습니다."
     },
     "title": "AutoObserve",
-    "subtitle": "데이터를 전송하세요. OpenObserve가 문제를 찾아내고 원인에 대한 최선의 해석과 함께 알려드립니다. 조용할 때는 무엇을 확인했고 무엇을 볼 수 없는지 보여줍니다.",
     "tabs": {
       "issues": "이슈",
       "coverage": "커버리지",
@@ -30425,7 +30373,6 @@
     },
     "issuesPage": {
       "title": "모든 이슈",
-      "sentence": "{within} 제가 생성한 모든 문제입니다. 하나를 선택하면 무슨 일이 있었고 제가 어떻게 대응했는지 확인할 수 있습니다.",
       "ranges": {
         "week": "지난 7일",
         "month": "지난 30일",
@@ -32182,7 +32129,6 @@
   },
   "fleet": {
     "title": "플릿 관리",
-    "subtitle": "OpenTelemetry 수집기를 등록하고, 구성을 버전으로 관리하며, 변경 사항을 안전하게 롤아웃하세요",
     "addCollector": "수집기 추가",
     "tabs": {
       "collectors": "수집기",
@@ -32721,7 +32667,6 @@
     },
     "editor": {
       "pageTitle": "구성 편집기",
-      "newDescription": "새 수집기 구성",
       "visual": "시각",
       "issues": "문제 {count}개 | 문제 {count}개",
       "valid": "유효함",

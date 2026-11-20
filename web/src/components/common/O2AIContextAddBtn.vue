@@ -2,35 +2,25 @@
   <!-- ai button is only enabled when it is enteprise version and also ai is enabled from the BE -->
   <OButton
     v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-    variant="ghost"
+    variant="outline"
     size="icon-toolbar"
     @click.stop="sendToAiChat"
     data-test="o2-ai-context-add-btn"
     :aria-label="t('menu.aiAssistant')"
-    class="group hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease] hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:shadow-md dark:hover:shadow-md"
     :class="props.class"
     :style="props.style"
   >
-    <div class="flex flex-nowrap items-center">
-      <img
-        alt=""
-        :height="props.imageHeight"
-        :width="props.imageWidth"
-        :src="getBtnLogo"
-        class="header-icon ai-icon [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
-      />
-    </div>
+    <OIcon name="auto-awesome" size="sm" class="text-ai-accent" />
   </OButton>
 </template>
 
 <script setup lang="ts">
-import { getImageURL } from "@/utils/zincutils";
 import { useI18nTyped } from "@/types/i18n";
-import { computed, type PropType } from "vue";
+import { type PropType } from "vue";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
-import useTheme from "@/composables/useTheme";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 const { t } = useI18nTyped();
 //we can pass class to the button to make it customized
 //all of the props are optional
@@ -53,8 +43,7 @@ const props = defineProps({
     default: "",
     required: false,
   },
-  //this is for image height and width sometimes we need to change the size of the image
-  // HTML dimension attributes: bare integer only. A rem value here renders at 1/16 scale (width="1.25rem" → 1.25px) with no error.
+  // Accepted for backward compatibility; declared so callers' values do not fall through to the button.
   imageHeight: {
     type: String,
     default: "20",
@@ -69,12 +58,6 @@ const props = defineProps({
 //once user clicks on the button, it will emit the event to the parent component
 const emit = defineEmits(["sendToAiChat"]);
 const store = useStore();
-const { isDark } = useTheme();
-const getBtnLogo = computed(() => {
-  return isDark.value
-    ? getImageURL("images/common/ai_icon_dark.svg")
-    : getImageURL("images/common/ai_icon_gradient.svg");
-});
 //this function is responsible for sending the event / button is clicked to the parent component
 const sendToAiChat = () => {
   emit("sendToAiChat");

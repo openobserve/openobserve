@@ -385,3 +385,13 @@ describe("QueryErrorState protected-stream refusal without Alert Calibration (OS
     expect(wrapper.find('[data-test="query-error-open-calibration-card"]').exists()).toBe(false);
   });
 });
+
+describe("QueryErrorState Ask AI", () => {
+  it("rests Ask AI on the outline fill and shows the compact illustration", () => {
+    const wrapper = mountState({ errorCode: 20001, aiEnabled: true });
+    const btn = wrapper.find('[data-test="query-error-ask-ai-btn"]');
+    expect(btn.attributes("data-o2-variant")).toBe("outline");
+    expect(btn.classes().join(" ")).not.toContain("gradient-ai");
+    expect(wrapper.find('[data-test="o2-empty-state"] svg').attributes("width")).toBe("80");
+  });
+});

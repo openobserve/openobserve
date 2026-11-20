@@ -17,13 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="flex h-full flex-col p-0">
-    <OPageLayout
-      v-if="!showAddDialog"
-      :title="t('cipherKey.header')"
-      icon="key"
-      :subtitle="t('settings.cipherKeysPage.subtitle')"
-      bleed
-    >
+    <OPageLayout v-if="!showAddDialog" :title="t('cipherKey.header')" icon="key" bleed>
       <template #actions>
         <OButton
           variant="primary"

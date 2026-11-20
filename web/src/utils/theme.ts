@@ -226,6 +226,52 @@ const generatePrimaryPalette = (baseHex: string): Record<string, string> => {
   };
 };
 
+/** Lowers HSL lightness, keeping hue and saturation, until white text clears 4.5:1 on the fill. */
+export const primaryFillFor = (hex: string): string => {
+  const [r, g, b] = [0, 2, 4].map(
+    (i) => parseInt(hex.replace("#", "").substring(i, i + 2), 16) / 255,
+  );
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let lightness = (max + min) / 2;
+  const delta = max - min;
+  const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
+  let hue = 0;
+  if (delta !== 0) {
+    if (max === r) hue = ((g - b) / delta) % 6;
+    else if (max === g) hue = (b - r) / delta + 2;
+    else hue = (r - g) / delta + 4;
+  }
+  hue = (hue * 60 + 360) % 360;
+  const toHex = (l: number): string => {
+    const c = (1 - Math.abs(2 * l - 1)) * saturation;
+    const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+    const m = l - c / 2;
+    const [r1, g1, b1] =
+      hue < 60
+        ? [c, x, 0]
+        : hue < 120
+          ? [x, c, 0]
+          : hue < 180
+            ? [0, c, x]
+            : hue < 240
+              ? [0, x, c]
+              : hue < 300
+                ? [x, 0, c]
+                : [c, 0, x];
+    return `#${[r1, g1, b1]
+      .map((v) =>
+        Math.round((v + m) * 255)
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")}`;
+  };
+  // 4.6 leaves margin over 4.5 for rounding in the browser's colour pipeline.
+  while (contrastRatio("#FFFFFF", toHex(lightness)) < 4.6 && lightness > 0) lightness -= 0.005;
+  return toHex(Math.max(lightness, 0));
+};
+
 /**
  * Sync the O2 component-library design tokens (--color-primary-*)
  * with the current custom theme color so all O2 components pick it up.
@@ -236,10 +282,12 @@ const syncO2LibraryTokens = (themeColor: string): void => {
   for (const [shade, hex] of Object.entries(palette)) {
     root.style.setProperty(`--color-primary-${shade}`, hex);
   }
-  // The "primary" button variant's label text must stay readable against its
-  // resting background (the 600 shade) — see pickButtonForeground for why this
-  // can't be hardcoded to white.
-  root.style.setProperty("--color-button-primary-foreground", pickButtonForeground(palette["600"]));
+  // One white-label primary in both themes: a pale or bright theme colour is darkened until white reads at 4.5:1.
+  const fill = primaryFillFor(palette["600"]);
+  root.style.setProperty("--color-button-primary", fill);
+  root.style.setProperty("--color-button-primary-hover", mixColors(fill, "#000000", 88));
+  root.style.setProperty("--color-button-primary-active", mixColors(fill, "#000000", 78));
+  root.style.setProperty("--color-button-primary-foreground", pickButtonForeground(fill));
   // Timeline pills carry small text, so they take the strict AA pick, not the button floor.
   root.style.setProperty("--color-timeline-dot-primary-fg", pickReadableForeground(palette["600"]));
 };
@@ -248,12 +296,12 @@ const syncO2LibraryTokens = (themeColor: string): void => {
  * Apply theme colors directly to CSS variables
  * @param themeColor - Hex color code for the theme
  * @param mode - Theme mode ("light" or "dark")
- * @param isDefault - Whether this is the default theme
+ * @param _isDefault - Kept for callers; the default theme is synced like any other
  */
 export const applyThemeColors = (
   themeColor: string,
   mode: "light" | "dark",
-  isDefault: boolean = false,
+  _isDefault: boolean = false,
   semanticColors?: SemanticColors,
 ) => {
   const darkModeActive = mode === "dark";
@@ -262,21 +310,8 @@ export const applyThemeColors = (
   // variant). `.dark` on <html> is the single dark-mode signal.
   document.documentElement.classList.toggle("dark", darkModeActive);
 
-  // Sync O2 library tokens with the custom theme color.
-  // When using the default theme, clear any previously-set inline primary palette so
-  // the CSS token values in base.css take effect (inline styles beat stylesheets).
-  if (isDefault) {
-    const root = document.documentElement;
-    ["50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950"].forEach(
-      (shade) => {
-        root.style.removeProperty(`--color-primary-${shade}`);
-      },
-    );
-    root.style.removeProperty("--color-button-primary-foreground");
-    root.style.removeProperty("--color-timeline-dot-primary-fg");
-  } else {
-    syncO2LibraryTokens(themeColor);
-  }
+  // Synced for the default too: base.css holds one ramp and cannot follow the dark theme colour.
+  syncO2LibraryTokens(themeColor);
 
   if (darkModeActive) {
     // Apply dark mode theme color
@@ -301,24 +336,12 @@ export const applyThemeColors = (
     // document.body.style.setProperty('--color-theme-header-menu-bg', headerMenuBg);
 
     // Apply menu gradient colors
-    if (isDefault) {
-      // Use default menu gradient colors
-      document.body.style.setProperty(
-        "--color-theme-menu-gradient-start",
-        "rgba(89, 155, 174, 0.3)",
-      );
-      document.body.style.setProperty("--color-theme-menu-gradient-end", "rgba(48, 193, 233, 0.3)");
-      // Use default menu color for dark mode
-      document.body.style.setProperty("--color-theme-menu-color", "#FFFFFF");
-    } else {
-      // Calculate menu gradient from theme color
-      const menuGradientStart = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
-      const menuGradientEnd = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
-      document.body.style.setProperty("--color-theme-menu-gradient-start", menuGradientStart);
-      document.body.style.setProperty("--color-theme-menu-gradient-end", menuGradientEnd);
-      // Use theme color as menu color for dark mode
-      document.body.style.setProperty("--color-theme-menu-color", themeColor);
-    }
+    const menuGradientStart = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
+    const menuGradientEnd = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
+    document.body.style.setProperty("--color-theme-menu-gradient-start", menuGradientStart);
+    document.body.style.setProperty("--color-theme-menu-gradient-end", menuGradientEnd);
+    // Use theme color as menu color for dark mode
+    document.body.style.setProperty("--color-theme-menu-color", themeColor);
 
     // Clear light mode variables
     document.documentElement.style.removeProperty("--color-theme-accent");
@@ -331,10 +354,8 @@ export const applyThemeColors = (
     document.documentElement.style.removeProperty("--color-theme-menu-gradient-start");
     document.documentElement.style.removeProperty("--color-theme-menu-gradient-end");
     document.documentElement.style.removeProperty("--color-theme-menu-color");
-    // Page background = a single near-black color with a subtle theme tint (no
-    // gradient), mirroring the light-mode single-tint treatment.
-    const darkBodyBg = mixColors(themeColor, "#000000", 8); // 8% theme + 92% black
-    document.body.style.setProperty("background", darkBodyBg, "important");
+    // The frame behind the card is the neutral shell; a theme tint reads as a second hue.
+    document.body.style.setProperty("background", "var(--color-surface-chrome)", "important");
   } else {
     // Apply light mode theme color
     const rgbaColor = hexToRgba(themeColor, 10);
@@ -350,11 +371,7 @@ export const applyThemeColors = (
     document.documentElement.style.setProperty("--color-theme-body-bg-primary", primaryBg);
     document.documentElement.style.setProperty("--color-theme-body-bg-secondary", secondaryBg);
 
-    // Page background = a single, subtle primary tint (no gradient) so the muted
-    // area around the white content card reads as one calm color — matching the
-    // page chrome (surface-chrome = primary-100).
-    const bodyBg = hexToRgba(themeColor, 0.5); // ~0.05 alpha — a calm, barely-tinted backdrop
-    document.body.style.setProperty("background", bodyBg, "important");
+    document.body.style.setProperty("background", "var(--color-surface-chrome)", "important");
 
     // Apply table header background color (80% theme color mixed with 20% white)
     const tableHeaderBg = mixColors(themeColor, "#FFFFFF", 30);
@@ -370,33 +387,18 @@ export const applyThemeColors = (
     document.documentElement.style.setProperty("--color-theme-tab-bg-inactive", inactiveTabBg);
 
     // Apply menu gradient colors
-    if (isDefault) {
-      // Use default menu gradient colors
-      document.documentElement.style.setProperty(
-        "--color-theme-menu-gradient-start",
-        "rgba(89, 175, 199, 0.3)",
-      );
-      document.documentElement.style.setProperty(
-        "--color-theme-menu-gradient-end",
-        "rgba(48, 193, 233, 0.3)",
-      );
-      // Use default menu color for light mode
-      document.documentElement.style.setProperty("--color-theme-menu-color", "#3F7994");
-    } else {
-      // Calculate menu gradient from theme color
-      const menuGradientStart = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
-      const menuGradientEnd = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
-      document.documentElement.style.setProperty(
-        "--color-theme-menu-gradient-start",
-        menuGradientStart,
-      );
-      document.documentElement.style.setProperty(
-        "--color-theme-menu-gradient-end",
-        menuGradientEnd,
-      );
-      // Use theme color as menu color for light mode
-      document.documentElement.style.setProperty("--color-theme-menu-color", themeColor);
-    }
+    const menuGradientStart = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
+    const menuGradientEnd = hexToRgba(themeColor, 3); // 0.3 alpha (30%)
+    document.documentElement.style.setProperty(
+      "--color-theme-menu-gradient-start",
+      menuGradientStart,
+    );
+    document.documentElement.style.setProperty(
+      "--color-theme-menu-gradient-end",
+      menuGradientEnd,
+    );
+    // Use theme color as menu color for light mode
+    document.documentElement.style.setProperty("--color-theme-menu-color", themeColor);
 
     // Clear dark mode variables
     document.body.style.removeProperty("--color-theme-accent");

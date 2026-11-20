@@ -22,7 +22,6 @@ const props = withDefaults(defineProps<SwitchProps>(), {
   size: "md",
   disabled: false,
   labelPosition: "right",
-  offTone: "brand",
   stateText: false,
 });
 
@@ -65,8 +64,7 @@ function toggle() {
 }
 
 // ── Track sizes ────────────────────────────────────────────────────────────
-// border-2 (2px each side) + p-0.5 (2px each side) = 4px eaten from each dimension
-// thumb = track_height - 4(border) - 4(padding), translate = track_width - 4 - 4 - thumb
+// p-0.5 eats 2px per side: thumb = height - 4, translate = width - 4 - thumb.
 type TrackSize = {
   track: string;
   thumb: string;
@@ -76,33 +74,27 @@ type TrackSize = {
 const trackSizes: Record<NonNullable<SwitchProps["size"]>, TrackSize> = {
   sm: {
     track: "w-6 h-3.5",
-    thumb: "size-1.5",
-    thumbTranslate: "translate-x-2 rtl:-translate-x-2",
-  },
-  md: {
-    track: "w-7 h-4.5",
     thumb: "size-2.5",
     thumbTranslate: "translate-x-2.5 rtl:-translate-x-2.5",
   },
+  md: {
+    track: "w-8 h-4.5",
+    thumb: "size-3.5",
+    thumbTranslate: "translate-x-3.5 rtl:-translate-x-3.5",
+  },
   lg: {
-    track: "w-8 h-5",
-    thumb: "size-3",
-    thumbTranslate: "translate-x-3 rtl:-translate-x-3",
+    track: "w-9 h-5",
+    thumb: "size-4",
+    thumbTranslate: "translate-x-4 rtl:-translate-x-4",
   },
   xl: {
     track: "w-11.5 h-6",
-    thumb: "size-4.5",
-    thumbTranslate: "translate-x-5 rtl:-translate-x-5",
+    thumb: "size-5",
+    thumbTranslate: "translate-x-5.5 rtl:-translate-x-5.5",
   },
 };
 
 const currentSizes = computed(() => trackSizes[props.size ?? "md"]);
-
-const offClasses = computed(() =>
-  props.offTone === "neutral"
-    ? { border: "border-switch-border-off-neutral", thumb: "bg-switch-thumb-off-neutral" }
-    : { border: "border-switch-border-off", thumb: "bg-switch-thumb-off" },
-);
 
 const slots = useSlots();
 const autoId = useId();
@@ -144,21 +136,13 @@ onMounted(() =>
       v-bind="controlAttrs"
       :class="[
         'relative inline-flex shrink-0 rounded-full',
-        'items-center border-2 p-0.5',
+        'items-center p-0.5',
         currentSizes.track,
-        /* Three visually distinct states:
-           ON       → primary FILLED track + white thumb (high contrast)
-           OFF      → transparent track + primary outline + primary thumb
-           DISABLED → transparent + grey dashed outline + grey thumb */
-        isDisabled
-          ? 'border-switch-disabled-border border-dashed bg-transparent'
-          : isChecked
-            ? 'bg-switch-track-on border-switch-border'
-            : [offClasses.border, 'bg-transparent'],
-        isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
+        isChecked ? 'bg-switch-track-on' : 'bg-switch-track-off',
+        isDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         'outline-none',
-        'focus-visible:ring-focus-ring-accent focus-visible:ring-4',
-        'transition-[color,background-color,border-color,box-shadow] duration-200',
+        'focus-visible:outline-focus-ring-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid',
+        'transition-[color,background-color,opacity] duration-200',
       ]"
     >
       <span
@@ -166,7 +150,7 @@ onMounted(() =>
           'block rounded-full',
           'transition-transform duration-200',
           currentSizes.thumb,
-          isDisabled ? 'bg-switch-disabled-thumb' : isChecked ? 'bg-white' : offClasses.thumb,
+          'shadow-switch-thumb dark:bg-text-heading bg-white',
           isChecked ? currentSizes.thumbTranslate : 'translate-x-0',
         ]"
       />

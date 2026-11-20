@@ -82,6 +82,33 @@
 
     <!-- Code Editor with relative positioning for floating button -->
     <div class="relative min-h-0 flex-1 overflow-hidden">
+      <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open; before the editor so Tab reaches it -->
+      <OButton
+        v-if="aiFeatureVisible && !hideNlToggle && !isAIMode"
+        :data-test="`${dataTestPrefix}-ai-toggle-btn`"
+        variant="ghost"
+        size="icon-toolbar"
+        :aria-label="t('search.aiModeIconAlt')"
+        :disabled="props.disableAi"
+        @click="onAiToggleClick"
+        class="rounded-default absolute! top-0.75 z-100 size-7! min-h-7! min-w-7!"
+        :class="props.hasExpandButton ? 'right-9' : 'right-1'"
+      >
+        <OIcon name="auto-awesome" size="sm" class="text-text-secondary" />
+        <span
+          v-if="!aiAccess.allowed"
+          aria-hidden="true"
+          class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
+        >
+          <OIcon name="lock" size="xs" class="text-icon-locked size-2.5!" />
+        </span>
+        <OTooltip
+          v-if="aiAccess.allowed"
+          :content="
+            props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')
+          "
+        />
+      </OButton>
       <CodeQueryEditor
         :ref="(el) => (editorRef = el)"
         :key="currentLanguage"
@@ -114,37 +141,6 @@
         @generation-success="handleGenerationSuccess"
         class="h-full w-full"
       />
-
-      <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
-      <OButton
-        v-if="aiFeatureVisible && !hideNlToggle && !isAIMode"
-        :data-test="`${dataTestPrefix}-ai-toggle-btn`"
-        variant="ghost"
-        size="icon-toolbar"
-        :disabled="props.disableAi"
-        @click="onAiToggleClick"
-        class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-1 z-100 h-7! min-h-7! w-7! min-w-7! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
-        :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
-      >
-        <img
-          :src="nlpIcon"
-          :alt="t('search.aiModeIconAlt')"
-          class="h-4.5 w-4.5 transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert"
-        />
-        <span
-          v-if="!aiAccess.allowed"
-          aria-hidden="true"
-          class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
-        >
-          <OIcon name="lock" size="xs" class="text-icon-locked size-2.5!" />
-        </span>
-        <OTooltip
-          v-if="aiAccess.allowed"
-          :content="
-            props.disableAi && props.disableAiReason ? props.disableAiReason : t('nlMode.toggle')
-          "
-        />
-      </OButton>
     </div>
   </div>
 </template>

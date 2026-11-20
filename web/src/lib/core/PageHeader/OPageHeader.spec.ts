@@ -213,3 +213,39 @@ describe("OPageHeader with the access chip", () => {
     expect(card()).not.toBeNull();
   });
 });
+
+describe("OPageHeader title row", () => {
+  const mountPlain = (props: Record<string, unknown>) => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", component: { render: () => null } }],
+    });
+    return mount(OPageHeader, {
+      props: { title: raw("Alerts"), ...props },
+      slots: {
+        actions: () => h("button", { "data-test": "new" }, "New Alert"),
+        tabs: () => h("div", { "data-test": "tabs" }, "List"),
+      },
+      global: { plugins: [i18n, router] },
+    });
+  };
+
+  it("puts a small inline icon, the title, the tabs and the actions on one row", () => {
+    const header = mountPlain({ icon: "shield-alert-outline" });
+    const icon = header.find('[data-test="app-page-header-icon"]');
+    expect(icon.classes()).toEqual(expect.arrayContaining(["size-5!", "text-text-secondary"]));
+    expect(icon.element.nextElementSibling?.tagName).toBe("H1");
+    expect(header.find("h1").classes()).toEqual(
+      expect.arrayContaining(["text-lg!", "font-semibold!", "tracking-[-0.01em]!"]),
+    );
+    expect(header.find('[data-test="tabs"]').exists()).toBe(true);
+    expect(header.find('[data-test="new"]').exists()).toBe(true);
+    expect(header.findAll(".-mt-2")).toHaveLength(0);
+  });
+
+  it("shows a Back button instead of the icon on a sub-page", () => {
+    const header = mountPlain({ icon: "shield-alert-outline", back: { onClick: () => {} } });
+    expect(header.find('[data-test="app-page-header-icon"]').exists()).toBe(false);
+    expect(header.find('[data-test="app-page-header-back"]').exists()).toBe(true);
+  });
+});

@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- With a config open the page header is the detail header, as on the other detail pages. -->
     <OPageHeader
       :title="!configId && sectionHeader ? sectionHeader.title : header.title"
-      :subtitle="!configId && sectionHeader ? sectionHeader.subtitle : header.subtitle"
       :icon="configId ? undefined : (sectionHeader?.icon ?? 'star-rate')"
       :back="
         configId
@@ -31,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : undefined
       "
       title-data-test="quality-page-title"
-      :tabs-below="hasTabs && !configId"
       overflow-first
     >
       <!-- The config list's peer tabs; a config's detail has its back button instead. -->
@@ -283,12 +281,11 @@ const only = computed<QualityOnly>(() => {
   return config && !thresholdForConfig(config).label ? "all" : "unhealthy";
 });
 
-/** The module title on the list; the config's name, description, type and version on the detail. */
+/** The module title on the list; the config's name, type and version on the detail. */
 const header = computed(() => {
   if (!configId.value) {
     return {
       title: t("aiObservability.nav.quality"),
-      subtitle: t("aiObservability.subtitle.quality"),
       dataType: null,
       version: null,
     };
@@ -297,7 +294,6 @@ const header = computed(() => {
   const config = selectedConfig.value;
   return {
     title: raw(row?.name ?? config?.name ?? configId.value),
-    subtitle: raw(row?.description || config?.description || ""),
     dataType: row?.dataType ?? (config ? dataTypeOf(config) : null),
     version: row?.version ?? config?.version ?? null,
   };

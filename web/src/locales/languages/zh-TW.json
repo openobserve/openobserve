@@ -1424,6 +1424,8 @@
     "selectOrganization": "請選擇一個組織"
   },
   "search": {
+    "liveRefreshingEvery": "Live: refreshing every {interval}",
+    "rowsPerPageLabel": "{n} / page",
     "queryFailed": "查詢失敗",
     "unknownError": "未知錯誤",
     "selectedLabel": "已選擇",
@@ -2075,7 +2077,6 @@
   "menu": {
     "alertCalibration": "警示校準",
     "autoobserve": "AutoObserve",
-    "upgradeToProPlan": "升級至 PRO 方案",
     "home": "首頁",
     "about": "關於",
     "index": "串流",
@@ -2134,7 +2135,6 @@
   },
   "profiles": {
     "title": "效能剖析",
-    "subtitle": "依函式追蹤 CPU、記憶體和鎖的使用情況",
     "stream": "串流",
     "dataSource": "資料來源",
     "service": "服務",
@@ -2285,7 +2285,6 @@
     "from": "從",
     "to": "到",
     "title": "真實使用者監控",
-    "subtitle": "監控真實使用者工作階段、錯誤和前端效能",
     "issueColumn": "問題",
     "trendColumn": "趨勢",
     "usersColumn": "使用者",
@@ -3325,7 +3324,6 @@
         "bulkDeleteMessage": "刪除 {count} 個具名事件？使用它的漏斗會顯示已刪除步驟標籤。 | 刪除 {count} 個具名事件？使用它們的漏斗會顯示已刪除步驟標籤。",
         "bulkDeleteInUseMessage": "刪除 {count} 個具名事件？已儲存的漏斗將針對以下項目顯示「已刪除事件」步驟：{names}。 | 刪除 {count} 個具名事件？已儲存的漏斗將針對以下項目顯示「已刪除事件」步驟：{names}。",
         "notFound": "此具名事件已不存在",
-        "editorApp": "應用程式：{app}",
         "details": "詳細資料",
         "opParam": "URL 參數",
         "opRef": "來源主機",
@@ -3695,6 +3693,13 @@
     }
   },
   "about": {
+    "header_button": {
+      "upgrade": "Upgrade",
+      "enterprise_tooltip": "About {product} — Enterprise edition",
+      "cloud_features": "{product} 功能",
+      "enterprise_edition": "版本：企業版",
+      "get_enterprise_free": "取得 OpenObserve 企業版 (免費)"
+    },
     "copyCommitHash": "複製提交雜湊",
     "cargoToml": "Cargo.toml",
     "rustCrates": "Rust crates",
@@ -4004,11 +4009,6 @@
     "license_downgrade_limit": "每日額度從 {old} 變更為 {new}",
     "license_downgrade_expiry": "到期日從 {old} 變更為 {new}",
     "license_limit_per_day": "{gb} GB/天",
-    "header_button": {
-      "cloud_features": "{product} 功能",
-      "enterprise_edition": "版本：企業版",
-      "get_enterprise_free": "取得 OpenObserve 企業版 (免費)"
-    },
     "enterprise_offer": {
       "cloud": {
         "hero_title": "企業版功能",
@@ -4379,7 +4379,6 @@
     "nameInvalid": "使用小寫字母、數字和連字符（最多 {max} 個字元）",
     "createFailed": "建立服務帳戶失敗。請再試一次。",
     "updateFailed": "更新服務帳戶失敗。請再試一次。",
-    "headerSubtitle": "API 的程式化存取權杖",
     "search": "搜尋服務帳戶",
     "rotate": "輪換權杖",
     "deleteServiceAccount": "刪除服務帳戶",
@@ -4472,7 +4471,6 @@
     "mcpServerLabel": "MCP 伺服器",
     "mcpServerDesc": "透過 {product} 連接 AI 用戶端",
     "mcpServerHeader": "MCP 伺服器",
-    "mcpServerHeaderSubtitle": "將 Claude、Cursor、VS Code 及其他 AI 客戶端連接到此組織。",
     "invitationsDesc": "待處理與已寄送的成員邀請",
     "groupsDesc": "將使用者分組以指派角色",
     "rolesDesc": "定義權限與存取政策",
@@ -4901,7 +4899,6 @@
       "other": "其他"
     },
     "invitationList": {
-      "subtitle": "待處理及已傳送的成員邀請",
       "loadingPending": "正在載入待處理邀請…",
       "failedLoadPending": "載入待處理邀請失敗",
       "accepting": "正在接受邀請…",
@@ -4955,7 +4952,6 @@
       "errorCreating": "建立群組時發生錯誤"
     },
     "quotaPage": {
-      "subtitle": "每個角色的使用限制已套用",
       "selectOrganization": "選擇組織",
       "editQuota": "編輯配額",
       "selectApiCategory": "選擇API類別",
@@ -5082,7 +5078,6 @@
       "brand": "鮮明藍色"
     },
     "list": {
-      "subtitle": "顯示在應用程式頂端的通知，適用於所有組織，或僅限您選擇的組織。",
       "liveNow": "目前即時顯示",
       "liveNowEmpty": "目前沒有顯示任何橫幅。",
       "liveOnlyFor": "僅限 {orgs}",
@@ -5276,7 +5271,6 @@
     },
     "deleteField": "刪除欄位",
     "header": "串流",
-    "subtitle": "索引管理與串流設定",
     "streamNameHelpText": "僅可使用英數字元、底線與冒號。",
     "search": "搜尋串流",
     "emptyOr": "或者：",
@@ -5367,7 +5361,6 @@
   },
   "workflow": {
     "header": "工作流程",
-    "subtitle": "使用觸發器、邏輯與目標自動化動作",
     "create": "新增工作流程",
     "createSuccess": "工作流程建立成功",
     "name": "工作流程名稱",
@@ -6279,7 +6272,6 @@
     "functionName": "函式名稱",
     "remoteDestination": "遠端目標",
     "failedToLoadPipeline": "無法載入管線",
-    "subtitle": "在傳輸過程中轉換、擴充與路由資料",
     "deleteNode": "刪除",
     "addPipeline": "新增管線",
     "deletePipeline": "刪除管線",
@@ -6526,7 +6518,6 @@
     "order": "順序",
     "applyBeforeFlattening": "在扁平化之前套用",
     "header": "函式",
-    "subtitle": "套用於管線中的可重複使用 VRL 函式",
     "clickTestFunctionHint": "請點擊「測試函式」以查看事件",
     "add": "新增函式",
     "search": "搜尋函式",
@@ -6550,7 +6541,6 @@
     "enterFunctionPrompt": "輸入提示以產生函式",
     "associatedFunctionHeader": "已關聯的函式",
     "enrichmentTables": "擴充表",
-    "enrichmentTablesSubtitle": "用於擴充已擷取資料的查找資料表",
     "addEnrichmentTable": "新增擴充表",
     "updateEnrichmentTable": "更新擴充表",
     "searchEnrichmentTable": "搜尋擴充表",
@@ -10142,7 +10132,6 @@
     "publicLinks": {
       "panelTitle": "公開連結",
       "pageTitle": "公開儀表板",
-      "pageSubtitle": "此組織中的所有公開連結",
       "panelTitleFor": "公開連結 — {name}",
       "intro": "任何擁有公開連結的人都能在無需登入的情況下檢視此儀表板。",
       "editNote": "連結的網址保持不變。變更會於公開頁面下次更新時顯示。",
@@ -10529,7 +10518,6 @@
     "tabOverview": "概觀",
     "tabUsage": "使用量",
     "removeHomeDashboard": "移除首頁儀表板",
-    "subtitle": "一覽您的可觀測性工作區",
     "resources": "資源",
     "explore": "探索"
   },
@@ -11471,7 +11459,6 @@
   },
   "alertCalibration": {
     "title": "警示校準",
-    "subtitle": "從警示自身的執行記錄衡量其運作表現",
     "configure": "設定",
     "runNow": "立即執行",
     "runNowHint": "要求立即執行，而不必等待下一次。如果已有執行到期或正在進行中，則會改以該執行回應請求。",
@@ -11893,7 +11880,6 @@
     "detail": {
       "title": "{time} 的摘要",
       "titleLoading": "摘要",
-      "subtitle": "涵蓋 {start} 至 {end}，產生於 {time}",
       "back": "摘要",
       "unavailableTitle": "摘要無法取得",
       "noRecords": "本次執行找不到任何記錄。",
@@ -12702,7 +12688,6 @@
       "commentPlaceholder": "寫下留言...",
       "sendComment": "傳送留言",
       "title": "事件",
-      "subtitle": "事件管理與追蹤",
       "search": "搜尋事件...",
       "status": "狀態",
       "severity": "嚴重程度",
@@ -14153,7 +14138,6 @@
       "firingTotal": "觸發中",
       "observedTotal": "群組",
       "nOfMFiring": "{firing}／{observed} 個群組觸發中",
-      "groupedBy": "依 {columns} 分組",
       "groupBy": "群組依據",
       "criticalCondition": "嚴重條件",
       "warningCondition": "警告條件",
@@ -14501,7 +14485,6 @@
         "startDateRequired": "請選擇第一天。"
       },
       "title": "停機時段",
-      "subtitle": "排程時段可讓警示、異常偵測與合成監控檢查繼續執行，但停止其通知",
       "newDowntime": "新增停機時段",
       "filterAll": "全部",
       "filterOnce": "單次",
@@ -15411,7 +15394,6 @@
   },
   "alert_sources": {
     "header": "外部警示來源",
-    "subtitle": "從 Grafana、Prometheus Alertmanager 或任何可呼叫 Webhook 的工具傳送警示 — 它們會顯示在此處，並自動關聯至事件。",
     "acceptsAnyFormat": "接受任何 Webhook 格式",
     "revealToken": "顯示完整 URL",
     "hideToken": "隱藏完整 URL",
@@ -16499,11 +16481,7 @@
     "modelPricingEditor": {
       "copySuffix": " (副本)"
     },
-    "modelPricingList": {
-      "subtitle": "LLM 模型成本配置"
-    },
     "orgStorageSettings": {
-      "subtitle": "各組織儲存配置",
       "awsCredentials": "AWS 憑證",
       "azureCredentials": "Azure 憑證",
       "awsRoleArn": "AWS 角色 ARN"
@@ -16536,11 +16514,7 @@
       "settingsUpdated": "組織設定已成功更新",
       "settingsSaveError": "儲存組織設定時發生錯誤"
     },
-    "aiToolsetsPage": {
-      "subtitle": "配置 AI 工具整合"
-    },
     "cipherKeysPage": {
-      "subtitle": "敏感欄位的加密金鑰",
       "delete": "刪除",
       "deleteCipherKeyTitle": "刪除加密金鑰",
       "deleteCipherKeyMessage": "您確定要刪除加密金鑰 {name} 嗎？",
@@ -16555,15 +16529,11 @@
       "bulkDeleteFailed": "刪除 {count} 個加密金鑰失敗",
       "bulkDeleteError": "刪除加密金鑰時發生錯誤"
     },
-    "correlationSettingsPage": {
-      "subtitle": "遙測關聯設定"
-    },
     "licensePage": {
       "unexpectedError": "非預期錯誤",
       "daysRemaining": "您的授權將於 {days} 天後到期"
     },
     "nodesPage": {
-      "subtitle": "叢集節點及其健康狀態",
       "to": "至",
       "name": "名稱",
       "loadingData": "資料載入中，請稍候...",
@@ -16651,7 +16621,6 @@
       "processingTrialExtension": "正在處理試用期延長請求，請稍候...",
       "trialExtendedSuccess": "試用期延長成功。",
       "extendTrialError": "延長試用期失敗，請重試。",
-      "subtitle": "建立與管理組織",
       "addContract": "新增合約",
       "extendTrialTitle": "延長 {name} 的試用期",
       "extendTrialSubtitle": "設定新的試用延長期間。",
@@ -16771,7 +16740,6 @@
       "sourceBuiltIn": "內建"
     },
     "regexPatternList": {
-      "subtitle": "用於遮罩的可重複使用正則表達式模式",
       "exportTitle": "匯出正則表達式模式",
       "delete": "刪除",
       "bulkDeleteTitle": "刪除正則表達式模式",
@@ -16865,7 +16833,6 @@
         "valueMismatch": "找到 TXT 記錄，但值不相符",
         "dnsFailed": "DNS 解析失敗"
       },
-      "pageSubtitle": "連結您的電子郵件網域，將其使用者對應至組織，並控制其中哪些使用者可以加入。",
       "linkedTab": "已連結網域",
       "mappingsTab": "對應",
       "accessTab": "封鎖的使用者",
@@ -16988,7 +16955,6 @@
       "lastRun": "上次執行",
       "lastRunAt": "執行時間",
       "nextRun": "下次執行",
-      "nextRunAt": "下次執行 {time}",
       "acceptedTooltip": "郵件伺服器已接收",
       "cachedTooltip": "已預熱儀表板快取;不傳送郵件",
       "unrecordedTooltip": "最新執行結果未記錄；較早的執行可能可在歷史記錄中查看。",
@@ -17062,9 +17028,7 @@
       "everyHours": "每小時 | 每 {count} 小時",
       "everyDays": "每天 | 每 {count} 天",
       "everyWeeks": "每週 | 每 {count} 週",
-      "everyMonths": "每月 | 每 {count} 個月",
-      "dashboardCount": "{count} 個儀表板 | {count} 個儀表板",
-      "recipientCount": "{count} 位收件人 | {count} 位收件人"
+      "everyMonths": "每月 | 每 {count} 個月"
     },
     "frequencyUnits": {
       "days": "天",
@@ -17092,7 +17056,6 @@
     "never": "永不",
     "startDate": "開始日期",
     "header": "報表",
-    "subtitle": "已排程的報表與匯出",
     "searchThisFolder": "此資料夾",
     "searchAllFolders": "所有資料夾",
     "reloadReports": "重新載入報表",
@@ -18736,7 +18699,6 @@
     },
     "unpriced": {
       "title": "定價缺口",
-      "subtitle": "在擷取時，您的 LLM 追蹤中沒有價格或僅有約略價格的模型",
       "banner": "在擷取時，{count} 個模型沒有價格或僅有約略價格。其記錄的成本可能不完整。 | 在擷取時，{count} 個模型沒有價格或僅有約略價格。其記錄的成本可能不完整。",
       "bannerTruncated": "您的追蹤中有 {total} 個模型在擷取時沒有價格或僅有約略價格。其成本可能有誤。依 token 數顯示前 {shown} 個。",
       "streamLabel": "串流",
@@ -18857,7 +18819,6 @@
       "tools": "工具"
     },
     "promptManagement": {
-      "subtitle": "建立、版本控管並發布可重複使用的提示詞。",
       "promptSubtitle": "{type} 提示詞",
       "prompt": "提示詞",
       "promptId": "提示詞 ID",
@@ -19297,7 +19258,6 @@
         }
       },
       "workbench": {
-        "subtitle": "{reviewed} / {total} 已審核",
         "itemCounter": "待審核項目 {index} / {total}",
         "prev": "上一項",
         "next": "下一項",
@@ -19777,7 +19737,6 @@
       },
       "detail": {
         "fallbackTitle": "資料集",
-        "meta": "{count} 個項目 · 已更新 {updated}",
         "loadError": "載入資料集失敗",
         "tryInPlayground": "在 Playground 中試用",
         "tabs": {
@@ -20741,7 +20700,6 @@
       "backTo": "供應商",
       "createTitle": "建立 LLM 供應商",
       "editTitle": "編輯 LLM 供應商",
-      "subtitle": "設定 LLM 評審評分器使用的模型端點。",
       "sectionTitle": "供應商",
       "nameLabel": "名稱",
       "typeLabel": "供應商類型",
@@ -22700,9 +22658,7 @@
       "usedBy": {
         "aria": "使用此測試的測試",
         "help": "它們在自己的頁面上執行這些步驟。此測試的起始 URL、環境和密鑰不會在那裡使用。",
-        "viewAll": "檢視全部 {count} 個測試",
-        "subtitle": "{folder} · 由 {count} 個測試使用 | {folder} · 由 {count} 個測試使用",
-        "subtitleNoFolder": "由 {count} 個測試使用 | 由 {count} 個測試使用"
+        "viewAll": "檢視全部 {count} 個測試"
       },
       "recordingIn": "在 {environment} 中錄製",
       "needsDesktopRecorder": "需要桌面錄製器擴充功能",
@@ -22913,7 +22869,6 @@
       "folder": "資料夾",
       "willBeCreatedIn": "將建立於"
     },
-    "pageSubtitle": "從全球位置主動監控正常運行時間、效能和使用者旅程",
     "pageTitle": "合成監控",
     "protocolConfig": {
       "http": {
@@ -24942,7 +24897,6 @@
     "title": "SLOs",
     "notFound": "找不到 SLO",
     "notFoundDescription": "此 SLO 已不存在，或您沒有存取權限。它可能已被刪除。",
-    "subtitle": "服務水準目標：目標、錯誤預算、燃燒速率警示",
     "new": "新增 SLO",
     "newTitle": "新增 SLO",
     "editTitle": "編輯 SLO",
@@ -24960,7 +24914,6 @@
     "totalSlos": "SLO 總數",
     "noGrouping": "無（單一整體系列）",
     "newAlert": "新增警示",
-    "overRolling": "在滾動 {window} 內",
     "searchPlaceholder": "搜尋 SLO 或標籤，例如 team:payments",
     "loadFailed": "無法載入 SLO",
     "requestFailed": "請求失敗（{code}）",
@@ -26070,7 +26023,6 @@
       "groupWorkloads": "工作負載",
       "groupStorage": "儲存",
       "groupAutoscaling": "自動擴縮",
-      "subtitle": "監控叢集、工作負載與資源",
       "clusterPickerLabel": "叢集",
       "clusterPickerLoading": "正在載入叢集…",
       "clusterPickerTrigger": "叢集：{name}",
@@ -26528,8 +26480,7 @@
       "actions": "操作"
     },
     "header": {
-      "title": "資料庫",
-      "subtitle": "跨資料庫的查詢效能與健康狀態"
+      "title": "資料庫"
     },
     "ai": {
       "suggestFix": "詢問 AI 如何修正",
@@ -27794,7 +27745,6 @@
     "fromRotation": "來自 {name}",
     "ownershipMatch": "符合",
     "ownershipSpecificity": "維度",
-    "teamSubtitle": "{tz} · {count} 位成員 | {tz} · {count} 位成員",
     "statOnCallNow": "目前值班",
     "statRotations": "輪值",
     "statRoutingRules": "路由規則",
@@ -28795,7 +28745,6 @@
     "teamOpenInOnCall": "在 On-Call 中檢視全部",
     "teamCoverage": "未來 {days} 天的值班涵蓋率",
     "teamCoverageHint": "此處唯一值得留意的是空檔",
-    "teamOwnsRules": "擁有 {count} 條路由規則 | 擁有 {count} 條路由規則",
     "teamCoveredNow": "目前有人值班",
     "teamOverview": "總覽",
     "teamAnsweredBy": "回應者",
@@ -29488,7 +29437,6 @@
       "allClearNone": "沒有需要你處理的事項。"
     },
     "title": "AutoObserve",
-    "subtitle": "傳送您的資料。OpenObserve 會找出問題並通知您，同時提供對原因的最佳判讀。當一切平靜時，它會顯示檢查過的項目，以及它看不見的部分。",
     "tabs": {
       "issues": "問題",
       "coverage": "涵蓋範圍",
@@ -30420,7 +30368,6 @@
     },
     "issuesPage": {
       "title": "所有問題",
-      "sentence": "我在{within}開啟的每個問題。選擇一個來查看發生了什麼事，以及我做了什麼處理。",
       "ranges": {
         "week": "最近 7 天",
         "month": "最近 30 天",
@@ -32177,7 +32124,6 @@
   },
   "fleet": {
     "title": "Fleet 管理",
-    "subtitle": "註冊 OpenTelemetry 收集器、為其組態建立版本，並安全地推出變更",
     "addCollector": "新增收集器",
     "tabs": {
       "collectors": "收集器",
@@ -32716,7 +32662,6 @@
     },
     "editor": {
       "pageTitle": "組態編輯器",
-      "newDescription": "新的收集器組態",
       "visual": "視覺化",
       "issues": "{count} 個問題 | {count} 個問題",
       "valid": "有效",

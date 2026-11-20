@@ -28,6 +28,8 @@ export interface OTabsProps {
   reorderable?: boolean;
   /** Below md, inactive tabs show only their icon while the active tab keeps its label. Default: false */
   collapseLabels?: boolean;
+  /** Horizontal only: the active tab takes the shared selected fill and edge instead of the underline. Default: false */
+  filled?: boolean;
 }
 
 export interface OTabsEmits {
@@ -68,6 +70,8 @@ export interface TabsContext {
   dropBefore: boolean;
   /** Whether inactive tabs hide their label below md (see OTabsProps) */
   collapseLabels: boolean;
+  /** Whether the active tab uses the selected fill instead of the underline */
+  filled: boolean;
 }
 
 /** Symbol key used for provide / inject */

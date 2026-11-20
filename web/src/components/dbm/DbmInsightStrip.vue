@@ -51,10 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="insight.id"
       type="button"
       class="border-border-subtle hover:bg-surface-subtle group flex shrink-0 cursor-pointer items-center gap-2 border-e px-2.5 py-1 text-left whitespace-nowrap"
-      :class="[
-        index === 0 ? 'ps-0' : '',
-        activeId === insight.id ? 'bg-surface-accent-active' : '',
-      ]"
+      :class="[index === 0 ? 'ps-0' : '', activeId === insight.id ? 'bg-selected-bg' : '']"
       :data-test="`dbm-insight-${insight.id}`"
       @click="emit('filter', insight)"
     >

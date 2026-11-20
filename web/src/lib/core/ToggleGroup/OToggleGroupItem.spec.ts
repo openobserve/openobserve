@@ -152,8 +152,9 @@ describe("OToggleGroupItem", () => {
   it("applies md size classes by default", () => {
     const wrapper = mountItem({ value: "x" });
     const classes = wrapper.find("button").classes().join(" ");
-    expect(classes).toContain("h-9");
+    expect(classes).toContain("h-6");
     expect(classes).toContain("px-3");
+    expect(classes).toContain("focus-visible:outline-offset-2");
   });
 
   it('applies xs size classes when size="xs"', () => {

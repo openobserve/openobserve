@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OPageHeader
         :title="raw(activeSectionItem?.label || '')"
         :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
-        :subtitle="raw(pageSubtitles[activeSection] || activeSectionItem?.description || '')"
         :icon="activeSectionItem?.icon as any"
         content-size="lg"
         class="border-border-default shrink-0 border-b"

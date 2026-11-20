@@ -47,21 +47,24 @@ const resolvedAs = computed(() => props.as ?? variantDefaultAs[props.variant ?? 
 // registered in the @theme inline block so `text-typography-*` works.
 // Font sizes use Tailwind's built-in scale (text-sm = 14px, text-xs = 12px).
 const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
-  // Page title: compact, authoritative. Designed for the page header rail.
-  // Deliberately restrained: a dense observability UI wants the page title to
-  // orient you, not to shout over the data it sits above.
-  "page-title": ["text-sm font-medium", "text-typography-page-title", "leading-tight"].join(" "),
+  // Page title (h1).
+  "page-title": [
+    "text-lg font-semibold tracking-[-0.01em]",
+    "text-typography-page-title",
+    "leading-tight",
+  ].join(" "),
 
-  // Section group label (gray eyebrow). Recedes via color + size, not weight.
-  section: ["text-2xs font-medium", "text-typography-section", "leading-none"].join(" "),
+  // Group label (sidebar, field list): recedes by colour, not weight.
+  section: ["text-xs font-medium", "text-typography-section", "leading-none"].join(" "),
 
-  // Panel / card title: mixed-case, slightly heavier than body, primary color.
-  // For collapsible triggers, sidebar group headings, widget card headers.
-  "panel-title": ["text-xs font-medium", "text-typography-panel-title", "leading-tight"].join(" "),
+  // Card or panel title (h3).
+  "panel-title": [
+    "text-compact font-semibold",
+    "text-typography-panel-title",
+    "leading-tight",
+  ].join(" "),
 
-  // Section-pane heading on a detail page. One step up from panel-title in both
-  // size and weight: these headings label the panes a reader scans the page by,
-  // so they have to be findable at a glance across a two-column layout.
+  // Section title (h2) on a detail page; no 15px token yet, so text-sm is the nearest.
   "card-title": ["text-sm font-semibold", "text-typography-panel-title", "leading-tight"].join(" "),
 
   // Default body text. Most table cells, descriptions, and paragraphs.
@@ -70,11 +73,10 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   // Emphasized body: same size as body but medium. Names, totals, values.
   "body-strong": ["text-sm font-medium", "text-typography-body"].join(" "),
 
-  // Compact label: 12px medium. Filter labels, column sub-labels, pill text.
-  label: ["text-xs font-medium", "text-typography-label", "leading-none"].join(" "),
+  // Form label: body colour, so it sits below the headings.
+  label: ["text-compact font-medium", "text-typography-body", "leading-none"].join(" "),
 
-  // Metadata: timestamps, record counts, helper text, last-updated info.
-  // Visually recessive — secondary color, no emphasis.
+  // Helper text and metadata: timestamps, counts, last-updated info.
   meta: ["text-xs font-normal", "text-typography-meta", "leading-none"].join(" "),
 
   // Monospace: cron expressions, stream names (non-linked), field paths, IDs.

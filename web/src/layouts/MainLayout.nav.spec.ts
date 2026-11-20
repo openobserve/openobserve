@@ -40,7 +40,7 @@ import MainLayout from "./MainLayout.vue";
 const StubDiv = defineComponent({ setup: () => () => h("div") });
 const RoutedPage = defineComponent({ setup: () => () => h("div", { "data-test": "routed-page" }) });
 const NavbarStub = defineComponent({
-  name: "ONavbar",
+  name: "OSidebar",
   props: { linksList: { type: Array, default: () => [] }, loading: Boolean },
   setup: () => () => h("div"),
 });
@@ -54,7 +54,7 @@ describe("MainLayout — Product Analytics menu entry", () => {
         plugins: [store, i18n, router],
         stubs: {
           AppHeader: StubDiv,
-          ONavbar: NavbarStub,
+          OSidebar: NavbarStub,
           O2AIChat: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,
@@ -436,7 +436,7 @@ describe("MainLayout — rail while the config loads", () => {
         plugins: [store, i18n, router],
         stubs: {
           AppHeader: StubDiv,
-          ONavbar: NavbarStub,
+          OSidebar: NavbarStub,
           O2AIChat: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,

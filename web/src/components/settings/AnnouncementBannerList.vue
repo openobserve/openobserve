@@ -15,12 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    :title="t('announcements.settings.label')"
-    icon="campaign"
-    :subtitle="t('announcements.list.subtitle')"
-    bleed
-  >
+  <OPageLayout :title="t('announcements.settings.label')" icon="campaign" bleed>
     <template #actions>
       <OButton
         variant="primary"

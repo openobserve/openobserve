@@ -81,8 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="showDrillDown"
             data-test="insights-button"
-            variant="outline"
-            size="xs"
+            variant="ghost"
+            size="sm-toolbar"
             :disabled="searchObj.loading"
             focusable-unavailable
             @click="$emit('drill-down')"
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             inert
             data-test="insights-button-placeholder"
           >
-            <OButton variant="outline" size="xs" tabindex="-1">
+            <OButton variant="ghost" size="sm-toolbar" tabindex="-1">
               <template #icon-left>
                 <OIcon name="timeline" size="sm" class="shrink-0" />
               </template>
@@ -118,14 +118,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="!toolbarMoveResetToMenu"
               data-test="traces-search-bar-reset-filters-btn"
-              variant="outline"
+              variant="ghost"
               size="sm-toolbar"
               @click="resetFilters"
             >
               <template #icon-left>
                 <OIcon name="restart-alt" size="sm" class="shrink-0" />
               </template>
-              <span v-if="!shouldHideToolbarButtonText">{{ t("common.reset") }}</span>
+              <span>{{ t("common.reset") }}</span>
             </OButton>
           </template>
 
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showPinnedMetrics"
             data-test="traces-search-bar-metrics-pinned-btn"
             size="sm-toolbar"
-            variant="outline"
+            variant="ghost"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
             <OSwitch v-model="searchObj.meta.showHistogram" size="md" @click.stop />
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButtonGroup
             v-if="showPinnedSavedViews"
             data-test="traces-search-bar-saved-views"
-            class="border-button-outline-border h-8.5 shrink-0 border p-0"
+            class="h-7 shrink-0 p-0"
           >
             <ODropdown
               :open="savedViewsDropdownOpen"
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="h-full!"
                 >
                   <OIcon name="saved-search" size="sm" />
-                  <OIcon name="arrow-drop-down" size="sm" />
+                  <OIcon name="expand-more" size="xs" data-menu-chevron class="-ms-0.5" />
                   <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
                 </OButton>
               </template>
@@ -200,12 +200,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="traces-search-bar-more-menu-btn"
-              variant="outline"
+              variant="ghost"
               size="sm-toolbar"
-              icon-left="more-horiz"
               class="shrink-0 max-lg:ms-auto"
             >
               {{ t("search.menuMore") }}
+              <template #icon-right>
+                <OIcon name="expand-more" size="xs" data-menu-chevron class="-ms-0.5" />
+              </template>
             </OButton>
           </template>
 
@@ -365,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : 'rounded-default',
                   showRunQueryPending
                     ? ''
-                    : 'bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 hover:opacity-90 hover:ring-2',
+                    : 'bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 hover:ring-2',
                 ]"
                 @click="searchData"
                 :loading="isLoading"
@@ -404,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                         : showRunQueryPending
                           ? 'border-s-0'
-                          : 'bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 hover:opacity-90 hover:ring-2',
+                          : 'bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 hover:ring-2',
                       'rounded-e-default! rounded-s-none!',
                     ]"
                   >
@@ -419,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       :name="searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'"
                       size="sm"
-                      :class="searchObj.meta.liveMode ? 'text-accent' : ''"
+                      :class="searchObj.meta.liveMode ? 'text-live!' : ''"
                     />
                   </template>
                   <span>
@@ -444,8 +446,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ShareButton
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
-            variant="outline"
-            size="icon-md"
+            variant="ghost"
+            size="icon-toolbar"
             shortcut-id="tracesCopyUrl"
             :disabled="!!shareReason"
             :tooltip="shareReason || undefined"
@@ -454,12 +456,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #trigger>
               <OButton
                 data-test="traces-search-bar-more-actions-btn"
-                class="hover:bg-interactive-hover-bg! size-[2.125rem]!"
-                variant="outline"
+                :aria-label="toolbarActionsLabel"
+                variant="ghost"
                 size="icon-toolbar"
               >
-                <OIcon name="menu" size="sm" />
-                <OTooltip max-width="7rem" :content="t('search.moreActions')" />
+                <OIcon name="more-vert" size="sm" />
+                <OTooltip :content="toolbarActionsLabel" />
               </OButton>
             </template>
 
@@ -546,13 +548,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="service-graph-date-time-picker"
               calendar-presets
-              class="h-8.5!"
               @on:date-change="updateDateTime"
             />
             <OButton
               data-test="service-graph-refresh-btn"
-              variant="outline"
-              size="icon-md"
+              variant="ghost"
+              size="icon-toolbar"
               @click="$emit('service-graph-refresh')"
             >
               <OIcon name="refresh" size="sm" />
@@ -618,20 +619,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         ref="queryEditorBoxRef"
-        class="relative flex h-full w-full flex-col overflow-hidden"
+        class="bg-surface-base focus-within:after:ring-focus-ring-accent relative flex h-full w-full flex-col overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-50 focus-within:after:ring-1 focus-within:after:ring-inset"
         @keydown.capture="onRecentEditorKeydown"
       >
         <OButton
           v-if="!searchObj.meta.sqlMode && !nlpMode"
-          :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
           data-test="traces-search-bar-filter-builder-toggle"
           :aria-pressed="filterBuilderOn"
           variant="ghost"
-          size="icon-xs-sq"
-          class="absolute! top-0.75 z-51"
+          size="icon-toolbar"
+          class="rounded-default absolute! top-0.75 z-51 size-7! min-h-7! min-w-7!"
           :style="{ right: filterBuilderToggleRight }"
           @click="toggleFilterBuilder"
         >
+          <OIcon
+            :name="filterBuilderOn ? 'code' : 'filter-list'"
+            size="sm"
+            class="text-text-secondary"
+          />
           <OTooltip
             :content="filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')"
           />
@@ -663,13 +668,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-search-bar-filter-builder-ai-btn"
           variant="ghost"
           size="icon-toolbar"
-          class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-1 right-1 z-51 h-7! min-h-7! w-7! min-w-7! hover:shadow-md"
+          class="rounded-default absolute! top-0.75 right-1 z-51 size-7! min-h-7! min-w-7!"
           @click="openAiFromBuilder"
         >
-          <img
-            :src="aiIcon"
-            :alt="t('search.aiModeIconAlt')"
-            class="h-4.5 w-4.5 group-hover:brightness-0 group-hover:invert"
+          <OIcon
+            name="auto-awesome"
+            size="sm"
+            :label="t('search.aiModeIconAlt')"
+            class="text-text-secondary"
           />
           <OTooltip :content="t('nlMode.toggle')" />
         </OButton>
@@ -770,7 +776,7 @@ import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { nlSqlToTracesFilter } from "@/plugins/traces/utils/nlSqlToTracesFilter";
 import { chartInterval } from "./metrics/latencyHeatmap";
 import { buildTracesRedPanels, tracesBucketNotice } from "./metrics/tracesRedPanels";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -845,8 +851,6 @@ import {
 } from "@/utils/queryHistory/recentSearches";
 import { TRACES_EXAMPLE_QUERIES } from "@/utils/queryHistory/traces";
 import type { HistoryStatus } from "@/services/query_history";
-import { useTheme } from "@/composables/useTheme";
-import { getImageURL } from "@/utils/zincutils";
 import {
   savedViewsQuery,
   createSavedViewMutation,
@@ -926,6 +930,15 @@ export default defineComponent({
   setup(props, { emit }) {
     const router = useRouter();
     const { t } = useI18nTyped();
+    const toolbarActionsLabel = computed(() =>
+      raw(
+        [
+          t("search.menuGroupDownloads"),
+          t("search.menuGroupAlerts"),
+          t("traces.redActions.menuGroupDashboards"),
+        ].join(" · "),
+      ),
+    );
     const store = useStore();
 
     const { searchObj, tracesShareURL, tracesParser } = useTraces();
@@ -1088,13 +1101,7 @@ export default defineComponent({
       () => filterBuilderOn.value && !searchObj.meta.sqlMode && !nlpMode.value,
     );
     // The AI button holds the corner slot in both modes: QueryEditor's own, or the builder's copy.
-    const filterBuilderToggleRight = computed(() => (isAiEnabled.value ? "2.375rem" : "0.25rem"));
-    const { isDark } = useTheme();
-    const aiIcon = computed(() =>
-      getImageURL(
-        isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
-      ),
-    );
+    const filterBuilderToggleRight = computed(() => (isAiEnabled.value ? "2.25rem" : "0.25rem"));
     const openAiFromBuilder = () =>
       (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
     const filterBuilderFields = computed(() =>
@@ -1760,6 +1767,7 @@ export default defineComponent({
 
     return {
       t,
+      toolbarActionsLabel,
       router,
       store,
       searchObj,
@@ -1807,7 +1815,6 @@ export default defineComponent({
       toggleFilterBuilder,
       showFilterBuilder,
       filterBuilderToggleRight,
-      aiIcon,
       openAiFromBuilder,
       filterBuilderFields,
       filterBuilderRef,

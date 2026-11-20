@@ -69,25 +69,24 @@
   --font-medium: 500;
   --font-semibold: 550; /* Geist is variable, so 550 renders between medium and bold */
   --font-bold: 700;
-  /* --- Primary palette — blue-teal #3F7994 ---
+  /* --- Primary palette — O2 Signature indigo #5A64DB ---
      The runtime theme engine is the AUTHORITY for brand colour. `constants/themes.ts`
      defines the selectable themes; `utils/theme.ts#generatePrimaryPalette` derives the
      full 50–950 ramp from the chosen base and writes it as inline styles on <html>,
-     which beat this stylesheet. The values below are the DEFAULT O2 theme only —
-     theme.ts removes its inline overrides when the default theme is active, so these
-     then apply. To change the brand: edit constants/themes.ts (or pick a theme in the
+     which beat this stylesheet. The values below are the DEFAULT O2 theme only and
+     paint the first frame before theme.ts runs. To change the brand: edit constants/themes.ts (or pick a theme in the
      UI) — do NOT edit this ramp and expect custom themes to follow. */
-  --color-primary-50: #f5f8fa;
-  --color-primary-100: #e2ebef;
-  --color-primary-200: #c5d7df;
-  --color-primary-300: #9fbcca;
-  --color-primary-400: #79a1b4;
-  --color-primary-500: #5c8da4;
-  --color-primary-600: #3f7994; /* brand accent — buttons, links, active tabs */
-  --color-primary-700: #326176; /* hover */
-  --color-primary-800: #264959;
-  --color-primary-900: #19303b;
-  --color-primary-950: #0d181e; /* darkest — dark-mode hover/drag bgs */
+  --color-primary-50: #f7f7fd;
+  --color-primary-100: #e6e8fa;
+  --color-primary-200: #ced0f4;
+  --color-primary-300: #acb2ed;
+  --color-primary-400: #8c92e6;
+  --color-primary-500: #737be0;
+  --color-primary-600: #5a64db; /* brand accent — buttons, links, active tabs */
+  --color-primary-700: #4850af; /* hover */
+  --color-primary-800: #363c83;
+  --color-primary-900: #242858;
+  --color-primary-950: #12142c; /* darkest — dark-mode hover/drag bgs */
 
   /* --- Grey palette --- */
   /* Tailwind "neutral" palette — true greys with no blue undertone. Tailwind's
@@ -219,18 +218,20 @@
   /* --- Dashboard classic series palette — light values (dark overrides in dark.css).
      Read by utils/dashboard/colorPalette.ts getColorPalette() via chartColor(), so the
      light/dark swap lives in CSS instead of a `theme === "dark"` branch in JS. --- */
-  --color-chart-series-1: #5b8ef0;
-  --color-chart-series-2: #34d399;
-  --color-chart-series-3: #fb923c;
-  --color-chart-series-4: #f472b6;
-  --color-chart-series-5: #a78bfa;
-  --color-chart-series-6: #fbbf24;
-  --color-chart-series-7: #38bdf8;
-  --color-chart-series-8: #f87171;
-  --color-chart-series-9: #2dd4bf;
-  --color-chart-series-10: #4ade80;
-  --color-chart-series-11: #e879f9;
-  --color-chart-series-12: #facc15;
+  /* 10 hues, none in 230-290 (accent and violet) or red (error); slot 2 stays green for SLO good; dark keeps each hue, only lightness changes */
+  /* Slots 1-8 sit 30+ degrees apart (22, 53, 92, 130, 186, 218, 308, 342), so adjacent lines never read as one hue. */
+  --color-chart-series-1: #0d97a6;
+  --color-chart-series-2: #1b812c;
+  --color-chart-series-3: #e86113;
+  --color-chart-series-4: #b32aa1;
+  --color-chart-series-5: #9d8b06;
+  --color-chart-series-6: #2d71e7;
+  --color-chart-series-7: #df3e6f;
+  --color-chart-series-8: #4b9d04;
+  --color-chart-series-9: #097450;
+  --color-chart-series-10: #708103;
+  --color-chart-series-11: #64748b;
+  --color-chart-series-12: #7e7367;
 
   /* Map heat ramp, calm low (1) to hot high (5): every step keeps 3:1 against surface-base. */
   --color-map-seq-1: #05a92e;
@@ -320,7 +321,7 @@
 
   /* --- Chart metric-panel text default — contrast fallback when a panel has no
      background; read via chartColor() by getContrastColor's callers. --- */
-  --color-chart-metric-text: #000000;
+  --color-chart-metric-text: var(--color-text-heading);
 
   /* --- Chart NUMERIC tokens (not colours) — read via chartNumber(); light/dark
      swap lives in dark.css, so chart JS branches on neither token nor theme. --- */

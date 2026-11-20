@@ -59,7 +59,7 @@ describe("SyntaxGuide", () => {
 
     it("should render button with help icon", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      // HelpCircle (lucide) renders as an SVG inside the button
+      // The help icon renders as an SVG inside the button
       expect(button.find("svg").exists()).toBe(true);
     });
 

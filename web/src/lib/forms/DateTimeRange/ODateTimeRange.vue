@@ -296,7 +296,7 @@ const triggerClasses = computed(() => [
   "flex items-center gap-2 w-full min-h-10 px-3 rounded-default border text-sm transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring bg-datepicker-bg",
   hasError.value
     ? "border-datepicker-error-border"
-    : "border-datepicker-border hover:border-datepicker-hover-border",
+    : "border-select-border hover:border-select-border-hover",
   isDisabled.value
     ? "opacity-60 cursor-not-allowed bg-datepicker-disabled-bg border-datepicker-disabled-border"
     : "cursor-pointer",
@@ -543,7 +543,7 @@ const triggerClasses = computed(() => [
             <button
               type="button"
               :disabled="isDisabled || stagedRelativeAmount <= 0"
-              class="rounded-default ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-sm font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:opacity-90 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded-default ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-sm font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none enabled:hover:bg-button-primary-hover focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
               data-test="datetimerange-relative-apply"
               @click="commitRelative"
             >
@@ -742,7 +742,7 @@ const triggerClasses = computed(() => [
             <button
               type="button"
               :disabled="isDisabled"
-              class="rounded-default ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-sm font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:opacity-90 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded-default ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-sm font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none enabled:hover:bg-button-primary-hover focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
               data-test="datetimerange-apply"
               @click="handleApply"
             >

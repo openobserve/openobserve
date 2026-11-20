@@ -15,13 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="traces-metrics-dashboard" class="traces-metrics-dashboard w-full overflow-hidden">
+  <div
+    data-test="traces-metrics-dashboard"
+    class="traces-metrics-dashboard w-full overflow-hidden [&_[data-test=dashboard-panel-bar]]:h-7 [&_[data-test=dashboard-panel-bar]]:min-h-7 [&_[data-test=dashboard-panel-bar]]:shrink-0 [&_[data-test=dashboard-panel-bar]]:border-b-0! [&_[data-test=dashboard-panel-bar]]:py-0"
+  >
     <!-- Charts Section -->
     <div
       v-if="show"
       class="charts-wrapper dashboard-strip relative flex h-auto min-h-[8.5rem] flex-col overflow-hidden py-0! will-change-[transform,opacity] md:h-40 md:flex-row"
     >
-      <div class="h-40 min-w-0 md:h-auto md:flex-2 dark:hover:shadow-sm">
+      <div class="h-40 min-w-0 md:h-auto md:flex-2">
         <RenderDashboardCharts
           v-if="show"
           ref="dashboardChartsRef"
@@ -42,8 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </RenderDashboardCharts>
       </div>
-      <!-- Tied to the Rate/Errors panels: metrics.json h (9 rows after migration) × 17px cellHeight, 4px GridStack margin -->
-      <div class="h-40 min-w-0 px-1 py-0.5 md:h-[9.5625rem] md:flex-1 md:py-1">
+      <div class="h-40 min-w-0 px-1 pt-1.5 pb-0.5 md:h-[9.5625rem] md:flex-1">
         <TracesLatencyHeatmap
           :request="heatmapRequest"
           :stream="streamName"
@@ -94,12 +96,16 @@ import {
   watch,
 } from "vue";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useI18nTyped, raw } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { SERIES_OVERRIDE_MATCH_BY } from "@/utils/dashboard/seriesOverrides";
 import metrics from "./metrics.json";
+import { TRACES_CHART_GRID } from "./tracesChartLayout";
 import { deepCopy } from "@/utils/zincutils";
+import { chartSeriesPrimary, chartColor, withAlpha } from "@/utils/chartTheme";
+import { SEMANTIC_COLORS_DARK } from "@/utils/logs/convertLogData";
 import type { MetricsRangeFilter } from "@/ts/interfaces/traces/trace.types";
 import TracesLatencyHeatmap, {
   type LatencyHeatmapAskAi,
@@ -172,6 +178,7 @@ const LATENCY_HEATMAP_PANEL_ID = "traces_latency_heatmap";
 
 const { showErrorNotification } = useNotifications();
 const store = useStore();
+const { isDark } = useTheme();
 const { searchObj, tracesParser } = useTraces();
 const { t } = useI18nTyped();
 
@@ -296,9 +303,37 @@ const loadDashboard = async () => {
     heatmapSelection.value = null;
     convertedDashboard.tabs[0].panels.forEach(
       (
-        panel: { title?: string; config: Record<string, unknown>; queries: { query: string }[] },
+        panel: {
+          title?: string;
+          type?: string;
+          config: Record<string, unknown>;
+          queries: { query: string }[];
+        },
         index: number,
       ) => {
+        // Rate in full-strength series cyan (85% drops it under 3:1 in light); Errors in red, 2px top radius.
+        if (panel.title === "Rate" || panel.title === "Errors") {
+          panel.type = "bar";
+          panel.config.bar_radius = 2;
+          panel.config.axis_width = TRACES_CHART_GRID.left;
+          panel.config.custom_chart_options = {
+            tooltip: { appendToBody: true, confine: false },
+            grid: { ...TRACES_CHART_GRID, containLabel: false },
+          };
+          panel.config.color = {
+            mode: "fixed",
+            // Dark errors use the Logs histogram ERROR red at full strength so red means the same on both pages.
+            fixedColor: [
+              panel.title === "Rate"
+                ? chartSeriesPrimary()
+                : isDark.value
+                  ? SEMANTIC_COLORS_DARK.error
+                  : withAlpha(chartColor("--color-status-negative"), 0.85),
+            ],
+            seriesBy: "last",
+            colorBySeries: [],
+          };
+        }
         // Build WHERE clause based on filters
         let whereClause = "";
 

@@ -1424,6 +1424,8 @@
     "selectOrganization": "Veuillez sélectionner une organisation"
   },
   "search": {
+    "liveRefreshingEvery": "Live: refreshing every {interval}",
+    "rowsPerPageLabel": "{n} / page",
     "queryFailed": "Échec de la requête",
     "unknownError": "Erreur inconnue",
     "selectedLabel": "sélectionnés",
@@ -2075,7 +2077,6 @@
   "menu": {
     "alertCalibration": "Calibration des alertes",
     "autoobserve": "AutoObserve",
-    "upgradeToProPlan": "Passer au plan PRO",
     "home": "Accueil",
     "about": "À propos",
     "index": "Flux",
@@ -2134,7 +2135,6 @@
   },
   "profiles": {
     "title": "Profils",
-    "subtitle": "Suivez l'utilisation du CPU, de la mémoire et des verrous par fonction",
     "stream": "Flux",
     "dataSource": "Source de données",
     "service": "Service",
@@ -2285,7 +2285,6 @@
     "from": "de",
     "to": "à",
     "title": "Surveillance des utilisateurs réels",
-    "subtitle": "Surveillez les sessions utilisateur réelles, les erreurs et les performances frontend",
     "issueColumn": "Problème",
     "trendColumn": "Tendance",
     "usersColumn": "Les utilisateurs",
@@ -3325,7 +3324,6 @@
         "bulkDeleteMessage": "Supprimer {count} événement nommé ? Les entonnoirs qui l'utilisent afficheront une étiquette d'étape supprimée. | Supprimer {count} événements nommés ? Les entonnoirs qui les utilisent afficheront une étiquette d'étape supprimée.",
         "bulkDeleteInUseMessage": "Supprimer {count} événement nommé ? Les entonnoirs enregistrés afficheront une étape Événement supprimé pour : {names}. | Supprimer {count} événements nommés ? Les entonnoirs enregistrés afficheront une étape Événement supprimé pour : {names}.",
         "notFound": "Cet événement nommé n'existe plus",
-        "editorApp": "Application : {app}",
         "details": "Détails",
         "opParam": "Paramètre d'URL",
         "opRef": "Hôte référent",
@@ -4004,11 +4002,6 @@
     "license_downgrade_limit": "La limite quotidienne passe de {old} à {new}",
     "license_downgrade_expiry": "L'expiration passe de {old} à {new}",
     "license_limit_per_day": "{gb} Go/jour",
-    "header_button": {
-      "cloud_features": "Fonctionnalités de {product}",
-      "enterprise_edition": "Édition : Enterprise",
-      "get_enterprise_free": "Téléchargez OpenObserve Enterprise (gratuit)"
-    },
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Fonctionnalités d'entreprise",
@@ -4203,7 +4196,14 @@
     "usageChartDate": "{month} {day}",
     "usageChartDay": "Jour {day}",
     "usageChartUsage": "Utilisation : {value}",
-    "startFreeTrial": "Commencer l'essai gratuit"
+    "startFreeTrial": "Commencer l'essai gratuit",
+    "header_button": {
+      "upgrade": "Upgrade",
+      "enterprise_tooltip": "About {product} — Enterprise edition",
+      "cloud_features": "Fonctionnalités de {product}",
+      "enterprise_edition": "Édition : Enterprise",
+      "get_enterprise_free": "Téléchargez OpenObserve Enterprise (gratuit)"
+    }
   },
   "login": {
     "lockedOut": "Trop de tentatives de connexion échouées. Réessayez dans {duration} ou contactez votre administrateur.",
@@ -4379,7 +4379,6 @@
     "nameInvalid": "Utilisez des lettres minuscules, des chiffres et des traits d'union (jusqu'à {max} caractères)",
     "createFailed": "Échec de la création du compte de service. Veuillez réessayer.",
     "updateFailed": "Échec de la mise à jour du compte de service. Veuillez réessayer.",
-    "headerSubtitle": "Jetons d'accès programmatiques pour les API",
     "search": "Rechercher un compte de service",
     "rotate": "Faire pivoter le jeton",
     "deleteServiceAccount": "Supprimer le compte de service",
@@ -4472,7 +4471,6 @@
     "mcpServerLabel": "Serveur MCP",
     "mcpServerDesc": "Connectez les clients IA via {product}",
     "mcpServerHeader": "Serveur MCP",
-    "mcpServerHeaderSubtitle": "Connectez Claude, Cursor, VS Code et d'autres clients IA à cette organisation.",
     "invitationsDesc": "Invitations aux membres en attente et envoyées",
     "groupsDesc": "Regroupez les utilisateurs pour attribuer des rôles",
     "rolesDesc": "Définissez les autorisations et les politiques d'accès",
@@ -4901,7 +4899,6 @@
       "other": "Autre"
     },
     "invitationList": {
-      "subtitle": "Invitations de membres en attente et envoyées",
       "loadingPending": "Chargement des invitations en attente...",
       "failedLoadPending": "Échec du chargement des invitations en attente",
       "accepting": "Acceptation de l'invitation...",
@@ -4955,7 +4952,6 @@
       "errorCreating": "Erreur lors de la création du groupe"
     },
     "quotaPage": {
-      "subtitle": "Limites d'utilisation appliquées par rôle",
       "selectOrganization": "Sélectionner une organisation",
       "editQuota": "Modifier le quota",
       "selectApiCategory": "Sélectionner une catégorie d'API",
@@ -5082,7 +5078,6 @@
       "brand": "Bleu soutenu"
     },
     "list": {
-      "subtitle": "Annonces affichées en haut de l'application pour toutes les organisations, ou uniquement celles que vous choisissez.",
       "liveNow": "Actif en ce moment",
       "liveNowEmpty": "Aucun bandeau n'est affiché en ce moment.",
       "liveOnlyFor": "Uniquement pour {orgs}",
@@ -5276,7 +5271,6 @@
     },
     "deleteField": "Supprimer le champ",
     "header": "Flux",
-    "subtitle": "Gestion des index et configuration des flux",
     "streamNameHelpText": "Utilisez uniquement des caractères alphanumériques, un trait de soulignement et deux points.",
     "search": "Rechercher un flux",
     "emptyOr": "Ou :",
@@ -5367,7 +5361,6 @@
   },
   "workflow": {
     "header": "Workflows",
-    "subtitle": "Automatiser les actions avec des déclencheurs, de la logique et des destinations",
     "create": "Nouveau workflow",
     "createSuccess": "Workflow créé avec succès",
     "name": "Nom du workflow",
@@ -6279,7 +6272,6 @@
     "functionName": "Nom de la fonction",
     "remoteDestination": "Destination distante",
     "failedToLoadPipeline": "Échec du chargement du pipeline",
-    "subtitle": "Transformez, enrichissez et acheminez les données en vol",
     "deleteNode": "Supprimer",
     "addPipeline": "Ajouter un pipeline",
     "deletePipeline": "Supprimer le pipeline",
@@ -6526,7 +6518,6 @@
     "order": "Commande",
     "applyBeforeFlattening": "Appliquer avant l'aplatissement",
     "header": "Fonctions",
-    "subtitle": "Fonctions VRL réutilisables appliquées aux pipelines",
     "clickTestFunctionHint": "Cliquez sur Tester la fonction pour voir les événements",
     "add": "Créer une nouvelle fonction",
     "search": "Rechercher une fonction",
@@ -6550,7 +6541,6 @@
     "enterFunctionPrompt": "Entrez une invite pour générer une fonction",
     "associatedFunctionHeader": "Fonctions associées",
     "enrichmentTables": "Tableaux d'enrichissement",
-    "enrichmentTablesSubtitle": "Tables de recherche qui enrichissent les données ingérées",
     "addEnrichmentTable": "Ajouter une table d'enrichissement",
     "updateEnrichmentTable": "Mettre à jour le tableau d'enrichissement",
     "searchEnrichmentTable": "Rechercher une table d'enrichissement",
@@ -10147,7 +10137,6 @@
     "publicLinks": {
       "panelTitle": "Liens publics",
       "pageTitle": "Tableaux de bord publics",
-      "pageSubtitle": "Tous les liens publics de cette organisation",
       "panelTitleFor": "Liens publics — {name}",
       "intro": "Toute personne disposant d'un lien public peut consulter ce tableau de bord sans se connecter.",
       "editNote": "L'adresse du lien reste inchangée. Les modifications apparaissent sur la page publique lors de sa prochaine mise à jour.",
@@ -10534,7 +10523,6 @@
     "tabOverview": "Vue d'ensemble",
     "tabUsage": "Utilisation",
     "removeHomeDashboard": "Supprimer le tableau de bord d'accueil",
-    "subtitle": "Votre espace de travail d'observabilité en un coup d'œil",
     "resources": "Ressources",
     "explore": "Explorer"
   },
@@ -11476,7 +11464,6 @@
   },
   "alertCalibration": {
     "title": "Calibration des alertes",
-    "subtitle": "Comportement de vos alertes, mesuré à partir de leur propre historique d'exécution",
     "configure": "Configurer",
     "runNow": "Exécuter maintenant",
     "runNowHint": "Demande une exécution immédiate plutôt que d'attendre la suivante. Si une exécution est déjà due ou en cours, c'est elle qui répond à la demande.",
@@ -11898,7 +11885,6 @@
     "detail": {
       "title": "Synthèse du {time}",
       "titleLoading": "Synthèse",
-      "subtitle": "Couvre de {start} à {end}, généré à {time}",
       "back": "Synthèses",
       "unavailableTitle": "Synthèse indisponible",
       "noRecords": "Aucun enregistrement n'a été trouvé pour cette exécution.",
@@ -12707,7 +12693,6 @@
       "commentPlaceholder": "Écrire un commentaire...",
       "sendComment": "Envoyer le commentaire",
       "title": "Incidents",
-      "subtitle": "Gestion et suivi des incidents",
       "search": "Rechercher des incidents...",
       "status": "État",
       "severity": "Gravité",
@@ -14158,7 +14143,6 @@
       "firingTotal": "Déclenchée",
       "observedTotal": "Groupes",
       "nOfMFiring": "{firing} sur {observed} groupes en déclenchement",
-      "groupedBy": "regroupés par {columns}",
       "groupBy": "Grouper par",
       "criticalCondition": "Condition critique",
       "warningCondition": "Condition d'avertissement",
@@ -14506,7 +14490,6 @@
         "startDateRequired": "Choisissez le premier jour."
       },
       "title": "Plages de maintenance",
-      "subtitle": "Fenêtres planifiées qui laissent s'exécuter les alertes, les détections d'anomalies et les contrôles synthétiques, mais suspendent leurs notifications",
       "newDowntime": "Nouvelle plage de maintenance",
       "filterAll": "Toutes",
       "filterOnce": "Ponctuelle",
@@ -15416,7 +15399,6 @@
   },
   "alert_sources": {
     "header": "Sources d'alerte externes",
-    "subtitle": "Envoyez des alertes depuis Grafana, Prometheus Alertmanager, ou tout outil pouvant appeler un webhook — elles apparaîtront ici et seront automatiquement corrélées en incidents.",
     "acceptsAnyFormat": "accepte tout format de webhook",
     "revealToken": "Afficher l'URL complète",
     "hideToken": "Masquer l'URL complète",
@@ -16504,9 +16486,6 @@
     "modelPricingEditor": {
       "copySuffix": " (Copie)"
     },
-    "modelPricingList": {
-      "subtitle": "Configuration des coûts des modèles LLM"
-    },
     "orgStorageSettings": {
       "subtitle": "Stockez les données de cette organisation dans un bucket qui vous appartient",
       "awsCredentials": "Identifiants AWS",
@@ -16541,9 +16520,6 @@
       "settingsUpdated": "Paramètres de l'organisation mis à jour avec succès",
       "settingsSaveError": "Erreur lors de l'enregistrement des paramètres de l'organisation"
     },
-    "aiToolsetsPage": {
-      "subtitle": "Configurer les intégrations d'outils d'IA"
-    },
     "cipherKeysPage": {
       "subtitle": "Clés qui chiffrent et déchiffrent les valeurs de champs sensibles",
       "delete": "Supprimer",
@@ -16560,15 +16536,11 @@
       "bulkDeleteFailed": "Échec de la suppression de {count} clé de chiffrement | Échec de la suppression de {count} clés de chiffrement",
       "bulkDeleteError": "Erreur lors de la suppression des clés de chiffrement"
     },
-    "correlationSettingsPage": {
-      "subtitle": "Configuration de la corrélation de télémétrie"
-    },
     "licensePage": {
       "unexpectedError": "erreur inattendue",
       "daysRemaining": "{days} jours restants avant l'expiration de votre licence"
     },
     "nodesPage": {
-      "subtitle": "Nœuds du cluster et leur santé",
       "to": "à",
       "name": "Nom",
       "loadingData": "Veuillez patienter pendant le chargement des données...",
@@ -16656,7 +16628,6 @@
       "processingTrialExtension": "Veuillez patienter pendant le traitement de la demande de prolongation de période d'essai...",
       "trialExtendedSuccess": "Période d'essai prolongée avec succès.",
       "extendTrialError": "Échec de la prolongation de la période d'essai. Veuillez réessayer.",
-      "subtitle": "Créer et gérer des organisations",
       "addContract": "Ajouter un contrat",
       "extendTrialTitle": "Prolonger l'essai pour {name}",
       "extendTrialSubtitle": "Définissez la nouvelle période de prolongation d'essai.",
@@ -16776,7 +16747,6 @@
       "sourceBuiltIn": "Intégré"
     },
     "regexPatternList": {
-      "subtitle": "Motifs regex réutilisables pour le masquage",
       "exportTitle": "Exporter le motif regex",
       "delete": "Supprimer",
       "bulkDeleteTitle": "Supprimer les motifs regex",
@@ -16870,7 +16840,6 @@
         "valueMismatch": "Enregistrement TXT trouvé, mais la valeur ne correspond pas",
         "dnsFailed": "Échec de la résolution DNS"
       },
-      "pageSubtitle": "Liez vos domaines e-mail, associez leurs utilisateurs aux organisations et contrôlez lesquels peuvent les rejoindre.",
       "linkedTab": "Domaines liés",
       "mappingsTab": "Mappages",
       "accessTab": "Utilisateurs bloqués",
@@ -16993,7 +16962,6 @@
       "lastRun": "Dernière exécution",
       "lastRunAt": "Exécuté",
       "nextRun": "Prochaine exécution",
-      "nextRunAt": "prochaine exécution {time}",
       "acceptedTooltip": "Accepté par le serveur de messagerie",
       "cachedTooltip": "Cache du tableau de bord préchargé ; aucun e-mail n’est envoyé",
       "unrecordedTooltip": "Le résultat de la dernière exécution n'a pas été enregistré ; des exécutions plus anciennes peuvent être disponibles dans l'historique.",
@@ -17067,9 +17035,7 @@
       "everyHours": "Toutes les heures | Toutes les {count} heures",
       "everyDays": "Tous les jours | Tous les {count} jours",
       "everyWeeks": "Toutes les semaines | Toutes les {count} semaines",
-      "everyMonths": "Tous les mois | Tous les {count} mois",
-      "dashboardCount": "{count} tableau de bord | {count} tableaux de bord",
-      "recipientCount": "{count} destinataire | {count} destinataires"
+      "everyMonths": "Tous les mois | Tous les {count} mois"
     },
     "frequencyUnits": {
       "days": "jours",
@@ -17097,7 +17063,6 @@
     "never": "Jamais",
     "startDate": "Date de début",
     "header": "Rapports",
-    "subtitle": "Rapports et exportations planifiés",
     "searchThisFolder": "Ce dossier",
     "searchAllFolders": "Tous les dossiers",
     "reloadReports": "Recharger les rapports",
@@ -18741,7 +18706,6 @@
     },
     "unpriced": {
       "title": "Lacunes de tarification",
-      "subtitle": "Modèles de vos traces LLM qui n'avaient pas de prix, ou seulement un prix approximatif, à l'ingestion",
       "banner": "{count} modèle n'avait pas de prix ou avait un prix approximatif à l'ingestion. Son coût enregistré peut être incomplet. | {count} modèles n'avaient pas de prix ou avaient un prix approximatif à l'ingestion. Leurs coûts enregistrés peuvent être incomplets.",
       "bannerTruncated": "{total} modèles de vos traces n'avaient pas de prix ou seulement un prix approximatif à l'ingestion. Leur coût peut être erroné. Affichage des {shown} premiers par tokens.",
       "streamLabel": "Flux",
@@ -18862,7 +18826,6 @@
       "tools": "Outils"
     },
     "promptManagement": {
-      "subtitle": "Créez, versionnez et publiez des prompts réutilisables.",
       "promptSubtitle": "prompt {type}",
       "prompt": "Prompt",
       "promptId": "ID du prompt",
@@ -19302,7 +19265,6 @@
         }
       },
       "workbench": {
-        "subtitle": "{reviewed} sur {total} examinés",
         "itemCounter": "Élément {index} sur {total} à examiner",
         "prev": "Élément précédent",
         "next": "Élément suivant",
@@ -19782,7 +19744,6 @@
       },
       "detail": {
         "fallbackTitle": "Jeu de données",
-        "meta": "{count} éléments · mis à jour {updated}",
         "loadError": "Échec du chargement du jeu de données",
         "tryInPlayground": "Essayer dans Playground",
         "tabs": {
@@ -20746,7 +20707,6 @@
       "backTo": "Fournisseurs",
       "createTitle": "Créer un fournisseur LLM",
       "editTitle": "Modifier le fournisseur LLM",
-      "subtitle": "Configurez le point de terminaison du modèle utilisé par les évaluateurs LLM.",
       "sectionTitle": "Prestataire",
       "nameLabel": "Nom",
       "typeLabel": "Type de fournisseur",
@@ -22705,9 +22665,7 @@
       "usedBy": {
         "aria": "Tests qui utilisent celui-ci",
         "help": "Ils exécutent ces étapes sur leur propre page. L'URL de départ, les environnements et les secrets de ce test n'y sont pas utilisés.",
-        "viewAll": "Voir les {count} tests",
-        "subtitle": "{folder} · utilisé par {count} test | {folder} · utilisé par {count} tests",
-        "subtitleNoFolder": "Utilisé par {count} test | Utilisé par {count} tests"
+        "viewAll": "Voir les {count} tests"
       },
       "recordingIn": "Enregistrement dans {environment}",
       "needsDesktopRecorder": "Nécessite l'extension d'enregistrement pour ordinateur",
@@ -22918,7 +22876,6 @@
       "folder": "dossier",
       "willBeCreatedIn": "Sera créé dans"
     },
-    "pageSubtitle": "Surveillez de manière proactive la disponibilité, les performances et les parcours utilisateur depuis des emplacements mondiaux",
     "pageTitle": "Synthetics",
     "protocolConfig": {
       "http": {
@@ -24947,7 +24904,6 @@
     "title": "SLOs",
     "notFound": "SLO introuvable",
     "notFoundDescription": "Ce SLO n'existe plus, ou vous n'y avez pas accès. Il a peut-être été supprimé.",
-    "subtitle": "Objectifs de niveau de service : cibles, budgets d'erreur, alertes de taux d'épuisement",
     "new": "Nouveau SLO",
     "newTitle": "Nouveau SLO",
     "editTitle": "Modifier le SLO",
@@ -24965,7 +24921,6 @@
     "totalSlos": "Total des SLOs",
     "noGrouping": "Aucun (une seule série globale)",
     "newAlert": "Nouvelle alerte",
-    "overRolling": "sur la période glissante {window}",
     "searchPlaceholder": "Rechercher un SLO ou une étiquette, p. ex. team:payments",
     "loadFailed": "Impossible de charger les SLOs",
     "requestFailed": "Échec de la requête ({code})",
@@ -26075,7 +26030,6 @@
       "groupWorkloads": "Charges de travail",
       "groupStorage": "Stockage",
       "groupAutoscaling": "Mise à l'échelle automatique",
-      "subtitle": "Surveillez les clusters, les charges de travail et les ressources",
       "clusterPickerLabel": "Cluster",
       "clusterPickerLoading": "Chargement des clusters…",
       "clusterPickerTrigger": "Cluster : {name}",
@@ -26533,8 +26487,7 @@
       "actions": "Actions"
     },
     "header": {
-      "title": "Bases de données",
-      "subtitle": "Performances et santé des requêtes sur vos bases de données"
+      "title": "Bases de données"
     },
     "ai": {
       "suggestFix": "Demander à l'IA comment corriger ceci",
@@ -27799,7 +27752,6 @@
     "fromRotation": "de {name}",
     "ownershipMatch": "Correspondances",
     "ownershipSpecificity": "Dimensions",
-    "teamSubtitle": "{tz} · {count} membre | {tz} · {count} membres",
     "statOnCallNow": "En astreinte maintenant",
     "statRotations": "Rotations",
     "statRoutingRules": "Règles de routage",
@@ -28800,7 +28752,6 @@
     "teamOpenInOnCall": "Voir tout dans On-Call",
     "teamCoverage": "Couverture des {days} prochains jours",
     "teamCoverageHint": "seuls les trous de couverture valent le coup d'œil ici",
-    "teamOwnsRules": "possède {count} règle de routage | possède {count} règles de routage",
     "teamCoveredNow": "Couvert actuellement",
     "teamOverview": "Vue d'ensemble",
     "teamAnsweredBy": "Répondu par",
@@ -29493,7 +29444,6 @@
       "allClearNone": "Rien n'a nécessité votre intervention."
     },
     "title": "AutoObserve",
-    "subtitle": "Envoyez vos données. OpenObserve détecte les problèmes et vous les signale, avec sa meilleure interprétation de la cause. Quand tout est calme, il vous montre ce qu'il a vérifié et ce qu'il ne peut pas voir.",
     "tabs": {
       "issues": "Problèmes",
       "coverage": "Couverture",
@@ -30425,7 +30375,6 @@
     },
     "issuesPage": {
       "title": "Tous les problèmes",
-      "sentence": "Chaque problème que j'ai ouvert {within}. Choisissez-en un pour voir ce qui s'est passé et ce que j'ai fait.",
       "ranges": {
         "week": "7 derniers jours",
         "month": "30 derniers jours",
@@ -32182,7 +32131,6 @@
   },
   "fleet": {
     "title": "Gestion de la flotte",
-    "subtitle": "Enregistrez des collecteurs OpenTelemetry, versionnez leurs configurations et déployez les changements en toute sécurité",
     "addCollector": "Ajouter un collecteur",
     "tabs": {
       "collectors": "Collecteurs",
@@ -32721,7 +32669,6 @@
     },
     "editor": {
       "pageTitle": "Éditeur de configuration",
-      "newDescription": "Nouvelle configuration de collecteur",
       "visual": "Visuel",
       "issues": "{count} problème | {count} problèmes",
       "valid": "Valide",

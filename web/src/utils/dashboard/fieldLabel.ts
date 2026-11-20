@@ -48,8 +48,12 @@ export const getFieldLabel = (field: any, config: any, customQuery = false): str
   return name ? generateLabelFromName(name) : (field?.alias ?? "");
 };
 
+// Builder-generated aliases ("y_axis_1") name nothing for the reader.
+export const AUTO_AXIS_ALIAS = /^[xyz]_axis_\d+$/;
+
 /** An axis only ever shows a label the user typed; hide drops even that. */
 export const getAxisLabel = (field: any, config: any): string => {
   const mode: AxisLabelMode | undefined = config?.axis_label_mode;
-  return mode === "hide" ? "" : field?.label;
+  if (mode === "hide" || AUTO_AXIS_ALIAS.test(field?.label ?? "")) return "";
+  return field?.label;
 };

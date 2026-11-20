@@ -1464,12 +1464,12 @@ describe("SearchResult Component", () => {
       const title = () => wrapper.find('[data-test="logs-search-result-title"]');
       expect(progress().text()).toBe("Scanned 1.50 GB");
       expect(title().find('[data-test="logs-result-scan-progress"]').exists()).toBe(false);
-      expect(chip().text()).toBe("Scan Size: 300.00 MB");
+      expect(chip().text()).toBe("300.00 MB scanned");
 
       wrapper.vm.searchObj.loading = false;
       await nextTick();
       expect(progress().text()).toBe("Scanned 1.50 GB");
-      expect(chip().text()).toBe("Scan Size: 300.00 MB");
+      expect(chip().text()).toBe("300.00 MB scanned");
 
       wrapper.vm.searchObj.loadingHistogram = false;
       vi.advanceTimersByTime(1500);

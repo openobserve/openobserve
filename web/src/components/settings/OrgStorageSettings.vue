@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="currentAction === 'list'"
       :title="t('storage_settings.tabLabel')"
       icon="cloud"
-      :subtitle="t('settings.orgStorageSettings.subtitle')"
       bleed
       scroll
     >

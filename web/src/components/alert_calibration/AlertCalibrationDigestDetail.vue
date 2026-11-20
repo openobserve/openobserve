@@ -21,15 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ? t('alertCalibration.detail.title', { time: formatTime(run.window_end) })
         : t('alertCalibration.detail.titleLoading')
     "
-    :subtitle="
-      run
-        ? t('alertCalibration.detail.subtitle', {
-            start: formatDay(run.window_start),
-            end: formatDay(run.window_end),
-            time: formatAgo(run.emitted_at),
-          })
-        : raw('')
-    "
     icon="tune"
     :back="{ label: t('alertCalibration.detail.back'), to: digestsRoute }"
     scroll
@@ -251,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { format, formatDistanceToNowStrict } from "date-fns";
+import { format } from "date-fns";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -324,10 +315,6 @@ const digestsRoute = computed(() => ({
 }));
 
 const formatTime = (micros: number) => raw(format(micros / 1000, "MMM d, HH:mm"));
-const formatDay = (micros: number) => raw(format(micros / 1000, "MMM d"));
-const formatAgo = (micros: number) =>
-  raw(formatDistanceToNowStrict(micros / 1000, { addSuffix: true }));
-
 const records = useLatestRead(async () => {
   const hits = await search<DigestRecord>("/records", {
     window_start: windowStart.value,

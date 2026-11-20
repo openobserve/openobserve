@@ -72,19 +72,20 @@ const KNOWN_COLUMN_META: Record<
 > = {
   service_name: {
     headerKey: "traces.tableColumns.service",
-    size: 160,
+    size: 128,
     meta: { cellClass: "text-text-secondary" },
   },
   operation_name: {
     headerKey: "traces.tableColumns.operationName",
-    size: 200,
+    size: 160,
     meta: { cellClass: "text-text-secondary" },
   },
   duration: {
     headerKey: "traces.tableColumns.duration",
-    size: 120,
+    size: 100,
     meta: {
       sortable: true,
+      align: "right",
       cellClass: "text-text-heading!",
     },
   },
@@ -106,12 +107,13 @@ const KNOWN_COLUMN_META: Record<
   },
   span_status: {
     headerKey: "traces.tableColumns.spanStatus",
+    // Fits the full "Span Status" header with its sort mark at 1440.
     size: 120,
     meta: { align: "left", disableCellAction: true },
   },
   status: {
     headerKey: "traces.tableColumns.status",
-    size: 120,
+    size: 104,
     meta: { align: "left", disableCellAction: true },
   },
   service_latency: {
@@ -135,6 +137,9 @@ const KNOWN_COLUMN_META: Record<
     meta: { align: "right" },
   },
 };
+
+// IDs are compared character by character, so they read in mono.
+const MONO_ID_FIELDS = new Set(["trace_id", "span_id", "parent_span_id", "request_id"]);
 
 function toColumnDef(
   fieldName: string,
@@ -162,7 +167,7 @@ function toColumnDef(
     id: fieldName,
     header: raw(header),
     size: 160,
-    meta: { closable: true },
+    meta: { closable: true, ...(MONO_ID_FIELDS.has(fieldName) && { mono: true }) },
     accessorFn: (row: any) => row[fieldName],
   };
 }
@@ -175,7 +180,7 @@ function spanDerivedColumns(
     {
       id: SPAN_ERROR_COLUMN_ID,
       header: t("traces.results.errorColumn"),
-      size: 240,
+      size: 144,
       meta: { align: "left", disableCellAction: true, cellOverflowTooltip: false },
       accessorFn: (row: any) => {
         const error = spanResultCellsFor(row, timestampField).error;
@@ -185,14 +190,14 @@ function spanDerivedColumns(
     {
       id: SPAN_EVENTS_COLUMN_ID,
       header: t("traces.results.eventsColumn"),
-      size: 150,
+      size: 80,
       meta: { align: "left", disableCellAction: true, cellOverflowTooltip: false },
       accessorFn: (row: any) => spanResultCellsFor(row, timestampField).events.total,
     },
   ];
 }
 
-/** Marks the last non-timestamp column to absorb leftover width, which clamps every other column to its size. */
+/** Marks Operation (else the last non-timestamp column) to absorb leftover width, which clamps every other column to its size. */
 export function fillLastColumn(
   cols: OTableColumnDef<Record<string, any>>[],
   timestampCol: string,
@@ -207,7 +212,8 @@ export function fillLastColumn(
     col.meta = meta;
     delete col.minSize;
   }
-  const last = cols.at(-1);
+  // Operation names vary most in length, so that column flexes and the table fits at 1440 without scrolling.
+  const last = cols.find((c) => c.id === "operation_name") ?? cols.at(-1);
   if (!last || last.id === timestampCol) return;
   last.minSize = last.size;
   last.meta = { ...last.meta, autoWidth: true, fillRemaining: true };
@@ -235,9 +241,15 @@ export function useTracesTableColumns() {
     if (!selectedFields.find((col) => col === timestampCol))
       cols.unshift({
         id: timestampCol,
-        header: raw(`${t("traces.timestamp")} (${store.state.timezone})`),
-        size: 210,
-        meta: { sortable: true, headerClass: "capitalize!" },
+        // The timezone lives in the tooltip so the fixed header never truncates.
+        header: t("traces.timestamp"),
+        size: 216,
+        meta: {
+          sortable: true,
+          headerClass: "capitalize!",
+          mono: true,
+          headerTooltip: raw(`${t("traces.timestamp")} (${store.state.timezone})`),
+        },
         accessorFn: (row: any) =>
           timestampToTimezoneDate(
             (row[timestampCol] ?? row["zo_sql_timestamp"]) / 1000,

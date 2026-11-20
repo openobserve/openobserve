@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon="menu-book"
         :label="t('traces.noStream.queryGuide')"
         :sublabel="t('traces.noStream.queryGuideDesc')"
-        icon-variant="teal"
         data-test="traces-no-stream-query-guide-card"
         @click="openGuide"
       />

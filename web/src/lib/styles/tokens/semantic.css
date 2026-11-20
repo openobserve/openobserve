@@ -219,6 +219,9 @@
 
 /* ── Register ALL semantic tokens for Tailwind utilities ── */
 @theme inline {
+  --color-live: var(--color-live);
+  --color-live-soft: var(--color-live-soft);
+  --color-live-border: var(--color-live-border);
   /* Text */
   --color-text-heading: var(--color-text-heading);
   --color-text-body: var(--color-text-body);
@@ -256,6 +259,15 @@
   --color-icon-chip-orange-bg: var(--color-icon-chip-orange-bg);
   --color-icon-chip-orange-text: var(--color-icon-chip-orange-text);
   --color-surface-chrome: var(--color-surface-chrome);
+  /* STYLE-SPEC-10 ladder names (values live in refresh.css) */
+  --color-surface-shell: var(--color-surface-shell);
+  --color-surface-card: var(--color-surface-card);
+  --color-surface-band: var(--color-surface-band);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-surface-hover: var(--color-surface-hover);
+  --color-border-button: var(--color-border-button);
+  --color-accent-text: var(--color-accent-text);
+  --color-status-warning-solid: var(--color-status-warning-solid);
   --color-surface-chrome-deeper: var(--color-surface-chrome-deeper);
 
   /* Borders. `strong`/`subtle` were library-internal; reachable only as a raw
@@ -427,6 +439,8 @@
          1px bottom hairline      ->  border-b border-<token>              */
   /* eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom */
   --shadow-xs: 0 1px 3px var(--shadow-xs-c);
+  /* A white thumb needs the same lift on any track, so this one shadow is fixed in both themes. */
+  --shadow-switch-thumb: 0 1px 2px rgb(0 0 0 / 0.25);
   --shadow-sm: 0 2px 8px -2px var(--shadow-sm-c1), 0 1px 3px -1px var(--shadow-sm-c2);
   --shadow-md: 0 4px 12px -2px var(--shadow-md-c1), 0 2px 6px -2px var(--shadow-md-c2);
   --shadow-lg: 0 12px 24px -4px var(--shadow-lg-c1), 0 4px 8px -4px var(--shadow-lg-c2);
@@ -513,15 +527,15 @@
    Static values below are the light-mode DEFAULT theme; theme.ts overrides
    them via inline style when a custom accent color is picked or dark mode is active. */
 :root {
-  --color-theme-accent: #3f7994;
+  --color-theme-accent: var(--color-primary-600);
   --color-theme-table-header-bg: color-mix(in srgb, var(--color-theme-accent) 20%, white);
   --color-theme-tab-bg: color-mix(in srgb, var(--color-theme-accent) 20%, white);
   --color-theme-tab-bg-inactive: color-mix(in srgb, var(--color-theme-accent) 10%, white);
-  --color-theme-menu-color: #3f7994;
-  --color-theme-menu-gradient-start: rgba(89, 175, 199, 0.3);
-  --color-theme-menu-gradient-end: rgba(48, 193, 233, 0.3);
-  --color-theme-body-bg-primary: rgba(89, 155, 174, 0.01);
-  --color-theme-body-bg-secondary: rgba(89, 155, 174, 0.4);
+  --color-theme-menu-color: var(--color-primary-600);
+  --color-theme-menu-gradient-start: rgb(90 100 219 / 0.3);
+  --color-theme-menu-gradient-end: rgb(90 100 219 / 0.3);
+  --color-theme-body-bg-primary: rgb(90 100 219 / 0.01);
+  --color-theme-body-bg-secondary: rgb(90 100 219 / 0.4);
   --color-theme-header-menu-bg: rgba(255, 255, 255, 0.5);
 
   /* Shared hover + surface accent formula */

@@ -14,7 +14,6 @@
   <OPageLayout
     data-test="ai-playground-page"
     :title="t('aiObservability.nav.playground')"
-    :subtitle="t('aiObservability.subtitle.playground')"
     icon="play-circle"
     title-data-test="ai-playground-title"
     bleed

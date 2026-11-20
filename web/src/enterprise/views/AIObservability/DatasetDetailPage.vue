@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="ai-dataset-detail-page"
     :back="backTarget"
     :title="raw(dataset?.name) || t('aiObservability.datasets.detail.fallbackTitle')"
-    :subtitle="metaSubtitle"
     icon="table-chart"
     bleed
     :scroll="false"
@@ -397,7 +396,6 @@ import { computed, onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
-import { formatDistanceToNowStrict } from "date-fns";
 import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -482,17 +480,6 @@ const backTarget = computed(() => ({
   label: t("aiObservability.nav.datasets"),
   onClick: backToDatasets,
 }));
-
-const metaSubtitle = computed(() => {
-  if (!dataset.value) return raw("");
-  const updated = dataset.value.updatedAt
-    ? formatDistanceToNowStrict(new Date(dataset.value.updatedAt), { addSuffix: true })
-    : "";
-  return t("aiObservability.datasets.detail.meta", {
-    count: totalItems.value,
-    updated,
-  });
-});
 
 const columns = computed(() => [
   {

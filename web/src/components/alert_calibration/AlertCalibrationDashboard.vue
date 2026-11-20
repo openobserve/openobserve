@@ -17,9 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('alertCalibration.title')"
-    :subtitle="t('alertCalibration.subtitle')"
     icon="tune"
-    tabs-below
     scroll
     pad-y
     data-test="alert-calibration-dashboard-page"

@@ -71,9 +71,7 @@ the Free Software Foundation, either version 3 of the License, or
       <OPageHeader
         v-if="hideTabBar && embeddedHeader && activeTab !== 'quality'"
         :title="sectionHeader?.title ?? raw(embeddedHeader.title)"
-        :subtitle="sectionHeader?.subtitle ?? raw(embeddedHeader.subtitle)"
         :icon="sectionHeader?.icon ?? embeddedHeader.icon"
-        :tabs-below="hasTabs"
         class="border-border-default shrink-0 border-b"
       >
         <template v-if="hasTabs" #tabs><AiSectionTabs /></template>
@@ -663,36 +661,29 @@ const tabs = computed<Array<{ value: ActiveTab; label: I18nText; badge?: string 
 // Header chrome shown only when embedded in the AI Observability shell —
 // mirrors the LLM Insights / Sessions pages so every section in the rail
 // shares the same title strip. Title + icon track the active rail item.
-const EMBEDDED_HEADER_META: Record<
-  ActiveTab,
-  { i18nKey: I18nKey; subtitleKey: I18nKey; icon: IconName }
-> = {
+const EMBEDDED_HEADER_META: Record<ActiveTab, { i18nKey: I18nKey; icon: IconName }> = {
   quality: {
     i18nKey: "aiObservability.nav.quality",
-    subtitleKey: "aiObservability.subtitle.quality",
     icon: "star-rate",
   },
   jobs: {
     i18nKey: "aiObservability.nav.evalJobs",
-    subtitleKey: "aiObservability.subtitle.evalJobs",
     icon: "event",
   },
   scorers: {
     i18nKey: "aiObservability.nav.scorers",
-    subtitleKey: "aiObservability.subtitle.scorers",
     icon: "rule",
   },
   scoreConfigs: {
     i18nKey: "aiObservability.nav.scoreConfigs",
-    subtitleKey: "aiObservability.subtitle.scoreConfigs",
     icon: "tune",
   },
 };
 
-const embeddedHeader = computed<{ title: string; subtitle: string; icon: IconName } | null>(() => {
+const embeddedHeader = computed<{ title: string; icon: IconName } | null>(() => {
   const meta = EMBEDDED_HEADER_META[activeTab.value];
   if (!meta) return null;
-  return { title: t(meta.i18nKey), subtitle: t(meta.subtitleKey), icon: meta.icon };
+  return { title: t(meta.i18nKey), icon: meta.icon };
 });
 
 // Per-tab "create" button label for the embedded OPageHeader. Quality has

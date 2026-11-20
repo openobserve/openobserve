@@ -15,9 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <span v-if="!events.total" class="text-text-muted text-xs" data-test="span-events-cell-empty">{{
-    raw("–")
-  }}</span>
+  <span
+    v-if="!events.total"
+    class="bg-text-secondary inline-block h-0.5 w-3 align-middle text-[0px] select-none"
+    data-test="span-events-cell-empty"
+    >{{ raw("—") }}</span
+  >
   <span v-else class="inline-flex min-w-0">
     <OBadge
       size="xs"

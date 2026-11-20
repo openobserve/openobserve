@@ -16,6 +16,23 @@ describe("OInput", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
+  it("defaults to the 28px sm box with a soft focus glow, not a solid ring", () => {
+    wrapper = mount(OInput);
+    const box = wrapper.find(".bg-input-bg").classes();
+    expect(box).toContain("h-7");
+    expect(box).toContain("focus-within:ring-input-focus-glow");
+    expect(box).not.toContain("focus-within:ring-focus-ring-accent");
+  });
+
+  it.each([
+    ["xs", "h-6"],
+    ["md", "h-8"],
+    ["lg", "h-9"],
+  ] as const)("sizes the %s box", (size, expected) => {
+    wrapper = mount(OInput, { props: { size } });
+    expect(wrapper.find(".bg-input-bg").classes()).toContain(expected);
+  });
+
   it("renders a text input by default", () => {
     wrapper = mount(OInput);
     expect(wrapper.find("input").attributes("type")).toBe("text");

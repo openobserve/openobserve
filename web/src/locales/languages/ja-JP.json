@@ -1424,6 +1424,8 @@
     "selectOrganization": "組織を選択してください"
   },
   "search": {
+    "liveRefreshingEvery": "Live: refreshing every {interval}",
+    "rowsPerPageLabel": "{n} / page",
     "queryFailed": "クエリが失敗しました",
     "unknownError": "不明なエラー",
     "selectedLabel": "選択済み",
@@ -2075,7 +2077,6 @@
   "menu": {
     "alertCalibration": "アラートキャリブレーション",
     "autoobserve": "AutoObserve",
-    "upgradeToProPlan": "PROプランにアップグレード",
     "home": "ホーム",
     "about": "概要",
     "index": "ストリーム",
@@ -2134,7 +2135,6 @@
   },
   "profiles": {
     "title": "プロファイル",
-    "subtitle": "関数ごとの CPU、メモリ、ロックの使用状況を追跡します",
     "stream": "ストリーム",
     "dataSource": "データソース",
     "service": "サービス",
@@ -2285,7 +2285,6 @@
     "from": "から",
     "to": "まで",
     "title": "リアルユーザーモニタリング",
-    "subtitle": "実際のユーザーセッション、エラー、フロントエンドのパフォーマンスを監視",
     "issueColumn": "問題",
     "trendColumn": "トレンド",
     "usersColumn": "ユーザ",
@@ -3325,7 +3324,6 @@
         "bulkDeleteMessage": "名前付きイベントを {count} 件削除しますか？これを使用するファネルには削除済みステップのタグが表示されます。 | 名前付きイベントを {count} 件削除しますか？これらを使用するファネルには削除済みステップのタグが表示されます。",
         "bulkDeleteInUseMessage": "名前付きイベントを {count} 件削除しますか？保存済みファネルには次の削除済みイベントステップが表示されます: {names}。 | 名前付きイベントを {count} 件削除しますか？保存済みファネルには次の削除済みイベントステップが表示されます: {names}。",
         "notFound": "この名前付きイベントはすでに存在しません",
-        "editorApp": "アプリ: {app}",
         "details": "詳細",
         "opParam": "URL パラメーター",
         "opRef": "リファラーホスト",
@@ -4004,11 +4002,6 @@
     "license_downgrade_limit": "1 日あたりの上限が {old} から {new} に変わります",
     "license_downgrade_expiry": "有効期限が {old} から {new} に変わります",
     "license_limit_per_day": "{gb} GB/日",
-    "header_button": {
-      "cloud_features": "{product} の機能",
-      "enterprise_edition": "エディション:エンタープライズ",
-      "get_enterprise_free": "OpenObserve エンタープライズを入手 (無料)"
-    },
     "enterprise_offer": {
       "cloud": {
         "hero_title": "エンタープライズ機能",
@@ -4203,7 +4196,14 @@
     "usageChartDate": "{month}月{day}日",
     "usageChartDay": "{day}日",
     "usageChartUsage": "使用量: {value}",
-    "startFreeTrial": "無料トライアルを開始"
+    "startFreeTrial": "無料トライアルを開始",
+    "header_button": {
+      "upgrade": "Upgrade",
+      "enterprise_tooltip": "About {product} — Enterprise edition",
+      "cloud_features": "{product} の機能",
+      "enterprise_edition": "エディション:エンタープライズ",
+      "get_enterprise_free": "OpenObserve エンタープライズを入手 (無料)"
+    }
   },
   "login": {
     "lockedOut": "サインインの失敗回数が多すぎます。{duration}後に再試行するか、管理者にお問い合わせください。",
@@ -4379,7 +4379,6 @@
     "nameInvalid": "小文字、数字、ハイフンを使用してください（最大{max}文字）",
     "createFailed": "サービスアカウントの作成に失敗しました。もう一度お試しください。",
     "updateFailed": "サービスアカウントの更新に失敗しました。もう一度お試しください。",
-    "headerSubtitle": "API のプログラマティックアクセストークン",
     "search": "サービスアカウントを検索",
     "rotate": "トークンをローテーション",
     "deleteServiceAccount": "サービスアカウントを削除",
@@ -4472,7 +4471,6 @@
     "mcpServerLabel": "MCPサーバー",
     "mcpServerDesc": "AIクライアントを {product} 経由で接続",
     "mcpServerHeader": "MCPサーバー",
-    "mcpServerHeaderSubtitle": "Claude、Cursor、VS Code、その他のAIクライアントをこの組織に接続します。",
     "invitationsDesc": "保留中および送信済みのメンバーへの招待",
     "groupsDesc": "ユーザーをグループ化してロールを割り当てる",
     "rolesDesc": "権限とアクセスポリシーの定義",
@@ -4901,7 +4899,6 @@
       "other": "その他"
     },
     "invitationList": {
-      "subtitle": "保留中および送信済みのメンバー招待",
       "loadingPending": "保留中の招待を読み込み中...",
       "failedLoadPending": "保留中の招待の読み込みに失敗しました",
       "accepting": "招待を受け付けています...",
@@ -4955,7 +4952,6 @@
       "errorCreating": "グループ作成中にエラーが発生しました"
     },
     "quotaPage": {
-      "subtitle": "ロールごとの使用制限が適用されました",
       "selectOrganization": "組織を選択",
       "editQuota": "クォータを編集",
       "selectApiCategory": "APIカテゴリを選択",
@@ -5082,7 +5078,6 @@
       "brand": "鮮やかなブルー"
     },
     "list": {
-      "subtitle": "アプリの上部に表示されるお知らせです。すべての組織に表示するか、選択した組織のみに表示するかを選べます。",
       "liveNow": "現在公開中",
       "liveNowEmpty": "現在表示中のバナーはありません。",
       "liveOnlyFor": "{orgs} のみ",
@@ -5276,7 +5271,6 @@
     },
     "deleteField": "フィールドを削除",
     "header": "ストリーム",
-    "subtitle": "インデックス管理とストリーム構成",
     "streamNameHelpText": "英数字、アンダースコア、コロンのみを使用してください。",
     "search": "ストリームを検索",
     "emptyOr": "または:",
@@ -5367,7 +5361,6 @@
   },
   "workflow": {
     "header": "ワークフロー",
-    "subtitle": "トリガー、ロジック、宛先でアクションを自動化",
     "create": "新しいワークフロー",
     "createSuccess": "ワークフローを作成しました",
     "name": "ワークフロー名",
@@ -6279,7 +6272,6 @@
     "functionName": "関数名",
     "remoteDestination": "リモート宛先",
     "failedToLoadPipeline": "パイプラインを読み込めませんでした",
-    "subtitle": "転送中のデータの変換、強化、ルーティング",
     "deleteNode": "ノードを削除",
     "addPipeline": "パイプラインを追加",
     "deletePipeline": "パイプラインを削除",
@@ -6526,7 +6518,6 @@
     "order": "順序",
     "applyBeforeFlattening": "フラット化前に適用",
     "header": "関数",
-    "subtitle": "パイプラインで適用される再利用可能な VRL 関数",
     "clickTestFunctionHint": "イベントを確認するには、「関数をテスト」をクリックしてください",
     "add": "関数を作成",
     "search": "関数を検索",
@@ -6550,7 +6541,6 @@
     "enterFunctionPrompt": "関数を生成するプロンプトを入力してください",
     "associatedFunctionHeader": "関連関数",
     "enrichmentTables": "エンリッチメントテーブル",
-    "enrichmentTablesSubtitle": "取り込んだデータを充実させるルックアップテーブル",
     "addEnrichmentTable": "エンリッチメントテーブルを追加",
     "updateEnrichmentTable": "エンリッチメントテーブルを更新",
     "searchEnrichmentTable": "エンリッチメントテーブルを検索",
@@ -10147,7 +10137,6 @@
     "publicLinks": {
       "panelTitle": "公開リンク",
       "pageTitle": "公開ダッシュボード",
-      "pageSubtitle": "この組織内のすべての公開リンク",
       "panelTitleFor": "公開リンク — {name}",
       "intro": "公開リンクを持つ人は誰でもサインインせずにこのダッシュボードを閲覧できます。",
       "editNote": "リンクのアドレスは変わりません。変更は次回の更新時に公開ページに反映されます。",
@@ -10534,7 +10523,6 @@
     "tabOverview": "概要",
     "tabUsage": "使い方",
     "removeHomeDashboard": "ホームダッシュボードを削除",
-    "subtitle": "一目でわかるオブザーバビリティワークスペース",
     "resources": "リソース",
     "explore": "探索"
   },
@@ -11476,7 +11464,6 @@
   },
   "alertCalibration": {
     "title": "アラートキャリブレーション",
-    "subtitle": "アラートの挙動を、それぞれの実行履歴から測定します",
     "configure": "設定",
     "runNow": "今すぐ実行",
     "runNowHint": "次の実行を待たずに今すぐ実行を要求します。実行がすでに予定されているか進行中の場合は、代わりにその要求に応答します。",
@@ -11898,7 +11885,6 @@
     "detail": {
       "title": "{time} のダイジェスト",
       "titleLoading": "ダイジェスト",
-      "subtitle": "{start} から {end} を対象、生成 {time}",
       "back": "ダイジェスト",
       "unavailableTitle": "ダイジェストを利用できません",
       "noRecords": "この実行のレコードは見つかりませんでした。",
@@ -12707,7 +12693,6 @@
       "commentPlaceholder": "コメントを書く...",
       "sendComment": "コメントを送信",
       "title": "インシデント",
-      "subtitle": "インシデント管理と追跡",
       "search": "インシデントを検索...",
       "status": "ステータス",
       "severity": "重大度",
@@ -14158,7 +14143,6 @@
       "firingTotal": "発火中",
       "observedTotal": "グループ",
       "nOfMFiring": "{firing} / {observed} グループが発火中",
-      "groupedBy": "{columns} でグループ化",
       "groupBy": "グループ化",
       "criticalCondition": "クリティカル条件",
       "warningCondition": "警告条件",
@@ -14506,7 +14490,6 @@
         "startDateRequired": "初日を選択してください。"
       },
       "title": "ダウンタイム",
-      "subtitle": "アラート、異常検知、合成モニタリングのチェックは実行したまま、その通知のみを停止するスケジュールされたウィンドウ",
       "newDowntime": "新しいダウンタイム",
       "filterAll": "すべて",
       "filterOnce": "一回限り",
@@ -15416,7 +15399,6 @@
   },
   "alert_sources": {
     "header": "外部アラートソース",
-    "subtitle": "Grafana、Prometheus Alertmanager、またはWebhookを呼び出せる任意のツールからアラートを送信できます。アラートはここに表示され、インシデントに自動的に相関付けられます。",
     "acceptsAnyFormat": "任意のWebhook形式を受け入れます",
     "revealToken": "完全なURLを表示",
     "hideToken": "完全なURLを非表示",
@@ -16504,11 +16486,7 @@
     "modelPricingEditor": {
       "copySuffix": " (コピー)"
     },
-    "modelPricingList": {
-      "subtitle": "LLMモデルコスト設定"
-    },
     "orgStorageSettings": {
-      "subtitle": "組織別ストレージ設定",
       "awsCredentials": "AWS認証情報",
       "azureCredentials": "Azure認証情報",
       "awsRoleArn": "AWSロールARN"
@@ -16541,11 +16519,7 @@
       "settingsUpdated": "組織設定が正常に更新されました",
       "settingsSaveError": "組織設定の保存中にエラーが発生しました"
     },
-    "aiToolsetsPage": {
-      "subtitle": "AIツール連携を設定"
-    },
     "cipherKeysPage": {
-      "subtitle": "機密フィールドの暗号化キー",
       "delete": "削除",
       "deleteCipherKeyTitle": "暗号化キーを削除",
       "deleteCipherKeyMessage": "{name} 暗号鍵を削除してもよろしいですか？",
@@ -16560,15 +16534,11 @@
       "bulkDeleteFailed": "{count} 件の暗号化キーの削除に失敗しました | {count} 件の暗号化キーの削除に失敗しました",
       "bulkDeleteError": "暗号化キーの削除中にエラーが発生しました"
     },
-    "correlationSettingsPage": {
-      "subtitle": "テレメトリー相関設定"
-    },
     "licensePage": {
       "unexpectedError": "予期しないエラー",
       "daysRemaining": "ライセンスの期限まであと{days}日"
     },
     "nodesPage": {
-      "subtitle": "クラスターノードとそのヘルス状態",
       "to": "～",
       "name": "名前",
       "loadingData": "データを読み込んでいます。お待ちください...",
@@ -16656,7 +16626,6 @@
       "processingTrialExtension": "トライアル期間延長リクエストを処理中です。お待ちください...",
       "trialExtendedSuccess": "トライアル期間が正常に延長されました。",
       "extendTrialError": "トライアル期間の延長に失敗しました。もう一度お試しください。",
-      "subtitle": "組織の作成と管理",
       "addContract": "契約を追加",
       "extendTrialTitle": "{name}のトライアルを延長",
       "extendTrialSubtitle": "新しいトライアル延長期間を設定してください。",
@@ -16776,7 +16745,6 @@
       "sourceBuiltIn": "組み込み"
     },
     "regexPatternList": {
-      "subtitle": "編集のための再利用可能な正規表現パターン",
       "exportTitle": "Regexパターンをエクスポート",
       "delete": "削除",
       "bulkDeleteTitle": "Regexパターンを削除",
@@ -16870,7 +16838,6 @@
         "valueMismatch": "TXT レコードは見つかりましたが、値が一致しません",
         "dnsFailed": "DNS 解決に失敗しました"
       },
-      "pageSubtitle": "メールドメインをリンクし、そのユーザーを組織にマッピングして、参加できるユーザーを制御します。",
       "linkedTab": "リンク済みドメイン",
       "mappingsTab": "マッピング",
       "accessTab": "ブロック済みユーザー",
@@ -16993,7 +16960,6 @@
       "lastRun": "前回の実行",
       "lastRunAt": "実行日時",
       "nextRun": "次回の実行",
-      "nextRunAt": "次回の実行 {time}",
       "acceptedTooltip": "メールサーバーが受け付けました",
       "cachedTooltip": "ダッシュボードのキャッシュを準備しました。メールは送信されません",
       "unrecordedTooltip": "最新の実行結果は記録されていません。過去の実行は履歴で確認できる場合があります。",
@@ -17067,9 +17033,7 @@
       "everyHours": "1 時間ごと | {count} 時間ごと",
       "everyDays": "毎日 | {count} 日ごと",
       "everyWeeks": "毎週 | {count} 週間ごと",
-      "everyMonths": "毎月 | {count} か月ごと",
-      "dashboardCount": "ダッシュボード {count} 件 | ダッシュボード {count} 件",
-      "recipientCount": "受信者 {count} 人 | 受信者 {count} 人"
+      "everyMonths": "毎月 | {count} か月ごと"
     },
     "frequencyUnits": {
       "days": "日",
@@ -17097,7 +17061,6 @@
     "never": "なし",
     "startDate": "開始日",
     "header": "レポート",
-    "subtitle": "定期レポートとエクスポート",
     "searchThisFolder": "このフォルダー",
     "searchAllFolders": "すべてのフォルダー",
     "reloadReports": "レポートを再読み込み",
@@ -18741,7 +18704,6 @@
     },
     "unpriced": {
       "title": "価格の未設定",
-      "subtitle": "取り込み時に価格がない、または概算価格しかなかった LLM トレース内のモデル",
       "banner": "{count} 件のモデルが取り込み時に価格または概算価格を持っていませんでした。記録されたコストは不完全な可能性があります。 | {count} 件のモデルが取り込み時に価格または概算価格を持っていませんでした。記録されたコストは不完全な可能性があります。",
       "bannerTruncated": "トレース内の {total} 件のモデルが取り込み時に価格または概算価格を持っていませんでした。コストが誤っている可能性があります。トークン数上位 {shown} 件を表示しています。",
       "streamLabel": "ストリーム",
@@ -18862,7 +18824,6 @@
       "tools": "ツール"
     },
     "promptManagement": {
-      "subtitle": "再利用可能なプロンプトを作成、バージョン管理、リリースできます。",
       "promptSubtitle": "{type} プロンプト",
       "prompt": "プロンプト",
       "promptId": "プロンプト ID",
@@ -19302,7 +19263,6 @@
         }
       },
       "workbench": {
-        "subtitle": "{reviewed} / {total} レビュー済み",
         "itemCounter": "レビュー対象 {index} / {total}",
         "prev": "前の項目",
         "next": "次の項目",
@@ -19782,7 +19742,6 @@
       },
       "detail": {
         "fallbackTitle": "データセット",
-        "meta": "{count} 項目 · 更新日時 {updated}",
         "loadError": "データセットの読み込みに失敗しました",
         "tryInPlayground": "プレイグラウンドで試す",
         "tabs": {
@@ -20746,7 +20705,6 @@
       "backTo": "プロバイダー",
       "createTitle": "LLM プロバイダーの作成",
       "editTitle": "LLM プロバイダーの編集",
-      "subtitle": "LLM ジャッジスコアラーが使用するモデルエンドポイントを設定します。",
       "sectionTitle": "プロバイダー",
       "nameLabel": "名前",
       "typeLabel": "プロバイダーの種類",
@@ -22705,9 +22663,7 @@
       "usedBy": {
         "aria": "これを使用するテスト",
         "help": "これらのステップはそれぞれのページで実行されます。このテストの開始 URL、環境、シークレットはそこでは使用されません。",
-        "viewAll": "{count} 件のテストをすべて表示",
-        "subtitle": "{folder} · {count} 件のテストで使用 | {folder} · {count} 件のテストで使用",
-        "subtitleNoFolder": "{count} 件のテストで使用 | {count} 件のテストで使用"
+        "viewAll": "{count} 件のテストをすべて表示"
       },
       "recordingIn": "{environment} で記録中",
       "needsDesktopRecorder": "デスクトップレコーダー拡張機能が必要",
@@ -22918,7 +22874,6 @@
       "folder": "フォルダ",
       "willBeCreatedIn": "作成場所"
     },
-    "pageSubtitle": "グローバルロケーションからアップタイム、パフォーマンス、ユーザージャーニーをプロアクティブに監視",
     "pageTitle": "合成モニタリング",
     "protocolConfig": {
       "http": {
@@ -24947,7 +24902,6 @@
     "title": "SLOs",
     "notFound": "SLOが見つかりません",
     "notFoundDescription": "このSLOは存在しないか、アクセス権がない可能性があります。削除された可能性もあります。",
-    "subtitle": "サービスレベル目標: 目標、エラーバジェット、バーンレートアラート",
     "new": "新規SLO",
     "newTitle": "新規SLO",
     "editTitle": "SLOを編集",
@@ -24965,7 +24919,6 @@
     "totalSlos": "SLO総数",
     "noGrouping": "なし (単一の全体シリーズ)",
     "newAlert": "新しいアラート",
-    "overRolling": "ローリング {window} にわたる",
     "searchPlaceholder": "SLOまたはタグを検索、例: team:payments",
     "loadFailed": "SLOを読み込めませんでした",
     "requestFailed": "リクエストに失敗しました ({code})",
@@ -26075,7 +26028,6 @@
       "groupWorkloads": "ワークロード",
       "groupStorage": "ストレージ",
       "groupAutoscaling": "オートスケーリング",
-      "subtitle": "クラスター、ワークロード、リソースを監視",
       "clusterPickerLabel": "クラスター",
       "clusterPickerLoading": "クラスターを読み込み中…",
       "clusterPickerTrigger": "クラスター: {name}",
@@ -26533,8 +26485,7 @@
       "actions": "アクション"
     },
     "header": {
-      "title": "データベース",
-      "subtitle": "データベース全体のクエリパフォーマンスと健全性"
+      "title": "データベース"
     },
     "ai": {
       "suggestFix": "AIに修正方法を尋ねる",
@@ -27799,7 +27750,6 @@
     "fromRotation": "{name} から",
     "ownershipMatch": "一致",
     "ownershipSpecificity": "ディメンション",
-    "teamSubtitle": "{tz} · {count} メンバー | {tz} · {count} メンバー",
     "statOnCallNow": "現在オンコール中",
     "statRotations": "ローテーション",
     "statRoutingRules": "ルーティングルール",
@@ -28800,7 +28750,6 @@
     "teamOpenInOnCall": "オンコールですべて表示",
     "teamCoverage": "カバレッジ（今後 {days} 日間）",
     "teamCoverageHint": "ここで見る価値があるのはギャップだけです",
-    "teamOwnsRules": "{count} 件のルーティングルールを所有 | {count} 件のルーティングルールを所有",
     "teamCoveredNow": "現在カバー中",
     "teamOverview": "概要",
     "teamAnsweredBy": "応答者",
@@ -29493,7 +29442,6 @@
       "allClearNone": "対応が必要なものはありませんでした。"
     },
     "title": "AutoObserve",
-    "subtitle": "データを送信してください。OpenObserve が問題を検出し、原因についての最善の見解とともに通知します。問題がないときは、チェックした内容と、確認できない内容を示します。",
     "tabs": {
       "issues": "インシデント",
       "coverage": "カバレッジ",
@@ -30425,7 +30373,6 @@
     },
     "issuesPage": {
       "title": "すべての問題",
-      "sentence": "{within}に私が起票したすべての問題です。1つ選ぶと、何が起きたか、それに対して私が何をしたかを確認できます。",
       "ranges": {
         "week": "過去7日間",
         "month": "過去30日間",
@@ -32182,7 +32129,6 @@
   },
   "fleet": {
     "title": "フリート管理",
-    "subtitle": "OpenTelemetry コレクターを登録し、構成をバージョン管理して、変更を安全にロールアウトします",
     "addCollector": "コレクターを追加",
     "tabs": {
       "collectors": "コレクター",
@@ -32721,7 +32667,6 @@
     },
     "editor": {
       "pageTitle": "構成エディター",
-      "newDescription": "新しいコレクター構成",
       "visual": "ビジュアル",
       "issues": "{count} 件の問題 | {count} 件の問題",
       "valid": "有効",

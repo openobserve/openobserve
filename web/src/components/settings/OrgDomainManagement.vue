@@ -18,9 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     icon="domain"
     :title="t('settings.orgDomainMapping.tabLabel')"
-    :subtitle="t('settings.orgDomainMapping.pageSubtitle')"
     data-test="settings-org-domain-management"
-    tabs-below
     bleed
   >
     <template #header-tabs>

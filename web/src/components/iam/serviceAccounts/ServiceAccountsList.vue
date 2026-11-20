@@ -18,12 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 
 <template>
-  <OPageLayout
-    :title="t('serviceAccounts.header')"
-    icon="manage-accounts"
-    :subtitle="t('serviceAccounts.headerSubtitle')"
-    bleed
-  >
+  <OPageLayout :title="t('serviceAccounts.header')" icon="manage-accounts" bleed>
     <template #actions>
       <OButton
         data-test="service-accounts-add-btn"

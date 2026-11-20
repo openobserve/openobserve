@@ -15,9 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
-    <!-- LEFT SIDE: Logo -->
-    <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5">
+  <div class="bg-surface-chrome-deeper flex h-12 w-full shrink-0 flex-nowrap items-center">
+    <!-- LEFT SIDE: Logo; the sidebar carries it from md up -->
+    <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5 md:hidden">
       <OButton
         v-if="!focusMode"
         variant="ghost"
@@ -27,7 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :aria-label="t('components.navbar.mainNavigation')"
         @click="$emit('toggle-mobile-nav')"
       >
-        <OIcon name="menu" size="sm" class="size-5!" />
+        <OIcon name="menu" size="sm" />
+        <OTooltip side="bottom" :content="t('components.navbar.mainNavigation')" />
       </OButton>
       <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
       <!-- Shows custom logo/text if configured in enterprise mode -->
@@ -144,19 +145,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end left side -->
 
-    <div
-      v-if="securityAccess.canOpen.value"
-      class="ms-3 flex shrink-0 items-center md:max-xl:min-w-0 md:max-xl:shrink"
-    >
-      <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
-    </div>
-
     <!-- CENTER: elastic spacer so the right-side controls stay right-aligned. -->
     <div class="min-w-0 flex-1" />
 
     <!-- RIGHT SIDE: Controls -->
     <div
-      class="flex shrink-0 items-center justify-end gap-1 pe-3 md:max-xl:min-w-0 md:max-xl:shrink"
+      class="flex shrink-0 items-center justify-end gap-1 pe-2 md:max-xl:min-w-0 md:max-xl:shrink"
     >
       <!-- SAMPLE DATA: stays visible while the org holds sample data -->
       <SampleDataHeaderChip class="me-2" />
@@ -171,14 +165,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.organizationData.quotaThresholdMsg
           }}
         </div>
-        <OButton
-          variant="secondary"
-          size="sm"
-          class="m-1"
-          @click="router.replace('/billings/plans')"
-        >
-          {{ t("menu.upgradeToProPlan") }}
-        </OButton>
       </div>
 
       <!-- HEADER MENU: Contains all header navigation and user controls -->
@@ -204,36 +190,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <OPageHeaderStatus fallback />
-        <!-- EDITION BADGE / UPGRADE BUTTON -->
-        <!-- Enterprise/Cloud: ghost-muted badge (informational, opens about dialog) -->
-        <!-- Open Source: primary CTA to drive upgrades -->
-        <OButton
-          :variant="
-            config.isEnterprise === 'true' || config.isCloud === 'true'
-              ? 'outline-primary'
-              : 'primary'
-          "
-          size="xs"
-          class="max-md:hidden md:max-xl:min-w-0"
-          data-test="upgrade-to-enterprise-btn"
-          @click="openEnterpriseDialog"
-        >
-          <template #icon-left>
-            <OIcon
-              :name="
-                config.isEnterprise === 'true' || config.isCloud === 'true'
-                  ? 'verified'
-                  : 'card-giftcard'
-              "
-              size="sm"
-            />
-          </template>
-          <span class="md:max-xl:truncate">{{ enterpriseButtonText }}</span>
-          <OTooltip :content="enterpriseButtonText" />
-        </OButton>
 
         <!-- ORGANIZATION SELECTOR: Dropdown to switch between organizations -->
         <OrganizationSelector
+          class="header-org"
           :organizations="organizations"
           :current="userClickedOrg"
           @select="handleOrgSelection"
@@ -251,16 +211,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="aiLicenseLocked ? openLockedAiAssistant() : toggleAIChat()"
               :data-test="aiLicenseLocked ? 'menu-link-ai-locked' : 'menu-link-ai-item'"
               :aria-label="aiButtonLabel"
-              class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
+              :aria-pressed="store.state.isAiChatEnabled && !aiLicenseLocked ? 'true' : 'false'"
               :class="store.state.isAiChatEnabled && !aiLicenseLocked ? 'ai-btn-active' : ''"
-              @mouseenter="handleMouseEnter"
-              @mouseleave="handleMouseLeave"
             >
-              <img
-                alt=""
-                :src="getBtnLogo"
-                class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
-              />
+              <OIcon name="auto-awesome" size="sm" />
               <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" class="-end-2! -top-1!" />
               <OTooltip
                 side="bottom"
@@ -273,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             v-else-if="aiSlotPending"
             aria-hidden="true"
-            class="size-[1.875rem] shrink-0"
+            class="size-7 shrink-0"
             data-test="header-ai-slot-placeholder"
           />
 
@@ -289,8 +243,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aria-label="raw('Slack')"
             @click="openSlack"
           >
-            <component :is="slackIcon" class="size-5 shrink-0" />
+            <component :is="slackIcon" class="size-4 shrink-0" />
             <OTooltip side="top" align="center" :content="raw('Slack')" />
+          </OButton>
+
+          <OButton
+            variant="ghost"
+            size="sm-toolbar"
+            class="max-md:hidden md:max-xl:min-w-0"
+            data-test="upgrade-to-enterprise-btn"
+            :aria-label="enterpriseButtonTooltip"
+            @click="openEnterpriseDialog"
+          >
+            <template #icon-left>
+              <OIcon
+                :name="
+                  config.isEnterprise === 'true' || config.isCloud === 'true'
+                    ? 'info-outline'
+                    : 'card-giftcard'
+                "
+                size="sm"
+              />
+            </template>
+            <span class="md:max-xl:truncate">{{ enterpriseButtonText }}</span>
+            <OTooltip
+              side="left"
+              align="end"
+              :side-offset="8"
+              max-width="15rem"
+              :content="enterpriseButtonTooltip"
+            />
           </OButton>
 
           <!-- HELP MENU: Contains links to docs, API, and about page -->
@@ -303,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="menu-link-help-item"
                 :aria-label="t('menu.help')"
               >
-                <OIcon name="help-outline" size="sm" class="size-5!" />
+                <OIcon name="help-outline" size="sm" />
                 <OTooltip side="top" align="center" :content="t('menu.help')" />
               </OButton>
             </template>
@@ -508,8 +490,6 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
-import SolutionSwitcher from "./SolutionSwitcher.vue";
-import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -536,7 +516,6 @@ export default defineComponent({
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OrganizationSelector,
-    SolutionSwitcher,
     SampleDataHeaderChip,
     LinkedAccountsDialog,
     OButton,
@@ -604,20 +583,9 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       required: true,
     },
-    // AI button hover state
-    isHovered: {
-      type: Boolean,
-      required: true,
-    },
-    // AI button logo based on state
-    getBtnLogo: {
-      type: String,
-      required: true,
-    },
   },
   emits: [
     "update:selectedOrg",
-    "update:isHovered",
     "updateOrganization",
     "goToHome",
     "goToAbout",
@@ -632,7 +600,6 @@ export default defineComponent({
     "signout",
   ],
   setup(props, { emit }) {
-    const securityAccess = useSecurityAccess();
     const { t } = useI18nTyped();
     const { featureName } = useFeatureNames();
     const router = useRouter();
@@ -778,19 +745,16 @@ export default defineComponent({
     );
     const showLinkedAccounts = ref(false);
 
-    // Computed property for enterprise button text based on deployment type
-    const enterpriseButtonText = computed(() => {
-      const isEnterprise = props.config.isEnterprise === "true";
-      const isCloud = props.config.isCloud === "true";
-
-      if (isCloud) {
-        return t("about.header_button.cloud_features", { product: raw("OpenObserve") });
-      } else if (isEnterprise) {
-        return t("about.header_button.enterprise_edition");
-      } else {
-        return t("about.header_button.get_enterprise_free");
-      }
-    });
+    const enterpriseButtonText = computed(() =>
+      props.config.isEnterprise === "true" || props.config.isCloud === "true"
+        ? t("about.value_license_enterprise")
+        : t("about.header_button.upgrade"),
+    );
+    const enterpriseButtonTooltip = computed(() =>
+      props.config.isEnterprise === "true" || props.config.isCloud === "true"
+        ? t("about.header_button.enterprise_tooltip", { product: raw("OpenObserve") })
+        : t("about.header_button.get_enterprise_free"),
+    );
 
     // Computed property for ingestion quota percentage
     const ingestionQuotaPercentage = computed(() => {
@@ -860,15 +824,6 @@ export default defineComponent({
       emit("signout");
     };
 
-    // Handle mouse hover events for AI button
-    const handleMouseEnter = () => {
-      emit("update:isHovered", true);
-    };
-
-    const handleMouseLeave = () => {
-      emit("update:isHovered", false);
-    };
-
     // Handle organization selection from the OrganizationSelector menu
     const handleOrgSelection = (org: any) => {
       emit("update:selectedOrg", org);
@@ -876,13 +831,13 @@ export default defineComponent({
     };
 
     return {
-      securityAccess,
       isDark,
       t,
       raw,
       featureName,
       getImageURL,
       enterpriseButtonText,
+      enterpriseButtonTooltip,
       aiSlotPending,
       ingestionQuotaPercentage,
       ingestionQuotaColor,
@@ -913,24 +868,9 @@ export default defineComponent({
       openPredefinedThemes,
       openShortcuts,
       signout,
-      handleMouseEnter,
-      handleMouseLeave,
       handleOrgSelection,
       openEnterpriseDialog,
     };
   },
 });
 </script>
-
-<style scoped>
-/* keep(lib-override:o2-button): dark-only, element-scoped re-point of OButton's
-   ghost-primary tokens for the navbar upgrade CTA. The custom properties are READ by OButton's
-   own internal DOM, so they have to be declared on the button element itself —
-   there is no utility that sets them. Scoping appends [data-v] to the
-   [data-test] compound, which is OButton's root and therefore carries this
-   component's scope id. Was a global in styles/utilities.css (W1.d). */
-.dark [data-test="upgrade-to-enterprise-btn"] {
-  --color-button-ghost-primary-active-bg: var(--color-primary-900);
-  --color-button-ghost-primary-text: var(--color-primary-200);
-}
-</style>

@@ -21,7 +21,7 @@
         <!-- Group header (only rendered for grouped/label rows) -->
         <template #group-header="{ row, groupName }">
           <div
-            class="field-group-header -ms-page-edge px-page-edge bg-surface-subtle text-field-list-group-text flex h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-pointer items-center justify-between text-xs leading-7 font-semibold"
+            class="field-group-header -ms-page-edge px-page-edge bg-field-list-group-bg text-field-list-group-text flex h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-pointer items-center justify-between text-xs leading-7 font-semibold"
             :data-test="`search-field-list-group-${row.group}-header`"
             @click="toggleGroup(row.group)"
           >
@@ -34,11 +34,12 @@
               v-if="(groupFieldCount[row.group] ?? 0) > 0"
               variant="ghost"
               size="icon"
-              class="size-5! flex-shrink-0"
+              class="hover:bg-button-ghost-hover-bg! border! border-transparent! bg-transparent!"
             >
               <OIcon
                 :name="expandGroupRows[row.group] !== false ? 'expand-more' : 'chevron-right'"
                 size="sm"
+                class="text-text-secondary! size-4!"
               />
             </OButton>
           </div>

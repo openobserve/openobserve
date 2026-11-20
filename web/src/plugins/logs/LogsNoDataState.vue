@@ -61,7 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             product5: raw('SyslogNg'),
           })
         "
-        icon-variant="teal"
         data-test="logs-no-data-shippers-card"
         @click="go('ingestLogs')"
       />
@@ -71,7 +70,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :image="getImageURL('images/ingestion/otlp.svg')"
         :label="raw('OpenTelemetry')"
         :sublabel="t('logs.noData.otelDesc')"
-        icon-variant="amber"
         data-test="logs-no-data-otel-card"
         @click="go('ingestLogsFromOtel')"
       />
@@ -122,11 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           v-if="aiEnabled"
-          variant="ai"
           data-test="logs-no-data-ask-ai-btn"
           @click="emit('ask-ai')"
         >
-          <img :src="aiIconSrc" class="h-3.5 w-3.5 shrink-0" alt="" />
+          <OIcon name="auto-awesome" size="sm" class="text-text-secondary shrink-0" />
           {{ t("logs.noData.askAi") }}
         </EmptyStateIngestionChip>
       </div>
@@ -135,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
@@ -142,7 +140,6 @@ import { useStore } from "vuex";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
-import { useAiIcon } from "@/composables/useAiIcon";
 import { getImageURL } from "@/utils/zincutils";
 
 const props = defineProps<{
@@ -163,7 +160,6 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
-const { aiIconSrc } = useAiIcon();
 
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization.identifier,

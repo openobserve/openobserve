@@ -19,7 +19,6 @@ import {
   calculateWidthText,
   calculateDynamicNameGap,
   calculateNiceTickValues,
-  calculateRotatedLabelBottomSpace,
   X_AXIS_TICK_LABEL_BAND,
 } from "../../chartDimensionUtils";
 import { ColorModeWithoutMinMax, getSQLMinMaxValue, getGridLineStyle } from "../../colorPalette";
@@ -35,6 +34,7 @@ import {
   chartAxisLine,
   chartAxisTextColor,
   chartColor,
+  chartCrosshairLabel,
   dataZoomBrushStyle,
 } from "@/utils/chartTheme";
 import { getPropsByChartTypeForSeries } from "../../sqlChartSeriesProps";
@@ -388,6 +388,26 @@ export function buildSQLContext(
     labelWidth = 120; // Fallback
   }
 
+  // A few category labels wider than their slot tilt 30° so full names show instead of "invent…".
+  let autoLabelRotation = 0;
+  const xCategoryCount = new Set(getAxisDataFromKey(xAxisKeys?.[0]) ?? []).size;
+  if (
+    labelRotation === 0 &&
+    !hasTimestampField &&
+    !isHorizontalChart &&
+    panelSchema.type != "h-stacked" &&
+    xAxisKeys.length === 1 &&
+    breakDownKeys.length === 0 &&
+    xCategoryCount > 0 &&
+    xCategoryCount <= 12 &&
+    panelWidthPx &&
+    labelWidth > Math.max(80, panelWidthPx - 80) / xCategoryCount - 6
+  ) {
+    autoLabelRotation = 30;
+    labelRotation = 30;
+    labelWidth = Math.min(labelWidth, 120);
+  }
+
   const labelFontSize = 12;
   const labelMargin = 10;
 
@@ -403,26 +423,18 @@ export function buildSQLContext(
       ? 35
       : calculateDynamicNameGap(labelRotation, labelWidth, labelFontSize, 25, labelMargin);
 
-  // Additional bottom space is only needed for non-horizontal, non-time-based charts
-  const additionalBottomSpace =
-    hasTimestampField || isHorizontalChart
-      ? 0
-      : calculateRotatedLabelBottomSpace(
-          labelRotation,
-          labelWidth,
-          labelFontSize,
-          !!hasXAxisName,
-          dynamicXAxisNameGap,
-        );
-
   const axisWidth = panelSchema.config?.axis_width;
   const axisWidthSet = axisWidth !== null && axisWidth !== undefined;
   const reserveYLabelLeft = !isHorizontalChart && !hasYAxisName && !axisWidthSet;
+  const hasBottomAxisName = isHorizontalChart ? hasYAxisName : hasXAxisName;
 
   // Without containLabel the tick-label band only covers one unrotated line, so a rotated
   // label's extra height is reserved here or it runs into a bottom legend.
   const rotatedLabelExtraSpace =
-    reserveYLabelLeft && !hasXAxisName && labelRotation !== 0 && xAxisKeys.length > 0
+    (reserveYLabelLeft || axisWidthSet) &&
+    !hasBottomAxisName &&
+    labelRotation !== 0 &&
+    xAxisKeys.length > 0
       ? (() => {
           const rotationInRadians = (Math.abs(labelRotation) * Math.PI) / 180;
           // eslint-disable-next-line local/no-hardcoded-px -- must match `labelFontSize`, which ECharts paints axis labels at as a literal CSS px
@@ -442,6 +454,8 @@ export function buildSQLContext(
     ? Math.min(calculateWidthText(largestLabel(getAxisDataFromKey(xAxisKeys?.[0]))), 120)
     : 0;
   const reserveHorizontalYName = isHorizontalChart && !!hasXAxisName && !axisWidthSet;
+  const reserveBottomTickLabels =
+    reserveYLabelLeft || reserveHorizontalYName || (axisWidthSet && !hasBottomAxisName);
 
   const options: any = {
     backgroundColor: "transparent",
@@ -461,14 +475,9 @@ export function buildSQLContext(
       right: 20,
       top: 12,
       bottom:
-        (hasXAxisName
+        (hasBottomAxisName
           ? (() => {
-              // Reserve enough vertical space below the plot for the tick labels, the
-              // axis name (`nameGap` 35) and — when a horizontal legend is shown — the
-              // legend row beneath it. Measured ideal is roughly `nameGap + 20` for the
-              // containLabel case (labels are reserved inside the grid box, so only the
-              // name needs to clear the bottom-anchored legend); the earlier values left
-              // the name overlapping the legend, and over-padding leaves a visible gap.
+              // Axis names need clearance beyond tick labels and any bottom legend.
               const baseBottom =
                 legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
                   ? panelSchema.config?.axis_width == null
@@ -477,25 +486,14 @@ export function buildSQLContext(
                   : panelSchema.config?.axis_width == null
                     ? 30
                     : 50;
-              // When an x-axis name is present, `nameGap` already reserves space
-              // between rotated labels and the axis name. Adding `additionalBottomSpace`
-              // here causes double-counting and extra blank space beneath the axis
-              // name. Only return the base bottom in this case.
               return baseBottom;
             })()
           : (() => {
-              // A bottom legend needs its row reserved even without an
-              // x-axis name, or it draws over the plot and tick labels.
+              // A hidden legend needs no reserve, even when the query has a breakdown.
               const baseBottom =
-                legendConfig.orient === "horizontal" && panelSchema.config?.show_legends
-                  ? 30
-                  : legendConfig.orient === "vertical" && panelSchema.config?.show_legends
-                    ? 0
-                    : breakDownKeys.length > 0
-                      ? 25
-                      : 0;
-              return baseBottom + additionalBottomSpace + rotatedLabelExtraSpace;
-            })()) + (reserveYLabelLeft || reserveHorizontalYName ? X_AXIS_TICK_LABEL_BAND : 0),
+                legendConfig.orient === "horizontal" && panelSchema.config?.show_legends ? 30 : 12;
+              return baseBottom + rotatedLabelExtraSpace;
+            })()) + (reserveBottomTickLabels ? X_AXIS_TICK_LABEL_BAND : 0),
     },
     tooltip: {
       trigger: "axis",
@@ -519,7 +517,7 @@ export function buildSQLContext(
           show: true,
           fontsize: 12,
           precision: panelSchema.config?.decimals,
-          backgroundColor: chartColor("--color-chart-crosshair-bg"),
+          ...chartCrosshairLabel(),
           formatter: function (params: any) {
             try {
               let lineBreaks = "";
@@ -660,13 +658,28 @@ export function buildSQLContext(
 
       // Use 0 for rotation and width if time-based field or horizontal chart
       const labelRotation =
-        hasTimestampField || isHorizontalChart ? 0 : panelSchema.config?.axis_label_rotate || 0;
+        hasTimestampField || isHorizontalChart
+          ? 0
+          : panelSchema.config?.axis_label_rotate || autoLabelRotation;
       const labelWidth = isHorizontalChart
         ? Math.min(calculateWidthText(largestLabel(getAxisDataFromKey(key))) + 2, 120)
         : hasTimestampField
           ? 120
           : panelSchema.config?.axis_label_truncate_width || 120;
       const labelMargin = 10;
+      const isLastKey = index == xAxisKeys.length + breakDownKeys.length - 1;
+      // Up to 12 categories always show every label; flat ones truncate at their slot, tilted ones at 120px.
+      const showAllCategories =
+        isLastKey &&
+        !hasTimestampField &&
+        !isHorizontalChart &&
+        labelRotation === autoLabelRotation &&
+        panelSchema.type != "h-stacked" &&
+        arr.length > 0 &&
+        arr.length <= 12;
+      const categorySlotPx = panelWidthPx
+        ? Math.floor(xPlotWidthPx / Math.max(1, arr.length)) - 6
+        : labelWidth;
 
       return {
         type: "category",
@@ -688,19 +701,21 @@ export function buildSQLContext(
         },
         axisLabel: {
           color: chartAxisTextColor(),
-          fontSize: 12,
-          interval:
-            panelSchema.type == "h-stacked"
+          fontSize: 11,
+          interval: showAllCategories
+            ? 0
+            : panelSchema.type == "h-stacked" || isLastKey
               ? "auto"
-              : index == xAxisKeys.length + breakDownKeys.length - 1
-                ? "auto"
-                : function (i: any) {
-                    return shownLabelIndexes.has(i);
-                  },
-          overflow: index == xAxisKeys.length + breakDownKeys.length - 1 ? "none" : "truncate",
+              : function (i: any) {
+                  return shownLabelIndexes.has(i);
+                },
+          overflow: showAllCategories || !isLastKey ? "truncate" : "none",
           // hide axis label if overlaps
-          hideOverlap: true,
-          width: labelWidth,
+          hideOverlap: !showAllCategories,
+          width:
+            showAllCategories && !autoLabelRotation
+              ? Math.max(24, Math.min(labelWidth, categorySlotPx))
+              : labelWidth,
           margin: labelMargin,
           rotate: labelRotation,
         },
@@ -749,7 +764,7 @@ export function buildSQLContext(
       },
       axisLabel: {
         color: chartAxisTextColor(),
-        fontSize: 12,
+        fontSize: 11,
         hideOverlap: true,
         formatter: function (value: any) {
           try {

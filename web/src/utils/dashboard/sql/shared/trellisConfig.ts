@@ -133,7 +133,7 @@ export function createTrellisHelpers(deps: TrellisDeps) {
       // Here we are setting the axis label properties, if showAxisLabel is false then we are hiding the axis label
       it.nameGap = showAxisLabel ? (isHorizontalChart ? 25 : yAxisNameGap) : 0;
       it.axisLabel.margin = showAxisLabel ? 5 : 0;
-      it.axisLabel.fontSize = showAxisLabel ? 12 : 10;
+      it.axisLabel.fontSize = 11;
       it.nameTextStyle.fontSize = 12;
       it.axisLabel.show = showAxisLabel;
       if (!showAxisLabel) it.name = "";

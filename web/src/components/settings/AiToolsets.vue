@@ -17,13 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="flex h-full flex-col p-0">
-    <OPageLayout
-      v-if="!showAddDialog"
-      :title="t('aiToolset.header')"
-      icon="smart-toy"
-      :subtitle="t('settings.aiToolsetsPage.subtitle')"
-      bleed
-    >
+    <OPageLayout v-if="!showAddDialog" :title="t('aiToolset.header')" icon="smart-toy" bleed>
       <template #actions>
         <OButton
           data-test="ai-toolsets-add-btn"

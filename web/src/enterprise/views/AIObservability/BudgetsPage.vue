@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AiPageShell
     data-test="ai-budgets"
     :title="t('aiBudgets.title')"
-    :subtitle="t('aiBudgets.subtitle')"
     icon="account-balance"
     :date-state="dateState"
     :last-run-at="lastRunAt"

@@ -15,28 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  OPageHeader — the standard page header used across the app (dashboards,
-  pipelines, logs, …). The single header contract (the "TAS law"):
-
-    ROW 1 (fixed h-14, never reflows): module icon tile + <h1> current-item
-      title + right-aligned actions.
-    ROW 2 (fixed h-5 band): EXACTLY ONE of —
-      • Level 2 (list w/ peer sections): peer tabs (#tabs slot).
-      • true module index: a plain tagline (`subtitle` prop / #subtitle).
-    Tabs XOR tagline — never both at once.
+  OPageHeader — the standard page header. One row: optional module icon, the
+  <h1> title, optional page tabs (#tabs), then the actions on the right.
+  No description line: a page that needs an explanation puts it in its empty state.
 
   Sub-navigation (CRUD add/edit, drill-down editors): pass
-  `:back="{ label, to|onClick }"` (or the #back slot). On a sub-page the leading
-  module-icon TILE is replaced by a Back button (a ‹ chevron in the same 8×8
-  footprint) — so a listing page shows the module icon and its add/edit page
-  shows a Back button in the exact same spot, with the title's X position
-  unchanged.
+  `:back="{ label, to|onClick }"` (or the #back slot). A sub-page shows a Back
+  button (a ‹ chevron) before the title instead of the icon.
 
   NOTE: title/heading font sizes use `!important` because the app defines
   global, *unlayered* h1/h2 rules (styles/app.scss) that otherwise beat
   Tailwind utilities (unlayered CSS wins over layered utilities in v4).
 
-  Props: title | titleDataTest | subtitle | icon | back | tabsBelow
+  Props: title | titleDataTest | icon | back
   Slots: title-prefix | title | subtitle | actions | actions-overflow | tabs | back
 
   #actions-overflow — secondary actions. Inline on desktop; < md they collapse
@@ -67,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="[
           statusComponent ? 'md:@max-4xl/page:min-w-40' : '',
           hasBack() ? 'max-md:min-w-40' : 'max-md:min-w-24',
-          hasTabs() && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
+          hasTabs() ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
         ]"
       >
         <FeatureLockExempt v-if="ownsSidebarTrigger" as="span" class="contents">
@@ -83,14 +74,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </FeatureLockExempt>
         <slot name="title-prefix" />
 
-        <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
-           footprint, so the title's X never shifts between list and add/edit). -->
         <template v-if="hasBack()">
           <slot name="back">
             <FeatureLockExempt as="span" class="contents">
               <button
                 type="button"
-                class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
+                class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent focus-visible:outline-focus-ring-accent inline-flex size-8 shrink-0 items-center justify-center transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid"
                 :title="backLabel"
                 :aria-label="backLabel"
                 :data-test="props.back?.dataTest ?? 'app-page-header-back'"
@@ -102,15 +91,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </slot>
         </template>
 
-        <!-- Listing/index page: the module icon tile. -->
-        <span
-          v-else-if="icon"
-          class="rounded-default bg-tabs-active-bg text-tabs-active-text inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center max-md:hidden"
-          aria-hidden="true"
-        >
-          <OIcon :name="icon" size="md" />
-        </span>
-
         <!-- shrink-0 keeps a short static title from being squeezed by tabs.
              An interactive title (titleOverflow="visible") holds a real name
              that can be long, so it may instead consume the free space in the
@@ -121,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="[
             titleOverflow === 'visible'
               ? ''
-              : hasTabs() && !tabsBelow
+              : hasTabs()
                 ? 'shrink-0 max-md:shrink'
                 : statusComponent
                   ? ''
@@ -132,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex min-w-0 items-center gap-1.5">
             <h1
               v-if="titleOverflow === 'visible'"
-              class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
+              class="text-text-heading min-h-6 min-w-0 text-lg! leading-6! font-semibold! tracking-[-0.01em]!"
               :data-test="titleDataTest"
             >
               <slot name="title">{{ title }}</slot>
@@ -140,11 +120,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTruncatedText
               v-else
               as="h1"
-              class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
+              class="text-text-heading min-h-6 min-w-0 text-lg! leading-6! font-semibold! tracking-[-0.01em]!"
               :data-test="titleDataTest"
             >
               <slot name="title">{{ title }}</slot>
             </OTruncatedText>
+            <!-- New or Beta pages explain themselves here instead of a subtitle line. -->
+            <span
+              v-if="info"
+              class="text-text-secondary inline-flex shrink-0"
+              data-test="app-page-header-info"
+            >
+              <OIcon name="info-outline" size="sm" class="size-4!" />
+              <OTooltip :content="info" />
+            </span>
             <span
               v-if="locked"
               role="img"
@@ -156,19 +145,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="lockedLabel" />
             </span>
           </div>
-          <!-- A page without a subtitle centres its title lower than one with a subtitle. -->
+          <!-- Detail pages put live data here (trace ID, session facts); a plain description no longer has a prop. -->
           <OText
             v-if="hasSubtitle()"
             variant="meta"
             as="div"
             class="-mt-0.5 flex h-5 min-w-0 items-center max-md:hidden"
           >
-            <slot name="subtitle">
-              <!-- leading-normal (not the meta variant's leading-none): truncate
-                 sets overflow:hidden, and a 1em line box clips descenders
-                 (g/y/p). The h-5 band + items-center leaves room for it. -->
-              <OTruncatedText class="leading-normal">{{ subtitle }}</OTruncatedText>
-            </slot>
+            <slot name="subtitle" />
           </OText>
         </div>
 
@@ -181,10 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <component :is="statusComponent" :compact="rowWraps" />
         </span>
 
-        <!-- Module tabs (Level-2 nav), inline to the right of the title.
-           Two-row mode renders them as a full-width strip below instead. -->
+        <!-- Module tabs (Level-2 nav), inline to the right of the title. -->
         <div
-          v-if="hasTabs() && !tabsBelow"
+          v-if="hasTabs()"
           class="flex h-full min-w-0 flex-1 items-center max-md:h-auto max-md:basis-full max-md:flex-wrap"
         >
           <slot name="tabs" />
@@ -218,16 +201,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODropdown>
         </template>
       </div>
-    </div>
-
-    <!-- Row 2: full-width section-tab strip (prototype's two-row header). The
-         header draws its own bottom divider (see the border-b on <header> above)
-         whenever it has tabs, and OTabs draws its active underline flush at its
-         bottom edge — so the underline lands exactly on that divider with no
-         margin hacks and no consumer-drawn border. The -mt-2 pulls the tab row up
-         into the title row's slack so the overall header height stays compact. -->
-    <div v-if="hasTabs() && tabsBelow" class="-mt-2">
-      <slot name="tabs" />
     </div>
   </header>
 </template>
@@ -274,13 +247,12 @@ const props = withDefaults(
     /** Optional data-test attribute rendered on the <h1>, so consumers can
      *  drop the #title slot (whose only purpose was attaching a test hook). */
     titleDataTest?: string;
-    subtitle?: I18nText;
+    /** Accepted for compatibility; page headers no longer draw a module icon. */
     icon?: IconName;
-    /** Overlay/dialog back-pill ("‹ {label}") shown leading, before the icon. */
+    /** One-sentence purpose, shown as a tooltip on a 16px info icon after the title. */
+    info?: I18nText;
+    /** Overlay/dialog back-pill ("‹ {label}") shown before the title. */
     back?: BackTarget;
-    /** Render the #tabs slot as a full-width strip below row 1 (prototype's
-     *  two-row header) instead of inline beside the title. */
-    tabsBelow?: boolean;
     /**
      * The <h1> clips its content by default (truncate → overflow:hidden), which
      * is right for text but wrong when the #title slot hosts an interactive
@@ -298,7 +270,6 @@ const props = withDefaults(
   }>(),
   {
     title: raw(""),
-    subtitle: raw(""),
     titleOverflow: "truncate",
     overflowFirst: false,
     titleMinWidth: false,
@@ -312,7 +283,7 @@ const SIZE_CLASS = {
   lg: "max-w-5xl",
   xl: "max-w-7xl",
 } as const;
-const ownRow = computed(() => props.tabsBelow || !!props.contentSize);
+const ownRow = computed(() => !!props.contentSize);
 // Fixed h-15 so h-full slot content (inline tabs, dividers) spans the row; < lg it may wrap.
 // The @page half repeats the max-lg half against the page container: a wide viewport whose content column is narrow collapses the same way.
 const ROW_CLASS =
@@ -386,12 +357,12 @@ const slotHasContent = (name: string): boolean => {
 };
 
 // Plain functions, not computed: a slot's content can start absent and
-// arrive later (e.g. a subtitle gated on data that is still loading), but
+// arrive later (e.g. actions gated on data that is still loading), but
 // `useSlots()` is not a tracked reactive dependency, so a `computed` here
 // would cache that first, empty answer and never re-run once the real
 // content shows up. Calling these from the template re-checks on every
 // render instead, which is exactly when the answer can have changed.
-const hasSubtitle = (): boolean => Boolean(props.subtitle) || slotHasContent("subtitle");
+const hasSubtitle = (): boolean => slotHasContent("subtitle");
 const hasTabs = (): boolean => slotHasContent("tabs");
 const hasActions = (): boolean => slotHasContent("actions");
 const hasActionsOverflow = (): boolean => slotHasContent("actions-overflow");

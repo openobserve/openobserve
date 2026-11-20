@@ -44,6 +44,8 @@ export type BadgeVariant =
    */
   | "warning-quiet"
   | "error-soft"
+  /** Error count chip: neutral edge, red dot and red text, so it never outshouts the primary button. */
+  | "error-quiet"
   // Extended color families for correlation dimensions.
   | "teal"
   | "teal-outline"

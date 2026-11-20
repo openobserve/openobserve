@@ -275,7 +275,7 @@ export default defineComponent({
         return isDark.value ? "text-tabs-active-text" : "text-accent";
       }
       return isDark.value
-        ? "text-tabs-active-text bg-surface-accent-active ring-1 ring-inset ring-accent"
+        ? "text-selected-fg bg-selected-bg ring-1 ring-inset ring-selected-border"
         : "text-accent bg-surface-base shadow-xs ring-1 ring-inset ring-accent";
     });
     const activeIconClass = computed(() =>

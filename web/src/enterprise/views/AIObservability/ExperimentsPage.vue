@@ -4,10 +4,8 @@
   <OPageLayout
     data-test="ai-experiments-page"
     :title="header?.title ?? t('aiObservability.nav.experiments')"
-    :subtitle="header?.subtitle ?? t('aiObservability.subtitle.experiments')"
     :icon="header?.icon ?? 'science'"
     bleed
-    :tabs-below="hasTabs"
   >
     <template v-if="hasTabs" #header-tabs><AiSectionTabs /></template>
     <template #actions>

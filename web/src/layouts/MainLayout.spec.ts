@@ -262,39 +262,6 @@ describe("MainLayout Methods and Functions", () => {
       // Test case insensitive
       expect(filteredOrganizations("TEST")).toHaveLength(1);
     });
-
-    it("should compute getBtnLogo based on state", () => {
-      const getImageURL = vi.fn((path: string) => `mock-${path}`);
-
-      const getBtnLogo = (theme: string, isHovered: boolean, isAiChatEnabled: boolean) => {
-        if (theme === "dark") {
-          if (isAiChatEnabled) {
-            return getImageURL("images/ai_icons/ai_icon_dark_enabled.svg");
-          } else if (isHovered) {
-            return getImageURL("images/ai_icons/ai_icon_dark_hovered.svg");
-          } else {
-            return getImageURL("images/ai_icons/ai_icon_dark.svg");
-          }
-        } else {
-          if (isAiChatEnabled) {
-            return getImageURL("images/ai_icons/ai_icon_enabled.svg");
-          } else if (isHovered) {
-            return getImageURL("images/ai_icons/ai_icon_hovered.svg");
-          } else {
-            return getImageURL("images/ai_icons/ai_icon.svg");
-          }
-        }
-      };
-
-      // Test dark theme default
-      expect(getBtnLogo("dark", false, false)).toContain("ai_icon_dark.svg");
-
-      // Test dark theme hovered
-      expect(getBtnLogo("dark", true, false)).toContain("ai_icon_dark_hovered.svg");
-
-      // Test dark theme enabled
-      expect(getBtnLogo("dark", false, true)).toContain("ai_icon_dark_enabled.svg");
-    });
   });
 
   describe("Organization Management", () => {
@@ -1010,23 +977,6 @@ describe("MainLayout Methods and Functions", () => {
   });
 
   describe("Theme and UI State Management", () => {
-    it("should compute button logo for light theme", () => {
-      const getImageURL = vi.fn((path: string) => `mock-${path}`);
-
-      const getBtnLogo = (theme: string, isHovered: boolean, isEnabled: boolean) => {
-        if (isHovered || isEnabled) {
-          return getImageURL("images/common/ai_icon_dark.svg");
-        }
-
-        return theme === "dark"
-          ? getImageURL("images/common/ai_icon_dark.svg")
-          : getImageURL("images/common/ai_icon.svg");
-      };
-
-      const result = getBtnLogo("light", false, false);
-      expect(result).toContain("ai_icon.svg");
-    });
-
     it("should handle theme switching", () => {
       const switchTheme = (currentTheme: string) => {
         return currentTheme === "dark" ? "light" : "dark";
@@ -1917,7 +1867,7 @@ describe("MainLayout — focus-mode route", () => {
         plugins: [store, i18n, router],
         stubs: {
           AppHeader: StubDiv,
-          ONavbar: { name: "ONavbar", setup: () => () => h("nav") },
+          OSidebar: { name: "OSidebar", setup: () => () => h("nav") },
           O2AIChat: StubDiv,
           WebinarBanner: { name: "WebinarBanner", setup: () => () => h("div") },
           AnnouncementBanner: StubDiv,
@@ -1960,7 +1910,7 @@ describe("MainLayout — focus-mode route", () => {
     (config as any).isCloud = wasCloud;
     expect(wrapper.find("header.o2-app-header").classes()).not.toContain("hidden");
     expect(wrapper.findComponent({ name: "WebinarBanner" }).exists()).toBe(false);
-    expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "OSidebar" }).exists()).toBe(false);
     expect(wrapper.find('[data-test="first-data-notice"]').exists()).toBe(false);
     expect(wrapper.find("aside.o2-sidebar-right").exists()).toBe(false);
     // it mounts before the page renders, so only its absence keeps the Slack invite off onboarding
@@ -1975,8 +1925,37 @@ describe("MainLayout — focus-mode route", () => {
     (config as any).isCloud = wasCloud;
     expect(wrapper.findComponent({ name: "WebinarBanner" }).exists()).toBe(true);
     expect(wrapper.find("header.o2-app-header").classes()).not.toContain("hidden");
-    expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "OSidebar" }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: "CommunitySlackInvite" }).exists()).toBe(true);
+    wrapper.unmount();
+  });
+});
+
+describe("MainLayout — actions row", () => {
+  it("renders the header in the actions row above the content card, not in the banner strip", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/page", name: "page", component: { render: () => h("div") } }],
+    });
+    await router.push("/page");
+    const wrapper = mount(MainLayout, {
+      global: {
+        plugins: [store, i18n, router],
+        stubs: {
+          AppHeader: { setup: () => () => h("div", { "data-test": "app-header-stub" }) },
+          OSidebar: true,
+          O2AIChat: true,
+          WebinarBanner: true,
+          AnnouncementBanner: true,
+          ShortcutCheatsheet: true,
+          CommunitySlackInvite: true,
+          ODialog: true,
+        },
+      },
+    });
+    await flushPromises();
+    expect(wrapper.find('header [data-test="app-header-stub"]').exists()).toBe(false);
+    expect(wrapper.find('div.o2-app-header [data-test="app-header-stub"]').exists()).toBe(true);
     wrapper.unmount();
   });
 });
@@ -2001,7 +1980,7 @@ describe("MainLayout — first-time cloud login", () => {
         plugins: [store, i18n, router],
         stubs: {
           AppHeader: StubDiv,
-          ONavbar: StubDiv,
+          OSidebar: StubDiv,
           O2AIChat: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,
@@ -2340,7 +2319,7 @@ describe("MainLayout — org switch on an org-scoped page", () => {
         plugins: [store, i18n, router],
         stubs: {
           AppHeader: StubDiv,
-          ONavbar: StubDiv,
+          OSidebar: StubDiv,
           O2AIChat: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,

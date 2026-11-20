@@ -57,11 +57,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex shrink-0 items-center gap-2 pe-3">
         <OPopover v-if="!embedded" align="end" :aria-label="t('logs.severity.popoverAriaLabel')">
           <template #trigger>
+            <!-- Unknown takes the outline fill: its soft grey read lighter than the controls beside it in dark. -->
             <OTag
               type="logLevel"
               :value="severity.level"
               :label="severityTagLabel"
               clickable
+              :class="[
+                'border-button-outline-border! h-7! border!',
+                { 'bg-button-outline-bg!': severity.level === 'unknown' },
+              ]"
               data-test="log-detail-severity-badge"
               :data-severity-source="severity.source"
             />
@@ -290,7 +295,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #cell-field="{ value }">
                 <!-- `log-key` (assets/styles/log-highlighting.css) is the same class the
                      JSON tab puts on its keys, so both tabs stay one color in both themes. -->
-                <span :data-test="`log-detail-${value}-key`" class="log-key text-left">
+                <span
+                  :data-test="`log-detail-${value}-key`"
+                  class="log-key text-text-secondary! text-left"
+                >
                   {{ value }}
                 </span>
               </template>
@@ -1583,6 +1591,33 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* Roomier 13px JSON in the row detail drawer. */
+[data-test^="log-detail-"][data-test$="-value"],
+[data-test^="log-detail-"][data-test$="-value"] :deep(.log-highlight) {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+/* The drawer header hairline is the only divider; the badge is a 6px chip. */
+.searchdetaildialog {
+  border-top-width: 0;
+}
+[data-test="log-detail-severity-badge"] {
+  border-radius: var(--radius-default);
+  font-size: var(--text-xs);
+}
+/* Hairline rows only; the token swap reaches OTable's !important row border too. */
+.log-detail-source-table {
+  --color-card-glass-border: var(--color-table-row-divider);
+}
+.o2-schema-table :deep(thead th),
+.o2-schema-table :deep(tbody td) {
+  border-right: none;
+}
+[data-test="logs-detail-ai-context-btn"] {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
 /* keep(complex-state): :deep override of the child tab component's panel to fill height */
 .full-height-panels :deep(.o-tab-panel) {
   flex: 1;

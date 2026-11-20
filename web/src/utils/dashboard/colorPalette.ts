@@ -16,7 +16,7 @@
 import { scaleLinear } from "d3-scale";
 import { isNumber } from "lodash-es";
 import { color as echartsColor } from "echarts/core";
-import { chartColor, chartNumber } from "../chartTheme";
+import { chartColor, chartGridLine, chartNumber } from "../chartTheme";
 import { getSeriesThresholds, resolveStepValues, stepColorFor } from "./thresholds";
 
 export enum ColorModeWithoutMinMax {
@@ -25,36 +25,36 @@ export enum ColorModeWithoutMinMax {
   FIXED = "fixed",
 }
 
-// Light theme colors — perceptually distinct, blue-first, safe on light backgrounds
+// Mirrors --color-chart-series-* in base.css: ten distinct hues, none in the 230–290° accent/violet band; each keeps 3:1 on the light card.
 export const classicColorPaletteLightTheme = [
-  "#5b8ef0", // blue
-  "#34d399", // green
-  "#fb923c", // orange
-  "#f472b6", // pink
-  "#a78bfa", // purple
-  "#fbbf24", // yellow
-  "#38bdf8", // sky
-  "#f87171", // red
-  "#2dd4bf", // teal
-  "#4ade80", // lime
-  "#e879f9", // fuchsia
-  "#facc15", // amber
+  "#0d97a6", // cyan
+  "#1b812c", // green
+  "#e86113", // orange
+  "#b32aa1", // magenta
+  "#9d8b06", // amber
+  "#2d71e7", // sky
+  "#df3e6f", // pink
+  "#4b9d04", // lime
+  "#097450", // teal
+  "#708103", // olive
+  "#64748b", // slate
+  "#7e7367", // stone
 ];
 
-// Dark theme colors — brighter variants of the same hues for dark canvas legibility
+// Mirrors --color-chart-series-* in dark.css: same hues, lighter.
 export const classicColorPaletteDarkTheme = [
-  "#60a5fa", // blue
-  "#6ee7b7", // green
-  "#fdba74", // orange
-  "#f9a8d4", // pink
-  "#c4b5fd", // purple
-  "#fde68a", // yellow
-  "#7dd3fc", // sky
-  "#fca5a5", // red
-  "#5eead4", // teal
-  "#86efac", // lime
-  "#f5d0fe", // fuchsia
-  "#fef08a", // amber
+  "#21acbc", // cyan
+  "#2d9c40", // green
+  "#ef803f", // orange
+  "#dd4bc9", // magenta
+  "#b6a30f", // amber
+  "#5d90e8", // sky
+  "#e85f88", // pink
+  "#5eb017", // lime
+  "#269671", // teal
+  "#9aaf13", // olive
+  "#8797af", // slate
+  "#a49a8f", // stone
 ];
 
 // d3 schemeCategory10, the categorical palette many tools default to.
@@ -504,8 +504,8 @@ export const colorToRgba = (color: string, alpha: number): string => {
 export const getGridLineStyle = (_theme?: string) => ({
   type: "solid",
   width: 1,
-  // light/dark swap lives in the --color-chart-gridline token (base/dark css).
-  color: chartColor("--color-chart-gridline"),
+  // Gridlines share the structure hairline so they never outweigh the data.
+  color: chartGridLine(),
 });
 
 const verticalGradient = (topColor: string, bottomColor: string) => ({

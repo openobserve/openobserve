@@ -140,7 +140,8 @@ const rowStyle = computed(() => {
 });
 
 const isStriped = computed(() => {
-  return props.striped && props.row.index % 2 === 1;
+  // Dividers already separate rows; zebra on top is a double separator.
+  return props.striped && !props.bordered && props.row.index % 2 === 1;
 });
 
 // A row with no detected level gets "transparent", which paints no spine.

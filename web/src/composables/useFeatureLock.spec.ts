@@ -150,7 +150,7 @@ describe("OPageHeader on a locked page", () => {
     const Locked = defineComponent({
       setup() {
         provideFeatureLock(ref("alerts"));
-        return () => h(OPageHeader, { title: "Downtimes", subtitle: "Muted alerts" } as never);
+        return () => h(OPageHeader, { title: "Downtimes" } as never);
       },
     });
     wrapper = mount(Locked, { global: { plugins: [i18n, router] } });

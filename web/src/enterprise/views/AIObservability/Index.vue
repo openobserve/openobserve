@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, provide, ref, watch, type VNode } from "vue";
-import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -319,18 +319,11 @@ function openTab(key: string | number) {
   );
 }
 
-const ITEM_SUBTITLES: Record<AiObservabilityTabbedItemKey, I18nKey> = {
-  agents: "aiObservability.itemSubtitle.agents",
-  costUsage: "aiObservability.itemSubtitle.costUsage",
-  evaluations: "aiObservability.itemSubtitle.evaluations",
-  scorers: "aiObservability.itemSubtitle.scorers",
-  experiments: "aiObservability.itemSubtitle.experiments",
-};
 const activeItemHeader = computed(() => {
   const key = TAB_OF_SECTION.get(activeTab.value);
   if (!key) return null;
   const item = AI_OBSERVABILITY_TABBED_ITEMS[key];
-  return { title: t(item.labelKey), subtitle: t(ITEM_SUBTITLES[key]), icon: item.icon };
+  return { title: t(item.labelKey), icon: item.icon };
 });
 provide(AI_SECTION_TABS, {
   tabs: activeTabs,

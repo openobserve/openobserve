@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="header.title"
     :icon="page ? undefined : 'navigation'"
     :back="header.back"
-    :subtitle="header.subtitle"
     :title-data-test="header.titleTest"
   >
     <template #title-trail>
@@ -395,12 +394,6 @@ const ISSUES_RANGE_LABEL: Record<IssuesRange, I18nKey> = {
   "90d": "autoobserve2.issuesPage.ranges.quarter",
 };
 
-const ISSUES_RANGE_WITHIN: Record<IssuesRange, I18nKey> = {
-  "7d": "autoobserve2.issuesPage.within.week",
-  "30d": "autoobserve2.issuesPage.within.month",
-  "90d": "autoobserve2.issuesPage.within.quarter",
-};
-
 const { t, locale } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
@@ -625,19 +618,12 @@ const PAGE_TITLE: Record<(typeof PAGES)[number], { title: I18nKey; test: string 
 const header = computed<{
   title: I18nText;
   titleTest: string;
-  subtitle?: I18nText;
   back?: { label: I18nText; onClick: () => void; dataTest: string };
 }>(() => {
   if (!page.value) return { title: t("autoobserve.title"), titleTest: "autoobserve2-title" };
   return {
     title: t(PAGE_TITLE[page.value].title),
     titleTest: PAGE_TITLE[page.value].test,
-    subtitle:
-      page.value === "issues"
-        ? t("autoobserve2.issuesPage.sentence", {
-            within: t(ISSUES_RANGE_WITHIN[issuesRange.value]),
-          })
-        : undefined,
     back: {
       label: t("autoobserve.title"),
       onClick: closePage,

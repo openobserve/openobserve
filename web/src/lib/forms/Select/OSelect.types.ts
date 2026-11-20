@@ -32,7 +32,7 @@ export const SELECT_PARENT_DATA_TEST_KEY: InjectionKey<ComputedRef<string | unde
  */
 export const NULL_VALUE_SENTINEL = "__o2__null__";
 
-export type SelectSize = "xs" | "sm" | "md";
+export type SelectSize = "xs" | "sm" | "md" | "lg";
 
 /**
  * Trigger chrome.

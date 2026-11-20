@@ -15,9 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="logs-search-bar-component" id="searchBarComponent">
+  <div
+    class="logs-search-bar-component flex h-full min-h-0 flex-col overflow-visible"
+    id="searchBarComponent"
+  >
     <div
-      class="solid border-border-default m-0! flex w-full items-center! overflow-hidden border-b p-1.5! max-md:flex-wrap max-md:gap-y-1 max-md:overflow-visible"
+      class="solid border-border-default m-0! flex w-full shrink-0 items-center! overflow-hidden border-b p-1.5! max-md:flex-wrap max-md:gap-y-1 max-md:overflow-visible"
     >
       <div
         ref="toolbarLeftRef"
@@ -159,12 +162,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="!toolbarMoveResetToMenu"
             data-test="logs-search-bar-reset-filters-btn"
-            :size="shouldHideToolbarButtonText ? 'icon-toolbar' : 'sm-toolbar'"
-            variant="outline"
+            size="sm-toolbar"
+            variant="ghost"
             @click="resetFilters"
           >
             <OIcon name="restart-alt" size="sm" />
-            <span v-if="!shouldHideToolbarButtonText">{{ t("common.reset") }}</span>
+            <span>{{ t("common.reset") }}</span>
             <OTooltip :content="t('search.resetFilters')" />
           </OButton>
 
@@ -179,24 +182,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             as="div"
             data-test="logs-search-bar-histogram-btn"
             size="sm-toolbar"
-            variant="outline"
+            variant="ghost"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
           >
             <OSwitch
+              class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
               v-model="searchObj.meta.showHistogram"
               :aria-label="t('search.showHistogramLabel')"
-              :size="toolbarToggleIconOnly ? 'sm' : 'md'"
+              size="sm"
               @click.stop
             />
-            <OIcon name="bar-chart" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
-            <OTooltip
-              :content="
-                searchObj.meta.showHistogram
-                  ? t('search.hideHistogram')
-                  : t('search.showHistogramLabel')
-              "
-              shortcut-id="logsToggleHistogram"
-            />
+            <OIcon name="bar-chart" size="sm" class="shrink-0" />
+            <OTooltip :content="t('search.showHistogramLabel')" shortcut-id="logsToggleHistogram" />
           </OButton>
 
           <!-- SQL Mode (pinned) -->
@@ -205,17 +202,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             as="div"
             data-test="logs-search-bar-sql-mode-pinned-btn"
             size="sm-toolbar"
-            variant="outline"
+            variant="ghost"
             @click="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
           >
             <OSwitch
+              class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
               :model-value="searchObj.meta.sqlMode"
               :aria-label="t('search.sqlModeLabel')"
               :disabled="isSqlModeDisabled"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
               @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
             />
-            <OIcon name="code" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
+            <OIcon name="code" size="sm" class="shrink-0" />
             <OTooltip :content="t('search.sqlModeLabel')" />
           </OButton>
 
@@ -225,10 +223,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             as="div"
             data-test="logs-search-bar-quick-mode-pinned-btn"
             size="sm-toolbar"
-            variant="outline"
+            variant="ghost"
             @click="handleQuickMode"
           >
             <OSwitch
+              class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
               :model-value="searchObj.meta.quickMode"
               :aria-label="t('search.quickModeLabel')"
               :size="toolbarToggleIconOnly ? 'sm' : 'md'"
@@ -245,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButtonGroup
             v-if="showPinnedSavedViews"
             data-test="logs-search-bar-saved-views-pinned"
-            class="border-button-outline-border border p-0"
+            class="p-0"
           >
             <!-- A real dropdown, not a modal: one click to open, one click to
                apply. The heavyweight list dialog stays reachable via Manage. -->
@@ -260,10 +259,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-bar-saved-views-pinned-list-btn"
                   variant="ghost"
                   size="sm-toolbar"
-                  class="h-8!"
                 >
                   <OIcon name="saved-search" size="sm" />
-                  <OIcon name="arrow-drop-down" size="sm" />
+                  <OIcon name="expand-more" size="xs" data-menu-chevron class="-ms-0.5" />
                   <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
                 </OButton>
               </template>
@@ -289,7 +287,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-label="t('search.createSavedView')"
               variant="ghost"
               size="icon-panel"
-              class="size-8!"
               :disabled="!!saveViewReason"
               focusable-unavailable
               @click="fnSavedView"
@@ -321,11 +318,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
               class="max-md:ms-auto"
-              icon-left="more-horiz"
-              variant="outline"
-              size="sm-toolbar"
+              :icon-left="toolbarMoreIconOnly ? 'more-horiz' : undefined"
+              variant="ghost"
+              :size="toolbarMoreIconOnly ? 'icon-toolbar' : 'sm-toolbar'"
+              :aria-label="toolbarMoreIconOnly ? t('search.menuMore') : undefined"
             >
-              {{ t("search.menuMore") }}
+              <OTooltip v-if="toolbarMoreIconOnly" :content="t('search.menuMore')" />
+              <template v-else>{{ t("search.menuMore") }}</template>
+              <template v-if="!toolbarMoreIconOnly" #icon-right>
+                <OIcon name="expand-more" size="xs" data-menu-chevron class="-ms-0.5" />
+              </template>
             </OButton>
           </template>
 
@@ -333,6 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownGroup :label="t('search.menuGroupSetOnce')">
             <!-- SQL Mode — toggles the same flag used for SQL auto-detection -->
             <ODropdownItem
+              class="h-8 py-1!"
               data-test="logs-search-bar-menu-sql-mode-toggle-btn"
               @select.prevent="
                 !isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)
@@ -340,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template #icon-left>
                 <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  class="text-text-secondary inline-flex size-4 shrink-0 items-center justify-center"
                 >
                   <OIcon name="code" size="sm" />
                 </span>
@@ -349,9 +352,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
+                    class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
                     :model-value="searchObj.meta.sqlMode"
                     :disabled="isSqlModeDisabled"
-                    size="md"
+                    size="sm"
                     data-test="logs-search-bar-sql-mode-toggle"
                     @click.stop="
                       !isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)
@@ -360,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     data-test="logs-search-bar-menu-pin-sql-mode-btn"
                     variant="ghost-neutral"
-                    size="icon-sm"
+                    size="icon"
                     :title="
                       isPinned('sqlMode') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
                     "
@@ -374,13 +378,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Reset filters (shown here only when toolbar is too narrow for inline button) -->
             <ODropdownItem
+              class="h-8 py-1!"
               v-if="toolbarMoveResetToMenu"
               data-test="logs-search-bar-menu-reset-btn"
               @select="resetFilters"
             >
               <template #icon-left>
                 <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  class="text-text-secondary inline-flex size-4 shrink-0 items-center justify-center"
                 >
                   <OIcon name="restart-alt" size="sm" />
                 </span>
@@ -390,12 +395,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Histogram — pinned copy renders on the toolbar -->
             <ODropdownItem
+              class="h-8 py-1!"
               data-test="logs-search-bar-menu-histogram-btn"
               @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
             >
               <template #icon-left>
                 <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  class="text-text-secondary inline-flex size-4 shrink-0 items-center justify-center"
                 >
                   <OIcon name="bar-chart" size="sm" />
                 </span>
@@ -404,15 +410,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
+                    class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
                     v-model="searchObj.meta.showHistogram"
-                    size="md"
+                    size="sm"
                     data-test="logs-search-bar-show-histogram-toggle-btn"
                     @click.stop
                   />
                   <OButton
                     data-test="logs-search-bar-menu-pin-histogram-btn"
                     variant="ghost-neutral"
-                    size="icon-sm"
+                    size="icon"
                     :title="
                       isPinned('histogram')
                         ? t('search.unpinFromToolbar')
@@ -428,12 +435,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Quick Mode — always in the More menu -->
             <ODropdownItem
+              class="h-8 py-1!"
               data-test="logs-search-bar-menu-quick-mode-toggle-btn"
               @select.prevent="handleQuickMode"
             >
               <template #icon-left>
                 <span
-                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                  class="text-text-secondary inline-flex size-4 shrink-0 items-center justify-center"
                 >
                   <OIcon name="bolt" size="sm" />
                 </span>
@@ -442,15 +450,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-right>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
+                    class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
                     :model-value="searchObj.meta.quickMode"
-                    size="md"
+                    size="sm"
                     data-test="logs-search-bar-quick-mode-switch"
                     @click.stop="handleQuickMode"
                   />
                   <OButton
                     data-test="logs-search-bar-menu-pin-quick-mode-btn"
                     variant="ghost-neutral"
-                    size="icon-sm"
+                    size="icon"
                     :title="
                       isPinned('quickMode')
                         ? t('search.unpinFromToolbar')
@@ -466,30 +475,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Function Editor -->
             <ODropdownItem
+              class="h-8 py-1!"
               data-test="logs-search-bar-menu-transform-editor-toggle-btn"
               @select.prevent="
                 searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor
               "
             >
               <template #icon-left>
-                <span
-                  class="rounded-default bg-section-header-bg text-text-secondary text-compact text-accent inline-flex h-7 w-7 shrink-0 items-center justify-center font-mono font-bold italic"
-                  >fx</span
-                >
+                <OIcon name="function" size="sm" class="text-text-secondary" />
               </template>
               {{ t("search.functionEditorLabel") }}
               <template #icon-right>
                 <span class="ms-auto flex items-center gap-1">
                   <OSwitch
+                    class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
                     data-test="logs-search-bar-show-query-toggle-btn"
                     v-model="searchObj.meta.showTransformEditor"
-                    size="md"
+                    size="sm"
                     @click.stop
                   />
                   <OButton
                     data-test="logs-search-bar-menu-pin-function-editor-btn"
                     variant="ghost-neutral"
-                    size="icon-sm"
+                    size="icon"
                     :title="
                       isPinned('functionEditor')
                         ? t('search.unpinFromToolbar')
@@ -507,51 +515,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownSeparator />
 
           <!-- SAVED VIEWS -->
-          <SavedViewsSubmenu
-            :views="searchObj.data.savedViews"
-            :favorite-ids="favoriteViews"
-            :applied-view-id="appliedSavedViewId"
-            :loading="!!searchObj.loadingSavedView"
-            :save-reason="saveViewReason"
-            :save-note="saveViewNote"
-            create-shortcut-id="logsSaveView"
-            data-test-prefix="logs-search-bar-menu-saved-views"
-            trigger-test-id="logs-search-bar-menu-list-saved-views-btn"
-            create-test-id="logs-search-bar-menu-create-saved-view-btn"
-            @apply="applySavedView"
-            @update="requestUpdateSavedView"
-            @toggle-favorite="handleFavoriteSavedView"
-            @create="fnSavedView"
-            @delete="handleDeleteSavedView"
+          <div
+            class="[&_[aria-hidden=true].w-8]:w-6! [&_[role=menuitem]]:h-8 [&_[role=menuitem]]:py-1! [&_[role=menuitem]>.bg-section-header-bg]:size-4! [&_[role=menuitem]>.bg-section-header-bg]:bg-transparent! [&_[role=menuitem]>span.flex-col]:flex-row! [&_[role=menuitem]>span.flex-col]:items-center [&_[role=menuitem]>span.flex-col]:gap-2 [&_[role=menuitem]>span.flex-col]:whitespace-nowrap [&_[role=menuitem]>span.flex-col>span]:min-w-0 [&_[role=menuitem]>span.flex-col>span]:truncate"
           >
-            <template #actions>
-              <OButton
-                data-test="logs-search-bar-menu-pin-saved-views-btn"
-                variant="ghost-neutral"
-                size="icon-sm"
-                :title="
-                  isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
-                "
-                @click.stop="togglePin('savedViews')"
-              >
-                <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
-              </OButton>
-            </template>
-          </SavedViewsSubmenu>
+            <SavedViewsSubmenu
+              :views="searchObj.data.savedViews"
+              :favorite-ids="favoriteViews"
+              :applied-view-id="appliedSavedViewId"
+              :loading="!!searchObj.loadingSavedView"
+              :save-reason="saveViewReason"
+              :save-note="saveViewNote"
+              create-shortcut-id="logsSaveView"
+              data-test-prefix="logs-search-bar-menu-saved-views"
+              trigger-test-id="logs-search-bar-menu-list-saved-views-btn"
+              create-test-id="logs-search-bar-menu-create-saved-view-btn"
+              @apply="applySavedView"
+              @update="requestUpdateSavedView"
+              @toggle-favorite="handleFavoriteSavedView"
+              @create="fnSavedView"
+              @delete="handleDeleteSavedView"
+            >
+              <template #actions>
+                <OButton
+                  data-test="logs-search-bar-menu-pin-saved-views-btn"
+                  variant="ghost-neutral"
+                  size="icon"
+                  :title="
+                    isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
+                  "
+                  @click.stop="togglePin('savedViews')"
+                >
+                  <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
+                </OButton>
+              </template>
+            </SavedViewsSubmenu>
+          </div>
 
           <!-- SYNTAX GUIDE -->
-          <div class="flex w-full items-center pe-2">
+          <div class="flex h-8 w-full items-center pe-3">
             <SyntaxGuide
               :sqlmode="searchObj.meta.sqlMode"
               :menuItem="true"
               ref="syntaxGuideRef"
-              class="min-w-0"
+              class="min-w-0 flex-1"
               data-test="logs-search-bar-syntax-guide-btn"
             />
             <OButton
               data-test="logs-search-bar-menu-pin-syntax-guide-btn"
               variant="ghost-neutral"
-              size="icon-sm"
+              size="icon"
               class="ms-auto"
               :title="
                 isPinned('syntaxGuide') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
@@ -577,6 +589,395 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @save:function="fnSavedFunctionDialog"
           />
         </template>
+        <!-- Function Editor (pinned) — sits to the left of the date picker -->
+        <OButton
+          v-if="showPinnedFunctionEditor"
+          as="div"
+          data-test="logs-search-bar-function-editor-pinned-btn"
+          size="sm-toolbar"
+          variant="ghost"
+          class="order-1"
+          @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
+        >
+          <OSwitch
+            class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
+            v-model="searchObj.meta.showTransformEditor"
+            :aria-label="t('search.functionEditorLabel')"
+            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
+            @click.stop
+          />
+          <span class="text-accent shrink-0 font-mono text-sm font-bold italic">fx</span>
+          <OTooltip :content="t('search.functionEditorLabel')" />
+        </OButton>
+
+        <div class="order-1 max-md:me-auto">
+          <DateTime
+            ref="dateTimeRef"
+            auto-apply
+            menu-align="end"
+            :default-type="searchObj.data.datetime.type"
+            :default-absolute-time="{
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
+            }"
+            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+            data-test="logs-search-bar-date-time-dropdown"
+            calendar-presets
+            :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
+            :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
+            @on:date-change="updateDateTime"
+            @on:timezone-change="updateTimezone"
+            :disable="disable"
+          />
+        </div>
+
+        <div class="search-time order-2">
+          <div class="flex gap-2">
+            <OTooltip
+              v-if="
+                config.isEnterprise == 'true' &&
+                store.state.zoConfig.super_cluster_enabled &&
+                superClusterLocked
+              "
+              :content="superClusterLockedReason"
+            >
+              <span class="inline-flex">
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  class="region-dropdown-btn px-1"
+                  disabled
+                  data-test="logs-search-bar-region-btn"
+                >
+                  <template #icon-left>
+                    <OIcon
+                      name="lock"
+                      class="lock-chip"
+                      size="sm"
+                      data-test="logs-search-bar-region-lock"
+                    />
+                  </template>
+                  {{ t("search.region") }}
+                </OButton>
+              </span>
+            </OTooltip>
+            <OButtonGroup
+              class="border-card-glass-border border p-0"
+              v-else-if="
+                config.isEnterprise == 'true' &&
+                Object.keys(store.state.regionInfo).length > 0 &&
+                store.state.zoConfig.super_cluster_enabled
+              "
+            >
+              <ODropdown side="bottom" align="start" data-test="logs-search-bar-region-btn">
+                <template #trigger>
+                  <OButton
+                    variant="outline"
+                    size="sm"
+                    class="region-dropdown-btn px-1"
+                    :title="t('search.regionTitle')"
+                  >
+                    {{ t("search.region") }}
+                    <OIcon name="arrow-drop-down" size="sm" class="ms-1" />
+                  </OButton>
+                </template>
+                <div class="min-w-60 p-2" data-test="logs-search-bar-region-menu">
+                  <OInput
+                    clearable
+                    class="indexlist-search-input mx-2 mt-2 mb-1.5!"
+                    v-model="regionFilter"
+                    :label="t('search.regionFilterMsg')"
+                  />
+                  <OTree
+                    class="col-sm-6 mx-2 mb-2 w-full"
+                    :nodes="store.state.regionInfo"
+                    node-key="label"
+                    :filter="regionFilter"
+                    :filter-method="regionFilterMethod"
+                    tick-strategy="leaf"
+                    v-model:ticked="searchObj.meta.clusters"
+                  />
+                </div>
+              </ODropdown>
+            </OButtonGroup>
+            <RecentSearchesButton
+              data-test="logs-search-bar-recent-searches-btn"
+              @view-all="openRecentSearches"
+            />
+            <div
+              v-if="
+                searchObj.meta.logsVisualizeToggle === 'visualize' ||
+                searchObj.meta.logsVisualizeToggle === 'build'
+              "
+            >
+              <div
+                v-if="config.isEnterprise == 'true'"
+                class="flex items-center [&_button:focus-visible]:z-1"
+              >
+                <OButton
+                  v-if="visualizeSearchRequestTraceIds.length > 0"
+                  data-test="logs-search-bar-visualize-cancel-btn"
+                  :title="t('search.cancel')"
+                  variant="ghost"
+                  size="sm-toolbar"
+                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! bg-none! shadow-none! transition-opacity"
+                  @click="cancelVisualizeQueries"
+                  >{{ t("search.cancel") }}</OButton
+                >
+                <OButton
+                  v-else
+                  data-test="logs-search-bar-visualize-refresh-btn"
+                  :data-run-pending="panelRunPending ? 'true' : undefined"
+                  :aria-label="panelRunPending ? t('search.runQueryPendingLabel') : undefined"
+                  :variant="panelRunPending ? 'pending' : 'ghost'"
+                  :title="t('search.runQuery')"
+                  :disabled="buildRunBlocked"
+                  size="sm-toolbar"
+                  class="rounded-s-default! h-7! w-[5.875rem]! rounded-e-none! bg-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal shadow-none! transition-opacity"
+                  :class="panelRunPending ? 'border-e-button-pending-hover-bg!' : runButtonTone"
+                  @click="handleRunQueryFn()"
+                >
+                  {{ t("search.runQuery") }}
+                </OButton>
+                <OSeparator v-if="!visualizeRunPending" class="h-7! w-px" vertical />
+                <ODropdown align="end" side="bottom">
+                  <template #trigger>
+                    <OButton
+                      :variant="visualizeRunPending ? 'pending' : 'ghost'"
+                      size="icon-toolbar"
+                      :aria-label="t('search.refreshCacheAndRunQuery')"
+                      data-test="logs-search-bar-refresh-cache-dropdown-trigger"
+                      :class="[
+                        config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
+                          ? 'bg-cancel-query-bg! text-button-primary-foreground!'
+                          : visualizeRunPending
+                            ? 'border-s-0'
+                            : runButtonTone,
+                        'rounded-e-default! rounded-s-none! bg-none! shadow-none!',
+                      ]"
+                    >
+                      <OIcon name="arrow-drop-down" size="sm" />
+                    </OButton>
+                  </template>
+                  <ODropdownItem
+                    data-test="logs-search-bar-refresh-btn"
+                    data-cy="search-bar-visuzlie-hard-refresh-button"
+                    :disabled="
+                      buildRunBlocked ||
+                      (config.isEnterprise === 'true' && !!visualizeSearchRequestTraceIds.length)
+                    "
+                    @select="handleRunQueryFn(true)"
+                  >
+                    <template #icon-left><OIcon name="refresh" size="sm" /></template>
+                    {{ t("search.refreshCacheAndRunQuery") }}
+                  </ODropdownItem>
+                </ODropdown>
+              </div>
+              <div v-else class="flex items-center [&_button:focus-visible]:z-1">
+                <!-- Cancel button when query is running -->
+                <OButton
+                  v-if="visualizeSearchRequestTraceIds.length > 0 && config.isEnterprise == 'true'"
+                  data-test="logs-search-bar-visualize-cancel-btn"
+                  variant="ghost"
+                  :title="t('search.cancel')"
+                  size="sm-toolbar"
+                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! bg-none! shadow-none! transition-opacity"
+                  @click="cancelVisualizeQueries"
+                  >{{ t("search.cancel") }}</OButton
+                >
+                <!-- Main action button -->
+                <OButton
+                  v-else
+                  data-test="logs-search-bar-visualize-refresh-btn"
+                  :data-run-pending="panelRunPending ? 'true' : undefined"
+                  :aria-label="panelRunPending ? t('search.runQueryPendingLabel') : undefined"
+                  :variant="panelRunPending ? 'pending' : 'ghost'"
+                  :title="t('search.runQuery')"
+                  :disabled="buildRunBlocked || disable"
+                  size="sm-toolbar"
+                  class="rounded-s-default! h-7! w-[5.875rem]! rounded-e-none! bg-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal shadow-none! transition-opacity"
+                  :class="panelRunPending ? 'border-e-button-pending-hover-bg!' : runButtonTone"
+                  @click="handleRunQueryFn()"
+                >
+                  {{ t("search.runQuery") }}
+                </OButton>
+                <OSeparator v-if="!visualizeRunPending" class="h-7! w-px" vertical />
+                <ODropdown align="end" side="bottom">
+                  <template #trigger>
+                    <OButton
+                      :variant="visualizeRunPending ? 'pending' : 'ghost'"
+                      size="icon-toolbar"
+                      :aria-label="t('search.refreshCacheAndRunQuery')"
+                      data-test="logs-search-bar-refresh-cache-dropdown-trigger"
+                      :class="[
+                        config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
+                          ? 'bg-cancel-query-bg! text-button-primary-foreground!'
+                          : visualizeRunPending
+                            ? 'border-s-0'
+                            : runButtonTone,
+                        'rounded-e-default! rounded-s-none! bg-none! shadow-none!',
+                      ]"
+                    >
+                      <OIcon name="arrow-drop-down" size="sm" />
+                    </OButton>
+                  </template>
+                  <ODropdownItem
+                    data-test="logs-search-bar-refresh-btn"
+                    data-cy="search-bar-visuzlie-hard-refresh-button"
+                    :disabled="
+                      buildRunBlocked ||
+                      (config.isEnterprise === 'true' && !!visualizeSearchRequestTraceIds.length)
+                    "
+                    @select="handleRunQueryFn(true)"
+                  >
+                    <template #icon-left><OIcon name="refresh" size="sm" /></template>
+                    {{ t("search.refreshCacheAndRunQuery") }}
+                  </ODropdownItem>
+                </ODropdown>
+              </div>
+            </div>
+            <div v-else class="flex items-center [&_button:focus-visible]:z-1">
+              <!-- Lift the focused half so its offset outline paints over the joined twin. -->
+              <!-- Cancel button for patterns tab -->
+              <OButton
+                v-if="searchObj.meta.logsVisualizeToggle === 'patterns' && patternsState.loading"
+                data-test="logs-search-bar-patterns-cancel-btn"
+                variant="ghost"
+                :title="t('search.cancel')"
+                size="sm-toolbar"
+                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-default min-w-[5.875rem] bg-none! shadow-none! transition-opacity"
+                @click="autoRun.engine.cancelGeneration(null, { cause: 'user' })"
+                >{{ t("search.cancel") }}</OButton
+              >
+              <OButton
+                v-else-if="isGridInFlight"
+                data-test="logs-search-bar-refresh-btn"
+                data-cy="search-bar-refresh-button"
+                variant="primary"
+                :title="t('search.cancel')"
+                size="sm-toolbar"
+                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! bg-none! shadow-none! transition-opacity"
+                @click="cancelRun"
+                >{{ t("search.cancel") }}</OButton
+              >
+              <OButton
+                v-else
+                data-test="logs-search-bar-refresh-btn"
+                data-cy="search-bar-refresh-button"
+                :data-run-pending="showRunQueryPending ? 'true' : undefined"
+                :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
+                :variant="showRunQueryPending ? 'pending' : 'primary'"
+                :title="t('search.runQuery')"
+                size="sm-toolbar"
+                class="rounded-s-default! relative min-w-[5.875rem] rounded-e-none! bg-none! shadow-none! transition-opacity"
+                :class="[
+                  showRunQueryPending ? '' : runButtonTone,
+                  showRunQueryPending ? 'border-e-button-pending-hover-bg!' : '',
+                ]"
+                @click="handleRunQueryFn()"
+                :loading="searchObj.loading || searchObj.loadingHistogram"
+                :disabled="
+                  searchObj.loading == true ||
+                  searchObj.loadingHistogram == true ||
+                  patternsState.loading
+                "
+              >
+                <OTooltip
+                  v-if="
+                    (searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled) ||
+                    showRunQueryPending
+                  "
+                  :content="
+                    showRunQueryPending ? t('search.autoRunPendingDot') : t('search.autoRunEnabled')
+                  "
+                />
+                <OIcon
+                  v-if="searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled"
+                  name="autorenew"
+                  size="xs"
+                  class="me-1"
+                />
+                {{ t("search.runQuery") }}
+              </OButton>
+              <OSeparator
+                v-if="!showRunQueryPending || isRunQueryCancelShown"
+                class="h-7! w-px"
+                vertical
+              />
+              <ODropdown align="end" side="bottom">
+                <template #trigger>
+                  <OButton
+                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'pending' : 'ghost'"
+                    size="icon-toolbar"
+                    :aria-label="t('search.refreshCacheAndRunQuery')"
+                    data-test="logs-search-bar-refresh-cache-dropdown-trigger"
+                    :class="[
+                      isRunQueryCancelShown
+                        ? 'bg-cancel-query-bg! text-button-primary-foreground!'
+                        : !showRunQueryPending
+                          ? runButtonTone
+                          : showRunQueryPending
+                            ? 'border-s-0'
+                            : '',
+                      'rounded-e-default! rounded-s-none! bg-none! shadow-none!',
+                    ]"
+                  >
+                    <OIcon name="arrow-drop-down" size="sm" />
+                  </OButton>
+                </template>
+                <ODropdownItem
+                  data-test="logs-search-bar-refresh-btn"
+                  data-cy="search-bar-refresh-button"
+                  :disabled="searchObj.loading == true || searchObj.loadingHistogram == true"
+                  @select="handleRunQueryFn(true)"
+                >
+                  <template #icon-left><OIcon name="refresh" size="sm" /></template>
+                  {{ t("search.refreshCacheAndRunQuery") }}
+                </ODropdownItem>
+                <ODropdownSeparator v-if="store.state.zoConfig.auto_query_enabled" />
+                <ODropdownItem
+                  v-if="store.state.zoConfig.auto_query_enabled"
+                  data-test="logs-search-bar-live-mode-toggle-btn"
+                  @select="toggleLiveMode"
+                >
+                  <template #icon-left>
+                    <OIcon
+                      :name="searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'"
+                      size="sm"
+                      :class="searchObj.meta.liveMode ? 'text-live!' : ''"
+                    />
+                  </template>
+                  <span>
+                    <div class="font-medium">
+                      {{
+                        searchObj.meta.liveMode
+                          ? t("search.turnOffLiveMode")
+                          : t("search.turnOnLiveMode")
+                      }}
+                    </div>
+                    <div class="text-text-secondary text-xs">
+                      {{ t("search.liveModeTooltip") }}
+                    </div>
+                    <div class="text-text-secondary text-xs">
+                      {{ t("search.autoRunAppliesTo") }}
+                    </div>
+                  </span>
+                </ODropdownItem>
+              </ODropdown>
+              <!-- Compact Auto Refresh Button -->
+              <AutoRefreshInterval
+                class="ms-2"
+                variant="ghost"
+                v-model="searchObj.meta.refreshInterval"
+                :trigger="true"
+                :is-compact="true"
+                :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval ?? 0"
+                @update:model-value="onRefreshIntervalUpdate"
+                @trigger="$emit('onAutoIntervalTrigger')"
+              />
+            </div>
+          </div>
+        </div>
         <ODropdown
           side="bottom"
           align="start"
@@ -589,21 +990,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-more-options-btn"
-              class="download-logs-btn hover:bg-interactive-hover-bg! order-4"
-              variant="outline"
-              size="icon-md"
+              class="download-logs-btn order-4"
+              variant="ghost"
+              size="icon-toolbar"
             >
-              <OIcon name="menu" size="sm" />
+              <OIcon name="more-horiz" size="sm" />
               <OTooltip max-width="7rem" :content="t('search.moreActions')" />
             </OButton>
           </template>
 
           <!-- Share Link -->
-          <div
-            v-if="shouldMoveShareToMenu"
-            class="p-2"
-            data-test="logs-search-bar-menu-share-link-btn"
-          >
+          <div class="p-2" data-test="logs-search-bar-menu-share-link-btn">
             <ShareButton
               :url="shareURL"
               variant="outline"
@@ -615,7 +1012,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <ODropdownSeparator v-if="shouldMoveShareToMenu" />
+          <ODropdownSeparator />
 
           <!-- HISTORY -->
           <ODropdownGroup :label="t('search.menuGroupHistory')">
@@ -847,433 +1244,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
           </ODropdownGroup>
         </ODropdown>
-        <ShareButton
-          v-if="!shouldMoveShareToMenu"
-          data-test="logs-search-bar-share-link-btn"
-          :url="shareURL"
-          variant="outline"
-          size="icon-md"
-          :disabled="!!shareReason"
-          :tooltip="shareReason || undefined"
-          class="order-3"
-        />
-        <!-- Function Editor (pinned) — sits to the left of the date picker -->
-        <OButton
-          v-if="showPinnedFunctionEditor"
-          as="div"
-          data-test="logs-search-bar-function-editor-pinned-btn"
-          size="sm-toolbar"
-          variant="outline"
-          class="order-1"
-          @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
-        >
-          <OSwitch
-            v-model="searchObj.meta.showTransformEditor"
-            :aria-label="t('search.functionEditorLabel')"
-            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
-            @click.stop
-          />
-          <span class="text-accent shrink-0 font-mono text-sm font-bold italic">fx</span>
-          <OTooltip :content="t('search.functionEditorLabel')" />
-        </OButton>
-
-        <div class="order-1 max-md:me-auto">
-          <DateTime
-            ref="dateTimeRef"
-            auto-apply
-            menu-align="end"
-            :default-type="searchObj.data.datetime.type"
-            :default-absolute-time="{
-              startTime: searchObj.data.datetime.startTime,
-              endTime: searchObj.data.datetime.endTime,
-            }"
-            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
-            data-test="logs-search-bar-date-time-dropdown"
-            calendar-presets
-            :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
-            :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
-            @on:date-change="updateDateTime"
-            @on:timezone-change="updateTimezone"
-            :disable="disable"
-            class="h-8.5!"
-          />
-        </div>
-
-        <div class="search-time order-2">
-          <div class="flex gap-2">
-            <OTooltip
-              v-if="
-                config.isEnterprise == 'true' &&
-                store.state.zoConfig.super_cluster_enabled &&
-                superClusterLocked
-              "
-              :content="superClusterLockedReason"
-            >
-              <span class="inline-flex">
-                <OButton
-                  variant="outline"
-                  size="sm"
-                  class="region-dropdown-btn px-1"
-                  disabled
-                  data-test="logs-search-bar-region-btn"
-                >
-                  <template #icon-left>
-                    <OIcon
-                      name="lock"
-                      class="lock-chip"
-                      size="sm"
-                      data-test="logs-search-bar-region-lock"
-                    />
-                  </template>
-                  {{ t("search.region") }}
-                </OButton>
-              </span>
-            </OTooltip>
-            <OButtonGroup
-              class="border-card-glass-border border p-0"
-              v-else-if="
-                config.isEnterprise == 'true' &&
-                Object.keys(store.state.regionInfo).length > 0 &&
-                store.state.zoConfig.super_cluster_enabled
-              "
-            >
-              <ODropdown side="bottom" align="start" data-test="logs-search-bar-region-btn">
-                <template #trigger>
-                  <OButton
-                    variant="outline"
-                    size="sm"
-                    class="region-dropdown-btn px-1"
-                    :title="t('search.regionTitle')"
-                  >
-                    {{ t("search.region") }}
-                    <OIcon name="arrow-drop-down" size="sm" class="ms-1" />
-                  </OButton>
-                </template>
-                <div class="min-w-60 p-2" data-test="logs-search-bar-region-menu">
-                  <OInput
-                    clearable
-                    class="indexlist-search-input mx-2 mt-2 mb-1.5!"
-                    v-model="regionFilter"
-                    :label="t('search.regionFilterMsg')"
-                  />
-                  <OTree
-                    class="col-sm-6 mx-2 mb-2 w-full"
-                    :nodes="store.state.regionInfo"
-                    node-key="label"
-                    :filter="regionFilter"
-                    :filter-method="regionFilterMethod"
-                    tick-strategy="leaf"
-                    v-model:ticked="searchObj.meta.clusters"
-                  />
-                </div>
-              </ODropdown>
-            </OButtonGroup>
-            <RecentSearchesButton
-              class="me-1 size-[2.125rem]!"
-              data-test="logs-search-bar-recent-searches-btn"
-              @view-all="openRecentSearches"
-            />
-            <div
-              v-if="
-                searchObj.meta.logsVisualizeToggle === 'visualize' ||
-                searchObj.meta.logsVisualizeToggle === 'build'
-              "
-            >
-              <div
-                v-if="config.isEnterprise == 'true'"
-                class="flex items-center [&_button:focus-visible]:z-1"
-              >
-                <OButton
-                  v-if="visualizeSearchRequestTraceIds.length > 0"
-                  data-test="logs-search-bar-visualize-cancel-btn"
-                  :title="t('search.cancel')"
-                  variant="ghost"
-                  size="sm-toolbar"
-                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
-                  @click="cancelVisualizeQueries"
-                  >{{ t("search.cancel") }}</OButton
-                >
-                <OButton
-                  v-else
-                  data-test="logs-search-bar-visualize-refresh-btn"
-                  :data-run-pending="panelRunPending ? 'true' : undefined"
-                  :aria-label="panelRunPending ? t('search.runQueryPendingLabel') : undefined"
-                  :variant="panelRunPending ? 'pending' : 'ghost'"
-                  :title="t('search.runQuery')"
-                  :disabled="buildRunBlocked"
-                  size="sm-toolbar"
-                  class="rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
-                  :class="
-                    panelRunPending
-                      ? 'border-e-button-pending-hover-bg!'
-                      : [
-                          runButtonTone,
-                          'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
-                        ]
-                  "
-                  @click="handleRunQueryFn()"
-                >
-                  {{ t("search.runQuery") }}
-                </OButton>
-                <OSeparator v-if="!visualizeRunPending" class="h-8.5! w-px" vertical />
-                <ODropdown align="end" side="bottom">
-                  <template #trigger>
-                    <OButton
-                      :variant="visualizeRunPending ? 'pending' : 'ghost'"
-                      size="icon-toolbar"
-                      :aria-label="t('search.refreshCacheAndRunQuery')"
-                      data-test="logs-search-bar-refresh-cache-dropdown-trigger"
-                      :class="[
-                        config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
-                          ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : visualizeRunPending
-                            ? 'border-s-0'
-                            : [
-                                runButtonTone,
-                                'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
-                              ],
-                        'rounded-e-default! rounded-s-none!',
-                      ]"
-                    >
-                      <OIcon name="arrow-drop-down" size="sm" />
-                    </OButton>
-                  </template>
-                  <ODropdownItem
-                    data-test="logs-search-bar-refresh-btn"
-                    data-cy="search-bar-visuzlie-hard-refresh-button"
-                    :disabled="
-                      buildRunBlocked ||
-                      (config.isEnterprise === 'true' && !!visualizeSearchRequestTraceIds.length)
-                    "
-                    @select="handleRunQueryFn(true)"
-                  >
-                    <template #icon-left><OIcon name="refresh" size="sm" /></template>
-                    {{ t("search.refreshCacheAndRunQuery") }}
-                  </ODropdownItem>
-                </ODropdown>
-              </div>
-              <div v-else class="flex items-center [&_button:focus-visible]:z-1">
-                <!-- Cancel button when query is running -->
-                <OButton
-                  v-if="visualizeSearchRequestTraceIds.length > 0 && config.isEnterprise == 'true'"
-                  data-test="logs-search-bar-visualize-cancel-btn"
-                  variant="ghost"
-                  :title="t('search.cancel')"
-                  size="sm-toolbar"
-                  class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
-                  @click="cancelVisualizeQueries"
-                  >{{ t("search.cancel") }}</OButton
-                >
-                <!-- Main action button -->
-                <OButton
-                  v-else
-                  data-test="logs-search-bar-visualize-refresh-btn"
-                  :data-run-pending="panelRunPending ? 'true' : undefined"
-                  :aria-label="panelRunPending ? t('search.runQueryPendingLabel') : undefined"
-                  :variant="panelRunPending ? 'pending' : 'ghost'"
-                  :title="t('search.runQuery')"
-                  :disabled="buildRunBlocked || disable"
-                  size="sm-toolbar"
-                  class="rounded-s-default! h-[2.125rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
-                  :class="
-                    panelRunPending
-                      ? 'border-e-button-pending-hover-bg!'
-                      : [
-                          runButtonTone,
-                          'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
-                        ]
-                  "
-                  @click="handleRunQueryFn()"
-                >
-                  {{ t("search.runQuery") }}
-                </OButton>
-                <OSeparator v-if="!visualizeRunPending" class="h-8.5! w-px" vertical />
-                <ODropdown align="end" side="bottom">
-                  <template #trigger>
-                    <OButton
-                      :variant="visualizeRunPending ? 'pending' : 'ghost'"
-                      size="icon-toolbar"
-                      :aria-label="t('search.refreshCacheAndRunQuery')"
-                      data-test="logs-search-bar-refresh-cache-dropdown-trigger"
-                      :class="[
-                        config.isEnterprise == 'true' && visualizeSearchRequestTraceIds.length
-                          ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : visualizeRunPending
-                            ? 'border-s-0'
-                            : [
-                                runButtonTone,
-                                'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
-                              ],
-                        'rounded-e-default! rounded-s-none!',
-                      ]"
-                    >
-                      <OIcon name="arrow-drop-down" size="sm" />
-                    </OButton>
-                  </template>
-                  <ODropdownItem
-                    data-test="logs-search-bar-refresh-btn"
-                    data-cy="search-bar-visuzlie-hard-refresh-button"
-                    :disabled="
-                      buildRunBlocked ||
-                      (config.isEnterprise === 'true' && !!visualizeSearchRequestTraceIds.length)
-                    "
-                    @select="handleRunQueryFn(true)"
-                  >
-                    <template #icon-left><OIcon name="refresh" size="sm" /></template>
-                    {{ t("search.refreshCacheAndRunQuery") }}
-                  </ODropdownItem>
-                </ODropdown>
-              </div>
-            </div>
-            <div v-else class="flex items-center [&_button:focus-visible]:z-1">
-              <!-- Lift the focused half so its offset outline paints over the joined twin. -->
-              <!-- Cancel button for patterns tab -->
-              <OButton
-                v-if="searchObj.meta.logsVisualizeToggle === 'patterns' && patternsState.loading"
-                data-test="logs-search-bar-patterns-cancel-btn"
-                variant="ghost"
-                :title="t('search.cancel')"
-                size="sm-toolbar"
-                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-default min-w-[5.875rem] [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
-                @click="autoRun.engine.cancelGeneration(null, { cause: 'user' })"
-                >{{ t("search.cancel") }}</OButton
-              >
-              <OButton
-                v-else-if="isGridInFlight"
-                data-test="logs-search-bar-refresh-btn"
-                data-cy="search-bar-refresh-button"
-                variant="primary"
-                :title="t('search.cancel')"
-                size="sm-toolbar"
-                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
-                @click="cancelRun"
-                >{{ t("search.cancel") }}</OButton
-              >
-              <OButton
-                v-else
-                data-test="logs-search-bar-refresh-btn"
-                data-cy="search-bar-refresh-button"
-                :data-run-pending="showRunQueryPending ? 'true' : undefined"
-                :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
-                :variant="showRunQueryPending ? 'pending' : 'primary'"
-                :title="t('search.runQuery')"
-                size="sm-toolbar"
-                class="rounded-s-default! relative min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
-                :class="[
-                  showRunQueryPending
-                    ? ''
-                    : [
-                        runButtonTone,
-                        'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
-                      ],
-                  showRunQueryPending ? 'border-e-button-pending-hover-bg!' : '',
-                ]"
-                @click="handleRunQueryFn()"
-                :loading="searchObj.loading || searchObj.loadingHistogram"
-                :disabled="
-                  searchObj.loading == true ||
-                  searchObj.loadingHistogram == true ||
-                  patternsState.loading
-                "
-              >
-                <OTooltip
-                  v-if="
-                    (searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled) ||
-                    showRunQueryPending
-                  "
-                  :content="
-                    showRunQueryPending ? t('search.autoRunPendingDot') : t('search.autoRunEnabled')
-                  "
-                />
-                <OIcon
-                  v-if="searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled"
-                  name="autorenew"
-                  size="xs"
-                  class="me-1"
-                />
-                {{ t("search.runQuery") }}
-              </OButton>
-              <OSeparator
-                v-if="!showRunQueryPending || isRunQueryCancelShown"
-                class="h-8.5! w-px"
-                vertical
-              />
-              <ODropdown align="end" side="bottom">
-                <template #trigger>
-                  <OButton
-                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'pending' : 'ghost'"
-                    size="icon-toolbar"
-                    :aria-label="t('search.refreshCacheAndRunQuery')"
-                    data-test="logs-search-bar-refresh-cache-dropdown-trigger"
-                    :class="[
-                      isRunQueryCancelShown
-                        ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                        : !showRunQueryPending
-                          ? [
-                              runButtonTone,
-                              'hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
-                            ]
-                          : showRunQueryPending
-                            ? 'border-s-0'
-                            : '',
-                      'rounded-e-default! rounded-s-none!',
-                    ]"
-                  >
-                    <OIcon name="arrow-drop-down" size="sm" />
-                  </OButton>
-                </template>
-                <ODropdownItem
-                  data-test="logs-search-bar-refresh-btn"
-                  data-cy="search-bar-refresh-button"
-                  :disabled="searchObj.loading == true || searchObj.loadingHistogram == true"
-                  @select="handleRunQueryFn(true)"
-                >
-                  <template #icon-left><OIcon name="refresh" size="sm" /></template>
-                  {{ t("search.refreshCacheAndRunQuery") }}
-                </ODropdownItem>
-                <ODropdownSeparator v-if="store.state.zoConfig.auto_query_enabled" />
-                <ODropdownItem
-                  v-if="store.state.zoConfig.auto_query_enabled"
-                  data-test="logs-search-bar-live-mode-toggle-btn"
-                  @select="toggleLiveMode"
-                >
-                  <template #icon-left>
-                    <OIcon
-                      :name="searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'"
-                      size="sm"
-                      :class="searchObj.meta.liveMode ? 'text-accent' : ''"
-                    />
-                  </template>
-                  <span>
-                    <div class="font-medium">
-                      {{
-                        searchObj.meta.liveMode
-                          ? t("search.turnOffLiveMode")
-                          : t("search.turnOnLiveMode")
-                      }}
-                    </div>
-                    <div class="text-text-secondary text-xs">
-                      {{ t("search.liveModeTooltip") }}
-                    </div>
-                    <div class="text-text-secondary text-xs">
-                      {{ t("search.autoRunAppliesTo") }}
-                    </div>
-                  </span>
-                </ODropdownItem>
-              </ODropdown>
-              <!-- Compact Auto Refresh Button -->
-              <AutoRefreshInterval
-                class="ms-2"
-                v-model="searchObj.meta.refreshInterval"
-                :trigger="true"
-                :is-compact="true"
-                :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval ?? 0"
-                @update:model-value="onRefreshIntervalUpdate"
-                @trigger="$emit('onAutoIntervalTrigger')"
-              />
-            </div>
-          </div>
-        </div>
       </div>
     </div>
     <!-- pe-1.5 mirrors the editor's ms-1.5 so the editor area sits at 10px on
@@ -1286,20 +1256,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          reads as a stray card. -->
     <div
       ref="editorContainerRef"
-      class="query-editor-container relative flex w-full overflow-visible"
+      class="query-editor-container relative flex min-h-0 w-full flex-1 overflow-visible"
       :class="{ 'bg-surface-base! overflow-hidden!': isFocused }"
       :data-fullscreen="isFocused ? 'true' : 'false'"
       :style="editorFullscreenStyle"
     >
       <!-- Expand / collapse button — always top-right of the full editor area -->
       <OButton
-        :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
         data-test="logs-query-editor-full_screen-btn"
         variant="ghost"
         size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="rounded-default border-card-glass-border! absolute! top-0.75 right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
+        class="rounded-default absolute! top-0.75 right-1 z-51 size-7! min-h-7! min-w-7!"
       >
+        <OIcon
+          :name="isFocused ? 'fullscreen-exit' : 'fullscreen'"
+          size="sm"
+          class="text-text-secondary"
+        />
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
       <div class="flex h-full w-full min-w-0 flex-col">
@@ -1314,13 +1288,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div
               ref="queryEditorBoxRef"
-              class="relative flex h-full flex-col overflow-hidden"
+              class="bg-surface-base focus-within:after:ring-focus-ring-accent relative flex h-full flex-col overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-50 focus-within:after:ring-1 focus-within:after:ring-inset [&_.logs-query-editor]:ring-0!"
               @keydown.capture="onRecentEditorKeydown"
               @pointerdown.capture="noteEditorPointer"
-              :class="{
-                'rounded-r-none border-e-0': searchObj.data.transformType,
-                'fn-editor-open': showFunctionEditor,
-              }"
+              :class="{ 'fn-editor-open': showFunctionEditor }"
             >
               <OButton
                 v-if="
@@ -1328,15 +1299,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   !searchObj.meta.nlpMode &&
                   searchObj.meta.logsVisualizeToggle === 'logs'
                 "
-                :icon-left="filterBuilderOn ? 'code' : 'filter-list'"
                 data-test="logs-search-bar-filter-builder-toggle"
                 :aria-pressed="filterBuilderOn"
                 variant="ghost"
                 size="icon-toolbar"
                 @click="toggleFilterBuilder"
-                class="rounded-default border-card-glass-border! absolute! top-0.75 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
+                class="rounded-default absolute! top-0.75 z-51 size-7! min-h-7! min-w-7!"
                 :style="{ right: filterBuilderToggleRight }"
               >
+                <OIcon
+                  :name="filterBuilderOn ? 'code' : 'filter-list'"
+                  size="sm"
+                  class="text-text-secondary"
+                />
                 <OTooltip
                   :content="
                     filterBuilderOn ? t('filterBar.queryTooltip') : t('filterBar.builderTooltip')
@@ -1373,13 +1348,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-toolbar"
                 :disabled="!searchObj.data.stream.selectedStream.length"
                 @click="openAiFromBuilder"
-                class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-1 z-51 h-7! min-h-7! w-7! min-w-7! hover:shadow-md"
+                class="rounded-default absolute! top-0.75 z-51 size-7! min-h-7! min-w-7!"
                 :style="{ right: aiButtonRight }"
               >
-                <img
-                  :src="aiIcon"
-                  :alt="t('search.aiModeIconAlt')"
-                  class="h-4.5 w-4.5 group-hover:brightness-0 group-hover:invert"
+                <OIcon
+                  name="auto-awesome"
+                  size="sm"
+                  :label="t('search.aiModeIconAlt')"
+                  class="text-text-secondary"
                 />
                 <span
                   v-if="!aiAccess.allowed"
@@ -2415,17 +2391,13 @@ export default defineComponent({
       () => !aiAccess.value.allowed || Boolean(store.state.zoConfig.ai_enabled),
     );
     const aiButtonRight = computed(() =>
-      searchObj.meta.showTransformEditor ? "0.25rem" : "2.375rem",
+      searchObj.meta.showTransformEditor ? "0.25rem" : "2.25rem",
     );
+    // 28px button + 4px gap per slot, matching the fullscreen button at right-1.
     const filterBuilderToggleRight = computed(() => {
-      const corner = searchObj.meta.showTransformEditor ? 0.25 : 2.375;
-      return `${aiButtonShown.value ? corner + 2.125 : corner}rem`;
+      const corner = searchObj.meta.showTransformEditor ? 0.25 : 2.25;
+      return `${aiButtonShown.value ? corner + 2 : corner}rem`;
     });
-    const aiIcon = computed(() =>
-      getImageURL(
-        isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
-      ),
-    );
     const openAiFromBuilder = () =>
       (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
     const filterBuilderFields = computed(() =>
@@ -2719,30 +2691,28 @@ export default defineComponent({
     const TOGGLE_ICONS_WIDTH = 168;
     const TOGGLE_DROPDOWN_WIDTH = 120;
     const RESET_LABEL_WIDTH = computed(() => (isNarrowToolbar.value ? 77 : 81));
-    const RESET_ICON_WIDTH = 34;
     const MORE_BUTTON_WIDTH = computed(() => (isNarrowToolbar.value ? 73 : 77));
+    const MORE_ICON_WIDTH = 32;
     const TOOLBAR_GAP = 8;
     const COLLAPSE_BUFFER = 16;
 
-    // The default-pinned histogram keeps its slot ahead of button labels.
-    const leftContentWidth = (toggleWidth: number, resetWidth: number) =>
-      toggleWidth +
-      resetWidth +
-      MORE_BUTTON_WIDTH.value +
-      2 * TOOLBAR_GAP +
-      (isPinned("histogram") ? TOOLBAR_GAP + PIN_BUTTON_WIDTH.value : 0) +
+    // The mode-tab labels outlive Reset, the pinned histogram and the More label, which go first.
+    const labelsWidth = (resetWidth: number, moreWidth = MORE_BUTTON_WIDTH.value) =>
+      TOGGLE_LABELS_WIDTH.value +
+      (resetWidth ? resetWidth + TOOLBAR_GAP : 0) +
+      moreWidth +
+      TOOLBAR_GAP +
       COLLAPSE_BUFFER;
-    const shouldHideToolbarButtonText = computed(
-      () =>
-        availableLeftWidth.value <
-        leftContentWidth(TOGGLE_LABELS_WIDTH.value, RESET_LABEL_WIDTH.value),
-    );
+    const toolbarMoreIconOnly = computed(() => availableLeftWidth.value < labelsWidth(0));
     const toolbarToggleIconOnly = computed(
-      () =>
-        availableLeftWidth.value < leftContentWidth(TOGGLE_LABELS_WIDTH.value, RESET_ICON_WIDTH),
+      () => availableLeftWidth.value < labelsWidth(0, MORE_ICON_WIDTH),
     );
-    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 288);
+    const toolbarMoveResetToMenu = computed(
+      () => availableLeftWidth.value < labelsWidth(RESET_LABEL_WIDTH.value),
+    );
     const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 216);
+    // Icon-only switch, so it stays on the toolbar at 1440.
+    const HISTOGRAM_PIN_WIDTH = PIN_BUTTON_WIDTH;
 
     // Width consumed by the always-present left content (toggle group in its
     // current collapse state, reset) plus the reserved More button.
@@ -2752,11 +2722,10 @@ export default defineComponent({
       else if (toolbarToggleIconOnly.value) w += TOGGLE_ICONS_WIDTH;
       else w += TOGGLE_LABELS_WIDTH.value;
       if (!toolbarMoveResetToMenu.value) {
-        w +=
-          (shouldHideToolbarButtonText.value ? RESET_ICON_WIDTH : RESET_LABEL_WIDTH.value) +
-          TOOLBAR_GAP;
+        w += RESET_LABEL_WIDTH.value + TOOLBAR_GAP;
       }
-      w += MORE_BUTTON_WIDTH.value + 2 * TOOLBAR_GAP;
+      w +=
+        (toolbarMoreIconOnly.value ? MORE_ICON_WIDTH : MORE_BUTTON_WIDTH.value) + 2 * TOOLBAR_GAP;
       return w;
     });
 
@@ -2785,7 +2754,7 @@ export default defineComponent({
         }
         return false;
       };
-      if (isPinned("histogram")) res.histogram = tryFit(PIN_BUTTON_WIDTH.value);
+      if (isPinned("histogram")) res.histogram = tryFit(HISTOGRAM_PIN_WIDTH.value);
       if (isPinned("sqlMode")) res.sqlMode = tryFit(PIN_BUTTON_WIDTH.value);
       if (isPinned("quickMode")) res.quickMode = tryFit(PIN_BUTTON_WIDTH.value);
       if (isPinned("savedViews")) res.savedViews = tryFit(SAVED_VIEWS_PIN_WIDTH.value);
@@ -5510,7 +5479,6 @@ export default defineComponent({
       aiAccess,
       aiButtonShown,
       aiButtonRight,
-      aiIcon,
       openAiFromBuilder,
       filterBuilderToggleRight,
       filterBuilderFields,
@@ -5662,8 +5630,8 @@ export default defineComponent({
       shouldMoveShareToMenu,
       toolbarLeftRef,
       toolbarRightRef,
-      shouldHideToolbarButtonText,
       toolbarToggleIconOnly,
+      toolbarMoreIconOnly,
       toolbarMoveResetToMenu,
       toolbarToggleAsDropdown,
       isPinned,
@@ -5857,29 +5825,9 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* ── .logs-search-bar-component: the root modifier this file puts on its own
-   wrapper. The rest of the former global block (18 nested rules — .reset-filters,
-   .toggle-container, .ddlWrapper/.listWrapper, .savedview-dropdown, #logsQueryEditor,
-   #fnEditor, the legacy `> .row` rules, …) targeted DOM that no longer exists
-   and was deleted rather than moved. */
-.logs-search-bar-component {
-  height: 100%;
-  overflow: visible;
-}
-
 .logs-search-bar-component .download-logs-btn {
   border-radius: var(--radius-default);
   transition: all 0.2s ease;
-}
-
-.logs-search-bar-component .query-editor-container {
-  height: calc(100% - 2.9rem) !important;
-}
-
-@media (max-width: 47.99rem) {
-  .logs-search-bar-component .query-editor-container {
-    height: calc(100% - 5rem) !important;
-  }
 }
 
 /* padding-left intentionally outranks the `px-1` utility on this button — that
@@ -5889,7 +5837,7 @@ export default defineComponent({
   font-weight: 600;
   font-size: var(--text-xs);
   padding-left: 0.5rem;
-  height: 2rem;
+  height: 1.75rem;
   padding-top: 0.1875rem;
   border-radius: var(--radius-default);
 }

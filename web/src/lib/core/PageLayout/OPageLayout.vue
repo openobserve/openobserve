@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   so no screen can drift off the grid.
 
   Header — from props (the normal case):
-    :title :subtitle :icon :back :titleDataTest
+    :title :icon :back :titleDataTest
     #actions      — right-aligned header actions (O2 buttons)
     #actions-overflow — secondary actions; inline on desktop, behind "More" < md
     #header-tabs  — inline module tabs in the header row (Level-2 nav)
@@ -64,11 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <slot name="header">
         <OPageHeader
           :title="title"
-          :subtitle="subtitle"
           :icon="icon"
           :back="back"
           :title-data-test="titleDataTest"
-          :tabs-below="tabsBelow"
           :title-overflow="titleOverflow"
           :overflow-first="overflowFirst"
           :title-min-width="titleMinWidth"
@@ -239,12 +237,9 @@ const props = withDefaults(
   defineProps<{
     // Header (from props)
     title?: I18nText;
-    subtitle?: I18nText;
     icon?: IconName;
     back?: BackTarget;
     titleDataTest?: string;
-    /** Render #header-tabs on a second row below the title (Level-2 module nav). */
-    tabsBelow?: boolean;
     /**
      * Forwarded to OPageHeader. Pass "visible" when #title hosts an interactive
      * control (an inline-edited page name) so the <h1> stops clipping it.
@@ -272,7 +267,6 @@ const props = withDefaults(
     headerClass?: string;
   }>(),
   {
-    tabsBelow: false,
     overflowFirst: false,
     titleMinWidth: false,
     bleed: false,
@@ -321,7 +315,6 @@ if (slots.sidebar) {
 const hasHeader = computed(
   () =>
     !!props.title ||
-    !!props.subtitle ||
     !!props.icon ||
     !!props.back ||
     !!slots.header ||

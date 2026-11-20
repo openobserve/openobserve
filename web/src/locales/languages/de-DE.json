@@ -1424,6 +1424,8 @@
     "selectOrganization": "Bitte wählen Sie eine Organisation aus"
   },
   "search": {
+    "liveRefreshingEvery": "Live: refreshing every {interval}",
+    "rowsPerPageLabel": "{n} / page",
     "queryFailed": "Abfrage fehlgeschlagen",
     "unknownError": "Unbekannter Fehler",
     "selectedLabel": "ausgewählt",
@@ -2075,7 +2077,6 @@
   "menu": {
     "alertCalibration": "Alarmkalibrierung",
     "autoobserve": "AutoObserve",
-    "upgradeToProPlan": "Upgrade auf den PRO-Plan",
     "home": "Startseite",
     "about": "Über",
     "index": "Streams",
@@ -2134,7 +2135,6 @@
   },
   "profiles": {
     "title": "Profile",
-    "subtitle": "Verfolgen Sie CPU-, Speicher- und Sperrnutzung pro Funktion",
     "stream": "Stream",
     "dataSource": "Datenquelle",
     "service": "Service",
@@ -2285,7 +2285,6 @@
     "from": "von",
     "to": "bis",
     "title": "Real User Monitoring",
-    "subtitle": "Überwachen Sie reale Benutzersitzungen, Fehler und Frontend-Leistung",
     "issueColumn": "Problem",
     "trendColumn": "Trend",
     "usersColumn": "Nutzer",
@@ -3325,7 +3324,6 @@
         "bulkDeleteMessage": "{count} benanntes Ereignis löschen? Funnels, die es verwenden, zeigen ein Tag für einen gelöschten Schritt an. | {count} benannte Ereignisse löschen? Funnels, die sie verwenden, zeigen ein Tag für einen gelöschten Schritt an.",
         "bulkDeleteInUseMessage": "{count} benanntes Ereignis löschen? Gespeicherte Funnels zeigen für {names} einen Schritt für ein gelöschtes Ereignis an. | {count} benannte Ereignisse löschen? Gespeicherte Funnels zeigen für {names} einen Schritt für ein gelöschtes Ereignis an.",
         "notFound": "Dieses benannte Ereignis existiert nicht mehr",
-        "editorApp": "App: {app}",
         "details": "Details",
         "opParam": "URL-Parameter",
         "opRef": "Referrer-Host",
@@ -4004,11 +4002,6 @@
     "license_downgrade_limit": "Das Tageslimit ändert sich von {old} auf {new}",
     "license_downgrade_expiry": "Das Ablaufdatum ändert sich von {old} auf {new}",
     "license_limit_per_day": "{gb} GB/Tag",
-    "header_button": {
-      "cloud_features": "{product}-Funktionen",
-      "enterprise_edition": "Ausgabe: Enterprise",
-      "get_enterprise_free": "Holen Sie sich OpenObserve Enterprise (kostenlos)"
-    },
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Enterprise-Funktionen",
@@ -4203,7 +4196,14 @@
     "usageChartDate": "{month} {day}",
     "usageChartDay": "Tag {day}",
     "usageChartUsage": "Nutzung: {value}",
-    "startFreeTrial": "Kostenlose Testversion starten"
+    "startFreeTrial": "Kostenlose Testversion starten",
+    "header_button": {
+      "upgrade": "Upgrade",
+      "enterprise_tooltip": "About {product} — Enterprise edition",
+      "cloud_features": "{product}-Funktionen",
+      "enterprise_edition": "Ausgabe: Enterprise",
+      "get_enterprise_free": "Holen Sie sich OpenObserve Enterprise (kostenlos)"
+    }
   },
   "login": {
     "lockedOut": "Zu viele fehlgeschlagene Anmeldeversuche. Versuchen Sie es in {duration} erneut, oder wenden Sie sich an Ihren Administrator.",
@@ -4379,7 +4379,6 @@
     "nameInvalid": "Verwenden Sie Kleinbuchstaben, Zahlen und Bindestriche (bis zu {max} Zeichen)",
     "createFailed": "Fehler beim Erstellen des Dienstkontos. Bitte versuchen Sie es erneut.",
     "updateFailed": "Fehler beim Aktualisieren des Dienstkontos. Bitte versuchen Sie es erneut.",
-    "headerSubtitle": "Programmatische Zugriffstoken für APIs",
     "search": "Dienstkonto suchen",
     "rotate": "Token drehen",
     "deleteServiceAccount": "Dienstkonto löschen",
@@ -4472,7 +4471,6 @@
     "mcpServerLabel": "MCP-Server",
     "mcpServerDesc": "Verbinden Sie KI-Clients über {product}",
     "mcpServerHeader": "MCP-Server",
-    "mcpServerHeaderSubtitle": "Verbinden Sie Claude, Cursor, VS Code und andere KI-Clients mit dieser Organisation.",
     "invitationsDesc": "Ausstehende und gesendete Mitgliedereinladungen",
     "groupsDesc": "Gruppieren Sie Benutzer, um Rollen zuzuweisen",
     "rolesDesc": "Definieren Sie Berechtigungen und Zugriffsrichtlinien",
@@ -4901,7 +4899,6 @@
       "other": "Sonstiges"
     },
     "invitationList": {
-      "subtitle": "Ausstehende und gesendete Mitgliedereinladungen",
       "loadingPending": "Lade ausstehende Einladungen...",
       "failedLoadPending": "Fehler beim Laden ausstehender Einladungen",
       "accepting": "Einladung wird angenommen...",
@@ -4955,7 +4952,6 @@
       "errorCreating": "Fehler beim Erstellen der Gruppe"
     },
     "quotaPage": {
-      "subtitle": "Nutzungslimits pro Rolle angewendet",
       "selectOrganization": "Organisation auswählen",
       "editQuota": "Kontingent bearbeiten",
       "selectApiCategory": "API-Kategorie auswählen",
@@ -5082,7 +5078,6 @@
       "brand": "Kräftiges Blau"
     },
     "list": {
-      "subtitle": "Hinweise, die oben in der App für jede Organisation angezeigt werden – oder nur für die von Ihnen ausgewählten.",
       "liveNow": "Jetzt live",
       "liveNowEmpty": "Derzeit wird kein Banner angezeigt.",
       "liveOnlyFor": "Nur für {orgs}",
@@ -5276,7 +5271,6 @@
     },
     "deleteField": "Feld löschen",
     "header": "Streams",
-    "subtitle": "Indexverwaltung und Stream-Konfiguration",
     "streamNameHelpText": "Verwenden Sie nur alphanumerische Zeichen, Unterstriche und Doppelpunkte.",
     "search": "Stream suchen",
     "emptyOr": "Oder:",
@@ -5367,7 +5361,6 @@
   },
   "workflow": {
     "header": "Workflows",
-    "subtitle": "Aktionen mit Triggern, Logik und Zielen automatisieren",
     "create": "Neuer Workflow",
     "createSuccess": "Workflow erfolgreich erstellt",
     "name": "Workflow-Name",
@@ -6279,7 +6272,6 @@
     "functionName": "Funktionsname",
     "remoteDestination": "Remote-Ziel",
     "failedToLoadPipeline": "Pipeline konnte nicht geladen werden",
-    "subtitle": "Daten während des Fluges transformieren, anreichern und routen",
     "deleteNode": "Löschen",
     "addPipeline": "Pipeline hinzufügen",
     "deletePipeline": "Pipeline löschen",
@@ -6526,7 +6518,6 @@
     "order": "Bestellung",
     "applyBeforeFlattening": "Vor dem Abflachen anwenden",
     "header": "Funktionen",
-    "subtitle": "Wiederverwendbare VRL-Funktionen, die in Pipelines angewendet werden",
     "clickTestFunctionHint": "Bitte klicken Sie auf Funktion testen, um die Ereignisse zu sehen",
     "add": "Neue Funktion erstellen",
     "search": "Funktion suchen",
@@ -6550,7 +6541,6 @@
     "enterFunctionPrompt": "Geben Sie eine Aufforderung ein, um eine Funktion zu generieren",
     "associatedFunctionHeader": "Assoziierte Funktionen",
     "enrichmentTables": "Anreicherungstabellen",
-    "enrichmentTablesSubtitle": "Nachschlagetabellen, die aufgenommene Daten anreichern",
     "addEnrichmentTable": "Anreicherungstabelle hinzufügen",
     "updateEnrichmentTable": "Anreicherungstabelle aktualisieren",
     "searchEnrichmentTable": "Anreicherungstabelle suchen",
@@ -10147,7 +10137,6 @@
     "publicLinks": {
       "panelTitle": "Öffentliche Links",
       "pageTitle": "Öffentliche Dashboards",
-      "pageSubtitle": "Alle öffentlichen Links in dieser Organisation",
       "panelTitleFor": "Öffentliche Links — {name}",
       "intro": "Jeder mit einem öffentlichen Link kann dieses Dashboard ohne Anmeldung ansehen.",
       "editNote": "Die Adresse des Links bleibt gleich. Änderungen erscheinen bei der nächsten Aktualisierung auf der öffentlichen Seite.",
@@ -10534,7 +10523,6 @@
     "tabOverview": "Überblick",
     "tabUsage": "Verwendungszweck",
     "removeHomeDashboard": "Home-Dashboard entfernen",
-    "subtitle": "Ihr Observability-Workspace auf einen Blick",
     "resources": "Ressourcen",
     "explore": "Erkunden"
   },
@@ -11476,7 +11464,6 @@
   },
   "alertCalibration": {
     "title": "Alarmkalibrierung",
-    "subtitle": "Wie sich Ihre Alarme verhalten, gemessen an ihrer eigenen Ausführungshistorie",
     "configure": "Konfigurieren",
     "runNow": "Jetzt ausführen",
     "runNowHint": "Fordert eine sofortige Ausführung an, statt auf die nächste zu warten. Wenn eine Ausführung bereits fällig ist oder läuft, wird stattdessen diese Anforderung beantwortet.",
@@ -11898,7 +11885,6 @@
     "detail": {
       "title": "Digest von {time}",
       "titleLoading": "Digest",
-      "subtitle": "Umfasst {start} bis {end}, erstellt {time}",
       "back": "Digests",
       "unavailableTitle": "Digest nicht verfügbar",
       "noRecords": "Für diesen Lauf wurden keine Datensätze gefunden.",
@@ -12707,7 +12693,6 @@
       "commentPlaceholder": "Kommentar schreiben...",
       "sendComment": "Kommentar senden",
       "title": "Vorfälle",
-      "subtitle": "Vorfallsverwaltung und -verfolgung",
       "search": "Vorfälle suchen...",
       "status": "Status",
       "severity": "Schweregrad",
@@ -14158,7 +14143,6 @@
       "firingTotal": "Ausgelöst",
       "observedTotal": "Gruppen",
       "nOfMFiring": "{firing} von {observed} Gruppen ausgelöst",
-      "groupedBy": "gruppiert nach {columns}",
       "groupBy": "Gruppieren nach",
       "criticalCondition": "Kritische Bedingung",
       "warningCondition": "Warnbedingung",
@@ -14506,7 +14490,6 @@
         "startDateRequired": "Wählen Sie den ersten Tag."
       },
       "title": "Wartungsfenster",
-      "subtitle": "Geplante Zeitfenster, in denen Alarme, Anomalieerkennungen und Synthetics-Prüfungen weiterlaufen, aber keine Benachrichtigungen senden",
       "newDowntime": "Neues Wartungsfenster",
       "filterAll": "Alle",
       "filterOnce": "Einmalig",
@@ -15416,7 +15399,6 @@
   },
   "alert_sources": {
     "header": "Externe Alarmquellen",
-    "subtitle": "Senden Sie Alarme von Grafana, Prometheus Alertmanager oder jedem Tool, das einen Webhook aufrufen kann – sie werden hier angezeigt und automatisch mit Vorfällen verknüpft.",
     "acceptsAnyFormat": "akzeptiert jedes Webhook-Format",
     "revealToken": "Vollständige URL anzeigen",
     "hideToken": "Vollständige URL ausblenden",
@@ -16504,9 +16486,6 @@
     "modelPricingEditor": {
       "copySuffix": " (Kopie)"
     },
-    "modelPricingList": {
-      "subtitle": "LLM-Modellkostenkonfiguration"
-    },
     "orgStorageSettings": {
       "subtitle": "Die Daten dieser Organisation in einem Bucket speichern, den Sie besitzen",
       "awsCredentials": "AWS-Zugangsdaten",
@@ -16541,9 +16520,6 @@
       "settingsUpdated": "Organisationseinstellungen erfolgreich aktualisiert.",
       "settingsSaveError": "Fehler beim Speichern der Organisationseinstellungen."
     },
-    "aiToolsetsPage": {
-      "subtitle": "Konfigurieren Sie KI-Tool-Integrationen."
-    },
     "cipherKeysPage": {
       "subtitle": "Schlüssel, die sensible Feldwerte verschlüsseln und entschlüsseln",
       "delete": "Löschen",
@@ -16560,15 +16536,11 @@
       "bulkDeleteFailed": "Fehler beim Löschen von {count} Cipher-Schlüssel | Fehler beim Löschen von {count} Cipher-Schlüsseln",
       "bulkDeleteError": "Fehler beim Löschen der Cipher-Schlüssel."
     },
-    "correlationSettingsPage": {
-      "subtitle": "Telemetrie-Korrelationskonfiguration"
-    },
     "licensePage": {
       "unexpectedError": "unerwarteter Fehler",
       "daysRemaining": "{days} Tage verbleibend bis zum Ablauf Ihrer Lizenz."
     },
     "nodesPage": {
-      "subtitle": "Cluster-Knoten und deren Zustand.",
       "to": "bis",
       "name": "Name",
       "loadingData": "Bitte warten Sie, während die Daten geladen werden...",
@@ -16656,7 +16628,6 @@
       "processingTrialExtension": "Bitte warten Sie, während die Verlängerung des Testzeitraums bearbeitet wird...",
       "trialExtendedSuccess": "Testzeitraum erfolgreich verlängert.",
       "extendTrialError": "Fehler beim Verlängern des Testzeitraums. Bitte versuchen Sie es erneut.",
-      "subtitle": "Organisationen erstellen und verwalten",
       "addContract": "Vertrag hinzufügen",
       "extendTrialTitle": "Testzeitraum für {name} verlängern",
       "extendTrialSubtitle": "Legen Sie den neuen Verlängerungszeitraum des Testzeitraums fest.",
@@ -16776,7 +16747,6 @@
       "sourceBuiltIn": "Integriert"
     },
     "regexPatternList": {
-      "subtitle": "Wiederverwendbare Regex-Muster für die Schwärzung",
       "exportTitle": "Regex-Muster exportieren",
       "delete": "Löschen",
       "bulkDeleteTitle": "Regex-Muster löschen",
@@ -16870,7 +16840,6 @@
         "valueMismatch": "TXT-Eintrag gefunden, aber der Wert stimmt nicht überein",
         "dnsFailed": "DNS-Auflösung fehlgeschlagen"
       },
-      "pageSubtitle": "Verknüpfen Sie Ihre E-Mail-Domänen, ordnen Sie deren Benutzer Organisationen zu und steuern Sie, welche davon beitreten können.",
       "linkedTab": "Verknüpfte Domänen",
       "mappingsTab": "Zuordnungen",
       "accessTab": "Blockierte Benutzer",
@@ -16993,7 +16962,6 @@
       "lastRun": "Letzte Ausführung",
       "lastRunAt": "Zuletzt ausgeführt",
       "nextRun": "Nächste Ausführung",
-      "nextRunAt": "nächste Ausführung {time}",
       "acceptedTooltip": "Vom Mailserver angenommen",
       "cachedTooltip": "Dashboard-Cache aufgewärmt; es wird keine E-Mail gesendet",
       "unrecordedTooltip": "Das Ergebnis des letzten Laufs wurde nicht aufgezeichnet; ältere Läufe sind möglicherweise im Verlauf verfügbar.",
@@ -17067,9 +17035,7 @@
       "everyHours": "Jede Stunde | Alle {count} Stunden",
       "everyDays": "Jeden Tag | Alle {count} Tage",
       "everyWeeks": "Jede Woche | Alle {count} Wochen",
-      "everyMonths": "Jeden Monat | Alle {count} Monate",
-      "dashboardCount": "{count} Dashboard | {count} Dashboards",
-      "recipientCount": "{count} Empfänger | {count} Empfänger"
+      "everyMonths": "Jeden Monat | Alle {count} Monate"
     },
     "frequencyUnits": {
       "days": "Tage",
@@ -17097,7 +17063,6 @@
     "never": "Nie",
     "startDate": "Startdatum",
     "header": "Berichte",
-    "subtitle": "Geplante Berichte und Exporte",
     "searchThisFolder": "Dieser Ordner",
     "searchAllFolders": "Alle Ordner",
     "reloadReports": "Berichte neu laden",
@@ -18741,7 +18706,6 @@
     },
     "unpriced": {
       "title": "Preislücken",
-      "subtitle": "Modelle in Ihren LLM-Traces, die bei der Erfassung keinen oder nur einen ungefähren Preis hatten",
       "banner": "{count} Modell hatte bei der Erfassung keinen oder nur einen ungefähren Preis. Die erfassten Kosten sind möglicherweise unvollständig. | {count} Modelle hatten bei der Erfassung keinen oder nur einen ungefähren Preis. Die erfassten Kosten sind möglicherweise unvollständig.",
       "bannerTruncated": "{total} Modelle in Ihren Traces hatten bei der Erfassung keinen oder nur einen ungefähren Preis. Deren Kosten sind möglicherweise falsch. Angezeigt werden die Top {shown} nach Tokens.",
       "streamLabel": "Stream",
@@ -18862,7 +18826,6 @@
       "tools": "Tools"
     },
     "promptManagement": {
-      "subtitle": "Wiederverwendbare Prompts erstellen, versionieren und veröffentlichen.",
       "promptSubtitle": "{type}-Prompt",
       "prompt": "Prompt",
       "promptId": "Prompt-ID",
@@ -19302,7 +19265,6 @@
         }
       },
       "workbench": {
-        "subtitle": "{reviewed} von {total} geprüft",
         "itemCounter": "Element {index} von {total} zu prüfen",
         "prev": "Vorheriges Element",
         "next": "Nächstes Element",
@@ -19782,7 +19744,6 @@
       },
       "detail": {
         "fallbackTitle": "Datensatz",
-        "meta": "{count} Elemente · aktualisiert {updated}",
         "loadError": "Fehler beim Laden des Datensatzes",
         "tryInPlayground": "Im Playground testen",
         "tabs": {
@@ -20746,7 +20707,6 @@
       "backTo": "Provider",
       "createTitle": "LLM-Anbieter erstellen",
       "editTitle": "LLM-Anbieter bearbeiten",
-      "subtitle": "Konfigurieren Sie den Modellendpunkt, der von LLM-Judge Scorern verwendet wird.",
       "sectionTitle": "Anbieter",
       "nameLabel": "Name",
       "typeLabel": "Anbietertyp",
@@ -22705,9 +22665,7 @@
       "usedBy": {
         "aria": "Tests, die diesen verwenden",
         "help": "Sie führen diese Schritte auf ihrer eigenen Seite aus. Die Start-URL, Umgebungen und Secrets dieses Tests werden dort nicht verwendet.",
-        "viewAll": "Alle {count} Tests anzeigen",
-        "subtitle": "{folder} · verwendet von {count} Test | {folder} · verwendet von {count} Tests",
-        "subtitleNoFolder": "Verwendet von {count} Test | Verwendet von {count} Tests"
+        "viewAll": "Alle {count} Tests anzeigen"
       },
       "recordingIn": "Aufzeichnung in {environment}",
       "needsDesktopRecorder": "Benötigt die Desktop-Recorder-Erweiterung",
@@ -22918,7 +22876,6 @@
       "folder": "Ordner",
       "willBeCreatedIn": "Wird erstellt in"
     },
-    "pageSubtitle": "Überwachen Sie proaktiv Verfügbarkeit, Leistung und Benutzer-Journeys von globalen Standorten aus",
     "pageTitle": "Synthetics",
     "protocolConfig": {
       "http": {
@@ -24947,7 +24904,6 @@
     "title": "SLOs",
     "notFound": "SLO nicht gefunden",
     "notFoundDescription": "Dieses SLO existiert nicht mehr, oder Sie haben keinen Zugriff darauf. Es wurde möglicherweise gelöscht.",
-    "subtitle": "Service-Level-Ziele: Ziele, Fehlerbudgets, Burn-Rate-Alarme",
     "new": "Neues SLO",
     "newTitle": "Neues SLO",
     "editTitle": "SLO bearbeiten",
@@ -24965,7 +24921,6 @@
     "totalSlos": "SLOs gesamt",
     "noGrouping": "Keine (eine einzelne Gesamtserie)",
     "newAlert": "Neuer Alarm",
-    "overRolling": "über gleitende {window}",
     "searchPlaceholder": "SLO oder Tag suchen, z. B. team:payments",
     "loadFailed": "SLOs konnten nicht geladen werden",
     "requestFailed": "Anfrage fehlgeschlagen ({code})",
@@ -26075,7 +26030,6 @@
       "groupWorkloads": "Workloads",
       "groupStorage": "Speicher",
       "groupAutoscaling": "Autoscaling",
-      "subtitle": "Cluster, Workloads und Ressourcen überwachen",
       "clusterPickerLabel": "Cluster",
       "clusterPickerLoading": "Cluster werden geladen…",
       "clusterPickerTrigger": "Cluster: {name}",
@@ -26533,8 +26487,7 @@
       "actions": "Aktionen"
     },
     "header": {
-      "title": "Datenbanken",
-      "subtitle": "Abfrageleistung und -zustand in Ihren Datenbanken"
+      "title": "Datenbanken"
     },
     "ai": {
       "suggestFix": "KI fragen, wie das zu beheben ist",
@@ -27799,7 +27752,6 @@
     "fromRotation": "von {name}",
     "ownershipMatch": "Übereinstimmungen",
     "ownershipSpecificity": "Dimensionen",
-    "teamSubtitle": "{tz} · {count} Mitglied | {tz} · {count} Mitglieder",
     "statOnCallNow": "Aktuell im Dienst",
     "statRotations": "Rotationen",
     "statRoutingRules": "Routing-Regeln",
@@ -28800,7 +28752,6 @@
     "teamOpenInOnCall": "Alle in On-Call anzeigen",
     "teamCoverage": "Abdeckung der nächsten {days} Tage",
     "teamCoverageHint": "Hier sind nur die Lücken von Interesse",
-    "teamOwnsRules": "besitzt {count} Routing-Regel | besitzt {count} Routing-Regeln",
     "teamCoveredNow": "Aktuell abgedeckt",
     "teamOverview": "Übersicht",
     "teamAnsweredBy": "Beantwortet von",
@@ -29493,7 +29444,6 @@
       "allClearNone": "Nichts erforderte Ihre Aufmerksamkeit."
     },
     "title": "AutoObserve",
-    "subtitle": "Senden Sie Ihre Daten. OpenObserve findet die Probleme und teilt sie Ihnen mit – mit seiner besten Einschätzung der Ursache. Wenn es still ist, zeigt es Ihnen, was es geprüft hat und was es nicht sehen kann.",
     "tabs": {
       "issues": "Probleme",
       "coverage": "Abdeckung",
@@ -30425,7 +30375,6 @@
     },
     "issuesPage": {
       "title": "Alle Probleme",
-      "sentence": "Jedes Problem, das ich {within} geöffnet habe. Wählen Sie eines aus, um zu sehen, was passiert ist und was ich dagegen unternommen habe.",
       "ranges": {
         "week": "Letzte 7 Tage",
         "month": "Letzte 30 Tage",
@@ -32182,7 +32131,6 @@
   },
   "fleet": {
     "title": "Fleet-Verwaltung",
-    "subtitle": "OpenTelemetry-Collector registrieren, ihre Konfigurationen versionieren und Änderungen sicher ausrollen",
     "addCollector": "Collector hinzufügen",
     "tabs": {
       "collectors": "Collector",
@@ -32721,7 +32669,6 @@
     },
     "editor": {
       "pageTitle": "Konfigurationseditor",
-      "newDescription": "Neue Collector-Konfiguration",
       "visual": "Visuell",
       "issues": "{count} Problem | {count} Probleme",
       "valid": "Gültig",

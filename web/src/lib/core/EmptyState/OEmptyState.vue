@@ -29,8 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OEmptyState size="block" title="…" description="…" />
     <OEmptyState> <template #illustration>…</template> … </OEmptyState>
 
-  Motion: animated illustrations honour prefers-reduced-motion automatically —
-  the `animated` flag is computed here and passed down to the illustration.
 -->
 <template>
   <div
@@ -59,34 +57,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sizeClass.stack,
       ]"
     >
-      <!-- illustration (hero/block) — preset/illustration prop or slot -->
-      <div v-if="hasIllustration" :class="['shrink-0', sizeClass.illustration]">
-        <slot name="illustration">
-          <component
-            :is="illustrationComponent"
-            v-if="illustrationComponent"
-            :width="sizeClass.illustrationWidth"
-            :animated="animated"
-          />
-        </slot>
+      <!-- A caller's own illustration slot still wins; built-in scenes give way to a neutral glyph. -->
+      <div
+        v-if="$slots.illustration && !isInlineCopy"
+        :class="['shrink-0', sizeClass.illustration]"
+      >
+        <slot name="illustration" />
       </div>
+      <OIcon
+        v-else-if="glyph"
+        :name="glyph"
+        size="xl"
+        class="size-10! shrink-0"
+        :class="glyphTone"
+        data-test="o2-empty-state-glyph"
+      />
 
       <!-- inline size shows a compact icon instead of a full illustration -->
-      <span
-        v-else-if="inlineIcon"
-        :class="[
-          'o2-empty-state__inline-icon inline-flex items-center justify-center rounded-full',
-          sizeClass.iconWrap,
-          inlineIconTone,
-        ]"
-      >
-        <OIcon :name="inlineIcon" :size="size === 'inline' ? 'lg' : 'xl'" />
-      </span>
 
       <div :class="['flex max-w-xl flex-col', sizeClass.copy]">
         <component
           :is="isInlineCopy ? 'p' : 'h2'"
-          :class="['text-text-heading font-medium tracking-[-0.01em]', sizeClass.title]"
+          :class="['text-text-heading font-semibold', sizeClass.title]"
         >
           <slot name="title">{{ resolvedTitle }}</slot>
         </component>
@@ -132,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="resolvedActionLabel"
               :variant="actionVariant"
-              :size="isInlineCopy ? 'sm' : 'md'"
+              :size="isInlineCopy ? 'sm' : 'lg'"
               :icon-left="resolvedActionIcon"
               :data-test="`o2-empty-state-action-${actionId}`"
               :data-empty-state-action="actionId"
@@ -143,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               v-if="secondaryActionLabel"
               variant="ghost"
-              :size="isInlineCopy ? 'sm' : 'md'"
+              :size="isInlineCopy ? 'sm' : 'lg'"
               :data-test="`o2-empty-state-action-${secondaryActionId}`"
               :data-empty-state-action="secondaryActionId"
               @click="emit('secondaryAction')"
@@ -162,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, useSlots } from "vue";
+import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -170,7 +162,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 import EmptyStateActionCard from "./EmptyStateActionCard.vue";
-import { illustrations, type IllustrationName } from "./illustrations";
+import type { IllustrationName } from "./illustrations";
 import {
   emptyStatePresets,
   presetNouns,
@@ -226,6 +218,8 @@ const props = withDefaults(
     backdrop?: boolean;
     /** Tint the `inline` icon red for `error`, amber for `warning`; off keeps the grey circle. */
     toneIcon?: boolean;
+    /** Set `outline` when the page already shows its one primary button. */
+    actionVariant?: "primary" | "outline";
   }>(),
   { size: "block", actionId: "primary", secondaryActionId: "secondary" },
 );
@@ -235,7 +229,6 @@ const emit = defineEmits<{
   (e: "secondaryAction"): void;
 }>();
 
-const slots = useSlots();
 const { t } = useI18nTyped();
 
 // Widen to the interface: the `satisfies` map keeps per-key literal types,
@@ -291,19 +284,48 @@ const resolvedActionIcon = computed<IconName | undefined>(() => props.actionIcon
 const variant = computed<EmptyStateVariant>(() =>
   isFiltered.value ? "no-results" : (props.variant ?? preset.value?.variant ?? "neutral"),
 );
-const actionVariant = computed(() => (variant.value === "error" ? "outline" : "primary"));
+const actionVariant = computed(
+  () => props.actionVariant ?? (variant.value === "error" ? "outline" : "primary"),
+);
 
 // Filtered always uses the magnifier so it reads as "search found nothing".
 const illustrationName = computed<IllustrationName | undefined>(() =>
   isFiltered.value ? "no-results" : (props.illustration ?? preset.value?.illustration),
 );
-const illustrationComponent = computed(() =>
-  illustrationName.value ? illustrations[illustrationName.value] : undefined,
-);
-// inline never shows the full illustration — it uses a compact icon instead.
-const hasIllustration = computed(
-  () => !isInlineCopy.value && (!!slots.illustration || !!illustrationComponent.value),
-);
+// Built-in scenes map to a neutral glyph of the same subject.
+const ILLUSTRATION_GLYPHS: Partial<Record<IllustrationName, IconName>> = {
+  users: "group",
+  connect: "link",
+  query: "query-stats",
+  check: "check-circle",
+  board: "dashboard",
+  alert: "notifications",
+  schedule: "schedule",
+  pipeline: "lan",
+  constellation: "hub",
+  "wave-bars": "bar-chart",
+  trace: "account-tree",
+  history: "history",
+  function: "function",
+  "data-scene": "dataset",
+  "services-catalog": "menu-book",
+  "service-graph": "share",
+  report: "description",
+  "no-results": "search-off",
+  logs: "description",
+  lock: "lock",
+  "browser-check": "public",
+  "broken-panel": "error-outline",
+};
+const glyph = computed<IconName | undefined>(() => {
+  if (size.value === "slim") return undefined;
+  if (size.value === "inline") return inlineIcon.value;
+  if (props.icon) return props.icon;
+  if (!illustrationName.value) return undefined;
+  if (variant.value === "error") return "error-outline";
+  if (variant.value === "warning") return "warning";
+  return ILLUSTRATION_GLYPHS[illustrationName.value] ?? "inbox";
+});
 const inlineIcon = computed<IconName | undefined>(() => {
   if (size.value !== "inline") return undefined; // slim is text only
   if (props.icon) return props.icon;
@@ -311,31 +333,16 @@ const inlineIcon = computed<IconName | undefined>(() => {
   if (variant.value === "error") return "error-outline";
   return variant.value === "warning" ? "warning" : "search-off";
 });
-const inlineIconTone = computed(() => {
-  if (props.toneIcon && variant.value === "error")
-    return "bg-status-error-bg text-status-error-text";
-  if (props.toneIcon && variant.value === "warning")
-    return "bg-status-warning-bg text-status-warning-text";
-  return "bg-surface-subtle text-text-secondary";
+// Status colour only on a status glyph, and never as a tile.
+const glyphTone = computed(() => {
+  if (props.toneIcon && variant.value === "error") return "text-status-error-text";
+  if (props.toneIcon && variant.value === "warning") return "text-status-warning-text";
+  return "text-text-secondary";
 });
-
-// --- prefers-reduced-motion -------------------------------------------------
-const animated = ref(true);
-let mq: MediaQueryList | undefined;
-const syncMotion = () => {
-  animated.value = !(mq?.matches ?? false);
-};
-onMounted(() => {
-  if (typeof window !== "undefined" && window.matchMedia) {
-    mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    syncMotion();
-    mq.addEventListener?.("change", syncMotion);
-  }
-});
-onBeforeUnmount(() => mq?.removeEventListener?.("change", syncMotion));
 
 // --- backdrop ---------------------------------------------------------------
-const showBackdrop = computed(() => props.backdrop ?? !isInlineCopy.value);
+// The dot grid is decoration in a work area, so it is opt-in.
+const showBackdrop = computed(() => props.backdrop ?? false);
 const dotGridStyle =
   // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
   "background-image: radial-gradient(var(--empty-dot) 1.25px, transparent 1.25px);" +
@@ -368,8 +375,8 @@ const SIZE_MAP: Record<
     copy: "gap-2.5 max-md:gap-1.5",
     actions: "gap-3 pt-1 max-md:gap-2 max-md:pt-0",
     extra: "w-full flex flex-col items-center gap-3 pt-2 max-md:gap-2 max-md:pt-0",
-    title: raw("text-2xl! max-md:text-lg!"),
-    description: raw("text-base max-md:text-sm"),
+    title: raw("text-sm!"),
+    description: raw("text-compact"),
     illustrationWidth: 300,
     // CSS width beats the SVG width attribute; h-auto keeps the viewBox ratio.
     illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-36",
@@ -381,8 +388,8 @@ const SIZE_MAP: Record<
     copy: "gap-2 max-md:gap-1.5",
     actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
     extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",
-    title: raw("text-lg! max-md:text-base!"),
-    description: raw("text-sm"),
+    title: raw("text-sm!"),
+    description: raw("text-compact"),
     illustrationWidth: 150,
     illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-28",
     iconWrap: "",
@@ -393,8 +400,8 @@ const SIZE_MAP: Record<
     copy: "gap-2 max-md:gap-1.5",
     actions: "gap-2.5 pt-0.5 max-md:gap-2 max-md:pt-0",
     extra: "w-full flex flex-col items-center gap-2 pt-1 max-md:pt-0",
-    title: raw("text-lg! max-md:text-base!"),
-    description: raw("text-sm"),
+    title: raw("text-sm!"),
+    description: raw("text-compact"),
     illustrationWidth: 150,
     illustration: "max-md:[&>svg]:h-auto max-md:[&>svg]:w-28",
     iconWrap: "",

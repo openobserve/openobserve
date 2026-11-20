@@ -116,7 +116,6 @@
     },
     "overview": {
       "title": "Visão geral do SOC",
-      "subtitle": "O que foi disparado, o que está em aberto e se as suas fontes continuam a comunicar",
       "autoRefreshOn": "A atualização automática a cada minuto está ativa",
       "autoRefreshOff": "A atualização automática está desativada",
       "historyError": "Não foi possível carregar o histórico de deteções: {reason}",
@@ -165,7 +164,6 @@
     },
     "events": {
       "title": "Eventos de segurança",
-      "subtitle": "Investigue em telemetria de segurança normalizada",
       "run": "Executar",
       "hideSidebar": "Ocultar campos",
       "showSidebar": "Mostrar campos",
@@ -348,7 +346,6 @@
     },
     "alerts": {
       "title": "Alertas",
-      "subtitle": "Sempre que uma deteção é disparada e as evidências que a sustentam",
       "eyebrow": "Deteção disparada",
       "range": {
         "1h": "1h",
@@ -463,7 +460,6 @@
     },
     "cases": {
       "title": "Casos",
-      "subtitle": "Disparos correlacionados, triados até um veredicto",
       "eyebrow": "Caso",
       "search": "Filtrar esta página por título, id, responsável ou entidade",
       "refresh": "Atualizar",
@@ -712,7 +708,6 @@
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
-      "subtitle": "Que técnicas as suas deteções ativadas cobrem e quais foram disparadas",
       "summaryPartial": "Esta janela tem mais histórico de alertas do que um resumo consegue conter, pelo que as contagens de disparos são um limite inferior; escolha uma janela mais curta para obter números completos.",
       "stat": {
         "firing": "Técnicas com disparos",
@@ -775,7 +770,6 @@
     },
     "detections": {
       "title": "Deteções",
-      "subtitle": "Regras Sigma em execução como deteções agendadas sobre os seus streams de segurança",
       "new": "Nova deteção",
       "eyebrow": "Regra de deteção",
       "refresh": "Atualizar deteções",
@@ -1073,7 +1067,6 @@
     },
     "content": {
       "title": "Conteúdo",
-      "subtitle": "As regras de deteção e as fontes de logs fornecidas com o SIEM, avaliadas face aos seus dados",
       "refresh": "Atualizar",
       "streamsError": "Não foi possível carregar os seus streams, pelo que as correspondências com os seus dados são desconhecidas",
       "tab": {
@@ -1219,7 +1212,6 @@
     },
     "entities": {
       "title": "Entidades",
-      "subtitle": "Todos os utilizadores, IPs de origem e hosts mencionados pelas suas origens de segurança",
       "view": {
         "table": "Tabela",
         "graph": "Grafo de risco"
@@ -1339,7 +1331,6 @@
     },
     "ueba": {
       "title": "Análise de comportamento do utilizador",
-      "subtitle": "Cada utilizador comparado com o seu próprio passado recente",
       "windowHint": "Nos últimos {current}, em comparação com os {baseline} anteriores",
       "method": "As pontuações de risco são heurísticas: os últimos {current} de cada utilizador são comparados com os seus próprios {baseline} anteriores. Cada sinalização mostra os números que a originaram.",
       "noSources": "Nenhuma fonte identifica um utilizador",
@@ -1438,7 +1429,6 @@
     },
     "intel": {
       "title": "Inteligência de ameaças",
-      "subtitle": "Indicadores maliciosos conhecidos e todos os locais onde apareceram nos seus dados de segurança",
       "loadFailed": "Não foi possível carregar as listas de indicadores",
       "add": "Adicionar indicadores",
       "import": "Importar",
@@ -1607,7 +1597,6 @@
     "sources": {
       "title": "Fontes de dados",
       "comingSoon": "A integração guiada com modelos de normalização OCSF está a chegar. Até lá, ingira logs de segurança como qualquer stream; a página Eventos identifica-os e normaliza-os automaticamente.",
-      "subtitle": "Associe um pacote OCSF para normalizar um stream na ingestão, ou inclua-o como fonte de segurança tal como está.",
       "colStream": "Stream",
       "colSourceType": "Tipo de fonte",
       "colMapping": "Mapeamento",

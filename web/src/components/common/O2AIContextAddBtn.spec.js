@@ -1,13 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import O2AIContextAddBtn from "./O2AIContextAddBtn.vue";
-import { getImageURL } from "@/utils/zincutils";
 import store from "@/test/unit/helpers/store";
-
-// Mock the getImageURL function
-vi.mock("@/utils/zincutils", () => ({
-  getImageURL: vi.fn((path) => path),
-}));
 
 // Mock aws-exports config
 vi.mock("@/aws-exports", () => ({
@@ -83,29 +77,10 @@ describe("O2AIContextAddBtn", () => {
     expect(button.attributes("style")).toContain("margin: 10px");
   });
 
-  it("applies custom image dimensions when provided", async () => {
-    await wrapper.setProps({
-      imageHeight: "30px",
-      imageWidth: "30px",
-    });
-    const img = wrapper.find("img");
-    expect(img.attributes("height")).toBe("30px");
-    expect(img.attributes("width")).toBe("30px");
-  });
-
-  it("uses correct icon based on theme", async () => {
-    // Test light theme
-    expect(getImageURL).toHaveBeenCalledWith("images/common/ai_icon_gradient.svg");
-
-    // Test dark theme
-    store.state.theme = "dark";
-    await wrapper.vm.$nextTick();
-    expect(getImageURL).toHaveBeenCalledWith("images/common/ai_icon_dark.svg");
-  });
-
   it("has correct button attributes", () => {
     const button = wrapper.find('[data-test="o2-ai-context-add-btn"]');
     expect(button.attributes("flat")).toBe(undefined);
-    expect(button.classes()).toContain("group");
+    expect(button.attributes("data-o2-variant")).toBe("outline");
+    expect(button.find("img").exists()).toBe(false);
   });
 });

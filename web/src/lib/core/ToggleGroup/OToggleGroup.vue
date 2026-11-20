@@ -184,7 +184,7 @@ onBeforeUnmount(() => {
 
 const indicatorClasses = computed(() => [
   // An inset ring paints inside the measured box, so the edge moves neither the pill nor the items.
-  "pointer-events-none absolute left-0 top-0 rounded-default bg-toggle-item-active-bg ring-1 ring-inset ring-toggle-item-active-border shadow-xs",
+  "pointer-events-none absolute left-0 top-0 rounded-default bg-toggle-item-active-bg ring-1 ring-inset ring-toggle-item-active-border",
   transitionOn.value &&
     "transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none",
   indicatorVisible.value ? "opacity-100" : "opacity-0",
@@ -343,7 +343,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       :class="[
         'relative inline-flex items-stretch',
         orientation === 'vertical' ? 'flex-col' : 'flex-row',
-        'bg-toggle-track-bg rounded-default p-0.5',
+        'bg-toggle-track-bg rounded-default min-h-6 gap-0.5 p-0.5',
       ]"
       v-bind="dragListeners"
       @update:model-value="
@@ -375,8 +375,7 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
     :class="[
       'relative inline-flex items-stretch',
       orientation === 'vertical' ? 'flex-col' : 'flex-row',
-      'bg-toggle-track-bg rounded-default p-0.5',
-      'border-toggle-border border',
+      'bg-toggle-track-bg rounded-default min-h-6 gap-0.5 p-0.5',
       // Wrapped toggle chips read as two unrelated controls, so the strip scrolls within its track.
       orientation !== 'vertical' &&
         'max-md:max-w-full max-md:overflow-x-auto @max-4xl/page:max-w-full @max-4xl/page:overflow-x-auto',

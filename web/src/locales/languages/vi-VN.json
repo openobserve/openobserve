@@ -1424,6 +1424,8 @@
     "selectOrganization": "Vui lòng chọn tổ chức"
   },
   "search": {
+    "liveRefreshingEvery": "Live: refreshing every {interval}",
+    "rowsPerPageLabel": "{n} / page",
     "queryFailed": "Truy vấn thất bại",
     "unknownError": "Lỗi không xác định",
     "selectedLabel": "đã chọn",
@@ -2075,7 +2077,6 @@
   "menu": {
     "alertCalibration": "Hiệu chỉnh cảnh báo",
     "autoobserve": "AutoObserve",
-    "upgradeToProPlan": "Nâng cấp lên gói PRO",
     "home": "Trang chủ",
     "about": "Giới thiệu",
     "index": "Stream",
@@ -2134,7 +2135,6 @@
   },
   "profiles": {
     "title": "Profiles",
-    "subtitle": "Theo dõi mức sử dụng CPU, bộ nhớ và khóa theo từng hàm",
     "stream": "Stream",
     "dataSource": "Nguồn dữ liệu",
     "service": "Dịch vụ",
@@ -2285,7 +2285,6 @@
     "from": "từ",
     "to": "đến",
     "title": "Giám sát người dùng thực",
-    "subtitle": "Giám sát phiên người dùng thực, lỗi và hiệu suất giao diện người dùng",
     "issueColumn": "Vấn đề",
     "trendColumn": "Xu hướng",
     "usersColumn": "Người dùng",
@@ -3325,7 +3324,6 @@
         "bulkDeleteMessage": "Xóa {count} sự kiện có tên? Các phễu sử dụng nó sẽ hiển thị thẻ bước đã xóa. | Xóa {count} sự kiện có tên? Các phễu sử dụng nó sẽ hiển thị thẻ bước đã xóa.",
         "bulkDeleteInUseMessage": "Xóa {count} sự kiện có tên? Các phễu đã lưu sẽ hiển thị bước Sự kiện đã xóa cho: {names}. | Xóa {count} sự kiện có tên? Các phễu đã lưu sẽ hiển thị bước Sự kiện đã xóa cho: {names}.",
         "notFound": "Sự kiện có tên này không còn tồn tại",
-        "editorApp": "Ứng dụng: {app}",
         "details": "Chi tiết",
         "opParam": "Tham số URL",
         "opRef": "Host giới thiệu",
@@ -4004,11 +4002,6 @@
     "license_downgrade_limit": "Giới hạn hàng ngày thay đổi từ {old} thành {new}",
     "license_downgrade_expiry": "Ngày hết hạn thay đổi từ {old} thành {new}",
     "license_limit_per_day": "{gb} GB/ngày",
-    "header_button": {
-      "cloud_features": "Tính năng {product}",
-      "enterprise_edition": "Phiên bản: Enterprise",
-      "get_enterprise_free": "Nhận OpenObserve Enterprise (Miễn phí)"
-    },
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Tính năng Enterprise",
@@ -4203,7 +4196,14 @@
     "usageChartDate": "{month} {day}",
     "usageChartDay": "Ngày {day}",
     "usageChartUsage": "Mức sử dụng: {value}",
-    "startFreeTrial": "Bắt đầu dùng thử miễn phí"
+    "startFreeTrial": "Bắt đầu dùng thử miễn phí",
+    "header_button": {
+      "upgrade": "Upgrade",
+      "enterprise_tooltip": "About {product} — Enterprise edition",
+      "cloud_features": "Tính năng {product}",
+      "enterprise_edition": "Phiên bản: Enterprise",
+      "get_enterprise_free": "Nhận OpenObserve Enterprise (Miễn phí)"
+    }
   },
   "login": {
     "lockedOut": "Quá nhiều lần đăng nhập thất bại. Thử lại sau {duration}, hoặc liên hệ quản trị viên.",
@@ -4379,7 +4379,6 @@
     "nameInvalid": "Sử dụng chữ thường, số và dấu gạch ngang (tối đa {max} ký tự)",
     "createFailed": "Không thể tạo tài khoản dịch vụ. Vui lòng thử lại.",
     "updateFailed": "Không thể cập nhật tài khoản dịch vụ. Vui lòng thử lại.",
-    "headerSubtitle": "Mã truy cập lập trình cho API",
     "search": "Tìm kiếm tài khoản dịch vụ",
     "rotate": "Xoay mã",
     "deleteServiceAccount": "Xóa tài khoản dịch vụ",
@@ -4472,7 +4471,6 @@
     "mcpServerLabel": "MCP Server",
     "mcpServerDesc": "Kết nối các ứng dụng AI qua {product}",
     "mcpServerHeader": "MCP Server",
-    "mcpServerHeaderSubtitle": "Kết nối Claude, Cursor, VS Code và các máy khách AI khác với tổ chức này.",
     "invitationsDesc": "Lời mời thành viên đang chờ xử lý và đã gửi",
     "groupsDesc": "Nhóm người dùng để gán vai trò",
     "rolesDesc": "Xác định quyền và chính sách truy cập",
@@ -4901,7 +4899,6 @@
       "other": "Khác"
     },
     "invitationList": {
-      "subtitle": "Lời mời thành viên đang chờ và đã gửi",
       "loadingPending": "Đang tải lời mời đang chờ...",
       "failedLoadPending": "Không thể tải lời mời đang chờ",
       "accepting": "Đang chấp nhận lời mời...",
@@ -4955,7 +4952,6 @@
       "errorCreating": "Lỗi khi tạo nhóm"
     },
     "quotaPage": {
-      "subtitle": "Giới hạn sử dụng áp dụng theo vai trò",
       "selectOrganization": "Chọn tổ chức",
       "editQuota": "Chỉnh sửa hạn mức",
       "selectApiCategory": "Chọn danh mục API",
@@ -5082,7 +5078,6 @@
       "brand": "Xanh dương đậm"
     },
     "list": {
-      "subtitle": "Thông báo hiển thị ở đầu ứng dụng cho mọi tổ chức, hoặc chỉ những tổ chức bạn chọn.",
       "liveNow": "Đang hiển thị ngay lúc này",
       "liveNowEmpty": "Hiện không có banner nào đang hiển thị.",
       "liveOnlyFor": "Chỉ dành cho {orgs}",
@@ -5276,7 +5271,6 @@
     },
     "deleteField": "Xóa trường",
     "header": "Stream",
-    "subtitle": "Quản lý chỉ mục và cấu hình stream",
     "streamNameHelpText": "Chỉ sử dụng ký tự chữ số, dấu gạch dưới và dấu hai chấm.",
     "search": "Tìm kiếm stream",
     "emptyOr": "Hoặc:",
@@ -5367,7 +5361,6 @@
   },
   "workflow": {
     "header": "Quy trình làm việc",
-    "subtitle": "Tự động hóa Hành động bằng Trình kích hoạt, Logic và Đích",
     "create": "Quy trình làm việc mới",
     "createSuccess": "Tạo quy trình làm việc thành công",
     "name": "Tên Workflow",
@@ -6279,7 +6272,6 @@
     "functionName": "Tên hàm",
     "remoteDestination": "Đích từ xa",
     "failedToLoadPipeline": "Không tải được pipeline",
-    "subtitle": "Biến đổi, làm giàu và định tuyến dữ liệu đang xử lý",
     "deleteNode": "Xóa",
     "addPipeline": "Pipeline mới",
     "deletePipeline": "Xóa Pipeline",
@@ -6526,7 +6518,6 @@
     "order": "Thứ tự",
     "applyBeforeFlattening": "Áp dụng trước khi làm phẳng",
     "header": "Hàm",
-    "subtitle": "Các hàm VRL có thể tái sử dụng được áp dụng trong pipeline",
     "clickTestFunctionHint": "Vui lòng nhấp vào Kiểm tra Hàm để xem các sự kiện",
     "add": "Hàm mới",
     "search": "Tìm kiếm hàm",
@@ -6550,7 +6541,6 @@
     "enterFunctionPrompt": "Nhập lời nhắc để tạo hàm",
     "associatedFunctionHeader": "Các Hàm Liên kết",
     "enrichmentTables": "Bảng làm giàu dữ liệu",
-    "enrichmentTablesSubtitle": "Bảng tra cứu giúp làm giàu dữ liệu đã nhập",
     "addEnrichmentTable": "Bảng làm giàu mới",
     "updateEnrichmentTable": "Cập nhật bảng làm giàu",
     "searchEnrichmentTable": "Tìm kiếm bảng làm giàu",
@@ -10147,7 +10137,6 @@
     "publicLinks": {
       "panelTitle": "Liên kết công khai",
       "pageTitle": "Bảng điều khiển công khai",
-      "pageSubtitle": "Mọi liên kết công khai trong tổ chức này",
       "panelTitleFor": "Liên kết công khai — {name}",
       "intro": "Bất kỳ ai có liên kết công khai đều có thể xem bảng điều khiển này mà không cần đăng nhập.",
       "editNote": "Địa chỉ của liên kết không thay đổi. Các thay đổi sẽ xuất hiện trên trang công khai ở lần cập nhật tiếp theo.",
@@ -10534,7 +10523,6 @@
     "tabOverview": "Tổng quan",
     "tabUsage": "Sử dụng",
     "removeHomeDashboard": "Xóa bảng điều khiển chính",
-    "subtitle": "Không gian quan sát của bạn trong nháy mắt",
     "resources": "Tài nguyên",
     "explore": "Khám phá"
   },
@@ -11476,7 +11464,6 @@
   },
   "alertCalibration": {
     "title": "Hiệu chỉnh cảnh báo",
-    "subtitle": "Cách các cảnh báo của bạn hoạt động, được đo từ chính lịch sử chạy của chúng",
     "configure": "Cấu hình",
     "runNow": "Chạy ngay",
     "runNowHint": "Yêu cầu chạy ngay thay vì chờ lần chạy tiếp theo. Nếu đã đến lúc chạy hoặc đang chạy, nó sẽ đáp ứng yêu cầu thay vào đó.",
@@ -11898,7 +11885,6 @@
     "detail": {
       "title": "Bản tổng hợp của {time}",
       "titleLoading": "Bản tổng hợp",
-      "subtitle": "Bao gồm từ {start} đến {end}, được tạo lúc {time}",
       "back": "Bản tổng hợp",
       "unavailableTitle": "Bản tổng hợp không khả dụng",
       "noRecords": "Không tìm thấy bản ghi nào cho lần chạy này.",
@@ -12707,7 +12693,6 @@
       "commentPlaceholder": "Viết bình luận...",
       "sendComment": "Gửi bình luận",
       "title": "Sự cố",
-      "subtitle": "Quản lý và theo dõi sự cố",
       "search": "Tìm kiếm sự cố...",
       "status": "Trạng thái",
       "severity": "Mức độ nghiêm trọng",
@@ -14158,7 +14143,6 @@
       "firingTotal": "Đang kích hoạt",
       "observedTotal": "Nhóm",
       "nOfMFiring": "{firing} trong số {observed} nhóm đang kích hoạt",
-      "groupedBy": "nhóm theo {columns}",
       "groupBy": "Nhóm theo",
       "criticalCondition": "Điều kiện nghiêm trọng",
       "warningCondition": "Điều kiện cảnh báo",
@@ -14506,7 +14490,6 @@
         "startDateRequired": "Chọn ngày đầu tiên."
       },
       "title": "Thời gian bảo trì",
-      "subtitle": "Các khoảng thời gian đã lên lịch giữ cho cảnh báo, phát hiện bất thường và kiểm tra Synthetics vẫn chạy nhưng dừng thông báo của chúng",
       "newDowntime": "Thời gian bảo trì mới",
       "filterAll": "Tất cả",
       "filterOnce": "Một lần",
@@ -15416,7 +15399,6 @@
   },
   "alert_sources": {
     "header": "Nguồn cảnh báo bên ngoài",
-    "subtitle": "Gửi cảnh báo từ Grafana, Prometheus Alertmanager hoặc bất kỳ công cụ nào có thể gọi webhook — chúng sẽ hiển thị ở đây và được tự động tương quan thành Sự cố.",
     "acceptsAnyFormat": "chấp nhận mọi định dạng webhook",
     "revealToken": "Hiển thị URL đầy đủ",
     "hideToken": "Ẩn URL đầy đủ",
@@ -16504,11 +16486,7 @@
     "modelPricingEditor": {
       "copySuffix": " (Sao chép)"
     },
-    "modelPricingList": {
-      "subtitle": "Cấu hình chi phí mô hình LLM"
-    },
     "orgStorageSettings": {
-      "subtitle": "Cấu hình lưu trữ theo tổ chức",
       "awsCredentials": "Thông tin xác thực AWS",
       "azureCredentials": "Thông tin xác thực Azure",
       "awsRoleArn": "ARN vai trò AWS"
@@ -16541,11 +16519,7 @@
       "settingsUpdated": "Đã cập nhật cài đặt tổ chức thành công",
       "settingsSaveError": "Lỗi khi lưu cài đặt tổ chức"
     },
-    "aiToolsetsPage": {
-      "subtitle": "Cấu hình tích hợp công cụ AI"
-    },
     "cipherKeysPage": {
-      "subtitle": "Khóa mã hóa cho các trường nhạy cảm",
       "delete": "Xóa",
       "deleteCipherKeyTitle": "Xóa Khóa Mã hóa",
       "deleteCipherKeyMessage": "Bạn có chắc chắn muốn xóa khóa mã hóa {name} không?",
@@ -16560,15 +16534,11 @@
       "bulkDeleteFailed": "Không thể xóa {count} khóa mã hóa | Không thể xóa {count} khóa mã hóa",
       "bulkDeleteError": "Lỗi khi xóa khóa mã hóa"
     },
-    "correlationSettingsPage": {
-      "subtitle": "Cấu hình tương quan từ xa"
-    },
     "licensePage": {
       "unexpectedError": "lỗi không mong đợi",
       "daysRemaining": "Còn {days} ngày cho đến khi giấy phép hết hạn"
     },
     "nodesPage": {
-      "subtitle": "Các nút cụm và trạng thái của chúng",
       "to": "đến",
       "name": "Tên",
       "loadingData": "Vui lòng đợi trong khi tải dữ liệu...",
@@ -16656,7 +16626,6 @@
       "processingTrialExtension": "Vui lòng đợi trong khi xử lý yêu cầu gia hạn thời gian dùng thử...",
       "trialExtendedSuccess": "Gia hạn thời gian dùng thử thành công.",
       "extendTrialError": "Không thể gia hạn thời gian dùng thử. Vui lòng thử lại.",
-      "subtitle": "Tạo và quản lý tổ chức",
       "addContract": "Thêm hợp đồng",
       "extendTrialTitle": "Gia hạn dùng thử cho {name}",
       "extendTrialSubtitle": "Đặt thời gian gia hạn dùng thử mới.",
@@ -16776,7 +16745,6 @@
       "sourceBuiltIn": "Tích hợp sẵn"
     },
     "regexPatternList": {
-      "subtitle": "Mẫu regex có thể tái sử dụng để che giấu thông tin",
       "exportTitle": "Xuất mẫu Regex",
       "delete": "Xóa",
       "bulkDeleteTitle": "Xóa các mẫu Regex",
@@ -16870,7 +16838,6 @@
         "valueMismatch": "Đã tìm thấy bản ghi TXT nhưng giá trị không khớp",
         "dnsFailed": "Phân giải DNS thất bại"
       },
-      "pageSubtitle": "Liên kết các miền email của bạn, ánh xạ người dùng của chúng tới tổ chức và kiểm soát những ai có thể tham gia.",
       "linkedTab": "Miền đã liên kết",
       "mappingsTab": "Ánh xạ",
       "accessTab": "Người dùng bị chặn",
@@ -16993,7 +16960,6 @@
       "lastRun": "Lần chạy gần nhất",
       "lastRunAt": "Đã chạy",
       "nextRun": "Lần chạy tiếp theo",
-      "nextRunAt": "lần chạy tiếp theo {time}",
       "acceptedTooltip": "Máy chủ thư đã chấp nhận",
       "cachedTooltip": "Đã làm nóng bộ nhớ đệm bảng điều khiển; không gửi email",
       "unrecordedTooltip": "Chưa ghi nhận kết quả lần chạy mới nhất; các lần chạy cũ hơn có thể có trong Lịch sử.",
@@ -17067,9 +17033,7 @@
       "everyHours": "Mỗi giờ | Mỗi {count} giờ",
       "everyDays": "Mỗi ngày | Mỗi {count} ngày",
       "everyWeeks": "Mỗi tuần | Mỗi {count} tuần",
-      "everyMonths": "Mỗi tháng | Mỗi {count} tháng",
-      "dashboardCount": "{count} bảng điều khiển | {count} bảng điều khiển",
-      "recipientCount": "{count} người nhận | {count} người nhận"
+      "everyMonths": "Mỗi tháng | Mỗi {count} tháng"
     },
     "frequencyUnits": {
       "days": "ngày",
@@ -17097,7 +17061,6 @@
     "never": "Không bao giờ",
     "startDate": "Ngày bắt đầu",
     "header": "Báo cáo",
-    "subtitle": "Báo cáo và xuất theo lịch",
     "searchThisFolder": "Thư mục này",
     "searchAllFolders": "Tất cả thư mục",
     "reloadReports": "Tải lại báo cáo",
@@ -18741,7 +18704,6 @@
     },
     "unpriced": {
       "title": "Khoảng trống về giá",
-      "subtitle": "Các mô hình trong trace LLM của bạn không có giá, hoặc chỉ có giá gần đúng, tại thời điểm tiếp nhận",
       "banner": "{count} mô hình không có giá hoặc chỉ có giá gần đúng tại thời điểm tiếp nhận. Chi phí đã ghi nhận có thể không đầy đủ. | {count} mô hình không có giá hoặc chỉ có giá gần đúng tại thời điểm tiếp nhận. Chi phí đã ghi nhận của chúng có thể không đầy đủ.",
       "bannerTruncated": "{total} mô hình trong trace của bạn không có giá hoặc chỉ có giá gần đúng tại thời điểm tiếp nhận. Chi phí của chúng có thể sai. Đang hiển thị {shown} mô hình hàng đầu theo token.",
       "streamLabel": "Stream",
@@ -18862,7 +18824,6 @@
       "tools": "Công cụ"
     },
     "promptManagement": {
-      "subtitle": "Tạo, đánh phiên bản và phát hành các prompt có thể tái sử dụng.",
       "promptSubtitle": "Prompt {type}",
       "prompt": "Prompt",
       "promptId": "ID Prompt",
@@ -19302,7 +19263,6 @@
         }
       },
       "workbench": {
-        "subtitle": "{reviewed} trên {total} đã đánh giá",
         "itemCounter": "Mục {index} trên {total} cần đánh giá",
         "prev": "Mục trước",
         "next": "Mục tiếp theo",
@@ -19782,7 +19742,6 @@
       },
       "detail": {
         "fallbackTitle": "Tập dữ liệu",
-        "meta": "{count} mục · đã cập nhật {updated}",
         "loadError": "Không thể tải tập dữ liệu",
         "tryInPlayground": "Dùng thử trong Playground",
         "tabs": {
@@ -20746,7 +20705,6 @@
       "backTo": "Nhà cung cấp",
       "createTitle": "Tạo nhà cung cấp LLM",
       "editTitle": "Chỉnh sửa nhà cung cấp LLM",
-      "subtitle": "Cấu hình điểm cuối mô hình được sử dụng bởi bộ chấm điểm trọng tài LLM.",
       "sectionTitle": "Nhà cung cấp",
       "nameLabel": "Tên",
       "typeLabel": "Loại nhà cung cấp",
@@ -22705,9 +22663,7 @@
       "usedBy": {
         "aria": "Các bài kiểm tra dùng bài này",
         "help": "Chúng chạy các bước này trên trang riêng. URL bắt đầu, môi trường và bí mật của bài kiểm tra này không được dùng ở đó.",
-        "viewAll": "Xem tất cả {count} bài kiểm tra",
-        "subtitle": "{folder} · được dùng bởi {count} bài kiểm tra | {folder} · được dùng bởi {count} bài kiểm tra",
-        "subtitleNoFolder": "Được dùng bởi {count} bài kiểm tra | Được dùng bởi {count} bài kiểm tra"
+        "viewAll": "Xem tất cả {count} bài kiểm tra"
       },
       "recordingIn": "Đang ghi trong {environment}",
       "needsDesktopRecorder": "Cần tiện ích mở rộng trình ghi trên desktop",
@@ -22918,7 +22874,6 @@
       "folder": "thư mục",
       "willBeCreatedIn": "Sẽ được tạo trong"
     },
-    "pageSubtitle": "Giám sát chủ động thời gian hoạt động, hiệu suất và hành trình người dùng từ các vị trí toàn cầu",
     "pageTitle": "Synthetics",
     "protocolConfig": {
       "http": {
@@ -24947,7 +24902,6 @@
     "title": "SLO",
     "notFound": "Không tìm thấy SLO",
     "notFoundDescription": "SLO này không còn tồn tại hoặc bạn không có quyền truy cập. Nó có thể đã bị xóa.",
-    "subtitle": "Mục tiêu mức dịch vụ: mục tiêu, ngân sách lỗi, cảnh báo tốc độ tiêu hao",
     "new": "SLO mới",
     "newTitle": "SLO mới",
     "editTitle": "Chỉnh sửa SLO",
@@ -24965,7 +24919,6 @@
     "totalSlos": "Tổng số SLO",
     "noGrouping": "Không có (một chuỗi tổng thể duy nhất)",
     "newAlert": "Cảnh báo mới",
-    "overRolling": "trong cửa sổ trượt {window}",
     "searchPlaceholder": "Tìm kiếm SLO hoặc thẻ, ví dụ: team:payments",
     "loadFailed": "Không thể tải SLO",
     "requestFailed": "Yêu cầu thất bại ({code})",
@@ -26075,7 +26028,6 @@
       "groupWorkloads": "Workload",
       "groupStorage": "Lưu trữ",
       "groupAutoscaling": "Tự động mở rộng",
-      "subtitle": "Giám sát cụm, workload và tài nguyên",
       "clusterPickerLabel": "Cụm",
       "clusterPickerLoading": "Đang tải các cụm…",
       "clusterPickerTrigger": "Cụm: {name}",
@@ -26533,8 +26485,7 @@
       "actions": "Hành động"
     },
     "header": {
-      "title": "Cơ sở dữ liệu",
-      "subtitle": "Hiệu suất và tình trạng truy vấn trên các cơ sở dữ liệu của bạn"
+      "title": "Cơ sở dữ liệu"
     },
     "ai": {
       "suggestFix": "Hỏi AI cách khắc phục điều này",
@@ -27799,7 +27750,6 @@
     "fromRotation": "từ {name}",
     "ownershipMatch": "Khớp",
     "ownershipSpecificity": "Chiều",
-    "teamSubtitle": "{tz} · {count} thành viên | {tz} · {count} thành viên",
     "statOnCallNow": "Đang trực",
     "statRotations": "Ca trực",
     "statRoutingRules": "Quy tắc định tuyến",
@@ -28800,7 +28750,6 @@
     "teamOpenInOnCall": "Xem tất cả trong Trực",
     "teamCoverage": "Độ phủ, {days} ngày tới",
     "teamCoverageHint": "khoảng trống là thứ duy nhất đáng để xem ở đây",
-    "teamOwnsRules": "sở hữu {count} quy tắc định tuyến | sở hữu {count} quy tắc định tuyến",
     "teamCoveredNow": "Hiện có người trực",
     "teamOverview": "Tổng quan",
     "teamAnsweredBy": "Được trả lời bởi",
@@ -29493,7 +29442,6 @@
       "allClearNone": "Không có gì cần bạn xử lý."
     },
     "title": "AutoObserve",
-    "subtitle": "Gửi dữ liệu của bạn. OpenObserve tìm ra vấn đề và thông báo cho bạn, kèm theo đánh giá tốt nhất về nguyên nhân. Khi mọi thứ yên ắng, hệ thống cho bạn biết nó đã kiểm tra những gì và những gì nó không thể thấy.",
     "tabs": {
       "issues": "Vấn đề",
       "coverage": "Phạm vi bao phủ",
@@ -30425,7 +30373,6 @@
     },
     "issuesPage": {
       "title": "Tất cả vấn đề",
-      "sentence": "Mọi vấn đề tôi đã mở {within}. Chọn một vấn đề để xem chuyện gì đã xảy ra và tôi đã làm gì với nó.",
       "ranges": {
         "week": "7 ngày qua",
         "month": "30 ngày qua",
@@ -32182,7 +32129,6 @@
   },
   "fleet": {
     "title": "Quản lý fleet",
-    "subtitle": "Đăng ký collector OpenTelemetry, quản lý phiên bản cấu hình và triển khai thay đổi an toàn",
     "addCollector": "Thêm collector",
     "tabs": {
       "collectors": "Collector",
@@ -32721,7 +32667,6 @@
     },
     "editor": {
       "pageTitle": "Trình chỉnh sửa cấu hình",
-      "newDescription": "Cấu hình collector mới",
       "visual": "Trực quan",
       "issues": "{count} vấn đề | {count} vấn đề",
       "valid": "Hợp lệ",

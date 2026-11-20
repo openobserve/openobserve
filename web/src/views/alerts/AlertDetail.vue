@@ -30,7 +30,6 @@
   <OPageLayout
     :title="unavailableTitle ?? raw(alert?.name || '')"
     icon="notifications"
-    :subtitle="unavailable ? raw('') : subtitle"
     :back="backTarget"
     title-data-test="alerts-alertdetail-title"
     bleed
@@ -666,21 +665,6 @@ const fetchSloName = async () => {
     sloName.value = "";
   }
 };
-
-const subtitle = computed(() => {
-  if (!alert.value) return raw("");
-  // An SLO alert's stream_name is empty and its group_by does not exist, so the
-  // generic subtitle renders as nothing at all. Say what it actually watches.
-  if (isSloAlertView.value) {
-    return raw(sloName.value || sloId.value || "");
-  }
-  const groupBy = aggregation.value?.group_by || [];
-  const parts = [alert.value.stream_name].filter(Boolean);
-  if (groupBy.length) {
-    parts.push(t("alerts.groups.groupedBy", { columns: groupBy.join(", ") }));
-  }
-  return raw(parts.join(" · "));
-});
 
 /** Render a count that may be a lower bound with the `≥` the marker demands. */
 const withBound = (value?: number, isLowerBound?: boolean) => {

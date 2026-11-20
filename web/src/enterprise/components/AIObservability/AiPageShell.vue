@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Sessions = `ai-sessions`, Graph = `ai-agent-graph`, LLM =
                     `ai-llm-insights`). Passing the bare prefix reproduces all
                     three unchanged.
-    - `title` / `subtitle` / `icon` — resolved header content (each page owns
+    - `title` / `icon` — resolved header content (each page owns
                     its own i18n keys / icon).
     - `dateState` — the shared useAiDateRange() state bound to the picker.
     - `lastRunAt` / `isLoading` — drive the refresh control.
@@ -37,11 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :data-test="`${dataTest}-page`"
     :title="header?.title ?? title"
-    :subtitle="header?.subtitle ?? subtitle"
     :icon="header?.icon ?? icon"
     bleed
     :scroll="false"
-    :tabs-below="hasTabs"
   >
     <template v-if="hasTabs" #header-tabs><AiSectionTabs /></template>
     <template #actions>
@@ -124,8 +122,6 @@ defineProps<{
   dataTest: string;
   /** Resolved page title (each page passes its own t(...) value). */
   title: I18nText;
-  /** Resolved page subtitle. */
-  subtitle: I18nText;
   /** OPageHeader icon name. */
   icon: IconName;
   /** Shared AI date-range state (useAiDateRange().state) bound to the picker. */

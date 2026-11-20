@@ -1424,6 +1424,8 @@
     "selectOrganization": "Selecteer een organisatie"
   },
   "search": {
+    "liveRefreshingEvery": "Live: refreshing every {interval}",
+    "rowsPerPageLabel": "{n} / page",
     "queryFailed": "Query mislukt",
     "unknownError": "Onbekende fout",
     "selectedLabel": "geselecteerd",
@@ -2075,7 +2077,6 @@
   "menu": {
     "alertCalibration": "Alarmkalibratie",
     "autoobserve": "AutoObserve",
-    "upgradeToProPlan": "Upgrade naar PRO Plan",
     "home": "Home",
     "about": "Over",
     "index": "Streams",
@@ -2134,7 +2135,6 @@
   },
   "profiles": {
     "title": "Profielen",
-    "subtitle": "Volg CPU-, geheugen- en lockgebruik per functie",
     "stream": "Stream",
     "dataSource": "Gegevensbron",
     "service": "Service",
@@ -2285,7 +2285,6 @@
     "from": "van",
     "to": "tot",
     "title": "Monitoring van echte gebruikers",
-    "subtitle": "Monitor echte gebruikerssessies, fouten en frontend-prestaties",
     "issueColumn": "Probleem",
     "trendColumn": "Trend",
     "usersColumn": "Gebruikers",
@@ -3325,7 +3324,6 @@
         "bulkDeleteMessage": "{count} benoemde gebeurtenis verwijderen? Funnels die het gebruiken tonen een tag voor een verwijderde stap. | {count} benoemde gebeurtenissen verwijderen? Funnels die ze gebruiken tonen een tag voor een verwijderde stap.",
         "bulkDeleteInUseMessage": "{count} benoemde gebeurtenis verwijderen? Opgeslagen funnels tonen een stap voor een verwijderde gebeurtenis voor: {names}. | {count} benoemde gebeurtenissen verwijderen? Opgeslagen funnels tonen een stap voor een verwijderde gebeurtenis voor: {names}.",
         "notFound": "Deze benoemde gebeurtenis bestaat niet meer",
-        "editorApp": "App: {app}",
         "details": "Details",
         "opParam": "URL-parameter",
         "opRef": "Referrerhost",
@@ -4004,11 +4002,6 @@
     "license_downgrade_limit": "Daglimiet gaat van {old} naar {new}",
     "license_downgrade_expiry": "Vervaldatum verschuift van {old} naar {new}",
     "license_limit_per_day": "{gb} GB/dag",
-    "header_button": {
-      "cloud_features": "{product} functies",
-      "enterprise_edition": "Editie: Enterprise",
-      "get_enterprise_free": "Download OpenObserve Enterprise (gratis)"
-    },
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Enterprise-functies",
@@ -4203,7 +4196,14 @@
     "usageChartDate": "{month} {day}",
     "usageChartDay": "Dag {day}",
     "usageChartUsage": "Gebruik: {value}",
-    "startFreeTrial": "Start gratis proef"
+    "startFreeTrial": "Start gratis proef",
+    "header_button": {
+      "upgrade": "Upgrade",
+      "enterprise_tooltip": "About {product} — Enterprise edition",
+      "cloud_features": "{product} functies",
+      "enterprise_edition": "Editie: Enterprise",
+      "get_enterprise_free": "Download OpenObserve Enterprise (gratis)"
+    }
   },
   "login": {
     "lockedOut": "Te veel mislukte aanmeldpogingen. Probeer het over {duration} opnieuw, of neem contact op met uw beheerder.",
@@ -4379,7 +4379,6 @@
     "nameInvalid": "Gebruik kleine letters, cijfers en koppeltekens (maximaal {max} tekens)",
     "createFailed": "Het serviceaccount aanmaken is mislukt. Probeer het opnieuw.",
     "updateFailed": "Het serviceaccount bijwerken is mislukt. Probeer het opnieuw.",
-    "headerSubtitle": "Programmatische toegangstokens voor API's",
     "search": "Serviceaccount zoeken",
     "rotate": "Token roteren",
     "deleteServiceAccount": "Serviceaccount verwijderen",
@@ -4472,7 +4471,6 @@
     "mcpServerLabel": "MCP-server",
     "mcpServerDesc": "Verbind AI-cliënten via {product}",
     "mcpServerHeader": "MCP-server",
-    "mcpServerHeaderSubtitle": "Verbind Claude, Cursor, VS Code en andere AI-clients met deze organisatie.",
     "invitationsDesc": "Uitnodigingen voor leden in behandeling en verzonden",
     "groupsDesc": "Gebruikers groeperen om rollen toe te wijzen",
     "rolesDesc": "Machtigingen en toegangsbeleid definiëren",
@@ -4901,7 +4899,6 @@
       "other": "Overig"
     },
     "invitationList": {
-      "subtitle": "Openstaande en verzonden lid uitnodigingen",
       "loadingPending": "Openstaande uitnodigingen laden...",
       "failedLoadPending": "Laden van openstaande uitnodigingen mislukt",
       "accepting": "Uitnodiging accepteren...",
@@ -4955,7 +4952,6 @@
       "errorCreating": "Fout bij het aanmaken van groep"
     },
     "quotaPage": {
-      "subtitle": "Gebruikslimieten toegepast per rol",
       "selectOrganization": "Selecteer organisatie",
       "editQuota": "Quota bewerken",
       "selectApiCategory": "Selecteer API-categorie",
@@ -5082,7 +5078,6 @@
       "brand": "Vet blauw"
     },
     "list": {
-      "subtitle": "Meldingen die bovenaan de app worden getoond voor elke organisatie, of alleen voor de organisaties die je kiest.",
       "liveNow": "Nu live",
       "liveNowEmpty": "Er wordt momenteel geen banner getoond.",
       "liveOnlyFor": "Alleen voor {orgs}",
@@ -5276,7 +5271,6 @@
     },
     "deleteField": "Veld verwijderen",
     "header": "Streams",
-    "subtitle": "Indexbeheer en streamconfiguratie",
     "streamNameHelpText": "Gebruik alleen alfanumerieke tekens, onderstrepingstekens en dubbele punten.",
     "search": "Stream zoeken",
     "emptyOr": "Of:",
@@ -5367,7 +5361,6 @@
   },
   "workflow": {
     "header": "Workflows",
-    "subtitle": "Automatiseer acties met triggers, logica en bestemmingen",
     "create": "Nieuwe workflow",
     "createSuccess": "Workflow succesvol aangemaakt",
     "name": "Workflownaam",
@@ -6279,7 +6272,6 @@
     "functionName": "Functienaam",
     "remoteDestination": "Externe bestemming",
     "failedToLoadPipeline": "Pipeline laden mislukt",
-    "subtitle": "Transformeer, verrijk en routeer gegevens tijdens de vlucht",
     "deleteNode": "Verwijderen",
     "addPipeline": "Pipeline toevoegen",
     "deletePipeline": "Pipeline verwijderen",
@@ -6526,7 +6518,6 @@
     "order": "Bestellen",
     "applyBeforeFlattening": "Toepassen vóór afvlakking",
     "header": "Functies",
-    "subtitle": "Herbruikbare VRL-functies toegepast in pipelines",
     "clickTestFunctionHint": "Klik op Test Function om de gebeurtenissen te zien",
     "add": "Maak een nieuwe functie",
     "search": "Functie zoeken",
@@ -6550,7 +6541,6 @@
     "enterFunctionPrompt": "Voer een prompt in om een functie te genereren",
     "associatedFunctionHeader": "Bijbehorende functies",
     "enrichmentTables": "Verrijkingstabellen",
-    "enrichmentTablesSubtitle": "Tabellen opzoeken die opgenomen gegevens verrijken",
     "addEnrichmentTable": "Verrijkingstabel toevoegen",
     "updateEnrichmentTable": "Verrijkingstabel bijwerken",
     "searchEnrichmentTable": "Zoek in de verrijkingstabel",
@@ -10147,7 +10137,6 @@
     "publicLinks": {
       "panelTitle": "Openbare links",
       "pageTitle": "Openbare dashboards",
-      "pageSubtitle": "Elke openbare link in deze organisatie",
       "panelTitleFor": "Openbare links — {name}",
       "intro": "Iedereen met een openbare link kan dit dashboard bekijken zonder in te loggen.",
       "editNote": "Het adres van de link blijft hetzelfde. Wijzigingen verschijnen bij de volgende update op de openbare pagina.",
@@ -10534,7 +10523,6 @@
     "tabOverview": "Overzicht",
     "tabUsage": "Gebruik",
     "removeHomeDashboard": "Home-dashboard verwijderen",
-    "subtitle": "Uw observabiliteitswerkruimte in één oogopslag",
     "resources": "Bronnen",
     "explore": "Verkennen"
   },
@@ -11476,7 +11464,6 @@
   },
   "alertCalibration": {
     "title": "Alarmkalibratie",
-    "subtitle": "Hoe je alarmen zich gedragen, gemeten op basis van hun eigen uitvoeringsgeschiedenis",
     "configure": "Configureren",
     "runNow": "Nu uitvoeren",
     "runNowHint": "Vraagt om een uitvoering nu in plaats van te wachten op de volgende. Als er al een uitvoering gepland staat of bezig is, wordt het verzoek daardoor al beantwoord.",
@@ -11898,7 +11885,6 @@
     "detail": {
       "title": "Samenvatting van {time}",
       "titleLoading": "Samenvatting",
-      "subtitle": "Bestrijkt {start} tot {end}, gegenereerd {time}",
       "back": "Samenvattingen",
       "unavailableTitle": "Samenvatting niet beschikbaar",
       "noRecords": "Er zijn geen records gevonden voor deze uitvoering.",
@@ -12707,7 +12693,6 @@
       "commentPlaceholder": "Schrijf een opmerking...",
       "sendComment": "Opmerking verzenden",
       "title": "Incidenten",
-      "subtitle": "Incidentbeheer en -tracking",
       "search": "Zoek incidenten...",
       "status": "Status",
       "severity": "Ernst",
@@ -14158,7 +14143,6 @@
       "firingTotal": "Actief",
       "observedTotal": "Groepen",
       "nOfMFiring": "{firing} van {observed} groepen actief",
-      "groupedBy": "gegroepeerd op {columns}",
       "groupBy": "Groeperen op",
       "criticalCondition": "Kritieke voorwaarde",
       "warningCondition": "Waarschuwingsvoorwaarde",
@@ -14506,7 +14490,6 @@
         "startDateRequired": "Kies de eerste dag."
       },
       "title": "Onderhoudsperiodes",
-      "subtitle": "Geplande vensters waarin alarmen, anomaliedetecties en Synthetics-checks blijven draaien, maar hun meldingen worden gestopt",
       "newDowntime": "Nieuwe onderhoudsperiode",
       "filterAll": "Alle",
       "filterOnce": "Eenmalig",
@@ -15416,7 +15399,6 @@
   },
   "alert_sources": {
     "header": "Externe alarmbronnen",
-    "subtitle": "Verstuur alarmen vanuit Grafana, Prometheus Alertmanager of een ander hulpmiddel dat een webhook kan aanroepen — ze verschijnen hier en worden automatisch gecorreleerd tot incidenten.",
     "acceptsAnyFormat": "accepteert elk webhook-formaat",
     "revealToken": "Volledige URL tonen",
     "hideToken": "Volledige URL verbergen",
@@ -16504,11 +16486,7 @@
     "modelPricingEditor": {
       "copySuffix": " (Kopiëren)"
     },
-    "modelPricingList": {
-      "subtitle": "LLM-modelkostenconfiguratie"
-    },
     "orgStorageSettings": {
-      "subtitle": "Opslagconfiguratie per organisatie",
       "awsCredentials": "AWS-referenties",
       "azureCredentials": "Azure-referenties",
       "awsRoleArn": "AWS Role ARN"
@@ -16541,11 +16519,7 @@
       "settingsUpdated": "Organisatie-instellingen succesvol bijgewerkt",
       "settingsSaveError": "Fout bij opslaan organisatie-instellingen"
     },
-    "aiToolsetsPage": {
-      "subtitle": "AI-toolintegraties configureren"
-    },
     "cipherKeysPage": {
-      "subtitle": "Versleutelingssleutels voor gevoelige velden",
       "delete": "Verwijderen",
       "deleteCipherKeyTitle": "Cipher key verwijderen",
       "deleteCipherKeyMessage": "Weet je zeker dat je de versleutelingssleutel {name} wilt verwijderen?",
@@ -16560,15 +16534,11 @@
       "bulkDeleteFailed": "Verwijderen van {count} cipher key mislukt | Verwijderen van {count} cipher keys mislukt",
       "bulkDeleteError": "Fout bij verwijderen cipher keys"
     },
-    "correlationSettingsPage": {
-      "subtitle": "Telemetrie-correlatieconfiguratie"
-    },
     "licensePage": {
       "unexpectedError": "onverwachte fout",
       "daysRemaining": "{days} dagen resterend tot uw licentie verloopt"
     },
     "nodesPage": {
-      "subtitle": "Clusterknooppunten en hun status",
       "to": "tot",
       "name": "Naam",
       "loadingData": "Even wachten terwijl gegevens worden geladen...",
@@ -16656,7 +16626,6 @@
       "processingTrialExtension": "Even geduld terwijl de proefperiodeverlenging wordt verwerkt...",
       "trialExtendedSuccess": "Proefperiode succesvol verlengd.",
       "extendTrialError": "Kan proefperiode niet verlengen. Probeer het opnieuw.",
-      "subtitle": "Organisaties aanmaken en beheren",
       "addContract": "Contract toevoegen",
       "extendTrialTitle": "Proefperiode verlengen voor {name}",
       "extendTrialSubtitle": "Stel de nieuwe proefperiodeverlenging in.",
@@ -16776,7 +16745,6 @@
       "sourceBuiltIn": "Ingebouwd"
     },
     "regexPatternList": {
-      "subtitle": "Herbruikbare regex-patronen voor redactie",
       "exportTitle": "Regex-patroon exporteren",
       "delete": "Verwijderen",
       "bulkDeleteTitle": "Regex-patronen verwijderen",
@@ -16870,7 +16838,6 @@
         "valueMismatch": "TXT-record gevonden, maar de waarde komt niet overeen",
         "dnsFailed": "DNS-resolutie mislukt"
       },
-      "pageSubtitle": "Koppel je e-maildomeinen, wijs hun gebruikers toe aan organisaties en bepaal wie van hen kan deelnemen.",
       "linkedTab": "Gekoppelde domeinen",
       "mappingsTab": "Koppelingen",
       "accessTab": "Geblokkeerde gebruikers",
@@ -16993,7 +16960,6 @@
       "lastRun": "Laatste uitvoering",
       "lastRunAt": "Uitgevoerd",
       "nextRun": "Volgende uitvoering",
-      "nextRunAt": "volgende uitvoering {time}",
       "acceptedTooltip": "Geaccepteerd door de mailserver",
       "cachedTooltip": "Dashboardcache opgewarmd; er wordt geen e-mail verzonden",
       "unrecordedTooltip": "Uitkomst van de meest recente uitvoering is niet geregistreerd; oudere uitvoeringen zijn mogelijk beschikbaar in Geschiedenis.",
@@ -17067,9 +17033,7 @@
       "everyHours": "Elk uur | Elke {count} uur",
       "everyDays": "Elke dag | Elke {count} dagen",
       "everyWeeks": "Elke week | Elke {count} weken",
-      "everyMonths": "Elke maand | Elke {count} maanden",
-      "dashboardCount": "{count} dashboard | {count} dashboards",
-      "recipientCount": "{count} ontvanger | {count} ontvangers"
+      "everyMonths": "Elke maand | Elke {count} maanden"
     },
     "frequencyUnits": {
       "days": "dagen",
@@ -17097,7 +17061,6 @@
     "never": "Nooit",
     "startDate": "Startdatum",
     "header": "Rapporten",
-    "subtitle": "Geplande rapporten en exports",
     "searchThisFolder": "Deze map",
     "searchAllFolders": "Alle mappen",
     "reloadReports": "Rapporten opnieuw laden",
@@ -18741,7 +18704,6 @@
     },
     "unpriced": {
       "title": "Ontbrekende prijzen",
-      "subtitle": "Modellen in je LLM-traces die bij ingestie geen prijs of alleen een benaderende prijs hadden",
       "banner": "{count} model had bij ingestie geen prijs of een benaderende prijs. De geregistreerde kosten zijn mogelijk onvolledig. | {count} modellen hadden bij ingestie geen prijs of een benaderende prijs. Hun geregistreerde kosten zijn mogelijk onvolledig.",
       "bannerTruncated": "{total} modellen in je traces hadden bij ingestie geen prijs of een benaderende prijs. Hun kosten zijn mogelijk onjuist. De top {shown} op tokens wordt getoond.",
       "streamLabel": "Stream",
@@ -18862,7 +18824,6 @@
       "tools": "Tools"
     },
     "promptManagement": {
-      "subtitle": "Maak, versioneer en publiceer herbruikbare prompts.",
       "promptSubtitle": "{type} prompt",
       "prompt": "Prompt",
       "promptId": "Prompt-ID",
@@ -19302,7 +19263,6 @@
         }
       },
       "workbench": {
-        "subtitle": "{reviewed} van {total} beoordeeld",
         "itemCounter": "Item {index} van {total} te beoordelen",
         "prev": "Vorig item",
         "next": "Volgend item",
@@ -19782,7 +19742,6 @@
       },
       "detail": {
         "fallbackTitle": "Dataset",
-        "meta": "{count} items · bijgewerkt {updated}",
         "loadError": "Dataset laden mislukt",
         "tryInPlayground": "Uitproberen in Playground",
         "tabs": {
@@ -20746,7 +20705,6 @@
       "backTo": "Providers",
       "createTitle": "LLM-provider aanmaken",
       "editTitle": "LLM-provider bewerken",
-      "subtitle": "Configureer het modeleindpunt dat wordt gebruikt door LLM Judge-scorers.",
       "sectionTitle": "Aanbieder",
       "nameLabel": "Naam",
       "typeLabel": "Soort provider",
@@ -22705,9 +22663,7 @@
       "usedBy": {
         "aria": "Tests die deze gebruiken",
         "help": "Ze voeren deze stappen uit op hun eigen pagina. De start-URL, omgevingen en secrets van deze test worden daar niet gebruikt.",
-        "viewAll": "Alle {count} tests bekijken",
-        "subtitle": "{folder} · gebruikt door {count} test | {folder} · gebruikt door {count} tests",
-        "subtitleNoFolder": "Gebruikt door {count} test | Gebruikt door {count} tests"
+        "viewAll": "Alle {count} tests bekijken"
       },
       "recordingIn": "Opnemen in {environment}",
       "needsDesktopRecorder": "Vereist de desktop-recorder-extensie",
@@ -22918,7 +22874,6 @@
       "folder": "map",
       "willBeCreatedIn": "Wordt gemaakt in"
     },
-    "pageSubtitle": "Proactief uptime, prestaties en gebruikersreizen monitoren vanuit wereldwijde locaties",
     "pageTitle": "Synthetics",
     "protocolConfig": {
       "http": {
@@ -24947,7 +24902,6 @@
     "title": "SLO's",
     "notFound": "SLO niet gevonden",
     "notFoundDescription": "Deze SLO bestaat niet meer, of je hebt er geen toegang toe. Mogelijk is deze verwijderd.",
-    "subtitle": "Service level objectives: doelen, foutbudgetten, burn-rate-alarmen",
     "new": "Nieuwe SLO",
     "newTitle": "Nieuwe SLO",
     "editTitle": "Bewerk SLO",
@@ -24965,7 +24919,6 @@
     "totalSlos": "Totaal SLO's",
     "noGrouping": "Geen (een enkele overkoepelende reeks)",
     "newAlert": "Nieuw alarm",
-    "overRolling": "over rollend {window}",
     "searchPlaceholder": "Zoek SLO of tag, bijv. team:payments",
     "loadFailed": "Kon SLO's niet laden",
     "requestFailed": "Aanvraag mislukt ({code})",
@@ -26075,7 +26028,6 @@
       "groupWorkloads": "Workloads",
       "groupStorage": "Opslag",
       "groupAutoscaling": "Autoscaling",
-      "subtitle": "Monitor clusters, workloads en resources",
       "clusterPickerLabel": "Cluster",
       "clusterPickerLoading": "Clusters laden…",
       "clusterPickerTrigger": "Cluster: {name}",
@@ -26533,8 +26485,7 @@
       "actions": "Acties"
     },
     "header": {
-      "title": "Databases",
-      "subtitle": "Queryprestaties en status van uw databases"
+      "title": "Databases"
     },
     "ai": {
       "suggestFix": "Vraag AI hoe dit op te lossen",
@@ -27799,7 +27750,6 @@
     "fromRotation": "van {name}",
     "ownershipMatch": "Overeenkomsten",
     "ownershipSpecificity": "Dimensies",
-    "teamSubtitle": "{tz} · {count} lid | {tz} · {count} leden",
     "statOnCallNow": "Nu op piket",
     "statRotations": "Rotaties",
     "statRoutingRules": "Routeringsregels",
@@ -28800,7 +28750,6 @@
     "teamOpenInOnCall": "Bekijk alles in On-Call",
     "teamCoverage": "Dekking, komende {days} dagen",
     "teamCoverageHint": "alleen de gaten zijn hier de moeite waard",
-    "teamOwnsRules": "Beheert {count} routeringsregel | Beheert {count} routeringsregels",
     "teamCoveredNow": "Nu gedekt",
     "teamOverview": "Overzicht",
     "teamAnsweredBy": "Beantwoord door",
@@ -29493,7 +29442,6 @@
       "allClearNone": "Niets vroeg je aandacht."
     },
     "title": "AutoObserve",
-    "subtitle": "Stuur je gegevens. OpenObserve vindt de problemen en vertelt het je, met zijn beste inschatting van de oorzaak. Als het rustig is, laat het zien wat het heeft gecontroleerd en wat het niet kan zien.",
     "tabs": {
       "issues": "Problemen",
       "coverage": "Dekking",
@@ -30425,7 +30373,6 @@
     },
     "issuesPage": {
       "title": "Alle problemen",
-      "sentence": "Elk probleem dat ik {within} heb geopend. Kies er een om te zien wat er is gebeurd en wat ik eraan heb gedaan.",
       "ranges": {
         "week": "Afgelopen 7 dagen",
         "month": "Afgelopen 30 dagen",
@@ -32182,7 +32129,6 @@
   },
   "fleet": {
     "title": "Fleetbeheer",
-    "subtitle": "Registreer OpenTelemetry-collectors, beheer versies van hun configuraties en rol wijzigingen veilig uit",
     "addCollector": "Collector toevoegen",
     "tabs": {
       "collectors": "Collectors",
@@ -32721,7 +32667,6 @@
     },
     "editor": {
       "pageTitle": "Configuratie-editor",
-      "newDescription": "Nieuwe collectorconfiguratie",
       "visual": "Visueel",
       "issues": "{count} probleem | {count} problemen",
       "valid": "Geldig",

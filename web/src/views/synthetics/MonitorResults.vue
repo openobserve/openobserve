@@ -24,7 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :title="raw(monitorName)"
     data-test="synthetic-monitor-results-page"
-    :subtitle="raw(folderName)"
     :back="{
       label: t('synthetics.results.monitors'),
       to: backTo,
@@ -185,11 +184,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
-import {
-  syntheticsEditRoute,
-  syntheticsFolderName,
-  syntheticsListRoute,
-} from "@/utils/synthetics/routes";
+import { syntheticsEditRoute, syntheticsListRoute } from "@/utils/synthetics/routes";
 
 defineOptions({ name: "SyntheticMonitorResults" });
 
@@ -253,12 +248,6 @@ const checkIdentity = computed(() =>
     folderId.value,
     store.state.userInfo?.email,
   ]),
-);
-const folderName = computed(() =>
-  syntheticsFolderName(
-    store.state.organizationData?.foldersByType?.synthetics ?? [],
-    folderId.value,
-  ),
 );
 const monitorStatus = computed<"healthy" | "degraded" | "critical">(
   () => (route.query.status as any) || "degraded",

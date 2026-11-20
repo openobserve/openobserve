@@ -37,7 +37,7 @@ const CALENDAR_IDS = [
   "last-quarter",
 ];
 
-const SELECTED_CLASS = "bg-button-primary!";
+const SELECTED_CLASS = "bg-selected-bg!";
 
 describe("DateTime rail", () => {
   let wrapper: VueWrapper<InstanceType<typeof DateTime>> | null = null;
@@ -579,7 +579,7 @@ describe("DateTime rail", () => {
       wrapper!.vm.selectedTime.startTime = "09:15:00";
       wrapper!.vm.selectedTime.endTime = "10:30:00";
       await flushPromises();
-      expect(wrapper!.vm.triggerLabel).toBe("2026/10/03 09:15:00 - 2026/10/03 10:30:00");
+      expect(wrapper!.vm.triggerLabel).toBe("10/03 09:15 - 10:30");
       el("date-time-apply-btn")!.click();
       await flushPromises();
 
@@ -588,6 +588,24 @@ describe("DateTime rail", () => {
         startTime: micros("2026-10-03T03:45:00Z"),
         endTime: micros("2026-10-03T05:00:00Z"),
       });
+    });
+
+    it("shows a compact label and keeps the full range in the tooltip", async () => {
+      createWrapper({ autoApply: true });
+      await flushPromises();
+      await openMenu();
+      el("date-time-absolute-tab")!.click();
+      await flushPromises();
+      wrapper!.vm.selectedDate = { from: "2026/10/03", to: "2026/10/04" };
+      wrapper!.vm.selectedTime.startTime = "09:15:00";
+      wrapper!.vm.selectedTime.endTime = "10:30:00";
+      await flushPromises();
+      expect(wrapper!.vm.triggerLabel).toBe("10/03 09:15 - 10/04 10:30");
+      expect(wrapper!.vm.triggerTooltip).toBe("2026/10/03 09:15:00 - 2026/10/04 10:30:00");
+
+      wrapper!.vm.selectedDate = { from: "2025/10/03", to: "2025/10/04" };
+      await flushPromises();
+      expect(wrapper!.vm.triggerLabel).toBe("2025/10/03 09:15 - 2025/10/04 10:30");
     });
 
     it("drops an unapplied pending day from the label when the panel closes without Apply", async () => {

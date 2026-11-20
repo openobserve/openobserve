@@ -22,8 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showImportTemplate && !showTemplateEditor"
       :title="t('alerts.header')"
       icon="shield-alert-outline"
-      :subtitle="t('alerts.subtitle')"
-      tabs-below
     >
       <template #header-tabs>
         <AlertSectionTabs />

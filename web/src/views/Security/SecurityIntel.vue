@@ -868,7 +868,6 @@ async function onSaved() {
 <template>
   <OPageLayout
     :title="t('siem.intel.title')"
-    :subtitle="t('siem.intel.subtitle')"
     icon="radar"
     bleed
     title-data-test="security-intel-title"

@@ -1,7 +1,6 @@
 <template>
   <OForm class="bg-card-bg flex min-h-0 flex-1 flex-col" :form="form" v-slot="{ isSubmitting }">
     <OPageLayout
-      :subtitle="t('onlineEvals.provider.subtitle')"
       :back="{
         label: t('onlineEvals.provider.backTo'),
         onClick: () => $emit('cancel'),

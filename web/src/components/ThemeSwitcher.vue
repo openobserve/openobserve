@@ -27,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="darkMode ? 'dark' : 'light'"
         :name="darkMode ? 'dark-mode' : 'light-mode'"
         size="sm"
-        class="size-5!"
       />
     </Transition>
     <OTooltip side="top" align="center" :content="raw(tooltipText)" />

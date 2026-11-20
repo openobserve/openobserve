@@ -26,38 +26,38 @@
  *
  * Style deliberately matches `formatTimeWithSuffix` (utils/formatters.ts), the
  * app's norm for span/query latency — ASCII `us`, two decimals with trailing
- * zeros kept, `0us` for a measured zero — because the Service Catalog prints
+ * zeros kept, `0 µs` for a measured zero — because the Service Catalog prints
  * its p50/p95/p99 one tab over and the two must not disagree about a duration.
  * The ASCII `us` also parses back through the traces `UNIT_ALIASES` table,
  * which does not accept the Greek mu.
  *
  * Two tiers the norm lacks are kept, because DBM genuinely reaches both ends:
- * `ns` for sub-microsecond queries (the norm collapses them to `0.00us`) and
+ * `ns` for sub-microsecond queries (the norm collapses them to `0.00 µs`) and
  * `h` for database time, which on a busy instance runs to hours (the norm
  * would print three of them as `180.00m`).
  */
 export const formatNs = (ns: number | undefined | null): string => {
   if (ns === undefined || ns === null || !Number.isFinite(ns)) return "—";
-  // `0us` is reachable ONLY for a duration that was genuinely measured at zero
+  // `0 µs` is reachable ONLY for a duration that was genuinely measured at zero
   // — a single sub-nanosecond row, or an engine that reported a zero total.
   // It is NOT the rendering for "this vantage measured nothing": an absent
   // measurement must never reach a formatter, because a formatter's contract
   // is total (every input returns a string) and so it cannot withhold. Callers
   // holding an OVERLAP measure route through `overlapTile`, which withholds
   // before formatting; see D6/L2 and the constraint note there.
-  if (ns <= 0) return "0us";
+  if (ns <= 0) return "0 µs";
 
   const units: [limit: number, divisor: number, suffix: string][] = [
     [1_000, 1, "ns"],
-    [1_000_000, 1_000, "us"],
+    [1_000_000, 1_000, "µs"],
     [1_000_000_000, 1_000_000, "ms"],
     [60 * 1_000_000_000, 1_000_000_000, "s"],
   ];
   for (const [limit, divisor, suffix] of units) {
-    if (ns < limit) return `${(ns / divisor).toFixed(2)}${suffix}`;
+    if (ns < limit) return `${(ns / divisor).toFixed(2)} ${suffix}`;
   }
   const minutes = ns / (60 * 1_000_000_000);
-  return minutes < 60 ? `${minutes.toFixed(2)}m` : `${(minutes / 60).toFixed(2)}h`;
+  return minutes < 60 ? `${minutes.toFixed(2)} min` : `${(minutes / 60).toFixed(2)} h`;
 };
 
 /** 3 significant figures without trailing zeros: 1.23, 12.3, 123. */

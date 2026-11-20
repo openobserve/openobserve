@@ -16,11 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OTag
+    v-if="hasErrors"
     data-test="trace-row-status-pill"
     type="spanStatus"
-    :value="hasErrors ? 'error' : 'success'"
+    value="error"
     :label="label"
   />
+  <span v-else data-test="trace-row-status-pill" class="text-text-secondary text-compact">{{
+    label
+  }}</span>
 </template>
 
 <script setup lang="ts">

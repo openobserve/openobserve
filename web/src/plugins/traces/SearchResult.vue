@@ -22,12 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="showHeader"
         data-test="traces-section-header"
-        class="border-border-default relative flex h-9 shrink-0 items-center border-b px-[0.4rem]! max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5 @max-[58rem]/results:h-auto @max-[58rem]/results:min-h-9 @max-[58rem]/results:flex-wrap @max-[58rem]/results:gap-y-1 @max-[58rem]/results:py-0.5"
+        class="border-border-default relative flex h-8 shrink-0 items-center border-b px-[0.4rem]! max-md:h-auto max-md:min-h-8 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5 @max-[58rem]/results:h-auto @max-[58rem]/results:min-h-8 @max-[58rem]/results:flex-wrap @max-[58rem]/results:gap-y-1 @max-[58rem]/results:py-0.5"
       >
         <!-- Field panel toggle — same style as logs page -->
         <OButton
-          variant="outline"
-          size="icon-xs-sq"
+          variant="ghost"
+          size="icon-toolbar"
           class="me-1.5 shrink-0"
           data-test="traces-search-field-list-collapse-btn"
           @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
@@ -55,11 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <!-- Left: count chips -->
-        <OTag
+        <!-- Plain text like the logs stats line: a count is not a status, so it gets no chip. -->
+        <span
           data-test="traces-count-badge"
-          type="logsResultChip"
-          value="neutral"
-          class="me-2.5 tabular-nums"
+          class="text-text-secondary me-2.5 inline-flex items-center gap-1 text-xs whitespace-nowrap tabular-nums"
           :aria-busy="countState.loading ? 'true' : undefined"
         >
           <template v-if="countState.loading">
@@ -73,10 +72,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="sr-only">{{ t("common.loading") }}</span>
             <span aria-hidden="true">{{ countNoun }}</span>
           </template>
-          <span v-else class="transition-opacity" :class="{ 'opacity-60': headerDimmed }">
-            {{ countLabel }}
-          </span>
-        </OTag>
+          <span v-else class="transition-opacity" :class="{ 'opacity-60': headerDimmed }"
+            >{{ countParts.lead
+            }}<span class="text-text-body text-sm font-semibold">{{ countParts.num }}</span
+            >{{ countParts.tail }}</span
+          >
+        </span>
+        <span
+          v-if="shownErrorCount > 0"
+          class="text-text-secondary me-2.5 text-xs"
+          :class="{ 'opacity-60': headerDimmed }"
+          aria-hidden="true"
+          >·</span
+        >
         <OTag
           v-if="shownErrorCount > 0"
           data-test="traces-error-count-badge"
@@ -85,25 +93,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :clickable="true"
           class="tabular-nums transition-opacity"
           :class="[
-            showErrorOnly
-              ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
-              : 'bg-error-tag-bg! text-error-tag-text!',
+            showErrorOnly &&
+              'bg-selected-bg! text-selected-fg! ring-selected-border! font-semibold ring-1 ring-inset',
             { 'opacity-60': headerDimmed },
           ]"
           :aria-disabled="regionBusy ? 'true' : undefined"
           @click="toggleErrorOnly"
         >
-          {{
-            `${formatLargeNumber(shownErrorCount)} ${searchObj.meta.searchMode === "traces" ? t("traces.errorTraces") : t("traces.errorSpans")}`
-          }}
+          {{ t("traces.errorsCount", { count: formatLargeNumber(shownErrorCount) }) }}
           <OTooltip
             :content="showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
             side="bottom"
           />
-          <template #trailing>
-            <OIcon name="filter-alt" size="xs" class="shrink-0" />
+          <template v-if="showErrorOnly" #trailing>
+            <OIcon name="check" size="xs" class="shrink-0" />
           </template>
         </OTag>
+
+        <!-- Same order as the Logs stats line: count · errors · start–end. -->
+        <span
+          v-if="showingRange"
+          class="text-text-secondary me-2.5 text-xs whitespace-nowrap tabular-nums @max-[58rem]/results:hidden"
+          :class="{ 'opacity-60': headerDimmed }"
+          data-test="traces-showing-range"
+          ><span class="me-2.5" aria-hidden="true">·</span
+          ><span>{{ showingRange.start }}–{{ showingRange.end }}</span></span
+        >
 
         <div
           class="hidden basis-full @max-[58rem]/results:block"
@@ -122,9 +137,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="me-1 flex min-w-0 items-center @max-[58rem]/results:flex-1 @max-[58rem]/results:justify-end @min-[58rem]/results:min-w-33"
           data-test="traces-search-result-data-age"
         >
+          <span
+            v-if="dataFresh"
+            class="bg-status-success-text size-1.5 shrink-0 rounded-full"
+            aria-hidden="true"
+            data-test="traces-search-result-fresh-dot"
+          />
+          <!-- Tight start so the fresh dot reads as part of the age, not a lone mark. -->
           <ORefreshButton
             layout="inline"
-            age-format="clock"
+            variant="ghost"
+            class="gap-1.5! ps-1! pe-2! text-xs!"
             :last-run-at="searchObj.meta.lastRunAt"
             :failed-at="searchObj.meta.refreshFailedAt"
             :loading="regionBusy"
@@ -137,13 +160,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              the widest thing on a row, and clipping it hides the part that
              distinguishes one trace or span from the next. -->
         <OButton
-          variant="outline"
-          size="icon-chip"
+          variant="ghost"
+          size="sm-toolbar"
+          :class="searchObj.meta.resultGrid.wrapCells ? '' : 'border! border-transparent!'"
           :active="searchObj.meta.resultGrid.wrapCells"
+          :aria-pressed="searchObj.meta.resultGrid.wrapCells ? 'true' : 'false'"
           @click.stop="toggleWrapCells"
           data-test="traces-search-result-wrap-btn"
         >
           <OIcon name="wrap-text" size="sm" />
+          <span class="whitespace-nowrap @max-[58rem]/results:hidden">{{ t("common.wrap") }}</span>
           <OTooltip :content="t('search.messageWrapContent')" />
         </OButton>
         <div
@@ -156,16 +182,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             :model-value="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
-            class="select-pagination ms-1 me-1 mt-0!"
+            class="select-pagination results-page-select"
+            appearance="inline"
             size="sm"
             :searchable="false"
+            :aria-label="t('search.resultsPerPage')"
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
-          />
+          >
+            <template #trigger>
+              {{ t("search.rowsPerPageLabel", { n: searchObj.meta.resultGrid.rowsPerPage }) }}
+            </template>
+          </OSelect>
           <OPagination
             :model-value="searchObj.data.resultGrid.currentPage + 1"
             :max="totalPages"
-            class="paginator-section float-right mt-0! min-w-54 justify-end"
+            class="border-0! bg-transparent! p-0!"
             data-test="traces-search-result-pagination"
             @update:model-value="(page: number) => changePage(page)"
           />
@@ -247,6 +279,7 @@ import {
   defineComponent,
   nextTick,
   onActivated,
+  onBeforeUnmount,
   onDeactivated,
   onMounted,
   ref,
@@ -536,16 +569,32 @@ export default defineComponent({
     const pagerInert = computed(() => headerDimmed.value || countState.value.loading);
     const shownTotal = computed(() => countState.value.value?.total ?? resultTotal.value);
     const shownErrorCount = computed(() => countState.value.value?.errorCount ?? 0);
+    const showingRange = computed(() => {
+      const total = countState.value.value?.total ?? 0;
+      const rows = searchObj.data.queryResults?.hits?.length ?? 0;
+      if (!total || !rows) return null;
+      const start =
+        searchObj.data.resultGrid.currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
+      return { start, end: Math.min(start - 1 + rows, total) };
+    });
 
     const countText = (count: string, plural: number) =>
       searchObj.meta.searchMode === "spans"
-        ? `${count} ${t("traces.spansFound")}`
+        ? t("traces.spansCount", { count })
         : t("traces.results.tracesWithMatchingSpan", { count }, plural);
     const countLabel = computed(() =>
       countText(formatLargeNumber(shownTotal.value), shownTotal.value),
     );
     // A blank count would be replaced by the plural number, so a space stands in and is trimmed.
     const countNoun = computed(() => countText(" ", 2).trim());
+    const countParts = computed(() => {
+      const num = formatLargeNumber(shownTotal.value);
+      const label = countLabel.value;
+      const at = label.indexOf(num);
+      return at < 0
+        ? { lead: label, num: "", tail: "" }
+        : { lead: label.slice(0, at), num, tail: label.slice(at + num.length) };
+    });
 
     // The pager keeps the last settled page count through a run, so it never shrinks to one page.
     const settledTotal = ref<number | null>(null);
@@ -631,6 +680,18 @@ export default defineComponent({
       searchObj.meta.showFields = !searchObj.meta.showFields;
     };
 
+    // Same 30s "fresh" window as the refresh button's own staleness dot.
+    const freshNow = ref(Date.now());
+    const freshTimer = setInterval(() => (freshNow.value = Date.now()), 5000);
+    onBeforeUnmount(() => clearInterval(freshTimer));
+    const dataFresh = computed(
+      () =>
+        !regionBusy.value &&
+        !searchObj.meta.refreshFailedAt &&
+        !!searchObj.meta.lastRunAt &&
+        freshNow.value - searchObj.meta.lastRunAt < 30_000,
+    );
+
     const searchResultListRef = ref<InstanceType<typeof TracesSearchResultList> | null>(null);
     const stepTraceRow = (direction: 1 | -1, isRepeat = false) =>
       searchResultListRef.value?.stepTraceRow(direction, isRepeat);
@@ -638,6 +699,7 @@ export default defineComponent({
     return {
       t,
       store,
+      dataFresh,
       resultTotal,
       isMobile,
       searchObj,
@@ -657,7 +719,9 @@ export default defineComponent({
       countPending,
       countState,
       countLabel,
+      countParts,
       countNoun,
+      showingRange,
       headerDimmed,
       pagerShown,
       pagerInert,
@@ -681,47 +745,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-/* keep(lib-override:opagination): reaches into the OPagination/OSelect-rendered
-   button DOM to compress the pagination controls into the results toolbar. */
-.paginator-section {
-  line-height: 1.5rem;
-  max-height: 2rem;
-  border-radius: 0.5rem;
-  padding: 0.125rem 0.25rem;
-  background: color-mix(in srgb, var(--color-white) 10%, transparent);
-  backdrop-filter: blur(0.625rem);
-  margin-top: 0;
-  overflow: visible;
-}
-
-.paginator-section :deep(.o-pagination__btn) {
-  padding: 0.125rem 0.25rem !important;
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
-  min-width: 1.5rem !important;
-  font-size: var(--text-xs) !important;
-  border-radius: 0.25rem !important;
-  line-height: 1rem !important;
-}
-
-.paginator-section :deep(.o-pagination__btn svg) {
-  width: 1rem !important;
-  height: 1rem !important;
-}
-
-.select-pagination {
-  position: relative;
-  width: 4rem !important;
-  height: 1.5rem !important;
-  margin-top: 0;
-}
-
-.select-pagination :deep(button) {
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
-  font-size: var(--text-xs) !important;
-  padding-inline: 0.5rem !important;
-}
-</style>

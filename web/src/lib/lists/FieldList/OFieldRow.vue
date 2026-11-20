@@ -17,9 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="o-field-row group rounded-default hover:bg-field-list-row-hover-bg relative flex h-6 w-full items-center gap-1 ps-1 max-md:h-7"
-    :class="[highlight && 'bg-field-list-row-hover-bg!']"
+    :class="[
+      highlight &&
+        'o-field-row--selected bg-field-list-row-selected-bg! font-medium [--color-field-list-label-text:var(--color-field-list-row-selected-text)] [--field-row-bg:var(--color-field-list-row-selected-bg)]!',
+    ]"
   >
     <slot />
+    <!-- Neutral tint, weight and this eye carry "in the table", so the state is never colour-only. -->
+    <OIcon
+      v-if="highlight"
+      name="visibility"
+      size="xs"
+      class="o-field-row__in-table text-text-body me-1 shrink-0"
+      aria-hidden="true"
+    />
     <div
       v-if="$slots.actions"
       class="o-field-row__actions bg-field-list-actions-bg rounded-default absolute top-0 right-0 bottom-0 hidden items-center gap-1.5 overflow-hidden px-1 py-0 group-hover:flex max-md:flex"
@@ -30,6 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+
 defineProps<{
   highlight?: boolean;
 }>();

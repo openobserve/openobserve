@@ -33,7 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             onClick: goBack,
             dataTest: 'dashboard-back-btn',
           }"
-          :subtitle="editMode ? t('panel.editPanel') : t('panel.addPanel')"
           title-overflow="visible"
         >
           <template #title>

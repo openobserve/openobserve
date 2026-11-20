@@ -9,13 +9,7 @@
       @cancel="leaveForm"
     />
 
-    <OPageLayout
-      v-else
-      icon="smart-toy"
-      :subtitle="t('llmProviders.subtitle')"
-      bleed
-      :scroll="false"
-    >
+    <OPageLayout v-else icon="smart-toy" bleed :scroll="false">
       <template #title>
         <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
       </template>

@@ -65,7 +65,7 @@
         </div>
         <p
           v-if="description || $slots.description"
-          class="text-text-secondary text-compact mt-0.5"
+          class="text-text-secondary mt-0.5 text-xs"
           :data-test="dataTest ? `${dataTest}-description` : undefined"
         >
           <slot name="description">{{ description }}</slot>

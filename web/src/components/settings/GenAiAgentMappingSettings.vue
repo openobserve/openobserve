@@ -1,11 +1,5 @@
 <template>
-  <OPageLayout
-    overflow-first
-    data-test="gen-ai-agent-mapping-settings"
-    :subtitle="t('genAiAgentMapping.subtitle')"
-    icon="account-tree"
-    bleed
-  >
+  <OPageLayout overflow-first data-test="gen-ai-agent-mapping-settings" icon="account-tree" bleed>
     <template #title>
       <span data-test="gen-ai-agent-mapping-page-title">{{ t("genAiAgentMapping.title") }}</span>
     </template>

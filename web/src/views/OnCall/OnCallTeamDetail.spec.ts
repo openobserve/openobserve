@@ -2237,7 +2237,6 @@ describe("OnCallTeamDetail", () => {
       ...stubs,
       OPageLayout: {
         name: "OPageLayout",
-        props: { tabsBelow: Boolean },
         template:
           "<div><slot name='title-trail' /><div data-test='header-actions-slot'><slot name='actions' /></div><div data-test='header-overflow-slot'><slot name='actions-overflow' /></div><div data-test='header-tabs-slot'><slot name='header-tabs' /></div><slot /></div>",
       },
@@ -2264,12 +2263,11 @@ describe("OnCallTeamDetail", () => {
       expect(overflow.find('[data-test="oncall-team-detail-edit-btn"]').exists()).toBe(true);
     });
 
-    /// Same header as the Incident page: tabs attached below the title, grey tallies.
+    /// Same header as the Incident page: tabs in the header, grey tallies.
     it("attaches tabs with icons to the header, with neutral counts", async () => {
       const wrapper = mountHeader();
       await flushPromises();
 
-      expect(wrapper.findComponent({ name: "OPageLayout" }).props("tabsBelow")).toBe(true);
       expect(
         wrapper.find('[data-test="header-tabs-slot"] [data-test="oncall-team-tabs"]').exists(),
       ).toBe(true);
@@ -2333,30 +2331,5 @@ describe("OnCallTeamDetail", () => {
     expect(router.push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallResponses" }));
     expect(useListViewState("oncall-responses", { teamFilter: "all" }).teamFilter).toBe("team_1");
     resetListViewState("oncall-responses");
-  });
-
-  it("counts the same routing rules in the header as the Routing tab lists", async () => {
-    service.listOwnershipRules.mockResolvedValue(ok([{ id: "r1" }, { id: "r2" }]));
-    service.teamOverview.mockResolvedValue(ok({ alerts_assigned: 0, members: 1 }));
-    routeParams.tab = "routing";
-    const wrapper = mount(OnCallTeamDetail, {
-      global: {
-        plugins: [i18n, store],
-        stubs: {
-          ...stubs,
-          OPageLayout: {
-            name: "OPageLayout",
-            props: ["subtitle"],
-            template: "<div><span class='sub'>{{ subtitle }}</span><slot /></div>",
-          },
-        },
-      },
-    });
-    await flushPromises();
-    expect(wrapper.find(".sub").text()).toContain("owns 2 routing rules");
-
-    wrapper.findComponent({ name: "OnCallOwnership" }).vm.$emit("rules-loaded", 3);
-    await flushPromises();
-    expect(wrapper.find(".sub").text()).toContain("owns 3 routing rules");
   });
 });

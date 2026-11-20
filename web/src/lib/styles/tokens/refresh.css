@@ -1,0 +1,609 @@
+/* ============================================================
+   REFRESH — app-wide look layered over the base tokens (base, semantic,
+   component, dark). Imported after dark.css so these values win by order.
+   Values follow STYLE-SPEC-10 §2: quiet neutral surfaces, colour only on the
+   primary action, the selected state, focus and status.
+   ============================================================ */
+
+/* ── Light ───────────────────────────────────────────────── */
+/* Plain :root is the light baseline; every token here is restated under :root.dark. */
+:root {
+  /* Cool-neutral grey ramp; every semantic grey token follows it. */
+  --color-grey-50: #fafafa;
+  --color-grey-100: #f4f4f5;
+  --color-grey-150: #ececee;
+  --color-grey-200: #e4e4e7;
+  --color-grey-300: #d4d4d8;
+  --color-grey-400: #a1a1aa;
+  --color-grey-450: #85858e;
+  --color-grey-500: #71717a;
+  --color-grey-600: #52525b;
+  --color-grey-700: #3f3f46;
+  --color-grey-800: #27272a;
+  --color-grey-850: #1f1f23;
+  --color-grey-900: #18181b;
+  --color-grey-950: #09090b;
+
+  /* Surface ladder, darker to lighter: shell < card < raised. */
+  --color-surface-shell: #f0f1f4;
+  --color-surface-card: #fbfbfc;
+  --color-surface-panel: #f5f6f8;
+  --color-surface-band: #eceef2;
+  --color-surface-raised: #ffffff;
+  --color-surface-overlay: #ffffff;
+  --color-surface-hover: #dadde4;
+  --color-surface-subtle-hover: #e3e5ea;
+
+  --color-text-heading: #16171d;
+  --color-text-body: #2b2d36;
+  --color-text-secondary: #545866;
+  --color-text-disabled: #9a9da8;
+
+  /* Structure hairline < button edge < control edge (3:1) < hover edge. */
+  /* Neutral selected-item fill, 1.3:1 on the panel so it never matches a header or hover. */
+  --color-surface-selected-neutral: #d5d8df;
+  --color-border-subtle: #e3e4e9;
+  --color-border-button: #c9ccd4;
+  --color-border-control: #8a8d99;
+  --color-border-strong: #6b6e7a;
+  /* Accent mixes keep text at 4.5:1 and the fill at 1.34:1 on the card under every light preset, so selection reads on a projector. */
+  /* Accent mixes are tuned so every theme preset keeps text at 4.5:1 and the fill at 1.34:1 or more on the card (projector-safe) (brandThemes.spec.ts). */
+  --color-accent-text: color-mix(in srgb, var(--color-accent) 78%, var(--color-black));
+  --color-selected-bg: color-mix(in srgb, var(--color-accent) 26%, transparent);
+  --color-selected-fg: color-mix(in srgb, var(--color-accent) 65%, var(--color-black));
+  --color-selected-border: var(--color-accent-text);
+  /* Opaque twin of the selected fill, so sticky table cells stay solid. */
+  --color-table-row-selected-bg: color-mix(
+    in srgb,
+    var(--color-accent) 26%,
+    var(--color-surface-card)
+  );
+
+  --color-status-error-text: #b42318;
+  --color-status-negative: #d92d20;
+  --color-status-error-bg: #fdecea;
+  --color-status-warning-text: #8a5300;
+  --color-status-warning-solid: #c98500;
+  --color-status-warning-bg: #fdf3dc;
+  --color-status-success-text: #137a3a;
+  --color-status-positive: #1f9d55;
+  --color-status-success-bg: #e6f4ea;
+
+  --color-live: #15803d;
+  --color-live-soft: color-mix(in srgb, var(--color-live) 12%, var(--color-surface-card));
+  --color-live-border: var(--color-live);
+
+  /* eslint-disable-next-line local/no-hardcoded-px -- optical shadow geometry, not layout */
+  --shadow-overlay: 0 0 0 1px var(--color-border-subtle), 0 8px 24px rgb(16 18 27 / 0.12);
+
+  /* The content card lifts off the shell by edge plus a faint shadow; flat fill alone read as one plane. */
+  --color-card-edge: var(--color-border-subtle);
+  /* eslint-disable-next-line local/no-hardcoded-px -- optical shadow geometry, not layout */
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04);
+  /* Legacy white page fills (80% white read #FEFEFE) take the card tone, as dark already does. */
+  --color-card-glass-bg: var(--color-surface-card);
+  --color-card-glass-solid: var(--color-surface-card);
+  --color-log-table-row-bg: var(--color-surface-card);
+
+  /* White on error-700 is 6.47:1. */
+  --color-cancel-query-bg: var(--color-error-700);
+  --color-cancel-query-fg: var(--color-white);
+}
+
+/* ── Dark ────────────────────────────────────────────────── */
+:root.dark {
+  /* dark.css builds its surfaces and borders from these. */
+  --d-chrome: #0f1013;
+  /* One step further from the shell so the card reads as its own surface. */
+  --d-base: #17181c;
+  --d-panel: #1b1c21;
+  --d-well: #262830;
+  --d-overlay: #26272e;
+  --d-divider: #2a2c33;
+  --d-border: #3a3c45;
+  --d-border-strong: #6e717d;
+  --d-zebra: #1b1c21;
+  --d-hover: #33353e;
+
+  --color-surface-shell: var(--d-chrome);
+  --color-surface-card: var(--d-base);
+  --color-surface-panel: var(--d-panel);
+  --color-surface-band: var(--d-well);
+  --color-surface-raised: #202127;
+  --color-surface-overlay: var(--d-overlay);
+  --color-surface-hover: var(--d-hover);
+  --color-surface-subtle-hover: #2c2e36;
+  --color-surface-selected-neutral: #383a45;
+
+  /* Not pure white: near-white text halates on dark surfaces. */
+  --color-text-heading: #e6e7ec;
+  --color-text-body: #c4c6cf;
+  --color-text-secondary: #9a9dab;
+  --color-text-disabled: #5c5f6b;
+
+  --color-border-subtle: var(--d-divider);
+  --color-border-button: var(--d-border);
+  --color-border-control: var(--d-border-strong);
+  --color-border-strong: #8d909c;
+
+  /* Lighter step so marks and text read on dark; the primary button fill stays on 600 via theme.ts. */
+  --color-accent: var(--color-primary-400);
+  --color-accent-text: color-mix(in srgb, var(--color-accent) 78%, var(--color-white));
+  --color-selected-bg: color-mix(in srgb, var(--color-accent) 26%, transparent);
+  --color-selected-fg: color-mix(in srgb, var(--color-accent) 65%, var(--color-white));
+  --color-selected-border: var(--color-accent);
+  --color-table-row-selected-bg: color-mix(
+    in srgb,
+    var(--color-accent) 26%,
+    var(--color-surface-card)
+  );
+
+  --color-status-error-text: #f2867c;
+  --color-status-negative: #e5534b;
+  --color-status-error-bg: #3a1d1c;
+  --color-status-warning-text: #e5b350;
+  --color-status-warning-solid: #e5b350;
+  --color-status-warning-bg: #33280f;
+  --color-status-success-text: #5fc485;
+  --color-status-positive: #5fc485;
+  --color-status-success-bg: #15301f;
+
+  --color-live: #4ade80;
+  --color-live-soft: color-mix(in srgb, var(--color-live) 12%, var(--color-surface-card));
+  --color-live-border: var(--color-live);
+
+  /* Dark overlays lift by tone, not shadow. */
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline ring */
+  --shadow-overlay: 0 0 0 1px var(--color-border-subtle);
+
+  --color-card-edge: rgb(255 255 255 / 0.06);
+  --shadow-card: none;
+
+  /* grey-900 on error-400 is 6.40:1. */
+  --color-cancel-query-bg: var(--color-error-400);
+  --color-cancel-query-fg: var(--color-grey-900);
+}
+
+/* ── Both themes: semantic and component names map onto the ladder ── */
+/* `:root.dark` matches dark.css's specificity, so these win by order. */
+:root,
+:root.dark {
+  --color-surface-chrome: var(--color-surface-shell);
+  --color-surface-chrome-deeper: var(--color-surface-shell);
+  --color-surface-base: var(--color-surface-card);
+  --color-surface-subtle: var(--color-surface-band);
+  --color-surface-chip: var(--color-surface-raised);
+  --color-surface-chip-hover: var(--color-surface-hover);
+  /* Hover and press are neutral, so the brand colour stays the single accent. */
+  --color-surface-accent-hover: var(--color-surface-hover);
+  --color-surface-accent-active: var(--color-surface-band);
+  --color-interactive-hover-bg: var(--color-surface-hover);
+
+  --color-text-label: var(--color-text-secondary);
+  --color-text-muted: var(--color-text-secondary);
+  --color-text-placeholder: var(--color-text-secondary);
+  --color-text-soft: var(--color-text-body);
+  --color-text-link: var(--color-accent-text);
+  --color-text-link-hover: var(--color-selected-fg);
+  --color-accent-on-tint: var(--color-selected-fg);
+
+  /* Hairlines carry structure; only controls take the 3:1 edge. */
+  --color-border-default: var(--color-border-subtle);
+
+  --color-focus-ring-accent: var(--color-accent);
+
+  --color-status-info-text: var(--color-text-secondary);
+  --color-status-info-bg: var(--color-surface-band);
+  --color-warning: var(--color-status-warning-solid);
+
+  /* AI entry points are neutral; a second hue would compete with the accent. */
+  --color-ai-accent: var(--color-text-secondary);
+
+  /* Primary and secondary buttons */
+  --color-button-primary-focus-ring: var(--color-focus-ring-accent);
+  --color-button-secondary: var(--color-surface-raised);
+  --color-button-secondary-foreground: var(--color-text-body);
+  --color-button-secondary-border: var(--color-border-button);
+  --color-button-secondary-hover: var(--color-surface-hover);
+  --color-button-secondary-active: var(--color-surface-band);
+  --color-button-secondary-disabled: transparent;
+
+  /* Outline: raised fill and a button edge, so it reads as a control at rest. */
+  --color-button-outline-bg: var(--color-surface-raised);
+  --color-button-outline-border: var(--color-border-button);
+  --color-button-outline-text: var(--color-text-body);
+  --color-button-outline-hover-bg: var(--color-surface-hover);
+  --color-button-outline-hover-border: var(--color-border-strong);
+  --color-button-outline-active-bg: var(--color-surface-band);
+  --color-button-outline-selected-bg: var(--color-selected-bg);
+  --color-button-outline-selected-fg: var(--color-selected-fg);
+  --color-button-border-hover: var(--color-border-strong);
+
+  --color-button-ghost-text: var(--color-text-body);
+  --color-button-ghost-hover-bg: var(--color-surface-hover);
+  /* Pressed matches hover: the band tone is the segmented track, so a pressed trigger read as a mode tab. */
+  --color-button-ghost-active-bg: var(--color-surface-hover);
+  --color-button-ghost-muted-text: var(--color-text-secondary);
+  --color-button-ghost-muted-hover-text: var(--color-text-heading);
+  --color-button-ghost-muted-hover-bg: var(--color-surface-hover);
+  --color-button-ghost-muted-active-bg: var(--color-surface-hover);
+  --color-button-ghost-subtle-text: var(--color-text-secondary);
+  --color-button-ghost-subtle-hover-bg: var(--color-surface-hover);
+  --color-button-ghost-subtle-active-bg: var(--color-surface-hover);
+  --color-button-ghost-primary-text: var(--color-accent-text);
+  --color-button-ghost-primary-hover-text: var(--color-selected-fg);
+  --color-button-ghost-primary-hover-bg: var(--color-surface-hover);
+  --color-button-ghost-primary-active-bg: var(--color-selected-bg);
+  --color-table-row-action-hover-bg: var(--color-surface-hover);
+
+  /* Tabs: heading text and the accent underline; vertical rails take the selected recipe. */
+  --color-tabs-active-text: var(--color-text-heading);
+  --color-tabs-active-bg: var(--color-selected-bg);
+  --color-tabs-inactive-text: var(--color-text-secondary);
+  --color-tabs-hover-text: var(--color-text-heading);
+  --color-tabs-hover-bg: var(--color-surface-hover);
+  --color-tabs-rail-hover-bg: var(--color-surface-hover);
+  --color-tabs-indicator: var(--color-accent);
+  --color-tabs-bar-border: var(--color-border-subtle);
+  --color-tabs-disabled-text: var(--color-text-disabled);
+
+  --color-toggle-track-bg: var(--color-surface-band);
+  --color-toggle-border: var(--color-border-subtle);
+  --color-toggle-item-text: var(--color-text-body);
+  --color-toggle-item-hover-bg: var(--color-surface-subtle-hover);
+  --color-toggle-item-active-bg: var(--color-selected-bg);
+  --color-toggle-item-active-border: var(--color-selected-border);
+  --color-toggle-item-active-text: var(--color-selected-fg);
+  --color-toggle-item-disabled: var(--color-text-disabled);
+
+  /* Pager: the current page takes the selected recipe, never a solid fill. */
+  --color-pagination-item-text: var(--color-text-body);
+  --color-pagination-item-hover-bg: var(--color-surface-hover);
+  --color-pagination-item-active-bg: var(--color-selected-bg);
+  --color-pagination-item-active-text: var(--color-selected-fg);
+  --color-pagination-item-disabled-text: var(--color-text-disabled);
+  --color-pagination-nav-text: var(--color-text-secondary);
+  --color-pagination-nav-hover-bg: var(--color-surface-hover);
+  --color-pagination-nav-disabled-text: var(--color-text-disabled);
+
+  /* Menus, options and nav rows */
+  --color-dropdown-item-hover-bg: var(--color-surface-hover);
+  --color-dropdown-item-active-bg: var(--color-surface-band);
+  --color-select-item-hover-bg: var(--color-surface-hover);
+  --color-select-item-selected-bg: var(--color-selected-bg);
+  --color-select-item-selected-text: var(--color-selected-fg);
+  --color-nav-flyout-item-hover-bg: var(--color-surface-hover);
+  --color-nav-flyout-item-selected-bg: var(--color-selected-bg);
+  --color-datepicker-relative-btn-selected-bg: var(--color-selected-bg);
+  --color-datepicker-relative-btn-selected-text: var(--color-selected-fg);
+
+  /* Fields: raised fill and the 3:1 control edge; focus is the accent ring alone. */
+  --color-input-bg: var(--color-surface-raised);
+  --color-input-border: var(--color-border-control);
+  --color-input-border-hover: var(--color-border-strong);
+  --color-input-border-focus: var(--color-border-control);
+  --color-input-focus-glow: var(--color-focus-ring-accent);
+  --color-input-placeholder: var(--color-text-placeholder);
+  --color-select-bg: var(--color-surface-raised);
+  --color-select-border: var(--color-border-control);
+  --color-select-border-hover: var(--color-border-strong);
+  --color-select-border-focus: var(--color-border-control);
+  --color-select-icon: var(--color-text-secondary);
+  --color-datepicker-focus-border: var(--color-border-control);
+  --color-field-rest-bg: var(--color-input-bg);
+  --color-field-rest-border: var(--color-input-border);
+  --color-field-hover-border: var(--color-input-border-hover);
+
+  /* Switch and checkbox */
+  --color-switch-track-on: var(--color-accent);
+  --color-switch-track-off: var(--color-border-control);
+  --color-checkbox-bg: var(--color-surface-raised);
+  --color-checkbox-border: var(--color-border-control);
+  --color-checkbox-hover-border: var(--color-border-strong);
+  /* A checked box takes the primary button pair, so the white tick keeps its contrast in both themes. */
+  --color-checkbox-checked-bg: var(--color-button-primary);
+  --color-checkbox-checked-border: var(--color-button-primary);
+  --color-checkbox-checked-fg: var(--color-button-primary-foreground);
+  --color-radio-border: var(--color-border-control);
+  --color-radio-hover-border: var(--color-border-strong);
+
+  /* Table: band header so the data reads as one block, hairline dividers, neutral hover. */
+  --color-table-header-bg: var(--color-surface-band);
+  --color-table-header-text: var(--color-text-secondary);
+  --color-table-header-border: var(--color-border-subtle);
+  --color-table-border: var(--color-border-subtle);
+  --color-table-row-divider: var(--color-border-subtle);
+  --color-table-row-hover-bg: var(--color-surface-subtle-hover);
+  --color-table-row-expanded-bg: var(--color-surface-band);
+  --color-table-row-striped-bg: var(--color-surface-panel);
+  --color-table-row-text-secondary-tinted: var(--color-text-secondary);
+  --color-table-cell-bg: var(--color-surface-card);
+  --color-table-cell-text: var(--color-text-body);
+  --color-table-sort-icon-active: var(--color-accent);
+  --color-table-sort-icon-inactive: var(--color-text-secondary);
+
+  /* Field list: group header is a secondary label on the panel (opaque for sticky), so only selected rows carry a fill. */
+  --color-field-list-group-bg: var(--color-surface-panel);
+  --color-field-list-group-text: var(--color-text-secondary);
+  --color-field-list-label-text: var(--color-text-body);
+  --color-field-list-row-hover-bg: var(--color-surface-hover);
+  /* In-table field rows: neutral fill, no accent; weight and the eye icon also carry the state. */
+  --color-field-list-row-selected-bg: var(--color-surface-selected-neutral);
+  --color-field-list-row-selected-text: var(--color-text-heading);
+  --color-field-list-expansion-bg: var(--color-surface-band);
+  /* The field-row action strip takes the row's own fill, so it never reads as a second box. */
+  --color-field-list-actions-bg: var(--field-row-bg, var(--color-interactive-hover-bg));
+
+  /* Neutral chips; status chips keep their status pair. */
+  --color-badge-default-soft-bg: var(--color-surface-band);
+  --color-badge-default-soft-text: var(--color-text-body);
+  --color-badge-error-soft-bg: var(--color-status-error-bg);
+  --color-badge-error-soft-text: var(--color-status-error-text);
+  /* Old tag pair was 2.78:1 in light and a solid red block in dark. */
+  --color-error-tag-bg: var(--color-status-error-bg);
+  --color-error-tag-text: var(--color-status-error-text);
+  --color-badge-warning-soft-bg: var(--color-status-warning-bg);
+  --color-badge-warning-soft-text: var(--color-status-warning-text);
+  --color-badge-success-soft-bg: var(--color-status-success-bg);
+  --color-badge-success-soft-text: var(--color-status-success-text);
+
+  /* Overlays sit one step above what they cover. */
+  --color-dialog-bg: var(--color-surface-overlay);
+  --color-dialog-header-bg: var(--color-surface-overlay);
+  --color-dialog-footer-bg: var(--color-surface-overlay);
+
+  --color-logs-divider: var(--color-border-subtle);
+
+  /* Three weights only: 400, 500 and 600. */
+  --font-semibold: 600;
+}
+
+/* The button label follows the accent's foreground, so the cancel state pins its own. */
+:root [class*="bg-cancel-query-bg"] {
+  --color-button-primary-foreground: var(--color-cancel-query-fg);
+}
+
+/* Primary-painted run buttons hover darker, not translucent: 90% opacity dropped the label under 4.5:1. */
+:root [data-o2-btn][class*="bg-button-primary!"]:not(:disabled):hover {
+  opacity: 1;
+  background-color: var(--color-button-primary-hover) !important;
+}
+
+/* ── Shell: content sits in an inset card with its own edge and, in light, a faint lift ── */
+:root main[data-test="main-content"] > div {
+  border-radius: 0.625rem;
+  box-shadow: var(--shadow-card);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline border */
+  border: 1px solid var(--color-card-edge);
+  overflow: hidden;
+}
+
+/* ── Type ────────────────────────────────────────────────── */
+/* One body size app-wide: 13/20. */
+:root body {
+  font-size: var(--text-compact);
+}
+
+/* Layered so a utility on the element still wins, like the base label rule. */
+@layer base {
+  :root label {
+    font-weight: var(--font-medium);
+  }
+}
+
+/* ── Tables ──────────────────────────────────────────────── */
+:root thead[data-test="o2-table-header"] th {
+  font-size: var(--text-xs);
+  line-height: var(--leading-sm);
+  font-weight: var(--font-medium);
+  text-transform: none;
+}
+
+/* The resting resize grip draws a vertical line per column; show it on hover only. */
+:root thead[data-test="o2-table-header"] .resizer:not(:hover) > .bg-border-default {
+  background-color: transparent;
+}
+
+:root td[data-test^="o2-table-cell-"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Top-bar org switcher: a raised button, name plus chevron ── */
+:root .header-org [data-test="navbar-organizations-select-trigger"] {
+  width: auto;
+  max-width: 14rem;
+  height: 1.75rem;
+  padding-inline: 0.625rem 0.375rem;
+  gap: 0.375rem;
+  font-size: var(--text-compact);
+  font-weight: var(--font-medium);
+  background-color: var(--color-button-outline-bg);
+  /* A select, so it takes the 3:1 input edge, not the button edge. */
+  border-color: var(--color-select-border);
+  border-radius: var(--radius-default);
+  box-shadow: none;
+}
+
+/* The leading org icon is noise beside the logo. */
+:root
+  .header-org
+  [data-test="navbar-organizations-select-trigger"]
+  > span:last-child
+  > :first-child {
+  display: none;
+}
+
+:root .header-org [data-test="navbar-organizations-select-trigger"]:hover,
+:root .header-org [data-test="navbar-organizations-select-trigger"][data-state="open"] {
+  background-color: var(--color-button-outline-hover-bg);
+  border-color: var(--color-select-border-hover);
+}
+
+/* box-shadow is cleared above, so focus needs its own ring. */
+:root .header-org [data-test="navbar-organizations-select-trigger"]:focus-visible {
+  /* eslint-disable-next-line local/no-hardcoded-px -- ring width: must not scale with text */
+  outline: 2px solid var(--color-focus-ring-accent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- ring offset: sub-pixel geometry */
+  outline-offset: 2px;
+}
+
+:root .header-menu [data-o2-btn][data-o2-variant="ghost"]:not(:disabled, [data-o2-active]):hover,
+:root
+  .header-menu
+  [data-o2-btn][data-o2-variant="ghost"]:not(:disabled):is(
+    :active,
+    [aria-expanded="true"],
+    [aria-pressed="true"]
+  ) {
+  background-color: var(--color-button-ghost-hover-bg);
+}
+
+:root [data-test="o-drawer-close-btn"] {
+  background-color: var(--color-button-outline-bg);
+}
+
+:root [data-test="o-drawer-close-btn"]:hover {
+  background-color: var(--color-button-outline-hover-bg);
+}
+
+/* Tighter inner spacing leaves room for the Logs mode-tab labels at 1280. */
+:root .date-time-container:has([data-test="date-time-prev-btn"]) [data-cy="date-time-button"] {
+  gap: 0.25rem;
+  padding-inline: 0.5rem;
+}
+
+/* ── Table: the active row is a soft fill, never an outline; keyboard focus keeps its outline ── */
+:root tr[data-active-row="true"] {
+  --tw-ring-shadow: 0 0 #0000;
+}
+
+:root .o2-table-row-selected-bar > td:first-child::before {
+  display: none;
+}
+
+/* A selected stream is a value, not a status, so its chip is neutral. */
+:root [data-o-select-chip] {
+  background-color: var(--color-badge-default-soft-bg);
+  color: var(--color-badge-default-soft-text);
+  border-radius: 0.25rem;
+}
+
+/* Icon and age read as one label. */
+:root [data-o2-refresh-separator] {
+  display: none;
+}
+
+/* Logs page dividers: one quiet hairline each. */
+:root
+  :is(
+    .logs-search-bar-component > div:first-child,
+    #thirdLevel,
+    #thirdLevel ~ .border-t,
+    .logs-splitter-smooth > .o-splitter__before > .border-e,
+    [data-test="logs-search-search-result"] .bg-card-glass-bg.border-b
+  ) {
+  border-color: var(--color-logs-divider);
+}
+
+/* ── Pagers ── */
+/* These wrappers already draw the group, so the pager's own group would double the edge. */
+:root :is(.paginator-section, .field-list-pager) .o-pagination {
+  border-width: 0;
+  background-color: transparent;
+  padding: 0;
+}
+
+/* The doubled class outranks the pages' scoped rule. */
+:root :is(.paginator-section.paginator-section, .field-list-pager) {
+  background: var(--color-button-outline-bg);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline border */
+  border: 1px solid var(--color-button-outline-border);
+  border-radius: var(--radius-default);
+  backdrop-filter: none;
+}
+
+:root .field-list-pager {
+  padding: 0.0625rem;
+}
+
+/* Run and Cancel share one width, so the cluster to the right does not jump. */
+:root [data-o2-btn][data-test="logs-search-bar-refresh-btn"] {
+  min-width: 6.5rem;
+}
+
+/* ── Empty and error states: neutral cards and glyphs; the accent stays on the run action ── */
+:root
+  :is([data-test^="query-error-"], [data-test^="logs-no-events-"])[data-test$="-card"]:not(:hover),
+:root [data-test="error-detail-panel"],
+:root [data-test="error-detail-panel"] .border-t {
+  border-color: var(--color-button-outline-border);
+}
+
+:root
+  :is([data-test^="query-error-"], [data-test^="logs-no-events-"])[data-test$="-card"]:not(
+    [aria-disabled]
+  )
+  > span:first-child {
+  background-color: transparent;
+  box-shadow: none;
+  color: var(--color-text-secondary);
+}
+
+:root
+  :is([data-test^="query-error-"], [data-test^="logs-no-events-"])[data-test$="-card"]:not(
+    [aria-disabled]
+  ):hover
+  > span:first-child {
+  color: var(--color-text-heading);
+}
+
+/* Severity colors muted on dark so they read without glare; syntax colors live in log-highlighting.css. */
+:root.dark {
+  --color-log-severity-emergency-indicator: #c97a7a;
+  --color-log-severity-error-indicator: #c97a7a;
+  --color-log-severity-critical-indicator: #c98a6a;
+  --color-log-severity-error-text: #dea19c;
+}
+
+/* ── Icons ── */
+/* Secondary at rest (6.8:1), body on hover, open or pressed; filled (incl. ghost painted primary) and disabled buttons keep currentColor. */
+:root
+  [data-o2-btn]:is([data-o2-variant="outline"], [data-o2-variant="ghost"]):not(
+    :disabled,
+    [data-o2-active],
+    [class*="bg-cancel-query-bg"],
+    [class*="text-button-primary-foreground"]
+  )
+  span.inline-flex.shrink-0.align-middle:not([data-destructive-icon]) {
+  color: var(--color-text-secondary);
+}
+:root
+  [data-o2-btn]:is([data-o2-variant="outline"], [data-o2-variant="ghost"]):not(
+    :disabled,
+    [data-o2-active],
+    [class*="bg-cancel-query-bg"],
+    [class*="text-button-primary-foreground"]
+  ):is(:hover, :active, [aria-expanded="true"], [aria-pressed="true"])
+  span.inline-flex.shrink-0.align-middle:not([data-destructive-icon], [data-menu-chevron]) {
+  color: var(--color-text-body);
+}
+/* An off toggle item's glyph is its label, so it takes the label colour; secondary thin glyphs fell under 3:1. */
+:root [data-otoggle-value][data-state="off"] span.inline-flex.shrink-0.align-middle {
+  color: inherit;
+}
+/* An on item's glyph matches its selected label. */
+:root [data-state="on"] span.inline-flex.shrink-0.align-middle,
+:root
+  [data-o2-btn]:is([data-state="on"], [data-o2-active]):not(:disabled)
+  span.inline-flex.shrink-0.align-middle:not([data-destructive-icon]) {
+  color: var(--color-selected-fg);
+}
+/* Glyph sizes: 16px in 28px controls, 14px in 24px controls. */
+:root [data-o2-btn]:is(.h-7, .size-7) span.inline-flex.shrink-0.align-middle.size-6 {
+  width: 1rem;
+  height: 1rem;
+}
+:root [data-o2-btn]:is(.h-6, .size-6) span.inline-flex.shrink-0.align-middle.size-4 {
+  width: 0.875rem;
+  height: 0.875rem;
+}

@@ -41,7 +41,7 @@ onMounted(() =>
 
 const props = withDefaults(defineProps<InputProps>(), {
   type: "text",
-  size: "md",
+  size: "sm",
   disabled: false,
   readonly: false,
   clearable: false,
@@ -249,37 +249,31 @@ function focus() {
 defineExpose({ focus });
 
 // ── Styles ─────────────────────────────────────────────────────────────────
-// Height applied to the wrapper (so border is included in the box, matching
-// OSelect); the inner input fills it via h-full. 34px control height per the
-// design system.
+// Height sits on the wrapper so the border is inside the box, matching OSelect.
 const heightClasses: Record<NonNullable<InputProps["size"]>, string> = {
-  xs: "h-7",
-  sm: "h-[2.125rem]",
-  md: "h-[2.125rem]",
+  xs: "h-6",
+  sm: "h-7",
+  md: "h-8",
+  lg: "h-9",
 };
 const textSizeClasses: Record<NonNullable<InputProps["size"]>, string> = {
   xs: "text-xs",
-  sm: "text-sm",
-  md: "text-sm",
+  sm: "text-compact",
+  md: "text-compact",
+  lg: "text-sm",
 };
 
 const wrapperClasses = computed(() => [
   "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "bg-input-bg",
-  !isTextarea.value ? heightClasses[props.size ?? "md"] : "",
-  /* Focus affordance = a 2px ring hugging the border, plus the focus border color.
-     The normal ring is OPAQUE (--color-focus-ring-accent): at 25% alpha it measured
-     1.38:1 against the 3:1 SC 1.4.11 floor. Only the ERROR ring stays translucent
-     (/30) — there the red border already carries the state, and the ring is a tint
-     behind it. On error, keep that red border on focus rather than letting the focus
-     color override it, or the blue would hide the error while the field is focused. */
+  !isTextarea.value ? heightClasses[props.size ?? "sm"] : "",
+  // The accent border is the focus cue; the glow only softens it. Error keeps its red border on focus.
   hasError.value
-    ? "border-input-border-error focus-within:ring-[0.125rem] focus-within:ring-input-border-error/30"
-    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
-  /* Disabled inputs get a muted bg + dashed border so they read as obviously
-     inactive at a glance. */
+    ? "border-input-border-error focus-within:ring-2 focus-within:ring-input-border-error/20"
+    : "border-input-border hover:border-input-border-hover focus-within:ring-2 focus-within:ring-focus-ring-accent",
+  // Whole-control dim: a dashed edge read as a drop zone.
   isDisabled.value
-    ? "bg-input-disabled-bg border-input-disabled-border cursor-not-allowed border-dashed"
+    ? "opacity-50 cursor-not-allowed"
     : "",
   props.readonly ? "border-input-border bg-input-bg" : "",
   // Inside-label mode: wrapper is relative so the floating label can be absolutely placed
@@ -410,7 +404,7 @@ const wrapperClasses = computed(() => [
           // Inside-label: push text down to leave room for the floating mini-label
           labelPosition === 'inside' && label
             ? 'pt-3 pb-0.5 text-xs font-semibold'
-            : textSizeClasses[size ?? 'md'],
+            : textSizeClasses[size ?? 'sm'],
           $slots['icon-left'] || $slots.prefix || prefix ? 'ps-2' : 'ps-3',
           $slots['icon-right'] || $slots.suffix || suffix || clearable || canReveal
             ? 'pe-2'

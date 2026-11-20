@@ -1424,6 +1424,8 @@
     "selectOrganization": "Selecione uma organização"
   },
   "search": {
+    "liveRefreshingEvery": "Live: refreshing every {interval}",
+    "rowsPerPageLabel": "{n} / page",
     "queryFailed": "Falha na consulta",
     "unknownError": "Erro desconhecido",
     "selectedLabel": "selecionados",
@@ -2075,7 +2077,6 @@
   "menu": {
     "alertCalibration": "Calibração de alertas",
     "autoobserve": "AutoObserve",
-    "upgradeToProPlan": "Atualizar para o Plano PRO",
     "home": "Início",
     "about": "Sobre",
     "index": "Streams",
@@ -2134,7 +2135,6 @@
   },
   "profiles": {
     "title": "Perfis",
-    "subtitle": "Acompanhe o uso de CPU, memória e bloqueios por função",
     "stream": "Stream",
     "dataSource": "Fonte de dados",
     "service": "Serviço",
@@ -2285,7 +2285,6 @@
     "from": "de",
     "to": "até",
     "title": "Monitorização de utilizadores reais",
-    "subtitle": "Monitorize sessões de utilizadores reais, erros e desempenho do frontend",
     "issueColumn": "Problema",
     "trendColumn": "Tendência",
     "usersColumn": "Utilizadores",
@@ -3325,7 +3324,6 @@
         "bulkDeleteMessage": "Eliminar {count} evento nomeado? Os funis que o usam mostrarão uma etiqueta de etapa eliminada. | Eliminar {count} eventos nomeados? Os funis que os usam mostrarão uma etiqueta de etapa eliminada.",
         "bulkDeleteInUseMessage": "Eliminar {count} evento nomeado? Funis guardados mostrarão uma etapa de evento eliminado para: {names}. | Eliminar {count} eventos nomeados? Funis guardados mostrarão uma etapa de evento eliminado para: {names}.",
         "notFound": "Este evento nomeado já não existe",
-        "editorApp": "Aplicativo: {app}",
         "details": "Detalhes",
         "opParam": "Parâmetro de URL",
         "opRef": "Host do referenciador",
@@ -4004,11 +4002,6 @@
     "license_downgrade_limit": "O limite diário passa de {old} para {new}",
     "license_downgrade_expiry": "A expiração passa de {old} para {new}",
     "license_limit_per_day": "{gb} GB/dia",
-    "header_button": {
-      "cloud_features": "Funcionalidades do {product}",
-      "enterprise_edition": "Edição: Enterprise",
-      "get_enterprise_free": "Obtenha o OpenObserve Enterprise (grátis)"
-    },
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Funcionalidades corporativas",
@@ -4203,7 +4196,14 @@
     "usageChartDate": "{month} {day}",
     "usageChartDay": "Dia {day}",
     "usageChartUsage": "Utilização: {value}",
-    "startFreeTrial": "Iniciar avaliação gratuita"
+    "startFreeTrial": "Iniciar avaliação gratuita",
+    "header_button": {
+      "upgrade": "Upgrade",
+      "enterprise_tooltip": "About {product} — Enterprise edition",
+      "cloud_features": "Funcionalidades do {product}",
+      "enterprise_edition": "Edição: Enterprise",
+      "get_enterprise_free": "Obtenha o OpenObserve Enterprise (grátis)"
+    }
   },
   "login": {
     "lockedOut": "Demasiadas tentativas de início de sessão falhadas. Tente novamente dentro de {duration} ou contacte o seu administrador.",
@@ -4379,7 +4379,6 @@
     "nameInvalid": "Use letras minúsculas, números e hífens (até {max} caracteres)",
     "createFailed": "Falha ao criar a conta de serviço. Tente novamente.",
     "updateFailed": "Falha ao atualizar a conta de serviço. Tente novamente.",
-    "headerSubtitle": "Tokens de acesso programático para APIs",
     "search": "Pesquisar contas de serviço",
     "rotate": "Rodar token",
     "deleteServiceAccount": "Eliminar conta de serviço",
@@ -4472,7 +4471,6 @@
     "mcpServerLabel": "Servidor MCP",
     "mcpServerDesc": "Ligue clientes de IA através do {product}",
     "mcpServerHeader": "Servidor MCP",
-    "mcpServerHeaderSubtitle": "Ligue Claude, Cursor, VS Code e outros clientes de IA a esta organização.",
     "invitationsDesc": "Convites de membros pendentes e enviados",
     "groupsDesc": "Agrupe utilizadores para atribuir funções",
     "rolesDesc": "Defina permissões e políticas de acesso",
@@ -4901,7 +4899,6 @@
       "other": "Outro"
     },
     "invitationList": {
-      "subtitle": "Convites de membros pendentes e enviados",
       "loadingPending": "A carregar convites pendentes...",
       "failedLoadPending": "Falha ao carregar convites pendentes",
       "accepting": "A aceitar convite...",
@@ -4955,7 +4952,6 @@
       "errorCreating": "Erro ao criar grupo"
     },
     "quotaPage": {
-      "subtitle": "Limites de utilização aplicados por função",
       "selectOrganization": "Selecionar Organização",
       "editQuota": "Editar Quota",
       "selectApiCategory": "Selecionar Categoria de API",
@@ -5082,7 +5078,6 @@
       "brand": "Azul forte"
     },
     "list": {
-      "subtitle": "Avisos exibidos no topo da aplicação para todas as organizações, ou apenas para as que escolher.",
       "liveNow": "Em exibição agora",
       "liveNowEmpty": "Nenhum banner está a ser exibido neste momento.",
       "liveOnlyFor": "Apenas para {orgs}",
@@ -5276,7 +5271,6 @@
     },
     "deleteField": "Eliminar campo",
     "header": "Streams",
-    "subtitle": "Gestão de índices e configuração de streams",
     "streamNameHelpText": "Use apenas caracteres alfanuméricos, sublinhado e dois pontos.",
     "search": "Pesquisar streams",
     "emptyOr": "Ou:",
@@ -5367,7 +5361,6 @@
   },
   "workflow": {
     "header": "Fluxos de trabalho",
-    "subtitle": "Automatize Ações com Gatilhos, Lógica e Destinos",
     "create": "Novo workflow",
     "createSuccess": "Fluxo de trabalho criado com sucesso",
     "name": "Nome do workflow",
@@ -6279,7 +6272,6 @@
     "functionName": "Nome da Função",
     "remoteDestination": "Destino Remoto",
     "failedToLoadPipeline": "Falha ao carregar pipeline",
-    "subtitle": "Transforme, enriqueça e encaminhe dados em trânsito",
     "deleteNode": "Eliminar",
     "addPipeline": "Adicionar pipeline",
     "deletePipeline": "Eliminar pipeline",
@@ -6526,7 +6518,6 @@
     "order": "Ordem",
     "applyBeforeFlattening": "Aplicar Antes do Achatamento",
     "header": "Funções",
-    "subtitle": "Funções VRL reutilizáveis aplicadas em pipelines",
     "clickTestFunctionHint": "Clique em Testar função para ver os eventos",
     "add": "Criar nova função",
     "search": "Pesquisar funções",
@@ -6550,7 +6541,6 @@
     "enterFunctionPrompt": "Introduza um prompt para gerar a função",
     "associatedFunctionHeader": "Funções associadas",
     "enrichmentTables": "Tabelas de enriquecimento",
-    "enrichmentTablesSubtitle": "Tabelas de pesquisa que enriquecem os dados ingeridos",
     "addEnrichmentTable": "Adicionar tabela de enriquecimento",
     "updateEnrichmentTable": "Atualizar tabela de enriquecimento",
     "searchEnrichmentTable": "Pesquisar tabelas de enriquecimento",
@@ -10147,7 +10137,6 @@
     "publicLinks": {
       "panelTitle": "Links públicos",
       "pageTitle": "Painéis públicos",
-      "pageSubtitle": "Todos os links públicos desta organização",
       "panelTitleFor": "Links públicos — {name}",
       "intro": "Qualquer pessoa com um link público pode visualizar este painel sem fazer login.",
       "editNote": "O endereço do link permanece o mesmo. As alterações aparecem na página pública na próxima atualização.",
@@ -10534,7 +10523,6 @@
     "tabOverview": "Visão geral",
     "tabUsage": "Utilização",
     "removeHomeDashboard": "Remover o dashboard inicial",
-    "subtitle": "O seu espaço de trabalho de observabilidade num piscar de olhos",
     "resources": "Recursos",
     "explore": "Explorar"
   },
@@ -11476,7 +11464,6 @@
   },
   "alertCalibration": {
     "title": "Calibração de alertas",
-    "subtitle": "Como os seus alertas se comportam, medidos a partir do próprio histórico de execução",
     "configure": "Configurar",
     "runNow": "Executar agora",
     "runNowHint": "Solicita uma execução agora em vez de esperar pela próxima. Se já houver uma execução agendada ou em curso, é essa que responde ao pedido.",
@@ -11898,7 +11885,6 @@
     "detail": {
       "title": "Resumo de {time}",
       "titleLoading": "Resumo",
-      "subtitle": "Abrange de {start} a {end}, gerado em {time}",
       "back": "Resumos",
       "unavailableTitle": "Resumo indisponível",
       "noRecords": "Não foram encontrados registos para esta execução.",
@@ -12707,7 +12693,6 @@
       "commentPlaceholder": "Escreva um comentário...",
       "sendComment": "Enviar comentário",
       "title": "Incidentes",
-      "subtitle": "Gestão e acompanhamento de incidentes",
       "search": "Pesquisar incidentes...",
       "status": "Estado",
       "severity": "Severidade",
@@ -14158,7 +14143,6 @@
       "firingTotal": "Disparado",
       "observedTotal": "Grupos",
       "nOfMFiring": "{firing} de {observed} grupos em disparo",
-      "groupedBy": "agrupado por {columns}",
       "groupBy": "Agrupar por",
       "criticalCondition": "Condição crítica",
       "warningCondition": "Condição de aviso",
@@ -14506,7 +14490,6 @@
         "startDateRequired": "Escolha o primeiro dia."
       },
       "title": "Janelas de manutenção",
-      "subtitle": "Janelas agendadas que mantêm alertas, deteções de anomalias e verificações sintéticas em execução, mas interrompem as suas notificações",
       "newDowntime": "Nova janela de manutenção",
       "filterAll": "Todas",
       "filterOnce": "Pontuais",
@@ -15416,7 +15399,6 @@
   },
   "alert_sources": {
     "header": "Fontes de alerta externas",
-    "subtitle": "Envie alertas do Grafana, Prometheus Alertmanager ou qualquer ferramenta que possa chamar um webhook — aparecerão aqui e serão correlacionados em Incidentes automaticamente.",
     "acceptsAnyFormat": "aceita qualquer formato de webhook",
     "revealToken": "Revelar URL completo",
     "hideToken": "Ocultar URL completo",
@@ -16504,11 +16486,7 @@
     "modelPricingEditor": {
       "copySuffix": " (Cópia)"
     },
-    "modelPricingList": {
-      "subtitle": "Configuração de custo do modelo LLM"
-    },
     "orgStorageSettings": {
-      "subtitle": "Configuração de armazenamento por organização",
       "awsCredentials": "Credenciais AWS",
       "azureCredentials": "Credenciais Azure",
       "awsRoleArn": "ARN da função AWS"
@@ -16541,11 +16519,7 @@
       "settingsUpdated": "Definições da organização atualizadas com sucesso",
       "settingsSaveError": "Erro ao guardar definições da organização"
     },
-    "aiToolsetsPage": {
-      "subtitle": "Configurar integrações de ferramentas de IA"
-    },
     "cipherKeysPage": {
-      "subtitle": "Chaves de encriptação para campos sensíveis",
       "delete": "Eliminar",
       "deleteCipherKeyTitle": "Eliminar Chave de Cifra",
       "deleteCipherKeyMessage": "Tem a certeza de que pretende eliminar a chave de cifra {name}?",
@@ -16560,15 +16534,11 @@
       "bulkDeleteFailed": "Falha ao eliminar {count} chave de cifra | Falha ao eliminar {count} chaves de cifra",
       "bulkDeleteError": "Erro ao eliminar chaves de cifra"
     },
-    "correlationSettingsPage": {
-      "subtitle": "Configuração de correlação de telemetria"
-    },
     "licensePage": {
       "unexpectedError": "erro inesperado",
       "daysRemaining": "{days} dias restantes até à expiração da sua licença"
     },
     "nodesPage": {
-      "subtitle": "Nós do cluster e a sua saúde",
       "to": "para",
       "name": "Nome",
       "loadingData": "Aguarde enquanto os dados são carregados...",
@@ -16656,7 +16626,6 @@
       "processingTrialExtension": "Aguarde enquanto o pedido de prolongamento do período de teste é processado...",
       "trialExtendedSuccess": "Período de teste prolongado com sucesso.",
       "extendTrialError": "Falha ao prolongar o período de teste. Tente novamente.",
-      "subtitle": "Criar e gerir organizações",
       "addContract": "Adicionar Contrato",
       "extendTrialTitle": "Prolongar Teste para {name}",
       "extendTrialSubtitle": "Defina o novo período de prolongamento do teste.",
@@ -16776,7 +16745,6 @@
       "sourceBuiltIn": "Integrado"
     },
     "regexPatternList": {
-      "subtitle": "Padrões regex reutilizáveis para ocultação de dados",
       "exportTitle": "Exportar Padrão Regex",
       "delete": "Eliminar",
       "bulkDeleteTitle": "Eliminar Padrões Regex",
@@ -16870,7 +16838,6 @@
         "valueMismatch": "Registro TXT encontrado, mas o valor não corresponde",
         "dnsFailed": "Falha na resolução de DNS"
       },
-      "pageSubtitle": "Associe os seus domínios de e-mail, mapeie os seus utilizadores para organizações e controle quais deles podem iniciar sessão.",
       "linkedTab": "Domínios vinculados",
       "mappingsTab": "Mapeamentos",
       "accessTab": "Usuários bloqueados",
@@ -16993,7 +16960,6 @@
       "lastRun": "Última execução",
       "lastRunAt": "Executado",
       "nextRun": "Próxima execução",
-      "nextRunAt": "próxima execução {time}",
       "acceptedTooltip": "Aceite pelo servidor de correio",
       "cachedTooltip": "Cache do painel preparada; não é enviado nenhum email",
       "unrecordedTooltip": "O resultado da última execução não foi registrado; execuções mais antigas podem estar disponíveis no Histórico.",
@@ -17067,9 +17033,7 @@
       "everyHours": "A cada hora | A cada {count} horas",
       "everyDays": "Todos os dias | A cada {count} dias",
       "everyWeeks": "Todas as semanas | A cada {count} semanas",
-      "everyMonths": "Todos os meses | A cada {count} meses",
-      "dashboardCount": "{count} painel | {count} painéis",
-      "recipientCount": "{count} destinatário | {count} destinatários"
+      "everyMonths": "Todos os meses | A cada {count} meses"
     },
     "frequencyUnits": {
       "days": "dias",
@@ -17097,7 +17061,6 @@
     "never": "Nunca",
     "startDate": "Data de início",
     "header": "Relatórios",
-    "subtitle": "Relatórios e exportações programados",
     "searchThisFolder": "Esta pasta",
     "searchAllFolders": "Todas as pastas",
     "reloadReports": "Recarregar relatórios",
@@ -18741,7 +18704,6 @@
     },
     "unpriced": {
       "title": "Lacunas de preços",
-      "subtitle": "Modelos nos seus traces de LLM que não tinham preço, ou apenas um preço aproximado, no momento da ingestão",
       "banner": "{count} modelo não tinha preço ou tinha um preço aproximado no momento da ingestão. O custo registado pode estar incompleto. | {count} modelos não tinham preço ou tinham um preço aproximado no momento da ingestão. Os custos registados podem estar incompletos.",
       "bannerTruncated": "{total} modelos nos seus traces não tinham preço ou tinham um preço aproximado no momento da ingestão. O custo pode estar errado. A mostrar os {shown} principais por tokens.",
       "streamLabel": "Stream",
@@ -18862,7 +18824,6 @@
       "tools": "Ferramentas"
     },
     "promptManagement": {
-      "subtitle": "Crie, versione e lance prompts reutilizáveis.",
       "promptSubtitle": "Prompt de {type}",
       "prompt": "Prompt",
       "promptId": "ID do prompt",
@@ -19302,7 +19263,6 @@
         }
       },
       "workbench": {
-        "subtitle": "{reviewed} de {total} revistos",
         "itemCounter": "Item {index} de {total} para rever",
         "prev": "Item anterior",
         "next": "Item seguinte",
@@ -19782,7 +19742,6 @@
       },
       "detail": {
         "fallbackTitle": "Dataset",
-        "meta": "{count} itens · atualizado em {updated}",
         "loadError": "Falha ao carregar dataset",
         "tryInPlayground": "Experimente no Playground",
         "tabs": {
@@ -20746,7 +20705,6 @@
       "backTo": "Fornecedores",
       "createTitle": "Criar fornecedor LLM",
       "editTitle": "Editar fornecedor LLM",
-      "subtitle": "Configure o endpoint do modelo usado pelos avaliadores de juiz LLM.",
       "sectionTitle": "Fornecedor",
       "nameLabel": "Nome",
       "typeLabel": "Tipo de fornecedor",
@@ -22705,9 +22663,7 @@
       "usedBy": {
         "aria": "Testes que usam este",
         "help": "Executam estas etapas na sua própria página. O URL inicial, os ambientes e os segredos deste teste não são usados aí.",
-        "viewAll": "Ver todos os {count} testes",
-        "subtitle": "{folder} · usado por {count} teste | {folder} · usado por {count} testes",
-        "subtitleNoFolder": "Usado por {count} teste | Usado por {count} testes"
+        "viewAll": "Ver todos os {count} testes"
       },
       "recordingIn": "A gravar em {environment}",
       "needsDesktopRecorder": "Precisa da extensão de gravação para desktop",
@@ -22918,7 +22874,6 @@
       "folder": "pasta",
       "willBeCreatedIn": "Será criado em"
     },
-    "pageSubtitle": "Monitorize proativamente disponibilidade, desempenho e jornadas do utilizador a partir de locais globais",
     "pageTitle": "Sintéticos",
     "protocolConfig": {
       "http": {
@@ -24947,7 +24902,6 @@
     "title": "SLOs",
     "notFound": "SLO não encontrado",
     "notFoundDescription": "Este SLO já não existe, ou não tem acesso a este. Pode ter sido eliminado.",
-    "subtitle": "Objetivos de nível de serviço: metas, orçamentos de erro, alertas de taxa de consumo",
     "new": "Novo SLO",
     "newTitle": "Novo SLO",
     "editTitle": "Editar SLO",
@@ -24965,7 +24919,6 @@
     "totalSlos": "Total de SLOs",
     "noGrouping": "Nenhum (uma única série geral)",
     "newAlert": "Novo alerta",
-    "overRolling": "em janela contínua de {window}",
     "searchPlaceholder": "Pesquisar SLO ou tag, ex.: team:payments",
     "loadFailed": "Não foi possível carregar SLOs",
     "requestFailed": "Falha no pedido ({code})",
@@ -26075,7 +26028,6 @@
       "groupWorkloads": "Cargas de trabalho",
       "groupStorage": "Armazenamento",
       "groupAutoscaling": "Escalonamento automático",
-      "subtitle": "Monitorizar clusters, cargas de trabalho e recursos",
       "clusterPickerLabel": "Cluster",
       "clusterPickerLoading": "A carregar clusters…",
       "clusterPickerTrigger": "Cluster: {name}",
@@ -26533,8 +26485,7 @@
       "actions": "Ações"
     },
     "header": {
-      "title": "Bases de dados",
-      "subtitle": "Desempenho e saúde das consultas nas suas bases de dados"
+      "title": "Bases de dados"
     },
     "ai": {
       "suggestFix": "Pergunte à IA como corrigir isto",
@@ -27799,7 +27750,6 @@
     "fromRotation": "de {name}",
     "ownershipMatch": "Corresponde",
     "ownershipSpecificity": "Dimensões",
-    "teamSubtitle": "{tz} · {count} membro | {tz} · {count} membros",
     "statOnCallNow": "De piquete agora",
     "statRotations": "Rotações",
     "statRoutingRules": "Regras de encaminhamento",
@@ -28800,7 +28750,6 @@
     "teamOpenInOnCall": "Ver todos no Piquete",
     "teamCoverage": "Cobertura, próximos {days} dias",
     "teamCoverageHint": "as lacunas são a única coisa que vale a pena olhar aqui",
-    "teamOwnsRules": "possui {count} regra de encaminhamento | possui {count} regras de encaminhamento",
     "teamCoveredNow": "Coberto agora",
     "teamOverview": "Visão geral",
     "teamAnsweredBy": "Respondido por",
@@ -29493,7 +29442,6 @@
       "allClearNone": "Nada exigiu a sua atenção."
     },
     "title": "AutoObserve",
-    "subtitle": "Envie os seus dados. O OpenObserve encontra os problemas e avisa-o, com a sua melhor leitura da causa. Quando está tudo calmo, mostra o que verificou e o que não consegue ver.",
     "tabs": {
       "issues": "Problemas",
       "coverage": "Cobertura",
@@ -30425,7 +30373,6 @@
     },
     "issuesPage": {
       "title": "Todos os problemas",
-      "sentence": "Cada problema que eu abri {within}. Escolha um para ver o que aconteceu e o que fiz em relação a isso.",
       "ranges": {
         "week": "Últimos 7 dias",
         "month": "Últimos 30 dias",
@@ -32182,7 +32129,6 @@
   },
   "fleet": {
     "title": "Gestão de frota",
-    "subtitle": "Registe coletores OpenTelemetry, versione as respetivas configurações e implemente alterações em segurança",
     "addCollector": "Adicionar coletor",
     "tabs": {
       "collectors": "Coletores",
@@ -32721,7 +32667,6 @@
     },
     "editor": {
       "pageTitle": "Editor de configuração",
-      "newDescription": "Nova configuração de coletor",
       "visual": "Visual",
       "issues": "{count} problema | {count} problemas",
       "valid": "Válida",

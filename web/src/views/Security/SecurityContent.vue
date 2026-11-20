@@ -945,7 +945,6 @@ const STATUS_VARIANT: Record<string, "success-soft" | "blue-soft" | "amber-soft"
 <template>
   <OPageLayout
     :title="t('siem.content.title')"
-    :subtitle="t('siem.content.subtitle')"
     icon="menu-book"
     bleed
     :resizable="false"

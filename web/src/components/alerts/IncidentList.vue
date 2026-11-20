@@ -16,12 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="incident-list" class="incident-list h-full">
-    <OPageLayout
-      bleed
-      :title="t('alerts.incidents.title')"
-      icon="notifications-active"
-      :subtitle="t('alerts.incidents.subtitle')"
-    >
+    <OPageLayout bleed :title="t('alerts.incidents.title')" icon="notifications-active">
       <OTable
         ref="qTableRef"
         :data="visibleIncidents"

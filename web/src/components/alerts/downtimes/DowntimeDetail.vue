@@ -18,14 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     bleed
     :title="title"
-    :subtitle="subtitle"
     icon="notifications-paused"
     :back="{
       label: t('alerts.downtimes.title'),
       onClick: goBack,
       dataTest: 'downtime-detail-back',
     }"
-    tabs-below
     title-data-test="downtime-detail-title"
   >
     <template #title>
@@ -572,12 +570,6 @@ const stoppedAt = computed<{ label: I18nText; time: string; line: I18nText } | n
         time: zoned,
         line: t("alerts.downtimes.detail.cancelledAtTime", { time: zoned }),
       };
-});
-
-const subtitle = computed<I18nText | undefined>(() => {
-  if (!downtime.value) return undefined;
-  const planned = scheduleSentence(downtime.value.schedule, t);
-  return stoppedAt.value ? raw(`${planned} · ${stoppedAt.value.line}`) : planned;
 });
 
 const repeats = computed(() => !!downtime.value && downtime.value.schedule.repeat !== "none");

@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="info"
     class="date-time-container inline-flex items-stretch [&_button:focus-visible]:z-1"
     :class="{
-      'rounded-default border-button-outline-border min-h-7.5 border': !hideRangeShift,
+      'gap-0.5': !hideRangeShift,
       'w-full [&>*]:flex-1': fieldAppearance,
     }"
   >
@@ -28,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="date-time-prev-btn"
         variant="ghost"
         size="icon-xs-sq"
-        class="border-button-outline-border h-auto! rounded-e-none! border-e!"
         icon-left="chevron-left"
         :aria-label="t('common.previous')"
         :disabled="disable || disablePrevShift"
@@ -57,11 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
-            'md:min-w-71.5': !disableRelative && selectedType === 'absolute',
             'w-fit': disableRelative,
-            'h-auto! rounded-none! border-0!': !hideRangeShift,
-            'border-select-border! enabled:hover:border-select-border-hover! w-full':
-              fieldAppearance,
+            'border-select-border! enabled:hover:border-select-border-hover!':
+              fieldAppearance || variant === 'outline',
+            'w-full': fieldAppearance,
           }"
           class="max-md:max-w-full max-md:min-w-0"
           :disabled="disable"
@@ -202,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           calendarToken === null &&
                           relativePeriod == period.value &&
                           relativeValue == item
-                            ? 'bg-button-primary! text-button-primary-foreground!'
+                            ? 'bg-selected-bg! text-selected-fg!'
                             : `bg-text-heading/7! ${relativePeriod}`
                         "
                         variant="ghost"
@@ -383,7 +381,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="date-time-next-btn"
         variant="ghost"
         size="icon-xs-sq"
-        class="border-button-outline-border h-auto! rounded-s-none! border-s!"
         icon-left="chevron-right"
         :aria-label="t('common.next')"
         :disabled="disable || isNextShiftDisabled()"
@@ -1443,15 +1440,27 @@ export default defineComponent({
       };
       const rel = label.match(/^Past (\d+) ([A-Za-z]+?)s?$/);
       if (rel) return `Past ${rel[1]}${REL_UNIT[rel[2].toLowerCase()] ?? ` ${rel[2]}`}`;
+      return compactAbsoluteLabel(label);
+    };
+
+    // `onlyYear`: drop the year only when both ends fall in it, so an older range never reads as this year.
+    const compactAbsoluteLabel = (label: string, onlyYear?: string) => {
       const abs = label.match(
-        /^(\d{4})\/(\d{2}\/\d{2}) (\d{2}:\d{2})(?::\d{2})? - (\d{4})\/(\d{2}\/\d{2}) (\d{2}:\d{2})(?::\d{2})?$/,
+        /^(\d{4})\/(\d{2}\/\d{2}) (\d{2}:\d{2}(?::\d{2})?) - (\d{4})\/(\d{2}\/\d{2}) (\d{2}:\d{2}(?::\d{2})?)$/,
       );
+      const stamp = (year: string, day: string, time: string) =>
+        Date.parse(`${year}-${day.replace("/", "-")}T${time.length === 5 ? `${time}:00` : time}Z`);
+      // A span of an hour or less keeps its seconds, so a tight window still reads exactly.
+      const keepSeconds =
+        !!abs && stamp(abs[4], abs[5], abs[6]) - stamp(abs[1], abs[2], abs[3]) <= 3_600_000;
+      const trim = (time: string) => (keepSeconds ? time : time.replace(/^(\d{2}:\d{2}):\d{2}$/, "$1"));
       // The year is only dropped when both ends share it, or a cross-year range would read as same-day.
-      if (!abs || abs[1] !== abs[4]) return label.replace(/\b(\d{2}:\d{2}):\d{2}\b/g, "$1");
+      if (!abs || abs[1] !== abs[4] || (onlyYear && abs[1] !== onlyYear))
+        return keepSeconds ? label : label.replace(/\b(\d{2}:\d{2}):\d{2}\b/g, "$1");
       const [, , fromDay, fromTime, , toDay, toTime] = abs;
       return fromDay === toDay
-        ? `${fromDay} ${fromTime} - ${toTime}`
-        : `${fromDay} ${fromTime} - ${toDay} ${toTime}`;
+        ? `${fromDay} ${trim(fromTime)} - ${trim(toTime)}`
+        : `${fromDay} ${trim(fromTime)} - ${toDay} ${trim(toTime)}`;
     };
 
     /**
@@ -1464,7 +1473,7 @@ export default defineComponent({
      * back to what's actually applied; see `appliedDisplayValue`.
      * The `||` fallback covers the first paint, before the mount-time apply.
      */
-    const triggerLabel = computed(() => {
+    const fullTriggerLabel = computed(() => {
       if (props.triggerText) return props.triggerText;
       const showsApplied = !props.autoApply && !menuOpen.value;
       // A calendar label is re-derived so an older period keeps naming the right day after midnight.
@@ -1478,16 +1487,34 @@ export default defineComponent({
               tooltipNow.value,
             )
           : null;
-      const label = showsApplied
+      return showsApplied
         ? appliedCalendarLabel || appliedDisplayValue.value || getDisplayValue.value
         : getDisplayValue.value;
-      return isMobile.value ? compactRangeLabel(label) : label;
+    });
+
+    const triggerLabel = computed(() => {
+      const label = fullTriggerLabel.value;
+      if (props.triggerText) return label;
+      if (isMobile.value) return compactRangeLabel(label);
+      return compactAbsoluteLabel(
+        label,
+        timestampToTimezoneDate(tooltipNow.value, zone.value, "yyyy"),
+      );
     });
 
     // Mirrors triggerLabel: the live selection while it is in force or being edited, else the applied one.
     const triggerTooltip = computed(() => {
-      if (!props.autoApply && !menuOpen.value) return calendarTooltip(appliedCalendarToken.value);
-      return selectedType.value === "relative" ? calendarTooltip(calendarToken.value) : undefined;
+      const calendar =
+        !props.autoApply && !menuOpen.value
+          ? calendarTooltip(appliedCalendarToken.value)
+          : selectedType.value === "relative"
+            ? calendarTooltip(calendarToken.value)
+            : undefined;
+      if (calendar) return calendar;
+      // The compact label hides the year and seconds, so the full range stays one hover away.
+      return triggerLabel.value !== fullTriggerLabel.value
+        ? raw(fullTriggerLabel.value)
+        : undefined;
     });
 
     const getDisplayValue = computed(() => {

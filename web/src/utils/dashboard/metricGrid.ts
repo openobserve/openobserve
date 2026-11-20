@@ -89,7 +89,7 @@ export const layoutMetricGrid = (
     const floorY = bandTop + bandH - vGap;
     const xAt = (i: number) => left + hpad + (i / (n - 1)) * (width - 2 * hpad);
     const yAt = (v: number) => floorY - ((v - min) / range) * (floorY - ceilY);
-    const color = cfg?.color || chartColor("--color-chart-metric-text");
+    const color = cfg?.color || chartColor("--color-text-heading");
     const opacity = sparkBackground ? METRIC_SPARKLINE.faintOpacity : 1;
     const out: any[] = [];
     if (cfg?.type === "bar") {
@@ -195,7 +195,7 @@ export const layoutMetricGrid = (
           style: {
             text: s._metricText ?? "",
             fontSize: sharedFontSize,
-            fontWeight: 500,
+            fontWeight: 600,
             align: "center",
             verticalAlign: "middle",
             x: cx,

@@ -21,11 +21,21 @@ describe("OSelect", () => {
   });
 
   it.each([
-    ["sm", "h-[2.125rem]"],
-    ["md", "h-[2.125rem]"],
+    ["xs", "h-6"],
+    ["sm", "h-7"],
+    ["md", "h-8"],
+    ["lg", "h-9"],
   ] as const)("sizes the trigger for %s", (size, expected) => {
     wrapper = mount(OSelect, { props: { size } });
     expect(wrapper.find("button").classes()).toContain(expected);
+  });
+
+  it("defaults to the 28px sm box with a soft focus glow, not a solid ring", () => {
+    wrapper = mount(OSelect);
+    const classes = wrapper.find("button").classes();
+    expect(classes).toContain("h-7");
+    expect(classes).toContain("focus:ring-input-focus-glow");
+    expect(classes).not.toContain("focus:ring-focus-ring-accent");
   });
 
   it("renders a label when prop is provided", () => {

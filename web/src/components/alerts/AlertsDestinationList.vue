@@ -23,8 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alerts.header')"
       title-data-test="alert-destinations-list-title"
       icon="shield-alert-outline"
-      :subtitle="t('alerts.subtitle')"
-      tabs-below
     >
       <template #header-tabs>
         <AlertSectionTabs />

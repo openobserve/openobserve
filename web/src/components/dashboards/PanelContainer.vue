@@ -33,11 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <PanelBar
-        class="@container/panelbar w-full flex-nowrap"
-        :class="{
-          'border-b-transparent': isPanelLoading,
-          'bg-status-error-bg!': kioskFailed,
-        }"
+        class="@container/panelbar w-full flex-nowrap border-b-transparent!"
+        :class="kioskFailed ? 'bg-status-error-bg!' : 'bg-transparent!'"
         data-test="dashboard-panel-bar"
       >
         <OIcon
@@ -58,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- shrink-[1000]: at factor 1 a long title still hands a fraction of a pixel of its cut to the freshness label, which ellipsises it to "no…". -->
         <OTruncatedText
           as="div"
-          class="text-compact text-text-heading me-5 shrink-[1000] font-medium tracking-[0.02em] @max-[22rem]/panelbar:me-1"
+          class="text-compact text-text-heading me-5 shrink-[1000] font-semibold @max-[22rem]/panelbar:me-1"
           :class="[
             curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined,
             titleMeta ? 'me-2!' : undefined,
@@ -89,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <span
           v-if="titleMeta"
-          class="text-2xs text-text-secondary me-5 shrink-0 font-normal whitespace-nowrap"
+          class="text-text-secondary me-5 shrink-0 text-xs font-normal whitespace-nowrap"
           data-test="dashboard-panel-header-meta"
           >{{ titleMeta }}</span
         >
@@ -239,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <OButton
           v-if="!viewOnly && !simplifiedPanelView && props.data.description != ''"
-          :class="hoverRevealClass"
+          :class="isLayoutEditing ? 'hidden' : undefined"
           variant="ghost"
           size="icon"
           icon-left="info-outline"
@@ -352,8 +349,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :aria-label="t('panel.refreshPanel')"
           data-test="dashboard-panel-refresh-panel-btn"
           :disabled="isPanelLoading"
-          icon-left="refresh"
         >
+          <!-- 16px, not the 14px default for 24px buttons: at 14px these read as faint specks on every panel. -->
+          <OIcon name="refresh" size="sm" class="size-4!" />
           <OTooltip :content="refreshTooltip" />
         </OButton>
         <!-- simplifiedPanelView panels are ephemeral (Insights / Drill down): delete without a confirm -->
@@ -378,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon"
               data-test="panel-explore-actions-btn"
             >
-              <OIcon name="more-vert" size="sm" />
+              <OIcon name="more-vert" size="sm" class="size-4!" />
             </OButton>
           </template>
           <ODropdownItem
@@ -409,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon"
               :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
             >
-              <OIcon name="more-vert" size="sm" />
+              <OIcon name="more-vert" size="sm" class="size-4!" />
               <span
                 v-if="showDraftDot"
                 class="bg-button-pending-bg ring-button-pending-bg/30 pointer-events-none absolute -end-0.5 top-0 size-2.5 rounded-full ring-3 in-[.fullscreen]:hidden"
@@ -418,55 +416,149 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OButton>
           </template>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && !isLayoutEditing"
-            data-test="dashboard-edit-panel"
-            @select="onPanelModifyClick('EditPanel')"
-            shortcut-id="panelEdit"
-          >
-            <template #icon-left><OIcon name="edit" size="sm" /></template>
-            {{ t("panel.editPanel") }}
-            <template v-if="showDraftDot" #icon-right>
-              <OTooltip :content="t('dashboard.panelDraft.panelDot')" side="right">
-                <span
-                  role="img"
-                  :aria-label="t('dashboard.panelDraft.panelDot')"
-                  class="bg-button-pending-bg ring-button-pending-bg/30 size-2 shrink-0 rounded-full ring-2"
-                  data-test="dashboard-panel-edit-draft-dot"
-                />
-              </OTooltip>
-            </template>
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="showDataViewToggle && !isLayoutEditing"
-            data-test="dashboard-panel-data-view-toggle"
-            @select="previewView = isDataView ? 'chart' : 'data'"
-          >
-            <template #icon-left
-              ><OIcon :name="isDataView ? 'show-chart' : 'table-chart'" size="sm"
-            /></template>
-            {{ isDataView ? t("panel.showChart") : t("panel.showRawData") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && layoutMode !== 'view'"
-            data-test="dashboard-edit-layout"
-            @select="onPanelModifyClick('EditLayout')"
-          >
-            <template #icon-left><OIcon name="dashboard-customize" size="sm" /></template>
-            {{ t("panel.editLayout") }}
-          </ODropdownItem>
-          <!-- Only the layout dialog belongs to layout edit mode; every other action saves on its own. -->
-          <template v-if="!isLayoutEditing">
+          <ODropdownGroup v-if="!isLayoutEditing" :label="t('common.view')">
             <ODropdownItem
-              v-if="!simplifiedPanelView"
-              data-test="dashboard-duplicate-panel"
-              @select="onPanelModifyClick('DuplicatePanel')"
-              shortcut-id="panelDuplicate"
+              v-if="!viewOnly && !simplifiedPanelView && !isLayoutEditing"
+              data-test="dashboard-panel-fullscreen-menu-item"
+              @select="onPanelModifyClick('ViewPanel')"
             >
-              <template #icon-left><OIcon name="content-copy" size="sm" /></template>
-              {{ t("panel.duplicate") }}
+              <template #icon-left><OIcon name="fullscreen" size="sm" /></template>
+              {{ t("panel.fullScreen") }}
+            </ODropdownItem>
+          </ODropdownGroup>
+          <ODropdownSeparator v-if="!isLayoutEditing" />
+          <ODropdownGroup :label="t('common.edit')">
+            <ODropdownItem
+              v-if="!simplifiedPanelView && !isLayoutEditing"
+              data-test="dashboard-edit-panel"
+              @select="onPanelModifyClick('EditPanel')"
+              shortcut-id="panelEdit"
+            >
+              <template #icon-left><OIcon name="edit" size="sm" /></template>
+              {{ t("panel.editPanel") }}
+              <template v-if="showDraftDot" #icon-right>
+                <OTooltip :content="t('dashboard.panelDraft.panelDot')" side="right">
+                  <span
+                    role="img"
+                    :aria-label="t('dashboard.panelDraft.panelDot')"
+                    class="bg-button-pending-bg ring-button-pending-bg/30 size-2 shrink-0 rounded-full ring-2"
+                    data-test="dashboard-panel-edit-draft-dot"
+                  />
+                </OTooltip>
+              </template>
             </ODropdownItem>
             <ODropdownItem
+              v-if="!simplifiedPanelView && layoutMode !== 'view'"
+              data-test="dashboard-edit-layout"
+              @select="onPanelModifyClick('EditLayout')"
+            >
+              <template #icon-left><OIcon name="dashboard-customize" size="sm" /></template>
+              {{ t("panel.editLayout") }}
+            </ODropdownItem>
+            <template v-if="!isLayoutEditing">
+              <ODropdownItem
+                v-if="!simplifiedPanelView"
+                data-test="dashboard-duplicate-panel"
+                @select="onPanelModifyClick('DuplicatePanel')"
+                shortcut-id="panelDuplicate"
+              >
+                <template #icon-left><OIcon name="content-copy" size="sm" /></template>
+                {{ t("panel.duplicate") }}
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="!simplifiedPanelView"
+                data-test="dashboard-move-to-another-panel"
+                @select="onPanelModifyClick('MovePanel')"
+              >
+                <template #icon-left><OIcon name="drive-file-move" size="sm" /></template>
+                {{ t("panel.moveToAnotherTab") }}
+              </ODropdownItem>
+            </template>
+          </ODropdownGroup>
+          <template v-if="!isLayoutEditing">
+            <ODropdownSeparator />
+            <ODropdownGroup :label="t('menu.data')">
+              <ODropdownItem
+                v-if="showDataViewToggle && !isLayoutEditing"
+                data-test="dashboard-panel-data-view-toggle"
+                @select="previewView = isDataView ? 'chart' : 'data'"
+              >
+                <template #icon-left
+                  ><OIcon :name="isDataView ? 'show-chart' : 'table-chart'" size="sm"
+                /></template>
+                {{ isDataView ? t("panel.showChart") : t("panel.showRawData") }}
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+                data-test="dashboard-query-inspector-panel"
+                @select="showViewPanel = true"
+                shortcut-id="panelQueryInspector"
+              >
+                <template #icon-left><OIcon name="manage-search" size="sm" /></template>
+                {{ t("panel.queryInspector") }}
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="
+                  !simplifiedPanelView && metaData && metaData.queries?.length > 0 && goToLogsLocked
+                "
+                disabled
+                focusable-unavailable
+                icon-left="lock"
+                :description="goToLogsLockedReason"
+                data-test="dashboard-move-to-logs-module"
+              >
+                {{ t("panel.goToLogs") }}
+              </ODropdownItem>
+              <ODropdownItem
+                v-else-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+                :disabled="props.data.queryType != 'sql'"
+                data-test="dashboard-move-to-logs-module"
+                @select="onLogPanel"
+                icon-left="search"
+              >
+                {{ t("panel.goToLogs") }}
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="!simplifiedPanelView"
+                data-test="dashboard-refresh-without-cache"
+                @select="onPanelModifyClick('Refresh')"
+                icon-left="cached"
+              >
+                {{ t("dashboard.panelContainer.refreshCacheReload") }}
+              </ODropdownItem>
+              <CreateAlertAction
+                v-if="!simplifiedPanelView && canCreateAlert"
+                variant="menu-item"
+                source="panel"
+                :build="buildPanelAlertPrefill"
+                :disabled-reason="alertDisabledReason"
+                data-test="dashboard-create-alert-from-panel"
+              />
+            </ODropdownGroup>
+            <template v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0">
+              <ODropdownSeparator />
+              <ODropdownGroup :label="t('common.export')">
+                <ODropdownItem
+                  v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+                  data-test="dashboard-panel-download-as-csv-btn"
+                  @select="PanleSchemaRendererRef?.downloadDataAsCSV(panelFileName)"
+                >
+                  <template #icon-left><OIcon name="file-download" size="sm" /></template>
+                  {{ t("panel.downloadAsCSV") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+                  data-test="dashboard-panel-download-as-json-btn"
+                  @select="PanleSchemaRendererRef?.downloadDataAsJSON(panelFileName)"
+                >
+                  <template #icon-left><OIcon name="data-object" size="sm" /></template>
+                  {{ t("panel.downloadAsJSON") }}
+                </ODropdownItem>
+              </ODropdownGroup>
+            </template>
+            <ODropdownSeparator />
+            <ODropdownItem
+              variant="destructive"
               data-test="dashboard-delete-panel"
               @select="onPanelModifyClick('DeletePanel')"
               shortcut-id="panelDelete"
@@ -476,79 +568,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               /></template>
               {{ t("panel.deletePanel") }}
             </ODropdownItem>
-            <ODropdownItem
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-              data-test="dashboard-query-inspector-panel"
-              @select="showViewPanel = true"
-              shortcut-id="panelQueryInspector"
-            >
-              <template #icon-left><OIcon name="manage-search" size="sm" /></template>
-              {{ t("panel.queryInspector") }}
-            </ODropdownItem>
-            <ODropdownItem
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-              data-test="dashboard-panel-download-as-csv-btn"
-              @select="PanleSchemaRendererRef?.downloadDataAsCSV(panelFileName)"
-            >
-              <template #icon-left><OIcon name="file-download" size="sm" /></template>
-              {{ t("panel.downloadAsCSV") }}
-            </ODropdownItem>
-            <ODropdownItem
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-              data-test="dashboard-panel-download-as-json-btn"
-              @select="PanleSchemaRendererRef?.downloadDataAsJSON(panelFileName)"
-            >
-              <template #icon-left><OIcon name="data-object" size="sm" /></template>
-              {{ t("panel.downloadAsJSON") }}
-            </ODropdownItem>
-            <ODropdownItem
-              v-if="
-                !simplifiedPanelView && metaData && metaData.queries?.length > 0 && goToLogsLocked
-              "
-              disabled
-              focusable-unavailable
-              icon-left="lock"
-              :description="goToLogsLockedReason"
-              data-test="dashboard-move-to-logs-module"
-            >
-              {{ t("panel.goToLogs") }}
-            </ODropdownItem>
-            <ODropdownItem
-              v-else-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-              :disabled="props.data.queryType != 'sql'"
-              data-test="dashboard-move-to-logs-module"
-              @select="onLogPanel"
-              icon-left="search"
-            >
-              {{ t("panel.goToLogs") }}
-            </ODropdownItem>
-            <ODropdownItem
-              v-if="!simplifiedPanelView"
-              data-test="dashboard-refresh-without-cache"
-              @select="onPanelModifyClick('Refresh')"
-              icon-left="cached"
-            >
-              {{ t("dashboard.panelContainer.refreshCacheReload") }}
-            </ODropdownItem>
-            <ODropdownItem
-              v-if="!simplifiedPanelView"
-              data-test="dashboard-move-to-another-panel"
-              @select="onPanelModifyClick('MovePanel')"
-            >
-              <template #icon-left><OIcon name="drive-file-move" size="sm" /></template>
-              {{ t("panel.moveToAnotherTab") }}
-            </ODropdownItem>
-            <!-- Alert creation is shared platform machinery: this contributes the
-                 panel's state through a pure adapter and the action owns the rest
-                 (label, confirm dialog, transport). See CreateAlertAction.vue. -->
-            <CreateAlertAction
-              v-if="!simplifiedPanelView && canCreateAlert"
-              variant="menu-item"
-              source="panel"
-              :build="buildPanelAlertPrefill"
-              :disabled-reason="alertDisabledReason"
-              data-test="dashboard-create-alert-from-panel"
-            />
           </template>
         </ODropdown>
       </PanelBar>
@@ -750,6 +769,8 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
@@ -859,6 +880,8 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
+    ODropdownGroup,
+    ODropdownSeparator,
     OTooltip,
     OTruncatedText,
     CreateAlertAction,

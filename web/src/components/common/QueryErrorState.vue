@@ -100,6 +100,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :hide-action="true"
       class="w-full shrink-0"
     >
+      <!-- A compact mark so the message, not the art, leads the state. -->
+      <template #illustration>
+        <component :is="errorIllustration" :width="80" :animated="false" />
+      </template>
       <template #title>
         <span
           :class="tone === 'error' ? 'text-status-error-text' : undefined"
@@ -173,7 +177,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OEmptyState>
 
     <!-- Detail panel + buttons (outside OEmptyState — avoids its overflow:hidden) -->
-    <div v-if="hasAnyContent" class="mx-auto flex w-full max-w-2xl flex-col gap-3 px-6">
+    <!-- Two 18rem cards plus their gap, so the panel edges line up with the card row. -->
+    <div
+      v-if="hasAnyContent"
+      class="mx-auto flex w-full max-w-[min(36.625rem,calc(100%-3rem))] flex-col gap-3"
+    >
       <ErrorDetailPanel
         :summary-line="explanation ? '' : summaryLine"
         :detail-body="detailBody"
@@ -185,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div class="flex flex-wrap items-center justify-center gap-2">
         <OButton
-          variant="ghost"
+          variant="outline"
           size="sm"
           :icon-left="copied ? 'check' : 'content-copy'"
           data-test="query-error-copy-btn"
@@ -195,9 +203,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="aiEnabled && (isQueryError || errorCode === 0)"
-          variant="ghost"
+          variant="outline"
           size="sm"
-          class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
           data-test="query-error-ask-ai-btn"
           @click="emit('ask-ai')"
         >
@@ -219,10 +226,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mt-2 flex justify-center"
     >
       <OButton
-        variant="ghost"
+        variant="outline"
         size="sm"
         icon-left="bolt"
-        class="text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
+        class="[&_svg]:text-ai-accent!"
         data-test="query-error-ask-ai-btn"
         @click="emit('ask-ai')"
       >
@@ -333,10 +340,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         v-if="aiEnabled && (isQueryError || errorCode === 0)"
-        variant="ghost"
+        variant="outline"
         size="sm"
         icon-left="bolt"
-        class="text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
+        class="[&_svg]:text-ai-accent!"
         data-test="query-error-ask-ai-btn"
         @click="emit('ask-ai')"
       >
@@ -356,7 +363,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import type { IllustrationName } from "@/lib/core/EmptyState/illustrations/index";
+import { illustrations, type IllustrationName } from "@/lib/core/EmptyState/illustrations/index";
 import { useQueryError } from "@/composables/useQueryError";
 import { useOrgId } from "@/composables/query";
 import ErrorDetailPanel from "./ErrorDetailPanel.vue";
@@ -479,4 +486,8 @@ const slotProps = computed(() => ({
 }));
 
 const { aiIconSrc } = useAiIcon();
+
+const errorIllustration = computed(
+  () => illustrations[props.illustration ?? codeIllustration.value ?? "broken-panel"],
+);
 </script>

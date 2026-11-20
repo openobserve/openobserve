@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="ingestion-page"
     :title="t('ingestion.header')"
     icon="data-plus-line"
-    tabs-below
     bleed
   >
     <template #actions>

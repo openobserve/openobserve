@@ -29,6 +29,8 @@ const isDisabled = useLockedDisabled(() => props.disable);
 const isActive = computed<boolean>(() => context?.value.modelValue === props.name);
 const isDense = computed<boolean>(() => context?.value.dense ?? false);
 const isVertical = computed<boolean>(() => context?.value.isVertical ?? false);
+// Vertical rails and filled strips share the selected recipe: fill, inset edge, 600.
+const isFilled = computed<boolean>(() => isVertical.value || (context?.value.filled ?? false));
 const isReorderable = computed<boolean>(() => context?.value.reorderable ?? false);
 /** Reorderable, and this tab hasn't opted out (e.g. while its label is edited). */
 const isDraggable = computed<boolean>(() => isReorderable.value && !props.disableDrag);
@@ -59,8 +61,10 @@ const isImgIcon = computed<boolean>(() => Boolean(props.icon?.startsWith("img:")
 /** The resolved src URL (stripped of `img:` prefix) */
 const imgSrc = computed<string>(() => (props.icon?.startsWith("img:") ? props.icon.slice(4) : ""));
 /** True when the icon name is registered in the OIcon SVG registry (kebab-case) */
+// Legacy snake_case glyph names map onto the kebab-case registry, so no icon font is needed.
+const oIconName = computed<string>(() => (props.icon ?? "").replace(/_/g, "-"));
 const isOIcon = computed<boolean>(() =>
-  Boolean(props.icon && (props.icon as keyof typeof iconRegistry) in iconRegistry),
+  Boolean(props.icon && (oIconName.value as keyof typeof iconRegistry) in iconRegistry),
 );
 // Only a horizontal prop label reserves its bold width, so only it turns bold without moving its neighbours.
 const reservesBoldWidth = computed<boolean>(() => Boolean(props.label) && !isVertical.value);
@@ -84,13 +88,9 @@ const baseClasses = computed<string>(() =>
         : slots.trailing
           ? "ps-2 pe-1"
           : "px-2",
-    emboldens.value
-      ? "font-semibold"
-      : isVertical.value && isActive.value
-        ? "font-medium"
-        : "font-normal",
-    "text-sm whitespace-nowrap",
-    isVertical.value ? "rounded-default" : "rounded-t-default",
+    emboldens.value || (isFilled.value && isActive.value) ? "font-semibold" : "font-medium",
+    "text-compact whitespace-nowrap",
+    isFilled.value ? "rounded-default" : "rounded-t-default",
     "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke] duration-(--duration-control) ease-(--ease-control)",
     "select-none",
     "focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-focus-ring-accent",
@@ -104,7 +104,7 @@ const stateClasses = computed<string>(() => {
   if (isDisabled.value && isActive.value) {
     return [
       "text-tabs-active-text cursor-not-allowed opacity-60",
-      isVertical.value
+      isFilled.value
         ? "bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
         : "border-b-2 border-transparent",
     ].join(" ");
@@ -115,13 +115,13 @@ const stateClasses = computed<string>(() => {
   if (isActive.value) {
     // OTabs draws the one sliding underline, so a horizontal tab keeps a transparent border the size of its inactive one.
     return [
-      "text-tabs-active-text cursor-pointer",
-      isVertical.value
-        ? "bg-tabs-active-bg ring-tabs-indicator ring-1 ring-inset"
+      isFilled.value ? "text-selected-fg cursor-pointer" : "text-tabs-active-text cursor-pointer",
+      isFilled.value
+        ? "bg-tabs-active-bg ring-selected-border ring-1 ring-inset"
         : "border-b-2 border-transparent",
     ].join(" ");
   }
-  if (isVertical.value) {
+  if (isFilled.value) {
     return "text-text-body cursor-pointer enabled:hover:text-tabs-hover-text enabled:hover:bg-tabs-rail-hover-bg";
   }
   return "text-tabs-inactive-text cursor-pointer enabled:hover:text-tabs-hover-text border-b-2 border-transparent";
@@ -138,6 +138,7 @@ const heightClasses = computed<string>(() => {
   if (isVertical.value) {
     return "py-1.5";
   }
+  if (isFilled.value) return isDense.value ? "h-7" : "h-8";
   return isDense.value ? "h-8" : "h-10";
 });
 </script>
@@ -218,18 +219,11 @@ const heightClasses = computed<string>(() => {
           <!-- OIcon registry name (kebab-case SVG icon) -->
           <OIcon
             v-else-if="icon && isOIcon"
-            :name="icon as any"
+            :name="oIconName as any"
             size="sm"
             class="o-tab__icon shrink-0"
             :class="iconToneClass"
           />
-          <!-- Fallback: Material icon font glyph (legacy underscore names) -->
-          <span
-            v-else-if="icon"
-            class="o-tab__icon material-icons-outlined shrink-0 text-base leading-none"
-            :class="iconToneClass"
-            >{{ icon }}</span
-          >
         </slot>
         <span
           v-if="label"

@@ -22,9 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label: t('alerts.incidents.goBack'),
         dataTest: 'incident-detail-back-btn',
       }"
-      :subtitle="t('alerts.incidents.incident')"
       title-overflow="visible"
-      tabs-below
       bleed
     >
       <!-- Incident name — click the title to rename, Enter or blur saves,

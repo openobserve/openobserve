@@ -1424,6 +1424,8 @@
     "selectOrganization": "请选择一个组织"
   },
   "search": {
+    "liveRefreshingEvery": "Live: refreshing every {interval}",
+    "rowsPerPageLabel": "{n} / page",
     "queryFailed": "查询失败",
     "unknownError": "未知错误",
     "selectedLabel": "已选择",
@@ -2075,7 +2077,6 @@
   "menu": {
     "alertCalibration": "告警校准",
     "autoobserve": "AutoObserve",
-    "upgradeToProPlan": "升级到 PRO 计划",
     "home": "主页",
     "about": "关于",
     "index": "数据流",
@@ -2134,7 +2135,6 @@
   },
   "profiles": {
     "title": "性能分析",
-    "subtitle": "按函数跟踪 CPU、内存和锁的使用情况",
     "stream": "数据流",
     "dataSource": "数据源",
     "service": "服务",
@@ -2285,7 +2285,6 @@
     "from": "从",
     "to": "到",
     "title": "用户体验监控",
-    "subtitle": "监控真实用户会话、错误和前端性能",
     "issueColumn": "问题",
     "trendColumn": "趋势",
     "usersColumn": "用户",
@@ -3325,7 +3324,6 @@
         "bulkDeleteMessage": "删除 {count} 个命名事件？使用它的漏斗将显示已删除步骤标签。 | 删除 {count} 个命名事件？使用它们的漏斗将显示已删除步骤标签。",
         "bulkDeleteInUseMessage": "删除 {count} 个命名事件？已保存的漏斗将为以下项显示“已删除事件”步骤：{names}。 | 删除 {count} 个命名事件？已保存的漏斗将为以下项显示“已删除事件”步骤：{names}。",
         "notFound": "此命名事件已不存在",
-        "editorApp": "应用：{app}",
         "details": "详细信息",
         "opParam": "URL 参数",
         "opRef": "来源主机",
@@ -4004,11 +4002,6 @@
     "license_downgrade_limit": "每日限额从 {old} 变为 {new}",
     "license_downgrade_expiry": "到期时间从 {old} 变为 {new}",
     "license_limit_per_day": "{gb} GB/天",
-    "header_button": {
-      "cloud_features": "{product} 功能",
-      "enterprise_edition": "版本：企业版",
-      "get_enterprise_free": "获取OpenObserve 企业版（免费）"
-    },
     "enterprise_offer": {
       "cloud": {
         "hero_title": "企业功能",
@@ -4203,7 +4196,14 @@
     "usageChartDate": "{month}月{day}日",
     "usageChartDay": "第 {day} 天",
     "usageChartUsage": "用量：{value}",
-    "startFreeTrial": "开始免费试用"
+    "startFreeTrial": "开始免费试用",
+    "header_button": {
+      "upgrade": "Upgrade",
+      "enterprise_tooltip": "About {product} — Enterprise edition",
+      "cloud_features": "{product} 功能",
+      "enterprise_edition": "版本：企业版",
+      "get_enterprise_free": "获取OpenObserve 企业版（免费）"
+    }
   },
   "login": {
     "lockedOut": "登录失败次数过多。请在 {duration} 后重试，或联系管理员。",
@@ -4379,7 +4379,6 @@
     "nameInvalid": "使用小写字母、数字和连字符（最多 {max} 个字符）",
     "createFailed": "创建服务账户失败。请重试。",
     "updateFailed": "更新服务账户失败。请重试。",
-    "headerSubtitle": "API 的编程访问令牌",
     "search": "搜索服务账号",
     "rotate": "轮换令牌",
     "deleteServiceAccount": "删除服务帐号",
@@ -4472,7 +4471,6 @@
     "mcpServerLabel": "MCP 服务器",
     "mcpServerDesc": "通过 {product} 连接 AI 客户端",
     "mcpServerHeader": "MCP 服务器",
-    "mcpServerHeaderSubtitle": "将 Claude、Cursor、VS Code 及其他 AI 客户端连接到此组织。",
     "invitationsDesc": "待处理和已发送的成员邀请",
     "groupsDesc": "将用户分组在一起以分配角色",
     "rolesDesc": "定义权限和访问策略",
@@ -4901,7 +4899,6 @@
       "other": "其他"
     },
     "invitationList": {
-      "subtitle": "待处理和已发送的成员邀请",
       "loadingPending": "正在加载待处理的邀请...",
       "failedLoadPending": "加载待处理邀请失败",
       "accepting": "正在接受邀请...",
@@ -4955,7 +4952,6 @@
       "errorCreating": "创建组时出错"
     },
     "quotaPage": {
-      "subtitle": "按角色应用的使用限制",
       "selectOrganization": "选择组织",
       "editQuota": "编辑配额",
       "selectApiCategory": "选择 API 类别",
@@ -5082,7 +5078,6 @@
       "brand": "亮蓝色"
     },
     "list": {
-      "subtitle": "显示在应用顶部、面向所有组织（或仅您选择的组织）的公告。",
       "liveNow": "正在实时展示",
       "liveNowEmpty": "当前没有正在展示的横幅。",
       "liveOnlyFor": "仅对 {orgs}",
@@ -5276,7 +5271,6 @@
     },
     "deleteField": "删除字段",
     "header": "数据流",
-    "subtitle": "索引管理和流配置",
     "streamNameHelpText": "仅使用字母数字字符、下划线和冒号。",
     "search": "搜索数据流",
     "emptyOr": "或者：",
@@ -5367,7 +5361,6 @@
   },
   "workflow": {
     "header": "工作流",
-    "subtitle": "使用触发器、逻辑和目标实现操作自动化",
     "create": "新建工作流",
     "createSuccess": "工作流创建成功",
     "name": "工作流名称",
@@ -6279,7 +6272,6 @@
     "functionName": "函数名称",
     "remoteDestination": "远程目标",
     "failedToLoadPipeline": "加载流水线失败",
-    "subtitle": "在飞行中转换、丰富和路由数据",
     "deleteNode": "删除",
     "addPipeline": "添加流水线",
     "deletePipeline": "删除流水线",
@@ -6526,7 +6518,6 @@
     "order": "执行顺序",
     "applyBeforeFlattening": "在扁平化之前应用",
     "header": "函数",
-    "subtitle": "在流水线中应用的可复用 VRL 函数",
     "clickTestFunctionHint": "请单击“测试函数”查看事件",
     "add": "添加函数",
     "search": "搜索函数",
@@ -6550,7 +6541,6 @@
     "enterFunctionPrompt": "输入提示生成函数",
     "associatedFunctionHeader": "关联函数",
     "enrichmentTables": "富化表",
-    "enrichmentTablesSubtitle": "丰富采集数据的查找表",
     "addEnrichmentTable": "添加富化表",
     "updateEnrichmentTable": "更新富化表",
     "searchEnrichmentTable": "搜索富化表",
@@ -10147,7 +10137,6 @@
     "publicLinks": {
       "panelTitle": "公开链接",
       "pageTitle": "公开仪表盘",
-      "pageSubtitle": "此组织中的所有公开链接",
       "panelTitleFor": "公开链接 — {name}",
       "intro": "任何拥有公开链接的人无需登录即可查看此仪表盘。",
       "editNote": "链接地址保持不变。更改将在公开页面下次更新时显示。",
@@ -10534,7 +10523,6 @@
     "tabOverview": "概述",
     "tabUsage": "用量",
     "removeHomeDashboard": "移除主控制面板",
-    "subtitle": "您的可观测性工作空间一览",
     "resources": "资源",
     "explore": "探索"
   },
@@ -11476,7 +11464,6 @@
   },
   "alertCalibration": {
     "title": "告警校准",
-    "subtitle": "依据告警自身的运行历史，衡量告警的表现",
     "configure": "配置",
     "runNow": "立即运行",
     "runNowHint": "请求立即运行，而不是等待下一次运行。如果已有运行到期或正在进行，则会直接响应该请求。",
@@ -11898,7 +11885,6 @@
     "detail": {
       "title": "{time} 的摘要",
       "titleLoading": "摘要",
-      "subtitle": "覆盖 {start} 至 {end}，生成于 {time}",
       "back": "摘要",
       "unavailableTitle": "摘要不可用",
       "noRecords": "此次运行未找到记录。",
@@ -12707,7 +12693,6 @@
       "commentPlaceholder": "写评论...",
       "sendComment": "发送评论",
       "title": "事件",
-      "subtitle": "事件管理与跟踪",
       "search": "搜索事件...",
       "status": "状态",
       "severity": "严重程度",
@@ -14158,7 +14143,6 @@
       "firingTotal": "触发中",
       "observedTotal": "分组",
       "nOfMFiring": "{firing} / {observed} 个分组正在触发",
-      "groupedBy": "按 {columns} 分组",
       "groupBy": "分组依据",
       "criticalCondition": "严重条件",
       "warningCondition": "警告条件",
@@ -14506,7 +14490,6 @@
         "startDateRequired": "请选择第一天。"
       },
       "title": "停机时间",
-      "subtitle": "按计划执行的时间窗口，在此期间告警、异常检测和合成监控检查继续运行，但停止发送通知",
       "newDowntime": "新建停机时间",
       "filterAll": "全部",
       "filterOnce": "一次性",
@@ -15416,7 +15399,6 @@
   },
   "alert_sources": {
     "header": "外部告警源",
-    "subtitle": "发送来自 Grafana、Prometheus Alertmanager 或任何可调用 webhook 的工具的告警——它们将显示在此处，并自动关联到事件中。",
     "acceptsAnyFormat": "接受任何 webhook 格式",
     "revealToken": "显示完整 URL",
     "hideToken": "隐藏完整 URL",
@@ -16504,9 +16486,6 @@
     "modelPricingEditor": {
       "copySuffix": "（副本）"
     },
-    "modelPricingList": {
-      "subtitle": "LLM 模型成本配置"
-    },
     "orgStorageSettings": {
       "subtitle": "将此组织的数据存储在您自己的桶中",
       "awsCredentials": "AWS 凭证",
@@ -16541,9 +16520,6 @@
       "settingsUpdated": "组织设置更新成功",
       "settingsSaveError": "保存组织设置时出错"
     },
-    "aiToolsetsPage": {
-      "subtitle": "配置 AI 工具集成"
-    },
     "cipherKeysPage": {
       "subtitle": "用于加密和解密敏感字段值的密钥",
       "delete": "删除",
@@ -16560,15 +16536,11 @@
       "bulkDeleteFailed": "删除 {count} 个加密密钥失败",
       "bulkDeleteError": "删除加密密钥时出错"
     },
-    "correlationSettingsPage": {
-      "subtitle": "遥测关联配置"
-    },
     "licensePage": {
       "unexpectedError": "意外错误",
       "daysRemaining": "距离许可证过期还有 {days} 天"
     },
     "nodesPage": {
-      "subtitle": "集群节点及其健康状态",
       "to": "至",
       "name": "名称",
       "loadingData": "正在加载数据，请稍候...",
@@ -16656,7 +16628,6 @@
       "processingTrialExtension": "正在处理试用期延长请求，请稍候...",
       "trialExtendedSuccess": "试用期延长成功。",
       "extendTrialError": "试用期延长失败，请重试。",
-      "subtitle": "创建和管理组织",
       "addContract": "添加合同",
       "extendTrialTitle": "延长 {name} 的试用",
       "extendTrialSubtitle": "设置新的试用延长时段。",
@@ -16776,7 +16747,6 @@
       "sourceBuiltIn": "内置"
     },
     "regexPatternList": {
-      "subtitle": "用于编辑的可重用正则表达式模式",
       "exportTitle": "导出正则表达式模式",
       "delete": "删除",
       "bulkDeleteTitle": "删除正则表达式模式",
@@ -16870,7 +16840,6 @@
         "valueMismatch": "已找到 TXT 记录，但值不匹配",
         "dnsFailed": "DNS 解析失败"
       },
-      "pageSubtitle": "关联你的邮箱域名，将其用户映射到组织，并控制其中哪些用户可以加入。",
       "linkedTab": "已关联域名",
       "mappingsTab": "映射",
       "accessTab": "被阻止的用户",
@@ -16993,7 +16962,6 @@
       "lastRun": "上次运行",
       "lastRunAt": "运行时间",
       "nextRun": "下次运行",
-      "nextRunAt": "下次运行 {time}",
       "acceptedTooltip": "邮件服务器已接收",
       "cachedTooltip": "已预热仪表盘缓存;不发送邮件",
       "unrecordedTooltip": "最近一次运行的结果未记录；较早的运行可能可在历史记录中查看。",
@@ -17067,9 +17035,7 @@
       "everyHours": "每小时 | 每 {count} 小时",
       "everyDays": "每天 | 每 {count} 天",
       "everyWeeks": "每周 | 每 {count} 周",
-      "everyMonths": "每月 | 每 {count} 个月",
-      "dashboardCount": "{count} 个仪表盘 | {count} 个仪表盘",
-      "recipientCount": "{count} 位收件人 | {count} 位收件人"
+      "everyMonths": "每月 | 每 {count} 个月"
     },
     "frequencyUnits": {
       "days": "天",
@@ -17097,7 +17063,6 @@
     "never": "从不",
     "startDate": "开始日期",
     "header": "报表",
-    "subtitle": "预定报告和导出",
     "searchThisFolder": "这个文件夹",
     "searchAllFolders": "所有文件夹",
     "reloadReports": "重新加载报告",
@@ -18741,7 +18706,6 @@
     },
     "unpriced": {
       "title": "定价缺口",
-      "subtitle": "您的 LLM 追踪中在摄取时没有价格或仅有近似价格的模型",
       "banner": "{count} 个模型在摄取时没有价格或仅有近似价格。其记录的成本可能不完整。 | {count} 个模型在摄取时没有价格或仅有近似价格。其记录的成本可能不完整。",
       "bannerTruncated": "{total} 个模型在您的追踪中于摄取时没有价格或仅有近似价格。其成本可能有误。按 Token 数显示前 {shown} 个。",
       "streamLabel": "数据流",
@@ -18862,7 +18826,6 @@
       "tools": "工具"
     },
     "promptManagement": {
-      "subtitle": "创建、版本化并发布可复用的提示词。",
       "promptSubtitle": "{type} 提示词",
       "prompt": "提示词",
       "promptId": "提示词 ID",
@@ -19302,7 +19265,6 @@
         }
       },
       "workbench": {
-        "subtitle": "{reviewed} / {total} 已审核",
         "itemCounter": "待审项目 {index} / {total}",
         "prev": "上一项",
         "next": "下一项",
@@ -19782,7 +19744,6 @@
       },
       "detail": {
         "fallbackTitle": "数据集",
-        "meta": "{count} 个条目 · 更新于 {updated}",
         "loadError": "加载数据集失败",
         "tryInPlayground": "在演练场中试用",
         "tabs": {
@@ -20746,7 +20707,6 @@
       "backTo": "提供商",
       "createTitle": "创建 LLM 提供商",
       "editTitle": "编辑 LLM 提供商",
-      "subtitle": "配置 LLM 评分器使用的模型端点。",
       "sectionTitle": "提供商",
       "nameLabel": "姓名",
       "typeLabel": "提供商类型",
@@ -22705,9 +22665,7 @@
       "usedBy": {
         "aria": "使用此测试的测试",
         "help": "它们在自己的页面上运行这些步骤。此测试的起始 URL、环境和密钥在那里不会被使用。",
-        "viewAll": "查看全部 {count} 个测试",
-        "subtitle": "{folder} · 被 {count} 个测试使用 | {folder} · 被 {count} 个测试使用",
-        "subtitleNoFolder": "被 {count} 个测试使用 | 被 {count} 个测试使用"
+        "viewAll": "查看全部 {count} 个测试"
       },
       "recordingIn": "正在 {environment} 中录制",
       "needsDesktopRecorder": "需要桌面录制器扩展",
@@ -22918,7 +22876,6 @@
       "folder": "文件夹",
       "willBeCreatedIn": "将创建于"
     },
-    "pageSubtitle": "从全球位置主动监控正常运行时间、性能和用户流程",
     "pageTitle": "合成监测",
     "protocolConfig": {
       "http": {
@@ -24947,7 +24904,6 @@
     "title": "SLO",
     "notFound": "未找到 SLO",
     "notFoundDescription": "此 SLO 不再存在，或者您无权访问它。它可能已被删除。",
-    "subtitle": "服务级别目标：目标、错误预算、消耗率告警",
     "new": "新建 SLO",
     "newTitle": "新建 SLO",
     "editTitle": "编辑 SLO",
@@ -24965,7 +24921,6 @@
     "totalSlos": "SLO 总数",
     "noGrouping": "无（单一整体序列）",
     "newAlert": "新建告警",
-    "overRolling": "在滚动 {window} 内",
     "searchPlaceholder": "搜索 SLO 或标签，例如 team:payments",
     "loadFailed": "无法加载 SLOs",
     "requestFailed": "请求失败（{code}）",
@@ -26075,7 +26030,6 @@
       "groupWorkloads": "工作负载",
       "groupStorage": "存储",
       "groupAutoscaling": "自动扩缩容",
-      "subtitle": "监控集群、工作负载和资源",
       "clusterPickerLabel": "集群",
       "clusterPickerLoading": "正在加载集群…",
       "clusterPickerTrigger": "集群：{name}",
@@ -26533,8 +26487,7 @@
       "actions": "操作"
     },
     "header": {
-      "title": "数据库",
-      "subtitle": "数据库的查询性能与运行状况"
+      "title": "数据库"
     },
     "ai": {
       "suggestFix": "向 AI 询问如何修复",
@@ -27799,7 +27752,6 @@
     "fromRotation": "来自 {name}",
     "ownershipMatch": "匹配",
     "ownershipSpecificity": "维度",
-    "teamSubtitle": "{tz} · {count} 名成员 | {tz} · {count} 名成员",
     "statOnCallNow": "当前值班",
     "statRotations": "轮换",
     "statRoutingRules": "路由规则",
@@ -28800,7 +28752,6 @@
     "teamOpenInOnCall": "在 On-Call 中查看全部",
     "teamCoverage": "接下来 {days} 天覆盖情况",
     "teamCoverageHint": "这里唯一需要关注的是空缺",
-    "teamOwnsRules": "拥有 {count} 条路由规则 | 拥有 {count} 条路由规则",
     "teamCoveredNow": "当前已覆盖",
     "teamOverview": "概览",
     "teamAnsweredBy": "响应人",
@@ -29493,7 +29444,6 @@
       "allClearNone": "没有需要你处理的事项。"
     },
     "title": "AutoObserve",
-    "subtitle": "发送您的数据。OpenObserve 会发现问题并告知您，同时给出对原因的最佳判断。当一切平静时，它会展示已检查的内容以及无法看到的内容。",
     "tabs": {
       "issues": "问题",
       "coverage": "覆盖范围",
@@ -30425,7 +30375,6 @@
     },
     "issuesPage": {
       "title": "所有问题",
-      "sentence": "我在{within}开启的每个问题。选择一个，查看发生了什么以及我做了哪些处理。",
       "ranges": {
         "week": "最近 7 天",
         "month": "最近 30 天",
@@ -32182,7 +32131,6 @@
   },
   "fleet": {
     "title": "机群管理",
-    "subtitle": "注册 OpenTelemetry Collector，对其配置进行版本管理，并安全地推送变更",
     "addCollector": "添加 Collector",
     "tabs": {
       "collectors": "Collector",
@@ -32721,7 +32669,6 @@
     },
     "editor": {
       "pageTitle": "配置编辑器",
-      "newDescription": "新建 Collector 配置",
       "visual": "可视化",
       "issues": "{count} 个问题 | {count} 个问题",
       "valid": "有效",

@@ -274,6 +274,39 @@ describe("convertLogData.ts", () => {
   // ---------------------------------------------------------------------------
   // formatCount
   // ---------------------------------------------------------------------------
+  describe("modern skin options", () => {
+    const base = { title: "T", unparsed_x_data: [], timezone: "UTC" };
+
+    it("adds gap, rounded tops and muted axis labels to the flat histogram", () => {
+      const { options } = convertLogData([1640995200000], [10], { ...base, modern: true });
+      expect(options.series[0].barCategoryGap).toBe("30%");
+      expect(options.series[0].itemStyle.borderRadius).toEqual([3, 3, 0, 0]);
+      expect(options.yAxis.axisLabel.fontSize).toBe(11);
+      expect(options.xAxis.axisLabel.fontSize).toBe(11);
+    });
+
+    it("leaves the flat histogram untouched when not modern", () => {
+      const { options } = convertLogData([1640995200000], [10], base);
+      expect(options.series[0].barCategoryGap).toBeUndefined();
+      expect(options.series[0].itemStyle.borderRadius).toBeUndefined();
+      expect(options.xAxis.axisLabel).toBeUndefined();
+    });
+
+    it("applies the modern bar style to stacked series only when modern", () => {
+      const bd = new Map([["error", [10]]]);
+      const on = convertStackedLogData(
+        [1],
+        bd,
+        { title: "T", timezone: "UTC", modern: true },
+        false,
+      );
+      const off = convertStackedLogData([1], bd, { title: "T", timezone: "UTC" }, false);
+      expect(on.options.series[0].itemStyle.borderRadius).toEqual([3, 3, 0, 0]);
+      expect(on.options.series[0].barCategoryGap).toBe("30%");
+      expect(off.options.series[0].itemStyle.borderRadius).toBeUndefined();
+    });
+  });
+
   describe("formatCount", () => {
     it("returns raw value for numbers below 1000", () => {
       expect(formatCount(0)).toBe("0");

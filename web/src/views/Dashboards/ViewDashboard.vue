@@ -40,9 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'hidden'
             : isFullscreen || store.state.printMode === true
               ? 'stickyHeader fullscreenHeader bg-surface-panel'
-              : 'shrink-0'
+              : 'shrink-0 [&_[data-test=dashboard-back-btn]]:size-7'
         "
-        :subtitle="folderNameFromFolderId"
         :icon="!isFullscreen && store.state.printMode !== true ? undefined : 'dashboard'"
         :back="
           !isFullscreen && store.state.printMode !== true
@@ -71,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="!isFullscreen && !isEditingLayout"
             v-show="store.state.printMode !== true"
-            variant="outline"
+            variant="ghost"
             :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
             @click="addPanelData"
             data-test="dashboard-panel-add"
@@ -131,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isMobile || kioskMode"
             v-model="refreshInterval"
             trigger
+            variant="ghost"
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
             @trigger="onAutoRefreshTick"
             class="dashboard-icons hideOnPrintMode"
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="!isFullscreen && !isEditingLayout"
             v-show="store.state.printMode !== true"
-            variant="outline"
+            variant="ghost"
             :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
             icon-left="edit"
             :aria-label="t('dashboard.layoutEdit.enter')"
@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <template v-if="!isMobile">
               <OButton
-                variant="outline"
+                variant="ghost"
                 size="icon-toolbar"
                 icon-left="undo"
                 :disabled="!canUndoLayout || isSavingLayout"
@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OButton>
               <OButton
-                variant="outline"
+                variant="ghost"
                 size="icon-toolbar"
                 icon-left="redo"
                 :disabled="!canRedoLayout || isSavingLayout"
@@ -318,6 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="isMobile && !kioskMode"
             v-model="refreshInterval"
             trigger
+            variant="ghost"
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
             @trigger="onAutoRefreshTick"
             class="dashboard-icons hideOnPrintMode"
@@ -329,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ShareButton
                 :url="dashboardShareURL"
                 @copy:success="onDashboardShared"
-                variant="outline"
+                variant="ghost"
                 :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
                 :show-label="!isMobile"
                 data-test="dashboard-share-btn"
@@ -341,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #trigger>
                   <OButton
-                    variant="outline"
+                    variant="ghost"
                     size="icon-toolbar"
                     class="w-5"
                     :aria-label="t('dashboard.viewDashboard.moreShareOptions')"
@@ -375,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OButton
               v-if="store.state.printMode === true || isFullscreen"
-              variant="outline"
+              variant="ghost"
               size="icon-toolbar"
               @click="printDashboard"
               data-test="dashboard-print-btn"
@@ -389,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               v-show="store.state.printMode !== true"
-              variant="outline"
+              variant="ghost"
               size="icon-toolbar"
               @click="toggleFullscreen"
               data-test="dashboard-fullscreen-btn"
@@ -410,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown align="end" side="bottom" @close-auto-focus="onMoreOptionsClosed">
                 <template #trigger>
                   <OButton
-                    variant="outline"
+                    variant="ghost"
                     :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
                     icon-left="more-horiz"
                     :aria-label="
@@ -422,6 +423,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template v-if="!isMobile">{{ t("search.menuMore") }}</template>
                     <OTooltip v-if="isMobile" :content="t('common.moreOptions')" />
+                    <template v-if="!isMobile" #icon-right>
+                      <OIcon name="expand-more" size="xs" data-menu-chevron class="-ms-0.5" />
+                    </template>
                     <EditorDraftDot
                       v-if="hasSettingsDraft"
                       corner
@@ -503,7 +507,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-if="isEditingLayout && isMobile">
             <OButton
-              variant="outline"
+              variant="ghost"
               size="icon-toolbar"
               icon-left="undo"
               :disabled="!canUndoLayout || isSavingLayout"
@@ -514,7 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('dashboard.layoutEdit.undo')" />
             </OButton>
             <OButton
-              variant="outline"
+              variant="ghost"
               size="icon-toolbar"
               icon-left="redo"
               :disabled="!canRedoLayout || isSavingLayout"
@@ -2024,7 +2028,7 @@ export default defineComponent({
     // Refresh is the dashboard's main action, but in layout edit Save owns the primary slot.
     const refreshVariant = computed(() => {
       if (isRefreshPending.value) return "pending";
-      return isEditingLayout.value ? "outline" : "primary";
+      return isEditingLayout.value ? "ghost" : "primary";
     });
 
     const refreshOptionsVariant = computed(() => {

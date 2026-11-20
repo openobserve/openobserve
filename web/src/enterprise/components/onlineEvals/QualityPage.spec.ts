@@ -198,12 +198,11 @@ describe("QualityPage", () => {
     expect(wrapper.find('[data-test="filters-slot"]').exists()).toBe(true);
   });
 
-  it("turns the page header into the detail header: back, name, description, tags, Edit config", async () => {
+  it("turns the page header into the detail header: back, name, tags, Edit config", async () => {
     route.query = { tab: "quality", config: "tox" };
     const wrapper = mountPage(undefined, [TOX_CONFIG]);
     await flushPromises();
     expect(wrapper.find('[data-test="quality-page-title"]').text()).toBe("toxicity");
-    expect(wrapper.text()).toContain("Toxicity level of the response.");
     const tags = wrapper.find('[data-test="quality-detail-tags"]');
     expect(tags.findAllComponents({ name: "OTag" }).map((tag) => tag.text())).toEqual([
       "Categorical",

@@ -23,13 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          bottom divider reaches the card edges (like Data Sources / Pipelines) —
          a padded root insets the header and makes it read as a floating bar.
          Padding is reintroduced on the body wrapper below the header instead. -->
-    <OPageLayout
-      :title="t('menu.home')"
-      :subtitle="t('home.subtitle')"
-      icon="home"
-      :tabs-below="tabOrder.length > 1"
-      bleed
-    >
+    <OPageLayout :title="t('menu.home')" icon="home" bleed>
       <template v-if="isMobile && activeHomeTab === 'ai' && !aiLocked" #actions>
         <OButton
           variant="outline"
@@ -42,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
       <!-- Top-level page header: module icon + "Home" title, with the home tabs
-           rendered as a full-width strip below (tabsBelow). The header owns its
+           rendered as a full-width strip below. The header owns its
            own bottom divider when tabs are present; when only a single tab
            exists we hand-draw the border so the header still reads as a header.
            The tab bar keeps its drag-to-reorder behavior (OTabs `reorderable`);

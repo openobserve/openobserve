@@ -235,7 +235,7 @@ describe("OverrideConfigPopup in chart mode", () => {
     await flushPromises();
     await save();
     expect(wrapper.emitted("save")).toBeUndefined();
-    expect($('[data-test="series-override-row-1"]')!.className).toContain("bg-accent/6");
+    expect($('[data-test="series-override-row-1"]')!.className).toContain("bg-selected-bg");
   });
 
   it("writes the display name, unit, decimals and colour, and only the settings that are set", async () => {

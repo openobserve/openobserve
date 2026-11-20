@@ -71,10 +71,10 @@ describe("OSwitch", () => {
 
   it("mirrors the checked-thumb offset for RTL at every size", () => {
     for (const [size, offset] of [
-      ["sm", "2"],
-      ["md", "2.5"],
-      ["lg", "3"],
-      ["xl", "5"],
+      ["sm", "2.5"],
+      ["md", "3.5"],
+      ["lg", "4"],
+      ["xl", "5.5"],
     ] as const) {
       const sized = mount(OSwitch, { props: { size, modelValue: true } });
       const thumb = sized.find('[role="switch"]').find("span");
@@ -83,6 +83,18 @@ describe("OSwitch", () => {
       expect(thumb.classes()).toContain(`rtl:-translate-x-${offset}`);
       sized.unmount();
     }
+  });
+
+  it("draws a 32x18 accent track when on and a neutral track when off", () => {
+    const on = mount(OSwitch, { props: { modelValue: true } }).find('[role="switch"]');
+    expect(on.classes()).toEqual(expect.arrayContaining(["w-8", "h-4.5", "bg-switch-track-on"]));
+    expect(on.find("span").classes()).toEqual(
+      expect.arrayContaining(["bg-white", "shadow-switch-thumb"]),
+    );
+    const off = mount(OSwitch, { props: { modelValue: false } }).find('[role="switch"]');
+    expect(off.classes()).toContain("bg-switch-track-off");
+    expect(off.classes().some((c) => c.startsWith("border"))).toBe(false);
+    expect(off.classes()).toContain("focus-visible:outline-offset-2");
   });
 
   it("parks the thumb at the reading edge while unchecked", () => {

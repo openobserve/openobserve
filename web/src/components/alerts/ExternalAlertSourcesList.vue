@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('alert_sources.header')"
-    :subtitle="t('alert_sources.subtitle')"
     title-data-test="alert-sources-list-title"
     icon="webhook"
     bleed

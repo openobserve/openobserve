@@ -2638,7 +2638,7 @@ describe("SearchBar", () => {
       const group = wrapper.find('[data-test="traces-search-bar-saved-views"]');
       expect(group.classes()).toContain("border");
       expect(group.classes()).toContain("p-0");
-      expect(group.classes()).toContain("h-8.5");
+      expect(group.classes()).toContain("h-7");
       expect(group.find('[data-test="traces-search-bar-saved-views-btn"]').classes()).toContain(
         "h-full!",
       );
@@ -2649,7 +2649,7 @@ describe("SearchBar", () => {
         "traces-search-bar-reset-filters-btn",
         "traces-search-bar-more-menu-btn",
       ]) {
-        expect(wrapper.find(`[data-test="${neighbour}"]`).classes()).toContain("h-8.5");
+        expect(wrapper.find(`[data-test="${neighbour}"]`).classes()).toContain("h-7");
       }
     });
 

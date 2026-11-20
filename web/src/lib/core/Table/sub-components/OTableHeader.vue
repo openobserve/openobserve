@@ -728,7 +728,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   v-else
                   name="unfold-more"
                   size="sm"
-                  class="opacity-40"
+                  class="text-table-sort-icon-inactive"
                   data-test="o2-table-sort-icon-inactive"
                   data-test-sort-direction="none"
                 />
@@ -806,7 +806,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   v-else
                   name="unfold-more"
                   size="sm"
-                  class="opacity-40"
+                  class="text-table-sort-icon-inactive"
                   data-test="o2-table-sort-icon-inactive"
                   data-test-sort-direction="none"
                 />
@@ -1174,7 +1174,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   v-else
                   name="unfold-more"
                   size="sm"
-                  class="shrink-0 opacity-40"
+                  class="shrink-0 text-table-sort-icon-inactive"
                   data-test="o2-table-sort-icon-inactive"
                   data-test-sort-direction="none"
                 />
@@ -1235,7 +1235,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   v-else
                   name="unfold-more"
                   size="sm"
-                  class="shrink-0 opacity-40"
+                  class="shrink-0 text-table-sort-icon-inactive"
                   data-test="o2-table-sort-icon-inactive"
                   data-test-sort-direction="none"
                 />

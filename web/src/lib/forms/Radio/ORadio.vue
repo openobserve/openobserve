@@ -74,7 +74,7 @@ const surfaceClasses = computed(() => [
         "has-[[data-state=checked]]:ring-2 has-[[data-state=checked]]:ring-accent/20",
       ]
     : "items-center",
-  isDisabled.value ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+  isDisabled.value ? "cursor-not-allowed opacity-50" : "cursor-pointer",
 ]);
 </script>
 
@@ -93,7 +93,7 @@ const surfaceClasses = computed(() => [
       Three visually distinct states:
         OFF      → primary outline + white bg + no dot
         ON       → primary outline + white bg + primary dot
-        DISABLED → grey outline + grey bg + 50% opacity + dashed border
+        DISABLED → the wrapper dims to 50%
     -->
     <RadioGroupItem
       :id="props.id"
@@ -110,9 +110,6 @@ const surfaceClasses = computed(() => [
         'bg-radio-bg border-radio-border',
         'enabled:hover:border-radio-hover-border',
         'data-[state=checked]:border-radio-checked-border',
-        'data-disabled:bg-radio-disabled-bg',
-        'data-disabled:border-radio-disabled-border',
-        'data-disabled:border-dashed',
         'data-disabled:cursor-not-allowed',
       ]"
     >

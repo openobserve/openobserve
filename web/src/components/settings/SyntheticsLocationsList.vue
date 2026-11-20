@@ -17,13 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full flex-col p-0">
     <template v-if="!showImportDialog">
-      <OPageLayout
-        overflow-first
-        :title="t('synthetics.locations.title')"
-        icon="location-on"
-        :subtitle="t('synthetics.locations.description')"
-        bleed
-      >
+      <OPageLayout overflow-first :title="t('synthetics.locations.title')" icon="location-on" bleed>
         <template #actions-overflow>
           <OButton
             variant="outline"

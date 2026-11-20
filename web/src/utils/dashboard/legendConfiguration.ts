@@ -16,6 +16,7 @@
 import { calculateWidthText } from "./chartDimensionUtils";
 import { createSeriesOverrideLookup } from "./seriesOverrides";
 import { escapeHtml } from "@/utils/html";
+import { AUTO_AXIS_ALIAS } from "./fieldLabel";
 
 // Constants for better maintainability
 const LEGEND_CONSTANTS = {
@@ -735,6 +736,10 @@ export const createBaseLegendConfig = (
     type: panelSchema.config?.legends_type === "plain" ? "plain" : "scroll",
     orient: legendPosition,
     padding: LEGEND_CONSTANTS.PADDING,
+    // A filled dot in both themes; the default line icon draws a hollow ring on the light card.
+    icon: "circle",
+    itemWidth: 8,
+    itemHeight: 8,
     tooltip: {
       show: true,
       padding: LEGEND_CONSTANTS.PADDING_OFFSET,
@@ -1487,6 +1492,13 @@ export const applyLegendConfiguration = (
   hoveredSeriesState: any,
   options: any,
 ) => {
+  const named = ["pie", "donut"].includes(panelSchema.type)
+    ? []
+    : (options?.series ?? []).filter((s: any) => s?.name);
+  // A lone series named only by the builder's alias ("y_axis_1") gives the reader nothing to key.
+  if (named.length === 1 && AUTO_AXIS_ALIAS.test(String(named[0].name))) {
+    panelSchema = { ...panelSchema, config: { ...panelSchema.config, show_legends: false } };
+  }
   // If trellis is enabled (layout is not null), disable all legend configurations
   if (
     panelSchema.config?.trellis?.layout !== null &&

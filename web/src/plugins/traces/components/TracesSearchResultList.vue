@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :sort-by="props.sortBy"
                 :sort-order="props.sortOrder"
                 :sort-field-map="sortFieldMap"
-                :row-height="28"
+                :row-height="26"
                 virtual-scroll
                 :fill-height="false"
                 :scroll-el="scrollEl"
@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       showCellActions &&
                       active &&
                       !contextMenuOpen &&
+                      column.id !== timestampCol &&
                       !column.meta?.disableCellAction
                     "
                     :column="column"
@@ -99,8 +100,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </template>
 
-                <template #[`cell-${store.state.zoConfig.timestamp_column}`]="{ value }">
-                  <TraceTimestampCell :value="value" />
+                <template #[`cell-${store.state.zoConfig.timestamp_column}`]="{ row, value }">
+                  <div class="group/timestamp flex min-w-0 items-center gap-1">
+                    <TraceTimestampCell :value="value" class="min-w-0 flex-1" />
+                    <OButton
+                      v-if="showCellActions"
+                      variant="ghost"
+                      size="icon"
+                      class="text-text-secondary! opacity-0 group-focus-within/timestamp:opacity-100 group-hover/timestamp:opacity-100 max-md:opacity-100"
+                      data-test="logs-cell-actions-copy-btn"
+                      :aria-label="t('logs.cellActions.copy')"
+                      @click.prevent.stop="copyToClipboard(timestampCol, row[timestampCol])"
+                    >
+                      <OIcon name="content-copy" size="sm" class="size-4" />
+                      <OTooltip :content="t('logs.cellActions.copy')" />
+                    </OButton>
+                  </div>
                 </template>
 
                 <template #cell-service_name="{ row }">
@@ -120,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="onRowLinkClick($event, row)"
                   >
                     <span
-                      class="text-text-body block text-xs group-hover:underline"
+                      class="text-text-body text-compact block group-hover:underline"
                       :class="wrap ? '' : 'truncate'"
                       data-test="trace-row-operation-name"
                     >
@@ -131,13 +146,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #cell-duration="{ row }">
-                  <span class="text-text-body font-mono text-xs" data-test="trace-row-duration">
+                  <span
+                    class="text-text-body text-compact tabular-nums"
+                    data-test="trace-row-duration"
+                  >
                     {{ formatTimeWithSuffix(row.duration) || raw("0us") }}
                   </span>
                 </template>
 
                 <template #cell-spans="{ row }">
-                  <span class="text-text-body font-mono text-xs" data-test="trace-row-spans">
+                  <span
+                    class="text-text-body text-compact tabular-nums"
+                    data-test="trace-row-spans"
+                  >
                     {{ row.spans }}
                   </span>
                 </template>
@@ -162,7 +183,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <SpanEventsCell :row="row" :timestamp-field="timestampCol" />
                 </template>
                 <template #cell-input_tokens="{ row }">
-                  <span class="text-text-body font-mono text-xs" data-test="trace-row-input-tokens">
+                  <span
+                    class="text-text-body text-compact tabular-nums"
+                    data-test="trace-row-input-tokens"
+                  >
                     {{
                       isLLMTrace(row) ? formatTokens(extractLLMData(row)?.usage?.input ?? 0) : "-"
                     }}
@@ -171,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <template #cell-output_tokens="{ row }">
                   <span
-                    class="text-text-body font-mono text-xs"
+                    class="text-text-body text-compact tabular-nums"
                     data-test="trace-row-output-tokens"
                   >
                     {{
@@ -181,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #cell-cost="{ row }">
-                  <span class="text-text-body font-mono text-xs" data-test="trace-row-cost">
+                  <span class="text-text-body text-compact tabular-nums" data-test="trace-row-cost">
                     <LLMCostCell
                       v-if="isLLMTrace(row)"
                       scope="trace"
@@ -308,7 +332,7 @@ import SpanStatusPill from "./SpanStatusPill.vue";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import SpanErrorCell from "./SpanErrorCell.vue";
 import SpanEventsCell from "./SpanEventsCell.vue";
-import { SPAN_ERROR_COLUMN_ID, SPAN_EVENTS_COLUMN_ID } from "./spanResultCells";
+import { SPAN_ERROR_COLUMN_ID, SPAN_EVENTS_COLUMN_ID, spanResultCellsFor } from "./spanResultCells";
 import { isLLMTrace, extractLLMData, formatCost, formatTokens } from "../../../utils/llmUtils";
 import LLMCostCell from "../LLMCostCell.vue";
 import { unpricedFields } from "../llmDataTrust.utils";
@@ -320,6 +344,7 @@ import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OContextMenu from "@/lib/overlay/ContextMenu/OContextMenu.vue";
 import OContextMenuItem from "@/lib/overlay/ContextMenu/OContextMenuItem.vue";
 import OContextMenuLabel from "@/lib/overlay/ContextMenu/OContextMenuLabel.vue";
@@ -559,7 +584,14 @@ const injectsVersionColumn = computed(
     ),
 );
 const tableColumns = computed(() => {
-  const columns = searchObj.data.resultGrid.columns;
+  const cells = props.hits.map((row) => spanResultCellsFor(row, timestampCol.value));
+  const hasErrors = cells.some((cell) => cell.error !== null);
+  const hasEvents = cells.some((cell) => cell.events.total > 0);
+  const columns = searchObj.data.resultGrid.columns.filter(
+    (column: { id: string }) =>
+      (column.id !== SPAN_ERROR_COLUMN_ID || hasErrors) &&
+      (column.id !== SPAN_EVENTS_COLUMN_ID || hasEvents),
+  );
   if (!injectsVersionColumn.value) return columns;
   const at = columns.findIndex((column: { id: string }) => column.id === "service_name");
   const version = {
@@ -814,5 +846,18 @@ defineExpose({ stepTraceRow });
 /* keep(complex-state): :deep override to square off the child table's corners */
 .traces-table-container :deep(.table-container) {
   border-radius: 0 !important;
+}
+
+/* keep(lib-override:OTable): a whole-pixel 20px line box, as on Logs, keeps thin glyphs like the "—" crisp. */
+.traces-table-container :deep(td[data-test^="o2-table-cell-"]) {
+  line-height: 1.25rem;
+}
+
+/* keep(lib-override:OTable): ID columns come from the generic cell renderer, so mono is set per column id. */
+.traces-table-container :deep(td[data-test="o2-table-cell-trace_id"]),
+.traces-table-container :deep(td[data-test="o2-table-cell-span_id"]),
+.traces-table-container :deep(td[data-test="o2-table-cell-reference_parent_span_id"]) {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
 }
 </style>

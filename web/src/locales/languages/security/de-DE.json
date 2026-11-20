@@ -116,7 +116,6 @@
     },
     "overview": {
       "title": "SOC-Übersicht",
-      "subtitle": "Was ausgelöst wurde, was offen ist und ob Ihre Quellen noch melden",
       "autoRefreshOn": "Automatische Aktualisierung jede Minute ist aktiviert",
       "autoRefreshOff": "Automatische Aktualisierung ist deaktiviert",
       "historyError": "Erkennungsverlauf konnte nicht geladen werden: {reason}",
@@ -165,7 +164,6 @@
     },
     "events": {
       "title": "Sicherheitsereignisse",
-      "subtitle": "In normalisierter Sicherheitstelemetrie suchen",
       "run": "Ausführen",
       "hideSidebar": "Felder ausblenden",
       "showSidebar": "Felder einblenden",
@@ -348,7 +346,6 @@
     },
     "alerts": {
       "title": "Alarme",
-      "subtitle": "Jede Auslösung einer Erkennung samt der zugrunde liegenden Evidenz.",
       "eyebrow": "Erkennungsauslösung",
       "range": {
         "1h": "1 Std.",
@@ -463,7 +460,6 @@
     },
     "cases": {
       "title": "Fälle",
-      "subtitle": "Korrelierte Auslösungen, triagiert bis zur Bewertung",
       "eyebrow": "Fall",
       "search": "Diese Seite nach Titel, ID, Bearbeiter oder Entität filtern",
       "refresh": "Aktualisieren",
@@ -712,7 +708,6 @@
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
-      "subtitle": "Welche Techniken Ihre aktivierten Detektionen abdecken und welche ausgelöst haben",
       "summaryPartial": "Dieser Zeitraum enthält mehr Alarmverlauf, als eine Zusammenfassung fassen kann, daher sind die Auslösezahlen eine Untergrenze; wählen Sie einen kürzeren Zeitraum für vollständige Zahlen.",
       "stat": {
         "firing": "Ausgelöste Techniken",
@@ -775,7 +770,6 @@
     },
     "detections": {
       "title": "Erkennungen",
-      "subtitle": "Sigma-Regeln, die als geplante Erkennungen auf Ihren Sicherheits-Streams ausgeführt werden",
       "new": "Neue Erkennung",
       "eyebrow": "Erkennungsregel",
       "refresh": "Erkennungen aktualisieren",
@@ -1073,7 +1067,6 @@
     },
     "content": {
       "title": "Inhalt",
-      "subtitle": "Die mit dem SIEM gelieferten Erkennungsregeln und Logquellen, abgeglichen mit Ihren Daten",
       "refresh": "Aktualisieren",
       "streamsError": "Ihre Streams konnten nicht geladen werden, daher sind Übereinstimmungen mit Ihren Daten unbekannt",
       "tab": {
@@ -1219,7 +1212,6 @@
     },
     "entities": {
       "title": "Entitäten",
-      "subtitle": "Alle Benutzer, Quell-IPs und Hosts, die Ihre Sicherheitsquellen erwähnen",
       "view": {
         "table": "Tabelle",
         "graph": "Risikografik"
@@ -1339,7 +1331,6 @@
     },
     "ueba": {
       "title": "Benutzerverhaltensanalyse",
-      "subtitle": "Jeder Benutzer wird mit seinem eigenen jüngsten Verhalten verglichen",
       "windowHint": "Letzte {current}, verglichen mit den {baseline} davor",
       "method": "Risikobewertungen sind Heuristiken: Die letzten {current} jedes Benutzers werden mit seinen eigenen {baseline} davor verglichen. Jede Markierung zeigt die Zahlen, die dazu geführt haben.",
       "noSources": "Keine Quelle identifiziert einen Benutzer",
@@ -1438,7 +1429,6 @@
     },
     "intel": {
       "title": "Threat Intelligence",
-      "subtitle": "Bekanntermaßen schädliche Indikatoren und jeder Ort, an dem sie in Ihren Sicherheitsdaten aufgetaucht sind",
       "loadFailed": "Indikatorlisten konnten nicht geladen werden",
       "add": "Indikatoren hinzufügen",
       "import": "Importieren",
@@ -1607,7 +1597,6 @@
     "sources": {
       "title": "Datenquellen",
       "comingSoon": "Geführtes Onboarding mit OCSF-Normalisierungsvorlagen ist in Kürze verfügbar. Bis dahin erfassen Sie Sicherheits-Logs wie jeden anderen Stream; die Seite „Ereignisse“ erkennt und normalisiert sie automatisch.",
-      "subtitle": "Hängen Sie ein OCSF-Paket an, um einen Stream bei der Datenerfassung zu normalisieren, oder beziehen Sie es unverändert als Sicherheitsquelle ein.",
       "colStream": "Stream",
       "colSourceType": "Quellentyp",
       "colMapping": "Zuordnung",

@@ -49,7 +49,7 @@
     <O2AIContextAddBtn
       v-if="!hideAi"
       @send-to-ai-chat="sendToAiChat(JSON.stringify(cellValue))"
-      class="size-6! border border-solid border-white"
+      class="size-6!"
       :imageHeight="'14'"
       :imageWidth="'14'"
     />

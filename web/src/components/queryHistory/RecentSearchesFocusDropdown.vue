@@ -99,6 +99,17 @@ const position = computed(() => {
 
 const caretRect = () => props.anchor?.querySelector(CARET_SELECTOR)?.getBoundingClientRect();
 
+const placementRect = () => {
+  if (props.source !== "logs") return caretRect();
+  const anchor = props.anchor;
+  if (!anchor) return undefined;
+  const editor = anchor.getBoundingClientRect();
+  const line = Array.from(anchor.querySelectorAll(".monaco-editor .view-lines .view-line"))
+    .map((element) => element.getBoundingClientRect())
+    .find((rect) => rect.bottom > editor.top && rect.top < editor.bottom);
+  return line ? { left: editor.left, top: line.top, bottom: line.bottom } : undefined;
+};
+
 const clampLeft = (left: number, width: number) =>
   Math.max(EDGE_GAP_PX, Math.min(left, window.innerWidth - width - EDGE_GAP_PX));
 
@@ -121,28 +132,28 @@ const clearOfAvoided = (left: number, width: number, top: number, bottom: number
 };
 
 const place = (): Placement | null => {
-  const caret = caretRect();
-  if (!caret || caret.bottom <= 0 || caret.top >= window.innerHeight) return null;
+  const rect = placementRect();
+  if (!rect || rect.bottom <= 0 || rect.top >= window.innerHeight) return null;
   const width = panelRef.value?.offsetWidth ?? 0;
   const height = panelRef.value?.offsetHeight ?? 0;
-  const left = clampLeft(caret.left, width);
-  const roomBelow = window.innerHeight - caret.bottom - EDGE_GAP_PX;
+  const left = clampLeft(rect.left, width);
+  const roomBelow = window.innerHeight - rect.bottom - EDGE_GAP_PX;
   if (roomBelow >= MIN_ROOM_PX) {
-    const bottom = caret.bottom + Math.min(height, roomBelow);
+    const bottom = rect.bottom + Math.min(height, roomBelow);
     return {
       side: "below",
-      viewportOffset: caret.bottom,
-      left: clearOfAvoided(left, width, caret.bottom, bottom),
+      viewportOffset: rect.bottom,
+      left: props.source === "logs" ? left : clearOfAvoided(left, width, rect.bottom, bottom),
       maxHeight: roomBelow,
     };
   }
-  const roomAbove = caret.top - EDGE_GAP_PX;
+  const roomAbove = rect.top - EDGE_GAP_PX;
   if (roomAbove >= MIN_ROOM_PX) {
-    const top = caret.top - Math.min(height, roomAbove);
+    const top = rect.top - Math.min(height, roomAbove);
     return {
       side: "above",
-      viewportOffset: window.innerHeight - caret.top,
-      left: clearOfAvoided(left, width, top, caret.top),
+      viewportOffset: window.innerHeight - rect.top,
+      left: props.source === "logs" ? left : clearOfAvoided(left, width, top, rect.top),
       maxHeight: roomAbove,
     };
   }
@@ -163,28 +174,28 @@ const onOutside = (event: Event) => {
   open.value = false;
 };
 
-let placedCaret = "";
+let placedAnchor = "";
 let stopObserving: (() => void) | null = null;
 let panelSizes: ResizeObserver | null = null;
 
-const caretKey = () => {
-  const caret = caretRect();
+const anchorKey = () => {
+  const rect = placementRect();
   const width = panelRef.value?.offsetWidth ?? 0;
   const height = panelRef.value?.offsetHeight ?? 0;
-  if (!caret) return "";
-  return `${caret.left}|${caret.top}|${caret.bottom}|${width}|${height}|${window.innerWidth}|${window.innerHeight}`;
+  if (!rect) return "";
+  return `${rect.left}|${rect.top}|${rect.bottom}|${width}|${height}|${window.innerWidth}|${window.innerHeight}`;
 };
 
 const reposition = () => {
   if (!open.value) return;
   placement.value = place();
-  placedCaret = caretKey();
+  placedAnchor = anchorKey();
   if (!placement.value) open.value = false;
 };
 
 // Editors rewrite inline styles on every keystroke and paint, so only a real move re-places the panel.
 const repositionIfMoved = () => {
-  if (open.value && caretKey() !== placedCaret) reposition();
+  if (open.value && anchorKey() !== placedAnchor) reposition();
 };
 
 const listen = (on: boolean) => {
@@ -215,7 +226,7 @@ watch(
       open.value = false;
       return;
     }
-    placedCaret = isOpen ? caretKey() : "";
+    placedAnchor = isOpen ? anchorKey() : "";
     listen(isOpen);
     observe(isOpen ? props.anchor : null);
   },

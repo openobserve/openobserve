@@ -22,8 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showAddJSTransformDialog"
       :title="t('function.header')"
       icon="function"
-      :subtitle="t('function.subtitle')"
-      tabs-below
       bleed
     >
       <template #header-tabs>

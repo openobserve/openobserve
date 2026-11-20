@@ -453,7 +453,8 @@ const searchResultRef = ref<any>(null);
 const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
-const splitterModel = ref(90);
+// 85 = 47px toolbar + 1px pad + a 36px filter bar with its rule, the same height as Logs.
+const splitterModel = ref(85);
 const fieldValues = ref({});
 
 const { isMobile, isTablet } = useBreakpoint();
@@ -468,7 +469,7 @@ watch(
       if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
         searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
       }
-      splitterModel.value = 90;
+      splitterModel.value = 85;
     }
   },
   { immediate: true },
@@ -478,7 +479,7 @@ const filterBuilderGrowth = ref<number | null>(null);
 let autoSplitterHeight = 0;
 // The query pane grows with the builder and shrinks back, but never overrides a larger user-set height.
 watch([filterBuilderGrowth, isMobile], ([growth, mobile]) => {
-  const base = mobile ? 150 : 90;
+  const base = mobile ? 150 : 85;
   const target = base + (growth ?? 0);
   if (splitterModel.value < target || splitterModel.value <= Math.max(base, autoSplitterHeight)) {
     splitterModel.value = target;

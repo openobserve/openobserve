@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="raw(name)"
-    :subtitle="raw(subtitle)"
     :back="{ label: t('fleet.tabs.configurations'), to: backTo }"
     bleed
     overflow-first
@@ -574,9 +573,6 @@ const unsaved = computed(
 );
 // Taken off the list page at load and applied only once the draft baseline is the seed.
 let pendingImport: string | null = null;
-const subtitle = computed(() =>
-  isNew.value ? t("fleet.editor.newDescription") : (detail.value?.description ?? ""),
-);
 const savedYaml = computed(
   () => detail.value?.draft?.yaml ?? savedVersion.version.value?.yaml ?? "",
 );

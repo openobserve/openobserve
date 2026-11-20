@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showDestinationEditor"
       :title="t('pipeline_destinations.header')"
       icon="person-pin-circle"
-      :subtitle="t('settings.pipelineDestinationsDesc')"
     >
       <template #actions>
         <OButton

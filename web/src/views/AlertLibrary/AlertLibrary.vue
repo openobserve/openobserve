@@ -34,8 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('alerts.header')"
       icon="shield-alert-outline"
       title-data-test="alert-library-title"
-      :subtitle="t('alerts.subtitle')"
-      tabs-below
     >
       <template #header-tabs>
         <AlertSectionTabs />

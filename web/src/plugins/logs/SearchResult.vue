@@ -21,12 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex h-full max-h-full w-full flex-col overflow-hidden" ref="searchListContainer">
       <!-- Section header: static at top -->
       <div
-        class="border-card-glass-border bg-card-glass-bg flex min-h-9 shrink-0 items-center border-b max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
+        class="border-card-glass-border bg-card-glass-bg flex min-h-8 shrink-0 items-center border-b max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       >
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
-          variant="outline"
-          size="icon-chip"
+          variant="ghost"
+          size="icon-toolbar"
           class="ms-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
           @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-left transition-opacity max-md:min-w-32"
+          class="text-text-secondary flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-left transition-opacity max-md:min-w-32"
           :class="{ [STALE_DIM]: summaryDimmed }"
           data-test="logs-search-result-title"
           :data-search-state="
@@ -74,55 +74,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Logs mode: structured chips -->
           <template v-if="searchObj.meta.logsVisualizeToggle !== 'patterns'">
-            <template v-if="recordsChips">
+            <span v-if="recordsChips" class="logs-strip-box">
               <OTag
                 type="logsResultChip"
                 value="neutral"
-                class="tabular-nums"
+                class="text-text-secondary! logs-strip-chip logs-strip-chip--lead tabular-nums"
                 data-test="logs-result-records-chip"
-                >{{ recordsChips.records }}</OTag
+                ><i18n-t keypath="search.stripTotal" tag="span" scope="global">
+                  <template #total
+                    ><span class="text-text-body text-sm font-semibold">{{
+                      recordsChips.parts.total
+                    }}</span></template
+                  >
+                </i18n-t></OTag
+              >
+              <OTag
+                type="logsResultChip"
+                value="neutral"
+                class="text-text-secondary! logs-strip-chip logs-strip-chip--neutral max-md:hidden"
+                data-test="logs-result-showing-chip"
+                ><span>{{ recordsChips.parts.start }}–{{ recordsChips.parts.end }}</span></OTag
               >
               <OTag
                 type="logsResultChip"
                 value="info"
-                class="tabular-nums max-md:hidden"
+                class="text-text-secondary! logs-strip-chip logs-strip-chip--ok tabular-nums max-md:hidden"
                 data-test="logs-result-time-chip"
-                >{{ recordsChips.time }}</OTag
+                ><i18n-t keypath="search.tookChipCompact" tag="span" scope="global">
+                  <template #took
+                    ><span>{{ recordsChips.parts.took }}</span></template
+                  >
+                </i18n-t></OTag
               >
               <OTag
                 v-if="recordsChips.scan"
                 type="logsResultChip"
                 value="warn"
-                class="max-md:hidden"
+                class="text-text-secondary! logs-strip-chip logs-strip-chip--info max-md:hidden"
                 data-test="logs-result-scan-chip"
-                >{{ recordsChips.scan }}</OTag
+                ><OTooltip :content="recordsChips.scan" /><i18n-t
+                  keypath="search.scannedChip"
+                  tag="span"
+                  scope="global"
+                >
+                  <template #size
+                    ><span>{{ splitUnit(recordsChips.parts.scanSize).value }}</span
+                    >{{ splitUnit(recordsChips.parts.scanSize).unit }}</template
+                  >
+                </i18n-t></OTag
               >
-            </template>
+            </span>
             <span v-else-if="!summaryView.updating" class="min-w-0 truncate">{{
               noOfRecordsTitle
             }}</span>
           </template>
           <!-- Patterns mode: structured chips -->
           <template v-else>
-            <template v-if="patternChips">
+            <span v-if="patternChips" class="logs-strip-box">
               <OTag
                 v-if="patternChips.events !== null"
                 type="logsResultChip"
                 value="neutral"
+                class="text-text-secondary! logs-strip-chip logs-strip-chip--lead"
                 data-test="logs-result-events-chip"
-                >{{ patternChips.events }} {{ t("logs.searchResult.events") }}</OTag
+                ><span class="text-text-body text-sm font-semibold tabular-nums">{{
+                  patternChips.events
+                }}</span>
+                {{ t("logs.searchResult.events") }}</OTag
               >
-              <OTag type="logsResultChip" value="neutral" data-test="logs-result-patterns-chip"
-                >{{ patternChips.patterns }} {{ t("logs.searchResult.patterns") }}</OTag
+              <OTag
+                type="logsResultChip"
+                value="neutral"
+                class="text-text-secondary! logs-strip-chip logs-strip-chip--neutral"
+                data-test="logs-result-patterns-chip"
+                ><span class="tabular-nums">{{ patternChips.patterns }}</span>
+                {{ t("logs.searchResult.patterns") }}</OTag
               >
               <OTag
                 type="logsResultChip"
                 value="info"
-                class="max-md:hidden"
+                class="text-text-secondary! logs-strip-chip logs-strip-chip--ok tabular-nums max-md:hidden"
                 data-test="logs-result-pattern-time-chip"
-                >{{ patternChips.time }} {{ t("logs.searchResult.msUnit") }}</OTag
+                ><i18n-t keypath="search.tookChipCompact" tag="span" scope="global">
+                  <template #took
+                    ><span>{{ patternChips.time }}</span></template
+                  >
+                </i18n-t></OTag
               >
-            </template>
+            </span>
             <span v-else class="min-w-0 truncate">{{ patternSummaryText }}</span>
           </template>
           <span v-if="searchObj.loadingCounter" class="shrink-0">
@@ -145,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
-              <OButton variant="outline" size="icon-chip" data-test="logs-result-actions-menu-btn">
+              <OButton variant="ghost" size="icon-toolbar" data-test="logs-result-actions-menu-btn">
                 <OIcon name="more-horiz" size="sm" />
                 <OTooltip :content="t('search.moreActions')" />
               </OButton>
@@ -177,25 +216,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- INLINE BUTTONS (wider container) -->
           <template v-else>
-            <!-- Refresh in bordered wrapper -->
-            <div
-              class="border-card-glass-border rounded-default inline-flex h-6 items-center border px-1"
-            >
-              <ORefreshButton
-                size="inset"
-                :last-run-at="searchObj.meta.lastRunAt"
-                :loading="searchObj.loading || histogramSettling"
-                :disabled="searchObj.loading || histogramSettling"
-                @click="$emit('run-query')"
-              />
-            </div>
+            <span
+              v-if="dataFresh"
+              class="bg-status-success-text size-1.5 shrink-0 rounded-full"
+              aria-hidden="true"
+              data-test="logs-result-fresh-dot"
+            />
+            <!-- One filled chip; the whole chip is the refresh target. -->
+            <ORefreshButton
+              layout="inline"
+              variant="ghost"
+              class="gap-1.5! ps-1! pe-2! text-xs!"
+              :last-run-at="searchObj.meta.lastRunAt"
+              :loading="searchObj.loading || histogramSettling"
+              :disabled="searchObj.loading || histogramSettling"
+              @click="$emit('run-query')"
+            />
             <!-- Action buttons -->
             <div v-if="inspectAvailable || showWrapBtn" class="inline-flex items-center gap-0.5">
               <OButton
                 v-if="inspectAvailable"
-                variant="outline"
-                :size="showActionLabels ? 'chip' : 'icon-chip'"
+                variant="ghost"
+                :size="showActionLabels ? 'sm-toolbar' : 'icon-toolbar'"
                 :disabled="!showInspectBtn"
+                :aria-label="t('volumeInsights.searchInspectionsLabel')"
                 @click="openSearchJobInspector"
                 data-test="logs-inspect-button"
               >
@@ -203,20 +247,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-if="showActionLabels" class="whitespace-nowrap">{{
                   t("volumeInsights.inspectBtnLabel")
                 }}</span>
-                <OTooltip
-                  v-if="!showActionLabels"
-                  :content="t('volumeInsights.searchInspectionsLabel')"
-                />
+                <OTooltip :content="t('volumeInsights.searchInspectionsLabel')" />
               </OButton>
               <OButton
                 v-if="showWrapBtn"
-                variant="outline"
-                size="icon-chip"
+                variant="ghost"
+                :size="showActionLabels ? 'sm-toolbar' : 'icon-toolbar'"
+                :class="searchObj.meta.toggleSourceWrap ? '' : 'border! border-transparent!'"
                 :active="searchObj.meta.toggleSourceWrap"
+                :aria-pressed="searchObj.meta.toggleSourceWrap ? 'true' : 'false'"
                 @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
                 data-test="logs-search-result-wrap-table-content-btn"
               >
                 <OIcon name="wrap-text" size="sm" />
+                <span v-if="showActionLabels" class="whitespace-nowrap">{{
+                  t("common.wrap")
+                }}</span>
                 <OTooltip :content="t('search.messageWrapContent')" />
               </OButton>
             </div>
@@ -236,15 +282,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 searchObj.meta.resultGrid.showPagination &&
                 searchObj.meta.logsVisualizeToggle === 'logs'
               "
+              :aria-label="t('search.resultsPerPage')"
               data-test="logs-search-result-records-per-page"
               v-model="searchObj.meta.resultGrid.rowsPerPage"
               :options="rowsPerPageOptions"
-              class="select-pagination min-w-[4.5rem]"
+              class="select-pagination results-page-select"
+              appearance="inline"
               size="sm"
               :searchable="false"
               :disabled="searchObj.loading || !!gridLockReason"
               @update:model-value="getPageData('recordsPerPage')"
-            />
+            >
+              <template #trigger>
+                {{ t("search.rowsPerPageLabel", { n: searchObj.meta.resultGrid.rowsPerPage }) }}
+              </template>
+            </OSelect>
             <span v-if="gridLockReason" id="logs-page-size-reason" class="sr-only">{{
               gridLockReason
             }}</span>
@@ -272,9 +324,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disable="searchObj.loading || histogramSettling || !!gridLockReason"
               :data-locked="gridLockReason ? 'true' : undefined"
               v-model="pageNumberInput"
+              class="border-0! bg-transparent! p-0!"
               :max="summaryView.pageCount"
               :max-pages="paginationMaxPages"
-              class="paginator-section"
               @update:model-value="getPageData('pageChange')"
               data-test="logs-search-result-pagination"
             />
@@ -388,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Same no-data treatment as dashboard panels (PanelSchemaRenderer);
-               inline min-height/padding overridden to fit the 6.25rem strip. -->
+               inline min-height/padding overridden to fit the 5.75rem strip. -->
           <OEmptyState
             v-else-if="histogramView.phase === 'empty'"
             size="inline"
@@ -536,7 +588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :streaming="isResultsStreaming || showStaleRows"
                   :data-stale-rows="showStaleRows ? 'true' : undefined"
                   :row-key="logsRowKey"
-                  :row-height="20"
+                  :row-height="26"
                   virtual-scroll
                   skeleton-on-refetch
                   :fill-height="false"
@@ -557,14 +609,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   expansion="multiple"
                   :expanded-ids="expandedLogIds"
                   data-test="logs-search-result-logs-table"
-                  class="logs-results-otable w-full"
+                  class="logs-results-otable log-level-rail w-full"
                   :class="[
                     !searchObj.meta.showHistogram ||
                     (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
                       ? 'min-h-full!'
-                      : 'min-h-[calc(100%-6.25rem)]!',
+                      : 'min-h-[calc(100%-5.75rem)]!',
                     showStaleRows ? 'pointer-events-none' : '',
                     rowsDimmed ? STALE_DIM : '',
+                    searchObj.meta.toggleSourceWrap ? 'logs-results-otable--wrap' : '',
                   ]"
                   @update:columnSizes="handleColumnSizesUpdate"
                   @column-order-change="handleColumnOrderUpdate"
@@ -582,23 +635,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="col.id"
                     #[`cell-${col.id}`]="{ row, value }"
                   >
-                    <span
-                      v-if="logsCellHtml(col.id, row)"
-                      class="log-cell-html"
-                      :class="severityFieldTextClass(col.id, value)"
-                      :data-test="
-                        col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
-                      "
-                      v-html="logsCellHtml(col.id, row)"
-                    />
-                    <span
-                      v-else
-                      :class="severityFieldTextClass(col.id, value)"
-                      :data-test="
-                        col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
-                      "
-                      >{{ value }}</span
+                    <LogCellWrap
+                      :wrap="searchObj.meta.toggleSourceWrap"
+                      :expanded="expandedWrappedRows.has(row)"
+                      @update:expanded="setWrappedRowExpanded(row, $event)"
                     >
+                      <span
+                        v-if="value === undefined || value === null || value === ''"
+                        class="text-text-secondary select-none"
+                        data-test="log-row-empty-cell"
+                        >—</span
+                      >
+                      <span
+                        v-else-if="logsCellHtml(col.id, row)"
+                        class="log-cell-html"
+                        :class="severityFieldTextClass(col.id, value)"
+                        :data-test="
+                          col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
+                        "
+                        v-html="logsCellHtml(col.id, row)"
+                      />
+                      <span
+                        v-else
+                        :class="severityFieldTextClass(col.id, value)"
+                        :data-test="
+                          col.id === logsTimestampCol ? 'log-row-timestamp-value' : undefined
+                        "
+                        >{{ value }}</span
+                      >
+                    </LogCellWrap>
                     <span
                       v-if="col.id === logsTimestampCol"
                       class="sr-only select-none"
@@ -613,6 +678,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <O2AIContextAddBtn
                       v-if="active && !contextMenuOpen && column.id === logsTimestampCol"
                       data-test="logs-search-result-ai-btn"
+                      class="size-6!"
                       @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
                     />
                     <CellActions
@@ -633,7 +699,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #expansion="{ row }">
                     <div
                       v-if="quickModeHiddenFields(row)"
-                      class="text-text-secondary flex items-center gap-2 px-2 pt-1.5 text-xs"
+                      class="text-text-secondary flex items-center gap-2 px-5 pt-1.5 text-xs"
                       data-test="logs-expanded-quick-mode-hint"
                     >
                       <span>
@@ -645,8 +711,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         }}
                       </span>
                       <OButton
-                        variant="ghost"
-                        size="sm"
+                        variant="outline"
+                        size="xs"
                         data-test="logs-expanded-quick-mode-off"
                         @click="turnOffQuickMode"
                       >
@@ -781,7 +847,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             !searchObj.meta.showHistogram ||
             (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
               ? 'min-h-full!'
-              : 'min-h-[calc(100%-6.25rem)]!',
+              : 'min-h-[calc(100%-5.75rem)]!',
           ]"
         >
           <!-- Patterns List -->
@@ -909,6 +975,7 @@ import {
   computed,
   defineComponent,
   ref,
+  reactive,
   onMounted,
   onUpdated,
   onBeforeUnmount,
@@ -1008,6 +1075,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LogsTableSkeleton from "@/plugins/logs/LogsTableSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import LogCellWrap from "@/plugins/logs/data-table/LogCellWrap.vue";
 import {
   noFtsRecoveryStreams,
   noFtsRecoveryTerm as recoveryTerm,
@@ -1017,7 +1085,7 @@ import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import {
   severityFieldTextClass,
-  severityIndicatorColor,
+  severityStripColor,
   severityRowClass,
 } from "@/utils/logs/statusParser";
 import useLogSeverity from "@/composables/useLogs/useLogSeverity";
@@ -1056,6 +1124,7 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     OTable: defineAsyncComponent(() => import("@/lib/core/Table/OTable.vue")),
     CellActions,
+    LogCellWrap,
     LogsMissingStreamBanner,
     LogsTableSkeleton,
     O2AIContextAddBtn,
@@ -1338,8 +1407,15 @@ export default defineComponent({
         time: t("search.tookChip", { took: parts.took }),
         // Label is already translated, the size is data — joined so the pair reads like the title.
         scan: parts.scanLabel != null ? raw(`${parts.scanLabel}: ${parts.scanSize}`) : null,
+        parts,
       };
     });
+
+    // "3.00 MB" -> number and unit, so only the number takes the stat weight.
+    const splitUnit = (text: string | undefined) => {
+      const m = /^(\S+)(\s.*)$/.exec(text ?? "");
+      return m ? { value: m[1], unit: m[2] } : { value: text ?? "", unit: "" };
+    };
 
     // Derives structured chip data for patterns mode from raw stats.
     const patternChips = computed(() => {
@@ -1794,7 +1870,18 @@ export default defineComponent({
       }
     });
 
+    // Same 30s "fresh" window as the refresh button's own staleness dot.
+    const freshNow = ref(Date.now());
+    const freshTimer = setInterval(() => (freshNow.value = Date.now()), 5000);
+    const dataFresh = computed(
+      () =>
+        !searchObj.loading &&
+        !!searchObj.meta.lastRunAt &&
+        freshNow.value - searchObj.meta.lastRunAt < 30_000,
+    );
+
     onBeforeUnmount(() => {
+      clearInterval(freshTimer);
       window.removeEventListener("themeColorChanged", handleThemeColorChange);
       containerResizeObserver?.disconnect();
       histogramResizeObserver?.disconnect();
@@ -1828,11 +1915,14 @@ export default defineComponent({
           plotChart.value = convertStackedLogData(
             xData,
             breakdownSeries,
-            { ...chartParams, breakdownField: breakdownField ?? null },
+            { ...chartParams, breakdownField: breakdownField ?? null, modern: true },
             isDark.value,
           );
         } else {
-          plotChart.value = convertLogData(xData, yData, chartParams);
+          plotChart.value = convertLogData(xData, yData, {
+            ...chartParams,
+            modern: true,
+          });
         }
         // An animated first paint grows the bars out of empty axes, which reads as another flicker.
         if (plotChart.value?.options) plotChart.value.options.animation = false;
@@ -3022,6 +3112,11 @@ export default defineComponent({
       return m;
     });
     const logsRowIndex = (row: any): number => logsHitIndexMap.value.get(row) ?? -1;
+    const expandedWrappedRows = reactive(new WeakSet<object>());
+    const setWrappedRowExpanded = (row: object, expanded: boolean) => {
+      if (expanded) expandedWrappedRows.add(row);
+      else expandedWrappedRows.delete(row);
+    };
     const logsCellHtml = (columnId: string, row: any): string | null => {
       // The highlight cache is keyed by row position in the current hits, which stale rows no longer match.
       if (showStaleRows.value) return null;
@@ -3055,7 +3150,9 @@ export default defineComponent({
     );
 
     const { rowSeverity } = useLogSeverity();
-    const getLogRowStatusColor = (row: any): string => severityIndicatorColor(rowSeverity(row));
+    const getLogRowStatusColor = (row: any): string => {
+      return severityStripColor(rowSeverity(row));
+    };
     const logRowSeveritySrText = (row: any) => {
       const severity = rowSeverity(row);
       const level = t(`logs.severity.levels.${severity.level}`);
@@ -3141,6 +3238,7 @@ export default defineComponent({
     const openLogDetailsByRow = (row: any) => openLogDetails(row, logsRowIndex(row));
 
     return {
+      dataFresh,
       noFtsRecoverySchemas,
       noFtsRecoveryTerm,
       gridLockReason,
@@ -3205,8 +3303,11 @@ export default defineComponent({
       showLogCellActions,
       logsCellHtml,
       logsRowIndex,
+      expandedWrappedRows,
+      setWrappedRowExpanded,
       logsRowKey,
       getLogRowStatusColor,
+      splitUnit,
       getLogRowClass,
       logRowSeveritySrText,
       severityFieldTextClass,
@@ -3382,10 +3483,99 @@ export default defineComponent({
    rendered by OTableBodyCell, so the rule must reach them through :deep(), and it
    is scoped to the DATA cells so the expanded row keeps its own typography. */
 .logs-results-otable :deep(td[data-test^="o2-table-cell-"]) {
+  /* Mono only for the log body, timestamp and ID columns; the rest is tabular sans. */
+  font-family: var(--font-sans);
+  font-size: var(--text-compact);
+  font-variant-numeric: tabular-nums;
+  /* Cap the line box so a single log line can't grow the row height. */
+  line-height: 1.25rem;
+}
+
+.logs-results-otable--wrap :deep(td[data-test^="o2-table-cell-"]),
+.logs-results-otable--wrap :deep(td[data-test="o2-table-expand-cell"]) {
+  vertical-align: top;
+}
+.logs-results-otable--wrap :deep(td[data-test^="o2-table-cell-"] > div) {
+  align-items: flex-start;
+}
+
+/* Plain text, no box or colour: the strip is background info, not a focus point. */
+.logs-strip-box {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  height: 1.5rem;
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  line-height: 1;
+  cursor: default;
+}
+.logs-strip-chip {
+  display: inline-flex;
+  align-items: center;
+  height: auto;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0;
+  font-size: var(--text-xs);
+  font-weight: 400 !important;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  box-shadow: none !important;
+  background: transparent !important;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.logs-strip-chip + .logs-strip-chip::before {
+  content: "·";
+  margin-inline-end: 0.5rem;
+  color: var(--color-text-secondary);
+}
+.logs-strip-chip .font-semibold {
+  font-weight: 600;
+}
+/* The strip stays one line: the lead item truncates, then scan and showing hide. */
+[data-test="logs-search-result-title"]:has(.logs-strip-chip) {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  container-type: inline-size;
+}
+.logs-strip-chip:first-child {
+  display: block;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@container (max-width: 20rem) {
+  [data-test="logs-result-scan-chip"] {
+    display: none !important;
+  }
+}
+@container (max-width: 16rem) {
+  [data-test="logs-result-showing-chip"] {
+    display: none !important;
+  }
+}
+
+.logs-results-otable :deep(td[data-test="o2-table-cell-source"]),
+.logs-results-otable :deep(td[data-test="o2-table-cell-source"] .log-highlight),
+.logs-results-otable :deep(td[data-test="o2-table-cell-trace_id"]),
+.logs-results-otable :deep(td[data-test="o2-table-cell-span_id"]),
+.logs-results-otable :deep(td[data-test="o2-table-cell-request_id"]) {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  /* Cap the line box so a single log line can't grow the row height. */
-  line-height: 1.125rem;
+}
+
+/* Mono 12px timestamps line up digit for digit down the column. */
+.logs-results-otable :deep([data-test="log-row-timestamp-value"]) {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
 }
 
 /* The default expand button sets a floor under every log row height
@@ -3513,50 +3703,6 @@ export default defineComponent({
   }
 }
 
-/* keep(lib-override:opagination): reaches into the OPagination/OSelect-rendered
-   button DOM to compress the pagination controls into the results toolbar. */
-.paginator-section {
-  line-height: 1.5rem;
-  max-height: 2rem;
-  border-radius: 0.5rem;
-  padding: 0.125rem 0.25rem;
-  background: color-mix(in srgb, var(--color-white) 10%, transparent);
-  backdrop-filter: blur(0.625rem);
-  margin-top: 0;
-  overflow: visible;
-}
-
-/* keep(deep-nesting): without lang="scss", Vue's scoped compiler doesn't flatten a
-   nested :deep() with its parent selector, so it silently never matches — keep these
-   top-level instead of nested inside .paginator-section/.select-pagination. */
-.paginator-section :deep(.o-pagination__btn) {
-  padding: 0.125rem 0.25rem !important;
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
-  min-width: 1.5rem !important;
-  font-size: var(--text-xs) !important;
-  border-radius: 0.25rem !important;
-  line-height: 1rem !important;
-}
-
-.paginator-section :deep(.o-pagination__btn) svg {
-  width: 1rem !important;
-  height: 1rem !important;
-}
-
-.select-pagination {
-  position: relative;
-  width: 4rem !important;
-  height: 1.5rem !important;
-  margin-top: 0;
-}
-
-.select-pagination :deep(button) {
-  height: 1.5rem !important;
-  min-height: 1.5rem !important;
-  font-size: var(--text-xs) !important;
-  padding-inline: 0.5rem !important;
-}
 /* keep(keyframes): the histogram skeleton's shimmer @keyframes and the
    animation: that references it must stay in the same scoped block so Vue
    renames both consistently. */
@@ -3574,8 +3720,7 @@ export default defineComponent({
 }
 
 .histogram-container--visible {
-  height: 6.25rem;
-  padding-top: 0.25rem;
+  height: 5.75rem;
   opacity: 1;
   transition: all 0.3s ease-in-out;
 }
@@ -3591,19 +3736,18 @@ export default defineComponent({
   /* Explicit height (not just max-height): the ChartRenderer inside sizes
      with h-full, and a percentage height collapses to 0 against an
      auto-height parent — which renders an empty histogram strip. */
-  height: 6rem;
-  max-height: 6.25rem;
+  height: 5.75rem;
   border-radius: 0.5rem;
 }
 
 .histogram-empty {
-  height: 6.25rem;
+  height: 5.75rem;
   border-radius: 0.5rem;
 }
 
 .histogram-skeleton--over-chart {
   position: absolute;
-  top: 0.25rem;
+  top: 0;
   inset-inline: 0;
 }
 
@@ -3616,7 +3760,7 @@ export default defineComponent({
     --hsk-shimmer: color-mix(in srgb, var(--color-white) 6%, transparent);
   }
 
-  height: 6.25rem;
+  height: 5.75rem;
   display: flex;
   flex-direction: column;
   padding-top: 0.25rem;

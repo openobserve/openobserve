@@ -1018,7 +1018,6 @@ onUnmounted(() => {
 <template>
   <OPageLayout
     :title="t('siem.alerts.title')"
-    :subtitle="t('siem.alerts.subtitle')"
     icon="notifications-active"
     bleed
     title-data-test="security-alerts-title"

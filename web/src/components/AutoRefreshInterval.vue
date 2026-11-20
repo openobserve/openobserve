@@ -28,32 +28,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="isCompact"
           data-test="logs-search-bar-refresh-interval-btn"
           size="icon-toolbar"
-          :variant="variant"
-          :active="isAnimating"
+          variant="ghost"
+          class="relative shrink-0 overflow-visible border!"
+          :class="
+            isOn
+              ? 'border-live-border! bg-live-soft! text-live!'
+              : 'border-transparent! text-text-secondary!'
+          "
           :aria-label="triggerAriaLabel"
         >
           <OIcon
             name="update"
-            :class="isAnimating ? 'auto-refresh-icon--spinning' : ''"
+            :class="[isOn ? 'text-live!' : '', isAnimating ? 'auto-refresh-icon--spinning' : '']"
             size="sm"
           />
-          <OTooltip :content="t('search.autoRefreshWithValue', { value: triggerLabel })" />
+          <span
+            v-if="isOn"
+            aria-hidden="true"
+            class="bg-live-soft text-live text-3xs ring-surface-card pointer-events-none absolute -top-1.5 -right-1.5 flex h-4 items-center rounded-full px-1 leading-none font-semibold tabular-nums ring-1"
+          >
+            <span class="inline-block brightness-90 dark:brightness-100">
+              {{ triggerLabel }}
+            </span>
+          </span>
+          <OTooltip :content="triggerTooltip" />
         </OButton>
         <OButton
           v-else
           data-test="logs-search-bar-refresh-interval-btn-dropdown"
-          :variant="isOn ? 'outline-primary' : variant"
+          variant="ghost"
+          class="relative shrink-0 overflow-visible border!"
+          :class="
+            isOn
+              ? 'border-live-border! bg-live-soft! text-live!'
+              : 'border-transparent! text-text-secondary!'
+          "
           size="sm-toolbar"
           :aria-label="triggerAriaLabel"
         >
           <div class="flex flex-nowrap items-center">
-            <OIcon name="update" size="sm" class="me-1" />
-            <div class="text-compact text-center leading-4">
-              {{ t("search.autoRefreshTrigger", { interval: triggerLabel }) }}
-            </div>
-            <OIcon name="arrow-drop-down" size="sm" class="ms-0.5" />
+            <OIcon name="update" size="sm" class="me-1" :class="isOn ? 'text-live!' : ''" />
+            <OIcon
+              name="arrow-drop-down"
+              size="sm"
+              class="ms-0.5"
+              :class="isOn ? 'text-live!' : ''"
+            />
           </div>
-          <OTooltip :content="t('search.autoRefreshTitle')" />
+          <span
+            v-if="isOn"
+            aria-hidden="true"
+            class="bg-live-soft text-live text-3xs ring-surface-card pointer-events-none absolute -top-1.5 -right-1.5 flex h-4 items-center rounded-full px-1 leading-none font-semibold tabular-nums ring-1"
+          >
+            <span class="inline-block brightness-90 dark:brightness-100">
+              {{ triggerLabel }}
+            </span>
+          </span>
+          <OTooltip :content="triggerTooltip" />
         </OButton>
       </template>
       <div data-test="auto-refresh-panel">
@@ -254,6 +285,12 @@ export default defineComponent({
       isOn.value ? autoRefreshShortLabel(selectedValue.value, t) : t("common.off"),
     );
 
+    const triggerTooltip = computed(() =>
+      isOn.value
+        ? t("search.liveRefreshingEvery", { interval: selectedLabel.value })
+        : t("search.autoRefreshWithValue", { value: triggerLabel.value }),
+    );
+
     const triggerAriaLabel = computed(() =>
       isOn.value
         ? t("search.autoRefreshAriaOn", { value: triggerLabel.value })
@@ -332,6 +369,7 @@ export default defineComponent({
     });
 
     return {
+      isAnimating,
       raw,
       t,
       router,
@@ -347,7 +385,7 @@ export default defineComponent({
       onPick,
       onSwitch,
       minRangeRestrictionMessageVal,
-      isAnimating,
+      triggerTooltip,
       selectedValue,
     };
   },

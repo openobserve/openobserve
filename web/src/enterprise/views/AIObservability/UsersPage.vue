@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AiPageShell
     data-test="ai-users"
     :title="t('llmAttribution.users.title')"
-    :subtitle="t('llmAttribution.users.subtitle')"
     icon="group"
     :date-state="dateState"
     :last-run-at="lastRunAt"

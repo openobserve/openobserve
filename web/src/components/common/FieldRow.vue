@@ -19,16 +19,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OFieldRow
     v-if="(field.ftsKey && !showFtsFieldValues) || !field.isSchemaField || !field.showValues"
     :data-test="`logs-field-list-item-${field.name}`"
-    class="ps-6"
+    class="group/field ps-6"
     :highlight="isFieldSelected && field.name !== timestampColumn"
   >
     <OFieldLabel :field="field" :show-type-icon="false" />
     <OButton
       :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
       v-if="showQuickMode && isInterestingCandidate && field.name !== timestampColumn"
-      :name="field.isInterestingField ? 'info-filled' : 'info-outline'"
       variant="ghost-neutral"
       class="me-1 gap-0!"
+      :class="
+        field.isInterestingField
+          ? 'opacity-100'
+          : 'opacity-0 group-focus-within/field:opacity-100 group-hover/field:opacity-100 focus-visible:opacity-100'
+      "
+      :aria-pressed="field.isInterestingField"
       size="icon"
       :title="
         field.isInterestingField
@@ -37,7 +42,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
     >
-      <OIcon :name="field.isInterestingField ? 'info-filled' : 'info-outline'" size="sm" />
+      <OIcon
+        name="bolt"
+        size="sm"
+        class="size-4!"
+        :class="field.isInterestingField ? 'text-text-body!' : 'text-text-secondary!'"
+      />
     </OButton>
 
     <template v-if="field.name !== timestampColumn" #actions>
@@ -58,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         class="gap-0!"
         :title="t('search.addFieldToTable')"
+        aria-pressed="false"
         @click.stop="$emit('toggle-field', field)"
       >
         <OIcon name="visibility" size="sm" />
@@ -69,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="gap-0!"
         size="icon"
         :title="t('search.removeFieldFromTable')"
+        aria-pressed="true"
         @click.stop="$emit('toggle-field', field)"
       >
         <OIcon name="visibility-off" size="sm" />
@@ -78,6 +90,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="showQuickMode && isInterestingCandidate && field.name !== timestampColumn"
         variant="ghost-neutral"
         class="gap-0!"
+        :class="
+          field.isInterestingField
+            ? 'opacity-100'
+            : 'opacity-0 group-focus-within/field:opacity-100 group-hover/field:opacity-100 focus-visible:opacity-100'
+        "
+        :aria-pressed="field.isInterestingField"
         size="icon"
         :title="
           field.isInterestingField
@@ -86,7 +104,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
       >
-        <OIcon :name="field.isInterestingField ? 'info-filled' : 'info-outline'" size="sm" />
+        <OIcon
+          name="bolt"
+          size="sm"
+          class="size-4!"
+          :class="field.isInterestingField ? 'text-text-body!' : 'text-text-secondary!'"
+        />
       </OButton>
     </template>
   </OFieldRow>

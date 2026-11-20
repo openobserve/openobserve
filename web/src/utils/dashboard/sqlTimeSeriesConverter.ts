@@ -17,7 +17,7 @@ import { toZonedTime } from "date-fns-tz";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { calculateDynamicNameGap } from "./chartDimensionUtils";
 import { formatDate, isTimeSeries, isTimeStamp } from "./dateTimeUtils";
-import { chartColor } from "../chartTheme";
+import { chartCrosshairLabel } from "../chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { createSeriesOverrideLookup } from "./seriesOverrides";
 import { sortTooltipParams } from "./tooltipSort";
@@ -240,7 +240,7 @@ export const applyAutoSQLTimeSeries = (
         label: {
           fontsize: 12,
           precision: panelSchema.config?.decimals,
-          backgroundColor: chartColor("--color-chart-crosshair-bg"),
+          ...chartCrosshairLabel(),
           formatter: function (params: any) {
             try {
               if (params?.axisDimension == "y")
@@ -471,7 +471,7 @@ export const applyCustomSQLTimeSeries = (
         label: {
           fontsize: 12,
           precision: panelSchema.config?.decimals,
-          backgroundColor: chartColor("--color-chart-crosshair-bg"),
+          ...chartCrosshairLabel(),
           formatter: function (params: any) {
             try {
               if (params?.axisDimension == "y")

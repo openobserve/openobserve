@@ -10,6 +10,7 @@
 /* Element reset/typography layer. Imported here so its cascade order is kept. */
 @import "./base-elements.css";
 @import "../lib/styles/tokens/dark.css";
+@import "../lib/styles/tokens/refresh.css";
 /* App-wide @keyframes referenced from template `[animation:…]` arbitrary
    utilities — must be global, as Vue's scoped rewriter can't follow them. */
 @import "./keyframes.css";

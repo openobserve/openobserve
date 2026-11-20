@@ -1424,6 +1424,8 @@
     "selectOrganization": "Please select an organization"
   },
   "search": {
+    "liveRefreshingEvery": "Live: refreshing every {interval}",
+    "rowsPerPageLabel": "{n} / page",
     "queryFailed": "Query failed",
     "unknownError": "Unknown error",
     "selectedLabel": "selected",
@@ -1887,12 +1889,18 @@
     "selectedFunctionTooltip": "Function: {name}",
     "addToDashboard": "Add To Dashboard",
     "selectStream": "Select Stream",
+    "streamAriaLabel": "Stream",
+    "resultsPerPage": "Results per page",
     "pattern_summary": "Showing 1 to 50 out of {totalEvents} events & {patternsFound} patterns found in {logsAnalyzed} events in {totalTime} ms.",
     "histogramTitle": "Showing {start} to {end} out of {total} events in {took} ms.",
     "histogramTitleWithScan": "Showing {start} to {end} out of {total} events in {took} ms. ({scanLabel}: {scanSize})",
     "recordsChip": "{start} to {end} out of {total} events",
     "recordsChipShort": "{start}–{end} of {total}",
     "tookChip": "{took} ms",
+    "tookChipCompact": "{took} ms",
+    "stripTotal": "{total} events",
+    "stripShowing": "Showing {start}–{end}",
+    "scannedChip": "{size} scanned",
     "scanSize": "Scan Size",
     "deltaScanSize": "Delta Scan Size",
     "scannedSoFar": "Scanned {size}",
@@ -2075,7 +2083,6 @@
   "menu": {
     "alertCalibration": "Alert Calibration",
     "autoobserve": "AutoObserve",
-    "upgradeToProPlan": "Upgrade to PRO Plan",
     "home": "Home",
     "about": "About",
     "index": "Streams",
@@ -2134,7 +2141,6 @@
   },
   "profiles": {
     "title": "Profiles",
-    "subtitle": "Track CPU, memory, and lock usage by function",
     "stream": "Stream",
     "dataSource": "Data source",
     "service": "Service",
@@ -2285,7 +2291,6 @@
     "from": "from",
     "to": "to",
     "title": "Real User Monitoring",
-    "subtitle": "Monitor real-user sessions, errors, and frontend performance",
     "issueColumn": "Issue",
     "trendColumn": "Trend",
     "usersColumn": "Users",
@@ -3325,7 +3330,6 @@
         "bulkDeleteMessage": "Delete {count} named event? Funnels that use it will show a deleted-step tag. | Delete {count} named events? Funnels that use them will show a deleted-step tag.",
         "bulkDeleteInUseMessage": "Delete {count} named event? Saved funnels will show a Deleted event step for: {names}. | Delete {count} named events? Saved funnels will show a Deleted event step for: {names}.",
         "notFound": "This named event no longer exists",
-        "editorApp": "App: {app}",
         "details": "Details",
         "opParam": "URL parameter",
         "opRef": "Referrer host",
@@ -4004,11 +4008,6 @@
     "license_downgrade_limit": "Daily limit goes from {old} to {new}",
     "license_downgrade_expiry": "Expiry moves from {old} to {new}",
     "license_limit_per_day": "{gb} GB/day",
-    "header_button": {
-      "cloud_features": "{product} Features",
-      "enterprise_edition": "Edition: Enterprise",
-      "get_enterprise_free": "Get OpenObserve Enterprise (Free)"
-    },
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Enterprise Features",
@@ -4203,7 +4202,14 @@
     "usageChartDate": "{month} {day}",
     "usageChartDay": "Day {day}",
     "usageChartUsage": "Usage: {value}",
-    "startFreeTrial": "Start free trial"
+    "startFreeTrial": "Start free trial",
+    "header_button": {
+      "upgrade": "Upgrade",
+      "enterprise_tooltip": "About {product} — Enterprise edition",
+      "cloud_features": "{product} Features",
+      "enterprise_edition": "Edition: Enterprise",
+      "get_enterprise_free": "Get OpenObserve Enterprise (Free)"
+    }
   },
   "login": {
     "lockedOut": "Too many failed sign-in attempts. Try again in {duration}, or contact your administrator.",
@@ -4288,7 +4294,6 @@
     }
   },
   "user": {
-    "subtitle": "People who can sign in to {org}.",
     "id": "User ID",
     "name": "User name",
     "role": "Role",
@@ -4379,7 +4384,6 @@
     "nameInvalid": "Use lowercase letters, numbers and hyphens (up to {max} characters)",
     "createFailed": "Failed to create the service account. Please try again.",
     "updateFailed": "Failed to update the service account. Please try again.",
-    "headerSubtitle": "Programmatic access tokens for APIs",
     "search": "Search Service Account",
     "rotate": "Rotate Token",
     "deleteServiceAccount": "Delete Service Account",
@@ -4472,7 +4476,6 @@
     "mcpServerLabel": "MCP Server",
     "mcpServerDesc": "Connect AI clients over the {product}",
     "mcpServerHeader": "MCP Server",
-    "mcpServerHeaderSubtitle": "Connect Claude, Cursor, VS Code and other AI clients to this organization.",
     "invitationsDesc": "Pending and sent member invitations",
     "groupsDesc": "Group users together to assign roles",
     "rolesDesc": "Define permissions and access policies",
@@ -4844,7 +4847,6 @@
       "createFailed": "Organization creation failed."
     },
     "listOrganizations": {
-      "subtitle": "Every organization you can access. Switch to one or rename it from its row actions.",
       "switch": "Switch to this organization",
       "current": "Current",
       "cannotEditWhileDeleting": "Cannot edit while deletion is in progress",
@@ -4901,7 +4903,6 @@
       "other": "Other"
     },
     "invitationList": {
-      "subtitle": "Pending and sent member invitations",
       "loadingPending": "Loading pending invitations...",
       "failedLoadPending": "Failed to load pending invitations",
       "accepting": "Accepting invitation...",
@@ -4955,7 +4956,6 @@
       "errorCreating": "Error while creating group"
     },
     "quotaPage": {
-      "subtitle": "Usage limits applied per role",
       "selectOrganization": "Select Organization",
       "editQuota": "Edit Quota",
       "selectApiCategory": "Select API Category",
@@ -5082,7 +5082,6 @@
       "brand": "Bold blue"
     },
     "list": {
-      "subtitle": "Notices shown at the top of the app for every organization, or only the ones you choose.",
       "liveNow": "Live right now",
       "liveNowEmpty": "No banner is showing right now.",
       "liveOnlyFor": "Only for {orgs}",
@@ -5276,7 +5275,6 @@
     },
     "deleteField": "Delete field",
     "header": "Streams",
-    "subtitle": "Index management and stream configuration",
     "streamNameHelpText": "Use alphanumeric characters, underscore and colon only.",
     "search": "Search Stream",
     "emptyOr": "Or:",
@@ -5367,7 +5365,6 @@
   },
   "workflow": {
     "header": "Workflows",
-    "subtitle": "Automate Actions With Triggers, Logic, And Destinations",
     "create": "New workflow",
     "createSuccess": "Workflow created successfully",
     "name": "Workflow name",
@@ -6279,7 +6276,6 @@
     "functionName": "Function Name",
     "remoteDestination": "Remote Destination",
     "failedToLoadPipeline": "Failed to load pipeline",
-    "subtitle": "Transform, enrich and route data in flight",
     "deleteNode": "Delete",
     "addPipeline": "New pipeline",
     "deletePipeline": "Delete Pipeline",
@@ -6526,7 +6522,6 @@
     "order": "Order",
     "applyBeforeFlattening": "Apply Before Flattening",
     "header": "Functions",
-    "subtitle": "Reusable VRL functions applied in pipelines",
     "clickTestFunctionHint": "Please click Test Function to see the events",
     "add": "New function",
     "search": "Search Function",
@@ -6550,7 +6545,6 @@
     "enterFunctionPrompt": "Enter a prompt to generate function",
     "associatedFunctionHeader": "Associated Functions",
     "enrichmentTables": "Enrichment Tables",
-    "enrichmentTablesSubtitle": "Lookup tables that enrich ingested data",
     "addEnrichmentTable": "New enrichment table",
     "updateEnrichmentTable": "Update enrichment table",
     "searchEnrichmentTable": "Search enrichment table",
@@ -8195,7 +8189,7 @@
     "edit": "Edit Dashboard",
     "duplicate": "Duplicate Dashboard",
     "move_to_another_folder": "Move to another Folder",
-    "search": "Search Dashboard",
+    "search": "Search dashboards",
     "name": "Name",
     "typeDesc": "Description",
     "createdashboard": "New dashboard",
@@ -10145,7 +10139,6 @@
     "publicLinks": {
       "panelTitle": "Public links",
       "pageTitle": "Public dashboards",
-      "pageSubtitle": "Every public link in this organization",
       "panelTitleFor": "Public links — {name}",
       "intro": "Anyone with a public link can view this dashboard without signing in.",
       "editNote": "The link's address stays the same. Changes appear on the public page at its next update.",
@@ -10532,7 +10525,6 @@
     "tabOverview": "Overview",
     "tabUsage": "Usage",
     "removeHomeDashboard": "Remove home dashboard",
-    "subtitle": "Your observability workspace at a glance",
     "resources": "Resources",
     "explore": "Explore"
   },
@@ -11474,7 +11466,6 @@
   },
   "alertCalibration": {
     "title": "Alert calibration",
-    "subtitle": "How your alerts behave, measured from their own run history",
     "configure": "Configure",
     "runNow": "Run now",
     "runNowHint": "Asks for a run now instead of waiting for the next one. If a run is already due or in progress, it answers the request instead.",
@@ -11896,7 +11887,6 @@
     "detail": {
       "title": "Digest of {time}",
       "titleLoading": "Digest",
-      "subtitle": "Covers {start} to {end}, generated {time}",
       "back": "Digests",
       "unavailableTitle": "Digest unavailable",
       "noRecords": "No records were found for this run.",
@@ -12705,7 +12695,6 @@
       "commentPlaceholder": "Write a comment...",
       "sendComment": "Send comment",
       "title": "Incidents",
-      "subtitle": "Incident management and tracking",
       "search": "Search incidents...",
       "status": "Status",
       "severity": "Severity",
@@ -14156,7 +14145,6 @@
       "firingTotal": "Firing",
       "observedTotal": "Groups",
       "nOfMFiring": "{firing} of {observed} groups firing",
-      "groupedBy": "grouped by {columns}",
       "groupBy": "Group by",
       "criticalCondition": "Critical condition",
       "warningCondition": "Warning condition",
@@ -14504,7 +14492,6 @@
         "startDateRequired": "Choose the first day."
       },
       "title": "Downtimes",
-      "subtitle": "Scheduled windows that keep alerts, anomaly detections and synthetics checks running but stop their notifications",
       "newDowntime": "New downtime",
       "filterAll": "All",
       "filterOnce": "One-time",
@@ -15414,7 +15401,6 @@
   },
   "alert_sources": {
     "header": "External Alert Sources",
-    "subtitle": "Send alerts from Grafana, Prometheus Alertmanager, or any tool that can call a webhook — they'll show up here and get correlated into Incidents automatically.",
     "acceptsAnyFormat": "accepts any webhook format",
     "revealToken": "Reveal full URL",
     "hideToken": "Hide full URL",
@@ -16502,11 +16488,7 @@
     "modelPricingEditor": {
       "copySuffix": " (Copy)"
     },
-    "modelPricingList": {
-      "subtitle": "LLM model cost configuration"
-    },
     "orgStorageSettings": {
-      "subtitle": "Store this organization's data in a bucket you own",
       "awsCredentials": "AWS credentials",
       "azureCredentials": "Azure credentials",
       "awsRoleArn": "AWS role ARN"
@@ -16539,11 +16521,7 @@
       "settingsUpdated": "Organization settings updated successfully",
       "settingsSaveError": "Error saving organization settings"
     },
-    "aiToolsetsPage": {
-      "subtitle": "Configure AI tool integrations"
-    },
     "cipherKeysPage": {
-      "subtitle": "Keys that encrypt and decrypt sensitive field values",
       "delete": "Delete",
       "deleteCipherKeyTitle": "Delete Cipher Key",
       "deleteCipherKeyMessage": "Are you sure you want to delete the {name} cipher key?",
@@ -16558,15 +16536,11 @@
       "bulkDeleteFailed": "Failed to delete {count} cipher key | Failed to delete {count} cipher keys",
       "bulkDeleteError": "Error while deleting cipher keys"
     },
-    "correlationSettingsPage": {
-      "subtitle": "Telemetry correlation configuration"
-    },
     "licensePage": {
       "unexpectedError": "unexpected error",
       "daysRemaining": "{days} days remaining until your license expires"
     },
     "nodesPage": {
-      "subtitle": "Cluster nodes and their health",
       "to": "to",
       "name": "Name",
       "loadingData": "Please wait while loading data...",
@@ -16654,7 +16628,6 @@
       "processingTrialExtension": "Please wait while processing trial period extension request...",
       "trialExtendedSuccess": "Trial period extended successfully.",
       "extendTrialError": "Failed to extend trial period. Please try again.",
-      "subtitle": "Create and manage organizations",
       "addContract": "Add Contract",
       "extendTrialTitle": "Extend Trial for {name}",
       "extendTrialSubtitle": "Set the new trial extension period.",
@@ -16774,7 +16747,6 @@
       "sourceBuiltIn": "Built-in"
     },
     "regexPatternList": {
-      "subtitle": "Reusable regex patterns for redaction",
       "exportTitle": "Export regex pattern",
       "delete": "Delete",
       "bulkDeleteTitle": "Delete Regex Patterns",
@@ -16868,7 +16840,6 @@
         "valueMismatch": "TXT record found, but the value doesn't match",
         "dnsFailed": "DNS resolution failed"
       },
-      "pageSubtitle": "Link your email domains, map their users to organizations, and control which of them can join.",
       "linkedTab": "Linked domains",
       "mappingsTab": "Mappings",
       "accessTab": "Blocked users",
@@ -16991,7 +16962,6 @@
       "lastRun": "Last run",
       "lastRunAt": "Last run at",
       "nextRun": "Next run",
-      "nextRunAt": "next run {time}",
       "acceptedTooltip": "Accepted by the mail server",
       "cachedTooltip": "Dashboard cache warmed; no email is sent",
       "unrecordedTooltip": "Latest run outcome not recorded; older runs may be available in History.",
@@ -17065,9 +17035,7 @@
       "everyHours": "Every hour | Every {count} hours",
       "everyDays": "Every day | Every {count} days",
       "everyWeeks": "Every week | Every {count} weeks",
-      "everyMonths": "Every month | Every {count} months",
-      "dashboardCount": "{count} dashboard | {count} dashboards",
-      "recipientCount": "{count} recipient | {count} recipients"
+      "everyMonths": "Every month | Every {count} months"
     },
     "frequencyUnits": {
       "days": "days",
@@ -17095,7 +17063,6 @@
     "never": "Never",
     "startDate": "Start Date",
     "header": "Reports",
-    "subtitle": "Scheduled reports and exports",
     "searchThisFolder": "This folder",
     "searchAllFolders": "All folders",
     "reloadReports": "Reload reports",
@@ -17437,6 +17404,8 @@
     "spansFound": "Spans Found",
     "errorTraces": "Error Traces",
     "errorSpans": "Error Spans",
+    "spansCount": "{count} spans",
+    "errorsCount": "{count} errors",
     "filterByErrors": "Filter by errors",
     "clearErrorFilter": "Clear error filter",
     "error": "ERROR",
@@ -18739,7 +18708,6 @@
     },
     "unpriced": {
       "title": "Pricing gaps",
-      "subtitle": "Models in your LLM traces that had no price, or only an approximate one, at ingest",
       "banner": "{count} model had no price or an approximate price at ingest. Its recorded cost may be incomplete. | {count} models had no price or an approximate price at ingest. Their recorded costs may be incomplete.",
       "bannerTruncated": "{total} models in your traces had no price or an approximate one at ingest. Their cost may be wrong. Showing the top {shown} by tokens.",
       "streamLabel": "Stream",
@@ -18860,7 +18828,6 @@
       "tools": "Tools"
     },
     "promptManagement": {
-      "subtitle": "Create, version, and release reusable prompts.",
       "promptSubtitle": "{type} prompt",
       "prompt": "Prompt",
       "promptId": "Prompt ID",
@@ -19080,29 +19047,6 @@
       "settingsSaved": "Prompt settings saved.",
       "settingsSaveError": "Could not save prompt settings."
     },
-    "itemSubtitle": {
-      "agents": "See what your agents call, and where they loop or fail",
-      "costUsage": "See who uses your agents, what they cost, and cap the spend",
-      "evaluations": "Score live traffic and run the jobs that score it",
-      "scorers": "The scorers that grade LLM outputs and the rubrics they score with",
-      "experiments": "Run agents over datasets, and the HTTP services they call"
-    },
-    "subtitle": {
-      "llmInsights": "Track latency, errors, tokens, and cost across your LLM traffic",
-      "sessions": "Browse and inspect agent sessions turn by turn",
-      "agentGraph": "See what your agents interact with — tools, models, services, and datastores",
-      "agentBehavior": "Spot agents stuck in loops and the errors making them fail",
-      "discovery": "Find unhealthy traces worth reviewing",
-      "queues": "Stateful review to-do lists",
-      "datasets": "Curate golden datasets from annotated traces and reviews",
-      "experiments": "Preview and create immutable offline evaluation runs",
-      "quality": "Track score quality across span, trace, and session evaluations",
-      "evalJobs": "Run and monitor evaluation jobs across your sessions",
-      "scorers": "Create and manage the scorers that grade LLM outputs",
-      "scoreConfigs": "Configure the scoring rubrics used by your evaluations",
-      "playground": "Try prompts and models side by side before committing to an experiment",
-      "remoteTasks": "HTTP services experiments can call — published once, versioned, reused"
-    },
     "annotate": {
       "button": "Annotate",
       "title": "Annotate · {scope}",
@@ -19300,7 +19244,6 @@
         }
       },
       "workbench": {
-        "subtitle": "{reviewed} of {total} reviewed",
         "itemCounter": "Item {index} of {total} to review",
         "prev": "Previous item",
         "next": "Next item",
@@ -19780,7 +19723,6 @@
       },
       "detail": {
         "fallbackTitle": "Dataset",
-        "meta": "{count} items · updated {updated}",
         "loadError": "Failed to load dataset",
         "tryInPlayground": "Try in Playground",
         "tabs": {
@@ -20744,7 +20686,6 @@
       "backTo": "Providers",
       "createTitle": "Create LLM Provider",
       "editTitle": "Edit LLM Provider",
-      "subtitle": "Configure the model endpoint used by LLM judge scorers.",
       "sectionTitle": "Provider",
       "nameLabel": "Name",
       "typeLabel": "Provider type",
@@ -21460,7 +21401,6 @@
   "llmProviders": {
     "tabLabel": "LLM Providers",
     "title": "LLM Providers",
-    "subtitle": "LLM providers for online evaluations",
     "newButton": "New provider",
     "searchPlaceholder": "Search providers",
     "defaultBadge": "Default",
@@ -21479,7 +21419,6 @@
   "genAiAgentMapping": {
     "tabLabel": "Agent Mapping",
     "title": "Agent Mapping",
-    "subtitle": "How agent identity, cost attribution and session titles are read from telemetry",
     "identity": {
       "title": "Agent identity fields",
       "help": "How OpenObserve names each agent and reads its environment and version. It reads the standard attribute first. When a span does not have it, the first fallback field the span carries is used.",
@@ -22703,9 +22642,7 @@
       "usedBy": {
         "aria": "Tests that use this one",
         "help": "They run these steps on their own page. This test's Starting URL, environments and secrets are not used there.",
-        "viewAll": "View all {count} tests",
-        "subtitle": "{folder} · used by {count} test | {folder} · used by {count} tests",
-        "subtitleNoFolder": "Used by {count} test | Used by {count} tests"
+        "viewAll": "View all {count} tests"
       },
       "recordingIn": "Recording in {environment}",
       "needsDesktopRecorder": "Needs the desktop recorder extension",
@@ -22916,7 +22853,6 @@
       "folder": "folder",
       "willBeCreatedIn": "Will be created in"
     },
-    "pageSubtitle": "Proactively monitor uptime, performance, and user journeys from global locations",
     "pageTitle": "Synthetics",
     "protocolConfig": {
       "http": {
@@ -24056,6 +23992,14 @@
     "navbar": {
       "mainNavigation": "Main navigation"
     },
+    "sidebar": {
+      "explore": "Explore",
+      "monitor": "Monitor",
+      "ai": "AI",
+      "collapse": "Collapse Sidebar",
+      "collapseShort": "Collapse",
+      "expand": "Expand Sidebar"
+    },
     "tableLoading": {
       "ariaLabel": "Loading data"
     },
@@ -24945,7 +24889,6 @@
     "title": "SLOs",
     "notFound": "SLO not found",
     "notFoundDescription": "This SLO no longer exists, or you do not have access to it. It may have been deleted.",
-    "subtitle": "Service level objectives: targets, error budgets, burn-rate alerts",
     "new": "New SLO",
     "newTitle": "New SLO",
     "editTitle": "Edit SLO",
@@ -24963,7 +24906,6 @@
     "totalSlos": "Total SLOs",
     "noGrouping": "None (a single overall series)",
     "newAlert": "New alert",
-    "overRolling": "over rolling {window}",
     "searchPlaceholder": "Search SLO or tag, e.g. team:payments",
     "loadFailed": "Could not load SLOs",
     "requestFailed": "Request failed ({code})",
@@ -26073,7 +26015,6 @@
       "groupWorkloads": "Workloads",
       "groupStorage": "Storage",
       "groupAutoscaling": "Autoscaling",
-      "subtitle": "Monitor clusters, workloads and resources",
       "clusterPickerLabel": "Cluster",
       "clusterPickerLoading": "Loading clusters…",
       "clusterPickerTrigger": "Cluster: {name}",
@@ -26531,8 +26472,7 @@
       "actions": "Actions"
     },
     "header": {
-      "title": "Databases",
-      "subtitle": "Query performance and health across your databases"
+      "title": "Databases"
     },
     "ai": {
       "suggestFix": "Ask AI how to fix this",
@@ -27797,7 +27737,6 @@
     "fromRotation": "from {name}",
     "ownershipMatch": "Matches",
     "ownershipSpecificity": "Dimensions",
-    "teamSubtitle": "{tz} · {count} member | {tz} · {count} members",
     "statOnCallNow": "On call now",
     "statRotations": "Rotations",
     "statRoutingRules": "Routing rules",
@@ -28798,7 +28737,6 @@
     "teamOpenInOnCall": "View all in On-Call",
     "teamCoverage": "Coverage, next {days} days",
     "teamCoverageHint": "gaps are the only thing worth looking at here",
-    "teamOwnsRules": "owns {count} routing rule | owns {count} routing rules",
     "teamCoveredNow": "Covered now",
     "teamOverview": "Overview",
     "teamAnsweredBy": "Answered by",
@@ -29491,7 +29429,6 @@
       "allClearNone": "Nothing needed you."
     },
     "title": "AutoObserve",
-    "subtitle": "Send your data. OpenObserve finds the problems and tells you, with its best read on the cause. When it's quiet, it shows you what it checked and what it can't see.",
     "tabs": {
       "issues": "Issues",
       "coverage": "Coverage",
@@ -30423,7 +30360,6 @@
     },
     "issuesPage": {
       "title": "All issues",
-      "sentence": "Every problem I opened {within}. Pick one to see what happened and what I did about it.",
       "ranges": {
         "week": "Last 7 days",
         "month": "Last 30 days",
@@ -31242,7 +31178,6 @@
     },
     "users": {
       "title": "Users",
-      "subtitle": "See who uses your agents and what they cost",
       "stream": "Stream",
       "agent": "Agent",
       "search": "Search by user id",
@@ -31260,7 +31195,6 @@
   },
   "aiBudgets": {
     "title": "Budgets",
-    "subtitle": "Spend limits per agent, feature and user, with a signal your gateway can enforce",
     "new": "New budget",
     "create": "Create budget",
     "edit": "Edit budget",
@@ -32180,7 +32114,6 @@
   },
   "fleet": {
     "title": "Fleet management",
-    "subtitle": "Enroll OpenTelemetry collectors, version their configurations and roll changes out safely",
     "addCollector": "Add collector",
     "tabs": {
       "collectors": "Collectors",
@@ -32719,7 +32652,6 @@
     },
     "editor": {
       "pageTitle": "Configuration editor",
-      "newDescription": "New collector configuration",
       "visual": "Visual",
       "issues": "{count} issue | {count} issues",
       "valid": "Valid",

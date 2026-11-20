@@ -112,6 +112,8 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "bg-badge-warning-quiet-bg text-badge-warning-quiet-text ring-1 ring-inset ring-badge-warning-quiet-border/30",
   "error-soft":
     "bg-badge-error-soft-bg text-badge-error-soft-text ring-1 ring-inset ring-badge-error-ol-border/30",
+  "error-quiet":
+    "bg-transparent text-badge-error-soft-text ring-1 ring-inset ring-border-control",
 
   // NEW: Extended color families for correlation dimensions
   // Teal

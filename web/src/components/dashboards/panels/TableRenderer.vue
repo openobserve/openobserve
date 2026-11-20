@@ -611,9 +611,12 @@ export default defineComponent({
           const col = colById.value.get(params.columnId);
           const value = params.value;
 
-          // Number / timestamp columns render monospace so digits align. Merged
-          // into every branch below so it composes with the colour rules.
-          const base: Record<string, any> = col?.mono ? { fontFamily: "var(--font-mono)" } : {};
+          // Numbers stay upright sans with tabular digits; only timestamps take mono. Merged into every branch below.
+          const base: Record<string, any> = col?.isNumeric
+            ? { fontVariantNumeric: "tabular-nums", fontStyle: "normal" }
+            : col?.mono
+              ? { fontFamily: "var(--font-mono)", fontStyle: "normal" }
+              : {};
 
           // 1) Auto color mode — stable palette per distinct string value.
           if (col?.colorMode === "auto") {
@@ -847,31 +850,6 @@ export default defineComponent({
 /* Dashboard table cells should not use the monospace font from tenstack-table.scss */
 .table-wrapper :deep(td) {
   font-family: var(--font-sans);
-}
-
-/* Column dividers matching the resize-handle dividers other tables show. Resize
-   is disabled here, so they're drawn statically as a header-only ::after. */
-.table-wrapper :deep(thead th) {
-  position: relative;
-}
-.table-wrapper :deep(thead th:not(:last-child))::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
-  height: 1rem;
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the column divider is a 1-device-pixel rule and must not scale with text or it smears at fractional zoom */
-  width: 1px;
-  background: var(--color-border-default);
-}
-/* The row-field header spans every level (rowspan), so a short centered stub
-   would float on the group→value boundary — draw it full-height instead. */
-.table-wrapper :deep(thead th.o2-pivot-rowfield-th)::after {
-  top: 0;
-  bottom: 0;
-  height: auto;
-  transform: none;
 }
 
 /* Pivot table styles */

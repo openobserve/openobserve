@@ -233,7 +233,7 @@ const options = computed(() => {
       data: bins.map((b) => binLabel(b.lo, b.hi)),
       axisTick: { show: false },
       axisLine: { lineStyle: { color: chartAxisLine() } },
-      axisLabel: { color: textColor, fontSize: 10, hideOverlap: true },
+      axisLabel: { color: textColor, fontSize: 11, hideOverlap: true },
     },
     yAxis: { type: "value", show: false },
     series: [

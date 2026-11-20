@@ -77,7 +77,7 @@ the Free Software Foundation, either version 3 of the License, or
                 v-for="entry in group.entries"
                 :key="entry.name"
                 class="flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors duration-200"
-                :class="[isSelected(entry.name) ? 'bg-accent/6' : 'hover:bg-table-row-hover-bg']"
+                :class="[isSelected(entry.name) ? 'bg-selected-bg' : 'hover:bg-table-row-hover-bg']"
                 :data-test="`scorer-library-item-${entry.name}`"
                 @click="toggle(entry)"
               >

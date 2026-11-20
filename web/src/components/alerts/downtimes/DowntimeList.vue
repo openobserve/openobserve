@@ -16,12 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="downtime-list-page" class="flex h-full flex-col">
-    <OPageLayout
-      bleed
-      :title="t('alerts.downtimes.title')"
-      icon="notifications-paused"
-      :subtitle="t('alerts.downtimes.subtitle')"
-    >
+    <OPageLayout bleed :title="t('alerts.downtimes.title')" icon="notifications-paused">
       <template #title>
         <span class="inline-flex max-w-full min-w-0 items-center gap-2">
           <span class="truncate">{{ t("alerts.downtimes.title") }}</span>

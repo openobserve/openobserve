@@ -2,7 +2,7 @@
 
 import type { I18nText } from "@/types/i18n";
 
-export type InputSize = "xs" | "sm" | "md";
+export type InputSize = "xs" | "sm" | "md" | "lg";
 
 /**
  * Semantic field width — maps to pre-defined CSS tokens.

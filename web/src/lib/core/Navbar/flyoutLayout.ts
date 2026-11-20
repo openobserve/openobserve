@@ -25,6 +25,15 @@ export function needsColumns(box: FlyoutBox, sections: number): boolean {
   return sections >= 2 && top + box.height > box.viewportHeight - box.margin;
 }
 
+/** Columns cap at 3 so the 200px columns stay within 600px and most of the table stays visible. */
+export const MAX_FLYOUT_COLUMNS = 3;
+
+/** One column per group once a flyout holds more than 8 items in at least 2 groups; a short list stays one column. */
+export function flyoutColumns(groupSizes: number[]): number {
+  const items = groupSizes.reduce((sum, n) => sum + n, 0);
+  return items > 8 && groupSizes.length >= 2 ? Math.min(groupSizes.length, MAX_FLYOUT_COLUMNS) : 1;
+}
+
 export function flyoutTop(box: FlyoutBox): number {
   const { tileTop, height, viewportHeight, margin } = box;
   const shown = Math.min(height, viewportHeight - margin * 2);

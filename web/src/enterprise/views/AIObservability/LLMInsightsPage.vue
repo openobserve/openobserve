@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AiPageShell
     data-test="ai-llm-insights"
     :title="t('aiObservability.nav.llmInsights')"
-    :subtitle="t('aiObservability.subtitle.llmInsights')"
     icon="dashboard"
     :date-state="dateState"
     :last-run-at="dashboardLastRunAt"

@@ -27,7 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       bleed
       :title="t('statusPages.editTitle')"
-      :subtitle="pageName ? raw(pageName) : undefined"
       :back="{ label: t('statusPages.back'), onClick: cancel, dataTest: 'status-page-editor-back' }"
       title-overflow="truncate"
     >

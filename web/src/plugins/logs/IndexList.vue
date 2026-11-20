@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          so all three form controls line up on one left/right edge. The scrolling
          list itself deliberately runs flush to the divider so its scrollbar lands
          on the panel edge — only the rows inside it carry the gutter. -->
-    <div class="px-page-edge flex max-w-full items-center gap-2">
+    <div class="logs-index-menu__stream px-page-edge flex max-w-full items-center gap-2">
       <FeatureLockExempt
         v-if="searchObj.data.stream.streamType && searchObj.data.stream.streamType !== 'logs'"
         class="shrink-0"
@@ -29,8 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="log-search-index-list-back-to-logs-btn"
           variant="outline"
-          size="icon-sm"
-          class="border-border-default rounded-default h-8 w-8 shrink-0 border p-0"
+          size="icon-toolbar"
+          class="border-border-default rounded-default shrink-0 border p-0"
           @click="onStreamTypeChange('logs')"
         >
           <OIcon name="swap-horiz" size="sm" />
@@ -67,6 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @search="onStreamPickerSearch"
           @header-action="onStreamPickerHeaderAction"
         >
+          <template v-if="searchObj.data.stream.selectedStream.length === 1" #trigger>
+            <OTruncatedText class="text-select-text flex-1 text-start">{{
+              searchObj.data.stream.selectedStream[0]
+            }}</OTruncatedText>
+          </template>
           <template #empty>{{ t("search.noResult") }}</template>
         </OSelect>
         <OTooltip
@@ -2106,15 +2111,78 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* keep(lib-override:o-field-list): one 8px inset and 8px rhythm for the select,
+   search, headers and rows; the field list DOM belongs to OFieldList/OFieldRow, so it needs :deep(). */
+.logs-index-menu__stream {
+  padding-inline: 0.5rem;
+}
+.logs-index-menu :deep([data-test="o-field-list"] > div:has(> [data-test="o-field-list-search"])) {
+  padding: 0.5rem;
+}
+/* Search icon and placeholder sit on the same 20px / 40px lines as the header label and field names. */
+.logs-index-menu :deep([data-test="o-field-list-search"] span:has(> .o-field-list__search-icon)) {
+  padding-inline-start: 0.75rem;
+}
+.logs-index-menu :deep([data-test="o-field-list-search-field"]) {
+  padding-inline-start: 0.25rem;
+}
+/* The row owns one fill (--field-row-bg); the action strip reuses it, so no second box shows. */
+.logs-index-menu :deep(.o-field-row) {
+  --field-row-bg: var(--color-interactive-hover-bg);
+}
+.logs-index-menu :deep(.o-field-row.o-field-row--selected) {
+  --field-row-bg: var(--color-field-list-row-selected-bg);
+}
+.logs-index-menu :deep(.o-field-row:hover) {
+  background-color: var(--field-row-bg);
+}
+.logs-index-menu :deep(.o-field-row__actions) {
+  gap: 0.125rem;
+  padding-inline: 0.875rem 0.25rem;
+  border-radius: 0 var(--radius-default) var(--radius-default) 0;
+  background:
+    linear-gradient(to right, transparent, var(--field-row-bg) 0.875rem),
+    linear-gradient(to right, transparent, var(--color-surface-base) 0.875rem);
+}
+.logs-index-menu :deep(.o-field-row__actions [data-o2-btn]) {
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  padding: 0;
+  border-radius: 0.25rem;
+  background-color: transparent;
+  color: var(--color-text-body);
+}
+.logs-index-menu :deep(.o-field-row__actions [data-o2-btn]:hover) {
+  background-color: var(--color-interactive-hover-bg);
+  color: var(--color-text-heading);
+}
+.logs-index-menu :deep(.o-field-list__row) {
+  margin-top: 0.125rem;
+  padding-inline: 0.5rem;
+}
+.logs-index-menu :deep(.o-field-row) {
+  height: 1.75rem;
+  padding-inline-start: 2rem;
+}
+.logs-index-menu :deep(.field-expansion-item .o-field-row) {
+  padding-inline-start: 0.75rem;
+}
+.logs-index-menu :deep(.field-expansion-item .o-field-row > span:first-child) {
+  width: 1rem;
+  margin-inline-end: 0;
+}
+
 /* keep(lib-override:o2-table): `.logs-index-menu` and both `.index-table` divs are
    this component's own template, but the tbody/tr/td they lay out are OTable's
-   internal render (via GroupedFieldList) and `.schema-field-toggle` is
-   FieldListPagination's DOM — child DOM this owner can only reach with :deep().
+   internal render (via GroupedFieldList).
    The `.logs-index-menu` ancestor is kept so the selectors match at their original
    specificity. */
 .logs-index-menu .index-table {
   width: 100%;
-  height: calc(100% - 2.5rem);
+  flex: 1;
+  min-height: 0;
+  margin-top: 0;
 }
 
 .logs-index-menu .index-table :deep(tr) {
@@ -2129,13 +2197,5 @@ export default defineComponent({
   display: block;
   height: fit-content;
   overflow: hidden;
-}
-
-.logs-index-menu .index-table :deep(.schema-field-toggle) {
-  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the 1-device-pixel toggle border must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--color-card-glass-border);
-  border-radius: 0.325rem;
-  background-color: transparent;
-  line-height: 0.625rem;
 }
 </style>

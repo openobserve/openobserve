@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="layoutRef"
     :key="org"
     data-test="rum-analytics-page"
-    :subtitle="t('rum.analytics.subtitle')"
     title-data-test="rum-analytics-title"
     icon="insights"
     bleed

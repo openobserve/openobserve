@@ -8,153 +8,58 @@
 
 }
 
-/* Syntax highlighting classes */
-.log-key {
-  color: #B71C1C;
-
+/* Calm syntax palette: keys secondary, values body, one muted accent for numbers.
+   :root.dark selectors match refresh.css specificity; this file loads later, so it wins. */
+:root {
+  --log-syntax-key: var(--color-text-secondary);
+  --log-syntax-value: var(--color-text-body);
+  --log-syntax-accent: color-mix(in srgb, var(--color-accent-text) 70%, var(--color-text-body));
+  --log-syntax-muted: var(--color-text-secondary);
 }
-.log-string {
-  color: #047857;
 
-}
-.log-number {
-  color: #2563eb;
-
-}
-.log-boolean {
-  color: #6d28d9;
-
-}
-.log-null {
-  color: #6b7280;
-
-}
-.log-separator {
-  color: #6b7280;
-
-}
-/* `.log-key`/`.log-separator` are applied to generated log HTML injected via
-   v-html (useLogsHighlighter.ts, JsonPreview.vue), so they live in this global
-   stylesheet rather than any component scope. */
-.log-key,
-.log-separator {
+:root .log-key,
+:root.dark .log-key {
+  color: var(--log-syntax-key);
   font-weight: normal;
 }
-.log-object-brace {
-  color: #6b7280;
-
+:root :is(.log-number, .log-boolean, .log-file-size),
+:root.dark :is(.log-number, .log-boolean, .log-file-size) {
+  color: var(--log-syntax-accent);
 }
-
-/* Semantic type classes - colors from keyValueParser.ts */
-.log-ip {
-  color: #D97706; /* Bold amber for IP addresses */
-
+:root :is(.log-null, .log-separator, .log-object-brace),
+:root.dark :is(.log-null, .log-separator, .log-object-brace) {
+  color: var(--log-syntax-muted);
+  font-weight: normal;
 }
-.log-url {
-  color: #1D4ED8; /* Strong blue for URLs */
-
-}
-.log-email {
-  color: #9333EA; /* Vivid purple for emails */
-
-}
-.log-timestamp {
-  color: #2563EB; /* Blue for timestamps */
-
-}
-.log-http-method {
-  color: #388e3c; /* Green for HTTP methods (not in keyValueParser) */
-
-}
-.log-status-code {
-  color: #f57c00; /* Orange for status codes (not in keyValueParser) */
-
-}
-.log-path {
-  color: #4338CA; /* Deep indigo for file paths */
-
-}
-.log-uuid {
-  color: #047857; /* Dark teal for UUIDs */
-
-}
-.log-file-size {
-  color: #2563eb; /* Blue for file sizes (not in keyValueParser) */
-
-}
-.log-object-value {
-  color: #4b5563; /* Neutral gray for objects */
-
-}
-.log-array-value {
-  color: #0E7490; /* Calm teal for arrays */
-
-}
-
-/* Dark theme variants - colors from keyValueParser.ts */
-.dark .log-key {
-  color: #f67a7aff; /* Lighter red for dark mode */
-
-}
-.dark .log-string {
-  color: #6EE7B7; /* Soft mint green */
-
-}
-.dark .log-separator,
-.dark .log-object-brace {
-  color: #999;
-}
-.dark .log-number {
-  color: #60A5FA; /* Light blue for numbers */
-
-}
-.dark .log-boolean {
-  color: #A5B4FC; /* Lavender */
-
-}
-.dark .log-null {
-  color: #9CA3AF; /* Medium gray */
-
-}
-.dark .log-ip {
-  color: #FCD34D; /* Soft gold */
-
-}
-.dark .log-url {
-  color: #93C5FD; /* Light blue */
-
-}
-.dark .log-email {
-  color: #C4B5FD; /* Soft purple */
-
-}
-.dark .log-timestamp {
-  color: #60A5FA; /* Light blue */
-
-}
-.dark .log-http-method {
-  color: #66bb6a; /* Green for HTTP methods (not in keyValueParser) */
-
-}
-.dark .log-status-code {
-  color: #ffb74d; /* Orange for status codes (not in keyValueParser) */
-
-}
-.dark .log-path {
-  color: #BAE6FD; /* Ice blue */
-
-}
-.dark .log-uuid {
-  color: #6EE7B7; /* Mint green (consistent with string) */
-
-}
-.dark .log-object-value {
-  color: #D1D5DB; /* Light gray */
-
-}
-.dark .log-array-value {
-  color: #67E8F9; /* Soft cyan */
-
+:root
+  :is(
+    .log-string,
+    .log-ip,
+    .log-url,
+    .log-email,
+    .log-timestamp,
+    .log-http-method,
+    .log-status-code,
+    .log-path,
+    .log-uuid,
+    .log-object-value,
+    .log-array-value
+  ),
+:root.dark
+  :is(
+    .log-string,
+    .log-ip,
+    .log-url,
+    .log-email,
+    .log-timestamp,
+    .log-http-method,
+    .log-status-code,
+    .log-path,
+    .log-uuid,
+    .log-object-value,
+    .log-array-value
+  ) {
+  color: var(--log-syntax-value);
 }
 
 /* Highlighting class */
@@ -189,4 +94,33 @@
   font-size: var(--text-xs);
   word-break: break-word;
 
+}
+
+/* Row values inherit the cell so severity text retains its own color; search matches keep theirs. */
+:root
+  .log-cell-html
+  :is(
+    .log-string,
+    .log-number,
+    .log-boolean,
+    .log-null,
+    .log-separator,
+    .log-object-brace,
+    .log-ip,
+    .log-url,
+    .log-email,
+    .log-timestamp,
+    .log-http-method,
+    .log-status-code,
+    .log-path,
+    .log-uuid,
+    .log-file-size,
+    .log-object-value,
+    .log-array-value
+  ) {
+  color: inherit;
+}
+
+:root .log-cell-html :is(.log-key, .log-embedded-key) {
+  color: var(--color-selected-fg);
 }

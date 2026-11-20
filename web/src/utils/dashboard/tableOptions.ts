@@ -25,8 +25,9 @@ export const DEFAULT_TABLE_DENSITY = "compact";
 export type TableFooterCalc = (typeof TABLE_FOOTER_CALCS)[number];
 
 // Absent density keeps today's row height, which is the compact one.
-const ROW_HEIGHTS: Record<string, number> = { compact: 22, standard: 28, comfortable: 36 };
-const DEFAULT_ROW_HEIGHT = 22;
+// Compact matches the 26px Logs and Traces rows, so the three tables read as one.
+const ROW_HEIGHTS: Record<string, number> = { compact: 26, standard: 28, comfortable: 36 };
+const DEFAULT_ROW_HEIGHT = 26;
 
 const CALC_LABEL_KEYS: Record<TableFooterCalc, I18nKey> = {
   sum: "dashboard.tableFooterCalcSum",

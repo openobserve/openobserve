@@ -35,12 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          and forwards #title/#actions), so there is no nested header component and
          no header-class: it draws its own bottom border. `bleed` keeps the table
          flush to the page edge, as the old main-panel=false layout did. -->
-    <OPageLayout
-      :title="t('workflow.header')"
-      :subtitle="t('workflow.subtitle')"
-      icon="schema"
-      bleed
-    >
+    <OPageLayout :title="t('workflow.header')" icon="schema" bleed>
       <!-- Beta tag rides INSIDE the title line. `#title-trail` would place it
            after the whole title+subtitle column — i.e. past the subtitle's
            width — leaving it stranded far from the word "Workflows". -->

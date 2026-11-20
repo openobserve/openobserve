@@ -116,7 +116,6 @@
     },
     "overview": {
       "title": "Przegląd SOC",
-      "subtitle": "Co zostało wyzwolone, co jest otwarte i czy Twoje źródła nadal przesyłają dane",
       "autoRefreshOn": "Automatyczne odświeżanie co minutę jest włączone",
       "autoRefreshOff": "Automatyczne odświeżanie jest wyłączone",
       "historyError": "Nie udało się wczytać historii wykryć: {reason}",
@@ -165,7 +164,6 @@
     },
     "events": {
       "title": "Zdarzenia bezpieczeństwa",
-      "subtitle": "Przeszukuj znormalizowaną telemetrię bezpieczeństwa",
       "run": "Uruchom",
       "hideSidebar": "Ukryj pola",
       "showSidebar": "Pokaż pola",
@@ -348,7 +346,6 @@
     },
     "alerts": {
       "title": "Alerty",
-      "subtitle": "Każde wyzwolenie wykrycia oraz dowody, które za nim stoją",
       "eyebrow": "Wyzwolenie wykrycia",
       "range": {
         "1h": "1 godz.",
@@ -463,7 +460,6 @@
     },
     "cases": {
       "title": "Sprawy",
-      "subtitle": "Skorelowane wyzwolenia, poddane ocenie aż do werdyktu",
       "eyebrow": "Sprawa",
       "search": "Filtruj tę stronę według tytułu, id, osoby przypisanej lub encji",
       "refresh": "Odśwież",
@@ -712,7 +708,6 @@
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
-      "subtitle": "Które techniki obejmują włączone wykrycia i które zostały wyzwolone",
       "summaryPartial": "Ten przedział czasu zawiera więcej historii alertów, niż mieści jedno podsumowanie, więc liczby wyzwoleń są wartością dolną; wybierz krótszy przedział, aby uzyskać pełne liczby.",
       "stat": {
         "firing": "Wyzwolone techniki",
@@ -775,7 +770,6 @@
     },
     "detections": {
       "title": "Detekcje",
-      "subtitle": "Reguły Sigma działające jako zaplanowane detekcje na Twoich strumieniach bezpieczeństwa",
       "new": "Nowa detekcja",
       "eyebrow": "Reguła detekcji",
       "refresh": "Odśwież detekcje",
@@ -1073,7 +1067,6 @@
     },
     "content": {
       "title": "Zawartość",
-      "subtitle": "Reguły wykrywania i źródła logów dołączone do SIEM, zestawione z Twoimi danymi",
       "refresh": "Odśwież",
       "streamsError": "Nie udało się wczytać Twoich strumieni, więc nie wiadomo, czy pasują do Twoich danych",
       "tab": {
@@ -1219,7 +1212,6 @@
     },
     "entities": {
       "title": "Encje",
-      "subtitle": "Wszyscy użytkownicy, źródłowe adresy IP i hosty wymieniane przez Twoje źródła bezpieczeństwa",
       "view": {
         "table": "Tabela",
         "graph": "Graf ryzyka"
@@ -1339,7 +1331,6 @@
     },
     "ueba": {
       "title": "Analiza zachowań użytkowników",
-      "subtitle": "Każdy użytkownik jest porównywany z własną niedawną historią",
       "windowHint": "Ostatnie {current} w porównaniu z wcześniejszym okresem {baseline}",
       "method": "Oceny ryzyka mają charakter heurystyczny: ostatnie {current} każdego użytkownika jest porównywane z jego własnym okresem {baseline} sprzed tego okresu. Każdy sygnał ostrzegawczy pokazuje liczby, które go wywołały.",
       "noSources": "Żadne źródło nie wskazuje użytkownika",
@@ -1438,7 +1429,6 @@
     },
     "intel": {
       "title": "Analiza zagrożeń",
-      "subtitle": "Znane złośliwe wskaźniki i każde miejsce, w którym pojawiły się w Twoich danych bezpieczeństwa",
       "loadFailed": "Nie udało się załadować list wskaźników",
       "add": "Dodaj wskaźniki",
       "import": "Importuj",
@@ -1607,7 +1597,6 @@
     "sources": {
       "title": "Źródła danych",
       "comingSoon": "Wkrótce pojawi się wdrażanie z przewodnikiem i szablonami normalizacji OCSF. Do tego czasu pozyskuj logi bezpieczeństwa jako dowolny strumień; strona Zdarzenia automatycznie je identyfikuje i normalizuje.",
-      "subtitle": "Dołącz pakiet OCSF, aby normalizować strumień podczas pozyskiwania, lub uwzględnij go jako źródło bezpieczeństwa bez zmian.",
       "colStream": "Strumień",
       "colSourceType": "Typ źródła",
       "colMapping": "Mapowanie",

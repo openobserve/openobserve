@@ -1007,9 +1007,10 @@ export const BADGE_GROUPS = {
     size: "md",
     values: {
       neutral: { variant: "default-soft" },
-      info: { variant: "blue-soft" },
-      warn: { variant: "warning-soft" },
-      error: { variant: "error-soft" },
+      // Took and scanned are plain stats, not status; only errors earn a colour.
+      info: { variant: "default-soft" },
+      warn: { variant: "default-soft" },
+      error: { variant: "error-quiet", dot: true },
     },
     fallback: { variant: "default-soft" },
   },

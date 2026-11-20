@@ -144,7 +144,6 @@ import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer
 import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTestSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyBrowserCheck from "@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue";
-import useBreakpoint from "@/composables/useBreakpoint";
 
 const router = useRouter();
 const route = useRoute();
@@ -199,19 +198,6 @@ const headerTitle = computed(() => {
   if (isLoadingEdit.value) return t("synthetics.createBrowserTest.loading");
   if (loadError.value) return t("synthetics.createBrowserTest.loadFailedTitle");
   return check.value.name || t("synthetics.createBrowserTest.untitledCheck");
-});
-const folderName = computed(() => {
-  const fid = check.value.folder;
-  if (!fid || fid === "default") return "";
-  return folders.value.find((f) => f.folderId === fid)?.name ?? "";
-});
-const { isMobile } = useBreakpoint();
-/** A phone has no room for the header's Used by button, so the count joins the subtitle. */
-const headerSubtitle = computed(() => {
-  const count = referencedByCount.value;
-  if (!isMobile.value || count === 0) return raw(folderName.value);
-  if (!folderName.value) return t("synthetics.journey.usedBy.subtitleNoFolder", { count }, count);
-  return t("synthetics.journey.usedBy.subtitle", { folder: folderName.value, count }, count);
 });
 /**
  * Where every exit from this wizard lands.
@@ -2001,7 +1987,6 @@ function onClearResults() {
   <OPageLayout
     :title="raw(headerTitle)"
     class="bg-surface-base"
-    :subtitle="headerSubtitle"
     :back="{
       label: t('synthetics.newCheck.back'),
       to: backTo,

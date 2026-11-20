@@ -15,10 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="index-menu bg-surface-panel! flex w-full flex-col py-1.5!">
-    <!-- Stream selector sits on the same page-edge rail inset as the field list below it. -->
-    <div class="px-page-edge">
+  <div
+    class="index-menu bg-surface-panel! flex w-full flex-col pt-1.5! pb-0! [&_.field-expansion-item_.o-field-row]:ps-3 [&_.field-expansion-item_.o-field-row>span:first-child]:me-0 [&_.field-expansion-item_.o-field-row>span:first-child]:w-4 [&_.o-field-list__row]:mt-0.5 [&_.o-field-list__row]:px-2 [&_.o-field-row]:h-7 [&_.o-field-row]:ps-8"
+  >
+    <div class="px-2">
       <OSelect
+        :aria-label="t('search.streamAriaLabel')"
         data-test="log-search-index-list-select-stream"
         :model-value="searchObj.data.stream.selectedStream?.value ?? null"
         :label="
@@ -36,14 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSelect>
     </div>
-    <div
-      class="index-table h-[calc(100%-2rem)]! w-full"
-      data-test="log-search-index-list-fields-table"
-    >
+    <div class="index-table min-h-0 w-full flex-1" data-test="log-search-index-list-fields-table">
       <GroupedFieldList
         ref="fieldListRef"
         :fields="normalizedFieldList"
         :search="searchObj.data.stream.filterField"
+        search-class="p-2! [&_span:has(>.o-field-list__search-icon)]:ps-3 [&_[data-test=o-field-list-search-field]]:ps-1"
         :loading="
           searchObj.loadingStream ||
           (searchObj.meta.loadingFields && !searchObj.data.stream.selectedStreamFields.length)
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #loading>
           <div
-            class="px-page-edge flex w-full flex-col gap-3 pt-3"
+            class="flex w-full flex-col gap-3 px-2 pt-3"
             aria-busy="true"
             data-test="traces-field-list-skeleton"
           >
@@ -206,6 +206,7 @@ import {
   formatTimeWithSuffix,
 } from "../../utils/zincutils";
 import FieldRow from "@/components/common/FieldRow.vue";
+import FieldExpansion from "@/components/common/FieldExpansion.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -248,7 +249,8 @@ export default defineComponent({
     GroupedFieldListPagination: defineAsyncComponent(
       () => import("@/components/common/FieldListPagination.vue"),
     ),
-    FieldExpansion: defineAsyncComponent(() => import("@/components/common/FieldExpansion.vue")),
+    // Static: an async row renders empty until its chunk lands, leaving blank gaps under each group.
+    FieldExpansion,
   },
   emits: ["update:changeStream", "update:selectedFields"],
   props: {
@@ -747,10 +749,6 @@ export default defineComponent({
   align-items: center;
 }
 
-.index-menu :deep(.field_list.selected .field_overlay) {
-  background-color: var(--color-interactive-hover-bg);
-}
-
 .index-table :deep(table) {
   width: 100%;
   table-layout: fixed;
@@ -765,9 +763,5 @@ export default defineComponent({
 
 .index-table :deep(table .field-container:hover .field_overlay) {
   visibility: visible;
-}
-
-.index-table :deep(table .field_list.selected) {
-  background-color: var(--color-interactive-hover-bg);
 }
 </style>

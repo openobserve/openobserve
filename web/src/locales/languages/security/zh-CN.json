@@ -116,7 +116,6 @@
     },
     "overview": {
       "title": "SOC 概览",
-      "subtitle": "哪些规则已触发、哪些仍未解决，以及数据源是否仍在上报",
       "autoRefreshOn": "每分钟自动刷新已开启",
       "autoRefreshOff": "自动刷新已关闭",
       "historyError": "无法加载检测历史：{reason}",
@@ -165,7 +164,6 @@
     },
     "events": {
       "title": "安全事件",
-      "subtitle": "在规范化安全遥测数据中开展狩猎",
       "run": "运行",
       "hideSidebar": "隐藏字段",
       "showSidebar": "显示字段",
@@ -348,7 +346,6 @@
     },
     "alerts": {
       "title": "告警",
-      "subtitle": "每次检测触发的时刻及其证据",
       "eyebrow": "检测触发",
       "range": {
         "1h": "1 小时",
@@ -463,7 +460,6 @@
     },
     "cases": {
       "title": "案例",
-      "subtitle": "关联触发记录，经分诊得出结论",
       "eyebrow": "案例",
       "search": "按标题、ID、负责人或实体筛选此页面",
       "refresh": "刷新",
@@ -712,7 +708,6 @@
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
-      "subtitle": "已启用的检测覆盖了哪些技术，以及哪些已触发",
       "summaryPartial": "此时间窗口内的告警历史超出单个摘要的容量，因此触发次数为下限；请选择较短的时间窗口以获得完整数字。",
       "stat": {
         "firing": "触发中的技术",
@@ -775,7 +770,6 @@
     },
     "detections": {
       "title": "检测",
-      "subtitle": "以定时检测形式在你的安全数据流上运行的 Sigma 规则",
       "new": "新建检测",
       "eyebrow": "检测规则",
       "refresh": "刷新检测",
@@ -1073,7 +1067,6 @@
     },
     "content": {
       "title": "内容",
-      "subtitle": "SIEM 自带的检测规则和日志源，并与您的数据进行对照",
       "refresh": "刷新",
       "streamsError": "无法加载您的数据流，因此无法确定与您数据的匹配情况",
       "tab": {
@@ -1219,7 +1212,6 @@
     },
     "entities": {
       "title": "实体",
-      "subtitle": "安全来源提及的每个用户、源 IP 和主机",
       "view": {
         "table": "表格",
         "graph": "风险图"
@@ -1339,7 +1331,6 @@
     },
     "ueba": {
       "title": "用户行为分析",
-      "subtitle": "每位用户都与其自身近期历史进行对比",
       "windowHint": "最近 {current}，与其之前的 {baseline} 相比",
       "method": "风险评分为启发式结果：将每位用户最近 {current} 的数据与其之前的 {baseline} 进行对比。每个标记都会显示触发该标记的数值。",
       "noSources": "没有数据源包含用户字段",
@@ -1438,7 +1429,6 @@
     },
     "intel": {
       "title": "威胁情报",
-      "subtitle": "已知恶意指标，以及它们在您的安全数据中出现的所有位置",
       "loadFailed": "无法加载指标列表",
       "add": "添加指标",
       "import": "导入",
@@ -1607,7 +1597,6 @@
     "sources": {
       "title": "数据源",
       "comingSoon": "使用 OCSF 规范化模板的引导式接入即将推出。在此之前，可像任意数据流一样摄取安全日志；事件页面会自动识别并规范化它们。",
-      "subtitle": "附加 OCSF 包以在摄取时规范化数据流，或将其原样作为安全源纳入。",
       "colStream": "数据流",
       "colSourceType": "来源类型",
       "colMapping": "映射",

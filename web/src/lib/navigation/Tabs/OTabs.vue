@@ -36,6 +36,7 @@ const props = withDefaults(defineProps<OTabsProps>(), {
   bordered: false,
   reorderable: false,
   collapseLabels: false,
+  filled: false,
 });
 
 const emit = defineEmits<OTabsEmits>();
@@ -188,6 +189,7 @@ const context = computed<TabsContext>(() => ({
   dropTargetName: dropTargetName.value,
   dropBefore: dropBefore.value,
   collapseLabels: props.collapseLabels,
+  filled: props.filled,
 }));
 
 provide(TABS_CONTEXT_KEY, context);
@@ -413,7 +415,7 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
         <TabsList as-child :loop="true">
           <div
             ref="tablistRef"
-            :class="['o-tabs relative flex flex-row px-0.75', alignClasses[align]]"
+            :class="['o-tabs relative flex flex-row px-0.75', filled ? 'items-center gap-0.5' : '', alignClasses[align]]"
             @focusin="handleFocusin"
             @dragstart="onTabDragStart"
             @dragover="onTabDragOver"
@@ -424,7 +426,7 @@ const alignClasses: Record<NonNullable<OTabsProps["align"]>, string> = {
             <!-- Single shared underline — slides (translateX + width) to the
                  active tab instead of each tab drawing its own border. -->
             <span
-              v-show="indicator.visible"
+              v-show="indicator.visible && !filled"
               aria-hidden="true"
               data-test="otabs-active-indicator"
               class="bg-tabs-indicator pointer-events-none absolute bottom-0 left-0 z-10 h-0.5 rounded-full"

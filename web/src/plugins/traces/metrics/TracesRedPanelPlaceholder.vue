@@ -26,11 +26,14 @@ defineProps<{
 
 <template>
   <div class="flex h-full min-h-0 w-full flex-1 flex-col" data-test="traces-red-panel-placeholder">
-    <PanelBar class="w-full flex-nowrap" data-test="traces-metrics-placeholder-title">
+    <PanelBar
+      class="h-7! min-h-7! w-full shrink-0 flex-nowrap border-b-0! bg-transparent! py-0!"
+      data-test="traces-metrics-placeholder-title"
+    >
       <span class="truncate">{{ title }}</span>
       <span
         v-if="meta"
-        class="text-2xs text-text-secondary ms-2 shrink-0 font-normal whitespace-nowrap"
+        class="text-text-secondary ms-2 shrink-0 text-xs font-normal whitespace-nowrap"
         >{{ meta }}</span
       >
     </PanelBar>

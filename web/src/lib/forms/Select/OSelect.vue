@@ -116,7 +116,7 @@ const DEFAULT_OPTION_DISABLED = "disabled";
 const { lgUp } = useBreakpoint();
 
 const props = withDefaults(defineProps<SelectProps>(), {
-  size: "md",
+  size: "sm",
   appearance: "field",
   disabled: false,
   clearable: false,
@@ -1030,11 +1030,12 @@ function getPaletteGradient(colors: string[]): string {
   return `linear-gradient(to right, ${colors.join(", ")})`;
 }
 
-// Aligned with OInput and OButton sm: h-[2.125rem] ≈ 30px at the 14px html base.
+// Same boxes as OInput and OButton.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
-  xs: "h-7 text-xs",
-  sm: "h-[2.125rem] text-sm",
-  md: "h-[2.125rem] text-sm",
+  xs: "h-6 text-xs",
+  sm: "h-7 text-compact",
+  md: "h-8 text-compact",
+  lg: "h-9 text-sm",
 };
 
 // Open-state tracking. Reka's PopoverTrigger / SelectTrigger expose
@@ -1444,15 +1445,15 @@ const fieldWidthClass = computed(() => {
                         : 'ps-3',
                     'bg-select-bg',
                     hasError
-                      ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
-                      : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-focus-ring-accent data-[state=open]:border-select-border-focus data-[state=open]:ring-focus-ring-accent focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
+                      ? 'border-select-border-error focus:ring-select-border-error/20 data-[state=open]:ring-select-border-error/20 focus:ring-2 data-[state=open]:ring-2'
+                      : 'border-select-border hover:border-select-border-hover focus:ring-focus-ring-accent data-[state=open]:ring-focus-ring-accent focus:ring-2 data-[state=open]:ring-2',
                     /* Keep the red error border on focus; focus border color applies only when there's no error. */
                     'focus:outline-none',
                     'transition-[color,background-color,border-color,box-shadow] duration-150',
-                    'disabled:bg-select-disabled-bg disabled:border-select-disabled-border disabled:cursor-not-allowed disabled:border-dashed',
+                    'disabled:opacity-50 disabled:cursor-not-allowed',
                     labelPosition === 'inside' && label
-                      ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'md']]
-                      : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],
+                      ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'sm']]
+                      : ['items-center', triggerEndPadding, heightClasses[size ?? 'sm']],
                   ]
             "
           >
@@ -1483,7 +1484,7 @@ const fieldWidthClass = computed(() => {
 
               <slot name="trigger" :value="modelValue">
                 <template v-if="multiple && allSelectedLabel && allSelected">
-                  <span class="text-select-text flex-1 truncate text-start text-sm">{{
+                  <span class="text-select-text flex-1 truncate text-start">{{
                     allSelectedLabel
                   }}</span>
                 </template>
@@ -1497,6 +1498,7 @@ const fieldWidthClass = computed(() => {
                     >
                       <OTruncatedText
                         :key="`${idx}-${String(labelText ?? '')}`"
+                        data-o-select-chip
                         class="rounded-default bg-select-item-selected-bg text-select-item-selected-text inline-block max-w-40 shrink-0 px-2 py-0.5 text-xs leading-none"
                       >
                         {{ labelText }}
@@ -1518,7 +1520,7 @@ const fieldWidthClass = computed(() => {
                       // An inline trigger is a word in a sentence: it grows to fit
                       // its value. `truncate` would also zero its min-content
                       // width, letting any ancestor squeeze it to a lone ellipsis.
-                      isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
+                      isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate',
                       labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
                       isDisabled
                         ? 'text-select-disabled-text'
@@ -1646,7 +1648,7 @@ const fieldWidthClass = computed(() => {
                     'text-input-text w-full shrink-0 bg-transparent px-3',
                     'placeholder:text-input-placeholder outline-none',
                     'border-dropdown-border border-b',
-                    heightClasses[size ?? 'md'],
+                    heightClasses[size ?? 'sm'],
                   ]"
                   :placeholder="resolvedSearchPlaceholder"
                   @keydown="handleDropdownKeydown"
@@ -2113,15 +2115,15 @@ const fieldWidthClass = computed(() => {
                   labelPosition === 'inside' && label ? '' : 'ps-3',
                   'bg-select-bg',
                   hasError
-                    ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
-                    : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-focus-ring-accent data-[state=open]:border-select-border-focus data-[state=open]:ring-focus-ring-accent focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
+                    ? 'border-select-border-error focus:ring-select-border-error/20 data-[state=open]:ring-select-border-error/20 focus:ring-2 data-[state=open]:ring-2'
+                    : 'border-select-border hover:border-select-border-hover focus:ring-focus-ring-accent data-[state=open]:ring-focus-ring-accent focus:ring-2 data-[state=open]:ring-2',
                   /* Keep the red error border on focus; focus border color applies only when there's no error. */
                   'focus:outline-none',
                   'transition-[color,background-color,border-color,box-shadow] duration-150',
-                  'data-disabled:bg-select-disabled-bg data-disabled:border-select-disabled-border data-disabled:cursor-not-allowed data-disabled:border-dashed',
+                  'data-disabled:opacity-50 data-disabled:cursor-not-allowed',
                   labelPosition === 'inside' && label
-                    ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'md']]
-                    : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],
+                    ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'sm']]
+                    : ['items-center', triggerEndPadding, heightClasses[size ?? 'sm']],
                 ]
           "
         >

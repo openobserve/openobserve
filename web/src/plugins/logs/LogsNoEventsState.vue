@@ -35,6 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OEmptyState illustration="logs" size="hero" :hide-action="true">
+    <!-- A compact mark so the message, not the art, leads the state. -->
+    <template #illustration>
+      <EmptyLogs :width="80" :animated="false" />
+    </template>
     <template #title>{{ t("logs.noEvents.title") }}</template>
 
     <template #description>
@@ -67,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #extra>
       <div class="flex flex-wrap items-center justify-center gap-2">
         <OButton
-          variant="ghost"
+          variant="outline"
           size="sm"
           icon-left="history"
           data-test="logs-no-events-open-history-btn"
@@ -77,13 +81,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <OButton
           v-if="aiEnabled && windowHasStreamData && !jumpTarget"
-          variant="ghost"
+          variant="outline"
           size="sm"
           data-test="logs-no-events-ask-ai-btn"
           @click="emit('ask-ai')"
         >
           <template #icon-left>
-            <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+            <OIcon name="auto-awesome" size="sm" class="text-text-secondary shrink-0" />
           </template>
           {{ t("logs.noEvents.askAi") }}
         </OButton>
@@ -93,12 +97,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { useAiIcon } from "@/composables/useAiIcon";
+import EmptyLogs from "@/lib/core/EmptyState/illustrations/EmptyLogs.vue";
 import { DateTime } from "luxon";
 import { periodToLabel } from "@/composables/useWidenRange";
 import DOMPurify from "dompurify";
@@ -129,7 +134,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
-const { aiIconSrc } = useAiIcon();
 
 // --- filter detection -------------------------------------------------------
 

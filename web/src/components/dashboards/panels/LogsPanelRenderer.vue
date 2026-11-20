@@ -19,10 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Without rows PanelSchemaRenderer draws the No Data state; an empty slot would not stop OTable's own. -->
     <OTable
       v-if="rows.length > 0"
-      class="logs-panel-table min-h-0 w-full flex-1"
+      class="logs-panel-table log-level-rail min-h-0 w-full flex-1"
       :columns="columns"
       :data="sourceRows"
       :wrap="wrap"
+      :class="{ 'log-level-rail--wrap': wrap }"
       :cell-overflow-tooltip="false"
       :row-key="rowKey"
       :row-height="20"
@@ -90,7 +91,7 @@ import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
-import { severityIndicatorColor } from "@/utils/logs/statusParser";
+import { severityStripColor } from "@/utils/logs/statusParser";
 import { byString } from "@/utils/json";
 import { copyToClipboard } from "@/utils/clipboard";
 import { timestampToTimezoneDate } from "@/utils/timezone";
@@ -195,7 +196,7 @@ watch(sourceRows, () => reprocess(true));
 
 // The logs table's severity rail, read from the panel's level field.
 const rowStatusColor = (row: any): string =>
-  severityIndicatorColor({
+  severityStripColor({
     level: rowsBySource.value.get(row)?.row.level ?? "unknown",
     source: "field",
     field: fields.value.level,

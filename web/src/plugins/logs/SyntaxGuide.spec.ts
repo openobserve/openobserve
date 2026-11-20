@@ -406,13 +406,13 @@ describe("SyntaxGuide.vue", () => {
     expect(wrapper.props().label).toBe("");
   });
 
-  // Test 41: toolbar variant matches the 34px logs toolbar row
-  it("should give the toolbar variant the 34px toolbar height and keep xs text", () => {
+  // Test 41: toolbar variant matches the 28px logs toolbar row
+  it("should give the toolbar variant the 28px toolbar height and compact text", () => {
     wrapper = createWrapper({ toolbar: true, label: "Syntax Guide" });
     const button = wrapper.findComponent({ name: "OButton" });
     expect(button.props("variant")).toBe("outline");
-    expect(button.classes()).toContain("h-8.5");
-    expect(button.classes()).toContain("text-xs");
+    expect(button.classes()).toContain("h-7");
+    expect(button.classes()).toContain("text-compact");
   });
 
   // Test 42: non-toolbar variants keep their own height
