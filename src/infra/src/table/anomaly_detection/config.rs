@@ -301,18 +301,16 @@ pub async fn put<C: TransactionTrait + ConnectionTrait>(
     Ok(result)
 }
 
-/// Deletes a config by `anomaly_id` + `org_id`.
-pub async fn delete<C: ConnectionTrait>(conn: &C, org_id: &str, anomaly_id: &str) -> Result<()> {
+/// Deletes a config by `anomaly_id` + `org_id` and returns whether a row went; the caller
+/// publishes once it commits, since the event write needs the connection a transaction holds.
+pub async fn delete<C: ConnectionTrait>(conn: &C, org_id: &str, anomaly_id: &str) -> Result<bool> {
     let deleted = anomaly_detection_config::Entity::delete_many()
         .filter(anomaly_detection_config::Column::AnomalyId.eq(anomaly_id))
         .filter(anomaly_detection_config::Column::OrgId.eq(org_id))
         .exec(conn)
         .await
         .map_err(|e| Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
-    if deleted.rows_affected > 0 {
-        publish_delete(org_id, anomaly_id).await;
-    }
-    Ok(())
+    Ok(deleted.rows_affected > 0)
 }
 
 /// Deletes the config and the detector's Slack thread and watermark rows together, so a
@@ -326,6 +324,8 @@ pub async fn delete_with_slack_rows<C: TransactionTrait + ConnectionTrait>(
     delete(&txn, org_id, anomaly_id).await?;
     crate::table::slack_alert_messages::delete_by_alert_with(&txn, org_id, anomaly_id).await?;
     txn.commit().await?;
+    // Sent even when no row went, so a retry clears a key an earlier failed send left.
+    publish_delete(org_id, anomaly_id).await;
     Ok(())
 }
 
@@ -1379,5 +1379,32 @@ mod tests {
             NEVER,
             "a replicated 'Never' must not be rewritten into a cadence"
         );
+    }
+
+    /// Runs inside a caller's transaction without publishing, so the event can wait for commit.
+    #[tokio::test]
+    async fn delete_reports_the_removed_row_inside_a_transaction() {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let schema = Schema::new(db.get_database_backend());
+        db.execute(
+            db.get_database_backend()
+                .build(&schema.create_table_from_entity(anomaly_detection_config::Entity)),
+        )
+        .await
+        .unwrap();
+        make_model("anom-1", "acme")
+            .into_active_model()
+            .insert(&db)
+            .await
+            .unwrap();
+
+        let txn = db.begin().await.unwrap();
+        assert!(delete(&txn, "acme", "anom-1").await.unwrap());
+        assert!(!delete(&txn, "acme", "anom-1").await.unwrap());
+        txn.commit().await.unwrap();
+
+        assert!(get_by_id(&db, "acme", "anom-1").await.unwrap().is_none());
     }
 }
