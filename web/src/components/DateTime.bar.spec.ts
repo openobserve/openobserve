@@ -443,6 +443,47 @@ describe("DateTime typed range bar review fixes", () => {
     expect(lastChange(wrapper!).relativeTimePeriod).toBe("120M");
   });
 
+  it("offers both capped readings when the capped start falls in a repeated hour", async () => {
+    vi.setSystemTime(new Date("2026-11-04T06:30:00Z"));
+    store.state.timezone = "America/New_York";
+    create({ autoApply: true });
+    await openMenu(wrapper!);
+    await typeInBar("last 3651 days");
+
+    expect(barState()).toBe("blocked");
+    expect(el("date-time-range-reading-0")!.textContent).toContain("First time, UTC-04:00");
+    expect(el("date-time-range-reading-1")!.textContent).toContain("Second time, UTC-05:00");
+    await press(barInput(), "ArrowDown");
+    await press(barInput(), "ArrowDown");
+    await press(barInput(), "Enter");
+    const change = lastChange(wrapper!);
+    expect(change.relativeTimePeriod).toBe("3650d");
+    expect(Number(change.endTime) - Number(change.startTime)).toBe(3650 * 24 * 3_600_000_000);
+  });
+
+  it("applies the capped row for an over-cap range read in a repeated hour", async () => {
+    vi.setSystemTime(new Date("2026-11-01T05:30:00Z"));
+    store.state.timezone = "America/New_York";
+    create({ autoApply: true });
+    await openMenu(wrapper!);
+    await typeInBar("last 11 years");
+
+    expect(barState()).toBe("blocked");
+    expect(el("date-time-range-reading-0")!.getAttribute("aria-disabled")).toBeNull();
+    await press(barInput(), "ArrowDown");
+    await press(barInput(), "Enter");
+    expect(lastChange(wrapper!).relativeTimePeriod).toBe("120M");
+  });
+
+  it("keeps the weeks cap within the days cap", async () => {
+    create({ autoApply: true });
+    await openMenu(wrapper!);
+    await typeInBar("last 521 weeks");
+    expect(barState()).toBe("valid");
+    await typeInBar("last 522 weeks");
+    expect(barState()).toBe("blocked");
+  });
+
   it("shows the range a host set through setSavedDate as applied", async () => {
     create({ autoApply: true, defaultRelativeTime: "15m" });
     await flushPromises();

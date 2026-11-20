@@ -145,6 +145,30 @@ test.describe("Date-Time Picker Forward Shift Cap testcases", () => {
   });
 
   // TC-05
+  test("forward shift is disabled once an absolute window reaches the present", {
+    tag: ['@date-time-next-shift-cap', '@all', '@P1']
+  }, async ({ page }) => {
+    testLogger.info('Shifting an absolute window up to now and checking Next is then disabled');
+
+    // A future end is refused at paste, so the guard is reached by a clamped shift that ends at now.
+    const { startMicros, endMicros } = await page.evaluate(() => {
+      const now = Date.now() * 1_000;
+      return { startMicros: now - 90_000_000, endMicros: now - 30_000_000 };
+    });
+
+    await pm.dateTimePickerPage.pasteAndReadBackRange(`${startMicros} - ${endMicros}`);
+    await pm.dateTimePickerPage.expectNextEnabled();
+
+    await pm.dateTimePickerPage.clickNext();
+    await pm.dateTimePickerPage.expectNextDisabled();
+
+    await pm.dateTimePickerPage.openPicker();
+    await pm.dateTimePickerPage.expectAbsolutePanelActive();
+
+    testLogger.info('Absolute window ending at now keeps Next disabled');
+  });
+
+  // TC-05b
   test("a pasted window ending past the present is refused, so Next stays disabled", {
     tag: ['@date-time-next-shift-cap', '@all', '@P1']
   }, async ({ page }) => {

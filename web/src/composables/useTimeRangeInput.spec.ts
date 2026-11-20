@@ -19,6 +19,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { localeFileMap } from "@/locales";
 import {
+  formatDay,
   formatInstant,
   formatRangeText,
   formatSpan,
@@ -55,6 +56,8 @@ describe("useTimeRangeInput helpers", () => {
     [250_000, "250 ms"],
     [1_500_000, "1.5 sec"],
     [1, "0.001 ms"],
+    [59_999_600, "1 min"],
+    [999_999, "999.999 ms"],
   ])("formats a span of %i µs as %s", (span, text) => {
     expect(formatSpan(span, "en-US")).toBe(text);
   });
@@ -73,6 +76,19 @@ describe("useTimeRangeInput helpers", () => {
     expect(formatRangeText(at - 15 * MIN_US, at, "UTC", "en-US", NOW_US)).toBe(
       "13:05:05 → 13:20:05",
     );
+  });
+
+  it("tells apart endpoints that share a millisecond", () => {
+    const at = Date.parse("2026-11-18T09:20:05.250Z") * 1000;
+    expect(formatRangeText(at + 1, at + 999, "UTC", "en-US", NOW_US)).toBe(
+      "09:20:05.250001 → 09:20:05.250999",
+    );
+  });
+
+  it("formats the day of an instant without its time", () => {
+    const at = Date.parse("2026-11-01T05:30:00.020Z") * 1000;
+    expect(formatDay(at, "America/New_York", "en-US", NOW_US)).toBe("Sun, Nov 1");
+    expect(formatDay(at - 365 * 1440 * MIN_US, "UTC", "en-US", NOW_US)).toBe("Sat, Nov 1, 2025");
   });
 
   it("names the day only for a range off today and repeats it only when the end differs", () => {

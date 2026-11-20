@@ -382,16 +382,31 @@ describe("DateTimeRangeInput review fixes", () => {
 describe("DateTimeRangeInput polish fixes", () => {
   let wrapper: Bar | null = null;
 
-  const capRolling = (reading: TimeRangeReading): TimeRangeReading | null =>
-    reading.rolling && reading.rolling.unit === "M" && reading.rolling.value > 120
-      ? {
-          ...reading,
-          rolling: { unit: "M", value: 120 },
-          startUs: Date.UTC(2016, 9, 8, 3) * 1000,
-          name: undefined,
-          notes: [],
-        }
-      : null;
+  const capped = (reading: TimeRangeReading, startUs: number, startOffset: string) => ({
+    ...reading,
+    rolling: { unit: "M" as const, value: 120 },
+    startUs,
+    startOffset,
+    name: undefined,
+    notes: [],
+    blocked: undefined,
+  });
+  // A cap whose start falls in a repeated hour yields both readings, as DateTime's does.
+  const capRolling = (reading: TimeRangeReading): TimeRangeReading[] | null => {
+    if (reading.rolling?.unit === "h" && reading.rolling.value > 87_600)
+      return [
+        {
+          ...capped(reading, reading.endUs - 87_600 * 3_600_000_000, "+00:00"),
+          rolling: { unit: "h", value: 87_600 },
+        },
+      ];
+    if (!reading.rolling || reading.rolling.unit !== "M" || reading.rolling.value <= 120)
+      return null;
+    if (reading.startOffset === "+00:00")
+      return [capped(reading, reading.endUs - 3653 * 86_400_000_000, "+00:00")];
+    const fold = Date.UTC(2016, 10, 6, 5, 30) * 1000;
+    return [capped(reading, fold, "-04:00"), capped(reading, fold + 3_600_000_000, "-05:00")];
+  };
 
   const create = (props: Record<string, unknown> = {}) => {
     wrapper = mount(DateTimeRangeInput, {
@@ -439,7 +454,7 @@ describe("DateTimeRangeInput polish fixes", () => {
       "Longer than the picker's 10-year limit.",
     );
     const row = el("date-time-range-reading-0")!.textContent;
-    expect(row).toContain("Past 120 Months");
+    expect(row).toContain("Last 120 months");
     expect(row).toContain("Longest allowed");
     await press(barInput(), "Enter");
     expect(applied()).toHaveLength(0);
@@ -473,11 +488,93 @@ describe("DateTimeRangeInput polish fixes", () => {
     await typeInBar("2026-10-08 02:59");
     expect(el("date-time-range-note")!.textContent).toBe("5 min before and 1 min after");
 
+    vi.setSystemTime(new Date(NOW.getTime() + 20));
     await typeInBar("2026-10-08 03:00:00");
     expect(el("date-time-range-note")!.textContent).toBe("5 min before Thu, Oct 8, 03:00");
 
     await typeInBar("2026-10-08 01:00");
     expect(el("date-time-range-note")!.textContent).toBe("5 min either side of Thu, Oct 8, 01:00");
+  });
+
+  it("offers the capped range when a stream limit is over the picker's cap", async () => {
+    create({ limits: { allowFuture: false, maxSpanUs: 100_000 * 3_600_000_000 } });
+    await typeInBar("last 200 months");
+
+    expect(state()).toBe("blocked");
+    const row = el("date-time-range-reading-0")!;
+    expect(row.getAttribute("aria-disabled")).toBeNull();
+    expect(row.textContent).toContain("Last 120 months");
+    expect(row.textContent).toContain("Longest allowed");
+    await press(barInput(), "ArrowDown");
+    await press(barInput(), "Enter");
+    expect(applied()[0].rolling).toEqual({ unit: "M", value: 120 });
+  });
+
+  it("names the capped row in the unit the user typed", async () => {
+    create();
+    await typeInBar("last 11 years");
+
+    expect(state()).toBe("blocked");
+    expect(el("date-time-range-reading-0")!.textContent).toContain("Last 10 years");
+  });
+
+  it("offers a capped fix for an over-cap range read in a repeated hour", async () => {
+    vi.setSystemTime(new Date("2026-11-01T05:30:00Z"));
+    create({ zone: "America/New_York" });
+    await typeInBar("last 11 years");
+
+    expect(state()).toBe("blocked");
+    expect(el("date-time-range-message")!.textContent).toBe(
+      "Longer than the picker's 10-year limit.",
+    );
+    const first = el("date-time-range-reading-0")!;
+    const second = el("date-time-range-reading-1")!;
+    expect(first.getAttribute("aria-disabled")).toBeNull();
+    expect(first.textContent).toContain("First time, UTC-04:00");
+    expect(second.textContent).toContain("Second time, UTC-05:00");
+    expect(second.textContent).toContain("Longest allowed");
+    await press(barInput(), "ArrowDown");
+    await press(barInput(), "ArrowDown");
+    await press(barInput(), "Enter");
+    expect(applied()[0].startOffset).toBe("-05:00");
+  });
+
+  it("labels each zone row by the offset that differs between them", async () => {
+    create();
+    await typeInBar("2026-10-07 00:00Z to 2026-10-07 12:00 IST");
+
+    expect(state()).toBe("ambiguous");
+    expect(el("date-time-range-reading-0")!.textContent).toContain("UTC+05:30");
+    expect(el("date-time-range-reading-1")!.textContent).toContain("UTC+02:00");
+    expect(el("date-time-range-reading-2")!.textContent).toContain("UTC+01:00");
+  });
+
+  it("says a future stamp's window ends at now, before the stamp", async () => {
+    create();
+    await typeInBar("2026-10-08T03:04:59Z");
+
+    expect(el("date-time-range-note")!.textContent).toBe(
+      "Ends now, 4 min 59 sec before Thu, Oct 8, 03:04:59",
+    );
+  });
+
+  it("names the typed stamp, not the window end, when it is in the future", async () => {
+    create();
+    await typeInBar("2026-10-08 12:00");
+
+    expect(state()).toBe("blocked");
+    expect(el("date-time-range-message")!.textContent).toBe("Thu, Oct 8, 12:00 is in the future.");
+  });
+
+  it("names a repeated hour once, without milliseconds, and the date alone", async () => {
+    vi.setSystemTime(new Date("2026-11-02T06:30:00.020Z"));
+    create({ zone: "America/New_York" });
+    await typeInBar("last 1 day");
+
+    expect(state()).toBe("ambiguous");
+    expect(el("date-time-range-message")!.textContent).toBe(
+      "01:30 happens twice on Sun, Nov 1. Pick one",
+    );
   });
 
   it("shows no duration for an empty applied range", async () => {

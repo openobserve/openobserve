@@ -387,7 +387,7 @@ describe("DateTime paste review fixes", () => {
 
     expect(barInput()!.value).toBe("now-200M");
     expect(el("date-time-range-status")!.getAttribute("data-state")).toBe("blocked");
-    expect(el("date-time-range-reading-0")!.textContent).toContain("Past 120 Months");
+    expect(el("date-time-range-reading-0")!.textContent).toContain("Last 120 months");
     expect((wrapper!.emitted("on:date-change") ?? []).length).toBe(before);
   });
 

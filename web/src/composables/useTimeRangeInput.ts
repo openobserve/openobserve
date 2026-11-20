@@ -90,8 +90,10 @@ export function formatSpan(spanUs: number, intlLocale: string): string {
   // Two log stamps can be under a second apart, so a short span keeps its fraction.
   if (spanUs > 0 && spanUs < US_PER_S)
     return unitText(spanUs / US_PER_MS, "millisecond", intlLocale);
-  if (spanUs > 0 && spanUs < 60 * US_PER_S && spanUs % US_PER_S !== 0)
-    return unitText(spanUs / US_PER_S, "second", intlLocale);
+  // Rounded to the shown ms first, so 59.9996 s reads as 1 min rather than 60 sec.
+  const shownMs = Math.round(spanUs / US_PER_MS);
+  if (spanUs > 0 && shownMs < 60_000 && spanUs % US_PER_S !== 0)
+    return unitText(shownMs / US_PER_MS, "second", intlLocale);
   const seconds = Math.max(0, Math.round(spanUs / US_PER_S));
   const parts: [number, string][] = [
     [Math.floor(seconds / 86_400), "day"],
@@ -133,6 +135,19 @@ function dayKey(us: number, zone: string): string {
   );
 }
 
+function dayOptions(us: number, zone: string, nowUs: number): Intl.DateTimeFormatOptions {
+  const yearFormat = dateFormat("en-CA", { timeZone: zone, year: "numeric" });
+  const sameYear =
+    yearFormat.format(new Date(Math.floor(us / US_PER_MS))) ===
+    yearFormat.format(new Date(Math.floor(nowUs / US_PER_MS)));
+  return {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    ...(sameYear ? {} : { year: "numeric" }),
+  };
+}
+
 /** One instant in the picker zone: the day only when it is not today, the year only when it is not this year. */
 export function formatInstant(
   us: number,
@@ -141,28 +156,34 @@ export function formatInstant(
   nowUs: number,
   withDay = dayKey(us, zone) !== dayKey(nowUs, zone),
   withMillis = us % US_PER_S !== 0,
+  withMicros = false,
 ): string {
   const at = new Date(Math.floor(us / US_PER_MS));
-  const yearFormat = dateFormat("en-CA", { timeZone: zone, year: "numeric" });
-  const sameYear =
-    yearFormat.format(at) === yearFormat.format(new Date(Math.floor(nowUs / US_PER_MS)));
-  const withSeconds = withMillis || Math.floor(us / US_PER_S) % 60 !== 0;
-  return dateFormat(intlLocale, {
+  const fraction = withMillis || withMicros;
+  const withSeconds = fraction || Math.floor(us / US_PER_S) % 60 !== 0;
+  const format = dateFormat(intlLocale, {
     timeZone: zone,
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
     ...(withSeconds ? { second: "2-digit" } : {}),
-    ...(withMillis ? { fractionalSecondDigits: 3 as const } : {}),
-    ...(withDay
-      ? {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-          ...(sameYear ? {} : { year: "numeric" }),
-        }
-      : {}),
-  }).format(at);
+    ...(fraction ? { fractionalSecondDigits: 3 as const } : {}),
+    ...(withDay ? dayOptions(us, zone, nowUs) : {}),
+  });
+  if (!withMicros) return format.format(at);
+  // Intl stops at milliseconds, so the microsecond digits extend its fraction.
+  const micros = String(((us % US_PER_MS) + US_PER_MS) % US_PER_MS).padStart(3, "0");
+  return format
+    .formatToParts(at)
+    .map((p) => (p.type === "fractionalSecond" ? p.value + micros : p.value))
+    .join("");
+}
+
+/** "Sun, Nov 1": the day of an instant in the picker zone, the year only when it is not this year. */
+export function formatDay(us: number, zone: string, intlLocale: string, nowUs: number): string {
+  return dateFormat(intlLocale, { timeZone: zone, ...dayOptions(us, zone, nowUs) }).format(
+    new Date(Math.floor(us / US_PER_MS)),
+  );
 }
 
 /** "Wed, Nov 18, 14:17 → 14:32": the end repeats the day only when it differs from the start's. */
@@ -183,15 +204,18 @@ export function formatRangeText(
     undefined,
     short && startUs % US_PER_S !== 0,
   );
+  const endDay = dayKey(endUs, zone) !== dayKey(startUs, zone);
   const end = formatInstant(
     endUs,
     zone,
     intlLocale,
     nowUs,
-    dayKey(endUs, zone) !== dayKey(startUs, zone),
+    endDay,
     short && endUs % US_PER_S !== 0,
   );
-  return `${start} → ${end}`;
+  if (start !== end || startUs === endUs) return `${start} → ${end}`;
+  const startMicros = formatInstant(startUs, zone, intlLocale, nowUs, undefined, true, true);
+  return `${startMicros} → ${formatInstant(endUs, zone, intlLocale, nowUs, endDay, true, true)}`;
 }
 
 /** Text, parse result and locale pack of the typed bar; the parse runs on every change. */
