@@ -131,17 +131,18 @@ export async function clickNavUntilRoute(page, selector, pathSuffix, attempts = 
  * @param {import('@playwright/test').Page} page
  * @param {string} mode
  */
-export async function selectLogsViewMode(page, mode, timeout = 20000) {
+// `force` skips the enabled check, so a test can try a mode the page should refuse.
+export async function selectLogsViewMode(page, mode, timeout = 20000, { force = false } = {}) {
     const toggle = page.locator(`[data-test="logs-${mode}-toggle"]`);
     const dropdownBtn = page.locator('[data-test="logs-view-mode-dropdown-btn"]');
     // SearchBar.vue swaps the toggle group for a dropdown while its measured toolbar width is narrow, which can be transient.
     await toggle.or(dropdownBtn).first().waitFor({ state: 'visible', timeout });
     if (await toggle.isVisible()) {
-        await toggle.click();
+        await toggle.click({ force });
         return;
     }
     await dropdownBtn.click();
-    await page.locator(`[data-test="logs-view-mode-${mode}-item"]`).click();
+    await page.locator(`[data-test="logs-view-mode-${mode}-item"]`).click({ force });
 }
 
 /** Opens the Metrics Explorer in Visualize mode, where the panel editor lives. */
@@ -185,6 +186,28 @@ export class CommonActions {
         this.alertsMenuItem = '[data-test="menu-link-\\/alerts-item"]';
         this.settingsMenuItem = '[data-test="menu-link-/settings-item"]';
         this.homeMenuItem = '[data-test="menu-link-\\/-item"]';
+    }
+
+    // The same router.push an in-app link makes: a kept-alive page is re-activated, not reloaded.
+    async routerPush(path) {
+        await this.page.evaluate(
+            (to) => document.querySelector('#app').__vue_app__.config.globalProperties.$router.push(to),
+            path.replace(/^\/web/, ''),
+        );
+    }
+
+    /** Tags the current document so expectSameDocument() can tell a later reload apart. */
+    async markDocument() {
+        await this.page.evaluate(() => {
+            window.__e2eSameDocument = 'same-document';
+        });
+    }
+
+    async expectSameDocument() {
+        expect(
+            await this.page.evaluate(() => window.__e2eSameDocument),
+            'navigation must not reload the page',
+        ).toBe('same-document');
     }
 
     async navigateToAlerts() {
