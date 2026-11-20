@@ -3491,7 +3491,7 @@ export default defineComponent({
 
         if (format === "csv") {
           filename += ".csv";
-          dataobj = await json2csv(data, options);
+          dataobj = "\uFEFF" + (await json2csv(data, options));
         } else {
           filename += ".json";
           dataobj = JSON.stringify(data, null, 2);
