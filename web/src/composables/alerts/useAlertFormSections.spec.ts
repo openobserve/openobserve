@@ -666,7 +666,10 @@ describe("useAlertFormSections", () => {
         "Tells StandardAlert (Webhook), notifying at most every 30 minutes.",
         "Checks every 5 minutes, looking at the last 5 minutes.",
       ],
-      nav: ["more than 50 events · Group by service_name · matching 1 filter", "StandardAlert"],
+      nav: [
+        "more than 50 events · One alert when at least 1 service_name group matches · matching 1 filter",
+        "StandardAlert",
+      ],
     },
     {
       scenario: "LOG: a count of the group field counts events, one alert per service",
@@ -792,7 +795,10 @@ describe("useAlertFormSections", () => {
         "Tells no one yet.",
         "Checks every 15 minutes, looking at the last 15 minutes.",
       ],
-      nav: ["p95 of duration > 500 ms · Group by service_name · Warning > 300 ms", "No one yet"],
+      nav: [
+        "p95 of duration > 500 ms · One alert when at least 1 service_name group matches · Warning > 300 ms",
+        "No one yet",
+      ],
     },
     {
       scenario: "CMP: SQL against last week through a function",

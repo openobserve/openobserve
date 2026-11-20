@@ -456,7 +456,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </OToggleGroupItem>
                         </OToggleGroup>
                         <AlertGroupByPicker
-                          v-if="builderGroupAnswer === 'each'"
+                          v-if="builderGroupAnswer === 'each' || countRuleOn"
                           :model-value="groupByLabels"
                           :options="groupByOptions"
                           @update:model-value="setGroupBy"
@@ -464,7 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <!-- Both states share one grid cell, so turning the rule on or off never moves what follows. -->
                       <div
-                        v-if="builderGroupAnswer === 'each' && groupByLabels.length"
+                        v-if="groupByLabels.length"
                         class="text-text-body grid text-sm"
                         data-test="add-alert-group-limit"
                       >
@@ -496,16 +496,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           >
                             <template #error />
                           </OFormInput>
-                          <span>{{ t("alerts.form.group.groupsMatch", thresholdPlural) }}</span>
-                          <OButton
-                            variant="ghost"
-                            size="icon-circle-sm"
-                            :aria-label="t('alerts.form.group.oneForAllOff')"
-                            data-test="add-alert-group-limit-off"
-                            @click="setCountRule(false)"
-                          >
-                            <OIcon name="close" size="sm" />
-                          </OButton>
+                          <span class="inline-flex items-center gap-x-2">
+                            <span>{{ t("alerts.form.group.groupsMatch", thresholdPlural) }}</span>
+                            <OButton
+                              variant="ghost"
+                              size="icon-circle-sm"
+                              :aria-label="t('alerts.form.group.oneForAllOff')"
+                              data-test="add-alert-group-limit-off"
+                              @click="setCountRule(false)"
+                            >
+                              <OIcon name="close" size="sm" />
+                            </OButton>
+                          </span>
                         </div>
                         <div
                           class="col-start-1 row-start-1 flex min-h-8.5 items-start"
@@ -524,9 +526,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                       <AlertMessageLine
-                        v-show="
-                          (builderGroupAnswer === 'each' && groupByLabels.length) || thresholdError
-                        "
+                        v-show="groupByLabels.length || thresholdError"
                         :error="thresholdError"
                         :error-data-test="countErrorTest"
                         data-test="alert-group-limit-message"
@@ -3133,11 +3133,12 @@ export default defineComponent({
 
     // "One per" picked before any field: the picker opens, and the alert splits once a field is ticked.
     const groupEachWanted = ref(false);
-    const builderGroupAnswer = computed(() =>
-      groupEachWanted.value || groupByLabels.value.length ? "each" : "one",
-    );
     // Grouped without one alert per group is the count rule: one alert once N groups cross.
     const countRuleOn = computed(() => groupByLabels.value.length > 0 && !isMultiAlert.value);
+    // The toggle names what is sent, so the count rule reads as One alert over the picked fields.
+    const builderGroupAnswer = computed(() =>
+      !countRuleOn.value && (groupEachWanted.value || groupByLabels.value.length) ? "each" : "one",
+    );
     const setCountRule = (on: boolean) => {
       onGroupAnswer(on ? "one" : "each");
       if (on && !(Number(triggerThreshold.value) >= 1)) triggerThreshold.value = 1;
@@ -3155,6 +3156,7 @@ export default defineComponent({
         if (groupByLabels.value.length) onGroupAnswer("each");
         return;
       }
+      if (countRuleOn.value) return;
       groupEachWanted.value = false;
       if (groupByLabels.value.length || isMultiAlert.value) clearGroupBy();
     };

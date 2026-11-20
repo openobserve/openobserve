@@ -3039,6 +3039,14 @@ describe("QueryConfig.vue", () => {
       await host.find('[data-test="add-alert-group-limit-on"]').trigger("click");
       await host.find('[data-test="add-alert-group-limit-threshold"] input').setValue("3");
       await flushPromises();
+      // The toggle names what is sent: one alert, still over the picked fields.
+      const sends = () => ({
+        answer: wrapper.vm.builderGroupAnswer,
+        fields: host.findComponent({ name: "AlertGroupByPicker" }).exists()
+          ? host.findComponent({ name: "AlertGroupByPicker" }).props("modelValue")
+          : null,
+      });
+      expect(sends()).toEqual({ answer: "one", fields: ["service", "status"] });
       const saved = cloneDeep(hostForm().state.values);
       const payload = getAlertPayload({ ...saved, context_attributes: [], description: "" }, {
         store: mockStore,
@@ -3067,10 +3075,11 @@ describe("QueryConfig.vue", () => {
         },
       );
       await flushPromises();
-      expect(wrapper.vm.builderGroupAnswer).toBe("each");
+      expect(sends()).toEqual({ answer: "one", fields: ["service", "status"] });
       expect(rule().attributes("inert")).toBeUndefined();
       await host.find('[data-test="add-alert-group-limit-off"]').trigger("click");
       await flushPromises();
+      expect(sends()).toEqual({ answer: "each", fields: ["service", "status"] });
       expect(hostForm().getFieldValue("query_condition.aggregation.multi_alert")).toBe(true);
       expect(hostForm().getFieldValue("trigger_condition")).toMatchObject({
         operator: ">=",

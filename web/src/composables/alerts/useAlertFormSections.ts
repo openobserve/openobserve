@@ -27,7 +27,7 @@ import {
 } from "@/components/alerts/alertFormSections";
 import { operatorsToWords } from "@/components/alerts/composite/expression";
 import { alertConditionText } from "@/utils/alerts/alertCondition";
-import { countComparisonWords } from "@/utils/alerts/countComparison";
+import { countRuleText } from "@/utils/alerts/countComparison";
 import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import {
   compactDuration,
@@ -557,7 +557,17 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
     if (labels.length && perGroup(fd)) {
       facts.push(t("alerts.form.group.eachOfPlain", { labels: joinListMore(labels, t) }));
     } else if (labels.length && builderMeasure(fd)) {
-      facts.push(fact(t("alerts.tiers.names.groupBy"), joinListMore(labels, t)));
+      const tc = fd.trigger_condition ?? {};
+      facts.push(
+        t(
+          "alerts.form.group.oneWhenGroups",
+          {
+            count: countRuleText(tc.operator, tc.threshold, t),
+            labels: joinListMore(labels, t),
+          },
+          Number(tc.threshold ?? 1),
+        ),
+      );
     }
     const filter = filterOf(fd);
     if (filter) facts.push(t("alerts.plain.whereFilters", { count: filter.count }, filter.count));
@@ -799,11 +809,10 @@ export function useAlertFormSections(input: AlertFormSectionsInput): {
 
   // "at least 3", "fewer than 2": how many groups or series must cross, in the count picker's words.
   const groupCount = (fd: AlertSectionsFormData) => {
-    const count = Number(fd.trigger_condition?.threshold ?? 1);
-    const op = countComparisonWords(fd.trigger_condition?.operator, t);
+    const tc = fd.trigger_condition ?? {};
     return {
-      count,
-      text: strong(t("alerts.sections.review.comparison", { op, value: formatNumber(count) })),
+      count: Number(tc.threshold ?? 1),
+      text: strong(countRuleText(tc.operator, tc.threshold, t)),
     };
   };
 

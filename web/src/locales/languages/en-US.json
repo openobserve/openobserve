@@ -15733,9 +15733,10 @@
         "eachSeriesHelp": "One per series: each series over the threshold alerts on its own.",
         "fewerThan": "fewer than",
         "oneForAll": "Send one alert for all of them instead",
-        "oneForAllWhen": "One alert for all of them when",
+        "oneForAllWhen": "One alert when",
         "oneForAllOff": "Back to one alert per group",
-        "groupsMatch": "group matches | groups match"
+        "groupsMatch": "of these groups matches | of these groups match",
+        "oneWhenGroups": "One alert when {count} {labels} group matches | One alert when {count} {labels} groups match"
       },
       "editor": {
         "promql": "PromQL",
