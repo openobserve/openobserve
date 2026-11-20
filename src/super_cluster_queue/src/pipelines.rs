@@ -38,6 +38,12 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             let pipeline_id = parse_key(&msg.key)?;
             infra::coordinator::pipelines::emit_delete_event(&pipeline_id).await?;
             infra::pipeline::delete(&pipeline_id).await?;
+            // A put event re-read before the row delete can cache the pipeline again.
+            if let Err(e) = infra::coordinator::pipelines::emit_delete_event(&pipeline_id).await {
+                log::error!(
+                    "[SUPER_CLUSTER:PIPELINE] error triggering event to remove pipeline {pipeline_id} from cache: {e}"
+                );
+            }
         }
         MessageType::EnrichmentUrlPut => {
             let bytes = msg
