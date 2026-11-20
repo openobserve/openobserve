@@ -66,6 +66,21 @@ export default class DashboardTreemap {
       .first();
   }
 
+  sizeWellLabel() {
+    return this.page
+      .locator('[data-test="dashboard-y-layout"]')
+      .locator("xpath=..")
+      .locator(".layout-name");
+  }
+
+  // The "Size" well label and the x-field trim are applied in the same chart-type handler, so the label proves the group-by defaults are final.
+  async waitForTreemapDefaults(expect) {
+    await expect(this.sizeWellLabel()).toContainText("Size", {
+      timeout: 15000,
+    });
+    await expect(this.firstSizeField()).toBeVisible({ timeout: 15000 });
+  }
+
   // `__vueParentComponent` is dev-only, so the chart is found by walking the app's vnode tree.
   async snapshot(panelId) {
     return this.chartHost(panelId).evaluate((host) => {

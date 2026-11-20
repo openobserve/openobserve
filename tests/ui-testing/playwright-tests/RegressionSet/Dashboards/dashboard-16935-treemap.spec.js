@@ -149,9 +149,7 @@ test.describe(
       await pm.dashboardTreemap.openPanelEditor(id);
       await pm.chartTypeSelector.selectChartType("treemap");
       await pm.chartTypeSelector.selectStream(STREAM);
-      await expect(pm.dashboardTreemap.firstSizeField()).toBeVisible({
-        timeout: 15000,
-      });
+      await pm.dashboardTreemap.waitForTreemapDefaults(expect);
       expect(
         await pm.dashboardTreemap.groupFieldLabels().allTextContents(),
       ).toEqual([]);

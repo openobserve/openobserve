@@ -2,6 +2,7 @@
 
 import { expect } from "@playwright/test";
 import { decodedSqlOf } from "./tracesPage.js";
+import { getOrgIdentifier } from "../../playwright-tests/utils/cloud-auth.js";
 
 const b64 = (s) => Buffer.from(s).toString("base64");
 
@@ -60,7 +61,7 @@ export class TracesRegressionPage {
   }
 
   org() {
-    return process.env.ORGNAME || "default";
+    return getOrgIdentifier() || "default";
   }
 
   /** Opens Spans view of `stream` over the last 6 hours with `query` in the editor. */
