@@ -111,9 +111,7 @@ export function foldText(
 }
 
 export function codePointLength(s: string): number {
-  let n = 0;
-  for (const ch of s) n += ch.length > 0 ? 1 : 0;
-  return n;
+  return [...s].length;
 }
 
 export function normalize(
@@ -129,17 +127,10 @@ export function normalize(
   if (nfkc.length > MAX_CODE_UNITS) return "too-long";
   const text = mapped(nfkc);
   if (text.length === 0) return "empty";
-  let cut = raw.length;
-  for (let i = 0; i < raw.length; i++) {
-    if (raw[i] === "\n" || raw[i] === "\r") {
-      cut = i;
-      break;
-    }
-  }
   return {
     text,
     fold: foldText(text, bcp47, script, hooks.fold),
-    firstLine: mapped(clean(raw.slice(0, cut).normalize("NFKC"))),
+    firstLine: mapped(clean(raw.split("\n")[0].split("\r")[0].normalize("NFKC"))),
   };
 }
 

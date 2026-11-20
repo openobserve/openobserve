@@ -223,7 +223,9 @@ function names(tag, era) {
       .formatToParts(Date.UTC(2026, 0, 1, h))
       .filter((p) => p.type === "dayPeriod")
       .map((p) => clean(p.value));
-  return { months, weekdays, meridiem: [uniq(period(9)), uniq(period(15))] };
+  // An h11 locale writes its marks on hours 0-11 (ja 午後0時), so hour 0 takes a mark there.
+  const h11 = hour.resolvedOptions().hourCycle === "h11";
+  return { months, weekdays, meridiem: [uniq(period(9)), uniq(period(15))], h11 };
 }
 
 function firstDay(tag) {
