@@ -193,6 +193,7 @@ pub async fn cancel_alert_mute(
             &downtime_id,
             query.version,
             &user_email.user_id,
+            None,
         )
         .await
         {
@@ -369,17 +370,23 @@ mod tests {
         use o2_enterprise::enterprise::autoobserve::ports::{FixPort, MuteAnswer};
         let port = crate::request::autoobserve::fix_ports::LiveFixPort;
         put("snooze", serde_json::Value::Null, 2).await;
-        let stale = port.unmute(&org, &alert_id, ("snooze", 1), root).await;
+        let stale = port
+            .unmute(&org, &alert_id, ("snooze", 1), root, None)
+            .await;
         assert!(matches!(stale, Ok(MuteAnswer::Changed(_))), "{stale:?}");
         assert!(!cancelled("snooze").await);
+        assert!(port.mute_in_force(&org, "snooze").await.unwrap());
         let live = port.mutes(&org, &alert_id).await.unwrap();
         assert!(
             live.iter()
                 .any(|m| m.downtime_id == "snooze" && m.version == 2)
         );
-        let ended = port.unmute(&org, &alert_id, ("snooze", 2), root).await;
+        let ended = port
+            .unmute(&org, &alert_id, ("snooze", 2), root, None)
+            .await;
         assert!(matches!(ended, Ok(MuteAnswer::Done(_))), "{ended:?}");
         assert!(cancelled("snooze").await);
+        assert!(!port.mute_in_force(&org, "snooze").await.unwrap());
     }
 
     #[cfg(feature = "enterprise")]

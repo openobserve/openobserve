@@ -43,6 +43,7 @@ use config::{
     },
     utils::time::now_micros,
 };
+use infra::table::downtimes::IdleRun;
 use o2_enterprise::enterprise::{
     announcements::meta::{Banner, BannerCount, BannerCta, BannerVariant},
     common::config::get_config as get_o2_config,
@@ -302,17 +303,19 @@ pub async fn cancel(
     access::authorize_row(org, user_id, &before, "PUT").await?;
     // The same row goes to the guarded write, so an edit after this check also fails.
     check_version(version, &before)?;
-    cancel_row(org, user_id, before).await
+    cancel_row(org, user_id, before, None).await
 }
 
-/// [cancel] of a quick mute, whose alert rule stands in for the row check.
+/// [cancel] of a quick mute, whose alert rule stands in for the row check; `idle` also guards it
+/// by the alert's scheduler row.
 pub async fn cancel_quick_mute(
     org: &str,
     user_id: &str,
     before: Downtime,
+    idle: Option<IdleRun<'_>>,
 ) -> Result<Downtime, DowntimeError> {
     ensure_enabled()?;
-    cancel_row(org, user_id, before).await
+    cancel_row(org, user_id, before, idle).await
 }
 
 /// Ends an Until-it-clears row at the moment its alert first cleared (R-117); idempotent.
@@ -726,7 +729,12 @@ pub fn corrections_may_change(before: Option<&Downtime>, after: &Downtime) -> bo
     })
 }
 
-async fn cancel_row(org: &str, user_id: &str, before: Downtime) -> Result<Downtime, DowntimeError> {
+async fn cancel_row(
+    org: &str,
+    user_id: &str,
+    before: Downtime,
+    idle: Option<IdleRun<'_>>,
+) -> Result<Downtime, DowntimeError> {
     let id = before.id.clone();
     let now = now_micros();
     if before.cancelled_at.is_some() {
@@ -739,7 +747,14 @@ async fn cancel_row(org: &str, user_id: &str, before: Downtime) -> Result<Downti
     check_cancellable(&before, now)?;
     let after = cancelled(&before, user_id, now);
     let plan = remeasure_plan(Some(&before), &after).await?;
-    set_if_unchanged(&after, before.updated_at, &plan).await?;
+    match idle {
+        Some(run) => {
+            if !db::downtimes::set_if_idle(&after, before.updated_at, run, plan.jobs()).await? {
+                return Err(changed_meanwhile());
+            }
+        }
+        None => set_if_unchanged(&after, before.updated_at, &plan).await?,
+    }
     forget_recorded_mutes(&after.org, &after.id).await;
     if let Some(window) = cancelled_window(&before, now) {
         notify::deliver_in_background(
