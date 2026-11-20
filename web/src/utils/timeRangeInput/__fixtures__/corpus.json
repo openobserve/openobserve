@@ -105,12 +105,12 @@
     "now": "2026-11-17T12:00:00Z",
     "zone": "Asia/Riyadh",
     "expected": {
-      "start": "2026-11-15T00:00:00+03:00",
+      "start": "2026-11-16T00:00:00+03:00",
       "end": "2026-11-17T15:00:00+03:00"
     },
     "category": "this-last-week",
-    "note": "Sunday week start per [CLDR](https://raw.githubusercontent.com/unicode-org/cldr/main/common/supplemental/supplementalData.xml); end clipped to now. D2: CLDR uses a Sunday week start; its fit with Saudi civil practice is uncertain.",
-    "uncertain": true
+    "note": "Current Monday-start week, the same week as the rail's `calendar:week` token; end clipped to now.",
+    "uncertain": false
   },
   {
     "id": "ar-SA-10",
@@ -119,12 +119,12 @@
     "now": "2026-11-17T12:00:00Z",
     "zone": "Asia/Riyadh",
     "expected": {
-      "start": "2026-11-08T00:00:00+03:00",
-      "end": "2026-11-15T00:00:00+03:00"
+      "start": "2026-11-09T00:00:00+03:00",
+      "end": "2026-11-16T00:00:00+03:00"
     },
     "category": "this-last-week",
-    "note": "Previous complete Sunday-start week. D2: CLDR uses a Sunday week start; its fit with Saudi civil practice is uncertain.",
-    "uncertain": true
+    "note": "Previous complete Monday-start week, the same week as the rail's `calendar:week` token.",
+    "uncertain": false
   },
   {
     "id": "ar-SA-12",
@@ -321,12 +321,12 @@
     "now": "2027-01-01T06:30:00Z",
     "zone": "Asia/Riyadh",
     "expected": {
-      "start": "2026-12-20T00:00:00+03:00",
-      "end": "2026-12-27T00:00:00+03:00"
+      "start": "2026-12-21T00:00:00+03:00",
+      "end": "2026-12-28T00:00:00+03:00"
     },
     "category": "this-last-week",
-    "note": "Sunday-start previous week; phrasing attested in [Saudi usage](https://hawamer.com/vb/hawamer2861564-7). D2: CLDR uses a Sunday week start; its fit with Saudi civil practice is uncertain.",
-    "uncertain": true
+    "note": "Previous complete Monday-start week, the same week as the rail's `calendar:week` token.",
+    "uncertain": false
   },
   {
     "id": "ar-SA-30",
@@ -349,12 +349,12 @@
     "now": "2027-01-01T06:30:00Z",
     "zone": "Asia/Riyadh",
     "expected": {
-      "start": "2026-12-27T00:00:00+03:00",
+      "start": "2026-12-28T00:00:00+03:00",
       "end": "2027-01-01T09:30:00+03:00"
     },
     "category": "this-last-week",
-    "note": "Colloquial this week; Sunday start falls on December 27. D2: CLDR uses a Sunday week start; its fit with Saudi civil practice is uncertain.",
-    "uncertain": true
+    "note": "Current Monday-start week, the same week as the rail's `calendar:week` token; end clipped to now.",
+    "uncertain": false
   },
   {
     "id": "ar-SA-32",
@@ -3880,12 +3880,12 @@
     "now": "2026-11-17T12:00:00Z",
     "zone": "Europe/Lisbon",
     "expected": {
-      "start": "2026-11-15T00:00:00+00:00",
+      "start": "2026-11-16T00:00:00+00:00",
       "end": "2026-11-17T12:00:00+00:00"
     },
     "category": "this-last-week",
-    "note": "CLDR specifies Sunday for Portugal; current week ends at now. [CLDR week data](https://raw.githubusercontent.com/unicode-org/cldr-json/main/cldr-json/cldr-core/supplemental/weekData.json). D2 uncertainty: CLDR uses Sunday as Portugal's first weekday, while civil practice uses ISO Monday.",
-    "uncertain": true
+    "note": "Current Monday-start week, the same week as the rail's `calendar:week` token; end clipped to now.",
+    "uncertain": false
   },
   {
     "id": "pt-PT-10",
@@ -3894,12 +3894,12 @@
     "now": "2026-11-17T12:00:00Z",
     "zone": "Europe/Lisbon",
     "expected": {
-      "start": "2026-11-08T00:00:00+00:00",
-      "end": "2026-11-15T00:00:00+00:00"
+      "start": "2026-11-09T00:00:00+00:00",
+      "end": "2026-11-16T00:00:00+00:00"
     },
     "category": "this-last-week",
-    "note": "Previous complete Sunday-start calendar week. D2 uncertainty: CLDR uses Sunday as Portugal's first weekday, while civil practice uses ISO Monday.",
-    "uncertain": true
+    "note": "Previous complete Monday-start week, the same week as the rail's `calendar:week` token.",
+    "uncertain": false
   },
   {
     "id": "pt-PT-11",
@@ -4019,12 +4019,12 @@
     "now": "2027-01-01T06:30:00Z",
     "zone": "Europe/Lisbon",
     "expected": {
-      "start": "2026-12-20T00:00:00+00:00",
-      "end": "2026-12-27T00:00:00+00:00"
+      "start": "2026-12-21T00:00:00+00:00",
+      "end": "2026-12-28T00:00:00+00:00"
     },
     "category": "this-last-week",
-    "note": "Previous complete Sunday-start week; do not apply a Monday-start default. D2 uncertainty: CLDR uses Sunday as Portugal's first weekday, while civil practice uses ISO Monday.",
-    "uncertain": true
+    "note": "Previous complete Monday-start week, the same week as the rail's `calendar:week` token.",
+    "uncertain": false
   },
   {
     "id": "pt-PT-26",
@@ -4047,12 +4047,12 @@
     "now": "2027-01-01T06:30:00Z",
     "zone": "Europe/Lisbon",
     "expected": {
-      "start": "2026-12-27T00:00:00+00:00",
+      "start": "2026-12-28T00:00:00+00:00",
       "end": "2027-01-01T06:30:00+00:00"
     },
     "category": "this-last-week",
-    "note": "Standard expression for this week; the current Sunday-start week crosses the year boundary. D2 uncertainty: CLDR uses Sunday as Portugal's first weekday, while civil practice uses ISO Monday.",
-    "uncertain": true
+    "note": "Current Monday-start week, the same week as the rail's `calendar:week` token; end clipped to now.",
+    "uncertain": false
   },
   {
     "id": "pt-PT-28",
