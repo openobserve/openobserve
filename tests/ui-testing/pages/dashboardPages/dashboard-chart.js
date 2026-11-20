@@ -1087,4 +1087,17 @@ export default class ChartTypeSelector {
     }).toPass({ timeout: 15000 });
     await this.clearFieldSearch();
   }
+
+  /** Assert a field row offers no add-to-axis button for `target` at all, e.g. +B on a chart type without a breakdown. */
+  async expectAddFieldButtonAbsent(fieldName, target) {
+    if (!["x", "y", "b"].includes(target)) throw new Error(`Invalid target type: ${target}`);
+    await this.searchField(fieldName);
+    const row = this.fieldListRow(fieldName);
+    await row.waitFor({ state: "visible", timeout: 10000 });
+    await row.hover();
+    // The sibling +X button proves the hover revealed the row's add buttons before counting the missing one.
+    await expect(this.fieldAddButton(fieldName, "x")).toBeVisible();
+    await expect(this.fieldAddButton(fieldName, target)).toHaveCount(0);
+    await this.clearFieldSearch();
+  }
 }
