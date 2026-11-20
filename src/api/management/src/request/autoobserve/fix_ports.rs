@@ -23,6 +23,7 @@ use config::{
         destinations::{DestinationType, Module},
         downtimes::{AlertMuteConflict, AlertMuteRequest, Downtime, MuteSource},
         oncall::SubjectType,
+        triggers::{ScheduledTriggerData, TriggerModule, TriggerStatus},
     },
     utils::time::now_micros,
 };
@@ -34,7 +35,9 @@ use o2_enterprise::enterprise::{
         decisions::{Permission, RefusalReason, Source},
         fixes::builtin,
         insight::FieldPatch,
-        ports::{AlertRow, AlertWrite, DestinationRow, FixPort, MuteAnswer, MuteRow, PageRow},
+        ports::{
+            AlertRow, AlertWrite, DestinationRow, Evaluation, FixPort, MuteAnswer, MuteRow, PageRow,
+        },
     },
     downtimes::schedule,
 };
@@ -45,7 +48,9 @@ use openobserve_core::alerts::{
     destinations,
     mute::{self, MuteError},
 };
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+};
 use svix_ksuid::Ksuid;
 
 use super::LiveDigest;
@@ -55,6 +60,7 @@ use crate::request::security;
 const MAX_PAGES: u64 = 20_000;
 const SECOND_US: i64 = 1_000_000;
 const MINUTE_US: i64 = 60 * SECOND_US;
+const INCIDENTS_PER_READ: usize = 200;
 
 pub struct LiveFixPort;
 
@@ -197,6 +203,23 @@ impl FixPort for LiveFixPort {
         live_mutes(org, alert_id).await
     }
 
+    async fn evaluation(&self, org: &str, alert_id: &str) -> anyhow::Result<Option<Evaluation>> {
+        // The scheduler read answers a failed read like a missing row; both, like a row it can't
+        // decode, keep the snooze.
+        let Ok(trigger) = infra::scheduler::get(org, TriggerModule::Alert, alert_id).await else {
+            return Ok(None);
+        };
+        let Ok(data) = ScheduledTriggerData::from_json_string(&trigger.data) else {
+            return Ok(None);
+        };
+        Ok(Some(Evaluation {
+            last_fired_us: data.last_satisfied_at,
+            next_run_us: trigger.next_run_at,
+            running: trigger.status == TriggerStatus::Processing,
+            realtime: trigger.is_realtime,
+        }))
+    }
+
     async fn pages(
         &self,
         org: &str,
@@ -271,14 +294,35 @@ async fn pages_with<C: ConnectionTrait>(
 ) -> anyhow::Result<Vec<PageRow>> {
     use oncall_responses::Column;
     let alert = Column::SubjectType.eq(SubjectType::Alert.to_i32());
-    let own = alert_id.map(|id| Column::SubjectId.starts_with(format!("{id}#")));
-    let mut out: Vec<PageRow> = pages_of(conn, org, since_us, alert.clone(), own)
+    let own =
+        alert_id.map(|id| Condition::all().add(Column::SubjectId.starts_with(format!("{id}#"))));
+    let mut out: Vec<PageRow> = pages_of(conn, org, since_us, alert, own)
         .await?
         .into_iter()
         .map(|r| page_row(source_of(&r.subject_id).to_string(), r))
         .collect();
-    let incident = Column::SubjectType.eq(SubjectType::Incident.to_i32());
-    let incident_pages = pages_of(conn, org, since_us, incident, None).await?;
+    let incident = || Column::SubjectType.eq(SubjectType::Incident.to_i32());
+    let incident_pages = match alert_id {
+        None => pages_of(conn, org, since_us, incident(), None).await?,
+        // One alert's read never counts other alerts' incident pages against its bound.
+        Some(id) => {
+            let candidates =
+                incident_membership::incidents_open_since_with(conn, org, id, since_us).await?;
+            let openers = incident_membership::openers_with(conn, &candidates).await?;
+            let ids: Vec<&String> = candidates
+                .iter()
+                .filter(|i| openers.get(*i).is_some_and(|o| o == id))
+                .collect();
+            let mut pages = Vec::new();
+            for chunk in ids.chunks(INCIDENTS_PER_READ) {
+                let any = chunk.iter().fold(Condition::any(), |c, i| {
+                    c.add(Column::SubjectId.starts_with(format!("{i}#")))
+                });
+                pages.extend(pages_of(conn, org, since_us, incident(), Some(any)).await?);
+            }
+            pages
+        }
+    };
     let ids: Vec<String> = incident_pages
         .iter()
         .map(|r| source_of(&r.subject_id).to_string())
@@ -301,7 +345,7 @@ async fn pages_of<C: ConnectionTrait>(
     org: &str,
     since_us: i64,
     subject: sea_orm::sea_query::SimpleExpr,
-    narrow: Option<sea_orm::sea_query::SimpleExpr>,
+    narrow: Option<Condition>,
 ) -> anyhow::Result<Vec<oncall_responses::Model>> {
     use oncall_responses::{Column, Entity};
     let mut query = Entity::find()
@@ -411,7 +455,7 @@ fn kind_of(t: &DestinationType) -> String {
 
 #[cfg(test)]
 mod tests {
-    use infra::table::entity::alert_incident_alerts;
+    use infra::table::entity::{alert_incident_alerts, alert_incidents};
     use sea_orm::{ActiveModelTrait, Database, IntoActiveModel, Schema};
 
     use super::*;
@@ -463,6 +507,40 @@ mod tests {
         }
     }
 
+    fn incident(id: &str, resolved_at: Option<i64>) -> alert_incidents::Model {
+        alert_incidents::Model {
+            id: id.into(),
+            org_id: "o".into(),
+            status: "open".into(),
+            severity: "P3".into(),
+            group_values: serde_json::json!({}),
+            key_type: "service".into(),
+            topology_context: None,
+            first_alert_at: 0,
+            last_alert_at: 0,
+            resolved_at,
+            alert_count: 1,
+            title: None,
+            assigned_to: None,
+            acknowledged_by: None,
+            acknowledged_at: None,
+            created_at: 0,
+            updated_at: 0,
+            muted_by_downtime_id: None,
+            rca_run_id: None,
+            rca_state: None,
+            rca_started_at: None,
+            rca_updated_at: None,
+            rca_outcome: None,
+            rca_confidence: None,
+            rca_summary: None,
+            rca_off_reason: None,
+            security_case: false,
+            historical: false,
+            last_detection_at: None,
+        }
+    }
+
     #[tokio::test]
     async fn an_alert_that_pages_through_incidents_has_those_pages() {
         let db = Database::connect("sqlite::memory:").await.unwrap();
@@ -475,6 +553,7 @@ mod tests {
         for table in [
             schema.create_table_from_entity(oncall_responses::Entity),
             schema.create_table_from_entity(alert_incident_alerts::Entity),
+            schema.create_table_from_entity(alert_incidents::Entity),
         ] {
             db.execute(backend.build(&table)).await.unwrap();
         }
@@ -491,6 +570,21 @@ mod tests {
         firings.push(firing("i4", "vpc", "internal", 410));
         pages.push(page(SubjectType::Incident, "i5#1", 500));
         firings.push(firing("i5", "finding-1", "autoobserve", 495));
+        // Opened by the alert two days before the read and paged again inside it.
+        pages.push(page(SubjectType::Incident, "i6#2", 700));
+        firings.push(firing(
+            "i6",
+            "vpc",
+            "internal",
+            50 - 2 * 24 * 60 * MINUTE_US,
+        ));
+        for id in ["i0", "i1", "i2", "i3", "i4", "i5", "i6"] {
+            incident(id, None)
+                .into_active_model()
+                .insert(&db)
+                .await
+                .unwrap();
+        }
         for p in pages {
             p.into_active_model().insert(&db).await.unwrap();
         }
@@ -501,7 +595,13 @@ mod tests {
         let seen: Vec<(i64, bool)> = vpc.iter().map(|p| (p.opened_at, p.acked)).collect();
         assert_eq!(
             seen,
-            [(600, true), (300, false), (200, false), (100, false)]
+            [
+                (700, false),
+                (600, true),
+                (300, false),
+                (200, false),
+                (100, false)
+            ]
         );
         let all = pages_with(&db, "o", 50, None).await.unwrap();
         let seen: Vec<(&str, i64)> = all
@@ -511,6 +611,7 @@ mod tests {
         assert_eq!(
             seen,
             [
+                ("vpc", 700),
                 ("vpc", 600),
                 ("other", 400),
                 ("vpc", 300),
