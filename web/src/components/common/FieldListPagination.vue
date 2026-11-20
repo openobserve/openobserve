@@ -145,8 +145,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="ring-1 ring-inset"
             :class="
               currentPage === page
-                ? 'bg-selected-bg! text-selected-fg! ring-selected-border'
-                : 'ring-transparent'
+                ? 'bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)]! text-selected-fg! ring-transparent'
+                : 'ring-transparent text-text-secondary!'
             "
             :aria-current="currentPage === page ? 'page' : undefined"
             :data-test="`${dataTestPrefix}-fields-list-pagination-page-${page}-button`"

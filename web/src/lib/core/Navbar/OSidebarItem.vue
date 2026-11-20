@@ -89,9 +89,9 @@ const rowClass = computed(() => [
   "group/nav flex min-w-9 w-full items-center gap-2.5 overflow-hidden rounded-default text-xs [text-decoration:none]! transition-colors duration-150 motion-reduce:transition-none cursor-pointer border-0 text-start [font-family:inherit]",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent",
   props.sub ? "h-8 ps-8.5 pe-2" : "h-8 px-2",
-  // Inset ring: the fill alone is 1.3:1 on the shell, so the edge carries the 3:1 state cue.
+  // Calm selection: a soft accent tint, no ring and no bold; the accent icon carries the state cue.
   props.active
-    ? "bg-selected-bg text-selected-fg! font-semibold ring-1 ring-inset ring-selected-border"
+    ? "bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)] text-text-body! font-normal"
     : props.childActive
       ? "bg-transparent hover:bg-surface-hover font-normal text-text-heading!"
       : "bg-transparent hover:bg-surface-hover hover:text-text-body! font-normal text-text-body!",
