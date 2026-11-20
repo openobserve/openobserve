@@ -2,7 +2,7 @@
 
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { h } from "vue";
+import { KeepAlive, defineComponent, h, nextTick, ref } from "vue";
 
 import OTable from "../OTable.vue";
 import type { OTableColumnDef } from "../OTable.types";
@@ -318,5 +318,47 @@ describe("OTableBodyCell focusToolbar", () => {
     });
     await flushPromises();
     expect(cells()).toHaveLength(0);
+  });
+});
+
+describe("OTableBodyCell hover toolbar lifecycle", () => {
+  const toolbar = () => document.body.querySelector<HTMLElement>(".o2-table-cell-hover-actions");
+
+  it("drops the teleported toolbar when a kept-alive page is left", async () => {
+    const shown = ref(true);
+    const Host = defineComponent({
+      setup: () => () =>
+        h(KeepAlive, null, [
+          shown.value
+            ? h(
+                OTable,
+                {
+                  key: "table",
+                  columns,
+                  data: rows,
+                  rowKey: "id",
+                  pagination: "none",
+                  sorting: "none",
+                },
+                {
+                  "cell-hover-actions": () =>
+                    h("button", { type: "button", "data-test": "act" }, "act"),
+                },
+              )
+            : h("div", { key: "other" }),
+        ]),
+    });
+    wrapper = mount(Host, { attachTo: document.body });
+    await flushPromises();
+    document
+      .querySelector("tbody td")!
+      .dispatchEvent(new MouseEvent("mouseenter", { clientX: 10, clientY: 10 }));
+    await flushPromises();
+    expect(toolbar()).not.toBeNull();
+
+    shown.value = false;
+    await nextTick();
+    await flushPromises();
+    expect(toolbar()).toBeNull();
   });
 });

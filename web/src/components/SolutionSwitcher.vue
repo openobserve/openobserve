@@ -2,7 +2,7 @@
 SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
@@ -54,6 +54,17 @@ const SOLUTIONS: {
   },
 ];
 
+// The menu returns focus to the trigger on close, which would open its focus tooltip over the page.
+const tooltipSuppressed = ref(false);
+const menuOpen = ref(false);
+function onMenuOpen(open: boolean) {
+  menuOpen.value = open;
+  if (open) tooltipSuppressed.value = true;
+}
+function releaseTooltip() {
+  if (!menuOpen.value) tooltipSuppressed.value = false;
+}
+
 const current = computed(() => SOLUTIONS.find((s) => s.key === mode.value) ?? SOLUTIONS[0]);
 
 function switchTo(solution: (typeof SOLUTIONS)[0]) {
@@ -67,7 +78,7 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
 </script>
 
 <template>
-  <ODropdown side="bottom" align="start">
+  <ODropdown side="bottom" align="start" @update:open="onMenuOpen">
     <template #trigger>
       <OButton
         variant="ghost"
@@ -76,6 +87,8 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
         icon-right="expand-more"
         class="font-semibold tracking-tight md:max-xl:max-w-full md:max-xl:min-w-0"
         data-test="solution-switcher"
+        @blur="releaseTooltip"
+        @mouseleave="releaseTooltip"
       >
         <span class="max-md:sr-only md:max-xl:truncate">{{ t(current.labelKey) }}</span>
         <BetaBadge
@@ -84,7 +97,7 @@ function switchTo(solution: (typeof SOLUTIONS)[0]) {
           size="xs"
           class="shrink-0"
         />
-        <OTooltip :content="t(current.labelKey)" />
+        <OTooltip :content="t(current.labelKey)" :disabled="tooltipSuppressed" />
       </OButton>
     </template>
 

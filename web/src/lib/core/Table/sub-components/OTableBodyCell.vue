@@ -11,7 +11,9 @@ import {
   computed,
   inject,
   nextTick,
+  onActivated,
   onBeforeUnmount,
+  onDeactivated,
   onMounted,
   provide,
   ref,
@@ -338,7 +340,18 @@ function handleContextMenu(event: MouseEvent) {
 // keyed by `cell.id` (already `${row.id}_${column.id}`).
 const hasCellActions = computed(() => !!slots["cell-hover-actions"]);
 const cellActionsCtx = inject(OTableCellActionsKey, null);
-const isCellActionActive = computed(() => cellActionsCtx?.activeCellKey.value === props.cell.id);
+// KeepAlive moves the cell off-page but leaves its <body> teleport behind, and no mouseleave fires.
+const cellDeactivated = ref(false);
+onDeactivated(() => {
+  cellDeactivated.value = true;
+  if (cellActionsCtx?.activeCellKey.value === props.cell.id) cellActionsCtx.setActiveCell(null);
+});
+onActivated(() => {
+  cellDeactivated.value = false;
+});
+const isCellActionActive = computed(
+  () => !cellDeactivated.value && cellActionsCtx?.activeCellKey.value === props.cell.id,
+);
 
 // Anchored to the cell's top edge (not the pointer) with an arrow pointing back at
 // the row, so the toolbar can't be read as belonging to the row it is drawn over.

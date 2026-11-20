@@ -241,7 +241,7 @@ export default defineComponent({
     // Compute the tile's active state.
     // In trigger mode the parent owns the active flag; otherwise we derive it
     // from the route. Home (link === '/') needs special handling because every
-    // path starts with '/' — match by route name "home". Others prefix-match.
+    // path starts with '/' — match by route name "home". Others match whole segments.
     const isActive = computed(() => {
       if (props.asTrigger) return props.active;
       // Explicit override — link+subnav group tiles (e.g. Data) pass `active`
@@ -249,10 +249,13 @@ export default defineComponent({
       // under different path roots than the tile's own link.
       if (props.active) return true;
       const route = router.currentRoute.value;
+      // A route outside its tile's path tree (shared chat under /ai) names its owner tile.
+      const navLink = route.meta?.navLink;
+      if (typeof navLink === "string") return navLink === props.link;
       if (props.link === "/") {
         return route.name === "home" || route.path === "/" || route.path === "";
       }
-      return route.path.indexOf(props.link) === 0;
+      return route.path === props.link || route.path.startsWith(`${props.link}/`);
     });
 
     // Active-state styling is theme-aware: LIGHT keeps the classic white pill
