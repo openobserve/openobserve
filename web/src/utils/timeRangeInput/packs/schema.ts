@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { foldText, type FoldScript } from "../normalize";
-import type { Draft, SpanUnit, TimeRangePack, TimeRangeLocale, UnitKey } from "../types";
+import type { ClockMod, Draft, SpanUnit, TimeRangePack, TimeRangeLocale, UnitKey } from "../types";
 
 export type WordKey = "today" | "yesterday" | "thisWeek" | "lastWeek" | "thisMonth" | "lastMonth";
 
@@ -149,7 +149,7 @@ export interface CompiledPack {
   nowWords: string[];
   months: Words<number>;
   weekdays: Words<number>;
-  mods: Words<{ from: number; to: number; shift: number }>;
+  mods: Words<ClockMod>;
   autoNames: Record<string, string>;
   nameLastN: string;
   examples: string[];
@@ -410,11 +410,11 @@ export function compilePack(hand: LocalePack, gen: GeneratedTables, en?: LocaleP
     ...gen.weekdays.map((n, i) => [n, i] as const),
     ...(pack.weekdays ?? []).map((n, i) => [n, i] as const),
   ].forEach(([names, i]) => names.forEach((s) => weekdays.push({ s: fold(s), value: i })));
-  const mods: Word<{ from: number; to: number; shift: number }>[] = [];
+  const mods: Word<ClockMod>[] = [];
   const am = [...gen.meridiem[0], ...(pack.meridiem?.am ?? [])];
   const pm = [...gen.meridiem[1], ...(pack.meridiem?.pm ?? [])];
-  am.forEach((s) => mods.push({ s: fold(s), value: { from: 0, to: 12, shift: 0 } }));
-  pm.forEach((s) => mods.push({ s: fold(s), value: { from: 12, to: 24, shift: 0 } }));
+  am.forEach((s) => mods.push({ s: fold(s), value: { from: 0, to: 12, shift: 0, ap: true } }));
+  pm.forEach((s) => mods.push({ s: fold(s), value: { from: 12, to: 24, shift: 0, ap: true } }));
   for (const [s, [from, to, shift]] of Object.entries(pack.dayParts ?? {})) {
     mods.push({ s: fold(s), value: { from, to, shift: shift ?? 0 } });
   }
