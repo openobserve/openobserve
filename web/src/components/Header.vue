@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="bg-surface-chrome-deeper flex h-12 w-full shrink-0 flex-nowrap items-center">
+  <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
     <!-- LEFT SIDE: Logo; the sidebar carries it from md up -->
     <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5 md:hidden">
       <OButton

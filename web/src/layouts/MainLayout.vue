@@ -867,9 +867,9 @@ export default defineComponent({
     const announcementBarRef = ref<HTMLElement | null>(null);
     let announcementBarObserver: ResizeObserver | null = null;
 
-    // The actions row is 48px (Header.vue h-12).
+    // The actions row is 40px (Header.vue h-10).
     const setNavbarHeight = (barHeightPx: number) => {
-      document.documentElement.style.setProperty("--navbar-height", `${3 + barHeightPx / 16}rem`);
+      document.documentElement.style.setProperty("--navbar-height", `${2.5 + barHeightPx / 16}rem`);
     };
 
     // a sign-up that never reaches onboarding still sends its one attribution event: its pick, or skipped
