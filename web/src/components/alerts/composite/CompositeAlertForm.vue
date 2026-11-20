@@ -29,6 +29,11 @@ import {
   removeExpressionOperand,
   validateExpression,
 } from "./expression";
+import {
+  stalePolicyHelpText,
+  stalePolicyLabel,
+  stalePolicyOptions as staleOptionsFor,
+} from "./stalePolicy";
 
 const props = withDefaults(
   defineProps<{
@@ -76,13 +81,10 @@ const summaryExpression = computed(() => {
   );
   return lettered || "—";
 });
-const stalePolicyOptions = computed(() => [
-  { label: t("alerts.composite.useLastState"), value: "use_last_state" },
-  { label: t("alerts.composite.treatStaleFalse"), value: "treat_as_false" },
-  { label: t("alerts.composite.treatStaleTrue"), value: "treat_as_true" },
-]);
-// Each option names what it does, so the help says what "stale" means instead.
-const stalePolicyHelp = computed(() => t("alerts.form.composite.staleLastState"));
+const stalePolicyOptions = computed(() => staleOptionsFor(t));
+const stalePolicyHelp = computed(() =>
+  stalePolicyHelpText(draft.value.composite_condition.stale_child_policy, t),
+);
 
 const updateCondition = (patch: Partial<CompositeAlertDraft["composite_condition"]>): void => {
   emit("update:modelValue", {
@@ -340,11 +342,7 @@ watch(
               {{ t("alerts.composite.stalePolicy") }}
             </dt>
             <dd class="text-text-heading">
-              {{
-                draft.composite_condition.stale_child_policy === "use_last_state"
-                  ? t("alerts.composite.useLastState")
-                  : raw(draft.composite_condition.stale_child_policy)
-              }}
+              {{ stalePolicyLabel(draft.composite_condition.stale_child_policy, t) }}
             </dd>
             <dt class="text-text-secondary whitespace-nowrap">
               {{ t("alerts.composite.levelWhenFiring") }}

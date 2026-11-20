@@ -172,9 +172,19 @@ describe("CompositeAlertForm", () => {
     expect(
       wrapper.find('[data-test="alerts-composite-stale-policy"]').attributes("data-value"),
     ).toBe("use_last_state");
-    expect(wrapper.find('[data-test="alerts-composite-stale-policy-help"]').text()).toMatch(
-      /missed several checks/i,
+  });
+
+  it("the stale-policy help follows the picked option", () => {
+    const helps = ["use_last_state", "treat_as_false", "treat_as_true"].map((policy) =>
+      mountForm(
+        draft({
+          composite_condition: { ...draft().composite_condition, stale_child_policy: policy },
+        }),
+      )
+        .find('[data-test="alerts-composite-stale-policy-help"]')
+        .text(),
     );
+    expect(new Set(helps).size).toBe(3);
   });
 
   it("writes Warning and stale-policy control changes into the draft condition", async () => {
