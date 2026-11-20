@@ -715,6 +715,20 @@ describe("FieldValuesPanel.vue", () => {
       expect(wrapper.emitted("search-field-values")).toBeFalsy();
     });
 
+    it("keeps the scroll where it is on a load more after a term cleared before it was sent", async () => {
+      wrapper = createWrapper({ fieldValues: buildFieldValues(30) });
+      valuesList().scrollTop = 0;
+      (wrapper.vm as unknown as { valueSearchTerm: string }).valueSearchTerm = "val";
+      await nextTick();
+      (wrapper.vm as unknown as { valueSearchTerm: string }).valueSearchTerm = "";
+      await nextTick();
+      vi.advanceTimersByTime(300);
+      valuesList().scrollTop = 200;
+      await wrapper.setProps({ fieldValues: buildFieldValues(40) });
+      await nextTick();
+      expect(valuesList().scrollTop).toBe(200);
+    });
+
     it("puts the values list back at its scroll position once the search is cleared", async () => {
       wrapper = createWrapper({ fieldValues: buildFieldValues(30) });
       valuesList().scrollTop = 120;

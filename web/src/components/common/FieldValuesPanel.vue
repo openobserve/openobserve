@@ -433,9 +433,11 @@ watch(valueSearchTerm, (term, previous) => {
     emitSearch(term);
     return;
   }
-  scrollToRestore = scrollBeforeSearch;
+  const restoreTo = scrollBeforeSearch;
   scrollBeforeSearch = null;
+  // A term cleared before it was sent never changed the list, so there is no scroll to put back.
   if (!searchSent) return;
+  scrollToRestore = restoreTo;
   searchSent = false;
   emit("search-field-values", props.fieldName, "");
 });
@@ -509,6 +511,7 @@ const reset = () => {
   selectedValues.value = activeValues();
   searchSent = false;
   scrollBeforeSearch = null;
+  scrollToRestore = null;
   valueSearchTerm.value = "";
   cachedValues.value = [];
   filterMode.value = initialMode();
