@@ -587,6 +587,17 @@ export const convertMultiSQLData = async (
     return options[0];
   }
 
+  // An empty query 1 builds a category axis; take the chart frame from the first query that has rows.
+  const baseIdx = options.findIndex((opt: any) =>
+    opt?.options?.series?.some((s: any) => Array.isArray(s.data) && s.data.length > 0),
+  );
+  if (baseIdx > 0 && options[0]?.options) {
+    options[0] = {
+      ...options[baseIdx],
+      options: { ...options[baseIdx].options, series: options[0].options.series },
+    };
+  }
+
   // C3: X-axis merge + reindex for time-series charts
   const isHorizontal = chartType === "h-bar" || chartType === "h-stacked";
   const categoryAxis = isHorizontal ? "yAxis" : "xAxis";

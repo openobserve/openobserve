@@ -42,7 +42,6 @@ pub mod organization;
 pub mod otlp;
 pub mod pipeline;
 pub mod plan;
-pub mod projections;
 pub mod promql;
 pub mod public_dashboards;
 pub mod queue_store;

@@ -551,6 +551,14 @@ pub async fn update_stream_settings(
         settings.security = v;
     }
 
+    #[cfg(feature = "vectorscan")]
+    let added_partition_keys: Vec<String> = new_settings
+        .partition_keys
+        .add
+        .iter()
+        .filter(|p| !p.disabled)
+        .map(|p| p.field.clone())
+        .collect();
     // partition_keys: remove-then-add, dedup (by `field`) deferred to normalize.
     if !new_settings.partition_keys.remove.is_empty() {
         settings.partition_keys.retain(|p| {
@@ -763,6 +771,20 @@ pub async fn update_stream_settings(
     }
 
     #[cfg(feature = "vectorscan")]
+    if let Some(conflict) = search_pattern_conflict(
+        org_id,
+        stream_name,
+        stream_type,
+        &settings,
+        &added_partition_keys,
+        &new_settings.pattern_associations,
+    )
+    .await
+    {
+        return Ok(MetaHttpResponse::bad_request(conflict));
+    }
+
+    #[cfg(feature = "vectorscan")]
     {
         if let Err(e) = process_association_changes(
             org_id,
@@ -784,6 +806,52 @@ pub async fn update_stream_settings(
     }
 
     save_stream_settings(org_id, stream_name, stream_type, settings).await
+}
+
+/// Refuses a change that would leave a search-time pattern unable to protect its field.
+#[cfg(feature = "vectorscan")]
+async fn search_pattern_conflict(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    settings: &StreamSettings,
+    added_partition_keys: &[String],
+    update: &config::meta::stream::UpdateSettingsWrapper<config::meta::stream::PatternAssociation>,
+) -> Option<String> {
+    if added_partition_keys.is_empty() && update.add.is_empty() {
+        return None;
+    }
+    let schema = infra::schema::get(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_else(|_| Schema::empty());
+    let existing = o2_enterprise::enterprise::re_patterns::get_pattern_manager()
+        .await
+        .map(|mgr| mgr.get_associations(org_id, stream_type, stream_name))
+        .unwrap_or_default();
+    let associations: Vec<_> = existing
+        .into_iter()
+        .filter(|a| {
+            !update
+                .remove
+                .iter()
+                .any(|r| r.field == a.field && r.pattern_id == a.pattern_id)
+        })
+        .chain(update.add.iter().cloned())
+        .collect();
+    let partition_keys: Vec<&str> = settings
+        .partition_keys
+        .iter()
+        .filter(|p| !p.disabled)
+        .map(|p| p.field.as_str())
+        .collect();
+    let added: Vec<&str> = added_partition_keys.iter().map(String::as_str).collect();
+    infra::table::re_pattern_stream_map::search_association_changes_conflict(
+        &schema,
+        &partition_keys,
+        &added,
+        &associations,
+        &update.add,
+    )
 }
 
 #[tracing::instrument(skip(cleanup_related_resources, cleanup_enrichment_table_resources))]
