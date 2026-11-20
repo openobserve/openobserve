@@ -486,6 +486,21 @@ describe("SettingsIndex", () => {
       expect(regexItem?.locked).toBe(true);
     });
 
+    it("lists Model Pricing unlocked in an OSS build, whose config reports ai_observability locked", () => {
+      vi.mocked(awsConfig).isEnterprise = "false";
+      vi.mocked(awsConfig).isCloud = "false";
+      Object.assign(mockStore.state, {
+        zoConfig: { model_pricing_enabled: true, features: { ai_observability: "locked" } },
+      });
+
+      const item = getAllItems(createWrapper()).find(
+        (i: { key: string }) => i.key === "model_pricing",
+      );
+      expect(item?.visible).toBe(true);
+      expect(item?.locked).toBeFalsy();
+      expect(item?.licenseLocked).toBe(false);
+    });
+
     // Cloud never offers this batch at all — not even locked — because a
     // Cloud customer can't "upgrade" into self-hosted node/license/cipher-key
     // management. Pure cloud (isEnterprise=false, isCloud=true) must hide it.

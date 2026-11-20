@@ -230,8 +230,6 @@ describe("useManagementRoutes", () => {
     });
 
     it.each([
-      ["modelPricing", "ai_observability"],
-      ["modelPricingEditor", "ai_observability"],
       ["llmProviders", "ai_observability"],
       ["genAiAgentMapping", "ai_observability"],
       ["aiToolsets", "ai_toolsets"],
@@ -243,13 +241,17 @@ describe("useManagementRoutes", () => {
       expect(route.meta.licenseFeature).toBe(key);
     });
 
-    it.each(["pipelineDestinations", "correlationSettings", "nodes"])(
-      "leaves %s untagged",
-      (name) => {
-        const route = routes[0].children.find((child: any) => child.name === name);
-        expect(route.meta?.licenseFeature).toBeUndefined();
-      },
-    );
+    it.each([
+      "pipelineDestinations",
+      "correlationSettings",
+      "nodes",
+      "modelPricing",
+      "modelPricingGaps",
+      "modelPricingEditor",
+    ])("leaves %s untagged", (name) => {
+      const route = routes[0].children.find((child: any) => child.name === name);
+      expect(route.meta?.licenseFeature).toBeUndefined();
+    });
 
     it("AC-1.10 registers slack in OSS builds and sends it to General, never the locked page", () => {
       const slackRoute = routes[0].children.find((child: any) => child.name === "slack");
@@ -337,22 +339,19 @@ describe("useManagementRoutes", () => {
       expect(actualPaths).toEqual(expectedPaths);
     });
 
-    it("should have modelPricing route in OSS builds too, and redirect when locked", () => {
-      const modelPricingRoute = routes[0].children.find(
-        (child: any) => child.name === "modelPricing",
-      );
-      expect(modelPricingRoute).toBeDefined();
-      const mockNext = vi.fn();
-      modelPricingRoute.beforeEnter({ query: {} }, {}, mockNext);
-      expect(mockNext).toHaveBeenCalledWith({
-        name: "enterpriseFeatureLocked",
-        query: { feature: "modelPricing" },
-      });
-      const modelPricingEditor = routes[0].children.find(
-        (child: any) => child.name === "modelPricingEditor",
-      );
-      expect(modelPricingEditor).toBeDefined();
-    });
+    it.each(["modelPricing", "modelPricingGaps", "modelPricingEditor"])(
+      "lets an OSS build into %s instead of the locked page",
+      (name) => {
+        const route = routes[0].children.find((child: any) => child.name === name);
+        const to = { query: {} };
+        const mockNext = vi.fn();
+        route.beforeEnter(to, {}, mockNext);
+        expect(routeGuard).toHaveBeenCalledWith(to, {}, mockNext);
+        expect(mockNext).not.toHaveBeenCalledWith(
+          expect.objectContaining({ name: "enterpriseFeatureLocked" }),
+        );
+      },
+    );
 
     it("should have unique names for each named base child route", () => {
       // Redirect-only children are deliberately unnamed — their name belongs to
@@ -406,6 +405,14 @@ describe("useManagementRoutes", () => {
       expect(modelPricingEditor).toBeDefined();
       expect(modelPricingEditor.path).toBe("model_pricing/edit");
     });
+
+    it.each(["modelPricing", "modelPricingGaps", "modelPricingEditor"])(
+      "tags %s with the ai_observability license feature when enterprise",
+      (name) => {
+        const route = useManagementRoutes()[0].children.find((child: any) => child.name === name);
+        expect(route.meta.licenseFeature).toBe("ai_observability");
+      },
+    );
 
     it("should have pipelineDestinations route when enterprise", () => {
       const routes = useManagementRoutes();

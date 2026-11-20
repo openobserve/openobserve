@@ -36,7 +36,6 @@ export type FeatureKey =
   | "nodes"
   | "license"
   | "correlationSettings"
-  | "modelPricing"
   | "llmProviders"
   | "genAiAgentMapping"
   | "incidents"
@@ -177,10 +176,6 @@ const FEATURE_GATES: Record<FeatureKey, FeatureGateDefinition> = {
     predicate: (c) => c.isEnterprise,
     labelKey: "settings.correlationSettings",
     cloudOffers: false,
-  },
-  modelPricing: {
-    predicate: (c) => c.isEnterprise || c.isCloud,
-    labelKey: "settings.llmModelPricing",
   },
   llmProviders: {
     predicate: (c) => c.isEnterprise || c.isCloud,

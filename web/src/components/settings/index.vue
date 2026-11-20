@@ -253,7 +253,6 @@ export default defineComponent({
       const pipelineDestinationsAccess = checkFeatureAccess("pipelineDestinations", featureGateCtx);
       const oncallAccess = checkFeatureAccess("oncall", featureGateCtx);
       const storageSettingsAccess = checkFeatureAccess("storageSettings", featureGateCtx);
-      const modelPricingAccess = checkFeatureAccess("modelPricing", featureGateCtx);
       const correlationSettingsAccess = checkFeatureAccess("correlationSettings", featureGateCtx);
       const llmProvidersAccess = checkFeatureAccess("llmProviders", featureGateCtx);
       const genAiAgentMappingAccess = checkFeatureAccess("genAiAgentMapping", featureGateCtx);
@@ -433,10 +432,11 @@ export default defineComponent({
           description: t("settings.modelPricingDesc"),
           icon: "paid",
           to: { name: "modelPricing", query: { org_identifier: org } },
-          visible: !!z.model_pricing_enabled && modelPricingAccess.visible,
-          locked: !modelPricingAccess.allowed,
-          lockedMessage: modelPricingAccess.message,
-          licenseLocked: featureState(z?.features, "ai_observability") === "locked",
+          visible: !!z.model_pricing_enabled,
+          // The OSS config reports `ai_observability` locked, yet OSS prices traces without a license.
+          licenseLocked:
+            (config.isEnterprise == "true" || isCloud) &&
+            featureState(z?.features, "ai_observability") === "locked",
           dataTest: "model-pricing-tab",
           group: "Data & AI",
         },
