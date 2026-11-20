@@ -275,6 +275,61 @@ mod tests {
     }
 
     #[test]
+    fn test_column_visitor_detects_standard_aggregates_without_group_by() {
+        let mut schemas = HashMap::new();
+        let schema = Schema::new(vec![
+            Arc::new(Field::new("x", DataType::Float64, false)),
+            Arc::new(Field::new("y", DataType::Float64, false)),
+        ]);
+        schemas.insert(
+            TableReference::from("t"),
+            Arc::new(SchemaCache::new(schema)),
+        );
+
+        for call in [
+            "stddev(x)",
+            "stddev_samp(x)",
+            "stddev_pop(x)",
+            "var_samp(x)",
+            "var_pop(x)",
+            "corr(x, y)",
+            "covar_samp(x, y)",
+            "bool_and(x > 1)",
+            "bool_or(x > 1)",
+            "bit_and(x)",
+            "bit_or(x)",
+            "bit_xor(x)",
+            "string_agg(x, ',')",
+            "STDDEV(x)",
+        ] {
+            let sql = format!("SELECT {call} AS v FROM t");
+            let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+                .unwrap()
+                .pop()
+                .unwrap();
+            let mut column_visitor = ColumnVisitor::new(&schemas);
+            let _ = statement.visit(&mut column_visitor);
+            assert!(column_visitor.has_agg_function, "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_aggregate_list_covers_every_default_datafusion_aggregate() {
+        let missing: Vec<String> =
+            datafusion::functions_aggregate::all_default_aggregate_functions()
+                .iter()
+                .flat_map(|f| {
+                    std::iter::once(f.name().to_string()).chain(f.aliases().iter().cloned())
+                })
+                .filter(|name| !AGGREGATE_UDF_LIST.contains(&name.to_lowercase().as_str()))
+                .collect();
+        assert!(
+            missing.is_empty(),
+            "missing from AGGREGATE_UDF_LIST: {missing:?}"
+        );
+    }
+
+    #[test]
     fn test_column_visitor_with_limit() {
         let sql = "SELECT name, age, COUNT(*) FROM users WHERE status in (select distinct status from users order by status limit 10) GROUP BY name, age ORDER BY name limit 1000";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)

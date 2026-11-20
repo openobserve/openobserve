@@ -168,6 +168,28 @@ mod tests {
     }
 
     #[test]
+    fn test_ungrouped_statistical_aggregates_are_complex() {
+        for call in [
+            "stddev(x)",
+            "stddev_samp(x)",
+            "stddev_pop(x)",
+            "var_samp(x)",
+            "var_pop(x)",
+            "corr(x, y)",
+            "covar_samp(x, y)",
+            "bool_and(b)",
+            "bool_or(b)",
+            "bit_and(x)",
+            "bit_or(x)",
+            "bit_xor(x)",
+            "string_agg(s, ',')",
+        ] {
+            let sql = format!("SELECT {call} AS v FROM t");
+            assert!(is_complex_query(&sql).unwrap(), "{sql}");
+        }
+    }
+
+    #[test]
     fn test_is_complex_query_having_join_union_subquery() {
         assert!(
             is_complex_query("SELECT x, count(*) FROM t GROUP BY x HAVING count(*) > 1").unwrap()
