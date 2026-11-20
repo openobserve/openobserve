@@ -1,0 +1,95 @@
+// Copyright 2026 OpenObserve Inc.
+
+import { expect } from '@playwright/test';
+
+const ORG = () => process.env.ORGNAME || 'default';
+// Default page size of all three lists; a row count is only the full answer within one page.
+const PAGE_SIZE = 20;
+
+// Each list page names its table, its card hooks and how a row shows its object.
+const LISTS = {
+  alerts: {
+    table: '[data-test="alert-list-table"]',
+    card: (key) => `[data-test="alert-summary-${key}"]`,
+    rowName: (name) => `[data-test="alert-list-${name}-name-cell"]`,
+  },
+  pipelines: {
+    table: '[data-test="pipeline-list-table"]',
+    card: (key) => `[data-test="pipeline-summary-${key}"]`,
+    rowName: (name) => `[data-test="pipeline-list-name-cell-${name}"]`,
+  },
+  publicLinks: {
+    table: '[data-test="dashboards-public-links-table"]',
+    card: (key) => `[data-test="dashboards-public-links-summary-${key}"]`,
+    rowName: (id) => `[data-test="dashboards-public-links-${id}-name"]`,
+  },
+};
+
+/** The tray-style quick filter cards above the Alerts, Pipelines and Public links lists. */
+export class QuickFilterCardsPage {
+  constructor(page) {
+    this.page = page;
+  }
+
+  async gotoPipelines() {
+    await this.page.goto(`/web/pipeline/pipelines?org_identifier=${ORG()}`);
+    await expect(this.page.locator(LISTS.pipelines.table)).toBeVisible({ timeout: 30000 });
+  }
+
+  async gotoPublicLinks() {
+    await this.page.goto(`/web/dashboards?org_identifier=${ORG()}&folder=__public_links__`);
+    await expect(this.page.locator(LISTS.publicLinks.table)).toBeVisible({ timeout: 30000 });
+  }
+
+  /** Open one alert folder with no `state` in the URL, so the list picks its own default tile. */
+  async gotoAlertsFolderUnfiltered(folderId) {
+    await this.page.goto(`/web/alerts?org_identifier=${ORG()}&folder=${folderId}`);
+    await expect(this.card('alerts', 'firing')).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectAlertsNoFiringEmptyState() {
+    await expect(this.page.locator('[data-test="alert-list-empty-no-firing"]')).toBeVisible({ timeout: 30000 });
+  }
+
+  async showAllAlertsFromEmptyState() {
+    await this.page.locator('[data-test="alert-list-empty-no-firing"] [data-test="alert-list-empty-show-all"]').click();
+  }
+
+  card(list, key) {
+    return this.page.locator(LISTS[list].card(key));
+  }
+
+  /** A chip card renders its label before the count, so assert on the count badge alone. */
+  async expectCardCount(list, key, count) {
+    const value = this.card(list, key).locator('[data-test="o-stat-card-value"]');
+    await expect(value, `${list} card "${key}" count`).toHaveText(
+      new RegExp(`^\\s*${count}\\s*$`),
+      { timeout: 30000 },
+    );
+  }
+
+  async clickCard(list, key) {
+    await this.card(list, key).click();
+  }
+
+  async expectCardSelected(list, key, selected) {
+    await expect(this.card(list, key), `${list} card "${key}" selected`).toHaveAttribute(
+      'aria-pressed',
+      String(selected),
+      { timeout: 15000 },
+    );
+  }
+
+  /** The table lists exactly `count` rows, every `shown` object among them and no `hidden` one. */
+  async expectRows(list, { count, shown = [], hidden = [] }) {
+    const { table, rowName } = LISTS[list];
+    expect(count, `${list}: expected rows must fit the first page of ${PAGE_SIZE}`).toBeLessThanOrEqual(PAGE_SIZE);
+    for (const name of shown) {
+      await expect(this.page.locator(`${table} ${rowName(name)}`), `${list} row ${name} shown`).toBeVisible({ timeout: 30000 });
+    }
+    for (const name of hidden) {
+      await expect(this.page.locator(`${table} ${rowName(name)}`), `${list} row ${name} hidden`).toHaveCount(0, { timeout: 15000 });
+    }
+    await expect(this.page.locator(`${table} tr[data-test^="o2-table-row-"]`), `${list} row count`).toHaveCount(count, { timeout: 15000 });
+  }
+}

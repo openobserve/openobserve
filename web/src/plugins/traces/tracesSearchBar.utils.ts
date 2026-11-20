@@ -128,6 +128,15 @@ export function tracesSearchRunSignature(searchObj: {
   });
 }
 
+/** True when nothing ran yet or the search state differs from the last Run, so the results are not its. */
+export function tracesQueryNotRun(
+  searchObj: Parameters<typeof tracesSearchRunSignature>[0] & {
+    meta: { lastRunSignature?: string | null };
+  },
+): boolean {
+  return searchObj.meta.lastRunSignature !== tracesSearchRunSignature(searchObj);
+}
+
 /** True when auto-run is off and the search state differs from the last Run, so the edit waits for Run. */
 export function tracesRunIsStaged(
   searchObj: Parameters<typeof tracesSearchRunSignature>[0] & {

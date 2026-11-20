@@ -596,27 +596,10 @@ test.describe("Dashboard Variables - URL Sync & Drilldown", { tag: ['@dashboards
     await scopedVars.getVariableSelectorLocator(globalVar).waitFor({ state: "visible", timeout: 10000 });
     await scopedVars.getVariableSelectorLocator(tabVar).waitFor({ state: "visible", timeout: 10000 });
 
-    // Set values
-    const globalDropdown = scopedVars.getVariableTriggerLocator(globalVar);
-    await globalDropdown.waitFor({ state: "visible", timeout: 5000 });
+    // Values load after the selectors render; a click on the still-loading list commits nothing to the URL.
+    await scopedVars.changeVariableValue(globalVar, { optionIndex: 0 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    await globalDropdown.click();
-    // Wait for dropdown menu to open
-    await scopedVars.getVariablePopoverLocator(globalVar).waitFor({ state: "visible", timeout: 5000 });
-    await scopedVars.getVariablePopoverLocator(globalVar).locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await scopedVars.getVariablePopoverLocator(globalVar).locator(SELECTORS.ROLE_OPTION).first().click();
-    await safeWaitForHidden(page, `[data-test="variable-selector-${globalVar}-inner-popover"]`, { timeout: 3000 });
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
-
-    const tabDropdown = scopedVars.getVariableTriggerLocator(tabVar);
-    await tabDropdown.waitFor({ state: "visible", timeout: 5000 });
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
-    await tabDropdown.click();
-    // Wait for dropdown menu to open
-    await scopedVars.getVariablePopoverLocator(tabVar).waitFor({ state: "visible", timeout: 5000 });
-    await scopedVars.getVariablePopoverLocator(tabVar).locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await scopedVars.getVariablePopoverLocator(tabVar).locator(SELECTORS.ROLE_OPTION).first().click();
-    await safeWaitForHidden(page, `[data-test="variable-selector-${tabVar}-inner-popover"]`, { timeout: 3000 });
+    await scopedVars.changeVariableValue(tabVar, { optionIndex: 0 });
 
     // Refresh
     await scopedVars.clickDashboardRefresh();

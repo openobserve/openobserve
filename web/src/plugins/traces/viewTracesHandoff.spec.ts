@@ -26,10 +26,83 @@ describe("buildViewTracesFilter", () => {
     expect(buildViewTracesFilter({ serviceName: "svc" })).toBe("service_name = 'svc'");
   });
 
+  it("matches every spelling of a folded catalog service", () => {
+    expect(
+      buildViewTracesFilter({
+        serviceName: "checkout.service",
+        serviceNames: ["Checkout", "checkout.service"],
+      }),
+    ).toBe("service_name IN ('Checkout','checkout.service')");
+  });
+
   it("uses infer_service_name when a serviceType is present", () => {
     expect(buildViewTracesFilter({ serviceName: "db", serviceType: "database" })).toBe(
       "infer_service_name = 'db'",
     );
+  });
+
+  it("keeps infer_service_name for a typed node that sends no identity expression", () => {
+    expect(
+      buildViewTracesFilter({ serviceName: "kafka", serviceType: "queue", callerService: "api" }),
+    ).toBe("infer_service_name = 'kafka' AND service_name = 'api'");
+  });
+
+  it("filters an agent node by its identity expression and keeps the caller service", () => {
+    expect(
+      buildViewTracesFilter({
+        serviceName: "planner",
+        serviceType: "agent",
+        identityExpr: "gen_ai_agent_name",
+        operationName: "invoke_agent",
+        callerService: "chat-api",
+      }),
+    ).toBe(
+      "gen_ai_agent_name = 'planner' AND operation_name = 'invoke_agent' AND service_name = 'chat-api'",
+    );
+  });
+
+  it("filters a tool node by its identity expression", () => {
+    expect(
+      buildViewTracesFilter({
+        serviceName: "web_search",
+        serviceType: "tool",
+        identityExpr: "gen_ai_tool_name",
+        operationName: "execute_tool",
+      }),
+    ).toBe("gen_ai_tool_name = 'web_search' AND operation_name = 'execute_tool'");
+  });
+
+  it("filters a model node by a plain model column", () => {
+    expect(
+      buildViewTracesFilter({
+        serviceName: "gpt-4o",
+        serviceType: "model",
+        identityExpr: "gen_ai_response_model",
+      }),
+    ).toBe("gen_ai_response_model = 'gpt-4o'");
+  });
+
+  it("filters a model node by a COALESCE identity expression", () => {
+    expect(
+      buildViewTracesFilter({
+        serviceName: "gpt-4o",
+        serviceType: "model",
+        identityExpr: "COALESCE(gen_ai_request_model, gen_ai_response_model)",
+        errorsOnly: true,
+      }),
+    ).toBe(
+      "COALESCE(gen_ai_request_model, gen_ai_response_model) = 'gpt-4o' AND span_status = 'ERROR'",
+    );
+  });
+
+  it("escapes single quotes in a name matched by an identity expression", () => {
+    expect(
+      buildViewTracesFilter({
+        serviceName: "it's",
+        serviceType: "tool",
+        identityExpr: "gen_ai_tool_name",
+      }),
+    ).toBe("gen_ai_tool_name = 'it''s'");
   });
 
   it("uses the complete inferred identity when a catalog system is provided", () => {

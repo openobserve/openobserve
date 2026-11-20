@@ -112,6 +112,7 @@ test.describe('Traces query placeholder', () => {
   test('Traces query placeholder never suggests match_all', {
     tag: ['@bug-12603', '@P0', '@regression', '@traces', '@tracesRegressionPlaceholder'],
   }, async () => {
+    await pm.tracesPage.recordQueryPlaceholder();
     await pm.tracesPage.navigateToTracesUrlWithStream(TRACE_STREAM);
     await pm.tracesPage.waitForTraceSearchResults();
 

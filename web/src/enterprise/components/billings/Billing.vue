@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:before>
         <div class="h-full w-full ps-2.5 pt-2 pb-2.5">
           <div class="h-full overflow-y-auto">
-            <OTabs v-model="billingtab" orientation="vertical">
+            <OTabs v-model="billingtab" orientation="vertical" class="px-1">
               <ORouteTab
                 exact
                 name="plans"

@@ -17,6 +17,7 @@
 //!
 //! Handles periodic tasks for incident lifecycle management:
 //! - Auto-resolution of stale incidents
+//! - Purge of expired alert pair verdicts
 //! - Retention of ended and cancelled downtimes
 
 use config::spawn_pausable_job;
@@ -71,6 +72,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                     if let Err(e) = auto_resolve_stale_incidents().await {
                         log::error!("[INCIDENTS::JOB] Auto-resolve failed: {e}");
                     }
+                    purge_expired_alert_pairs().await;
                 }
             },
             sleep_after
@@ -155,6 +157,18 @@ async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+/// Each region sweeps its own table, so nothing is sent to other regions.
+#[cfg(feature = "enterprise")]
+async fn purge_expired_alert_pairs() {
+    let db = infra::db::get_orm_client_rw().await;
+    let now = config::utils::time::now_micros();
+    match infra::table::incident_membership::purge_expired_pairs(db, now).await {
+        Ok(0) => {}
+        Ok(removed) => log::info!("[INCIDENTS::JOB] Removed {removed} expired alert pair verdicts"),
+        Err(e) => log::error!("[INCIDENTS::JOB] Expired alert pair purge failed: {e}"),
+    }
 }
 
 /// Each region sweeps its own table, so nothing is sent to other regions.

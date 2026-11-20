@@ -338,14 +338,12 @@ impl Engine {
         kind: &str,
     ) -> Result<Option<SelectorScan>> {
         let query_ctx = &self.ctx.query_ctx;
-        // need_wal bails early: WAL would split series across contexts
         if !config::get_config()
             .search
             .feature_metrics_streaming_agg_enabled
             || query_ctx.query_exemplars
             || query_ctx.query_data
             || query_ctx.is_super_cluster
-            || query_ctx.need_wal
         {
             return Ok(None);
         }

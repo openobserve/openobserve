@@ -74,6 +74,7 @@ impl From<ListSyntheticsQuery> for config::meta::synthetics::ListSyntheticsParam
     fn from(q: ListSyntheticsQuery) -> Self {
         Self {
             folder_id: q.folder,
+            listable_folder_ids: None,
             check_type: q.check_type,
             enabled: q.enabled,
             location: q.location,
@@ -614,8 +615,24 @@ pub async fn job_upload(
 pub async fn list_synthetics(
     Path(org_id): Path<String>,
     Query(query): Query<ListSyntheticsQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let params: config::meta::synthetics::ListSyntheticsParams = query.into();
+    #[cfg(feature = "enterprise")]
+    let params = match listable_synthetics_folders(
+        &org_id,
+        &user_email.user_id,
+        params.folder_id.as_deref(),
+        false,
+    )
+    .await
+    {
+        Ok(listable_folder_ids) => config::meta::synthetics::ListSyntheticsParams {
+            listable_folder_ids,
+            ..params
+        },
+        Err(resp) => return resp,
+    };
     match openobserve_synthetics::service::list_synthetics(&org_id, &params).await {
         Ok(mut resp) => {
             last_check::enrich(&org_id, &mut resp.checks).await;
@@ -627,6 +644,90 @@ pub async fn list_synthetics(
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
                 .into_response()
         }
+    }
+}
+
+/// The synthetics folders the caller may list; the route gate skips a list naming no folder.
+#[cfg(feature = "enterprise")]
+async fn listable_synthetics_folders(
+    org_id: &str,
+    user_id: &str,
+    folder: Option<&str>,
+    allow_empty: bool,
+) -> Result<Option<Vec<String>>, Response> {
+    let folder_type = o2_openfga::meta::mapping::OFGA_MODELS
+        .get("synthetic_folder")
+        .map_or("synthetic_folder", |model| model.key);
+    let listable = db::authz::listable_folders(org_id, user_id, folder_type)
+        .await
+        .map_err(|e| MetaHttpResponse::forbidden(e.to_string()))?;
+    admit_listable(listable, folder, allow_empty).map_err(MetaHttpResponse::forbidden)
+}
+
+/// `Err` says which list access is missing; `None` (every folder) admits any request.
+#[cfg(any(feature = "enterprise", test))]
+fn admit_listable(
+    listable: Option<Vec<String>>,
+    folder: Option<&str>,
+    allow_empty: bool,
+) -> Result<Option<Vec<String>>, &'static str> {
+    let Some(folders) = listable else {
+        return Ok(None);
+    };
+    if folders.is_empty() && !allow_empty {
+        return Err("You cannot list any synthetics folder; ask an admin for list access to one.");
+    }
+    if folder.is_some_and(|folder| !folders.iter().any(|f| f == folder)) {
+        return Err("You cannot list this synthetics folder; ask an admin for list access to it.");
+    }
+    Ok(Some(folders))
+}
+
+/// The synthetics folders the caller may list, whatever `list_only_permitted` says.
+#[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
+pub(crate) async fn listable_folders(
+    org_id: &str,
+    user_id: Option<&str>,
+) -> Result<Vec<config::meta::folder::Folder>, Response> {
+    #[cfg(feature = "enterprise")]
+    let listable =
+        listable_synthetics_folders(org_id, user_id.unwrap_or_default(), None, false).await?;
+    #[cfg(not(feature = "enterprise"))]
+    let listable: Option<Vec<String>> = None;
+    let mut folders =
+        infra::table::folders::list_folders(org_id, config::meta::folder::FolderType::Synthetics)
+            .await
+            .map_err(MetaHttpResponse::internal_error)?;
+    if lacks_listable_default(&folders, listable.as_deref()) {
+        let default = openobserve_synthetics::service::create_default_synthetics_folder(org_id)
+            .await
+            .map_err(MetaHttpResponse::internal_error)?;
+        folders.insert(0, default);
+    }
+    Ok(retain_listable(folders, listable.as_deref()))
+}
+
+/// `default` is minted on first use, so a caller who may list it must not miss it before then.
+fn lacks_listable_default(
+    folders: &[config::meta::folder::Folder],
+    listable: Option<&[String]>,
+) -> bool {
+    let default = config::meta::folder::DEFAULT_FOLDER;
+    !folders.iter().any(|folder| folder.folder_id == default)
+        && listable.is_none_or(|ids| ids.iter().any(|id| id == default))
+}
+
+/// Keeps the folders `listable` names; `None` keeps every folder.
+fn retain_listable(
+    folders: Vec<config::meta::folder::Folder>,
+    listable: Option<&[String]>,
+) -> Vec<config::meta::folder::Folder> {
+    match listable {
+        None => folders,
+        Some(ids) => folders
+            .into_iter()
+            .filter(|folder| ids.contains(&folder.folder_id))
+            .collect(),
     }
 }
 
@@ -801,16 +902,19 @@ async fn composition_error_response(
     })
 }
 
+/// A blank override means no override.
+fn normalized_template(template: Option<String>) -> Option<String> {
+    template
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+}
+
 /// A template override must name a user template that applies to synthetics; "" clears it.
 async fn checked_template(
     org_id: &str,
     body: &mut config::meta::synthetics::Synthetic,
 ) -> Result<(), Response> {
-    body.template = body
-        .template
-        .take()
-        .map(|t| t.trim().to_string())
-        .filter(|t| !t.is_empty());
+    body.template = normalized_template(body.template.take());
     if let Some(name) = body.template.as_deref() {
         openobserve_core::alerts::templates::check_binding(
             org_id,
@@ -964,6 +1068,40 @@ pub async fn get_synthetic(
     }
 }
 
+/// The update body: a full check, except that an absent `template` keeps the stored override.
+#[derive(Deserialize)]
+pub struct SyntheticUpdate {
+    #[serde(flatten)]
+    check: config::meta::synthetics::Synthetic,
+    /// Absent keeps the stored override; `null` or "" clears it; a name sets it.
+    #[serde(default, deserialize_with = "double_option")]
+    template: Option<Option<String>>,
+}
+
+/// `#[serde(default)]` alone decodes an explicit `null` to the outer `None`, losing "clear".
+fn double_option<'de, D, T>(de: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Deserialize::deserialize(de).map(Some)
+}
+
+impl SyntheticUpdate {
+    /// The check to save: the sent override, or the stored one when the field is absent.
+    async fn into_check(
+        self,
+        stored: impl std::future::Future<Output = anyhow::Result<Option<String>>>,
+    ) -> anyhow::Result<config::meta::synthetics::Synthetic> {
+        let mut check = self.check;
+        check.template = match self.template {
+            Some(template) => template,
+            None => stored.await?,
+        };
+        Ok(check)
+    }
+}
+
 #[utoipa::path(
     put,
     path = "/{org_id}/synthetics/{id}",
@@ -977,7 +1115,7 @@ pub async fn get_synthetic(
         ("id" = String, Path, description = "Check ID"),
         ("folder" = Option<String>, Query, description = "Current folder ID of the synthetic (for RBAC)"),
     ),
-    request_body(content = config::meta::synthetics::Synthetic, description = "Updated synthetic definition", content_type = "application/json"),
+    request_body(content = config::meta::synthetics::Synthetic, description = "Updated synthetic definition. An absent `template` keeps the stored override; `null` or \"\" clears it.", content_type = "application/json"),
     responses(
         (status = 200, description = "Updated",   content_type = "application/json", body = config::meta::synthetics::Synthetic),
         (status = 403, description = "Forbidden"),
@@ -993,8 +1131,11 @@ pub async fn update_synthetic(
     Path((org_id, id)): Path<(String, String)>,
     Query(_folder_query): Query<FolderQuery>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<config::meta::synthetics::Synthetic>,
+    Json(update): Json<SyntheticUpdate>,
 ) -> Response {
+    // The stored override is read only after the permission checks pass.
+    #[cfg(feature = "enterprise")]
+    let body = &update.check;
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &id,
@@ -1049,7 +1190,7 @@ pub async fn update_synthetic(
     }
 
     #[cfg(feature = "enterprise")]
-    match caller_can_read_children(&org_id, &user_email.user_id, &body, Some(id.as_str())).await {
+    match caller_can_read_children(&org_id, &user_email.user_id, body, Some(id.as_str())).await {
         Ok(None) => {}
         Ok(Some(child)) => {
             return MetaHttpResponse::forbidden(format!(
@@ -1070,7 +1211,21 @@ pub async fn update_synthetic(
     #[cfg(not(feature = "enterprise"))]
     let user_id = "";
 
-    let mut body = body;
+    let mut body = match update
+        .into_check(openobserve_synthetics::service::template_of(&org_id, &id))
+        .await
+    {
+        Ok(body) => body,
+        Err(e) => {
+            tracing::error!("[synthetics] update_synthetic: load stored template: {e}");
+            return MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                e.to_string(),
+            )
+            .into_response();
+        }
+    };
+    // A kept override is checked again, because its template can change after it was set.
     if let Err(response) = checked_template(&org_id, &mut body).await {
         return response;
     }
@@ -1863,70 +2018,35 @@ async fn process_ack(
     // 3` alerted on the first failure and a 30-minute cooldown sent thirty
     // notifications.
     #[cfg(feature = "enterprise")]
-    use openobserve_synthetics::job_api::AlertDecision;
-    #[cfg(feature = "enterprise")]
-    let recovery = matches!(resp.alert, AlertDecision::Recovered);
-    #[cfg(feature = "enterprise")]
-    let flaky = matches!(resp.alert, AlertDecision::Flaky);
-    // A degrading target is `warning` on every run for as long as the condition
-    // lasts, so this one is throttled by transition upstream, not by cooldown.
-    #[cfg(feature = "enterprise")]
-    let degraded = matches!(resp.alert, AlertDecision::Degraded);
-    #[cfg(feature = "enterprise")]
-    let should_notify =
-        !matches!(resp.alert, AlertDecision::Silent) && resp.suppressed_by.is_none();
+    let should_notify = !matches!(
+        resp.alert,
+        openobserve_synthetics::job_api::AlertDecision::Silent
+    ) && resp.suppressed_by.is_none();
     // Enterprise-gated because alert *destinations* are: the dispatch it ends in
     // (the shared notification path) is not built in OSS. An OSS build
     // runs the check, records the run and serves the result — it just has
     // nowhere to send a notification, exactly as it has for alerts.
     #[cfg(feature = "enterprise")]
     if should_notify && !resp.destinations.is_empty() {
-        let notification = openobserve_core::synthetics::CheckNotification {
-            org_id: resp.org_id.clone(),
-            check_name: resp.synthetics_name.clone(),
-            check_id: resp.synthetics_id.clone(),
-            check_type: resp.synthetic_type.clone(),
-            target: resp.target.clone(),
-            destinations: resp.destinations.clone(),
-            run_id: resp.run_id.clone(),
-            status: resp.run_status.clone().unwrap_or_else(|| status.clone()),
-            job_count: resp.job_count as i64,
-            error: error.clone(),
+        let notification = openobserve_core::synthetics::CheckNotification::from_ack(
+            &resp,
+            &status,
+            error.clone(),
+            error_source.clone(),
             checked_at,
-            recovery,
-            consecutive_failures: resp.consecutive_failures,
-            flaky,
-            degraded,
-            status_reason: resp.status_reason.clone(),
-            error_source: error_source.clone(),
-            failing_locations: resp.failing_locations.clone(),
-            failing_environments: resp.failing_environments.clone(),
-            passing_locations: resp.passing_locations.clone(),
-            template: resp.template.clone(),
-            event: check_event(recovery, flaky, degraded),
-        };
+        );
         tokio::spawn(async move {
             openobserve_core::synthetics::notify_check_result(notification).await;
         });
     }
-    Ok(resp)
-}
-
-/// The platform event of a run's message: a recovery resolves, the notices never open a record.
-#[cfg(feature = "enterprise")]
-fn check_event(
-    recovery: bool,
-    flaky: bool,
-    degraded: bool,
-) -> config::meta::alerts::notification_kind::NotificationEvent {
-    use config::meta::alerts::notification_kind::NotificationEvent;
-    if recovery {
-        NotificationEvent::Resolved
-    } else if flaky || degraded {
-        NotificationEvent::Informational
-    } else {
-        NotificationEvent::Firing
+    // The gap notices are about our side, so they go out whatever the run's own alert decided.
+    #[cfg(feature = "enterprise")]
+    if let Some(gap) = openobserve_core::synthetics::GapNotification::from_ack(&resp) {
+        tokio::spawn(async move {
+            openobserve_core::synthetics::notify_gap(gap).await;
+        });
     }
+    Ok(resp)
 }
 
 // ── Agent liveness API (probe-facing, authenticated via o2syn_ token) ────────
@@ -2547,8 +2667,20 @@ pub async fn delete_location(
         ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "list"}))
     )
 )]
-pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
-    match openobserve_synthetics::service::list_locations_for_org(&_org_id).await {
+pub async fn list_locations(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    // A direct grant on one check opens its editor, which needs every location to pick from.
+    let listable = match listable_synthetics_folders(&org_id, &user_email.user_id, None, true).await
+    {
+        Ok(listable) => listable,
+        Err(resp) => return resp,
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let listable = None;
+    match openobserve_synthetics::service::list_locations_for_org(&org_id, listable).await {
         Ok(capabilities) => MetaHttpResponse::json(capabilities),
         Err(e) => {
             tracing::error!("[synthetics] list_locations: {e}");
@@ -2566,26 +2698,158 @@ mod tests {
         service::composition::CompositionError as CE,
     };
 
-    use super::{ReferencedByQuery, composition_error_response, stamp_undefined_placeholders};
+    use super::{
+        ReferencedByQuery, admit_listable, composition_error_response, lacks_listable_default,
+        retain_listable, stamp_undefined_placeholders,
+    };
+
+    /// An update body as a client sends it; `template` is left out when `None`.
+    fn update_body(template: Option<serde_json::Value>) -> super::SyntheticUpdate {
+        let check = config::meta::synthetics::Synthetic {
+            name: "login-check".to_string(),
+            destinations: vec!["slack-ops".to_string()],
+            ..Default::default()
+        };
+        let mut value = serde_json::to_value(check).unwrap();
+        let fields = value.as_object_mut().unwrap();
+        fields.remove("template");
+        if let Some(template) = template {
+            fields.insert("template".to_string(), template);
+        }
+        serde_json::from_value(value).unwrap()
+    }
+
+    async fn resolved(body: super::SyntheticUpdate) -> Option<String> {
+        let check = body
+            .into_check(async { Ok(Some("ops-short".to_string())) })
+            .await
+            .unwrap();
+        // The rest of the check still reaches the save.
+        assert_eq!(check.name, "login-check");
+        assert_eq!(check.destinations, ["slack-ops"]);
+        check.template
+    }
+
+    #[tokio::test]
+    async fn an_update_without_template_keeps_the_stored_override() {
+        let body = update_body(None);
+        assert_eq!(body.template, None);
+        assert_eq!(resolved(body).await.as_deref(), Some("ops-short"));
+    }
+
+    #[test]
+    fn a_raw_update_body_reads_the_same_as_a_plain_check() {
+        // An alias, an unknown field and nested config, as raw JSON a client sends.
+        let raw = r#"{
+            "name": "login-check", "type": "http", "target": "https://example.com",
+            "config": {"headers": {"a": [1, 2]}}, "frequency": {"type": "minutes", "interval": 5},
+            "locations": ["us-east-1"], "enabled": true, "destinations": ["slack-ops"],
+            "cooldown_secs": 7, "client_metadata": {"x": 1}, "template": "ops-long"
+        }"#;
+        let update: super::SyntheticUpdate = serde_json::from_str(raw).unwrap();
+        let plain: config::meta::synthetics::Synthetic = serde_json::from_str(raw).unwrap();
+        assert_eq!(update.template, Some(Some("ops-long".to_string())));
+        assert_eq!(update.check.template, None);
+        let mut plain = serde_json::to_value(plain).unwrap();
+        plain.as_object_mut().unwrap().remove("template");
+        assert_eq!(serde_json::to_value(update.check).unwrap(), plain);
+    }
+
+    #[tokio::test]
+    async fn an_update_with_null_template_clears_the_override() {
+        let body = update_body(Some(serde_json::Value::Null));
+        assert_eq!(body.template, Some(None));
+        assert_eq!(resolved(body).await, None);
+    }
+
+    #[tokio::test]
+    async fn an_update_with_empty_template_clears_the_override() {
+        let template = resolved(update_body(Some(serde_json::json!("")))).await;
+        assert_eq!(template.as_deref(), Some(""));
+        // checked_template turns "" into no override before the save.
+        assert_eq!(super::normalized_template(template), None);
+        assert_eq!(
+            super::normalized_template(Some(" ops-short ".to_string())).as_deref(),
+            Some("ops-short")
+        );
+        assert_eq!(super::normalized_template(Some("   ".to_string())), None);
+    }
+
+    #[tokio::test]
+    async fn an_update_with_a_template_sets_it_without_reading_the_stored_one() {
+        let body = update_body(Some(serde_json::json!("ops-long")));
+        assert_eq!(body.template, Some(Some("ops-long".to_string())));
+        let check = body
+            .into_check(async { panic!("a sent template must not load the stored one") })
+            .await
+            .unwrap();
+        assert_eq!(check.template.as_deref(), Some("ops-long"));
+    }
+
+    #[tokio::test]
+    async fn a_failed_stored_read_fails_the_update() {
+        let body = update_body(None);
+        let result = body
+            .into_check(async { Err(anyhow::anyhow!("db down")) })
+            .await;
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn listing_needs_a_listable_folder_and_shows_only_listable_ones() {
+        let team = || Some(vec!["team".to_string()]);
+        assert_eq!(admit_listable(None, None, false), Ok(None));
+        assert_eq!(admit_listable(None, Some("any"), false), Ok(None));
+        assert_eq!(admit_listable(team(), None, false), Ok(team()));
+        assert_eq!(admit_listable(team(), Some("team"), false), Ok(team()));
+        assert!(admit_listable(team(), Some("default"), false).is_err());
+        assert!(admit_listable(Some(vec![]), None, false).is_err());
+        // Locations admit an empty set: an editor opened by a check grant needs the picker.
+        assert_eq!(admit_listable(Some(vec![]), None, true), Ok(Some(vec![])));
+        assert_eq!(admit_listable(team(), None, true), Ok(team()));
+
+        let folders = || {
+            ["default", "team"].map(|id| config::meta::folder::Folder {
+                folder_id: id.to_string(),
+                ..Default::default()
+            })
+        };
+        let ids = |listable: Option<&[String]>| {
+            retain_listable(folders().into(), listable)
+                .into_iter()
+                .map(|folder| folder.folder_id)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(ids(None), ["default", "team"]);
+        assert_eq!(ids(team().as_deref()), ["team"]);
+
+        let all = folders();
+        let only_team = &all[1..];
+        let with_default = Some(vec!["default".to_string()]);
+        assert!(lacks_listable_default(only_team, None));
+        assert!(lacks_listable_default(only_team, with_default.as_deref()));
+        assert!(!lacks_listable_default(only_team, team().as_deref()));
+        assert!(!lacks_listable_default(&all, None));
+    }
 
     #[cfg(feature = "enterprise")]
     #[test]
     fn a_runs_event_follows_the_alerting_decision() {
         use config::meta::alerts::notification_kind::NotificationEvent;
         assert_eq!(
-            super::check_event(true, false, false),
+            openobserve_core::synthetics::check_event(true, false, false),
             NotificationEvent::Resolved
         );
         assert_eq!(
-            super::check_event(false, true, false),
+            openobserve_core::synthetics::check_event(false, true, false),
             NotificationEvent::Informational
         );
         assert_eq!(
-            super::check_event(false, false, true),
+            openobserve_core::synthetics::check_event(false, false, true),
             NotificationEvent::Informational
         );
         assert_eq!(
-            super::check_event(false, false, false),
+            openobserve_core::synthetics::check_event(false, false, false),
             NotificationEvent::Firing
         );
     }
@@ -2651,6 +2915,8 @@ mod tests {
             failing_environments: Vec::new(),
             usage_events,
             suppressed_by: None,
+            coverage: None,
+            gap_notice: None,
             template: None,
         }
     }

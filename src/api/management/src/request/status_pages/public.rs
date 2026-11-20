@@ -1346,6 +1346,8 @@ mod tests {
                 key: "c0".into(),
                 name: "API".into(),
                 status: ComponentStatus::Operational,
+                last_checked_at: Some(1),
+                stale_after_secs: Some(180),
             }],
             notices: vec![PublicNotice {
                 kind: NoticeKind::Incident,

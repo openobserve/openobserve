@@ -55,6 +55,11 @@ const MAX_FIELDS_STORED = Number((import.meta as any).env?.VITE_MAX_FIELDS_STORE
 export const FIELD_VALUES_LOOKBACK_MINUTES = 15;
 const VALUES_LOOKBACK_MS = FIELD_VALUES_LOOKBACK_MINUTES * 60 * 1000;
 
+// Lookups over a page's own time range search its latest day at most, which bounds the scan.
+export const FIELD_VALUES_MAX_RANGE_HOURS = 24;
+const MAX_RANGE_MICROS = FIELD_VALUES_MAX_RANGE_HOURS * 3_600_000_000;
+const MICROS_PER_MINUTE = 60_000_000;
+
 // How many values one request asks for. A dropdown shows a handful; the
 // endpoint charges for the rest.
 const VALUES_REQUEST_SIZE = 10;
@@ -340,6 +345,52 @@ export interface ValueLookupOptions {
   /** What the user typed inside the value's quote, so the resolver can ask past the top values. */
   prefix?: string;
 }
+
+export interface FieldValuesWindow extends FieldValuesTimeRange {
+  /** Set when only the latest FIELD_VALUES_MAX_RANGE_HOURS of the caller's range are searched. */
+  capped?: boolean;
+}
+
+/** A page's date-time state: microseconds, possibly as strings, or a relative period such as `15m` or `calendar:week:-1`. */
+export interface PageTimeRange {
+  type?: string;
+  startTime?: unknown;
+  endTime?: unknown;
+  relativeTimePeriod?: unknown;
+}
+
+/** A time range as the window value lookups search: its latest day at most; null when it is not a range. */
+export const valuesWindowFor = (startTime: unknown, endTime: unknown): FieldValuesWindow | null => {
+  const start = Number(startTime);
+  const end = Number(endTime);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start >= end) return null;
+  const capped = end - start > MAX_RANGE_MICROS;
+  // Whole minutes, so lookups within one minute ask the cached question again.
+  const windowEnd = Math.ceil(end / MICROS_PER_MINUTE) * MICROS_PER_MINUTE;
+  const windowStart = capped
+    ? windowEnd - MAX_RANGE_MICROS
+    : Math.floor(start / MICROS_PER_MINUTE) * MICROS_PER_MINUTE;
+  return { startTime: windowStart, endTime: windowEnd, capped };
+};
+
+/** The window for a page's date-time; `resolveRelative` is the page search's own resolver (getConsumableRelativeTime). */
+export const pageValuesWindow = (
+  datetime: PageTimeRange,
+  resolveRelative: (period: string) => FieldValuesTimeRange | null | undefined,
+): FieldValuesWindow | null => {
+  // The stored times are from the last run, and a calendar period is not "the same length up to now".
+  const range =
+    datetime.type === "relative"
+      ? resolveRelative(String(datetime.relativeTimePeriod ?? ""))
+      : datetime;
+  return range ? valuesWindowFor(range.startTime, range.endTime) : null;
+};
+
+/** The range as picked, not where it lands now: a relative period keeps its name as the clock moves. */
+export const pageValuesSetting = (datetime: PageTimeRange): string =>
+  datetime.type === "relative"
+    ? `relative:${String(datetime.relativeTimePeriod ?? "")}`
+    : `${String(datetime.type ?? "")}:${String(datetime.startTime)}-${String(datetime.endTime)}`;
 
 // The read cache is filled synchronously so the next keystroke is local; IndexedDB persistence can wait.
 const storeAnswer = (

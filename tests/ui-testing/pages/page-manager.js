@@ -40,7 +40,6 @@ import { AlertLibraryPage } from "./alertsPages/alertLibraryPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
 import { AlertAckPage } from "./alertsPages/alertAckPage.js";
-import { AlertFiringPage } from "./alertsPages/alertFiringPage.js";
 import { AlertSaveQueryModePage } from "./alertsPages/alertSaveQueryModePage.js";
 import { AlertNoDestinationPage } from "./alertsPages/alertNoDestinationPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
@@ -64,6 +63,7 @@ import { SyntheticsListPage } from "./syntheticsPages/syntheticsListPage.js";
 import { SyntheticsCreatePage } from "./syntheticsPages/syntheticsCreatePage.js";
 import { SyntheticsResultsPage } from "./syntheticsPages/syntheticsResultsPage.js";
 import { SyntheticsSettingsPage } from "./syntheticsPages/syntheticsSettingsPage.js";
+import { SyntheticsRegressionPage } from "./syntheticsPages/syntheticsRegressionPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -90,14 +90,18 @@ import { MetricsExplorerPage } from "./metricsPages/metricsExplorerPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
+import { ServiceVersionsPage } from "./tracesPages/serviceVersionsPage.js";
 import { ProfilesPage } from "./profilesPages/profilesPage.js";
 import { DatabaseMonitoringPage } from "./dbmPages/databaseMonitoringPage.js";
+import { KubernetesPage } from "./infraPages/kubernetesPage.js";
 import { RumPage } from "./rumPages/rumPage.js";
 import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
 import { RumPerformancePage } from "./rumPages/rumPerformancePage.js";
 import { RumIngestionPage } from "./rumPages/rumIngestionPage.js";
 import { RumSourcemapsPage } from "./rumPages/rumSourcemapsPage.js";
 import { RumProductAnalyticsPage } from "./rumPages/rumProductAnalyticsPage.js";
+import { RumReplayPlayerPage } from "./rumPages/rumReplayPlayerPage.js";
+import { RumSessionTracesTabPage } from "./rumPages/rumSessionTracesTabPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { ReportFoldersPage } from "./reportsPages/reportFoldersPage.js";
 import { ReportsFormValidationPage } from "./reportsPages/reportsFormValidationPage.js";
@@ -143,6 +147,7 @@ import { PasswordPolicyPage } from "./generalPages/passwordPolicyPage.js";
 import { AiToolsetsFormValidationPage } from "./generalPages/aiToolsetsFormValidationPage.js";
 import { AiAssistantCreditsPage } from "./generalPages/aiAssistantCreditsPage.js";
 import { RumFormValidationPage } from "./generalPages/rumFormValidationPage.js";
+import { QuickFilterCardsPage } from "./generalPages/quickFilterCardsPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
@@ -155,11 +160,18 @@ const FleetInstallPage = require("./fleetPages/fleetInstallPage.js");
 const FleetConfigPage = require("./fleetPages/fleetConfigPage.js");
 const FleetRolloutPage = require("./fleetPages/fleetRolloutPage.js");
 const FleetSeed = require("./fleetPages/fleetSeed.js");
+const SecurityPage = require("./securityPages/securityPage.js");
+const SecuritySeed = require("./securityPages/securitySeed.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
 import { LogsToolbarPinsPage } from "./logsPages/logsToolbarPinsPage.js";
 import { SearchHistoryPage } from "./logsPages/searchHistoryPage.js";
+import { LogsSavedViewsMenuPage } from "./logsPages/logsSavedViewsMenuPage.js";
+import { LogsRecentSearchesPage } from "./logsPages/logsRecentSearchesPage.js";
+import { LogsAutoRefreshPage } from "./logsPages/logsAutoRefreshPage.js";
+import { AlertPromqlEditorDialogPage } from "./alertsPages/alertPromqlEditorDialogPage.js";
+import { TraceFlameGraphPage } from "./tracesPages/traceFlameGraphPage.js";
 import UnflattenedPage from "./logsPages/unflattened.js";
 
 // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
@@ -231,12 +243,12 @@ class PageManager {
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
+    this.quickFilterCardsPage = new QuickFilterCardsPage(page);
     this.createAlertFromSourceDialog = new CreateAlertFromSourceDialogPage(page);
     this.alertLibraryPage = new AlertLibraryPage(page);
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
     this.alertAckPage = new AlertAckPage(page);
-    this.alertFiringPage = new AlertFiringPage(page);
     this.alertSaveQueryModePage = new AlertSaveQueryModePage(page);
     this.alertNoDestinationPage = new AlertNoDestinationPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
@@ -266,6 +278,7 @@ class PageManager {
     this.syntheticsCreatePage = new SyntheticsCreatePage(page);
     this.syntheticsResultsPage = new SyntheticsResultsPage(page);
     this.syntheticsSettingsPage = new SyntheticsSettingsPage(page);
+    this.syntheticsRegressionPage = new SyntheticsRegressionPage(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);
@@ -283,10 +296,19 @@ class PageManager {
     this.fleetRolloutPage = new FleetRolloutPage(page);
     this.fleetSeed = new FleetSeed(page);
 
+    // ===== SECURITY PAGE OBJECTS =====
+    this.securityPage = new SecurityPage(page);
+    this.securitySeed = new SecuritySeed(page);
+
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
     this.logsToolbarPinsPage = new LogsToolbarPinsPage(page);
     this.searchHistoryPage = new SearchHistoryPage(page);
+    this.logsSavedViewsMenuPage = new LogsSavedViewsMenuPage(page);
+    this.logsRecentSearchesPage = new LogsRecentSearchesPage(page);
+    this.logsAutoRefreshPage = new LogsAutoRefreshPage(page);
+    this.alertPromqlEditorDialogPage = new AlertPromqlEditorDialogPage(page);
+    this.traceFlameGraphPage = new TraceFlameGraphPage(page);
     this.streamsPage = new StreamsPage(page);
     this.alertTemplatesPage = new AlertTemplatesPage(page);
     this.alertDestinationsPage = new AlertDestinationsPage(page);
@@ -308,8 +330,10 @@ class PageManager {
     this.tracesPage = new TracesPage(page);
     this.serviceGraphPage = new ServiceGraphPage(page);
     this.servicesCatalogPage = new ServicesCatalogPage(page);
+    this.serviceVersionsPage = new ServiceVersionsPage(page);
     this.profilesPage = new ProfilesPage(page);
     this.databaseMonitoringPage = new DatabaseMonitoringPage(page);
+    this.kubernetesPage = new KubernetesPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);
     this.reportFoldersPage = new ReportFoldersPage(page);
@@ -394,6 +418,8 @@ class PageManager {
     this.rumIngestionPage = new RumIngestionPage(page);
     this.rumSourcemapsPage = new RumSourcemapsPage(page);
     this.rumProductAnalyticsPage = new RumProductAnalyticsPage(page);
+    this.rumReplayPlayerPage = new RumReplayPlayerPage(page);
+    this.rumSessionTracesTabPage = new RumSessionTracesTabPage(page);
   }
 }
 

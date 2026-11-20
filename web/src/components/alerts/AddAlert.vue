@@ -170,6 +170,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OPageHeader>
       </template>
 
+      <div v-if="siemDetectionId" class="flex shrink-0 flex-col gap-2 px-3 pt-2">
+        <OBanner
+          dense
+          variant="info"
+          icon="shield-alert-outline"
+          data-test="add-alert-siem-detection"
+        >
+          {{ t("alerts.siemDetection.notice") }}
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm"
+              icon-right="open-in-new"
+              data-test="add-alert-siem-detection-open"
+              @click="openInSecurity"
+              >{{ t("alerts.siemDetection.open") }}</OButton
+            >
+          </template>
+        </OBanner>
+      </div>
       <!-- What the source adapter had to change to turn the user's query into an
            alert — a stripped LIMIT, an absolute range become a rolling window.
            Shown here rather than only in the confirm dialog because most
@@ -464,6 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :config="anomalyConfig"
                   :preview-sql="anomalyPreviewSql"
                   :stored-intervals="anomalyStoredIntervals"
+                  :stored-sql-function="anomalyStoredSqlFunction"
                 />
               </div>
 
@@ -573,7 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("alerts.wouldNotTrigger")
                   }}
                 </span>
-                <span class="text-xs opacity-60">{{ activeEvaluationStatus.reason }}</span>
+                <span class="text-text-secondary text-xs">{{ activeEvaluationStatus.reason }}</span>
               </template>
             </div>
             <div class="min-h-0 flex-1 overflow-hidden">
@@ -746,9 +767,11 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
+import { childOptionsFrom } from "./composite/expression";
 import alertsService from "@/services/alerts";
 import { unreachableLine, viaIncidentLine } from "@/utils/alerts/deliveryTarget";
 import { useOnCallSetup } from "@/composables/useOnCallSetup";
+import { getFoldersListByType } from "@/utils/commons";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 
 export default defineComponent({
@@ -891,24 +914,7 @@ export default defineComponent({
           "all",
         );
         const rows = Array.isArray(response.data?.list) ? response.data.list : [];
-        availableCompositeChildren.value = rows
-          .filter((row: any) => {
-            const id = row.alert_id ?? row.id;
-            return (
-              id && id !== alertForm.formData.value.id && row.alert_type !== "anomaly_detection"
-            );
-          })
-          .map((row: any) => ({
-            alert_id: row.alert_id ?? row.id,
-            name: row.name,
-            alert_type: row.alert_type,
-            folder_id: row.folder_id,
-            folder_name: row.folder_name,
-            enabled: row.enabled,
-            level: row.level,
-            stale: row.stale,
-            accessible: true,
-          }));
+        availableCompositeChildren.value = childOptionsFrom(rows);
       } catch {
         availableCompositeChildren.value = [];
       }
@@ -1033,6 +1039,14 @@ export default defineComponent({
       const found = folders.find((f: any) => f.folderId === alertForm.activeFolderId.value);
       return found?.name ?? "default";
     });
+    // Opened straight from an alert's page, the folder list may not be loaded, which read as "default".
+    onMounted(() => {
+      const folders = alertForm.store.state.organizationData.foldersByType?.alerts ?? [];
+      const id = alertForm.activeFolderId.value;
+      if (id && id !== "default" && !folders.some((f: any) => f.folderId === id)) {
+        void getFoldersListByType(alertForm.store, "alerts").catch(() => undefined);
+      }
+    });
 
     const goBackToAlertsList = () => {
       return alertForm.router.push({
@@ -1142,8 +1156,29 @@ export default defineComponent({
       enabled: () => !alertForm.beingUpdated.value && !alertForm.anomalyEditMode.value,
     });
 
+    // Its SQL is compiled from its Sigma rule, so the server refuses query edits from here.
+    const siemDetectionId = computed(() => {
+      const attrs = props.modelValue?.context_attributes;
+      const marker = Array.isArray(attrs)
+        ? attrs.find((a: { key?: string }) => a?.key === "siem")?.value
+        : attrs?.siem;
+      return props.isUpdated && String(marker) === "true"
+        ? String(props.modelValue?.id ?? props.modelValue?.alert_id ?? "")
+        : "";
+    });
+    const openInSecurity = () =>
+      alertForm.router.push({
+        path: "/security/detections",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          detection: siemDetectionId.value,
+        },
+      });
+
     return {
       raw,
+      siemDetectionId,
+      openInSecurity,
       ...alertForm,
       alertDraft: alertEditorDraft.draft,
       calibrationHandoff,

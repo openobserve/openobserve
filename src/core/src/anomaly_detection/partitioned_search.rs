@@ -22,6 +22,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use config::meta::{
+    anomaly_detection::{LEGACY_VALUE_COLUMNS, TIMESTAMP_COLUMNS},
     histogram_origin::divides_histogram_origin,
     search::{Request, Response, SearchPartitionRequest, SearchPartitionResponse},
     stream::StreamType,
@@ -30,15 +31,13 @@ use o2_enterprise::enterprise::anomaly_detection::types::QueryDataPoint;
 use search::sql::visitor::histogram_interval::validate_and_adjust_histogram_interval;
 use sqlparser::{
     ast::{
-        BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr,
+        BinaryOperator, Expr, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr, Ident,
         ObjectNamePart, Query, Select, SelectFlavor, SelectItem, SetExpr, Statement, TableFactor,
         Value, visit_expressions,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
-
-use super::{LEGACY_VALUE_COLUMNS, TIMESTAMP_COLUMNS};
 
 /// The filter builder's bucket and metric aliases; custom SQL names its own.
 const BUCKET_COLUMN: &str = "time_bucket";
@@ -145,6 +144,12 @@ struct CustomBucket<'a> {
     alias: String,
     expr: &'a Expr,
     literal: &'a str,
+}
+
+/// A GROUP BY the save guard refuses: `GROUP BY ALL` names its bucket, any other its extra key.
+enum GroupByOffender {
+    All(String),
+    Key(String),
 }
 
 /// One supported invocation: its identity, window, proven grid and per-search row budget.
@@ -538,6 +543,157 @@ pub(super) fn log_fallback(org_id: &str, anomaly_id: &str, reason: &str) {
     }
 }
 
+/// The save-time form of [`check_custom_group_by`]: the P1.11 error for a GROUP BY that is
+/// not the bucket alone, in any SELECT that can produce the rows. Other SQL errors are left out.
+pub(super) fn custom_group_by_error(sql: &str, stream_fields: &HashSet<String>) -> Option<String> {
+    let statement = single_statement(sql).ok()?;
+    let Statement::Query(query) = &statement else {
+        return None;
+    };
+    let offender = row_selects(query)
+        .into_iter()
+        .find_map(|select| select_group_by_offender(select, stream_fields))?;
+    Some(match offender {
+        GroupByOffender::All(bucket) => super::GROUP_BY_ALL_ERROR.replace("{bucket}", &bucket),
+        GroupByOffender::Key(expr) => super::SECOND_GROUP_KEY_ERROR.replace("{expr}", &expr),
+    })
+}
+
+/// Each set-operation branch, then each CTE that builds the bucket; a helper CTE is not one.
+fn row_selects(query: &Query) -> Vec<&Select> {
+    let mut selects = Vec::new();
+    set_branches(&query.body, &mut selects);
+    for cte in query.with.iter().flat_map(|with| &with.cte_tables) {
+        selects.extend(
+            row_selects(&cte.query)
+                .into_iter()
+                .filter(|select| save_time_bucket(select).is_some()),
+        );
+    }
+    selects
+}
+
+fn set_branches<'a>(body: &'a SetExpr, selects: &mut Vec<&'a Select>) {
+    match body {
+        SetExpr::Select(select) => selects.push(select),
+        SetExpr::Query(query) => selects.extend(row_selects(query)),
+        SetExpr::SetOperation { left, right, .. } => {
+            set_branches(left, selects);
+            set_branches(right, selects);
+        }
+        _ => {}
+    }
+}
+
+/// A bucket from a FROM subquery is checked there; above it a GROUP BY may hold only one key.
+fn select_group_by_offender(
+    select: &Select,
+    stream_fields: &HashSet<String>,
+) -> Option<GroupByOffender> {
+    let Some(bucket) = save_time_bucket(select) else {
+        if let Some(offender) = single_key_offender(&select.group_by) {
+            return Some(offender);
+        }
+        return derived_select(select)
+            .and_then(|inner| select_group_by_offender(inner, stream_fields));
+    };
+    let (exprs, modifiers) = match &select.group_by {
+        GroupByExpr::All(_) if bucket.alias.is_empty() => {
+            return Some(GroupByOffender::All((bucket.position + 1).to_string()));
+        }
+        GroupByExpr::All(_) => return Some(GroupByOffender::All(bucket.alias.clone())),
+        GroupByExpr::Expressions(exprs, modifiers) => (exprs, modifiers),
+    };
+    if let Some(modifier) = modifiers.first() {
+        return Some(GroupByOffender::Key(modifier.to_string()));
+    }
+    exprs
+        .iter()
+        .find(|expr| !matches!(save_bucket_key(expr, &bucket, stream_fields), Ok(true)))
+        .map(|expr| GroupByOffender::Key(expr.to_string()))
+}
+
+/// The engine folds unquoted names to lower case, so `TIME_BUCKET` names `time_bucket`.
+fn save_bucket_key(
+    expr: &Expr,
+    bucket: &CustomBucket<'_>,
+    stream_fields: &HashSet<String>,
+) -> Result<bool, String> {
+    match expr {
+        Expr::Identifier(ident) if ident.quote_style.is_none() => is_bucket_key(
+            &Expr::Identifier(Ident::new(ident.value.to_ascii_lowercase())),
+            bucket,
+            Some(stream_fields),
+        ),
+        other => is_bucket_key(other, bucket, Some(stream_fields)),
+    }
+}
+
+/// With no bucket in this SELECT, its GROUP BY can be the bucket only when it has one key.
+fn single_key_offender(group_by: &GroupByExpr) -> Option<GroupByOffender> {
+    match group_by {
+        GroupByExpr::All(_) => Some(GroupByOffender::All("<bucket alias>".to_string())),
+        GroupByExpr::Expressions(_, modifiers) if !modifiers.is_empty() => {
+            Some(GroupByOffender::Key(modifiers[0].to_string()))
+        }
+        // One ROLLUP, CUBE or GROUPING SETS item groups by several keys.
+        GroupByExpr::Expressions(exprs, _) => exprs
+            .iter()
+            .find(|expr| {
+                matches!(
+                    unnested(expr),
+                    Expr::Rollup(_) | Expr::Cube(_) | Expr::GroupingSets(_)
+                )
+            })
+            .or_else(|| exprs.get(1))
+            .map(|expr| GroupByOffender::Key(expr.to_string())),
+    }
+}
+
+/// The SELECT of a lone `FROM (<subquery>)`.
+fn derived_select(select: &Select) -> Option<&Select> {
+    let [from] = select.from.as_slice() else {
+        return None;
+    };
+    let TableFactor::Derived { subquery, .. } = &from.relation else {
+        return None;
+    };
+    match subquery.body.as_ref() {
+        SetExpr::Select(inner) => Some(inner),
+        _ => None,
+    }
+}
+
+/// The first histogram column whatever its arguments' spelling, such as `"_timestamp"`;
+/// run time still holds the exact form.
+fn save_time_bucket(select: &Select) -> Option<CustomBucket<'_>> {
+    select
+        .projection
+        .iter()
+        .enumerate()
+        .find_map(|(position, item)| {
+            let (expr, alias) = match item {
+                SelectItem::ExprWithAlias { expr, alias } if alias.quote_style.is_none() => {
+                    (expr, alias.value.to_ascii_lowercase())
+                }
+                SelectItem::ExprWithAlias { expr, alias } => (expr, alias.value.clone()),
+                SelectItem::UnnamedExpr(expr) => (expr, String::new()),
+                _ => return None,
+            };
+            let expr = unnested(expr);
+            let Expr::Function(function) = expr else {
+                return None;
+            };
+            function_name(&function.name).filter(|name| name == "histogram")?;
+            Some(CustomBucket {
+                position,
+                alias,
+                expr,
+                literal: "",
+            })
+        })
+}
+
 fn fallback_log_due(
     logged: &mut FallbackLog,
     key: (String, String),
@@ -879,21 +1035,38 @@ fn check_custom_group_by(
     let ([expr], []) = (exprs.as_slice(), modifiers.as_slice()) else {
         return Err("GROUP BY is not exactly the histogram bucket".to_string());
     };
+    if is_bucket_key(expr, bucket, stream_fields)? {
+        Ok(())
+    } else {
+        Err("GROUP BY is not exactly the histogram bucket".to_string())
+    }
+}
+
+/// Whether one GROUP BY expression names the bucket; an alias that a stream field shadows errs.
+fn is_bucket_key(
+    expr: &Expr,
+    bucket: &CustomBucket<'_>,
+    stream_fields: Option<&HashSet<String>>,
+) -> Result<bool, String> {
     let ordinal = (bucket.position + 1).to_string();
-    let is_bucket = match expr {
+    Ok(match expr {
         Expr::Identifier(ident) if ident.value == bucket.alias => {
             alias_free_of_stream_fields(&bucket.alias, stream_fields)?;
             true
         }
         Expr::Identifier(_) => false,
         Expr::Value(v) => matches!(&v.value, Value::Number(n, false) if *n == ordinal),
-        other => other.to_string() == bucket.expr.to_string(),
-    };
-    if is_bucket {
-        Ok(())
-    } else {
-        Err("GROUP BY is not exactly the histogram bucket".to_string())
+        Expr::Nested(_) => is_bucket_key(unnested(expr), bucket, stream_fields)?,
+        other => other.to_string() == unnested(bucket.expr).to_string(),
+    })
+}
+
+/// `(histogram(...))` is the call itself, so parentheses never hide a key from the guard.
+fn unnested(mut expr: &Expr) -> &Expr {
+    while let Expr::Nested(inner) = expr {
+        expr = inner.as_ref();
     }
+    expr
 }
 
 /// The engine binds a GROUP BY name to a stream field before a projection alias of that name.
@@ -2055,7 +2228,8 @@ mod tests {
         let widest = (i64::from(i32::MAX) - 2) * 1_000_000;
         let run = SupportedRun::new("a1", "t", (0, widest), one_second()).unwrap();
         assert_eq!(run.budget, i32::MAX as usize);
-        let wire = proto::cluster_rpc::SearchQuery::from(run.search_request(SQL).query);
+        let wire =
+            proto::cluster_rpc::SearchQuery::try_from(run.search_request(SQL).query).unwrap();
         assert_eq!(wire.size, i32::MAX);
 
         let err = SupportedRun::new("a1", "t", (0, widest + 1), one_second())

@@ -89,15 +89,6 @@ pub async fn write_results_to_cache(
         && !merged_response.hits.is_empty();
 
     if cfg.common.result_cache_enabled && should_cache_results {
-        // Determine if this is a non-timestamp histogram query for websocket streaming
-        let is_histogram_non_ts_order = c_resp.histogram_interval > 0
-            && !merged_response.order_by_metadata.is_empty()
-            && merged_response
-                .order_by_metadata
-                .first()
-                .map(|(field, _)| field != &c_resp.ts_column)
-                .unwrap_or(false);
-
         cache::write_results(
             &c_resp.trace_id,
             &c_resp.ts_column,
@@ -108,7 +99,6 @@ pub async fn write_results_to_cache(
             c_resp.is_aggregate,
             c_resp.is_descending,
             clear_cache,
-            is_histogram_non_ts_order,
         )
         .await;
         log::info!(
@@ -450,18 +440,6 @@ async fn send_cached_responses(
         cached.cached_response.hits.len(),
         cached.cached_response.result_cache_ratio,
     );
-
-    #[cfg(feature = "vectorscan")]
-    crate::cache::apply_regex_to_response(
-        req,
-        org_id,
-        all_streams,
-        stream_type,
-        &mut cached.cached_response,
-        trace_id,
-        "cached_res",
-    )
-    .await?;
 
     if is_result_array_skip_vrl {
         cached.cached_response.hits = crate::cache::apply_vrl_to_response(

@@ -18,7 +18,7 @@ import { quantizeRange } from "@/composables/query/queryClient";
 import alerts from "./alerts";
 import analytics from "./product_analytics";
 import search from "./search";
-import type { AlertHistoryQuery } from "./alerts";
+import type { AlertHistoryQuery, AlertHistorySummaryQuery } from "./alerts";
 import { alertKeys, oneAckScopes } from "./alerts.querykeys";
 import { oncallKeys } from "./oncall.querykeys";
 import { anomalyKeys } from "./anomaly_detection.querykeys";
@@ -26,7 +26,6 @@ import { downtimeKeys } from "./downtimes.querykeys";
 import { announcementKeys } from "./announcements.querykeys";
 import type {
   AckAlertRequest,
-  AckAlertResponse,
   AckView,
   ExtendAlertMuteRequest,
   MuteAlertRequest,
@@ -36,13 +35,6 @@ import type { FiringPage } from "@/utils/alerts/firingAlerts";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
 type AlertSqlSource = { stream_name: string; stream_type: string; query_condition: unknown };
-
-export interface BulkAckFailure {
-  alertId: string;
-  error: unknown;
-}
-
-const BULK_ACK_CONCURRENCY = 10;
 
 export const alertsListQuery = (
   org: string,
@@ -68,7 +60,11 @@ export const alertsListQuery = (
       const res = await (options
         ? alerts.listByFolderId(...args, undefined, options)
         : alerts.listByFolderId(...args));
-      return res.data?.list ?? [];
+      const list = res.data?.list ?? [];
+      // Rows stay the cached shape every patch edits; each one carries that its live fields are unknown.
+      return res.data?.status_unavailable
+        ? list.map((row: Record<string, unknown>) => ({ ...row, status_unavailable: true }))
+        : list;
     },
     staleTime: LIVE_STALE_TIME,
   });
@@ -129,7 +125,16 @@ export const alertDetailQuery = (
 /** The SQL a builder alert runs; an alert written as SQL already carries it. */
 export const alertSqlQuery = (org: string, id: string, alert: AlertSqlSource | null) =>
   queryOptions({
-    queryKey: [...alertKeys.detail(org, id), "sql"],
+    // The SQL follows the conditions, so a refreshed definition must not reuse an older answer.
+    queryKey: [
+      ...alertKeys.detail(org, id),
+      "sql",
+      {
+        stream_name: alert?.stream_name,
+        stream_type: alert?.stream_type,
+        query_condition: alert?.query_condition,
+      },
+    ],
     queryFn: async (): Promise<string> => {
       const { data } = await alerts.generate_sql(org, {
         stream_name: alert?.stream_name,
@@ -149,13 +154,14 @@ export const alertAcksQuery = (org: string, id: string, folderId?: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
-export const alertHistoryQuery = (org: string, query: AlertHistoryQuery) => {
+/** `exact` keys one firing's own lookup by its exact window, so nearby firings never share it. */
+export const alertHistoryQuery = (org: string, query: AlertHistoryQuery, exact = false) => {
   // Callers anchor start/end to a raw `now`, so without quantizing, every open
   // mints a new key and the cache never hits.
   const start = Number(query.start_time);
   const end = Number(query.end_time);
   const q: AlertHistoryQuery = { ...query };
-  if (Number.isFinite(start) && Number.isFinite(end)) {
+  if (!exact && Number.isFinite(start) && Number.isFinite(end)) {
     const bucketed = quantizeRange(start, end);
     q.start_time = bucketed.start;
     q.end_time = bucketed.end;
@@ -164,6 +170,27 @@ export const alertHistoryQuery = (org: string, query: AlertHistoryQuery) => {
     queryKey: alertKeys.history(org, q),
     // Only the key buckets: a bucketed `end` would hide every evaluation from the current minute.
     queryFn: async () => (await alerts.getHistory(org, query)).data ?? {},
+    staleTime: LIVE_STALE_TIME,
+  });
+};
+
+/** One row per bucket, alert and outcome, as the history summary returns them. */
+export interface AlertHistorySummaryRow {
+  bucket: number;
+  alert_id: string;
+  outcome: string;
+  n: number;
+  silenced?: number;
+}
+
+export const alertHistorySummaryQuery = (org: string, query: AlertHistorySummaryQuery) => {
+  const bucketed = quantizeRange(query.start_time, query.end_time);
+  const q = { ...query, start_time: bucketed.start, end_time: bucketed.end };
+  return queryOptions({
+    queryKey: alertKeys.historySummary(org, q),
+    // Only the key buckets: a bucketed `end` would hide every evaluation from the current minute.
+    queryFn: async (): Promise<AlertHistorySummaryRow[]> =>
+      (await alerts.getHistorySummary(org, query)).data?.rows ?? [],
     staleTime: LIVE_STALE_TIME,
   });
 };
@@ -222,7 +249,7 @@ export const retrainAnomalyMutation = (org: string) =>
     meta: { invalidates: [anomalyKeys.all(org)], silentError: true },
   });
 
-/** Only the Firing read drops: the caller patches the list row, since refetching the whole folder for one cell would take the scroll with it. */
+/** Only the org-wide firing read drops: the caller patches the list row, since refetching the whole folder for one cell would take the scroll with it. */
 export const toggleAlertStateMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { alertId: string; enabled: boolean; folderId?: string }) =>
@@ -248,35 +275,6 @@ export const ackAlertMutation = (org: string) =>
       if (answer?.changed) analytics.track("alert_acknowledged", { count: 1 });
     },
     // Callers render refusals and stale-firing answers themselves.
-    meta: { invalidates: oneAckScopes(org), silentError: true },
-  });
-
-/** One invalidation for the whole batch; a failed request is reported apart from an unchanged alert. */
-export const ackAlertsMutation = (org: string) =>
-  mutationOptions({
-    mutationFn: async (
-      targets: { alertId: string; body: AckAlertRequest; folderId?: string }[],
-    ): Promise<{ acked: number; failures: BulkAckFailure[] }> => {
-      const answers: AckAlertResponse[] = [];
-      const failures: BulkAckFailure[] = [];
-      for (let i = 0; i < targets.length; i += BULK_ACK_CONCURRENCY) {
-        const batch = targets.slice(i, i + BULK_ACK_CONCURRENCY);
-        const results = await Promise.allSettled(
-          batch.map((t) => alerts.ackAlert(org, t.alertId, t.body, t.folderId)),
-        );
-        results.forEach((result, index) => {
-          if (result.status === "fulfilled") answers.push(result.value.data);
-          else failures.push({ alertId: batch[index].alertId, error: result.reason });
-        });
-      }
-      // One write acks the whole incident, so its other rows answer unchanged yet were acked here.
-      const written = new Set(answers.flatMap((a) => (a.changed && a.incident?.id) || []));
-      const acked = answers.filter((a) => a.changed || written.has(a.incident?.id ?? "")).length;
-      return { acked, failures };
-    },
-    onSuccess: ({ acked }) => {
-      if (acked > 0) analytics.track("alert_acknowledged", { count: acked });
-    },
     meta: { invalidates: oneAckScopes(org), silentError: true },
   });
 
@@ -322,8 +320,12 @@ export const extendAlertMuteMutation = (org: string) =>
 
 export const cancelAlertMuteMutation = (org: string) =>
   mutationOptions({
-    mutationFn: (vars: { alertId: string; downtimeId: string; folderId?: string }) =>
-      alerts.cancelAlertMute(org, vars.alertId, vars.downtimeId, vars.folderId),
+    mutationFn: (vars: {
+      alertId: string;
+      downtimeId: string;
+      folderId?: string;
+      version?: number;
+    }) => alerts.cancelAlertMute(org, vars.alertId, vars.downtimeId, vars.folderId, vars.version),
     meta: {
       invalidates: [alertKeys.all(org), downtimeKeys.all(org), announcementKeys.all(org)],
       silentError: true,

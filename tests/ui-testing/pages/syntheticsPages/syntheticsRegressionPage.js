@@ -22,6 +22,7 @@ const MONITORS_TABLE = 'synthetic-monitoring-monitors-table';
 const RUNS_TABLE = 'monitor-runs-runs-table';
 const LOCATIONS_TABLE = 'synthetics-locations-list-table';
 const RESULTS_STREAM = 'synthetics_results';
+const BROWSER_CAPTURE = { screenshot: 'on-fail', trace: 'on-fail', video: 'off' };
 
 export class SyntheticsRegressionPage {
   constructor(page) {
@@ -31,6 +32,7 @@ export class SyntheticsRegressionPage {
     this.createdLocationIds = [];
     this.createdDestinationNames = [];
     this.createdTemplateNames = [];
+    this.createdDowntimeIds = [];
   }
 
   _initializeLocators() {
@@ -46,6 +48,11 @@ export class SyntheticsRegressionPage {
       runDetailBackButton: '[data-test="synthetics-run-detail-back-btn"]',
       runDetailTitle: '[data-test="synthetics-run-detail-title"]',
       runDetailInfoSkeleton: '[data-test="synthetics-run-detail-info-skeleton"]',
+      runDetailStatusBadge: '[data-test="synthetics-run-detail-status-badge"]',
+      runDetailStepsTab: '[data-test="synthetics-run-detail-tab-steps"]',
+      runDetailSkippedCount: '[data-test="synthetics-run-detail-skipped-count"]',
+      stepDetailsCell: '[data-test="o2-table-cell-details"]',
+      stepDot: '[data-test="o2-table-cell-step"] span',
       protocolRunTitle: '[data-test="synthetics-protocol-run-title"]',
       protocolRunBackButton: '[data-test="synthetics-protocol-run-back-btn"]',
       locationsAddButton: '[data-test="synthetics-locations-add-btn"]',
@@ -64,6 +71,13 @@ export class SyntheticsRegressionPage {
       sortTrigger: '[data-test="o2-table-th-sort-trigger"]',
       sortIcon: '[data-test^="o2-table-sort-icon-"]',
       durationCell: '[data-test="o2-table-cell-duration"]',
+      checkAlertsCard: '[data-test="synthetics-check-configure-alerts"]',
+      destinationsTrigger: '[data-test="alert-destinations-select-trigger"]',
+      destinationsPopover: '[data-test="alert-destinations-select-popover"]',
+      destinationsOption: '[data-test="alert-destinations-select-option"]',
+      templateOverrideRow: '[data-test="synthetics-check-alerts-template"]',
+      templateOverrideTrigger: '[data-test="template-override-select-trigger"]',
+      saveCheckButton: '[data-test="synthetics-create-save-btn"]',
     };
   }
 
@@ -142,31 +156,59 @@ export class SyntheticsRegressionPage {
   }
 
   // Disabled so the scheduler never claims it; the seeded runs stand in for real probes.
-  async createCheck(name, type, locationId, { destinations = [] } = {}) {
+  async createCheck(name, type, locationId, { destinations = [], config, target, template = null } = {}) {
     const configs = {
       http: { method: 'GET', timeout_ms: 10000, follow_redirects: true, headers: [], assertions: [{ field: 'status_code', operator: 'eq', value: 200 }] },
       tcp: { port: 443, timeout_ms: 10000 },
-      browser: {
-        steps: [{ id: 'step-navigate', action: 'navigate', url: 'https://example.com' }],
-        browser_devices: [{ browser: 'chromium', device: 'desktop' }],
-        timeout_ms: 30000,
-        capture: { screenshot: 'on-fail', trace: 'on-fail', video: 'off' },
-      },
+      browser: this.journeyConfig([{ id: 'step-navigate', action: 'navigate', url: 'https://example.com' }]),
     };
+    const checkTarget = target ?? (type === 'tcp' ? 'example.com' : 'https://example.com');
     const { status, body } = await this.apiRequest('post', `/api/${this.org()}/synthetics?folder=default`, {
       name,
       type,
-      target: type === 'tcp' ? 'example.com' : 'https://example.com',
+      target: checkTarget,
       enabled: false,
       retries: 0,
       locations: [locationId],
       frequency: { type: 'minutes', interval: 5, cron: '' },
-      config: configs[type],
+      config: config ?? configs[type],
       destinations,
+      template,
     });
     if (body?.id) this.createdCheckIds.push(body.id);
     expect([200, 201], `check ${name} must be created: ${JSON.stringify(body)}`).toContain(status);
-    return { id: body.id, name, type };
+    return { id: body.id, name, type, target: checkTarget };
+  }
+
+  journeyConfig(steps) {
+    return { steps, browser_devices: [{ browser: 'chromium', device: 'desktop' }], timeout_ms: 30000, capture: BROWSER_CAPTURE };
+  }
+
+  clickStep(id, name, selector, extra = {}) {
+    return {
+      id,
+      action: 'click',
+      name,
+      locator: { candidates: [{ kind: 'css', value: selector, origin: 'recorded' }, { kind: 'text', value: `${name} text`, origin: 'recorded' }] },
+      ...extra,
+    };
+  }
+
+  titleAssertStep(id, name) {
+    return { id, action: 'assert', name, assertion: { kind: 'page_title', expected: 'Page two' } };
+  }
+
+  async fetchCheck(checkId) {
+    const { status, body } = await this.apiRequest('get', `/api/${this.org()}/synthetics/${checkId}?folder=default`);
+    expect(status, `check ${checkId} must load: ${JSON.stringify(body)}`).toBe(200);
+    return body;
+  }
+
+  async fetchCheckSteps(checkId) {
+    const { status, body } = await this.apiRequest('get', `/api/${this.org()}/synthetics/${checkId}?folder=default`);
+    expect(status, `check ${checkId} must load: ${JSON.stringify(body)}`).toBe(200);
+    expect(body?.config?.steps?.length, 'the check must have stored steps').toBeGreaterThan(0);
+    return body.config.steps;
   }
 
   async deleteCheck(id) {
@@ -197,12 +239,64 @@ export class SyntheticsRegressionPage {
     return destinationName;
   }
 
+  /** A template a check can name as its own override; returns its name. */
+  async createOverrideTemplate(tag) {
+    const name = `synreg_${tag}_override`;
+    const tpl = await this.apiRequest('post', `/api/${this.org()}/alerts/templates`, {
+      name, body: '{"text":"synthetics override"}', type: 'http', title: '', applies_to: ['synthetics'],
+    });
+    expect(tpl.status, `override template must be created: ${JSON.stringify(tpl.body)}`).toBe(200);
+    this.createdTemplateNames.push(name);
+    return name;
+  }
+
   forgetDestination(name) {
     this.createdDestinationNames = this.createdDestinationNames.filter((created) => created !== name);
   }
 
+  /** One active downtime over the given checks, so ending it would free more than one row. */
+  async createDowntimeOverChecks(name, checkIds) {
+    const startsAt = (Date.now() - 60000) * 1000;
+    const { status, body } = await this.apiRequest('post', `/api/v2/${this.org()}/downtimes?folder=default`, {
+      folder_id: 'default',
+      name,
+      targets: [{ module: 'synthetics', folders: { kind: 'all' }, ids: checkIds }],
+      schedule: { repeat: 'none', starts_at: startsAt, ends_at: startsAt + 3660 * 1e6, timezone: 'UTC', duration_secs: 3660, weekdays: [] },
+      show_banner: false,
+    });
+    expect([200, 201], `downtime ${name} must be created: ${JSON.stringify(body)}`).toContain(status);
+    this.createdDowntimeIds.push(body.id);
+    return body.id;
+  }
+
+  // A fresh org lists no downtime folder until its first downtime creates "default", and a quick mute needs one listed.
+  async ensureDowntimeFolder() {
+    const listed = await this.apiRequest('get', `/api/v2/${this.org()}/folders/downtimes`);
+    if ((listed.body?.list ?? []).some((f) => f.folderId === 'default')) return;
+    const startsAt = (Date.now() + 7200000) * 1000;
+    const { status, body } = await this.apiRequest('post', `/api/v2/${this.org()}/downtimes?folder=default`, {
+      folder_id: 'default',
+      name: `synreg_folder_seed_${this.newRunTag()}`,
+      targets: [{ module: 'synthetics', folders: { kind: 'all' } }],
+      schedule: { repeat: 'none', starts_at: startsAt, ends_at: startsAt + 3600 * 1e6, timezone: 'UTC', duration_secs: 3600, weekdays: [] },
+      show_banner: false,
+    });
+    expect([200, 201], `the folder seed downtime must be created: ${JSON.stringify(body)}`).toContain(status);
+    await this.apiRequest('delete', `/api/v2/${this.org()}/downtimes/${body.id}?folder=default`);
+  }
+
+  async downtimeStatus(id) {
+    const { status, body } = await this.apiRequest('get', `/api/v2/${this.org()}/downtimes/${id}?folder=default`);
+    expect(status, `downtime ${id} must load: ${JSON.stringify(body)}`).toBe(200);
+    return body.status;
+  }
+
   // Checks go first: a location or destination still referenced by a check refuses deletion.
   async deleteCreated() {
+    for (const id of this.createdDowntimeIds.splice(0)) {
+      await this.apiRequest('post', `/api/v2/${this.org()}/downtimes/${id}/cancel?folder=default`);
+      await this.apiRequest('delete', `/api/v2/${this.org()}/downtimes/${id}?folder=default`);
+    }
     for (const id of this.createdCheckIds.splice(0)) await this.deleteCheck(id);
     for (const id of this.createdLocationIds.splice(0)) await this.deleteLocation(id);
     for (const name of this.createdDestinationNames.splice(0)) {
@@ -256,13 +350,80 @@ export class SyntheticsRegressionPage {
           : { status_code: passed ? 200 : 503, assertions_passed: passed }),
       };
     });
+    await this.ingestResultRows(check, rows);
+    return rows.map((r) => ({ runId: r.run_id, executionId: r.execution_id }));
+  }
+
+  stepResult(stepId, status, durationMs, error) {
+    return { step_id: stepId, status, duration_ms: durationMs, ...(error ? { error } : {}) };
+  }
+
+  startLoad(url) {
+    return { step_id: '_start', status: 'passed', duration_ms: 300, url };
+  }
+
+  /** Stores one browser run with the fields the probe posts, so run detail reads it through real ingest and search. */
+  async seedBrowserRunRecord(check, locationId, { status, lastAttemptSteps, startLoad, failureDetail, error = '', durationMs = 4000 }) {
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const tsMicros = (Date.now() - 30000) * 1000;
+    const row = {
+      _timestamp: tsMicros,
+      execution_id: `exec-${suffix}`,
+      run_id: `run-${suffix}`,
+      job_id: `job-${suffix}`,
+      synthetics_id: check.id,
+      synthetics_name: check.name,
+      org_id: this.org(),
+      location: locationId,
+      location_label: locationId,
+      scheduled_ts: tsMicros - 6_000_000,
+      started_ts: tsMicros - 5_000_000,
+      completed_ts: tsMicros,
+      trigger_type: 'schedule',
+      type: 'browser',
+      target: check.target,
+      runtime: 'lambda',
+      region: 'us-east-1',
+      schema_version: 1,
+      engine: 'chromium',
+      device: 'desktop',
+      status,
+      response_time_ms: durationMs,
+      init_ms: 300,
+      total_attempt_ms: durationMs,
+      error,
+      attempts: 1,
+      recorded_steps: await this.fetchCheckSteps(check.id),
+      last_attempt_steps: lastAttemptSteps,
+      start_load: startLoad,
+      retry_history: [{
+        attempt: 0,
+        steps: lastAttemptSteps.map(({ step_id, status: stepStatus, duration_ms }) => ({ step_id, status: stepStatus, duration_ms })),
+        start_load: startLoad,
+        status,
+        response_time_ms: durationMs,
+        init_ms: 300,
+        ...(failureDetail ? { failure_detail: failureDetail } : {}),
+        artifacts: { screenshot_refs: [] },
+      }],
+      ...(failureDetail ? { failure_detail: failureDetail } : {}),
+      artifacts_withheld: [],
+      evidence_truncated: false,
+      evidence_by_step: [],
+      probe_id: 'e2e-probe',
+      probe_name: 'e2e',
+    };
+    await this.ingestResultRows(check, [row]);
+    return { runId: row.run_id, executionId: row.execution_id };
+  }
+
+  async ingestResultRows(check, rows) {
     const res = await ingestCustomData(this.page, RESULTS_STREAM, rows);
     const failed = res.data?.status?.find((s) => Number(s.failed) > 0);
     expect(res.status === 200 && !failed, `seeding ${RESULTS_STREAM} must succeed: ${JSON.stringify(res.data)}`).toBe(true);
     const searchable = await waitForFieldValueSearchable(this.page, RESULTS_STREAM, 'synthetics_id', check.id, 60000);
     expect(searchable, `seeded runs for ${check.id} must become searchable`).toBe(true);
     testLogger.info('Synthetics runs seeded', { checkId: check.id, count: rows.length });
-    return rows.map((r) => ({ runId: r.run_id, executionId: r.execution_id }));
   }
 
   // One click per settled direction, so a slow re-render cannot step past the target in the asc -> desc -> none cycle.
@@ -354,6 +515,49 @@ export class SyntheticsRegressionPage {
     await expect(this.table(MONITORS_TABLE).locator(this.locators.nameCell).filter({ hasText: name })).toBeVisible({ timeout: 30000 });
   }
 
+  monitorRow(name) {
+    return this.table(MONITORS_TABLE).locator(this.locators.tableRow)
+      .filter({ has: this.page.locator(this.locators.nameCell).filter({ hasText: name }) });
+  }
+
+  async openMonitorRowMenu(name) {
+    await this.monitorRow(name).locator(`[data-test="${MONITORS_TABLE}-more-btn"]`).click();
+  }
+
+  async quickMuteMonitorRow(name, preset = '1h') {
+    await this.openMonitorRowMenu(name);
+    const [response] = await Promise.all([
+      this.page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname.endsWith('/downtimes')),
+      this.page.locator(`[data-test="${MONITORS_TABLE}-mute-${preset}"]`).click(),
+    ]);
+    expect([200, 201], 'the quick mute must be created').toContain(response.status());
+    return (await response.json()).id;
+  }
+
+  async expectMonitorRowMuted(check, muted) {
+    await expect(this.page.locator(`[data-test="${MONITORS_TABLE}-${check.id}-muted"]`)).toHaveCount(muted ? 1 : 0, { timeout: 30000 });
+  }
+
+  async endMuteFromMonitorRow(check) {
+    await this.openMonitorRowMenu(check.name);
+    const endMute = this.page.locator(`[data-test="${MONITORS_TABLE}-${check.id}-end-mute"]`);
+    await expect(endMute).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(`[data-test="${MONITORS_TABLE}-${check.id}-muted-by"]`)).toHaveCount(0);
+    const [response] = await Promise.all([
+      this.page.waitForResponse((r) => r.request().method() === 'POST' && /\/downtimes\/[^/]+\/cancel$/.test(new URL(r.url()).pathname)),
+      endMute.click(),
+    ]);
+    expect(response.status(), 'the cancel must succeed').toBe(200);
+    return new URL(response.url()).pathname.split('/').slice(-2)[0];
+  }
+
+  async expectOnlyMutedByLink(check, downtimeName) {
+    await this.openMonitorRowMenu(check.name);
+    await expect(this.page.locator(`[data-test="${MONITORS_TABLE}-${check.id}-muted-by"]`)).toContainText(downtimeName, { timeout: 10000 });
+    await expect(this.page.locator(`[data-test="${MONITORS_TABLE}-${check.id}-end-mute"]`)).toHaveCount(0);
+    await this.page.keyboard.press('Escape');
+  }
+
   async expectMonitorRowAbsent(name) {
     await expect(this.table(MONITORS_TABLE).locator(this.locators.nameCell).filter({ hasText: name })).toHaveCount(0);
   }
@@ -423,6 +627,40 @@ export class SyntheticsRegressionPage {
     await expect(this.page).toHaveURL(new RegExp(`/synthetics/edit/${checkId}`), { timeout: 30000 });
   }
 
+  async gotoEditCheck(check) {
+    await this.page.goto(`/web/synthetics/edit/${check.id}?org_identifier=${this.org()}&folder=default`);
+    await expect(this.page.locator(this.locators.checkAlertsCard)).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectTemplateOverride(name) {
+    await expect(this.page.locator(this.locators.templateOverrideTrigger)).toHaveAttribute('data-test-selected-value', name, { timeout: 30000 });
+  }
+
+  async expectTemplateOverrideHidden() {
+    await expect(this.page.locator(this.locators.templateOverrideRow)).toHaveCount(0);
+  }
+
+  async untickAlertDestination(name) {
+    const card = this.page.locator(this.locators.checkAlertsCard);
+    const popover = this.page.locator(this.locators.destinationsPopover);
+    await card.locator(this.locators.destinationsTrigger).click();
+    await popover.waitFor({ state: 'visible', timeout: 10000 });
+    await popover.locator(`${this.locators.destinationsOption}[data-test-value="dest:${name}"]`).click();
+    await this.page.keyboard.press('Escape');
+    await popover.waitFor({ state: 'hidden', timeout: 10000 });
+    await expect(card.locator(this.locators.destinationsTrigger)).toHaveAttribute('data-test-selected-value', '');
+  }
+
+  async saveEditedCheck(checkId) {
+    const [request] = await Promise.all([
+      this.page.waitForRequest((r) => r.method() === 'PUT' && new URL(r.url()).pathname.endsWith(`/synthetics/${checkId}`)),
+      this.page.locator(this.locators.saveCheckButton).click(),
+    ]);
+    const response = await request.response();
+    expect(response?.status(), 'the check update must succeed').toBe(200);
+    return request.postDataJSON();
+  }
+
   async runDurationsMs() {
     const texts = await this.table(RUNS_TABLE).locator(this.locators.tableRow).locator(this.locators.durationCell).allTextContents();
     const toMs = { us: 0.001, ms: 1, s: 1000, m: 60000 };
@@ -480,6 +718,106 @@ export class SyntheticsRegressionPage {
     await this.gotoRunDetail(check, run, { period: '6h' });
     await this.clickRunDetailBack(type);
     await this.expectResultsReopenedOnRun(check.id, run, '6h');
+  }
+
+  runStepRow(index) { return this.page.locator(`[data-test="o2-table-row-${index}"]`); }
+  runStepPanel(index) { return this.page.locator(`[data-test="o2-table-expanded-row-${index}"]`); }
+  runStepBadge(index) { return this.page.locator(`[data-test="synthetics-journey-step-badge-${index}"]`); }
+  runStepErrorCard(rowId) { return this.page.locator(`[data-test="synthetics-run-detail-step-error-card-${rowId}"]`); }
+
+  // By visible label: the bug rendered these rows with the wrong value, so a missing test id would prove less.
+  runStepFieldLabel(index, label) { return this.runStepPanel(index).locator(`dt:text-is("${label}")`); }
+  runStepField(index, label) { return this.runStepPanel(index).locator(`dt:text-is("${label}") + dd`); }
+
+  async openRunSteps(check, run, stepCount) {
+    await this.gotoRunDetail(check, run);
+    await this.page.locator(this.locators.runDetailStepsTab).click();
+    await expect(this.page.locator(this.locators.tableRow), 'one row per executed step').toHaveCount(stepCount, { timeout: 30000 });
+  }
+
+  async expandRunStep(index) {
+    await this.runStepRow(index).locator(this.locators.stepDetailsCell).click();
+    await expect(this.runStepPanel(index)).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectRunStatus(text) {
+    await expect(this.page.locator(this.locators.runDetailStatusBadge)).toHaveText(text, { timeout: 30000 });
+  }
+
+  async expectSkippedStepCount(count) {
+    await expect(this.page.locator(this.locators.runDetailSkippedCount)).toHaveText(`${count} skipped`);
+  }
+
+  async expectRunStepBadge(index, text) {
+    await expect(this.runStepBadge(index)).toHaveText(text);
+  }
+
+  async expectNoRunStepBadge(index) {
+    await expect(this.runStepBadge(index)).toHaveCount(0);
+  }
+
+  async runStepDotColor(index) {
+    const dot = this.runStepRow(index).locator(this.locators.stepDot);
+    await expect(dot).toBeVisible();
+    return dot.evaluate((el) => getComputedStyle(el).backgroundColor);
+  }
+
+  async expectRunStepDotsDiffer(index, otherIndex) {
+    expect(await this.runStepDotColor(index), `step ${index} and step ${otherIndex} must not share a status colour`)
+      .not.toBe(await this.runStepDotColor(otherIndex));
+  }
+
+  async expectRunStepField(index, label, value) {
+    await expect(this.runStepField(index, label), `${label} of step ${index}`).toHaveText(value);
+  }
+
+  async expectNoRunStepField(index, label) {
+    await expect(this.runStepFieldLabel(index, label), `step ${index} must not list ${label}`).toHaveCount(0);
+  }
+
+  async expectRunStepPanelOmits(index, text) {
+    await expect(this.runStepPanel(index), `step ${index} must not mention ${text}`).not.toContainText(text);
+  }
+
+  async expectRunStepError(rowId, text) {
+    await expect(this.runStepErrorCard(rowId)).toContainText(text, { timeout: 15000 });
+  }
+
+  // The first step opens the start address, which is the value the bug showed as URL on every later step.
+  async openFailedRunOnSecondPage(tag, { startUrl, pageTwoUrl, error }) {
+    const locationId = await this.createProbeLocation(tag);
+    const check = await this.createCheck(`synreg${tag}_failed_journey`, 'browser', locationId, {
+      target: startUrl,
+      config: this.journeyConfig([
+        { id: 'j6-open', action: 'navigate', name: 'Open start page', url: startUrl },
+        this.clickStep('j6-next', 'Next link', '#next'),
+        { id: 'j6-goto', action: 'navigate', name: 'Open page two', url: pageTwoUrl },
+        this.titleAssertStep('j6-title', 'Title is Page two'),
+        this.clickStep('j6-fail', 'Never there', '#never-there'),
+      ]),
+    });
+    const run = await this.seedBrowserRunRecord(check, locationId, {
+      status: 'failed',
+      error,
+      lastAttemptSteps: [
+        this.stepResult('j6-open', 'passed', 300),
+        this.stepResult('j6-next', 'passed', 120),
+        this.stepResult('j6-goto', 'passed', 400),
+        this.stepResult('j6-title', 'passed', 30),
+        this.stepResult('j6-fail', 'failed', 3000, error),
+      ],
+      failureDetail: {
+        step_id: 'j6-fail',
+        step_name: 'Never there',
+        step_index: 5,
+        error,
+        candidates_tried: [{ kind: 'css', value: '#never-there', origin: 'recorded', outcome: 'not_found' }],
+        settle_signals: [],
+      },
+    });
+    await this.openRunSteps(check, run, 5);
+    await this.expectRunStatus('Failed');
+    await this.expectRunStepError(5, error);
   }
 
   async gotoLocations(metaOrg) {

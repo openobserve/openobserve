@@ -266,6 +266,7 @@ export interface AutoRunDeps {
   resetLoading?: () => void;
   clearResults?: () => void;
   rearmRefresh?: () => void;
+  onResetScope?: () => void;
   readPanelConfigSignature?: (surface: "visualize" | "build") => string | null;
   getFreeTextFlags?: () => FreeTextGateFlags;
   t?: (key: string) => I18nText;
@@ -575,6 +576,7 @@ export function createAutoRun(deps: AutoRunDeps) {
   const pending: Record<"grid" | "patterns", PendingEntry | null> = { grid: null, patterns: null };
   let deferredRefresh = false;
   let missedTick = false;
+  let userCancels = 0;
   let invalidation: string | null = null;
   let hitsTraceId: string | null = null;
   const pausePredicates = new Set<() => boolean>();
@@ -710,7 +712,10 @@ export function createAutoRun(deps: AutoRunDeps) {
       clearAllPending();
       deferredRefresh = false;
     }
-    if (cause === "user") missedTick = false;
+    if (cause === "user") {
+      missedTick = false;
+      userCancels += 1;
+    }
     deps.resetLoading?.();
   }
 
@@ -1421,6 +1426,10 @@ export function createAutoRun(deps: AutoRunDeps) {
     setOutcome("logs", "invalidated");
   }
 
+  function clearSearchAroundInvalidation(): void {
+    if (invalidation === "search-around") invalidation = null;
+  }
+
   function resetScope(cause: "saved-view" | "url" | "reapply" | "job" | "org"): void {
     meta.lastRunAttempt = null;
     cancelGeneration(null, { cause: cause === "org" ? "org" : "reset" });
@@ -1436,6 +1445,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     missedTick = false;
     invalidation = null;
     if (cause === "saved-view" || cause === "url" || cause === "reapply") meta.editorDirty = false;
+    deps.onResetScope?.();
   }
 
   function registerRefreshPause(predicate: () => boolean): () => void {
@@ -1527,6 +1537,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     recordPanelComplete,
     recordPanelFailure,
     invalidateExecuted,
+    clearSearchAroundInvalidation,
     resetScope,
     registerRefreshPause,
     onRefreshTick,
@@ -1535,6 +1546,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     tick,
     checkRefreshResume,
     onRefreshIntervalChanged,
+    userCancelCount: () => userCancels,
     hasMissedTick: () => missedTick,
     hasDeferredRefresh: () => deferredRefresh,
     hasPendingRequest: () => !!pending.grid || !!pending.patterns,

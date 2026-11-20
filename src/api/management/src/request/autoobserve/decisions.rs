@@ -34,12 +34,12 @@ use infra::db::get_orm_client_ro;
 use o2_enterprise::enterprise::{
     alert_calibration_service::{applied::SuggestedChange, dismissals::Target},
     autoobserve::{
-        api::Deps,
+        api::{Deps, Page},
         contract::EntityRef,
         decisions::{
-            self, Access, BODY_INVALID, CAN_ACT_SHOWN, Caller, Ctx, DecideBody, DecisionError,
-            Family, ListQuery, Owners, OwnersScope, PreviewQuery, QUERY_INVALID, RefusalReason,
-            Source, SubjectInfo, UndoRequest,
+            self, Access, BODY_INVALID, CAN_ACT_SHOWN, Caller, Change, Ctx, DecideBody,
+            DecisionError, DecisionResult, DecisionView, Family, ListQuery, Owners, OwnersScope,
+            PreviewQuery, QUERY_INVALID, RefusalReason, Source, SubjectInfo, UndoRequest,
         },
         names::{dims, kinds},
     },
@@ -91,10 +91,11 @@ impl Access for LiveAccess<'_> {
     }
 
     /// Calibration's org-wide rule; the service adds DEC-3's folder rule through `may_edit_alert`.
+    /// An issue's verdict quiets its subject, so it needs what a mark on that subject needs.
     async fn may_decide(&self, family: Family, subject: &EntityRef) -> bool {
         match family {
             Family::AlertFinding => may_dismiss(self.org_id, self.user_id).await,
-            Family::Suggestion => {
+            Family::Suggestion | Family::Issue => {
                 let id = subject
                     .key_dims
                     .get(dims::ENTITY_ID)
@@ -107,7 +108,7 @@ impl Access for LiveAccess<'_> {
     async fn reads_notes(&self, family: Family) -> bool {
         match family {
             Family::AlertFinding => may_dismiss(self.org_id, self.user_id).await,
-            Family::Suggestion => {
+            Family::Suggestion | Family::Issue => {
                 !rbac_enforced().await
                     || org_wide_allows(self.org_id, self.user_id, "alerts", "PUT").await
             }
@@ -231,10 +232,10 @@ pub async fn preview_decision(
     tag = "AutoObserve",
     operation_id = "AutoObserveDecide",
     summary = "Dismiss, accept or apply",
-    description = "Dismisses or accepts a suggestion, or dismisses an alert calibration finding or applies its stored change to the alert as the caller, for the whole org. An apply writes only while the alert still holds each old value; `applied_via: editor` records a change the alert editor already saved. The body is one decision or `items` (1 to 50), each answered with its own status. The same `request_id` answers the stored outcome as `unchanged` and writes nothing; a stale `expected_revision` is a 409. Planned work takes `until`, at most 7 days ahead; other reasons take `duration_days` (30, 90 or 180) or, for a finding, `until_reopened`. A refusal is a 403 naming the folder and up to 3 people who can act.",
+    description = "Dismisses or accepts a suggestion, or dismisses an alert calibration finding or applies its stored change to the alert as the caller, for the whole org. A patch write requires the offer_fingerprint from preview and writes only while that offer and the alert's old values still match; `applied_via: editor` records a change the alert editor already saved. The body is one decision or `items` (1 to 50), each answered with its own status. The same `request_id` answers the stored outcome as `unchanged` and writes nothing; a stale `expected_revision` is a 409. Planned work takes `until`, at most 7 days ahead; other reasons take `duration_days` (30, 90 or 180) or, for a finding, `until_reopened`. A refusal is a 403 naming the folder and up to 3 people who can act.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
-    request_body(content = inline(Object), description = "family, id, action, reason, note, until, duration_days or until_reopened, expected_revision, request_id, applied_via; or items of those", content_type = "application/json"),
+    request_body(content = inline(Object), description = "family, id, action, reason, note, until, duration_days or until_reopened, expected_revision, offer_fingerprint, request_id, applied_via; or items of those", content_type = "application/json"),
     responses(
         (status = 200, description = "`change` is created, updated or unchanged; a batch answers `results`", content_type = "application/json", body = Object),
         (status = 400, description = "An unreadable body, or an invalid reason, note or term", content_type = "application/json", body = Object),
@@ -274,8 +275,20 @@ pub async fn decide(
     let ctx = context(&deps, &access, source);
     let now = now_micros();
     match body {
-        DecideBody::One(request) => respond(decisions::decide_one(&ctx, &request, now).await),
-        DecideBody::Batch(batch) => respond(decisions::decide_batch(&ctx, &batch.items, now).await),
+        DecideBody::One(request) => {
+            let done = decisions::decide_one(&ctx, &request, now).await;
+            note_on_incidents(&org_id, done.as_ref().ok());
+            respond(done)
+        }
+        DecideBody::Batch(batch) => {
+            let done = decisions::decide_batch(&ctx, &batch.items, now).await;
+            let results = done
+                .as_ref()
+                .map(|b| b.results.as_slice())
+                .unwrap_or_default();
+            note_on_incidents(&org_id, results.iter().filter_map(|i| i.result.as_ref()));
+            respond(done)
+        }
     }
 }
 
@@ -330,7 +343,9 @@ pub async fn undo_decision(
         Err(e) => return failed(&e.into()),
     };
     let ctx = context(&deps, &access, source);
-    respond(decisions::undo(&ctx, &decision_id, &request, now_micros()).await)
+    let done = decisions::undo(&ctx, &decision_id, &request, now_micros()).await;
+    note_on_incidents(&org_id, done.as_ref().ok());
+    respond(done)
 }
 
 #[utoipa::path(
@@ -340,7 +355,7 @@ pub async fn undo_decision(
     tag = "AutoObserve",
     operation_id = "AutoObserveListDecisions",
     summary = "List decisions in force and applied changes",
-    description = "The dismissals and accepts in force on items the caller can read, and every change applied to an alert the caller can read, newest first: who, why, until when, and the revision an undo needs. An applied change has action `apply`, state `applied` or `undone`, `via` (`apply` or `editor`) and `change` with the alert's id and title and each field from old to new; undone changes stay listed. `total` counts only readable decisions. A note is returned only to its author and to callers who may decide; others see `has_note`.",
+    description = "The dismissals and accepts in force on items the caller can read, and every change applied to an alert the caller can read, newest first: who, why, until when, and the revision an undo needs. An applied change has action `apply`, state `applied` or `undone`, `via` (`apply` or `editor`) and `change` with the alert's id and title, each field from old to new, and `evidence`: the finding's confidence and evidence as they read when the change was applied, absent for a change applied before they were kept; undone changes stay listed. `total` counts only readable decisions. A note is returned only to its author and to callers who may decide; others see `has_note`.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -395,29 +410,35 @@ pub(crate) fn decision_source(delegated: Option<&DelegatedCaller>, headers: &Hea
     }
 }
 
-/// Every active suggestion decision `user_id` can read, for the Slack insights feed's S5 updates.
+/// One page of the active `family` decisions `user_id` can read, with their total.
 pub(super) async fn feed_decisions(
     org_id: &str,
     user_id: &str,
+    family: Family,
+    page: Page,
     now: i64,
-) -> Result<Vec<o2_enterprise::enterprise::autoobserve::decisions::DecisionView>, DecisionError> {
-    use o2_enterprise::enterprise::autoobserve::decisions::{Family, ListQuery};
+) -> Result<(Vec<DecisionView>, usize), DecisionError> {
     let access = LiveAccess { org_id, user_id };
     let deps = Deps::live().map_err(DecisionError::from)?;
     let ctx = context(&deps, &access, Source::Api);
-    let mut out = Vec::new();
-    loop {
-        let query = ListQuery {
-            state: Some("active".into()),
-            family: Some(Family::Suggestion),
-            limit: None,
-            offset: Some(out.len()),
-        };
-        let page = decisions::list(&ctx, &query, now).await?;
-        let got = page.decisions.len();
-        out.extend(page.decisions);
-        if got == 0 || out.len() >= page.total {
-            return Ok(out);
+    let query = ListQuery {
+        state: Some("active".into()),
+        family: Some(family),
+        limit: Some(page.limit),
+        offset: Some(page.offset),
+    };
+    let list = decisions::list(&ctx, &query, now).await?;
+    Ok((list.decisions, list.total))
+}
+
+/// Notes each issue decision the call changed on its incident, off the response path.
+fn note_on_incidents<'a>(org_id: &str, results: impl IntoIterator<Item = &'a DecisionResult>) {
+    use openobserve_core::autoobserve::incidents::note_issue_decision;
+
+    for r in results {
+        if r.decision.family == Family::Issue && r.change != Change::Unchanged {
+            let (org, view) = (org_id.to_string(), r.decision.clone());
+            tokio::spawn(note_issue_decision(org, r.change, view));
         }
     }
 }
@@ -756,6 +777,8 @@ mod tests {
             expected_revision: None,
             request_id: Some("3f2c9a1e-dialog".into()),
             applied_via: None,
+            offer_fingerprint: None,
+            step_id: None,
         };
         let report = DecisionRequest {
             family: Family::AlertFinding,
@@ -791,6 +814,7 @@ mod tests {
             current: None,
             locked: None,
             change: None,
+            offer_fingerprint: None,
             summary: None,
         };
         let mut reported = view(
@@ -1132,7 +1156,7 @@ mod tests {
                     }
                 }
                 self.writes.fetch_add(1, SeqCst);
-                Patched::Written
+                Patched::Written { updated_at: None }
             }
         }
 
@@ -1271,6 +1295,7 @@ mod tests {
                 alert_id: alert_id.to_string(),
                 patch: vec![FieldPatch::PendingPeriodSecs { from: 0, to: 120 }],
                 acknowledged: None,
+                evidence: None,
             }
         }
 
@@ -1296,7 +1321,7 @@ mod tests {
 
         async fn apply(ctx: &Ctx<'_>) -> Result<DecisionResult, DecisionError> {
             let ask: DecisionRequest = serde_json::from_value(
-                json!({"family": "alert_finding", "id": FINDING, "action": "apply"}),
+                json!({"family": "alert_finding", "id": FINDING, "action": "apply", "offer_fingerprint": preview(ctx).await.offer_fingerprint}),
             )
             .unwrap();
             decisions::decide_one(ctx, &ask, now_micros()).await

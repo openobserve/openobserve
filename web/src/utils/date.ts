@@ -70,18 +70,14 @@ export const generateDurationLabel = (seconds: number) => {
   for (let i = units.length - 1; i >= 0; i--) {
     const unit = units[i];
 
-    if (duration >= unit.value) {
-      const unitDuration = Math.floor(duration / unit.value);
-      const remainingDuration = duration % unit.value;
-
-      if (remainingDuration === 0) {
-        label = `${unitDuration}${unit.label}`;
-        break;
-      } else {
-        label = `${duration}s`;
-        break;
-      }
+    if (duration >= unit.value && duration % unit.value === 0) {
+      label = `${duration / unit.value}${unit.label}`;
+      break;
     }
+  }
+
+  if (label === "" && duration >= 1) {
+    label = `${duration}s`;
   }
 
   if (label === "") {

@@ -206,10 +206,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :enable-column-resize="true"
             :get-row-status-color="getCorrelatedRowStatusColor"
             expansion="multiple"
+            :expand-on-row-click="expandOnRowClick"
             :expanded-ids="correlatedExpandedIds"
             class="overflow-y-auto!"
             data-test="logs-tenstack-table"
-            @row-click="handleRowClick"
             @close-column="handleCloseColumn"
             @column-order-change="handleColumnOrderChange"
             @update:expandedIds="onCorrelatedExpandedIdsChange"
@@ -291,18 +291,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </p>
           </div>
 
-          <!-- Empty State -->
-          <div
-            v-else-if="isEmpty"
-            class="flex h-full flex-col items-center justify-center py-20"
-            data-test="empty-state"
-          >
-            <p class="mb-2 text-base font-medium opacity-90">
-              {{ t("correlation.logs.noData") }}
-            </p>
-            <p class="mb-4 text-sm opacity-70">
-              {{ t("correlation.logs.noDataDetails") }}
-            </p>
+          <div v-else-if="noLogStreams" class="min-h-80">
+            <OEmptyState
+              size="hero"
+              illustration="logs"
+              :title="t('correlation.noLogsFound')"
+              :description="t('traces.noLogStreamForCorrelation')"
+              data-test="no-log-streams-state"
+            />
+          </div>
+
+          <div v-else-if="isEmpty" class="min-h-80">
+            <OEmptyState
+              size="hero"
+              illustration="logs"
+              :title="t('correlation.logs.noData')"
+              :description="t('correlation.logs.noDataDetails')"
+              data-test="empty-state"
+            />
           </div>
         </div>
 
@@ -362,10 +368,12 @@ import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { correlatedByKeys, correlatedByLabel, useLocationDimensions } from "./correlationHeader";
 import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { canvasFont } from "@/utils/fonts";
@@ -398,6 +406,7 @@ const {
   hasResults,
   isLoading,
   hasError,
+  noLogStreams,
   isEmpty,
   fetchCorrelatedLogs,
   goToPage,
@@ -995,7 +1004,8 @@ const handleApplyFilters = () => {
   updateFilters(pendingFilters.value);
 };
 
-const handleRowClick = () => {};
+// A click that ends a text selection must not toggle the row.
+const expandOnRowClick = (): boolean => !window.getSelection()?.toString();
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
@@ -1356,18 +1366,26 @@ const subjectSemanticIds = computed<Set<string>>(() => {
     : new Set();
 });
 
+const locationIds = useLocationDimensions(
+  computed(() => store.state.selectedOrganization.identifier),
+);
 const unifiedChips = computed<DimensionChip[]>(() =>
-  Object.keys(chipDimensionSource.value)
-    .filter((key) => !subjectSemanticIds.value.has(key))
-    .map(
-      (key) =>
-        ({
-          key,
-          label: raw(dimensionDisplayLabel(key)),
-          value: chipDimensionSource.value[key],
-          kind: "context" as DimensionChip["kind"],
-        }) as DimensionChip,
-    ),
+  correlatedByKeys(
+    Object.keys(chipDimensionSource.value).filter((key) => !subjectSemanticIds.value.has(key)),
+    props.logStreams,
+    props.semanticGroups ?? [],
+    locationIds.value,
+  ).map(
+    (key) =>
+      ({
+        key,
+        label: raw(
+          correlatedByLabel(key, props.semanticGroups ?? []) ?? dimensionDisplayLabel(key),
+        ),
+        value: chipDimensionSource.value[key],
+        kind: "context" as DimensionChip["kind"],
+      }) as DimensionChip,
+  ),
 );
 </script>
 

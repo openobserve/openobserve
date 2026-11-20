@@ -122,11 +122,13 @@ describe("SampleDataHeaderChip", () => {
     sampleDataFlow = true,
     version: string | null = "v0.0.0",
     realMenu = false,
+    freeTrialExpiry: string | number = "",
   ) => {
     store = createStore({
       state: {
         selectedOrganization: { identifier: ORG },
         kioskMode: false,
+        organizationData: { organizationSettings: { free_trial_expiry: freeTrialExpiry } },
         zoConfig: {
           // null leaves the version absent, as before /config has loaded
           ...(version === null ? {} : { version }),
@@ -237,6 +239,30 @@ describe("SampleDataHeaderChip", () => {
         el.textContent?.trim(),
       );
       expect(labels).toEqual(["Start the Guided Tour", "Delete Sample Data"]);
+    });
+  });
+
+  describe("an org whose free trial has ended", () => {
+    const EXPIRED = (Date.now() - 5 * 24 * 60 * 60 * 1000) * 1000;
+    const FUTURE = (Date.now() + 5 * 24 * 60 * 60 * 1000) * 1000;
+
+    it("offers no Try Sample Data", () => {
+      Object.assign(data, { sample: false, own: false });
+      mountChip(true, "v0.0.0", false, EXPIRED);
+      expect(wrapper.find('[data-test="header-sample-data-try"]').exists()).toBe(false);
+    });
+
+    it("hides the Sample Data menu", () => {
+      mountChip(true, "v0.0.0", false, EXPIRED);
+      expect(items()).toEqual([]);
+    });
+
+    it("keeps both for an org whose trial runs on", () => {
+      mountChip(true, "v0.0.0", false, FUTURE);
+      expect(items().length).toBeGreaterThan(0);
+      Object.assign(data, { sample: false, own: false });
+      mountChip(true, "v0.0.0", false, FUTURE);
+      expect(wrapper.find('[data-test="header-sample-data-try"]').exists()).toBe(true);
     });
   });
 

@@ -32,6 +32,7 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { useLicenseLock, useLicenseLocks } from "@/composables/useFeatureLock";
 import { streamTypeFeature } from "@/utils/featureGate";
 import { buildChipDimensionsFromFilters } from "@/services/service_streams";
+import { correlationDisplayProps } from "@/types/serviceRef";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { extractSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
@@ -503,7 +504,15 @@ async function openCorrelationFromLog(logData: any) {
       timestamp: logData._timestamp || Date.now() * 1000,
       fields: logData,
     };
-    const result = await findRelatedTelemetry(context, "logs", 5, props.stream);
+    const timeWindowMicros = 5 * 60 * 1000000;
+    const startTimeMicros = context.timestamp - timeWindowMicros;
+    let endTimeMicros = context.timestamp + timeWindowMicros;
+    const currentTimeMicros = Date.now() * 1000;
+    if (endTimeMicros > currentTimeMicros) endTimeMicros = currentTimeMicros;
+    const result = await findRelatedTelemetry(context, "logs", 5, props.stream, {
+      start: startTimeMicros,
+      end: endTimeMicros,
+    });
     if (!result) {
       correlationError.value = correlationNoMatch.value
         ? t("logs.searchResult.noMatchingService")
@@ -514,16 +523,12 @@ async function openCorrelationFromLog(logData: any) {
       correlationError.value = t("logs.searchResult.unableToRetrieveCorrelation");
       return;
     }
-    const timeWindowMicros = 5 * 60 * 1000000;
-    const startTimeMicros = context.timestamp - timeWindowMicros;
-    let endTimeMicros = context.timestamp + timeWindowMicros;
-    const currentTimeMicros = Date.now() * 1000;
-    if (endTimeMicros > currentTimeMicros) endTimeMicros = currentTimeMicros;
     const logFilters = result.correlationData.related_streams.logs?.[0]?.filters || {};
     const actualMatchedDimensions =
       Object.keys(logFilters).length > 0 ? logFilters : result.correlationData.matched_dimensions;
     correlationDashboardProps.value = {
       serviceName: result.correlationData.service_name,
+      ...correlationDisplayProps(result.correlationData),
       matchedDimensions: actualMatchedDimensions,
       additionalDimensions: {},
       matchedSetId: result.correlationData.matched_set_id,

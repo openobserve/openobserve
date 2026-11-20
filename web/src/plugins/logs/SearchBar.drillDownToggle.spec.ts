@@ -51,7 +51,9 @@ describe("SearchBar — Drill down mode toggle", () => {
       vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
         this: HTMLElement,
       ) {
-        const isToolbarBar = this.classList.contains("border-b-card-glass-border");
+        const isToolbarBar =
+          this.classList.contains("border-border-default") &&
+          this.classList.contains("overflow-hidden");
         return { width: isToolbarBar ? toolbarWidth : 0 } as DOMRect;
       });
     }
@@ -123,6 +125,46 @@ describe("SearchBar — Drill down mode toggle", () => {
 
     expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("drilldown");
     expect(router.currentRoute.value.query.logs_visualize_toggle).toBe("drilldown");
+  });
+
+  it.each(["traces", "metrics"])(
+    "disables Patterns on a %s stream, which it cannot mine",
+    async (streamType) => {
+      (config as any).isEnterprise = "true";
+      wrapper = mountSearchBar();
+      wrapper.vm.searchObj.data.stream.streamType = streamType;
+      await flushPromises();
+
+      const option = wrapper.vm.toggleViewOptions.find(
+        (o: { value: string }) => o.value === "patterns",
+      );
+      expect(option.disabled).toBe(true);
+    },
+  );
+
+  it("leaves the Patterns view when the stream switches to a traces stream", async () => {
+    (config as any).isEnterprise = "true";
+    wrapper = mountSearchBar();
+    wrapper.vm.searchObj.data.stream.streamType = "logs";
+    wrapper.vm.searchObj.meta.logsVisualizeToggle = "patterns";
+    await flushPromises();
+
+    wrapper.vm.searchObj.data.stream.streamType = "traces";
+    await flushPromises();
+
+    expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("logs");
+  });
+
+  it("keeps Patterns enabled on a logs stream", async () => {
+    (config as any).isEnterprise = "true";
+    wrapper = mountSearchBar();
+    wrapper.vm.searchObj.data.stream.streamType = "logs";
+    await flushPromises();
+
+    const option = wrapper.vm.toggleViewOptions.find(
+      (o: { value: string }) => o.value === "patterns",
+    );
+    expect(option.disabled).toBe(false);
   });
 
   it("extracts patterns when switching from drill down to patterns", async () => {

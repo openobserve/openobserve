@@ -287,6 +287,8 @@ export interface ValueContext {
   operator: ValueOperator;
   /** Earlier elements of the IN list being typed; empty for every other operator. */
   chosen: string[];
+  /** From the field to the caret, e.g. `level = 'err`. */
+  span: string;
 }
 
 const BARE_OR_QUOTED = String.raw`(?:'([^']*)|([\w.\-]*))`;
@@ -331,6 +333,7 @@ export const parseValueContext = (textUntilCursor: string): ValueContext | null 
       operator,
       chosen:
         operator === "in" ? chosenInValues(match[0].slice(match[0].indexOf("(") + 1, listEnd)) : [],
+      span: match[0],
     };
   }
   return null;
@@ -384,7 +387,14 @@ export interface ValueEntryOptions {
   /** Without it the value itself decides whether to quote. */
   fieldType?: string;
   pattern?: boolean;
+  /** The text typed so far; a value that only contains it is ranked after those starting with it. */
+  typed?: string;
 }
+
+const typedWord = (typed: string): string => typed.replace(/^%+|%+$/g, "").toLowerCase();
+
+const startsWithWord = (text: string, word: string): boolean =>
+  text.startsWith(word) || text.split("_").some((segment) => segment.startsWith(word));
 
 const looksBare = (value: string): boolean =>
   (value !== "" && !Number.isNaN(Number(value))) || value === "true" || value === "false";
@@ -395,17 +405,22 @@ const likeLiteral = (value: string): string =>
 
 export const buildValueEntries = (
   values: string[],
-  { hasOpenQuote, closingQuoteAhead = false, range, fieldType, pattern = false }: ValueEntryOptions,
+  {
+    hasOpenQuote,
+    closingQuoteAhead = false,
+    range,
+    fieldType,
+    pattern = false,
+    typed = "",
+  }: ValueEntryOptions,
 ): LooseEntry[] => {
   const kind = columnKind(fieldType);
-  return values.map((value, index) => {
+  const entries = values.map((value) => {
     const entry: LooseEntry = {
       name: value,
       label: value,
       kind: "Value",
       insertText: value,
-      // An escape, not a raw NUL: a literal one makes the file binary to git.
-      sortText: `\u0000${String(index).padStart(6, "0")}`,
       filterText: value,
     };
 
@@ -432,6 +447,20 @@ export const buildValueEntries = (
     }
     return entry;
   });
+  const filtered = !!typedWord(typed);
+  const kept = filtered
+    ? prefixMatchesFirst(
+        entries.filter((entry) => matchesTyped(entry, typed)),
+        typed,
+      )
+    : entries;
+  return kept.map((entry, index) => ({
+    ...entry,
+    // An escape, not a raw NUL: a literal one makes the file binary to git.
+    sortText: `\u0000${String(index).padStart(6, "0")}`,
+    // Monaco's fuzzy filter would rescore what we already matched, so every kept row scores alike and sortText decides.
+    ...(filtered ? { filterText: typed } : {}),
+  }));
 };
 
 export type ValueStatus = "loading" | "empty" | "failed" | "cap";
@@ -726,6 +755,26 @@ export const parseLogicalLeadContext = (
   };
 };
 
+// CASE words are left out, so a CASE inside WHERE still counts as WHERE.
+const AGGREGATE_SCOPES = new Set([
+  ...PREDICATE_CLAUSES,
+  "SELECT",
+  "FROM",
+  "BY",
+  "LIMIT",
+  "OFFSET",
+  "UNION",
+]);
+
+/** Aggregate and window functions are never valid in a WHERE or ON condition, or in the Logs filter. */
+export const aggregatesAllowed = (textBefore: string, filterMode = false): boolean => {
+  for (let frame: Frame | null = scanFrames(textBefore); frame; frame = frame.parent) {
+    const scope = [...frame.tokens].reverse().find((token) => AGGREGATE_SCOPES.has(token));
+    if (scope) return scope !== "WHERE" && scope !== "ON";
+  }
+  return !filterMode;
+};
+
 interface OperatorSpec {
   label: string;
   insert: string;
@@ -897,6 +946,129 @@ export const buildOperatorLane = ({
   });
 };
 
+const TERM_SEARCH_FUNCTIONS = ["match_all"];
+const FIELD_SEARCH_FUNCTIONS = ["str_match", "str_match_ignore_case", "re_match", "re_not_match"];
+// The server rejects these on a stream with no full-text search field; the raw ones are rewritten to match_all first.
+const FULL_TEXT_FUNCTIONS = new Set([
+  "match_all",
+  "match_all_raw",
+  "match_all_raw_ignore_case",
+  "fuzzy_match_all",
+  "match_all_hash",
+]);
+
+/** The catalog without the full-text search functions, for streams that have no field they can search. */
+export const withoutFullTextFunctions = <T>(entries: T[]): T[] =>
+  entries.filter((raw) => {
+    const entry = raw as LooseEntry | string | null;
+    if (!entry || typeof entry === "string" || entry.kind !== "Function") return true;
+    return !FULL_TEXT_FUNCTIONS.has(String(entryName(entry)).toLowerCase());
+  });
+
+const sqlQuoted = (value: string): string => `'${value.replace(/'/g, "''")}'`;
+const snippetLiteral = (text: string): string => text.replace(/[\\$}]/g, "\\$&");
+
+// Only functions the catalog offers, so a server without one never gets a row for it.
+const catalogFunctions = (catalog: LooseEntry[], names: string[]): LooseEntry[] =>
+  names.flatMap((name) => {
+    const entry = catalog.find((e) => e?.kind === "Function" && entryName(e) === name);
+    return entry ? [entry] : [];
+  });
+
+const filledRow = (entry: LooseEntry, labelDetail: string): LooseEntry => ({
+  name: entryName(entry),
+  label: entryName(entry),
+  kind: "Function",
+  labelDetail,
+  documentation: entry.documentation,
+  filled: true,
+});
+
+/** Search functions with a bare typed word as their value; the field-taking ones open the field menu at the field. */
+export const buildFilledWordEntries = (word: string, catalog: LooseEntry[]): LooseEntry[] => {
+  if (!word) return [];
+  const literal = sqlQuoted(word);
+  // A prefix filter word ties with the catalog's prefix matches, which then sort first; an exact one would be boosted above them.
+  const shared = {
+    filterText: `${word.toLowerCase()}\u0001`,
+    sortText: `${SORT_LANE.clause}\uffff`,
+  };
+  const term = catalogFunctions(catalog, TERM_SEARCH_FUNCTIONS).map((entry) => ({
+    ...filledRow(entry, `(${literal})`),
+    ...shared,
+    insertText: `${entryName(entry)}(${literal})`,
+  }));
+  const withField = catalogFunctions(catalog, FIELD_SEARCH_FUNCTIONS).map((entry) => ({
+    ...filledRow(entry, `(…, ${literal})`),
+    ...shared,
+    insertText: `${entryName(entry)}(\${1}, ${snippetLiteral(literal)})`,
+    insertTextRules: "InsertAsSnippet" as const,
+    command: { id: "editor.action.triggerSuggest", title: "" },
+  }));
+  return [...term, ...withField].map((entry, index) => ({
+    ...entry,
+    sortText: `${entry.sortText}${index}`,
+  }));
+};
+
+export interface FilledValueOptions {
+  context: ValueContext;
+  /** Everything before the caret, to tell a predicate from any other `x = 'v'`. */
+  textUntilCaret: string;
+  filterMode: boolean;
+  fieldType?: string;
+  lineNumber: number;
+  column: number;
+  closingQuoteAhead: boolean;
+  catalog: LooseEntry[];
+}
+
+/** `level = 'err` rewritten as a string-search call on the same field and value. */
+export const buildFilledValueEntries = ({
+  context,
+  textUntilCaret,
+  filterMode,
+  fieldType,
+  lineNumber,
+  column,
+  closingQuoteAhead,
+  catalog,
+}: FilledValueOptions): LooseEntry[] => {
+  const { field, typed, hasOpenQuote, operator, span } = context;
+  const kind = columnKind(fieldType);
+  if (!typed || operator !== "compare" || (kind !== "text" && kind !== "unknown")) return [];
+  // Only `=`: the same value under `!=` or `>` asks for something these functions do not do.
+  if (!/^\w+\s*=/.test(span) || span.includes("\n")) return [];
+  const textBeforeSpan = textUntilCaret.slice(0, textUntilCaret.length - span.length);
+  // A qualified `t.level` would keep its `t.` in front of the call.
+  if (textBeforeSpan.endsWith(".") || !isPredicatePosition(textBeforeSpan, filterMode)) return [];
+  const literal = sqlQuoted(typed);
+  const typedStart = column - typed.length;
+  // The opening quote stays where it is, so the filter word is only what was typed after it.
+  const valueStart = typedStart - (hasOpenQuote ? 1 : 0);
+  return catalogFunctions(catalog, FIELD_SEARCH_FUNCTIONS).map((entry) => ({
+    ...filledRow(entry, `(${field}, ${literal})`),
+    insertText: `${hasOpenQuote ? literal.slice(1) : literal})`,
+    range: {
+      startLineNumber: lineNumber,
+      endLineNumber: lineNumber,
+      startColumn: typedStart,
+      endColumn: column + (hasOpenQuote && closingQuoteAhead ? 1 : 0),
+    },
+    additionalTextEdits: [
+      {
+        range: {
+          startLineNumber: lineNumber,
+          endLineNumber: lineNumber,
+          startColumn: column - span.length,
+          endColumn: valueStart,
+        },
+        text: `${entryName(entry)}(${field}, `,
+      },
+    ],
+  }));
+};
+
 /** Catalog names in lead order; GROUP BY and friends only where the full query can end the WHERE here. */
 export const logicalLeadNames = (context: LogicalLeadContext, filterMode: boolean): string[] => {
   const lead = ["and", "or"];
@@ -930,11 +1102,12 @@ const CLOSE_PAREN_ENTRY: LooseEntry = {
   filterText: ")",
 };
 
-/** Moves the lead to the top by sortText alone; every other entry stays in the menu. */
+/** Moves the lead to the top by sortText; every other entry stays in the menu. */
 export const buildLogicalLead = (
   entries: unknown[],
   leadNames: string[],
   chainCommand?: SqlCompletionEntry["command"],
+  typed = "",
 ): unknown[] => {
   const nameOf = (raw: unknown) =>
     raw && typeof raw === "object" ? String(entryName(raw as LooseEntry)).toLowerCase() : "";
@@ -942,7 +1115,13 @@ export const buildLogicalLead = (
     const found = entries.find((raw) => nameOf(raw) === name) as LooseEntry | undefined;
     const base = found ?? (name === ")" ? CLOSE_PAREN_ENTRY : undefined);
     if (!base) return [];
-    const sorted: LooseEntry = { ...base, sortText: `${SORT_LANE.operator}${index}` };
+    // Monaco scores before it sorts, and `an` matches `any_value` better than `AND`; this ties them.
+    const prefixed = typed !== "" && name.startsWith(typed.toLowerCase());
+    const sorted: LooseEntry = {
+      ...base,
+      sortText: `${SORT_LANE.operator}${index}`,
+      ...(prefixed ? { filterText: `${typed}${name.slice(typed.length)}\u0001` } : {}),
+    };
     const chains = chainCommand && CHAINING_KEYWORDS.has(name);
     return [chains ? chainedKeyword(sorted, chainCommand) : sorted];
   });
@@ -970,7 +1149,6 @@ const isStatusEntry = (entry: LooseEntry): boolean => String(entryName(entry)).s
 const matchText = (entry: LooseEntry): string =>
   String(entryName(entry)).replace(/^'|'$/g, "").toLowerCase();
 
-/** Case-insensitive prefix of the name or of any `_` segment; LIKE wildcards around the typed text are ignored. */
 // CAST is catalogued as a keyword but is a call, and an aggregate is never a comparison operand.
 const VALUE_KEYWORD_CALLS = new Set(["cast"]);
 
@@ -981,11 +1159,20 @@ export const isValueFunction = (entry: LooseEntry | null | undefined): boolean =
   return entry.kind === "Keyword" && VALUE_KEYWORD_CALLS.has(entryName(entry).toLowerCase());
 };
 
+/** Case-insensitive prefix of the name or of any `_` segment, or for a value anywhere inside as the server's keyword match is; LIKE wildcards are ignored. */
 export const matchesTyped = (entry: LooseEntry, typed: string): boolean => {
-  const word = typed.replace(/^%+|%+$/g, "").toLowerCase();
-  if (!word) return true;
+  const word = typedWord(typed);
+  if (!word || entry.filled) return true;
   const text = matchText(entry);
-  return text.startsWith(word) || text.split("_").some((segment) => segment.startsWith(word));
+  return startsWithWord(text, word) || (entry.kind === "Value" && text.includes(word));
+};
+
+// Stable: prefix matches keep their order ahead of values that only contain the typed text.
+export const prefixMatchesFirst = (entries: LooseEntry[], typed: string): LooseEntry[] => {
+  const word = typedWord(typed);
+  if (!word) return entries;
+  const prefixed = (entry: LooseEntry) => startsWithWord(matchText(entry), word);
+  return [...entries.filter(prefixed), ...entries.filter((entry) => !prefixed(entry))];
 };
 
 const groupHeader = (
@@ -1030,8 +1217,9 @@ const isCapEntry = (entry: LooseEntry): boolean => entryName(entry) === "\u0000c
 export const groupEntries = (groups: SuggestGroup[], options: GroupOptions): LooseEntry[] =>
   groups.flatMap((group, index) => {
     const status = group.entries.filter(isStatusEntry);
-    const members = group.entries.filter(
-      (entry) => !isStatusEntry(entry) && matchesTyped(entry, options.typed),
+    const members = prefixMatchesFirst(
+      group.entries.filter((entry) => !isStatusEntry(entry) && matchesTyped(entry, options.typed)),
+      options.typed,
     );
     // The cap counts the values shown, so it goes with them; a loading or empty row stands alone.
     const statusShown = members.length ? status : status.filter((entry) => !isCapEntry(entry));

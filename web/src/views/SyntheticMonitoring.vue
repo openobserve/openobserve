@@ -111,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="synthetics"
           data-test="synthetic-monitoring-folder-list"
           @update:activeFolderId="updateActiveFolderId"
+          @folders-loaded="clearFolderFailure"
         />
       </div>
 
@@ -131,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- RIGHT MAIN: filter bar + table -->
       <div
         v-if="activeSection === 'checks'"
-        class="flex min-w-0 flex-1 flex-col overflow-hidden max-md:min-h-0"
+        class="@container/synthetics-toolbar flex min-w-0 flex-1 flex-col overflow-hidden max-md:min-h-0"
       >
         <!-- ── CHECKS TABLE ── -->
         <MonitorTable
@@ -148,6 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="filteredMonitors"
           :loading="loading"
           :forbidden="forbidden"
+          :error="foldersError"
           :timezone="store.state.timezone"
           :empty-message="emptyMessage"
           :selected-ids="selectedMonitorIds"
@@ -160,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :bulk-action-loading="bulkActionLoading"
           :has-filters="hasActiveFilters"
           @row-click="openDetail"
+          @retry="refreshMonitors"
           @edit="openEdit"
           @toggle-enabled="toggleEnabled"
           @duplicate="duplicateMonitor"
@@ -180,28 +183,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           @empty-action="onEmptyAction"
         >
-          <!-- Health strip: the status facet, attention-first (failing → degrading
-               → passing → unknown), with Total last. It replaces the status dropdown
-               that used to hide these same counts inside its option labels. -->
-          <template #subheader>
-            <div data-test="synthetic-monitoring-summary">
-              <OStatStrip
-                :items="summaryStats"
-                :loading="loading"
-                selectable
-                :selected-key="statusFilter === 'all' ? null : statusFilter"
-                default-key="all"
-                @select="onStatSelect"
-              />
-            </div>
-          </template>
-
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>
-            <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
-            <div
-              class="@container/synthetics-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
-            >
+            <!-- Children of the toolbar row, so the chips can wrap below them; label queries read the table column. -->
+            <div class="contents">
               <!-- Type tabs -->
               <OToggleGroup
                 mobile-dropdown
@@ -217,13 +202,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :icon-left="tab.icon"
                   :title="lgUp ? undefined : tab.label"
                 >
-                  <span class="@max-[38rem]/synthetics-toolbar:hidden">{{ tab.label }}</span>
+                  <span class="@max-[48rem]/synthetics-toolbar:hidden">{{ tab.label }}</span>
                 </OToggleGroupItem>
               </OToggleGroup>
 
               <!-- Search -->
               <!-- flex-1 is basis-0, so the min-w floor is what wraps the input instead of shrinking it to nothing. -->
-              <div class="min-w-0 flex-1 md:max-lg:min-w-60">
+              <div class="min-w-0 flex-1 md:min-w-48 md:max-lg:min-w-60">
                 <OInput
                   v-model="search"
                   :placeholder="
@@ -268,8 +253,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OInput>
               </div>
 
-              <!-- Status is faceted by the summary strip below, not by a dropdown -
-                   the counts belong on screen, not hidden inside option labels. -->
+              <!-- Status is faceted by these chips, not a dropdown: the counts belong on screen. -->
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :row="false"
+                multiple
+                :selected-keys="statusFilters"
+                default-key="all"
+                class="max-md:order-last"
+                data-test="synthetic-monitoring-summary"
+                @update:selected-keys="statusFilters = $event"
+              />
             </div>
           </template>
 
@@ -280,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :last-run-at="lastUpdatedAt"
               :loading="fetching"
               data-test="synthetic-monitoring-refresh-btn"
-              @click="loadMonitors(undefined, true)"
+              @click="refreshMonitors"
             />
           </template>
         </MonitorTable>
@@ -535,6 +531,7 @@ import statusPagesService, {
 import SyntheticsVariablesTab from "@/components/synthetics/variables/SyntheticsVariablesTab.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CheckTypePicker from "@/components/synthetics/CheckTypePicker.vue";
+import { selectSyntheticsFolder } from "@/utils/synthetics/selectFolder";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
@@ -557,6 +554,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import syntheticsService from "@/services/synthetics";
 import analytics from "@/services/product_analytics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
+import { statusFromRunClass } from "@/utils/synthetics/runClass";
 import {
   syntheticsCreateRoute,
   syntheticsEditRoute,
@@ -572,6 +570,7 @@ import { useListViewState } from "@/composables/useListViewState";
 import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
+import { matchesAnyKey, readFilterKeys } from "@/utils/filterKeys";
 
 const router = useRouter();
 const route = useRoute();
@@ -602,6 +601,10 @@ interface ApiMonitor {
   locations: string[];
   enabled: boolean;
   status: string;
+  /** Class of the newest finalized run (0 unknown … 5 misconfigured); absent on older servers. */
+  last_run_class?: number;
+  /** When the current class began, in microseconds. */
+  last_run_class_at?: number;
   created_at: number;
   updated_at: number;
   last_triggered_at: number;
@@ -672,7 +675,9 @@ function mapMonitor(m: ApiMonitor) {
     url: m.target,
     type: m.type.toUpperCase(),
     interval: formatFrequency(m.frequency),
-    status: normalizeMonitorStatus(m.status),
+    status: statusFromRunClass(m.last_run_class, normalizeMonitorStatus(m.status)),
+    // When the current run class began: drives "Not measured since 10:36 UTC".
+    statusSince: m.last_run_class_at || null,
     responseTime: m.last_response_ms,
     locations: m.locations,
     lastCheck: m.last_check_at !== null ? formatTimeAgo(m.last_check_at) : "—",
@@ -755,12 +760,24 @@ const monitorsList = useQuery(() =>
   }),
 );
 
-const loading = monitorsList.isPending;
+const foldersLoaded = ref(false);
+const foldersFailed = ref(false);
+// Without a listable folder no check request runs, so the folder list's own 403 is the denial.
+const foldersForbidden = ref<ForbiddenState>(false);
+const loading = computed(
+  () => !foldersLoaded.value || (!!activeFolderId.value && monitorsList.isPending.value),
+);
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = monitorsList.error.value;
-  return forbiddenState(e) || e?.status === 403;
+  return foldersForbidden.value || forbiddenState(e) || e?.status === 403;
 });
+// With no folder to read, no checks request runs, so an empty table would hide the failure.
+const foldersError = computed(() =>
+  foldersFailed.value && !foldersForbidden.value && !folderResolved.value
+    ? t("synthetics.checkDetails.foldersUnavailable")
+    : null,
+);
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
 const fetching = monitorsList.isFetching;
@@ -788,6 +805,7 @@ async function loadMonitors(folderId?: string, force = false) {
       : searchAcrossFolders.value
         ? undefined
         : activeFolderId.value;
+  if (!foldersLoaded.value || (!targetFolder && !searchAcrossFolders.value)) return;
   readFolder.value = targetFolder;
   folderResolved.value = true;
   // Let the key pick up the new folder before asking for the data.
@@ -795,18 +813,48 @@ async function loadMonitors(folderId?: string, force = false) {
   if (force) await monitorsList.refetch();
 }
 
-async function initPage() {
-  // Load folders first so the sidebar tablist renders with data.
+async function loadFolders() {
+  // A request before the org hydrates would fail and leave no folder to read checks from.
+  await waitForOrgIdentifier();
   try {
-    await getFoldersListByType(store, "synthetics");
+    const folders = await getFoldersListByType(store, "synthetics");
+    const folder = selectSyntheticsFolder(folders, route.query.folder);
+    activeFolderId.value = folder ?? "";
+    clearFolderFailure();
   } catch (err) {
     console.error("[synthetics] failed to load folders", err);
+    foldersFailed.value = true;
+    foldersForbidden.value = forbiddenState(err);
+  } finally {
+    foldersLoaded.value = true;
   }
+}
 
-  // Wait for the organisation identifier to be resolved before making API
-  // calls — loadMonitors silently returns when orgIdentifier is empty, and
-  // the table skeleton would stay forever because loading is never cleared.
-  await waitForOrgIdentifier();
+// A delete that leaves no listable folder empties the list, which the server answers with a 403.
+watch(
+  () => (store.state as any).organizationData?.foldersByType?.synthetics,
+  (folders) => {
+    if (!foldersLoaded.value || folders?.length !== 0) return;
+    foldersFailed.value = true;
+    foldersForbidden.value = true;
+  },
+);
+
+// The sidebar refetches on remount, so its success must lift a denial this page saw earlier.
+function clearFolderFailure() {
+  foldersFailed.value = false;
+  foldersForbidden.value = false;
+}
+
+/** Refresh retries a failed folder load, since no check can be read without a folder. */
+async function refreshMonitors() {
+  if (foldersFailed.value) await loadFolders();
+  await loadMonitors(undefined, true);
+}
+
+async function initPage() {
+  // Load folders first so the sidebar tablist renders with data.
+  await loadFolders();
 
   await loadMonitors(activeFolderId.value);
 
@@ -877,7 +925,7 @@ watch(
 const savedView = useListViewState("synthetics", {
   folder: "",
   activeTab: "all",
-  statusFilter: "all",
+  statusFilter: [] as string[],
   typeFilter: "all",
   locationFilter: "all",
   search: "",
@@ -886,12 +934,10 @@ const savedView = useListViewState("synthetics", {
   sortBy: "",
   sortOrder: "asc" as "asc" | "desc",
 });
-// A stored page belongs to the folder it was viewed in; arriving on another folder starts at page 1.
-const savedFolder = (route.query.folder as string) ?? "default";
-if (savedView.folder && savedView.folder !== savedFolder) savedView.currentPage = 1;
 const activeTab = ref(savedView.activeTab);
 const monitorTableMode = computed(() => (activeTab.value === "browser" ? "browser" : "all"));
-const statusFilter = ref(savedView.statusFilter);
+const isStatusKey = (key: string): key is string => !!key && key !== "all";
+const statusFilters = ref<string[]>(readFilterKeys(savedView.statusFilter, isStatusKey));
 const typeFilter = ref(savedView.typeFilter);
 const locationFilter = ref(savedView.locationFilter);
 const search = ref(savedView.search);
@@ -901,13 +947,13 @@ const sortBy = ref(savedView.sortBy);
 const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
 const monitorTableRef = ref<InstanceType<typeof MonitorTable> | null>(null);
 
-watch([activeTab, statusFilter, typeFilter, locationFilter, search], () => {
+watch([activeTab, statusFilters, typeFilter, locationFilter, search], () => {
   currentPage.value = 1;
 });
 watch(
   [
     activeTab,
-    statusFilter,
+    statusFilters,
     typeFilter,
     locationFilter,
     search,
@@ -920,7 +966,7 @@ watch(
     Object.assign(savedView, {
       folder: activeFolderId.value,
       activeTab: activeTab.value,
-      statusFilter: statusFilter.value,
+      statusFilter: statusFilters.value,
       typeFilter: typeFilter.value,
       locationFilter: locationFilter.value,
       search: search.value,
@@ -941,7 +987,7 @@ watch(loading, (isLoading) => {
 const showTypePicker = ref(false);
 
 // ── Folder state ───────────────────────────────────────────────────────
-const activeFolderId = ref<string>((route.query.folder as string) ?? "default");
+const activeFolderId = ref<string>("");
 const searchAcrossFolders = ref(false);
 
 const updateActiveFolderId = (folderId: string) => {
@@ -951,12 +997,16 @@ const updateActiveFolderId = (folderId: string) => {
 const activeFolderName = computed(() => {
   const folders: any[] = (store.state as any).organizationData?.foldersByType?.synthetics ?? [];
   const folder = folders.find((f: any) => f.folderId === activeFolderId.value);
-  return folder?.name ?? "Default";
+  return folder?.name ?? activeFolderId.value;
 });
 
-watch(activeFolderId, async (newFolderId) => {
-  currentPage.value = 1;
+watch(activeFolderId, async (newFolderId, oldFolderId) => {
+  if (oldFolderId || (savedView.folder && savedView.folder !== newFolderId)) currentPage.value = 1;
   savedView.folder = newFolderId;
+  if (!newFolderId) {
+    folderResolved.value = false;
+    return;
+  }
   selectedMonitorIds.value = [];
   duplicateFolder.value = newFolderId;
   if (searchAcrossFolders.value) {
@@ -1340,7 +1390,9 @@ async function loadLocations() {
 
 // The list is the query, not a copy of it: a monitor write invalidates the
 // synthetics scope and these rows repaint with no wiring here.
-const monitors = computed<DisplayMonitor[]>(() => (monitorsList.data.value ?? []).map(mapMonitor));
+const monitors = computed<DisplayMonitor[]>(() =>
+  folderResolved.value ? (monitorsList.data.value ?? []).map(mapMonitor) : [],
+);
 
 // Enrich monitors with folder names from Vuex store
 const enrichedMonitors = computed(() => {
@@ -1412,6 +1464,45 @@ const summaryStats = computed<StatItem[]>(() => {
       dataTest: "synthetics-summary-passed",
     },
   ];
+  // Run classes an older server never sends: a tile only once a check is in one.
+  const classTiles: StatItem[] = [
+    {
+      key: "misconfigured",
+      label: t("synthetics.filters.misconfigured"),
+      value: v(count("misconfigured")),
+      icon: "error-outline",
+      tone: "error",
+      max: share,
+      dataTest: "synthetics-summary-misconfigured",
+    },
+    {
+      key: "partial",
+      label: t("synthetics.filters.partial"),
+      value: v(count("partial")),
+      icon: "warning-amber",
+      tone: "warning",
+      max: share,
+      dataTest: "synthetics-summary-partial",
+    },
+    {
+      key: "not_measured",
+      label: t("synthetics.filters.notMeasured"),
+      value: v(count("not_measured")),
+      icon: "help-outline",
+      tone: "neutral",
+      max: share,
+      dataTest: "synthetics-summary-not-measured",
+    },
+  ];
+  // Attention-first: misconfigured after failed, partial before warning, not measured last.
+  const after: Record<string, string> = {
+    misconfigured: "failed",
+    partial: "error",
+    not_measured: "passed",
+  };
+  for (const tile of classTiles.filter((c) => count(c.key) > 0)) {
+    tiles.splice(tiles.findIndex((x) => x.key === after[tile.key]) + 1, 0, tile);
+  }
   // "Unknown" only means something once a monitor has never reported.
   if (count("unknown") > 0) {
     tiles.push({
@@ -1426,9 +1517,7 @@ const summaryStats = computed<StatItem[]>(() => {
   }
   tiles.push({
     key: "all",
-    // "All", not "All Statuses": the tile sits in a row of statuses, so the noun is
-    // already established, and its job is simply "clear the facet".
-    label: t("synthetics.filters.all"),
+    label: t("common.allStatuses"),
     value: v(total),
     icon: "monitor-heart",
     tone: "primary",
@@ -1437,15 +1526,10 @@ const summaryStats = computed<StatItem[]>(() => {
   return tiles;
 });
 
-// Selecting the active tile clears back to "all", like every other strip.
-const onStatSelect = (key: string) => {
-  statusFilter.value = key === "all" || statusFilter.value === key ? "all" : key;
-};
-
 const filteredMonitors = computed(() =>
   enrichedMonitors.value.filter(
     (m) =>
-      (statusFilter.value === "all" || m.status === statusFilter.value) &&
+      matchesAnyKey(statusFilters.value, m, (row, key) => row.status === key) &&
       (typeFilter.value === "all" || m.type === typeFilter.value) &&
       (locationFilter.value === "all" || m.locations.includes(locationFilter.value)) &&
       (!search.value ||
@@ -1456,12 +1540,12 @@ const filteredMonitors = computed(() =>
 
 const hasActiveFilters = computed(
   () =>
-    statusFilter.value !== "all" || locationFilter.value !== "all" || search.value.trim() !== "",
+    statusFilters.value.length > 0 || locationFilter.value !== "all" || search.value.trim() !== "",
 );
 
 const clearFilters = () => {
   search.value = "";
-  statusFilter.value = "all";
+  statusFilters.value = [];
   locationFilter.value = "all";
 };
 
@@ -1693,7 +1777,7 @@ async function duplicateMonitor(m: any) {
   // The row's own folder, falling back to the folder being browsed. These are
   // the same value unless "search across folders" is on, in which case the copy
   // should land beside its original rather than jump to the active folder.
-  duplicateFolder.value = m.folderId || activeFolderId.value || "default";
+  duplicateFolder.value = m.folderId || activeFolderId.value;
   duplicateSource.value = null;
   showDuplicateDialog.value = true;
   try {

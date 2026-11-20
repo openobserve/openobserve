@@ -268,6 +268,7 @@ describe("SettingsIndex", () => {
         ["synthetics_locations", "synthetics"],
         ["queryManagement", "query_management"],
         ["storageSettings", "byob"],
+        ["ai_toolsets", "ai_toolsets"],
       ])("marks %s license-locked under a locked %s license", (key, feature) => {
         const byKey = byKeyUnder({ features: { [feature]: "locked" } });
         expect(byKey(key)?.licenseLocked).toBe(true);
@@ -290,6 +291,7 @@ describe("SettingsIndex", () => {
         ["queryManagement", "query_management"],
         ["storageSettings", "byob"],
         ["correlation_settings", "correlation"],
+        ["ai_toolsets", "ai_toolsets"],
       ])("hides %s under a hidden %s license", (key, feature) => {
         const byKey = byKeyUnder({ features: { [feature]: "hidden" } });
         expect(byKey(key)?.visible).toBe(false);
@@ -351,28 +353,6 @@ describe("SettingsIndex", () => {
     router.currentRoute.value = originalRoute;
   });
 
-  describe("Theme integration", () => {
-    // regexIcon is computed internally and used in settingsItems icon field
-    // (not directly exposed on vm), so we verify it via the sectionGroups items.
-    it("should use light regex icon for light theme", () => {
-      mockStore.state.theme = "light";
-      const wrapper = createWrapper();
-      const groups = wrapper.vm.sectionGroups as any[];
-      const allItems = groups.flatMap((g: any) => g.items ?? []);
-      const regexItem = allItems.find((i: any) => i.dataTest === "regex-patterns-tab");
-      expect(regexItem?.icon).toContain("regex_icon_light.svg");
-    });
-
-    it("should use dark regex icon for dark theme", () => {
-      mockStore.state.theme = "dark";
-      const wrapper = createWrapper();
-      const groups = wrapper.vm.sectionGroups as any[];
-      const allItems = groups.flatMap((g: any) => g.items ?? []);
-      const regexItem = allItems.find((i: any) => i.dataTest === "regex-patterns-tab");
-      expect(regexItem?.icon).toContain("regex_icon_dark.svg");
-    });
-  });
-
   describe("Section groups", () => {
     it("should build section groups from settings items", () => {
       const wrapper = createWrapper();
@@ -405,11 +385,11 @@ describe("SettingsIndex", () => {
       expect(labels.indexOf("Integrations")).toBe(labels.indexOf("Destinations") + 1);
     });
 
-    it("gives the Slack section no page subtitle", () => {
+    it("gives the Slack section a page subtitle like its siblings", () => {
       mockStore.state.zoConfig = { service_streams_enabled: true, slack_enabled: true };
       const wrapper = createWrapper();
       const items = (wrapper.vm.sectionGroups as SectionHubGroup[]).flatMap((g) => g.items);
-      expect(items.find((i) => i.key === "slack")?.description).toBeUndefined();
+      expect(items.find((i) => i.key === "slack")?.description).toBeTruthy();
     });
 
     it("AC-1.4 shows no Slack rail item on Cloud while Slack is disabled", () => {
@@ -461,17 +441,14 @@ describe("SettingsIndex", () => {
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);
       const cipherItem = items.find((i: any) => i.dataTest === "management-cipher-key-tab");
-      const nodesItem = items.find((i: any) => i.dataTest === "nodes-tab");
       const pipelineItem = items.find((i: any) => i.dataTest === "pipeline-destinations-tab");
       const regexItem = items.find((i: any) => i.dataTest === "regex-patterns-tab");
 
       // Present but locked — not hidden — in OSS, so the feature stays discoverable.
       expect(cipherItem?.visible).not.toBe(false);
-      expect(nodesItem?.visible).not.toBe(false);
       expect(pipelineItem?.visible).not.toBe(false);
       expect(regexItem?.visible).not.toBe(false);
       expect(cipherItem?.locked).toBe(true);
-      expect(nodesItem?.locked).toBe(true);
       expect(pipelineItem?.locked).toBe(true);
       expect(regexItem?.locked).toBe(true);
     });
@@ -493,6 +470,60 @@ describe("SettingsIndex", () => {
       expect(cipherItem?.visible).toBe(false);
       expect(nodesItem?.visible).toBe(false);
       expect(pipelineItem?.visible).toBe(false);
+    });
+
+    describe("AI Toolsets entry", () => {
+      beforeEach(async () => {
+        const config = await import("@/aws-exports");
+        vi.mocked(config.default).isEnterprise = "true";
+        vi.mocked(config.default).isCloud = "false";
+      });
+
+      afterEach(async () => {
+        const config = await import("@/aws-exports");
+        vi.mocked(config.default).isEnterprise = "true";
+        vi.mocked(config.default).isCloud = "true";
+      });
+
+      const aiToolsets = () =>
+        getAllItems(createWrapper()).find((i: any) => i.key === "ai_toolsets");
+
+      it("is listed and unlocked on enterprise", () => {
+        expect(aiToolsets()).toMatchObject({
+          group: "Integrations",
+          dataTest: "ai-toolsets-tab",
+          to: { name: "aiToolsets", query: { org_identifier: "test-org" } },
+          visible: true,
+          locked: false,
+        });
+      });
+
+      it("is shown locked on OSS", async () => {
+        const config = await import("@/aws-exports");
+        vi.mocked(config.default).isEnterprise = "false";
+        vi.mocked(config.default).isCloud = "false";
+        expect(aiToolsets()).toMatchObject({ visible: true, locked: true });
+      });
+
+      it("follows the ai_assistant feature the page depends on", () => {
+        const under = (features: Record<string, string>) => {
+          mockStore.state.zoConfig = { service_streams_enabled: true, features } as any;
+          return aiToolsets();
+        };
+        expect(under({ ai_assistant: "hidden" })?.visible).toBe(false);
+        expect(under({ ai_assistant: "locked" })).toMatchObject({
+          visible: true,
+          licenseLocked: true,
+        });
+        expect(under({ ai_assistant: "enabled" })?.licenseLocked).toBe(false);
+      });
+
+      it("is hidden on a pure cloud build", async () => {
+        const config = await import("@/aws-exports");
+        vi.mocked(config.default).isEnterprise = "false";
+        vi.mocked(config.default).isCloud = "true";
+        expect(aiToolsets()?.visible).toBe(false);
+      });
     });
 
     // Synthetics ships in OSS: the locations hub card stays visible on an OSS

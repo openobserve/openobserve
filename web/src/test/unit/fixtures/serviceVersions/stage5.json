@@ -1,0 +1,188 @@
+{
+  "deploys": {
+    "deploys": [
+      {
+        "at": 1792845600000000,
+        "badge": "regressed",
+        "deploy_key": "dk-1",
+        "env": "fixture-cluster",
+        "env_source": "cluster_name",
+        "from_version": "1.0",
+        "kind": "deploy",
+        "overlaps_previous": true,
+        "previous_last_seen": 1792850220000000,
+        "previous_version": "1.0",
+        "provisional": false,
+        "regions": ["fixture-region"],
+        "signal_first_seen": {
+          "rum": null,
+          "traces": 1792845601000000
+        },
+        "verdict": {
+          "baseline": {
+            "env": "fixture-cluster",
+            "initial_rule": "canary",
+            "rule": "canary",
+            "switched_at": null,
+            "traffic_share": 0.5,
+            "version": "1.0",
+            "where_key": "k8s:fixture-cluster/fixture-ns"
+          },
+          "checks_done": 11,
+          "deploy": {
+            "at": 1792845600000000,
+            "from_version": "1.0",
+            "kind": "deploy"
+          },
+          "deploy_key": "dk-1",
+          "env": "fixture-cluster",
+          "env_source": "cluster_name",
+          "frozen_at": 1792849200000000,
+          "headline": {
+            "base": 0.008333333333333333,
+            "ci_kind": "variance",
+            "hi": 0.2611446868048399,
+            "lo": 0.22271597205102323,
+            "metric": "error_rate",
+            "new": 0.25,
+            "unit": "ratio"
+          },
+          "metrics": [],
+          "needs": {
+            "have": null,
+            "metric": null,
+            "need": null
+          },
+          "new_error_sample": null,
+          "new_error_types": 0,
+          "reason": null,
+          "reason_code": "regressed_significant",
+          "recheck": {
+            "at": null,
+            "verdict": null
+          },
+          "regions": [
+            {
+              "cluster": "fixture-region",
+              "verdict": "regressed"
+            }
+          ],
+          "restricted": false,
+          "rollback_outcome": null,
+          "sample": {
+            "n_base": 1440,
+            "n_new": 1440,
+            "since": 1792845600000000
+          },
+          "second": {
+            "base": null,
+            "metric": null,
+            "new": null,
+            "unit": "count"
+          },
+          "service": "store",
+          "signal": "traces",
+          "state": "frozen",
+          "verdict": "regressed",
+          "verdict_key": "vd-1",
+          "version": "2.0",
+          "version_key": "vk-1",
+          "where_key": "k8s:fixture-cluster/fixture-ns"
+        },
+        "version": "2.0",
+        "where_key": "k8s:fixture-cluster/fixture-ns"
+      },
+      {
+        "at": 1792845600000000,
+        "badge": "evaluating",
+        "deploy_key": "dk-2",
+        "env": "fixture-cluster",
+        "env_source": "cluster_name",
+        "from_version": "1.0",
+        "kind": "deploy",
+        "overlaps_previous": true,
+        "previous_last_seen": 1792850220000000,
+        "previous_version": "1.0",
+        "provisional": false,
+        "regions": ["fixture-region"],
+        "signal_first_seen": {
+          "rum": null,
+          "traces": 1792850401000000
+        },
+        "verdict": {
+          "baseline": {
+            "env": "fixture-cluster",
+            "initial_rule": "canary",
+            "rule": "previous",
+            "switched_at": 1792850700000000,
+            "traffic_share": null,
+            "version": "1.0",
+            "where_key": "k8s:fixture-cluster/fixture-ns"
+          },
+          "checks_done": 12,
+          "deploy": {
+            "at": 1792845600000000,
+            "from_version": "1.0",
+            "kind": "deploy"
+          },
+          "deploy_key": "dk-2",
+          "env": "fixture-cluster",
+          "env_source": "cluster_name",
+          "frozen_at": null,
+          "headline": {
+            "base": 1002.42800852213,
+            "ci_kind": "sketch_band",
+            "hi": 20.0485601704426,
+            "lo": -20.0485601704426,
+            "metric": "p95",
+            "new": 1002.42800852213,
+            "unit": "us"
+          },
+          "metrics": [],
+          "needs": {
+            "have": 120,
+            "metric": "p95",
+            "need": 1000
+          },
+          "new_error_sample": null,
+          "new_error_types": 0,
+          "reason": "below_min_count",
+          "reason_code": "below_min_count",
+          "recheck": {
+            "at": null,
+            "verdict": null
+          },
+          "regions": [
+            {
+              "cluster": "fixture-region",
+              "verdict": "insufficient"
+            }
+          ],
+          "restricted": false,
+          "rollback_outcome": null,
+          "sample": {
+            "n_base": 120,
+            "n_new": 120,
+            "since": 1792850400000000
+          },
+          "second": {
+            "base": null,
+            "metric": null,
+            "new": null,
+            "unit": "count"
+          },
+          "service": "store",
+          "signal": "traces",
+          "state": "evaluating",
+          "verdict": "insufficient",
+          "verdict_key": "vd-2",
+          "version": "3.0",
+          "version_key": "vk-2",
+          "where_key": "k8s:fixture-cluster/fixture-ns"
+        },
+        "version": "3.0",
+        "where_key": "k8s:fixture-cluster/fixture-ns"
+      }
+    ]
+  }
+}

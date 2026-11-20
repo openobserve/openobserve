@@ -496,6 +496,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import type { AcceptableValue } from "reka-ui";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { isLeavingRoute, trackPendingNavigation } from "@/utils/pendingNavigation";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useLLMInsights } from "./composables/useLLMInsights";
 import { splitNumberWithUnit, splitDuration, splitCost } from "./llmInsightsDashboard.utils";
@@ -572,6 +573,7 @@ import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseF
 const { t } = useI18nTyped();
 const { getStreams } = useStreams(t);
 const router = useRouter();
+trackPendingNavigation(router);
 const route = useRoute();
 const store = useStore();
 
@@ -596,6 +598,7 @@ const {
   sparklines,
   loading,
   p95Loading,
+  p95Unavailable,
   error,
   fetchAll,
   restore,
@@ -924,6 +927,8 @@ async function enterCompareMode(pair?: { a: string; b: string }) {
 }
 
 function exitCompareMode() {
+  // Stop the compare queries; a run still in flight would otherwise write into the next compare.
+  versionCompare.cancel();
   compareMode.value = false;
   compareVersionList.value = [];
   compareInitialPair.value = null;
@@ -1078,6 +1083,8 @@ watch(panelCacheDashboardId, (id) => ensurePanelCacheStub(id), {
 // keep readable values (not the internal agent key) and preserve other params
 // (e.g. the time range owned by the parent).
 function syncFilterUrl() {
+  // A late write after the user navigated away would cancel or pollute the new route.
+  if (route.name !== "aiLLMInsights" || isLeavingRoute("aiLLMInsights")) return;
   const agent = selectedAgent.value
     ? {
         name: selectedAgent.value.name,
@@ -1436,8 +1443,8 @@ const kpiCards = computed<KpiCard[]>(() => {
       id: "p95",
       label: t("traces.lLMInsightsDashboard.p95Latency"),
       icon: "schedule",
-      value: p95.value,
-      unit: p95.unit,
+      value: p95Unavailable.value ? "—" : p95.value,
+      unit: p95Unavailable.value ? "" : p95.unit,
       sparkData: sparklines.value.p95Micros,
       sparkColor: "#f97316",
       loading: p95Loading.value,
@@ -1578,7 +1585,8 @@ async function loadInsights(
 
     const result = await fetchAll(stream, start, end, effectiveAgent.value, filterClause.value);
     // Snapshot this call's result so returning to this selection skips the network.
-    if (result) {
+    // A failed P95 is not cached, so a return to this selection asks for it again.
+    if (result && !p95Unavailable.value) {
       kpiCache.set(ck, { ...result, lastRunAt: lastRunAt.value });
     }
   } finally {

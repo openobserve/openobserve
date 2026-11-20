@@ -17,6 +17,7 @@
 // API emits — nothing is renamed on the way in.
 
 import type { SentTemplate } from "@/utils/alerts/notificationKinds";
+import type { ServiceDisplayFields } from "@/types/serviceRef";
 
 /**
  * Who a level of the ladder pages.
@@ -1578,7 +1579,8 @@ export interface DimensionCatalogue {
  * an appliance. Those are claimable by service name alone, and the form says so
  * rather than pretending the claim is narrower than it is.
  */
-export interface DiscoveredService {
+export interface DiscoveredService extends ServiceDisplayFields {
+  /** The service key: what a claim writes and what dedupe and sort use. */
   name: string;
   /** Which identity set matched, e.g. `kubernetes`. `default` means none did. */
   setId: string;

@@ -3,6 +3,10 @@
 
 const { expect } = require("@playwright/test");
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
+const MonacoEditorHelper = require("../../playwright-tests/utils/MonacoEditorHelper.js");
+const { getAuthHeaders, getOrgIdentifier } = require("../../playwright-tests/utils/cloud-auth.js");
+import { answerPanelDraftRestore } from "./panel-leave-dialog.js";
+import DashboardactionPage from "./dashboard-panel-actions.js";
 
 export default class ChartTypeSelector {
   constructor(page) {
@@ -18,6 +22,30 @@ export default class ChartTypeSelector {
     this.treatAsNonTimestampCheckbox = page.locator('[data-test="dynamic-function-popup-treat-as-non-timestamp"]');
     this.showFieldAsJsonCheckbox = page.locator('[data-test="dynamic-function-popup-show-field-as-json"]');
 
+    // Query builder axis drop zones
+    this.xAxisLayout = page.locator('[data-test="dashboard-x-layout"]');
+    this.yAxisLayout = page.locator('[data-test="dashboard-y-layout"]');
+    this.breakdownLayout = page.locator('[data-test="dashboard-b-layout"]');
+
+    // A field-list row and its add-to-axis buttons (+X / +Y / +B), CSS-hidden until the row is hovered
+    this.fieldListRow = (fieldName) => page.locator(`[data-test="o-field-list-row-${fieldName}"]`).first();
+    this.fieldAddButton = (fieldName, target) =>
+      this.fieldListRow(fieldName).locator(`[data-test="dashboard-add-${target}-data"]`);
+
+    // Name shown beside an axis drop zone ("Group", "Size", "Sub-group" on a sunburst):
+    // the nearest ancestor of the zone that holds a .layout-name label.
+    this.axisLayoutName = (layout) =>
+      layout
+        .locator('xpath=ancestor::div[.//div[contains(@class,"layout-name")]][1]')
+        .locator(".layout-name")
+        .first();
+
+    // Chart picker item currently marked as selected, for a given chart type id
+    this.selectedChartTypeItem = (chartType) =>
+      page.locator(
+        `[data-test="dashboard-addpanel-chart-selection-item"][data-test-selected="${chartType}"]`
+      );
+
     // Query type selectors
     this.sqlQueryTypeBtn = page.locator('[data-test="dashboard-sql-query-type"]');
     this.customQueryTypeBtn = page.locator('[data-test="dashboard-custom-query-type"]');
@@ -26,6 +54,7 @@ export default class ChartTypeSelector {
 
     // Custom query editor
     this.queryEditor = page.locator('[data-test="dashboard-panel-query-editor"]');
+    this.monaco = new MonacoEditorHelper(page);
 
     // JSON renderer locators (source-defined data-tests in JsonFieldRenderer.vue)
     this.jsonFieldRenderer = page.locator('[data-test="json-field-renderer"]');
@@ -55,8 +84,7 @@ export default class ChartTypeSelector {
   }
 
   async fillMarkdownEditor(markdown) {
-    await this.markdownEditor.locator(".monaco-editor").click();
-    await this.markdownEditor.locator(".inputarea").fill(markdown);
+    await this.monaco.fillInputArea(this.markdownEditor, markdown);
   }
 
   getHtmlRendererElement(selector) {
@@ -70,8 +98,7 @@ export default class ChartTypeSelector {
 
   // Enter HTML code into the HTML chart Monaco editor
   async fillHtmlEditor(html) {
-    await this.htmlEditor.locator(".monaco-editor").click();
-    await this.htmlEditor.locator(".inputarea").fill(html);
+    await this.monaco.fillInputArea(this.htmlEditor, html);
   }
 
   // Rendered HTML output: heading by accessible name
@@ -220,7 +247,6 @@ export default class ChartTypeSelector {
     await this.page.locator('[data-test="index-dropdown-stream"]').waitFor({ state: "visible", timeout: 10000 });
   }
 
-  // Stream select with retry mechanism (no page reload to preserve context)
   async selectStream(streamName, maxRetries = 3) {
     const streamInput = this.page.locator(
       '[data-test="index-dropdown-stream"]'
@@ -228,11 +254,21 @@ export default class ChartTypeSelector {
 
     // An already-selected stream can be missing from the open option list (seen on alpha1), so there is nothing to click.
     const trigger = this.page.locator('[data-test="index-dropdown-stream-trigger"]').first();
-    await streamInput.waitFor({ state: "visible", timeout: 10000 });
-    if ((await trigger.getAttribute("data-test-selected-value", { timeout: 5000 })) === streamName) {
+    const isAlreadySelected = async () => {
+      await streamInput.waitFor({ state: "visible", timeout: 10000 });
+      return (await trigger.getAttribute("data-test-selected-value", { timeout: 5000 })) === streamName;
+    };
+    if (await isAlreadySelected()) {
       testLogger.info(`selectStream: "${streamName}" is already the selected stream`);
       return;
     }
+
+    const popover = this.page.locator('[data-test="index-dropdown-stream-popover"]');
+    // Exact value match: hasText is a substring match, so "e2e_automate" also hit "e2e_automate1_w0".
+    const streamOption = this.page
+      .locator(`[data-test="index-dropdown-stream-option"][data-test-value="${streamName}"]`)
+      .first();
+    let reloaded = false;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -243,7 +279,6 @@ export default class ChartTypeSelector {
         await streamInput.click();
 
         // Wait for popover to open, then type via keyboard (OSelect wrapper div doesn't accept fill directly)
-        const popover = this.page.locator('[data-test="index-dropdown-stream-popover"]');
         await popover.waitFor({ state: "visible", timeout: 10000 });
         await this.page.keyboard.press("Control+a");
         await this.page.keyboard.type(streamName);
@@ -254,15 +289,23 @@ export default class ChartTypeSelector {
           .allTextContents();
         testLogger.debug(`Attempt ${attempt}: Looking for "${streamName}". Available options (${allOptions.length}): ${allOptions.slice(0, 10).join(', ')}`);
 
-        // Exact value match: hasText is a substring match, so "e2e_automate" also hit "e2e_automate1_w0".
-        const streamOption = this.page
-          .locator(`[data-test="index-dropdown-stream-option"][data-test-value="${streamName}"]`)
-          .first();
-
         await streamOption.waitFor({ state: "visible", timeout: 15000 });
         await streamOption.click();
         return; // Success
       } catch (error) {
+        // With ZO_RESTRICTED_ROUTES_ON_EMPTY_DATA on, the stream list is fetched at boot, so a stream ingested after navigation shows only after a reload.
+        const missingFromList = (await popover.isVisible()) && (await streamOption.count()) === 0;
+        if (
+          !reloaded &&
+          missingFromList &&
+          (await this.isRestrictedRoutesOnEmptyDataOn()) &&
+          (await this.reloadPanelEditorKeepingSelections())
+        ) {
+          reloaded = true;
+          if (await isAlreadySelected()) return;
+          attempt--;
+          continue;
+        }
         if (attempt === maxRetries) {
           // Final attempt: log full diagnostic info
           const finalOptions = await this.page
@@ -272,11 +315,105 @@ export default class ChartTypeSelector {
           testLogger.error(`FAILED after ${maxRetries} attempts. Final options: ${finalOptions.join(', ')}`);
           throw error;
         }
-        // Close dropdown and wait for network before retry (don't reload - loses context!)
         await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
         await this.page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
       }
     }
+  }
+
+  async isRestrictedRoutesOnEmptyDataOn() {
+    if (this.restrictedRoutesOnEmptyData !== undefined) return this.restrictedRoutesOnEmptyData;
+    const org = new URL(this.page.url()).searchParams.get("org_identifier") || getOrgIdentifier() || "default";
+    const res = await this.page.request
+      .get(`${process.env.ZO_BASE_URL}/api/${org}/config`, { headers: getAuthHeaders() })
+      .catch(() => null);
+    if (!res?.ok()) {
+      testLogger.warn(`selectStream: GET /api/${org}/config answered ${res ? `HTTP ${res.status()}` : "no response"}, treating restricted routes as off`);
+      this.restrictedRoutesOnEmptyData = false;
+    } else {
+      this.restrictedRoutesOnEmptyData = (await res.json().catch(() => ({})))?.restricted_routes_on_empty_data === true;
+    }
+    return this.restrictedRoutesOnEmptyData;
+  }
+
+  // A reload re-applies only chart type, stream type and panel name; any other setting it would reset makes it throw instead.
+  async reloadPanelEditorKeepingSelections() {
+    if (!/\/dashboards\/add_panel/.test(this.page.url())) return false;
+    if ((await this.page.locator('[data-test="dashboard-panel-query-tab-1"]').count()) > 0) {
+      throw new Error("selectStream: stream missing from the cached list, but reloading would drop the extra query tabs this panel already has");
+    }
+    const chartType = await this.readEditorAttribute(
+      this.page.locator('[data-test="dashboard-addpanel-chart-selection-item"][data-test-selected]').first(),
+      "data-test-selected",
+      "chart type",
+    );
+    const streamType = await this.readEditorAttribute(
+      this.page.locator('[data-test="index-dropdown-stream_type-trigger"]').first(),
+      "data-test-selected-value",
+      "stream type",
+    );
+    const panelName = await this.readPanelName();
+    const unrestored = await this.readUnrestoredEditorState();
+    testLogger.info(`selectStream: stream missing from the cached list, reloading the panel editor (chart=${chartType}, streamType=${streamType}, panelName=${panelName})`);
+    await this.page.reload({ waitUntil: "domcontentloaded" });
+    await this.page.locator('[data-test="index-dropdown-stream"]').waitFor({ state: "visible", timeout: 30000 });
+    // The unload flushes the panel draft, so the reloaded editor opens "Unsaved panel draft" over itself.
+    if (await this.hasPanelDraftForThisEditor()) {
+      const answered = await answerPanelDraftRestore(this.page, { choice: "fresh", timeout: 15000 });
+      if (!answered) throw new Error("Panel draft restore dialog did not open after reloading the panel editor");
+    }
+    await this.selectChartType(chartType);
+    await this.selectStreamType(streamType);
+    if (panelName && (await this.readPanelName()) !== panelName) {
+      await new DashboardactionPage(this.page).addPanelName(panelName);
+    }
+    const after = await this.readUnrestoredEditorState();
+    if (JSON.stringify(after) !== JSON.stringify(unrestored)) {
+      throw new Error(`selectStream: reloading the panel editor reset settings this helper does not restore (before ${JSON.stringify(unrestored)}, after ${JSON.stringify(after)})`);
+    }
+    return true;
+  }
+
+  async readUnrestoredEditorState() {
+    const attr = async (selector, name) => {
+      const el = this.page.locator(selector).first();
+      return (await el.count()) ? el.getAttribute(name, { timeout: 5000 }) : null;
+    };
+    const timeRange = this.page.locator('[data-test="date-time-btn"]').first();
+    return {
+      sql: await attr('[data-test="dashboard-sql-query-type"]', "data-state"),
+      promql: await attr('[data-test="dashboard-promql-query-type"]', "data-state"),
+      builder: await attr('[data-test="dashboard-builder-query-type"]', "data-state"),
+      custom: await attr('[data-test="dashboard-custom-query-type"]', "data-state"),
+      timeRange: (await timeRange.count()) ? (await timeRange.innerText({ timeout: 5000 })).trim() : null,
+    };
+  }
+
+  async readEditorAttribute(locator, attribute, label) {
+    let value;
+    try {
+      value = await locator.getAttribute(attribute, { timeout: 5000 });
+    } catch (error) {
+      throw new Error(`selectStream: cannot read the panel's ${label} before reloading the editor: ${error.message}`);
+    }
+    if (!value) throw new Error(`selectStream: the panel's ${label} is empty, so a reload could not restore it`);
+    return value;
+  }
+
+  // Display mode shows the placeholder for an empty name, which compares equal before and after the reload.
+  async readPanelName() {
+    const input = this.page.locator('[data-test="dashboard-panel-name-input"]');
+    if (await input.isVisible()) return input.inputValue();
+    return this.page.locator('[data-test="dashboard-panel-name-trigger"] [data-test="dashboard-panel-name-value"]').innerText({ timeout: 5000 });
+  }
+
+  async hasPanelDraftForThisEditor() {
+    const url = new URL(this.page.url());
+    const suffix = `:${url.searchParams.get("dashboard")}:${url.searchParams.get("panelId") || "new"}`;
+    return this.page.evaluate(
+      (keySuffix) => Object.keys(localStorage).some((key) => key.startsWith("o2_panel_draft:") && key.endsWith(keySuffix)),
+      suffix,
+    );
   }
 
   // Search field and added for X, Y,Breakdown etc.
@@ -412,11 +549,27 @@ export default class ChartTypeSelector {
     await removeButton.click();
   }
 
+  // Seeded fields land asynchronously, so wait briefly before deciding there is nothing to remove.
+  // Returns whether a field was removed.
+  async removeFieldIfPresent(alias, target, timeout = 5000) {
+    const baseTestIds = { x: "dashboard-x-item", y: "dashboard-y-item", b: "dashboard-b-item" };
+    if (!baseTestIds[target]) throw new Error(`Invalid target type: ${target}`);
+    const removeButton = this.page.locator(`[data-test="${baseTestIds[target]}-${alias}-remove"]`);
+    const present = await removeButton
+      .waitFor({ state: "visible", timeout })
+      .then(() => true)
+      .catch(() => false);
+    if (!present) return false;
+    await removeButton.click();
+    await expect(removeButton).toHaveCount(0);
+    return true;
+  }
+
   // Helper function to wait for table data to load completely
   async waitForTableDataLoad() {
     // Wait for table to be visible
     await this.page.waitForSelector('[data-test="dashboard-panel-table"]', {
-      timeout: 10000,
+      timeout: 30000,
     });
 
     // Wait for table to have data (non-empty tbody)
@@ -437,7 +590,7 @@ export default class ChartTypeSelector {
         );
       },
       undefined,
-      { timeout: 15000 }
+      { timeout: 30000 }
     );
 
     // The check above is satisfied by a STALE table. Re-applying a query leaves the
@@ -742,7 +895,7 @@ export default class ChartTypeSelector {
    * @param {string} query - The SQL query to fill
    */
   async fillQueryEditorInputArea(query) {
-    await this.queryEditor.locator(".inputarea").fill(query);
+    await this.monaco.fillInputArea(this.queryEditor, query);
   }
 
   /**
@@ -755,22 +908,12 @@ export default class ChartTypeSelector {
     await fieldRow.waitFor({ state: "visible", timeout });
   }
 
-  /**
-   * Enter a custom SQL query in the Monaco editor.
-   * Clicks the editor wrapper (data-test) then types via the page keyboard,
-   * avoiding class/role selectors that violate the PO selector policy.
-   * @param {string} query - The SQL query to enter
-   */
   async enterCustomSQL(query) {
     await this.queryEditor.waitFor({ state: "visible", timeout: 10000 });
     await this.queryEditor.click();
     await this.dismissSuggestionsIfOpen();
-    await this.page.keyboard.press("Control+a");
-    await this.page.keyboard.press("Delete");
-    // Use insertText (single input event) instead of type (per-character keydown events)
-    // to prevent Monaco's autocomplete from accepting suggestions mid-input and
-    // mangling the SQL (e.g. replacing table names with function calls).
-    await this.page.keyboard.insertText(query);
+    // One edit, not keystrokes: typing lets autocomplete rewrite the SQL, and a multi-line insertText repeats line one in Firefox.
+    await this.monaco.fillInputArea(this.queryEditor, query);
     await this.dismissSuggestionsIfOpen();
     testLogger.debug('Entered custom SQL query', { query });
   }
@@ -897,5 +1040,64 @@ export default class ChartTypeSelector {
     if (!found) {
       throw new Error(`Expected JSON value "${expectedValue}" was not rendered`);
     }
+  }
+
+  /** Assert the chart picker marks the given chart type as selected. */
+  async expectChartTypeSelected(chartType) {
+    await expect(this.selectedChartTypeItem(chartType)).toHaveCount(1);
+  }
+
+  /** Assert the X axis drop zone is shown (visible = true) or not rendered at all (visible = false). */
+  async expectXAxisLayoutVisible(visible = true) {
+    if (visible) await expect(this.xAxisLayout).toBeVisible();
+    else await expect(this.xAxisLayout).toHaveCount(0);
+  }
+
+  /** Assert the Breakdown drop zone is visible, and optionally that it holds the given field. */
+  async expectBreakdownLayoutContains(field) {
+    await expect(this.breakdownLayout).toBeVisible();
+    if (field) await expect(this.breakdownLayout).toContainText(field);
+  }
+
+  /** Assert the Y axis holds the given field read raw, with no aggregation such as count(). */
+  async expectYAxisRawField(field) {
+    await expect(this.yAxisLayout).toContainText(field);
+    await expect(this.yAxisLayout).not.toContainText("count(");
+  }
+
+  /** Assert the X, Y and Breakdown drop zones carry the given names (e.g. Group / Size / Sub-group). */
+  async expectAxisLayoutNames({ x, y, b }) {
+    if (x) await expect(this.axisLayoutName(this.xAxisLayout)).toContainText(x);
+    if (y) await expect(this.axisLayoutName(this.yAxisLayout)).toContainText(y);
+    if (b) await expect(this.axisLayoutName(this.breakdownLayout)).toContainText(b);
+  }
+
+  // The add buttons are CSS-hidden until the row is hovered, and a field-list re-render after the
+  // search drops :hover, so the hover is retried inside the poll.
+  async expectAddFieldButtonEnabled(fieldName, target, enabled) {
+    if (!["x", "y", "b"].includes(target)) throw new Error(`Invalid target type: ${target}`);
+    await this.searchField(fieldName);
+    const row = this.fieldListRow(fieldName);
+    const button = this.fieldAddButton(fieldName, target);
+    await row.waitFor({ state: "visible", timeout: 10000 });
+    await expect(async () => {
+      await row.hover({ timeout: 2000 });
+      if (enabled) await expect(button).toBeEnabled({ timeout: 1000 });
+      else await expect(button).toBeDisabled({ timeout: 1000 });
+    }).toPass({ timeout: 15000 });
+    await this.clearFieldSearch();
+  }
+
+  /** Assert a field row offers no add-to-axis button for `target` at all, e.g. +B on a chart type without a breakdown. */
+  async expectAddFieldButtonAbsent(fieldName, target) {
+    if (!["x", "y", "b"].includes(target)) throw new Error(`Invalid target type: ${target}`);
+    await this.searchField(fieldName);
+    const row = this.fieldListRow(fieldName);
+    await row.waitFor({ state: "visible", timeout: 10000 });
+    await row.hover();
+    // The sibling +X button proves the hover revealed the row's add buttons before counting the missing one.
+    await expect(this.fieldAddButton(fieldName, "x")).toBeVisible();
+    await expect(this.fieldAddButton(fieldName, target)).toHaveCount(0);
+    await this.clearFieldSearch();
   }
 }

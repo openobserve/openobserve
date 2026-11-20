@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex h-full min-h-0 w-full flex-col" data-test="metrics-explorer">
+    <AnomalyOriginBanner class="mx-1.5 mt-1.5 shrink-0" data-test="metrics-anomaly-origin-banner" />
     <!-- No page title: Metrics is an EXPLORE surface like Logs and Traces, so the
          first row is the toolbar — scope on the left, time on the right, like the
          Logs toolbar. -->
@@ -138,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="dateTimePickerRef"
           v-model="selectedDate"
           data-test="metrics-date-picker"
+          class="h-8.5!"
           :auto-apply-dashboard="mode === 'visualize'"
           calendar-presets
           @on:date-change="onDateChange"
@@ -169,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               :variant="isVisualizePending ? 'pending' : 'primary'"
               size="sm-toolbar"
-              class="w-[5.875rem]! px-1!"
+              class="min-w-[5.875rem]"
               data-test="metrics-explorer-run"
               :data-run-pending="isVisualizePending ? 'true' : undefined"
               :aria-label="isVisualizePending ? t('search.runQueryPendingLabel') : undefined"
@@ -183,7 +185,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   :variant="isVisualizePending ? 'pending' : 'primary'"
                   size="icon-toolbar"
-                  class="w-5"
                   icon-left="arrow-drop-down"
                   :aria-label="t('metrics.runQueryOptions')"
                   data-test="metrics-explorer-run-options"
@@ -237,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="shareUrl"
           :url="shareUrl"
           variant="outline"
-          size="icon-toolbar"
+          size="icon-md"
           data-test="metrics-explorer-share-btn"
           shortcut-id="metricsCopyUrl"
         />
@@ -893,6 +894,7 @@ import { STALE_DIM, STALE_DIM_DELAY_MS } from "@/lib/styles/motion";
 import { formatRangeLength, formatRefreshFailed } from "@/utils/formatters";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import AnomalyOriginBanner from "@/components/alerts/AnomalyOriginBanner.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -987,6 +989,7 @@ export default defineComponent({
     LoadingProgress,
     PanelChartPlaceholder,
     FirstDataPanel,
+    AnomalyOriginBanner,
     DateTimePickerDashboard,
     AutoRefreshInterval,
     OButton,

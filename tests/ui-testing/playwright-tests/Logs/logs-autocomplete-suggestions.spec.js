@@ -205,6 +205,7 @@ async function triggerSuggestionsWithRetry(page, pm, expectedValueOrNull, timeou
             lastSuggestions = [];
         }
         if (expectedValueOrNull == null) return lastSuggestions.length > 0;
+        if (expectedValueOrNull instanceof RegExp) return lastSuggestions.some((s) => expectedValueOrNull.test(s));
         return lastSuggestions.some((s) => s.includes(String(expectedValueOrNull)));
     }, { timeout, intervals: [400, 800, 1500] }).toBe(true);
     return lastSuggestions;
@@ -1139,11 +1140,9 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
         // Don't run search - just type in query editor
         await setQueryEditorContent(page, pm, `SELECT * FROM "${streamName}" WHERE `);
         await pm.logsPage.waitForQueryEditorValue('WHERE', 5000);
-        await page.keyboard.press('Control+Space');
 
-        // Wait for suggestions widget - cold start should still show SQL keywords/field names
-        await waitForSuggestionsWidget(page, pm, 10000);
-        const suggestions = await getSuggestionLabels(page, pm);
+        // A trigger answered before the editor's update:query debounce lists stale FROM-context stream names.
+        const suggestions = await triggerSuggestionsWithRetry(page, pm, /^(AND|OR|NOT|IN|LIKE|BETWEEN|IS)$|^kubernetes_/i);
 
         testLogger.info(`Cold start suggestions: ${suggestions.slice(0, 10).join(', ')}`);
 
@@ -1912,7 +1911,8 @@ test.describe("Autocomplete group headers — never a target", () => {
     }, async ({ page }) => {
         const menu = await valueMenu(page);
         // Monaco renders only the rows in view, so the Functions header below the fields may not be in the DOM yet.
-        expect(menu.headers.slice(0, 2)).toEqual(['Values · recent', 'Fields']);
+        // Logs looks values up over the selected range, so the header carries no "recent".
+        expect(menu.headers.slice(0, 2)).toEqual(['Values', 'Fields']);
         expect(menu.focused).toBeNull();
     });
 
@@ -2023,7 +2023,9 @@ test.describe("Autocomplete group headers — never a target", () => {
         const whole = row.replace(/'/g, '');
         await page.keyboard.type(whole);
         const after = await waitForMenu(page, 5000);
-        expect(after.headers, `only values should match "${whole}"`).toEqual(['Values · recent']);
+        // The value-filled search functions follow a matching value; a field match would add Fields.
+        expect(after.headers, `only values should match "${whole}"`).toEqual(['Values', 'Functions']);
+        expect(after.rows, 'the functions are on the same field').toContain('str_match (level');
         expect(after.focused).toBe(row);
     });
 

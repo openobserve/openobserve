@@ -108,7 +108,8 @@ export class DashboardPage {
     this.absoluteTab = page.locator(absoluteTabLocator);
 
     // Share / view dashboard locators
-    this.shareSuccessToast = page.locator('[data-test-variant="success"]');
+    this.copyConfirmBubble = page.locator('[data-test="copy-confirm"][data-test-variant="success"]');
+    this.shareCopiedToast = page.locator('[data-test^="o-toast-"][data-test-variant="success"][data-test-message*="copied" i]');
     this.dashboardBackBtn = page.locator('[data-test="dashboard-back-btn"]');
     this.dashboardNameTitle = page.locator('[data-test="dashboard-name-title"]');
 
@@ -419,27 +420,75 @@ export class DashboardPage {
     // Verify that the time filter displays "Past 30 Seconds"
     await expect(this.dateTimeButton).toContainText(Past30SecondsValue);
   }
+  async isCopyConfirmOnShareButton() {
+    const [bubble, button] = await Promise.all([
+      this.copyConfirmBubble.boundingBox({ timeout: 500 }).catch(() => null),
+      this.shareButton.boundingBox(),
+    ]);
+    if (!bubble || !button) return false;
+    const gapX = Math.max(button.x - (bubble.x + bubble.width), bubble.x - (button.x + button.width), 0);
+    const gapY = Math.max(button.y - (bubble.y + bubble.height), bubble.y - (button.y + button.height), 0);
+    return gapX <= 32 && gapY <= 32;
+  }
+
   async verifyShareDashboardLink(randomDashboardName){
+    // readText() waits forever on Firefox's Paste prompt, so record what the app itself copies.
+    await this.page.evaluate(() => {
+      window.__e2eCopiedText = "";
+      const clip = navigator.clipboard;
+      if (clip && !clip.__e2eWrapped) {
+        const write = clip.writeText.bind(clip);
+        clip.writeText = (text) =>
+          write(text).then((result) => {
+            window.__e2eCopiedText = text;
+            return result;
+          });
+        clip.__e2eWrapped = true;
+      }
+      if (window.__e2eCopyListener) return;
+      window.__e2eCopyListener = true;
+      // The app's execCommand fallback copies a selected textarea, which writeText never sees.
+      document.addEventListener(
+        "copy",
+        (event) => {
+          const el = event.target;
+          const text =
+            el && typeof el.value === "string"
+              ? el.value.slice(el.selectionStart ?? 0, el.selectionEnd ?? el.value.length)
+              : String(document.getSelection() || "");
+          if (text) window.__e2eCopiedText = text;
+        },
+        true
+      );
+    });
+    const shortUrlResponse = this.page.waitForResponse(
+      (res) =>
+        res.request().method() === "POST" &&
+        /\/api\/[^/]+\/short$/.test(new URL(res.url()).pathname),
+      { timeout: 30000 }
+    );
     await this.shareButton.click();
-    // Success toast container — ShareButton.vue triggers it after the
-    // short-URL API resolves AND the clipboard write completes.
-    await this.shareSuccessToast
-      .last()
-      .waitFor({ state: "visible", timeout: 15000 });
-    // Poll for clipboard text to absorb the microtask gap between toast
-    // render and clipboard becoming readable.
+    const response = await shortUrlResponse;
+    expect(response.status()).toBe(200);
+    const shortUrl = (await response.json()).short_url;
+    expect(shortUrl).toBeTruthy();
+    // The bubble lasts two seconds, and with no room beside the button the app shows the same confirmation as a toast.
+    await expect
+      .poll(async () => (await this.shareCopiedToast.count()) > 0 || (await this.isCopyConfirmOnShareButton()), {
+        timeout: 10000,
+        intervals: [100, 200, 400],
+      })
+      .toBe(true);
     let copiedUrl = "";
     await expect
       .poll(
         async () => {
-          copiedUrl = await this.page.evaluate(() =>
-            navigator.clipboard.readText()
-          );
+          copiedUrl = await this.page.evaluate(() => window.__e2eCopiedText);
           return copiedUrl;
         },
         { timeout: 10000, intervals: [200, 400, 800] }
       )
-      .not.toBe("");
+      .toBe(shortUrl);
     // The backend's short-URL service can bake in an external host (e.g.
     // production ingestion endpoint). Rewrite to the test base URL so we
     // exercise the same local instance the rest of the test runs against.

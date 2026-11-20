@@ -96,6 +96,25 @@ function cronAlert(name) {
   return a;
 }
 
+/** A simple alert with one `city = paris` condition, so a copy that drops conditions shows. */
+function cityConditionAlert(name, threshold = 3) {
+  const a = simpleAlert(name);
+  a.trigger_condition.threshold = threshold;
+  a.query_condition.conditions.conditions.conditions = [
+    { filterType: 'condition', column: 'city', operator: '=', value: 'paris', logicalOperator: 'AND' },
+  ];
+  return a;
+}
+
+/** A no-group alert on `stream` that fires on its first run (every minute, one row is enough). */
+function firstRunFiringAlert(name, { stream, destinations, silence }) {
+  const a = simpleAlert(name);
+  a.stream_name = stream;
+  a.destinations = destinations;
+  a.trigger_condition = { ...a.trigger_condition, period: 5, frequency: 1, threshold: 1, silence };
+  return a;
+}
+
 /** V1 composite payload. Operands are stable alert IDs, never display names. */
 function compositeAlert(name, childIds, overrides = {}) {
   return {
@@ -198,6 +217,22 @@ async function listAlerts(page) {
 
 async function findAlertId(page, name) {
   return (await listAlerts(page)).find((a) => a.name === name)?.alert_id;
+}
+
+/** Id of the alert named `name`; throws when the list does not have it. */
+async function requireAlertId(page, name) {
+  const id = await findAlertId(page, name);
+  if (!id) throw new Error(`requireAlertId: "${name}" is absent from the alert list`);
+  return id;
+}
+
+/** Creates `payload`, throws unless the create answers 200, and returns the new alert's id. */
+async function createAlertForId(page, payload) {
+  const response = await createAlert(page, payload);
+  if (response.status() !== 200) {
+    throw new Error(`createAlertForId: "${payload.name}" -> ${response.status()}: ${await response.text()}`);
+  }
+  return requireAlertId(page, payload.name);
 }
 
 /**
@@ -408,6 +443,7 @@ module.exports = {
   BASE, STREAM, SINK, TMPL, DEST,
   uniq, urls, api,
   simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert, cronAlert,
+  cityConditionAlert, firstRunFiringAlert, requireAlertId, createAlertForId,
   compositeAlert, validateComposite, getCompositeReferences,
   createChildAlerts, createCompositeAlert, deleteAlertsCascade,
   createAlert, listAlerts, findAlertId, getAlert, deleteAlerts,

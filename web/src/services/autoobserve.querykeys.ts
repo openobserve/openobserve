@@ -28,10 +28,17 @@ export const autoobserveKeys = {
     orgKey(org, "autoobserve", "suggestions", "rank", id, kind ?? ""),
   gapSuggestions: (org: string, pageSize: number) =>
     orgKey(org, "autoobserve", "suggestions", "proposed", "coverage_gap", pageSize),
+  incidents: (org: string) => orgKey(org, "autoobserve", "incidents"),
+  incidentItem: (org: string, incidentId: string) =>
+    orgKey(org, "autoobserve", "incidents", "item", incidentId),
   incidentsPage: (org: string, limit: number, offset: number) =>
     orgKey(org, "autoobserve", "incidents", limit, offset),
   incidentsPages: (org: string, range: string, pageSize: number, cap: number) =>
     orgKey(org, "autoobserve", "incidents", "pages", range, pageSize, cap),
+  issueSeries: (org: string, type: string, stream: string, startMs: number, endMs: number) =>
+    orgKey(org, "autoobserve", "issueSeries", type, stream, startMs, endMs),
+  volumeSeries: (org: string, ids: string, startMs: number, endMs: number) =>
+    orgKey(org, "autoobserve", "volumeSeries", ids, startMs, endMs),
   pagingSettings: (org: string) => orgKey(org, "autoobserve", "settings", "paging"),
   decisionsEnabled: (org: string) => orgKey(org, "autoobserve", "decisions", "enabled"),
   decisionsPages: (org: string) => orgKey(org, "autoobserve", "decisions", "page"),

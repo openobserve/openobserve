@@ -224,7 +224,7 @@ const props = withDefaults(
     filtered?: boolean;
     /** Force the dot-grid backdrop on/off (default: on for hero/block). */
     backdrop?: boolean;
-    /** Tint the `inline` icon red for an `error` variant; off keeps the grey circle. */
+    /** Tint the `inline` icon red for `error`, amber for `warning`; off keeps the grey circle. */
     toneIcon?: boolean;
   }>(),
   { size: "block", actionId: "primary", secondaryActionId: "secondary" },
@@ -308,13 +308,16 @@ const inlineIcon = computed<IconName | undefined>(() => {
   if (size.value !== "inline") return undefined; // slim is text only
   if (props.icon) return props.icon;
   // sensible default icon per tone
-  return variant.value === "error" ? "error-outline" : "search-off";
+  if (variant.value === "error") return "error-outline";
+  return variant.value === "warning" ? "warning" : "search-off";
 });
-const inlineIconTone = computed(() =>
-  props.toneIcon && variant.value === "error"
-    ? "bg-status-error-bg text-status-error-text"
-    : "bg-surface-subtle text-text-secondary",
-);
+const inlineIconTone = computed(() => {
+  if (props.toneIcon && variant.value === "error")
+    return "bg-status-error-bg text-status-error-text";
+  if (props.toneIcon && variant.value === "warning")
+    return "bg-status-warning-bg text-status-warning-text";
+  return "bg-surface-subtle text-text-secondary";
+});
 
 // --- prefers-reduced-motion -------------------------------------------------
 const animated = ref(true);

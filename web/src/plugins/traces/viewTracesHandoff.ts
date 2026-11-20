@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { escapeSingleQuotes } from "@/utils/zincutils";
+import { serviceNamesSql } from "@/utils/serviceCount";
 
 /**
  * Payload emitted by ServiceGraph / ServicesCatalog `view-traces`. Every field
@@ -22,7 +23,11 @@ import { escapeSingleQuotes } from "@/utils/zincutils";
  */
 export interface ViewTracesPayload {
   serviceName?: string;
+  /** Every raw spelling a folded catalog row covers; absent means serviceName alone. */
+  serviceNames?: string[];
   serviceType?: string;
+  /** SQL expression that names the node when it is not `infer_service_name` (GenAI nodes). */
+  identityExpr?: string;
   serviceSystem?: string | null;
   operationName?: string;
   nodeName?: string;
@@ -50,9 +55,12 @@ export interface ViewTracesPayload {
 export function buildViewTracesFilter(data: ViewTracesPayload): string {
   if (!data.serviceName) return "";
 
-  const escapedServiceName = escapeSingleQuotes(data.serviceName);
-  const serviceField = data.serviceType ? "infer_service_name" : "service_name";
-  let filterQuery = `${serviceField} = '${escapedServiceName}'`;
+  let filterQuery = data.serviceType
+    ? `${data.identityExpr || "infer_service_name"} = '${escapeSingleQuotes(data.serviceName)}'`
+    : serviceNamesSql(
+        "service_name",
+        data.serviceNames?.length ? data.serviceNames : [data.serviceName],
+      );
 
   if (data.serviceType && Object.prototype.hasOwnProperty.call(data, "serviceSystem")) {
     filterQuery += ` AND infer_service_type = '${escapeSingleQuotes(data.serviceType)}'`;

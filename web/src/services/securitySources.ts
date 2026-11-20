@@ -25,6 +25,7 @@ export interface SigmaLogsource {
 export interface ValueSignal {
   field: string;
   any: string[];
+  optional?: boolean;
 }
 
 /** One built-in source type, as the server's catalog describes it; the UI reads only its display and field-map parts. */
@@ -53,6 +54,9 @@ export interface SourceType {
     keywords?: string;
   };
   telemetryOnly?: boolean;
+  line?: { field: string; formats: string[] };
+  /** Kept so stored settings resolve; never offered as a choice. */
+  supersededBy?: string;
 }
 
 export interface Classification {
@@ -78,6 +82,10 @@ export interface SourceMatch {
 }
 
 export type SourceDecision = "auto" | "suggested" | "ignored";
+/** Who a classifier pass is recorded as, so a page view is never logged as the viewer's change. */
+export const CLASSIFIER_ACTOR = "system:classifier";
+/** Who chose a stream's source type; the classifier never replaces a manual or pack one. */
+export type SourceTypeOrigin = "auto" | "manual" | "pack";
 export type SourceReason = "auto" | "manual" | "pack";
 export type SourceState = "mapped" | "included" | "excluded" | "not_mapped";
 export type SourceHealth = "live" | "quiet" | "never";
@@ -115,6 +123,8 @@ export interface SourceRow {
   source_type: string;
   offered_pack: PackRef | null;
   detach_pack: PackRef | null;
+  /** A newer version of the attached pack; absent from servers that predate it. */
+  update_available?: PackRef | null;
   health: SourceHealth;
   activity: { doc_num: number; doc_time_max: number };
   included: boolean | null;
@@ -174,6 +184,7 @@ export interface SecuritySetting {
   included?: boolean | null;
   verdict?: SourceDecision | null;
   confidence?: number;
+  origin?: SourceTypeOrigin | null;
   updated_by?: string;
   updated_at?: number;
   changes?: SecuritySettingChange[];
@@ -277,6 +288,18 @@ const securitySources = {
     http().post<AttachResult>(
       `/api/${org}/security/sources/${encodeURIComponent(stream)}/attach`,
       body,
+    ),
+  /** The stream's schema; Security read covers a Security source without a stream grant. */
+  schema: (org: string, stream: string) =>
+    http().get(`/api/${org}/security/sources/${encodeURIComponent(stream)}/schema`),
+  /** Explicit include or exclude; needs Security write, and Security delete to exclude a source. */
+  setIncluded: (org: string, stream: string, included: boolean) =>
+    http().post(`/api/${org}/security/sources/${encodeURIComponent(stream)}/include`, { included }),
+  /** An empty source type hands the stream back to the classifier. */
+  setSourceType: (org: string, stream: string, sourceType: string) =>
+    http().post<{ setting: SecuritySetting }>(
+      `/api/${org}/security/sources/${encodeURIComponent(stream)}/source_type`,
+      { source_type: sourceType || null },
     ),
   detach: (org: string, stream: string) =>
     http().post<DetachResult>(`/api/${org}/security/sources/${encodeURIComponent(stream)}/detach`),

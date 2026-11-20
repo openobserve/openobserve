@@ -26,6 +26,7 @@ import {
   type HuntSort,
 } from "@/utils/security/huntLink";
 import { formatEventCount } from "@/utils/formatters";
+import { searchErrorText } from "@/utils/security/eventQuery";
 
 const props = defineProps<{
   orgId: string;
@@ -137,7 +138,7 @@ async function run({ recount = true } = {}) {
     if (isForbiddenError(e)) refusal.value = e;
     else
       error.value =
-        e?.response?.data?.message ?? e?.message ?? String(t("siem.events.searchFailed"));
+        searchErrorText(e?.response?.data) || e?.message || String(t("siem.events.searchFailed"));
   } finally {
     if (mine === seq) {
       loading.value = false;
@@ -239,7 +240,7 @@ function onRow(row: HuntRow) {
     @row-click="onRow"
   >
     <template #toolbar>
-      <div class="flex w-full flex-wrap items-center gap-2">
+      <div class="flex flex-1 flex-wrap items-center gap-2">
         <div class="w-40 shrink-0">
           <OSelect
             :aria-label="t('siem.aria.huntKind')"

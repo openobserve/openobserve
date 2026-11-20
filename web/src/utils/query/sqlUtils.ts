@@ -385,7 +385,7 @@ export function extractFields(parsedAst: any, timeField: string, sqlParser?: any
       field.streamAlias = column?.expr?.table || null;
     } else if (column.expr.type === "aggr_func") {
       field.column = column?.expr?.args?.expr?.column?.expr?.value ?? timeField;
-      field.aggregationFunction = column?.expr?.name?.toLowerCase() ?? "count";
+      field.aggregationFunction = aggregationName(column.expr);
       // Extract table/streamAlias from aggregation function argument
       field.streamAlias = column?.expr?.args?.expr?.table || null;
     } else if (column.expr.type === "function") {
@@ -419,6 +419,155 @@ export function extractFields(parsedAst: any, timeField: string, sqlParser?: any
   }
 
   return fields;
+}
+
+const HAVING_OPERATORS: Record<string, string> = {
+  "=": "=",
+  "<>": "<>",
+  "!=": "<>",
+  ">=": ">=",
+  "<=": "<=",
+  ">": ">",
+  "<": "<",
+};
+
+interface AstExpr {
+  type?: string;
+  value?: unknown;
+  table?: string | null;
+  column?: string | { expr?: { value?: string } };
+  name?: string | { name?: { value?: string }[] };
+  operator?: string;
+  left?: AstExpr;
+  right?: AstExpr;
+  args?: { distinct?: string | null; expr?: AstExpr; value?: AstExpr[] };
+}
+
+interface AstColumn {
+  expr: AstExpr;
+  as?: string | null;
+}
+
+interface AstSelect {
+  columns?: AstColumn[];
+  having?: AstExpr | null;
+  orderby?: { expr: AstExpr; type?: string; nulls?: string | null }[] | null;
+  limit?: { seperator?: string; value?: AstExpr[] } | null;
+}
+
+interface ClauseField {
+  column?: string;
+  type?: string;
+  havingConditions?: { operator: string; value: number }[];
+  sortBy?: "ASC" | "DESC";
+}
+
+function nestedColumnName(expr?: AstExpr): string | undefined {
+  return typeof expr?.column === "object" ? expr.column?.expr?.value : undefined;
+}
+
+function columnRefName(expr: AstExpr): string | undefined {
+  return nestedColumnName(expr) ?? (typeof expr.column === "string" ? expr.column : undefined);
+}
+
+function aggregationName(expr: AstExpr): string {
+  const name = typeof expr.name === "string" ? expr.name.toLowerCase() : "count";
+  return expr.args?.distinct ? `${name}-distinct` : name;
+}
+
+function exprSignature(expr: AstExpr | undefined, timeField: string): string | null {
+  if (expr?.type === "column_ref") {
+    return `${expr.table ?? ""}.${columnRefName(expr)}`;
+  }
+  // The argument's table keeps max(a.took) and max(b.took) apart in a JOIN.
+  if (expr?.type === "aggr_func") {
+    const arg = expr.args?.expr;
+    return `${aggregationName(expr)}(${arg?.table ?? ""}.${nestedColumnName(arg) ?? timeField})`;
+  }
+  if (expr?.type === "function") {
+    const name =
+      typeof expr.name === "object" ? expr.name?.name?.[0]?.value?.toLowerCase() : undefined;
+    const arg = expr.args?.value?.[0];
+    return `${name}(${arg?.table ?? ""}.${nestedColumnName(arg) ?? timeField})`;
+  }
+  return null;
+}
+
+/** Index into ast.columns that a HAVING/ORDER BY expression refers to: by position (ORDER BY only), alias or same expression. */
+function resolveSelectIndex(
+  expr: AstExpr | undefined,
+  columns: AstColumn[],
+  timeField: string,
+  allowPosition: boolean,
+): number {
+  if (allowPosition && expr?.type === "number") return Number(expr.value) - 1;
+  if (expr?.type === "column_ref" && !expr.table) {
+    const name = columnRefName(expr);
+    const aliased = name === undefined ? -1 : columns.findIndex((column) => column.as === name);
+    if (aliased !== -1) return aliased;
+  }
+  const signature = exprSignature(expr, timeField);
+  if (!signature) return -1;
+  return columns.findIndex((column) => exprSignature(column.expr, timeField) === signature);
+}
+
+function flattenAnd(expr: AstExpr): AstExpr[] {
+  if (
+    expr.type === "binary_expr" &&
+    expr.operator?.toUpperCase() === "AND" &&
+    expr.left &&
+    expr.right
+  ) {
+    return [...flattenAnd(expr.left), ...flattenAnd(expr.right)];
+  }
+  return [expr];
+}
+
+/** Copies HAVING, ORDER BY and LIMIT onto the select-aligned fields (orderedFields in ORDER BY key order), or names the clause the builder cannot express. */
+export function applyQueryClauses(
+  ast: AstSelect,
+  fields: ClauseField[],
+  timeField: string,
+): { limit: number; orderedFields: ClauseField[]; unsupported?: string } {
+  const columns = ast.columns ?? [];
+  const fieldFor = (expr: AstExpr | undefined, allowPosition: boolean) => {
+    const field = fields[resolveSelectIndex(expr, columns, timeField, allowPosition)];
+    return field && (field.column || field.type === "raw") ? field : null;
+  };
+  const result = { limit: 0, orderedFields: [] as ClauseField[] };
+
+  for (const condition of ast.having ? flattenAnd(ast.having) : []) {
+    const operator = condition.operator ? HAVING_OPERATORS[condition.operator] : undefined;
+    const field = operator ? fieldFor(condition.left, false) : null;
+    const value = condition.right?.type === "number" ? Number(condition.right.value) : NaN;
+    if (!operator || !field || !Number.isFinite(value) || field.havingConditions?.length) {
+      return { ...result, unsupported: "Contains a HAVING condition the builder cannot express" };
+    }
+    field.havingConditions = [{ operator, value }];
+  }
+
+  for (const key of ast.orderby ?? []) {
+    if (key.nulls) return { ...result, unsupported: "Contains ORDER BY with NULLS placement" };
+    const field = fieldFor(key.expr, true);
+    if (!field)
+      return { ...result, unsupported: "Contains ORDER BY on an expression not in SELECT" };
+    if (result.orderedFields.includes(field)) {
+      return { ...result, unsupported: "Contains ORDER BY on the same field twice" };
+    }
+    field.sortBy = key.type?.toUpperCase() === "DESC" ? "DESC" : "ASC";
+    result.orderedFields.push(field);
+  }
+
+  const limitValues = ast.limit?.value ?? [];
+  // The parser reports a lone OFFSET as one value, which would otherwise read as a LIMIT.
+  const hasOffset = ast.limit?.seperator === "offset" || limitValues.length > 1;
+  const limit = limitValues[0]?.type === "number" ? Number(limitValues[0].value) : NaN;
+  if (hasOffset || (limitValues.length === 1 && !(limit > 0))) {
+    return { ...result, unsupported: "Contains OFFSET or a LIMIT the builder cannot express" };
+  }
+  if (limitValues.length === 1) result.limit = limit;
+
+  return result;
 }
 
 /**
@@ -783,6 +932,57 @@ function countWhereLeaves(node: any): number {
   return 1;
 }
 
+const COMPARISON_OPERATORS = ["=", "!=", "<>", "<", ">", "<=", ">="];
+const STRING_TYPES = ["string", "single_quote_string"];
+const FIELD_FUNCTIONS = ["str_match", "str_match_ignore_case", "re_match", "re_not_match"];
+
+const isColumnRef = (node: any) => node?.type === "column_ref" && !!node.column;
+const isStringLiteral = (node: any) => STRING_TYPES.includes(node?.type);
+const isValueLiteral = (node: any) => isStringLiteral(node) || node?.type === "number";
+
+// LIKE only round-trips as starts-with, ends-with or a wildcard-free contains.
+function isChartableLike(pattern: any): boolean {
+  if (typeof pattern !== "string") return false;
+  const [lead, trail] = [pattern.startsWith("%"), pattern.endsWith("%")];
+  const inner = pattern.replace(/^%/, "").replace(/%$/, "");
+  if (!inner || inner.includes("%")) return false;
+  return lead && trail ? !inner.includes("_") : lead !== trail;
+}
+
+// Whether buildCondition re-emits the leaf with the same meaning (parseCondition drops the rest).
+function isChartableLeaf(node: any): boolean {
+  if (!node) return true;
+  if (node.type === "binary_expr" && (node.operator === "AND" || node.operator === "OR")) {
+    return isChartableLeaf(node.left) && isChartableLeaf(node.right);
+  }
+  if (node.type === "function") {
+    const name = node.name?.name?.[0]?.value?.toLowerCase();
+    const args = node.args?.value ?? [];
+    if (name === "match_all") return args.length === 1 && isStringLiteral(args[0]);
+    return (
+      FIELD_FUNCTIONS.includes(name) &&
+      args.length === 2 &&
+      isColumnRef(args[0]) &&
+      isStringLiteral(args[1])
+    );
+  }
+  if (node.type !== "binary_expr" || !isColumnRef(node.left)) return false;
+  const { operator, right } = node;
+  if (COMPARISON_OPERATORS.includes(operator))
+    return isValueLiteral(right) || right?.type === "bool";
+  if (operator === "IS" || operator === "IS NOT") return right?.type === "null";
+  if (operator === "IN" || operator === "NOT IN") {
+    return (
+      right?.type === "expr_list" && right.value?.length > 0 && right.value.every(isValueLiteral)
+    );
+  }
+  if (operator === "LIKE") return isStringLiteral(right) && isChartableLike(right.value);
+  if (operator === "NOT LIKE") {
+    return isStringLiteral(right) && isChartableLike(right.value) && /^%.+%$/.test(right.value);
+  }
+  return false;
+}
+
 function countFilterConditions(filter: any): number {
   if (!filter) return 0;
   if (filter.filterType === "condition") return 1;
@@ -850,6 +1050,7 @@ export const getFieldsFromQuery = async (query: any, timeField: string = "_times
     let fields = extractFields(ast, timeField, parser);
     let filters: any = extractFilters(ast);
     const joins = extractJoins(ast);
+    const clauses = applyQueryClauses(ast, fields, timeField);
 
     // remove wrong fields and filters (but keep raw fields)
     fields = fields.filter((field: any) => field.column || field.type === "raw");
@@ -868,6 +1069,7 @@ export const getFieldsFromQuery = async (query: any, timeField: string = "_times
       filters,
       streamName,
       joins,
+      ...clauses,
     };
   } catch (error) {
     return {
@@ -890,6 +1092,8 @@ export const getFieldsFromQuery = async (query: any, timeField: string = "_times
       },
       streamName: null,
       joins: [],
+      limit: 0,
+      orderedFields: [],
     };
   }
 };
@@ -1362,7 +1566,12 @@ export const parseWhereClauseToFilterChecked = async (
   const filter = await parseWhereClauseToFilter(whereClauseText);
   try {
     const ast: any = parser.astify(`SELECT * FROM "dummy" WHERE ${whereClauseText}`);
-    return { filter, complete: countWhereLeaves(ast?.where) === countFilterConditions(filter) };
+    return {
+      filter,
+      complete:
+        isChartableLeaf(ast?.where) &&
+        countWhereLeaves(ast?.where) === countFilterConditions(filter),
+    };
   } catch {
     return { filter, complete: false };
   }

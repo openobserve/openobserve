@@ -23,7 +23,9 @@ import {
   findParent,
   groupLevel,
   insertNode,
+  liftAutoGroups,
   makeCondition,
+  nestLeftToRight,
   newFilterId,
   OPERATORS,
   removeNode,
@@ -43,7 +45,7 @@ import {
 import { parseShorthand } from "@/utils/query/filterBarParser";
 import { leafConditions } from "./codecs/types";
 import { arityFor, type FilterEditorConfig } from "./filterProfiles";
-import type { FilterBarExtraSection } from "./QueryFilterBar.types";
+import type { FilterBarExtraSection, FilterValueLabel } from "./QueryFilterBar.types";
 
 export type FilterBarStep = "field" | "operator" | "value";
 
@@ -74,6 +76,7 @@ export interface FilterBarEditorOptions {
   loadValues: Ref<((field: string, search: string) => Promise<string[]>) | undefined>;
   /** Values offered before the loaded ones for every field, e.g. dashboard `$variables`. */
   extraValues?: Ref<((field: string) => string[]) | undefined>;
+  valueLabel?: Ref<((field: string, value: string) => FilterValueLabel | undefined) | undefined>;
   /** Host rows listed above the fields while the bar is empty and nothing is typed. */
   extraSuggestions?: Ref<FilterBarExtraSection | undefined>;
   selectExtra?: (key: string, event: MouseEvent | KeyboardEvent) => void;
@@ -344,11 +347,16 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const pinned = editedValue.value !== null ? [editedValue.value] : typedPicks;
     const source = [...pinned, ...loaded.filter((v) => !pinned.includes(v))];
     const ranked = rankByMatch(source, needle).slice(0, MAX_ROWS);
-    const rows: ChipInputSuggestion[] = ranked.map((value) => ({
-      key: value,
-      label: raw(value === "" ? t("filterBar.emptyValue") : value),
-      selected: multiValue.value && chosen.has(value),
-    }));
+    const named = (value: string) => options.valueLabel?.value?.(draft.value?.field ?? "", value);
+    const rows: ChipInputSuggestion[] = ranked.map((value) => {
+      const name = named(value);
+      return {
+        key: value,
+        label: raw(name?.label || (value === "" ? t("filterBar.emptyValue") : value)),
+        ...(name?.detail ? { detail: name.detail } : {}),
+        selected: multiValue.value && chosen.has(value),
+      };
+    });
     if (needle && !source.includes(needle)) {
       const row: ChipInputSuggestion = {
         key: CUSTOM_KEY,
@@ -477,10 +485,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
             id: editingId.value,
           });
     } else {
-      next = place(
-        tree.value,
-        makeCondition(current.field, current.operator, filled, nextConnector.value),
-      );
+      const condition = makeCondition(current.field, current.operator, filled, nextConnector.value);
+      next = nestUpFrom(place(tree.value, condition), targetGroup.value.id);
     }
     const wasEditing = Boolean(editingId.value);
     pendingConnector.value = "AND";
@@ -608,6 +614,33 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     return insertNode(moved, { ...node, connector: first.connector }, group.id, 0);
   }
 
+  // A per-item group never mixes AND and OR, so the chips read left to right exactly as the SQL runs.
+  function nestMixed(base: FilterGroup, groupId: string): FilterGroup {
+    if (config.value.connectors !== "per-item") return base;
+    const group = groupId === base.id ? base : findNode(base, groupId);
+    if (group?.kind !== "group") return base;
+    const items = nestLeftToRight(group.items);
+    if (items === group.items) return base;
+    const next =
+      group.id === base.id ? { ...base, items } : replaceNode(base, group.id, { ...group, items });
+    followCaret(next);
+    return next;
+  }
+
+  // A group started empty joins its level only when its first condition lands, so nest every level above too.
+  function nestUpFrom(base: FilterGroup, groupId: string): FilterGroup {
+    let next = base;
+    for (let id: string | undefined = groupId; id; id = findParent(next, id)?.id)
+      next = nestMixed(next, id);
+    return next;
+  }
+
+  // The chip after the caret may now sit in another group; the caret goes with it.
+  function followCaret(next: FilterGroup) {
+    const holder = caretBeforeId.value ? findParent(next, caretBeforeId.value) : undefined;
+    if (holder) openGroupId.value = holder.id === next.id ? null : holder.id;
+  }
+
   /** Drops the empty group the caret leaves, and any parent that empties with it, but never `keepId`. */
   function dropAbandoned(base: FilterGroup, fromId: string, keepId: string): FilterGroup {
     let id: string | undefined = fromId;
@@ -661,6 +694,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
       connector: advanced.value ? (groupConnector(siblings) ?? pendingConnector.value) : "AND",
       items: [],
     };
+    // Nesting waits for the group's first condition, so a group left empty leaves the row as it was.
     next = place(next, group);
     pendingConnector.value = "AND";
     text.value = "";
@@ -731,11 +765,15 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     const node = findNode(tree.value, id);
     if (!node) return;
     const next: FilterConnector = node.connector === "AND" ? "OR" : "AND";
-    if (config.value.connectors === "per-group") {
-      const parent = findParent(tree.value, id);
-      if (parent) return options.commit(setGroupConnector(tree.value, parent.id, next));
-    }
-    options.commit(replaceNode(tree.value, id, { ...node, connector: next }));
+    const parent = findParent(tree.value, id);
+    if (config.value.connectors === "per-group" && parent)
+      return options.commit(setGroupConnector(tree.value, parent.id, next));
+    const flipped = replaceNode(tree.value, id, { ...node, connector: next });
+    if (!parent) return options.commit(flipped);
+    // A flip back undoes the nesting the first flip made, so the row reads as it did.
+    const lifted = liftAutoGroups(flipped, parent.id);
+    if (lifted !== flipped) followCaret(lifted);
+    options.commit(nestMixed(lifted, parent.id));
   }
 
   function toggleNegate(id: string) {
@@ -833,6 +871,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
 
   function onEscape() {
     if (draft.value) reset();
+    // An empty group goes with its connector, as when the caret leaves it, so the row reads as before.
+    if (openGroupId.value && !targetGroup.value.items.length) closeGroup();
   }
 
   function editCondition(id: string, part: FilterBarStep) {
@@ -889,7 +929,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   /** Only offered where dropping the brackets leaves the filter meaning the same. */
   function canUngroup(id: string): boolean {
     if (config.value.connectors === "any-of-groups") return false;
-    return canUngroupNode(tree.value, id, perGroup.value);
+    return canUngroupNode(tree.value, id);
   }
 
   function ungroup(id: string) {

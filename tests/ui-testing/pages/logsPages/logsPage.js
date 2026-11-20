@@ -526,6 +526,9 @@ export class LogsPage {
         // The settled status dot is the only analyze-mode id besides the in-flight elapsed counter.
         this.queryPlanAnalyzeSettled = `${this.queryPlanDialog} [data-test^="query-plan-mode-analyze-"]:not([data-test$="-elapsed"])`;
         this.queryPlanModeAnalyzeDone = `${this.queryPlanDialog} [data-test="query-plan-mode-analyze-done"]`;
+        this.queryPlanAnalyzeWarning = `${this.queryPlanDialog} [data-test="query-plan-analyze-warning"]`;
+        this.queryPlanAnalyzeBarWarning = `${this.queryPlanDialog} [data-test="query-plan-analyze-bar-warning"]`;
+        this.queryPlanAnalyzeBarSuccess = `${this.queryPlanDialog} [data-test="query-plan-analyze-bar-success"]`;
         this.queryProfileView = `${this.queryPlanDialog} [data-test="query-profile-view"]`;
         this.queryProfileSummary = `${this.queryPlanDialog} [data-test="query-profile-summary"]`;
         this.queryProfileTileRows = `${this.queryPlanDialog} [data-test="query-profile-tile-rows"]`;
@@ -567,6 +570,18 @@ export class LogsPage {
         this.datetimeTimezoneSelectSearch = '[data-test="datetime-timezone-select-search"]';
         this.datetimeTimezoneSelectPopover = '[data-test="datetime-timezone-select-popover"]';
         this.datetimeTimezoneOption = (value) => `[data-test="datetime-timezone-select-option"][data-test-value="${value}"]`;
+
+        // ===== RUN BUTTON STATES, RECENT SEARCHES DRAWER, VALUE SUGGESTIONS =====
+        this.runQueryInFlight = `${this.queryButton}[class*="bg-cancel-query-bg"]`;
+        this.runQueryPending = `${this.queryButton}[data-run-pending="true"]`;
+        this.noQueryAppliedText = '[data-test="logs-search-apply-search-text"]';
+        this.filterBuilderToggle = '[data-test="logs-search-bar-filter-builder-toggle"]';
+        this.recentSearchesButton = '[data-test="logs-search-bar-recent-searches-btn"]';
+        this.recentSearchesDrawer = '[data-test="recent-searches-drawer"]';
+        this.recentSearchesDrawerSearch = `${this.recentSearchesDrawer} [data-test="recent-searches-search"] input`;
+        this.recentSearchesDrawerRows = `${this.recentSearchesDrawer} [data-test^="recent-searches-drawer-row-"]`;
+        this.queryEditorViewLines = `${this.queryEditor} .view-lines`;
+        this.suggestWidgetVisible = '.monaco-editor .suggest-widget.visible';
     }
 
 
@@ -1561,9 +1576,7 @@ export class LogsPage {
 
     async typeQuery(query) {
         await this.page.locator(this.queryEditor).click();
-        await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: 'visible', timeout: 30000 });
-        await this.page.locator(this.queryEditor).press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await this.page.locator(this.queryEditor).locator('.inputarea').fill(query);
+        await this.getMonacoEditorHelper().fillInputArea(this.page.locator(this.queryEditor), query);
     }
 
     async executeQueryWithKeyboardShortcut() {
@@ -3029,7 +3042,7 @@ export class LogsPage {
 
         if (!set) {
             // Fallback to DOM fill
-            return await this.page.locator(this.queryEditor).locator('.inputarea').first().fill(query);
+            return await this.getMonacoEditorHelper().fillInputArea(this.page.locator(this.queryEditor), query);
         }
     }
 
@@ -3650,6 +3663,13 @@ export class LogsPage {
         return await this.savedViewApplyLocator(text).first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
+    async expectSavedViewAbsent(name) {
+        await this.clickSavedViewsExpand();
+        await this.clickSavedViewSearchInput();
+        await this.fillSavedViewSearchInput(name);
+        await expect(this.savedViewApplyLocator(name)).toHaveCount(0, { timeout: 10000 });
+    }
+
     /**
      * Wait briefly for the success OToast after creating a saved view.
      * Resolves true on toast visible, false on timeout. Non-throwing — toasts may
@@ -3665,6 +3685,21 @@ export class LogsPage {
         } catch (e) {
             return false;
         }
+    }
+
+    async waitForSavedViewViaApi(org, viewName, timeout = 30000) {
+        let view;
+        await expect.poll(async () => {
+            const response = await this.page.request.get(`${process.env.ZO_BASE_URL}/api/${org}/savedviews`, { headers: getAuthHeaders() });
+            view = response.ok() ? ((await response.json()).views ?? []).find((v) => v.view_name === viewName) : undefined;
+            return Boolean(view);
+        }, { timeout }).toBe(true);
+        return view;
+    }
+
+    async fetchSavedViewViaApi(org, viewId) {
+        const response = await this.page.request.get(`${process.env.ZO_BASE_URL}/api/${org}/savedviews/${viewId}`, { headers: getAuthHeaders() });
+        return response.json();
     }
 
     async clickDeleteSavedViewButton(savedViewName) {
@@ -3698,7 +3733,7 @@ export class LogsPage {
     }
 
     async waitForQueryEditorTextbox() {
-        return await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: "visible" });
+        return await this.getMonacoEditorHelper().waitForReady(this.page.locator(this.queryEditor));
     }
 
     async getQueryEditorText() {
@@ -4292,6 +4327,11 @@ export class LogsPage {
         return await expect(this.page.locator(this.errorMessage)).not.toBeVisible({ timeout });
     }
 
+    /** Stricter than expectSqlErrorStateNotVisible: the error state must not be rendered at all, hidden or not. */
+    async expectNoQueryError(message) {
+        await expect(this.page.locator(this.errorMessage), message).toHaveCount(0);
+    }
+
     /**
      * Assert the error state element, if visible, does NOT contain the given text.
      * Passes trivially when no error element is shown (intended for edge-case queries
@@ -4852,7 +4892,7 @@ export class LogsPage {
     }
 
     async isVrlEditorInputVisible() {
-        return await this.page.locator(this.fnEditor).locator('.inputarea').isVisible().catch(() => false);
+        return await this.page.locator(this.fnEditor).locator('.monaco-editor').first().isVisible().catch(() => false);
     }
 
     async clickPast6DaysButton() {
@@ -4896,7 +4936,7 @@ export class LogsPage {
      */
     async expectVrlEditorReady() {
         await this.page.locator(this.vrlEditor).first().waitFor({ state: 'visible', timeout: 15000 });
-        await this.page.locator(`${this.vrlEditor} .inputarea`).first().waitFor({ state: 'visible', timeout: 15000 });
+        await this.getMonacoEditorHelper().waitForReady(this.page.locator(this.vrlEditor).first(), 15000);
     }
 
     /**
@@ -5060,7 +5100,7 @@ export class LogsPage {
         // initialised (setupEditor() async load completes). This prevents the
         // waitForFunction below from timing out on page reloads where window.monaco
         // is not yet set when domcontentloaded fires.
-        await this.page.locator(this.queryEditor).locator('.inputarea').waitFor({ state: 'visible', timeout: 20000 });
+        await this.getMonacoEditorHelper().waitForReady(this.page.locator(this.queryEditor), 20000);
         // Assert against Monaco's model value (not DOM view-lines which render
         // line numbers when empty — AGENT_RULES §5).
         await this.page.waitForFunction(
@@ -5415,6 +5455,10 @@ export class LogsPage {
 
     async expectLogTableColumnSourceNotHaveText(text) {
         await expect(this.page.locator(this.logTableColumnSource)).not.toHaveText(text);
+    }
+
+    async expectLogTableColumnSourceToContainText(text) {
+        await expect(this.page.locator(this.logTableColumnSource)).toContainText(text, { timeout: 30000 });
     }
 
     async selectStreamAndStreamTypeForLogs(stream) {
@@ -6186,9 +6230,48 @@ export class LogsPage {
         return buttonCount;
     }
 
+    async waitForSearchStreamQuiet({ quietMs = 1500, timeout = 30000 } = {}) {
+        const isSearch = (request) => request.url().includes('/_search_stream') && request.method() === 'POST';
+        let inFlight = 0;
+        let lastActivity = Date.now();
+        const onStart = (request) => {
+            if (!isSearch(request)) return;
+            inFlight++;
+            lastActivity = Date.now();
+        };
+        const onEnd = (request) => {
+            if (!isSearch(request)) return;
+            inFlight = Math.max(0, inFlight - 1);
+            lastActivity = Date.now();
+        };
+        this.page.on('request', onStart);
+        this.page.on('requestfinished', onEnd);
+        this.page.on('requestfailed', onEnd);
+        try {
+            const deadline = Date.now() + timeout;
+            while (Date.now() < deadline) {
+                if (inFlight === 0 && Date.now() - lastActivity >= quietMs) return true;
+                await this.page.waitForTimeout(100);
+            }
+            return false;
+        } finally {
+            this.page.off('request', onStart);
+            this.page.off('requestfinished', onEnd);
+            this.page.off('requestfailed', onEnd);
+        }
+    }
+
+    // J on a page's last row crosses only once the page-count query has given the pager its next page.
+    async expectResultPageCountAtLeast(pageNumber, timeout = 60000) {
+        await expect(this.page.locator(this.resultPaginationPageBtn(pageNumber)).first()).toBeVisible({ timeout });
+    }
+
     async setupAPICallTracking() {
+        // A search the SQL or histogram toggle set off can land after the tracked shortcut and be counted as its own.
+        await this.waitForRunQueryReady();
+        await this.waitForSearchStreamQuiet();
         const allRequests = [];
-        
+
         const requestHandler = (request) => {
             if (request.url().includes('/_search_stream') && request.method() === 'POST') {
                 let postData = null;
@@ -10527,6 +10610,10 @@ export class LogsPage {
         await this.expectNoToastContaining(this.multiStreamPatternsToastText);
     }
 
+    async isAutoQueryEnabledOnInstance() {
+        return await this.logsQueryPage._isAutoQueryEnabled();
+    }
+
     /**
      * Read `quick_mode_enabled` from the instance /config endpoint.
      * isSelectStarForTable() short-circuits to false when this is off, so the
@@ -11496,8 +11583,11 @@ export class LogsPage {
         testLogger.info('Query profile rendered operator cards');
     }
 
-    async expectAnalyzeNotShownAsSuccess() {
-        await expect(this.page.locator(this.queryPlanModeAnalyzeDone)).toHaveCount(0);
+    /** A partial EXPLAIN ANALYZE run settles as done but must carry the warning bar and banner, never the success bar. */
+    async expectAnalyzeShownAsPartial() {
+        await expect(this.page.locator(this.queryPlanAnalyzeBarWarning)).toBeVisible();
+        await expect(this.page.locator(this.queryPlanAnalyzeWarning)).toBeVisible();
+        await expect(this.page.locator(this.queryPlanAnalyzeBarSuccess)).toHaveCount(0);
     }
 
     /** The logs table delegates scrolling to an unnamed ancestor, so resolve it at runtime. */
@@ -12417,6 +12507,27 @@ export class LogsPage {
         // of WHERE context field names).
         await this.page.waitForTimeout(600);
         await monacoHelper.triggerSuggestions();
+    }
+
+    /** Re-opens suggestions until a label matches expectedLabels (case-insensitive) or the timeout passes; returns the last labels. */
+    async setQueryEditorContentAndWaitForSuggestions(content, expectedLabels, timeout = 10000) {
+        const monacoHelper = this.getMonacoEditorHelper();
+        await monacoHelper.setContent(this.getQueryEditorContainer(), content);
+        const expected = expectedLabels.map(l => l.toLowerCase());
+        const deadline = Date.now() + timeout;
+        let interval = 600;
+        for (let attempt = 1; ; attempt++) {
+            // Stale context keywords clear only after the editor debounce + keywords prop round trip; the menu is the sole signal.
+            await this.page.waitForTimeout(interval);
+            await this.dismissSuggestions();
+            await monacoHelper.triggerSuggestions();
+            const labels = await this.waitAndGetSuggestionLabels(2000).catch(() => []);
+            if (labels.some(l => expected.includes(l.toLowerCase())) || Date.now() >= deadline) {
+                return labels;
+            }
+            testLogger.info(`Suggestions not settled (attempt ${attempt}): ${labels.slice(0, 5).join(', ')} — re-opening`);
+            interval = 1000;
+        }
     }
 
     /**
@@ -13924,4 +14035,160 @@ export class LogsPage {
     fieldValueCheckbox(field, text) {
         return this.fieldValueRow(field, text).locator('input[type="checkbox"], [role="checkbox"]').first();
     }
+
+    /** Wait until a search is in flight, shown by the Run button's Cancel variant. */
+    async expectQueryInFlight(timeout = 30000) {
+        await expect(this.page.locator(this.runQueryInFlight)).toBeVisible({ timeout });
+    }
+
+    async expectNoQueryInFlight(timeout = 10000) {
+        await expect(this.page.locator(this.runQueryInFlight)).toHaveCount(0, { timeout });
+    }
+
+    async cancelInFlightQuery() {
+        await this.page.locator(this.runQueryInFlight).click();
+        await this.expectNoQueryInFlight();
+    }
+
+    async isNoQueryAppliedVisible() {
+        return await this.page.locator(this.noQueryAppliedText).isVisible();
+    }
+
+    /** Only an edited query arms the pending Run button, and only a run from it is recorded as a recent search. */
+    async runPendingQuery(timeout = 10000) {
+        await expect(this.page.locator(this.runQueryPending)).toBeVisible({ timeout });
+        await this.page.locator(this.runQueryPending).click();
+    }
+
+    /** The query input mode is remembered per browser, so turn the filter builder off when a previous test left it on. */
+    async ensureQueryEditorMode() {
+        const toggle = this.page.locator(this.filterBuilderToggle);
+        if ((await toggle.getAttribute('aria-pressed').catch(() => null)) !== 'true') return;
+        await toggle.click();
+        await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    }
+
+    async openRecentSearchesDrawer() {
+        await this.page.locator(this.recentSearchesButton).click();
+        await expect(this.page.locator(this.recentSearchesDrawer)).toBeVisible({ timeout: 15000 });
+    }
+
+    /** Waits for the filtered answer, since the unfiltered list can already hold the expected count and a click on a row it replaces is lost. */
+    async filterRecentSearches(text, expectedCount) {
+        const answered = this.page.waitForResponse((r) => {
+            const url = new URL(r.url());
+            return url.pathname.endsWith('/query_history') && url.searchParams.get('q') === text
+                && !url.searchParams.has('count_only') && r.ok();
+        }, { timeout: 15000 });
+        await this.page.locator(this.recentSearchesDrawerSearch).fill(text);
+        await answered;
+        await expect(this.page.locator(this.recentSearchesDrawerRows)).toHaveCount(expectedCount, { timeout: 15000 });
+    }
+
+    async clickRecentSearchRow(text) {
+        const row = this.page.locator(this.recentSearchesDrawerRows).filter({ hasText: text });
+        await expect(row).toBeVisible();
+        await row.click();
+    }
+
+    async expectResultRowWithText(text, timeout = 60000) {
+        await expect(this.page.locator(this.logsSearchResultTableRows).filter({ hasText: text }).first()).toBeVisible({ timeout });
+    }
+
+    /** Replace the query and leave a keyboard-focused caret at its end with no suggest menu open, so typed text appends. */
+    async seedQueryEditorForTyping(text) {
+        await this.page.waitForFunction((host) => {
+            const el = document.querySelector(host);
+            return !!el && (window.monaco?.editor?.getEditors?.() || []).some((e) => el.contains(e.getDomNode()));
+        }, this.queryEditor, { timeout: 15000 });
+        await this.page.evaluate(({ host, value }) => {
+            const el = document.querySelector(host);
+            const ed = window.monaco.editor.getEditors().find((e) => el.contains(e.getDomNode()));
+            ed.focus();
+            ed.setValue(value);
+            const model = ed.getModel();
+            const line = model.getLineCount();
+            ed.setPosition({ lineNumber: line, column: model.getLineMaxColumn(line) });
+            ed.trigger('e2e', 'hideSuggestWidget', {});
+        }, { host: this.queryEditor, value: text });
+        // A page.evaluate focus() does not give Monaco keyboard focus in every layout, so a real click does.
+        await this.page.locator(this.queryEditorViewLines).click();
+        await this.page.keyboard.press('ControlOrMeta+End');
+    }
+
+    /** Labels of the open suggest menu's value rows; field rows carry a folder icon and are left out. */
+    async getSuggestValueRows() {
+        const widget = this.page.locator(this.suggestWidgetVisible);
+        if (!(await widget.isVisible().catch(() => false))) return [];
+        return widget.locator('.monaco-list-row').evaluateAll((nodes) =>
+            nodes
+                .filter((n) => !n.querySelector('.codicon-symbol-folder'))
+                .map((n) => (n.getAttribute('aria-label') || n.textContent || '').split(',')[0].trim()),
+        );
+    }
+
+    /** Re-asks with Ctrl+Space until `value` is offered, since the server lookup answers after the menu first opens. */
+    async expectSuggestValueOffered(value, timeout = 20000) {
+        let rows = [];
+        await expect.poll(async () => {
+            rows = await this.getSuggestValueRows();
+            if (rows.some((r) => r.includes(value))) return true;
+            if (rows.length) await this.page.keyboard.press('Escape');
+            await this.page.keyboard.press('Control+Space');
+            return false;
+        }, { timeout, intervals: [500, 1000, 1500] }).toBe(true);
+        return rows;
+    }
+
+    runQueryPrompt() {
+        return this.page.locator('[data-test="logs-search-apply-search-text"]');
+    }
+
+    async expectRunQueryPromptVisible(timeout = 30000) {
+        await expect(this.runQueryPrompt()).toBeVisible({ timeout });
+    }
+
+    async expectNoSearchResultGrid() {
+        await expect(this.page.locator('[data-test="logs-search-search-result"]')).toHaveCount(0);
+    }
+
+    async clickRunQueryPromptAction() {
+        await this.runQueryPrompt().locator('[data-test^="o2-empty-state-action-"]').first().click();
+    }
+
+    /** Opens Logs on `stream` with a non-SQL `filter` passed as the base64 `query` URL param. */
+    async openLogsWithFilter(stream, filter) {
+        const query = encodeURIComponent(Buffer.from(filter).toString('base64'));
+        const org = getOrgIdentifier() || 'default';
+        await this.page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${org}&stream_type=logs&stream=${stream}&period=15m&sql_mode=false&quick_mode=false&query=${query}`);
+    }
+
+    /** Opens the first row containing `rowText`, includes its `field` value as a search term, and closes the detail. */
+    async includeFieldFromRowContaining(rowText, field) {
+        await this.openLogDetailForRowContaining(rowText);
+        await this.clickLogDetailTableTab();
+        await this.includeLogDetailFieldValue(field);
+        await this.clickCloseDialog();
+    }
+
+    /** Returns a live list of the SQL of every Visualize panel query the page sends from now on, read from the request body. */
+    collectVisualizeSql() {
+        const seen = [];
+        this.page.on('request', (req) => {
+            const url = req.url();
+            if (req.method() !== 'POST' || !/\/(_search_stream|_search|result_schema)\?/.test(url)) return;
+            if (!url.includes('type=dashboards') && !url.includes('fallback_order_by_col')) return;
+            try {
+                const body = JSON.parse(req.postData() || '{}');
+                let sql = body?.query?.sql;
+                // With sql_base64_enabled the UI sends URL-safe base64.
+                if (sql && (body.encoding === 'base64' || body?.query?.encoding === 'base64')) {
+                    sql = Buffer.from(sql.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '='), 'base64').toString('utf-8');
+                }
+                if (sql) seen.push(sql);
+            } catch { /* non-JSON body */ }
+        });
+        return seen;
+    }
+
 }

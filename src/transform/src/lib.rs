@@ -63,11 +63,11 @@ pub static QUERY_FUNCTIONS: LazyLock<RwHashMap<String, Transform>> =
 static GLOBAL_ENRICHMENT_TABLES: LazyLock<RwHashMap<String, Box<dyn Table + Send + Sync>>> =
     LazyLock::new(Default::default);
 
-/// VRL functions that reach the network, the environment or host files.
+/// VRL functions that reach the network; allowed only when `ZO_SKIP_SSRF_CHECKS` is set.
+const NETWORK_VRL_FUNCTIONS: &[&str] = &["http_request", "dns_lookup", "reverse_dns"];
+
+/// VRL functions that reach the environment or host files; denied regardless of SSRF settings.
 const DENIED_VRL_FUNCTIONS: &[&str] = &[
-    "http_request",
-    "dns_lookup",
-    "reverse_dns",
     "get_env_var",
     "get_hostname",
     "parse_proto",
@@ -153,6 +153,46 @@ impl Function for WithoutFileArgument {
 
     fn closure(&self) -> Option<closure::Definition> {
         self.inner.closure()
+    }
+}
+
+/// A runtime failure of a query function on a row or array; an intentional `abort` is flagged.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VrlFailure {
+    detail: String,
+    reason: String,
+    aborted: bool,
+}
+
+/// Tallies rows on which a query function failed at runtime, so a search can report
+/// one `function_error` message instead of silently returning the original rows.
+#[derive(Debug, Default)]
+pub struct VrlRunErrors {
+    total: usize,
+    failed: usize,
+    first: Option<String>,
+}
+
+impl VrlRunErrors {
+    pub fn record(&mut self, failure: Option<VrlFailure>) {
+        self.record_rows(1, failure);
+    }
+
+    /// An error fails all `rows` of the call; an intentional abort fails none.
+    pub fn record_rows(&mut self, rows: usize, failure: Option<VrlFailure>) {
+        self.total += rows;
+        if let Some(failure) = failure.filter(|f| !f.aborted) {
+            self.failed += rows;
+            self.first.get_or_insert(failure.reason);
+        }
+    }
+
+    pub fn message(&self) -> Option<String> {
+        let first = self.first.as_ref()?;
+        Some(format!(
+            "Query function failed on {} of {} rows: {first}",
+            self.failed, self.total
+        ))
     }
 }
 
@@ -275,6 +315,17 @@ pub fn apply_vrl_fn(
     org_id: &str,
     stream_name: &[String],
 ) -> (json::Value, Option<String>) {
+    let (value, failure) = apply_vrl_fn_checked(runtime, vrl_runtime, row, org_id, stream_name);
+    (value, failure.map(|f| f.detail))
+}
+
+pub fn apply_vrl_fn_checked(
+    runtime: &mut Runtime,
+    vrl_runtime: &VRLResultResolver,
+    row: json::Value,
+    org_id: &str,
+    stream_name: &[String],
+) -> (json::Value, Option<VrlFailure>) {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
     metadata.insert("org_id", vrl::value::Value::from(org_id.to_string()));
     metadata.insert(
@@ -314,8 +365,13 @@ pub fn apply_vrl_fn(
                     "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row."
                 );
                 // Return only error message without sensitive record data
-                let clean_err = format!("{org_id}/{stream_name:?} vrl failed: {err:?}");
-                (row, Some(clean_err))
+                let detail = format!("{org_id}/{stream_name:?} vrl failed: {err:?}");
+                let failure = VrlFailure {
+                    detail,
+                    reason: first_line(&err.to_string()),
+                    aborted: false,
+                };
+                (row, Some(failure))
             }
         },
         Err(err) => {
@@ -332,10 +388,19 @@ pub fn apply_vrl_fn(
                 "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row."
             );
             // Return only error message without sensitive record data
-            let clean_err = format!("{org_id}/{stream_name:?} vrl runtime error: {err:?}");
-            (row, Some(clean_err))
+            let detail = format!("{org_id}/{stream_name:?} vrl runtime error: {err:?}");
+            let failure = VrlFailure {
+                detail,
+                reason: first_line(&err.to_string()),
+                aborted: matches!(err, vrl::compiler::runtime::Terminate::Abort(_)),
+            };
+            (row, Some(failure))
         }
     }
+}
+
+fn first_line(msg: &str) -> String {
+    msg.lines().next().unwrap_or_default().to_string()
 }
 
 pub fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
@@ -401,9 +466,16 @@ fn org_enrichment_tables(org_id: &str) -> HashMap<String, enrichment::StreamTabl
 }
 
 fn vrl_stdlib_functions() -> Vec<Box<dyn Function>> {
+    vrl_stdlib_functions_inner(config::get_config().common.skip_ssrf_checks)
+}
+
+fn vrl_stdlib_functions_inner(skip_ssrf: bool) -> Vec<Box<dyn Function>> {
     vrl::stdlib::all()
         .into_iter()
-        .filter(|f| !DENIED_VRL_FUNCTIONS.contains(&f.identifier()))
+        .filter(|f| {
+            !DENIED_VRL_FUNCTIONS.contains(&f.identifier())
+                && (skip_ssrf || !NETWORK_VRL_FUNCTIONS.contains(&f.identifier()))
+        })
         .map(|f| {
             match DENIED_VRL_FILE_ARGUMENTS
                 .iter()
@@ -427,6 +499,20 @@ mod tests {
         enrichment::{ENRICHMENT_TABLES, StreamTable},
         *,
     };
+
+    const NETWORK_SOURCES: [&str; 3] = [
+        ".x = http_request!(\"http://127.0.0.1/\")",
+        ".x = dns_lookup!(\"localhost\")",
+        ".x = reverse_dns!(\"127.0.0.1\")",
+    ];
+
+    const HOST_SOURCES: [&str; 5] = [
+        ".x = get_env_var!(\"HOME\")",
+        ".x = get_hostname!()",
+        ".x = parse_proto!(.m, \"/etc/hosts\", \"a.B\")",
+        ".x = encode_proto!(.m, \"/etc/hosts\", \"a.B\")",
+        ".x = validate_json_schema!(.m, \"/etc/hosts\")",
+    ];
 
     #[test]
     fn creates_vrl_compiler_config_with_org_enrichment_tables() {
@@ -614,30 +700,53 @@ mod tests {
     }
 
     #[test]
+    fn default_config_rejects_network_functions() {
+        if config::get_config().common.skip_ssrf_checks {
+            return;
+        }
+        for source in NETWORK_SOURCES {
+            let error = compile_error(source);
+            assert!(error.contains("call to undefined function"), "{error}");
+        }
+    }
+
+    fn is_undefined_function(source: &str, skip_ssrf: bool) -> bool {
+        let external = vrl::prelude::state::ExternalEnv::default();
+        let functions = vrl_stdlib_functions_inner(skip_ssrf);
+        let config = vrl::compiler::CompileConfig::default();
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            vrl::compiler::compile_with_external(source, &functions, &external, config)
+        }))
+        .ok()
+        .and_then(|res| res.err())
+        .is_some_and(|e| {
+            vrl::diagnostic::Formatter::new(source, e)
+                .to_string()
+                .contains("call to undefined function")
+        })
+    }
+
+    #[test]
     fn rejects_network_and_host_functions() {
-        let sources = [
-            ".x = http_request!(\"http://127.0.0.1/\")",
-            ".x = dns_lookup!(\"localhost\")",
-            ".x = reverse_dns!(\"127.0.0.1\")",
-            ".x = get_env_var!(\"HOME\")",
-            ".x = get_hostname!()",
-            ".x = parse_proto!(.m, \"/etc/hosts\", \"a.B\")",
-            ".x = encode_proto!(.m, \"/etc/hosts\", \"a.B\")",
-            ".x = validate_json_schema!(.m, \"/etc/hosts\")",
-        ];
-        let allowed: Vec<&str> =
-            sources
-                .into_iter()
-                .filter(|source| {
-                    std::panic::catch_unwind(|| compile_vrl_function(source, "vrl_crate_test"))
-                        .map_or(true, |res| {
-                            res.map_or_else(
-                                |e| !e.to_string().contains("call to undefined function"),
-                                |_| true,
-                            )
-                        })
-                })
-                .collect();
+        let allowed: Vec<&str> = NETWORK_SOURCES
+            .into_iter()
+            .chain(HOST_SOURCES)
+            .filter(|source| !is_undefined_function(source, false))
+            .collect();
+        assert!(allowed.is_empty(), "still callable: {allowed:?}");
+    }
+
+    #[test]
+    fn skip_ssrf_checks_allows_only_network_functions() {
+        let denied: Vec<&str> = NETWORK_SOURCES
+            .into_iter()
+            .filter(|source| is_undefined_function(source, true))
+            .collect();
+        assert!(denied.is_empty(), "still denied: {denied:?}");
+        let allowed: Vec<&str> = HOST_SOURCES
+            .into_iter()
+            .filter(|source| !is_undefined_function(source, true))
+            .collect();
         assert!(allowed.is_empty(), "still callable: {allowed:?}");
     }
 
@@ -679,5 +788,92 @@ mod tests {
                 "{source}"
             );
         }
+    }
+
+    fn failure(reason: &str, aborted: bool) -> VrlFailure {
+        VrlFailure {
+            detail: format!("detail {reason}"),
+            reason: reason.to_string(),
+            aborted,
+        }
+    }
+
+    fn run_rows(code: &str, inputs: &[&str]) -> VrlRunErrors {
+        let program = compile_vrl_function(code, "vrl_crate_test").unwrap();
+        let resolver = VRLResultResolver {
+            program: program.program.clone(),
+            fields: program.fields.clone(),
+        };
+        let mut runtime = init_vrl_runtime();
+        let streams = vec!["s".to_string()];
+        let mut errors = VrlRunErrors::default();
+        for m in inputs {
+            let row = json::json!({ "m": m });
+            let (_, f) =
+                apply_vrl_fn_checked(&mut runtime, &resolver, row, "vrl_crate_test", &streams);
+            errors.record(f);
+        }
+        errors
+    }
+
+    #[test]
+    fn run_errors_report_nothing_when_no_row_failed() {
+        let mut errors = VrlRunErrors::default();
+        errors.record(None);
+        errors.record(None);
+        assert_eq!(errors.message(), None);
+    }
+
+    #[test]
+    fn run_errors_count_failed_rows_and_keep_first_error() {
+        let mut errors = VrlRunErrors::default();
+        errors.record(None);
+        errors.record(Some(failure("first", false)));
+        errors.record(Some(failure("second", false)));
+        assert_eq!(
+            errors.message().as_deref(),
+            Some("Query function failed on 2 of 3 rows: first")
+        );
+    }
+
+    #[test]
+    fn run_errors_fail_every_row_of_a_whole_array_call() {
+        let mut errors = VrlRunErrors::default();
+        errors.record_rows(5, Some(failure("boom", false)));
+        assert_eq!(
+            errors.message().as_deref(),
+            Some("Query function failed on 5 of 5 rows: boom")
+        );
+    }
+
+    #[test]
+    fn run_errors_ignore_an_empty_successful_array_call() {
+        let mut errors = VrlRunErrors::default();
+        errors.record_rows(0, None);
+        assert_eq!(errors.message(), None);
+    }
+
+    #[test]
+    fn run_errors_do_not_count_an_intentional_abort() {
+        let mut errors = VrlRunErrors::default();
+        errors.record(Some(failure("aborted", true)));
+        assert_eq!(errors.message(), None);
+    }
+
+    #[test]
+    fn apply_vrl_fn_flags_runtime_failure_on_only_the_bad_row() {
+        let errors = run_rows(".x = parse_json!(.m)", &["{\"a\":1}", "not json"]);
+        assert_eq!(
+            errors.message().as_deref(),
+            Some(
+                "Query function failed on 1 of 2 rows: function call error for \"parse_json\" at (5:20): unable to parse json: expected ident at line 1 column 2"
+            )
+        );
+    }
+
+    #[test]
+    fn apply_vrl_fn_does_not_flag_an_intentional_abort() {
+        let errors = run_rows("if .m == \"skip\" { abort }\n.", &["skip", "keep"]);
+        assert_eq!(errors.message(), None);
     }
 }

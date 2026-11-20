@@ -3,7 +3,14 @@
 import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
 import type { DimensionCondition, DowntimeTarget } from "@/services/downtimes";
-import { alertGroupChips, conditionSummary, sortedTargets, targetSummary } from "./targetSummary";
+import {
+  alertGroupChips,
+  conditionSummary,
+  sortedTargets,
+  targetSummary,
+  type ValueLabelFn,
+} from "./targetSummary";
+import stage8 from "@/test/unit/fixtures/serviceVersions/stage8.json";
 
 const eq = (key: string, value: string): DimensionCondition => ({
   type: "pair",
@@ -142,5 +149,25 @@ describe("alertGroupChips", () => {
   it("has nothing to show for a whole-alert downtime", () => {
     expect(alertGroupChips(null, gt)).toEqual([]);
     expect(alertGroupChips(undefined, gt)).toEqual([]);
+  });
+});
+
+// Display names as the real values endpoint returns them for `service` (stage 8 golden).
+const goldenLabel: ValueLabelFn = (key, value) =>
+  key === "service"
+    ? stage8.downtime_values.values.find((v) => v.value === value)?.label
+    : undefined;
+
+describe("conditionSummary with display names", () => {
+  it("words a pair with and without a display name in one key=value format", () => {
+    expect(
+      conditionSummary(and(eq("service", "checkoutservice"), eq("env", "prod")), gt, goldenLabel),
+    ).toBe("service=CheckoutService · env=prod");
+  });
+
+  it("keeps service=key when the value has no display name", () => {
+    expect(conditionSummary(eq("service", "no-such-svc"), gt, goldenLabel)).toBe(
+      "service=no-such-svc",
+    );
   });
 });

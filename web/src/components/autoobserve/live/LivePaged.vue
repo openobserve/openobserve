@@ -16,10 +16,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <SectionCard
-    :title="copy.title"
+    :count="settled && view.ranged.length ? view.ranged.length : undefined"
     :aria-busy="state.status === 'loading'"
     data-test="autoobserve2-paged"
   >
+    <template #title>
+      <h2 class="text-text-heading text-base font-semibold whitespace-nowrap">
+        <ODropdown align="start">
+          <template #trigger>
+            <button
+              type="button"
+              class="hover:bg-surface-subtle-hover focus-visible:ring-focus-ring-accent rounded-default -ms-2 inline-flex items-center gap-1 px-2 py-0.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              data-test="autoobserve2-paged-range"
+            >
+              {{ t(RANGE_LABEL[range]) }}
+              <OIcon name="expand-more" size="sm" class="text-text-secondary" />
+            </button>
+          </template>
+          <ODropdownItem
+            v-for="option in HOME_RANGES"
+            :key="option"
+            role="menuitemradio"
+            :aria-checked="option === range"
+            :data-test="`autoobserve2-paged-range-${option}`"
+            @select="selectRange(option)"
+          >
+            <span class="flex-1">{{ t(RANGE_LABEL[option]) }}</span>
+            <template #icon-right>
+              <OIcon
+                name="check"
+                size="sm"
+                :class="option === range ? 'text-text-heading' : 'invisible'"
+              />
+            </template>
+          </ODropdownItem>
+        </ODropdown>
+      </h2>
+    </template>
+    <template v-if="settled && view.ranged.length" #actions>
+      <OToggleGroup
+        :model-value="priority"
+        :aria-label="t('autoobserve2.recent.priorityLabel')"
+        data-test="autoobserve2-paged-priority"
+        @update:model-value="(v) => v && selectPriority(v as HomePriority)"
+      >
+        <OToggleGroupItem
+          v-for="option in HOME_PRIORITIES"
+          :key="option"
+          :value="option"
+          size="xs"
+          :disabled="!view.counts[option]"
+          :data-test="`autoobserve2-paged-priority-${option}`"
+        >
+          {{ option === "all" ? t("autoobserve2.recent.all") : option.toUpperCase() }}
+          <span class="ms-1 tabular-nums">{{ view.counts[option] }}</span>
+        </OToggleGroupItem>
+      </OToggleGroup>
+    </template>
     <span class="sr-only" role="status" data-test="autoobserve2-paged-announce">{{
       loadText
     }}</span>
@@ -93,45 +146,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       ref="bodyEl"
       tabindex="-1"
-      class="min-h-35 px-3 pb-3 outline-none sm:px-4"
+      class="min-h-35 outline-none"
       data-test="autoobserve2-paged-body"
     >
       <ul
         v-if="skeleton"
-        class="flex flex-col gap-2.5"
+        class="border-border-subtle divide-border-subtle divide-y border-t"
         aria-hidden="true"
         data-test="autoobserve2-paged-skeleton"
       >
-        <li
-          v-for="n in skeletonRows(cap)"
-          :key="n"
-          class="border-border-subtle rounded-default flex flex-col gap-1.5 border px-3 py-2.5"
-        >
-          <div class="flex h-5 items-center">
+        <li v-for="n in skeletonRows(cap)" :key="n" class="flex gap-4 px-5 py-4 sm:px-6">
+          <OSkeleton animation="none" class="w-1 rounded-full" />
+          <div class="flex flex-1 flex-col gap-2">
+            <OSkeleton animation="none" class="h-4 w-[70%]" />
+            <div class="flex items-center gap-1.5">
+              <OSkeleton animation="none" class="h-3 w-24" />
+              <OSkeleton animation="none" class="h-4 w-8" />
+              <OSkeleton animation="none" class="h-4 w-14" />
+            </div>
             <OSkeleton animation="none" class="h-3 w-[85%]" />
           </div>
-          <div class="flex h-5 items-center gap-1.5">
-            <OSkeleton animation="none" class="h-4 w-8" />
-            <OSkeleton animation="none" class="h-4 w-14" />
-            <OSkeleton animation="none" class="h-3 w-24" />
-          </div>
-          <div class="flex h-5 items-center gap-1.5">
-            <OSkeleton animation="none" class="h-4 w-20" />
-            <OSkeleton animation="none" class="h-3 w-28" />
-          </div>
-          <div class="flex h-7 items-center"><OSkeleton animation="none" class="h-4 w-24" /></div>
+          <OSkeleton animation="none" class="hidden h-9 w-40 self-center sm:block" />
         </li>
       </ul>
-      <LiveNoticeState
-        v-else-if="notice"
-        :notice="notice"
-        size="inline"
-        :detail="state.detail"
-        :busy="state.busy"
-        :data-test="NOTICE_TEST[notice.failure]"
-        retry-test="autoobserve2-paged-retry"
-        @retry="state.retry()"
-      />
+      <div v-else-if="notice" class="px-3 pb-3 sm:px-4">
+        <LiveNoticeState
+          :notice="notice"
+          size="inline"
+          :detail="state.detail"
+          :busy="state.busy"
+          :data-test="NOTICE_TEST[notice.failure]"
+          retry-test="autoobserve2-paged-retry"
+          @retry="state.retry()"
+        />
+      </div>
       <OEmptyState
         v-else-if="settled && !rows.length && waiting"
         size="inline"
@@ -151,123 +199,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="autoobserve2-paged-empty-off"
       />
       <OEmptyState
-        v-else-if="settled && !rows.length"
+        v-else-if="settled && !view.ranged.length"
         size="inline"
         icon="task-alt"
-        :title="copy.emptyTitle"
-        :description="copy.emptyDesc"
+        :title="allClear.title"
+        :description="allClear.desc"
         data-test="autoobserve2-paged-empty"
       />
-      <ul v-else-if="settled" class="flex flex-col gap-2.5" data-test="autoobserve2-paged-list">
-        <li v-for="(row, index) in shown" :key="row.id">
-          <article
-            class="border-border-subtle bg-surface-base rounded-default flex flex-col gap-1.5 border py-3.5 ps-4 pe-3.5"
-            :data-test="`autoobserve2-paged-row-${index}`"
+      <ul
+        v-else-if="settled"
+        class="border-border-subtle divide-border-subtle divide-y border-t"
+        data-test="autoobserve2-paged-list"
+      >
+        <li v-for="(entry, index) in shownRows" :key="entry.row.id">
+          <p
+            v-if="entry.group !== undefined"
+            class="bg-surface-subtle text-text-body px-5 py-1.5 text-xs font-medium sm:px-6"
+            :data-test="`autoobserve2-paged-group-${entry.group}`"
           >
-            <OTruncatedText
-              as="p"
-              class="text-text-heading text-sm leading-5 font-medium"
-              data-test="autoobserve2-paged-sentence"
-              >{{ row.copy.headline ?? row.sentence }}</OTruncatedText
-            >
-            <div class="flex h-5 min-w-0 items-center gap-1.5">
-              <OTag
-                type="severity"
-                :value="row.severity"
-                size="sm"
-                class="shrink-0"
-                data-test="autoobserve2-paged-severity"
-              />
-              <OTag
-                type="incidentStatus"
-                :value="row.status"
-                :label="row.statusText"
-                size="sm"
-                class="shrink-0"
-                data-test="autoobserve2-paged-status"
-              />
-              <OTruncatedText
-                class="text-text-secondary text-xs"
-                data-test="autoobserve2-paged-opened"
-                >{{ row.opened }}</OTruncatedText
-              >
-            </div>
-            <div class="flex h-5 min-w-0 items-center gap-1.5">
-              <OBadge
-                :variant="RCA_BADGE_VARIANT[row.analysis.tone]"
-                size="sm"
-                class="shrink-0"
-                :data-tone="row.analysis.tone"
-                data-test="autoobserve2-paged-analysis"
-              >
-                <template v-if="row.analysis.spinner" #icon>
-                  <OSpinner size="xs" />
-                </template>
-                {{ row.analysis.label }}
-              </OBadge>
-              <OTruncatedText
-                v-if="row.analysis.detail && !shared?.covers(row.analysis)"
-                class="text-text-secondary text-xs"
-                data-test="autoobserve2-paged-analysis-detail"
-                >{{ row.analysis.detail }}</OTruncatedText
-              >
-            </div>
-            <p
-              v-if="row.copy.page"
-              class="flex items-start gap-1.5 text-xs leading-5"
-              :class="PAGE_TONE[row.copy.page.tone].text"
-              :data-tone="row.copy.page.tone"
-              data-test="autoobserve2-paged-page"
-            >
-              <OIcon :name="PAGE_TONE[row.copy.page.tone].icon" size="xs" class="mt-1 shrink-0" />
-              <span>{{ row.copy.page.text }}</span>
-            </p>
-            <p
-              v-if="row.copy.why"
-              class="text-text-body text-xs leading-5"
-              data-test="autoobserve2-paged-why"
-            >
-              {{ row.copy.why }}
-            </p>
-            <p
-              v-if="row.copy.next"
-              class="text-text-secondary text-xs leading-5"
-              data-test="autoobserve2-paged-next"
-            >
-              {{ row.copy.next }}
-            </p>
-            <div
-              class="-ms-2.5 flex flex-wrap items-center gap-1"
-              data-test="autoobserve2-paged-actions"
-            >
+            {{ weekLabel(t, entry.group) }}
+          </p>
+          <LivePagedRow
+            :row="entry.row"
+            :index="index"
+            :shared-analysis="!!shared?.covers(entry.row.analysis)"
+            @open="openRow(entry.item)"
+          >
+            <template #actions>
               <OButton
                 variant="ghost-primary"
                 size="xs"
                 data-test="autoobserve2-paged-open"
-                @click="router.push(incidentLink(org, row.incidentId))"
+                @click="router.push(incidentLink(org, entry.item.incident.id))"
               >
                 {{ copy.openIncident }}
               </OButton>
               <OButton
-                v-if="row.analysis.hasRun"
+                v-if="entry.row.analysis.hasRun"
                 variant="ghost-primary"
                 size="xs"
                 data-test="autoobserve2-paged-view-analysis"
-                @click="router.push(analysisLink(org, row.incidentId))"
+                @click="router.push(analysisLink(org, entry.item.incident.id))"
               >
                 {{ copy.viewAnalysis }}
               </OButton>
               <OButton
-                v-if="row.logs"
+                v-if="entry.logs"
                 variant="ghost-primary"
                 size="xs"
                 data-test="autoobserve2-paged-logs"
-                @click="router.push(row.logs)"
+                @click="router.push(entry.logs)"
               >
                 {{ insightCtaLabel(t, "openInLogs") }}
               </OButton>
               <OButton
-                v-if="row.copy.page?.routing"
+                v-if="entry.row.copy.page?.routing"
                 variant="outline"
                 size="xs"
                 data-test="autoobserve2-paged-routing"
@@ -276,30 +262,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ copy.routing }}
               </OButton>
               <OButton
-                v-if="canAsk && row.ai"
+                v-if="canAsk && entry.ai"
                 variant="ghost-primary"
                 size="xs"
                 icon-left="auto-awesome"
                 data-test="autoobserve2-paged-ask-ai"
-                @click="ask(row.ai)"
+                @click="ask(entry.ai)"
               >
                 {{ insightCtaLabel(t, "askAi") }}
               </OButton>
-            </div>
-          </article>
+            </template>
+          </LivePagedRow>
         </li>
       </ul>
+      <p
+        v-if="settled && cantSee"
+        class="text-text-secondary border-border-subtle flex flex-wrap items-center gap-x-2 gap-y-1 border-t px-5 py-3 text-sm sm:px-6"
+        data-test="autoobserve2-paged-cantsee"
+      >
+        <OIcon name="visibility-off" size="sm" class="shrink-0" />
+        <span class="min-w-0">{{ cantSee }}</span>
+        <OButton
+          variant="ghost-primary"
+          size="xs"
+          icon-right="arrow-forward"
+          data-test="autoobserve2-paged-cantsee-open"
+          @click="emit('open-coverage', 'attention')"
+        >
+          {{ t("autoobserve.homeLive.cantSeeAction") }}
+        </OButton>
+      </p>
     </div>
-    <template v-if="settled && rows.length && (hasMore || shared)" #footer>
-      <div class="flex min-w-0 items-center gap-2">
+    <template v-if="settled && rows.length" #footer>
+      <div ref="footerEl" class="flex min-w-0 flex-wrap items-center gap-2">
+        <OButton
+          v-if="view.remaining"
+          variant="ghost-primary"
+          size="sm"
+          icon-right="expand-more"
+          data-test="autoobserve2-paged-show-more"
+          @click="expand(view.visible.length + Math.min(view.remaining, HOME_STEP))"
+        >
+          {{ t("autoobserve2.showMore", { count: Math.min(view.remaining, HOME_STEP) }) }}
+        </OButton>
+        <OButton
+          v-else-if="view.filtered.length > view.base"
+          variant="ghost-primary"
+          size="sm"
+          icon-right="expand-less"
+          data-test="autoobserve2-paged-show-fewer"
+          @click="expand(0)"
+        >
+          {{ t("autoobserve2.showFewer") }}
+        </OButton>
         <span
           v-if="hasMore"
           class="text-text-secondary shrink-0 text-xs"
           data-test="autoobserve2-paged-more"
-          >{{ moreText(t, locale, cap) }}</span
-        >
-        <span v-if="hasMore && shared" class="text-text-secondary text-xs" aria-hidden="true"
-          >·</span
+          >{{ moreText(t, locale, fetchCap) }}</span
         >
         <OTruncatedText
           v-if="shared"
@@ -310,15 +330,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ shared.text }}</OTruncatedText
         >
         <OButton
-          v-if="hasMore"
           variant="ghost-primary"
-          size="xs"
+          size="sm"
           icon-right="arrow-forward"
           class="ms-auto shrink-0"
           data-test="autoobserve2-paged-see-all"
           @click="router.push({ query: { ...route.query, org_identifier: org, page: 'issues' } })"
         >
-          {{ copy.seeAllIssues }}
+          {{ t("autoobserve2.recent.allIssues") }}
         </OButton>
       </div>
     </template>
@@ -330,17 +349,19 @@ import { computed, inject, nextTick, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useQuery } from "@tanstack/vue-query";
 import { routingConfigQuery } from "@/services/oncall.queries";
+import { autoobserveCoverageQuery } from "@/services/autoobserve.queries";
+import type { AutoObserveIncidentItem } from "@/services/autoobserve";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { RCA_BADGE_VARIANT } from "@/utils/incidents/rcaCell";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import {
   ASK_AI_KEY,
   aiEnabled,
@@ -348,10 +369,11 @@ import {
   insightCtaLabel,
   type AiFinding,
 } from "../insight/insightCta";
-import { pagedFindingCopy, type PageLine } from "../insight/kindCopy";
+import { pagedFindingCopy } from "../insight/kindCopy";
 import SectionCard from "../v2/SectionCard.vue";
 import LiveNoticeState from "./LiveNoticeState.vue";
 import LiveRefreshFailed from "./LiveRefreshFailed.vue";
+import LivePagedRow, { type LivePagedRowView } from "./LivePagedRow.vue";
 import {
   analysisLine,
   analysisLink,
@@ -369,14 +391,27 @@ import {
   skeletonRows,
   statusLabel,
 } from "./incidentsCopy";
-import {
-  learningEmpty,
-  learningLine,
-  liveLoadText,
-  liveNotice,
-  type LiveFailure,
-} from "./liveCopy";
+import { formatWhen, liveLoadText, liveNotice, type LiveFailure } from "./liveCopy";
+import { toCoverageSource } from "./liveAdapter";
 import { useLivePaged, useLoadPhase } from "./liveModel";
+import { learningSummary, learningWaiting, type LearningStream } from "./LiveCoverageLearning";
+import {
+  HOME_FETCH,
+  HOME_PRIORITIES,
+  HOME_RANGES,
+  HOME_STEP,
+  RANGE_LABEL,
+  allClearText,
+  cantSeeText,
+  homeView,
+  isHomePriority,
+  isHomeRange,
+  outcomeOf,
+  weekLabel,
+  type HomePriority,
+  type HomeRange,
+} from "./LivePagedModel";
+import { issueStreams } from "./issueModel";
 
 const NOTICE_TEST: Record<LiveFailure, string> = {
   denied: "autoobserve2-paged-denied",
@@ -385,24 +420,25 @@ const NOTICE_TEST: Record<LiveFailure, string> = {
   failed: "autoobserve2-paged-error",
 };
 
-const PAGE_TONE: Record<PageLine["tone"], { icon: string; text: string }> = {
-  neutral: { icon: "check", text: "text-text-secondary" },
-  pending: { icon: "schedule", text: "text-text-secondary" },
-  warning: { icon: "warning", text: "text-badge-amber-soft-text" },
-  error: { icon: "warning", text: "text-status-error-text" },
-};
-
 const props = withDefaults(defineProps<{ cap?: number }>(), { cap: PAGED_CAP });
-const emit = defineEmits<{ settled: [] }>();
+const emit = defineEmits<{
+  settled: [];
+  "open-incident": [item: AutoObserveIncidentItem];
+  "open-coverage": [filter: string];
+}>();
 
 const { t, locale } = useI18nTyped();
 const router = useRouter();
+const route = useRoute();
 const store = useStore();
-const paged = useLivePaged(props.cap);
+// The range picker filters what was read, so the home reads enough rows for a month.
+const fetchCap = Math.max(props.cap, HOME_FETCH);
+const paged = useLivePaged(fetchCap);
 const askAi = inject(ASK_AI_KEY, null);
 
 const slotEl = ref<HTMLElement | null>(null);
 const bodyEl = ref<HTMLElement | null>(null);
+const footerEl = ref<HTMLElement | null>(null);
 
 const copy = computed(() => pagedCopy(t));
 
@@ -410,11 +446,16 @@ const state = computed(() => paged.state.value);
 const skeleton = computed(() => paged.skeleton.value);
 const org = computed(() => paged.org.value);
 const rows = computed(() => paged.rows.value);
-const route = useRoute();
+const now = computed(() => paged.now.value);
 // Read only while a card would offer routing setup; a failed read keeps the offer.
 const anyUnrouted = computed(() => rows.value.some((item) => item.page?.outcome === "unrouted"));
 const routing = useQuery(() => ({ ...routingConfigQuery(org.value), enabled: anyUnrouted.value }));
 const routingSet = computed(() => !!routing.data.value?.default_team_id);
+// The same cached read the learning line uses, so naming the gaps costs no request.
+const coverage = useQuery(() => ({
+  ...autoobserveCoverageQuery(org.value, "strict"),
+  enabled: !!org.value,
+}));
 const paging = computed(() => paged.paging.value);
 const hasMore = computed(() => paged.hasMore.value);
 const settled = computed(() => !skeleton.value && state.value.status === "ready");
@@ -429,9 +470,56 @@ const notice = computed(() =>
     ? liveNotice(t, "incidents", state.value.failure)
     : null,
 );
-const learningText = computed(() => learningLine(t, paged.zone.value, paged.learning.value));
-const waiting = computed(() => learningEmpty(t, paged.zone.value, paged.learning.value));
+
+const queryText = (key: string) =>
+  typeof route.query[key] === "string" ? (route.query[key] as string) : "";
+const range = ref<HomeRange>(
+  isHomeRange(queryText("range")) ? (queryText("range") as HomeRange) : "7d",
+);
+const priorityParam = queryText("priority").toLowerCase();
+const priority = ref<HomePriority>(isHomePriority(priorityParam) ? priorityParam : "all");
+const shownParam = Number(route.query.shown);
+const shown = ref(Number.isInteger(shownParam) && shownParam > 0 ? shownParam : 0);
+
+const view = computed(() =>
+  homeView(rows.value, range.value, priority.value, shown.value, now.value),
+);
+
+const streams = computed<LearningStream[]>(
+  () => coverage.data.value?.rows.flatMap((row) => row.streams as LearningStream[]) ?? [],
+);
+const learningText = computed(() =>
+  learningSummary(t, paged.zone.value, paged.learning.value, streams.value, now.value),
+);
+const waiting = computed(() =>
+  learningWaiting(t, paged.zone.value, paged.learning.value, streams.value, now.value),
+);
 const newText = computed(() => newFindingsText(t, locale.value, paged.newCount.value));
+
+const coverageSource = computed(() =>
+  toCoverageSource(
+    t,
+    coverage.data.value,
+    { status: "ready", retry: () => undefined },
+    locale.value,
+    now.value,
+  ),
+);
+const cantSee = computed(() =>
+  cantSeeText(
+    t,
+    locale.value,
+    coverageSource.value.rows.filter((r) => r.status?.state === "gap").map((r) => r.service),
+  ),
+);
+const allClear = computed(() =>
+  allClearText(
+    t,
+    locale.value,
+    range.value,
+    coverageSource.value.totals.fullyWatched + coverageSource.value.totals.partial,
+  ),
+);
 
 // One message at a time, so the slot never grows a second line of notices.
 const slotKind = computed(() => {
@@ -445,31 +533,50 @@ const slotKind = computed(() => {
   return "subtitle";
 });
 
-const shown = computed(() =>
-  rows.value.map((item) => ({
+const rowView = (item: AutoObserveIncidentItem): LivePagedRowView => {
+  const pageCopy = pagedFindingCopy(t, paged.zone.value, item, now.value, routingSet.value);
+  return {
     id: item.finding.id,
-    incidentId: item.incident.id,
+    title: pageCopy.headline ?? findingSentence(t, item),
+    opened: openedText(t, locale.value, item, now.value),
+    openedAt: formatWhen(
+      item.incident.created_at / 1000,
+      paged.zone.value.locale,
+      paged.zone.value.timeZone,
+      now.value,
+    ),
+    stream: item.finding.stream_name,
     severity: item.incident.severity,
     status: item.incident.status,
     statusText: statusLabel(t, item.incident.status),
-    sentence: findingSentence(t, item),
-    opened: openedText(t, locale.value, item, paged.now.value),
+    outcome: outcomeOf(item.incident.status),
     analysis: analysisLine(t, item, paged.rcaEnabled.value),
-    logs: findingLogs(item, paged.now.value),
-    ai: findingAi(t, item, paged.zone.value, paged.now.value),
-    copy: pagedFindingCopy(t, paged.zone.value, item, paged.now.value, routingSet.value),
+    copy: pageCopy,
+    signal: issueStreams(item).find((s) => s.lead) ?? null,
+  };
+};
+
+const shownRows = computed(() =>
+  view.value.visible.map(({ item, group }) => ({
+    item,
+    group,
+    row: rowView(item),
+    logs: findingLogs(item, now.value),
+    ai: findingAi(t, item, paged.zone.value, now.value),
   })),
 );
 
 const canAsk = computed(() => !!askAi && aiEnabled(store.state.zoConfig));
 const ask = (finding: AiFinding) => askAi?.(askAiPayload(t, finding, org.value));
 
+const openRow = (item: AutoObserveIncidentItem) => emit("open-incident", item);
+
 // The footer sits outside the subtitle slot, so a stale or new-findings notice never hides the reason the rows dropped.
 const shared = computed(() =>
   settled.value
     ? sharedAnalysis(
         t,
-        shown.value.map((row) => row.analysis),
+        shownRows.value.map((entry) => entry.row.analysis),
       )
     : null,
 );
@@ -477,20 +584,56 @@ const shared = computed(() =>
 const loadPhase = useLoadPhase(() => state.value.status, skeleton);
 const loadText = computed(() => liveLoadText(t, "incidents", loadPhase.value));
 
-const view = computed(
+// The choice lives in the URL, so reload and browser Back keep the range and filter.
+watch([range, priority, shown], ([r, p, s]) => {
+  const next = {
+    range: r === "7d" ? undefined : r,
+    priority: p === "all" ? undefined : p.toUpperCase(),
+    shown: s ? String(s) : undefined,
+  };
+  const same = (Object.keys(next) as (keyof typeof next)[]).every(
+    (k) => next[k] === route.query[k],
+  );
+  if (!same) void router.replace({ query: { ...route.query, ...next } });
+});
+
+const selectPriority = (value: HomePriority) => {
+  priority.value = value;
+  shown.value = 0;
+};
+
+const selectRange = (value: HomeRange) => {
+  range.value = value;
+  shown.value = 0;
+  const left = homeView(rows.value, value, priority.value, 0, now.value);
+  if (!left.filtered.length) priority.value = "all";
+};
+
+// Show more and Show fewer replace each other, so focus follows to whichever is left.
+const expand = async (count: number) => {
+  shown.value = count;
+  await nextTick();
+  footerEl.value
+    ?.querySelector<HTMLElement>(
+      '[data-test="autoobserve2-paged-show-more"], [data-test="autoobserve2-paged-show-fewer"]',
+    )
+    ?.focus();
+};
+
+const viewKey = computed(
   () => `${slotKind.value}|${notice.value?.failure ?? ""}|${rows.value.map((r) => r.finding.id)}`,
 );
 
 // A swap that removes the focused Show or Retry moves focus to the card body, never to the page.
 watch(
-  view,
+  viewKey,
   () => {
     const active = document.activeElement;
     const inside = !!active && (slotEl.value?.contains(active) || bodyEl.value?.contains(active));
     if (!inside) return;
     void nextTick(() => {
-      const now = document.activeElement;
-      if (!now || now === document.body) bodyEl.value?.focus();
+      const current = document.activeElement;
+      if (!current || current === document.body) bodyEl.value?.focus();
     });
   },
   { flush: "pre" },

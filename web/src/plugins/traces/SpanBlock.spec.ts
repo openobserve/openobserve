@@ -286,8 +286,8 @@ describe("SpanBlock", () => {
 
     it("should apply defocus class when span is not selected", async () => {
       await flushPromises();
-      const spanBlock = newWrapper.find('[data-test="span-block-select-trigger"]');
-      expect(spanBlock.classes()).toContain("opacity-30");
+      const bar = newWrapper.find('[data-test="span-marker"]');
+      expect(bar.classes()).toContain("opacity-30");
     });
 
     it("Should not show border when span is not selected", async () => {
@@ -1191,8 +1191,7 @@ describe("SpanBlock critical path", () => {
     await flushPromises();
   };
 
-  const isDimmed = () =>
-    wrapper.find('[data-test="span-block-select-trigger"]').classes().includes("opacity-30");
+  const isDimmed = () => wrapper.find('[data-test="span-marker"]').classes().includes("opacity-30");
 
   afterEach(() => {
     wrapper.vm.searchObj.data.traceDetails.selectedSpanId = null;

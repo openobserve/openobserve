@@ -20,7 +20,8 @@ use std::time::Duration;
 use config::meta::destinations::{DestinationType, Email, Template, TemplateKind, TemplateType};
 
 use super::{
-    NotificationContext, RenderedMessage, apply_custom_template, derive_channel_format,
+    NotificationContext, RenderedMessage, apply_custom_template, apply_template_body,
+    derive_channel_format,
     format::ChannelFormat,
     jira,
     platform::{self, platform_of},
@@ -131,7 +132,7 @@ pub async fn send_to_destination(
     match template.kind {
         TemplateKind::Custom => {
             // Unchanged legacy path — byte-identical output.
-            let msg = apply_custom_template(&template.body, ctx, is_email);
+            let msg = apply_template_body(template, ctx, is_email);
             let msg = stamp_platform_key(dest_type, ctx, msg);
             let title = custom_title(template, ctx, is_email);
             let (email_subject, sns_subject) = custom_subjects(subject, title);
@@ -254,6 +255,14 @@ fn members_to_send(kept: Vec<String>, skipped: &[String]) -> Result<Email, SendE
 
 /// The subject of a Custom template; alerts never set a fallback, so their subjects are unchanged.
 fn custom_title(template: &Template, ctx: &NotificationContext, is_email: bool) -> String {
+    let title = custom_title_unmarked(template, ctx, is_email);
+    if ctx.render_hints.test_marker {
+        return format!("{}{title}", super::TEST_MARKER);
+    }
+    title
+}
+
+fn custom_title_unmarked(template: &Template, ctx: &NotificationContext, is_email: bool) -> String {
     let fallback = ctx.render_hints.fallback_subject.as_ref();
     match &template.template_type {
         TemplateType::Email { title } if !(title.is_empty() && fallback.is_some()) => {
@@ -287,6 +296,34 @@ mod tests {
         assert_eq!(
             custom_title(&template, &ctx, true),
             "API \"edge\" & Bob's worker is down"
+        );
+    }
+
+    #[test]
+    fn a_test_send_marks_a_custom_email_subject_and_its_fallback() {
+        let titled = Template {
+            name: "check-mail".into(),
+            template_type: TemplateType::Email {
+                title: "{check_name} is down".into(),
+            },
+            ..Default::default()
+        };
+        let untitled = Template {
+            name: "plain".into(),
+            ..Default::default()
+        };
+        let mut ctx = NotificationContext {
+            context_attributes: vec![("check_name".into(), "api".into())],
+            ..Default::default()
+        };
+        ctx.render_hints.fallback_subject = Some("Nightly started".into());
+        assert_eq!(custom_title(&titled, &ctx, true), "api is down");
+        assert_eq!(custom_title(&untitled, &ctx, false), "Nightly started");
+        ctx.render_hints.test_marker = true;
+        assert_eq!(custom_title(&titled, &ctx, true), "[TEST] api is down");
+        assert_eq!(
+            custom_title(&untitled, &ctx, false),
+            "[TEST] Nightly started"
         );
     }
 

@@ -324,6 +324,36 @@ mod tests {
     }
 
     #[test]
+    fn a_window_capped_on_spring_forward_ends_and_reminds_at_the_capped_end() {
+        // Europe/Berlin daily 00:00 for 23.5 hours: on 2026-03-29 (23 local hours) the window
+        // ends at the next 00:00 CEST, 2026-03-29T22:00Z, not 30 minutes later.
+        let row = with_schedule(DowntimeSchedule {
+            repeat: Repeat::Daily,
+            starts_at: 1_772_323_200 * MICROS_PER_SEC,
+            ends_at: None,
+            timezone: "Europe/Berlin".to_string(),
+            start_time_local: Some("00:00".to_string()),
+            duration_secs: 23 * 3_600 + 1_800,
+            weekdays: vec![],
+        });
+        let start = 1_774_738_800 * MICROS_PER_SEC;
+        let capped_end = 1_774_821_600 * MICROS_PER_SEC;
+        let dues = due_events(&row, capped_end - HOUR, capped_end + MIN);
+        let of = |event| {
+            dues.iter()
+                .find(|d| d.event == event && d.window.start == start)
+                .map(|d| d.window.end)
+        };
+        assert_eq!(of(NotificationEvent::EndingSoon), Some(capped_end));
+        assert_eq!(of(NotificationEvent::Ended), Some(capped_end));
+        assert!(
+            dues.iter()
+                .all(|d| d.window.end <= capped_end || d.window.start >= capped_end),
+            "no window of the series overlaps the next"
+        );
+    }
+
+    #[test]
     fn a_daily_rule_sends_start_reminder_and_end_once_per_window_across_ticks() {
         let row = nightly();
         let start = DAY + 2 * HOUR;
@@ -529,22 +559,27 @@ mod tests {
     }
 
     #[test]
-    fn overlapping_windows_each_send_their_own_end() {
+    fn a_window_longer_than_the_gap_ends_at_the_next_start() {
+        // Validation refuses such a row; a stored one still never overlaps its next window.
         let row = daily_for(36 * 3_600);
-        let ends = summary(&due_events(
+        let at_next_start = summary(&due_events(
+            &row,
+            DAY + 2 * HOUR - MIN,
+            DAY + 2 * HOUR + MIN,
+        ));
+        assert_eq!(
+            at_next_start,
+            vec![
+                (NotificationEvent::Ended, 2 * HOUR),
+                (NotificationEvent::Started, DAY + 2 * HOUR),
+            ]
+        );
+        let at_uncapped_end = summary(&due_events(
             &row,
             DAY + 14 * HOUR - MIN,
             DAY + 14 * HOUR + MIN,
         ));
-        assert_eq!(ends, vec![(NotificationEvent::Ended, 2 * HOUR)]);
-        let reminder = summary(&due_events(
-            &row,
-            DAY + 13 * HOUR + 50 * MIN,
-            DAY + 13 * HOUR + 51 * MIN,
-        ));
-        assert_eq!(reminder, vec![(NotificationEvent::EndingSoon, 2 * HOUR)]);
-        let starts = summary(&due_events(&row, DAY + 2 * HOUR, DAY + 2 * HOUR + MIN));
-        assert_eq!(starts, vec![(NotificationEvent::Started, DAY + 2 * HOUR)]);
+        assert!(at_uncapped_end.is_empty());
     }
 
     #[test]

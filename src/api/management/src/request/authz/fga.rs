@@ -14,8 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
+use axum::Json;
+#[cfg(feature = "enterprise")]
 use axum::response::IntoResponse;
-use axum::{Json, extract::Path, response::Response};
+use axum::{extract::Path, response::Response};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
@@ -129,10 +131,7 @@ pub async fn create_role(
         ("x-o2-mcp" = json!({"enabled": true}))
     )
 )]
-pub async fn create_role(
-    Path(_org_id): Path<String>,
-    Json(_role_id): Json<UserRoleRequest>,
-) -> Response {
+pub async fn create_role(Path(_org_id): Path<String>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -269,7 +268,6 @@ pub async fn delete_role_bulk(
 pub async fn delete_role_bulk(
     Path(_path): Path<String>,
     Headers(_user_email): Headers<UserEmail>,
-    Json(_req): Json<BulkDeleteRequest>,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
@@ -474,6 +472,7 @@ pub async fn update_role(
         ("org_id" = String, Path, description = "Organization name"),
         ("role_id" = String, Path, description = "Role Id"),
     ),
+    request_body(content = String, content_type = "text/plain"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
@@ -483,10 +482,7 @@ pub async fn update_role(
         ("x-o2-ratelimit" = json!({"module": "Roles", "operation": "update"}))
     )
 )]
-pub async fn update_role(
-    Path(_path): Path<(String, String)>,
-    Json(_permissions): Json<String>,
-) -> Response {
+pub async fn update_role(Path(_path): Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -962,10 +958,7 @@ pub async fn create_group(
         ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "create"}))
     )
 )]
-pub async fn create_group(
-    Path(_org_id): Path<String>,
-    Json(_user_group): Json<UserGroup>,
-) -> Response {
+pub async fn create_group(Path(_org_id): Path<String>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -1066,10 +1059,7 @@ pub async fn update_group(
         ("x-o2-ratelimit" = json!({"module": "Groups", "operation": "update"}))
     )
 )]
-pub async fn update_group(
-    Path(_path): Path<(String, String)>,
-    Json(_user_group): Json<UserGroupRequest>,
-) -> Response {
+pub async fn update_group(Path(_path): Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -1449,7 +1439,6 @@ pub async fn delete_group_bulk(
 pub async fn delete_group_bulk(
     Path(_path): Path<String>,
     Headers(_user_email): Headers<UserEmail>,
-    Json(_req): Json<BulkDeleteRequest>,
 ) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
@@ -1612,12 +1601,7 @@ mod tests {
 
         #[cfg(not(feature = "enterprise"))]
         {
-            let role_request = UserRoleRequest {
-                role: "custom_role".to_string(),
-                custom: None,
-            };
-
-            let resp = create_role(Path("test_org".to_string()), Json(role_request)).await;
+            let resp = create_role(Path("test_org".to_string())).await;
             assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
@@ -1734,11 +1718,7 @@ mod tests {
 
         #[cfg(not(feature = "enterprise"))]
         {
-            let resp = update_role(
-                Path(("test_org".to_string(), "test_role".to_string())),
-                Json("test".to_string()),
-            )
-            .await;
+            let resp = update_role(Path(("test_org".to_string(), "test_role".to_string()))).await;
             assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
@@ -2095,13 +2075,7 @@ mod tests {
 
         #[cfg(not(feature = "enterprise"))]
         {
-            let group = UserGroup {
-                name: "test_group".to_string(),
-                users: None,
-                roles: None,
-            };
-
-            let resp = create_group(Path("test_org".to_string()), Json(group)).await;
+            let resp = create_group(Path("test_org".to_string())).await;
             assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }
@@ -2162,18 +2136,7 @@ mod tests {
 
         #[cfg(not(feature = "enterprise"))]
         {
-            let group_request = UserGroupRequest {
-                add_users: None,
-                remove_users: None,
-                add_roles: None,
-                remove_roles: None,
-            };
-
-            let resp = update_group(
-                Path(("test_org".to_string(), "test_group".to_string())),
-                Json(group_request),
-            )
-            .await;
+            let resp = update_group(Path(("test_org".to_string(), "test_group".to_string()))).await;
             assert_eq!(extract_status_code(&resp), StatusCode::FORBIDDEN);
         }
     }

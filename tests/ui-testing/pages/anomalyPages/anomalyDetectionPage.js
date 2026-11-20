@@ -132,6 +132,15 @@ class AnomalyDetectionPage {
             // Detection charts (AlertDetail)
             detectionCharts: '[data-test="alerts-anomalydetectionchart"]',
             detectionChartsRange: '[data-test="alerts-anomalydetectionchart-range"]',
+            summaryStrip: '[data-test="alerts-anomalysummarystrip"]',
+            summaryStripLoading: '[data-test="alerts-anomalysummarystrip-loading"]',
+            summaryStripOpen: '[data-test="alerts-anomalysummarystrip-open"]',
+            summaryStripChip: '[data-test="alerts-anomalysummarystrip-chip"]',
+            summaryStripMessage: '[data-test="alerts-anomalysummarystrip-message"]',
+            summaryStripReadings: '[data-test="alerts-anomalysummarystrip-readings"]',
+            // One banner component on Logs, Traces and Metrics, told apart by the page's own prefix.
+            originBanner: (page) => `[data-test="${page}-anomaly-origin-banner"]`,
+            originBannerPart: (page, part) => `[data-test="${page}-anomaly-origin-banner-${part}"]`,
 
             toast: '[data-test="o-toast-message"]',
             toastDismiss: '[data-test="o-toast-dismiss"]',
@@ -194,6 +203,10 @@ class AnomalyDetectionPage {
         await tab.click();
         await expect(tab).toHaveAttribute('data-state', 'on', { timeout: 10000 });
         await this.page.locator(this.selectors.listTable).waitFor({ state: 'visible', timeout: 30000 });
+        // The list opens on Firing, so a detector the test just made needs the Total tile.
+        const total = this.page.locator('[data-test="alert-summary-total"]').first();
+        await total.waitFor({ state: 'visible', timeout: 15000 });
+        await total.click();
         testLogger.info('Anomaly Detection tab loaded');
     }
 
@@ -718,6 +731,15 @@ class AnomalyDetectionPage {
         }
     }
 
+    async saveAndCaptureCreate() {
+        const [request] = await Promise.all([
+            this.page.waitForRequest((r) => r.method() === 'POST' && /\/api\/v2\/[^/]+\/alerts(\?|$)/.test(r.url()), { timeout: 30000 }),
+            this.save(),
+        ]);
+        const response = await request.response();
+        return { body: request.postDataJSON(), status: response?.status(), text: await response?.text() };
+    }
+
     /**
      * Error toasts live 30s and stack over the wizard footer, where they
      * intercept the click meant for Cancel. Best-effort: the dismiss hook is
@@ -980,6 +1002,75 @@ class AnomalyDetectionPage {
                     .then(() => key),
             ),
         );
+    }
+
+    // Summary strip and the "Opened from anomaly" banner
+
+    getSummaryStripLocator() {
+        return this.page.locator(this.selectors.summaryStrip);
+    }
+
+    /** Waits out the skeleton; the strip always settles into a state, an error or a button. */
+    async waitForSummaryStrip() {
+        await this.getSummaryStripLocator().waitFor({ state: 'visible', timeout: 20000 });
+        await expect(this.page.locator(this.selectors.summaryStripLoading)).toHaveCount(0, { timeout: 30000 });
+    }
+
+    /** The state chip: Ongoing, Back in range, In range, Learning, Paused, No new data or No recent runs. */
+    getSummaryStripChipLocator() {
+        return this.page.locator(this.selectors.summaryStripChip);
+    }
+
+    /** The one sentence of a state with no readings, such as "No anomalies in the last 7 days". */
+    getSummaryStripMessageLocator() {
+        return this.page.locator(this.selectors.summaryStripMessage);
+    }
+
+    getSummaryStripReadingsLocator() {
+        return this.page.locator(this.selectors.summaryStripReadings);
+    }
+
+    getSummaryStripOpenLocator() {
+        return this.page.locator(this.selectors.summaryStripOpen);
+    }
+
+    /** Clicks the strip's primary data button and waits for the target page route. */
+    async openDataFromSummaryStrip(pathPart) {
+        const open = this.getSummaryStripOpenLocator();
+        await open.waitFor({ state: 'visible', timeout: 20000 });
+        await open.click();
+        await this.page.waitForURL((url) => url.pathname.includes(pathPart), { timeout: 30000 });
+    }
+
+    /** @param {'logs'|'traces'|'metrics'} page */
+    getOriginBannerLocator(page) {
+        return this.page.locator(this.selectors.originBanner(page));
+    }
+
+    /** @param {'logs'|'traces'|'metrics'} page @param {'title'|'values'|'back'|'close'|'filter-not-applied'|'switch-view'} part */
+    getOriginBannerPartLocator(page, part) {
+        return this.page.locator(this.selectors.originBannerPart(page, part));
+    }
+
+    /** A base64 URL parameter of the current page as SQL; the server encodes `+/=` as `-_.`. */
+    urlQueryParamSql(key, url = new URL(this.page.url())) {
+        const value = url.searchParams.get(key);
+        if (!value) return '';
+        const b64 = value.replace(/-/g, '+').replace(/_/g, '/').replace(/\./g, '=');
+        return Buffer.from(b64, 'base64').toString('utf8');
+    }
+
+    /** Clicks the Logs banner's "Show raw rows" / "Show aggregate" and waits for the query swap. */
+    async switchLogsOriginView() {
+        // Read the query before the click: the swap can land before a later read, which then never differs.
+        const before = this.urlQueryParamSql('query');
+        await this.getOriginBannerPartLocator('logs', 'switch-view').click();
+        await this.page.waitForURL(
+            (url) => url.searchParams.get('anomaly_alt_query') !== null
+                && this.urlQueryParamSql('query', url) !== before,
+            { timeout: 20000, waitUntil: 'commit' },
+        );
+        return before;
     }
 
     // Cleanup

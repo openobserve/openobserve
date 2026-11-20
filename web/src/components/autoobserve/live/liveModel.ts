@@ -23,7 +23,6 @@ import {
   type Ref,
   type WatchSource,
 } from "vue";
-import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -48,7 +47,6 @@ import {
 import {
   GAP_PAGE_SIZE,
   checkedView,
-  learningLine,
   liveErrorDetail,
   liveFailureOf,
   statusOf,
@@ -56,6 +54,7 @@ import {
   userTimeZone,
   type LivePhase,
 } from "./liveCopy";
+import { coverageLearningText, type LearningStream } from "./LiveCoverageLearning";
 import { PAGED_CAP, failedDetail } from "./incidentsCopy";
 import { useRecentlyCreated } from "../insight/bulk/useRecentlyCreated";
 import { gapDraftScopes } from "../insight/kindCopy";
@@ -81,19 +80,6 @@ const ADDED_POLL_MS = 60_000;
 export const SKELETON_DELAY_MS = 300;
 
 export const SKELETON_HOLD_MS = 300;
-
-// A production bundle can never show sample data, whatever the URL says.
-export const fixtureAllowed = (): boolean => import.meta.env.DEV || import.meta.env.MODE === "test";
-
-export const useFixtureMode = () => {
-  const route = useRoute();
-  return computed(() => fixtureAllowed() && route.query.fixture === "1");
-};
-
-export const useLiveMode = () => {
-  const fixture = useFixtureMode();
-  return computed(() => !fixture.value);
-};
 
 // A wait under the delay never shows a skeleton; once shown it stays for the hold, so it never flashes.
 export const useHeldSkeleton = (busy: WatchSource<boolean>): Readonly<Ref<boolean>> => {
@@ -192,6 +178,16 @@ export const useLiveZone = () => {
   }));
 };
 
+/** The `/config` flags of the issue context and its Next step; a server that omits one has it off. */
+export const useContextFlags = () => {
+  const store = useStore();
+  return computed(() => {
+    const zo = store.state.zoConfig;
+    const context = config.isEnterprise === "true" && zo?.autoobserve_context_enabled === true;
+    return { context, step: context && zo?.autoobserve_next_step_enabled === true };
+  });
+};
+
 // The fixture views mount this too, so nothing is fetched until the page is in live mode.
 // Gaps fold into one card, so the rail reads well past its cap to still fill it with other kinds.
 const RAIL_FETCH = 100;
@@ -199,12 +195,11 @@ const RAIL_FETCH = 100;
 /** `active` is off on a sub-page that shows none of it, so a reader is never refused a read the page does not use. */
 export const useLiveAutoObserve = (options: { active?: () => boolean } = {}) => {
   const store = useStore();
-  const live = useLiveMode();
   const { t } = useI18nTyped();
   const zone = useLiveZone();
   const now = useNow();
   const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
-  const enabled = computed(() => live.value && !!org.value && (options.active?.() ?? true));
+  const enabled = computed(() => !!org.value && (options.active?.() ?? true));
   const recently = useRecentlyCreated();
   // A pass runs about every 5 minutes; while an alert added here waits for one, read every minute.
   const coverage = useQuery(() =>
@@ -307,7 +302,15 @@ export const useLiveAutoObserve = (options: { active?: () => boolean } = {}) => 
     railSkeleton,
     today: computed(() => todayText(zone.value.locale, zone.value.timeZone, minute.value * 60_000)),
     checked: computed(() => checkedView(t, zone.value.locale, source.value)),
-    learning: computed(() => learningLine(t, zone.value, source.value.learning)),
+    learning: computed(() =>
+      coverageLearningText(
+        t,
+        zone.value,
+        source.value.learning,
+        source.value.rows.flatMap((row) => (row.identity?.streams ?? []) as LearningStream[]),
+        minute.value * 60_000,
+      ),
+    ),
   };
 };
 
@@ -330,12 +333,11 @@ export const keepLatched = (
 
 export const useLivePaged = (cap = PAGED_CAP) => {
   const store = useStore();
-  const live = useLiveMode();
   const now = useNow();
   const { t } = useI18nTyped();
   const zone = useLiveZone();
   const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
-  const enabled = computed(() => live.value && !!org.value);
+  const enabled = computed(() => !!org.value);
   const query = useQuery(() =>
     Object.assign(autoobserveIncidentsPageQuery(org.value, cap, 0), {
       enabled: enabled.value,

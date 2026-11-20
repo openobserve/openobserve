@@ -30,6 +30,7 @@ vi.mock("./locales", () => ({
   applyDocumentLocale: vi.fn(),
   getLocale: () => "en-US",
   loadLocaleMessages: () => Promise.resolve(),
+  loadLazyLocaleBlocks: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("./aws-exports", () => ({ default: {} }));
 vi.mock("@openobserve/browser-rum", () => ({ openobserveRum: { init: rumInit } }));

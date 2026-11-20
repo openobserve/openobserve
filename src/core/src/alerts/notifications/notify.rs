@@ -75,7 +75,7 @@ impl NotifyError {
         }
     }
 
-    fn from_send(e: anyhow::Error) -> Self {
+    pub(crate) fn from_send(e: anyhow::Error) -> Self {
         if let Some(rejected) = e.downcast_ref::<jira::JiraRejected>() {
             return NotifyError::Rejected {
                 status: rejected.status,

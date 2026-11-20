@@ -75,6 +75,9 @@ pub mod sns;
 pub mod teams;
 pub mod webhook;
 
+#[cfg(test)]
+mod link_tests;
+
 use config::meta::alerts::level::AlertLevel;
 
 use super::{context::NotificationContext, format::ChannelFormat, resolve::RenderedContent};
@@ -336,6 +339,16 @@ mod tests {
     use config::meta::alerts::level::AlertLevel;
 
     use super::*;
+    use crate::alerts::notifications::resolve::{Link, LinkRole};
+
+    fn primary(url: impl Into<String>) -> Link {
+        Link {
+            label: String::new(),
+            url: url.into(),
+            role: LinkRole::Primary,
+            reserved: true,
+        }
+    }
 
     /// Mirrors `resolve`'s fixture context (itself mirroring Task 5's).
     fn fixture_ctx() -> NotificationContext {
@@ -399,8 +412,8 @@ mod tests {
                 ("cpu".into(), "92.5".into()),
             ],
             links: vec![
-                ("Runbook".into(), "https://rb.example/x".into()),
-                ("".into(), "https://o2.example/short/abc".into()),
+                Link::authored("Runbook", "https://rb.example/x"),
+                primary("https://o2.example/short/abc"),
             ],
             rows: vec![vec![
                 ("host".into(), "web-1".into()),
@@ -437,7 +450,8 @@ mod tests {
     fn golden_slack_block_kit() {
         let body = http_body(ChannelFormat::Slack);
         // Always-valid JSON, asserted rather than eyeballed.
-        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let raw: serde_json::Value = serde_json::from_str(&body).unwrap();
+        let v = slack::flat_blocks(&raw);
 
         // mrkdwn safety: `&`/`<`/`>` entity-encoded in every mrkdwn text run.
         let fields = &v["blocks"][2]["fields"];
@@ -452,13 +466,20 @@ mod tests {
             v["blocks"][0]["text"]["text"],
             r#"*<https://o2.example/short/abc|CPU "high" &amp; &lt;fire&gt; on web-1>*"#
         );
-        // Empty link label gets the renderer default; no attachment carries a color stripe.
+        // Empty link label gets the renderer default; both attachments carry the dot's color.
         let buttons = slack_block(&v, "actions");
         assert_eq!(buttons["elements"][1]["text"]["text"], DEFAULT_LINK_LABEL);
-        assert!(v.get("attachments").is_none(), "{v}");
+        assert!(raw.get("blocks").is_none(), "{raw}");
+        let bars: Vec<&serde_json::Value> = raw["attachments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| &a["color"])
+            .collect();
+        assert_eq!(bars, vec!["#E01E5A", "#E01E5A"], "{raw}");
 
         assert_eq!(
-            v,
+            raw,
             serde_json::from_str::<serde_json::Value>(GOLDEN_SLACK).unwrap()
         );
     }
@@ -567,17 +588,14 @@ mod tests {
         // source rather than being interpreted as HTML.
         assert!(embed["description"].as_str().unwrap().contains("<script>"));
         assert!(embed.get("color").is_none());
-        // The FIRST link becomes the embed's clickable title link (a Discord
-        // embed has one), whatever it is — here that's the author-added
-        // "Runbook" link, since it precedes the alert URL in `hostile_content`.
-        assert_eq!(embed["url"], "https://rb.example/x");
-        // The alert URL (second link, empty label) has no embed slot left,
-        // so it's folded into the description as a markdown link.
+        // The Primary link takes the embed's one title link; the authored Runbook goes to the
+        // description as a markdown link.
+        assert_eq!(embed["url"], "https://o2.example/short/abc");
         assert!(
             embed["description"]
                 .as_str()
                 .unwrap()
-                .contains("https://o2.example/short/abc")
+                .contains("[Runbook](https://rb.example/x)")
         );
         let fields = embed["fields"].as_array().unwrap();
         assert!(fields.iter().any(|f| f["name"] == "host"));
@@ -671,7 +689,7 @@ mod tests {
         let content = hostile_content();
         let ctx = fixture_ctx();
         // The fixture's second link is the appended alert URL, empty-labelled.
-        assert_eq!(content.links[1].0, "");
+        assert_eq!(content.links[1].label, "");
 
         // Machine contract: empty label survives verbatim...
         let envelope = webhook::render_webhook(&content, &ctx);
@@ -682,7 +700,7 @@ mod tests {
         assert_eq!(envelope["links"][0]["label"], "Runbook");
 
         // Human-facing formats: the SAME content gets the display default.
-        let slack = slack::render_slack(&content, &fixture_ctx());
+        let slack = slack::flat_blocks(&slack::render_slack(&content, &fixture_ctx()));
         let actions = slack_block(&slack, "actions");
         assert_eq!(actions["elements"][1]["text"]["text"], DEFAULT_LINK_LABEL);
 
@@ -779,7 +797,7 @@ mod tests {
     fn field_value_starting_with_operator_does_not_trigger_blockquote() {
         let mut c = hostile_content();
         c.fields = vec![("Threshold".into(), ">= 5".into())];
-        let v = slack::render_slack(&c, &fixture_ctx());
+        let v = slack::flat_blocks(&slack::render_slack(&c, &fixture_ctx()));
         let blocks = v["blocks"].as_array().unwrap();
         let fields_block = blocks
             .iter()
@@ -808,7 +826,7 @@ mod tests {
     fn row_lines_take_precedence_over_rows() {
         let mut c = hostile_content();
         c.row_lines = Some(vec!["web-1 & 92.5".into()]);
-        let v = slack::render_slack(&c, &fixture_ctx());
+        let v = slack::flat_blocks(&slack::render_slack(&c, &fixture_ctx()));
         let text = v["blocks"][3]["text"]["text"].as_str().unwrap();
         assert_eq!(text, "web-1 &amp; 92.5");
     }
@@ -816,7 +834,7 @@ mod tests {
     #[test]
     fn email_drops_hostile_href_scheme() {
         let mut c = hostile_content();
-        c.links = vec![("evil".into(), "javascript:alert(1)".into())];
+        c.links = vec![Link::authored("evil", "javascript:alert(1)")];
         let (_, html, text) = email::render_email(&c, &fixture_ctx());
         assert!(!html.contains("javascript:"));
         assert!(html.contains(r##"href="#""##));
@@ -863,13 +881,13 @@ mod tests {
             // "dropped" assertions below could pass vacuously on a renderer
             // that emitted no actions at all for an unrelated reason.
             c.links = vec![
-                ("evil".into(), hostile.into()),
-                ("Runbook".into(), "https://rb.example/x".into()),
+                Link::authored("evil", hostile),
+                Link::authored("Runbook", "https://rb.example/x"),
             ];
             let survivor = "https://rb.example/x";
 
             // Strict transports: the hostile link is gone, the good one stays.
-            let slack = slack::render_slack(&c, &fixture_ctx());
+            let slack = slack::flat_blocks(&slack::render_slack(&c, &fixture_ctx()));
             let elements = &slack_block(&slack, "actions")["elements"];
             assert_eq!(
                 elements.as_array().map(Vec::len),
@@ -1054,12 +1072,12 @@ mod tests {
     fn hostile_link_is_dropped_not_emitted_as_blocked_url() {
         let mut c = hostile_content();
         c.links = vec![
-            ("click".into(), "javascript:alert(1)".into()),
-            ("Runbook".into(), "https://rb.example/x".into()),
-            ("".into(), "https://o2.example/short/abc".into()),
+            Link::authored("click", "javascript:alert(1)"),
+            Link::authored("Runbook", "https://rb.example/x"),
+            primary("https://o2.example/short/abc"),
         ];
 
-        let slack = slack::render_slack(&c, &fixture_ctx());
+        let slack = slack::flat_blocks(&slack::render_slack(&c, &fixture_ctx()));
         let elements = slack_block(&slack, "actions")["elements"]
             .as_array()
             .expect("slack actions block");
@@ -1107,13 +1125,45 @@ mod tests {
     /// emitted with an undispatchable URL, and when no link survives, no
     /// empty `actions` block may be emitted either (Slack rejects that too).
     #[test]
+    fn a_title_link_over_the_section_limit_renders_a_plain_header() {
+        let mut ctx = fixture_ctx();
+        let base = "https://o2.example/web/logs?q=";
+        ctx.alert_url = format!("{base}{}", "a".repeat(2_990 - base.len()));
+        assert_eq!(ctx.alert_url.len(), 2_990);
+        let mut c = hostile_content();
+        c.title = "CPU high on web-1".into();
+        c.links = vec![primary(ctx.alert_url.clone())];
+        let slack = slack::flat_blocks(&slack::render_slack(&c, &ctx));
+        let blocks = slack["blocks"].as_array().unwrap();
+        assert_eq!(blocks[0]["type"], "header", "{:#}", blocks[0]);
+        assert_eq!(blocks[0]["text"]["text"], "CPU high on web-1");
+        let button = &slack_block(&slack, "actions")["elements"][0];
+        assert_eq!(
+            button["url"],
+            ctx.alert_url.as_str(),
+            "the button keeps the link"
+        );
+        for block in blocks.iter().filter(|b| b["type"] == "section") {
+            let text = block["text"]["text"].as_str().unwrap_or_default();
+            assert!(text.chars().count() <= 3_000, "{}", text.len());
+        }
+        ctx.alert_url = "https://o2.example/web/logs?q=short".into();
+        c.links = vec![primary(ctx.alert_url.clone())];
+        let short = slack::flat_blocks(&slack::render_slack(&c, &ctx));
+        assert_eq!(
+            short["blocks"][0]["type"], "section",
+            "a short URL keeps the link"
+        );
+    }
+
+    #[test]
     fn relative_alert_url_does_not_produce_an_invalid_action_block() {
         let mut ctx = fixture_ctx();
         ctx.alert_url = "/web/logs?stream=app&org_identifier=default".into();
         let mut c = hostile_content();
-        c.links = vec![("".into(), ctx.alert_url.clone())];
+        c.links = vec![primary(ctx.alert_url.clone())];
 
-        let slack = slack::render_slack(&c, &ctx);
+        let slack = slack::flat_blocks(&slack::render_slack(&c, &ctx));
         // Only the content blocks remain: no buttons, no chart.
         assert!(
             slack_block(&slack, "actions").is_null(),
@@ -1143,7 +1193,7 @@ mod tests {
     #[test]
     fn email_still_substitutes_blocked_url_rather_than_dropping() {
         let mut c = hostile_content();
-        c.links = vec![("evil".into(), "javascript:alert(1)".into())];
+        c.links = vec![Link::authored("evil", "javascript:alert(1)")];
 
         let (_, html, text) = email::render_email(&c, &fixture_ctx());
         assert!(
@@ -1200,9 +1250,9 @@ mod tests {
     fn slack_truncates_beyond_vendor_caps() {
         let mut c = hostile_content();
         c.links = (0..8)
-            .map(|i| (format!("link{i}"), format!("https://example/{i}")))
+            .map(|i| Link::authored(format!("link{i}"), format!("https://example/{i}")))
             .collect();
-        let v = slack::render_slack(&c, &fixture_ctx());
+        let v = slack::flat_blocks(&slack::render_slack(&c, &fixture_ctx()));
         let actions = slack_block(&v, "actions");
         let elements = actions["elements"].as_array().unwrap();
         assert_eq!(elements.len(), 5, "Block Kit caps actions elements at 5");
@@ -1212,7 +1262,7 @@ mod tests {
         // Header clamps to 150 chars with an ellipsis rather than panicking.
         let mut c2 = hostile_content();
         c2.title = "x".repeat(400);
-        let v2 = slack::render_slack(&c2, &fixture_ctx());
+        let v2 = slack::flat_blocks(&slack::render_slack(&c2, &fixture_ctx()));
         // Linked-title path: the 150-char clamp applies to the link LABEL,
         // between the `|` and the closing `>`.
         let title = v2["blocks"][0]["text"]["text"].as_str().unwrap();
@@ -1223,7 +1273,7 @@ mod tests {
         // Section fields cap at 10.
         let mut c3 = hostile_content();
         c3.fields = (0..14).map(|i| (format!("f{i}"), i.to_string())).collect();
-        let v3 = slack::render_slack(&c3, &fixture_ctx());
+        let v3 = slack::flat_blocks(&slack::render_slack(&c3, &fixture_ctx()));
         assert_eq!(v3["blocks"][2]["fields"].as_array().unwrap().len(), 10);
     }
 
@@ -1235,11 +1285,10 @@ mod tests {
     fn slack_default_link_survives_action_cap_and_stays_primary() {
         let mut c = hostile_content();
         c.links = (0..6)
-            .map(|i| (format!("link{i}"), format!("https://example/{i}")))
+            .map(|i| Link::authored(format!("link{i}"), format!("https://example/{i}")))
             .collect();
-        c.links
-            .push((String::new(), "https://o2.example/short/abc".into()));
-        let v = slack::render_slack(&c, &fixture_ctx());
+        c.links.push(primary("https://o2.example/short/abc"));
+        let v = slack::flat_blocks(&slack::render_slack(&c, &fixture_ctx()));
         let actions = slack_block(&v, "actions");
         let elements = actions["elements"].as_array().unwrap();
         assert_eq!(elements.len(), 5);
@@ -1258,7 +1307,7 @@ mod tests {
         let mut ctx = fixture_ctx();
         ctx.chart_url =
             Some("https://o2.example/api/v2/default/alerts/charts/render?d=x&s=y".into());
-        let v = slack::render_slack(&hostile_content(), &ctx);
+        let v = slack::flat_blocks(&slack::render_slack(&hostile_content(), &ctx));
         let blocks = v["blocks"].as_array().unwrap();
         let tail = &blocks[blocks.len() - 2..];
         assert_eq!(tail[0]["type"], "actions");
@@ -1299,7 +1348,7 @@ mod tests {
         // Slack — mrkdwn entity-encodes `>` as `&gt;`, so the bullet must
         // carry `&gt;=` and no blockquote marker.
         let slack = resolve_content(&spec, &ctx, "slack");
-        let v = slack::render_slack(&slack, &fixture_ctx());
+        let v = slack::flat_blocks(&slack::render_slack(&slack, &fixture_ctx()));
         let section = v["blocks"][1]["text"]["text"].as_str().unwrap();
         assert_eq!(section, "• &gt;=");
 

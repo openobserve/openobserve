@@ -5,6 +5,7 @@ const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+const { gotoWithAlpha1Reauth } = require('../../playwright-tests/utils/reauth-alpha1.js');
 import { openNavFlyoutChild } from '../commonActions.js';
 import { ingestBase } from '../../playwright-tests/utils/ingest-url.js';
 const { FilterBuilderDriver, operatorId } = require('../generalPages/filterBuilderPage.js');
@@ -130,6 +131,8 @@ export class PipelinesPage {
         this.e2eAutomateOption = page.locator(
           '[data-test="input-node-stream-name-select-option"][data-test-value="e2e_automate"]'
         );
+        this.streamNameOption = (name) =>
+          page.locator(`[data-test="input-node-stream-name-select-option"][data-test-value="${name}"]`);
         this.inputNodeStreamSaveButton = page.locator(
           '[data-test="input-node-stream-drawer"] [data-test="o-drawer-primary-btn"]'
         );
@@ -163,6 +166,8 @@ export class PipelinesPage {
         this.functionNameLabel = page.locator('[data-test="add-function-node-routing-section"]').getByLabel('Name');
         this.associateFunctionSaveButton = page.locator('[data-test="associate-function-drawer"] [data-test="o-drawer-primary-btn"]');
         this.associateNewFunctionSaveButton = page.locator('[data-test="add-function-save-btn"]');
+        this.associateFunctionDrawer = page.locator('[data-test="associate-function-drawer"]');
+        this.associateFunctionDefinitionSection = page.locator('[data-test="associate-function-definition-section"]');
         // AddFunction's name field is an OInput — when the form is submitted
         // empty, OInput renders the "Field is required!" message inside the
         // auto-derived `${parent}-error` element with `data-test-error-text`.
@@ -376,16 +381,14 @@ export class PipelinesPage {
         // (validated against alpha at --workers=5). The flyout adds no coverage here — we
         // only need to land on the pipeline list page — so skip it. goto is already the
         // proven fallback path; promoting it to primary removes the flake source.
-        // (Auth is safe: with the stored session, a goto to a list route boots the SPA
-        // with the existing token — unlike a reload of the unsaved /pipelines/add editor,
-        // which re-triggers the Dex callback.)
         if (!(await this.page.locator('[data-test="pipeline-list-page"]')
             .isVisible({ timeout: 3000 }).catch(() => false))) {
-            await this.page.goto(
-                `${process.env.ZO_BASE_URL}/web/pipeline/pipelines?org_identifier=${process.env["ORGNAME"]}`
+            await gotoWithAlpha1Reauth(
+                this.page,
+                `${process.env.ZO_BASE_URL}/web/pipeline/pipelines?org_identifier=${process.env["ORGNAME"]}`,
+                this.page.locator('[data-test="pipeline-list-page"]'),
+                { timeout: 30000 }
             );
-            await this.page.locator('[data-test="pipeline-list-page"]')
-                .waitFor({ state: 'visible', timeout: 30000 });
         }
         // Ensure the Stream Pipelines section tab is selected. Wait for it to render
         // before clicking so the click never races the page mount.
@@ -800,6 +803,14 @@ export class PipelinesPage {
             .catch(() => {});
     }
 
+    async expectStreamNameOptionVisible(streamName, timeout = 15000) {
+        await expect(this.streamNameOption(streamName).first()).toBeVisible({ timeout });
+    }
+
+    async expectStreamNameOptionCount(streamName, count, timeout = 10000) {
+        await expect(this.streamNameOption(streamName)).toHaveCount(count, { timeout });
+    }
+
     async saveInputNodeStream() {
         await this.page.locator('[data-test="input-node-stream-name-select-popover"]')
             .waitFor({ state: 'detached', timeout: 5000 })
@@ -984,6 +995,13 @@ export class PipelinesPage {
 
     async saveNewFunction() {
         await this.associateNewFunctionSaveButton.click();
+    }
+
+    async saveCreatedFunction() {
+        // The picker selects a just-created function only after re-fetching the list; Save before that is a silent no-op.
+        await this.associateFunctionDefinitionSection.waitFor({ state: 'visible', timeout: 30000 });
+        await this.associateFunctionSaveButton.click();
+        await expect(this.associateFunctionDrawer).toBeHidden({ timeout: 15000 });
     }
 
     async enterFunctionName(name) {
@@ -1778,6 +1796,11 @@ export class PipelinesPage {
 
     async verifyOperatorLabel(text, index = 0) {
         await this.conditions.expectConnector(String(index + 1), text);
+    }
+
+    /** A connector by its builder path: `1` is the root's second item, `0-1` the second item of the group at root index 0. */
+    async verifyConnectorAt(path, text) {
+        await this.conditions.expectConnector(path, text);
     }
 
     async verifyNoteContainer() {

@@ -309,6 +309,36 @@ describe("useServiceCorrelation", () => {
       expect(result!.service.service_name).toBe("api-service");
     });
 
+    it("sends tracked dimensions as available_dimensions and every record dimension as source_dimensions", async () => {
+      const record = {
+        "k8s-cluster": "c1",
+        service: "openobserve",
+        "k8s-pod-name": "o2-querier-0",
+        host: "node-1",
+        rack: "r12",
+      };
+      mockGetSemanticGroups.mockResolvedValue({ data: MOCK_GROUPS });
+      mockExtractSemanticDimensions.mockReturnValue(record);
+      mockFilterDimensionsForCorrelation.mockReturnValue({ service: "openobserve" });
+      mockCorrelate.mockResolvedValue({ data: MOCK_CORRELATION_RESPONSE });
+      mockGenerateCorrelationQueries.mockReturnValue({ logs: [], traces: [], metrics: [] });
+
+      await useServiceCorrelation().findRelatedTelemetry(mockContext as any, "logs", 5, "default", {
+        start: 100,
+        end: 200,
+      });
+
+      expect(mockCorrelate).toHaveBeenCalledWith("test-org", {
+        source_stream: "default",
+        source_type: "logs",
+        available_dimensions: { service: "openobserve" },
+        source_dimensions: record,
+        resolve_from_source: true,
+        start_time: 100,
+        end_time: 200,
+      });
+    });
+
     it("makes no identity-config or correlate call when correlation is license-locked", async () => {
       mockZoConfig.features = { correlation: "locked" };
       try {

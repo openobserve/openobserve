@@ -15,6 +15,7 @@
 
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { ERROR_LEVELS } from "@/utils/alerts/prefill/fromAutoObserve";
+import { filterAliasFields } from "@/utils/telemetryCorrelation";
 import {
   STEPS,
   type ChartRange,
@@ -22,7 +23,7 @@ import {
   type MetricSeries,
   type MetricUnit,
 } from "../coverageSeries";
-import { SIGNAL_LABEL } from "../fixtures";
+import { SIGNAL_LABEL } from "../aoTypes";
 
 export type LiveChartSignal = "requests" | "errors" | "latency";
 
@@ -62,13 +63,18 @@ const NO_FACTS: ServiceChartFacts = {
 export const quoteIdent = (name: string) => `"${name.replace(/"/g, "")}"`;
 
 /** A null value means the field must be absent, as on a service that has no namespace. */
-export const filterSql = (filters: Record<string, string | null> | undefined): string =>
+export const filterSql = (
+  filters: Record<string, string | null> | undefined,
+  aliases: Record<string, string[]> = {},
+): string =>
   Object.entries(filters ?? {})
-    .map(([field, value]) =>
-      value === null
-        ? `(${quoteIdent(field)} IS NULL OR ${quoteIdent(field)} = '')`
-        : `${quoteIdent(field)} = '${escapeSingleQuotes(String(value))}'`,
-    )
+    .map(([field, value]) => {
+      if (value === null) return `(${quoteIdent(field)} IS NULL OR ${quoteIdent(field)} = '')`;
+      const matches = filterAliasFields(field, aliases).map(
+        (f) => `${quoteIdent(f)} = '${escapeSingleQuotes(String(value))}'`,
+      );
+      return matches.length > 1 ? `(${matches.join(" OR ")})` : matches[0];
+    })
     .join(" AND ");
 
 export const pickErrorField = (fields: Map<string, string>): ErrorRule | null => {
@@ -87,32 +93,42 @@ const bucketSql = (
   filters: Record<string, string | null>,
   range: ChartRange,
   cols: string[],
+  aliases?: Record<string, string[]>,
 ) =>
   `SELECT ${[`histogram(_timestamp, '${BUCKET[range]}') AS t`, "count(*) AS n", ...cols].join(", ")} ` +
-  `FROM ${quoteIdent(stream)} WHERE ${filterSql(filters)} GROUP BY t ORDER BY t`;
+  `FROM ${quoteIdent(stream)} WHERE ${filterSql(filters, aliases)} GROUP BY t ORDER BY t`;
 
 export const tracesSql = (
   stream: string,
   filters: Record<string, string | null>,
   range: ChartRange,
   want: { errors: boolean; latency: boolean },
+  aliases?: Record<string, string[]>,
 ) =>
-  bucketSql(stream, filters, range, [
-    ...(want.errors ? ["count(*) FILTER (WHERE span_status = 'ERROR') AS e"] : []),
-    ...(want.latency ? ["approx_percentile_cont(duration, 0.95) AS p95"] : []),
-  ]);
+  bucketSql(
+    stream,
+    filters,
+    range,
+    [
+      ...(want.errors ? ["count(*) FILTER (WHERE span_status = 'ERROR') AS e"] : []),
+      ...(want.latency ? ["approx_percentile_cont(duration, 0.95) AS p95"] : []),
+    ],
+    aliases,
+  );
 
 export const logsSql = (
   stream: string,
   filters: Record<string, string | null>,
   range: ChartRange,
   rule: ErrorRule | null,
+  aliases?: Record<string, string[]>,
 ) =>
   bucketSql(
     stream,
     filters,
     range,
     rule ? [`count(*) FILTER (WHERE ${errorCondition(rule)}) AS e`] : [],
+    aliases,
   );
 
 // The window ends at the last full bucket, so the newest point is never a bucket still filling up.
@@ -149,7 +165,7 @@ export const valueOf = (signal: LiveChartSignal, source: ChartSource, range: Cha
 };
 
 // Search answers a histogram bucket as a zone-less UTC string, or as epoch microseconds.
-const bucketMs = (t: unknown): number | null => {
+export const bucketMs = (t: unknown): number | null => {
   if (typeof t === "number") return t > 1e14 ? Math.floor(t / 1000) : t;
   if (typeof t !== "string") return null;
   const ms = Date.parse(/(Z|[+-]\d\d:?\d\d)$/i.test(t) ? t : `${t}Z`);

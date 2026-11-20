@@ -408,6 +408,18 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       expect(asked, "browser Back with edits opens the leave dialog").toBe(true);
       expect(watcher.messages, "browser Back never raises a native confirm").toEqual([]);
       await page.waitForURL((url) => !url.pathname.includes("add_panel"), { timeout: 30000 });
+      // A cancelled Back leaves the dashboard URL over a still-open editor, so the URL alone proves nothing.
+      await expect(
+        pm.dashboardPanelActions.addPanelBtn,
+        "Discard shows the dashboard view",
+      ).toBeVisible({
+        timeout: 30000,
+      });
+      await expect(
+        pm.dashboardPanelActions.getPanelSaveBtn(),
+        "Discard closes the panel editor",
+      ).toHaveCount(0);
+      await expect(page).toHaveURL(/\/dashboards\/view/);
 
       await openAddPanel(page, pm);
       await expect(page.locator(PANEL_DRAFT_RESTORE_DIALOG)).toHaveCount(0);

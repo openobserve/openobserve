@@ -19,7 +19,7 @@ use arrow_schema::SchemaRef;
 use config::{TIMESTAMP_COL_NAME, get_config};
 use datafusion::{
     catalog::{Session, TableProvider},
-    common::{Result, exec_datafusion_err, plan_err},
+    common::{Result, exec_datafusion_err, plan_datafusion_err, plan_err},
     datasource::{
         TableType,
         listing::{ListingTable, ListingTableConfig},
@@ -85,6 +85,24 @@ impl ListingTableAdapter {
     pub fn with_cache(mut self, cache: Option<Arc<FileStatisticsCache>>) -> Self {
         self.listing_table = self.listing_table.with_cache(cache);
         self
+    }
+
+    /// The files chained as a sorted scan reads them; errs when statistics cannot order them.
+    pub async fn sorted_file_chains(&self, state: &dyn Session) -> Result<Vec<FileGroup>> {
+        let listed = self
+            .listing_table
+            .list_files_for_scan(state, &[], None)
+            .await?;
+        let schema = self.listing_table.schema();
+        let ordering = self.sort_order.physical_ordering(&schema).ok_or_else(|| {
+            plan_datafusion_err!("sort columns of {} not found in schema", self.sort_order)
+        })?;
+        FileScanConfig::split_groups_by_statistics_with_target_partitions(
+            &schema,
+            &listed.file_groups,
+            &ordering,
+            self.target_partitions,
+        )
     }
 }
 

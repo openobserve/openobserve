@@ -17,11 +17,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@/locales";
 import config from "@/aws-exports";
 import { gt, raw } from "@/types/i18n";
-import type { CoverageCell, CoverageRow } from "../fixtures";
+import type { CoverageCell, CoverageRow } from "../aoTypes";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import { cantBuildKinds, cellInsight, gapInsight, serviceRoute, tracesRoute } from "./coverageCta";
 import { serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
-import type { CoverageCell as Cell } from "../fixtures";
+import type { CoverageCell as Cell } from "../aoTypes";
 
 const gapCell = (stateKey: "none" | "silent" = "none", monitor?: string): CoverageCell => ({
   state: "gap",
@@ -81,14 +81,17 @@ const covered = (): Cell => ({
 
 describe("Signals watched gap line (flagged surface 2)", () => {
   it("drafts the errors, latency and no-data alerts in one review list, and Ask AI (F1)", () => {
-    const parts = gapInsight(gt, "en-US", row([LOGS, TRACES]));
+    const busy = row([LOGS, TRACES]);
+    busy.identity!.trafficPerHour = 1_500_000;
+    const parts = gapInsight(gt, "en-US", busy);
     expect(parts?.cta?.label).toBe("Review and add alerts");
     const target = parts?.cta?.target;
     if (target?.type !== "bulk") throw new Error("expected bulk");
-    expect(target.request.rows.map((r) => [r.kind, r.scope.stream.name])).toEqual([
-      ["errors", "ingest_c"],
-      ["latency", "default"],
-      ["no_data", "ingest_c"],
+    // Only the no-data row's usual level is the service's traffic; errors and latency measure theirs.
+    expect(target.request.rows.map((r) => [r.kind, r.scope.stream.name, r.usually])).toEqual([
+      ["errors", "ingest_c", null],
+      ["latency", "default", null],
+      ["no_data", "ingest_c", 1_500_000],
     ]);
     expect(parts?.ai?.subject).toBe("svc-ingest-c");
   });
@@ -397,7 +400,7 @@ describe("Open the service where its data is (T2-7)", () => {
   type To = { name?: string; path?: string; query: Record<string, string> };
   it("opens Traces on the same scope the charts read, namespace included", () => {
     const to = serviceRoute(row([TRACES]), "demo-org", 1_000_000, {
-      traces: { service_name: "svc-a", service_k8s_namespace_name: "ns-b" },
+      traces: { filters: { service_name: "svc-a", service_k8s_namespace_name: "ns-b" } },
     }) as To;
     expect(to.name).toBe("traces");
     const where = b64DecodeUnicode(to.query.query) ?? "";
@@ -407,7 +410,7 @@ describe("Open the service where its data is (T2-7)", () => {
 
   it("opens Logs for a service that sends only logs", () => {
     const to = serviceRoute(row([LOGS]), "demo-org", 1_000_000, {
-      logs: { service_name: "svc-ingest-e" },
+      logs: { filters: { service_name: "svc-ingest-e" } },
     }) as To;
     expect(to.path).toBe("/logs");
     expect(to.query.stream).toBe("ingest_c");

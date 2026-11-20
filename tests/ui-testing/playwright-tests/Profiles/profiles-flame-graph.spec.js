@@ -232,12 +232,16 @@ test.describe('Profiles flame graph', () => {
       await pm.profilesPage.expectZoomHint(false);
     });
 
-    test('Closing the hint hides it for this graph only', { tag: ['@all', '@profiles', '@P3'] }, async () => {
+    test('Closing the hint hides it for this browser tab, not for good', { tag: ['@all', '@profiles', '@P3'] }, async () => {
       await pm.profilesPage.gotoRef(ref, { view: 'flame' });
       await pm.profilesPage.expectZoomHint(true);
       await pm.profilesPage.clickZoomHint('close');
       await pm.profilesPage.expectZoomHint(false);
       expect(await pm.profilesPage.zoomHintStorageValue()).toBeNull();
+      await pm.profilesPage.reload();
+      await pm.profilesPage.hoverFrame(F.db_query, 'db_query');
+      await pm.profilesPage.expectZoomHint(false);
+      await pm.profilesPage.forgetZoomHintClosedForTab();
       await pm.profilesPage.reload();
       await pm.profilesPage.expectZoomHint(true);
     });

@@ -20,7 +20,9 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 import config from "@/aws-exports";
+import enLocale from "@/locales/languages/en-US.json";
 import {
+  lockedMessage,
   checkFeatureAccess,
   buildFeatureGateContext,
   isFeatureKey,
@@ -91,6 +93,13 @@ describe("enterpriseFeatures", () => {
       expect(result.allowed).toBe(false);
       expect(result.visible).toBe(true);
       expect(result.message).not.toBe("");
+    });
+
+    // Self-hosted but not enterprise-only: OSS clusters too, and the node API answers there.
+    it("unlocks nodes in an OSS build", () => {
+      const result = checkFeatureAccess("nodes", buildFeatureGateContext());
+      expect(result.allowed).toBe(true);
+      expect(result.visible).toBe(true);
     });
 
     it("is visible (not hidden) on an enterprise+cloud hybrid build", () => {
@@ -210,6 +219,36 @@ describe("enterpriseFeatures", () => {
       expect(isFeatureKey("databaseMonitoring")).toBe(false);
       expect(isFeatureKey("streamPipelines")).toBe(false);
       expect(isFeatureKey("not-a-real-key")).toBe(false);
+    });
+  });
+
+  describe("keys gating routes opened by URL", () => {
+    const KEYS = [
+      "searchInspector",
+      "pipelineBackfill",
+      "privateLocations",
+      "downtimes",
+      "alertCalibration",
+      "anomalyDetection",
+      "semanticGroups",
+      "dbmInsights",
+    ] as const;
+
+    it.each(KEYS)("locks %s on OSS with a feature-specific pitch", (key) => {
+      const access = checkFeatureAccess(key, buildFeatureGateContext());
+      expect(access.allowed).toBe(false);
+      expect(access.visible).toBe(true);
+      expect(access.message).toBe(enLocale.enterpriseFeature.pitch[key]);
+    });
+
+    it.each(KEYS)("unlocks %s on an enterprise build", (key) => {
+      config.isEnterprise = "true";
+      expect(checkFeatureAccess(key, buildFeatureGateContext()).allowed).toBe(true);
+    });
+
+    it.each(KEYS)("gives %s its pitch even when the build flags allow it", (key) => {
+      config.isEnterprise = "true";
+      expect(lockedMessage(key)).toBe(enLocale.enterpriseFeature.pitch[key]);
     });
   });
 });

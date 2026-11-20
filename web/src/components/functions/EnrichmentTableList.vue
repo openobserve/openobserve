@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar: type filter + search -->
             <template #toolbar>
-              <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+              <div class="flex flex-1 items-center gap-2 max-md:contents">
                 <OToggleGroup
                   mobile-dropdown
                   :model-value="selectedFilter"
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`${row.name}-explore-btn`"
                   :title="t('logStream.explore')"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   class="max-md:hidden"
                   @click="exploreEnrichmentTable(row)"
                   icon-left="search"
@@ -249,7 +249,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`${row.name}-schema-btn`"
                   :title="t('logStream.schemaHeader')"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   class="max-md:hidden"
                   @click="listSchema(row)"
                   icon-left="format-list-bulleted"
@@ -267,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`${row.name}-edit-btn`"
                   :title="t('function.enrichmentTables')"
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   class="max-md:hidden"
                   @click="showAddUpdateFn(row)"
                   icon-left="edit"
@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`${row.name}-delete-btn`"
                   :title="t('function.delete')"
                   variant="ghost-destructive"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   class="max-md:hidden"
                   @click="showDeleteDialogFn(row)"
                   icon-left="delete"

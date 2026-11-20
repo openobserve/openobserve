@@ -20,6 +20,7 @@ import {
   viewportAt,
   wireframeStyle,
   isMobileReplaySource,
+  imageResourceIds,
 } from "./useMobileSessionReplay";
 
 describe("useMobileSessionReplay", () => {
@@ -199,6 +200,45 @@ describe("useMobileSessionReplay", () => {
       expect(isMobileReplaySource("browser")).toBe(false);
       expect(isMobileReplaySource("")).toBe(false);
       expect(isMobileReplaySource(undefined)).toBe(false);
+    });
+  });
+
+  describe("imageResourceIds", () => {
+    const ID_A = "a".repeat(32);
+    const ID_B = "b".repeat(32);
+    const ID_C = "c".repeat(32);
+
+    it("collects ids from snapshots, adds and updates once each", () => {
+      const records = [
+        {
+          type: 10,
+          timestamp: 1,
+          data: {
+            wireframes: [
+              { id: 1, type: "image", resourceId: ID_A },
+              { id: 2, type: "image", resourceId: ID_A },
+              { id: 3, type: "text" },
+              { id: 4, type: "image", base64: "AAAA" },
+            ],
+          },
+        },
+        {
+          type: 11,
+          timestamp: 2,
+          data: { adds: [{ wireframe: { id: 5, type: "image", resourceId: ID_B } }] },
+        },
+        { type: 11, timestamp: 3, data: { updates: [{ id: 1, resourceId: ID_C }] } },
+      ];
+      expect(imageResourceIds(records)).toEqual([ID_A, ID_B, ID_C]);
+    });
+
+    it("tolerates records without data and non-string ids", () => {
+      const records = [
+        { type: 10, timestamp: 1, data: undefined },
+        { type: 10, timestamp: 2, data: { wireframes: [{ id: 1, resourceId: 5 }, null] } },
+        { type: 11, timestamp: 3, data: { adds: [{}], updates: [null] } },
+      ] as any[];
+      expect(imageResourceIds(records)).toEqual([]);
     });
   });
 });

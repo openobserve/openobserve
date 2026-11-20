@@ -7,6 +7,9 @@ export class IncidentsPage {
     this.statusFilterGroup = '[data-test="incident-status-filter-group"]';
     this.incidentTable = '[data-test="incident-list-table"]';
     this.emptyState = '[data-test="o2-table-empty"]';
+    this.confirmDialogRoot = '[data-test="confirm-dialog-provider"]';
+    this.confirmDialogPrimary = '[data-test="o-dialog-primary-btn"]';
+    this.confirmDialogSecondary = '[data-test="o-dialog-secondary-btn"]';
   }
 
   statusTab(status) {
@@ -105,5 +108,72 @@ export class IncidentsPage {
 
   async clickMutedViewDowntime() {
     await this.page.locator('[data-test="incident-detail-muted-view"]').click();
+  }
+
+  async gotoDetail(incidentId) {
+    const org = process.env.ORGNAME || 'default';
+    const base = (process.env.ZO_BASE_URL || '').replace(/\/+$/, '');
+    await this.page.goto(`${base}/web/incidents/${incidentId}?org_identifier=${org}`);
+  }
+
+  // The detail drawer's Resolve/Reopen buttons carry no data-test.
+  statusAction(label) {
+    return this.page.getByRole('button', { name: label, exact: true }).first();
+  }
+
+  confirmDialog() {
+    return this.page.locator(this.confirmDialogRoot);
+  }
+
+  async expectConfirmDialog(title) {
+    await expect(this.confirmDialog()).toBeVisible({ timeout: 10000 });
+    await expect(this.confirmDialog()).toContainText(title);
+  }
+
+  async cancelConfirmDialog() {
+    await this.confirmDialog().locator(this.confirmDialogSecondary).click();
+    await expect(this.confirmDialog()).toBeHidden({ timeout: 10000 });
+  }
+
+  async acceptConfirmDialog() {
+    await this.confirmDialog().locator(this.confirmDialogPrimary).click();
+    await expect(this.confirmDialog()).toBeHidden({ timeout: 10000 });
+  }
+
+  unfoldCard(cardId) {
+    return this.page.locator(`[data-test="autoobserve-unfold-card-${cardId}"]`).first();
+  }
+
+  async openAlertGraph() {
+    await this.page.locator('[data-test="incident-alert-graph-tab"]').click();
+    await expect(this.page.locator('[data-test="incident-unfold-graph"]')).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectUnfoldCardTitle(cardId, title) {
+    await expect(this.page.locator(`[data-test="autoobserve-unfold-title-${cardId}"]`).first()).toContainText(title, { timeout: 30000 });
+  }
+
+  async expectUnfoldCardTag(cardId, text) {
+    const tag = this.page.locator(`[data-test="autoobserve-unfold-tag-${cardId}"]`);
+    if (text === null) await expect(tag).toHaveCount(0);
+    else await expect(tag.first()).toContainText(text);
+  }
+
+  /** True when the first card starts left of the second, as the unfold lays cards out in firing order. */
+  async unfoldCardIsLeftOf(firstId, secondId) {
+    const a = await this.unfoldCard(firstId).boundingBox();
+    const b = await this.unfoldCard(secondId).boundingBox();
+    expect(a && b, 'both cards must be laid out').toBeTruthy();
+    return a.x < b.x;
+  }
+
+  async openUnfoldCard(cardId) {
+    await this.unfoldCard(cardId).click();
+    await expect(this.page.locator('[data-test="incident-alert-panel"]')).toBeVisible({ timeout: 15000 });
+  }
+
+  async expectAlertPanel(name, countText) {
+    await expect(this.page.locator('[data-test="incident-alert-panel-name"]')).toContainText(name, { timeout: 15000 });
+    await expect(this.page.locator('[data-test="incident-alert-panel-count"]')).toContainText(countText);
   }
 }

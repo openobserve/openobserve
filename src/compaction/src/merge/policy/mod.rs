@@ -1,0 +1,701 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! The merge rules: which rule a window follows is decided here, what a rule reads and how it
+//! batches lives in its own file.
+
+#[cfg(feature = "enterprise")]
+mod downsampling;
+mod metrics_closed_hour;
+mod metrics_open_hour;
+mod size_bounded;
+
+use std::sync::Arc;
+
+use arrow_schema::Schema;
+use chrono::{TimeZone, Utc};
+#[cfg(feature = "enterprise")]
+use config::meta::promql::DownsamplingRule;
+use config::{
+    get_config,
+    meta::stream::{
+        FileKey, MergeStrategy, PartitionTimeLevel, StreamParams, StreamSettings, StreamType,
+    },
+    utils::time::hour_micros,
+};
+use infra::schema::get_partition_time_level_at;
+use metrics_index::{MetricsFileLayout, metrics_index_stream};
+use search::merge::MergeMode;
+
+use super::job::{job_range_end, scheduling_level};
+
+/// One planned merge: the files and the mode they merge in.
+pub(super) type PlannedBatch = (Vec<FileKey>, MergeMode);
+
+/// The size rules one merge round batches files under.
+pub(super) struct BatchLimits {
+    pub strategy: MergeStrategy,
+    pub max_file_size: usize,
+    pub max_group_files: usize,
+    /// The hour is still open: an unfilled trailing group waits for more files.
+    pub is_incremental: bool,
+    /// The classic merge query's cap: larger files are at their target size.
+    pub merge_max_original_size: i64,
+    /// Most sorted inputs (merge groups) one metrics merge may open; 0 is no cap.
+    pub max_merge_groups: usize,
+}
+
+impl BatchLimits {
+    pub(super) fn from_config(is_incremental: bool) -> Self {
+        let cfg = get_config();
+        Self {
+            strategy: MergeStrategy::from(&cfg.compact.strategy),
+            max_file_size: cfg.compact.max_file_size,
+            max_group_files: cfg.compact.max_group_files,
+            is_incremental,
+            merge_max_original_size: infra::file_list::merge_max_original_size(),
+            max_merge_groups: cfg.compact.metrics_max_groups,
+        }
+    }
+}
+
+/// What one round merges in a partition of the window.
+#[derive(Debug)]
+pub(super) struct RoundPlan {
+    pub batches: Vec<PlannedBatch>,
+    /// These batches only prepare the window: it is planned again once they are committed.
+    pub needs_another_round: bool,
+}
+
+impl RoundPlan {
+    fn new(batches: Vec<PlannedBatch>) -> Self {
+        Self {
+            batches,
+            needs_another_round: false,
+        }
+    }
+
+    fn with_another_round(mut self) -> Self {
+        self.needs_another_round = true;
+        self
+    }
+}
+
+/// A job's resolved window and merge rule, shared by file discovery and batch planning.
+#[derive(Debug)]
+pub(super) struct MergePolicy {
+    window: MergeWindow,
+    rule: MergeRule,
+}
+
+impl MergePolicy {
+    /// Resolve the job window, incremental state and merge rule before file discovery.
+    pub(super) fn resolve(
+        stream: &StreamParams,
+        schema: &Schema,
+        settings: Option<&StreamSettings>,
+        offset: i64,
+        now: i64,
+    ) -> Self {
+        let offset = offset - offset % hour_micros(1);
+        let job_level = scheduling_level(stream.stream_type, settings, offset);
+        let partition_level = get_partition_time_level_at(stream.stream_type, settings, offset);
+        let is_incremental = !crate::is_past_hour(job_range_end(offset, job_level), now);
+        let (read_level, rule) =
+            MergeRule::select(stream, schema, offset, partition_level, is_incremental, now);
+        let window = MergeWindow::new(stream, offset, job_level, read_level, is_incremental);
+        Self { window, rule }
+    }
+
+    /// Build merge batches for one partition using the selected rule.
+    /// Return non-empty batches and whether a follow-up round is needed.
+    pub(super) async fn plan(
+        &self,
+        files: Vec<FileKey>,
+        limits: &BatchLimits,
+        schema: &Arc<Schema>,
+    ) -> RoundPlan {
+        let files = sort_for_strategy(files, &limits.strategy);
+        let mut plan = match &self.rule {
+            MergeRule::SizeBounded(mode) => size_bounded::plan(&files, limits, mode),
+            MergeRule::MetricsOpenHour => metrics_open_hour::plan(files, limits),
+            MergeRule::MetricsClosedHour => {
+                metrics_closed_hour::plan(files, limits, schema, &self.window.stream_key()).await
+            }
+            #[cfg(feature = "enterprise")]
+            MergeRule::Downsampling(rule) => downsampling::plan(files, rule),
+        };
+        plan.batches.retain(|(files, _)| !files.is_empty());
+        plan
+    }
+
+    /// Return the query window paired with this rule; its read range can exceed the job range.
+    pub(super) fn window(&self) -> &MergeWindow {
+        &self.window
+    }
+
+    /// Whether file discovery must include files regardless of their original size.
+    pub(super) fn reads_whole_window(&self) -> bool {
+        match &self.rule {
+            MergeRule::SizeBounded(_) => size_bounded::READS_WHOLE_WINDOW,
+            MergeRule::MetricsOpenHour => metrics_open_hour::READS_WHOLE_WINDOW,
+            MergeRule::MetricsClosedHour => metrics_closed_hour::READS_WHOLE_WINDOW,
+            #[cfg(feature = "enterprise")]
+            MergeRule::Downsampling(_) => downsampling::READS_WHOLE_WINDOW,
+        }
+    }
+}
+
+/// Determines which files to select and how to group them into merge batches.
+#[derive(Debug)]
+enum MergeRule {
+    SizeBounded(MergeMode),
+    MetricsOpenHour,
+    MetricsClosedHour,
+    #[cfg(feature = "enterprise")]
+    Downsampling(DownsamplingRule),
+}
+
+impl MergeRule {
+    /// Prefer eligible downsampling rules, falling back to the stream's normal merge rule.
+    /// Return the selected rule and its file-query read level.
+    fn select(
+        stream: &StreamParams,
+        schema: &Schema,
+        _offset: i64,
+        partition_level: PartitionTimeLevel,
+        is_incremental: bool,
+        _now: i64,
+    ) -> (PartitionTimeLevel, Self) {
+        #[cfg(feature = "enterprise")]
+        if let Some(selection) =
+            downsampling::select(stream, _offset, partition_level, is_incremental, _now)
+        {
+            return selection;
+        }
+        (
+            partition_level,
+            Self::for_stream(stream, schema, is_incremental),
+        )
+    }
+
+    /// Use open/closed-hour rules for indexed metrics, and size-bounded merging otherwise.
+    fn for_stream(stream: &StreamParams, schema: &Schema, is_incremental: bool) -> Self {
+        if metrics_index_stream(stream.stream_type, schema) {
+            return if is_incremental {
+                Self::MetricsOpenHour
+            } else {
+                Self::MetricsClosedHour
+            };
+        }
+        Self::SizeBounded(MergeMode::for_stream(
+            stream.stream_type,
+            &stream.stream_name,
+        ))
+    }
+}
+
+/// Stream identity, scheduling state and file-query dates for one merge job.
+/// The query range may be wider than the scheduled job range.
+#[derive(Debug)]
+pub(crate) struct MergeWindow {
+    pub(crate) org_id: String,
+    pub(crate) stream_type: StreamType,
+    pub(crate) stream_name: String,
+    pub(super) offset: i64,
+    pub(super) job_end: i64,
+    pub(super) is_incremental: bool,
+    pub(super) merges_by_day: bool,
+    pub(super) date_start: String,
+    pub(super) date_end: String,
+}
+
+impl MergeWindow {
+    pub(super) fn stream_key(&self) -> String {
+        format!("{}/{}/{}", self.org_id, self.stream_type, self.stream_name)
+    }
+
+    fn new(
+        stream: &StreamParams,
+        offset: i64,
+        job_level: PartitionTimeLevel,
+        read_level: PartitionTimeLevel,
+        is_incremental: bool,
+    ) -> Self {
+        let offset = offset - offset % hour_micros(1);
+        let (date_start, date_end) = date_range(offset, read_level);
+        Self {
+            org_id: stream.org_id.to_string(),
+            stream_type: stream.stream_type,
+            stream_name: stream.stream_name.to_string(),
+            offset,
+            job_end: job_range_end(offset, job_level),
+            is_incremental,
+            // A wider read range must not combine hourly partitions into daily output.
+            merges_by_day: job_level == PartitionTimeLevel::Daily,
+            date_start,
+            date_end,
+        }
+    }
+}
+
+fn date_range(offset: i64, level: PartitionTimeLevel) -> (String, String) {
+    let offset_time = Utc.timestamp_nanos(offset * 1000);
+    if level == PartitionTimeLevel::Daily {
+        (
+            offset_time.format("%Y/%m/%d/00").to_string(),
+            offset_time.format("%Y/%m/%d/23").to_string(),
+        )
+    } else {
+        (
+            offset_time.format("%Y/%m/%d/%H").to_string(),
+            offset_time.format("%Y/%m/%d/%H").to_string(),
+        )
+    }
+}
+
+/// Legacy metrics files never join a hash-ordered batch: sorting them would
+/// be a full sort of the hour. Returns `(hash-ordered files, legacy files)`.
+fn split_legacy_metrics(files: Vec<FileKey>) -> (Vec<FileKey>, Vec<FileKey>) {
+    files
+        .into_iter()
+        .partition(|f| MetricsFileLayout::is_hash_ordered(&f.key))
+}
+
+/// The classic size-bounded merges the legacy files of a metrics-index hour keep.
+fn legacy_batches(mut files: Vec<FileKey>, limits: &BatchLimits) -> Vec<PlannedBatch> {
+    // a whole-hour query lists every file; the classic merge never rewrites the full-sized ones
+    files.retain(|f| f.meta.original_size <= limits.merge_max_original_size);
+    size_bounded::plan(&files, limits, &MergeMode::Classic).batches
+}
+
+/// `files` in chunks of at most `max_files` (0: one chunk); a lone trailing file is left out.
+fn mergeable_chunks(files: Vec<FileKey>, max_files: usize) -> Vec<Vec<FileKey>> {
+    if max_files == 0 {
+        return vec![files];
+    }
+    // a lone trailing file has nothing to merge with and waits for the next round
+    files
+        .chunks(max_files)
+        .filter(|chunk| chunk.len() > 1)
+        .map(<[FileKey]>::to_vec)
+        .collect()
+}
+
+fn sort_for_strategy(mut files: Vec<FileKey>, strategy: &MergeStrategy) -> Vec<FileKey> {
+    match strategy {
+        MergeStrategy::FileSize => files.sort_by_key(|k| k.meta.original_size),
+        MergeStrategy::FileTime => files.sort_by_key(|k| k.meta.min_ts),
+        MergeStrategy::TimeRange => files = sort_by_time_range(files),
+    }
+    files
+}
+
+fn sort_by_time_range(mut file_list: Vec<FileKey>) -> Vec<FileKey> {
+    let files_num = file_list.len();
+    file_list.sort_by_key(|f| f.meta.min_ts);
+    let mut groups: Vec<Vec<FileKey>> = Vec::with_capacity(files_num);
+    for file in file_list {
+        let mut inserted = None;
+        for (i, group) in groups.iter().enumerate() {
+            if group
+                .last()
+                .is_some_and(|f| file.meta.min_ts >= f.meta.max_ts)
+            {
+                inserted = Some(i);
+                break;
+            }
+        }
+        if let Some(i) = inserted {
+            groups[i].push(file);
+        } else {
+            groups.push(vec![file]);
+        }
+    }
+    let mut files = Vec::with_capacity(files_num);
+    for group in groups {
+        files.extend(group);
+    }
+    files
+}
+
+#[cfg(test)]
+mod tests {
+    use config::{
+        meta::stream::{FileMeta, PartitionTimeLevelChange},
+        utils::time::day_micros,
+    };
+
+    use super::*;
+
+    pub(super) fn create_file_key(
+        key: &str,
+        min_ts: i64,
+        max_ts: i64,
+        original_size: i64,
+    ) -> FileKey {
+        FileKey {
+            id: 0,
+            account: "test_account".to_string(),
+            key: key.to_string(),
+            meta: FileMeta {
+                min_ts,
+                max_ts,
+                records: 100,
+                original_size,
+                compressed_size: original_size / 2,
+                index_size: 0,
+                mindex_size: 0,
+                flattened: false,
+                bloom_ver: 0,
+            },
+            deleted: false,
+            selection: None,
+            row_group_size: None,
+        }
+    }
+
+    pub(super) fn limits(
+        strategy: &MergeStrategy,
+        max_group_files: usize,
+        is_incremental: bool,
+    ) -> BatchLimits {
+        BatchLimits {
+            strategy: strategy.clone(),
+            max_file_size: 1000,
+            max_group_files,
+            is_incremental,
+            merge_max_original_size: 950,
+            max_merge_groups: 100,
+        }
+    }
+
+    pub(super) fn schema() -> Arc<Schema> {
+        Arc::new(Schema::empty())
+    }
+
+    pub(super) fn metrics_file(name: &str, size: i64) -> FileKey {
+        create_file_key(
+            &format!("files/default/metrics/m/2026/08/18/10/{name}"),
+            10,
+            20,
+            size,
+        )
+    }
+
+    pub(super) fn names(files: &[FileKey]) -> Vec<&str> {
+        files
+            .iter()
+            .map(|f| f.key.rsplit('/').next().unwrap())
+            .collect()
+    }
+
+    pub(super) fn hash_file(name: &str, compressed_size: i64) -> FileKey {
+        let mut file = metrics_file(name, compressed_size * 40);
+        file.meta.compressed_size = compressed_size;
+        file
+    }
+
+    pub(super) fn test_policy(rule: MergeRule) -> MergePolicy {
+        MergePolicy {
+            window: MergeWindow {
+                org_id: "default".to_string(),
+                stream_type: StreamType::Metrics,
+                stream_name: "test".to_string(),
+                offset: day(),
+                job_end: day() + hour_micros(1) - 1,
+                is_incremental: matches!(rule, MergeRule::MetricsOpenHour),
+                merges_by_day: false,
+                date_start: "2026/08/18/00".to_string(),
+                date_end: "2026/08/18/00".to_string(),
+            },
+            rule,
+        }
+    }
+
+    pub(super) fn day() -> i64 {
+        Utc.with_ymd_and_hms(2026, 8, 18, 0, 0, 0)
+            .unwrap()
+            .timestamp_micros()
+    }
+
+    fn resolve_with_level(
+        stream: &StreamParams,
+        schema: &Schema,
+        offset: i64,
+        partition_level: PartitionTimeLevel,
+        now: i64,
+    ) -> MergePolicy {
+        let mut settings = StreamSettings::default();
+        settings.partition_time_level.changes = vec![PartitionTimeLevelChange {
+            since: day(),
+            level: partition_level,
+        }];
+        MergePolicy::resolve(stream, schema, Some(&settings), offset, now)
+    }
+
+    pub(super) fn indexed_schema() -> Schema {
+        Schema::new(vec![arrow_schema::Field::new(
+            config::meta::promql::HASH_LABEL,
+            arrow_schema::DataType::UInt64,
+            false,
+        )])
+    }
+
+    #[test]
+    fn test_resolve_policy_by_stream_and_window_state() {
+        let plain = Schema::empty();
+        let hashed = indexed_schema();
+        let resolve = |stream_type, name, schema, closed| {
+            resolve_with_level(
+                &StreamParams::new("default", name, stream_type),
+                schema,
+                day(),
+                PartitionTimeLevel::Hourly,
+                day() + hour_micros(1) + crate::settle_micros() + i64::from(closed),
+            )
+        };
+        assert!(matches!(
+            resolve(StreamType::Traces, "app", &plain, true).rule,
+            MergeRule::SizeBounded(MergeMode::Classic)
+        ));
+        assert!(matches!(
+            resolve(StreamType::Filelist, "x", &plain, false).rule,
+            MergeRule::SizeBounded(MergeMode::FileList)
+        ));
+        assert!(matches!(
+            resolve(StreamType::Metrics, "cpu", &plain, true).rule,
+            MergeRule::SizeBounded(MergeMode::Classic)
+        ));
+        assert!(matches!(
+            resolve(StreamType::Metrics, "cpu", &hashed, false).rule,
+            MergeRule::MetricsOpenHour
+        ));
+        assert!(matches!(
+            resolve(StreamType::Metrics, "cpu", &hashed, true).rule,
+            MergeRule::MetricsClosedHour
+        ));
+        assert!(!test_policy(MergeRule::SizeBounded(MergeMode::Classic)).reads_whole_window());
+        assert!(test_policy(MergeRule::MetricsOpenHour).reads_whole_window());
+        assert!(test_policy(MergeRule::MetricsClosedHour).reads_whole_window());
+    }
+
+    #[test]
+    fn test_resolve_window_preserves_job_and_read_ranges() {
+        let plain = Schema::empty();
+        let hourly = PartitionTimeLevel::Hourly;
+        let daily = PartitionTimeLevel::Daily;
+        for (stream_type, job_level, read_level, offset, start, end) in [
+            (
+                StreamType::Logs,
+                hourly,
+                hourly,
+                day() + hour_micros(10) + 123,
+                "10",
+                "10",
+            ),
+            (
+                StreamType::Logs,
+                daily,
+                daily,
+                day() + hour_micros(10) + 123,
+                "00",
+                "23",
+            ),
+            (StreamType::Metrics, hourly, hourly, day(), "00", "00"),
+            (
+                StreamType::Filelist,
+                hourly,
+                daily,
+                day() + hour_micros(10),
+                "00",
+                "23",
+            ),
+            (
+                StreamType::Metadata,
+                hourly,
+                PartitionTimeLevel::Unset,
+                day() + hour_micros(5),
+                "05",
+                "05",
+            ),
+        ] {
+            let policy = resolve_with_level(
+                &StreamParams::new("default", "cpu", stream_type),
+                &plain,
+                offset,
+                read_level,
+                day() + day_micros(2),
+            );
+            let window = policy.window();
+            let aligned = offset - offset % hour_micros(1);
+            assert_eq!(window.offset, aligned);
+            assert_eq!(window.job_end, job_range_end(aligned, job_level));
+            assert_eq!(window.date_start, format!("2026/08/18/{start}"));
+            assert_eq!(window.date_end, format!("2026/08/18/{end}"));
+            assert_eq!(window.merges_by_day, job_level == daily);
+            assert!(!window.is_incremental);
+        }
+    }
+
+    #[test]
+    fn test_resolve_settle_boundary_uses_the_scheduled_job_end() {
+        let schema = indexed_schema();
+        let settle_delay = crate::settle_micros();
+        for job_level in [PartitionTimeLevel::Hourly, PartitionTimeLevel::Daily] {
+            let job_end = job_range_end(day(), job_level);
+            for (delta, incremental) in [(-1, true), (0, true), (1, false)] {
+                let policy = resolve_with_level(
+                    &StreamParams::new("default", "cpu", StreamType::Metrics),
+                    &schema,
+                    day(),
+                    job_level,
+                    job_end + 1 + settle_delay + delta,
+                );
+                assert_eq!(policy.window().is_incremental, incremental);
+                assert_eq!(policy.window().job_end, job_end);
+                assert_eq!(
+                    matches!(policy.rule, MergeRule::MetricsOpenHour),
+                    incremental
+                );
+                assert_eq!(
+                    matches!(policy.rule, MergeRule::MetricsClosedHour),
+                    !incremental
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_resolve_uses_historical_partition_settings() {
+        let plain = Schema::empty();
+        let mut settings = StreamSettings::default();
+        settings.partition_time_level.changes = vec![
+            PartitionTimeLevelChange {
+                since: day(),
+                level: PartitionTimeLevel::Daily,
+            },
+            PartitionTimeLevelChange {
+                since: day() + day_micros(1),
+                level: PartitionTimeLevel::Hourly,
+            },
+        ];
+        for (offset, expected_end, merges_by_day) in [
+            (day() + hour_micros(5), "2026/08/18/23", true),
+            (
+                day() + day_micros(1) + hour_micros(5),
+                "2026/08/19/05",
+                false,
+            ),
+        ] {
+            let policy = MergePolicy::resolve(
+                &StreamParams::new("default", "test", StreamType::Logs),
+                &plain,
+                Some(&settings),
+                offset,
+                day() + day_micros(2),
+            );
+            assert_eq!(policy.window().date_end, expected_end);
+            assert_eq!(policy.window().merges_by_day, merges_by_day);
+            let level = if merges_by_day {
+                PartitionTimeLevel::Daily
+            } else {
+                PartitionTimeLevel::Hourly
+            };
+            assert_eq!(policy.window().job_end, job_range_end(offset, level));
+        }
+        let policy = MergePolicy::resolve(
+            &StreamParams::new("default", "test", StreamType::Filelist),
+            &plain,
+            Some(&settings),
+            day() + hour_micros(5),
+            day() + day_micros(2),
+        );
+        assert_eq!(policy.window().date_end, "2026/08/18/23");
+        assert_eq!(policy.window().job_end, day() + hour_micros(6) - 1);
+        assert!(!policy.window().merges_by_day);
+    }
+
+    fn sorted_positions(ranges: &[(i64, i64)]) -> Vec<usize> {
+        let files = ranges
+            .iter()
+            .enumerate()
+            .map(|(i, (min_ts, max_ts))| create_file_key(&i.to_string(), *min_ts, *max_ts, 1024))
+            .collect();
+        sort_by_time_range(files)
+            .iter()
+            .map(|f| f.key.parse().unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn test_sort_by_time_range_orders_non_overlapping_files_by_time() {
+        assert!(sorted_positions(&[]).is_empty());
+        assert_eq!(sorted_positions(&[(42, 42)]), [0]);
+        // a file starting where the previous one ends does not overlap it
+        assert_eq!(
+            sorted_positions(&[(1000, 2000), (2000, 3000), (3000, 4000)]),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            sorted_positions(&[(4000, 5000), (3000, 4000), (2000, 3000), (1000, 2000)]),
+            [3, 2, 1, 0]
+        );
+        assert_eq!(
+            sorted_positions(&[(1000, 2000), (5000, 6000), (3000, 4000)]),
+            [0, 2, 1]
+        );
+        assert_eq!(
+            sorted_positions(&[(-2000, -1000), (-1000, 0), (0, 1000)]),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            sorted_positions(&[(1000, 1000), (1000, 2000), (2000, 2000)]),
+            [0, 1, 2]
+        );
+        assert_eq!(
+            sorted_positions(&[
+                (i64::MAX - 1000, i64::MAX),
+                (i64::MIN, i64::MIN),
+                (i64::MIN, 0)
+            ]),
+            [1, 2, 0]
+        );
+    }
+
+    #[test]
+    fn test_sort_by_time_range_chains_overlapping_files() {
+        // one unit of overlap opens a second chain; the next file rejoins the first
+        assert_eq!(
+            sorted_positions(&[(1000, 2000), (1999, 3000), (2000, 2500)]),
+            [0, 2, 1]
+        );
+        // two interleaved chains come out one after the other
+        assert_eq!(
+            sorted_positions(&[(1000, 2000), (1500, 2500), (2000, 3000), (2500, 3500)]),
+            [0, 2, 1, 3]
+        );
+        // a file joins the first chain it fits
+        assert_eq!(
+            sorted_positions(&[(100, 200), (150, 300), (200, 400), (300, 500), (600, 700)]),
+            [0, 2, 4, 1, 3]
+        );
+        // files of one range are a chain each, in input order
+        assert_eq!(sorted_positions(&[(500, 1500); 4]), [0, 1, 2, 3]);
+        assert_eq!(sorted_positions(&[(1000, 3000), (1000, 2000)]), [0, 1]);
+        // an inverted range is kept, not dropped
+        assert_eq!(sorted_positions(&[(1000, 3000), (5000, 2000)]), [0, 1]);
+    }
+}

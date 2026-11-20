@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        v-if="showZoomHint && !noZoomHint"
+        v-if="showZoomHint"
         class="border-border-default bg-surface-panel rounded-default absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 border px-3 py-1.5 text-xs whitespace-nowrap"
         data-test="flame-graph-zoom-hint"
       >
@@ -259,6 +259,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { escapeHtml } from "@/utils/html";
 import { cssToken } from "@/utils/theme";
 import { paletteIndexFor } from "./flameGraphPackage";
+import { useFlameZoomHint } from "./useFlameZoomHint";
 import { parseColor } from "@/lib/styles/tokens/colorMath";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useThemeRevision } from "@/composables/useTheme";
@@ -830,27 +831,8 @@ const openMenuFromButton = (event: MouseEvent) => {
   nextTick(fitMenu);
 };
 
-// A one-time hint for the wheel zoom; "Don't show again" keeps it closed.
-const ZOOM_HINT_KEY = "o2_flame_zoom_hint_hidden";
 const zoomKey = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
-const readHintHidden = () => {
-  try {
-    return localStorage.getItem(ZOOM_HINT_KEY) === "1";
-  } catch {
-    return false;
-  }
-};
-const zoomHintHidden = ref(readHintHidden());
-const showZoomHint = computed(() => hasData.value && !zoomHintHidden.value);
-const hideZoomHint = (forever: boolean) => {
-  zoomHintHidden.value = true;
-  if (!forever) return;
-  try {
-    localStorage.setItem(ZOOM_HINT_KEY, "1");
-  } catch {
-    // Without storage the hint only stays closed until the page reloads.
-  }
-};
+const { showZoomHint, hideZoomHint } = useFlameZoomHint(() => hasData.value && !props.noZoomHint);
 
 // A new frame to zoom to, or new data, starts at the full width of the view.
 watch([focusPath, () => props.root], () => {

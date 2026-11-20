@@ -48,6 +48,46 @@ pub const UNMATCHED_MARKER: &str = "–";
 /// Families whose renderers send the body as plain text, so escaped values would show backslashes.
 const PLAIN_TEXT_BODY_FAMILIES: [&str; 3] = ["opsgenie", "pagerduty", "servicenow"];
 
+/// What a link is for, so renderers find the system buttons without reading labels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkRole {
+    Authored,
+    /// The data button, from `alert_url`.
+    Primary,
+    /// The object button, from `alert_detail_url`.
+    Detail,
+}
+
+/// One resolved link.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Link {
+    pub label: String,
+    pub url: String,
+    pub role: LinkRole,
+    /// Takes a Slack slot first: Primary, Detail, or an authored link that stands in for Detail.
+    pub reserved: bool,
+}
+
+impl Link {
+    pub fn authored(label: impl Into<String>, url: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            url: url.into(),
+            role: LinkRole::Authored,
+            reserved: false,
+        }
+    }
+
+    /// The label a human-facing channel shows; an empty one reads the channel default.
+    pub fn display_label(&self) -> &str {
+        if self.label.trim().is_empty() {
+            super::render::DEFAULT_LINK_LABEL
+        } else {
+            &self.label
+        }
+    }
+}
+
 /// Fully resolved, still-raw content for one channel render.
 pub struct RenderedContent {
     /// Per-channel override already applied.
@@ -56,8 +96,8 @@ pub struct RenderedContent {
     pub body_markdown: String,
     /// `show_when`-filtered, substituted.
     pub fields: Vec<(String, String)>,
-    /// (label, url); alert-URL link appended.
-    pub links: Vec<(String, String)>,
+    /// Authored links in template order, then Primary, then Detail when it applies.
+    pub links: Vec<Link>,
     /// ≤ `rows.max`, column-ordered per `RowsSpec`.
     pub rows: Vec<Vec<(String, String)>>,
     /// Present when `RowsSpec.enabled` is true and `RowsSpec.format` is set.
@@ -82,8 +122,11 @@ pub fn resolve_content(
         .title_overrides
         .get(channel_family)
         .unwrap_or(&spec.title);
-    let (title, mut unk) = substitute_raw(title_tpl, ctx);
+    let (mut title, mut unk) = substitute_raw(title_tpl, ctx);
     unknown_variables.append(&mut unk);
+    if ctx.render_hints.test_marker {
+        title.insert_str(0, super::TEST_MARKER);
+    }
 
     // Body values are markdown-escaped, except plain-text families, which get raw values.
     // Title, fields, links and rows stay raw; Teams guards them in its renderer.
@@ -94,11 +137,15 @@ pub fn resolve_content(
     };
     unknown_variables.append(&mut unk);
 
+    let (spec_fields, default_fields) = super::default_template::fields_for(&spec.fields, ctx.kind);
     let mut fields = Vec::new();
-    for field in &spec.fields {
+    for field in spec_fields.iter() {
         if let Some(filter) = &field.show_when
             && !filter.matches(ctx.level)
         {
+            continue;
+        }
+        if default_fields && !super::default_template::default_field_applies(field, ctx.kind) {
             continue;
         }
         let (label, mut unk) = substitute_raw(&field.label, ctx);
@@ -130,11 +177,9 @@ pub fn resolve_content(
         {
             continue;
         }
-        links.push((label, url));
+        links.push(Link::authored(label, url));
     }
-    // Appended alert link: empty label — renderers supply the localized
-    // default ("View alert" is an i18n/FE concern, Task 12), not this layer.
-    links.push((String::new(), ctx.alert_url.clone()));
+    append_system_links(&mut links, ctx);
 
     let max = if spec.rows.enabled {
         spec.rows.max as usize
@@ -182,6 +227,43 @@ pub fn resolve_content(
         severity: ctx.level,
         unknown_variables,
     }
+}
+
+/// Appends Primary, then Detail unless it is blank or repeats `alert_url`. On an anomaly an
+/// authored link to `alert_url` drops; one to the Detail URL stands in for it.
+pub(crate) fn append_system_links(links: &mut Vec<Link>, ctx: &NotificationContext) {
+    let primary_url = ctx.alert_url.trim();
+    if ctx.kind == NotificationKind::Anomaly && !primary_url.is_empty() {
+        links.retain(|l| l.role != LinkRole::Authored || l.url.trim() != primary_url);
+    }
+    links.push(Link {
+        label: ctx.alert_url_label.clone(),
+        url: ctx.alert_url.clone(),
+        role: LinkRole::Primary,
+        reserved: true,
+    });
+    let Some(detail_url) = detail_url(ctx) else {
+        return;
+    };
+    if let Some(stand_in) = links
+        .iter_mut()
+        .find(|l| l.role == LinkRole::Authored && l.url.trim() == detail_url)
+    {
+        stand_in.reserved = true;
+        return;
+    }
+    links.push(Link {
+        label: ctx.alert_detail_label.clone(),
+        url: detail_url.to_string(),
+        role: LinkRole::Detail,
+        reserved: true,
+    });
+}
+
+/// The object URL when it adds a second button: not blank and not the data URL.
+pub(crate) fn detail_url(ctx: &NotificationContext) -> Option<&str> {
+    let url = ctx.alert_detail_url.trim();
+    (!url.is_empty() && url != ctx.alert_url.trim()).then_some(url)
 }
 
 /// The body with markdown-escaped values, for surfaces that parse it as markdown on any family.
@@ -515,6 +597,9 @@ pub(crate) fn scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str, &str)
         ("alert_start_time", ctx.alert_start_time.as_str()),
         ("alert_end_time", ctx.alert_end_time.as_str()),
         ("alert_url", ctx.alert_url.as_str()),
+        ("alert_url_label", ctx.alert_url_label.as_str()),
+        ("alert_detail_url", ctx.alert_detail_url.as_str()),
+        ("alert_detail_label", ctx.alert_detail_label.as_str()),
         (
             "alert_trigger_time_str",
             ctx.alert_trigger_time_str.as_str(),
@@ -570,7 +655,26 @@ pub(crate) fn status_dot(ctx: &NotificationContext) -> &'static str {
         (NotificationEvent::Informational, _) => "🔵",
         // A maintenance window opening is a notice, not a failure.
         _ if ctx.kind == NotificationKind::Downtime => "🔵",
+        // A P4 incident and a P3 page carry no level on purpose: they are informational.
+        (_, None)
+            if matches!(
+                ctx.kind,
+                NotificationKind::Incident | NotificationKind::OnCall
+            ) =>
+        {
+            "🔵"
+        }
         _ => "🔴",
+    }
+}
+
+/// The Slack webhook bar color, read from `status_dot` so the dot and the bar never differ.
+pub(crate) fn status_color(ctx: &NotificationContext) -> &'static str {
+    match status_dot(ctx) {
+        "🟢" => "#2EB67D",
+        "🟠" => "#F2952F",
+        "🔵" => "#4A90D9",
+        _ => "#E01E5A",
     }
 }
 
@@ -616,7 +720,7 @@ pub(crate) const EXTRA_SCALAR_NAMES: [&str; 15] = [
 mod tests {
     use std::collections::BTreeMap;
 
-    use config::meta::alerts::level::AlertLevel;
+    use config::meta::alerts::{content_spec::ContentLink, level::AlertLevel};
 
     use super::*;
     use crate::alerts::notifications::context::NotificationContext;
@@ -898,11 +1002,15 @@ mod tests {
         assert_eq!(
             r.links,
             vec![
-                ("always".to_string(), "https://example/always".to_string()),
-                (String::new(), ctx.alert_url.clone()),
+                Link::authored("always", "https://example/always"),
+                Link {
+                    label: String::new(),
+                    url: ctx.alert_url.clone(),
+                    role: LinkRole::Primary,
+                    reserved: true,
+                },
             ]
         );
-        assert_eq!(r.links.last().unwrap().0, "");
     }
 
     /// The reported bug, at the substitution boundary.
@@ -1012,8 +1120,8 @@ mod tests {
         assert_eq!(r.title, r#"CPU "high""#); // no backslashes
         assert!(!r.title.contains('\\'));
         assert_eq!(r.fields[0].1, ">=");
-        assert_eq!(r.links[0].0, ">=");
-        assert_eq!(r.links[0].1, "https://x/?op=>=");
+        assert_eq!(r.links[0].label, ">=");
+        assert_eq!(r.links[0].url, "https://x/?op=>=");
     }
 
     #[test]
@@ -1172,15 +1280,28 @@ mod tests {
     #[test]
     fn status_dot_colors_by_event_and_level() {
         use NotificationEvent::{Firing, Informational, Resolved};
-        use NotificationKind::{Alert, Downtime, Synthetics};
-        for (kind, event, level, expected) in [
-            (Alert, Resolved, Some(AlertLevel::Critical), "🟢"),
-            (Alert, Firing, Some(AlertLevel::Ok), "🟢"),
-            (Synthetics, Informational, Some(AlertLevel::Warning), "🟠"),
-            (Alert, Informational, None, "🔵"),
-            (Downtime, Firing, None, "🔵"),
-            (Alert, Firing, Some(AlertLevel::Critical), "🔴"),
-            (Alert, Firing, None, "🔴"),
+        use NotificationKind::{Alert, Downtime, Incident, OnCall, Synthetics};
+        for (kind, event, level, expected, bar) in [
+            (Alert, Resolved, Some(AlertLevel::Critical), "🟢", "#2EB67D"),
+            // A P4 incident and a P3 page carry no level: informational, not urgent.
+            (Incident, Firing, None, "🔵", "#4A90D9"),
+            (OnCall, Firing, None, "🔵", "#4A90D9"),
+            (Incident, Firing, Some(AlertLevel::Warning), "🟠", "#F2952F"),
+            (Alert, Firing, Some(AlertLevel::NoData), "🟠", "#F2952F"),
+            (OnCall, Firing, Some(AlertLevel::Critical), "🔴", "#E01E5A"),
+            (Incident, Resolved, None, "🟢", "#2EB67D"),
+            (Alert, Firing, Some(AlertLevel::Ok), "🟢", "#2EB67D"),
+            (
+                Synthetics,
+                Informational,
+                Some(AlertLevel::Warning),
+                "🟠",
+                "#F2952F",
+            ),
+            (Alert, Informational, None, "🔵", "#4A90D9"),
+            (Downtime, Firing, None, "🔵", "#4A90D9"),
+            (Alert, Firing, Some(AlertLevel::Critical), "🔴", "#E01E5A"),
+            (Alert, Firing, None, "🔴", "#E01E5A"),
         ] {
             let ctx = NotificationContext {
                 kind,
@@ -1189,6 +1310,7 @@ mod tests {
                 ..Default::default()
             };
             assert_eq!(status_dot(&ctx), expected, "{kind:?} {event:?} {level:?}");
+            assert_eq!(status_color(&ctx), bar, "bar {kind:?} {event:?} {level:?}");
         }
     }
 
@@ -1248,5 +1370,154 @@ mod tests {
         };
         let r = resolve_content(&spec, &ctx, "slack");
         assert_eq!(r.title, "Homepage ()");
+    }
+
+    fn with_detail(detail: &str) -> NotificationContext {
+        let mut ctx = fixture_ctx();
+        ctx.alert_url_label = "View logs".into();
+        ctx.alert_detail_url = detail.into();
+        ctx.alert_detail_label = "Open alert".into();
+        ctx
+    }
+
+    fn authored(links: &[(&str, &str)]) -> ContentSpec {
+        ContentSpec {
+            links: links
+                .iter()
+                .map(|(label, url)| ContentLink {
+                    label: (*label).into(),
+                    url: (*url).into(),
+                    show_when: None,
+                })
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn primary_then_detail_are_appended_after_authored_links() {
+        let ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        let r = resolve_content(&authored(&[("Runbook", "https://rb")]), &ctx, "slack");
+        let roles: Vec<(LinkRole, bool)> = r.links.iter().map(|l| (l.role, l.reserved)).collect();
+        assert_eq!(
+            roles,
+            vec![
+                (LinkRole::Authored, false),
+                (LinkRole::Primary, true),
+                (LinkRole::Detail, true),
+            ]
+        );
+        assert_eq!(r.links[1].label, "View logs");
+        assert_eq!(r.links[1].url, ctx.alert_url);
+        assert_eq!(r.links[2].label, "Open alert");
+    }
+
+    #[test]
+    fn detail_drops_when_blank_or_equal_to_the_data_link() {
+        for detail in ["", "   "] {
+            let r = resolve_content(&ContentSpec::default(), &with_detail(detail), "slack");
+            assert!(
+                r.links.iter().all(|l| l.role != LinkRole::Detail),
+                "{detail:?}"
+            );
+        }
+        let ctx = with_detail("https://o2.example/short/abc");
+        assert_eq!(ctx.alert_detail_url, ctx.alert_url);
+        let r = resolve_content(&ContentSpec::default(), &ctx, "slack");
+        assert_eq!(r.links.len(), 1);
+        assert_eq!(r.links[0].role, LinkRole::Primary);
+    }
+
+    #[test]
+    fn an_authored_link_to_the_detail_url_stands_in_and_keeps_role_and_position() {
+        let detail = "https://o2.example/web/alerts/detail/a1";
+        let ctx = with_detail(detail);
+        let r = resolve_content(
+            &authored(&[("Mine", detail), ("Runbook", "https://rb")]),
+            &ctx,
+            "slack",
+        );
+        assert_eq!(r.links.len(), 3);
+        assert_eq!(
+            r.links[0],
+            Link {
+                label: "Mine".into(),
+                url: detail.into(),
+                role: LinkRole::Authored,
+                reserved: true,
+            }
+        );
+        assert!(!r.links[1].reserved);
+        assert_eq!(r.links[2].role, LinkRole::Primary);
+    }
+
+    #[test]
+    fn an_authored_link_to_the_data_url_drops_and_the_others_stay() {
+        let mut ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        ctx.kind = NotificationKind::Anomaly;
+        let data_url = format!(" {} ", ctx.alert_url);
+        let r = resolve_content(
+            &authored(&[
+                ("View data around the window", data_url.as_str()),
+                ("Runbook", "https://rb"),
+            ]),
+            &ctx,
+            "slack",
+        );
+        let links: Vec<(&str, LinkRole)> =
+            r.links.iter().map(|l| (l.label.as_str(), l.role)).collect();
+        assert_eq!(
+            links,
+            [
+                ("Runbook", LinkRole::Authored),
+                ("View logs", LinkRole::Primary),
+                ("Open alert", LinkRole::Detail),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_scheduled_alert_keeps_its_authored_link_to_the_data_url() {
+        let ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        assert_eq!(ctx.kind, NotificationKind::Alert);
+        let r = resolve_content(
+            &authored(&[("See the data", ctx.alert_url.as_str())]),
+            &ctx,
+            "slack",
+        );
+        let links: Vec<(&str, LinkRole)> =
+            r.links.iter().map(|l| (l.label.as_str(), l.role)).collect();
+        assert_eq!(
+            links,
+            [
+                ("See the data", LinkRole::Authored),
+                ("View logs", LinkRole::Primary),
+                ("Open alert", LinkRole::Detail),
+            ],
+            "as on main"
+        );
+    }
+
+    #[test]
+    fn a_blank_data_url_drops_no_authored_link() {
+        let mut ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        ctx.alert_url.clear();
+        let mut links = vec![Link::authored("Mine", "")];
+        append_system_links(&mut links, &ctx);
+        assert_eq!(links[0], Link::authored("Mine", ""));
+    }
+
+    #[test]
+    fn the_three_link_variables_substitute_in_templates() {
+        let ctx = with_detail("https://o2.example/web/alerts/detail/a1");
+        let (out, unknown) = substitute_raw(
+            "{alert_url_label} {alert_detail_label}: {alert_detail_url}",
+            &ctx,
+        );
+        assert_eq!(
+            out,
+            "View logs Open alert: https://o2.example/web/alerts/detail/a1"
+        );
+        assert!(unknown.is_empty());
     }
 }

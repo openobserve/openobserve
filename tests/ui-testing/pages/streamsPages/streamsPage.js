@@ -245,6 +245,8 @@ export class StreamsPage {
         const response = await sendRequest(this.page, ingestionUrl, payload, headers);
         testLogger.info(`Ingested to ${streamName}:`, response);
         await this.page.waitForTimeout(2000);
+        // The server may rewrite the name (ZO_FORMAT_STREAM_NAME_TO_LOWERCASE), so callers need the name it stored.
+        return response?.status?.[0]?.name;
     }
 
     // Validation methods
@@ -979,6 +981,8 @@ export class StreamsPage {
             testLogger.warn('Save did not complete — Add Stream dialog still open', { dialogText });
             await expect(toast).toBeVisible({ timeout: 1000 });
         }
+        // The dialog closes only after the post-create schema fetch; deleting the stream before that keeps it open.
+        await expect(this.addStreamModal).toBeHidden({ timeout: 15000 });
     }
 
     /**
@@ -1227,4 +1231,18 @@ export class StreamsPage {
     async expectSchemaTableVisible(timeout = 5000) {
         await expect(this.schemaTable).toBeVisible({ timeout });
     }
+    async expectStreamsTableVisible(timeout = 30000) {
+        await expect(this.streamsTable).toBeVisible({ timeout });
+    }
+
+    async expectStreamsEmptyStateVisible(timeout = 15000) {
+        await expect(this.page.locator('[data-test="o2-empty-state"]')).toBeVisible({ timeout });
+    }
+
+    async expectStreamsPaginationInfo(pattern, timeout = 10000) {
+        const info = this.page.locator('[data-test="log-stream-table"] [data-test="o2-table-pagination-info"]');
+        await expect(info).toBeVisible({ timeout });
+        await expect(info).toHaveText(pattern);
+    }
+
 }

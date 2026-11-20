@@ -18,6 +18,7 @@ import { effectScope, nextTick, ref } from "vue";
 import "@/locales";
 import { gt, raw } from "@/types/i18n";
 import {
+  percentText,
   coverageSentence,
   coverageWord,
   agoText,
@@ -98,6 +99,18 @@ describe("liveFailureOf / liveNotice", () => {
     const notice = liveNotice(gt, "suggestions", "failed");
     expect(notice).toMatchObject({ severity: "error", retry: true, details: true });
     expect(notice.title).toBe("Couldn't load suggestions");
+  });
+});
+
+describe("percentText", () => {
+  it.each([
+    [1200, 1205, "99%"],
+    [1, 1205, "<1%"],
+    [1205, 1205, "100%"],
+    [0, 1205, "0%"],
+    [0, 0, "0%"],
+  ])("%i of %i reads %s", (part, whole, expected) => {
+    expect(String(percentText(gt, "en-US", part, whole))).toBe(expected);
   });
 });
 
@@ -470,6 +483,12 @@ describe("liveCellWord / liveCellLook (the coverage table's cells)", () => {
     expect(liveCellWord(gt, "silent")).toBe("Coverage gap");
     expect(liveCellWord(gt, "blind")).toBe("Coverage gap");
     expect(liveCellWord(gt, "none", true)).toBe("Added");
+  });
+
+  it("an unwatched check of a learning service waits, and a watched one stays watched", () => {
+    expect(liveCellLook("none", false, true)).toBe("learning");
+    expect(liveCellLook("covered", false, true)).toBe("covered");
+    expect(liveCellWord(gt, "silent", false, true)).toBe(coverageWord(gt, "learning"));
   });
 
   it("draws covered green and every gap with the one amber", () => {

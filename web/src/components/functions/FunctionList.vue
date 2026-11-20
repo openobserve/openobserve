@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-full w-full"
           >
             <template #toolbar>
-              <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+              <div class="flex flex-1 items-center gap-2 max-md:contents">
                 <OSearchInput
                   data-test="functions-list-search-input"
                   v-model="filterQuery"
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="actions-container flex items-center">
                 <OButton
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   :title="t('function.updateTitle')"
                   data-test="function-list-edit-function-btn"
                   data-row-action="edit"
@@ -161,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   icon-left="account-tree"
                   :title="t('function.associatedPipelines')"
                   data-row-action="view"
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   icon-left="download"
                   :title="t('common.export')"
                   data-test="function-list-export-function-btn"
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <OButton
                   variant="ghost-destructive"
-                  size="icon-sm"
+                  size="icon-xs-sq"
                   :title="t('function.delete')"
                   data-test="function-list-delete-function-btn"
                   data-row-action="delete"

@@ -20,10 +20,13 @@ use axum::{
     extract::{Path, Query, rejection::JsonRejection},
     response::Response,
 };
-use config::meta::{
-    search::{Query as SearchQuery, Request as SearchRequest},
-    self_reporting::usage::TRIGGERS_STREAM,
-    stream::StreamType,
+use config::{
+    meta::{
+        search::{Query as SearchQuery, Request as SearchRequest},
+        self_reporting::usage::TRIGGERS_STREAM,
+        stream::StreamType,
+    },
+    utils::sql::quote_like_pattern,
 };
 use o2_enterprise::enterprise::security::sigma::{
     self, ApplicableRule, CatalogRule, MitreCoverage,
@@ -244,11 +247,18 @@ pub async fn compile(
         return MetaHttpResponse::bad_request("rule_yaml is too large");
     }
     let stream = req.stream.clone().unwrap_or_default();
+    let stream_type = StreamType::from(req.stream_type.as_deref().unwrap_or("logs"));
+    if req.fields.is_none()
+        && !stream.is_empty()
+        && let Err(denied) =
+            guard_schema_read(&org_id, &user_email.user_id, &stream, stream_type).await
+    {
+        return denied;
+    }
     let source = stream_source(&org_id, &stream, req.source_type.as_deref()).await;
     let (fields, field_types) = match req.fields.clone() {
         Some(fields) => (fields, req.field_types.clone()),
         None if !stream.is_empty() => {
-            let stream_type = StreamType::from(req.stream_type.as_deref().unwrap_or("logs"));
             match infra::schema::get(&org_id, &stream, stream_type).await {
                 Ok(schema) => schema_fields(&schema),
                 Err(e) => {
@@ -455,7 +465,7 @@ pub async fn get_detection_evidence(
 }
 
 /// The classifier's source for a stream, marked packed when an OCSF pack is attached to it.
-async fn stream_source(
+pub(super) async fn stream_source(
     org_id: &str,
     stream: &str,
     requested: Option<&str>,
@@ -476,6 +486,28 @@ async fn stream_source(
     Some(source)
 }
 
+/// [`super::guard_stream_reads`] for a stream of any type, so a schema read needs a search grant.
+async fn guard_schema_read(
+    org_id: &str,
+    user_id: &str,
+    stream: &str,
+    stream_type: StreamType,
+) -> Result<(), Response> {
+    use openobserve_core::authz::{QuerySource, authorize_query_sources, stream_access_forbidden};
+
+    if stream_type == StreamType::Logs {
+        return super::guard_stream_reads(org_id, user_id, [stream]).await;
+    }
+    let source = QuerySource::Stream {
+        org_id: org_id.to_string(),
+        stream_type,
+        name: stream.to_string(),
+    };
+    authorize_query_sources(user_id, std::slice::from_ref(&source))
+        .await
+        .map_err(|denied| stream_access_forbidden(org_id, &denied))
+}
+
 /// The groups the scheduler stored on this firing's trigger row; `None` for older firings.
 async fn stored_groups(
     org_id: &str,
@@ -487,9 +519,9 @@ async fn stored_groups(
         .await
         .ok()?;
     schema.field_with_name("siem_groups").ok()?;
-    let id = alert_id.replace('\'', "''").replace('%', "");
+    let pattern = quote_like_pattern("%", alert_id, "%");
     let sql = format!(
-        "SELECT siem_groups FROM \"{TRIGGERS_STREAM}\" WHERE key LIKE '%{id}%' AND siem_groups IS NOT NULL AND siem_groups <> ''"
+        "SELECT siem_groups FROM \"{TRIGGERS_STREAM}\" WHERE key LIKE {pattern} AND siem_groups IS NOT NULL AND siem_groups <> ''"
     );
     let rows = search_rows(
         org_id,
@@ -506,7 +538,7 @@ async fn stored_groups(
 }
 
 /// Runs `sql` over the stream with the caller's permissions; `None` when it cannot be read.
-async fn search_rows(
+pub(super) async fn search_rows(
     org_id: &str,
     user_id: &str,
     stream: &str,
@@ -564,7 +596,9 @@ async fn siem_detections(org_id: &str) -> Vec<MatrixDetection> {
     detections
 }
 
-fn schema_fields(schema: &arrow_schema::Schema) -> (Vec<String>, Option<HashMap<String, String>>) {
+pub(super) fn schema_fields(
+    schema: &arrow_schema::Schema,
+) -> (Vec<String>, Option<HashMap<String, String>>) {
     let fields = schema.fields().iter().map(|f| f.name().clone()).collect();
     let types = schema
         .fields()
@@ -645,6 +679,27 @@ mod tests {
         values.iter().map(|v| v.to_string()).collect()
     }
 
+    #[tokio::test]
+    async fn test_compile_refuses_a_stream_the_caller_cannot_read() {
+        openobserve_core::authz::fake_checker();
+        let user_id = format!("{}@example.com", config::ider::uuid());
+        super::super::tests::grant(&user_id, &["GET"]);
+        let mut req = request(None, None);
+        req.stream = Some("edr".to_string());
+        let refused = compile(
+            Path("org".to_string()),
+            Headers(UserEmail { user_id }),
+            Ok(Json(req)),
+        )
+        .await;
+        assert_eq!(refused.status(), axum::http::StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(refused.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert!(body["message"].as_str().unwrap().contains("edr"), "{body}");
+    }
+
     #[test]
     fn test_compiles_a_catalog_correlation_with_its_grouped_sql() {
         let travel = catalog::detection_catalog()
@@ -671,7 +726,7 @@ mod tests {
         assert!(response.compiled.unwrap().runnable);
         let correlation = response.correlation.unwrap();
         assert!(correlation.sql.contains("FROM \"okta_auth\""));
-        assert_eq!(correlation.timespan_minutes, 60);
+        assert_eq!(correlation.timespan_minutes, 15);
         assert!(response.rule.unwrap().correlation);
     }
 

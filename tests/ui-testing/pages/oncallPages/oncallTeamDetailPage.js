@@ -70,6 +70,8 @@ export class OnCallTeamDetailPage {
       overrideButton: '[data-test="oncall-team-override-btn"]',
       error: '[data-test="oncall-team-detail-error"]',
       notAvailable: '[data-test="oncall-team-detail-not-available"]',
+      notFound: '[data-test="oncall-team-detail-not-found"]',
+      headerBack: '[data-test="app-page-header-back"]',
       coverageTag: '[data-test="oncall-team-coverage"]',
       configRisks: '[data-test="oncall-attention-expand"]',
       coverageCard: '[data-test="oncall-team-coverage-card"]',
@@ -166,6 +168,14 @@ export class OnCallTeamDetailPage {
       membersTabCount: '[data-test="oncall-team-tab-members-count"]',
       membersAwayDialog: '[data-test="oncall-members-away-dialog"]',
       membersAwaySave: '[data-test="oncall-members-away-save"]',
+      anyMemberMarkAway: '[data-test^="oncall-members-mark-away-"]:not([data-test$="-menu"])',
+      membersAwayWindowButton: '[data-test="oncall-members-away-window"] [data-test="date-time-btn"]',
+      // The window's popup is portalled out of the dialog, so its parts are not scoped under the window.
+      awayEndTimeInput: '[data-test="datetime-end-time"] input',
+      awayEndTimeButton: '[data-test="datetime-end-time"] button',
+      timePopup: '[data-test="otime-popup"]',
+      timeClockNumber: '[data-test="otime-clock-face"] g[role="button"]',
+      rangeCalendar: '[data-test="daterangecalendar-root"]',
 
       // Setup checklist / Quick start banner.
       setupChecklist: '[data-test="oncall-setup-checklist"]',
@@ -350,6 +360,10 @@ export class OnCallTeamDetailPage {
     await tab.click();
     await expect(tab).toHaveAttribute('data-state', 'active', { timeout: 15000 });
     testLogger.info('On-call team tab opened', { tab: name });
+  }
+
+  async backToTeams() {
+    await this.page.locator(this.locators.headerBack).click();
   }
 
   /** The tab the URL landed on, in its INTERNAL spelling (policy / ownership). */
@@ -791,7 +805,57 @@ export class OnCallTeamDetailPage {
     await expect(this.page.locator(this.locators.overrideButton)).toHaveCount(0, { timeout: 20000 });
   }
 
+  async openMarkAwayDialog() {
+    await this.page.locator(this.locators.anyMemberMarkAway).first().click();
+    await expect(this.page.locator(this.locators.membersAwayDialog)).toBeVisible({ timeout: 20000 });
+  }
+
+  getAwayEndTimeInput() { return this.page.locator(this.locators.awayEndTimeInput).first(); }
+  getTimePopup() { return this.page.locator(this.locators.timePopup); }
+  getRangeCalendar() { return this.page.locator(this.locators.rangeCalendar); }
+
+  async openAwayWindow() {
+    await this.page.locator(this.locators.membersAwayWindowButton).click();
+    await expect(this.getRangeCalendar()).toBeVisible({ timeout: 10000 });
+  }
+
+  async openAwayEndTimePicker() {
+    await this.page.locator(this.locators.awayEndTimeButton).first().click();
+    await expect(this.getTimePopup()).toBeVisible({ timeout: 10000 });
+  }
+
+  /** Each element's centre and whether a click there would really land on it, which is what a clipped or covered popup breaks. */
+  async readHitTargets(selector) {
+    return this.page.locator(selector).evaluateAll((elements) => elements.map((el) => {
+      const box = el.getBoundingClientRect();
+      const x = box.left + box.width / 2;
+      const y = box.top + box.height / 2;
+      const top = document.elementFromPoint(x, y);
+      return {
+        label: el.getAttribute('aria-label') || el.textContent.trim(),
+        date: el.getAttribute('data-value'),
+        x,
+        y,
+        hit: Boolean(top) && (el === top || el.contains(top)),
+        onScreen: box.top >= 0 && box.left >= 0 && box.bottom <= window.innerHeight && box.right <= window.innerWidth,
+      };
+    }));
+  }
+
+  /** A real mouse click at the point, because the original bug left these targets in the DOM where a scripted click still worked. */
+  async clickAtHitTarget(target) {
+    await this.page.mouse.click(target.x, target.y);
+  }
+
+  async clickClockNumber(value) {
+    const numbers = await this.readHitTargets(this.locators.timeClockNumber);
+    await this.clickAtHitTarget(numbers.find((n) => new RegExp(`\\b${value}\\b`).test(n.label)));
+  }
+
   // ------------------------------------------------------- enterprise gating
+
+  getNotFound() { return this.page.locator(this.locators.notFound); }
+  getNotAvailable() { return this.page.locator(this.locators.notAvailable); }
 
   async isUnavailable() {
     return (await this.page.locator(this.locators.notAvailable).count()) > 0;

@@ -52,6 +52,11 @@ import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/c
 // A click on these lands on a named item (slice, bar, tile), not on a named series.
 const NAMED_ITEM_TYPES = ["pie", "donut", "bar-gauge", "treemap", "sunburst", "funnel"];
 
+interface NamedItemParams {
+  name?: string;
+  data?: { rawName?: string | null; path?: string[]; rawPath?: (string | null)[] };
+}
+
 export function usePanelDrilldown({
   panelSchema,
   variablesData,
@@ -165,7 +170,7 @@ export function usePanelDrilldown({
   );
 
   // drilldown
-  const replacePlaceholders = (str: any, obj: any) => {
+  const replacePlaceholders = (str: any, obj: any, missing?: string[]) => {
     str = normalizeVariableSyntax(str);
     // if the str is same as the key, return it's value(it can be an string or array).
     for (const key in obj) {
@@ -188,12 +193,22 @@ export function usePanelDrilldown({
           if (value && part in value) {
             value = value[part];
           } else {
+            missing?.push(key);
             return mustacheKey ? "{{" + key + "}}" : "${" + key + "}";
           }
         }
+        if (value === undefined) missing?.push(key);
         return value;
       },
     );
+  };
+
+  // A placeholder with no value for this click must not become the text the target dashboard filters on.
+  const resolvesToValue = (template: string | undefined, variables: Record<string, unknown>) => {
+    if (!template?.trim()) return false;
+    const missing: string[] = [];
+    const value = replacePlaceholders(template, variables, missing);
+    return !missing.length && value !== undefined;
   };
 
   const replaceDrilldownToLogs = (str: any, obj: any) => {
@@ -271,12 +286,24 @@ export function usePanelDrilldown({
     }
     if (panelSchema.value.type === "bar-gauge") return barGaugeDrilldownSeries(params);
     return {
-      __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type) ? params?.name : params?.seriesName,
+      __name: NAMED_ITEM_TYPES.includes(panelSchema.value.type)
+        ? drilldownItemName(params)
+        : params?.seriesName,
       __value: value,
-      // A gauge dial named "(empty)" stands in for a blank label; drilldowns filter on the blank.
-      __axisValue: params?.value?.[0] ?? params?.data?.rawName ?? params?.name,
+      __axisValue: params?.value?.[0] ?? drilldownItemName(params),
+      // Tiles of the same name sit under different parents, so the path tells them apart.
+      ...(panelSchema.value.type === "treemap"
+        ? { __path: treemapPathSegments(params).join("/") }
+        : {}),
     };
   };
+
+  // An item shown as "(empty)" or "(null)" stands in for a blank group; drilldowns filter on the blank.
+  const drilldownItemName = (params: NamedItemParams | undefined) =>
+    params?.data?.rawName !== undefined ? (params.data.rawName ?? "") : params?.name;
+
+  const treemapPathSegments = (params: NamedItemParams | undefined): string[] =>
+    (params?.data?.rawPath ?? params?.data?.path ?? []).map((segment) => segment ?? "");
 
   // get offset from parent
   function getOffsetFromParent(parent: any, child: any) {
@@ -800,7 +827,11 @@ export function usePanelDrilldown({
 
           let xAxisValue: any;
           if (isPieOrDonut) {
-            xAxisValue = drilldownParams[0]?.name;
+            // A stand-in tile matches the rows of the null or empty group it represents.
+            xAxisValue =
+              drilldownParams[0]?.data?.rawName !== undefined
+                ? drilldownParams[0].data.rawName
+                : drilldownParams[0]?.name;
           } else if (chartType === "heatmap") {
             xAxisValue = drilldownParams[0]?.value?.[0];
           } else {
@@ -821,7 +852,12 @@ export function usePanelDrilldown({
             for (const row of queryResult) {
               let matches = true;
               if (xFields.length > 0 && xAxisValue !== undefined) {
-                if (String(row[xFields[0].alias]) !== String(xAxisValue)) matches = false;
+                const cell = row[xFields[0].alias];
+                const mismatch =
+                  xAxisValue === null
+                    ? cell !== null && cell !== undefined
+                    : String(cell) !== String(xAxisValue);
+                if (mismatch) matches = false;
               }
               if (matches && breakdownFields.length > 0 && seriesName && !isPieOrDonut) {
                 if (String(row[breakdownFields[0].alias]) !== String(seriesName)) matches = false;
@@ -1154,7 +1190,20 @@ export function usePanelDrilldown({
           // save time, but that is client-side only: a direct dashboard PUT
           // stores anything, and dashboards saved before the schema existed
           // are still in the DB. A variable VALUE can also carry a scheme.
-          const resolved = replacePlaceholders(drilldownData.data.url, drilldownVariables);
+          const urlVariables =
+            drilldownVariables.series?.__path === undefined
+              ? drilldownVariables
+              : {
+                  ...drilldownVariables,
+                  series: {
+                    ...drilldownVariables.series,
+                    // Each segment is encoded on its own so a "/" inside a group value stays one segment.
+                    __path: treemapPathSegments(drilldownParams[0])
+                      .map((segment) => encodeURIComponent(segment))
+                      .join("/"),
+                  },
+                };
+          const resolved = replacePlaceholders(drilldownData.data.url, urlVariables);
           if (!isSafeNavigableUrl(resolved)) return;
           // open url
           return window.open(
@@ -1227,7 +1276,7 @@ export function usePanelDrilldown({
 
           // set variables provided by user
           drilldownData.data.variables.forEach((variable: any) => {
-            if (variable?.name?.trim() && variable?.value?.trim()) {
+            if (variable?.name?.trim() && resolvesToValue(variable?.value, drilldownVariables)) {
               url.searchParams.set(
                 "var-" + replacePlaceholders(variable.name, drilldownVariables),
                 replacePlaceholders(variable.value, drilldownVariables),
@@ -1250,7 +1299,7 @@ export function usePanelDrilldown({
           }
 
           drilldownData.data.variables.forEach((variable: any) => {
-            if (variable?.name?.trim() && variable?.value?.trim()) {
+            if (variable?.name?.trim() && resolvesToValue(variable?.value, drilldownVariables)) {
               oldParams["var-" + replacePlaceholders(variable.name, drilldownVariables)] =
                 replacePlaceholders(variable.value, drilldownVariables);
             }

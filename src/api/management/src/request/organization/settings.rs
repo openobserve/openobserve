@@ -13,12 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+
 use axum::{
     Json,
     extract::Path,
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use config::meta::stream::DataRetentionDefaults;
 #[cfg(feature = "cloud")]
 use config::utils::str::is_valid_domain;
 use db::organization::{get_org_setting, set_org_setting};
@@ -27,6 +33,8 @@ use infra::errors::{DbError, Error};
 use {
     axum::extract::{Multipart, Query},
     o2_enterprise::enterprise::common::settings,
+    openobserve_api_common::extractors::Headers,
+    openobserve_core::auth::UserEmail,
 };
 #[cfg(feature = "cloud")]
 use {
@@ -72,6 +80,8 @@ struct LogoUploadForm {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 403, description = "The retention defaults shorten a Security source stream and the user lacks the Security delete permission", content_type = "application/json", body = ()),
+        (status = 409, description = "The retention defaults changed during the update", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Settings", "operation": "create"})),
@@ -80,6 +90,7 @@ struct LogoUploadForm {
 )]
 pub async fn create(
     Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(settings): Json<OrganizationSettingPayload>,
 ) -> Response {
     if let Err(msg) = validate_settings_payload(&settings) {
@@ -101,11 +112,38 @@ pub async fn create(
         Err(msg) => return MetaHttpResponse::bad_request(msg),
     };
 
-    match db::organization::update_org_setting(&org_id, |data| {
-        apply_settings_payload(data, settings)
+    // a shorter org default deletes the data of every Security source that inherits it
+    #[cfg(feature = "enterprise")]
+    let judged = match &settings.data_retention {
+        Some(update) => match crate::request::security::streams::guard_org_retention_update(
+            &org_id,
+            &user_email.user_id,
+            update,
+        )
+        .await
+        {
+            Ok(judged) => judged,
+            Err(refusal) => return refusal,
+        },
+        None => None,
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let judged = None;
+    let moved = Arc::new(AtomicBool::new(false));
+    let flag = moved.clone();
+    let written = db::organization::update_org_setting(&org_id, move |data| {
+        apply_judged_payload(data, settings, judged).unwrap_or_else(|| {
+            flag.store(true, Ordering::Relaxed);
+            false
+        })
     })
-    .await
-    {
+    .await;
+    if moved.load(Ordering::Relaxed) {
+        return MetaHttpResponse::conflict(
+            "The organization retention defaults changed, try again",
+        );
+    }
+    match written {
         Ok(true) => (
             StatusCode::OK,
             Json(serde_json::json!({"successful": "true"})),
@@ -402,7 +440,13 @@ pub async fn delete_logo_text() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
-fn settings_response(data: OrganizationSetting) -> Response {
+#[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+fn settings_response(mut data: OrganizationSetting) -> Response {
+    // Security tuning has its own Security-gated routes; an org settings reader must not see it.
+    #[cfg(feature = "enterprise")]
+    {
+        data.security_tuning = Default::default();
+    }
     let resolved_data_retention = db::organization::resolved_retention_defaults(
         &db::organization::org_setting_retention_defaults(&data),
     );
@@ -636,6 +680,20 @@ async fn check_budget_config(
 }
 
 // Runs under the settings lock on a fresh read, so it must not await or fail.
+/// `None`, with nothing applied, when the stored retention defaults are no longer the ones the
+/// Security guard judged.
+fn apply_judged_payload(
+    data: &mut OrganizationSetting,
+    settings: OrganizationSettingPayload,
+    judged: Option<DataRetentionDefaults>,
+) -> Option<bool> {
+    if judged.is_some_and(|judged| judged != db::organization::org_setting_retention_defaults(data))
+    {
+        return None;
+    }
+    Some(apply_settings_payload(data, settings))
+}
+
 fn apply_settings_payload(
     data: &mut OrganizationSetting,
     settings: OrganizationSettingPayload,
@@ -734,6 +792,38 @@ fn merge_red_insights_enabled(data: &mut OrganizationSetting, value: Option<bool
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_a_payload_is_applied_only_to_the_retention_defaults_that_were_judged() {
+        let payload = || -> OrganizationSettingPayload {
+            serde_json::from_value(serde_json::json!({"data_retention": {"logs": 3}})).unwrap()
+        };
+        let stored = DataRetentionDefaults {
+            logs: 30,
+            ..Default::default()
+        };
+        let mut data = OrganizationSetting {
+            data_retention: stored,
+            ..Default::default()
+        };
+        let moved = DataRetentionDefaults {
+            logs: 90,
+            ..Default::default()
+        };
+        assert_eq!(
+            apply_judged_payload(&mut data, payload(), Some(moved)),
+            None
+        );
+        assert_eq!(data.data_retention, stored, "nothing is written");
+        assert_eq!(
+            apply_judged_payload(&mut data, payload(), Some(stored)),
+            Some(true)
+        );
+        assert_eq!(data.data_retention.logs, 3);
+        // a holder of the Security delete grant is bound to no stored value
+        assert_eq!(apply_judged_payload(&mut data, payload(), None), Some(true));
+    }
 
     #[cfg(feature = "enterprise")]
     #[test]

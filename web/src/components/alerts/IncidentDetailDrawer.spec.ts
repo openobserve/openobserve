@@ -14,6 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Mock config to enable enterprise routes - must be first before any imports
+// The Logs tab of a finding looks its incident up in the AutoObserve list.
+vi.mock("@/services/autoobserve", async (importOriginal) => {
+  const mod = await importOriginal<{ default: Record<string, unknown> }>();
+  return { ...mod, default: { ...mod.default, incidents: vi.fn() } };
+});
+
 vi.mock("@/aws-exports", () => ({
   default: {
     isEnterprise: "true",
@@ -52,10 +58,22 @@ vi.mock("@/composables/usePaidOverageConsent", () => ({
   usePaidOverageConsent: () => ({ promptForConsent: mockPromptForConsent }),
 }));
 
+// The server clock every "x min ago" reads; a skew proves no surface reads the browser's.
+const serverSkew = vi.hoisted(() => ({ ms: 0 }));
+vi.mock("@/composables/useAnnouncementBanners", async (importOriginal) => {
+  const actual = await importOriginal<typeof BannersModule>();
+  return { ...actual, serverNowMs: () => Date.now() + serverSkew.ms };
+});
+
 const mockGetAiUsage = vi.hoisted(() => vi.fn());
 vi.mock("@/services/billings", async (importOriginal) => {
   const actual = await importOriginal<typeof BillingsModule>();
   return { ...actual, default: { ...actual.default, get_ai_usage: mockGetAiUsage } };
+});
+
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: {} });
 });
 
 // Mock incidents service
@@ -82,6 +100,13 @@ vi.mock("@/services/incidents", async (importOriginal) => {
 // The panel is absent unless on-call answers, which is also the OSS and
 // feature-off case — so the default here is a rejection, and only the tests
 // about the panel resolve it.
+vi.mock("@/composables/downtimes/useDowntimeLookup", () => ({
+  useDowntimeLookup: () => ({
+    downtimeOf: () => ({ name: "Deploy", current_window: { end: 1700003600000000 } }),
+    nameOf: () => "Deploy",
+  }),
+}));
+
 vi.mock("@/services/oncall", () => ({
   default: {
     listResponsesForIncident: vi.fn(),
@@ -101,6 +126,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
 import type * as BillingsModule from "@/services/billings";
+import type * as BannersModule from "@/composables/useAnnouncementBanners";
 import incidentsService, {
   Incident,
   IncidentWithAlerts,
@@ -108,10 +134,13 @@ import incidentsService, {
 } from "@/services/incidents";
 import serviceStreamsApi, { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import oncallService from "@/services/oncall";
+import autoobserveService from "@/services/autoobserve";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   rcaRunSummaryLive,
   rcaSteering,
@@ -125,6 +154,14 @@ import type { RcaLiveEvent } from "@/services/incidents";
 import awsConfig from "@/aws-exports";
 import { formatToReadable } from "@/utils/date";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import alertsService from "@/services/alerts";
+import { firingAlertsQuery } from "@/services/alerts.queries";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import IncidentTimeline from "./IncidentTimeline.vue";
+import { DateTime } from "luxon";
+import { incidentAge, unfoldDuration } from "@/utils/incidents/incidentUnfold";
+import { overviewLanes, overviewPeak } from "@/utils/incidents/incidentOverview";
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
@@ -142,6 +179,7 @@ const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   created_at: overrides.created_at || 1700000000000000,
   updated_at: overrides.updated_at || 1700000000000000,
   topology_context: overrides.topology_context,
+  muted_by_downtime_id: overrides.muted_by_downtime_id,
   rca: overrides.rca ?? null,
 });
 
@@ -173,7 +211,12 @@ const connections: Connection[] = [];
 describe("IncidentDetailDrawer.vue", () => {
   let wrapper: VueWrapper<any>;
 
-  const createWrapper = async (props = {}, storeOverrides = {}, incidentId?: string | null) => {
+  const createWrapper = async (
+    props = {},
+    storeOverrides = {},
+    incidentId?: string | null,
+    stubs: Record<string, unknown> = {},
+  ) => {
     // Update store state with overrides
     if (storeOverrides && Object.keys(storeOverrides).length > 0) {
       Object.assign(store.state, storeOverrides);
@@ -196,7 +239,7 @@ describe("IncidentDetailDrawer.vue", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          IncidentServiceGraph: true,
+          IncidentUnfoldGraph: true,
           SREChat: true,
           // Use custom stubs that accept props so we can test them
           TelemetryCorrelationDashboard: {
@@ -206,6 +249,8 @@ describe("IncidentDetailDrawer.vue", () => {
               "mode",
               "externalActiveTab",
               "serviceName",
+              "displayServiceName",
+              "serviceDisplay",
               "matchedDimensions",
               "additionalDimensions",
               "matchedSetId",
@@ -236,6 +281,7 @@ describe("IncidentDetailDrawer.vue", () => {
             ],
             emits: ["sendToAiChat"],
           },
+          ...stubs,
         },
       },
     });
@@ -316,6 +362,9 @@ describe("IncidentDetailDrawer.vue", () => {
   });
 
   afterEach(() => {
+    serverSkew.ms = 0;
+    delete store.state.zoConfig.autoobserve_context_enabled;
+    delete store.state.zoConfig.autoobserve_next_step_enabled;
     if (wrapper) {
       wrapper.unmount();
     }
@@ -394,6 +443,204 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   });
 
+  describe("header live state and the Analysis tab's inputs", () => {
+    const MIN = 60_000_000;
+    const t0 = 1700000000000000;
+    const listAlerts = vi.fn();
+    const original = alertsService.listByFolderId;
+    beforeEach(() => {
+      listAlerts.mockReset().mockResolvedValue({ data: { list: [] } });
+      Object.assign(alertsService, { listByFolderId: listAlerts });
+    });
+    afterEach(() => Object.assign(alertsService, { listByFolderId: original }));
+
+    // An alert-list row whose last firing was `ago` minutes before `now`.
+    const alertRow = (alert_id: string, ago: number, now: number, enabled = true) => ({
+      alert_id,
+      name: alert_id,
+      enabled,
+      last_satisfied_at: now - ago * MIN,
+      trigger_condition: { frequency: 5, silence: 30 },
+    });
+    const mountWith = async (
+      triggers: IncidentAlert[],
+      over: Partial<IncidentWithAlerts> = {},
+      stubs: Record<string, unknown> = {},
+    ) => {
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "test-123", triggers, ...over }),
+      });
+      wrapper = await createWrapper({}, {}, "test-123", stubs);
+      await flushPromises();
+      await flushPromises();
+      await nextTick();
+    };
+    const openTab = async (tab: string) => {
+      wrapper.vm.activeTab = tab;
+      await flushPromises();
+      await nextTick();
+    };
+    const analysis = () => wrapper.findComponent({ name: "IncidentRCAAnalysis" });
+    const tooltips = () =>
+      wrapper.findAllComponents(OTooltip).map((c) => String(c.props("content")));
+    const twoAlerts = [
+      createAlert({ alert_id: "a1", alert_fired_at: t0 }),
+      createAlert({ alert_id: "a1", alert_fired_at: t0 }),
+      createAlert({ alert_id: "a1", alert_fired_at: t0 + 5 * MIN }),
+      createAlert({ alert_id: "a2", alert_fired_at: t0 + MIN }),
+    ];
+
+    const manyFirings = Array.from({ length: 1234 }, (_, i) =>
+      createAlert({ alert_fired_at: t0 + i }),
+    );
+    it.each([
+      ["repeated rows", twoAlerts, "3 firings · 2 alerts", "4"],
+      ["one firing", [twoAlerts[0]], "1 firing · 1 alert", "1"],
+      ["many rows", manyFirings, "1,234 firings · 1 alert", "1,234"],
+    ])(
+      "counts distinct firings and alerts, the tab badge the rows: %s",
+      async (_c, rows, chip, badge) => {
+        await mountWith(rows);
+        expect(wrapper.get('[data-test="incident-detail-firings-chip"]').text()).toBe(chip);
+        expect(wrapper.get('[data-test="incident-alert-triggers-count"]').text()).toBe(badge);
+      },
+    );
+
+    it.each([
+      ["one of two firing", { a1: 12, a2: 180 }, [], "1 of 2 alerts firing now"],
+      ["none firing", { a1: 0, a2: 600 }, ["a1"], "Quiet now"],
+      ["one not in the alert list", { a1: 0 }, ["a1"], "1 of 2 alerts quiet now"],
+    ])(
+      "says how many alerts fire now, with the last firing's age: %s",
+      async (_c, ages, disabled, chip) => {
+        const now = Date.now() * 1000;
+        const rows = Object.entries(ages).map(([id, ago]) =>
+          alertRow(id, ago, now, !disabled.includes(id)),
+        );
+        listAlerts.mockResolvedValue({ data: { list: rows } });
+        await mountWith(twoAlerts);
+        expect(wrapper.get('[data-test="incident-detail-live-chip"]').text()).toBe(chip);
+        expect(tooltips().some((c) => c.startsWith("Last firing in this incident"))).toBe(true);
+      },
+    );
+
+    it("shows no live chip on a resolved incident", async () => {
+      await mountWith(twoAlerts, { status: "resolved" });
+      expect(wrapper.find('[data-test="incident-detail-live-chip"]').exists()).toBe(false);
+    });
+
+    it("hands the Analysis tab the firings, its alerts' state now and the incident's events, fetched once", async () => {
+      const now = Date.now() * 1000;
+      const events = [{ timestamp: now - MIN, type: "Acknowledged", data: { user_id: "sam" } }];
+      (incidentsService.getEvents as any).mockResolvedValue({ data: { events } });
+      listAlerts.mockResolvedValue({ data: { list: [alertRow("a1", 2, now)] } });
+      const triggers = [
+        createAlert({ alert_id: "a1", alert_fired_at: now - 20 * MIN }),
+        createAlert({ alert_id: "a2", alert_fired_at: now - 10 * MIN }),
+      ];
+      await mountWith(triggers, {}, { IncidentUnfoldGraph: false });
+      await openTab("incidentAnalysis");
+
+      expect(analysis().props("firings")).toEqual(triggers);
+      expect(analysis().props("alertsNow")).toEqual({
+        firing: 1,
+        quiet: 0,
+        unknown: 1,
+        total: 2,
+        lastFiring: now - 10 * MIN,
+      });
+      expect(analysis().props("incidentEvents")).toEqual(events);
+      await openTab("serviceGraph");
+      expect(wrapper.findComponent({ name: "IncidentUnfoldGraph" }).exists()).toBe(true);
+      expect(incidentsService.getEvents).toHaveBeenCalledTimes(1);
+    });
+
+    it("preserves the header and Analysis live state when a cached refresh fails", async () => {
+      const now = Date.now() * 1000;
+      listAlerts.mockResolvedValue({ data: { list: [alertRow("a1", 2, now)] } });
+      await mountWith([createAlert({ alert_id: "a1", alert_fired_at: now - MIN })]);
+      await openTab("incidentAnalysis");
+      const facts = analysis().props("alertsNow");
+      const chip = () => wrapper.get('[data-test="incident-detail-live-chip"]').text();
+      const previous = chip();
+      listAlerts.mockRejectedValue(new Error("refresh unavailable"));
+      await queryClient.refetchQueries({ queryKey: firingAlertsQuery("default").queryKey });
+      await flushPromises();
+      expect(analysis().props("alertsNow")).toEqual(facts);
+      expect(chip()).toBe(previous);
+    });
+
+    it("refreshes live alert state on Analysis and Report until resolved or unmounted", async () => {
+      vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+      const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+      try {
+        listAlerts.mockResolvedValue({ data: { list: [alertRow("a1", 0, Date.now() * 1000)] } });
+        await mountWith([createAlert({ alert_id: "a1" })]);
+        for (const tab of ["incidentAnalysis", "report"]) {
+          await openTab(tab);
+          const calls = listAlerts.mock.calls.length;
+          listAlerts.mockResolvedValue({ data: { list: [] } });
+          await vi.advanceTimersByTimeAsync(30_000);
+          await flushPromises();
+          expect(listAlerts.mock.calls.length).toBe(calls + 1);
+          expect(analysis().props("alertsNow")).toMatchObject({ firing: 0 });
+        }
+        visibility.mockReturnValue("hidden");
+        const calls = listAlerts.mock.calls.length;
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(listAlerts).toHaveBeenCalledTimes(calls);
+        visibility.mockReturnValue("visible");
+        wrapper.vm.incidentDetails.status = "resolved";
+        await nextTick();
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(listAlerts).toHaveBeenCalledTimes(calls);
+        wrapper.unmount();
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(listAlerts).toHaveBeenCalledTimes(calls);
+      } finally {
+        visibility.mockRestore();
+        vi.useRealTimers();
+      }
+    });
+
+    it("leaves the alerts' state unknown while the alert list loads or fails", async () => {
+      listAlerts.mockRejectedValue(new Error("down"));
+      await mountWith([createAlert({ alert_id: "a1" })]);
+      await openTab("incidentAnalysis");
+      expect(analysis().props("alertsNow")).toBeNull();
+    });
+
+    it("gives the same age in the header, on the card and in the side panel", async () => {
+      serverSkew.ms = -6 * 60 * 60_000;
+      const serverNow = (Date.now() + serverSkew.ms) * 1000;
+      listAlerts.mockResolvedValue({ data: { list: [alertRow("a1", 3, serverNow)] } });
+      const drawerStub = {
+        props: ["open"],
+        template: "<div v-if='open'><slot name='header' /><slot /><slot name='footer' /></div>",
+      };
+      await mountWith(
+        [
+          createAlert({ alert_id: "a1", alert_fired_at: serverNow - 20 * MIN }),
+          createAlert({ alert_id: "a1", alert_fired_at: serverNow - 3 * MIN }),
+        ],
+        {},
+        { IncidentUnfoldGraph: false, ODrawer: drawerStub },
+      );
+      expect(tooltips()).toContain("Last firing in this incident 3 min ago");
+      expect(wrapper.get('[data-test="incident-detail-live-chip"]').text()).toBe(
+        "1 of 1 alert firing now",
+      );
+
+      await openTab("serviceGraph");
+      expect(wrapper.get('[data-test="autoobserve-unfold-live-alert-a1"]').text()).toBe(
+        "Firing now",
+      );
+      await wrapper.get('[data-test="autoobserve-unfold-card-alert-a1"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.get('[data-test="incident-alert-panel-state"]').text()).toBe("Firing now");
+    });
+  });
+
   describe("Status Update Actions", () => {
     beforeEach(async () => {
       wrapper = await createWrapper({}, {}, "1");
@@ -468,11 +715,11 @@ describe("IncidentDetailDrawer.vue", () => {
       });
     });
 
-    it("offers Unacknowledge in the Manage status chips of an acknowledged incident", async () => {
+    it("offers Unacknowledge in the status menu of an acknowledged incident", async () => {
       wrapper.vm.incidentDetails.status = "acknowledged";
       wrapper.vm.editableStatus = "acknowledged";
       await nextTick();
-      expect(wrapper.vm.statusOptions[0]).toEqual({ label: "Unacknowledge", value: "open" });
+      expect(wrapper.vm.statusOptions[0]).toMatchObject({ label: "Unacknowledge", value: "open" });
       await wrapper.vm.handleStatusChange("open");
       await flushPromises();
       expect(incidentsService.unacknowledge).toHaveBeenCalledWith("default", "1");
@@ -510,7 +757,7 @@ describe("IncidentDetailDrawer.vue", () => {
       ["resolved", "Resolve incident?"],
       ["open", "Reopen incident?"],
     ])(
-      "the Manage chip for %s asks first and changes nothing when cancelled",
+      "the status menu's %s asks first and changes nothing when cancelled",
       async (status, title) => {
         mockConfirm.mockResolvedValueOnce(false);
 
@@ -521,7 +768,7 @@ describe("IncidentDetailDrawer.vue", () => {
       },
     );
 
-    it("a reopen from the Manage chip drops the cleared resolve and acknowledgement", async () => {
+    it("a reopen from the status menu drops the cleared resolve and acknowledgement", async () => {
       wrapper.vm.incidentDetails.status = "resolved";
       wrapper.vm.incidentDetails.resolved_at = 1700000000000000;
       wrapper.vm.incidentDetails.acknowledged_by = "ana@example.com";
@@ -712,21 +959,6 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   });
 
-  describe("Utility Functions - Timestamp Formatting", () => {
-    beforeEach(async () => {
-      wrapper = await createWrapper();
-    });
-
-    it("should format timestamp in microseconds correctly", () => {
-      const timestamp = 1700000000000000; // microseconds
-      const result = wrapper.vm.formatTimestamp(timestamp);
-
-      expect(result).toBeTruthy();
-      expect(typeof result).toBe("string");
-      expect(result).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
-    });
-  });
-
   describe("Utility Functions - Trigger Durations", () => {
     beforeEach(async () => {
       wrapper = await createWrapper();
@@ -758,6 +990,46 @@ describe("IncidentDetailDrawer.vue", () => {
     it("shows N/A when the value is missing", () => {
       expect(wrapper.vm.formatPeriod(undefined)).toBe("N/A");
       expect(wrapper.vm.formatFrequency(undefined)).toBe("N/A");
+    });
+  });
+
+  describe("Alert Details - threshold and silence", () => {
+    const mountWithTriggerCondition = async (triggerCondition: Record<string, unknown>) => {
+      (incidentsService.get as any).mockResolvedValue({
+        data: {
+          ...createIncidentWithAlerts({ id: "test-123" }),
+          alerts: [{ id: "a1", name: "cpu_high", trigger_condition: triggerCondition }],
+        },
+      });
+      wrapper = await createWrapper({}, {}, "test-123");
+      await flushPromises();
+      wrapper.vm.activeTab = "alertTriggers";
+      wrapper.vm.selectedAlertIndex = 0;
+      await nextTick();
+    };
+
+    const detailValue = (field: "threshold" | "silence") =>
+      wrapper.get(`[data-test="incident-alert-${field}"]`).text().replace(/\s+/g, " ").trim();
+
+    it("renders a silence of 0 as 0 min and a threshold of 0 as 0", async () => {
+      await mountWithTriggerCondition({ operator: ">=", threshold: 0, period: 5, silence: 0 });
+
+      expect(detailValue("silence")).toBe("0 min");
+      expect(detailValue("threshold")).toBe(">= 0");
+    });
+
+    it("renders a missing silence as N/A with no unit", async () => {
+      await mountWithTriggerCondition({ operator: ">=", threshold: 3, period: 5 });
+
+      expect(detailValue("silence")).toBe("N/A");
+      expect(detailValue("threshold")).toBe(">= 3");
+    });
+
+    it("renders a missing threshold as N/A", async () => {
+      await mountWithTriggerCondition({ operator: ">=", period: 5, silence: 30 });
+
+      expect(detailValue("threshold")).toBe(">= N/A");
+      expect(detailValue("silence")).toBe("30 min");
     });
   });
 
@@ -843,128 +1115,297 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   });
 
-  describe("Unique Alerts Computation", () => {
-    it("should compute unique alerts map from triggers", async () => {
-      const triggers = [
-        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-2", alert_name: "Memory Alert" }),
-        createAlert({ alert_id: "alert-3", alert_name: "Disk Alert" }),
-        createAlert({ alert_id: "alert-2", alert_name: "Memory Alert" }),
-      ];
-
+  describe("Overview: one clock, each fact once", () => {
+    const MIN = 60_000_000;
+    const t0 = 1700000000000000;
+    const node = (alert_id: string, service_name: string) => ({
+      alert_id,
+      alert_name: alert_id,
+      service_name,
+      alert_count: 1,
+      first_fired_at: t0,
+      last_fired_at: t0,
+    });
+    const firings = (alert_id: string, count: number, from = t0) =>
+      Array.from({ length: count }, (_, i) =>
+        createAlert({ alert_id, alert_name: alert_id, alert_fired_at: from + i * MIN }),
+      );
+    const openOverview = async (
+      data: Partial<IncidentWithAlerts>,
+      stubs: Record<string, unknown> = {},
+      storeOverrides: Record<string, unknown> = {},
+    ) => {
       (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers }),
+        data: createIncidentWithAlerts({ id: "1", ...data }),
       });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
+      wrapper = await createWrapper({}, storeOverrides, "1", stubs);
       await flushPromises();
-
-      const uniqueAlertsMap = wrapper.vm.uniqueAlertsMap;
-
-      expect(uniqueAlertsMap.size).toBe(3);
-      expect(uniqueAlertsMap.get("alert-1")).toBe(2);
-      expect(uniqueAlertsMap.get("alert-2")).toBe(2);
-      expect(uniqueAlertsMap.get("alert-3")).toBe(1);
+      wrapper.vm.activeTab = "overview";
+      await flushPromises();
+    };
+    const overview = () => wrapper.get('[data-test="incident-overview"]');
+    afterEach(() => {
+      store.state.timezone = "UTC";
     });
 
-    it("should count alerts with same name but different IDs as separate alerts", async () => {
-      // This test verifies the fix: uniqueness should be by alert_id, not alert_name
-      const triggers = [
-        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-2", alert_name: "High CPU" }), // Same name, different ID
-        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-3", alert_name: "High CPU" }), // Same name, different ID
-      ];
+    it.each([
+      ["UTC", "2023-11-14 22:13", "2023-11-14 22:00", "UTC", "2023-11-14 23:13"],
+      ["America/New_York", "2023-11-14 17:13", "2023-11-14 17:00", "EST", "2023-11-14 18:13"],
+    ])(
+      "writes every time in the picked zone, %s, on Overview, Activity and Alert Triggers",
+      async (zone, firstFiring, firstBucket, zoneName, mutedUntil) => {
+        await openOverview(
+          {
+            status: "resolved",
+            first_alert_at: t0,
+            last_alert_at: t0 + 4 * MIN,
+            updated_at: t0 + 4 * MIN,
+            muted_by_downtime_id: "d1",
+            triggers: [...firings("a1", 2), ...firings("a2", 1, t0 + 20 * MIN)],
+          },
+          {},
+          { timezone: zone },
+        );
+        expect(wrapper.get('[data-test="incident-overview-step-first"]').text()).toContain(
+          firstFiring,
+        );
+        const peak = wrapper.get('[data-test="incident-overview-step-peak"]').text();
+        expect(peak).toContain(firstFiring);
+        expect(peak).not.toContain(firstBucket);
+        expect(peak).toContain(String(unfoldDuration(i18n.global.t, 15 * MIN)));
+        expect(peak).toContain(incidentAge(t0, Date.now() * 1000));
+        expect(wrapper.get('[data-test="incident-detail-muted-banner"]').text()).toContain(
+          `${mutedUntil} · `,
+        );
+        expect(wrapper.get('[data-test="incident-overview-alerts-caption"]').text()).toContain(
+          firstBucket,
+        );
+        wrapper.vm.activeTab = "activity";
+        await flushPromises();
+        const activityTime = wrapper.findComponent(IncidentTimeline).props("formatTime");
+        expect(activityTime(t0)).toMatch(new RegExp(`^${firstFiring} · `));
+        wrapper.vm.activeTab = "alertTriggers";
+        await flushPromises();
+        const cells = wrapper.findAllComponents(OTimeCell);
+        expect(cells.length).toBeGreaterThan(0);
+        expect(cells.every((cell) => cell.props("timezone") === zone)).toBe(true);
+      },
+    );
 
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers }),
+    it("shows each fact once: no tiles, Manage box, Details card or Show Full Activity, one Timeline card", async () => {
+      await openOverview({
+        title: "Checkout errors",
+        status: "resolved",
+        first_alert_at: t0,
+        last_alert_at: t0 + 32 * MIN,
+        created_at: t0 + 41,
+        updated_at: t0 + 32 * MIN + 52,
+        triggers: [...firings("a1", 1), ...firings("a2", 3, t0 + 30 * MIN)],
       });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
-      await flushPromises();
-
-      const uniqueAlertsMap = wrapper.vm.uniqueAlertsMap;
-
-      // Should have 3 unique alerts by alert_id (alert-1, alert-2, alert-3)
-      // even though all have the same name "High CPU"
-      expect(uniqueAlertsMap.size).toBe(3);
-      expect(wrapper.vm.uniqueAlertsCount).toBe(3);
-      expect(uniqueAlertsMap.get("alert-1")).toBe(2);
-      expect(uniqueAlertsMap.get("alert-2")).toBe(1);
-      expect(uniqueAlertsMap.get("alert-3")).toBe(1);
+      const text = overview().text();
+      const tr = i18n.global.t;
+      for (const gone of [
+        "alerts.incidents.totalAlerts",
+        "alerts.incidents.uniqueAlerts",
+        "alerts.incidents.incidentName",
+        "alerts.incidents.manage",
+        "alerts.incidents.showFullActivity",
+      ]) {
+        expect(text).not.toContain(tr(gone));
+      }
+      expect(text).not.toContain("Checkout errors");
+      expect(text.split("2023-11-14 22:13").length - 1).toBe(1);
+      expect(overview().findAll('[data-test="incident-overview-timeline"]')).toHaveLength(1);
+      for (const key of ["step-first", "step-peak", "step-latest", "fact-active", "fact-updated"]) {
+        expect(overview().findAll(`[data-test="incident-overview-${key}"]`)).toHaveLength(1);
+      }
+      expect(wrapper.get('[data-test="incident-overview-step-peak"]').text()).toContain(
+        "2023-11-14 22:30",
+      );
+      const copy = wrapper.get('[data-test="incident-overview-copy-id"]');
+      expect(copy.element.tagName).toBe("BUTTON");
+      expect(copy.attributes("aria-label")).toBeTruthy();
     });
+
+    it.each([
+      ["spring forward", "2026-03-01T12:00", "2026-03-09T00:30", "2026-03-11T12:00", 8],
+      ["fall back", "2026-10-25T12:00", "2026-11-01T23:30", "2026-11-04T12:00", 7],
+    ])("buckets days at New York midnight across %s", (_c, first, probe, last, day) => {
+      const us = (iso: string) =>
+        DateTime.fromISO(iso, { zone: "America/New_York" }).toMillis() * 1000;
+      const triggers = [first, probe, last].map((iso) =>
+        createAlert({ alert_id: "a1", alert_fired_at: us(iso) }),
+      );
+      const model = overviewLanes(triggers, "America/New_York", us(last), false)!;
+      expect(model.lanes[0].counts[day]).toBe(1);
+      expect(model.lanes[0].counts[day - 1]).toBe(0);
+    });
+
+    it.each([
+      [
+        "the tallest bar summed across alerts, not the busiest five minutes",
+        "a1:0 a1:1 a1:2 a1:60 a2:62 a1:70 a2:72",
+        [60, 4],
+      ],
+      ["the earliest bar on a tie", "a1:0 a1:1 a2:30 a2:31", [0, 2]],
+      ["no peak with one bar", "a1:0 a1:1 a1:2", null],
+      ["no peak when no bar holds two firings", "a1:0 a2:30", null],
+    ])("picks the Timeline's peak as %s", (_c, firings, expected) => {
+      const h0 = t0 + 2800 * 1_000_000;
+      const triggers = firings.split(" ").map((f) => {
+        const [alert_id, minute] = f.split(":");
+        return createAlert({ alert_id, alert_fired_at: h0 + Number(minute) * MIN });
+      });
+      const peak = overviewPeak(overviewLanes(triggers, "UTC", h0, false));
+      expect(peak && [(peak.at - h0) / MIN, peak.count]).toEqual(expected);
+    });
+
+    it.each([
+      ["no alert", [], [], false],
+      ["one alert", firings("a1", 2), ["a1"], false],
+      [
+        "a few, most firings first",
+        [...firings("b", 1), ...firings("a", 3), ...firings("c", 2)],
+        ["a", "c", "b"],
+        false,
+      ],
+      [
+        "many, folded after five",
+        ["a", "b", "c", "d", "e", "f", "g"].flatMap((id, i) => firings(id, 7 - i)),
+        ["a", "b", "c", "d", "e"],
+        true,
+      ],
+    ])("leads with one lane per alert: %s", async (_c, triggers, names, folded) => {
+      await openOverview({ status: "resolved", triggers });
+      const lanes = () =>
+        wrapper.findAll('[data-test="incident-overview-lane-name"]').map((n) => n.text());
+      expect(lanes()).toEqual(names);
+      expect(wrapper.find('[data-test="incident-overview-alerts-empty"]').exists()).toBe(
+        !names.length,
+      );
+      const more = wrapper.find('[data-test="incident-overview-lanes-more"]');
+      expect(more.exists()).toBe(folded);
+      if (folded) {
+        await more.trigger("click");
+        expect(lanes()).toHaveLength(7);
+      }
+    });
+
+    it.each([
+      [
+        "one service, folded from its dimension",
+        { service: "checkout", k8s_cluster: "prod", k8s_namespace: "shop" },
+        [node("a1", "checkout"), node("a2", "checkout")],
+        "1",
+        2,
+        "k8s:prod/shop",
+        ["checkout"],
+        "open",
+      ],
+      [
+        "distinct services of the alerts",
+        {},
+        [node("a1", "api"), node("a2", "db"), node("a3", "unknown")],
+        "2",
+        0,
+        null,
+        ["api", "db"],
+        "open",
+      ],
+      [
+        "more than three, the rest behind and N more",
+        {},
+        ["api", "db", "cache", "queue"].map((svc, i) => node(`a${i}`, svc)),
+        "4",
+        0,
+        null,
+        ["api", "db", "cache", "queue"],
+        "open",
+      ],
+      [
+        "resolved after one firing, window padded like the telemetry tabs",
+        { service: "checkout" },
+        [node("a1", "checkout")],
+        "1",
+        0,
+        null,
+        ["checkout"],
+        "resolved",
+      ],
+      ["no service known", { k8s_cluster: "prod" }, [], null, 1, null, [], "open"],
+    ])(
+      "counts services affected: %s",
+      async (_c, group_values, nodes, count, dimensionRows, where, linked, status) => {
+        await openOverview(
+          {
+            status,
+            group_values,
+            topology_context: { nodes, edges: [], related_incident_ids: [] },
+          },
+          { OPopover: { template: "<div><slot name='trigger' /><slot /></div>" } },
+        );
+        const linkedTo = wrapper
+          .findAll('[data-test="incident-overview-service-link"]')
+          .map((link) => new URLSearchParams(link.attributes("href")!.split("?")[1]));
+        expect(linkedTo.map((query) => query.get("panelSvc"))).toEqual(linked);
+        expect(linkedTo.every((query) => query.get("tab") === "services-catalog")).toBe(true);
+        for (const query of linkedTo) {
+          expect(query.get("from")).toBe(String(wrapper.vm.telemetryTimeRange.startTime));
+          if (status === "resolved")
+            expect(query.get("to")).toBe(String(wrapper.vm.telemetryTimeRange.endTime));
+          expect(Number(query.get("to"))).toBeGreaterThan(Number(query.get("from")));
+        }
+        const services = wrapper.find('[data-test="incident-overview-services"]');
+        expect(services.exists()).toBe(count !== null);
+        if (count !== null) expect(services.text().startsWith(count)).toBe(true);
+        expect(wrapper.findAll('[data-test="incident-dimension-row"]')).toHaveLength(dimensionRows);
+        if (where) {
+          const href = wrapper
+            .get('[data-test="incident-overview-service-link"]')
+            .attributes("href");
+          const query = new URLSearchParams(href!.split("?")[1]);
+          expect([query.get("tab"), query.get("panelSvc"), query.get("panelWhere")]).toEqual([
+            "services-catalog",
+            "checkout",
+            where,
+          ]);
+        }
+      },
+    );
+
+    const menuStubs = {
+      ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        emits: ["select"],
+        template: "<button v-bind='$attrs' @click=\"$emit('select')\"><slot /></button>",
+      },
+    };
+    it.each([
+      [
+        "status",
+        "incident-status-menu-resolved",
+        () =>
+          expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "resolved"),
+      ],
+      [
+        "severity",
+        "incident-severity-menu-P3",
+        () =>
+          expect(incidentsService.updateIncident).toHaveBeenCalledWith("default", "1", {
+            severity: "P3",
+          }),
+      ],
+    ])(
+      "the header %s chip's menu changes it through the incident API",
+      async (_c, item, called) => {
+        await openOverview({ status: "open", severity: "P1" }, menuStubs);
+        expect(wrapper.find('[data-test^="incident-manage-"]').exists()).toBe(false);
+        await wrapper.get(`[data-test="${item}"]`).trigger("click");
+        await flushPromises();
+        called();
+      },
+    );
   });
-
-  describe("Sorted Alerts By Trigger Count", () => {
-    it("should sort alerts by trigger count descending", async () => {
-      const triggers = [
-        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-2", alert_name: "Memory Alert" }),
-        createAlert({ alert_id: "alert-2", alert_name: "Memory Alert" }),
-        createAlert({ alert_id: "alert-3", alert_name: "Disk Alert" }),
-      ];
-
-      (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", triggers }),
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
-      await flushPromises();
-
-      const sorted = wrapper.vm.sortedAlertsByTriggerCount;
-
-      expect(sorted).toHaveLength(3);
-      expect(sorted[0].name).toBe("High CPU");
-      expect(sorted[0].count).toBe(3);
-      expect(sorted[1].name).toBe("Memory Alert");
-      expect(sorted[1].count).toBe(2);
-      expect(sorted[2].name).toBe("Disk Alert");
-      expect(sorted[2].count).toBe(1);
-    });
-
-    it("should derive alerts from triggers instead of API alerts array", async () => {
-      const triggers = [createAlert({ alert_id: "trigger-alert-1", alert_name: "From Triggers" })];
-
-      (incidentsService.get as any).mockResolvedValue({
-        data: {
-          ...createIncidentWithAlerts({ id: "test-123", triggers }),
-          alerts: [], // Empty alerts array from API
-        },
-      });
-
-      wrapper = await createWrapper({}, {}, "test-123");
-      await nextTick();
-      await flushPromises();
-
-      const sorted = wrapper.vm.sortedAlertsByTriggerCount;
-
-      // Should have 1 alert from triggers, not 0 from API alerts
-      expect(sorted).toHaveLength(1);
-      expect(sorted[0].name).toBe("From Triggers");
-    });
-  });
-
-  // Note: Child component integration tests removed
-  // These should be tested in the child components' own test files (CorrelatedLogsTable.spec.ts)
-  // Parent component responsibility is tested through computed properties and state management
-
-  // Note: Field Name Mapping integration tests removed
-  // These tests depend on complex child component interactions and conditional rendering
-  // Parent component's field name mapping logic should be tested through unit tests of computed properties
-
-  // Note: Send to AI Chat integration tests removed
-  // Event propagation from child components should be tested in their own test files
-  // Parent component's event handling should be tested through direct method calls
-
-  // Note: Metrics and Traces Tabs integration tests removed
-  // Testing child component prop bindings through complex conditional rendering is problematic
-  // These should be tested through computed properties and direct prop assertions
 
   describe("subject tabs (View by) — matchedSetId / chipDimensions", () => {
     // Regression: the embedded TelemetryCorrelationDashboard never received
@@ -1081,6 +1522,167 @@ describe("IncidentDetailDrawer.vue", () => {
         false,
       );
       expect(incidentsService.getCorrelatedStreams).toHaveBeenCalled();
+    });
+  });
+
+  describe("an incident with nothing to correlate by", () => {
+    it("shows one neutral message with no Retry on the logs, metrics and traces tabs", async () => {
+      const triggers = [createAlert({ alert_id: "alert-1" })];
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({ id: "1", group_values: {}, triggers }),
+      });
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue({
+        serviceName: "unknown",
+        matchedDimensions: {},
+        additionalDimensions: {},
+        logStreams: [],
+        metricStreams: [],
+        traceStreams: [],
+        correlationData: null,
+        emptyReason: "no_service_dimensions",
+      });
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+
+      const tr = i18n.global.t;
+      for (const tab of ["logs", "metrics", "traces"]) {
+        wrapper.vm.activeTab = tab;
+        await flushPromises();
+        expect(wrapper.text()).toContain(tr("alerts.incidents.noServiceDimensions"));
+        expect(wrapper.text()).not.toContain(tr("common.retry"));
+      }
+      expect(incidentsService.getCorrelatedStreams).toHaveBeenCalledTimes(1);
+      expect(incidentsService.getCorrelatedStreams).toHaveBeenCalledWith(
+        "default",
+        expect.objectContaining({ id: "1" }),
+        expect.any(Function),
+        { triggers, window: wrapper.vm.telemetryTimeRange },
+      );
+    });
+  });
+
+  describe("Service display name", () => {
+    const row = labelRows.differs;
+    let fetchSpy: ReturnType<typeof vi.spyOn> | undefined;
+    // A failed assertion must not leave fetchQuery stubbed for the on-call panel tests below.
+    afterEach(() => {
+      fetchSpy?.mockRestore();
+      fetchSpy = undefined;
+    });
+    const incidentWithDisplay = (display?: Record<string, string>) => ({
+      ...createIncidentWithAlerts({
+        id: "1",
+        group_values: { service: row.service_name },
+        alerts: [
+          {
+            ...createAlert({ alert_id: "alert-1" }),
+            stream_type: "logs",
+            stream_name: "default",
+          } as any,
+        ],
+      }),
+      ...(display ? { group_values_display: display } : {}),
+    });
+
+    it("renders the Dimensions service row with the display name", async () => {
+      (incidentsService.get as any).mockResolvedValue({
+        data: incidentWithDisplay({ service: row.display_name }),
+      });
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      wrapper.vm.activeTab = "overview";
+      await flushPromises();
+
+      const cell = wrapper.find('[data-test="incident-detail-dimension-service"]');
+      expect(cell.exists()).toBe(true);
+      expect(cell.text()).toContain(row.display_name);
+      expect(cell.find('[data-test="svcver-service-name-detected"]').text()).toContain(
+        row.service_name,
+      );
+    });
+
+    it("passes the display to the correlation dashboard while serviceName stays the key", async () => {
+      (incidentsService.get as any).mockResolvedValue({ data: incidentWithDisplay() });
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue({
+        serviceName: row.service_name,
+        displayServiceName: row.display_name,
+        serviceDisplay: { display_source: "trace" },
+        matchedDimensions: {},
+        additionalDimensions: {},
+        logStreams: [],
+        metricStreams: [{ stream_name: "k8s_metrics", stream_type: "Metrics", filters: {} }],
+        traceStreams: [],
+        correlationData: {
+          service_name: row.service_name,
+          matched_dimensions: {},
+          additional_dimensions: {},
+          related_streams: { logs: [], metrics: [], traces: [], profiles: [] },
+        },
+      });
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      await wrapper.vm.refreshCorrelation();
+      wrapper.vm.activeTab = "metrics";
+      await nextTick();
+      await flushPromises();
+
+      const dashboard = wrapper
+        .findAllComponents({ name: "TelemetryCorrelationDashboard" })
+        .find((c) => c.props("externalActiveTab") === "metrics");
+      expect(dashboard?.props("serviceName")).toBe(row.service_name);
+      expect(dashboard?.props("displayServiceName")).toBe(row.display_name);
+      expect(dashboard?.props("serviceDisplay")).toEqual({ display_source: "trace" });
+    });
+
+    it("keeps the synthetic dimension-match id internal and titles the fallback with the display", async () => {
+      (incidentsService.get as any).mockResolvedValue({
+        data: incidentWithDisplay({ service: row.display_name }),
+      });
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(null);
+      fetchSpy = vi
+        .spyOn(queryClient, "fetchQuery")
+        .mockResolvedValue({ schema: [{ name: "service_name" }] } as never);
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      await wrapper.vm.refreshCorrelation();
+      await flushPromises();
+
+      expect(wrapper.vm.correlationData.serviceName).toBe(`dimension-match-${row.service_name}`);
+      expect(wrapper.vm.correlationData.displayServiceName).toBe(row.display_name);
+      expect(wrapper.vm.correlationData.logStreams[0].filters).toEqual({
+        service_name: row.service_name,
+      });
+    });
+
+    it("filters the fallback stream on every field of a dimension's group its schema holds", async () => {
+      (incidentsService.get as any).mockResolvedValue({
+        data: createIncidentWithAlerts({
+          id: "1",
+          group_values: { "k8s-namespace": "kube-system" },
+          alerts: [
+            {
+              ...createAlert({ alert_id: "alert-1" }),
+              stream_type: "logs",
+              stream_name: "default",
+            } as any,
+          ],
+        }),
+      });
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(null);
+      (serviceStreamsApi.getSemanticGroups as any).mockResolvedValue({
+        data: [{ id: "k8s-namespace", fields: ["namespace", "k8s_ns", "k8s_namespace_name"] }],
+      });
+      fetchSpy = vi.spyOn(queryClient, "fetchQuery").mockResolvedValue({
+        schema: [{ name: "k8s_namespace_name" }, { name: "namespace" }],
+      } as never);
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      await wrapper.vm.refreshCorrelation();
+      await flushPromises();
+
+      const [stream] = wrapper.vm.correlationData.logStreams;
+      expect(stream.filters).toEqual({ namespace: "kube-system" });
+      expect(stream.filter_aliases).toEqual({ namespace: ["k8s_namespace_name"] });
     });
   });
 
@@ -1452,26 +2054,16 @@ describe("IncidentDetailDrawer.vue", () => {
         autoobserve_finding: "stream_silence",
       };
       await openOn("overview", { group_values: SERVER_ORDER, triggers: [findingTrigger(5)] });
+      const values = wrapper.findAll('[data-test="incident-dimension-value"]');
       const rows = wrapper
         .findAll('[data-test="incident-dimension-row"]')
-        .map((row) => row.text().replace(/\s+/g, " "));
+        .map((row, i) => `${row.text()}: ${values[i].text()}`.replace(/\s+/g, " "));
       expect(rows).toEqual([
         "Finding: Stopped sending data",
         "Stream Name: checkout",
         "Stream Type: logs",
       ]);
       expect(rows.join(" ")).not.toMatch(RAW);
-      wrapper.unmount();
-
-      (serviceStreamsApi.getSemanticGroups as any).mockResolvedValue({
-        data: [{ id: "service", display: "Service Name", fields: ["service"] }],
-      });
-      await openOn("overview", { group_values: { service: "api" } });
-      expect(
-        wrapper
-          .findAll('[data-test="incident-dimension-row"]')
-          .map((row) => row.text().replace(/\s+/g, " ")),
-      ).toEqual(["Service Name: api"]);
     });
 
     it("a finding's side panel shows the finding", async () => {
@@ -1559,58 +2151,274 @@ describe("IncidentDetailDrawer.vue", () => {
       });
       const labels = wrapper
         .findAll("tbody tr")
-        .map((row) => row.findAll('[data-test="trigger-label-chip"]').map((chip) => chip.text()));
+        .map((row) =>
+          row
+            .findAll('[data-test="trigger-label-chip"], [data-test="trigger-label-more"]')
+            .map((chip) => chip.text()),
+        );
       expect(labels).toEqual([
         ["Finding=Stopped sending data", "Stream Name=checkout", "Stream Type=logs"],
         ["env=prod"],
       ]);
     });
+
+    const aoList = (items: unknown[]) => {
+      queryClient.clear();
+      (autoobserveService.incidents as any).mockResolvedValue({
+        data: { items, total: items.length },
+      });
+    };
+
+    it("drops the empty Metrics and Traces tabs and opens the stream in Logs instead", async () => {
+      aoList([]);
+      (incidentsService.getCorrelatedStreams as any).mockClear();
+      await openOn("logs", { group_values: FINDING, triggers: [findingTrigger(5)] });
+      expect(wrapper.vm.shownTabs).not.toContain("metrics");
+      expect(wrapper.vm.shownTabs).not.toContain("traces");
+      expect(wrapper.vm.shownTabs).toContain("logs");
+      expect(byTest("autoobserve-issue-logs").text()).toContain("checkout");
+      expect(incidentsService.getCorrelatedStreams).not.toHaveBeenCalled();
+    });
+
+    it("words the Logs link as its AutoObserve drawer does, ending an hour after a resolved incident", async () => {
+      const at = 1_794_309_300_000_000;
+      const member = (name: string, back: number) => ({
+        id: `f-${name}`,
+        title: name,
+        stream_type: "logs",
+        stream_name: name,
+        first_seen_at: at,
+        recovered_at: at + back,
+      });
+      aoList([
+        {
+          finding: {
+            id: "f1",
+            kind: "stream_silence",
+            stream_type: "logs",
+            stream_name: "checkout",
+            first_seen_at: at,
+          },
+          incident: { id: "inc-1", status: "resolved", severity: "P2", title: "t", created_at: at },
+          investigation: {
+            run_id: null,
+            state: null,
+            outcome: null,
+            summary: null,
+            not_run_reason: null,
+          },
+          members: [
+            member("checkout", 600_000_000),
+            member("cart", 900_000_000),
+            member("pay", 300_000_000),
+          ],
+        },
+      ]);
+      await openOn("logs", {
+        group_values: FINDING,
+        triggers: [findingTrigger(5)],
+        status: "resolved",
+        resolved_at: at + 900_000_000,
+      } as never);
+      const logs = byTest("autoobserve-issue-logs");
+      expect(logs.text()).toContain("See checkout and 2 more streams in Logs");
+      expect(logs.text()).toContain("an hour after it ended");
+    });
+
+    it.each([
+      ["a failed lookup says so and retries", "failed", null, true],
+      ["an incident read by its id gets its card", "located", null, true],
+      ["with the Next step flag off, the card has no Next step box", "located", null, false],
+      [
+        "an item without context holds the space with the no-cause line",
+        "off",
+        "No cause found yet.",
+        true,
+      ],
+      ["with the context flag off, there is no card", "flag-off", null, true],
+    ])("the Incident Analysis card: %s", async (_name, outcome, note, step) => {
+      Object.assign(store.state.zoConfig, {
+        autoobserve_context_enabled: outcome !== "flag-off",
+        autoobserve_next_step_enabled: step,
+      });
+      const at = 1_794_309_300_000_000;
+      const item = (id: string, context: unknown) => ({
+        finding: {
+          id,
+          kind: "stream_silence",
+          stream_type: "logs",
+          stream_name: "checkout",
+          first_seen_at: at,
+        },
+        incident: { id, status: "open", severity: "P2", title: "t", created_at: at },
+        investigation: {
+          run_id: null,
+          state: null,
+          outcome: null,
+          summary: null,
+          not_run_reason: null,
+        },
+        context,
+      });
+      const context = {
+        causes: { top: [], more: 0 },
+        impact: [],
+        classes: [],
+        window: [at, at],
+        asked_at: null,
+        settled: false,
+        checks: [],
+        hidden: 0,
+        region_only: false,
+        next_step: null,
+      };
+      queryClient.clear();
+      const incidents = vi.mocked(autoobserveService.incidents);
+      incidents.mockReset();
+      if (outcome === "failed") incidents.mockRejectedValueOnce(new Error("down"));
+      incidents.mockResolvedValue({
+        data: {
+          paging: true,
+          has_more: false,
+          items: [item("inc-1", outcome === "off" ? undefined : context)],
+        },
+      } as never);
+      await openOn("incidentAnalysis", { group_values: FINDING, triggers: [findingTrigger(5)] });
+      if (outcome === "failed") {
+        expect(byTest("autoobserve-issue-context-card-failed").exists()).toBe(true);
+        await byTest("autoobserve-issue-context-card-retry").trigger("click");
+        await flushPromises();
+      }
+      const card = outcome !== "flag-off";
+      expect(byTest("autoobserve-issue-context-card").exists()).toBe(card);
+      expect(byTest("autoobserve-issue-context-card-failed").exists()).toBe(false);
+      expect(byTest("autoobserve-cause-list").exists()).toBe(card && note === null);
+      expect(byTest("autoobserve-next-step-line").exists()).toBe(card && note === null && step);
+      if (note) expect(byTest("autoobserve-issue-context-card-note").text()).toContain(note);
+    });
+
+    it("an incident with alerts keeps every tab and its correlated Logs", async () => {
+      await openOn("overview", { group_values: { service: "api" } });
+      expect(wrapper.vm.shownTabs).toEqual(wrapper.vm.tabOrder);
+      expect(wrapper.vm.shownTabs).toEqual(expect.arrayContaining(["logs", "metrics", "traces"]));
+      expect(byTest("autoobserve-issue-logs").exists()).toBe(false);
+    });
   });
 
   describe("Deep link", () => {
-    it("?tab=incidentAnalysis opens the Analysis tab", async () => {
-      router.currentRoute.value = {
-        ...router.currentRoute.value,
-        query: { tab: "incidentAnalysis" },
-      } as any;
+    const succeeded = () =>
+      rcaSummary({
+        state: "completed",
+        current_run: rcaRun({ state: "completed" }),
+        report_run: rcaRunItem({ run_id: "run-2" }),
+        history: [rcaRunItem({ run_id: "run-2" })],
+      });
+    it.each([
+      ["?tab=incidentAnalysis, none succeeded", "incidentAnalysis", null, "incidentAnalysis"],
+      ["?tab=report", "report", null, "report"],
+      ["no tab query and an analysis succeeded", undefined, succeeded, "incidentAnalysis"],
+      ["no tab query and no analysis", undefined, null, "incidentAnalysis"],
+    ])(
+      "opens the tab the link asks for, else the first tab: %s",
+      async (_c, tab, rca, expected, next?: string) => {
+        router.currentRoute.value = {
+          ...router.currentRoute.value,
+          query: tab ? { tab } : {},
+        } as any;
+        (incidentsService.get as any).mockResolvedValue({
+          data: createIncidentWithAlerts({ id: "1", rca: rca?.() ?? null }),
+        });
+        wrapper = await createWrapper({}, {}, "1");
+        await flushPromises();
+        if (next) {
+          (incidentsService.get as any).mockResolvedValue({
+            data: createIncidentWithAlerts({ id: next, rca: null }),
+          });
+          const route = router.currentRoute.value;
+          router.currentRoute.value = { ...route, params: { id: next }, query: {} } as any;
+          await flushPromises();
+          expect(wrapper.vm.incidentDetails.id).toBe(next);
+        }
+
+        expect(wrapper.vm.activeTab).toBe(expected);
+        router.currentRoute.value = { ...router.currentRoute.value, query: {} } as any;
+      },
+    );
+
+    it("?tab=logs fetches the correlated streams once the incident loads after mount", async () => {
+      router.currentRoute.value = { ...router.currentRoute.value, query: { tab: "logs" } } as any;
+      let resolveIncident!: (value: unknown) => void;
+      (incidentsService.get as any).mockReturnValue(
+        new Promise((resolve) => (resolveIncident = resolve)),
+      );
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue({
+        serviceName: "unknown",
+        matchedDimensions: {},
+        additionalDimensions: {},
+        logStreams: [],
+        metricStreams: [],
+        traceStreams: [],
+        correlationData: null,
+        emptyReason: "no_service_dimensions",
+      });
       wrapper = await createWrapper({}, {}, "1");
       await flushPromises();
+      const triggers = [createAlert({ alert_id: "alert-1" })];
+      resolveIncident({ data: createIncidentWithAlerts({ id: "1", group_values: {}, triggers }) });
+      await flushPromises();
 
-      expect(wrapper.vm.activeTab).toBe("incidentAnalysis");
+      expect(wrapper.vm.activeTab).toBe("logs");
+      expect(incidentsService.getCorrelatedStreams).toHaveBeenCalledTimes(1);
+      expect(incidentsService.getCorrelatedStreams).toHaveBeenCalledWith(
+        "default",
+        expect.objectContaining({ id: "1" }),
+        expect.any(Function),
+        expect.objectContaining({ triggers }),
+      );
+      expect(wrapper.text()).toContain(i18n.global.t("alerts.incidents.noServiceDimensions"));
       router.currentRoute.value = { ...router.currentRoute.value, query: {} } as any;
     });
+  });
 
-    it("without a tab query opens the Incident Analysis tab", async () => {
-      router.currentRoute.value = { ...router.currentRoute.value, query: {} } as any;
+  describe("Alert Graph and Report tabs", () => {
+    it("the Report tab shows the analysis panel's report view, and each tab opens the other", async () => {
       wrapper = await createWrapper({}, {}, "1");
       await flushPromises();
+      wrapper.vm.activeTab = "report";
+      await flushPromises();
 
+      const panel = wrapper.findComponent({ name: "IncidentRCAAnalysis" });
+      expect(panel.props("view")).toBe("report");
+      panel.vm.$emit("open-analysis");
+      await flushPromises();
       expect(wrapper.vm.activeTab).toBe("incidentAnalysis");
+
+      wrapper.findComponent({ name: "IncidentRCAAnalysis" }).vm.$emit("open-report");
+      await flushPromises();
+      expect(wrapper.vm.activeTab).toBe("report");
     });
   });
 
   describe("Tab order", () => {
     afterEach(() => localStorage.removeItem("o2_incident_detail_tab_order"));
 
-    it("opens on the first tab of a saved order, dropping unknown names and appending missing ones", async () => {
-      localStorage.setItem(
-        "o2_incident_detail_tab_order",
-        JSON.stringify(["logs", "gone", "overview"]),
-      );
+    it.each([
+      [
+        "drops unknown names and slots missing tabs after their default neighbour",
+        ["logs", "gone", "overview"],
+        ["incidentAnalysis", "report", "logs", "metrics", "traces", "overview", "activity"],
+      ],
+      [
+        "slots the Report tab after Incident Analysis in an order saved before it existed",
+        ["overview", "activity", "incidentAnalysis", "serviceGraph"],
+        ["overview", "activity", "incidentAnalysis", "report", "serviceGraph"],
+      ],
+    ])("migrates a saved tab order: %s", async (_case, saved, expected) => {
+      localStorage.setItem("o2_incident_detail_tab_order", JSON.stringify(saved));
       wrapper = await createWrapper({}, {}, "1");
       await flushPromises();
 
-      expect(wrapper.vm.activeTab).toBe("logs");
-      expect(wrapper.vm.tabOrder).toEqual([
-        "logs",
-        "overview",
-        "incidentAnalysis",
-        "activity",
-        "serviceGraph",
-        "alertTriggers",
-        "metrics",
-        "traces",
-      ]);
+      expect(wrapper.vm.tabOrder.slice(0, expected.length)).toEqual(expected);
     });
 
     it("applies and saves a drag reorder", async () => {
@@ -1619,7 +2427,9 @@ describe("IncidentDetailDrawer.vue", () => {
 
       wrapper.vm.onTabReorder({ from: "traces", to: "overview", before: false });
 
-      expect(wrapper.vm.tabOrder.slice(0, 3)).toEqual(["incidentAnalysis", "overview", "traces"]);
+      expect(wrapper.vm.tabOrder.slice(0, 4).join()).toBe(
+        "incidentAnalysis,report,overview,traces",
+      );
       expect(JSON.parse(localStorage.getItem("o2_incident_detail_tab_order")!)).toEqual(
         wrapper.vm.tabOrder,
       );
@@ -1692,7 +2502,9 @@ describe("IncidentDetailDrawer.vue", () => {
   /// page had been answered — while the payload behind it said all three.
   describe("on-call panel", () => {
     // The panel is on Overview, which a saved tab order opens first.
-    beforeEach(() => localStorage.setItem("o2_incident_detail_tab_order", '["overview"]'));
+    beforeEach(() =>
+      localStorage.setItem("o2_incident_detail_tab_order", '["overview", "incidentAnalysis"]'),
+    );
     afterEach(() => localStorage.removeItem("o2_incident_detail_tab_order"));
 
     const record = (overrides: Record<string, unknown> = {}) => ({

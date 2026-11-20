@@ -16,6 +16,7 @@ enterprise = [
     "dep:jsonwebtoken",
     "dep:o2_dex",
     "dep:o2_enterprise",
+    "dep:sketches-ddsketch",
     "dep:o2_openfga",
     "dep:o2_ratelimit",
     "dep:version-compare",
@@ -56,6 +57,7 @@ profiling = [
 ]
 
 [dependencies]
+sketches-ddsketch = { version = "=0.4.0", features = ["use_serde"], optional = true }
 db.workspace = true
 audit = { workspace = true, optional = true }
 common.workspace = true

@@ -27,7 +27,7 @@ use config::{
     },
     utils::time::{now_micros, second_micros},
 };
-use datafusion::error::DataFusionError;
+use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use hashbrown::HashSet;
 use infra::errors::Result;
 use promql::{
@@ -49,6 +49,7 @@ use tokio::sync::mpsc;
 
 mod storage;
 mod wal;
+pub(crate) mod wal_probe;
 
 /// What a range query's groups are planned from.
 struct GroupPlan {
@@ -56,6 +57,8 @@ struct GroupPlan {
     files: Vec<FileKey>,
     /// What the query reads beyond its evaluation range.
     window: SelectorWindow,
+    /// The streams the query's selectors read.
+    streams: std::collections::HashSet<String>,
 }
 
 struct StorageProvider {
@@ -81,7 +84,7 @@ impl TableProvider for StorageProvider {
             return Ok(vec![]);
         }
         // WAL before storage: a sample moved in between is then read twice, never missed.
-        let wal_ctxs = if self.need_wal {
+        let (wal_ctx, wal_warnings) = if self.need_wal {
             let trace_id = self.trace_id.to_owned() + "-wal-" + stream_name;
             wal::create_context(
                 &trace_id,
@@ -93,11 +96,10 @@ impl TableProvider for StorageProvider {
             )
             .await?
         } else {
-            Vec::new()
+            (None, Vec::new())
         };
-        let mut ctxs = Vec::with_capacity(wal_ctxs.len() + 1);
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
-        let ctx = storage::create_context(
+        let storage_ctx = storage::create_context(
             &trace_id,
             org_id,
             stream_name,
@@ -105,16 +107,13 @@ impl TableProvider for StorageProvider {
             matchers,
             filters,
             storage::SourcePreference {
-                streaming,
+                // WAL rows are merged by materializing, which a streaming-only source cannot feed
+                streaming: streaming && wal_ctx.is_none(),
                 output_labels: &label_selector,
             },
         )
         .await?;
-        if let Some(ctx) = ctx {
-            ctxs.push(ctx);
-        }
-        ctxs.extend(wal_ctxs);
-        Ok(ctxs)
+        Ok(scan_contexts(storage_ctx, wal_ctx, wal_warnings))
     }
 
     #[cfg(feature = "enterprise")]
@@ -153,7 +152,8 @@ pub async fn search(
 
     let mut results = Vec::new();
     if start == end {
-        results.push(search_inner(req, query_tracker).await?);
+        let need_wal = instant_need_wal(&trace_id, req, false).await?;
+        results.push(search_inner(req, need_wal, query_tracker).await?);
     } else {
         // 1. get max records stream
         let start_ts = std::time::Instant::now();
@@ -182,14 +182,14 @@ pub async fn search(
 
         // 2. generate search group with max records stream
         let start_ts = std::time::Instant::now();
-        let wal_floor = wal_floor();
+        let wal_floor = request_floor(req.wal_start_time);
         // no cut without streaming, or with an `@` pin on the WAL
         let cut = if cfg.search.feature_metrics_streaming_agg_enabled
             && !query.query_exemplars
             && !req.is_super_cluster
             && plan.window.pinned.is_none()
         {
-            wal_cut(start, end, step, micros(plan.window.ahead), wal_floor)
+            wal_cut(start, end, step, micros(plan.window.ahead), wal_head())
         } else {
             None
         };
@@ -225,13 +225,13 @@ pub async fn search(
 
         // 3. search each group
         for (start, end) in group {
+            let need_wal = plan.window.reaches(end, wal_floor);
             let mut req = req.clone();
-            req.need_wal = plan.window.reaches(end, wal_floor);
             req.query.as_mut().unwrap().start = start;
             req.query.as_mut().unwrap().end = end;
-            let resp = search_inner(&req, query_tracker).await?;
+            let resp = search_inner(&req, need_wal, query_tracker).await?;
             log::info!(
-                "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] get resp, took: {} ms",
+                "[trace_id {trace_id}] promql->search->grpc: group[{start}, {end}] need_wal: {need_wal}, get resp, took: {} ms",
                 start_ts.elapsed().as_millis()
             );
             results.push(resp);
@@ -305,7 +305,8 @@ pub async fn data(
 
     let start_ts = std::time::Instant::now();
     if start == end {
-        let ret = search_inner(req, query_tracker).await?;
+        let need_wal = instant_need_wal(&trace_id, req, true).await?;
+        let ret = search_inner(req, need_wal, query_tracker).await?;
         if let Err(e) = data_tx.send(ret).await {
             log::error!("[trace_id {trace_id}] promql->data->grpc: send data error: {e}");
         }
@@ -362,15 +363,22 @@ pub async fn data(
     );
 
     // 3. search each group
-    let wal_floor = wal_floor();
+    // a super-cluster peer cannot see this cluster's ingesters, so it never sends a probe result
+    let wal_start_time =
+        if req.wal_start_time == 0 && wal_probe::needs_probe(&plan.window, start, end) {
+            wal_probe::wal_start_time(&trace_id, org_id, &plan.streams).await
+        } else {
+            req.wal_start_time
+        };
+    let wal_floor = request_floor(wal_start_time);
     for (start, end) in group {
+        let need_wal = plan.window.reaches(end, wal_floor);
         let mut req = req.clone();
-        req.need_wal = plan.window.reaches(end, wal_floor);
         req.query.as_mut().unwrap().start = start;
         req.query.as_mut().unwrap().end = end;
-        let resp = search_inner(&req, query_tracker).await?;
+        let resp = search_inner(&req, need_wal, query_tracker).await?;
         log::info!(
-            "[trace_id {trace_id}] promql->data->grpc: group[{start}, {end}] get resp, took: {} ms",
+            "[trace_id {trace_id}] promql->data->grpc: group[{start}, {end}] need_wal: {need_wal}, get resp, took: {} ms",
             start_ts.elapsed().as_millis()
         );
         if let Err(e) = data_tx.send(resp).await {
@@ -394,6 +402,7 @@ pub async fn data(
 #[tracing::instrument(name = "promql:search:grpc:search_inner", skip_all, fields(org_id = req.org_id))]
 pub async fn search_inner(
     req: &cluster_rpc::MetricsQueryRequest,
+    need_wal: bool,
     query_tracker: &QueryTracker,
 ) -> Result<(value::Value, String, ScanStats, i64, Vec<String>)> {
     let start = std::time::Instant::now();
@@ -422,7 +431,6 @@ pub async fn search_inner(
         org_id: org_id.to_string(),
         query_exemplars: query.query_exemplars,
         query_data: query.query_data,
-        need_wal: req.need_wal,
         use_cache: req.use_cache,
         timeout,
         search_event_type: req.search_event_type.parse::<SearchEventType>().ok(),
@@ -436,7 +444,7 @@ pub async fn search_inner(
         StorageProvider {
             trace_id: trace_id.to_string(),
             query_tracker: query_tracker.clone(),
-            need_wal: req.need_wal,
+            need_wal,
         },
         query.label_selector.clone(),
     );
@@ -496,27 +504,20 @@ async fn get_max_file_list(
 ) -> Result<GroupPlan> {
     // 1. get metrics name
     let ast = promql::parse(query).map_err(DataFusionError::Execution)?;
-    let mut visitor = name_visitor::MetricNameVisitor::default();
-    walk_expr(&mut visitor, &ast).map_err(|e| DataFusionError::Execution(e.to_string()))?;
-    let mut metrics_name = visitor.into_names();
-    if query_exemplars {
-        let mut mapped = std::collections::HashSet::with_capacity(metrics_name.len());
-        for name in &metrics_name {
-            mapped.insert(promql::utils::exemplars_stream_for(org_id, name).await);
-        }
-        metrics_name = mapped;
-    }
+    let metrics_name = query_streams(org_id, &ast, query_exemplars)
+        .await
+        .map_err(|e| DataFusionError::Execution(e.to_string()))?;
     let window = selector_window(&ast);
 
     // 2. get max records stream
     let mut file_list = Vec::new();
     let mut max_records = 0;
-    for stream_name in metrics_name {
+    for stream_name in &metrics_name {
         let stream_file_list = search_service::file_list::query(
             trace_id,
             org_id,
             StreamType::Metrics,
-            &stream_name,
+            stream_name,
             PartitionTimeLevel::default(),
             start,
             end,
@@ -532,6 +533,7 @@ async fn get_max_file_list(
     Ok(GroupPlan {
         files: file_list,
         window,
+        streams: metrics_name,
     })
 }
 
@@ -550,16 +552,64 @@ async fn matches_nothing(
         .any(|mat| absent_label_rejects_all(schema.schema(), mat)))
 }
 
-/// The time from which a group must also read the WAL.
-fn wal_floor() -> i64 {
-    let retention = config::get_config().limit.max_file_retention_time as i64;
-    now_micros() - second_micros(retention * 3)
+/// Storage and WAL contexts, with the WAL's warnings kept even when it returned no rows.
+fn scan_contexts(
+    storage_ctx: Option<ScanContext>,
+    wal_ctx: Option<ScanContext>,
+    wal_warnings: Vec<String>,
+) -> Vec<ScanContext> {
+    let mut ctxs: Vec<ScanContext> = storage_ctx.into_iter().chain(wal_ctx).collect();
+    if wal_warnings.is_empty() {
+        return ctxs;
+    }
+    match ctxs.first_mut() {
+        Some(ctx) => ctx.warnings.extend(wal_warnings),
+        None => ctxs.push(
+            ScanContext::table(
+                SessionContext::new(),
+                Arc::new(Schema::empty()),
+                ScanStats::default(),
+                true,
+            )
+            .with_warnings(wal_warnings),
+        ),
+    }
+    ctxs
 }
 
-/// The grid-aligned cut before the WAL floor, `None` when the range does not straddle it.
-fn wal_cut(start: i64, end: i64, step: i64, ahead: i64, wal_floor: i64) -> Option<i64> {
-    // a group ending before the cut still reads `ahead` past its end, which must stay off the WAL
-    let cut = wal_floor - ahead;
+/// The floor a request's groups read the WAL from, the widest when its sender did not probe.
+fn request_floor(wal_start_time: i64) -> i64 {
+    if wal_start_time > 0 {
+        wal_start_time
+    } else {
+        wal_floor()
+    }
+}
+
+/// Whether an unsplit request reads the WAL, decided as a group ending at its end would be.
+async fn instant_need_wal(
+    trace_id: &str,
+    req: &cluster_rpc::MetricsQueryRequest,
+    probe_if_unknown: bool,
+) -> Result<bool> {
+    let query = req.query.as_ref().unwrap();
+    let ast = promql::parse(&query.query).map_err(DataFusionError::Execution)?;
+    let window = selector_window(&ast);
+    let mut wal_start_time = req.wal_start_time;
+    if probe_if_unknown
+        && wal_start_time == 0
+        && wal_probe::needs_probe(&window, query.start, query.end)
+        && let Ok(streams) = query_streams(&req.org_id, &ast, query.query_exemplars).await
+    {
+        wal_start_time = wal_probe::wal_start_time(trace_id, &req.org_id, &streams).await;
+    }
+    Ok(window.reaches(query.end, request_floor(wal_start_time)))
+}
+
+/// The grid-aligned cut before the WAL head, `None` when the range does not straddle it.
+fn wal_cut(start: i64, end: i64, step: i64, ahead: i64, wal_head: i64) -> Option<i64> {
+    // a group ending before the cut still reads `ahead` past its end, which must stay off the head
+    let cut = wal_head - ahead;
     if step <= 0 || cut <= start || cut > end {
         return None;
     }
@@ -655,6 +705,37 @@ async fn generate_search_group(
         groups.push((group_start, end));
     }
     Ok(groups)
+}
+
+/// The oldest sample time the WAL may hold: a sample the ingest window still accepts can wait
+/// there as long as the head does before it is flushed.
+pub(crate) fn wal_floor() -> i64 {
+    wal_head() - config::get_config().limit.ingest_allowed_upto_micro
+}
+
+/// The time from which the WAL routinely holds samples that are not flushed yet.
+pub(crate) fn wal_head() -> i64 {
+    let retention = config::get_config().limit.max_file_retention_time as i64;
+    now_micros() - second_micros(retention * 3)
+}
+
+/// The streams the query's selectors read; an exemplar query reads each metric's exemplar stream.
+pub(crate) async fn query_streams(
+    org_id: &str,
+    ast: &parser::Expr,
+    query_exemplars: bool,
+) -> std::result::Result<std::collections::HashSet<String>, &'static str> {
+    let mut visitor = name_visitor::MetricNameVisitor::default();
+    walk_expr(&mut visitor, ast)?;
+    let names = visitor.into_names();
+    if !query_exemplars {
+        return Ok(names);
+    }
+    let mut mapped = std::collections::HashSet::with_capacity(names.len());
+    for name in &names {
+        mapped.insert(promql::utils::exemplars_stream_for(org_id, name).await);
+    }
+    Ok(mapped)
 }
 
 pub(crate) fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: value::Value) {
@@ -819,6 +900,99 @@ mod tests {
             },
             ..Default::default()
         }
+    }
+
+    fn table_ctx(warnings: &[&str]) -> ScanContext {
+        ScanContext::table(
+            SessionContext::new(),
+            Arc::new(Schema::empty()),
+            ScanStats::default(),
+            true,
+        )
+        .with_warnings(warnings.iter().map(|w| w.to_string()).collect())
+    }
+
+    #[test]
+    fn test_wal_floor_reaches_back_over_the_ingest_window_behind_the_head() {
+        let upto = config::get_config().limit.ingest_allowed_upto_micro;
+        let before = wal_head();
+        let floor = wal_floor();
+        let after = wal_head();
+        assert!(upto > 0);
+        assert!(floor >= before - upto && floor <= after - upto);
+    }
+
+    #[test]
+    fn test_request_floor_uses_the_probe_and_falls_back_to_the_ingest_window() {
+        assert_eq!(request_floor(42), 42);
+        let before = wal_floor();
+        let floor = request_floor(0);
+        assert!(floor >= before && floor <= wal_floor());
+    }
+
+    #[tokio::test]
+    async fn test_instant_need_wal_decides_like_a_group_ending_at_the_instant() {
+        let req = |at: i64, wal_start_time: i64| cluster_rpc::MetricsQueryRequest {
+            org_id: "org".to_string(),
+            query: Some(cluster_rpc::MetricsQueryStmt {
+                query: "m".to_string(),
+                start: at,
+                end: at,
+                ..Default::default()
+            }),
+            wal_start_time,
+            ..Default::default()
+        };
+        let hour = second_micros(3600);
+        assert!(
+            instant_need_wal("t", &req(now_micros(), 0), false)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !instant_need_wal("t", &req(wal_floor() - hour, 0), false)
+                .await
+                .unwrap()
+        );
+        // between floor and head: read only when the probe saw a late sample that old
+        let late = wal_head() - hour;
+        assert!(instant_need_wal("t", &req(late, 0), false).await.unwrap());
+        assert!(
+            !instant_need_wal("t", &req(late, wal_head()), false)
+                .await
+                .unwrap()
+        );
+        assert!(
+            instant_need_wal("t", &req(late, late - hour), false)
+                .await
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_an_empty_wal_leaves_storage_as_the_only_context() {
+        let ctxs = scan_contexts(Some(table_ctx(&[])), None, vec![]);
+        assert_eq!(ctxs.len(), 1);
+        assert!(ctxs[0].warnings.is_empty());
+    }
+
+    #[test]
+    fn test_wal_rows_add_a_second_context_after_storage() {
+        let ctxs = scan_contexts(Some(table_ctx(&["s"])), Some(table_ctx(&[])), vec![]);
+        assert_eq!(ctxs.len(), 2);
+        assert_eq!(ctxs[0].warnings, vec!["s"]);
+    }
+
+    #[test]
+    fn test_wal_warnings_survive_an_empty_wal() {
+        let ctxs = scan_contexts(Some(table_ctx(&["s"])), None, vec!["ingester down".into()]);
+        assert_eq!(ctxs.len(), 1);
+        assert_eq!(ctxs[0].warnings, vec!["s", "ingester down"]);
+
+        let ctxs = scan_contexts(None, None, vec!["ingester down".into()]);
+        assert_eq!(ctxs.len(), 1);
+        assert_eq!(ctxs[0].warnings, vec!["ingester down"]);
+        assert!(scan_contexts(None, None, vec![]).is_empty());
     }
 
     #[test]

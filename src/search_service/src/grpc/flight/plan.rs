@@ -24,11 +24,7 @@ use config::{
     cluster::LOCAL_NODE,
     datafusion::request::FlightSearchRequest,
     get_config,
-    meta::{
-        search::ScanStats,
-        sql::TableReferenceExt,
-        stream::{FileKey, StreamType},
-    },
+    meta::{search::ScanStats, sql::TableReferenceExt, stream::StreamType},
 };
 use datafusion::{
     common::TableReference,
@@ -40,19 +36,24 @@ use datafusion::{
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use infra::errors::{Error, ErrorCodes};
 
-use super::scan::{PrecomputedAggregates, collect_stats};
+use super::{
+    redaction::ScanRedaction,
+    scan::{PrecomputedAggregates, collect_stats},
+};
 use crate::{
     datafusion::{
         datasource::{enrich_table::EnrichTable, uniontable::NewUnionTable},
         distributed::codec::get_physical_extension_codec,
         exec::{DataFusionContextBuilder, register_udf},
-        physical_optimizer::index_optimizer::index_aggregate_rewrite::aggregate_optimize_rewrite,
+        physical_optimizer::{
+            index_optimizer::index_aggregate_rewrite::aggregate_optimize_rewrite,
+            sdr_redact::{LiftRedaction, scan_filters, wrap_with_redaction},
+        },
         physical_plan::empty_exec::{NewEmptyExecVisitor, ReplaceTableScanExec},
         sort_order::FileSortOrder,
     },
     grpc::QueryParams,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-    tantivy::aggregate::IndexAggregate,
 };
 
 /// The stream the leader plan reads, taken from its empty exec before any rewrite.
@@ -128,14 +129,13 @@ pub(super) async fn decode_plan(
     Ok((ctx, physical_plan, source))
 }
 
-pub(super) async fn finalize_plan(
+pub(super) async fn replace_table_scan(
     query: &QueryParams,
     req: &FlightSearchRequest,
     ctx: &SessionContext,
     physical_plan: Arc<dyn ExecutionPlan>,
     mut tables: Vec<Arc<dyn TableProvider>>,
-    aggregates: PrecomputedAggregates,
-    scan_stats: &mut ScanStats,
+    redaction: &ScanRedaction,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
     let trace_id = query.trace_id.as_str();
 
@@ -175,14 +175,22 @@ pub(super) async fn finalize_plan(
     );
 
     let scan_start = std::time::Instant::now();
+    let filters = scan_filters(empty_exec.filters(), &redaction.redacted_columns());
     let union_exec = union_table
         .scan(
             &ctx.state(),
             empty_exec.projection(),
-            empty_exec.filters(),
+            &filters,
             empty_exec.limit(),
         )
         .await?;
+    // Every operator above, query functions on the leader included, sees only redacted values.
+    let union_exec = if redaction.is_protected() {
+        let options = Arc::new(ctx.state().config_options().as_ref().clone());
+        wrap_with_redaction(union_exec, redaction.udfs(), options)?
+    } else {
+        union_exec
+    };
     log::info!(
         "{}",
         search_inspector_fields(
@@ -199,7 +207,11 @@ pub(super) async fn finalize_plan(
 
     let rewrite_start = std::time::Instant::now();
     let mut rewriter = ReplaceTableScanExec::new(union_exec);
-    let physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+    let mut physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
+    // Before the pushdown rules: ProjectionPushdown folds the projection into the scan.
+    if redaction.is_protected() {
+        physical_plan = LiftRedaction.optimize(physical_plan, ctx.state().config_options())?;
+    }
     log::info!(
         "{}",
         search_inspector_fields(
@@ -214,42 +226,20 @@ pub(super) async fn finalize_plan(
         )
     );
 
-    let physical_plan = apply_pushdowns_and_optimizations(
-        trace_id,
-        ctx,
-        physical_plan,
-        scan_stats,
-        aggregates.metadata_count_files,
-        aggregates.index_aggregate,
-    )?;
-
-    log::info!(
-        "{}",
-        search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] flight->search: generated physical plan, took: {} ms",
-                start.elapsed().as_millis()
-            ),
-            SearchInspectorFieldsBuilder::new()
-                .trace_id(trace_id.to_string())
-                .node_name(LOCAL_NODE.name.clone())
-                .component("flight:do_get::search generated physical plan".to_string())
-                .search_role("follower".to_string())
-                .duration(start.elapsed().as_millis() as usize)
-                .build()
-        )
-    );
     Ok(physical_plan)
 }
 
-fn apply_pushdowns_and_optimizations(
+pub(super) fn apply_pushdown_rules(
     trace_id: &str,
     ctx: &SessionContext,
     mut physical_plan: Arc<dyn ExecutionPlan>,
+    aggregates: PrecomputedAggregates,
     scan_stats: &mut ScanStats,
-    metadata_count_file_list: Vec<FileKey>,
-    index_aggregate: Option<IndexAggregate>,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
+    let PrecomputedAggregates {
+        metadata_count_files: metadata_count_file_list,
+        index_aggregate,
+    } = aggregates;
     let cfg = get_config();
 
     let pushdown_filter = FilterPushdown::new();

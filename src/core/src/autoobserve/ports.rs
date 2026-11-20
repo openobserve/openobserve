@@ -28,19 +28,26 @@ use config::{
     ider,
     meta::{
         search::{Query, Request},
-        stream::{StreamParams, StreamPartition, StreamSettings, StreamStats, StreamType},
+        stream::{
+            PartitionTimeLevel, StreamParams, StreamPartition, StreamSettings, StreamStats,
+            StreamType,
+        },
         triggers::{Trigger, TriggerModule},
     },
 };
 use infra::errors::{DbError, Error as InfraError};
 use o2_enterprise::enterprise::autoobserve::{
+    context::{ChangeAsk, ChangeRecord, Checked},
     contract::DAY_US,
     engine::MAX_HOOK_TIMEOUT,
     job::MODULE_KEY,
+    names::streams::STREAM_PRESENCE,
     ports::{
-        AiPermit, AiUsagePort, KvWritePort, Ports, QueryRejected, SearchPage, SearchPort,
-        StreamSinkPort, StreamStat, StreamStatsPort, TriggerPort, stats_refresh_us,
+        AiPermit, AiUsagePort, ContextReadPort, HourRecords, KvWritePort, OssSource, Ports,
+        QueryRejected, SearchPage, SearchPort, StreamHistory, StreamSinkPort, StreamStat,
+        StreamStatsPort, TriggerPort, stats_refresh_us,
     },
+    stream_silence::PRESENCE_RETENTION_DAYS,
 };
 use serde_json::Value;
 
@@ -57,6 +64,12 @@ const STREAM_TYPES: [StreamType; 6] = [
 const META_RETENTION_DAYS: i64 = 35;
 /// Every engine read filters one `org_id`, so it opens one bucket of files, not every org's.
 const ORG_BUCKETS: u64 = 32;
+/// Streams per file-list read, so one statement's key list stays small.
+const RECORDS_BATCH: usize = 500;
+/// The file list's hour partition key, `YYYY/MM/DD/HH`.
+const DATE_KEY: &str = "%Y/%m/%d/%H";
+/// A querier that does not answer a cancel this soon is left to its own query timeout.
+const CANCEL_BUDGET: Duration = Duration::from_secs(5);
 
 pub struct SearchAdapter;
 
@@ -87,6 +100,34 @@ impl SearchPort for SearchAdapter {
                 Ok(SearchPage::default())
             }
             other => other.map_err(rejected_or_failed),
+        }
+    }
+
+    /// A read cut by the deadline or dropped by its caller has its scans cancelled in the
+    /// background.
+    async fn sql_streamed(
+        &self,
+        org: &str,
+        sql: &str,
+        range: (i64, i64),
+        size: i64,
+        timeout: Duration,
+    ) -> anyhow::Result<SearchPage> {
+        let trace_id = ider::generate_trace_id();
+        let mut guard = CancelOnDrop {
+            org: org.to_string(),
+            trace_id: trace_id.clone(),
+            armed: true,
+        };
+        let read = search_streamed(&trace_id, org, sql, range, size, timeout);
+        let read = tokio::time::timeout(timeout, read).await;
+        guard.armed = read.is_err();
+        match read {
+            Err(_) => anyhow::bail!("streamed search timed out after {timeout:?}"),
+            Ok(Err(InfraError::ErrorCode(infra::errors::ErrorCodes::SearchStreamNotFound(_)))) => {
+                Ok(SearchPage::default())
+            }
+            Ok(other) => other.map_err(rejected_or_failed),
         }
     }
 
@@ -311,6 +352,51 @@ impl StreamStatsPort for StreamStatsAdapter {
         *self.index.write() = Some(Arc::new(index));
     }
 
+    async fn history(&self, org: &str) -> anyhow::Result<Vec<StreamHistory>> {
+        let mut out = Vec::new();
+        for s in self.streams(org).await? {
+            let stream_type = stream_type_of(&s.stream_type)?;
+            let stats = infra::cache::stats::get_stream_stats(org, &s.name, stream_type);
+            let settings = infra::schema::get_settings(org, &s.name, stream_type).await;
+            let own = settings.as_ref().map_or(0, |x| x.data_retention);
+            let days =
+                db::organization::stream_retention_days(org, stream_type, &s.name, own).await?;
+            out.push(StreamHistory {
+                doc_time_min: (stats.doc_time_min > 0).then_some(stats.doc_time_min),
+                retention_days: (days > 0).then_some(days),
+                daily: settings.is_some_and(|x| {
+                    matches!(
+                        x.partition_time_level
+                            .level_at(config::utils::time::now_micros()),
+                        Some(PartitionTimeLevel::Daily)
+                    )
+                }),
+                name: s.name,
+                stream_type: s.stream_type,
+            });
+        }
+        Ok(out)
+    }
+
+    async fn hourly_records(
+        &self,
+        org: &str,
+        streams: &[(String, String)],
+        (from, to): (i64, i64),
+    ) -> anyhow::Result<Vec<HourRecords>> {
+        let range = (date_key(from)?, date_key(to)?);
+        let keys: Vec<String> = streams
+            .iter()
+            .map(|(t, n)| format!("{org}/{t}/{n}"))
+            .collect();
+        let mut out = Vec::new();
+        for batch in keys.chunks(RECORDS_BATCH) {
+            let rows = infra::file_list::records_by_date(batch, range.clone()).await?;
+            out.extend(rows.into_iter().filter_map(hour_records));
+        }
+        Ok(out)
+    }
+
     async fn has_field(
         &self,
         org: &str,
@@ -328,15 +414,78 @@ impl StreamStatsPort for StreamStatsAdapter {
 /// Each org's engine streams, by type then name.
 type OrgIndex = HashMap<String, Vec<(StreamType, String)>>;
 
-/// No reason text is generated until AI metering is wired to the engine, so every ask is refused.
-pub struct NoAiUsage;
+/// The engine's only AI is the incident's own analysis, so its gates decide; the run charges
+/// itself when it starts, so asking here never deducts.
+pub struct IncidentAiUsage;
 
 #[async_trait]
-impl AiUsagePort for NoAiUsage {
-    async fn authorize(&self, _org: &str) -> anyhow::Result<AiPermit> {
-        Ok(AiPermit::Refused(
-            "AI usage metering is not connected to the engine".to_string(),
-        ))
+impl AiUsagePort for IncidentAiUsage {
+    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))]
+    async fn authorize(&self, org: &str) -> anyhow::Result<AiPermit> {
+        if let Some(off) = crate::alerts::incidents::rca_not_run_reason() {
+            return Ok(AiPermit::Refused(off.to_string()));
+        }
+        #[cfg(feature = "cloud")]
+        if let Err(e) = crate::trial_quota::precheck_ai_usage(
+            org,
+            crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis,
+            crate::alerts::incidents::SYSTEM_USER_EMAIL,
+        )
+        .await
+        {
+            return Ok(AiPermit::Refused(e.to_string()));
+        }
+        Ok(AiPermit::Allowed)
+    }
+}
+
+/// The OSS reads behind the context providers; a source not read yet says it is not recorded.
+pub struct ContextReads;
+
+#[async_trait]
+impl ContextReadPort for ContextReads {
+    async fn changes(&self, source: OssSource, ask: &ChangeAsk) -> (Checked, Vec<ChangeRecord>) {
+        match source {
+            OssSource::PipelineErrors => super::causes::pipeline::read(ask).await,
+            OssSource::IngestRefusals => (Checked::NotRecorded, Vec::new()),
+            OssSource::AuditTrail => super::causes::audit::read(ask).await,
+            OssSource::Deploys => super::causes::deploy::read(ask).await,
+        }
+    }
+
+    async fn security_sources(&self, org: &str) -> (Checked, Vec<(String, String)>) {
+        use o2_enterprise::enterprise::security::sources::selection::{StreamRef, resolve_sources};
+        let streams = match db::schema::list(org, Some(StreamType::Logs), false).await {
+            Ok(streams) => streams,
+            Err(e) => {
+                return (
+                    Checked::Failed(format!("reading stream settings: {e}")),
+                    Vec::new(),
+                );
+            }
+        };
+        let settings: Vec<(&str, Option<StreamSettings>)> = streams
+            .iter()
+            .map(|s| {
+                (
+                    s.stream_name.as_str(),
+                    infra::schema::unwrap_stream_settings(&s.schema),
+                )
+            })
+            .collect();
+        let refs: Vec<StreamRef<'_>> = settings
+            .iter()
+            .map(|(name, s)| StreamRef {
+                name,
+                setting: s.as_ref().and_then(|s| s.security.as_ref()),
+            })
+            .collect();
+        let logs = StreamType::Logs.to_string();
+        let sources = resolve_sources(org, &refs)
+            .into_iter()
+            .map(|e| (logs.clone(), e.name))
+            .collect();
+        (Checked::Ok, sources)
     }
 }
 
@@ -362,15 +511,47 @@ impl TriggerPort for EngineTrigger {
     }
 }
 
+/// The collector's producer runs detached, so a read that did not finish cancels the trace's scans.
+struct CancelOnDrop {
+    org: String,
+    trace_id: String,
+    armed: bool,
+}
+
+impl Drop for CancelOnDrop {
+    fn drop(&mut self) {
+        let Ok(runtime) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
+        if !self.armed {
+            return;
+        }
+        let (org, trace_id) = (
+            std::mem::take(&mut self.org),
+            std::mem::take(&mut self.trace_id),
+        );
+        runtime.spawn(async move {
+            search_service::abort_trace_family(&org, &trace_id).await;
+            let cancel = search_service::cancel_query(&org, &trace_id);
+            match tokio::time::timeout(CANCEL_BUDGET, cancel).await {
+                Ok(Ok(_)) => {}
+                Ok(Err(e)) => log::warn!("[autoobserve] trace_id {trace_id}: cancel failed: {e}"),
+                Err(_) => log::warn!("[autoobserve] trace_id {trace_id}: cancel unanswered"),
+            }
+        });
+    }
+}
+
 pub fn ports() -> Ports {
     Ports {
         search: Arc::new(SearchAdapter),
         sink: Arc::new(MetaSink),
         kv: Arc::new(KvAdapter),
         stream_stats: Arc::new(StreamStatsAdapter::default()),
-        ai_usage: Arc::new(NoAiUsage),
+        ai_usage: Arc::new(IncidentAiUsage),
         investigation: Some(Arc::new(super::incidents::IncidentInvestigation)),
         triggers: Arc::new(EngineTrigger),
+        context: Arc::new(ContextReads),
     }
 }
 
@@ -393,6 +574,44 @@ async fn search(
     Ok(SearchPage {
         hits: resp.hits,
         is_partial: resp.is_partial,
+    })
+}
+
+/// The partitioned streaming search folded into one answer; a clamped range or cut answer fails.
+async fn search_streamed(
+    trace_id: &str,
+    org: &str,
+    sql: &str,
+    range: (i64, i64),
+    size: i64,
+    timeout: Duration,
+) -> Result<SearchPage, InfraError> {
+    let mut req = engine_request(sql, range, (0, size), timeout);
+    let streams = config::meta::sql::resolve_stream_names(sql).map_err(|e| {
+        InfraError::ErrorCode(infra::errors::ErrorCodes::SearchSQLNotValid(e.to_string()))
+    })?;
+    let resp = search_service::streaming::collect::search_partition_mode(
+        trace_id,
+        org,
+        "",
+        &mut req,
+        StreamType::Logs,
+        streams,
+        None,
+        String::new(),
+        tracing::Span::current(),
+        false,
+    )
+    .await?;
+    if resp.is_partial {
+        return Err(InfraError::Message(format!(
+            "partial streamed search: {}",
+            resp.function_error.join("; ")
+        )));
+    }
+    Ok(SearchPage {
+        hits: resp.hits,
+        is_partial: false,
     })
 }
 
@@ -434,10 +653,13 @@ fn stream_type_of(s: &str) -> anyhow::Result<StreamType> {
 }
 
 /// Leaves an operator's explicit retention and partitions alone; returns whether it changed any.
-fn engine_settings(settings: &mut StreamSettings) -> bool {
-    let retention = settings.data_retention == 0;
+fn engine_settings(stream: &str, settings: &mut StreamSettings) -> bool {
+    let days = retention_days(stream);
+    // The rollup's old engine default is the engine's own, so it moves to the new one.
+    let retention = settings.data_retention == 0
+        || (days != META_RETENTION_DAYS && settings.data_retention == META_RETENTION_DAYS);
     if retention {
-        settings.data_retention = META_RETENTION_DAYS;
+        settings.data_retention = days;
     }
     let partition = settings.partition_keys.is_empty();
     if partition {
@@ -448,6 +670,15 @@ fn engine_settings(settings: &mut StreamSettings) -> bool {
     retention || partition
 }
 
+/// The presence rollup holds a quiet stream as long as the stream watch does, past the others.
+fn retention_days(stream: &str) -> i64 {
+    if stream == STREAM_PRESENCE {
+        PRESENCE_RETENTION_DAYS
+    } else {
+        META_RETENTION_DAYS
+    }
+}
+
 /// The settings cache decides, not a node-local flag: deleting a stream drops its settings.
 async fn keep_bounded<'a, F, Fut>(stream: &'a str, bound: F) -> anyhow::Result<()>
 where
@@ -456,7 +687,7 @@ where
 {
     let key = format!("{META_ORG_ID}/{}/{stream}", StreamType::Logs);
     let cached = infra::schema::get_stream_settings_atomic(&key);
-    if cached.is_some_and(|s| !engine_settings(&mut (*s).clone())) {
+    if cached.is_some_and(|s| !engine_settings(stream, &mut (*s).clone())) {
         return Ok(());
     }
     bound(stream).await
@@ -468,7 +699,7 @@ async fn bound_retention(stream: &str) -> anyhow::Result<()> {
         .await
         .map(|s| (*s).clone())
         .unwrap_or_default();
-    if engine_settings(&mut settings) {
+    if engine_settings(stream, &mut settings) {
         schema::save_stream_settings(META_ORG_ID, stream, StreamType::Logs, settings).await?;
     }
     Ok(())
@@ -528,6 +759,32 @@ fn stream_stat(name: String, stream_type: StreamType, stats: &StreamStats) -> St
     }
 }
 
+/// The hour partition key holding `at_us`.
+fn date_key(at_us: i64) -> anyhow::Result<String> {
+    let at = chrono::DateTime::from_timestamp_micros(at_us)
+        .ok_or_else(|| anyhow::anyhow!("{at_us} is not a time"))?;
+    Ok(at.format(DATE_KEY).to_string())
+}
+
+/// One `{org}/{type}/{name}` partition row as the engine reads it; an unparsable key is dropped.
+fn hour_records(
+    (stream, date, records, daily): (String, String, i64, bool),
+) -> Option<HourRecords> {
+    let mut parts = stream.splitn(3, '/');
+    let (_, stream_type, name) = (parts.next()?, parts.next()?, parts.next()?);
+    let hour = chrono::NaiveDateTime::parse_from_str(&format!("{date}:00"), "%Y/%m/%d/%H:%M")
+        .ok()?
+        .and_utc()
+        .timestamp_micros();
+    Some(HourRecords {
+        stream_type: stream_type.to_string(),
+        name: name.to_string(),
+        hour_us: hour,
+        records: u64::try_from(records).ok()?,
+        daily,
+    })
+}
+
 /// A super cluster's remotes each sleep 100 ms per batch of 10 orgs; one cluster sleeps per org.
 fn cache_waits(orgs: usize, super_cluster: bool) -> usize {
     if super_cluster {
@@ -542,7 +799,7 @@ mod tests {
     use std::cell::Cell;
 
     use arrow_schema::{DataType, Field, Schema};
-    use config::meta::stream::{FileKey, FileMeta};
+    use config::meta::stream::{FileKey, FileMeta, SecuritySourceSetting};
     use infra::{errors::ErrorCodes, schema::SchemaCache};
     use o2_enterprise::enterprise::autoobserve::decision_log::engine_reads;
 
@@ -579,24 +836,45 @@ mod tests {
     #[test]
     fn engine_streams_get_a_bounded_retention_and_an_org_partition_unless_set() {
         let mut unset = StreamSettings::default();
-        assert!(engine_settings(&mut unset));
+        assert!(engine_settings("_o2_autoobserve_x", &mut unset));
         assert_eq!(unset.data_retention, META_RETENTION_DAYS);
         assert_eq!(
             unset.partition_keys,
             vec![StreamPartition::new_hash("org_id", ORG_BUCKETS)]
         );
-        assert!(!engine_settings(&mut unset));
+        assert!(!engine_settings("_o2_autoobserve_x", &mut unset));
         let operator = vec![StreamPartition::new("cluster")];
         let mut chosen = StreamSettings {
             data_retention: 400,
             partition_keys: operator.clone(),
             ..Default::default()
         };
-        assert!(!engine_settings(&mut chosen));
+        assert!(!engine_settings("_o2_autoobserve_x", &mut chosen));
+        assert!(!engine_settings(STREAM_PRESENCE, &mut chosen));
         assert_eq!(
             (chosen.data_retention, chosen.partition_keys),
             (400, operator)
         );
+    }
+
+    /// A stream quiet for weeks is still held by the watch, so its stored days must outlive it.
+    #[test]
+    fn the_presence_rollup_keeps_what_the_stream_watch_holds() {
+        use o2_enterprise::enterprise::autoobserve::{
+            plugins::stream::MAX_TRAINING_DAYS, stream_silence::kept_since,
+        };
+        let deepest = -kept_since(-MAX_TRAINING_DAYS * DAY_US) / DAY_US;
+        assert!(PRESENCE_RETENTION_DAYS > deepest, "{deepest} days are held");
+        let mut unset = StreamSettings::default();
+        assert!(engine_settings(STREAM_PRESENCE, &mut unset));
+        assert_eq!(unset.data_retention, PRESENCE_RETENTION_DAYS);
+        let mut old_default = StreamSettings {
+            data_retention: META_RETENTION_DAYS,
+            ..Default::default()
+        };
+        assert!(engine_settings(STREAM_PRESENCE, &mut old_default));
+        assert_eq!(old_default.data_retention, PRESENCE_RETENTION_DAYS);
+        assert!(!engine_settings(STREAM_PRESENCE, &mut old_default));
     }
 
     /// Plans each SQL the engine builds as search does, then opens files with what the plan kept.
@@ -604,7 +882,7 @@ mod tests {
     async fn every_engine_read_is_planned_onto_its_orgs_bucket_only() {
         infra::db_init().await.unwrap();
         let mut settings = StreamSettings::default();
-        engine_settings(&mut settings);
+        engine_settings("_o2_autoobserve_x", &mut settings);
         let key = &settings.partition_keys[0];
         let bucket = |org: &str| key.get_partition_value(org);
         let other = (0..100)
@@ -645,10 +923,14 @@ mod tests {
                 .await
                 .unwrap();
             let req = engine_request(&sql, (0, DAY_US), (0, 1_000), MAX_HOOK_TIMEOUT);
-            let planned =
-                ::search::sql::Sql::new(&req.query.into(), META_ORG_ID, StreamType::Logs, None)
-                    .await
-                    .unwrap();
+            let planned = ::search::sql::Sql::new(
+                &req.query.try_into().unwrap(),
+                META_ORG_ID,
+                StreamType::Logs,
+                None,
+            )
+            .await
+            .unwrap();
             let equal: Vec<(String, String)> =
                 planned.equal_items.values().flatten().cloned().collect();
             assert!(
@@ -740,6 +1022,41 @@ mod tests {
             "every org from one visit per key"
         );
         assert_eq!(index.len(), 3);
+    }
+
+    /// A stream with no retention of its own keeps data as long as its org's default says.
+    #[tokio::test]
+    async fn a_streams_history_ends_at_the_retention_its_org_resolves() {
+        infra::db_init().await.unwrap();
+        let org = format!("ao_keep_{}", config::utils::time::now_micros());
+        let key = format!("{org}/metrics/cpu");
+        infra::schema::STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .insert(key.clone(), SchemaCache::new(Schema::empty()));
+        let setting = common::meta::organization::OrganizationSetting {
+            data_retention: config::meta::stream::DataRetentionDefaults {
+                metrics: 7,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let setting_key = format!("{}/{org}", db::organization::ORG_SETTINGS_KEY_PREFIX);
+        common::infra::config::ORGANIZATION_SETTING
+            .write()
+            .await
+            .insert(setting_key.clone(), setting);
+        let history = StreamStatsAdapter::default().history(&org).await.unwrap();
+        infra::schema::STREAM_SCHEMAS_LATEST
+            .write()
+            .await
+            .remove(&key);
+        common::infra::config::ORGANIZATION_SETTING
+            .write()
+            .await
+            .remove(&setting_key);
+        let days: Vec<Option<i64>> = history.iter().map(|h| h.retention_days).collect();
+        assert_eq!(days, [Some(7)]);
     }
 
     #[test]
@@ -836,10 +1153,62 @@ mod tests {
         assert_eq!((week.doc_num, empty.doc_num), (Some(700), None));
     }
 
+    /// Tests run without an agent target, so the incident's analysis is off and so is the port.
     #[tokio::test]
-    async fn ai_is_refused_until_metering_is_connected() {
-        let permit = NoAiUsage.authorize("default").await.unwrap();
-        assert!(matches!(permit, AiPermit::Refused(_)));
+    async fn ai_usage_follows_the_incident_analysis_and_never_deducts() {
+        let off = crate::alerts::incidents::rca_not_run_reason().expect("no agent in tests");
+        #[cfg(feature = "cloud")]
+        let pool = crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis.pool();
+        #[cfg(feature = "cloud")]
+        let used = crate::trial_quota::get_used_for_pool("default", pool);
+        let permit = IncidentAiUsage.authorize("default").await.unwrap();
+        assert_eq!(permit, AiPermit::Refused(off.to_string()));
+        #[cfg(feature = "cloud")]
+        assert_eq!(crate::trial_quota::get_used_for_pool("default", pool), used);
+    }
+
+    #[tokio::test]
+    async fn security_sources_are_the_chosen_logs_streams_minus_internal_ones() {
+        let org = format!("ao_sec_{}", config::utils::time::now_micros());
+        let cached = |included: bool| {
+            let settings = StreamSettings {
+                security: Some(SecuritySourceSetting {
+                    included: Some(included),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+            let meta = std::collections::HashMap::from([(
+                "settings".to_string(),
+                serde_json::to_string(&settings).unwrap(),
+            )]);
+            SchemaCache::new(Schema::empty().with_metadata(meta))
+        };
+        let keys = [
+            (format!("{org}/logs/okta_system_log"), true),
+            (format!("{org}/logs/app"), false),
+            (format!("{org}/logs/_o2_autoobserve_health"), true),
+        ];
+        {
+            let mut w = infra::schema::STREAM_SCHEMAS_LATEST.write().await;
+            for (key, included) in &keys {
+                w.insert(key.clone(), cached(*included));
+            }
+        }
+        let got = ContextReads.security_sources(&org).await;
+        {
+            let mut w = infra::schema::STREAM_SCHEMAS_LATEST.write().await;
+            for (key, _) in &keys {
+                w.remove(key);
+            }
+        }
+        assert_eq!(
+            got,
+            (
+                Checked::Ok,
+                vec![("logs".to_string(), "okta_system_log".to_string())]
+            )
+        );
     }
 
     #[tokio::test]
@@ -882,7 +1251,7 @@ mod tests {
             let key = key.clone();
             async move {
                 let mut settings = StreamSettings::default();
-                engine_settings(&mut settings);
+                engine_settings(stream, &mut settings);
                 infra::schema::put_stream_settings(key, Arc::new(settings)).await;
                 anyhow::Ok(())
             }
@@ -1028,5 +1397,29 @@ mod tests {
             .await;
             assert!(written.is_err(), "{stream} took a user write");
         }
+    }
+
+    #[test]
+    fn a_file_list_partition_reads_back_as_its_hour_and_a_bad_key_is_dropped() {
+        let hour = 1_767_225_600_000_000 + 13 * 3_600_000_000;
+        assert_eq!(date_key(hour + 59 * 60_000_000).unwrap(), "2026/01/01/13");
+        let row =
+            |stream: &str, date: &str, n: i64| (stream.to_string(), date.to_string(), n, false);
+        assert_eq!(
+            hour_records(row("acme/logs/web/app", "2026/01/01/13", 42)),
+            Some(HourRecords {
+                stream_type: "logs".into(),
+                name: "web/app".into(),
+                hour_us: hour,
+                records: 42,
+                daily: false,
+            })
+        );
+        assert_eq!(hour_records(row("acme/logs", "2026/01/01/13", 1)), None);
+        assert_eq!(hour_records(row("acme/logs/web", "2026-01-01", 1)), None);
+        assert_eq!(
+            hour_records(row("acme/logs/web", "2026/01/01/13", -1)),
+            None
+        );
     }
 }

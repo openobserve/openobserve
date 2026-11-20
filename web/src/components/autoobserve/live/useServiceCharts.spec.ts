@@ -20,7 +20,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import type { ChartRange } from "../coverageSeries";
-import type { CoverageRow } from "../fixtures";
+import type { CoverageRow } from "../aoTypes";
 import { resetCorrelationCache, useServiceCharts } from "./useServiceCharts";
 
 const api = vi.hoisted(() => ({
@@ -219,6 +219,26 @@ describe("useServiceCharts on a traces service", () => {
     mountCharts(inNs);
     await flushPromises();
     expect(sqlOf(calls()[0])).not.toContain("IS NULL");
+  });
+
+  it("matches a filter on each alias of it the stream holds", async () => {
+    api.correlate.mockResolvedValue(
+      correlation(
+        "svc-b",
+        [
+          {
+            ...info("app_traces", "traces", { service_name: "svc-b", namespace: "ns-b" }),
+            filter_aliases: { namespace: ["k8s_namespace_name"] },
+          },
+        ],
+        [],
+      ),
+    );
+    const inNs = row("svc-b", TRACES);
+    inNs.identity!.namespace = "ns-b";
+    mountCharts(inNs);
+    await flushPromises();
+    expect(sqlOf(calls()[0])).toContain(`("namespace" = 'ns-b' OR "k8s_namespace_name" = 'ns-b')`);
   });
 
   it("re-queries on a range change without a second _correlate", async () => {

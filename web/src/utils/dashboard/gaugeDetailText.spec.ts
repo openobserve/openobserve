@@ -18,7 +18,7 @@ import * as echarts from "echarts";
 import { convertPanelData } from "./convertPanelData";
 
 vi.mock("./convertCustomChartData", () => ({
-  runJavaScriptCode: vi.fn(),
+  prepareCustomChartRun: vi.fn(),
   validateUserCode: vi.fn(() => null),
 }));
 

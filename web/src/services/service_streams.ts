@@ -15,6 +15,7 @@
 
 import http from "./http";
 import { featureState } from "@/utils/featureGate";
+import type { ServiceDisplayFields } from "@/types/serviceRef";
 
 /**
  * Service Streams API Client
@@ -29,7 +30,7 @@ export interface ServiceStreams {
   profiles: string[];
 }
 
-export interface ServiceMetadata {
+export interface ServiceMetadata extends ServiceDisplayFields {
   service_name: string;
   dimensions: Record<string, string>;
   disambiguation?: Record<string, string>;
@@ -52,6 +53,10 @@ export interface StreamInfo {
   stream_name: string;
   stream_type: string;
   filters?: Record<string, string>; // omitted by backend when empty (skip_serializing_if)
+  /** Lowercased spellings a filter field matches case-insensitively (the service key's spellings). */
+  filter_spellings?: Record<string, string[]>;
+  /** Other fields of a filter's group this stream holds, keyed by the filter field; each matches the same value. */
+  filter_aliases?: Record<string, string[]>;
   /** Identity dimensions the backend could not resolve on this stream's schema (query is wider than chips imply). */
   dropped_dimensions?: string[];
 }
@@ -67,9 +72,16 @@ export interface CorrelationRequest {
   source_stream: string;
   source_type: string;
   available_dimensions: Record<string, string>;
+  /** Pick the record's own service from all its dimensions instead of the first match. */
+  resolve_from_source?: boolean;
+  /** Every semantic dimension of the record, untracked ones included; resolves its own service. */
+  source_dimensions?: Record<string, string>;
+  /** The drawer's window in microseconds; the record's spans are read over the last hour without it. */
+  start_time?: number;
+  end_time?: number;
 }
 
-export interface CorrelationResponse {
+export interface CorrelationResponse extends ServiceDisplayFields {
   service_name: string;
   matched_dimensions: Record<string, string>;
   additional_dimensions: Record<string, string>;
@@ -198,6 +210,8 @@ export interface DimensionAnalyticsSummary {
   available_groups: FoundGroup[];
   service_field_sources: ServiceFieldSource[];
   generated_at: number;
+  /** Trace display name per `service` dimension value; enterprise builds only. */
+  value_display?: Record<string, string>;
 }
 
 /**

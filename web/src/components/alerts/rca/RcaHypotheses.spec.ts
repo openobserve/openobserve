@@ -29,29 +29,43 @@ import {
   rcaRunSummaryLive,
 } from "@/test/unit/fixtures/rcaThread";
 
-const mountList = (summary: RcaRunSummary, live = false) =>
+const mountList = (summary: RcaRunSummary) =>
   mount(RcaHypotheses, {
     props: {
       hypotheses: summary.hypotheses,
       outcome: summary.card.outcome,
       evidence: summary.evidence,
       org: "default",
-      live,
     },
     global: { plugins: [i18n] },
   });
 
-/** [group title, [status pill, statement] …] for each group. */
-const groups = (wrapper: VueWrapper) =>
-  wrapper.findAll('[data-test="rca-hypothesis-group"]').map((group) => [
-    group
-      .find("h4")
-      .text()
-      .replace(/\s*\d+$/, ""),
-    group
-      .findAll('[data-test="rca-hypothesis"]')
-      .map((row) => row.find('[data-test="rca-hypothesis-status"]').text()),
-  ]);
+const GROUP_TITLE: Record<string, string> = {
+  explains: "Explains the incident",
+  open: "Not confirmed",
+  testing: "Being tested",
+  out: "Ruled out",
+};
+
+/** [group, [status pill …]] for each run of rows of one group, in page order. */
+const groups = (wrapper: VueWrapper, live = false) => {
+  const out: [string, string[]][] = [];
+  for (const row of wrapper.findAll('[data-test="rca-hypothesis"]')) {
+    const id = row.attributes("data-group") ?? "";
+    const title = GROUP_TITLE[live && id === "open" ? "testing" : id];
+    const status = row.find('[data-test="rca-hypothesis-status"]').text();
+    if (out.at(-1)?.[0] === title) out.at(-1)![1].push(status);
+    else out.push([title, [status]]);
+  }
+  return out;
+};
+
+/** Opens every row, the way a reader expands them. */
+const expandAll = async (wrapper: VueWrapper) => {
+  for (const toggle of wrapper.findAll('[data-test="rca-fold-row-toggle"]')) {
+    await toggle.trigger("click");
+  }
+};
 
 describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
   it("frame B: Explains (root cause, contributing, symptom), then Not confirmed, then Ruled out", () => {
@@ -85,13 +99,22 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
     // Inside Ruled out: first seen first.
     expect(
       wrapper
-        .find('[data-group="out"]')
-        .findAll('[data-test="rca-hypothesis-statement"]')
+        .findAll('[data-group="out"] [data-test="rca-hypothesis-statement"]')
         .map((s) => s.text()),
     ).toEqual(["DNS", "Node CPU saturation"]);
   });
 
-  it("agent inline code in a statement or reason shows as code, never as backticks", () => {
+  it("each hypothesis is one title row: status, statement and evidence count; the reason opens below", async () => {
+    const wrapper = mountList(rcaRunSummary());
+    const row = wrapper.findAll('[data-test="rca-hypothesis"]')[0];
+
+    expect(row.find('[data-test="rca-hypothesis-evidence-count"]').text()).toBe("1 evidence");
+    expect(row.text()).not.toContain("Pool hits 100/100 within 2 min of rollout.");
+    await row.get('[data-test="rca-fold-row-toggle"]').trigger("click");
+    expect(row.text()).toContain("Pool hits 100/100 within 2 min of rollout.");
+  });
+
+  it("agent inline code in a statement or reason shows as code, never as backticks", async () => {
     const wrapper = mountList(
       rcaRunSummary({
         hypotheses: [
@@ -103,6 +126,7 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
       }),
     );
 
+    await expandAll(wrapper);
     const statement = wrapper.find('[data-test="rca-hypothesis-statement"]');
     expect(statement.text()).toBe("The adFailure flag was toggled on");
     expect(statement.find("code").text()).toBe("adFailure");
@@ -127,10 +151,10 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
     ).toBe(true);
   });
 
-  it("live: the open group reads 'Being tested'", () => {
-    const wrapper = mountList(rcaRunSummaryLive(), true);
+  it("live: the hypothesis being tested leads", () => {
+    const wrapper = mountList(rcaRunSummaryLive());
 
-    expect(groups(wrapper)).toEqual([
+    expect(groups(wrapper, true)).toEqual([
       ["Being tested", ["Testing"]],
       ["Explains the incident", ["Symptom"]],
     ]);
@@ -142,8 +166,9 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
     ]);
   });
 
-  it("each row has its reason, evidence numbers, and 'e7 · not verified' for an unverified id", () => {
+  it("each row has its reason, evidence numbers, and 'not verified' for an unverified id", async () => {
     const wrapper = mountList(rcaRunSummary());
+    await expandAll(wrapper);
     const rows = wrapper.findAll('[data-test="rca-hypothesis"]');
 
     expect(rows[0].text()).toContain("Pool hits 100/100 within 2 min of rollout.");
@@ -151,14 +176,13 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
       "1",
     ]);
     expect(rows[2].text()).toContain("No evidence yet");
-    expect(rows[3].find('[data-test="rca-hypothesis-unverified"]').text()).toBe(
-      "e7 · not verified",
-    );
+    expect(rows[3].find('[data-test="rca-hypothesis-unverified"]').text()).toBe("not verified");
     expect(rows[3].findAll('[data-test="rca-hypothesis-chip"]')).toHaveLength(0);
   });
 
   it("'Status history · N' expands the history with the actor of each change (VE11)", async () => {
     const wrapper = mountList(rcaRunSummary());
+    await expandAll(wrapper);
     const ruledOut = wrapper.find('[data-status="ruled_out"]');
     const toggle = ruledOut.find('[data-test="rca-hypothesis-history-toggle"]');
 
@@ -180,6 +204,7 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
 
   it("a number chip opens the evidence card inline", async () => {
     const wrapper = mountList(rcaRunSummary());
+    await expandAll(wrapper);
     const chip = wrapper.find('[data-status="contributing"] [data-test="rca-hypothesis-chip"]');
     await chip.trigger("click");
 
@@ -189,7 +214,7 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
   });
 
   it("no hypothesis actions without can_steer", () => {
-    const text = mountList(rcaRunSummary(), true).text();
+    const text = mountList(rcaRunSummary()).text();
 
     for (const action of ["Disprove", "Reopen", "Test first"]) expect(text).not.toContain(action);
   });
@@ -205,7 +230,6 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
           outcome: undefined,
           evidence: rcaRunSummary().evidence,
           org: "default",
-          live: true,
           canSteer: true,
           ...extra,
         },

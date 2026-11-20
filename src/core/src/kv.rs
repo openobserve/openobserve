@@ -20,6 +20,10 @@ pub async fn get(org_id: &str, key: &str) -> Result<bytes::Bytes, anyhow::Error>
     Ok(val)
 }
 
+pub async fn get_optional(org_id: &str, key: &str) -> Result<Option<bytes::Bytes>, anyhow::Error> {
+    kv::get_optional(org_id, key).await
+}
+
 pub async fn set(org_id: &str, key: &str, val: bytes::Bytes) -> Result<(), anyhow::Error> {
     kv::set(org_id, key, val).await?;
     Ok(())

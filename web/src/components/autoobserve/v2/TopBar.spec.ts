@@ -33,14 +33,8 @@ const has = (wrapper: { find: ReturnType<typeof mountBar>["find"] }, name: strin
 const TODAY = raw("Thursday, November 5");
 
 describe("TopBar", () => {
-  it("fixture mode shows the demo date and check time", () => {
-    const wrapper = mountStatus();
-    expect(has(wrapper, "topbar-checked")).toBe(false);
-    expect(wrapper.text()).toContain("Checked 2 minutes ago");
-  });
-
   it("the status is one line that never wraps, so a ticking time moves nothing", () => {
-    const wrapper = mountStatus({ live: true, date: TODAY, checked: { kind: "none" } });
+    const wrapper = mountStatus({ date: TODAY, checked: { kind: "none" } });
     expect(wrapper.find('[data-test="autoobserve2-topbar"]').classes()).toContain(
       "whitespace-nowrap",
     );
@@ -61,9 +55,7 @@ describe("TopBar", () => {
 
   it("the check slot follows the coverage pass", () => {
     const slot = (checked: Record<string, unknown>) =>
-      mountStatus({ live: true, date: TODAY, checked }).find(
-        '[data-test="autoobserve2-topbar-checked"]',
-      );
+      mountStatus({ date: TODAY, checked }).find('[data-test="autoobserve2-topbar-checked"]');
 
     const loading = slot({ kind: "loading" });
     expect(loading.classes()).toContain("min-w-32");
@@ -83,7 +75,7 @@ describe("TopBar", () => {
   });
 });
 
-describe("ViewSwitch label (T5-28)", () => {
+describe("ViewSwitch label", () => {
   it("names the full view by what it shows, not 'Nerd'", () => {
     const w = mount(ViewSwitch, { global: { plugins: [i18n, router] } });
     expect(w.find('[data-test="autoobserve-view-nerd"]').text()).toBe("Detailed");

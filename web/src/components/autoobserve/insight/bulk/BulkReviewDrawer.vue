@@ -160,9 +160,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template #cell-service="{ row }">
           <div class="flex min-w-0 flex-col py-1 whitespace-normal">
-            <span class="text-text-heading" :data-test="`bulk-review-service-${row.key}`">
-              {{ label(row) }}
-            </span>
+            <div class="flex min-w-0 items-baseline gap-2">
+              <span class="text-text-heading" :data-test="`bulk-review-service-${row.key}`">
+                {{ label(row) }}
+              </span>
+              <!-- The Service line's spare width says why the row waits, so the row keeps one line. -->
+              <OTruncatedText
+                v-if="!isMobile && waitNote(row)"
+                :lines="1"
+                class="text-text-secondary min-w-0 flex-1 text-xs"
+                :data-test="`bulk-review-wait-${row.key}`"
+              >
+                {{ blockLine(t, row, reviewRows) }}
+              </OTruncatedText>
+            </div>
             <span
               v-if="isMobile && row.prefill"
               class="text-text-secondary text-xs"
@@ -244,8 +255,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
         </template>
+        <template #cell-check="{ row }">
+          <span class="text-text-body" :data-test="`bulk-review-check-${row.key}`">{{
+            alertName(row)
+          }}</span>
+        </template>
         <template #cell-stream="{ row }">
-          <span class="text-text-body">{{ row.stream.name }}</span>
+          <OTruncatedText
+            :lines="1"
+            class="text-text-body"
+            :data-test="`bulk-review-stream-${row.key}`"
+          >
+            {{ streamLabel(row) }}
+          </OTruncatedText>
         </template>
         <template #cell-firesWhen="{ row }">
           <div
@@ -276,16 +298,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               :data-test="`bulk-review-measuring-${row.key}`"
             />
-            <template v-else>{{ firesWhenOf(t, kind, row) }}</template>
+            <template v-else>{{ firesWhenOf(t, locale, kind, row) }}</template>
           </div>
         </template>
         <template #cell-usually="{ row }">
-          <OSkeleton v-if="waits(row)" animation="pulse" class="h-4 w-20" aria-hidden="true" />
+          <OSkeleton
+            v-if="waits(row) && measuresLevel(row)"
+            animation="pulse"
+            class="h-4 w-20"
+            aria-hidden="true"
+          />
           <span
             v-else-if="asksThreshold(row)"
             class="text-text-secondary"
             :data-test="`bulk-review-no-usual-${row.key}`"
-            >{{ t("insight.threshold.noUsual") }}</span
+            >{{
+              row.timedOut ? t("insight.threshold.notMeasured") : t("insight.threshold.noUsual")
+            }}</span
           >
           <span v-else class="text-text-body tabular-nums">{{
             usuallyOf(t, locale, row, kind)
@@ -338,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="bulk-review-via-incident"
             >{{ viaIncidentLine(t, silent.length) }}</span
           >
-          <template v-else-if="tickedRows.length && !done">
+          <template v-else-if="tickedRows.length && !done && !waitLine">
             {{ t("insight.bulk.footerOrigin") }}
           </template>
         </p>
@@ -400,17 +429,21 @@ import {
   failureLine,
   firesWhenOf,
   footerOf,
+  mixedKinds,
   needsThresholdLine,
   partialBanner,
   rightsBanner,
   ruleOf,
   serviceLabel,
+  streamLabel,
   titleOf,
   usuallyOf,
+  waitingFooter,
   type FailureReason,
 } from "./bulkCopy";
 import { useBulkCreate } from "./useBulkCreate";
 import { existingAlertRoute, type ExistingAlert } from "./existingAlerts";
+import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import {
   DEFAULT_FOLDER,
   asksThreshold,
@@ -494,6 +527,7 @@ const title = computed(() =>
 );
 const rule = computed(() => ruleOf(t, kind.value, reviewRows.value));
 const rights = computed(() => rightsBanner(t, locale.value, reviewRows.value));
+const waitLine = computed(() => waitingFooter(t, tickedRows.value));
 const footer = computed(() => {
   if (done.value) return raw("");
   const existing = existingFooter(t, reviewRows.value);
@@ -502,7 +536,7 @@ const footer = computed(() => {
   const needs = reviewRows.value.filter((r) => !r.locked && r.block?.code === "noBaseline").length;
   const parts = [
     needs ? needsThresholdLine(t, needs) : null,
-    footerOf(t, locale.value, countByFolder(tickedRows.value)),
+    waitLine.value ?? footerOf(t, locale.value, countByFolder(tickedRows.value)),
     existing,
   ];
   return raw(parts.filter(Boolean).join(" "));
@@ -541,14 +575,28 @@ const label = (row: ReviewRow) => serviceLabel(t, row, reviewRows.value);
 const thresholdKind = (row: ReviewRow) =>
   (row.row.kind ?? kind.value) === "latency" ? "latency" : "errors";
 
+const mixed = computed(() => mixedKinds(kind.value, reviewRows.value));
+
 const compactLine = (row: ReviewRow) =>
-  [row.stream.name, firesWhenOf(t, kind.value, row), usuallyOf(t, locale.value, row, kind.value)]
+  [
+    mixed.value ? alertName(row) : "",
+    streamLabel(row),
+    firesWhenOf(t, locale.value, kind.value, row),
+    usuallyOf(t, locale.value, row, kind.value),
+  ]
     .filter(Boolean)
     .join(" · ");
 
 const measuring = (row: ReviewRow) => row.block?.code === "measuring";
 
 const waits = (row: ReviewRow) => measuring(row) || row.block?.code === "checking";
+
+const waitNote = (row: ReviewRow) =>
+  waits(row) || (row.timedOut && row.block?.code === "noBaseline");
+
+// A no-data row's Usually is the service's traffic, known before any wait ends.
+const measuresLevel = (row: ReviewRow) =>
+  ["errors", "latency"].includes(row.row.kind ?? kind.value);
 
 const columns = computed<OTableColumnDef<ReviewRow>[]>(() => [
   { id: "tick", header: raw(""), size: 44 },
@@ -561,7 +609,10 @@ const columns = computed<OTableColumnDef<ReviewRow>[]>(() => [
   ...(isMobile.value
     ? []
     : [
-        { id: "stream", header: t("insight.bulk.column.stream"), size: 120 },
+        ...(mixed.value
+          ? [{ id: "check", header: t("insight.bulk.column.check"), size: 110 }]
+          : []),
+        { id: "stream", header: t("insight.bulk.column.stream"), size: 130 },
         { id: "firesWhen", header: t("insight.bulk.column.firesWhen"), size: 220 },
         { id: "usually", header: t("insight.bulk.column.usually"), size: 130 },
       ]),
@@ -633,7 +684,11 @@ const openExisting = async (row: ReviewRow) => {
   } catch {
     alertId = "";
   }
-  const query: Record<string, string> = { folder: row.folder.id, org_identifier: org() };
+  const query: Record<string, string> = {
+    folder: row.folder.id,
+    org_identifier: org(),
+    state: ALERT_LIST_ALL_STATES,
+  };
   if (alertId) Object.assign(query, { action: "update", alert_id: alertId });
   closeBulkReview();
   router.push({ name: "alertList", query });

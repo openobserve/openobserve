@@ -19,7 +19,7 @@ import { useInfiniteQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useNow } from "@/composables/useNow";
 import { autoobserveIncidentsPagesQuery } from "@/services/autoobserve.queries";
-import type { IssuesRange } from "../v2/fixtures";
+import type { IssuesRange } from "../v2/autoobserveRoute";
 import {
   ISSUES_CAP,
   ISSUES_PAGE_SIZE,
@@ -28,14 +28,7 @@ import {
   issuesRangeStart,
 } from "./incidentsCopy";
 import { statusOf } from "./liveCopy";
-import {
-  keepSameOrg,
-  stateOf,
-  useHeldSkeleton,
-  useKeptFailure,
-  useLiveMode,
-  useLiveZone,
-} from "./liveModel";
+import { keepSameOrg, stateOf, useHeldSkeleton, useKeptFailure, useLiveZone } from "./liveModel";
 
 export const useLiveIssues = (
   range: Readonly<Ref<IssuesRange>>,
@@ -43,12 +36,11 @@ export const useLiveIssues = (
   pageSize = ISSUES_PAGE_SIZE,
 ) => {
   const store = useStore();
-  const live = useLiveMode();
   const now = useNow();
   const { t } = useI18nTyped();
   const zone = useLiveZone();
   const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
-  const enabled = computed(() => live.value && !!org.value);
+  const enabled = computed(() => !!org.value);
   const query = useInfiniteQuery(() =>
     Object.assign(autoobserveIncidentsPagesQuery(org.value, range.value, pageSize, cap), {
       enabled: enabled.value,

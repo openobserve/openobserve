@@ -69,7 +69,7 @@ test.describe('Clone Alert dialog testcases', {
   // The default folder accumulates alerts across parallel runs, so a row is
   // only addressable after searching for it.
   async function openAlertList(page, name) {
-    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}&folder=default`);
+    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}&folder=default&state=all`);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     await pm.alertsPage.searchAlert(name);
   }
@@ -209,5 +209,67 @@ test.describe('Clone Alert dialog testcases', {
       'a refused clone must leave the folder with only the source',
     ).toHaveLength(1);
     testLogger.info('Clone refused until the stream name select is answered');
+  });
+  test('should keep Save disabled until the source alert loads, then clone it whole', {
+    tag: ['@alert-clone-dialog', '@all', '@alerts', '@alerts-clone', '@bug-2995', '@P1'],
+  }, async ({ page }) => {
+    const source = await createSource(page, 'auto_alert_clone_slow_src');
+    const sourceAlert = await getAlert(page, source.id);
+    expect(sourceAlert.destinations.length, 'the fixture must carry a destination').toBeGreaterThan(0);
+
+    await openAlertList(page, source.name);
+    let delayed = 0;
+    await page.route(new RegExp(`/api/v2/[^/]+/alerts/${source.id}(\\?|$)`), async (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      delayed += 1;
+      await new Promise((r) => setTimeout(r, 5000));
+      return route.continue();
+    });
+    const newName = uniq('auto_alert_clone_slow_copy');
+    await pm.alertsPage.openCloneDialog(source.name);
+    await pm.alertsPage.fillCloneName(newName);
+    await expect(pm.alertsPage.cloneSaveButton(), 'Save must wait for the source alert').toBeDisabled();
+    await expect(pm.alertsPage.cloneSaveButton()).toBeEnabled({ timeout: 20000 });
+    expect(delayed, 'the clone must have fetched the source alert through the delayed route').toBeGreaterThan(0);
+
+    const posts = [];
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && /\/api\/v2\/[^/]+\/alerts(\?|$)/.test(req.url())) posts.push(req.postDataJSON());
+    });
+    await pm.alertsPage.submitCloneDialog();
+    await expect.poll(() => findAlertId(page, newName), { timeout: 20000 }).toBeTruthy();
+    const newId = await findAlertId(page, newName);
+    created.push({ id: newId, folderId: 'default' });
+
+    expect(posts, 'one create request').toHaveLength(1);
+    expect(posts[0].destinations).toEqual(sourceAlert.destinations);
+    const clone = await getAlert(page, newId);
+    expect(clone.destinations).toEqual(sourceAlert.destinations);
+    expect(clone.query_condition).toEqual(sourceAlert.query_condition);
+  });
+
+  test('should open the original, not the copy, when it is edited right after a clone', {
+    tag: ['@alert-clone-dialog', '@all', '@alerts', '@alerts-clone', '@bug-3037', '@P2'],
+  }, async ({ page }) => {
+    const source = await createSource(page, 'auto_alert_clone_edit_src');
+
+    await openAlertList(page, source.name);
+    const newName = uniq('auto_alert_clone_edit_copy');
+    await pm.alertsPage.cloneAlert(source.name, 'logs', STREAM, { newName });
+    const newId = await findAlertId(page, newName);
+    expect(newId).toBeTruthy();
+    created.push({ id: newId, folderId: 'default' });
+
+    await pm.alertsPage.searchAlert(source.name);
+    await pm.alertsPage.clickAlertEditButtonInList(source.name);
+    const nameField = pm.alertsPage.getAlertNameValueLocator();
+    await expect(nameField).toHaveText(source.name, { timeout: 20000 });
+
+    const saved = page.waitForResponse((r) => r.request().method() === 'PUT' && /\/api\/v2\/[^/]+\/alerts\//.test(r.url()));
+    await pm.alertsPage.getAlertSubmitButtonLocator().click();
+    const put = await saved;
+    expect(put.url(), 'Save must address the original alert').toContain(`/alerts/${source.id}`);
+    expect(put.status()).toBe(200);
+    expect((await getAlert(page, source.id)).name).toBe(source.name);
   });
 });

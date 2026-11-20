@@ -67,6 +67,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-if="view === 'dismissed'">
         <DecisionsDismissedList v-if="decisionRoute.transport.value === 'decision'" />
         <AlertCalibrationDismissedList v-else-if="decisionRoute.transport.value !== 'pending'" />
+        <section
+          v-if="appliedShown"
+          class="rounded-surface border-border-default bg-surface-base flex flex-col gap-2 border p-4"
+          data-test="alert-calibration-applied"
+        >
+          <header class="flex items-center gap-2">
+            <OText variant="label" as="h2">{{ t("insight.decisions.applied.title") }}</OText>
+            <OBadge variant="default-soft" data-test="alert-calibration-applied-total">
+              {{ countOrDash(appliedEntries.length, locale) }}
+            </OBadge>
+          </header>
+          <AppliedChangesList />
+        </section>
       </template>
 
       <LiveNoticeState
@@ -159,6 +172,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="view === 'dismissed'">
           <DecisionsDismissedList v-if="decisionRoute.transport.value === 'decision'" />
           <AlertCalibrationDismissedList v-else-if="decisionRoute.transport.value !== 'pending'" />
+          <section
+            v-if="appliedShown"
+            class="rounded-surface border-border-default bg-surface-base flex flex-col gap-2 border p-4"
+            data-test="alert-calibration-applied"
+          >
+            <header class="flex items-center gap-2">
+              <OText variant="label" as="h2">{{ t("insight.decisions.applied.title") }}</OText>
+              <OBadge variant="default-soft" data-test="alert-calibration-applied-total">
+                {{ countOrDash(appliedEntries.length, locale) }}
+              </OBadge>
+            </header>
+            <AppliedChangesList />
+          </section>
         </template>
 
         <OBanner
@@ -429,19 +455,24 @@ import AlertCalibrationLastRun from "./AlertCalibrationLastRun.vue";
 import AlertCalibrationDismissDialog from "./AlertCalibrationDismissDialog.vue";
 import AlertCalibrationDismissedList from "./AlertCalibrationDismissedList.vue";
 import DecisionsDismissedList from "@/components/autoobserve/decisions/DecisionsDismissedList.vue";
+import AppliedChangesList from "@/components/autoobserve/decisions/AppliedChangesList.vue";
 import {
   appliedDecisionsQuery,
   dismissedDecisionsQuery,
   useDecisionRoute,
 } from "@/composables/autoobserve/useDecisionRoute";
 import ReviewChangeDialog from "@/components/autoobserve/decisions/ReviewChangeDialog.vue";
-import type { ReviewChangeTarget } from "@/components/autoobserve/decisions/appliedChanges";
+import {
+  useAppliedChanges,
+  type ReviewChangeTarget,
+} from "@/components/autoobserve/decisions/appliedChanges";
 import { applyCopy, applySuggestionsOf } from "./applySuggestion";
 import AlertCalibrationFindingsFilter from "./AlertCalibrationFindingsFilter.vue";
 import {
   dismissalCopy,
   dismissedSinceRun,
   hiddenByRun,
+  hiddenByRunPerRule,
   isDismissable,
   openCount,
   openFindings,
@@ -452,6 +483,7 @@ import { readFailedDetail, readNotice } from "./notices";
 import LiveNoticeState from "@/components/autoobserve/live/LiveNoticeState.vue";
 import {
   countOrDash,
+  countTile,
   coverageNoteRows,
   findingsByRule,
   isScoped,
@@ -576,6 +608,11 @@ const appliedById = computed(
         .map((view) => [view.id, view] as const),
     ),
 );
+/** Applies, undone ones included, listed under Dismissed with their Undo (FU-APPLY-DELETE). */
+const appliedEntries = useAppliedChanges(orgId, () => appliedRead.data.value ?? []);
+const appliedShown = computed(
+  () => decisionRoute.transport.value === "decision" && appliedEntries.value.length > 0,
+);
 const appliedOf = (finding: FindingRecord) =>
   finding.finding_id ? (appliedById.value.get(finding.finding_id) ?? null) : null;
 const applyText = computed(() => applyCopy(t, locale.value));
@@ -613,7 +650,9 @@ const dismissedLabel = computed(() => copy.value.filterDismissed(dismissedTotal.
 const view = computed(() => (route.query.findings === "dismissed" ? "dismissed" : "open"));
 // A reader the page refuses is not offered the Dismissed view beside the refusal.
 const dismissedReachable = computed(
-  () => !forbidden.value && (view.value === "dismissed" || (dismissedTotal.value ?? 0) > 0),
+  () =>
+    !forbidden.value &&
+    (view.value === "dismissed" || (dismissedTotal.value ?? 0) > 0 || appliedShown.value),
 );
 const onView = (value: unknown) => {
   if (!value || value === view.value) return;
@@ -689,11 +728,16 @@ const groups = computed(() => {
   );
   const all = data.data.value?.findings ?? [];
   const hidden = all.filter((f) => !open.value.includes(f));
+  const leftOut = latest.value
+    ? hiddenByRunPerRule(latest.value, dismissals.query.data.value)
+    : new Map<string, number>();
   // An empty rule on a run whose counts are unknown has not been shown clear, only not yet read.
   return findingsByRule(rules, open.value).map((group) => ({
     ...group,
     pending: countsPending.value && !group.findings.length,
-    dismissedAlerts: alertCount(hidden.filter((f) => f.rule_id === group.rule_id)),
+    dismissedAlerts:
+      alertCount(hidden.filter((f) => f.rule_id === group.rule_id)) +
+      (leftOut.get(group.rule_id) ?? 0),
   }));
 });
 /** The Dismissed view replaces the groups, so none render under it. */
@@ -711,7 +755,7 @@ const latestStats = computed<StatItem[]>(() => {
     {
       key: "findings",
       label: t("alertCalibration.dashboard.openFindings"),
-      value: countsPending.value ? raw("—") : countOrDash(openTotal.value, locale.value),
+      ...(countsPending.value ? { value: raw("—") } : countTile(openTotal.value, locale.value)),
       icon: "fact-check",
       tone: countsPending.value
         ? "neutral"
@@ -724,7 +768,7 @@ const latestStats = computed<StatItem[]>(() => {
     {
       key: "scope",
       label: t("alertCalibration.dashboard.alertsInScope"),
-      value: countOrDash(scope.count, locale.value),
+      ...countTile(scope.count, locale.value),
       sub: scope.sub,
       subIcon: scope.subIcon,
       icon: "notifications",

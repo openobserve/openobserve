@@ -107,6 +107,71 @@ describe("useSyntheticResults", () => {
     );
   });
 
+  it("counts one result per slot on the server only when the window has confirm rows", async () => {
+    getStreamMock.mockImplementation(async (name: string) => {
+      if (name !== "synthetics_results") throw new Error("no stream");
+      return {
+        schema: [
+          { name: "trigger_type" },
+          { name: "run_id" },
+          { name: "execution_id" },
+          { name: "device" },
+        ],
+      };
+    });
+    const ts = Date.UTC(2026, 0, 1) * 1000;
+    executeQuery.mockImplementation(async (sql: string) => {
+      if (sql.includes("histogram(")) {
+        return [
+          {
+            ts: "2026-01-01T00:00:00",
+            total_runs: 4,
+            passed_runs: 2,
+            failed_runs: 2,
+            confirm_runs: 2,
+          },
+        ];
+      }
+      if (sql.includes("bucket_us")) return [{ bucket_us: ts, slot_up: 1, slot_measured: 2 }];
+      return [];
+    });
+    const { kpi, fetchAll } = useSyntheticResults(t);
+    await fetchAll("mon-1", ts, ts + 60_000_000);
+    // Desktop up, mobile down: one result per device, not 2 of 2 from the row estimate.
+    expect(kpi.value.uptimePct).toBe(50);
+
+    // No confirm rows: no extra query.
+    executeQuery.mockReset();
+    executeQuery.mockResolvedValue([]);
+    await fetchAll("mon-1", ts, ts + 60_000_000);
+    expect(executeQuery.mock.calls.some((c) => String(c[0]).includes("bucket_us"))).toBe(false);
+  });
+
+  it("keeps the row estimate when the slot query fails", async () => {
+    getStreamMock.mockImplementation(async () => ({
+      schema: [{ name: "trigger_type" }, { name: "run_id" }, { name: "execution_id" }],
+    }));
+    executeQuery.mockImplementation(async (sql: string) => {
+      if (sql.includes("histogram(")) {
+        return [
+          {
+            ts: "2026-01-01T00:00:00",
+            total_runs: 2,
+            passed_runs: 1,
+            failed_runs: 1,
+            confirm_runs: 1,
+          },
+        ];
+      }
+      if (sql.includes("bucket_us")) throw new Error("search failed");
+      return [];
+    });
+    const { kpi, kpiError, fetchAll } = useSyntheticResults(t);
+    await fetchAll("mon-1", 1, 100);
+    expect(kpi.value.uptimePct).toBe(100);
+    expect(kpiError.value).toBeNull();
+  });
+
   it("issues the step queries only from fetchSteps", async () => {
     executeQuery.mockResolvedValue([]);
     const { fetchSteps } = useSyntheticResults();

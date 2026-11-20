@@ -258,7 +258,7 @@ describe("AppRoles - onRoleAdded", () => {
     (wrapper.vm as any).onRoleAdded({ role_name: "RO", startFrom: "readonly" });
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({
-        query: expect.objectContaining({ preset: "readonly" }),
+        query: expect.objectContaining({ preset: "readonly", created: "1" }),
       }),
     );
   });

@@ -131,9 +131,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #subheader>
           <!-- The window's counts live inside the table frame, not in the page
                header: they summarise exactly the rows below. -->
-          <DbmSubheaderBand data-test="dbm-deadlocks-summary">
-            <OStatStrip :items="summaryStats" :loading="loading" />
-          </DbmSubheaderBand>
+          <OStatStrip
+            :items="summaryStats"
+            :loading="loading"
+            row
+            data-test="dbm-deadlocks-summary"
+          />
 
           <!-- ONE storm band, not two. The completion-bias caution has no
                condition of its own beyond `storm`, so it rides inside this
@@ -436,7 +439,6 @@ import DateTime from "@/components/DateTime.vue";
 import DbmRowActions, { type DbmRowAction } from "@/components/dbm/DbmRowActions.vue";
 import DbmScopeFilters from "@/components/dbm/DbmScopeFilters.vue";
 import DbmShareBar from "@/components/dbm/DbmShareBar.vue";
-import DbmSubheaderBand from "@/components/dbm/DbmSubheaderBand.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmLockEmptyState, {
   type DbmLockCheck,

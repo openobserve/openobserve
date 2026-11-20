@@ -214,6 +214,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSpinner size="lg" />
         <span>{{ t("logs.rowNav.loadingPage", { page: pageLoadingPage }) }}</span>
       </div>
+      <CorrelationServiceHeader
+        v-if="showCorrelationHeader"
+        class="px-page-edge border-card-glass-border shrink-0 border-b border-solid py-2"
+        :service-name="correlationProps.serviceName"
+        :display-service-name="correlationProps.displayServiceName"
+        :service-display="correlationProps.serviceDisplay"
+        :scope="correlationScope"
+        :instance-version="correlationVersion"
+        :time-range="correlationProps.timeRange"
+        :trace-stream="correlationTraceInfo?.stream_name"
+        @close="closeTable"
+      />
       <OTabPanels
         data-test="log-detail-tab-container"
         v-model="tab"
@@ -468,6 +480,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             mode="embedded-tabs"
             external-active-tab="metrics"
             :service-name="correlationProps.serviceName"
+            :display-service-name="correlationProps.displayServiceName"
+            :service-display="correlationProps.serviceDisplay"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
             :matched-set-id="correlationProps.matchedSetId"
@@ -512,6 +526,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             external-active-tab="traces"
             :shortcuts-active="tab === 'correlated-traces'"
             :service-name="correlationProps.serviceName"
+            :display-service-name="correlationProps.displayServiceName"
+            :service-display="correlationProps.serviceDisplay"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
             :matched-set-id="correlationProps.matchedSetId"
@@ -672,6 +688,17 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrelationDashboard.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
+import CorrelationServiceHeader from "@/plugins/correlation/CorrelationServiceHeader.vue";
+import { useCorrelationScope } from "@/plugins/correlation/useCorrelationVersions";
+import { useLocationDimensions } from "@/plugins/correlation/correlationHeader";
+import { enrichStreamsWithOverlap } from "@/utils/streamTimeOverlap";
+import {
+  appliedFilterSql,
+  correlationInstance,
+  placeFromDimensions,
+  rankCorrelatedStreams,
+  semanticRecordDimensions,
+} from "@/plugins/correlation/correlationVersions";
 import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
@@ -727,6 +754,7 @@ export default defineComponent({
     TelemetryCorrelationDashboard,
     CorrelatedLogsTable,
     LicenseDeniedState,
+    CorrelationServiceHeader,
     OButton,
     OSelect,
     ODropdown,
@@ -874,6 +902,65 @@ export default defineComponent({
     const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
     const { locked: correlationLicenseLocked, lockedReason: correlationLockedReason } =
       useLicenseLock("correlation");
+    const showCorrelationHeader = computed(
+      () => !!props.correlationProps && tab.value.startsWith("correlated-"),
+    );
+    // The instance reads use the trace stream the correlated Traces tab opens first.
+    const correlationTraceInfo = computed(() => {
+      const streams = props.correlationProps?.traceStreams ?? [];
+      const range = props.correlationProps?.timeRange;
+      const sorted = range
+        ? rankCorrelatedStreams(
+            enrichStreamsWithOverlap(streams, "traces", range, store.state.streams),
+          )
+        : streams;
+      return sorted[0];
+    });
+    const correlationLocationIds = useLocationDimensions(
+      computed(() => store.state.selectedOrganization?.identifier || ""),
+      showCorrelationHeader,
+    );
+    const { scope: correlationScope, instanceVersion: correlationVersion } = useCorrelationScope({
+      org: computed(() => store.state.selectedOrganization?.identifier || ""),
+      user: computed(() => store.state.userInfo?.email || ""),
+      displayName: computed(() => props.correlationProps?.displayServiceName),
+      displaySource: computed(() => props.correlationProps?.serviceDisplay?.display_source),
+      place: computed(() =>
+        placeFromDimensions(
+          [
+            props.correlationProps?.chipDimensions,
+            props.correlationProps?.matchedDimensions,
+            props.correlationProps?.additionalDimensions,
+            props.correlationProps?.availableDimensions,
+          ],
+          props.correlationProps?.semanticGroups ?? [],
+          correlationLocationIds.value,
+        ),
+      ),
+      enabled: showCorrelationHeader,
+      traceStream: computed(() => correlationTraceInfo.value?.stream_name as string | undefined),
+      traceFilter: computed(() => appliedFilterSql(correlationTraceInfo.value)),
+      instance: computed(() =>
+        correlationInstance(
+          correlationTraceInfo.value,
+          [
+            props.correlationProps?.chipDimensions,
+            props.correlationProps?.matchedDimensions,
+            props.correlationProps?.additionalDimensions,
+            semanticRecordDimensions(
+              props.correlationProps?.availableDimensions,
+              props.correlationProps?.semanticGroups ?? [],
+            ),
+          ],
+          props.correlationProps?.semanticGroups ?? [],
+          correlationLocationIds.value,
+        ),
+      ),
+      logTime: computed(() => {
+        const at = Number(props.correlationProps?.sourceEvent?.timestamp);
+        return Number.isFinite(at) && at > 0 ? at : undefined;
+      }),
+    });
 
     const selectedRelativeValue = ref<number>(10);
     const recordSizeOptions = ref<Array<{ label: I18nText; value: number }>>([
@@ -1462,6 +1549,10 @@ export default defineComponent({
       addSearchTerm,
       closeTable,
       showCorrelation,
+      showCorrelationHeader,
+      correlationScope,
+      correlationVersion,
+      correlationTraceInfo,
       severity,
       severityTagLabel,
       severityFieldValue,

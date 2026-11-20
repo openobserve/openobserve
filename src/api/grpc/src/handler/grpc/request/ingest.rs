@@ -86,7 +86,7 @@ fn feature_writer(request: &Request<IngestionRequest>) -> Result<Option<FeatureW
         .ok_or_else(|| Status::permission_denied("unknown feature writer"))
 }
 
-/// A writer token reaches only its own Logs stream and format, in its token's org.
+/// A writer token reaches only its own named streams, types and format, in its token's org.
 fn writer_caller(
     writer: FeatureWriter,
     header_org: Option<&str>,
@@ -94,7 +94,9 @@ fn writer_caller(
 ) -> std::result::Result<(String, IngestUser, bool), Status> {
     let in_scope = header_org == Some(req.org_id.as_str())
         && writer.token_org(&req.org_id) == req.org_id
-        && StreamType::from(req.stream_type.as_str()) == StreamType::Logs
+        && writer
+            .stream_types()
+            .contains(&StreamType::from(req.stream_type.as_str()))
         && req.ingestion_type == Some(writer.ingestion_type() as i32)
         && writer.allows(&req.stream_name);
     if !in_scope {
@@ -482,6 +484,69 @@ mod tests {
         }
         let req = writer_req("demo-org", StreamType::Logs, digests, IngestionType::Json);
         assert!(resolve_caller(writer, None, None, &req).is_err());
+    }
+
+    #[test]
+    fn the_service_signals_writer_reaches_its_named_log_and_metric_streams() {
+        let writer = Some(FeatureWriter::ServiceSignals);
+        let allowed = [
+            (StreamType::Logs, "_o2_service_verdicts"),
+            (StreamType::Metrics, "_o2_service_requests_total"),
+        ];
+        for (stream_type, stream) in allowed {
+            let req = writer_req("demo-org", stream_type, stream, IngestionType::Json);
+            let (org, user, _) = resolve_caller(writer, None, Some("demo-org"), &req).unwrap();
+            assert_eq!(org, "demo-org");
+            assert_eq!(user, IngestUser::SystemJob(SystemJobType::ServiceSignals));
+        }
+        let denied = [
+            (StreamType::Metrics, ""),
+            (StreamType::Metrics, "up"),
+            (StreamType::Traces, "_o2_service_requests_total"),
+        ];
+        for (stream_type, stream) in denied {
+            let req = writer_req("demo-org", stream_type, stream, IngestionType::Json);
+            assert!(
+                resolve_caller(writer, None, Some("demo-org"), &req).is_err(),
+                "{stream}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_session_replay_writer_reaches_only_its_log_stream_as_usage() {
+        use config::meta::stream::SESSION_REPLAY_RESOURCES_STREAM as stream;
+        let writer = Some(FeatureWriter::SessionReplay);
+        let ok = writer_req("demo-org", StreamType::Logs, stream, IngestionType::Usage);
+        let (org, user, _) = resolve_caller(writer, None, Some("demo-org"), &ok).unwrap();
+        assert_eq!(org, "demo-org");
+        assert_eq!(user, IngestUser::SystemJob(SystemJobType::SessionReplay));
+        let denied = [
+            writer_req("demo-org", StreamType::Logs, stream, IngestionType::Json),
+            writer_req(
+                "demo-org",
+                StreamType::Metrics,
+                stream,
+                IngestionType::Usage,
+            ),
+            writer_req(
+                "demo-org",
+                StreamType::Logs,
+                "_rumdata",
+                IngestionType::Usage,
+            ),
+            writer_req(
+                "demo-org",
+                StreamType::Logs,
+                "_o2_dbm_server",
+                IngestionType::Usage,
+            ),
+        ];
+        for req in denied {
+            assert!(resolve_caller(writer, None, Some("demo-org"), &req).is_err());
+        }
+        let other_org = writer_req("other", StreamType::Logs, stream, IngestionType::Usage);
+        assert!(resolve_caller(writer, None, Some("demo-org"), &other_org).is_err());
     }
 
     #[test]

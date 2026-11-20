@@ -44,6 +44,7 @@
   },
   {
     "testfolder": "Alerts-Composite-Library",
+    "_comment": "list-quick-filter-cards.spec.js counts every pipeline and public link of the org, so no spec in this shard may create either.",
     "actual_folder": "Alerts",
     "browser": "chrome",
     "run_files": [
@@ -57,7 +58,9 @@
       "alerts-composite-preview.spec.js",
       "alerts-clone-dialog.spec.js",
       "alerts-save-query-mode.spec.js",
-      "alerts-evaluation-chart.spec.js"
+      "alerts-evaluation-chart.spec.js",
+      "list-quick-filter-cards.spec.js",
+      "alerts-list-opens-on-firing.spec.js"
     ],
     "disabled": []
   },
@@ -74,6 +77,10 @@
       "dashboard-config-bar-gauge.spec.js",
       "dashboard-config-general.spec.js",
       "dashboard-config-heatmap.spec.js",
+      "dashboard-config-state-timeline.spec.js",
+      "dashboard-config-distribution.spec.js",
+      "dashboard-config-sunburst.spec.js",
+      "dashboard-config-funnel.spec.js",
       "dashboard-config-legends.spec.js",
       "dashboard-config-line-style.spec.js",
       "dashboard-config-panel-time.spec.js",
@@ -226,7 +233,8 @@
       "dashboard-variables-custom-parents.spec.js",
       "dashboard-mustache-variables.spec.js",
       "dashboard-variable-select-all.spec.js",
-      "dashboard-variables-auto-run.spec.js"
+      "dashboard-variables-auto-run.spec.js",
+      "dashboard-variables-date-format.spec.js"
     ],
     "disabled": []
   },
@@ -403,7 +411,8 @@
       "logs-query-editor-keyboard.spec.js",
       "logsCrossLinks.spec.js",
       "logsFieldValuePaging.spec.js",
-      "logsFreeText.spec.js"
+      "logsFreeText.spec.js",
+      "logsFilterBuilder.spec.js"
     ],
     "disabled": [
       {
@@ -611,7 +620,8 @@
       "traceQueryEditor.spec.js",
       "traces-autocomplete-suggestions.spec.js",
       "traces-autocomplete-filter-mode.spec.js",
-      "traceDetails.spec.js"
+      "traceDetails.spec.js",
+      "tracesFilterBuilder.spec.js"
     ],
     "disabled": []
   },
@@ -639,8 +649,7 @@
       "slo-crud.spec.js",
       "slo-form-validation.spec.js",
       "slo-required-fields.spec.js",
-      "slo-alert-sli.spec.js",
-      "slo-import.spec.js"
+      "slo-alert-sli.spec.js"
     ],
     "disabled": []
   },

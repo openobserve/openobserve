@@ -72,6 +72,7 @@ describe("logs recent searches with the filter builder on", () => {
   };
 
   beforeEach(() => {
+    localStorage.setItem("o2.logs.queryInput", "builder");
     store.state.zoConfig.query_history_enabled = true;
     queryClient.clear();
     api.list.mockResolvedValue({ data: [entry] });
@@ -79,6 +80,7 @@ describe("logs recent searches with the filter builder on", () => {
   });
 
   afterEach(() => {
+    localStorage.removeItem("o2.logs.queryInput");
     wrapper?.unmount();
     wrapper = null;
     delete store.state.zoConfig.query_history_enabled;
@@ -95,6 +97,15 @@ describe("logs recent searches with the filter builder on", () => {
       document.body.querySelector(`[data-test="${DT}-suggest-section"]`)!.textContent,
     ).toContain("Recent searches");
     expect(row("extra-recent-view-all")).not.toBeNull();
+  });
+
+  it("opens the bar from a press on the blank query area below the chips", async () => {
+    await mountBar();
+    const area = wrapper!.findComponent(SqlFilterBuilder).element.parentElement!;
+    area.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true }));
+    await flushPromises();
+    expect(document.activeElement).toBe(caret());
+    await vi.waitFor(() => expect(row("extra-recent-a")).not.toBeNull());
   });
 
   it("restores the picked row and closes the list", async () => {

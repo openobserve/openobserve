@@ -1350,4 +1350,29 @@ mod tests {
             "unexpected SQL start: {sql}"
         );
     }
+
+    /// Shutdown flushes run after the job runtime, which opened most idle pooled connections, has
+    /// dropped; a stale idle connection must be replaced, not stall the acquire until the timeout.
+    #[test]
+    fn test_a_pool_reconnects_after_the_runtime_that_opened_it_drops() {
+        if config::get_config().common.meta_store != "postgres" {
+            eprintln!("skipped: needs ZO_META_STORE=postgres");
+            return;
+        }
+        let opener = tokio::runtime::Runtime::new().unwrap();
+        let pool = opener.block_on(async {
+            let pool = connect(false, false);
+            sqlx::query("SELECT 1").execute(&pool).await.unwrap();
+            // Only a connection back in the idle queue is reused, so only it can go stale.
+            while pool.num_idle() == 0 {
+                tokio::task::yield_now().await;
+            }
+            pool
+        });
+        drop(opener);
+
+        let next = tokio::runtime::Runtime::new().unwrap();
+        next.block_on(sqlx::query("SELECT 1").execute(&pool))
+            .unwrap();
+    }
 }

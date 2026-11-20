@@ -161,6 +161,18 @@ fn insert_summary(
         .unwrap_or_default()
         .to_string();
 
+    let text = |name: &str| {
+        item.get(name)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string()
+    };
+    // The version pairs with whichever span names the event's service.
+    let event_service_version = if !root_service_name.is_empty() {
+        text("root_service_version")
+    } else {
+        text("first_service_version")
+    };
     let event_service_name = if !root_service_name.is_empty() {
         root_service_name
     } else {
@@ -187,6 +199,14 @@ fn insert_summary(
         batch.multi_service_total += service_count;
     }
 
+    let mut first_event = serde_json::json!({
+        "service_name": event_service_name,
+        "operation_name": event_operation_name,
+    });
+    if !event_service_version.is_empty() {
+        first_event["o2_service_version"] = event_service_version.into();
+    }
+
     let computed_duration = if trace_end_time - trace_start_time > max_duration * 1000 {
         (trace_end_time - trace_start_time) / 1000
     } else {
@@ -207,10 +227,7 @@ fn insert_summary(
                 error_count.try_into().unwrap_or_default(),
             ],
             service_name: svc_list,
-            first_event: serde_json::json!({
-                "service_name": event_service_name,
-                "operation_name": event_operation_name,
-            }),
+            first_event,
             gen_ai_usage_input_tokens: json::get_int_value(
                 item.get("gen_ai_usage_details_input").unwrap_or_default(),
             ),
@@ -386,5 +403,21 @@ mod tests {
                 expected
             );
         }
+    }
+
+    #[test]
+    fn first_event_carries_the_version_of_the_span_that_names_its_service() {
+        let mut root = summary("r", 1);
+        root["root_service_version"] = json::json!("v2.1.0");
+        root["first_service_version"] = json::json!("v1.0.0");
+        let mut first = summary("f", 1);
+        first["root_service_name"] = json::json!("");
+        first["first_service_version"] = json::json!("v1.0.0");
+        let batch = TraceBatch::from_hits(&[root, first, summary("n", 1)], (100, 150));
+        let event = |id: &str| json::to_value(&batch.traces[id]).unwrap()["first_event"].clone();
+        assert_eq!(event("r")["o2_service_version"], "v2.1.0");
+        assert_eq!(event("f")["service_name"], "api");
+        assert_eq!(event("f")["o2_service_version"], "v1.0.0");
+        assert!(event("n").get("o2_service_version").is_none());
     }
 }

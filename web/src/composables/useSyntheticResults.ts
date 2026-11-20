@@ -37,6 +37,8 @@ import {
   mapHistogram,
   mapHistogramSplit,
   deriveKpiFromHistogram,
+  applySlotUptime,
+  buildSlotUptimeSql,
   mapProtocolRunDetail,
   mapRun,
   mapRunDetail,
@@ -396,6 +398,38 @@ export function useSyntheticResults(t: TranslateFn) {
   }
 
   /**
+   * Counts a confirm job and the result it re-tested as one result per device, for uptime.
+   *
+   * Runs only when the histogram holds confirm rows, so most checks send no extra query and the
+   * cached histogram query does not change. The slot query counts on the server over the whole
+   * window. If it fails, or the stream lacks a field it needs, the histogram rows come back
+   * unchanged and uptime uses the row estimate in `uptimePercent`.
+   */
+  async function withConfirmPairs(
+    rows: Record<string, unknown>[],
+    monitorId: string,
+    interval: string,
+    schemaFields: Set<string>,
+    environment: string | undefined,
+    split: boolean,
+    startTime: number,
+    endTime: number,
+  ): Promise<Record<string, unknown>[]> {
+    if (!rows.some((r) => Number(r.confirm_runs) > 0)) return rows;
+    const sql = buildSlotUptimeSql(monitorId, interval, schemaFields, environment, split);
+    if (!sql) return rows;
+    try {
+      const slotRows = (await executeQuery(sql, startTime, endTime, "logs")) as Record<
+        string,
+        unknown
+      >[];
+      return applySlotUptime(rows, slotRows, split);
+    } catch {
+      return rows;
+    }
+  }
+
+  /**
    * Loads everything the Overview tab needs.
    *
    * Steps are deliberately NOT part of this: the step aggregation reads the
@@ -462,10 +496,22 @@ export function useSyntheticResults(t: TranslateFn) {
           hasStatusReasonField,
           environment,
           split,
+          schemaFields.has("trigger_type"),
         ),
         startTime,
         endTime,
         "logs",
+      ).then((rows) =>
+        withConfirmPairs(
+          rows as Record<string, unknown>[],
+          monitorId,
+          interval,
+          schemaFields,
+          environment,
+          split,
+          startTime,
+          endTime,
+        ),
       );
 
       const kpiPromise = Promise.all([

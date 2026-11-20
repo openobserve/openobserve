@@ -67,7 +67,7 @@ impl IndexPlan {
     }
 }
 
-pub(super) fn optimizer_physical_plan(
+pub(super) fn apply_index_rules(
     plan: Arc<dyn ExecutionPlan>,
     ctx: &SessionContext,
     schema: &Schema,
@@ -77,16 +77,23 @@ pub(super) fn optimizer_physical_plan(
     index_info: &IndexInfo,
 ) -> Result<(Arc<dyn ExecutionPlan>, IndexPlan), Error> {
     let index_condition_ref = Arc::new(Mutex::new(None));
-    let index_mode = index_info.index_optimize_mode.clone().map(Into::into);
+    let index_mode = index_info
+        .index_optimize_mode
+        .clone()
+        .map(Into::into)
+        .filter(|mode| !settings.reads_redacted(mode));
     let index_optimizer_rule_ref = Arc::new(Mutex::new(index_mode));
     let index_fields: HashSet<String> = settings.index_fields.iter().cloned().collect();
 
     // files written before a field joined FTS have none of its terms in `_all`
-    let index_rule = IndexRule::new(
+    let mut index_rule = IndexRule::new(
         index_fields.clone(),
         settings.fts_fields_indexed_since(time_range.0),
         index_condition_ref.clone(),
     );
+    if settings.fts_index_disabled {
+        index_rule = index_rule.without_match_all();
+    }
     let original_plan = Arc::clone(&plan);
     // a skipped rule leaves no condition and cannot optimize, which also drops the leader's mode
     let plan = if index_info.use_index {
@@ -117,7 +124,8 @@ pub(super) fn optimizer_physical_plan(
     {
         let mut index_optimizer_rule = index_optimizer_rule_ref.lock();
         *index_optimizer_rule =
-            index_optimize_mode_for_stream(stream_type, index_optimizer_rule.take());
+            index_optimize_mode_for_stream(stream_type, index_optimizer_rule.take())
+                .filter(|mode| !settings.reads_redacted(mode));
     }
 
     let rewrite_match_rule = RewriteMatchPhysical::new(
@@ -185,7 +193,7 @@ mod tests {
     };
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_detects_histogram_with_index_filter() {
+    async fn test_apply_index_rules_detects_histogram_with_index_filter() {
         let schema = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("kubernetes_namespace_name", DataType::Utf8, false),
@@ -220,7 +228,7 @@ mod tests {
             .create_physical_plan(&logical_plan)
             .await
             .unwrap();
-        let (_plan, index) = optimizer_physical_plan(
+        let (_plan, index) = apply_index_rules(
             physical_plan,
             &ctx,
             &schema,
@@ -290,7 +298,7 @@ mod tests {
             .create_physical_plan(&logical_plan)
             .await
             .unwrap();
-        optimizer_physical_plan(
+        apply_index_rules(
             physical_plan,
             &ctx,
             &schema,
@@ -328,7 +336,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_like_on_fts_field_keeps_filter() {
+    async fn test_apply_index_rules_like_on_fts_field_keeps_filter() {
         let (plan, index) = plan_with_index(
             "SELECT count(*) FROM default WHERE message LIKE '%timeout%'",
             true,
@@ -349,7 +357,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_like_needs_fts_field_older_than_query() {
+    async fn test_apply_index_rules_like_needs_fts_field_older_than_query() {
         let sql = "SELECT count(*) FROM default WHERE message LIKE '%timeout%'";
         let start = BASE_TIME.timestamp_micros() + 100;
         for (field_added_at, index_updated_at, uses_index) in [
@@ -375,7 +383,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_like_skips_fts_field_that_is_also_index_field() {
+    async fn test_apply_index_rules_like_skips_fts_field_that_is_also_index_field() {
         let settings = StreamSearchSettings {
             index_fields: vec!["service".to_string()],
             fts_fields: vec!["service".to_string(), "message".to_string()],
@@ -390,7 +398,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_late_fts_field_keeps_other_conditions() {
+    async fn test_apply_index_rules_late_fts_field_keeps_other_conditions() {
         let sql = "SELECT * FROM default WHERE service = 'auth' AND message LIKE '%timeout%'";
         let start = BASE_TIME.timestamp_micros() + 100;
         let settings = settings_with_fts_added_at(Some(start + 1), 0);
@@ -406,7 +414,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_skips_index_when_disabled() {
+    async fn test_apply_index_rules_skips_index_when_disabled() {
         let sql = "SELECT count(*) FROM default WHERE service = 'auth'";
         let (_plan, index) = plan_with_index(sql, true).await;
         assert!(index.use_inverted_index());
@@ -441,7 +449,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_optimizer_physical_plan_disables_detected_metrics_simple_select() {
+    async fn test_apply_index_rules_disables_detected_metrics_simple_select() {
         let schema = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("name", DataType::Utf8, false),
@@ -475,7 +483,7 @@ mod tests {
         ] {
             let is_metrics = stream_type == StreamType::Metrics;
 
-            let (_plan, index) = optimizer_physical_plan(
+            let (_plan, index) = apply_index_rules(
                 physical_plan.clone(),
                 &ctx,
                 &schema,

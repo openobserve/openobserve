@@ -24,6 +24,7 @@ import {
   topLevelAgentUsage,
 } from "./config/llmInsightsPanels";
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
+import { quoteStream } from "@/composables/firstEvent/confirmQuery";
 
 export const ATTRIBUTION_COLUMNS = {
   tenant: "tenant_id",
@@ -99,7 +100,7 @@ export function costByDimensionSql(
       `SUM(unpriced) AS unpriced FROM (` +
       `SELECT trace_id, COALESCE(MAX(${column}), '') AS v, ${traceUsage}, ` +
       `${unpricedTokensSum(!!cols.hasCostStatus)} AS unpriced ` +
-      `FROM "${stream}"${agentParentsJoin(stream, cols.hasParentSpan)}${where(scope)} ` +
+      `FROM ${quoteStream(stream)}${agentParentsJoin(stream, cols.hasParentSpan)}${where(scope)} ` +
       `GROUP BY trace_id) GROUP BY v`,
   );
 }
@@ -116,12 +117,12 @@ export function costByModelSql(stream: string, scope: string, cols: UsageColumns
       `COALESCE(${llmCallUsageSum(cost)}, 0) AS cost, ` +
       `COALESCE(${llmCallUsageSum(tokens)}, 0) AS tokens, ` +
       `${unpricedTokensSum(!!cols.hasCostStatus)} AS unpriced ` +
-      `FROM "${stream}" WHERE ${MODEL_SERIES_SQL} IS NOT NULL${scoped} ` +
+      `FROM ${quoteStream(stream)} WHERE ${MODEL_SERIES_SQL} IS NOT NULL${scoped} ` +
       `GROUP BY trace_id, ${MODEL_SERIES_SQL} ` +
       `UNION ALL ` +
       `SELECT trace_id, '' AS v, ${agentFallbackUsage(cost)} AS cost, ` +
       `${agentFallbackUsage(tokens)} AS tokens, 0 AS unpriced ` +
-      `FROM "${stream}"${agentParentsJoin(stream, cols.hasParentSpan)}${where(scope)} ` +
+      `FROM ${quoteStream(stream)}${agentParentsJoin(stream, cols.hasParentSpan)}${where(scope)} ` +
       `GROUP BY trace_id ` +
       `HAVING ${agentFallbackUsage(cost)} > 0 OR ${agentFallbackUsage(tokens)} > 0) ` +
       `GROUP BY v`,
@@ -220,7 +221,7 @@ export function usersSql(
     `MAX(gen_ai_conversation_id) AS session, ${traceUsage}, ` +
     `${unpricedTokensSum(!!opts.hasCostStatus)} AS unpriced, ` +
     `${TRACE_ERRORED_SQL} AS failed, MAX(_timestamp) AS last_ts ` +
-    `FROM "${stream}"${agentParentsJoin(stream, opts.hasParentSpan)}${where(opts.scope)} ` +
+    `FROM ${quoteStream(stream)}${agentParentsJoin(stream, opts.hasParentSpan)}${where(opts.scope)} ` +
     `GROUP BY trace_id) ` +
     `WHERE ${filters.join(" AND ")} GROUP BY user_id ORDER BY cost DESC LIMIT ${USERS_LIMIT}`
   );
@@ -237,6 +238,6 @@ export function coverageSql(stream: string, columns: string[], scope: string): s
   );
   return (
     `SELECT ${["COUNT(*) AS traces", ...per].join(", ")} FROM (` +
-    `SELECT ${["trace_id", ...inner].join(", ")} FROM "${stream}"${where(scope)} GROUP BY trace_id)`
+    `SELECT ${["trace_id", ...inner].join(", ")} FROM ${quoteStream(stream)}${where(scope)} GROUP BY trace_id)`
   );
 }

@@ -37,14 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <!-- Org-wide stream footprint. Deliberately OUTSIDE the table: these totals
-           come from the org summary endpoint and cover every stream type, so they
-           must not sit in the table's #subheader where they would read as a
-           summary of the (server-paginated, type-filtered) rows below. Read-only
-           for the same reason — they are page context, not a facet. -->
+      <!-- Outside the table: these totals cover every stream type, not the paginated rows. -->
       <template #subnav>
         <div class="px-page-edge py-1.5" data-test="log-stream-summary">
-          <OStatStrip :items="summaryStats" :loading="summaryLoading" />
+          <OStatStrip :items="summaryStats" :loading="summaryLoading" inline />
         </div>
       </template>
 
@@ -79,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Toolbar inside the table frame: stream-type filter + search. -->
           <template #toolbar>
             <div
-              class="flex w-full min-w-0 flex-wrap items-center justify-between gap-2 gap-y-1.5 max-md:contents"
+              class="flex flex-1 flex-wrap items-center justify-between gap-2 gap-y-1.5 max-md:contents"
             >
               <OToggleGroup
                 mobile-dropdown
@@ -197,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="log-stream-explore-btn"
                 data-row-action="view"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 @click="exploreStream({ row })"
               />
@@ -207,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="log-stream-schema-btn"
                 data-row-action="view"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 @click="listSchema({ row })"
               />
@@ -217,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="log-stream-delete-btn"
                 data-row-action="delete"
                 variant="ghost-destructive"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 @click="confirmDeleteAction({ row })"
               />

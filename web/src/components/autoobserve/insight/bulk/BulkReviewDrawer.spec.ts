@@ -19,9 +19,11 @@ import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { ALERT_LIST_ALL_STATES } from "@/utils/alerts/alertListLink";
 import { fieldRows, m12Rows } from "./bulkFixtures";
 import { dismissAll, toastRecords } from "@/lib/feedback/Toast/useToast";
 import {
+  MEASURE_TIMEOUT_MS,
   closeBulkReview,
   openBulkReview,
   setFolderRightsSource,
@@ -47,6 +49,9 @@ vi.mock("@/services/alerts", () => ({
   },
 }));
 vi.mock("@/services/common", () => ({ default: { list_Folders: api.folders } }));
+vi.mock("@/services/autoobserveFolders", () => ({
+  default: { writable: async () => ({ data: { folders: {} } }) },
+}));
 vi.mock("@/services/alert_destination", () => ({ default: { list: api.destinations } }));
 vi.mock("@/utils/clipboard", () => ({ copyToClipboard: api.copy }));
 vi.mock("@/services/stream", () => ({ default: { schema: api.schema } }));
@@ -118,6 +123,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   closeBulkReview();
   setFolderRightsSource(null);
   wrapper?.unmount();
@@ -152,6 +158,8 @@ describe("BulkReviewDrawer — review", () => {
     );
     expect(text("bulk-review-create")).toBe("Add alerts");
     expect(api.create).not.toHaveBeenCalled();
+    // One kind's list names it in the title, so no row repeats it.
+    expect(q("bulk-review-check-ingest-b")).toBeNull();
   });
 
   it("names one alert in the singular", async () => {
@@ -239,13 +247,18 @@ describe("BulkReviewDrawer — rows that can't be added (T2-11, T2-18, T2-24)", 
     expect(link.getAttribute("href")).toContain("alerts");
   });
 
-  it("names the alert in each row's tick label, so two rows of one service differ", async () => {
+  it("names each row's check and stream type, so two rows of one service differ", async () => {
     await mountDrawer();
     await openWith([svc("y:errors", "errors"), svc("y:no_data", "no_data")] as never);
     const labels = wrapper!
       .findAllComponents({ name: "BulkRowMark" })
       .map((c) => String(c.props("label")));
     expect(labels).toEqual(["Tick svc-y, Errors", "Tick svc-y, Stops sending"]);
+    expect([text("bulk-review-check-y:errors"), text("bulk-review-check-y:no_data")]).toEqual([
+      "Errors",
+      "Stops sending",
+    ]);
+    expect(text("bulk-review-stream-y:errors")).toBe("logs · app_logs");
   });
 
   it("says why a negative threshold can't be used, and keeps what was typed", async () => {
@@ -356,7 +369,7 @@ describe("BulkReviewDrawer — results", () => {
     await openWith();
     await click("bulk-review-create");
     expect(review.state.open).toBe(true);
-    expect(text("bulk-review-failures")).toContain("1 of 11 alerts wasn't created.");
+    expect(text("bulk-review-failures")).toContain("1 alert out of 11 wasn't created.");
     expect(text("bulk-review-failure-j")).toBe(
       "svc-j: You can't create alerts. Your role is missing the Create permission on Alerts. The alert was going to folder payments.",
     );
@@ -378,8 +391,17 @@ describe("BulkReviewDrawer — results", () => {
     expect(text("bulk-review-failure-a-j")).toBe(
       "svc-a · ns-j: an alert named svc-a-ns-j-no-data already exists in folder default.",
     );
-    expect(q("bulk-review-open-existing-a-j")).not.toBeNull();
     expect(q("bulk-review-retry-a-j")).toBeNull();
+    // Unfound, it opens the folder, where the list's Firing default could hide the quiet duplicate.
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined);
+    await click("bulk-review-open-existing-a-j");
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertList",
+        query: expect.objectContaining({ state: ALERT_LIST_ALL_STATES }),
+      }),
+    );
+    push.mockRestore();
   });
 
   it("offers Retry for a timeout and re-sends only that row", async () => {
@@ -469,7 +491,43 @@ describe("BulkReviewDrawer — stream fields and org", () => {
     expect(q("bulk-review-cant-errs")).toBeNull();
     const wait = q("bulk-review-measuring-errs")!;
     expect(q("bulk-review-firesWhen-errs")!.contains(wait)).toBe(true);
-    expect(wait.getAttribute("aria-label")).toBe("Measuring the usual level over the last 7 days…");
+    expect(wait.getAttribute("aria-label")).toBe("Measuring the usual level over 7 days…");
+  });
+
+  it("says on the row and in the footer what is measuring, and gives up on a measurement past its cap", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    api.schema.mockResolvedValue({
+      data: {
+        schema: [
+          { name: "service_name" },
+          { name: "k8s_namespace_name" },
+          { name: "level", type: "Utf8" },
+        ],
+      },
+    });
+    let signal: AbortSignal | undefined;
+    measureBaseline.mockImplementation((_org: string, _query: unknown, s: AbortSignal) => {
+      signal = s;
+      return new Promise(() => undefined);
+    });
+    await mountDrawer();
+    const [row] = fieldRows(IDS);
+    await openWith([
+      { ...row, key: "errs", kind: "errors", usually: null },
+      { ...row, key: "quiet", kind: "no_data" },
+    ]);
+    await flushPromises();
+    expect(text("bulk-review-wait-errs")).toBe("Measuring the usual level over 7 days…");
+    expect(text("bulk-review-footer")).toBe("Measuring 1 of 2 alerts…");
+    expect(createButton().disabled).toBe(true);
+    await vi.advanceTimersByTimeAsync(MEASURE_TIMEOUT_MS);
+    await flushPromises();
+    expect(signal?.aborted).toBe(true);
+    expect(text("bulk-review-wait-errs")).toBe("Measuring took too long. Set a threshold.");
+    expect(text("bulk-review-no-usual-errs")).toBe("Not measured");
+    expect(q("bulk-review-threshold-errs")!.querySelector("input")!.value).toBe("");
+    expect(text("bulk-review-footer")).toContain("1 alert needs a threshold");
+    expect(createButton().disabled).toBe(false);
   });
 
   it("keeps a row one line tall when its week has no usual level (T5-N5)", async () => {
@@ -525,7 +583,7 @@ describe("BulkReviewDrawer — stream fields and org", () => {
     expect(q("bulk-review-firesWhen-read-b")!.contains(wait)).toBe(true);
     expect(wait.getAttribute("aria-label")).toBe("Checking the stream's fields…");
     expect(text("bulk-review-rule")).toContain("no rows for 15 min");
-    expect(text("bulk-review-footer")).toContain("1 alert will be created in folder ingest.");
+    expect(text("bulk-review-footer")).toBe("Checking 1 of 1 alert…");
     expect(text("bulk-review-create")).toBe("Add alerts");
     expect(createButton().disabled).toBe(true);
     answer({ data: { schema: [{ name: "service_name" }, { name: "k8s_namespace_name" }] } });

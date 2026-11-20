@@ -23,13 +23,14 @@ use bytes::Bytes;
 use config::meta::{
     alerts::{
         level::AlertLevel,
+        notification_kind::NotificationKind,
         recovery::RecoveryEvent,
         state::{AlertState, ROLLUP_GROUP_KEY},
     },
     destinations::{DestinationType, Module, SlackAppTarget, Template, TemplateKind},
     slack::{
-        ALERT_SLACK_EVENT_VERSION, AlertSlackEvent, AlertSlackEventKind, RenderedWire,
-        SLACK_OUTBOUND_TOPIC, SlackAlertMessageKey,
+        ALERT_SLACK_EVENT_VERSION, ANOMALY_GROUP_KEY, AlertSlackEvent, AlertSlackEventKind,
+        RenderedWire, SLACK_OUTBOUND_TOPIC, SlackAlertMessageKey,
     },
 };
 use dashmap::DashMap;
@@ -37,10 +38,13 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use crate::alerts::notifications::{
-    apply_custom_template,
+    apply_template_body,
     context::NotificationContext,
-    render::markdown::{escape_mrkdwn, markdown_to_mrkdwn},
-    resolve::{RenderedContent, resolve_content},
+    render::{
+        DEFAULT_LINK_LABEL,
+        markdown::{escape_mrkdwn, markdown_to_mrkdwn},
+    },
+    resolve::{LinkRole, RenderedContent, detail_url, resolve_content},
 };
 
 /// A larger chart is dropped and the message goes out without it (§7.4).
@@ -185,6 +189,7 @@ pub fn build_event(
             .and_then(|png| chart_b64(t.alert_id, png)),
         level,
         at,
+        anomaly: None,
     }
 }
 
@@ -274,14 +279,38 @@ fn templated_post_event(
     now: i64,
 ) -> anyhow::Result<AlertSlackEvent> {
     let rendered = render_wire(template, ctx)?;
-    let target = post_target(org_id, destination_id, "", now.max(0) as u64);
-    Ok(build_event(
-        &target,
-        level_of(ctx),
-        rendered,
-        chart(ctx),
-        now,
-    ))
+    let thread = anomaly_thread(ctx);
+    let mut target = post_target(org_id, destination_id, "", now.max(0) as u64);
+    if let Some((anomaly_id, hint)) = thread {
+        // The leader finds the thread by detector, and each fire's data time keys its root row.
+        target.alert_id = anomaly_id;
+        target.group_key = ANOMALY_GROUP_KEY;
+        target.firing_started_at = hint.data_us;
+    }
+    let mut event = build_event(&target, level_of(ctx), rendered, chart(ctx), now);
+    event.anomaly = thread.map(|(_, hint)| hint.clone());
+    Ok(event)
+}
+
+/// The detector id and thread hint of an anomaly send; any other kind posts one-off.
+fn anomaly_thread(
+    ctx: &NotificationContext,
+) -> Option<(
+    &str,
+    &crate::alerts::notifications::context::SlackThreadHint,
+)> {
+    let hint = ctx
+        .slack_thread
+        .as_ref()
+        .filter(|_| ctx.kind == NotificationKind::Anomaly)?;
+    let anomaly_id = ctx
+        .context_attributes
+        .iter()
+        .find(|(key, _)| key == "anomaly_id")
+        .map(|(_, id)| id.as_str())
+        .or(ctx.episode_id.as_deref())
+        .filter(|id| !id.is_empty())?;
+    Some((anomaly_id, hint))
 }
 
 /// The short thread reply of a recovery a downtime did not mute; the green edit is the clear's.
@@ -338,7 +367,18 @@ pub async fn send_test_now(
         alert_name: title.to_string(),
         ..Default::default()
     };
-    let mut wire = wire_from_custom(body, &ctx);
+    send_test_wire(org_id, target, wire_from_custom(body, &ctx)).await
+}
+
+/// A content template's test-send as the live path builds it: buttons from the resolved links.
+pub async fn send_test_wire(
+    org_id: &str,
+    target: &SlackAppTarget,
+    mut wire: RenderedWire,
+) -> anyhow::Result<String> {
+    if let Some(reason) = unavailable_reason(org_id) {
+        return Err(anyhow::anyhow!(reason));
+    }
     if !wire
         .title
         .starts_with(crate::alerts::notifications::TEST_MARKER)
@@ -385,7 +425,7 @@ pub async fn send_form_test(
 pub fn render_wire(template: &Template, ctx: &NotificationContext) -> anyhow::Result<RenderedWire> {
     match template.kind {
         TemplateKind::Custom => Ok(wire_from_custom(
-            &apply_custom_template(&template.body, ctx, false),
+            &apply_template_body(template, ctx, false),
             ctx,
         )),
         TemplateKind::Content => {
@@ -437,11 +477,21 @@ pub fn wire_from_content(c: &RenderedContent, ctx: &NotificationContext) -> Rend
         }
         body.push_str(&lines.join("\n"));
     }
+    // An authored stand-in rides as the object button, so trimming the stored links cannot drop it.
+    let detail = c
+        .links
+        .iter()
+        .find(|l| l.role == LinkRole::Detail)
+        .or_else(|| {
+            c.links
+                .iter()
+                .find(|l| l.role == LinkRole::Authored && l.reserved)
+        });
     let links = c
         .links
         .iter()
-        .filter(|(label, url)| !(label.is_empty() && *url == ctx.alert_url))
-        .cloned()
+        .filter(|l| l.role == LinkRole::Authored && Some(*l) != detail)
+        .map(|l| (l.display_label().to_string(), l.url.trim().to_string()))
         .collect();
     RenderedWire {
         title: c.title.clone(),
@@ -449,6 +499,11 @@ pub fn wire_from_content(c: &RenderedContent, ctx: &NotificationContext) -> Rend
         fields: c.fields.clone(),
         links,
         open_url: ctx.alert_url.clone(),
+        open_label: open_label(ctx),
+        detail_url: detail.map(|l| l.url.trim().to_string()).unwrap_or_default(),
+        detail_label: detail
+            .map(|l| l.display_label().to_string())
+            .unwrap_or_default(),
     }
 }
 
@@ -457,10 +512,12 @@ pub fn wire_from_custom(msg: &str, ctx: &NotificationContext) -> RenderedWire {
     let mut wire = RenderedWire {
         title: ctx.alert_name.clone(),
         open_url: ctx.alert_url.clone(),
+        open_label: open_label(ctx),
         ..Default::default()
     };
     let Ok(Value::Object(doc)) = serde_json::from_str::<Value>(msg) else {
         wire.body = msg.trim().to_string();
+        set_custom_detail(&mut wire, ctx);
         return wire;
     };
     let mut body = Vec::new();
@@ -479,7 +536,15 @@ pub fn wire_from_custom(msg: &str, ctx: &NotificationContext) -> RenderedWire {
         .filter(|t| !t.is_empty());
     let has_header = wire.title != ctx.alert_name;
     match text {
-        Some(t) if !has_header => wire.title = t.to_string(),
+        Some(t) if !has_header => {
+            wire.title = t.to_string();
+            // A body that opens with its own bold title line, as the prebuilt Slack body does,
+            // would show the title twice.
+            let bold = format!("*{t}*");
+            if body.first().is_some_and(|b| b.trim() == bold) {
+                body.remove(0);
+            }
+        }
         Some(t) if body.is_empty() && t != wire.title => body.push(t.to_string()),
         _ => {}
     }
@@ -492,6 +557,7 @@ pub fn wire_from_custom(msg: &str, ctx: &NotificationContext) -> RenderedWire {
         read_attachment(attachment, ctx, &mut wire, &mut body);
     }
     wire.body = body.join("\n");
+    set_custom_detail(&mut wire, ctx);
     wire
 }
 
@@ -642,6 +708,37 @@ fn level_of(ctx: &NotificationContext) -> AlertLevel {
 
 fn chart(ctx: &NotificationContext) -> Option<&[u8]> {
     ctx.chart_png.as_deref().map(Vec::as_slice)
+}
+
+/// The data button label; a kind with no label of its own reads the channel default.
+fn open_label(ctx: &NotificationContext) -> String {
+    if ctx.alert_url_label.is_empty() {
+        DEFAULT_LINK_LABEL.to_string()
+    } else {
+        ctx.alert_url_label.clone()
+    }
+}
+
+/// The object button; a custom button to that page takes the slot, so trimming cannot drop it.
+fn set_custom_detail(wire: &mut RenderedWire, ctx: &NotificationContext) {
+    let Some(url) = detail_url(ctx) else {
+        return;
+    };
+    match wire.links.iter().position(|(_, u)| u.trim() == url) {
+        Some(i) => {
+            let (label, own) = wire.links.remove(i);
+            wire.detail_url = own.trim().to_string();
+            wire.detail_label = if label.trim().is_empty() {
+                ctx.alert_detail_label.clone()
+            } else {
+                label
+            };
+        }
+        None => {
+            wire.detail_url = url.to_string();
+            wire.detail_label = ctx.alert_detail_label.clone();
+        }
+    }
 }
 
 fn is_manual_trigger(ctx: &NotificationContext) -> bool {
@@ -881,6 +978,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+    use crate::alerts::notifications::{apply_custom_template, resolve::Link};
 
     const PREBUILT_SLACK: &str = r#"{
   "text": "[{alert_status}] {alert_name}",
@@ -1225,19 +1323,35 @@ mod tests {
             wire.body, wire.title,
             "the text is not repeated as the body"
         );
+        assert!(
+            !wire.body.contains("[firing] checkout-errors"),
+            "the bold title line is not repeated in the body: {wire:?}"
+        );
+        let starred = NotificationContext {
+            alert_name: "cpu_high*".into(),
+            ..ctx.clone()
+        };
+        let wire = render_wire(&built_in, &starred).unwrap();
+        assert_eq!(wire.title, "[firing] cpu_high*");
+        assert!(
+            !wire.body.contains("[firing] cpu_high*"),
+            "a name ending in * is not shown twice: {wire:?}"
+        );
     }
 
     #[test]
     fn a_content_template_body_becomes_mrkdwn_and_the_alert_link_becomes_open() {
-        let ctx = ctx();
+        let mut ctx = ctx();
+        ctx.alert_url_label = "View logs".into();
+        ctx.alert_detail_url = "https://o2.test/web/alerts/detail/a1?org_identifier=prod".into();
+        ctx.alert_detail_label = "Open alert".into();
+        let mut links = vec![Link::authored("Dashboard", "https://o2.test/d/1")];
+        crate::alerts::notifications::resolve::append_system_links(&mut links, &ctx);
         let content = RenderedContent {
             title: "Errors on checkout".into(),
             body_markdown: "**6.8%** of requests failed".into(),
             fields: vec![("env".into(), "prod".into())],
-            links: vec![
-                ("Dashboard".into(), "https://o2.test/d/1".into()),
-                (String::new(), ctx.alert_url.clone()),
-            ],
+            links,
             rows: vec![],
             row_lines: Some(vec!["host=web-1".into()]),
             severity: None,
@@ -1250,6 +1364,85 @@ mod tests {
             vec![("Dashboard".to_string(), "https://o2.test/d/1".to_string())]
         );
         assert_eq!(wire.open_url, ctx.alert_url);
+        assert_eq!(wire.open_label, "View logs");
+        assert_eq!(wire.detail_url, ctx.alert_detail_url);
+        assert_eq!(wire.detail_label, "Open alert");
+    }
+
+    #[test]
+    fn an_authored_link_to_the_detail_page_stands_in_for_the_object_button() {
+        let mut ctx = ctx();
+        ctx.alert_detail_url = "https://o2.test/web/alerts/detail/a1?org_identifier=prod".into();
+        ctx.alert_detail_label = "Open alert".into();
+        let mut links = vec![Link::authored("My alert", ctx.alert_detail_url.clone())];
+        crate::alerts::notifications::resolve::append_system_links(&mut links, &ctx);
+        let content = RenderedContent {
+            title: "t".into(),
+            body_markdown: String::new(),
+            fields: vec![],
+            links,
+            rows: vec![],
+            row_lines: None,
+            severity: None,
+            unknown_variables: vec![],
+        };
+        let wire = wire_from_content(&content, &ctx);
+        assert!(wire.links.is_empty(), "{wire:?}");
+        assert_eq!(wire.detail_url, ctx.alert_detail_url);
+        assert_eq!(wire.detail_label, "My alert");
+        assert_eq!(wire.open_label, DEFAULT_LINK_LABEL);
+    }
+
+    #[test]
+    fn a_blank_label_or_padded_url_stand_in_still_gets_a_usable_object_button() {
+        let mut ctx = ctx();
+        ctx.alert_detail_url = "https://o2.test/web/alerts/detail/a1?org_identifier=prod".into();
+        ctx.alert_detail_label = "Open alert".into();
+        let padded = format!(" {} ", ctx.alert_detail_url);
+        let mut links = vec![
+            Link::authored(" ", padded),
+            Link::authored("", " https://wiki/rb "),
+        ];
+        crate::alerts::notifications::resolve::append_system_links(&mut links, &ctx);
+        let content = RenderedContent {
+            title: "t".into(),
+            body_markdown: String::new(),
+            fields: vec![],
+            links,
+            rows: vec![],
+            row_lines: None,
+            severity: None,
+            unknown_variables: vec![],
+        };
+        let wire = wire_from_content(&content, &ctx);
+        assert_eq!(wire.detail_url, ctx.alert_detail_url);
+        assert_eq!(wire.detail_label, DEFAULT_LINK_LABEL);
+        assert_eq!(
+            wire.links,
+            vec![(
+                DEFAULT_LINK_LABEL.to_string(),
+                "https://wiki/rb".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn a_custom_body_gets_the_object_button_unless_it_has_one() {
+        let mut ctx = ctx();
+        ctx.alert_url_label = "View logs".into();
+        ctx.alert_detail_url = "https://o2.test/web/alerts/detail/a1?org_identifier=prod".into();
+        ctx.alert_detail_label = "Open alert".into();
+        let plain = wire_from_custom("disk full", &ctx);
+        assert_eq!(plain.open_label, "View logs");
+        assert_eq!(plain.detail_url, ctx.alert_detail_url);
+        let body = format!(
+            r#"{{"blocks":[{{"type":"actions","elements":[{{"type":"button","text":{{"type":"plain_text","text":"Mine"}},"url":"{}"}}]}}]}}"#,
+            ctx.alert_detail_url
+        );
+        let own = wire_from_custom(&body, &ctx);
+        assert!(own.links.is_empty(), "{own:?}");
+        assert_eq!(own.detail_url, ctx.alert_detail_url);
+        assert_eq!(own.detail_label, "Mine");
     }
 
     #[test]
@@ -1264,6 +1457,7 @@ mod tests {
                 .map(|i| (format!("l{i}"), format!("https://o2.test/{i}")))
                 .collect(),
             open_url: "https://o2.test/a".into(),
+            ..Default::default()
         };
         let fitted = fit_wire(wire);
         assert!(serde_json::to_vec(&fitted).unwrap().len() <= MAX_CONTENT_BYTES);
@@ -1368,6 +1562,54 @@ mod tests {
             event.rendered.map(|r| r.body).as_deref(),
             Some("checkout-errors opened an incident")
         );
+    }
+
+    #[test]
+    fn an_anomaly_post_is_keyed_by_the_detector_and_its_data_time() {
+        use config::meta::slack::AnomalyThreadInfo;
+        let template = Template {
+            body: "{alert_name}".to_string(),
+            ..Default::default()
+        };
+        let hint = AnomalyThreadInfo {
+            first_anomaly_us: Some(10),
+            data_us: 900,
+            bucket_end_us: 800,
+            gap_us: 3_600_000_000,
+            closes: false,
+            thread_headline: Some("checkout rose 50.0% above expected".into()),
+            model_version: Some(7),
+            recovered_at_us: None,
+        };
+        let anomaly = NotificationContext {
+            kind: NotificationKind::Anomaly,
+            episode_id: Some("2Kanomaly".into()),
+            context_attributes: vec![("anomaly_id".into(), "2Kanomaly".into())],
+            slack_thread: Some(hint.clone()),
+            ..ctx()
+        };
+        let event = templated_post_event("acme", "dest-1", &template, &anomaly, 5).unwrap();
+        assert_eq!(event.kind, AlertSlackEventKind::Post);
+        assert_eq!(event.alert_id, "2Kanomaly");
+        assert_eq!(event.group_key, ANOMALY_GROUP_KEY);
+        assert_eq!(event.firing_started_at, 900);
+        assert_eq!(event.anomaly, Some(hint.clone()));
+
+        let other = NotificationContext {
+            slack_thread: Some(hint),
+            ..ctx()
+        };
+        let event = templated_post_event("acme", "dest-1", &template, &other, 5).unwrap();
+        assert_eq!(event.alert_id, "");
+        assert_eq!(event.group_key, "");
+        assert_eq!(event.firing_started_at, 0);
+        assert_eq!(event.anomaly, None, "other kinds post one-off as before");
+        let plain = NotificationContext {
+            kind: NotificationKind::Anomaly,
+            ..ctx()
+        };
+        let event = templated_post_event("acme", "dest-1", &template, &plain, 5).unwrap();
+        assert_eq!(event.anomaly, None, "an anomaly with no hint posts one-off");
     }
 
     #[tokio::test]

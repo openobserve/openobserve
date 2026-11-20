@@ -135,7 +135,7 @@ The recipe every list toolbar follows:
 ```vue
 <template #toolbar>
   <!-- max-md:contents lets the filter, the search and OTable's own controls share one row -->
-  <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+  <div class="flex flex-1 items-center gap-2 max-md:contents">
     <OToggleGroup v-model="typeFilter" mobile-dropdown data-test="channels-type-filter">
       <OToggleGroupItem value="all" size="sm" data-test="channels-type-all">…</OToggleGroupItem>
       …
@@ -157,16 +157,18 @@ The recipe every list toolbar follows:
   unless you pass your own `min-w-*` (its input's intrinsic ~13rem floor is what used
   to push the column toggle and refresh onto a second row). A fixed `w-64` search
   becomes `w-64 max-md:w-auto max-md:flex-1`, never `max-md:w-full`.
-- **A `w-full` toolbar wrapper without `max-md:contents` always wraps.** Its width is
-  the whole row, so OTable's column toggle and refresh drop to a second line.
+- **A toolbar wrapper is `flex-1`, never `w-full`, and never `min-w-0`.** The OTable
+  toolbar wraps at every width: `w-full` takes the whole row and always pushes the
+  column toggle and refresh onto a second line, while `min-w-0` stops the row from ever
+  wrapping, so the filters slide under those controls once space runs out.
 - `ORefreshButton layout="inline"` drops its "Nm ago" label below md (icon-only);
   do not re-add a text refresh button to a phone toolbar.
 - **Page toolbars** (Logs / Metrics / Traces style): the mode toggle becomes an
   `ODropdown` showing the current mode (see `MetricsExplorer.vue`),
   `AutoRefreshInterval :is-compact="isMobile"`, text buttons go icon-only, spacers
   that pin a cluster right are `max-md:hidden` and the cluster takes `max-md:ms-auto`.
-- An `OTable` toolbar wraps below md and right-aligns its own controls (column toggle,
-  `#toolbar-trailing`) automatically.
+- An `OTable` toolbar wraps whenever its content does not fit and right-aligns its own
+  controls (column toggle, `#toolbar-trailing`) automatically.
 
 ## Tables and row actions
 
@@ -175,10 +177,11 @@ The recipe every list toolbar follows:
   column is dropped and persisted desktop column sizes are ignored. Tablets get a
   horizontal-scroll fallback once fill columns can't fit. **Do not hide data columns
   for mobile** — there is no per-column breakpoint flag.
-- **Row actions → one kebab below md.** Inline action buttons get
-  `class="max-md:hidden"`; add one `ODropdown` whose trigger is `md:hidden` and whose
-  items (each `class="md:hidden"`) mirror the inline buttons — same `v-if`, same
-  `:disabled`, `data-test="<inline data-test>-menu"`:
+- **Row actions → one kebab below md.** Prefer `OTable`'s `row-actions` prop: pass
+  the list once and the table draws at most three buttons at md and up (more than
+  three: two plus a menu), in the fixed order Edit, the item's own actions, Delete,
+  and one kebab below md. The hand-written form below remains for tables not yet
+  moved:
 
   ```vue
   <OButton class="max-md:hidden" icon-left="edit" :data-test="`x-${row.id}-edit`" @click="edit(row)" />
@@ -209,7 +212,9 @@ The recipe every list toolbar follows:
 ## Stat strips and KPI cards: one row
 
 `OStatStrip` / `OStatCard` and `KpiCard` / `KpiCardRow` compact below lg to icon +
-value; the label moves into the tile's `title`. Use them. A hand-rolled tile row follows
+value; the label moves into the tile's `title`. Use them. Filter chips (`selectable`)
+are the exception: below md they take their own toolbar line and scroll sideways on
+one line (swipe), never wrapping or compacting; see calm-signal § Summary-strip conventions. A hand-rolled tile row follows
 the same recipe so it never takes two rows of chrome:
 
 - row: `max-lg:flex max-lg:flex-wrap max-lg:gap-1.5` (or `max-md:grid-cols-4` for a

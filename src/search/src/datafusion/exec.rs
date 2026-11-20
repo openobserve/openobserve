@@ -67,7 +67,7 @@ use crate::{
 
 pub const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 
-fn create_session_config(
+pub(crate) fn create_session_config(
     sort_order: FileSortOrder,
     target_partitions: usize,
 ) -> Result<SessionConfig> {
@@ -362,6 +362,9 @@ pub fn register_builtin_udfs(ctx: &SessionContext) {
         ctx.register_udf(super::udf::cipher_udf::DECRYPT_UDF.clone());
         ctx.register_udf(super::udf::cipher_udf::DECRYPT_SLOW_UDF.clone());
         ctx.register_udf(super::udf::cipher_udf::ENCRYPT_UDF.clone());
+        ctx.register_udaf(AggregateUDF::from(
+            o2_enterprise::enterprise::search::datafusion::udaf::ddsketch::DDSketchMergeAgg::new(),
+        ));
         ctx.register_udaf(AggregateUDF::from(
             o2_enterprise::enterprise::search::datafusion::udaf::ddsketch::DDSketchAgg::new(),
         ));

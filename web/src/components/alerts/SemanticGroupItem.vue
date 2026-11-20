@@ -16,25 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="semantic-group-item rounded-default bg-card-glass-bg border-card-glass-border mb-2 w-full max-w-full border p-3 transition-all duration-200"
+    class="semantic-group-item border-border-default w-full max-w-full border-b px-4 py-3 last:border-b-0"
   >
     <OForm :form="form">
-      <div class="grid w-full grid-cols-[12.5rem_1fr_auto] items-start gap-4 overflow-hidden">
+      <div class="grid w-full grid-cols-[12.5rem_1fr_2rem] items-start gap-4 overflow-hidden">
         <!-- Left Column: Display Name only (ID is internal/read-only) -->
         <div class="flex min-w-0 flex-col justify-center gap-1">
           <div class="input-wrapper">
             <OFormInput
               name="display"
               data-test="semantic-group-display-input"
-              :label="t('common.name')"
-              required
-              class="showLabelOnTop"
+              :aria-label="t('common.name')"
               @blur="handleDisplayBlur"
             />
-          </div>
-          <!-- Show ID as read-only caption for existing groups -->
-          <div v-if="currentId" class="text-text-secondary text-xs">
-            {{ t("common.id") }}: {{ currentId }}
           </div>
           <!-- Category tag — shown in cross-category search results so hits are attributable -->
           <div v-if="categoryTag">
@@ -45,6 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OFormSwitch
             name="is_workload_type"
             :label="t('correlation.isWorkloadType')"
+            off-tone="neutral"
+            state-text
             class="mt-1"
           >
             <OTooltip :content="t('correlation.isWorkloadTypeTooltip')" />
@@ -68,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="semantic-group-remove-group-btn"
               type="button"
-              :variant="isProtected ? 'ghost-muted' : 'ghost-destructive'"
+              :variant="isProtected ? 'ghost-muted' : 'ghost'"
               size="icon-circle-sm"
               :disabled="isProtected"
               @click="!isProtected && emit('delete')"

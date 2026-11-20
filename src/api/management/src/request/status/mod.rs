@@ -37,7 +37,6 @@ use config::{
         search::{HashFileRequest, HashFileResponse},
         slack::DisabledReason,
         stream::DataRetentionDefaults,
-        user::UserRole,
     },
     stats::{CacheStats, CacheStatsAsync},
     utils::{base64, json},
@@ -133,6 +132,13 @@ macro_rules! enterprise_value {
 const LOGIN_STATE_COOKIE: &str = "o2_login_state";
 #[cfg(feature = "enterprise")]
 const LOGIN_STATE_MAX_AGE_SECS: i64 = 600;
+
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LoginStateFailure {
+    Invalid { clear_cookie: bool },
+    StoreFailure,
+}
 
 #[derive(Serialize, serde::Deserialize, ToSchema)]
 pub struct HealthzResponse {
@@ -238,6 +244,10 @@ struct ConfigResponse<'a> {
     model_pricing_enabled: bool,
     online_evals_enabled: bool,
     anomaly_detection_enabled: bool,
+    /// O2_AUTOOBSERVE_CONTEXT_ENABLED, only while O2_AUTOOBSERVE_ENABLED is on.
+    autoobserve_context_enabled: bool,
+    /// O2_AUTOOBSERVE_AI_EVIDENCE_ENABLED; off, the drawers hide the engine step too.
+    autoobserve_next_step_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
     /// Hides the publish button and the Public links view when the feature is off.
@@ -516,11 +526,13 @@ pub async fn zo_config(
 
     // per-user value: false unless this caller may use the search inspector
     let search_inspector_enabled = match &user_email {
-        Some(Headers(user)) => search_inspector_permitted(&org_id, &user.user_id).await,
+        Some(Headers(user)) => {
+            search_inspector_for_edition(search_inspector_permitted(&org_id, &user.user_id).await)
+        }
         None => false,
     };
     let is_org_admin = match &user_email {
-        Some(Headers(user)) => org_admin(&org_id, &user.user_id).await,
+        Some(Headers(user)) => openobserve_core::users::is_org_admin(&org_id, &user.user_id).await,
         None => false,
     };
     #[cfg(feature = "enterprise")]
@@ -588,9 +600,15 @@ pub async fn zo_config(
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
-    // Composite alerts are not available in super-cluster mode (§18, §19.2).
-    let composite_alerts_available =
-        config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
+    let autoobserve_context_enabled = enterprise_value!(
+        false,
+        o2_enterprise::enterprise::autoobserve::context::enabled()
+    );
+    let autoobserve_next_step_enabled = enterprise_value!(
+        false,
+        o2_enterprise::enterprise::autoobserve::next_step::enabled()
+    );
+    let composite_alerts_available = config::get_config().alert_composite.writes_enabled;
     let online_evals_enabled = enterprise_value!(
         false,
         o2cfg.llm_eval_config.enabled && check_org_features(&org_id, &[Feature::AiObservability])
@@ -624,10 +642,9 @@ pub async fn zo_config(
 
     let usage_enabled = enterprise_value!(false, true);
 
-    // Usage calculations need data at most 10 minutes old.
     let usage_publish_interval = enterprise_value!(
         cfg.common.usage_publish_interval,
-        (10 * 60).min(cfg.common.usage_publish_interval)
+        config::enterprise_usage_publish_interval(&cfg)
     );
 
     #[cfg(feature = "cloud")]
@@ -696,7 +713,10 @@ pub async fn zo_config(
         .filter_map(|(key, gate)| Some((key.clone(), gate.display_name.clone()?)))
         .collect();
     #[cfg(not(feature = "enterprise"))]
-    let feature_names: HashMap<String, String> = HashMap::new();
+    let feature_names: HashMap<String, String> = featuremap
+        .keys()
+        .map(|f| (<&str>::from(*f).to_string(), f.display_name().to_string()))
+        .collect();
 
     axum::Json(ConfigResponse {
         version: config::VERSION.to_string(),
@@ -788,6 +808,8 @@ pub async fn zo_config(
         model_pricing_enabled: cfg.common.model_pricing_enabled,
         online_evals_enabled,
         anomaly_detection_enabled,
+        autoobserve_context_enabled,
+        autoobserve_next_step_enabled,
         composite_alerts_available,
         synthetics_enabled,
         public_dashboards_enabled: cfg.public_dashboards.enabled,
@@ -898,11 +920,9 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
     .await
 }
 
-async fn org_admin(org_id: &str, user_id: &str) -> bool {
-    is_root_user(user_id)
-        || openobserve_core::users::get_user(Some(org_id), user_id)
-            .await
-            .is_some_and(|u| matches!(u.role, UserRole::Root | UserRole::Admin))
+/// The search inspector is enterprise-only, so OSS never offers it even to root.
+fn search_inspector_for_edition(permitted: bool) -> bool {
+    cfg!(feature = "enterprise") && permitted
 }
 
 /// Only enterprise builds run the transitions reaper; 0 tells the UI nothing is ever dropped.
@@ -1355,15 +1375,6 @@ pub async fn redirect(
 
     use crate::request::{LoginFailure, audit_login_failure};
 
-    let code = match query.get("code") {
-        Some(code) => code,
-        None => {
-            return Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Body::from("no code in request"))
-                .unwrap();
-        }
-    };
     let mut audit_message = AuditMessage {
         login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
         user_agent: super::users::login_user_agent(&headers),
@@ -1386,18 +1397,28 @@ pub async fn redirect(
     };
 
     let state_cookie = cookies.get(LOGIN_STATE_COOKIE).map(|c| c.value());
-    if let Err(msg) = consume_login_state(query.get("state"), state_cookie).await {
-        audit_login_failure(
-            audit_message,
-            LoginFailure::InvalidLoginState,
-            StatusCode::BAD_REQUEST,
-        )
-        .await;
-        return Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(Body::from(msg))
-            .unwrap();
-    }
+    let state = match validate_login_state(query.get("state"), state_cookie).await {
+        Ok(state) => state,
+        Err(failure) => {
+            let response = login_state_failure_response(failure, &get_config());
+            let reason = match failure {
+                LoginStateFailure::Invalid { .. } => LoginFailure::InvalidLoginState,
+                LoginStateFailure::StoreFailure => LoginFailure::LoginStateStoreFailed,
+            };
+            audit_login_failure(audit_message, reason, response.status()).await;
+            return response;
+        }
+    };
+    let code = match query.get("code") {
+        Some(code) => code,
+        None => {
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from("no code in request"))
+                .unwrap();
+        }
+    };
+    let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, state).await;
 
     match exchange_code(code).await {
         Ok(login_data) => {
@@ -1593,12 +1614,8 @@ pub async fn dex_login() -> impl IntoResponse {
 
     let login_data: PreLoginData = get_dex_login();
     let state = login_data.state.clone();
-    let _ = openobserve_core::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
-
-    with_login_state_cookie(
-        common::meta::http::HttpResponse::json(login_data.url),
-        &state,
-    )
+    let saved = openobserve_core::kv::set(PKCE_STATE_ORG, &state, state.clone().into()).await;
+    dex_login_saved_response(&login_data.url, &state, saved)
 }
 
 /// Binds the login `state` to this browser so `/config/redirect` rejects a code started elsewhere.
@@ -1871,22 +1888,98 @@ fn login_state_matches(cookie: Option<&str>, state: &str) -> bool {
 }
 
 #[cfg(feature = "enterprise")]
-async fn consume_login_state(
-    state: Option<&String>,
+fn classify_login_state(
+    state: Option<&str>,
     cookie: Option<&str>,
-) -> Result<(), &'static str> {
+    saved: Result<Option<&[u8]>, ()>,
+) -> Result<(), LoginStateFailure> {
     let Some(state) = state else {
-        return Err("no state in request");
+        return Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        });
     };
-    if !login_state_matches(cookie, state)
-        || openobserve_core::kv::get(PKCE_STATE_ORG, state)
-            .await
-            .is_err()
-    {
-        return Err("invalid state in request");
+    if !login_state_matches(cookie, state) {
+        return Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        });
     }
-    let _ = openobserve_core::kv::delete(PKCE_STATE_ORG, state).await;
-    Ok(())
+    match saved {
+        Ok(Some(value)) if value == state.as_bytes() => Ok(()),
+        Ok(None) => Err(LoginStateFailure::Invalid { clear_cookie: true }),
+        Ok(Some(_)) => Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        }),
+        Err(()) => Err(LoginStateFailure::StoreFailure),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn login_state_failure_response(failure: LoginStateFailure, conf: &Config) -> Response {
+    match failure {
+        LoginStateFailure::Invalid { clear_cookie } => {
+            let location = format!(
+                "{}{}/web/login",
+                conf.common.web_url.trim_end_matches('/'),
+                conf.common.base_uri.trim_end_matches('/')
+            );
+            let mut response = Response::builder()
+                .status(StatusCode::FOUND)
+                .header(header::LOCATION, location);
+            if clear_cookie {
+                response = response.header(
+                    header::SET_COOKIE,
+                    login_state_cookie("", 0, conf).to_string(),
+                );
+            }
+            response.body(Body::empty()).unwrap()
+        }
+        LoginStateFailure::StoreFailure => Response::builder()
+            .status(StatusCode::SERVICE_UNAVAILABLE)
+            .body(Body::from("login state unavailable"))
+            .unwrap(),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn dex_login_saved_response(url: &str, state: &str, saved: Result<(), anyhow::Error>) -> Response {
+    match saved {
+        Ok(()) => with_login_state_cookie(common::meta::http::HttpResponse::json(url), state),
+        Err(error) => {
+            log::error!("failed to save login state: {error}");
+            Response::builder()
+                .status(StatusCode::SERVICE_UNAVAILABLE)
+                .body(Body::from("login state unavailable"))
+                .unwrap()
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn validate_login_state<'a>(
+    state: Option<&'a String>,
+    cookie: Option<&str>,
+) -> Result<&'a str, LoginStateFailure> {
+    let Some(state) = state else {
+        return Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        });
+    };
+    if !login_state_matches(cookie, state) {
+        return Err(LoginStateFailure::Invalid {
+            clear_cookie: false,
+        });
+    }
+    let saved = openobserve_core::kv::get_optional(PKCE_STATE_ORG, state)
+        .await
+        .map_err(|error| {
+            log::error!("failed to load login state: {error}");
+        });
+    classify_login_state(
+        Some(state),
+        cookie,
+        saved.as_ref().map(|value| value.as_deref()).map_err(|_| ()),
+    )?;
+    Ok(state)
 }
 
 pub async fn logout(
@@ -2221,6 +2314,12 @@ mod tests {
     use serde_json;
 
     use super::*;
+
+    #[cfg(not(feature = "enterprise"))]
+    #[test]
+    fn oss_never_reports_the_search_inspector_enabled() {
+        assert!(!search_inspector_for_edition(true));
+    }
 
     #[test]
     fn with_downtimes_off_all_names_the_modules_main_names() {
@@ -2706,20 +2805,149 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
-    async fn test_consume_login_state_rejects_without_kv_lookup() {
+    async fn test_validate_login_state_rejects_without_kv_lookup() {
         assert_eq!(
-            consume_login_state(None, Some("abc")).await,
-            Err("no state in request")
+            validate_login_state(None, Some("abc")).await,
+            Err(LoginStateFailure::Invalid {
+                clear_cookie: false
+            })
         );
         let state = "abc".to_string();
         assert_eq!(
-            consume_login_state(Some(&state), None).await,
-            Err("invalid state in request")
+            validate_login_state(Some(&state), None).await,
+            Err(LoginStateFailure::Invalid {
+                clear_cookie: false
+            })
         );
         assert_eq!(
-            consume_login_state(Some(&state), Some("abd")).await,
-            Err("invalid state in request")
+            validate_login_state(Some(&state), Some("abd")).await,
+            Err(LoginStateFailure::Invalid {
+                clear_cookie: false
+            })
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_login_state_decisions() {
+        let state = "callback-state";
+        for (callback, cookie, saved, expected) in [
+            (
+                None,
+                Some(state),
+                Ok(Some(state.as_bytes())),
+                Err(LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                }),
+            ),
+            (
+                Some(state),
+                None,
+                Ok(Some(state.as_bytes())),
+                Err(LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                }),
+            ),
+            (
+                Some(state),
+                Some("other"),
+                Ok(Some(state.as_bytes())),
+                Err(LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                }),
+            ),
+            (
+                Some(state),
+                Some(state),
+                Ok(None),
+                Err(LoginStateFailure::Invalid { clear_cookie: true }),
+            ),
+            (
+                Some(state),
+                Some(state),
+                Ok(Some(b"other".as_slice())),
+                Err(LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                }),
+            ),
+            (Some(state), Some(state), Ok(Some(state.as_bytes())), Ok(())),
+            (
+                Some(state),
+                Some(state),
+                Err(()),
+                Err(LoginStateFailure::StoreFailure),
+            ),
+        ] {
+            assert_eq!(classify_login_state(callback, cookie, saved), expected);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_login_state_failure_response() {
+        let mut conf = Config::default();
+        conf.common.web_url = "https://observe.example/".to_string();
+        conf.common.base_uri = "/o2".to_string();
+        conf.auth.cookie_secure_only = true;
+        conf.auth.cookie_same_site_lax = true;
+        for (decision, status, cleared) in [
+            (
+                LoginStateFailure::Invalid {
+                    clear_cookie: false,
+                },
+                StatusCode::FOUND,
+                false,
+            ),
+            (
+                LoginStateFailure::Invalid { clear_cookie: true },
+                StatusCode::FOUND,
+                true,
+            ),
+            (
+                LoginStateFailure::StoreFailure,
+                StatusCode::SERVICE_UNAVAILABLE,
+                false,
+            ),
+        ] {
+            let response = login_state_failure_response(decision, &conf);
+            assert_eq!(response.status(), status);
+            assert_eq!(
+                response
+                    .headers()
+                    .get(header::LOCATION)
+                    .map(|v| v.to_str().unwrap()),
+                (status == StatusCode::FOUND).then_some("https://observe.example/o2/web/login")
+            );
+            let cookie = response
+                .headers()
+                .get(header::SET_COOKIE)
+                .map(|v| v.to_str().unwrap());
+            assert_eq!(cookie.is_some(), cleared);
+            if let Some(cookie) = cookie {
+                assert!(cookie.contains("Max-Age=0"));
+                assert!(cookie.contains("Path=/"));
+                assert!(cookie.contains("Secure"));
+                assert!(cookie.contains("SameSite=Lax"));
+            }
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_failed_state_save_has_no_dex_url_or_cookie() {
+        let state = "state";
+        let url = "https://dex.example/login";
+        let failed =
+            dex_login_saved_response(url, state, Err(anyhow::anyhow!("store unavailable")));
+        assert_eq!(failed.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(failed.headers().get(header::SET_COOKIE).is_none());
+        let body = axum::body::to_bytes(failed.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(!String::from_utf8_lossy(&body).contains(url));
+        let saved = dex_login_saved_response(url, state, Ok(()));
+        assert_eq!(saved.status(), StatusCode::OK);
+        assert!(saved.headers().get(header::SET_COOKIE).is_some());
     }
 
     #[tokio::test]
@@ -2944,6 +3172,28 @@ mod tests {
             "ingestion_quota_used",
         ] {
             assert!(json.get(k).is_none(), "{k}");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_zo_config_names_every_locked_feature_in_oss() {
+        let json = zo_config_json().await;
+        let locked: Vec<&str> = json["features"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .filter(|(_, state)| *state == "locked")
+            .map(|(key, _)| key.as_str())
+            .collect();
+        assert!(!locked.is_empty());
+        for key in locked {
+            let feature = Feature::all().find(|f| <&str>::from(*f) == key).unwrap();
+            assert_eq!(
+                json["feature_names"][key].as_str(),
+                Some(feature.display_name()),
+                "{key}"
+            );
         }
     }
 

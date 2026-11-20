@@ -19,6 +19,7 @@ import { flushPromises } from "@vue/test-utils";
 import config from "@/aws-exports";
 import { useMetricDrilldown } from "./useMetricDrilldown";
 import { b64DecodeUnicode } from "@/utils/zincutils";
+import { labelRows } from "@/components/shared/ServiceNameLabel.fixtures";
 
 const api = vi.hoisted(() => ({
   getIdentityConfig: vi.fn(),
@@ -382,6 +383,20 @@ describe("useMetricDrilldown", () => {
       });
     });
 
+    it("keeps the service key and carries the display fields of the answer", async () => {
+      const row = labelRows.qualified;
+      const answer = correlated([], []);
+      Object.assign(answer.data, row);
+      const { drilldown } = await opened(answer);
+      expect(drilldown.menu.value).toMatchObject({
+        kind: "streams",
+        service: row.service_name,
+        display_name: row.display_name,
+        display_source: row.display_source,
+        display_qualifier: row.display_qualifier,
+      });
+    });
+
     it("leaves a signal with no streams empty, for its disabled line", async () => {
       const { drilldown } = await opened(
         correlated([stream("checkout_logs", { service_name: "checkout" })], []),
@@ -437,9 +452,17 @@ describe("useMetricDrilldown", () => {
       expect(onDropped).toHaveBeenCalledWith(["namespace"]);
     });
 
-    it("opens traces on the stream's own field names, without a toast", async () => {
+    it("opens traces on the stream's own field names and their aliases, without a toast", async () => {
       api.correlate.mockResolvedValueOnce(
-        correlated([], [stream("default", { service_k8s_namespace_name: "shop" })]),
+        correlated(
+          [],
+          [
+            {
+              ...stream("default", { service_k8s_namespace_name: "shop" }),
+              filter_aliases: { service_k8s_namespace_name: ["k8s_namespace_name"] },
+            },
+          ],
+        ),
       );
       const { drilldown, router, onDropped } = setup({
         filters: [{ label: "service_name", value: "checkout" }],
@@ -450,7 +473,9 @@ describe("useMetricDrilldown", () => {
 
       const route = router.push.mock.calls[0][0];
       expect(route.name).toBe("traces");
-      expect(b64DecodeUnicode(route.query.query)).toBe(`"service_k8s_namespace_name" = 'shop'`);
+      expect(b64DecodeUnicode(route.query.query)).toBe(
+        `("service_k8s_namespace_name" = 'shop' OR "k8s_namespace_name" = 'shop')`,
+      );
       expect(onDropped).not.toHaveBeenCalled();
     });
   });

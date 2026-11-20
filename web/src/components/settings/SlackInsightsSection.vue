@@ -19,7 +19,6 @@ import { computed, ref, watch } from "vue";
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -407,10 +406,10 @@ async function save(value: InsightsFormValues): Promise<void> {
       @action="settings.refetch()"
     />
     <OForm v-else-if="data" :form="form" novalidate>
-      <OCard variant="outlined" class="overflow-hidden">
+      <div>
         <div
           v-if="!canEdit"
-          class="bg-surface-panel border-border-default text-text-heading flex items-start gap-2 border-b px-4 py-3 text-sm"
+          class="border-border-default text-text-heading flex items-start gap-2 border-b px-4 py-3 text-sm"
           data-test="slack-insights-lock"
         >
           <OIcon name="lock" size="sm" class="text-text-secondary mt-0.5 shrink-0" />
@@ -593,7 +592,7 @@ async function save(value: InsightsFormValues): Promise<void> {
 
         <div
           v-if="canEdit"
-          class="flex min-h-16 items-center justify-between gap-4 px-4 py-3 max-md:flex-wrap"
+          class="border-border-default flex min-h-16 items-center justify-between gap-4 border-t px-4 py-3 max-md:flex-wrap"
         >
           <div
             class="text-text-secondary text-compact flex min-h-10 flex-1 items-center max-md:basis-full"
@@ -642,7 +641,7 @@ async function save(value: InsightsFormValues): Promise<void> {
             {{ t("common.save") }}
           </OButton>
         </div>
-      </OCard>
+      </div>
     </OForm>
   </div>
 </template>

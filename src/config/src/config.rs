@@ -148,7 +148,16 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 148: add alert_incidents.security_case, backfilled from SIEM detections and case group keys.
 // 149: add alert_incidents.historical, set on a security case only backfilled firings opened.
 // 150: add budget to online_eval_jobs.
-pub const DB_SCHEMA_VERSION: u64 = 150;
+// 151: add last_run_class, last_run_class_at and last_tested_at to synthetics.
+// 152: add false_alarm_by, false_alarm_at and false_alarm_reason to status_page_notices.
+// 153: add gap_since, gap_runs, gap_notified_at and gap_resumed_at to synthetics.
+// 154: add synthetics.status_recovered_at and status_streak_sig, and
+//      status_page_notices.false_alarm_recovered_at.
+// 155: create the service version, identity, alias, deploy and verdict tables.
+// 156: add alert_incidents.last_detection_at, when a new detection joined a worked case.
+// 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
+//      service_streams rows named by the metric-name label that list no trace stream.
+pub const DB_SCHEMA_VERSION: u64 = 157;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -172,6 +181,9 @@ pub const GRPC_HTTP2_CONNECTION_WINDOW_SIZE: u32 = 16 * 1024 * 1024; // 16 MB
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 const MAX_FILE_SIZE_DEFAULT_CAP: usize = 512 * 1024 * 1024;
 const MAX_FILE_SIZE_DEFAULT_FLOOR: usize = 32 * 1024 * 1024;
+const JOB_RUNTIME_BLOCKING_PER_CPU: usize = 8;
+const JOB_RUNTIME_BLOCKING_FLOOR: usize = 32;
+const JOB_RUNTIME_BLOCKING_CAP: usize = 256;
 // The current value is recorded in each tantivy index file (puffin `row_group_size`
 // property) so it can be changed safely without breaking row_id → row_group mapping
 // for older files.
@@ -179,6 +191,8 @@ pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 pub const SOURCEMAP_MEM_CACHE_SIZE: usize = 10000;
+/// Enterprise usage calculations need data at most this old, so publishing never waits longer.
+const ENTERPRISE_USAGE_PUBLISH_CAP_SECS: i64 = 10 * 60;
 
 #[inline]
 pub fn get_batch_size() -> usize {
@@ -1127,6 +1141,7 @@ pub struct Config {
     pub public_dashboards: PublicDashboards,
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
+    pub service_versions: ServiceVersions,
     pub self_profiles: SelfProfiles,
     pub public_ai_chat: PublicAiChat,
 }
@@ -1238,6 +1253,17 @@ pub struct DatabaseMonitoring {
         help = "Rollup window and job cadence in seconds. This is also the freshness floor: rolled-up data is up to one interval stale, and the read path covers the remainder with a live delta query over un-rolled-up spans. Lowering it shrinks that delta (cheaper reads, fresher pages) at the cost of a more frequent rollup job and more `_o2_db_stats` rows."
     )]
     pub rollup_interval_secs: u64,
+}
+
+/// Service versions as a whole; a per-org switch is not offered.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct ServiceVersions {
+    #[env_config(
+        name = "ZO_SERVICE_VERSIONS_ENABLED",
+        default = true,
+        help = "Enable Service Versions: span stamping at ingest, the version registry flush and the service signals processor. false pauses all three and keeps every stored row and cursor; true resumes from the saved cursors."
+    )]
+    pub enabled: bool,
 }
 
 /// Public (unauthenticated) dashboards; clamped in `check_public_dashboards_config`.
@@ -2182,7 +2208,7 @@ pub struct Common {
     /// server legitimately needs to send notifications to itself.
     #[env_config(name = "ZO_SSRF_ALLOW_LOOPBACK", default = false)]
     pub ssrf_allow_loopback: bool,
-    // This will completely skip ssrf checks, not just localhost
+    /// Skips SSRF checks and lets any org's VRL call `http_request`, `dns_lookup`, `reverse_dns`.
     #[env_config(name = "ZO_SKIP_SSRF_CHECKS", default = false)]
     pub skip_ssrf_checks: bool,
     /// Comma-separated CIDRs that only send-only destinations may reach; changes need a restart.
@@ -2482,6 +2508,12 @@ pub struct Common {
     pub memory_circuit_breaker_enabled: bool,
     #[env_config(name = "ZO_MEMORY_CIRCUIT_BREAKER_RATIO", default = 90)]
     pub memory_circuit_breaker_ratio: usize,
+    #[env_config(
+        name = "ZO_MEMORY_CIRCUIT_BREAKER_RELEASE_RATIO",
+        default = 0,
+        help = "A tripped memory circuit breaker releases only once memory usage drops below this percentage of total memory. 0 means 5 points below ZO_MEMORY_CIRCUIT_BREAKER_RATIO, but not below half of it; it is kept at least 1 point below the trip ratio"
+    )]
+    pub memory_circuit_breaker_release_ratio: usize,
     #[env_config(name = "ZO_DISK_CIRCUIT_BREAKER_ENABLED", default = false)]
     pub disk_circuit_breaker_enabled: bool,
     #[env_config(
@@ -2597,7 +2629,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_SDR_FAIL_CLOSED",
         default = false,
-        help = "Refuse rather than keep unredacted data when sensitive-data redaction cannot run. Logs and traces ingestion is rejected with 503 while the pattern manager is unavailable or a stream's ingestion pattern failed to build, and a search on a stream with search-time patterns errors when its redaction step cannot run. Off by default: data is stored and returned unredacted and the evidence row records a fail-open."
+        help = "Refuse rather than keep unredacted data when ingestion-time redaction cannot run. Logs and traces ingestion is rejected with 503 while the pattern manager is unavailable or a stream's ingestion pattern failed to build. Off by default: data is stored unredacted and the evidence row records a fail-open. Search-time redaction ignores this setting and always fails closed."
     )]
     pub sdr_fail_closed: bool,
     #[env_config(
@@ -2877,8 +2909,6 @@ pub struct Limit {
     pub query_partition_by_secs: usize,
     #[env_config(name = "ZO_QUERY_PARTITION_MAX_NUM", default = 100)] // max number of partitions
     pub query_partition_max_num: usize,
-    #[env_config(name = "ZO_DISABLE_PARTITIONS_FOR_NON_TS_ORDER_BY", default = false)]
-    pub disable_partitions_for_non_ts_order_by: bool,
     // Default Config: Run Query Recommendation Analysis for last one hour for every hour
     #[env_config(name = "ZO_QUERY_RECOMMENDATION_DURATION", default = 3600000000)] // microseconds
     pub query_recommendation_duration: i64,
@@ -2945,8 +2975,12 @@ pub struct Limit {
     pub grpc_runtime_blocking_worker_num: usize, // equals to 512 if 0
     #[env_config(name = "ZO_JOB_RUNTIME_WORKER_NUM", default = 0)]
     pub job_runtime_worker_num: usize, // equals to cpu_num if 0
-    #[env_config(name = "ZO_JOB_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
-    pub job_runtime_blocking_worker_num: usize, // equals to 512 if 0
+    #[env_config(
+        name = "ZO_JOB_RUNTIME_BLOCKING_WORKER_NUM",
+        default = 0,
+        help = "Max tokio blocking threads of the job runtime. 0 means cpu_num * 8, clamped to 32..256. Each blocking thread keeps its own allocator heap, so a higher cap raises resident memory after bursts."
+    )]
+    pub job_runtime_blocking_worker_num: usize,
     #[env_config(name = "ZO_WAL_RUNTIME_WORKER_NUM", default = 0)]
     pub wal_runtime_worker_num: usize, // equals to mem_table_bucket_num if 0
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
@@ -3039,6 +3073,12 @@ pub struct Limit {
         help = "Per-user cap on alert-destination test-sends per minute. A test-send posts a real [TEST]-marked message to a real destination, so this bounds accidental or scripted spam of someone's channel/inbox. The cap is enforced PER PROCESS (in-memory, not cluster-shared) — a multi-node deployment's effective cap is N times this value, where N is the node count. 0 = unlimited."
     )]
     pub alert_test_send_per_minute: u32,
+    #[env_config(
+        name = "ZO_INCIDENTS_JOIN_WINDOW_MINUTES",
+        default = 240,
+        help = "How long after an incident's first alert another alert may still join it by matching dimensions, in minutes. Alerts already in the incident always rejoin it, and an incident without dimensions takes only its own alerts. 0 removes the time limit."
+    )]
+    pub incidents_join_window_minutes: i64,
     #[env_config(
         name = "ZO_ALERT_CHART_ENABLED",
         default = true,
@@ -3545,6 +3585,12 @@ pub struct Compact {
     #[env_config(name = "ZO_COMPACT_MAX_GROUP_FILES", default = 10000)]
     pub max_group_files: usize,
     #[env_config(
+        name = "ZO_COMPACT_METRICS_MAX_GROUPS",
+        default = 100,
+        help = "Max sorted inputs (ingester files plus chains of already merged files) one metrics merge opens at once; a closed hour holding more is first pre-merged into hash-merged files. 0 disables the cap, other values below 10 are raised to 10"
+    )]
+    pub metrics_max_groups: usize,
+    #[env_config(
         name = "ZO_COMPACT_RETENTION_ALLOWED_HOURS",
         default = "",
         help = "Comma-separated list of hours (0-23) when retention can run. Empty means run at all hours. Example: 5,6,8"
@@ -3553,7 +3599,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_TANTIVY_BUILDER_THREAD_NUM",
         default = 2,
-        help = "Per-file concurrent row_group workers for tantivy index generation during compaction. Minimum 2"
+        help = "Per-file concurrent row_group workers for tantivy index generation, on ingesters and compactors. Minimum 2. Times ZO_FILE_MERGE_THREAD_NUM, it is the thread count of the shared tantivy build pool"
     )]
     pub tantivy_builder_thread_num: usize,
 }
@@ -4266,7 +4312,8 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.job_runtime_worker_num = cpu_num;
     }
     if cfg.limit.job_runtime_blocking_worker_num == 0 {
-        cfg.limit.job_runtime_blocking_worker_num = 512;
+        cfg.limit.job_runtime_blocking_worker_num =
+            default_job_runtime_blocking_worker_num(cpu_num);
     }
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {
@@ -4972,6 +5019,10 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.search.metrics_blocks_cache_max_size,
         cfg.limit.mem_total,
     );
+    cfg.common.memory_circuit_breaker_release_ratio = memory_circuit_breaker_release_ratio(
+        cfg.common.memory_circuit_breaker_ratio,
+        cfg.common.memory_circuit_breaker_release_ratio,
+    );
     Ok(())
 }
 
@@ -4981,6 +5032,16 @@ fn metrics_blocks_cache_size_mb(configured: usize, mem_total: usize) -> usize {
         1..=9 => 0,
         size => size,
     }
+}
+
+/// At least one point below the trip ratio, so a breaker always has a gap to cross; the
+/// only exception is trip ratio 1, which has no whole percentage below it but 0.
+fn memory_circuit_breaker_release_ratio(trip_ratio: usize, configured: usize) -> usize {
+    let ratio = match configured {
+        0 => trip_ratio.saturating_sub(5).max(trip_ratio / 2),
+        ratio => ratio,
+    };
+    ratio.min(trip_ratio.saturating_sub(1)).max(1)
 }
 
 /// Strip the Windows extended-length prefix (`\\?\`) from a canonicalized path
@@ -5020,6 +5081,13 @@ fn default_mem_table_bucket_num(
 fn default_max_file_size(mem_table_max_size: usize) -> usize {
     let mb = 1024 * 1024;
     (mem_table_max_size / 4 / mb * mb).clamp(MAX_FILE_SIZE_DEFAULT_FLOOR, MAX_FILE_SIZE_DEFAULT_CAP)
+}
+
+/// Idle blocking threads pin their allocator heaps, so the cap bounds resident memory after a
+/// burst.
+fn default_job_runtime_blocking_worker_num(cpu_num: usize) -> usize {
+    (cpu_num * JOB_RUNTIME_BLOCKING_PER_CPU)
+        .clamp(JOB_RUNTIME_BLOCKING_FLOOR, JOB_RUNTIME_BLOCKING_CAP)
 }
 
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
@@ -5203,6 +5271,10 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.compact.old_data_min_files < 1 {
         cfg.compact.old_data_min_files = 10;
     }
+    // 0 disables the cap; a smaller cap would pre-merge an hour over too many rounds
+    if (1..10).contains(&cfg.compact.metrics_max_groups) {
+        cfg.compact.metrics_max_groups = 10;
+    }
     if cfg.compact.file_list_deleted_batch_size == 0 {
         cfg.compact.file_list_deleted_batch_size = 1000;
     }
@@ -5359,6 +5431,12 @@ fn check_health_check_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.health_check.failed_times = 3;
     }
     Ok(())
+}
+
+/// `ZO_USAGE_PUBLISH_INTERVAL` as an enterprise build applies it.
+#[inline]
+pub fn enterprise_usage_publish_interval(cfg: &Config) -> i64 {
+    ENTERPRISE_USAGE_PUBLISH_CAP_SECS.min(cfg.common.usage_publish_interval)
 }
 
 #[inline]
@@ -5605,6 +5683,30 @@ mod tests {
     }
 
     use super::*;
+
+    #[test]
+    fn memory_circuit_breaker_release_ratio_defaults_below_trip_and_stays_a_point_below_it() {
+        for (trip, configured, expected) in [
+            (90, 0, 85),
+            (95, 0, 90),
+            (16, 0, 11),
+            (10, 0, 5),
+            (8, 0, 4),
+            (2, 0, 1),
+            (1, 0, 1),
+            (90, 70, 70),
+            (90, 89, 89),
+            (90, 90, 89),
+            (90, 95, 89),
+            (2, 2, 1),
+        ] {
+            assert_eq!(
+                memory_circuit_breaker_release_ratio(trip, configured),
+                expected,
+                "trip {trip}, configured {configured}"
+            );
+        }
+    }
 
     /// A coherent starting point, so each ceiling test changes exactly the one
     /// thing it is about. `Synthetics::default()` is all zeroes — the derive
@@ -6518,6 +6620,19 @@ mod tests {
         assert_eq!(default_mem_table_bucket_num(0, 512 * mb, 28), 1);
         assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 0, 28), 28);
         assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 0), 1);
+    }
+
+    #[test]
+    fn test_default_job_runtime_blocking_worker_num() {
+        assert_eq!(default_job_runtime_blocking_worker_num(0), 32);
+        assert_eq!(default_job_runtime_blocking_worker_num(2), 32);
+        assert_eq!(default_job_runtime_blocking_worker_num(3), 32);
+        assert_eq!(default_job_runtime_blocking_worker_num(4), 32);
+        assert_eq!(default_job_runtime_blocking_worker_num(5), 40);
+        assert_eq!(default_job_runtime_blocking_worker_num(8), 64);
+        assert_eq!(default_job_runtime_blocking_worker_num(16), 128);
+        assert_eq!(default_job_runtime_blocking_worker_num(32), 256);
+        assert_eq!(default_job_runtime_blocking_worker_num(64), 256);
     }
 
     #[test]

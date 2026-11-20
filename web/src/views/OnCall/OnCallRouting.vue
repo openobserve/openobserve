@@ -123,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :rules="rules"
         :teams="teams"
         :aliases="aliases"
+        :services="services"
         :default-team-id="routingConfig?.default_team_id ?? null"
         :loading="loadingRules"
         :search="search"
@@ -136,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @clear-search="clearSearch"
       >
         <template #toolbar>
-          <div class="flex w-full min-w-0 flex-wrap items-center gap-2 max-md:contents">
+          <div class="flex flex-1 flex-wrap items-center gap-2 max-md:contents">
             <OToggleGroup
               :model-value="tab"
               type="single"
@@ -194,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @clear-search="clearSearch"
       >
         <template #toolbar>
-          <div class="flex w-full min-w-0 flex-wrap items-center gap-2 max-md:contents">
+          <div class="flex flex-1 flex-wrap items-center gap-2 max-md:contents">
             <OToggleGroup
               :model-value="tab"
               type="single"
@@ -440,6 +441,7 @@ import type {
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { displayFieldsOf } from "@/types/serviceRef";
 import {
   claimableDimensions,
   isOnCallUnavailable,
@@ -754,7 +756,12 @@ async function fetchServices(force = false) {
       const identity = (row.disambiguation ?? {}) as Record<string, string>;
       const existing = seen.get(name);
       if (!existing || (!Object.keys(existing.identity).length && Object.keys(identity).length)) {
-        seen.set(name, { name, setId: String(row.set_id ?? "default"), identity });
+        seen.set(name, {
+          name,
+          setId: String(row.set_id ?? "default"),
+          identity,
+          ...displayFieldsOf(row),
+        });
       }
     }
     services.value = [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));

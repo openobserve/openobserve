@@ -151,14 +151,14 @@ describe("SyntheticsLocationForm", () => {
 
   // ── 1. Create mode ─────────────────────────────────────────────────────────
 
-  it("renders in create mode (isEdit=false) with title 'Add Location'", () => {
+  it("renders in create mode (isEdit=false) with title 'New location'", () => {
     wrapper = createWrapper({ isEdit: false });
 
     // The ODrawer is rendered with create-mode title and button labels.
     const drawer = wrapper.findComponent({ name: "ODrawer" });
     expect(drawer.exists()).toBe(true);
-    expect(drawer.props("title")).toBe("Add Location");
-    expect(drawer.props("primaryButtonLabel")).toBe("Create & Close");
+    expect(drawer.props("title")).toBe("New location");
+    expect(drawer.props("primaryButtonLabel")).toBe("Create and close");
     expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
   });
 

@@ -15,7 +15,7 @@
 
 import { orgKey } from "@/composables/query/keys";
 import { stableFilters } from "@/composables/query/queryClient";
-import type { AlertHistoryQuery } from "./alerts";
+import type { AlertHistoryQuery, AlertHistorySummaryQuery } from "./alerts";
 import { incidentKeys } from "./incidents.querykeys";
 import { oncallKeys } from "./oncall.querykeys";
 
@@ -35,13 +35,15 @@ export const alertKeys = {
           type: alertType || "all",
         })
       : orgKey(org, "alerts", "list", folderId, alertType || "all"),
-  /** Every folder's alerts with live state: the Firing tab, its badge and its drawer share it. */
+  /** Every folder's alerts with live state, read by the incident views. */
   firing: (org: string) => orgKey(org, "alerts", "firing"),
   detail: (org: string, id: string) => orgKey(org, "alerts", "detail", id),
   acks: (org: string, id: string) => orgKey(org, "alerts", "acks", id),
   /** Every folder's alerts with their destination/template refs — the dep graph. */
   dependencies: (org: string) => orgKey(org, "alerts", "dependencies"),
   historyAll: (org: string) => orgKey(org, "alerts", "history"),
+  historySummary: (org: string, query: AlertHistorySummaryQuery) =>
+    orgKey(org, "alerts", "history", "summary", stableFilters({ ...query })),
   history: (org: string, query: AlertHistoryQuery) =>
     orgKey(
       org,

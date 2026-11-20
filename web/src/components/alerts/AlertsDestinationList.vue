@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:current-page="onPageChange"
         >
           <template #toolbar>
-            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+            <div class="flex flex-1 items-center gap-2 max-md:contents">
               <OToggleGroup
                 mobile-dropdown
                 :model-value="activeTab"
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="destination-export"
                 data-row-action="export"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 :title="t('alert_destinations.exportDestination')"
                 @click.stop="exportDestination(row)"
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`alert-destination-list-${row.name}-update-destination`"
                 data-row-action="edit"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(row)"
@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`alert-destination-list-${row.name}-delete-destination`"
                 data-row-action="delete"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs-sq"
                 class="max-md:hidden"
                 :title="t('alert_destinations.delete')"
                 :loading="deletingDestinations.has(row.name)"

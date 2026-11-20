@@ -26,10 +26,16 @@ export interface PickerCluster {
   tone: ClusterTone;
 }
 
-const props = defineProps<{ clusters: PickerCluster[]; active: string | null }>();
+const props = defineProps<{
+  clusters: PickerCluster[];
+  active: string | null;
+  loading?: boolean;
+}>();
 const emit = defineEmits<{ select: [name: string] }>();
 
 const { t } = useI18nTyped();
+
+const showLoading = computed(() => !!props.loading && !props.clusters.length);
 
 const DOT_CLASS: Record<ClusterTone, string> = {
   success: "bg-status-success-text",
@@ -65,11 +71,15 @@ const onSelect = (value: unknown) => {
     searchable
     :model-value="active"
     :options="options"
+    :disabled="showLoading"
+    :loading="showLoading"
     :search-placeholder="t('infra.k8s2.clusterPickerSearch')"
     :aria-label="
       current
         ? t('infra.k8s2.clusterPickerTrigger', { name: raw(current.name) })
-        : t('infra.k8s2.clusterPickerLabel')
+        : showLoading
+          ? t('infra.k8s2.clusterPickerLoading')
+          : t('infra.k8s2.clusterPickerLabel')
     "
     data-test="k8s2-cluster-picker"
     @update:model-value="onSelect"
@@ -83,7 +93,11 @@ const onSelect = (value: unknown) => {
           aria-hidden="true"
         />
         <OTruncatedText class="min-w-0 flex-1 font-semibold">{{
-          current ? raw(current.name) : t("infra.k8s2.clusterPickerLabel")
+          current
+            ? raw(current.name)
+            : showLoading
+              ? t("infra.k8s2.clusterPickerLoading")
+              : t("infra.k8s2.clusterPickerLabel")
         }}</OTruncatedText>
       </span>
     </template>

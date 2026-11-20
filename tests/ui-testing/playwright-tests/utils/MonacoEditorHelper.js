@@ -48,6 +48,34 @@ class MonacoEditorHelper {
         return container.locator(this.selectors.inputArea);
     }
 
+    async waitForReady(container, timeout = 30000) {
+        await container.locator(this.selectors.editor).first().waitFor({ state: 'visible', timeout });
+        // Firefox renders the textarea 0px wide, so it never counts as visible; attached is the cross-browser signal.
+        await this.getInputArea(container).first().waitFor({ state: 'attached', timeout });
+    }
+
+    /** Replace the editor content in one user edit (no per-key autocomplete), working in Chromium and Firefox. */
+    async fillInputArea(container, text, timeout = 30000) {
+        await this.waitForReady(container, timeout);
+        const inputArea = this.getInputArea(container).first();
+        await inputArea.focus();
+        // The textarea only mirrors the text around the cursor, so without a select-all a fill inserts instead of replacing.
+        await this.page.keyboard.press('ControlOrMeta+a');
+        // Firefox repeats the first line of a multi-line textarea fill, so multi-line text goes through the editor's paste command.
+        if (text.includes('\n') && await this.paste(container, text)) return;
+        await inputArea.fill(text, { force: true, timeout });
+    }
+
+    /** Paste text over the selection through the editor's own paste command; false when no editor instance is found. */
+    async paste(container, text) {
+        return container.first().evaluate((node, value) => {
+            const editor = window.monaco?.editor?.getEditors?.().find((e) => node.contains(e.getDomNode()));
+            if (!editor) return false;
+            editor.trigger('keyboard', 'paste', { text: value });
+            return true;
+        }, text);
+    }
+
     /**
      * Click into the Monaco editor to focus it
      * @param {import('@playwright/test').Locator} container - Container locator

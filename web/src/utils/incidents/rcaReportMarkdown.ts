@@ -236,6 +236,76 @@ export const stripVerdictFence = (md: string): string => {
     .trim();
 };
 
+const EXECUTIVE_SUMMARY = /^##\s+Executive Summary\s*$/i;
+
+/** The analysis writes Executive Summary last; readers want it first, after the title. */
+export const rcaReportExecutiveFirst = (md: string): string => {
+  const isCode = createCodeFenceTracker();
+  const lines = md.split("\n");
+  const sectionStarts = lines
+    .map((text, i) => ({ i, heading: !isCode(text) && /^##\s/.test(text) }))
+    .filter((line) => line.heading)
+    .map((line) => line.i);
+  const at = sectionStarts.findIndex((i) => EXECUTIVE_SUMMARY.test(lines[i]));
+  if (at <= 0) return md;
+  const start = sectionStarts[at];
+  const end = sectionStarts[at + 1] ?? lines.length;
+  const section = lines.slice(start, end);
+  // Keep one blank line between sections when the moved one ends the file.
+  if (section.at(-1)?.trim() !== "") section.push("");
+  const rest = [...lines.slice(0, start), ...lines.slice(end)];
+  rest.splice(sectionStarts[0], 0, ...section);
+  return rest.join("\n").replace(/\n+$/, md.endsWith("\n") ? "\n" : "");
+};
+
+// A run of N backticks opens a code span only the next run of exactly N closes (CommonMark); spans may cross lines.
+const proseOutsideCodeSpans = (text: string, replace: (prose: string) => string) => {
+  let out = "";
+  let from = 0;
+  const run = /`+/g;
+  for (let open = run.exec(text); open; open = run.exec(text)) {
+    const close = new RegExp(`(?<!\`)${open[0]}(?!\`)`, "g");
+    close.lastIndex = run.lastIndex;
+    if (!close.exec(text)) continue;
+    out += replace(text.slice(from, open.index)) + text.slice(open.index, close.lastIndex);
+    from = run.lastIndex = close.lastIndex;
+  }
+  return out + replace(text.slice(from));
+};
+
+/** "[e7]" becomes the page's evidence number, else `unmatched`; with no numbers yet the ids drop out. */
+export const rcaRenumberCitations = (
+  md: string,
+  numbers: Map<string, number> | null,
+  unmatched: (id: string) => string,
+): string => {
+  // An "[e1]" inside fenced or inline code is the author's literal, not a citation.
+  const isCode = createCodeFenceTracker();
+  const inProse = (replace: (prose: string) => string) => {
+    const out: string[] = [];
+    let paragraph: string[] = [];
+    const flush = () => {
+      if (paragraph.length) out.push(proseOutsideCodeSpans(paragraph.join("\n"), replace));
+      paragraph = [];
+    };
+    for (const line of md.split("\n")) {
+      if (isCode(line) || !line.trim()) {
+        flush();
+        out.push(line);
+      } else paragraph.push(line);
+    }
+    flush();
+    return out.join("\n");
+  };
+  if (!numbers) return inProse((prose) => prose.replace(/ ?\[e\d+\]/g, ""));
+  return inProse((prose) =>
+    prose.replace(/\[(e\d+)\]/g, (_match, id: string) => {
+      const number = numbers.get(id);
+      return number === undefined ? `[${unmatched(id)}]` : `[${number}]`;
+    }),
+  );
+};
+
 const prepare = (md: string): string => promoteBoldLinesToHeadings(stripVerdictFence(md));
 
 /** Renders an agent report to sanitized HTML wrapped in `.rca-report-content`. */

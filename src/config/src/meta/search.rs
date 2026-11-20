@@ -30,6 +30,8 @@ use crate::{
 
 pub const PARTIAL_ERROR_RESPONSE_MESSAGE: &str =
     "Please be aware that the response is based on partial data";
+/// The scan-level redaction function; the scanning node recognises its own projection by it.
+pub const SDR_REDACT_UDF_NAME: &str = "sdr_redact";
 
 /// To represent the query start and end time based of partition or cache
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -728,13 +730,6 @@ pub struct SearchPartitionResponse {
     pub streaming_id: Option<String>,
     #[serde(default)]
     pub is_histogram_eligible: bool,
-    /// ORDER BY columns when the primary sort is a non-timestamp column.
-    /// Non-empty means this is a non-ts ORDER BY query; empty means timestamp sort (normal path).
-    /// Each entry is (column_name, is_descending). The heap honors all columns in order so
-    /// that ties on the primary column are broken correctly by secondary columns.
-    /// Skipped from serialization — internal leader use only, not exposed to callers.
-    #[serde(skip)]
-    pub non_ts_order_by_cols: Vec<(String, bool)>,
 }
 
 /// Request parameters for querying search history
@@ -995,13 +990,20 @@ impl ScanStats {
     }
 }
 
-impl From<Query> for cluster_rpc::SearchQuery {
-    fn from(query: Query) -> Self {
-        cluster_rpc::SearchQuery {
+/// A `from` or `size` that does not fit the 32-bit field of the cluster query.
+#[derive(Debug, thiserror::Error)]
+#[error("{0} is out of range")]
+pub struct QueryOutOfRange(pub &'static str);
+
+impl TryFrom<Query> for cluster_rpc::SearchQuery {
+    type Error = QueryOutOfRange;
+
+    fn try_from(query: Query) -> Result<Self, Self::Error> {
+        Ok(cluster_rpc::SearchQuery {
+            from: i32::try_from(query.from).map_err(|_| QueryOutOfRange("from"))?,
+            size: i32::try_from(query.size).map_err(|_| QueryOutOfRange("size"))?,
             sql: query.sql,
             quick_mode: query.quick_mode,
-            from: query.from as i32,
-            size: query.size as i32,
             start_time: query.start_time,
             end_time: query.end_time,
             track_total_hits: query.track_total_hits,
@@ -1011,7 +1013,7 @@ impl From<Query> for cluster_rpc::SearchQuery {
             histogram_interval: query.histogram_interval,
             timezone: query.timezone,
             sampling_ratio: query.sampling_ratio,
-        }
+        })
     }
 }
 
@@ -2649,7 +2651,7 @@ mod tests {
             ..Default::default()
         };
 
-        let cluster_query: cluster_rpc::SearchQuery = query.into();
+        let cluster_query = cluster_rpc::SearchQuery::try_from(query).unwrap();
         assert_eq!(cluster_query.sql, "SELECT * FROM test");
         assert!(cluster_query.quick_mode);
         assert_eq!(cluster_query.from, 10);

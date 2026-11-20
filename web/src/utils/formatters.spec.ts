@@ -17,6 +17,7 @@ import {
   b64DecodeStandard,
   convertToTitleCase,
   truncateText,
+  identifierBreaks,
   formatLargeNumber,
   formatCompactCount,
   formatEventCount,
@@ -769,5 +770,15 @@ describe("formatMs", () => {
 
   it("shows a dash for no value", () => {
     expect(formatMs(null)).toBe("—");
+  });
+});
+
+describe("identifierBreaks", () => {
+  it.each([
+    ["VPC_Flow_Rejected__vpc.log", ["VPC_", "Flow_", "Rejected_", "_", "vpc.", "log"]],
+    ["k8s/pod:cpu-high", ["k8s/", "pod:", "cpu-", "high"]],
+    ["plain", ["plain"]],
+  ])("breaks %s only after its separators", (name, parts) => {
+    expect(identifierBreaks(name)).toEqual(parts);
   });
 });

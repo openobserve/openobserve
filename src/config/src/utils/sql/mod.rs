@@ -19,6 +19,7 @@ mod explain_query;
 mod group_by_query;
 mod helpers;
 mod simple_aggregate_query;
+mod time_splittable;
 mod timestamp_selected;
 mod visitors;
 mod where_fragment;
@@ -26,8 +27,9 @@ mod where_fragment;
 pub use complex_query::{is_complex_query, is_complex_query_stmt};
 pub use eligible_for_histogram::is_eligible_for_histogram;
 pub use explain_query::is_explain_query;
-pub use group_by_query::is_group_by_query;
+pub use group_by_query::{group_by_columns, is_group_by_query};
 pub use simple_aggregate_query::is_simple_aggregate_query;
+pub use time_splittable::is_time_splittable;
 pub use timestamp_selected::is_timestamp_selected;
 pub use visitors::TimestampVisitor;
 pub use where_fragment::{validate_optional_where_fragment, validate_where_fragment};
@@ -66,6 +68,16 @@ pub fn quote_sql_string(value: &str) -> String {
     } else {
         format!("'{body}'")
     }
+}
+
+/// Quotes a LIKE pattern in which `value` matches literally; `prefix` and `suffix` are raw
+/// LIKE syntax such as `%`. Escapes use `\`, DataFusion's default LIKE escape.
+pub fn quote_like_pattern(prefix: &str, value: &str, suffix: &str) -> String {
+    let escaped = value
+        .replace('\\', r"\\")
+        .replace('%', r"\%")
+        .replace('_', r"\_");
+    quote_sql_string(&format!("{prefix}{escaped}{suffix}"))
 }
 
 /// Prefer [`quote_sql_string`], which also parenthesises a split `||` chain.
@@ -199,6 +211,26 @@ mod tests {
                 escape_sql_string(value)
             );
             assert_eq!(compared_values(&sql), vec![value, "end"], "{sql}");
+        }
+    }
+
+    #[test]
+    fn like_patterns_survive_reserialisation_and_match_literally() {
+        for (value, pattern) in [
+            (r"x\' OR 1=1 --", r"%x\\' OR 1=1 --%"),
+            ("a''b", "%a''b%"),
+            (r"50%_off\", r"%50\%\_off\\%"),
+            ("O'Brien", "%O'Brien%"),
+        ] {
+            let sql = format!(
+                "SELECT * FROM t WHERE b LIKE {} AND d = 'end'",
+                quote_like_pattern("%", value, "%")
+            );
+            assert_eq!(
+                compared_values(&sql),
+                vec![pattern, "end"],
+                "{value:?} through {sql}"
+            );
         }
     }
 

@@ -463,6 +463,15 @@ pub async fn create_alert(
     if let Err(resp) = security::validate_detection(&org_id, Some(&folder_id), &alert).await {
         return resp;
     }
+    // An import or `?overwrite=true` naming a stored detection's id must not rewrite its query.
+    #[cfg(feature = "enterprise")]
+    if let Some(alert_id) = alert.id
+        && let Err(resp) =
+            security::guard_detection_definition(&org_id, &user_email.user_id, alert_id, &alert)
+                .await
+    {
+        return resp;
+    }
     if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
         return resp;
     }
@@ -1000,11 +1009,8 @@ fn composite_error_response(
         CompositeServiceError::ChildNotEligible(_) => {
             composite_machine_error(StatusCode::BAD_REQUEST, "child_not_eligible", error)
         }
-        CompositeServiceError::Cycle => {
-            composite_machine_error(StatusCode::CONFLICT, "composite_cycle", error)
-        }
-        CompositeServiceError::TooDeep => {
-            composite_machine_error(StatusCode::CONFLICT, "composite_too_deep", error)
+        CompositeServiceError::ChildIsComposite(_) => {
+            composite_machine_error(StatusCode::BAD_REQUEST, "child_is_composite", error)
         }
         CompositeServiceError::NotFound => {
             composite_machine_error(StatusCode::NOT_FOUND, "composite_not_found", error)
@@ -1023,11 +1029,6 @@ fn composite_error_response(
         CompositeServiceError::WritesDisabled => composite_machine_error(
             StatusCode::SERVICE_UNAVAILABLE,
             "composite_writes_disabled",
-            error,
-        ),
-        CompositeServiceError::SuperClusterUnsupported => composite_machine_error(
-            StatusCode::CONFLICT,
-            "composite_super_cluster_unsupported",
             error,
         ),
         CompositeServiceError::PermissionDenied => {
@@ -1193,15 +1194,12 @@ pub async fn validate_composite_alert(
                     format!("child alert {id} is not eligible for composite evaluation"),
                 );
             }
-            Some(infra::table::alert_composites::Resolution::Composite(composite)) => {
-                children.push(serde_json::json!({
-                    "alert_id": id,
-                    "accessible": true,
-                    "name": composite.name.clone(),
-                    "alert_type": "composite",
-                    "folder_id": composite.folder_id.clone(),
-                    "enabled": composite.enabled,
-                }));
+            Some(infra::table::alert_composites::Resolution::Composite(_)) => {
+                return composite_error_response(
+                    openobserve_core::alerts::composite::CompositeServiceError::ChildIsComposite(
+                        id,
+                    ),
+                );
             }
             _ => inaccessible.push(id),
         }
@@ -2514,6 +2512,12 @@ pub async fn update_alert(
     alert.id = Some(alert_id);
     #[cfg(feature = "enterprise")]
     if let Err(resp) = security::validate_detection(&org_id, None, &alert).await {
+        return resp;
+    }
+    #[cfg(feature = "enterprise")]
+    if let Err(resp) =
+        security::guard_detection_definition(&org_id, &user_email.user_id, alert_id, &alert).await
+    {
         return resp;
     }
     // the save's own checks answer first, so a bad body is never reported as a refused read
@@ -3902,43 +3906,49 @@ async fn enrich_with_incidents(
     list: &mut [ListAlertsResponseBodyItem],
     rollups: &StdHashMap<String, AlertState>,
 ) -> Result<(), infra::errors::Error> {
+    use infra::table::alert_incidents::CaseFilter;
+    use openobserve_core::alerts::ack::{episode_stands, pick_firing_incident};
+
     use crate::models::alerts::responses::AlertIncidentLink;
 
-    let firing: Vec<_> = list
-        .iter()
-        .filter_map(|item| {
-            let id = item.alert_id.to_string();
-            let rollup = rollups.get(&id).filter(|r| r.is_firing())?;
-            Some((id, rollup.episode_incident_id.clone()))
-        })
-        .collect();
-    let episodes: Vec<String> = firing.iter().filter_map(|(_, e)| e.clone()).collect();
-    let unlinked: Vec<String> = firing
-        .iter()
-        .filter(|(_, e)| e.is_none())
-        .map(|(id, _)| id.clone())
-        .collect();
+    let mut firing = Vec::new();
+    for item in list.iter() {
+        let id = item.alert_id.to_string();
+        if let Some(rollup) = rollups.get(&id).filter(|r| r.is_firing()) {
+            let detection = db::alerts::alert::any_siem_alert(org_id, [id.as_str()]).await;
+            firing.push((id, rollup.episode_incident_id.clone(), detection));
+        }
+    }
+    let episodes: Vec<String> = firing.iter().filter_map(|(_, e, _)| e.clone()).collect();
     let by_episode = infra::table::alert_incidents::get_many(org_id, &episodes).await?;
+    let marked = |id: &String| by_episode.get(id).map(|m| m.security_case);
+    // Only an alert whose episode is missing or of the other kind needs the batched lookup.
+    let unlinked: StdHashMap<_, _> = firing
+        .iter()
+        .filter(|(_, e, d)| !e.as_ref().is_some_and(|e| episode_stands(marked(e), *d)))
+        .map(|(id, _, d)| (id.clone(), CaseFilter::of_kind(*d)))
+        .collect();
     let by_alert =
         infra::table::alert_incidents::find_open_incidents_containing_alerts(org_id, &unlinked)
             .await?;
-    let links: StdHashMap<String, AlertIncidentLink> = firing
-        .into_iter()
-        .filter_map(|(id, episode)| {
-            let model = match episode {
-                Some(incident_id) => by_episode.get(&incident_id),
-                None => by_alert.get(&id),
-            }?;
-            Some((
-                id,
-                AlertIncidentLink {
-                    id: model.id.clone(),
-                    title: model.title.clone(),
-                    status: model.status.parse().unwrap_or_default(),
-                },
-            ))
-        })
-        .collect();
+    let mut links = StdHashMap::new();
+    for (id, episode, detection) in firing {
+        let open = by_alert.get(&id);
+        let episode = episode.map(|e| (e.clone(), marked(&e)));
+        let of_kind = async || Ok::<_, std::convert::Infallible>(open.map(|m| m.id.clone()));
+        let Ok(Some(picked)) = pick_firing_incident(episode, detection, of_kind).await else {
+            continue;
+        };
+        let Some(model) = open.filter(|m| m.id == picked).or(by_episode.get(&picked)) else {
+            continue;
+        };
+        let link = AlertIncidentLink {
+            id: model.id.clone(),
+            title: model.title.clone(),
+            status: model.status.parse().unwrap_or_default(),
+        };
+        links.insert(id, link);
+    }
     for item in list.iter_mut() {
         if let Some(link) = links.get(&item.alert_id.to_string()) {
             item.incident = Some(link.clone());
@@ -4417,7 +4427,17 @@ pub async fn retrain_alert(
     Path((org_id, alert_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, alert_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
     #[cfg(feature = "enterprise")]
+    retrain_anomaly_alert(&org_id, alert_id, &user_email.user_id).await
+}
+
+#[cfg(feature = "enterprise")]
+async fn retrain_anomaly_alert(org_id: &str, alert_id: String, user_id: &str) -> Response {
     let alert_id_str = alert_id.clone();
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
@@ -4427,7 +4447,7 @@ pub async fn retrain_alert(
     };
     let client = get_orm_client_ro().await;
     // Check if this is a regular alert — if so, return 400
-    match alert::get_by_id(client, &org_id, alert_id).await {
+    match alert::get_by_id(client, org_id, alert_id).await {
         Ok(_) => {
             return MetaHttpResponse::bad_request(
                 "retrain is only supported for anomaly detection alerts",
@@ -4438,26 +4458,19 @@ pub async fn retrain_alert(
         }
         Err(e) => return e.into(),
     }
-    #[cfg(not(feature = "enterprise"))]
-    {
-        MetaHttpResponse::bad_request("retrain is only supported for anomaly detection alerts")
-    }
-    #[cfg(feature = "enterprise")]
     if let Some(resp) = crate::request::anomaly_detection::disabled_response() {
         return resp;
     }
-    #[cfg(feature = "enterprise")]
     if let Err(resp) = openobserve_core::background_access::guard_loaded(
-        &org_id,
-        &user_email.user_id,
-        openobserve_core::background_access::runnable_anomaly_sources(&org_id, &alert_id_str),
+        org_id,
+        user_id,
+        openobserve_core::background_access::runnable_anomaly_sources(org_id, &alert_id_str),
     )
     .await
     {
         return resp;
     }
-    #[cfg(feature = "enterprise")]
-    match openobserve_core::anomaly_detection::train_model(&org_id, &alert_id_str).await {
+    match openobserve_core::anomaly_detection::train_model(org_id, &alert_id_str).await {
         Ok(_) => MetaHttpResponse::ok("Retraining triggered"),
         Err(e) => {
             let msg = e.to_string().to_lowercase();
@@ -4869,6 +4882,13 @@ mod tests {
         visible_alert,
     };
 
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn oss_retrain_alert_answers_403_before_parsing_the_id() {
+        let resp = super::retrain_alert(Path(("o".to_string(), "not-an-id".to_string()))).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
+
     fn row(name: &str, extra: serde_json::Value) -> ListAlertsResponseBodyItem {
         let mut value = serde_json::json!({
             "alert_id": Ksuid::new(None, None).to_string(),
@@ -4932,6 +4952,59 @@ mod tests {
             .map(String::as_str)
             .collect();
         assert_eq!(left, vec!["anomaly_id", "name", "threshold"]);
+    }
+
+    /// A detection converted from ops: its old incident until a case opens, then the case.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_list_links_a_converted_alert_to_the_incident_acknowledgement_targets() {
+        use config::meta::{
+            alerts::{
+                alert::{Alert, SIEM_ATTRIBUTE},
+                state::{AlertState, ROLLUP_GROUP_KEY},
+            },
+            self_reporting::usage::RunOutcome,
+        };
+        use infra::table::alert_incidents::{add_alert_to_incident, create, mark_security_case};
+
+        crate::request::security::tests::meta_store().await;
+        let org = format!("convert_{}", config::ider::uuid());
+        let mut item = row("a1", serde_json::json!({}));
+        let id = item.alert_id.to_string();
+        let mut alert = Alert::default();
+        alert.context_attributes = Some([(SIEM_ATTRIBUTE.into(), "true".into())].into());
+        let key = db::alerts::alert::cache_alert_key(&org, &id);
+        let cached = (Default::default(), alert);
+        common::infra::config::ALERTS
+            .write()
+            .await
+            .insert(key, cached);
+        let hold = async |case: bool| {
+            let held = create(&org, "P2", serde_json::json!({}), "alert_id", 1, None).await;
+            let held = held.unwrap().id;
+            if case {
+                mark_security_case(&org, &held).await.unwrap();
+            }
+            add_alert_to_incident(&held, &id, "a1", "internal", 1, "alert_id")
+                .await
+                .unwrap();
+            held
+        };
+        let ops = hold(false).await;
+        let mut rollup = AlertState::empty(&id, ROLLUP_GROUP_KEY);
+        rollup.last_outcome = Some(RunOutcome::Firing);
+        rollup.episode_incident_id = Some(ops.clone());
+        let rollups = super::StdHashMap::from([(id.clone(), rollup)]);
+        let mut linked = async || {
+            let list = std::slice::from_mut(&mut item);
+            super::enrich_with_incidents(&org, list, &rollups)
+                .await
+                .unwrap();
+            item.incident.as_ref().map(|link| link.id.clone())
+        };
+        assert_eq!(linked().await, Some(ops));
+        let case = hold(true).await;
+        assert_eq!(linked().await, Some(case));
     }
 
     fn status(err: AlertError) -> StatusCode {
@@ -5114,6 +5187,21 @@ mod tests {
         let parsed: GetAlertResponseBody = serde_json::from_value(named).unwrap();
         assert_eq!(parsed.locked_target_names["wf"], "Restart pods");
         assert_eq!(parsed.alert.name, body.alert.name);
+    }
+
+    #[tokio::test]
+    async fn a_composite_child_answers_400_with_a_stable_code() {
+        use openobserve_core::alerts::composite::CompositeServiceError;
+
+        let response = super::composite_error_response(CompositeServiceError::ChildIsComposite(
+            "c1".to_string(),
+        ));
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["code"], "child_is_composite");
     }
 
     // 400 Bad Request
@@ -5862,6 +5950,21 @@ mod tests {
                 .await
                 .unwrap_err();
             assert_ne!(resp.status(), StatusCode::FORBIDDEN);
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_every_save_of_a_stored_alert_guards_a_detections_definition() {
+        let text = include_str!("mod.rs");
+        for signature in ["pub async fn create_alert(", "pub async fn update_alert("] {
+            let start = text.find(signature).expect("handler");
+            let body = &text[start..];
+            let body = &body[..body.find("\n}\n").expect("handler end")];
+            assert!(
+                body.contains("security::guard_detection_definition("),
+                "{signature} must refuse a change to a detection's Sigma-compiled query"
+            );
         }
     }
 }

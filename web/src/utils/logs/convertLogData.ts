@@ -250,7 +250,11 @@ export const convertStackedLogData = (
   const textColor = isDarkTheme ? "#e0e0e0" : "#222";
 
   const esc = (s: string) =>
-    String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
 
   return {
     options: {
@@ -274,7 +278,7 @@ export const convertStackedLogData = (
         // vertically when a high-cardinality breakdown overflows.
         // !important is required because ECharts writes inline styles.
         extraCssText:
-          "max-height: 20vh !important; overflow-y: auto !important; overflow-x: hidden !important; white-space: normal !important;",
+          "max-width: min(25rem, calc(100vw - 1.5rem)) !important; max-height: 20vh !important; overflow-y: auto !important; overflow-x: hidden !important; white-space: normal !important;",
         backgroundColor: isDarkTheme ? "#1e1e2e" : "#ffffff",
         borderColor: isDarkTheme ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)",
         textStyle: { fontSize: 12, color: textColor },
@@ -289,15 +293,18 @@ export const convertStackedLogData = (
           // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
           html += `<div style="font-size:0.6875rem;font-weight:500;opacity:0.65;padding:0 0.625rem 0.25rem;margin-bottom:0;border-bottom:1px solid rgba(128,128,128,0.15);color:${textColor}">${esc(tooltipParams[0].axisValueLabel)}</div>`;
 
-          tooltipParams.forEach((p: any) => {
-            html += `
+          // A breakdown field can have dozens of values; listing the empty ones buries the few with data.
+          tooltipParams
+            .filter((p: any) => Number(p.value?.[1]) > 0)
+            .forEach((p: any) => {
+              html += `
               <div style="display:flex;align-items:center;gap:0.375rem;padding:0.0625rem 0.625rem;">
                 ${p.marker}
-                <span style="flex:1;color:${textColor};font-size:0.75rem">${esc(p.seriesName)}</span>
+                <span title="${esc(p.seriesName)}" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:${textColor};font-size:0.75rem">${esc(p.seriesName)}</span>
                 <span style="font-weight:600;color:${textColor};min-width:2rem;text-align:right;font-size:0.75rem">${esc(formatCount(p.value[1]))}</span>
               </div>`;
-            // p.marker is ECharts-generated HTML (a colored dot span) — intentionally not escaped
-          });
+              // p.marker is ECharts-generated HTML (a colored dot span) — intentionally not escaped
+            });
 
           html += `</div>`;
           return html;
@@ -307,7 +314,9 @@ export const convertStackedLogData = (
         show: series.length > 1,
         bottom: 0,
         type: "scroll",
-        textStyle: { fontSize: 11 },
+        // ECharts measures legend text on canvas, so the width is a pixel number.
+        textStyle: { fontSize: 11, width: 120, overflow: "truncate" },
+        tooltip: { show: true },
       },
       xAxis: { type: "time" },
       yAxis: {

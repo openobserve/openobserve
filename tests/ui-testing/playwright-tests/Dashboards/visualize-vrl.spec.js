@@ -662,7 +662,7 @@ test.describe("VRL visualization support testcases", () => {
     const vrlEditor = pm.logsVisualise.functionEditor;
     if (await vrlEditor.first().isVisible().catch(() => false)) {
       await vrlEditor.first().click();
-      await pm.logsVisualise.functionEditor.locator(".inputarea").fill("");
+      await pm.logsVisualise.clearFunctionEditor();
     }
 
     // Apply query without VRL
@@ -801,19 +801,13 @@ test.describe("VRL visualization support testcases", () => {
     await expect(vrlEditor.first()).toBeVisible();
 
     // Verify editor is ready to accept input
-    const editorInput = pm.logsVisualise.functionEditor
-      .locator(".inputarea")
-      .first();
-    await expect(editorInput).toBeVisible();
+    await pm.logsVisualise.expectFunctionEditorReady();
 
     // Add VRL function and verify it's entered correctly
     await pm.logsVisualise.vrlFunctionEditor(simpleVrlFunction);
 
     // Verify the VRL content was entered
-    const editorContent = pm.logsVisualise.functionEditor
-      .locator(".inputarea")
-      .first();
-    await expect(editorContent).toBeVisible();
+    await pm.logsVisualise.expectFunctionEditorContains(simpleVrlFunction);
   });
 
 });

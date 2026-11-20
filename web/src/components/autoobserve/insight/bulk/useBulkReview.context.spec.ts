@@ -23,12 +23,14 @@ const api = vi.hoisted(() => ({
   destinations: vi.fn(),
   schema: vi.fn(),
   alerts: vi.fn(),
+  writable: vi.fn(),
 }));
 
 vi.mock("@/services/common", () => ({ default: { list_Folders: api.folders } }));
 vi.mock("@/services/alert_destination", () => ({ default: { list: api.destinations } }));
 vi.mock("@/services/stream", () => ({ default: { schema: api.schema } }));
 vi.mock("@/services/alerts", () => ({ default: { listByFolderId: api.alerts } }));
+vi.mock("@/services/autoobserveFolders", () => ({ default: { writable: api.writable } }));
 const measureBaseline = vi.hoisted(() => vi.fn());
 vi.mock("../targets/baseline", () => ({
   measureBaseline: (...a: unknown[]) => measureBaseline(...a),
@@ -77,6 +79,7 @@ beforeEach(() => {
   api.destinations.mockReset().mockResolvedValue({ data: { list: [] } });
   api.schema.mockReset().mockResolvedValue(fields("service_name"));
   api.alerts.mockReset().mockResolvedValue({ data: { list: [] } });
+  api.writable.mockReset().mockResolvedValue({ data: { folders: {} } });
   setFolderRightsSource(null);
   measureBaseline.mockReset();
 });
@@ -166,6 +169,21 @@ describe("useBulkReview — review state belongs to one org", () => {
     open();
     await loadReviewContext("org-b");
     expect(review.state.folders).toEqual([]);
+  });
+
+  it("locks a row whose folder the server says the user cannot write to, and locks none when the server cannot say", async () => {
+    api.writable.mockResolvedValueOnce({ data: { folders: { default: false } } });
+    open();
+    await loadReviewContext("org-a");
+    expect(api.writable).toHaveBeenCalledWith("org-a");
+    expect(rowOf("a").folder.id).toBe("default");
+    expect(rowOf("a").locked).toBe(true);
+    expect(review.state.ticked.has("a")).toBe(false);
+    api.writable.mockRejectedValueOnce({ response: { status: 404 } });
+    open();
+    await loadReviewContext("org-a");
+    expect(review.state.rights).toBeNull();
+    expect(rowOf("a").locked).toBe(false);
   });
 
   it("ignores folders, rights and destinations that answer after the user moved to another org", async () => {

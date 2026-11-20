@@ -22,11 +22,10 @@ import {
 } from "@/utils/query/sqlCompletion";
 import { mergeServerFunctions } from "@/utils/query/serverFunctions";
 import { type ServerQueryFunction } from "@/services/query_functions";
-import { MAX_VALUE_LENGTH } from "@/utils/fieldValueUtils";
+import { MAX_VALUE_LENGTH, needsPrefixLookup } from "@/utils/fieldValueUtils";
 
 // Under the editor's 1 s value budget, so local values still beat the still-loading row.
 const LOCAL_VALUES_SERVER_WAIT_MS = 800;
-const PREFIX_ENOUGH_MATCHES = 3;
 
 const useSqlSuggestions = () => {
   // Both lists come from the shared catalog (web/src/utils/query/sqlCompletion.ts).
@@ -162,22 +161,36 @@ const useSqlSuggestions = () => {
   const sameStreamContext = (a: StreamContext, b: StreamContext | null): boolean =>
     !!b && a.org === b.org && a.streamType === b.streamType && a.streamName === b.streamName;
 
-  // Null means the default fifteen-minute lookback; a dashboard panel sets its own range.
-  let valuesTimeRange: FieldValuesTimeRange | null = null;
+  const validRange = (range: FieldValuesTimeRange | null): FieldValuesTimeRange | null =>
+    !!range &&
+    Number.isFinite(range.startTime) &&
+    Number.isFinite(range.endTime) &&
+    range.startTime < range.endTime
+      ? { startTime: range.startTime, endTime: range.endTime }
+      : null;
 
-  const setValuesTimeRange = (range: { startTime: number; endTime: number } | null): void => {
-    const valid =
-      !!range &&
-      Number.isFinite(range.startTime) &&
-      Number.isFinite(range.endTime) &&
-      range.startTime < range.endTime;
-    valuesTimeRange = valid ? { startTime: range.startTime, endTime: range.endTime } : null;
+  type RangeSource = FieldValuesTimeRange | null | (() => FieldValuesTimeRange | null);
+  // Null means the default fifteen-minute lookback; a dashboard panel or a page sets its own range.
+  let rangeSource: RangeSource = null;
+
+  /** A function is read once at the start of every lookup, so a range relative to now follows the clock. */
+  const setValuesTimeRange = (range: RangeSource): void => {
+    rangeSource = typeof range === "function" ? range : validRange(range);
   };
 
-  const lookupUnchanged = (ctx: StreamContext, range: FieldValuesTimeRange | null): boolean =>
-    sameStreamContext(ctx, readStreamContext()) &&
-    range?.startTime === valuesTimeRange?.startTime &&
-    range?.endTime === valuesTimeRange?.endTime;
+  const readRange = (source: RangeSource): FieldValuesTimeRange | null =>
+    typeof source === "function" ? validRange(source()) : source;
+
+  // A function is compared by identity: its window moving with the clock is not a new setting.
+  const sameSource = (a: RangeSource, b: RangeSource): boolean =>
+    a === b ||
+    (typeof a !== "function" &&
+      typeof b !== "function" &&
+      a?.startTime === b?.startTime &&
+      a?.endTime === b?.endTime);
+
+  const lookupUnchanged = (ctx: StreamContext, source: RangeSource): boolean =>
+    sameStreamContext(ctx, readStreamContext()) && sameSource(source, rangeSource);
 
   // Resolves to null when the server misses the wait, so local values are not held back by it.
   const withinServerWait = (lookup: Promise<string[]>, ms: number): Promise<string[] | null> => {
@@ -186,14 +199,6 @@ const useSqlSuggestions = () => {
       timer = setTimeout(() => resolve(null), Math.max(0, ms));
     });
     return Promise.race([lookup, wait]).finally(() => clearTimeout(timer));
-  };
-
-  // Only a truncated top list can be hiding matches, and a few matches already make a useful menu.
-  const needsPrefixLookup = (prefix: string, truncated: boolean, merged: string[]) => {
-    if (!truncated) return false;
-    const lower = prefix.toLowerCase();
-    const matches = merged.filter((v) => v.toLowerCase().startsWith(lower)).length;
-    return matches < PREFIX_ENOUGH_MATCHES;
   };
 
   /** Field values for one column: in-session first, then stored, then the server's, deduplicated. */
@@ -214,7 +219,8 @@ const useSqlSuggestions = () => {
       if (inSession.length) return inSession;
       throw noValueLookup();
     }
-    const range = valuesTimeRange;
+    const source = rangeSource;
+    const range = readRange(source);
 
     let stored: string[] = [];
     // Persisted values come from any window, so a caller with its own range does not get them.
@@ -228,7 +234,7 @@ const useSqlSuggestions = () => {
     }
 
     // The stream can change while a lookup is awaited, and the menu must show the current stream's values.
-    if (!lookupUnchanged(ctx, range)) return resolveFieldValues(fieldName, options);
+    if (!lookupUnchanged(ctx, source)) return resolveFieldValues(fieldName, options);
     const local = [...new Set([...inSession, ...stored])];
 
     const { prefix: typed = "", ...lookupOptions } = options;
@@ -243,7 +249,7 @@ const useSqlSuggestions = () => {
       !local.length && !fetched?.length && pendingFieldValues(ctx, fieldName, serverOptions);
     // Still answering is not "no values": staying pending lets the editor show its loading row.
     if (slow) fetched = await slow;
-    if (!lookupUnchanged(ctx, range)) return resolveFieldValues(fieldName, options);
+    if (!lookupUnchanged(ctx, source)) return resolveFieldValues(fieldName, options);
     let merged = [...new Set([...local, ...(fetched ?? [])])];
 
     const prefix = typed.trim();
@@ -257,7 +263,7 @@ const useSqlSuggestions = () => {
     ) {
       const matching = requestFieldValuesMatching(ctx, fieldName, prefix, serverOptions);
       const matched = await awaitServer(matching);
-      if (!lookupUnchanged(ctx, range)) return resolveFieldValues(fieldName, options);
+      if (!lookupUnchanged(ctx, source)) return resolveFieldValues(fieldName, options);
       merged = [...new Set([...merged, ...(matched ?? [])])];
     }
     if (!merged.length && fieldValuesUnavailable(ctx, fieldName, range)) {

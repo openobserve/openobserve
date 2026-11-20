@@ -318,6 +318,19 @@ describe("usePrebuiltDestinations", () => {
       expect(lastTestResult.value?.success).toBe(true);
     });
 
+    it("marks a test without a template as a generic sample, and one with a template not", async () => {
+      mockDestTest.mockResolvedValue({ data: { success: true, statusCode: 200 } });
+      const { testDestination } = usePrebuiltDestinations();
+      expect((await testDestination("slack", makeSlackCredentials())).genericSample).toBe(true);
+
+      mockGetByName.mockResolvedValue({
+        data: { name: "mine", kind: "content", body: "{}" },
+      });
+      mockTemplatePreview.mockResolvedValue({ data: { payload: { text: "mine" } } });
+      const picked = await testDestination("slack", makeSlackCredentials(), "mine");
+      expect(picked.genericSample).toBe(false);
+    });
+
     describe("with a picked template", () => {
       const contentTemplate = () =>
         mockGetByName.mockResolvedValue({

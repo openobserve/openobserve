@@ -34,7 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="folder-list-mobile-toggle"
         @click="mobileDrawerOpen = true"
       >
-        <template #icon-left><OIcon name="folder-outline" size="sm" /></template>
+        <template #icon-left
+          ><OIcon :name="publicLinksActive ? 'language' : 'folder-outline'" size="sm"
+        /></template>
         <OTruncatedText class="max-w-52">{{
           activeFolderName || t(folderKey(type, "dashboard.folders"))
         }}</OTruncatedText>
@@ -74,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Search Input -->
-          <div class="px-1.5 pb-1.5" :class="mobileRail ? 'pt-1' : ''">
+          <div class="px-1 pb-1.5" :class="mobileRail ? 'pt-1' : ''">
             <OSearchInput
               v-model="searchQuery"
               data-test="folder-search"
@@ -84,12 +86,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </div>
-        <div class="folders-tabs flex-1 overflow-y-auto px-1.5">
+        <div class="folders-tabs flex-1 overflow-y-auto px-1">
           <OTabs
             orientation="vertical"
             dense
-            v-model="activeFolderId"
+            :model-value="hideActive ? '' : activeFolderId"
             data-test="dashboards-folder-tabs"
+            @update:model-value="(v) => (activeFolderId = String(v))"
           >
             <OTab
               v-for="tab in filteredTabs"
@@ -108,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <FolderIcon
                   :token="iconFor(tab)"
                   :favorite="tab.folderId === FAVORITES_FOLDER_ID"
+                  :icon="isPublicTab(tab) ? 'language' : undefined"
                   :data-test="`dashboard-folder-icon-${tab.name}`"
                 />
                 <OTruncatedText
@@ -115,13 +119,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-folder-name-${tab.name}`"
                   >{{ tab.name }}</OTruncatedText
                 >
+                <BetaBadge v-if="isPublicTab(tab)" size="xs" class="shrink-0" />
                 <!-- Kept in flow rather than overlaid: an overlay needs a backdrop
                  matching the row, and OTab only paints a hover background on
                  INACTIVE tabs, so it would read wrong on the open folder. -->
                 <div
-                  v-if="
-                    tab.folderId.toLowerCase() != 'default' && tab.folderId !== FAVORITES_FOLDER_ID
-                  "
+                  v-if="tab.folderId.toLowerCase() != 'default' && !isPseudoFolder(tab.folderId)"
                   class="hidden shrink-0 items-center group-hover/row:flex has-[[data-state=open]]:flex max-md:flex"
                   @click="isMobile && $event.stopPropagation()"
                 >
@@ -211,7 +214,10 @@ import FolderIcon from "./FolderIcon.vue";
 import AddFolder from "./AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
 import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+import { PUBLIC_LINKS_FOLDER_ID, isPseudoFolder } from "@/utils/dashboard/pseudoFolders";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import { useFolderIcons } from "@/composables/useFolderIcons";
+import { selectSyntheticsFolder } from "@/utils/synthetics/selectFolder";
 import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
@@ -220,6 +226,7 @@ export default defineComponent({
   components: {
     OIcon,
     FolderIcon,
+    BetaBadge,
     ConfirmDialog,
     AddFolder,
     OTabs,
@@ -242,13 +249,23 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // Dashboards-only: a fixed "Public dashboards" entry under Favorites.
+    showPublicDashboards: {
+      type: Boolean,
+      default: false,
+    },
     // Off when the rail already lives inside another drawer (OPageLayout #sidebar), or the triggers double-wrap.
     drawerOnMobile: {
       type: Boolean,
       default: true,
     },
+    // The owner is listing every folder, so none reads as the open one; the active id is kept for its return.
+    hideActive: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["update:folders", "update:activeFolderId"],
+  emits: ["update:folders", "update:activeFolderId", "folders-loaded"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18nTyped();
@@ -270,9 +287,15 @@ export default defineComponent({
           }
         : {},
     );
-    const activeFolderName = computed(
-      () => filteredTabs.value.find((f: any) => f.folderId === activeFolderId.value)?.name ?? "",
+    const activeFolderName = computed(() =>
+      props.hideActive
+        ? ""
+        : (filteredTabs.value.find((f: any) => f.folderId === activeFolderId.value)?.name ?? ""),
     );
+    const publicLinksActive = computed(
+      () => !props.hideActive && activeFolderId.value === PUBLIC_LINKS_FOLDER_ID,
+    );
+    const isPublicTab = (tab: { folderId: string }) => tab.folderId === PUBLIC_LINKS_FOLDER_ID;
     const showAddFolderDialog = ref(false);
     const isFolderEditMode = ref(false);
     const selectedFolderToEdit = ref(null);
@@ -292,13 +315,24 @@ export default defineComponent({
 
     const router = useRouter();
 
+    const fallbackFolder = (urlFolder?: string) =>
+      props.type === "synthetics"
+        ? (selectSyntheticsFolder(
+            store.state.organizationData.foldersByType.synthetics ?? [],
+            urlFolder,
+          ) ?? "")
+        : urlFolder || "default";
+
     onMounted(async () => {
       // A folder-list 403 must not strand the folder selection below.
-      await getFoldersListByType(store, props.type).catch(() => null);
-      if (router.currentRoute.value.query.folder) {
-        activeFolderId.value = router.currentRoute.value.query.folder as string;
+      await getFoldersListByType(store, props.type)
+        .then(() => emit("folders-loaded"))
+        .catch(() => null);
+      const urlFolder = router.currentRoute.value.query.folder as string | undefined;
+      if (urlFolder) {
+        activeFolderId.value = fallbackFolder(urlFolder);
       } else if (!props.showFavorites) {
-        activeFolderId.value = "default";
+        activeFolderId.value = fallbackFolder();
       }
       // With showFavorites, the owning view decides the landing folder
       // (favorites-first) and pushes it to the route; self-assigning
@@ -309,7 +343,7 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.query.folder as string | undefined,
       (newVal) => {
-        activeFolderId.value = newVal || "default";
+        activeFolderId.value = fallbackFolder(newVal);
       },
     );
     const addFolder = () => {
@@ -339,7 +373,8 @@ export default defineComponent({
           await deleteFolderByIdByType(store, selectedFolderDelete.value, props.type);
 
           //check activeFolderId to be deleted
-          if (activeFolderId.value === selectedFolderDelete.value) activeFolderId.value = "default";
+          if (activeFolderId.value === selectedFolderDelete.value)
+            activeFolderId.value = fallbackFolder();
 
           showPositiveNotification(
             t(folderKey(props.type, "toastMessages.sidebar.folderDeletedSuccessfully")),
@@ -396,12 +431,20 @@ export default defineComponent({
       const tabs = props.showFavorites
         ? [{ folderId: FAVORITES_FOLDER_ID, name: t("dashboard.favorites") }, ...folders]
         : folders;
-      if (!searchQuery.value || searchQuery.value == "") {
-        return tabs;
-      }
-      return tabs.filter((tab: { name: string }) =>
-        tab.name.toLowerCase().includes(searchQuery.value.toLowerCase()),
-      );
+      const matching =
+        !searchQuery.value || searchQuery.value == ""
+          ? tabs
+          : tabs.filter((tab: { name: string }) =>
+              tab.name.toLowerCase().includes(searchQuery.value.toLowerCase()),
+            );
+      // Public dashboards is a page, not a folder, so the folder search never hides it.
+      if (!props.showPublicDashboards) return matching;
+      const publicTab = {
+        folderId: PUBLIC_LINKS_FOLDER_ID,
+        name: t("dashboard.publicLinks.pageTitle"),
+      };
+      const favIndex = matching.findIndex((tab: any) => tab.folderId === FAVORITES_FOLDER_ID);
+      return [...matching.slice(0, favIndex + 1), publicTab, ...matching.slice(favIndex + 1)];
     });
 
     return {
@@ -431,6 +474,9 @@ export default defineComponent({
       iconFor,
       folderKey,
       FAVORITES_FOLDER_ID,
+      publicLinksActive,
+      isPublicTab,
+      isPseudoFolder,
     };
   },
 });

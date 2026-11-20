@@ -9,6 +9,7 @@
 //   web/src/plugins/metrics/explorer/MetricCard.vue
 //   web/src/components/common/ShareButton.vue
 import { expect } from '@playwright/test';
+import { FilterBuilderDriver } from '../generalPages/filterBuilderPage.js';
 const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
 /** Blob envelope version the app accepts — metricsUrlState.ts METRICS_BLOB_VERSION. */
@@ -83,6 +84,9 @@ export class MetricsExplorerPage {
         this.breakdownTopk = '[data-test="metrics-breakdown-topk"]';
         this.breakdownBack = '[data-test="metrics-breakdown-back"]';
         this.labelChipPrefix = 'metrics-explorer-label-chip-';
+        // LabelFilterBar's QueryFilterBar: `-input` is the bar, `-suggest-item-<key>` its picker rows.
+        this.labelBarPrefix = 'metrics-explorer-label';
+        this.labelBar = new FilterBuilderDriver(page, this.labelBarPrefix);
 
         // ===== EMPTY STATES =====
         this.noMetricsState = '[data-test="metrics-explorer-no-metrics"]';
@@ -201,6 +205,12 @@ export class MetricsExplorerPage {
     /** The chart renderer stays mounted — a query re-run, not a stream reload. */
     async expectChartRendererVisible() {
         await expect(this.page.locator(this.chartRenderer).first()).toBeVisible({ timeout: 30000 });
+    }
+
+    /** The query ran and drew a series: a chart canvas, and no no-data placeholder. */
+    async expectChartDrawn() {
+        await expect(this.page.locator(`${this.chartRenderer} canvas`).first()).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator('[data-test="no-data"]')).toHaveCount(0);
     }
 
     async expectGridVisible() {
@@ -575,6 +585,10 @@ export class MetricsExplorerPage {
      * ever holds the rows in view. This is the upper bound that count sits under.
      */
     async getResultCount() {
+        // Until the count settles the label is an empty skeleton marked aria-busy, and Number('') would read as 0.
+        const label = this.page.locator(this.countLabel);
+        await expect(label).not.toHaveAttribute('aria-busy', 'true', { timeout: 30000 });
+        await expect(label).toHaveText(/\d/, { timeout: 15000 });
         const text = await this.getResultCountText();
         const shown = Number(text.split(' of ')[0].replace(/,/g, ''));
         return Number.isFinite(shown) ? shown : -1;
@@ -654,6 +668,28 @@ export class MetricsExplorerPage {
 
     async closeDetail() {
         await this.page.locator(this.detailClose).click();
+    }
+
+    /* ------------------------------------------------------- label filter bar */
+
+    /** Opens Filter -> `label` -> `=` and returns the value rows offered once their load settles. */
+    async labelValueSuggestions(label, timeout = 30000) {
+        const bar = this.labelBar;
+        await bar.barInput.click();
+        await bar.waitForPicker();
+        await bar.pickField(label);
+        await bar.pickOperator('=');
+        const rows = this.page.locator(`[data-test^="${this.labelBarPrefix}-suggest-item-"]`);
+        let values = [];
+        await expect
+            .poll(async () => {
+                // Value rows are final only once the panel's loading OSpinner (role=status) is gone.
+                if (await bar.suggestions.getByRole('status').count() > 0) return -1;
+                values = (await rows.allInnerTexts()).map((text) => text.trim()).filter(Boolean);
+                return values.length;
+            }, { timeout, message: `no value suggestions for ${label}` })
+            .toBeGreaterThan(0);
+        return values;
     }
 
     /* ------------------------------------------------------------- network */

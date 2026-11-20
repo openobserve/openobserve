@@ -97,6 +97,30 @@ const fontLicensePlugin = {
   },
 };
 
+// `en-US.json?without=a,b` is the file without those top-level keys and `en-US.json?block=a` is key `a`
+// alone, so a block can leave the entry chunk while en-US.json stays the one translation source.
+const localeBlocksPlugin = {
+  name: "locale-blocks",
+  enforce: "pre" as const,
+  load(this: { addWatchFile(file: string): void }, id: string) {
+    const [file, query = ""] = id.split("?");
+    const params = new URLSearchParams(query);
+    const block = params.get("block");
+    const without = params.get("without");
+    if (!file.endsWith("/src/locales/languages/en-US.json") || (block ?? without) === null) {
+      return null;
+    }
+    this.addWatchFile(file);
+    const messages = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (block !== null) {
+      if (!(block in messages)) throw new Error(`en-US.json has no top-level key "${block}"`);
+      return JSON.stringify(messages[block]);
+    }
+    for (const key of without!.split(",")) delete messages[key];
+    return JSON.stringify(messages);
+  },
+};
+
 function monacoEditorTestResolver() {
   return {
     name: "monaco-editor-test-resolver",
@@ -202,6 +226,7 @@ export default defineConfig(({ mode }) => {
     base: "./",
     plugins: [
       vue(),
+      localeBlocksPlugin,
       fontLicensePlugin,
       debugFilterPlugin,
       process.env.VITE_COVERAGE === "true" &&

@@ -41,8 +41,6 @@ use hashbrown::HashMap;
 use log;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
-#[cfg(feature = "enterprise")]
-use openobserve_core::auth::check_permissions;
 use search::utils::is_permissable_function_error;
 use search_service::streaming::process_search_stream_request;
 use tokio::sync::mpsc;
@@ -368,55 +366,28 @@ pub async fn search_http2_stream(
 
     req.clear_cache = get_clear_cache_from_request(&query);
 
-    // Check if user has edit permissions when clear_cache is requested
     #[cfg(feature = "enterprise")]
-    if req.clear_cache {
-        use o2_openfga::meta::mapping::{RESULT_LOGS_CACHE_KEY, is_cache_rbac_enabled};
-
-        // We only check DELETE cache rbac for logs stream type
-        let (permission_type, method) =
-            if stream_type.eq(&StreamType::Logs) && is_cache_rbac_enabled() {
-                // check if cache rbac is enabled
-                (RESULT_LOGS_CACHE_KEY, "DELETE")
-            } else {
-                (stream_type.as_str(), "PUT")
-            };
-        for stream_name in stream_names.iter() {
-            if !check_permissions(
-                stream_name,
-                &org_id,
-                &user_id,
-                permission_type,
-                method,
-                None,
-                false,
-                false,
-                true,
-            )
-            .await
-            {
-                // Add audit before closing
-                report_to_audit(
-                    user_id,
-                    org_id.clone(),
-                    trace_id,
-                    403,
-                    Some(
-                        "Unauthorized to clear cache - requires stream edit permission".to_string(),
-                    ),
-                    "POST".to_string(),
-                    format!("/api/{}/_search_stream", org_id),
-                    query
-                        .iter()
-                        .map(|(k, v)| format!("{}={}", k, v))
-                        .collect::<Vec<_>>()
-                        .join("&"),
-                    body_bytes,
-                )
-                .await;
-                return MetaHttpResponse::forbidden("Unauthorized Access");
-            }
-        }
+    if req.clear_cache
+        && !super::can_clear_cache(&org_id, &user_id, stream_type, &stream_names).await
+    {
+        // Add audit before closing
+        report_to_audit(
+            user_id,
+            org_id.clone(),
+            trace_id,
+            403,
+            Some("Unauthorized to clear cache - requires stream edit permission".to_string()),
+            "POST".to_string(),
+            format!("/api/{}/_search_stream", org_id),
+            query
+                .iter()
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>()
+                .join("&"),
+            body_bytes,
+        )
+        .await;
+        return MetaHttpResponse::forbidden("Unauthorized Access");
     }
 
     // Set use_cache from query params
@@ -489,6 +460,15 @@ pub async fn search_http2_stream(
         &trace_id,
     )
     .await
+        && !crate::search::security_scope_admits(
+            &req.query.sql,
+            &org_id,
+            &user_id,
+            stream_type,
+            permission_resource_type,
+            &query,
+        )
+        .await
     {
         report_to_audit(
             user_id,
@@ -1045,7 +1025,7 @@ async fn get_sql(
     stream_type: StreamType,
     search_type: Option<SearchEventType>,
 ) -> Result<search::sql::Sql, infra::errors::Error> {
-    search::sql::Sql::new(&query.clone().into(), org_id, stream_type, search_type).await
+    search::sql::Sql::new(&query.clone().try_into()?, org_id, stream_type, search_type).await
 }
 
 #[cfg(test)]

@@ -129,9 +129,9 @@ vi.mock("@/components/dashboards/panels/MarkdownRenderer.vue", () => ({
   },
 }));
 
-vi.mock("@/components/dashboards/panels/CustomChartRenderer.vue", () => ({
+vi.mock("@/components/dashboards/panels/CustomChartSandboxRenderer.vue", () => ({
   default: {
-    name: "CustomChartRenderer",
+    name: "CustomChartSandboxRenderer",
     template: '<div data-test="custom-chart-renderer"></div>',
   },
 }));
@@ -233,9 +233,10 @@ describe("PanelSchemaRenderer", () => {
 
   const createWrapper = (
     props = {},
-    extra: { plugins?: any[]; stubs?: Record<string, unknown> } = {},
+    extra: { plugins?: any[]; stubs?: Record<string, unknown>; attachTo?: HTMLElement } = {},
   ) => {
     return mount(PanelSchemaRenderer, {
+      attachTo: extra.attachTo,
       props: {
         ...defaultProps,
         ...props,
@@ -272,7 +273,7 @@ describe("PanelSchemaRenderer", () => {
             props: ["variablesData"],
             template: '<div data-test="markdown-renderer"></div>',
           },
-          CustomChartRenderer: { template: '<div data-test="custom-chart-renderer"></div>' },
+          CustomChartSandboxRenderer: { template: '<div data-test="custom-chart-renderer"></div>' },
           AddAnnotation: { template: '<div data-test="add-annotation"></div>' },
           LoadingProgress: { template: '<div data-test="loading-progress"></div>' },
           ...extra.stubs,
@@ -414,7 +415,7 @@ describe("PanelSchemaRenderer", () => {
       },
     );
 
-    it("should render CustomChartRenderer for custom_chart type", () => {
+    it("should render the sandbox renderer for custom_chart type", () => {
       wrapper = createWrapper({
         panelSchema: { ...defaultProps.panelSchema, type: "custom_chart" },
       });
@@ -636,6 +637,72 @@ describe("PanelSchemaRenderer", () => {
         false,
       );
       expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
+    });
+
+    describe("multi-query SQL panel (#16901)", () => {
+      const mountBar = async (data: any, hiddenIndex = -1, type = "bar") => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+          data: ref(data),
+          loading: ref(false),
+          errorDetail: ref({ message: "", code: "" }),
+          metadata: ref({}),
+          resultMetaData: ref({}),
+          annotations: ref([]),
+          lastTriggeredAt: ref(null),
+          isCachedDataDifferWithCurrentTimeRange: ref(false),
+          searchRequestTraceIds: ref([]),
+          loadingProgressPercentage: ref(0),
+          isPartialData: ref(false),
+        } as any);
+        const query = defaultProps.panelSchema.queries[0];
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type,
+            queries: [0, 1].map((i) => ({
+              ...query,
+              config: { ...query.config, hide: i === hiddenIndex },
+            })),
+          },
+        });
+        await flushPromises();
+        wrapper.vm.panelData = { chartType: type, options: { series: [{ data: [1] }] } };
+        await flushPromises();
+        return wrapper.vm.noData;
+      };
+      const rows = [{ x_axis_1: "a", y_axis_1: 1 }];
+
+      it("keeps the chart when only a later query has rows", async () => {
+        expect(await mountBar([[], rows])).toBe("");
+      });
+
+      it("keeps the chart when the first query has rows", async () => {
+        expect(await mountBar([rows, []])).toBe("");
+      });
+
+      it("shows No Data when every query is empty", async () => {
+        expect(await mountBar([[], []])).toBe("No Data");
+      });
+
+      it("shows No Data when the only non-empty query is hidden", async () => {
+        expect(await mountBar([rows, []], 0)).toBe("No Data");
+      });
+
+      it("keeps the chart when a hidden query is the empty one", async () => {
+        expect(await mountBar([[], rows], 0)).toBe("");
+      });
+
+      it.each(["gauge", "metric"])(
+        "keeps a %s panel when only a later query has a value",
+        async (type) => {
+          const alias = defaultProps.panelSchema.queries[0].fields.y[0].alias;
+          expect(await mountBar([[], [{ [alias]: 645 }]], -1, type)).toBe("");
+        },
+      );
+
+      it("shows No Data for a gauge when no query has a value", async () => {
+        expect(await mountBar([[], []], -1, "gauge")).toBe("No Data");
+      });
     });
 
     describe("a named missing value replaces No Data", () => {
@@ -1243,6 +1310,336 @@ describe("PanelSchemaRenderer", () => {
         expect(vi.mocked(convertPanelData).mock.calls.at(-1)?.[11]?.variables).toEqual({
           threshold: "9",
         });
+      });
+
+      it("hands the converted run to the sandbox renderer and shows the error it reports", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        const run = { code: "option = {}", data: [[{ count: 1 }]], panelId: "panel-1" };
+        vi.mocked(convertPanelData).mockResolvedValueOnce({
+          chartType: "custom_chart",
+          run,
+        } as any);
+        wrapper = createWrapper(
+          {
+            panelSchema: {
+              ...defaultProps.panelSchema,
+              type: "custom_chart",
+              customChartContent: "option = {}",
+              queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+            },
+          },
+          {
+            stubs: {
+              CustomChartSandboxRenderer: {
+                name: "CustomChartSandboxRenderer",
+                props: ["run"],
+                emits: ["error"],
+                template: '<div data-test="custom-chart-renderer"></div>',
+              },
+            },
+          },
+        );
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        const renderer = wrapper.findComponent({ name: "CustomChartSandboxRenderer" });
+        expect(renderer.props("run")).toEqual(run);
+
+        renderer.vm.$emit("error", { message: "Execution Error: boom", code: "" }, run);
+        await nextTick();
+        expect(wrapper.vm.errorDetail).toEqual({ message: "Execution Error: boom", code: "" });
+      });
+
+      it("ignores an error reported for a run the panel no longer shows", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        const run = { code: "option = {}", data: [[{ count: 1 }]], panelId: "panel-1" };
+        vi.mocked(convertPanelData).mockResolvedValueOnce({
+          chartType: "custom_chart",
+          run,
+        } as any);
+        wrapper = createWrapper(
+          {
+            panelSchema: {
+              ...defaultProps.panelSchema,
+              type: "custom_chart",
+              customChartContent: "option = {}",
+              queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+            },
+          },
+          {
+            stubs: {
+              CustomChartSandboxRenderer: {
+                name: "CustomChartSandboxRenderer",
+                props: ["run"],
+                emits: ["error"],
+                template: '<div data-test="custom-chart-renderer"></div>',
+              },
+            },
+          },
+        );
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        const renderer = wrapper.findComponent({ name: "CustomChartSandboxRenderer" });
+        renderer.vm.$emit("error", { message: "stale", code: "" }, { ...run });
+        renderer.vm.$emit("error", { message: "stale", code: "" }, null);
+        await nextTick();
+
+        expect(wrapper.vm.errorDetail.message).toBe("");
+      });
+
+      it("keeps a chart error over the still-mounted renderer until a later run of it reports", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        const code = "option = { title: { text: data[1][0].x } };";
+        vi.mocked(convertPanelData).mockImplementation(async (_schema, chartData) => ({
+          chartType: "custom_chart",
+          run: { code, data: chartData, panelId: "panel-1" },
+        }));
+        onTestFinished(() => {
+          vi.mocked(convertPanelData).mockResolvedValue({
+            chartType: "line",
+            options: {},
+            extras: { isTimeSeries: true },
+          } as any);
+        });
+        wrapper = createWrapper(
+          {
+            panelSchema: {
+              ...defaultProps.panelSchema,
+              type: "custom_chart",
+              customChartContent: code,
+              queries: [
+                { query: "SELECT 1", customQuery: true, fields: {}, config: {} },
+                { query: "SELECT 2", customQuery: true, fields: {}, config: {} },
+              ],
+            },
+          },
+          {
+            stubs: {
+              CustomChartSandboxRenderer: {
+                name: "CustomChartSandboxRenderer",
+                props: ["run"],
+                emits: ["error", "rendered"],
+                template: '<div data-test="custom-chart-renderer"></div>',
+              },
+            },
+          },
+        );
+        const renderer = () => wrapper.findComponent({ name: "CustomChartSandboxRenderer" });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        const firstRun = renderer().props("run");
+        renderer().vm.$emit("error", { message: "Execution Error: pt boom", code: "" }, firstRun);
+        await flushPromises();
+
+        expect(wrapper.vm.errorDetail.message).toBe("Execution Error: pt boom");
+        expect(renderer().exists()).toBe(true);
+        expect(renderer().element.parentElement!.style.display).toBe("none");
+
+        // A theme change sends a new run to the hidden renderer and keeps the error until it reports.
+        store.state.theme = "dark";
+        await flushPromises();
+        const themedRun = renderer().props("run");
+        expect(themedRun).not.toBe(firstRun);
+        expect(wrapper.vm.errorDetail.message).toBe("Execution Error: pt boom");
+        renderer().vm.$emit("error", { message: "Execution Error: pt boom", code: "" }, themedRun);
+        await flushPromises();
+        expect(wrapper.vm.errorDetail.message).toBe("Execution Error: pt boom");
+
+        // The second query streams into the same data array; its run renders, which clears the error.
+        data.value[1] = [{ x: "second query arrived" }];
+        await flushPromises();
+        const streamedRun = renderer().props("run");
+        expect(streamedRun.data[1]).toEqual([{ x: "second query arrived" }]);
+        renderer().vm.$emit("rendered", firstRun);
+        await flushPromises();
+        expect(wrapper.vm.errorDetail.message).toBe("Execution Error: pt boom");
+
+        renderer().vm.$emit("rendered", streamedRun);
+        await flushPromises();
+
+        expect(wrapper.vm.errorDetail.message).toBe("");
+        expect(renderer().element.parentElement!.style.display).toBe("");
+      });
+
+      it("clears a thrown chart error once corrected code renders, with the real sandbox renderer", async () => {
+        type Handler = ((event: { data: unknown }) => void) | null;
+        class FakePort {
+          other!: FakePort;
+          handler: Handler = null;
+          set onmessage(handler: Handler) {
+            this.handler = handler;
+          }
+          get onmessage() {
+            return this.handler;
+          }
+          postMessage(message: unknown) {
+            this.other.handler?.({ data: message });
+          }
+          close() {}
+        }
+        class FakeMessageChannel {
+          port1 = new FakePort();
+          port2 = new FakePort();
+          constructor() {
+            this.port1.other = this.port2;
+            this.port2.other = this.port1;
+          }
+        }
+        // Restored by hand: unstubAllGlobals would also drop the setup file's ResizeObserver stub.
+        const { MessageChannel: realChannel, fetch: realFetch } = globalThis;
+        globalThis.MessageChannel = FakeMessageChannel as unknown as typeof MessageChannel;
+        globalThis.fetch = vi.fn().mockResolvedValue({ ok: false });
+        onTestFinished(() => {
+          globalThis.MessageChannel = realChannel;
+          globalThis.fetch = realFetch;
+        });
+        const { default: RealSandboxRenderer } = await vi.importActual<any>(
+          "@/components/dashboards/panels/CustomChartSandboxRenderer.vue",
+        );
+        // Plays the frame side: the ready handshake, then the given answer to the given run.
+        const answerRun = async (runId: number, answer: Record<string, unknown>) => {
+          const iframe = wrapper.find("iframe").element as HTMLIFrameElement;
+          const post = vi.spyOn(iframe.contentWindow!, "postMessage");
+          const token = /token: "([0-9a-f]{32})"/.exec(iframe.srcdoc)![1];
+          window.dispatchEvent(
+            new MessageEvent("message", {
+              source: iframe.contentWindow,
+              data: { type: "ready", token },
+            }),
+          );
+          await flushPromises();
+          const port = post.mock.calls[0][2]![0] as unknown as FakePort;
+          port.onmessage = () => {};
+          port.postMessage({ ...answer, runId });
+          await flushPromises();
+        };
+
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        const throwing = {
+          code: 'throw new Error("pt boom"); var option = {};',
+          data: [[{ count: 1 }]],
+          panelId: "panel-1",
+        };
+        let converted: unknown = Promise.resolve({ chartType: "custom_chart", run: throwing });
+        vi.mocked(convertPanelData).mockImplementation(() => converted as any);
+        onTestFinished(() => {
+          vi.mocked(convertPanelData).mockResolvedValue({
+            chartType: "line",
+            options: {},
+            extras: { isTimeSeries: true },
+          } as any);
+        });
+        wrapper = createWrapper(
+          {
+            panelSchema: {
+              ...defaultProps.panelSchema,
+              type: "custom_chart",
+              customChartContent: throwing.code,
+              queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+            },
+          },
+          // Attached, so the frame gets a contentWindow to hand the port to.
+          { stubs: { CustomChartSandboxRenderer: RealSandboxRenderer }, attachTo: document.body },
+        );
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        await answerRun(1, { type: "error", message: "Execution Error: pt boom" });
+        expect(wrapper.vm.errorDetail.message).toBe("Execution Error: pt boom");
+        expect(wrapper.find("iframe").exists()).toBe(true);
+
+        const corrected = { code: "var option = {};", data: [[{ count: 2 }]], panelId: "panel-1" };
+        converted = Promise.resolve({ chartType: "custom_chart", run: corrected });
+        data.value = [[{ count: 2 }]];
+        await flushPromises();
+        expect((wrapper.find("iframe").element as HTMLIFrameElement).srcdoc).toContain(
+          "var option = {};",
+        );
+        expect(wrapper.vm.errorDetail.message).toBe("Execution Error: pt boom");
+        await answerRun(2, { type: "rendered" });
+
+        expect(wrapper.vm.errorDetail.message).toBe("");
+        expect(wrapper.emitted("error")!.at(-1)![0].message).toBe("");
+      });
+
+      it("leaves a custom chart to resize itself instead of re-running its code", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        const observers: ResizeObserverCallback[] = [];
+        const RealObserver = globalThis.ResizeObserver;
+        globalThis.ResizeObserver = class {
+          constructor(callback: ResizeObserverCallback) {
+            observers.push(callback);
+          }
+          observe() {}
+          unobserve() {}
+          disconnect() {}
+        } as unknown as typeof ResizeObserver;
+        onTestFinished(() => {
+          globalThis.ResizeObserver = RealObserver;
+        });
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "requestAnimationFrame"] });
+        onTestFinished(() => {
+          vi.useRealTimers();
+        });
+        vi.mocked(convertPanelData).mockResolvedValue({
+          chartType: "custom_chart",
+          run: { code: "option = {};", data: [[{ count: 1 }]], panelId: "panel-1" },
+        } as any);
+        onTestFinished(() => {
+          vi.mocked(convertPanelData).mockResolvedValue({
+            chartType: "line",
+            options: {},
+            extras: { isTimeSeries: true },
+          } as any);
+        });
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            type: "custom_chart",
+            customChartContent: "option = {};",
+            queries: [{ query: "SELECT 1", customQuery: true, fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        data.value = [[{ count: 1 }]];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+        const calls = vi.mocked(convertPanelData).mock.calls.length;
+        expect(observers.length).toBeGreaterThan(0);
+
+        observers.forEach((callback) => callback([], {} as ResizeObserver));
+        await vi.runAllTimersAsync();
+        await flushPromises();
+
+        expect(vi.mocked(convertPanelData).mock.calls.length).toBe(calls);
       });
 
       it("keeps the rendered chart and shows no error when the chart run is skipped", async () => {
@@ -2960,5 +3357,43 @@ describe("PanelSchemaRenderer", () => {
       wrapper = w;
       expect(w.vm.failedAnnotationSources).toEqual(["Incidents"]);
     });
+  });
+
+  it("adds clickable deploy lines without removing manual annotations or mutating search series", async () => {
+    vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+      data: ref([[{ timestamp: 1000, count: 2 }]]),
+      loading: ref(false),
+      errorDetail: ref({ message: "", code: "" }),
+      metadata: ref({}),
+      resultMetaData: ref({}),
+      annotations: ref([]),
+      lastTriggeredAt: ref(null),
+      isCachedDataDifferWithCurrentTimeRange: ref(false),
+      searchRequestTraceIds: ref([]),
+      loadingProgressPercentage: ref(0),
+      isPartialData: ref(false),
+    } as any);
+    const open = vi.fn();
+    const marker = { xAxis: 1000, deployKey: "d2", version: "v2", where: "env:prod" };
+    wrapper = createWrapper({
+      panelSchema: {
+        ...defaultProps.panelSchema,
+        config: { chart_mark_lines: [marker], chart_mark_line_click: open },
+      },
+    });
+    await flushPromises();
+    const series = [{ type: "line", data: [[1000, 2]], markLine: { data: [{ yAxis: 10 }] } }];
+    wrapper.vm.panelData = { chartType: "line", options: { series } };
+    wrapper.vm.errorDetail = { message: "", code: "" };
+    await nextTick();
+    expect(wrapper.vm.chartRendererData.options.series[0].markLine.data).toEqual([
+      { yAxis: 10 },
+      marker,
+    ]);
+    expect(series[0].markLine.data).toEqual([{ yAxis: 10 }]);
+    wrapper
+      .findComponent({ name: "ChartRenderer" })
+      .vm.$emit("click", { componentType: "markLine", data: marker });
+    expect(open).toHaveBeenCalledWith(marker);
   });
 });

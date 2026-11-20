@@ -787,6 +787,32 @@ describe("AlertCalibrationDashboard dismissals", () => {
     wrapper.unmount();
   });
 
+  it("a_rule_the_run_left_wholly_out_reads_as_dismissed_not_clear", async () => {
+    const marker = record({
+      schema_version: 2,
+      kind: "run",
+      dismissed_count: 3,
+      dismissed_rules: '[{"rule_id":"no_destination","alerts":2}]',
+    });
+    serve([marker], 0, {
+      dismissed_count: 3,
+      dismissed_rules: '[{"rule_id":"no_destination","alerts":2}]',
+    });
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([]));
+    const wrapper = await mountPage();
+    await settle();
+    const group = wrapper.find('[data-test="alert-calibration-dashboard-rule-no_destination"]');
+    await group.find("button").trigger("click");
+    await settle();
+    const allDismissed = wrapper.find(
+      '[data-test="alert-calibration-dashboard-rule-all-dismissed"]',
+    );
+    expect(allDismissed.text()).toMatch(/\b2\b/);
+    const other = wrapper.find('[data-test="alert-calibration-dashboard-rule-noise"]');
+    expect(other.text()).not.toContain("dismissed");
+    wrapper.unmount();
+  });
+
   it("a_failed_state_read_renders_with_the_findings_in_one_paint", async () => {
     queryClient.setQueryDefaults(["org"], { retry: false });
     serve([nodest(1)], 1);
@@ -872,6 +898,71 @@ describe("AlertCalibrationDashboard dismissals", () => {
         Promise.reject(Object.assign(new Error("HTTP 404"), { response: { status: 404 } })),
       );
     }
+  });
+
+  it("with_the_decision_route_on_the_dismissed_view_lists_applied_changes_apart", async () => {
+    serve([nodest(1)], 1);
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([]));
+    const applied: DecisionView = {
+      family: "alert_finding",
+      state: "applied",
+      note: null,
+      has_note: false,
+      actor: "root@example.com",
+      source: "ui",
+      decided_at: NOW - 1000,
+      revision: 1,
+      decision_id: `alert_finding:${fid(7)}:apply`,
+      id: fid(7),
+      action: "apply",
+      reason: null,
+      until: NOW + 30 * DAY_MICROS,
+      subject: { title: "ops-b", folder: "ops", team: null },
+      change: {
+        alert: { id: "al-7", title: "ops-b" },
+        fields: [{ field: "pending_period_secs", from: 0, to: 120 }],
+      },
+    };
+    vi.mocked(autoobserveDecisions.list).mockResolvedValue({
+      data: { decisions: [applied], total: 1, limit: 500, offset: 0 },
+    } as never);
+    try {
+      const wrapper = await mountPage();
+      await settle();
+      // An org whose only decision is an apply still reaches the view that lists it.
+      expect(filterText()).toContain("Dismissed (0)");
+      await wrapper.router.replace({ query: { org_identifier: "default", findings: "dismissed" } });
+      await settle();
+      const section = wrapper.find('[data-test="alert-calibration-applied"]');
+      expect(section.exists()).toBe(true);
+      expect(section.findAll('[data-test="autoobserve-applied-row"]')).toHaveLength(1);
+      expect(section.find('[data-test="alert-calibration-applied-total"]').text()).toBe("1");
+      expect(wrapper.findAll('[data-test="decision-dismissed-row"]')).toHaveLength(0);
+      wrapper.unmount();
+      vi.mocked(alertCalibration.readDigests).mockResolvedValue([] as never);
+      queryClient.clear();
+      const noBoard = await mountPage();
+      await settle();
+      expect(noBoard.find('[data-test="alert-calibration-dashboard-no-board"]').exists()).toBe(
+        true,
+      );
+      expect(filterText()).toContain("Dismissed (0)");
+      noBoard.unmount();
+    } finally {
+      vi.mocked(autoobserveDecisions.list).mockImplementation(() =>
+        Promise.reject(Object.assign(new Error("HTTP 404"), { response: { status: 404 } })),
+      );
+    }
+  });
+
+  it("without_the_decision_route_the_dismissed_view_has_no_applied_section", async () => {
+    serve([nodest(1)], 1);
+    vi.mocked(alertCalibration.listDismissals).mockResolvedValue(dismissalPage([fid(7)]));
+    const wrapper = await mountPage({ findings: "dismissed" });
+    await settle();
+    expect(wrapper.find('[data-test="alert-calibration-dismissed"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-calibration-applied"]').exists()).toBe(false);
+    wrapper.unmount();
   });
 
   it("a_reader_without_access_sees_the_no_access_state_without_retry", async () => {

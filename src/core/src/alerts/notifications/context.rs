@@ -78,6 +78,12 @@ pub struct NotificationContext {
     pub alert_end_time_millis: String,
     /// Already shortened; falls back to the long URL when shortening fails.
     pub alert_url: String,
+    /// Label of the data button, such as "View logs"; empty reads the channel default.
+    pub alert_url_label: String,
+    /// The page of the object that sent the message; empty when `alert_url` already opens it.
+    pub alert_detail_url: String,
+    /// Label of the object button, such as "Open alert"; empty when the URL is empty.
+    pub alert_detail_label: String,
     /// Stateless signed chart-render URL (the URL carries the chart data;
     /// see notifications::chart). Set per destination by `send_notification`:
     /// only when THAT destination's template enables the chart, so a shared
@@ -108,7 +114,11 @@ pub struct NotificationContext {
     /// Today's body for a generic webhook while no user template applies (D1).
     pub legacy_payload: Option<LegacyPayload>,
     pub render_hints: RenderHints,
+    /// Set only by the anomaly sender; the Slack app threads the message with it.
+    pub slack_thread: Option<SlackThreadHint>,
 }
+
+pub type SlackThreadHint = config::meta::slack::AnomalyThreadInfo;
 
 /// Producer choices the renderer honors; the defaults keep the alert output unchanged.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -117,6 +127,8 @@ pub struct RenderHints {
     pub fallback_subject: Option<String>,
     /// HTML-escape context attributes in email bodies, as the producer's own sender did.
     pub escape_email_attributes: bool,
+    /// A producer's test send: every title and subject starts with `[TEST] `.
+    pub test_marker: bool,
 }
 
 /// Builds a producer's pre-template JSON body only when the legacy rule selects it.
@@ -137,6 +149,15 @@ impl std::fmt::Debug for LegacyPayload {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("LegacyPayload")
     }
+}
+
+/// The alert detail page, the object button of an alert or an incident's source alert.
+/// Empty without a web URL or an id, so the button drops on every channel.
+pub fn alert_detail_url(web_url: &str, base_uri: &str, org_id: &str, alert_id: &str) -> String {
+    if web_url.is_empty() || alert_id.is_empty() {
+        return String::new();
+    }
+    format!("{web_url}{base_uri}/web/alerts/detail/{alert_id}?org_identifier={org_id}")
 }
 
 /// Collect row columns in deterministic order.
@@ -219,6 +240,16 @@ mod tests {
                 vec!["web-1".to_string(), "web-2".to_string()]
             )]
         );
+    }
+
+    #[test]
+    fn the_alert_detail_url_keeps_the_base_path_and_drops_without_web_url_or_id() {
+        assert_eq!(
+            alert_detail_url("https://o2.acme.com", "/o2", "acme", "7Kx2"),
+            "https://o2.acme.com/o2/web/alerts/detail/7Kx2?org_identifier=acme"
+        );
+        assert!(alert_detail_url("", "/o2", "acme", "7Kx2").is_empty());
+        assert!(alert_detail_url("https://o2.acme.com", "", "acme", "").is_empty());
     }
 
     #[test]

@@ -60,6 +60,7 @@ export default class DashboardactionPage {
     this.discardPanelBtn = page.locator('[data-test="dashboard-panel-discard"]');
     // Error toast surfaced on validation/apply/save errors
     this.errorToast = page.locator('[data-test-variant="error"]');
+    this.errorToastDismissBtn = this.errorToast.locator('[data-test="o-toast-dismiss"]');
     // Panel validation messages listed under the chart (DashboardErrors.vue)
     this.dashboardErrorItems = page.locator('[data-test="dashboard-errors-list-item"]');
     // Inline OForm field error under the panel name input (shown when the
@@ -258,6 +259,49 @@ export default class DashboardactionPage {
       this.errorToast.waitFor({ state: "visible", timeout: 20000 }),
       this.panelNameError.waitFor({ state: "visible", timeout: 20000 }),
     ]).catch(() => {});
+  }
+
+  /** Dismiss every visible error toast and wait until none is left. */
+  async dismissErrorToasts() {
+    for (let i = 0; i < 10 && (await this.errorToastDismissBtn.count()) > 0; i++) {
+      await this.errorToastDismissBtn.first().click().catch(() => {});
+    }
+    await expect(this.errorToast).toHaveCount(0, { timeout: 10000 });
+  }
+
+  /**
+   * Click Save on a panel whose config is invalid and prove the save was blocked.
+   *
+   * savePanel() alone cannot prove this on a repeat attempt: an error toast left over
+   * from an earlier failed save resolves its wait at once, and the URL check that follows
+   * passes before any navigation could happen. So this clears old error toasts first,
+   * waits for a fresh toast naming the expected reason, and fails if the dashboard
+   * save request (PUT/POST /api/{org}/dashboards/{id}) was sent.
+   *
+   * @param {string} expectedError - text the new error toast must contain
+   */
+  async savePanelExpectingBlocked(expectedError) {
+    await this.dismissErrorToasts();
+    const saveRequests = [];
+    const onRequest = (request) => {
+      const { pathname } = new URL(request.url());
+      if (
+        ["PUT", "POST"].includes(request.method()) &&
+        /^\/api\/[^/]+\/dashboards\/(?!bulk$|move$)[^/]+$/.test(pathname)
+      ) {
+        saveRequests.push(`${request.method()} ${pathname}`);
+      }
+    };
+    this.page.on("request", onRequest);
+    try {
+      await this.panelSaveBtn.waitFor({ state: "visible" });
+      await this.panelSaveBtn.click();
+      await expect(this.getErrorToastWithText(expectedError)).toBeVisible({ timeout: 20000 });
+      await expect(this.page).toHaveURL(/\/add_panel/);
+    } finally {
+      this.page.off("request", onRequest);
+    }
+    expect(saveRequests, "a blocked save must not send the dashboard save request").toEqual([]);
   }
 
   /**
@@ -604,6 +648,14 @@ export default class DashboardactionPage {
       .toBe(true);
   }
 
+  /** Waits for a Custom Chart panel, which draws inside a sandboxed iframe, not in [data-test="chart-renderer"]. */
+  async expectSandboxChartRendered(expect, timeout = 20000) {
+    const frame = this.page
+      .frameLocator('[data-test="dashboard-custom-chart-sandbox"] iframe')
+      .first();
+    await expect(frame.locator("#chart[_echarts_instance_]")).toBeVisible({ timeout });
+  }
+
   /**
    * Wait for the dashboard table panel to render AND contain at least one
    * populated data cell. Encapsulates a `page.waitForFunction` scoped to the
@@ -853,12 +905,53 @@ export default class DashboardactionPage {
     return { min: bounds.min ?? null, max: bounds.max ?? null, series: chart.series };
   }
 
-  // Legend and axes are canvas-painted, so read the live option via `_vnode` (`__vueParentComponent` is dev-only).
-  async getChartOptionSnapshots(scopeSelector = '[data-test="chart-renderer"]') {
-    return this.page.evaluate((scopeSel) => {
+  // page.evaluate cannot share code, so the Vue-tree chart lookup lives in one page-side function handed to each reader.
+  // Walks `_vnode` because `__vueParentComponent` is dev-only; returns [{ chart, host }] for charts inside the scope.
+  async _withLiveCharts(scopeSelector, reader) {
+    const finder = await this.page.evaluateHandle(() => (scopeSel) => {
       const scopes = Array.from(document.querySelectorAll(scopeSel));
-      const charts = [];
+      const found = [];
       const visited = new Set();
+      const walk = (node, depth) => {
+        if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
+        visited.add(node);
+        const comp = node.component;
+        if (comp) {
+          const state = comp.setupState || {};
+          let chart = null;
+          try {
+            chart = "chart" in state ? state.chart : null;
+          } catch {
+            chart = null;
+          }
+          const host = state.chartRef;
+          if (
+            chart &&
+            typeof chart.getOption === "function" &&
+            host instanceof Element &&
+            scopes.some((scope) => scope.contains(host))
+          ) {
+            found.push({ chart, host });
+          }
+          walk(comp.subTree, depth + 1);
+        }
+        if (node.suspense) walk(node.suspense.activeBranch, depth + 1);
+        if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
+      };
+      walk(document.querySelector("#app")?._vnode, 0);
+      return found;
+    });
+    try {
+      return await finder.evaluate(reader, { scopeSel: scopeSelector });
+    } finally {
+      await finder.dispose();
+    }
+  }
+
+  // Legend and axes are canvas-painted, so read the live option off each ECharts instance.
+  async getChartOptionSnapshots(scopeSelector = '[data-test="chart-renderer"]') {
+    return this._withLiveCharts(scopeSelector, (findCharts, { scopeSel }) => {
+      const charts = [];
       const numberOrNull = (value) => (typeof value === "number" ? value : null);
       const axesOf = (axis) =>
         (Array.isArray(axis) ? axis : axis ? [axis] : []).map((a) => ({
@@ -892,62 +985,243 @@ export default class DashboardactionPage {
           };
         });
       };
-      const walk = (node, depth) => {
-        if (!node || typeof node !== "object" || depth > 400 || visited.has(node)) return;
-        visited.add(node);
-        const comp = node.component;
-        if (comp) {
-          const state = comp.setupState || {};
-          let chart = null;
-          try {
-            chart = "chart" in state ? state.chart : null;
-          } catch {
-            chart = null;
-          }
-          const host = state.chartRef;
-          if (
-            chart &&
-            typeof chart.getOption === "function" &&
-            host instanceof Element &&
-            scopes.some((scope) => scope.contains(host))
-          ) {
-            try {
-              const option = chart.getOption() ?? {};
-              charts.push({
-                width: chart.getWidth(),
-                height: chart.getHeight(),
-                hostWidth: host.clientWidth,
-                hostHeight: host.clientHeight,
-                xAxis: axesOf(option.xAxis),
-                yAxis: axesOf(option.yAxis),
-                series: (option.series ?? []).map((s) => ({
-                  name: s?.name ? String(s.name) : "",
-                  type: s?.type ?? null,
-                  silent: s?.silent === true,
-                  stack: s?.stack === undefined || s?.stack === null ? null : String(s.stack),
-                  radius: s?.radius ?? null,
-                  center: Array.isArray(s?.center) ? s.center.map(String) : null,
-                  min: numberOrNull(s?.min),
-                  max: numberOrNull(s?.max),
-                  points: (s?.data ?? []).map(pointOf),
-                  pointNames: (s?.data ?? []).map((point) =>
-                    point !== null && typeof point === "object" && !Array.isArray(point) ? String(point.name ?? "") : "",
-                  ),
-                })),
-                legendEntries: legendEntriesOf(option),
-              });
-            } catch {
-              // A disposed instance throws; it draws nothing anyway.
-            }
-          }
-          walk(comp.subTree, depth + 1);
+      for (const { chart, host } of findCharts(scopeSel)) {
+        try {
+          const option = chart.getOption() ?? {};
+          charts.push({
+            width: chart.getWidth(),
+            height: chart.getHeight(),
+            hostWidth: host.clientWidth,
+            hostHeight: host.clientHeight,
+            xAxis: axesOf(option.xAxis),
+            yAxis: axesOf(option.yAxis),
+            series: (option.series ?? []).map((s) => ({
+              name: s?.name ? String(s.name) : "",
+              type: s?.type ?? null,
+              silent: s?.silent === true,
+              stack: s?.stack === undefined || s?.stack === null ? null : String(s.stack),
+              radius: s?.radius ?? null,
+              center: Array.isArray(s?.center) ? s.center.map(String) : null,
+              min: numberOrNull(s?.min),
+              max: numberOrNull(s?.max),
+              points: (s?.data ?? []).map(pointOf),
+              pointNames: (s?.data ?? []).map((point) =>
+                point !== null && typeof point === "object" && !Array.isArray(point) ? String(point.name ?? "") : "",
+              ),
+            })),
+            legendEntries: legendEntriesOf(option),
+          });
+        } catch {
+          // A disposed instance throws; it draws nothing anyway.
         }
-        if (node.suspense) walk(node.suspense.activeBranch, depth + 1);
-        if (Array.isArray(node.children)) for (const c of node.children) walk(c, depth + 1);
-      };
-      walk(document.querySelector("#app")?._vnode, 0);
+      }
       return charts;
-    }, scopeSelector);
+    });
+  }
+
+  // Segments are [start, end, rowIndex, styleIndex] with styleIndex -1 for "no data" (dropped here);
+  // the hidden line series has one point per distinct sample time.
+  async getStateTimelineLayout(scopeSelector = this.chartRendererSelector) {
+    const [chart] = await this.getChartOptionSnapshots(scopeSelector);
+    if (!chart) return null;
+    const segmentSeries = chart.series.find((s) => s.type === "custom" && s.points.length > 0);
+    const sampleSeries = chart.series.find((s) => s.type === "line");
+    const rows = [];
+    for (const [start, end, rowIndex, styleIndex] of segmentSeries?.points ?? []) {
+      rows[rowIndex] ??= [];
+      if (styleIndex !== -1) rows[rowIndex].push({ start, end });
+    }
+    return { rows: Array.from(rows, (row) => row ?? []), sampleTimes: sampleSeries?.points.length ?? 0 };
+  }
+
+  // Polls because freshly ingested samples can miss the panel's first query.
+  async waitForStateTimelineLayout(rowCount, scopeSelector = this.chartRendererSelector) {
+    let layout = null;
+    await expect
+      .poll(
+        async () => {
+          layout = await this.getStateTimelineLayout(scopeSelector);
+          return layout ? layout.rows.filter((row) => row.length > 0).length : 0;
+        },
+        { timeout: 30000, message: `state timeline never drew ${rowCount} rows with data` },
+      )
+      .toBe(rowCount);
+    return layout;
+  }
+
+  async applyAndGetStateTimelineLayout(rowCount) {
+    await this.applyDashboardBtn();
+    await this.waitForChartToRender();
+    return this.waitForStateTimelineLayout(rowCount);
+  }
+
+  // Each seeded row holds one state, so Bands must join neighbours into segments wider than a bucket.
+  expectStateTimelineBands(layout, bucketMs) {
+    for (const row of layout.rows) {
+      expect(row.length).toBeLessThan(layout.sampleTimes);
+      expect(row.some((segment) => segment.end - segment.start > bucketMs)).toBe(true);
+    }
+  }
+
+  // Cells never join equal neighbours: one cell per sample, none wider than its bucket.
+  expectStateTimelineCells(layout, bucketMs) {
+    for (const row of layout.rows) {
+      expect(row.length).toBe(layout.sampleTimes);
+      expect(row.every((segment) => segment.end - segment.start <= bucketMs)).toBe(true);
+    }
+  }
+
+  // A sunburst is canvas-painted, so its rings, view root and slice positions are read off the live ECharts
+  // instance; ECharts can still hand back a sector it detached on re-root, hence the `el.parent` check.
+  async getSunburstState(scopeSelector = this.chartRendererSelector) {
+    return this._withLiveCharts(scopeSelector, (findCharts, { scopeSel }) => {
+      const found = findCharts(scopeSel)
+        .map(({ chart }) => chart)
+        .find((chart) => {
+          try {
+            return chart.getOption()?.series?.[0]?.type === "sunburst";
+          } catch {
+            return false; // A disposed instance throws.
+          }
+        });
+      if (!found) return null;
+
+      const series = found.getOption().series[0];
+      const treeDepth = (nodes) =>
+        Array.isArray(nodes) && nodes.length ? 1 + Math.max(...nodes.map((n) => treeDepth(n.children))) : 0;
+      const seriesModel = found.getModel().getSeriesByIndex(0);
+      const data = seriesModel.getData();
+      const rect = found.getDom().getBoundingClientRect();
+      const slices = [];
+      for (let i = 0; i < data.count(); i++) {
+        const el = data.getItemGraphicEl(i);
+        const treeNode = data.tree.getNodeByDataIndex(i);
+        if (!el?.shape || !el.parent || el.invisible || el.ignore || !treeNode || treeNode.depth < 1) continue;
+        const { cx, cy, r0, r, startAngle, endAngle } = el.shape;
+        const angle = (startAngle + endAngle) / 2;
+        const radius = (r0 + r) / 2;
+        slices.push({
+          name: String(treeNode.name ?? ""),
+          depth: treeNode.depth,
+          value: Number(treeNode.getValue?.() ?? 0),
+          x: rect.left + cx + radius * Math.cos(angle),
+          y: rect.top + cy + radius * Math.sin(angle),
+        });
+      }
+      return {
+        depth: treeDepth(series.data),
+        rootNames: (series.data ?? []).map((n) => String(n.name ?? "")),
+        labelsShown: series.label?.show !== false,
+        nodeClick: series.nodeClick ?? null,
+        viewRoot: String(seriesModel.getViewRoot?.()?.name ?? ""),
+        slices,
+      };
+    });
+  }
+
+  /** Poll until a sunburst is drawn, and return its state. */
+  async waitForSunburst(timeout = 20000) {
+    let state = null;
+    await expect
+      .poll(async () => {
+        state = await this.getSunburstState();
+        return state?.slices?.length ?? 0;
+      }, { timeout, message: "sunburst never drew any slice" })
+      .toBeGreaterThan(0);
+    return state;
+  }
+
+  // The largest slice is the easiest real click target; ring 1 is the innermost ring.
+  async clickLargestSunburstSlice(ringDepth = 1) {
+    const state = await this.waitForSunburst();
+    const ring = state.slices.filter((slice) => slice.depth === ringDepth);
+    if (!ring.length) throw new Error(`No sunburst slice drawn on ring ${ringDepth}`);
+    const slice = ring.reduce((a, b) => (b.value > a.value ? b : a));
+    await this.page.mouse.move(slice.x, slice.y);
+    await this.page.mouse.click(slice.x, slice.y);
+    return slice;
+  }
+
+  // A funnel is canvas-painted too: each stage is an ECharts polygon, so its drawn centre (page coordinates)
+  // and its rendered label text are read off the live instance. Stages come back in data (query) order.
+  async getFunnelState(scopeSelector = this.chartRendererSelector) {
+    return this._withLiveCharts(scopeSelector, (findCharts, { scopeSel }) => {
+      const found = findCharts(scopeSel)
+        .map(({ chart }) => chart)
+        .find((chart) => {
+          try {
+            return chart.getOption()?.series?.[0]?.type === "funnel";
+          } catch {
+            return false; // A disposed instance throws.
+          }
+        });
+      if (!found) return null;
+
+      const series = found.getOption().series[0];
+      const data = found.getModel().getSeriesByIndex(0).getData();
+      const rect = found.getDom().getBoundingClientRect();
+      const stages = [];
+      for (let i = 0; i < data.count(); i++) {
+        const el = data.getItemGraphicEl(i);
+        const points = el?.shape?.points;
+        if (!Array.isArray(points) || !points.length || el.invisible || el.ignore) continue;
+        const cx = points.reduce((sum, p) => sum + p[0], 0) / points.length;
+        const cy = points.reduce((sum, p) => sum + p[1], 0) / points.length;
+        const label = el.getTextContent?.();
+        stages.push({
+          name: String(data.getName(i) ?? ""),
+          value: Number(data.get("value", i) ?? 0),
+          labelText: label && !label.ignore && !label.invisible ? String(label.style?.text ?? "") : "",
+          x: rect.left + cx,
+          y: rect.top + cy,
+        });
+      }
+      return {
+        sort: series.sort ?? null,
+        orient: series.orient ?? null,
+        stages,
+      };
+    });
+  }
+
+  /** Poll until a funnel is drawn, and return its state. */
+  async waitForFunnel(timeout = 20000) {
+    let state = null;
+    await expect
+      .poll(async () => {
+        state = await this.getFunnelState();
+        return state?.stages?.length ?? 0;
+      }, { timeout, message: "funnel never drew any stage" })
+      .toBeGreaterThan(0);
+    return state;
+  }
+
+  /** Stage names as drawn: top to bottom when vertical, left to right when horizontal. */
+  funnelDrawOrder(state) {
+    const axis = state.orient === "horizontal" ? "x" : "y";
+    return [...state.stages].sort((a, b) => a[axis] - b[axis]).map((stage) => stage.name);
+  }
+
+  /** Stage names ordered by value, largest first (smallest first with `ascending`). */
+  funnelNamesByValue(state, ascending = false) {
+    return [...state.stages]
+      .sort((a, b) => (ascending ? a.value - b.value : b.value - a.value))
+      .map((stage) => stage.name);
+  }
+
+  /** Rendered label text of the named funnel stage, or "" while it is not drawn. */
+  async getFunnelStageLabel(name) {
+    const state = await this.getFunnelState();
+    return state?.stages.find((stage) => stage.name === name)?.labelText ?? "";
+  }
+
+  // The largest stage is the widest, so it is the easiest real click target.
+  async clickLargestFunnelStage() {
+    const state = await this.waitForFunnel();
+    const stage = state.stages.reduce((a, b) => (b.value > a.value ? b : a));
+    await this.page.mouse.move(stage.x, stage.y);
+    await this.page.mouse.click(stage.x, stage.y);
+    return stage;
   }
 
   async getGaugeLayoutProblems(expected = {}, scopeSelector = this.chartRendererSelector) {

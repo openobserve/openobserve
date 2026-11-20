@@ -267,6 +267,7 @@ fn trigger_label(trigger: RunTrigger) -> &'static str {
         RunTrigger::Reanalyze => "re-analyze",
         RunTrigger::OncallPage => "on-call page",
         RunTrigger::Resume => "resume",
+        RunTrigger::EvidenceSettled => "settled evidence",
     }
 }
 
@@ -1137,6 +1138,13 @@ impl RunEnd {
                     grade,
                 )
                 .await;
+                crate::autoobserve::next_step::on_run_finished(
+                    &self.org_id,
+                    &self.run.subject_id,
+                    &self.run.run_id,
+                    verdict,
+                )
+                .await;
             }
             RunSubjectType::Alert => {
                 rca_service::deliver_alert_result(
@@ -1877,7 +1885,9 @@ pub async fn turn_run_of(run: &RunRow) -> anyhow::Result<RcaTurnRun> {
     } else {
         None
     };
-    let context = rca_service::build_incident_context(&run.org_id, &incident_id, previous).await;
+    // A later turn's session already holds the bundle its first turn read.
+    let context =
+        rca_service::build_incident_context(&run.org_id, &incident_id, previous, None).await;
     Ok(RcaTurnRun {
         org_id: run.org_id.clone(),
         run_id: run.run_id.clone(),
@@ -2273,7 +2283,7 @@ mod tests {
 
     // ---- the prompt ----
 
-    const TRIGGERS: [(RunTrigger, &str); 8] = [
+    const TRIGGERS: [(RunTrigger, &str); 9] = [
         (RunTrigger::AutoNewIncident, "new incident"),
         (RunTrigger::AutoNewAlertType, "new alert type"),
         (RunTrigger::AutoReopen, "reopen"),
@@ -2282,6 +2292,7 @@ mod tests {
         (RunTrigger::OncallPage, "on-call page"),
         (RunTrigger::Resume, "resume"),
         (RunTrigger::Legacy, "manual"),
+        (RunTrigger::EvidenceSettled, "settled evidence"),
     ];
 
     fn incident(id: &str, title: &str, alerts: u32, severity: &str) -> RcaPromptSubject {

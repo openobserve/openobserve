@@ -125,7 +125,7 @@ test.describe('Quick Mute from an alert', { tag: ['@alerts', '@alerts-mute', '@P
     await expect(ack.downtimeCell(chip.id, 'schedule')).toContainText('Until it clears');
     await expect(ack.downtimeCell(chip.id, 'schedule')).toContainText('24 h at most');
     await expect(ack.downtimeCell(chip.id, 'when')).toContainText('ends when it clears');
-    await expect(ack.downtimeCell(chip.id, 'when')).toContainText(/by \d{1,2}:\d{2}\s?[AP]M tomorrow/);
+    await expect(ack.downtimeCell(chip.id, 'when')).toContainText(/by \d{2}:\d{2} tomorrow/);
     await expect(ack.downtimeCell(chip.id, 'targets')).toContainText('city=mumbai');
     await shoot(page, 'mk19-list-until-clear-active');
 
@@ -136,6 +136,8 @@ test.describe('Quick Mute from an alert', { tag: ['@alerts', '@alerts-mute', '@P
     expect(ended.cancelled_by).toBe(SYSTEM);
 
     await ack.refreshDowntimes();
+    // Ended rows sort oldest first, so in a long-lived org this one can sit past the first page.
+    await pm.downtimesPage.search(ended.name);
     await expect(ack.downtimeCell(chip.id, 'when')).toContainText('when it cleared', { timeout: 15000 });
     await expect(ack.downtimeCell(chip.id, 'when')).not.toContainText('ended by');
     await shoot(page, 'mk19-list-ended-on-clear');

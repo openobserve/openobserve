@@ -4,7 +4,7 @@
 import { inject, ref } from "vue";
 import OCombobox from "./OCombobox.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
-import { firstFieldError } from "../Form/fieldError";
+import { leaveOnFocusOut, useVisibleFieldError } from "../Form/fieldError";
 import { raw } from "@/types/i18n";
 import type { FormComboboxProps } from "./OFormCombobox.types";
 
@@ -13,6 +13,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormComboboxProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormCombobox] must be rendered inside <OForm>. No form context found.");
@@ -47,13 +48,10 @@ defineExpose({ clear: () => comboboxRef.value?.clear() });
         :name="props.name"
         :label-position="props.labelPosition"
         :model-value="field.state.value"
-        :error="field.state.meta.errors.length > 0"
-        :error-message="
-          field.state.meta.errors.length > 0
-            ? raw(firstFieldError(field.state.meta.errors))
-            : undefined
-        "
+        :error="shown(field).invalid"
+        :error-message="shown(field).message !== undefined ? raw(shown(field).message) : undefined"
         @update:model-value="(val: string) => field.handleChange(val)"
+        @focusout="leaveOnFocusOut(field, $event)"
       >
         <template v-if="$slots.label" #label>
           <slot name="label" />

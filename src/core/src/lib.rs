@@ -78,6 +78,7 @@ use search_service as search;
 pub mod self_profiles;
 pub mod self_reporting;
 pub mod service;
+pub mod service_identity;
 pub mod session;
 pub mod short_url;
 pub mod slo;

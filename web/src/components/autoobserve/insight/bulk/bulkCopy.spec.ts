@@ -34,6 +34,7 @@ import {
   titleOf,
   toastOf,
   usuallyOf,
+  waitingFooter,
 } from "./bulkCopy";
 import { groupRows, reviewRowsOf, type FolderRef } from "./useBulkReview";
 
@@ -206,11 +207,33 @@ describe("bulkCopy — rows and groups", () => {
     const rows = rowsOf();
     const ingestB = rows.find((r) => r.key === "ingest-b")!;
     const j = rows.find((r) => r.key === "j")!;
-    expect(firesWhenOf(t, "no_data", ingestB)).toBe("no rows for 15 min");
-    expect(firesWhenOf(t, "no_data", j)).toBe("no spans for 15 min");
-    expect(usuallyOf(t, "en-US", ingestB)).toBe("2,400 an hour");
+    expect(firesWhenOf(t, "en-US", "no_data", ingestB)).toBe("no rows for 15 min");
+    expect(firesWhenOf(t, "en-US", "no_data", j)).toBe("no spans for 15 min");
+    expect(usuallyOf(t, "en-US", ingestB)).toBe("2.4K an hour");
     const bursty = rows.find((r) => r.key === "a-none")!;
-    expect(firesWhenOf(t, "no_data", bursty)).toBe("no rows for 3 hours");
+    expect(firesWhenOf(t, "en-US", "no_data", bursty)).toBe("no rows for 3 hours");
+  });
+
+  it("groups a threshold's digits as the Usually cell does", () => {
+    const base = rowsOf().find((r) => r.key === "ingest-b")!;
+    const at = (kind: "errors" | "latency", threshold: number) =>
+      firesWhenOf(t, "en-US", kind, { ...base, threshold, row: { ...base.row, kind } });
+    expect(at("errors", 10014)).toBe("errors above 10,014 an hour");
+    expect(at("latency", 12500)).toBe("p95 above 12,500 ms");
+    expect(at("latency", 1234.12345)).toBe("p95 above 1,234.12345 ms");
+  });
+
+  it("counts the rows on each wait in the footer, naming both steps when both run", () => {
+    const base = rowsOf()[0];
+    const on = (...codes: ("checking" | "measuring" | null)[]) =>
+      waitingFooter(
+        t,
+        codes.map((code) => ({ ...base, block: code && { code } })),
+      );
+    expect(on("measuring", null)).toBe("Measuring 1 of 2 alerts…");
+    expect(on("checking")).toBe("Checking 1 of 1 alert…");
+    expect(on("measuring", "checking", null)).toBe("Checking 1 and measuring 1 of 3 alerts…");
+    expect(on(null)).toBeNull();
   });
 
   it("fires a source row after an hour", () => {
@@ -218,7 +241,7 @@ describe("bulkCopy — rows and groups", () => {
       { kind: "source", rows: sourceRows(2) },
       { folders: [], overrides: {}, rights: null },
     );
-    expect(firesWhenOf(t, "source", rows[0])).toBe("no rows for 1 hour");
+    expect(firesWhenOf(t, "en-US", "source", rows[0])).toBe("no rows for 1 hour");
   });
 
   it("names how many alerts still need a threshold, one sentence for one or many", () => {
@@ -258,8 +281,11 @@ describe("bulkCopy — rows and groups", () => {
 
 describe("bulkCopy — results", () => {
   it("reports a partial failure with one reason per row", () => {
-    expect(partialBanner(t, 1, 8)).toBe("1 of 8 alerts wasn't created.");
-    expect(partialBanner(t, 2, 8)).toBe("2 of 8 alerts weren't created.");
+    expect(partialBanner(t, 1, 8)).toBe("1 alert out of 8 wasn't created.");
+    expect(partialBanner(t, 2, 8)).toBe("2 alerts out of 8 weren't created.");
+    // FU-U4-PLURAL: the noun follows the failed count, so one of one reads right.
+    expect(partialBanner(t, 1, 1)).toBe("1 alert out of 1 wasn't created.");
+    expect(partialBanner(t, 3, 3)).toBe("3 alerts out of 3 weren't created.");
     expect(failureLine(t, "svc-j", { code: "forbidden", folder: "payments" })).toBe(
       "svc-j: You can't create alerts. Your role is missing the Create permission on Alerts. The alert was going to folder payments.",
     );

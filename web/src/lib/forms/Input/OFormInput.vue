@@ -4,7 +4,7 @@
 import { inject } from "vue";
 import OInput from "./OInput.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
-import { firstFieldError } from "../Form/fieldError";
+import { useVisibleFieldError } from "../Form/fieldError";
 import { raw } from "@/types/i18n";
 import type { FormInputProps } from "./OFormInput.types";
 
@@ -13,6 +13,7 @@ defineOptions({ inheritAttrs: false });
 const props = defineProps<FormInputProps>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
+const shown = useVisibleFieldError(form);
 
 if (import.meta.env.DEV && !form) {
   console.warn("[OFormInput] must be rendered inside <OForm>. No form context found.");
@@ -49,10 +50,10 @@ if (import.meta.env.DEV && !form) {
         :size="props.size"
         :width="props.width"
         :model-value="field.state.value"
-        :error="field.state.meta.errors.length > 0"
+        :error="shown(field).invalid"
         :error-message="
-          !$slots.error && field.state.meta.errors.length > 0
-            ? raw(firstFieldError(field.state.meta.errors))
+          !$slots.error && shown(field).message !== undefined
+            ? raw(shown(field).message)
             : undefined
         "
         @update:model-value="(val: unknown) => field.handleChange(val)"

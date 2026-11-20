@@ -22,7 +22,7 @@ import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
 import { convertSankeyData } from "./convertSankeyData";
 import {
-  runJavaScriptCode,
+  prepareCustomChartRun,
   validateUserCode,
   type CustomChartContext,
 } from "./convertCustomChartData";
@@ -42,6 +42,7 @@ import { convertFlameGraphPanelData } from "./convertFlameGraphPanelData";
 import { convertBoxplotData } from "./convertBoxplotData";
 import { convertLogsPanelData } from "./convertLogsPanelData";
 import { convertHostmapData } from "./convertHostmapData";
+import { reserveAnnotationLabelRoom } from "./markLineLabelRoom";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -129,7 +130,7 @@ export const convertPanelData = async (
         applyCartesianOptions(result?.options, panelSchema);
         applyPanelTypeOptions(result?.options, panelSchema, chartPanelRef);
         applyMetricOptions(result?.options, panelSchema);
-        return { chartType: panelSchema.type, ...result };
+        return reserveAnnotationLabelRoom({ chartType: panelSchema.type, ...result });
       } catch (error) {
         if (panelSchema?.queryType == "promql") throw error;
         console.error(error);
@@ -359,11 +360,9 @@ export const convertPanelData = async (
           : data.length > 0 && data[0].length > 0;
 
       if (hasData) {
-        const result = await runJavaScriptCode(panelSchema, data, customChartContext);
-        const safeResult = result && typeof result === "object" ? result : {};
         return {
           chartType: panelSchema.type,
-          ...safeResult,
+          run: prepareCustomChartRun(panelSchema, data, customChartContext),
         };
       }
     }

@@ -131,7 +131,7 @@ const ODrawerStub = {
       data-test="o-drawer-stub"
       :data-open="String(open)"
       :data-title="title"
-      :data-width="String(width)"
+      :data-size="size"
       :data-primary-label="primaryButtonLabel"
     >
       <slot name="header-right" />
@@ -661,11 +661,11 @@ describe("AddRegexPattern", () => {
       expect(wrapper.vm.testStringValue).toBe("Test value");
     });
 
-    it("should handle component width calculations based on AI chat state", async () => {
+    it("should widen the drawer to a size preset when AI chat is open", async () => {
       mockStore.state.isAiChatEnabled = true;
       const wrapper = createWrapper();
       const drawer = wrapper.find('[data-test="o-drawer-stub"]');
-      expect(drawer.attributes("data-width")).toBe("70");
+      expect(drawer.attributes("data-size")).toBe("xxl");
     });
 
     it("should handle full screen mode", async () => {

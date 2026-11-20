@@ -24,6 +24,8 @@ import addToSlackImage2x from "@/assets/images/common/add_to_slack@2x.png";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
+import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
 import OnCallHint from "@/components/oncall/OnCallHint.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useSlackOAuthPopup } from "@/composables/slack/useSlackOAuthPopup";
@@ -301,30 +303,24 @@ const nextSteps = computed<I18nText[]>(() =>
       </template>
     </OBanner>
 
-    <OCard
+    <OFormSection
       v-if="!isCloud && offered.length"
-      variant="outlined"
-      class="gap-3 p-5"
+      variant="plain"
+      :title="t('slackApp.connect.existingTitle')"
       data-test="slack-available"
     >
-      <h2 class="text-text-heading m-0 text-lg font-semibold">
-        {{ t("slackApp.connect.existingTitle") }}
-      </h2>
-      <div
+      <OSettingRow
         v-for="item in offered"
         :key="item.installation_id"
-        class="border-border-default flex items-center justify-between gap-3 border-t pt-3"
+        control-at="end"
+        :label="raw(item.team_name)"
         :data-test="`slack-available-${item.installation_id}`"
       >
-        <div class="flex min-w-0 flex-col">
-          <span class="text-text-body text-sm font-medium">{{ raw(item.team_name) }}</span>
-          <span
-            v-if="offeredDetail.has(item.installation_id)"
-            class="text-text-secondary text-xs"
-            :data-test="`slack-available-detail-${item.installation_id}`"
-            >{{ offeredDetail.get(item.installation_id) }}</span
-          >
-        </div>
+        <template v-if="offeredDetail.has(item.installation_id)" #description>
+          <span :data-test="`slack-available-detail-${item.installation_id}`">{{
+            offeredDetail.get(item.installation_id)
+          }}</span>
+        </template>
         <OButton
           variant="primary"
           size="sm-action"
@@ -334,16 +330,11 @@ const nextSteps = computed<I18nText[]>(() =>
         >
           {{ t("slackApp.connect.connectExisting") }}
         </OButton>
-      </div>
-    </OCard>
+      </OSettingRow>
+    </OFormSection>
 
     <OCard variant="outlined">
-      <OEmptyState
-        size="block"
-        illustration="connect"
-        :title="t('slackApp.connect.title')"
-        :backdrop="false"
-      >
+      <OEmptyState size="block" preset="slack-not-connected" :backdrop="false">
         <template v-if="autoobserveEdition" #description>
           <span data-test="slack-connect-autoobserve">{{
             t("slackApp.connect.autoobserveHint")

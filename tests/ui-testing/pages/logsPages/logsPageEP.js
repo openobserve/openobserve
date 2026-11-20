@@ -1,6 +1,7 @@
 // logsPageEP.js
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 
 export class LogsPageEP {
   constructor(page) {
@@ -97,9 +98,7 @@ async queryJobSearch() {
   await this.page.waitForTimeout(500);
   await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
   await this.page.waitForTimeout(300);
-  const inputArea = queryEditorLocator.locator('.inputarea');
-  await inputArea.waitFor({ state: 'visible', timeout: 5000 });
-  await inputArea.fill('SELECT * FROM "e2e_automate"');
+  await new MonacoEditorHelper(this.page).fillInputArea(queryEditorLocator, 'SELECT * FROM "e2e_automate"');
   await this.page.waitForTimeout(2000);
 }
 

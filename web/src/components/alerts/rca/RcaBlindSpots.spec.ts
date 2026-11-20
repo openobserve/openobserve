@@ -43,19 +43,32 @@ const mountSpots = (
 const spots = (wrapper: VueWrapper) =>
   wrapper.findAll('[data-test="rca-blind-spot"]').map((row) => {
     const button = row.find('[data-test="rca-blind-spot-action"]');
-    return [row.find(".font-semibold").text(), button.exists() ? button.text() : null];
+    return [
+      row.find('[data-test="rca-blind-spot-title"]').text(),
+      button.exists() ? button.text() : null,
+    ];
   });
 
 describe("RcaBlindSpots (03 VE8, VE34, VE37)", () => {
   beforeEach(() => push.mockReset());
 
-  it("frame B: two blind spots, each with its button and reason", () => {
+  it("two blind spots, each a title row with its button; the reason opens below", async () => {
     const wrapper = mountSpots(rcaRunSummary().blind_spots);
 
     expect(spots(wrapper)).toEqual([
       ["Feature-flag history", "Connect AI Toolset"],
       ["payments-worker logs are sampled", "Open pipeline"],
     ]);
+    // The button sits beside the row's toggle, not inside it.
+    const first = wrapper.findAll('[data-test="rca-blind-spot"]')[0];
+    expect(
+      first
+        .get('[data-test="rca-fold-row-toggle"]')
+        .find('[data-test="rca-blind-spot-action"]')
+        .exists(),
+    ).toBe(false);
+    expect(wrapper.text()).not.toContain("No toolset in this org provides flag changes.");
+    await first.get('[data-test="rca-fold-row-toggle"]').trigger("click");
     expect(wrapper.text()).toContain("No toolset in this org provides flag changes.");
     expect(wrapper.text()).toContain("What the agent could not check");
   });
@@ -136,10 +149,11 @@ describe("RcaBlindSpots (03 VE8, VE34, VE37)", () => {
     expect(wrapper.emitted("resume")).toBeUndefined();
   });
 
-  it("frame E: the run_end blind spot names the stages that did not run, with no button", () => {
+  it("the run_end blind spot names the stages that did not run, with no button", async () => {
     const wrapper = mountSpots(rcaRunSummaryCancelled().blind_spots);
 
     expect(spots(wrapper)).toEqual([["3 stages did not run", null]]);
+    await wrapper.get('[data-test="rca-fold-row-toggle"]').trigger("click");
     expect(wrapper.text()).toContain("Log patterns, Metrics, Converge");
   });
 

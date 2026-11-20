@@ -334,17 +334,16 @@ async fn get_cardinality(
 
 /// Get cache statistics for monitoring
 pub async fn get_cache_stats() -> (usize, usize) {
-    let total_entries = CARDINALITY_CACHE.len();
+    cache_stats(&CARDINALITY_CACHE)
+}
+
+fn cache_stats(cache: &RwHashMap<String, CardinalityCacheEntry>) -> (usize, usize) {
     let now = now_micros();
-    let mut expired_count = 0;
-
-    for entry in CARDINALITY_CACHE.iter() {
-        if now - entry.value().timestamp > CACHE_EXPIRATION_MICROS {
-            expired_count += 1;
-        }
-    }
-
-    (total_entries, expired_count)
+    let expired_count = cache
+        .iter()
+        .filter(|entry| now - entry.value().timestamp > CACHE_EXPIRATION_MICROS)
+        .count();
+    (cache.len(), expired_count)
 }
 
 #[cfg(test)]
@@ -447,96 +446,32 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("cache miss"));
     }
 
-    #[tokio::test]
-    async fn test_get_cache_stats() {
-        // Use unique test keys to avoid conflicts with other tests
-        let test_prefix = format!("test_get_cache_stats_{}", now_micros());
-
-        // Get initial cache state (there might be entries from other tests)
-        let (initial_total, initial_expired) = get_cache_stats().await;
-
+    #[test]
+    fn test_cache_stats() {
+        // A local map: other tests write to CARDINALITY_CACHE concurrently.
+        let cache = RwHashMap::<String, CardinalityCacheEntry>::default();
         let now = now_micros();
-
-        // Add some fresh entries with unique keys
-        let fresh_key1 = format!("{test_prefix}_fresh1");
-        let fresh_entry1 = CardinalityCacheEntry {
-            value: 100.0,
-            timestamp: now - 1000, // 1ms ago (fresh)
+        let entry = |value, age| CardinalityCacheEntry {
+            value,
+            timestamp: now - age,
         };
-        CARDINALITY_CACHE.insert(fresh_key1.clone(), fresh_entry1);
-
-        let fresh_key2 = format!("{test_prefix}_fresh2");
-        let fresh_entry2 = CardinalityCacheEntry {
-            value: 200.0,
-            timestamp: now - 60 * 1_000_000, // 1 minute ago (fresh)
-        };
-        CARDINALITY_CACHE.insert(fresh_key2.clone(), fresh_entry2);
-
-        // Add some expired entries with unique keys
-        let expired_key1 = format!("{test_prefix}_expired1");
-        let expired_entry1 = CardinalityCacheEntry {
-            value: 300.0,
-            timestamp: now - CACHE_EXPIRATION_MICROS - 1000, // Over 1 hour ago (expired)
-        };
-        CARDINALITY_CACHE.insert(expired_key1.clone(), expired_entry1);
-
-        let expired_key2 = format!("{test_prefix}_expired2");
-        let expired_entry2 = CardinalityCacheEntry {
-            value: 400.0,
-            timestamp: now - CACHE_EXPIRATION_MICROS - 60 * 1_000_000, /* Way over 1 hour ago
-                                                                        * (expired) */
-        };
-        CARDINALITY_CACHE.insert(expired_key2.clone(), expired_entry2);
-
-        // Check cache stats - should have added 4 entries (2 fresh + 2 expired)
-        let (total, expired) = get_cache_stats().await;
-        assert!(
-            total >= initial_total + 4,
-            "Total entries should be initial_total + 4, but got total={total}, initial_total={initial_total}"
+        cache.insert("fresh1".to_string(), entry(100.0, 1000));
+        cache.insert("fresh2".to_string(), entry(200.0, 60 * 1_000_000));
+        cache.insert(
+            "expired1".to_string(),
+            entry(300.0, CACHE_EXPIRATION_MICROS + 1000),
         );
-        assert!(
-            expired >= initial_expired + 2,
-            "Expired entries should be initial_expired + 2, but got expired={expired}, initial_expired={initial_expired}"
+        cache.insert(
+            "expired2".to_string(),
+            entry(400.0, CACHE_EXPIRATION_MICROS + 60 * 1_000_000),
         );
+        assert_eq!(cache_stats(&cache), (4, 2));
 
-        // Add one more fresh entry
-        let fresh_key3 = format!("{test_prefix}_fresh3");
-        let fresh_entry3 = CardinalityCacheEntry {
-            value: 500.0,
-            timestamp: now - 30 * 1_000_000, // 30 seconds ago (fresh)
-        };
-        CARDINALITY_CACHE.insert(fresh_key3.clone(), fresh_entry3);
+        cache.insert("fresh3".to_string(), entry(500.0, 30 * 1_000_000));
+        assert_eq!(cache_stats(&cache), (5, 2));
 
-        // Check cache stats again - should have added 1 more fresh entry
-        let (total, expired) = get_cache_stats().await;
-        assert_eq!(
-            total,
-            initial_total + 5,
-            "Total entries should be initial_total + 5, but got total={total}, initial_total={initial_total}"
-        );
-        assert_eq!(
-            expired,
-            initial_expired + 2,
-            "Expired entries should be initial_expired + 2, but got expired={expired}, initial_expired={initial_expired}"
-        );
-
-        // Clean up test entries
-        CARDINALITY_CACHE.remove(&fresh_key1);
-        CARDINALITY_CACHE.remove(&fresh_key2);
-        CARDINALITY_CACHE.remove(&fresh_key3);
-        CARDINALITY_CACHE.remove(&expired_key1);
-        CARDINALITY_CACHE.remove(&expired_key2);
-
-        // Verify cleanup - should be back to initial state
-        let (total, expired) = get_cache_stats().await;
-        assert_eq!(
-            total, initial_total,
-            "After cleanup, total should be back to initial_total={initial_total}, but got total={total}"
-        );
-        assert_eq!(
-            expired, initial_expired,
-            "After cleanup, expired should be back to initial_expired={initial_expired}, but got expired={expired}"
-        );
+        cache.remove("expired1");
+        assert_eq!(cache_stats(&cache), (4, 1));
     }
 
     #[tokio::test]

@@ -4,6 +4,10 @@
     "actual_folder": "RegressionSet/Logs",
     "browser": "chrome",
     "run_files": [
+      "logs-16076-saved-views-more-menu.spec.js",
+      "logs-3086-11220-include-filter-shape.spec.js",
+      "logs-16429-recent-searches-drawer.spec.js",
+      "logs-16430-auto-refresh-popover.spec.js",
       "logs-bugs.spec.js",
       "logs-query-editor-resize-bounds.spec.js",
       "logs-result-display.spec.js",
@@ -16,7 +20,9 @@
       "logs-11966-value-multiselect-quotes.spec.js",
       "logs-explain-sql-mode.spec.js",
       "logs-3322-field-filter-similar-names.spec.js",
-      "logs-723-custom-range-sql-limit.spec.js"
+      "logs-723-custom-range-sql-limit.spec.js",
+      "logs-16799-value-suggest-mid-text.spec.js",
+      "logs-730-live-mode-org-switch.spec.js"
     ],
     "disabled": []
   },
@@ -53,7 +59,13 @@
       "alerts-14796-destination-usage.spec.js",
       "alerts-15091-alert-edit-flow.spec.js",
       "alerts-15096-query-mode-regressions.spec.js",
-      "alerts-15636-cross-type-join.spec.js"
+      "alerts-15636-cross-type-join.spec.js",
+      "alerts-15497-clone-composite-load-races.spec.js",
+      "alerts-529-list-search.spec.js",
+      "alerts-15951-destination-auth-header.spec.js",
+      "alerts-ent3430-template-bulk-delete-hidden-row.spec.js",
+      "alerts-16697-applies-to-server-reason.spec.js",
+      "alerts-834-835-promql-editor.spec.js"
     ],
     "disabled": []
   },
@@ -67,7 +79,11 @@
       "dashboard-cache-browser-refresh.spec.js",
       "dashboard-save-validation-message-11283.spec.js",
       "dashboard-14479-variable-name-prefix.spec.js",
-      "dashboard-3127-shortcut-behind-drawer.spec.js"
+      "dashboard-3127-shortcut-behind-drawer.spec.js",
+      "dashboard-16395-go-to-logs-aggregate-where.spec.js",
+      "dashboard-16808-org-switch-by-id.spec.js",
+      "dashboard-16631-promql-table-drilldown-row.spec.js",
+      "dashboard-16901-multi-query-empty-first.spec.js"
     ],
     "disabled": []
   },
@@ -89,7 +105,8 @@
       "pipeline-regression.spec.js",
       "enrichment-lifecycle.spec.js",
       "pipeline-preview-bounds.spec.js",
-      "pipeline-export.spec.js"
+      "pipeline-export.spec.js",
+      "pipeline-16318-stream-type-race.spec.js"
     ],
     "disabled": []
   },
@@ -98,6 +115,7 @@
     "actual_folder": "RegressionSet/Traces",
     "browser": "chrome",
     "run_files": [
+      "traces-15476-flame-graph-zoom.spec.js",
       "traces-regression.spec.js",
       "traces-12603-refresh-and-placeholder.spec.js",
       "traces-bugs.spec.js",
@@ -117,7 +135,16 @@
       "traces-15477-open-trace-new-tab.spec.js",
       "traces-ent3126-dag-controls-dark.spec.js",
       "traces-1578-apply-search-same-field.spec.js",
-      "traces-3126-catalog-health-badge.spec.js"
+      "traces-3126-catalog-health-badge.spec.js",
+      "traces-14760-auto-run-off.spec.js",
+      "traces-2693-span-kind-display.spec.js",
+      "traces-15973-trace-graph-views.spec.js",
+      "traces-11145-row-date.spec.js",
+      "traces-12213-cross-linking-tab.spec.js",
+      "traces-ent1272-share-link-stream.spec.js",
+      "traces-ent1740-dag-label-overflow.spec.js",
+      "traces-16288-rum-span-error-tab.spec.js",
+      "traces-16529-leave-mid-load.spec.js"
     ],
     "disabled": []
   },
@@ -127,7 +154,9 @@
     "browser": "chrome",
     "run_files": [
       "metrics-regression.spec.js",
-      "metrics-14238-stale-nodata.spec.js"
+      "metrics-14238-stale-nodata.spec.js",
+      "metrics-16290-search-skips-empty-page.spec.js",
+      "metrics-16405-label-values-by-prefix.spec.js"
     ],
     "disabled": []
   },
@@ -143,7 +172,11 @@
       "iam-users-15546-edit-dialog-cancel.spec.js",
       "query-management-sql-tooltip.spec.js",
       "signup-2795-signed-in-redirect.spec.js",
-      "login-2962-entry-payload.spec.js"
+      "login-2962-entry-payload.spec.js",
+      "home-16634-oss-overview-no-anomaly.spec.js",
+      "home-16699-pinned-dashboard-variable-refresh.spec.js",
+      "oss-enterprise-url-upgrade-screen-16461.spec.js",
+      "oss-locked-feature-hover-16805.spec.js"
     ],
     "disabled": []
   },
@@ -178,7 +211,9 @@
       "logs-reset-filters.spec.js",
       "logs-stream-name-case.spec.js",
       "logs-no-stream-prompt.spec.js",
-      "logs-field-actions.spec.js"
+      "logs-field-actions.spec.js",
+      "logs-16782-landing-cancel.spec.js",
+      "logs-16223-recent-search-new-stream.spec.js"
     ],
     "disabled": []
   },
@@ -198,11 +233,15 @@
   },
   {
     "testfolder": "SLO-Regression",
+    "_comment": "Pinned to 3 workers like the SLO shard: at 5 the concurrent SLO/folder writes trip SQLite's 'database is locked' on the single-node meta store.",
     "actual_folder": "RegressionSet/SLO",
     "browser": "chrome",
+    "workers": 3,
     "run_files": [
       "slo-error-messages.spec.js",
-      "slo-14273-form-overlay-exclusivity.spec.js"
+      "slo-14273-form-overlay-exclusivity.spec.js",
+      "slo-16546-import.spec.js",
+      "slo-16795-health-card-reclick.spec.js"
     ],
     "disabled": []
   },
@@ -233,7 +272,14 @@
       "rum-3268-no-widen-at-30d.spec.js",
       "rum-3268-analytics-header-1200.spec.js",
       "rum-14694-replay-missing-segment.spec.js",
-      "rum-3129-sessions-and-trace-card.spec.js"
+      "rum-3129-sessions-and-trace-card.spec.js",
+      "rum-replay-v710-traces-tab.spec.js",
+      "rum-2725-cdn-replay-recording.spec.js",
+      "rum-3072-performance-deep-links.spec.js",
+      "rum-2811-widen-range-picker-label.spec.js",
+      "rum-2924-overview-cards-narrow-viewport.spec.js",
+      "rum-16460-pretty-mobile-sourcemaps.spec.js",
+      "rum-16331-breadcrumb-click-targets.spec.js"
     ],
     "disabled": [],
     "ingest_allowed_upto": "1440",
@@ -247,11 +293,25 @@
     "run_files": [
       "synthetics-15269-list-state.spec.js",
       "synthetics-15060-full-text-on-hover.spec.js",
-      "synthetics-ent2691-destination-delete-guard.spec.js"
+      "synthetics-ent2691-destination-delete-guard.spec.js",
+      "synthetics-ent3140-run-detail-steps.spec.js",
+      "synthetics-16697-hidden-template-override.spec.js"
     ],
     "disabled": [],
     "synthetics_enabled": "true",
     "workers": 2,
     "_comment": "Own shard because the synthetics routes exist only when the server starts with ZO_SYNTHETICS_ENABLED=true. Workers 2: each test writes up to 14 checks/locations, and more concurrent writers trip SQLite's 'database is locked'."
+  },
+  {
+    "testfolder": "Infra-Regression",
+    "actual_folder": "RegressionSet/Infra",
+    "browser": "chrome",
+    "run_files": [
+      "k8s-16300-events-flatten-level.spec.js",
+      "k8s-16778-cluster-picker-and-presets.spec.js",
+      "dbm-16278-one-row-per-server.spec.js"
+    ],
+    "disabled": [],
+    "_comment": "Infrastructure bug-fix regressions (Kubernetes explorer, Database Monitoring). The Kubernetes specs seed k8s_events in their own org, because the stream name is fixed per org; the Database Monitoring spec serves its db_totals rows through page.route, because real rows appear only after the 15-minute rollup."
   }
 ]

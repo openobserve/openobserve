@@ -87,9 +87,10 @@ export class AlertCalibrationPage {
     return runs.isVisible();
   }
 
-  async openRunsExpectingRedirect() {
+  async openRunsExpectingUpgradeScreen() {
     await this.page.goto(this.runsUrl, { waitUntil: 'domcontentloaded' });
-    await expect(this.page.locator(this.alertListPage)).toBeVisible({ timeout: 15000 });
+    await expect(this.page).toHaveURL(/\/enterprise-locked\?feature=alertCalibration/);
+    await expect(this.page.locator('[data-test="enterprise-feature-locked"]')).toBeVisible({ timeout: 15000 });
     await expect(this.page.locator(this.runsPage)).toHaveCount(0);
   }
 

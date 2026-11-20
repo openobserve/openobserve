@@ -103,13 +103,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       aria-hidden="true"
       data-test="autoobserve-coverage-hover"
     >
-      <span class="text-text-heading text-sm font-semibold break-all">{{ hover.item.key }}</span>
+      <span class="text-text-heading text-sm font-semibold break-all">{{
+        hover.item.title ?? hover.item.key
+      }}</span>
       <span class="text-text-body flex items-center gap-1.5">
         <span class="size-2.5 shrink-0 rounded-full" :class="SWATCH[hover.item.stateCls]" />{{
           hover.item.state
         }}
       </span>
-      <OText variant="mono" class="text-text-secondary">{{ hover.item.stream }}</OText>
+      <OText v-if="hover.item.stream" variant="mono" class="text-text-secondary">{{
+        hover.item.stream
+      }}</OText>
       <span class="text-text-secondary">{{ hover.item.detectors }}</span>
     </div>
   </div>
@@ -121,10 +125,13 @@ import type { I18nText } from "@/types/i18n";
 import OText from "@/lib/core/Typography/OText.vue";
 import { LINE_HEIGHT, canLabel, fitLabels, type MeasureText } from "./hexLabel";
 
-export type HexClass = "watched" | "learning" | "gap" | "none" | "s1" | "s2" | "s3" | "s4" | "s5";
+export type HexClass =
+  "watched" | "partial" | "learning" | "gap" | "none" | "s1" | "s2" | "s3" | "s4" | "s5";
 
 export interface HexItem {
   key: string;
+  // A group hex names its group here; a service hex is named by its key.
+  title?: string;
   cls: HexClass;
   stateCls: HexClass;
   name: I18nText;
@@ -137,7 +144,7 @@ const props = defineProps<{
   items: HexItem[];
   label: I18nText;
   selected: string | null;
-  highlight: HexClass[];
+  /** The keys left lit by the search and the legend; null lights every hex. */
   matches: Set<string> | null;
 }>();
 
@@ -145,8 +152,9 @@ const emit = defineEmits<{ select: [key: string] }>();
 
 const FILL: Record<HexClass, string> = {
   watched: "fill-badge-success-soft-text/15 stroke-badge-success-soft-text/30",
+  partial: "fill-ingest-accent-amber/25 stroke-ingest-accent-amber",
   learning: "stroke-status-neutral-text/60",
-  gap: "fill-badge-amber-soft-text stroke-badge-amber-soft-text",
+  gap: "fill-ingest-accent-amber stroke-ingest-accent-amber",
   none: "fill-status-neutral-text stroke-transparent",
   s1: "fill-map-seq-1 stroke-transparent",
   s2: "fill-map-seq-2 stroke-transparent",
@@ -157,8 +165,9 @@ const FILL: Record<HexClass, string> = {
 
 const SWATCH: Record<HexClass, string> = {
   watched: "bg-badge-success-soft-text/15 border border-badge-success-soft-text/60",
+  partial: "bg-ingest-accent-amber/25 border border-ingest-accent-amber",
   learning: "bg-badge-default-soft-bg border border-dashed border-status-neutral-text",
-  gap: "bg-badge-amber-soft-text",
+  gap: "bg-ingest-accent-amber",
   none: "bg-status-neutral-text",
   s1: "bg-map-seq-1",
   s2: "bg-map-seq-2",
@@ -169,6 +178,7 @@ const SWATCH: Record<HexClass, string> = {
 
 const LABEL: Record<HexClass, string> = {
   watched: "fill-banner-success-text",
+  partial: "fill-text-heading",
   learning: "fill-text-heading",
   gap: "fill-text-inverse",
   none: "fill-text-inverse",
@@ -245,7 +255,7 @@ const labelsFor = (items: HexItem[], r: number) => {
   const room = 0.74 * SQRT3 * r;
   if (!canLabel(room, measureText)) return items.map(() => null);
   return fitLabels(
-    items.map((item) => item.key),
+    items.map((item) => item.title ?? item.key),
     room,
     r,
     Math.min(MAX_FONT, 0.24 * r),
@@ -301,9 +311,7 @@ const tabStop = computed(
   () => [current.value, props.selected].find((k) => k && order.value.includes(k)) ?? order.value[0],
 );
 
-const dimmed = (item: HexItem) =>
-  (props.highlight.length > 0 && !props.highlight.includes(item.cls)) ||
-  (props.matches != null && !props.matches.has(item.key));
+const dimmed = (item: HexItem) => props.matches != null && !props.matches.has(item.key);
 
 const show = (e: Event, item: HexItem) => {
   if (e.type === "focus") current.value = item.key;

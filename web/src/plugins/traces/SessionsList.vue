@@ -299,6 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { isLeavingRoute, trackPendingNavigation } from "@/utils/pendingNavigation";
 import { formatDate } from "@/utils/date";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -356,6 +357,7 @@ const STREAM_LS_KEY = "sessionsList_streamFilter";
 
 const { t } = useI18nTyped();
 const router = useRouter();
+trackPendingNavigation(router);
 const route = useRoute();
 const store = useStore();
 const {
@@ -736,6 +738,8 @@ function formatTokens(n: number): string {
 }
 
 function syncFilterUrl() {
+  // A late write after the user navigated away would cancel or pollute the new route.
+  if (route.name !== "aiSessions" || isLeavingRoute("aiSessions")) return;
   void replaceRouteQuery(router, route, (current) => {
     const query = scopeUrlQuery(current, {
       mode: filterMode.value,

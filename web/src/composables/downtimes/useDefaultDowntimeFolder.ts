@@ -51,6 +51,14 @@ export function useDefaultDowntimeFolder(
 
   const remember = (id: string) => rememberDowntimeFolder(orgId.value, id);
 
+  /** The folder's display name, from the list `resolve` already read; the id when it is not listed. */
+  const nameOf = (id: string): string => {
+    const listed =
+      folders.data.value ??
+      queryClient.getQueryData(permittedFoldersQuery(orgId.value, "downtimes").queryKey);
+    return listed?.find((f) => f.folderId === id)?.name ?? id;
+  };
+
   /**
    * The folder to file in, after the permitted list answered, or `null` when the user may use
    * none. A preset mute runs with no dialog, so it must not guess "default" while the list is
@@ -71,5 +79,5 @@ export function useDefaultDowntimeFolder(
     );
   };
 
-  return { folderId, ready, remember, resolve };
+  return { folderId, ready, remember, resolve, nameOf };
 }

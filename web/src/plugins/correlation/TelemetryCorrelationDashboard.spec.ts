@@ -693,6 +693,22 @@ describe("TelemetryCorrelationDashboard.vue", () => {
     });
   });
 
+  it.each([
+    {
+      name: "drops a pod name a Correlated by chip already shows",
+      filters: { "k8s-pod-name": "pod-a" },
+      label: undefined,
+    },
+    { name: "keeps it when no metric stream was filtered by the pod", filters: {}, label: "pod-a" },
+  ])("Pods tab label: $name", ({ filters, label }) => {
+    wrapper = createWrapper({
+      externalActiveTab: "metrics",
+      chipDimensions: { "k8s-pod-name": "pod-a" },
+      metricStreams: [{ stream_name: "k8s_pod_cpu_usage", stream_type: "metrics", filters }],
+    });
+    expect(wrapper.vm.outerTabResourceName.pods).toBe(label);
+  });
+
   describe("uniqueMetricStreams computed", () => {
     it("should return unique streams from metricStreams prop", () => {
       const streamsWithDuplicates = [
@@ -767,6 +783,31 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
       // Identifiers and values are escaped via buildSqlCondition (F2/F38)
       expect(callArg.queryReq.filter).toContain("\"service\" = 'api'");
+      expect(callArg.queryReq.filter).toContain("\"env\" = 'prod'");
+    });
+
+    it("filters traces on every spelling of the service key", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_payload: any, handlers: any) => {
+        handlers.complete();
+      });
+
+      wrapper = createWrapper({
+        traceStreams: [
+          {
+            stream_name: "traces",
+            stream_type: "traces",
+            filters: { service_name: "checkout", env: "prod" },
+            filter_spellings: { service_name: ["checkout", "checkout.service"] },
+          },
+        ],
+      });
+
+      await wrapper.vm.fetchTracesByDimensions();
+
+      const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
+      expect(callArg.queryReq.filter).toContain(
+        "lower(trim(\"service_name\")) IN ('checkout', 'checkout.service')",
+      );
       expect(callArg.queryReq.filter).toContain("\"env\" = 'prod'");
     });
 

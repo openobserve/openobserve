@@ -87,6 +87,9 @@ pub fn apply_common_middlewares(app: axum::Router) -> axum::Router {
         config::axum::middlewares::extract_real_ip,
     ))
     .layer(axum::Extension(ip_sources))
+    .layer(axum::middleware::from_fn(
+        crate::handler::http::router::middlewares::retry_after_middleware,
+    ))
 }
 
 /// Serve a router with the configured TLS and bounded graceful shutdown.
@@ -170,6 +173,9 @@ async fn shutdown_signal() {
         }
     }
 
+    // Before going offline: a peer takes the hook worker lock once this node leaves the node list.
+    #[cfg(feature = "enterprise")]
+    crate::service::workflows::http_trigger::worker::drain_on_shutdown().await;
     if let Err(e) = common::infra::cluster::set_offline().await {
         log::error!("set offline failed: {e}");
     }

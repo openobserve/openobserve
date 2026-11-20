@@ -20,6 +20,8 @@ import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
 
 import { b64DecodeUnicode } from "@/utils/zincutils";
+import { resolveUrlViewToggle } from "@/composables/useLogs/logsViewToggle";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { applyTimezone } from "@/utils/storage";
 
 import useNotifications from "@/composables/useNotifications";
@@ -267,6 +269,7 @@ const useLogs = (t: TranslateFn) => {
       const wasLoading = searchObj.loading;
       autoRun.engine.resetScope(reason === "url" ? "url" : "org");
       const generationAtStart = autoRun.engine.currentGeneration("grid")?.id;
+      const cancelsAtStart = autoRun.engine.userCancelCount();
       // Sync, because a run cancelled or failed before it completes clears its pending record again.
       const sentDuringLoad = new Set<number>();
       const stopWatchingSends = watch(
@@ -304,8 +307,10 @@ const useLogs = (t: TranslateFn) => {
             [searchObj.meta.pendingExecution, searchObj.meta.executed].some(
               (run) => run?.generation === latest.id,
             ));
+        // Cancel pressed while the metadata loaded means no search until the user runs one.
+        const userCancelled = autoRun.engine.userCancelCount() !== cancelsAtStart;
         const result =
-          searchObj.data.stream.selectedStream.length > 0 && !userSearchSent
+          searchObj.data.stream.selectedStream.length > 0 && !userSearchSent && !userCancelled
             ? autoRun.request(fromUrl ? "url" : reason, { origin: options.origin })
             : "skipped-ineligible";
         // A run that is about to start keeps loading on, or the histogram flashes "No data" first.
@@ -544,7 +549,11 @@ const useLogs = (t: TranslateFn) => {
       Object.prototype.hasOwnProperty.call(queryParams, "logs_visualize_toggle") &&
       queryParams.logs_visualize_toggle != ""
     ) {
-      searchObj.meta.logsVisualizeToggle = queryParams.logs_visualize_toggle;
+      searchObj.meta.logsVisualizeToggle = resolveUrlViewToggle(
+        queryParams.logs_visualize_toggle,
+        checkFeatureAccess("logPatterns", buildFeatureGateContext(store.state.zoConfig)).allowed,
+        queryParams.stream_type,
+      );
     }
 
     //here we restore the fn editor state from the url query params
@@ -637,7 +646,7 @@ const useLogs = (t: TranslateFn) => {
 
   const getFilterExpressionByFieldType = (
     field: string | number,
-    field_value: string | number | boolean,
+    field_value: string | number | boolean | null | undefined,
     action: string,
   ) => {
     let operator = action == "include" ? "=" : "!=";
@@ -663,19 +672,17 @@ const useLogs = (t: TranslateFn) => {
         fieldType = fieldTypeList[field];
       }
 
-      if (field_value === "null" || field_value === "" || field_value === null) {
-        operator = action == "include" ? "is" : "is not";
-        field_value = "null";
-      }
       const quotedField =
         searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(String(field)) : field;
-      let expression =
-        field_value == "null"
-          ? `${quotedField} ${operator} ${field_value}`
-          : `${quotedField} ${operator} ${sqlLiteral(field_value)}`;
-
       const isNumericType = (type: string) => ["int64", "float64"].includes(type.toLowerCase());
       const isBooleanType = (type: string) => type.toLowerCase() === "boolean";
+      const isTyped = isNumericType(fieldType) || isBooleanType(fieldType);
+
+      // "" and the text "null" are values a string holds; a number or boolean shown as "" is missing.
+      if (field_value === null || field_value === undefined || (isTyped && field_value === "")) {
+        return `${quotedField} ${action == "include" ? "is" : "is not"} null`;
+      }
+      let expression = `${quotedField} ${operator} ${sqlLiteral(field_value)}`;
 
       if (isNumericType(fieldType)) {
         expression = `${quotedField} ${operator} ${field_value}`;
