@@ -674,7 +674,7 @@ describe("composer", () => {
     store.setDraft(sid, { text: `  ${"why do checkout requests fail ".repeat(3)}` });
     void store.send(sid);
     expect(String(store.state.sessions[sid].title)).toBe(
-      "why do checkout requests fail why do che",
+      "why do checkout requests fail ".repeat(3).trim(),
     );
     expect(store.state.sessions[sid].titleSource).toBe("generated");
     const named = newSession(store);

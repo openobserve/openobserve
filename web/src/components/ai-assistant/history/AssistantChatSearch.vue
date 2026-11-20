@@ -63,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="!results.length"
       size="inline"
       :backdrop="false"
+      :icon="query ? undefined : 'chat'"
       :title="
         query
           ? t('assistant.history.noMatch', { q: raw(query) })

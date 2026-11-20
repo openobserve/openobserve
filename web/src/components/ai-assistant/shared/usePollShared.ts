@@ -42,6 +42,8 @@ export interface PollDeps {
   now?(): number;
   /** Injected for tests; the page reads `document`. */
   hidden?(): boolean;
+  /** The share being read; a new one starts the poll over. */
+  key?(): string;
 }
 
 const RUNNING_MS = 5_000;
@@ -154,6 +156,20 @@ export function usePollShared(
     const at = Math.max(lastRequestAt + RUNNING_MS, notBefore);
     arm(Math.max(0, at - now()));
   };
+
+  // The page is reused across tokens, so a 403 on one share must not keep the next one stopped.
+  if (deps.key)
+    watch(deps.key, () => {
+      clearTimeout(timer);
+      timer = undefined;
+      stopped = false;
+      version = null;
+      quiet = 0;
+      failures = 0;
+      notBefore = 0;
+      state.value = initialState();
+      if (query.value) onData(query.value, false);
+    });
 
   watch(
     query,

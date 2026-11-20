@@ -132,6 +132,12 @@ export function createHistoryMutations(ctx: HistoryCtx, list: HistoryList) {
     }
   };
 
+  // Without server history this browser holds the only copy, so its failed delete fails the mutation.
+  const storageFailed = (err: unknown) => {
+    ctx.noteStorageFailure();
+    if (!ctx.serverMode()) throw err;
+  };
+
   // The answer stops only once the delete holds; a chat the server already lost counts as deleted.
   const remove = async (sid: Sid): Promise<MutationResult> => {
     const store = deps.store();
@@ -146,8 +152,7 @@ export function createHistoryMutations(ctx: HistoryCtx, list: HistoryList) {
       }
       if (running(sid)) await store.stop(sid).catch(() => undefined);
       const id = recordIdOf(sid, ctx);
-      if (id !== null && userOrgKey)
-        await deps.db.remove([id], userOrgKey).catch(() => ctx.noteStorageFailure());
+      if (id !== null && userOrgKey) await deps.db.remove([id], userOrgKey).catch(storageFailed);
       await ctx.reloadLocal();
       if (store.state.sessions[sid]) store.dropSession(sid, "deleted");
       ctx.announce("assistant.history.deleted");
@@ -175,7 +180,7 @@ export function createHistoryMutations(ctx: HistoryCtx, list: HistoryList) {
       if (ctx.serverMode()) await build(deleteAllChatsMutation(deps.org() ?? ""), undefined);
       for (const sid of sids) ctx.deleted.add(sid);
       await Promise.all(sids.filter(running).map((sid) => store.stop(sid).catch(() => undefined)));
-      await deps.db.removeAll([userOrgKey]).catch(() => ctx.noteStorageFailure());
+      await deps.db.removeAll([userOrgKey]).catch(storageFailed);
       await ctx.reloadLocal();
       for (const sid of sids) store.dropSession(sid, "cleared");
       if (count === null) ctx.announce("assistant.history.clearAll.doneAll");
@@ -188,6 +193,7 @@ export function createHistoryMutations(ctx: HistoryCtx, list: HistoryList) {
       });
       return { ok: true };
     } catch (err) {
+      for (const sid of sids) ctx.deleted.delete(sid);
       ctx.failToast("assistant.history.clearAll.failed", () => void clearAll());
       return fail(err);
     }

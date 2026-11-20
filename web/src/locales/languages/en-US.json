@@ -12358,7 +12358,7 @@
       "shareAnswer": "Copy link to this answer",
       "linkCopied": "Link copied",
       "linkCopiedPrivate": "Link copied · only you can open it",
-      "linkCopiedOrg": "Link copied · anyone in {org} with the link can open it",
+      "linkCopiedOrg": "Link copied · people in {org} with shared-chat access can open it",
       "linkCopiedPublic": "Link copied · anyone with the link can open it",
       "branch": "Branch in new chat",
       "branchTitle": "Branch of {title}",

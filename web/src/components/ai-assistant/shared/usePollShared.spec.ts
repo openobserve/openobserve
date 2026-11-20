@@ -93,6 +93,29 @@ describe("usePollShared", () => {
     scope.stop();
   });
 
+  it("starts again for the next share after the last one stopped", async () => {
+    const data = ref<SharedChat | undefined>(chat());
+    const token = ref("a");
+    const answers: (() => PollResult)[] = [() => ({ error: { response: { status: 404 } } })];
+    const refetch = vi.fn(async () => answers.shift()?.() ?? { data: data.value });
+    const scope = effectScope();
+    const poll = scope.run(() =>
+      usePollShared(data, { refetch, hidden: () => false, key: () => token.value }),
+    )!;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(poll.state.value.status).toBe("stopped");
+    token.value = "b";
+    data.value = undefined;
+    await vi.advanceTimersByTimeAsync(0);
+    data.value = chat({ state_version: "b1" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(poll.state.value.status).toBe("live");
+    expect(poll.state.value.changes).toBe(0);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(refetch).toHaveBeenCalledTimes(2);
+    scope.stop();
+  });
+
   it("stops on 403 and 404", async () => {
     const { refetch, poll, scope } = run(chat(), [
       () => ({ error: { response: { status: 404 } } }),

@@ -508,6 +508,19 @@ describe("AssistantMessage", () => {
     expect(wrapper.findAll('[data-test="assistant-query-block"]')).toHaveLength(2);
   });
 
+  it("keeps two queries that differ only inside a quoted literal", () => {
+    const wrapper = mountMessage(
+      answer([
+        { type: "query", query: { language: "sql", text: "SELECT * FROM t WHERE level='ERROR'" } },
+        { type: "query", query: { language: "sql", text: "select *  from t where level='error'" } },
+        { type: "query", query: { language: "sql", text: "SELECT * FROM t WHERE msg='a  b'" } },
+        { type: "query", query: { language: "sql", text: "SELECT * FROM t WHERE msg='a b'" } },
+        { type: "query", query: { language: "sql", text: "select * from t where level='ERROR';" } },
+      ] as never),
+    );
+    expect(wrapper.findAll('[data-test="assistant-query-block"]')).toHaveLength(4);
+  });
+
   it("is aria-busy and streams only its last text block while live (HT-10 AC 3, EB-01 AC 4)", async () => {
     const blocks = [
       { type: "text" as const, text: "first part" },

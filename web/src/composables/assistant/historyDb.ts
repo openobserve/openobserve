@@ -97,9 +97,12 @@ export function createIndexedDbHistory(): HistoryDb {
       withStore("readonly", async (store) => (await request<LocalRecord>(store.get(id))) ?? null),
     merge: (record, writer) =>
       withStore("readwrite", async (store) => {
-        const stored = (await request<LocalRecord | undefined>(store.get(record.id))) ?? undefined;
+        const read = async (id: number) =>
+          (await request<LocalRecord | undefined>(store.get(id))) ?? undefined;
+        const id = await rowIdFor(record, read);
+        const stored = await read(id);
         if (stored && stored.userOrgKey !== record.userOrgKey) return null;
-        const next = mergeLocalRecord(stored, record, writer);
+        const next = mergeLocalRecord(stored, { ...record, id }, writer);
         await request(store.put(next));
         return next;
       }),
@@ -154,6 +157,19 @@ export function mergeLocalRecord(
 }
 
 /** Legacy messages carry no ids, so a turn is keyed by its id, its send time, else its prompt text. */
+/** The row a record lands in: its own id, or the next one not held by another chat. */
+export async function rowIdFor(
+  record: LocalRecord,
+  read: (id: number) => Promise<LocalRecord | undefined>,
+): Promise<number> {
+  // A row id is the chat's creation millisecond, which two chats can share.
+  for (let id = record.id; ; id++) {
+    const stored = await read(id);
+    if (!stored || !stored.sessionId || !record.sessionId || stored.sessionId === record.sessionId)
+      return id;
+  }
+}
+
 export function messageGroups(messages: ChatMessage[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
   for (const message of messages) {

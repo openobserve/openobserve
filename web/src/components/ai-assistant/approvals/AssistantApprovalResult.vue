@@ -877,7 +877,9 @@ function createdHref(): string | null {
   if (item.link) {
     try {
       const url = new URL(item.link, window.location.origin);
-      if (url.origin === window.location.origin) return url.pathname + url.search + url.hash;
+      // A pathname of "//host" would be a protocol-relative href off the app.
+      const path = "/" + url.pathname.replace(/^\/+/, "");
+      if (url.origin === window.location.origin) return path + url.search + url.hash;
     } catch {
       // An unparsable link falls through to the id.
     }

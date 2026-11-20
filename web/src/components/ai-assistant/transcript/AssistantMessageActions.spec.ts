@@ -252,7 +252,9 @@ describe("AssistantMessageActions", () => {
       await wrapper.get('[data-test="assistant-msg-share-link"]').trigger("click");
       await flushPromises();
       expect(String(copy.mock.calls[0][0])).toMatch(/\/ai\/shared\/tok1#answer-t1$/);
-      expect(linkSaid()).toMatch(/^Link copied · anyone in .* with the link can open it$/);
+      expect(linkSaid()).toMatch(
+        /^Link copied · people in .* with shared-chat access can open it$/,
+      );
       queryClient.setQueryData(key, [{ ...share, visibility: "public" }]);
       await wrapper.get('[data-test="assistant-msg-share-link"]').trigger("click");
       await flushPromises();

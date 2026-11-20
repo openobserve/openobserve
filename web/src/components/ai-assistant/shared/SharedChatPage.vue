@@ -183,7 +183,7 @@ const reread = async (): Promise<PollResult> => {
   const result = await chatQuery.refetch();
   return { data: result.data, error: result.error ?? undefined };
 };
-const poll = usePollShared(chat, { refetch: reread });
+const poll = usePollShared(chat, { refetch: reread, key: () => props.token });
 
 const errorStatus = computed(() => statusOfError(chatQuery.error.value));
 const pageState = computed<SharedPageState | "ready">(() => {

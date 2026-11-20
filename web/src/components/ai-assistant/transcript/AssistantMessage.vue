@@ -377,6 +377,13 @@ const LANGUAGE_NAMES: Record<string, string> = {
 
 const POLICY_CODES: ReadonlySet<string> = new Set(["permission_denied_tool", "data_level_blocked"]);
 
+const QUOTED = /('(?:[^']|'')*'|"(?:[^"\\]|\\.)*"|`[^`]*`)/;
+const SQL_KEYWORDS: ReadonlySet<string> = new Set(
+  "select from where and or not in is null like as by group order limit having asc desc distinct on join left right inner outer union all case when then else end between offset".split(
+    " ",
+  ),
+);
+
 // A block counts once per page load, so a re-render never repeats the event.
 const reported = new Set<string>();
 
@@ -653,8 +660,22 @@ function withoutCardedLinks(items: Rendered[]): Rendered[] {
   );
 }
 
+// Literals, quoted names and non-keyword words keep their case: `level='ERROR'` and `'error'` are two queries.
 function queryKey(text: string): string {
-  return text.trim().replace(/;\s*$/, "").replace(/\s+/g, " ").toLowerCase();
+  return text
+    .trim()
+    .replace(/;\s*$/, "")
+    .split(QUOTED)
+    .map((part, i) =>
+      i % 2
+        ? part
+        : part
+            .replace(/\s+/g, " ")
+            .replace(/[a-z_]+/gi, (word) =>
+              SQL_KEYWORDS.has(word.toLowerCase()) ? word.toLowerCase() : word,
+            ),
+    )
+    .join("");
 }
 
 function renderBlock(block: ContentBlock, index: number, links: Set<string>): Rendered[] {

@@ -83,6 +83,8 @@ export function createHistoryImport(ctx: HistoryCtx, list: HistoryList) {
     for (const batch of batchesOf(
       records.map((record) => [record, importItemOf(record, deps.t)]),
     )) {
+      // A sign-in mid-run would upload this account's chats under the next one's cookie.
+      if (ctx.key() !== userOrgKey || deps.org() !== org) return;
       const result = await assistant.importBrowserChats(
         org,
         batch.map(([, item]) => item),
@@ -101,6 +103,7 @@ export function createHistoryImport(ctx: HistoryCtx, list: HistoryList) {
   const runImport = async () => {
     const start = offered.value;
     if (!start) return;
+    const startKey = ctx.key();
     const records = eligible();
     view.value = { state: "moving", count: start.count, done: 0, failed: [] };
     let last = { done: 0, total: start.count, failed: [] as string[] };
@@ -121,6 +124,10 @@ export function createHistoryImport(ctx: HistoryCtx, list: HistoryList) {
       return;
     }
     await ctx.reloadLocal();
+    if (ctx.key() !== startKey) {
+      view.value = null;
+      return;
+    }
     list.invalidate();
     const failed = records
       .filter((record) => last.failed.includes(clientIdOf(record)))

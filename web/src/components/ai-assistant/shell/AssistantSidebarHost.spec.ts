@@ -320,6 +320,22 @@ describe("AssistantSidebarHost", () => {
     expect(document.activeElement?.getAttribute("data-test")).toBe("door");
   });
 
+  it("returns focus to the header button when the panel opened with nothing focused (TA1-08)", async () => {
+    const { store } = await setup();
+    const header = document.createElement("button");
+    header.dataset.entry = "ai-entry-header-ask";
+    document.body.append(header);
+    (document.activeElement as HTMLElement | null)?.blur();
+    store.createSession({
+      origin: { entryKind: "header_button", objectKind: "none", container: "sidebar" },
+    });
+    store.open({ kind: "sidebar" }, { focus: "composer" });
+    await flushPromises();
+    closers.forEach((close) => close());
+    await flushPromises();
+    expect(document.activeElement).toBe(header);
+  });
+
   it("opens the locked panel on G2 without touching placement", async () => {
     const { store } = await setup();
     fake.current.capability.value = { ...fake.current.capability.value, gate: "no_permission" };

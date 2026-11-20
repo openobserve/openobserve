@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, type ComputedRef } from "vue";
+import { computed, watch, type ComputedRef } from "vue";
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded, type Router } from "vue-router";
 
 import {
@@ -66,6 +66,8 @@ export interface AssistantPlace {
   label: I18nText;
   checked: boolean;
   disabled: boolean;
+  /** The move opens the chat in another browser tab, which the button must show. */
+  newTab?: boolean;
   run: () => void;
 }
 
@@ -138,6 +140,7 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
       label: t("assistant.shell.fullPage"),
       checked: placement === "full",
       disabled: false,
+      newTab: placement !== "full" && !sheet,
       run: toFull,
     };
     const dock: AssistantPlace = {
@@ -164,6 +167,7 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
       label: t("assistant.shell.newChatFullPage"),
       checked: false,
       disabled: false,
+      newTab: true,
       run: toFreshFull,
     };
   });
@@ -193,7 +197,21 @@ export function useAssistantPlaces(input: () => AssistantPlacesInput): {
     trackMove("sidebar");
     if (placement === "window" && sid) return store.pinChat(sid);
     store.open({ kind: "sidebar" }, { focus: "composer" });
+    if (placement === "full") focusAfterLeaving();
     leaveFullView();
+  }
+
+  // The page under the full view mounts its own composer and takes focus; the moved chat asks again once it has.
+  function focusAfterLeaving(): void {
+    const stop = watch(
+      () => isFullThreadRoute(route),
+      (full) => {
+        if (full) return;
+        stop();
+        if (store.state.shell.placement.kind === "sidebar")
+          store.open({ kind: "sidebar" }, { focus: "composer" });
+      },
+    );
   }
 
   function ensureChat(): Sid {

@@ -114,6 +114,19 @@ describe("useAssistantHistory in local-only mode", () => {
     expect(fake.history.rows.value.map((row) => row.sid)).toEqual([sid]);
   });
 
+  it("keeps two chats born in the same millisecond as two rows", async () => {
+    const fake = setup();
+    await flushPromises();
+    const first = chat(fake, "first");
+    const second = chat(fake, "second");
+    await fake.history.save(first);
+    await fake.history.save(second);
+    await fake.history.save(first);
+    const rows = [...fake.db.rows.values()];
+    expect(rows.map((row) => row.sessionId).sort()).toEqual([first, second].sort());
+    expect(rows.find((row) => row.sessionId === second)?.messages[0].content).toBe("second");
+  });
+
   it("keeps an incident chat's origin through a save and a reopen", async () => {
     const fake = setup();
     await flushPromises();
@@ -327,6 +340,18 @@ describe("useAssistantHistory in local-only mode", () => {
     await fake.history.clearAll();
     expect([...fake.db.rows.keys()]).toEqual([3]);
     expect(String(fake.history.announcement.value?.text)).toBe("Deleted 2 chats");
+  });
+
+  it("reports a failed clear or delete when this browser's store refuses it", async () => {
+    const fake = setup({}, [record(1), record(2)]);
+    await flushPromises();
+    vi.spyOn(fake.db, "removeAll").mockRejectedValueOnce(new Error("blocked"));
+    expect((await fake.history.clearAll()).ok).toBe(false);
+    expect(fake.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    expect(String(fake.history.announcement.value?.text ?? "")).not.toContain("Deleted");
+    vi.spyOn(fake.db, "remove").mockRejectedValueOnce(new Error("blocked"));
+    expect((await fake.history.remove(record(1).sessionId!)).ok).toBe(false);
+    expect(fake.history.rows.value).toHaveLength(2);
   });
 
   it("keeps the sign-out preference per user", () => {
@@ -736,6 +761,29 @@ describe("useAssistantHistory import resume", () => {
     expect(fake.db.rows.get(2)?.importedAs).toBe("s-new");
     expect(fake.db.rows.get(1)?.importedAs).toBe(record(1).sessionId);
     expect(fake.history.importView.value).toBeNull();
+  });
+
+  it("stops between batches when another account or org signs in", async () => {
+    vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+    const seed = Array.from({ length: IMPORT_BATCH + 2 }, (_, i) => record(i + 1));
+    const fake = setup({ persistence: true, historyImport: true }, seed);
+    const imported = vi
+      .spyOn(assistant, "importBrowserChats")
+      .mockImplementation(async (_org, items) => {
+        fake.store.setIdentity({ userOrgKey: "k2", org: "default" });
+        return {
+          imported: items.map((item) => ({
+            client_id: item.client_id,
+            session_id: `s-${item.client_id}`,
+          })),
+          skipped: [],
+          failed: [],
+        };
+      });
+    await flushPromises();
+    await fake.history.runImport();
+    expect(imported).toHaveBeenCalledTimes(1);
+    expect([...fake.db.rows.values()].filter((row) => row.userOrgKey === KEY)).toHaveLength(2);
   });
 
   it("stops on a server failure with a retryable error, never a zero-chat failure line", async () => {

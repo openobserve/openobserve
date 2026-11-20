@@ -101,8 +101,8 @@ export const MAX_CHIP_BYTES = 32 * 1024;
 
 export const MAX_IMAGES = 4;
 
-/** A chat is named after its first question, cut to this many characters, until the server names it. */
-export const DEFAULT_TITLE_CHARS = 40;
+/** A chat is named after its first question until the server names it; the header ellipsizes, never this cap. */
+export const DEFAULT_TITLE_CHARS = 200;
 
 /** Above this many idle sessions the least recently used release their transcript (`00` §4.2 rule 10). */
 export const IDLE_SESSION_LIMIT = 10;

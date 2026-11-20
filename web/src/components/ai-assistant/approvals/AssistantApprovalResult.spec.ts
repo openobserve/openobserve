@@ -403,6 +403,39 @@ describe("AssistantApprovalResult", () => {
     expect(made({}).exists()).toBe(false);
   });
 
+  it("never turns a same-origin link into a protocol-relative href", () => {
+    const create = approvalOf({
+      type: "confirmation_required",
+      id: "c9",
+      tool: "CreateAlert",
+      kind: "create",
+      targets: [{ type: "alert", name: "qa_error_burst" }],
+      args: { request_body: { name: "qa_error_burst" } },
+    });
+    const href = (link: string) => {
+      const open = mountRecord(
+        {
+          outcome: { state: "done", at: 1 },
+          result: {
+            status: "done",
+            items: [{ type: "alert", name: "qa_error_burst", status: "done", link }],
+            resolvedBy: "ada@example.com",
+            resolvedAt: 1,
+          },
+        },
+        { blocks: [{ type: "approval", approval: create }] },
+      ).wrapper.find('[data-test="assistant-approval-result-open"]');
+      return open.exists() ? open.attributes("href") : undefined;
+    };
+    const origin = window.location.origin;
+    for (const evil of [`${origin}//evil.com/x`, `${origin}///evil.com/x`, "//evil.com/x"]) {
+      const out = href(evil);
+      expect(out === undefined || !/^[/\\]{2}/.test(out)).toBe(true);
+    }
+    expect(href(`${origin}//evil.com/x?q=1#h`)).toBe("/evil.com/x?q=1#h");
+    expect(href(`${origin}/alerts/a8`)).toBe("/alerts/a8");
+  });
+
   it("opens a new panel's dashboard", () => {
     const panel = approvalOf({
       type: "confirmation_required",

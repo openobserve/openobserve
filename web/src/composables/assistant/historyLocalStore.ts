@@ -19,6 +19,7 @@ import { raw } from "@/types/i18n";
 import type { AssistantSession, Sid } from "./assistantStore.types";
 import {
   isHelperChat,
+  MAX_TITLE,
   originOf,
   plainCopy,
   readLocal,
@@ -71,6 +72,7 @@ export async function saveSession(
     return server ? "server" : "not_saved";
   }
   ctx.notSavedSids.delete(sid);
+  if (written.id !== record.id) session.chatId = written.id;
   if (record.userOrgKey) ctx.rememberKey(record.userOrgKey);
   const isNew = !ctx.localById.value.has(written.id);
   if (server) await keepWritten(written, ctx);
@@ -233,7 +235,7 @@ function recordFromSession(
   const title =
     (session.title && String(session.title)) ||
     (firstPrompt
-      ? String(firstPrompt.content).slice(0, 40)
+      ? String(firstPrompt.content).slice(0, MAX_TITLE)
       : String(ctx.deps.t("assistant.thread.newChatTitle")));
   const ended = isTerminal(session.turn);
   const server = ctx.serverMode();

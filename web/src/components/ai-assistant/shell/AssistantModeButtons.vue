@@ -24,6 +24,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @select="item.run"
     >
       {{ item.label }}
+      <template v-if="item.newTab" #icon-right>
+        <span class="sr-only">{{ t("assistant.docs.opensInNewTab") }}</span>
+        <OIcon
+          :name="assistantGlyph.newTab"
+          size="xs"
+          class="text-text-secondary ms-auto"
+          aria-hidden="true"
+          :data-test="`assistant-shell-place-${item.id}-new-tab`"
+        />
+      </template>
     </ODropdownItem>
     <ODropdownItem
       v-if="freshFull"
@@ -32,6 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @select="freshFull.run"
     >
       {{ freshFull.label }}
+      <template #icon-right>
+        <span class="sr-only">{{ t("assistant.docs.opensInNewTab") }}</span>
+        <OIcon
+          :name="assistantGlyph.newTab"
+          size="xs"
+          class="text-text-secondary ms-auto"
+          aria-hidden="true"
+        />
+      </template>
     </ODropdownItem>
   </template>
   <template v-else>
@@ -39,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="item in group"
       :key="item.id"
       :label="item.label"
-      :icon="PLACE_ICONS[item.id]"
+      :icon="item.newTab ? assistantGlyph.newTab : PLACE_ICONS[item.id]"
       :pressed="item.checked"
       :class="item.checked && PRESSED_CLASS"
       :data-test="`assistant-shell-place-${item.id}`"
@@ -84,7 +103,9 @@ const PLACE_ICONS: Record<PlaceId, IconName> = {
 import { computed } from "vue";
 
 import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 import { useAssistantPlaces } from "./useAssistantPlaces";
 
@@ -94,6 +115,7 @@ const props = withDefaults(defineProps<AssistantModeButtonsProps>(), {
   dockHost: undefined,
 });
 
+const { t } = useI18nTyped();
 const { places, freshFull } = useAssistantPlaces(() => ({
   placement: props.placement,
   sid: props.sid,

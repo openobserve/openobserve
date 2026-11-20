@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           tabindex="-1"
           data-answer
           :data-test="`assistant-answer-${turn.turnId}`"
-          class="rounded-default focus-visible:ring-border-strong flex min-w-0 flex-col gap-2 outline-none focus-visible:ring-2"
+          class="rounded-surface focus-visible:ring-border-strong -m-2 flex min-w-0 flex-col gap-2 p-2 outline-none focus-visible:ring-2"
         >
           <AssistantMessage
             :message="turn.answer ?? pendingAnswer"

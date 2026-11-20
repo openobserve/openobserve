@@ -296,6 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="!history.rows.value.length && !drawn.length"
           size="inline"
           :backdrop="false"
+          icon="chat"
           :title="t('assistant.history.empty.title')"
           data-test="assistant-history-empty"
         />

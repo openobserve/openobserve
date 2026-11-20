@@ -138,6 +138,9 @@ export const RESIZE_REPORT_MS = 600;
 
 const LANDSCAPE_PHONE_REM = 30;
 
+// The header's AI button, which reopens the panel: where focus lands when the opener is gone.
+const HEADER_ENTRY = "ai-entry-header-ask";
+
 // A press on a control or the resize handle is never a tear-off.
 const NO_TEAR_OFF = "button, a, input, textarea, select, [role='button'], [role='separator']";
 </script>
@@ -309,7 +312,7 @@ function onOpen(): void {
   });
 }
 
-// Focus goes back to the invoker, else the element focused before the open, else `main` (IW-09 AC 3).
+// Focus goes back to the invoker, else the element focused before the open, else the header button that reopens it (IW-09 AC 3).
 async function onClose(): Promise<void> {
   const tab = movedToTab.value;
   movedToTab.value = null;
@@ -326,7 +329,11 @@ async function onClose(): Promise<void> {
   );
   await nextTick();
   const invoker = store.state.shell.invoker?.el.deref();
-  const target = [invoker, returnFocusTo].find((el) => el?.isConnected);
+  const reopen = document.querySelector<HTMLElement>(`[data-entry="${HEADER_ENTRY}"]`);
+  // An open from a removed control saw `body` as the focused element, which is no place to return to.
+  const target = [invoker, returnFocusTo, reopen].find(
+    (el) => el && el !== document.body && el.isConnected,
+  );
   (target ?? document.querySelector<HTMLElement>("main"))?.focus();
   returnFocusTo = null;
 }

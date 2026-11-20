@@ -31,6 +31,7 @@ import type {
 } from "@/composables/assistant/assistantStore.types";
 import {
   mergeLocalRecord,
+  rowIdFor,
   type HistoryDb,
   type LocalRecord,
 } from "@/composables/assistant/historyDb";
@@ -147,10 +148,11 @@ export function memoryHistoryDb(
       [...rows.values()].filter((row) => row.userOrgKey === key).map((row) => structuredClone(row)),
     get: async (id) => structuredClone(rows.get(id) ?? null),
     merge: async (record, writer) => {
-      const stored = rows.get(record.id);
+      const id = await rowIdFor(record, async (at) => rows.get(at));
+      const stored = rows.get(id);
       if (stored && stored.userOrgKey !== record.userOrgKey) return null;
-      const next = mergeLocalRecord(stored, structuredClone(record), writer);
-      rows.set(record.id, next);
+      const next = mergeLocalRecord(stored, { ...structuredClone(record), id }, writer);
+      rows.set(id, next);
       return structuredClone(next);
     },
     remove: async (ids, userOrgKey) => {

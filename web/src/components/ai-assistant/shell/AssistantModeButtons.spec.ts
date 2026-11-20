@@ -147,6 +147,13 @@ describe("header move group", () => {
 });
 
 describe("Open as", () => {
+  it("marks Full page as opening a new tab, in the menu and on the header button", async () => {
+    await setup({});
+    expect(item("full-new-tab")).not.toBeNull();
+    expect(item("full")?.textContent).toContain("(opens in a new tab)");
+    expect(item("window-new-tab")).toBeNull();
+  });
+
   it("offers only the other places: full page and floating window from the sidebar", async () => {
     await setup({});
     expect(item("sidebar")).toBeNull();
@@ -401,6 +408,20 @@ describe("Open as", () => {
     expect(item("full-new")).toBeNull();
   });
 
+  it("asks the side panel for focus again once the full view's page has taken over", async () => {
+    const { store } = fake.current;
+    const sid = store.state.shell.activeSid;
+    const { router } = await setup({ placement: "full", sid });
+    await router.push({ name: "home", query: { thread: sid } });
+    await flushPromises();
+    item("sidebar")!.click();
+    const asked = store.focusRequest.value?.seq ?? 0;
+    await router.push({ name: "home" });
+    await flushPromises();
+    expect(store.state.shell.placement.kind).toBe("sidebar");
+    expect(store.focusRequest.value?.seq).toBeGreaterThan(asked);
+  });
+
   it("pins a window's chat from Side panel", async () => {
     const { store } = fake.current;
     const sid = store.state.shell.activeSid;
@@ -419,8 +440,8 @@ describe("Open as", () => {
       "assistant-shell-place-full",
       "assistant-shell-place-window",
     ]);
-    expect([...items].map((el) => el.textContent?.trim())).toEqual([
-      "Full page",
+    expect([...items].map((el) => el.textContent?.replace(/\s+/g, " ").trim())).toEqual([
+      "Full page (opens in a new tab)",
       "Floating window",
     ]);
     expect(document.body.querySelector("[aria-checked]")).toBeNull();
