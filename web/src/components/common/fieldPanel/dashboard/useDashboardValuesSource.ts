@@ -59,7 +59,7 @@ export function useDashboardValuesSource(options: DashboardValuesOptions) {
   const keywordPerField = ref<Record<string, string>>({});
   const pinnedRange = ref<Record<string, TimeRange>>({});
   // What each open field's values were fetched for, so a change to any of it fetches them again.
-  const fetchedContext: Record<string, { base: string; where: string }> = {};
+  const fetchedContext = ref<Record<string, { base: string; where: string }>>({});
 
   // The builder filter speaks in join aliases once the query joins, which a single-stream values query cannot resolve.
   const whereFor = (row: DashboardFieldRow): string => {
@@ -80,7 +80,7 @@ export function useDashboardValuesSource(options: DashboardValuesOptions) {
       resetFieldValues(row._uid);
       return;
     }
-    const where = fetchedContext[row._uid]?.where ?? whereFor(row);
+    const where = fetchedContext.value[row._uid]?.where ?? whereFor(row);
     fetch(
       {
         fields: [row.name],
@@ -107,7 +107,7 @@ export function useDashboardValuesSource(options: DashboardValuesOptions) {
 
   const startFieldValues = (row: DashboardFieldRow, keyword: string, keepValues = false) => {
     const key = row._uid;
-    fetchedContext[key] = { base: baseContextOf(row), where: whereFor(row) };
+    fetchedContext.value[key] = { base: baseContextOf(row), where: whereFor(row) };
     keywordPerField.value[key] = keyword;
     sizePerField.value[key] = pageSize();
     delete fieldValuesFinalizedValues.value[key];
@@ -132,7 +132,7 @@ export function useDashboardValuesSource(options: DashboardValuesOptions) {
     delete sizePerField.value[key];
     delete keywordPerField.value[key];
     delete pinnedRange.value[key];
-    delete fetchedContext[key];
+    delete fetchedContext.value[key];
     resetFieldValues(key);
     expandedFields.value = expandedFields.value.filter((id) => id !== key);
   };
@@ -175,7 +175,7 @@ export function useDashboardValuesSource(options: DashboardValuesOptions) {
         closeField(key);
         continue;
       }
-      const fetched = fetchedContext[key];
+      const fetched = fetchedContext.value[key];
       if (fetched?.base === baseContextOf(row) && fetched.where === whereFor(row)) continue;
       const range = options.timeRange();
       if (range) pinnedRange.value[key] = range;
@@ -192,7 +192,7 @@ export function useDashboardValuesSource(options: DashboardValuesOptions) {
     clearTimeout(settleTimer);
     const baseMoved = expandedFields.value.some((key) => {
       const row = rowByKey(key);
-      return !row || baseContextOf(row) !== fetchedContext[key]?.base;
+      return !row || baseContextOf(row) !== fetchedContext.value[key]?.base;
     });
     if (baseMoved) refreshOpenFields();
     else settleTimer = setTimeout(refreshOpenFields, FILTER_SETTLE_MS);
@@ -217,7 +217,7 @@ export function useDashboardValuesSource(options: DashboardValuesOptions) {
       streamType: currentQuery()?.fields?.stream_type ?? "logs",
       startTime: range?.start_time ?? 0,
       endTime: range?.end_time ?? 0,
-      whereClause: whereFor(row),
+      whereClause: fetchedContext.value[row._uid]?.where ?? whereFor(row),
     };
   };
 

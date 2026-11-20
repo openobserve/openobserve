@@ -1199,6 +1199,17 @@ describe("values", () => {
     expect(sentSql()).toBe('SELECT * FROM "app_logs"');
   });
 
+  it("describes an open field's request with the filter its values were fetched under until the edit settles", async () => {
+    fakeSettleTimer();
+    const { source, row } = openLevel();
+    expect(source.valuesRequest(row).whereClause).toBe("");
+    fields().filter = { filterType: "group", logicalOperator: "AND", conditions: [STATUS_200] };
+    await flushPromises();
+    expect(source.valuesRequest(row).whereClause).toBe("");
+    await settle();
+    expect(source.valuesRequest(row).whereClause).toBe("(status = 200)");
+  });
+
   it("settles empty without a request before the panel has a range", () => {
     mockReturn.getFilterValuesTimeRange = vi.fn(
       () => null,

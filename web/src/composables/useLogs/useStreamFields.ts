@@ -640,10 +640,11 @@ export const useStreamFields = () => {
     return fresh.map((entry) => {
       const previous = byName.get(entry?.name);
       if (!previous || (Array.isArray(entry.schema) && entry.schema.length > 0)) return entry;
+      // Settings come from the fresh list; removedSchemaFields is split off the schema, so it travels with it.
       return {
         ...entry,
         schema: previous.schema,
-        settings: previous.settings,
+        settings: entry.settings ?? previous.settings,
         removedSchemaFields: previous.removedSchemaFields,
       };
     });

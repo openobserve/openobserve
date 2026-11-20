@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { computed, ref, watch, type Ref } from "vue";
+import { computed, onScopeDispose, ref, watch, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import useFieldValuesStream, { stripFieldCondition } from "@/composables/useFieldValuesStream";
@@ -47,6 +47,9 @@ export interface LocalFieldSourceOptions {
 }
 
 const EMPTY_SET: Set<string> = new Set();
+const NO_ACTIVE_VALUES: ActiveFilterValues = { include: {}, exclude: {} };
+// Pages pass live editor text, so open lists follow the filter only once typing pauses.
+const FILTER_SETTLE_MS = 500;
 
 /** One SQL condition for a picked value; null-like values become IS NULL / IS NOT NULL. */
 export const buildValueExpression = (
@@ -152,12 +155,14 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
     collapsedGroups.value = next;
   };
 
-  const whereClause = computed<string>(() => {
+  // Null while the full SQL statement does not parse.
+  const liveWhere = computed<string | null>(() => {
     if (options.query) return options.query.value?.trim() ?? "";
     const sql = options.sql?.value?.trim();
     if (!sql) return "";
     const parsed = fnParsedSQL(sql);
-    if (!parsed?.where) return "";
+    if (!parsed?.from?.length) return null;
+    if (!parsed.where) return "";
     const rendered = fnUnparsedSQL({
       type: "select",
       columns: [{ expr: { type: "column_ref", table: null, column: "*" }, as: null }],
@@ -170,22 +175,39 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
 
   const baseFilter = computed(() => options.baseFilter?.value?.trim() ?? "");
 
-  const activeFilters = computed<ActiveFilterValues>(() => {
-    const where = whereClause.value;
-    if (!where) return { include: {}, exclude: {} };
+  // A half-typed filter has no checked values and is never sent.
+  const parsedFilter = computed<{ valid: boolean; active: ActiveFilterValues }>(() => {
+    const where = liveWhere.value;
+    if (where === null) return { valid: false, active: NO_ACTIVE_VALUES };
+    if (!where) return { valid: true, active: NO_ACTIVE_VALUES };
     const names = new Set(flatFields.value.map((field) => field.name));
     try {
-      return collectActiveValues(
-        fnParsedSQL(`select * from stream where ${filterForParsing(where, names)}`)?.where,
-      );
+      const ast = fnParsedSQL(
+        `select * from stream where ${filterForParsing(where, names)}`,
+      )?.where;
+      return ast
+        ? { valid: true, active: collectActiveValues(ast) }
+        : { valid: false, active: NO_ACTIVE_VALUES };
     } catch {
-      // A half-typed filter has no checked values.
-      return { include: {}, exclude: {} };
+      return { valid: false, active: NO_ACTIVE_VALUES };
     }
   });
 
-  const activeIncludeValues = computed(() => activeFilters.value.include);
-  const activeExcludeValues = computed(() => activeFilters.value.exclude);
+  const activeIncludeValues = computed(() => parsedFilter.value.active.include);
+  const activeExcludeValues = computed(() => parsedFilter.value.active.exclude);
+
+  // The last filter that parsed, so a half-typed edit keeps requests on the previous one.
+  const lastValidWhere = ref("");
+  const whereClause = computed<string>(() =>
+    parsedFilter.value.valid ? (liveWhere.value ?? "") : lastValidWhere.value,
+  );
+  watch(
+    whereClause,
+    (where) => {
+      lastValidWhere.value = where;
+    },
+    { immediate: true, flush: "sync" },
+  );
 
   // Base filter first, user query parenthesised: a top-level OR must not swallow the base filter.
   const whereFor = (fieldName: string): string => {
@@ -212,8 +234,11 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
   const sizePerField = ref<Record<string, number>>({});
   const keywordPerField = ref<Record<string, string>>({});
   const pinnedRange = ref<Record<string, { startTime: number; endTime: number }>>({});
+  // Load more and search stay on the filter the list was fetched under.
+  const pinnedWhere = ref<Record<string, string>>({});
 
   const rangeFor = (fieldName: string) => pinnedRange.value[fieldName] ?? options.timeRange();
+  const pinnedWhereFor = (fieldName: string) => pinnedWhere.value[fieldName] ?? whereFor(fieldName);
 
   const streamFor = (fieldName: string) => {
     const row = flatFields.value.find((field) => field.name === fieldName);
@@ -227,7 +252,7 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
     fetch: typeof fetchFieldValues = fetchFieldValues,
   ) => {
     const stream = streamFor(fieldName);
-    const where = whereFor(fieldName);
+    const where = pinnedWhereFor(fieldName);
     const range = rangeFor(fieldName);
     fetch({
       fields: [fieldName],
@@ -261,6 +286,7 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
     sizePerField.value[name] = defaultValuesCount.value;
     keywordPerField.value[name] = "";
     pinnedRange.value[name] = options.timeRange();
+    pinnedWhere.value[name] = whereFor(name);
     if (!expandedFields.value.includes(name))
       expandedFields.value = [...expandedFields.value, name];
     if (hasOverride(name)) return;
@@ -274,6 +300,7 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
     delete sizePerField.value[name];
     delete keywordPerField.value[name];
     delete pinnedRange.value[name];
+    delete pinnedWhere.value[name];
     resetFieldValues(name);
     expandedFields.value = expandedFields.value.filter((id) => id !== name);
   };
@@ -309,10 +336,12 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
     );
   };
 
-  // Some pages pass live editor text as the query, so only the base filter and range refetch open lists.
-  const refetchOpenFields = () => {
+  const refetchOpenFields = (onlyMovedWhere = false) => {
     for (const name of expandedFields.value) {
+      const where = whereFor(name);
+      if (onlyMovedWhere && pinnedWhere.value[name] === where) continue;
       pinnedRange.value[name] = options.timeRange();
+      pinnedWhere.value[name] = where;
       if (hasOverride(name)) continue;
       cancelFieldStream(name);
       delete fieldValuesFinalizedValues.value[name];
@@ -325,7 +354,17 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
     }
   };
 
-  watch([baseFilter, () => options.timeRange()], refetchOpenFields);
+  watch([baseFilter, () => options.timeRange()], () => refetchOpenFields());
+
+  let settleTimer: ReturnType<typeof setTimeout> | undefined;
+  onScopeDispose(() => clearTimeout(settleTimer));
+
+  watch(liveWhere, () => {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      if (parsedFilter.value.valid) refetchOpenFields(true);
+    }, FILTER_SETTLE_MS);
+  });
 
   const resetValues = () => {
     cancelAllFieldStreams();
@@ -333,6 +372,7 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
     sizePerField.value = {};
     keywordPerField.value = {};
     pinnedRange.value = {};
+    pinnedWhere.value = {};
     fieldValues.value = {};
   };
 
@@ -345,7 +385,7 @@ export default function useLocalFieldSource(options: LocalFieldSourceOptions): F
       streamType: options.streamType.value,
       startTime: range.startTime,
       endTime: range.endTime,
-      whereClause: whereFor(field.name),
+      whereClause: pinnedWhereFor(field.name),
     };
   };
 

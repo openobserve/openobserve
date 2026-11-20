@@ -332,8 +332,7 @@ describe("useLocalFieldSource", () => {
       expect(lastRequest()).toMatchObject({ start_time: 300, end_time: 400 });
     });
 
-    it("does not refetch open fields while the query text changes, but a newly opened field uses it", async () => {
-      harness = mountSource();
+    describe("query edits", () => {
       const field = (name: string) => ({
         name,
         dataType: "",
@@ -341,16 +340,102 @@ describe("useLocalFieldSource", () => {
         isSchemaField: true,
         showValues: true,
       });
-      harness.source.openField(field("msg"));
-      expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(1);
-      harness.query.value = "level='e";
-      await flush();
-      harness.query.value = "level='error'";
-      await flush();
-      expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(1);
-      harness.source.openField(field("service"));
-      expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(2);
-      expect(lastSql()).toBe(`SELECT * FROM "s1" WHERE level='error'`);
+      const type = async (text: string) => {
+        harness.query.value = text;
+        await nextTick();
+      };
+
+      beforeEach(() => {
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("refetches open lists once the parsed filter has settled, not per keystroke", async () => {
+        harness = mountSource();
+        harness.source.openField(field("msg"));
+        expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(1);
+        await type("level='er'");
+        vi.advanceTimersByTime(300);
+        await type("level='error'");
+        vi.advanceTimersByTime(300);
+        expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(1);
+        vi.advanceTimersByTime(200);
+        expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(2);
+        expect(lastSql()).toBe(`SELECT * FROM "s1" WHERE level='error'`);
+      });
+
+      it("never sends a half-typed filter, on settle or on open", async () => {
+        harness = mountSource();
+        await type("level='error'");
+        harness.source.openField(field("msg"));
+        await type("level='error' AND");
+        vi.advanceTimersByTime(500);
+        expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(1);
+        harness.source.openField(field("service"));
+        expect(lastSql()).toBe(`SELECT * FROM "s1" WHERE level='error'`);
+      });
+
+      it("refetches when the filter parses again after a half-typed edit", async () => {
+        harness = mountSource();
+        harness.source.openField(field("msg"));
+        await type("level='error'");
+        await type("level='error' AND");
+        vi.advanceTimersByTime(500);
+        await type("level='error' AND host='h'");
+        vi.advanceTimersByTime(500);
+        expect(lastSql()).toBe(`SELECT * FROM "s1" WHERE level='error' AND host='h'`);
+      });
+
+      it("keeps the full SQL statement's last parsed WHERE while it does not parse", async () => {
+        harness = mountSource({ useSql: true });
+        harness.sql.value = `SELECT * FROM "s1" WHERE level='error'`;
+        await nextTick();
+        harness.sql.value = `SELECT * FROM "s1" WHERE level='error' AND`;
+        await nextTick();
+        harness.source.openField(field("msg"));
+        expect(lastSql()).toBe(`SELECT * FROM "s1" WHERE level = 'error'`);
+      });
+
+      it("searches and loads more under the filter the list was fetched with, until a settle re-pins it", async () => {
+        harness = mountSource();
+        harness.source.openField(field("msg"));
+        await type("level='error'");
+        harness.source.searchValues("msg", "err");
+        expect(lastSql()).toBe(`SELECT * FROM "s1"`);
+        harness.source.loadMoreValues("msg");
+        expect(lastSql()).toBe(`SELECT * FROM "s1"`);
+        vi.advanceTimersByTime(500);
+        expect(lastRequest()).toMatchObject({ keyword: "err" });
+        expect(lastSql()).toBe(`SELECT * FROM "s1" WHERE level='error'`);
+        harness.source.loadMoreValues("msg");
+        expect(lastSql()).toBe(`SELECT * FROM "s1" WHERE level='error'`);
+      });
+
+      it("does not refetch a list whose filter did not move", async () => {
+        harness = mountSource();
+        await type("service='api'");
+        harness.source.openField(field("service"));
+        await type("service='web'");
+        vi.advanceTimersByTime(500);
+        expect(valuesMock.fetchFieldValues).toHaveBeenCalledTimes(1);
+      });
+
+      it("hands an override the settled filter, not the live text", async () => {
+        harness = mountSource({
+          expansionOverride: (row) => (row.name === "msg" ? { template: "<div />" } : null),
+        });
+        harness.source.openField(field("msg"));
+        await type("level='e");
+        expect(harness.source.valuesRequest(field("msg")).whereClause).toBe("");
+        await type("level='error'");
+        expect(harness.source.valuesRequest(field("msg")).whereClause).toBe("");
+        vi.advanceTimersByTime(500);
+        expect(harness.source.valuesRequest(field("msg")).whereClause).toBe("level='error'");
+        expect(valuesMock.fetchFieldValues).not.toHaveBeenCalled();
+      });
     });
 
     it("pins the time range of an open field for search and load more", async () => {

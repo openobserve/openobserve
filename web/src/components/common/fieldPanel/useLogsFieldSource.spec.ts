@@ -84,6 +84,7 @@ type StreamSeed = {
   name: string;
   schema?: { name: string; type: string }[];
   settings?: Record<string, unknown>;
+  removedSchemaFields?: { name: string; type: string }[];
   stats?: Record<string, number>;
   is_internal?: boolean;
 };
@@ -311,13 +312,14 @@ describe("useLogsFieldSource", () => {
       expect(onStreamChangeMock).not.toHaveBeenCalled();
     });
 
-    it("keeps the loaded schemas when the refreshed list carries none", async () => {
+    it("keeps the loaded schemas when the refreshed list carries none, but takes its settings", async () => {
       searchObj.data.stream.selectedStream = ["default"];
       const loaded = searchObj.data.streamResults.list.find(
         (entry: StreamSeed) => entry.name === "default",
       );
+      loaded.removedSchemaFields = [{ name: "_original", type: "Utf8" }];
       getStreamsMock.mockResolvedValueOnce({
-        list: [stream("default", { schema: [], settings: { fresh: true } })],
+        list: [stream("default", { schema: [], settings: { defined_schema_fields: ["a"] } })],
       });
       source.refreshStreams!();
       await flushPromises();
@@ -326,7 +328,25 @@ describe("useLogsFieldSource", () => {
       );
       expect(refreshed.schema).toEqual(loaded.schema);
       expect(refreshed.schema.length).toBeGreaterThan(0);
-      expect(refreshed.settings).toEqual(loaded.settings);
+      expect(refreshed.removedSchemaFields).toEqual([{ name: "_original", type: "Utf8" }]);
+      expect(refreshed.settings).toEqual({ defined_schema_fields: ["a"] });
+    });
+
+    it("keeps the loaded settings only when the refreshed entry has none", async () => {
+      searchObj.data.stream.selectedStream = ["default"];
+      const loaded = searchObj.data.streamResults.list.find(
+        (entry: StreamSeed) => entry.name === "default",
+      );
+      loaded.settings = { full_text_search_keys: ["msg"] };
+      getStreamsMock.mockResolvedValueOnce({
+        list: [{ name: "default", schema: [] }],
+      });
+      source.refreshStreams!();
+      await flushPromises();
+      const refreshed = searchObj.data.streamResults.list.find(
+        (entry: StreamSeed) => entry.name === "default",
+      );
+      expect(refreshed.settings).toEqual({ full_text_search_keys: ["msg"] });
     });
 
     it("clears the picker when the refreshed list comes back empty", async () => {
