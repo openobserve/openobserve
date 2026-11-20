@@ -42,6 +42,13 @@ import type { StarterPack } from "./types";
 
 export type PackMatchState = "checking" | "matched" | "waiting" | "none" | "error";
 
+interface Decision {
+  next: PackMatchState;
+  seen: string[];
+  found: string[];
+  types: Record<string, string>;
+}
+
 const MATCH_POLL_MS = 5_000;
 const MATCH_PARTIAL_AFTER_MS = 3 * 60_000;
 
@@ -111,6 +118,7 @@ export function useStarterPackMatcher(
   const state = ref<PackMatchState>("checking");
   const clusters = ref<string[]>([]);
   const streams = ref<string[]>([]);
+  const streamTypes = ref<Record<string, string>>({});
   const waitingSinceMs = ref<number | null>(null);
   const nowMs = ref(Date.now());
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -163,15 +171,11 @@ export function useStarterPackMatcher(
       );
     });
 
-  const decideBySignals = async (): Promise<{
-    next: PackMatchState;
-    seen: string[];
-    found: string[];
-  }> => {
+  const decideBySignals = async (): Promise<Decision> => {
     const streams = library ? await readOrgStreams(org) : await readDetectNames(org, pack);
     const present = await fitStreams(org, pack, streams, !library);
     // Without a detected stream the pack cannot fit, so the Library match is not paid for.
-    if (!present.length) return { next: "none", seen: [], found: [] };
+    if (!present.length) return { next: "none", seen: [], found: [], types: {} };
     const matched = library
       ? (await matchPack(org, pack, streams, library)).ready
       : (
@@ -179,11 +183,18 @@ export function useStarterPackMatcher(
             present.map((name) => readSchemaColumns(org, typeOf(streams, name), name, true)),
           )
         ).some((columns) => columns.length > 0);
-    if (matched) return { next: "matched", seen: [], found: present };
-    return { next: present.length ? "waiting" : "none", seen: [], found: present };
+    // Only listed streams get a type, since typeOf's metrics fallback would mislabel the rest.
+    const types = Object.fromEntries(
+      present.flatMap((name) => {
+        const type = Object.keys(streams).find((key) => streams[key]?.has(name));
+        return type ? [[name, type]] : [];
+      }),
+    );
+    if (matched) return { next: "matched", seen: [], found: present, types };
+    return { next: present.length ? "waiting" : "none", seen: [], found: present, types };
   };
 
-  const decide = async (): Promise<{ next: PackMatchState; seen: string[]; found: string[] }> => {
+  const decide = async (): Promise<Decision> => {
     if (pack.detector !== "kubernetes") return decideBySignals();
     const orgStreams = library ? await readOrgStreams(org) : null;
     const [metrics, logs] = orgStreams
@@ -195,20 +206,23 @@ export function useStarterPackMatcher(
     );
     const anchor = columns.findIndex((fields) => fields.length > 0);
     const found = kubernetesFit(metrics, logs);
+    const types = Object.fromEntries(
+      found.map((name) => [name, metrics.includes(name) ? "metrics" : "logs"]),
+    );
     const matched =
       library && orgStreams ? (await matchPack(org, pack, orgStreams, library)).ready : anchor >= 0;
     if (matched) {
-      if (anchor < 0) return { next: "matched", seen: [], found };
+      if (anchor < 0) return { next: "matched", seen: [], found, types };
       const column = CLUSTER_COLUMNS.find((name) => columns[anchor].includes(name));
       const last = orgStreams?.metrics?.get(present[anchor]);
       const seen = column ? await readClusters(present[anchor], "metrics", column, last) : [];
-      return { next: "matched", seen, found };
+      return { next: "matched", seen, found, types };
     }
     const arriving =
       present.length > 0 ||
       logs.includes(EVENTS_STREAM) ||
       workloadStateFromNames("kubernetes", { metrics, logs }) === "detected";
-    return { next: arriving ? "waiting" : "none", seen: [], found };
+    return { next: arriving ? "waiting" : "none", seen: [], found, types };
   };
 
   const schedule = () => {
@@ -221,13 +235,14 @@ export function useStarterPackMatcher(
     generation += 1;
     const run = generation;
     try {
-      const { next, seen, found } = await decide();
+      const { next, seen, found, types } = await decide();
       if (run !== generation || stopped) return;
       nowMs.value = Date.now();
       if (next === "waiting") waitingSinceMs.value ??= nowMs.value;
       else waitingSinceMs.value = null;
       clusters.value = seen;
       streams.value = found;
+      streamTypes.value = types;
       state.value = next;
     } catch {
       if (run !== generation || stopped) return;
@@ -261,5 +276,5 @@ export function useStarterPackMatcher(
 
   onScopeDispose(stop);
 
-  return { state, clusters, streams, waitedLong, check, checkShared, retry, stop };
+  return { state, clusters, streams, streamTypes, waitedLong, check, checkShared, retry, stop };
 }

@@ -15,17 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OText from "@/lib/core/Typography/OText.vue";
-import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { LibrarySeverity } from "@/constants/alertLibrary";
 import { ageText } from "@/composables/starterPacks/packCopy";
 import { packTitle } from "@/composables/starterPacks/usePackCatalog";
-import { useStreamFit } from "@/composables/starterPacks/streamFit";
 import type { RailPack } from "@/composables/starterPacks/useStarterPackPopup";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
@@ -62,6 +60,8 @@ interface Tile {
 const { t } = useI18nTyped();
 
 const KINDS: Kind[] = ["dashboard", "alert", "savedView"];
+const SHOWN_CLUSTERS = 3;
+const SHOWN_STREAMS = 4;
 const SEVERITY_ORDER: LibrarySeverity[] = ["critical", "warning", "info"];
 const SEVERITY_BADGE: Record<LibrarySeverity, SeverityBadge["variant"]> = {
   critical: "error-soft",
@@ -89,11 +89,18 @@ const TILE_LOOKS: Record<Kind, { tile: string; chip: string; icon: IconName }> =
 const selected = computed(
   () => props.rows.find(({ entry }) => entry.pack.id === props.selectedId) ?? props.rows[0] ?? null,
 );
-const streams = computed(() => selected.value?.source?.streams ?? []);
-const streamRow = ref<HTMLElement | null>(null);
-const streamSizer = ref<HTMLElement | null>(null);
-const shownStreams = useStreamFit(streamRow, streamSizer, () => streams.value);
-const hiddenStreams = computed(() => streams.value.slice(shownStreams.value));
+const streamsOf = (row: RailPack) => row.source?.streams ?? row.entry.matcher.streams.value;
+const streams = computed(() => (selected.value ? streamsOf(selected.value) : []));
+const streamTypes = computed(() => selected.value?.entry.matcher.streamTypes.value ?? {});
+const typeWord = (stream: string): I18nText | undefined =>
+  ({
+    logs: t("starterPacks.home.streamTypeLogs"),
+    metrics: t("starterPacks.home.streamTypeMetrics"),
+    traces: t("starterPacks.home.streamTypeTraces"),
+  })[streamTypes.value[stream] ?? ""];
+const hiddenStreams = computed(() => streams.value.slice(SHOWN_STREAMS));
+const clusters = computed(() => selected.value?.entry.matcher.clusters.value ?? []);
+const hiddenClusters = computed(() => clusters.value.slice(SHOWN_CLUSTERS));
 const bestStart = computed(
   () => !!selected.value && selected.value.entry.pack.id === props.bestStartId,
 );
@@ -104,6 +111,13 @@ const railLine = (row: RailPack): I18nText => {
   if (row.setUp && at) {
     return t("starterPacks.popup.setUpAgo", { when: ageText(t, Date.now() - at / 1000) });
   }
+  const clusterCount = row.entry.matcher.clusters.value.length;
+  const streamCount = streamsOf(row).length;
+  const clusters = t("starterPacks.home.railClusters", { count: clusterCount }, clusterCount);
+  const streams = t("starterPacks.adapted.streamCount", { count: streamCount }, streamCount);
+  if (clusterCount && streamCount) return t("starterPacks.home.railCounts", { clusters, streams });
+  if (clusterCount) return clusters;
+  if (streamCount) return streams;
   const count = KINDS.reduce((sum, kind) => sum + itemsOf(row, kind).length, 0);
   return count ? t("starterPacks.popup.items", { count }, count) : raw("");
 };
@@ -253,23 +267,23 @@ const tiles = computed<Tile[]>(() => {
     <div v-if="selected" class="flex min-h-0 min-w-0 flex-col overflow-y-auto">
       <div
         :class="[
-          'border-border-default flex min-h-24 shrink-0 items-center gap-3 border-b px-4',
+          'border-border-default bg-surface-base sticky top-0 z-1 flex min-h-24 shrink-0 items-center gap-3 border-b px-4',
           bestStart && 'from-accent/15 to-ingest-accent-purple/10 bg-linear-to-br',
         ]"
         :data-test="`${testPrefix}-hero`"
       >
         <span
-          class="border-border-default bg-surface-base rounded-default flex size-9 shrink-0 items-center justify-center border"
+          class="border-border-default bg-surface-base rounded-default flex size-11 shrink-0 items-center justify-center border"
         >
           <img
             v-if="selected.entry.pack.logo"
             :src="getImageURL(selected.entry.pack.logo)"
-            class="size-6 object-contain"
+            class="size-7 object-contain"
             alt=""
           />
-          <OIcon v-else name="package-2" size="sm" class="text-text-secondary" />
+          <OIcon v-else name="package-2" size="md" class="text-text-secondary" />
         </span>
-        <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div class="flex min-w-0 flex-1 flex-col gap-1.5">
           <span class="text-text-heading flex items-center gap-2 text-base font-bold">
             {{ packTitle(selected.entry.pack) }}
             <OBadge
@@ -280,63 +294,82 @@ const tiles = computed<Tile[]>(() => {
               >{{ t("starterPacks.home.bestStart") }}</OBadge
             >
           </span>
-          <OText
-            v-if="selected.entry.matcher.clusters.value.length"
-            variant="meta"
-            :data-test="`${testPrefix}-from`"
-            >{{
-              t("starterPacks.home.fromClusters", {
-                clusters: raw(selected.entry.matcher.clusters.value.join(", ")),
-              })
-            }}</OText
-          >
           <span
-            v-if="streams.length"
-            ref="streamRow"
-            class="relative flex min-w-0 items-center gap-1.5 text-xs"
-            :data-test="`${testPrefix}-streams`"
+            v-if="clusters.length"
+            class="flex min-w-0 flex-wrap items-center gap-1.5"
+            :data-test="`${testPrefix}-from`"
           >
-            <span class="bg-status-success-text size-1.5 shrink-0 rounded-full" />
-            <OTruncatedText class="text-text-body min-w-0 font-mono">{{
-              raw(streams.slice(0, shownStreams).join(", "))
-            }}</OTruncatedText>
-            <OTooltip v-if="hiddenStreams.length" side="bottom" align="start">
-              <span tabindex="0" class="text-accent shrink-0 font-semibold">{{
+            <span
+              v-for="cluster in clusters.slice(0, SHOWN_CLUSTERS)"
+              :key="cluster"
+              class="border-border-default bg-surface-base rounded-default inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 border px-2 text-xs"
+              :data-test="`${testPrefix}-source-chip`"
+            >
+              <span class="text-text-heading min-w-0 truncate font-mono" :title="cluster">{{
+                raw(cluster)
+              }}</span>
+              <span class="text-text-secondary shrink-0">{{
+                t("starterPacks.home.clusterKind")
+              }}</span>
+            </span>
+            <OTooltip v-if="hiddenClusters.length" side="bottom" align="start">
+              <span tabindex="0" class="text-accent text-xs font-semibold">{{
                 t(
-                  "starterPacks.home.moreStreams",
-                  { count: hiddenStreams.length },
-                  hiddenStreams.length,
+                  "starterPacks.home.moreClusters",
+                  { count: hiddenClusters.length },
+                  hiddenClusters.length,
                 )
               }}</span>
               <template #content>
                 <ul class="m-0 flex max-h-60 list-none flex-col gap-1 overflow-y-auto p-0">
-                  <li v-for="stream in hiddenStreams" :key="stream" class="font-mono">
-                    {{ raw(stream) }}
+                  <li v-for="cluster in hiddenClusters" :key="cluster" class="font-mono">
+                    {{ raw(cluster) }}
                   </li>
                 </ul>
               </template>
             </OTooltip>
-            <span
-              ref="streamSizer"
-              aria-hidden="true"
-              class="pointer-events-none invisible absolute size-0 overflow-hidden"
-            >
-              <span class="flex w-max whitespace-nowrap">
-                <span data-fit-fixed class="w-3 shrink-0" />
-                <span
-                  v-for="(stream, index) in streams"
-                  :key="stream"
-                  data-fit-item
-                  class="shrink-0 font-mono"
-                  >{{ raw(index ? `, ${stream}` : stream) }}</span
-                >
-                <span data-fit-more class="shrink-0 ps-1.5 font-semibold">{{
-                  t("starterPacks.home.moreStreams", { count: streams.length }, streams.length)
-                }}</span>
-              </span>
-            </span>
           </span>
         </div>
+        <div v-if="$slots.action" class="flex shrink-0 items-center gap-2">
+          <slot name="action" />
+        </div>
+      </div>
+
+      <div
+        v-if="streams.length"
+        class="flex flex-col gap-2 px-4 pt-3.5"
+        :data-test="`${testPrefix}-streams`"
+      >
+        <span class="text-text-secondary text-xs font-semibold">{{
+          t("starterPacks.home.streamsUses", { count: streams.length })
+        }}</span>
+        <span class="flex min-w-0 flex-wrap items-center gap-1.5">
+          <span
+            v-for="stream in streams.slice(0, SHOWN_STREAMS)"
+            :key="stream"
+            class="border-border-default bg-surface-base rounded-default inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 border px-2 text-xs"
+            :data-test="`${testPrefix}-stream-chip`"
+          >
+            <span class="text-text-heading min-w-0 truncate font-mono" :title="stream">{{
+              raw(stream)
+            }}</span>
+            <span v-if="typeWord(stream)" class="text-text-secondary shrink-0">{{
+              typeWord(stream)
+            }}</span>
+          </span>
+          <OTooltip v-if="hiddenStreams.length" side="bottom" align="start">
+            <span tabindex="0" class="text-accent text-xs font-semibold">{{
+              t("starterPacks.home.moreStreamsChip", { count: hiddenStreams.length })
+            }}</span>
+            <template #content>
+              <ul class="m-0 flex max-h-60 list-none flex-col gap-1 overflow-y-auto p-0">
+                <li v-for="stream in hiddenStreams" :key="stream" class="font-mono">
+                  {{ raw(stream) }}
+                </li>
+              </ul>
+            </template>
+          </OTooltip>
+        </span>
       </div>
 
       <div class="flex flex-col gap-2.5 px-4 py-3.5">
