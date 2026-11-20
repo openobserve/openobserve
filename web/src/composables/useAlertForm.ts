@@ -438,8 +438,22 @@ export const canSeedSqlTab = (current: string | undefined, lastSeed: string): bo
 };
 
 /** The stream a PromQL query reads: its first metric that is a stream of the org, or "" when none is. */
-export const promqlQueryStream = (promql: string, streamNames: readonly string[]): string =>
-  promqlMetricNames(promql).find((name) => streamNames.includes(name)) ?? "";
+// A histogram's buckets, sum and count are one metric: a query reading any of them keeps the picked one.
+const HISTOGRAM_PART = /_(?:bucket|sum|count)$/;
+export const promqlQueryStream = (
+  promql: string,
+  streamNames: readonly string[],
+  current = "",
+): string => {
+  const names = promqlMetricNames(promql);
+  const stem = (name: string) => name.replace(HISTOGRAM_PART, "");
+  if (
+    HISTOGRAM_PART.test(current) &&
+    names.some((n) => HISTOGRAM_PART.test(n) && stem(n) === stem(current))
+  )
+    return current;
+  return names.find((name) => streamNames.includes(name)) ?? "";
+};
 
 /** Copies a source's description and destinations from `meta`, since AlertPrefill has no field for either. */
 export const applyMetaSettings = (data: any, meta: AlertPrefill["meta"]): any => {
@@ -1274,7 +1288,7 @@ export function useAlertForm(
   // The stream names the alert, its read-back and its preview, so it follows the metric the query reads.
   const debouncedSyncStreamFromPromql = debounce(async (promql: string) => {
     if (beingUpdated.value || formData.value.stream_type !== "metrics") return;
-    const stream = promqlQueryStream(promql, indexOptions.value);
+    const stream = promqlQueryStream(promql, indexOptions.value, formData.value.stream_name);
     if (!stream || stream === formData.value.stream_name) return;
     setF("stream_name", stream);
     await updateStreamFields(stream).catch(() => undefined);

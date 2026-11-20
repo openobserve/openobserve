@@ -256,7 +256,9 @@ describe("promqlQueryStream", () => {
     ["rate(node_cpu_seconds_total[5m])", "node_cpu_seconds_total"],
     ["sum(recorded:rule) / sum(http_server_duration_count)", "http_server_duration_count"],
     ["sum(not_a_stream)", ""],
-  ])("%s reads %j", (promql, stream) => {
-    expect(promqlQueryStream(promql, streams)).toBe(stream);
+    ["sum(rate(d_sum[5m])) / sum(rate(d_count[5m]))", "d_bucket", "d_bucket"],
+    ["sum(rate(http_server_duration_count[5m]))", "http_server_duration_count", "other_bucket"],
+  ])("%s reads %j", (promql, stream, current = "") => {
+    expect(promqlQueryStream(promql, [...streams, "d_sum", "d_count"], current)).toBe(stream);
   });
 });
