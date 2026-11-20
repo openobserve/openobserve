@@ -1963,6 +1963,29 @@ describe("Logs Index", async () => {
       expect(dashboard().props("baseFilter")).toBe("level = 'warn'");
     });
 
+    it("keeps the picked dimensions when the time range changes and the search re-runs", async () => {
+      await enterDrillDown();
+      const { searchObj } = wrapper.vm;
+      wrapper.vm.searchResultRef = null;
+      searchObj.data.datetime.startTime = 10;
+      searchObj.data.datetime.endTime = 20;
+      dashboard().vm.$emit("update:dimensions", ["service_name", "k8s_deployment_name"]);
+      await flushPromises();
+
+      searchObj.data.datetime.startTime = 5;
+      searchObj.data.datetime.endTime = 20;
+      searchObj.loading = true;
+      await flushPromises();
+      searchObj.loading = false;
+      await flushPromises();
+
+      expect(dashboard().props("timeRange")).toEqual({ startTime: 5, endTime: 20 });
+      expect(dashboard().props("initialDimensions")).toEqual([
+        "service_name",
+        "k8s_deployment_name",
+      ]);
+    });
+
     it("re-runs the Search tab activation flow on keep-alive reactivation", async () => {
       await enterDrillDown();
       wrapper.vm.searchObj.meta.refreshHistogram = false;
