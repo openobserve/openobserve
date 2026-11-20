@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #trigger>
       <OFieldRow
         :data-test="`log-search-expand-${field.name}-field-btn`"
+        class="group/field"
         :highlight="isFieldSelected && !grouped"
         :class="{ 'bg-accent/10!': grouped }"
       >
@@ -43,6 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
           v-if="showQuickMode && isInterestingCandidate"
+          :class="
+            field.isInterestingField
+              ? 'text-selected-fg! opacity-100'
+              : 'opacity-0 group-focus-within/field:opacity-100 group-hover/field:opacity-100 focus-visible:opacity-100'
+          "
           variant="ghost-neutral"
           class="me-1 gap-0!"
           :title="
@@ -104,6 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
             v-if="showQuickMode && isInterestingCandidate"
+            :class="
+              field.isInterestingField
+                ? 'text-selected-fg! opacity-100'
+                : 'opacity-0 group-focus-within/field:opacity-100 group-hover/field:opacity-100 focus-visible:opacity-100'
+            "
             variant="ghost-neutral"
             class="gap-0!"
             :title="

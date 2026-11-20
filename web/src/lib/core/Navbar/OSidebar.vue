@@ -414,7 +414,7 @@ const selfLogoSrc = computed(() =>
   >
     <div
       v-if="collapsible"
-      class="flex h-12 shrink-0 items-center"
+      class="flex h-10 shrink-0 items-center"
       :class="collapsed ? 'justify-center px-2' : 'px-4'"
     >
       <RouterLink

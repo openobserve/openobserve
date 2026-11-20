@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="me-1 gap-0!"
       :class="
         field.isInterestingField
-          ? 'opacity-100'
+          ? 'text-selected-fg! opacity-100'
           : 'opacity-0 group-focus-within/field:opacity-100 group-hover/field:opacity-100 focus-visible:opacity-100'
       "
       :aria-pressed="field.isInterestingField"
@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         name="bolt"
         size="sm"
         class="size-4!"
-        :class="field.isInterestingField ? 'text-text-body!' : 'text-text-secondary!'"
+        :class="field.isInterestingField ? 'text-selected-fg!' : 'text-text-secondary!'"
       />
     </OButton>
 
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="gap-0!"
         :class="
           field.isInterestingField
-            ? 'opacity-100'
+            ? 'text-selected-fg! opacity-100'
             : 'opacity-0 group-focus-within/field:opacity-100 group-hover/field:opacity-100 focus-visible:opacity-100'
         "
         :aria-pressed="field.isInterestingField"
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="bolt"
           size="sm"
           class="size-4!"
-          :class="field.isInterestingField ? 'text-text-body!' : 'text-text-secondary!'"
+          :class="field.isInterestingField ? 'text-selected-fg!' : 'text-text-secondary!'"
         />
       </OButton>
     </template>

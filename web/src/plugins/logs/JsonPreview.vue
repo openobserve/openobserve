@@ -116,7 +116,7 @@
     <div v-show="activeTab !== 'unflattened'" class="ps-3">
       {
       <div
-        class="log_json_content flex font-mono text-xs whitespace-pre-wrap"
+        class="log_json_content group/jrow hover:bg-surface-subtle-hover rounded-default flex font-mono text-xs whitespace-pre-wrap"
         v-for="(key, index) in Object.keys(value)"
         :key="key"
         :data-test="`log-detail-row-${key}`"
@@ -133,6 +133,11 @@
               size="xs"
               variant="ghost"
               class="ms-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
+              :class="
+                dropdownOpenMap[key]
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover/jrow:opacity-100 focus-visible:opacity-100'
+              "
               :aria-label="t('logs.jsonPreview.addIcon')"
             >
               <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
@@ -1027,5 +1032,9 @@ export default {
 .log_json_content :deep(.log-highlight) {
   font-size: 0.8125rem;
   line-height: 1.5;
+}
+/* keep(complex-state): keys take the same accent as keys in the results table, so a field reads the same in both places. */
+.log_json_content :deep(.log-key) {
+  color: var(--color-selected-fg);
 }
 </style>
