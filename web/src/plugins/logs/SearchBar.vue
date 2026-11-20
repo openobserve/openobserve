@@ -2363,11 +2363,15 @@ export default defineComponent({
         searchObj.meta.logsVisualizeToggle !== "patterns" &&
         (searchObj.loading === true || searchObj.loadingHistogram === true),
     );
+    // Drill down is fed by the logs search, so its charts go stale the same way the grid does.
+    const isLogsRunToggle = computed(() =>
+      ["logs", "drilldown"].includes(searchObj.meta.logsVisualizeToggle),
+    );
     const showRunQueryPending = computed(
       () =>
         !!searchObj.meta.runPending ||
         !!searchObj.meta.editorDirty ||
-        (searchObj.meta.logsVisualizeToggle === "logs" && autoRun.engine.isRunDirty()),
+        (isLogsRunToggle.value && autoRun.engine.isRunDirty()),
     );
     // Logs-mode pending flags (a guard block, a dirty-time run) say nothing about a freshly loaded chart.
     const panelRunPending = computed(
