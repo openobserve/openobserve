@@ -15,57 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-nowrap! items-center" :data-test="dataTest || 'trace-row-service'">
-    <!-- Service type icon -->
-    <img
-      data-test="trace-row-service-icon"
-      :src="serviceIconUrl"
-      class="me-2 h-5 w-5 shrink-0"
-      aria-hidden="true"
-      alt=""
-    />
-
-    <!-- Service name + badge -->
-    <div class="flex min-w-0 flex-nowrap! items-center gap-[0.325rem]">
-      <OTruncatedText data-test="trace-row-service-name" class="text-text-body text-xs">
-        {{ item.service_name }}
-      </OTruncatedText>
-    </div>
+  <!-- Plain text: per-service colored icon rings read as decoration in a dense table. -->
+  <div class="flex min-w-0 flex-nowrap! items-center" :data-test="dataTest || 'trace-row-service'">
+    <OTruncatedText data-test="trace-row-service-name" class="text-text-body text-compact">
+      {{ item.service_name }}
+    </OTruncatedText>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import useTraces from "@/composables/useTraces";
-import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
-import useTheme from "@/composables/useTheme";
 
-const props = defineProps<{
+defineProps<{
   item: Record<string, any>;
   dataTest?: string;
 }>();
-
-const { isDark } = useTheme();
-
-const { getOrSetServiceColor } = useTraces();
-
-const rootColor = computed(() => getOrSetServiceColor(props.item.service_name) ?? "#9e9e9e");
-
-const serviceIconUrl = computed(() => {
-  if (props.item.infer_service_system) {
-    return getServiceIconDataUrl(props.item.infer_service_system, isDark.value, rootColor.value);
-  }
-
-  if (props.item.infer_service_type) {
-    return getServiceIconDataUrl(
-      props.item.service_name,
-      isDark.value,
-      rootColor.value,
-      props.item.infer_service_type,
-    );
-  }
-
-  return getServiceIconDataUrl(props.item.service_name, isDark.value, rootColor.value);
-});
 </script>

@@ -571,7 +571,6 @@ function nav(path: string, query: Record<string, string> = {}) {
 <template>
   <OPageLayout
     :title="t('siem.overview.title')"
-    :subtitle="t('siem.overview.subtitle')"
     icon="security"
     scroll
     pad-y

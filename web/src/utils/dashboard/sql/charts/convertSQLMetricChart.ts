@@ -34,13 +34,19 @@ export const METRIC_COPY_BTN_SLOT_PX = METRIC_COPY_BTN_PX + 4;
 // (or hides) instead of shrinking the text further.
 export const METRIC_MIN_FONT_PX = 12;
 
+// A stat reads as a calm heading, not a billboard, so the fit stops here.
+export const METRIC_MAX_FONT_PX = 24;
+
 /**
  * Font size for a metric value: fits the width left over after reserving the
  * copy-button slot on both sides, capped by the cell height, and floored at
  * a readable minimum (never beyond what the height allows).
  */
 export const calculateMetricFontSize = (text: string, width: number, height: number): number => {
-  const fit = calculateOptimalFontSize(text, width - 2 * METRIC_COPY_BTN_SLOT_PX, height);
+  const fit = Math.min(
+    METRIC_MAX_FONT_PX,
+    calculateOptimalFontSize(text, width - 2 * METRIC_COPY_BTN_SLOT_PX, height),
+  );
   const heightCap = Math.max(1, Math.floor(height / 1.2));
   const floorCap = Math.min(METRIC_MIN_FONT_PX, heightCap);
   // common case: the fit already clears the readability floor, so the
@@ -338,7 +344,7 @@ export function applyMetricChart(ctx: SQLContext): void {
     metricStyle.textColor ??
     getContrastColor(
       metricStyle.bgColor,
-      chartColor("--color-chart-metric-text"),
+      chartColor("--color-text-heading"),
       chartNumber("--chart-metric-contrast-threshold", 0.5),
     );
   const textSeries: any = {
@@ -366,7 +372,7 @@ export function applyMetricChart(ctx: SQLContext): void {
               params?.coordSys?.cx * 2,
               params?.coordSys?.cy * 2,
             ), //coordSys is relative. so that we can use it to calculate the dynamic size
-            fontWeight: 500,
+            fontWeight: 600,
             align: "center",
             verticalAlign: "middle",
             x: params?.coordSys?.cx,

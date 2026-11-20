@@ -35,6 +35,7 @@ import type { I18nText } from "@/types/i18n";
 
 import { useStore } from "vuex";
 import { escapeHtml } from "@/utils/html";
+import { findLogKeyRanges, renderLogTextWithKeys } from "@/utils/logs/keyValueParser";
 
 /**
  * Represents a processed text segment with styling information
@@ -857,6 +858,7 @@ export function useTextHighlighter() {
     patternRanges: Array<[number, number]> = [],
   ): string {
     let result = "";
+    const keyRanges = findLogKeyRanges(segments.map((segment) => segment.content).join(""));
 
     // Add opening quote if requested
     if (showQuotes) {
@@ -890,8 +892,11 @@ export function useTextHighlighter() {
 
         // For regular tokens, split by keywords and apply semantic colors
         const parts = splitTextByRanges(segment.content, keywords, segmentRanges);
+        let partOffset = start;
         return parts
           .map((part) => {
+            const contentOffset = partOffset;
+            partOffset += part.text.length;
             const content = escapeHtml(part.text);
             if (part.isHighlighted) {
               // Highlighted keywords get yellow background
@@ -900,7 +905,7 @@ export function useTextHighlighter() {
               // Apply semantic colorization based on content type
               const semanticType = detectSemanticType(part.text);
               const semanticClass = getSemanticCSSClass(semanticType);
-              return `<span class="${semanticClass}">${content}</span>`;
+              return `<span class="${semanticClass}">${renderLogTextWithKeys(part.text, keyRanges, contentOffset)}</span>`;
             }
           })
           .join("");

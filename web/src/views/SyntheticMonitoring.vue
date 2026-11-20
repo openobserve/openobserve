@@ -15,14 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    class="relative"
-    :title="t('synthetics.pageTitle')"
-    :subtitle="t('synthetics.pageSubtitle')"
-    icon="radar"
-    bleed
-    tabs-below
-  >
+  <OPageLayout class="relative" :title="t('synthetics.pageTitle')" icon="radar" bleed>
     <template #actions>
       <OButton
         v-if="activeSection === 'checks'"

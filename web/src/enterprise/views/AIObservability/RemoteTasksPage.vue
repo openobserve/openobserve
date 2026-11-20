@@ -27,11 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="ai-remote-tasks-page"
     :title="header?.title ?? t('aiObservability.nav.remoteTasks')"
-    :subtitle="header?.subtitle ?? t('aiObservability.subtitle.remoteTasks')"
     :icon="header?.icon ?? 'cloud-upload'"
     bleed
     :scroll="false"
-    :tabs-below="hasTabs"
   >
     <template v-if="hasTabs" #header-tabs><AiSectionTabs /></template>
     <template #actions>

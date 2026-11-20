@@ -630,12 +630,23 @@ export const useSearchQuery = (t: TranslateFn) => {
             searchObj.data.stream.selectedStreamFields,
           );
 
+      // Table columns must be fetched too, or quick mode leaves them empty.
+      const projectedFields = [
+        ...new Set([
+          ...interestingFields,
+          ...selectableInterestingFields(
+            searchObj.data.stream.selectedFields,
+            searchObj.data.stream.selectedStreamFields,
+          ),
+        ]),
+      ];
+
       // Replace field list placeholder with appropriate values
       if (interestingFields.length > 0 && searchObj.meta.quickMode && !ignoreQuickMode) {
         if (searchObj.data.stream.selectedStream.length == 1) {
           req.query.sql = req.query.sql.replace(
             "[FIELD_LIST]",
-            interestingFields.map((field: string) => quoteSqlIdentifierIfNeeded(field)).join(","),
+            projectedFields.map((field: string) => quoteSqlIdentifierIfNeeded(field)).join(","),
           );
         }
       } else if (searchObj.data.stream.selectedStream.length <= 1) {
@@ -839,7 +850,12 @@ export const useSearchQuery = (t: TranslateFn) => {
     }
 
     const timestampCol = store.state.zoConfig.timestamp_column || "_timestamp";
-    const fields = searchObj.data.stream.interestingFieldList.filter((field: string) =>
+    const fields = [
+      ...new Set([
+        ...searchObj.data.stream.interestingFieldList,
+        ...(searchObj.data.stream.selectedFields ?? []),
+      ]),
+    ].filter((field: string) =>
       searchObj.data.stream.selectedStreamFields.some(
         (streamField: any) => streamField?.name === field && streamField?.streams?.includes(stream),
       ),

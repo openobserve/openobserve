@@ -29,7 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'h-full overflow-y-auto',
     ]"
   >
-    <div class="px-page-edge render-dashboard-charts-container" :class="kiosk ? 'pt-0' : 'pt-2'">
+    <div
+      class="px-page-edge render-dashboard-charts-container"
+      :class="kiosk || (showTabs && selectedTabId !== null) ? 'pt-0' : 'pt-2'"
+    >
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
       <span
         class="hidden"
@@ -68,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Tab List -->
         <TabList
           v-if="showTabs && selectedTabId !== null"
-          :class="kiosk ? (kioskHasTabs ? 'order-first min-w-0 flex-1' : 'hidden') : 'mt-2'"
+          :class="kiosk ? (kioskHasTabs ? 'order-first min-w-0 flex-1' : 'hidden') : 'h-8'"
           :dashboardData="dashboardData"
           :viewOnly="viewOnly"
           :layoutMode="layoutMode"
@@ -91,7 +94,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <slot name="before_panels" />
-      <div class="displayDiv clear-both mt-2 h-auto min-h-0">
+      <div
+        class="displayDiv clear-both h-auto min-h-0"
+        :class="kiosk || !showTabs || selectedTabId === null ? 'mt-2' : ''"
+      >
         <div
           class="h-full w-full"
           v-if="store.state.printMode && panels.length === 1 && panels[0]?.type === 'table'"
@@ -2079,10 +2085,12 @@ export default defineComponent({
 
 .displayDiv :deep(.grid-stack-item .grid-stack-item-content) {
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the grid-item border is a 1-device-pixel rule and must not scale with text or it smears at fractional zoom */
-  border: 1px solid var(--color-border-default);
-  border-radius: 0.375rem;
+  border: 1px solid var(--color-border-subtle);
+  /* Card tier is 8px; the 12px surface radius reads too soft at panel size. */
+  border-radius: 0.5rem;
   overflow: hidden;
   box-shadow: none;
+  background-color: var(--color-surface-card);
 }
 
 /* Section headings label the panels below them, so they must not carry the card chrome

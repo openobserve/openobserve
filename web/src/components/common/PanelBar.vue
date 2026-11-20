@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="border-panel-bar-border bg-panel-bar-bg text-compact text-text-heading flex min-h-7 items-center border-b px-2 py-1 font-medium tracking-[0.02em]"
+    class="border-panel-bar-border bg-panel-bar-bg text-compact text-text-heading flex min-h-8 items-center border-b px-2 py-1 font-semibold"
   >
     <slot />
   </div>

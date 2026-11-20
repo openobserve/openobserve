@@ -63,4 +63,9 @@ describe("OIcon", () => {
     const wrapper = mount(OIcon, { props: { name: "settings" } });
     expect(wrapper.find("span").attributes("data-rtl-mirror")).toBeUndefined();
   });
+
+  it("renders the registry svg for a known name", () => {
+    const wrapper = mount(OIcon, { props: { name: "search" } });
+    expect(wrapper.find("span > svg").exists()).toBe(true);
+  });
 });

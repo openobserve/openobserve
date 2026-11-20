@@ -1290,7 +1290,6 @@ function widenTo(period: string) {
 <template>
   <OPageLayout
     :title="t('siem.events.title')"
-    :subtitle="t('siem.events.subtitle')"
     icon="manage-search"
     bleed
     resizable

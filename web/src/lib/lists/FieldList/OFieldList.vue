@@ -51,7 +51,7 @@
           <!-- Group header -->
           <div
             v-if="row.isGroup"
-            class="o-field-list__group-header px-page-edge text-2xs text-field-list-group-text bg-surface-panel sticky top-0 z-2 flex h-7 cursor-default items-center justify-between font-semibold tracking-[0.01em] select-none"
+            class="o-field-list__group-header px-page-edge text-field-list-group-text bg-field-list-group-bg border-border-subtle border-b sticky top-0 z-2 flex h-6 cursor-default items-center justify-between text-xs font-semibold select-none"
             :data-test="`o-field-list-group-${row.groupName}`"
           >
             <slot name="group-header" :row="row" :group-name="row.groupName">

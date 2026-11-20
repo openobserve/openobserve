@@ -29,10 +29,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ error.message }}
     </OTruncatedText>
   </span>
+  <span
+    v-else
+    class="bg-text-secondary inline-block h-0.5 w-3 align-middle text-[0px]"
+    data-test="span-error-cell-empty"
+    ><!-- A sub-pixel dash glyph anti-aliases to ~3.6:1; a 2px bar keeps a solid token row. -->{{
+      raw("—")
+    }}</span
+  >
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { raw } from "@/types/i18n";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import { spanResultCellsFor } from "./spanResultCells";

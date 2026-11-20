@@ -116,7 +116,6 @@
     },
     "overview": {
       "title": "Panoramica SOC",
-      "subtitle": "Cosa è scattato, cosa è aperto e se le tue origini stanno ancora inviando dati",
       "autoRefreshOn": "L'aggiornamento automatico ogni minuto è attivo",
       "autoRefreshOff": "L'aggiornamento automatico è disattivato",
       "historyError": "Impossibile caricare la cronologia dei rilevamenti: {reason}",
@@ -165,7 +164,6 @@
     },
     "events": {
       "title": "Eventi di sicurezza",
-      "subtitle": "Cerca tra la telemetria di sicurezza normalizzata",
       "run": "Esegui",
       "hideSidebar": "Nascondi campi",
       "showSidebar": "Mostra campi",
@@ -348,7 +346,6 @@
     },
     "alerts": {
       "title": "Avvisi",
-      "subtitle": "Ogni volta che un rilevamento è stato attivato, con le prove a supporto",
       "eyebrow": "Rilevamento attivo",
       "range": {
         "1h": "1h",
@@ -463,7 +460,6 @@
     },
     "cases": {
       "title": "Casi",
-      "subtitle": "Attivazioni correlate, valutate fino a un verdetto",
       "eyebrow": "Caso",
       "search": "Filtra questa pagina per titolo, id, assegnatario o entità",
       "refresh": "Aggiorna",
@@ -712,7 +708,6 @@
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
-      "subtitle": "Quali tecniche coprono i tuoi rilevamenti abilitati e quali si sono attivati",
       "summaryPartial": "Questa finestra contiene più cronologia degli avvisi di quanta un riepilogo possa contenerne, quindi i conteggi delle attivazioni sono un limite inferiore; scegli una finestra più breve per ottenere numeri completi.",
       "stat": {
         "firing": "Tecniche attive",
@@ -775,7 +770,6 @@
     },
     "detections": {
       "title": "Rilevamenti",
-      "subtitle": "Regole Sigma in esecuzione come rilevamenti pianificati sui tuoi stream di sicurezza",
       "new": "Nuovo rilevamento",
       "eyebrow": "Regola di rilevamento",
       "refresh": "Aggiorna rilevamenti",
@@ -1073,7 +1067,6 @@
     },
     "content": {
       "title": "Contenuto",
-      "subtitle": "Le regole di detection e le origini di log incluse nel SIEM, confrontate con i tuoi dati",
       "refresh": "Aggiorna",
       "streamsError": "Impossibile caricare i tuoi stream, quindi le corrispondenze con i tuoi dati sono sconosciute",
       "tab": {
@@ -1219,7 +1212,6 @@
     },
     "entities": {
       "title": "Entità",
-      "subtitle": "Tutti gli utenti, gli IP di origine e gli host menzionati dalle tue sorgenti di sicurezza",
       "view": {
         "table": "Tabella",
         "graph": "Grafico del rischio"
@@ -1339,7 +1331,6 @@
     },
     "ueba": {
       "title": "Analisi del comportamento degli utenti",
-      "subtitle": "Ogni utente confrontato con il proprio passato recente",
       "windowHint": "Ultimo periodo {current}, confrontato con il {baseline} precedente",
       "method": "I punteggi di rischio sono euristici: l'ultimo periodo {current} di ogni utente viene confrontato con il proprio {baseline} precedente. Ogni segnalazione mostra i numeri che l'hanno determinata.",
       "noSources": "Nessuna sorgente indica un utente",
@@ -1438,7 +1429,6 @@
     },
     "intel": {
       "title": "Threat Intel",
-      "subtitle": "Indicatori noti come malevoli e ogni punto in cui sono comparsi nei tuoi dati di sicurezza",
       "loadFailed": "Impossibile caricare gli elenchi di indicatori",
       "add": "Aggiungi indicatori",
       "import": "Importa",
@@ -1607,7 +1597,6 @@
     "sources": {
       "title": "Origini dei dati",
       "comingSoon": "L'onboarding guidato con template di normalizzazione OCSF è in arrivo. Fino ad allora, ingerisci i log di sicurezza come qualsiasi stream; la pagina Eventi li identifica e normalizza automaticamente.",
-      "subtitle": "Allega un pacchetto OCSF per normalizzare uno stream in fase di ingestione, oppure includilo così com'è come origine di sicurezza.",
       "colStream": "Stream",
       "colSourceType": "Tipo di origine",
       "colMapping": "Mappatura",

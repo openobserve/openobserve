@@ -81,7 +81,7 @@ const emit = defineEmits<{ click: [] }>();
 // `text-tabs-active-text` in the base class silently won over every
 // `text-ingest-accent-*` and all five variants rendered one colour.
 const ICON_VARIANT_CLASS: Record<IconVariant, string> = {
-  default: "bg-tabs-active-bg text-tabs-active-text",
+  default: "bg-surface-band text-text-secondary",
   blue: "bg-ingest-tint-blue text-ingest-accent-blue",
   teal: "bg-ingest-tint-teal text-ingest-accent-teal",
   purple: "bg-ingest-tint-purple text-ingest-accent-purple",

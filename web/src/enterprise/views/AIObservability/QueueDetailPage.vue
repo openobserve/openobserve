@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="ai-queue-detail-page"
     :back="backTarget"
     :title="queue?.name ? raw(queue.name) : t('aiObservability.queues.detail.fallbackTitle')"
-    :subtitle="raw(queue?.description)"
     icon="fact-check"
     bleed
     :scroll="false"

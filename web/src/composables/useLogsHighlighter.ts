@@ -22,7 +22,11 @@
 
 import type { TranslateFn } from "@/types/i18n";
 import { useTextHighlighter, scopeHighlightQuery } from "@/composables/useTextHighlighter";
-import { getThemeColors } from "@/utils/logs/keyValueParser";
+import {
+  findLogKeyRanges,
+  getThemeColors,
+  renderLogTextWithKeys,
+} from "@/utils/logs/keyValueParser";
 import { escapeHtml } from "@/utils/html";
 import { ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
 import { useTheme } from "@/composables/useTheme";
@@ -429,17 +433,21 @@ export function useLogsHighlighter(t: TranslateFn) {
    * Used when it is not an FTS key - just highlight text if query string is present
    */
   function simpleHighlight(text: string, queryString: string): string {
-    if (!text || !queryString) return escapeHtml(text);
+    const keyRanges = findLogKeyRanges(text);
+    if (!text || !queryString) return renderLogTextWithKeys(text, keyRanges);
 
     const keywords = extractKeywords(queryString);
     const parts = splitTextByKeywords(text, keywords, extractHighlightPatterns(queryString));
 
+    let offset = 0;
     return parts
       .map((part) => {
+        const start = offset;
+        offset += part.text.length;
         if (part.isHighlighted) {
           return `<span class="log-highlighted">${escapeHtml(part.text)}</span>`;
         } else {
-          return escapeHtml(part.text);
+          return renderLogTextWithKeys(part.text, keyRanges, start);
         }
       })
       .join("");
@@ -510,6 +518,8 @@ export function useLogsHighlighter(t: TranslateFn) {
     );
 
     let result = "";
+    const keyRanges = findLogKeyRanges(text);
+    let offset = 0;
 
     // Add opening quote if needed
     if (showQuotes) {
@@ -519,6 +529,8 @@ export function useLogsHighlighter(t: TranslateFn) {
     // Process content with highlighting
     result += highlightParts
       .map((part) => {
+        const start = offset;
+        offset += part.text.length;
         const classes = ["log-highlight"];
 
         if (part.isHighlighted) {
@@ -527,7 +539,10 @@ export function useLogsHighlighter(t: TranslateFn) {
           classes.push(`log-${semanticType}`);
         }
 
-        return `<span class="${classes.join(" ")}">${escapeHtml(part.text)}</span>`;
+        const content = part.isHighlighted
+          ? escapeHtml(part.text)
+          : renderLogTextWithKeys(part.text, keyRanges, start);
+        return `<span class="${classes.join(" ")}">${content}</span>`;
       })
       .join("");
 

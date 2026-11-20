@@ -138,7 +138,7 @@ function handleClick(e: MouseEvent) {
     size="sm-toolbar"
     :class="
       failedText
-        ? 'border-status-error-text! bg-status-error-bg! h-6! max-w-full pe-0! sm:min-w-0'
+        ? 'border-status-error-text! bg-status-error-bg! h-6! max-w-full pe-0! text-xs! sm:min-w-0'
         : size === 'header'
           ? 'h-8.5!'
           : undefined
@@ -182,6 +182,7 @@ function handleClick(e: MouseEvent) {
         v-if="lastRunAt"
         :class="['bg-border-default h-4 w-px shrink-0', !clockAge && 'max-md:hidden']"
         aria-hidden="true"
+        data-o2-refresh-separator
       />
       <!-- No colour class: here the age is the button's label, not the loose caption `split` renders. -->
       <span

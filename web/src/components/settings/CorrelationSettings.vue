@@ -15,13 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    icon="group-work"
-    :subtitle="t('settings.correlationSettingsPage.subtitle')"
-    data-test="correlation-settings-header"
-    tabs-below
-    bleed
-  >
+  <OPageLayout icon="group-work" data-test="correlation-settings-header" bleed>
     <template #title>
       <span data-test="correlation-settings-page-title">{{
         t("settings.correlationSettings")

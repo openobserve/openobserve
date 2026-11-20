@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       data-test="rum-analytics-event-editor"
       :title="id ? t('rum.analytics.events.editTitle') : t('rum.analytics.events.createTitle')"
-      :subtitle="app ? t('rum.analytics.events.editorApp', { app: raw(app) }) : undefined"
       :back="{ label: backLabel, onClick: goBack, dataTest: 'rum-analytics-event-editor-back-btn' }"
       bleed
     >

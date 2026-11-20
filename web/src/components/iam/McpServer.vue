@@ -44,14 +44,7 @@ const subs = computed<CardSubstitutions>(() => ({
 </script>
 
 <template>
-  <OPageLayout
-    data-test="iam-mcp-server"
-    :title="t('iam.mcpServerHeader')"
-    icon="mcp"
-    :subtitle="t('iam.mcpServerHeaderSubtitle')"
-    scroll
-    pad-y
-  >
+  <OPageLayout data-test="iam-mcp-server" :title="t('iam.mcpServerHeader')" icon="mcp" scroll pad-y>
     <McpServerCard :subs="subs" :doc-url="docUrl" />
   </OPageLayout>
 </template>

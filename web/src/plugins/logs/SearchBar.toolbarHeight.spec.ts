@@ -27,8 +27,8 @@ const router = createRouter({
   routes: [{ path: "/logs", name: "logs", component: { template: "<div />" } }],
 });
 
-// The view-mode OToggleGroup is 34px tall (28px sm items + 2px track padding each side + 1px border each side).
-const TOGGLE_GROUP_HEIGHT_CLASS = "h-8.5";
+// Every toolbar control, the view-mode toggle included, is 28px tall (h-7).
+const TOGGLE_GROUP_HEIGHT_CLASS = "h-7";
 
 describe("SearchBar — toolbar controls match the view-mode toggle height", () => {
   let wrapper: VueWrapper<any> | undefined;
@@ -60,7 +60,7 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
   const expectToolbarHeight = (dataTest: string) => {
     const button = wrapper!.get(`[data-test="${dataTest}"]`);
     expect(button.classes()).toContain(TOGGLE_GROUP_HEIGHT_CLASS);
-    expect(button.classes()).toContain("text-xs");
+    expect(button.classes()).toContain("text-compact");
   };
 
   beforeEach(() => {
@@ -80,7 +80,7 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
     vi.restoreAllMocks();
   });
 
-  it("gives Reset, the pinned switches and More the 34px toggle-group height at desktop width", async () => {
+  it("gives Reset, the pinned switches and More the 28px toggle-group height at desktop width", async () => {
     wrapper = mountSearchBar(1600);
     await flushPromises();
 
@@ -96,16 +96,15 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
     }
   });
 
-  it("gives the narrow-width view-mode dropdown button the same 34px height", async () => {
+  it("gives the narrow-width view-mode dropdown button the same 28px height", async () => {
     wrapper = mountSearchBar();
     await flushPromises();
 
     expect(wrapper.find('[data-test="logs-logs-toggle"]').exists()).toBe(false);
     expectToolbarHeight("logs-view-mode-dropdown-btn");
-    expectToolbarHeight("logs-search-bar-utilities-menu-btn");
   });
 
-  it("raises every right-hand control to the same 34px row height", async () => {
+  it("raises every right-hand control to the same 28px row height", async () => {
     const innerWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { value: 1600, configurable: true });
     if (!isPinned("functionEditor")) {
@@ -119,29 +118,23 @@ describe("SearchBar — toolbar controls match the view-mode toggle height", () 
       await flushPromises();
 
       const classesOf = (dataTest: string) => wrapper!.get(`[data-test="${dataTest}"]`).classes();
-      for (const dataTest of [
-        "logs-search-bar-more-options-btn",
-        "logs-search-bar-share-link-btn",
-      ]) {
-        expect(classesOf(dataTest)).toContain("h-8.5");
-      }
+      expect(classesOf("logs-search-bar-more-options-btn")).toContain("size-7");
       for (const dataTest of [
         "logs-search-bar-function-editor-pinned-btn",
         "logs-search-bar-refresh-btn",
       ]) {
         expect(classesOf(dataTest)).toContain(TOGGLE_GROUP_HEIGHT_CLASS);
       }
-      expect(classesOf("logs-search-bar-refresh-cache-dropdown-trigger")).toContain("size-8.5");
-      expect(classesOf("logs-search-bar-date-time-dropdown")).toContain("h-8.5!");
+      expect(classesOf("logs-search-bar-refresh-cache-dropdown-trigger")).toContain("size-7");
       const runButton = wrapper.get('[data-test="logs-search-bar-refresh-btn"]').element;
-      expect(runButton.nextElementSibling!.classList).toContain("h-8.5!");
-      expect(classesOf("logs-search-bar-refresh-interval-btn")).toContain("size-8.5");
-      // A 1px group border around 2rem buttons makes the function selector 34px.
+      expect(runButton.nextElementSibling!.classList).toContain("h-7!");
+      expect(classesOf("logs-search-bar-refresh-interval-btn")).toContain("size-7");
+      // A 1px group border around 2rem buttons makes the function selector 28px.
       for (const dataTest of [
         "logs-search-bar-function-dropdown",
         "logs-search-bar-save-function-btn",
       ]) {
-        expect(classesOf(dataTest)).toContain("size-8!");
+        expect(classesOf(dataTest)).toContain("size-7!");
       }
     } finally {
       Object.defineProperty(window, "innerWidth", { value: innerWidth, configurable: true });

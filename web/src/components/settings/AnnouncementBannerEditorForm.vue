@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       bleed
       :title="isNew ? t('announcements.editor.addTitle') : t('announcements.editor.editTitle')"
-      :subtitle="storedStatusLabel"
       :back="{
         label: t('announcements.settings.label'),
         onClick: goBack,
@@ -822,16 +821,6 @@ const values = form.useStore((state) => state.values);
 const isDirty = form.useStore((state) => state.isDirty);
 
 const messageLength = computed(() => messageChars(values.value.message ?? ""));
-
-const STATUS_LABEL_KEYS = {
-  live: "announcements.editor.statusLive",
-  scheduled: "announcements.editor.statusScheduled",
-  ended: "announcements.editor.statusEnded",
-} as const;
-
-const storedStatusLabel = computed(() =>
-  isNew.value ? undefined : t(STATUS_LABEL_KEYS[bannerStatus(props.draft)]),
-);
 
 const pendingStatus = computed(() => bannerStatus(draftFromValues(values.value)));
 

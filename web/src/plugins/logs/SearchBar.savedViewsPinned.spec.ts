@@ -93,7 +93,7 @@ describe("SearchBar — pinned saved views", () => {
     ).toBe(true);
   });
 
-  it("is as tall as the 34px toolbar buttons: a hairline border around 2rem children", async () => {
+  it("is as tall as the 28px toolbar buttons: a hairline border around 1.75rem children", async () => {
     wrapper = mountSearchBar(1600);
     await flushPromises();
 
@@ -101,12 +101,9 @@ describe("SearchBar — pinned saved views", () => {
     expect(group().classes()).toContain("p-0");
     expect(
       group().find('[data-test="logs-search-bar-saved-views-pinned-list-btn"]').classes(),
-    ).toContain("h-8!");
-    expect(
-      group().find('[data-test="logs-search-bar-saved-views-pinned-create-btn"]').classes(),
-    ).toContain("size-8!");
+    ).toContain("h-7");
     expect(wrapper!.find('[data-test="logs-search-bar-reset-filters-btn"]').classes()).toContain(
-      "h-8.5",
+      "h-7",
     );
   });
 
@@ -259,8 +256,8 @@ describe("SearchBar — pinned saved views", () => {
 
   // 93px = 1px border + 58px list trigger + 1px separator + 32px create button + 1px border.
   it.each([
-    [405, false],
-    [406, true],
+    [322, false],
+    [323, true],
   ])(
     "budgets the group at its rendered 93px width (toolbar %ipx → shown: %s)",
     async (width, shown) => {

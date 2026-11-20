@@ -62,7 +62,7 @@ describe("segmented control (item 3)", () => {
   const ON = "data-[state=on]:not-focus-visible:";
   // A border, padding, margin or size class would change the box the indicator is measured from.
   const BOX = /(^|:)(border|p[xyse]?|m[xyse]?|w|h|size)(-|$)/;
-  const BOX_CLASSES = ["h-7", "px-2.5"];
+  const BOX_CLASSES = ["h-5", "px-2.5"];
 
   it("edges the sliding indicator with an inset brand ring and main's shadow", () => {
     const indicator = mountToggle("single").find('[aria-hidden="true"].absolute');

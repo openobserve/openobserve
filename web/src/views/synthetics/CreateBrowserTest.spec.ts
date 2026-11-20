@@ -1829,53 +1829,6 @@ describe("CreateBrowserTest", () => {
     });
   });
 
-  describe("phone layout", () => {
-    const subtitle = (w: VueWrapper) =>
-      w.findComponent(pageLayoutStubs.OPageLayout).props("subtitle") as string;
-
-    async function mountUsedBy(hidden: number) {
-      mockGetFoldersListByType.mockResolvedValue([{ folderId: "folder-1", name: "Checkout" }]);
-      mockServiceReferencedBy.mockResolvedValue({
-        data: {
-          references: [{ id: "p1", name: "One", folder_id: "f1" }],
-          hidden_reference_count: hidden,
-        },
-      });
-      return mountValidEdit();
-    }
-
-    it("on a phone the used-by count moves into the subtitle", async () => {
-      wrapper = await mountUsedBy(0);
-      expect(subtitle(wrapper)).toBe("Checkout");
-      wrapper.unmount();
-
-      mockBreakpoint.mobile = true;
-      wrapper = await mountUsedBy(0);
-      expect(subtitle(wrapper)).toBe("Checkout · used by 1 test");
-      wrapper.unmount();
-
-      wrapper = await mountUsedBy(2);
-      expect(subtitle(wrapper)).toBe("Checkout · used by 3 tests");
-    });
-
-    it("on a phone a test in the default folder shows the used-by count alone", async () => {
-      mockBreakpoint.mobile = true;
-      mockServiceReferencedBy.mockResolvedValue({
-        data: {
-          references: [{ id: "p1", name: "One", folder_id: "f1" }],
-          hidden_reference_count: 0,
-        },
-      });
-      mockServiceGet.mockResolvedValue({
-        data: { name: "Test Check", url: "https://example.com", folder: "default", journey: [] },
-      });
-      wrapper = mountPage({ editId: "check-123" });
-      await flushPromises();
-
-      expect(subtitle(wrapper)).toBe("Used by 1 test");
-    });
-  });
-
   // The host already computes the executed count, so Save refuses before any request is sent.
   describe("edit mode — executed step cap", () => {
     const CAP_TOAST = "Too many executed steps — see the notice above the steps.";

@@ -20,21 +20,21 @@ import type { I18nText } from "@/types/i18n";
  */
 
 export type TextVariant =
-  /** Page header title. 14px semibold. One per page. */
+  /** Page header title. 18px semibold, tight tracking. One per page. */
   | "page-title"
-  /** Section group label. 12px semibold uppercase tracking-wide. Secondary color. */
+  /** Group label (sidebar, field list). 12px medium. Secondary color. */
   | "section"
-  /** Panel or card title. 12px medium. Primary color. */
+  /** Panel or card title. 13px semibold. Heading color. */
   | "panel-title"
-  /** Section-pane heading on a detail page. 14px semibold. Primary color. */
+  /** Section title on a detail page. 14px semibold (target 15px). Heading color. */
   | "card-title"
   /** Default body paragraph. 14px normal. */
   | "body"
   /** Emphasized inline text. 14px semibold. */
   | "body-strong"
-  /** Compact form-adjacent label. 12px semibold. */
+  /** Form label. 13px medium. Body color. */
   | "label"
-  /** Metadata: timestamps, counts, hints. 12px normal secondary. */
+  /** Helper text and metadata. 12px normal. Secondary color. */
   | "meta"
   /** Monospace: cron expressions, IDs, field names. 12px Geist Mono. */
   | "mono";

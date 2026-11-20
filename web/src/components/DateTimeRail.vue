@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabindex="tabindexFor(`recent-${item.id}`)"
             :data-test="`date-time-rail-recent-${item.id}`"
             class="w-full justify-start! gap-2 pe-8! font-normal tabular-nums aria-disabled:opacity-35"
-            :class="item.selected ? 'bg-button-primary! text-button-primary-foreground!' : ''"
+            :class="item.selected ? 'bg-selected-bg! text-selected-fg!' : ''"
             :disabled="item.disabled"
             focusable-unavailable
             :aria-pressed="item.selected"
@@ -86,9 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 class="text-2xs shrink-0 rounded-full px-2 font-normal"
                 :class="
-                  item.selected
-                    ? 'bg-button-primary-foreground/20'
-                    : 'bg-text-heading/7 text-text-secondary'
+                  item.selected ? 'bg-selected-fg/15' : 'bg-text-heading/7 text-text-secondary'
                 "
                 :data-test="`date-time-rail-recent-${item.id}-duration`"
                 >{{ item.compact.duration }}</span
@@ -109,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="absolute! end-1.5 top-1/2 -translate-y-1/2"
             :class="
               item.selected
-                ? 'text-button-primary-foreground/70! hover:text-button-primary-foreground! focus-visible:text-button-primary-foreground!'
+                ? 'text-selected-fg/70! hover:text-selected-fg! focus-visible:text-selected-fg!'
                 : 'text-text-secondary! hover:text-text-heading! focus-visible:text-text-heading!'
             "
             @click.stop="removeFocusedRecent(item.id, $event)"
@@ -171,11 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabindex="tabindexFor(`calendar-${item.id}`)"
             :data-test="`date-time-rail-calendar-${item.id}`"
             class="w-full justify-between! gap-2 font-medium! disabled:opacity-35"
-            :class="
-              item.selected
-                ? 'bg-button-primary! text-button-primary-foreground!'
-                : 'text-text-heading!'
-            "
+            :class="item.selected ? 'bg-selected-bg! text-selected-fg!' : 'text-text-heading!'"
             :disabled="item.disabled"
             :aria-pressed="item.selected"
             @mouseenter="emit('hover')"

@@ -424,12 +424,7 @@ onMounted(reload);
 </script>
 
 <template>
-  <OPageLayout
-    :title="t('siem.sources.title')"
-    :subtitle="t('siem.sources.subtitle')"
-    icon="cloud-upload"
-    data-test="security-sources"
-  >
+  <OPageLayout :title="t('siem.sources.title')" icon="cloud-upload" data-test="security-sources">
     <SecurityNotices :notices="notices" data-test="security-sources-notices" />
     <OTable
       :data="rows"

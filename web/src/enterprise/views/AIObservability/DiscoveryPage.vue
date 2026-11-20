@@ -25,7 +25,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AiPageShell
     data-test="ai-discovery"
     :title="t('aiObservability.nav.discovery')"
-    :subtitle="t('aiObservability.subtitle.discovery')"
     icon="saved-search"
     :date-state="dateState"
     :last-run-at="lastRunAt"

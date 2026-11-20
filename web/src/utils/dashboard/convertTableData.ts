@@ -537,6 +537,7 @@ export const convertMultiQueryTableData = (
           field: it,
           label: it,
           sortable: true,
+          isNumeric: isNumber,
           mono: isNumber || detectedTimestampAliases.has(it),
         };
         applyColumnOverrides(
@@ -604,6 +605,7 @@ export const convertMultiQueryTableData = (
       field: colName,
       label: knownLabels.get(colName) || colName,
       sortable: true,
+      isNumeric: isNumber,
       mono: isNumber || isTimestamp,
     };
 

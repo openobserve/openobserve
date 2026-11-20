@@ -26,12 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     data-test="ai-queue-workbench-page"
     :title="queue?.name ? raw(queue.name) : t('aiObservability.queues.detail.fallbackTitle')"
-    :subtitle="
-      t('aiObservability.queues.workbench.subtitle', {
-        reviewed: reviewedCount,
-        total: items.length,
-      })
-    "
     :back="backTarget"
     bleed
     :scroll="false"

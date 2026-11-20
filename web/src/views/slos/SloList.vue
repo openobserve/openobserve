@@ -25,13 +25,7 @@
   outage, which is the exact misreading coverage gating exists to prevent.
 -->
 <template>
-  <OPageLayout
-    :title="t('slos.title')"
-    icon="target"
-    :subtitle="t('slos.subtitle')"
-    title-data-test="slos-slolist-title"
-    bleed
-  >
+  <OPageLayout :title="t('slos.title')" icon="target" title-data-test="slos-slolist-title" bleed>
     <template #actions>
       <!-- The provider behind the Terraform export, which is otherwise only
            discoverable once the export dialog is already open. -->

@@ -823,7 +823,6 @@ watch(orgId, () => void refresh());
 <template>
   <OPageLayout
     :title="t('siem.detections.title')"
-    :subtitle="t('siem.detections.subtitle')"
     icon="shield-alert-outline"
     bleed
     title-data-test="security-detections-title"

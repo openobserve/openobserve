@@ -23,7 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :key="store.state.selectedOrganization.identifier"
     :title="t('dashboard.header')"
     icon="dashboard"
-    :subtitle="showPublicLinks ? t('dashboard.publicLinks.pageSubtitle') : t('dashboard.subtitle')"
     :main-panel="false"
   >
     <template #actions>
@@ -38,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              the home page and jumps straight to it. -->
       <OButton
         v-if="homeDashboard"
-        variant="outline"
+        variant="ghost"
         size="sm"
         icon-left="keep-outline"
         class="max-w-60"
@@ -51,14 +50,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- import dashboard button with dropdown -->
       <ODropdown side="bottom" align="end">
         <template #trigger>
-          <OButton
-            variant="outline"
-            size="sm"
-            data-test="dashboard-import"
-            icon-left="upload-file"
-            icon-right="expand-more"
-          >
+          <OButton variant="ghost" size="sm" data-test="dashboard-import" icon-left="upload-file">
             {{ t(`dashboard.import`) }}
+            <template #icon-right>
+              <OIcon name="expand-more" size="xs" data-menu-chevron class="-ms-0.5" />
+            </template>
           </OButton>
         </template>
         <ODropdownItem @select="importDashboard" data-test="dashboard-import-custom">
@@ -94,11 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 t(`dashboard.${migration.descKey}`)
               }}</span>
             </div>
-            <OIcon
-              name="open-in-new"
-              size="xs"
-              class="text-dropdown-item-text shrink-0 opacity-60"
-            />
+            <OIcon name="open-in-new" size="xs" class="text-dropdown-item-text shrink-0" />
           </div>
         </ODropdownItem>
       </ODropdown>
@@ -145,8 +137,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading-reset-key="activeFolderId"
               :forbidden="forbidden"
               :frame="false"
+              :bordered="false"
+              :row-height="28"
               :default-columns="false"
-              show-index
               :global-filter="filterQuery"
               :show-global-filter="false"
               :page-size="pageSize"
@@ -172,9 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="min-w-0 flex-1 max-md:min-w-40">
                     <OInput
                       v-model="dynamicQueryModel"
-                      :placeholder="
-                        searchAcrossFolders ? t('dashboard.searchAcross') : t('dashboard.search')
-                      "
+                      :placeholder="t('dashboard.search')"
                       clearable
                       @clear="clearSearchHistory"
                       data-test="dashboard-search"
@@ -183,43 +174,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left>
                         <OIcon name="search" size="sm" />
                       </template>
-                      <template #icon-right>
-                        <OToggleGroup
-                          :model-value="searchAcrossFolders ? 'all' : 'this'"
-                          type="single"
-                          class="me-1 self-center"
-                          @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
-                        >
-                          <OToggleGroupItem
-                            value="this"
-                            size="xs"
-                            icon-left="folder-outline"
-                            data-test="dashboard-search-scope-current"
-                            :title="t('dashboard.searchThisFolderTitle')"
-                            ><span class="max-md:hidden">{{
-                              t("dashboard.searchThisFolder")
-                            }}</span></OToggleGroupItem
-                          >
-                          <OToggleGroupItem
-                            value="all"
-                            size="xs"
-                            icon-left="search"
-                            data-test="dashboard-search-across-folders-toggle"
-                            :title="t('dashboard.searchAllFoldersTitle')"
-                            ><span class="max-md:hidden">{{
-                              t("dashboard.searchAllFolders")
-                            }}</span></OToggleGroupItem
-                          >
-                        </OToggleGroup>
-                      </template>
                     </OInput>
                   </div>
+                  <!-- Outside the input so the scope switch never covers the input edge. -->
+                  <OToggleGroup
+                    :model-value="searchAcrossFolders ? 'all' : 'this'"
+                    type="single"
+                    class="shrink-0"
+                    @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
+                  >
+                    <OToggleGroupItem
+                      value="this"
+                      size="toolbar"
+                      icon-left="folder-outline"
+                      data-test="dashboard-search-scope-current"
+                      :title="t('dashboard.searchThisFolderTitle')"
+                      ><span class="max-md:hidden">{{
+                        t("dashboard.searchThisFolder")
+                      }}</span></OToggleGroupItem
+                    >
+                    <OToggleGroupItem
+                      value="all"
+                      size="toolbar"
+                      icon-left="search"
+                      data-test="dashboard-search-across-folders-toggle"
+                      :title="t('dashboard.searchAllFoldersTitle')"
+                      ><span class="max-md:hidden">{{
+                        t("dashboard.searchAllFolders")
+                      }}</span></OToggleGroupItem
+                    >
+                  </OToggleGroup>
                 </div>
               </template>
               <template #toolbar-trailing>
                 <ORefreshButton
                   layout="inline"
-                  variant="outline"
+                  variant="ghost"
                   :last-run-at="lastUpdatedAt"
                   :loading="refreshing"
                   shortcut-id="dashboardsListRefresh"
@@ -229,13 +219,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template #cell-name="{ row, value }">
                 <span class="flex min-w-0 items-center gap-1">
-                  <!-- One-click favorite toggle — filled gold star when
-                     favorited, neutral outline otherwise. -->
                   <OButton
-                    variant="ghost"
-                    size="icon-xs-sq"
-                    :icon-left="isFavorite(row.id) ? 'star' : 'star-outline'"
-                    :class="isFavorite(row.id) ? 'text-favorite shrink-0' : 'shrink-0'"
+                    :variant="isFavorite(row.id) ? 'ghost-primary' : 'ghost-muted'"
+                    size="icon-toolbar"
+                    icon-left="star-outline"
+                    :aria-pressed="isFavorite(row.id)"
                     :aria-label="
                       isFavorite(row.id)
                         ? t('dashboard.removeFromFavorites')
@@ -254,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </OButton>
                   <OTruncatedText
-                    class="text-text-body"
+                    class="text-text-heading font-medium"
                     :data-test="`dashboard-name-cell-${value}`"
                     >{{ value }}</OTruncatedText
                   >
@@ -275,10 +263,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </template>
               <template #cell-identifier="{ value }">
-                <span class="text-text-body font-mono text-xs" :title="value">{{ value }}</span>
+                <span class="text-text-secondary font-mono text-xs" :title="value">{{
+                  value
+                }}</span>
               </template>
               <template #cell-description="{ value }">
-                <span class="text-text-body">{{ value || "—" }}</span>
+                <span class="text-text-secondary">{{ value || "—" }}</span>
               </template>
               <template #cell-owner="{ value }">
                 <OUserCell :value="value" />
@@ -302,29 +292,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <template #cell-actions="{ row }">
                 <span class="row-actions flex items-center justify-end gap-0.5">
+                  <!-- Thin outline glyphs anti-alias under 3:1 in secondary, so row actions rest in body. -->
                   <OButton
                     v-if="row.actions == 'true'"
-                    icon-left="drive-file-move"
                     :aria-label="t('dashboard.move_to_another_folder')"
                     variant="ghost"
-                    size="icon-xs-sq"
+                    size="icon-toolbar"
                     class="max-md:hidden"
                     data-test="dashboard-move-to-another-folder"
                     @click.stop="showMoveDashboardPanel(row)"
                   >
+                    <OIcon name="drive-file-move" size="sm" class="text-text-body!" />
                     <OTooltip side="bottom" :content="t('dashboard.move_to_another_folder')" />
                   </OButton>
                   <OButton
                     v-if="row.actions == 'true'"
-                    icon-left="content-copy"
                     :aria-label="t('dashboard.duplicate')"
                     variant="ghost"
-                    size="icon-xs-sq"
+                    size="icon-toolbar"
                     class="max-md:hidden"
                     data-test="dashboard-duplicate"
                     data-row-action="duplicate"
                     @click.stop="duplicateDashboard(row.id, row.folder_id)"
                   >
+                    <OIcon name="content-copy" size="sm" class="text-text-body!" />
                     <OTooltip side="bottom" :content="t('dashboard.duplicate')" />
                   </OButton>
                   <OButton
@@ -412,6 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : undefined
                     "
                     :hide-action="showFavoritesOnly && !filterQuery"
+                    action-variant="outline"
                     :filtered="!!filterQuery"
                     @action="
                       (id) =>
@@ -972,9 +964,9 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.name,
+          size: 200,
           minSize: 160,
-          meta: { align: "left", flex: true },
+          meta: { align: "left", headerClass: "ps-10!" },
         },
         // {
         //   id: "identifier",
@@ -992,8 +984,9 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.description,
-          meta: { align: "left" },
+          size: 320,
+          minSize: 300,
+          meta: { align: "left", flex: true },
         },
         {
           id: "owner",
@@ -1002,7 +995,8 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.owner,
+          size: 160,
+          minSize: 112,
           meta: { align: "left" },
         },
         {
@@ -1012,7 +1006,8 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
-          size: COL.date,
+          size: 112,
+          minSize: 112,
           meta: { align: "left" },
         },
         {
@@ -1020,8 +1015,8 @@ export default defineComponent({
           header: t("dashboard.actions"),
           sortable: false,
           isAction: true,
-          size: 124,
-          meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
+          size: 104,
+          meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
         },
       ];
 

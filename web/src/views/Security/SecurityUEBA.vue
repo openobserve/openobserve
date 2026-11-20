@@ -681,7 +681,6 @@ const noUserSources = computed(
 <template>
   <OPageLayout
     :title="t('siem.ueba.title')"
-    :subtitle="t('siem.ueba.subtitle')"
     icon="insights"
     bleed
     title-data-test="security-ueba-title"

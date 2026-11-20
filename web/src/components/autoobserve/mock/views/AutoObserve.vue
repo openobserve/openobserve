@@ -18,10 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="autoobserve-page" class="flex h-full flex-col">
     <OPageLayout
       bleed
-      tabs-below
       :title="t('autoobserve.title')"
       icon="navigation"
-      :subtitle="t('autoobserve.subtitle')"
       title-data-test="autoobserve-title"
     >
       <template #title-trail>

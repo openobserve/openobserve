@@ -218,15 +218,16 @@ const suggestThemeColors = (dark: boolean): Record<string, string> => {
   return colors;
 };
 
-// The theme is global and its colours come from the page's dark class, so it is applied once per change of that class.
-let appliedTheme: boolean | null = null;
+// The theme is global and its colours come from the page's dark class, so it is applied once per change of it.
+let appliedTheme: string | null = null;
 let themeClassObserver: MutationObserver | null = null;
 
 /** Redefine before setTheme: the token values differ between the light and dark sheets. */
 const applyEditorTheme = (monaco: any): void => {
   const dark = document.documentElement.classList.contains("dark");
-  if (appliedTheme === dark) return;
-  appliedTheme = dark;
+  const key = String(dark);
+  if (appliedTheme === key) return;
+  appliedTheme = key;
   defineEditorThemes(monaco);
   monaco.editor.setTheme(dark ? "myCustomDarkTheme" : "myCustomTheme");
 };
@@ -244,6 +245,9 @@ const followThemeClass = (monaco: any): void => {
 const defineEditorThemes = (monaco: any): void => {
   const dark = document.documentElement.classList.contains("dark");
   const suggest = suggestThemeColors(dark);
+  // The card is surface-base in light and lifts to surface-panel in dark; the editor sits flush on it.
+  const cardBg = tokenHex(dark ? "--color-surface-panel" : "--color-surface-base");
+  const cardBgColors = cardBg ? { "editor.background": cardBg } : {};
   monaco.editor.defineTheme("myCustomTheme", {
     base: "vs",
     inherit: true,
@@ -259,6 +263,7 @@ const defineEditorThemes = (monaco: any): void => {
       "editorLineNumber.foreground": "#000000",
       "editor.border": "#000000",
       ...(dark ? {} : suggest),
+      ...(dark ? {} : cardBgColors),
     },
   });
   monaco.editor.defineTheme("myCustomDarkTheme", {
@@ -270,7 +275,7 @@ const defineEditorThemes = (monaco: any): void => {
       { token: "string.vrl", foreground: "CE9178" },
       // PromQL: no rules on purpose — built-in "vs-dark" colours via inherit.
     ],
-    colors: dark ? suggest : {},
+    colors: dark ? { ...suggest, ...cardBgColors } : {},
   });
 };
 

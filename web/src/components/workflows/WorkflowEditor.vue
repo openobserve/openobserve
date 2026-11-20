@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          back chevron in the module-icon slot, the workflow name input inline
          after the title, and the Test / Cancel / Save actions right-aligned. -->
     <OPageHeader
-      :subtitle="headerModeLabel"
       title-overflow="visible"
       :back="{ label: t('workflow.header'), onClick: goBack, dataTest: 'workflow-editor-back' }"
       class="border-border-default border-b px-4"

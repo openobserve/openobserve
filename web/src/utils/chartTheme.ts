@@ -62,18 +62,18 @@ const FALLBACKS: Record<string, string> = {
   "--color-service-health-warning": "#fa8c16",
   // Dashboard classic series palette (light values) — so getColorPalette() has
   // sensible colors before the token stylesheet is live (jsdom / very-early render).
-  "--color-chart-series-1": "#5b8ef0",
-  "--color-chart-series-2": "#34d399",
-  "--color-chart-series-3": "#fb923c",
-  "--color-chart-series-4": "#f472b6",
-  "--color-chart-series-5": "#a78bfa",
-  "--color-chart-series-6": "#fbbf24",
-  "--color-chart-series-7": "#38bdf8",
-  "--color-chart-series-8": "#f87171",
-  "--color-chart-series-9": "#2dd4bf",
-  "--color-chart-series-10": "#4ade80",
-  "--color-chart-series-11": "#e879f9",
-  "--color-chart-series-12": "#facc15",
+  "--color-chart-series-1": "#0d97a6",
+  "--color-chart-series-2": "#1b812c",
+  "--color-chart-series-3": "#e86113",
+  "--color-chart-series-4": "#b32aa1",
+  "--color-chart-series-5": "#9d8b06",
+  "--color-chart-series-6": "#2d71e7",
+  "--color-chart-series-7": "#df3e6f",
+  "--color-chart-series-8": "#4b9d04",
+  "--color-chart-series-9": "#097450",
+  "--color-chart-series-10": "#708103",
+  "--color-chart-series-11": "#64748b",
+  "--color-chart-series-12": "#7e7367",
   // Mark-line drop shadow (light value) — dark override lives in dark.css.
   "--color-chart-markline-shadow": "rgba(255, 255, 255, 0.7)",
   // Dashboard table row-highlight palette (light values) + grid line.
@@ -124,7 +124,7 @@ const FALLBACKS: Record<string, string> = {
   // Metric-panel text default (contrast fallback when a panel has no background).
   "--color-chart-metric-text": "#000000",
   // Brand accent (--color-primary-600), light value — metric sparkline default color.
-  "--color-accent": "#3f7994",
+  "--color-accent": "#5a64db",
   // Alert threshold marklines (light values from semantic.css / base.css).
   "--color-status-error-text": "#cc3645",
   "--color-status-warning-text": "#be5a13",
@@ -147,7 +147,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-json-object": "#4b5563",
   "--color-json-string": "#047857",
   "--color-latency-p95": "#0a4ce8",
-  "--color-progress-bar-default": "#3f7994",
+  "--color-progress-bar-default": "#5a64db",
   "--color-progress-bar-neutral": "#a3a3a3",
   "--color-progress-bar-track": "#e5e5e5",
 };
@@ -164,15 +164,17 @@ export const TRACE_SPAN_COLOR_COUNT = Object.keys(FALLBACKS).filter((token) =>
 
 /** Resolve a `--color-*` (or `--text-*`) design token to its computed value. */
 export function chartColor(token: `--${string}`): string {
-  const cached = cache.get(token);
-  if (cached !== undefined) return cached;
   // No live DOM (SSR / node-env unit tests): fall back without touching the CSSOM.
   if (typeof document === "undefined" || typeof getComputedStyle === "undefined") {
     return FALLBACKS[token] ?? "";
   }
+  // Keyed by mode: a chart redrawn on the isDark watch can run before invalidateChartTheme().
+  const key = `${document.documentElement.classList.contains("dark") ? "d" : "l"}${token}`;
+  const cached = cache.get(key);
+  if (cached !== undefined) return cached;
   const computed = getComputedStyle(document.documentElement).getPropertyValue(token).trim();
   if (computed) {
-    cache.set(token, computed); // only cache real values; retry until CSS is live
+    cache.set(key, computed); // only cache real values; retry until CSS is live
     return computed;
   }
   return FALLBACKS[token] ?? "";
@@ -199,10 +201,47 @@ export function chartNumber(token: `--${string}`, fallback: number): number {
 
 // Convenience getters used by the dashboard/trace chart converters.
 export const chartTextColor = (): string => chartColor("--color-text-secondary");
-export const chartAxisTextColor = (): string => chartColor("--color-text-body");
+export const chartAxisTextColor = (): string => chartColor("--color-text-secondary");
 export const chartAxisLine = (): string => chartColor("--color-border-default");
 export const chartBg = (): string => chartColor("--color-surface-base");
 export const chartGridLine = (): string => chartColor("--color-border-subtle");
+
+// Read live, not cached: a theme preset rewrites --color-primary-* without a theme-mode change.
+const liveToken = (token: `--${string}`): string =>
+  typeof document === "undefined" || typeof getComputedStyle === "undefined"
+    ? ""
+    : getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+
+/** The one chart accent (bars, single-series marks), from the theme's --color-accent. */
+export const chartAccent = (): string =>
+  liveToken("--color-accent") || chartColor("--color-accent");
+
+// Single-series marks use series slot 1 (cyan), so they never read as a second indigo accent.
+export const CHART_SERIES_PRIMARY = "#0d97a6";
+export const chartSeriesPrimary = (): string =>
+  liveToken("--color-chart-series-1") || CHART_SERIES_PRIMARY;
+
+/** `#rrggbb` at `alpha`, for ECharts, which cannot parse color-mix(). */
+export const withAlpha = (hex: string, alpha: number): string => {
+  if (!HEX_RE.test(hex)) return hex;
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 0xff}, ${(n >> 8) & 0xff}, ${n & 0xff}, ${alpha})`;
+};
+
+/** Crosshair label on the primary fill, so the pointer shares the accent hue and keeps white text at 4.5:1. */
+export const chartCrosshairLabel = () => ({
+  backgroundColor: liveToken("--color-button-primary") || chartAccent(),
+  color: liveToken("--color-button-primary-foreground") || "#ffffff",
+  fontSize: 11,
+});
+
+/** Neutral hover card shared by the logs histogram and the dashboard charts. */
+export const chartTooltipStyle = () => ({
+  backgroundColor: chartColor("--color-tooltip-bg"),
+  borderColor: chartColor("--color-tooltip-border"),
+  borderWidth: 1,
+  textStyle: { color: chartColor("--color-tooltip-text"), fontSize: 12 },
+});
 
 export const HEX_RE = /^#[0-9a-f]{6}$/i;
 
@@ -254,5 +293,5 @@ export const CHART_SELECTION_FILL = "rgba(0, 191, 255, 0.15)";
 // echarts v6 defaults the toolbox dataZoom brush to a 50%-opaque tint that hides the chart while dragging.
 export const dataZoomBrushStyle = () => ({
   borderWidth: 0,
-  color: CHART_SELECTION_FILL,
+  color: HEX_RE.test(chartAccent()) ? withAlpha(chartAccent(), 0.15) : CHART_SELECTION_FILL,
 });

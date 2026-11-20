@@ -32,10 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('dbm.header.title')"
-    :subtitle="t('dbm.header.subtitle')"
     icon="database"
     :title-data-test="titleDataTest"
-    tabs-below
     bleed
   >
     <template #header-tabs>

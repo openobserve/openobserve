@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="logs-search-bar-function-dropdown"
           variant="ghost"
-          class="ms-1! size-8!"
+          class="ms-1! size-7!"
           size="icon-toolbar"
         >
           <img :src="functionIconUrl" :alt="t('logs.functionSelector.function')" class="size-4" />
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="logs-search-bar-save-function-btn"
       variant="ghost"
       size="icon-toolbar"
-      class="size-8!"
+      class="size-7!"
       @click="fnSavedFunctionDialog"
     >
       <OIcon name="save" size="sm" />

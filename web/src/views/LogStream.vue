@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
       :title="t('logStream.header')"
       title-data-test="log-stream-title-text"
-      :subtitle="t('logStream.subtitle')"
       icon="window"
     >
       <template #actions>

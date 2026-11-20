@@ -320,14 +320,11 @@ describe("OnCallRouting", () => {
           ...stubs,
           OPageLayout: {
             name: "OPageLayout",
-            props: ["subtitle"],
-            template:
-              "<div><span class='sub'>{{ subtitle }}</span><slot name='title-trail' /><slot /></div>",
+            template: "<div><slot name='title-trail' /><slot /></div>",
           },
         },
       },
     });
-    expect(wrapper.find(".sub").text()).toBe("");
     const info = wrapper.find('[data-test="oncall-routing-precedence-info"]');
     const precedence = String(i18n.global.t("oncall.routingPrecedence"));
     expect(info.attributes("tabindex")).toBe("0");

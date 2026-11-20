@@ -48,6 +48,8 @@ describe("OFormSection", () => {
       expect(title?.element.tagName).toBe(heading);
       expect(wrapper.find('[data-test="section-description"]').exists()).toBe(description);
       if (description) expect(wrapper.text()).toContain("Applies to every stream");
+      if (description)
+        expect(wrapper.find('[data-test="section-description"]').classes()).toContain("text-xs");
       const icons = wrapper.findAllComponents(OIcon).map((icon) => icon.props("name"));
       expect(icons.includes("warning")).toBe(warning);
       expect(wrapper.find('[data-test="control"]').exists()).toBe(true);

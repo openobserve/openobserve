@@ -50,11 +50,6 @@ export const RailIndicatorActiveKey: InjectionKey<ComputedRef<boolean>> = Symbol
   "o-navbar-rail-indicator-active",
 );
 
-/** Provided by ONavbar so a teleported flyout item can mark its click as rail-started. */
-export const RailNavigationMarkKey: InjectionKey<(event: MouseEvent) => void> = Symbol(
-  "o-navbar-rail-navigation-mark",
-);
-
 /**
  * A flyout sub-item. These mirror the target page's own in-page section nav
  * EXACTLY — same label (i18n key), same icon, same category grouping — so the
@@ -167,29 +162,3 @@ export type RailEntry =
       children: SubnavChild[];
       pinBottom: boolean;
     };
-
-export interface NavbarProps {
-  linksList: NavItem[];
-  miniMode?: boolean;
-  visible?: boolean;
-  /**
-   * Render the rail as a fixed slide-over above page content instead of a
-   * normal flex sibling that reserves its own column width. Used on narrow
-   * viewports, where the rail is hidden by default (`visible=false`) and
-   * revealed on demand via a header hamburger toggle — reserving its ~90px
-   * column permanently there would eat a quarter of a 390px viewport.
-   */
-  overlay?: boolean;
-  /** Render `linksList` as given, without the observability flyout groups (Infra, Data, Reliability). */
-  flat?: boolean;
-  /** Draws placeholder tiles in place of the menu while its entries are not known yet. */
-  loading?: boolean;
-}
-
-export interface NavbarEmits {
-  (e: "menu-hover", routePath: string): void;
-}
-
-export interface NavbarSlots {
-  default?: never;
-}

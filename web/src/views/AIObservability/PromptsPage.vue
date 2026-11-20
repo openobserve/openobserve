@@ -1,12 +1,6 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <template>
-  <OPageLayout
-    bleed
-    :title="t('aiObservability.nav.prompts')"
-    icon="edit"
-    :subtitle="t('aiObservability.promptManagement.subtitle')"
-    data-test="prompts-page"
-  >
+  <OPageLayout bleed :title="t('aiObservability.nav.prompts')" icon="edit" data-test="prompts-page">
     <template #actions>
       <OButton
         v-if="canManageSettings"

@@ -34,11 +34,11 @@ export const STATUS_COLORS = {
   emergency: "#E53935", // aligned with convertLogData fatal/emergency
   alert: "#ea580c",
   critical: "#F4511E", // aligned with convertLogData critical
-  error: "#EF5350", // aligned with convertLogData error
-  warning: "#FB8C00", // aligned with convertLogData warn/warning
+  error: "#D64541", // aligned with convertLogData error
+  warning: "#B8650A", // aligned with convertLogData warn/warning
   notice: "#16a34a",
-  info: "#1E88E5", // aligned with convertLogData info
-  debug: "#00ACC1", // aligned with convertLogData debug
+  info: "#2F7FD0", // aligned with convertLogData info
+  debug: "#0E8A99", // aligned with convertLogData debug
   ok: "#43A047", // aligned with convertLogData success/ok
 } as const;
 
@@ -494,11 +494,11 @@ const SEVERITY_TEXT_CLASSES: Readonly<Record<KnownLogSeverityLevel, string>> = {
   critical: "text-log-severity-error-text",
   error: "text-log-severity-error-text",
   warning: "text-log-severity-warning-text",
-  notice: "text-log-severity-info-text",
-  info: "text-log-severity-info-text",
-  debug: "text-log-severity-debug-text",
-  trace: "text-log-severity-debug-text",
-  ok: "text-log-severity-info-text",
+  notice: "text-text-body",
+  info: "text-text-body",
+  debug: "text-text-body",
+  trace: "text-text-body",
+  ok: "text-text-body",
 };
 
 const GUARDED_FIELDS: readonly string[] = [
@@ -589,6 +589,27 @@ export function severityIndicatorColor(severity: LogSeverity): string {
   return SEVERITY_INDICATOR_COLORS[severity.level];
 }
 
+export function severityStripColor(severity: LogSeverity): string {
+  switch (severity.level) {
+    case "emergency":
+    case "alert":
+    case "critical":
+    case "error":
+      return "var(--color-status-negative)";
+    case "warning":
+      return "var(--color-log-severity-warning-indicator)";
+    case "notice":
+    case "info":
+    case "ok":
+      return "color-mix(in srgb, var(--color-info) 55%, var(--color-text-secondary))";
+    case "debug":
+    case "trace":
+      return "var(--color-status-neutral-text)";
+    case "unknown":
+      return "transparent";
+  }
+}
+
 export function severityRowClass(severity: LogSeverity): string {
   return `o2-log-level-${severity.level} o2-log-level-src-${severity.source}`;
 }
@@ -597,7 +618,7 @@ export function severityRowClass(severity: LogSeverity): string {
 export function severityFieldTextClass(field: string, value: unknown): string {
   const resolved = resolveSeverityFieldValue(field, value);
   if (!resolved || resolved.source !== "field") return "";
-  return `font-mono font-medium ${SEVERITY_TEXT_CLASSES[resolved.level]}`;
+  return `font-normal ${SEVERITY_TEXT_CLASSES[resolved.level]}`;
 }
 
 export function severityStringValues(levels: readonly LogSeverityLevel[]): string[] {

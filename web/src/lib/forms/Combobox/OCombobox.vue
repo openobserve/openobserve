@@ -35,7 +35,7 @@ const controlAttrs = computed(() => split.value.controlAttrs);
 const props = withDefaults(defineProps<ComboboxProps>(), {
   items: () => [],
   disabled: false,
-  size: "md",
+  size: "sm",
   error: false,
   debounce: 0,
   valueReplaceFn: (option: ComboboxOption) => option.value,
@@ -165,12 +165,17 @@ function onSelect(optionValue: string) {
 }
 
 // ── Sizes ────────────────────────────────────────────────────────────────────
+const heightClasses: Record<NonNullable<ComboboxProps["size"]>, string> = {
+  xs: "h-6 text-xs",
+  sm: "h-7 text-compact",
+  md: "h-8 text-compact",
+  lg: "h-9 text-sm",
+};
 const heightClass = computed(() => {
   if (props.labelPosition === "inside" && (props.label || slots.label)) {
     return "h-10 text-sm pt-4";
   }
-  // Aligned with OInput/OSelect/OButton sm: h-[2.125rem].
-  return "h-[2.125rem] text-sm";
+  return heightClasses[props.size ?? "sm"];
 });
 
 // ── Error ────────────────────────────────────────────────────────────────────
@@ -255,7 +260,9 @@ const hasInsideLabel = computed(
             hasError
               ? 'border-input-border-error'
               : 'border-input-border hover:border-input-border-hover',
-            'focus:border-input-border-focus focus:ring-input-focus-ring focus:ring-2',
+            hasError
+              ? 'focus:ring-input-border-error/20 focus:ring-2'
+              : 'focus:ring-focus-ring-accent focus:ring-2',
             'disabled:bg-input-disabled-bg disabled:text-input-disabled-text disabled:cursor-not-allowed',
             heightClass,
           ]"

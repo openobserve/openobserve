@@ -14,13 +14,21 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
 
 <template>
+  <!-- Only ERROR earns a chip; a box on every OK/UNSET row is noise. -->
   <OTag
+    v-if="status?.toUpperCase() === 'ERROR'"
     data-test="span-row-status-pill"
     type="spanStatus"
-    :value="status || 'unset'"
-    :label="raw(status || 'UNSET')"
+    value="error"
+    :label="raw('ERROR')"
     class="uppercase"
   />
+  <span
+    v-else
+    data-test="span-row-status-pill"
+    class="text-text-secondary text-compact uppercase"
+    >{{ status || "UNSET" }}</span
+  >
 </template>
 
 <script setup lang="ts">

@@ -39,7 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <OPageHeader
         :title="raw(card.name)"
-        :subtitle="card.help ? raw(card.help) : undefined"
         title-data-test="metrics-detail-title"
         :back="{
           label: t('metrics.explorer.detail.backTo'),

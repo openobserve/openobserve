@@ -116,7 +116,6 @@
     },
     "overview": {
       "title": "Vue d'ensemble du SOC",
-      "subtitle": "Ce qui s'est déclenché, ce qui est ouvert, et si vos sources remontent toujours des données",
       "autoRefreshOn": "L'actualisation automatique toutes les minutes est activée",
       "autoRefreshOff": "L'actualisation automatique est désactivée",
       "historyError": "Impossible de charger l'historique des détections : {reason}",
@@ -165,7 +164,6 @@
     },
     "events": {
       "title": "Événements de sécurité",
-      "subtitle": "Chassez dans la télémétrie de sécurité normalisée",
       "run": "Exécuter",
       "hideSidebar": "Masquer les champs",
       "showSidebar": "Afficher les champs",
@@ -348,7 +346,6 @@
     },
     "alerts": {
       "title": "Alertes",
-      "subtitle": "Chaque déclenchement de détection, et les preuves associées",
       "eyebrow": "Déclenchement de détection",
       "range": {
         "1h": "1 h",
@@ -463,7 +460,6 @@
     },
     "cases": {
       "title": "Cas",
-      "subtitle": "Déclenchements corrélés, qualifiés jusqu'à un verdict",
       "eyebrow": "Cas",
       "search": "Filtrer cette page par titre, id, assigné ou entité",
       "refresh": "Actualiser",
@@ -712,7 +708,6 @@
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
-      "subtitle": "Quelles techniques vos détections activées couvrent, et lesquelles se sont déclenchées",
       "summaryPartial": "Cette fenêtre contient plus d'historique d'alertes qu'un résumé ne peut en contenir ; les décomptes de déclenchements sont donc une borne inférieure. Choisissez une fenêtre plus courte pour obtenir des chiffres complets.",
       "stat": {
         "firing": "Techniques déclenchées",
@@ -775,7 +770,6 @@
     },
     "detections": {
       "title": "Détections",
-      "subtitle": "Règles Sigma exécutées comme détections planifiées sur vos flux de sécurité",
       "new": "Nouvelle détection",
       "eyebrow": "Règle de détection",
       "refresh": "Actualiser les détections",
@@ -1073,7 +1067,6 @@
     },
     "content": {
       "title": "Contenu",
-      "subtitle": "Les règles de détection et sources de logs fournies avec le SIEM, confrontées à vos données",
       "refresh": "Actualiser",
       "streamsError": "Impossible de charger vos flux ; les correspondances avec vos données sont donc inconnues",
       "tab": {
@@ -1219,7 +1212,6 @@
     },
     "entities": {
       "title": "Entités",
-      "subtitle": "Tous les utilisateurs, adresses IP sources et hôtes mentionnés par vos sources de sécurité",
       "view": {
         "table": "Tableau",
         "graph": "Graphe des risques"
@@ -1339,7 +1331,6 @@
     },
     "ueba": {
       "title": "Analyse du comportement des utilisateurs",
-      "subtitle": "Chaque utilisateur est comparé à son propre passé récent",
       "windowHint": "Derniers {current}, comparés aux {baseline} précédents",
       "method": "Les scores de risque sont des heuristiques : les derniers {current} de chaque utilisateur sont comparés à ses propres {baseline} précédents. Chaque indicateur affiche les chiffres qui l’ont déclenché.",
       "noSources": "Aucune source ne désigne un utilisateur",
@@ -1438,7 +1429,6 @@
     },
     "intel": {
       "title": "Renseignement sur les menaces",
-      "subtitle": "Indicateurs malveillants connus et tous les endroits où ils sont apparus dans vos données de sécurité",
       "loadFailed": "Impossible de charger les listes d'indicateurs",
       "add": "Ajouter des indicateurs",
       "import": "Importer",
@@ -1607,7 +1597,6 @@
     "sources": {
       "title": "Sources de données",
       "comingSoon": "L'intégration guidée avec des modèles de normalisation OCSF arrive bientôt. En attendant, ingérez les logs de sécurité comme n'importe quel flux ; la page Événements les identifie et les normalise automatiquement.",
-      "subtitle": "Attachez un pack OCSF pour normaliser un flux lors de l'ingestion, ou incluez-le tel quel comme source de sécurité.",
       "colStream": "Flux",
       "colSourceType": "Type de source",
       "colMapping": "Mappage",

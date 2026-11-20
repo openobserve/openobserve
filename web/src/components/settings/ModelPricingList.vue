@@ -28,13 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <TestModelMatchDialog v-model="showTestMatchDialog" />
 
     <!-- Main List View -->
-    <OPageLayout
-      overflow-first
-      v-if="!showImportModelPricingPage"
-      icon="paid"
-      :subtitle="t('settings.modelPricingList.subtitle')"
-      bleed
-    >
+    <OPageLayout overflow-first v-if="!showImportModelPricingPage" icon="paid" bleed>
       <template #title>
         {{ t("modelPricing.header") }}
         <OButton variant="ghost" size="icon-xs-sq" class="-ms-1" data-test="model-pricing-info-btn">

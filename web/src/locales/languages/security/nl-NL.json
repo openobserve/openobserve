@@ -116,7 +116,6 @@
     },
     "overview": {
       "title": "SOC-overzicht",
-      "subtitle": "Wat is afgegaan, wat open staat en of je bronnen nog rapporteren",
       "autoRefreshOn": "Automatisch vernieuwen elke minuut staat aan",
       "autoRefreshOff": "Automatisch vernieuwen staat uit",
       "historyError": "Kan detectiegeschiedenis niet laden: {reason}",
@@ -165,7 +164,6 @@
     },
     "events": {
       "title": "Beveiligingsgebeurtenissen",
-      "subtitle": "Doorzoek genormaliseerde beveiligingstelemetrie",
       "run": "Uitvoeren",
       "hideSidebar": "Velden verbergen",
       "showSidebar": "Velden tonen",
@@ -348,7 +346,6 @@
     },
     "alerts": {
       "title": "Alarmen",
-      "subtitle": "Elke keer dat een detectie afging, en het bewijs erachter.",
       "eyebrow": "Afgaande detectie",
       "range": {
         "1h": "1u",
@@ -463,7 +460,6 @@
     },
     "cases": {
       "title": "Casussen",
-      "subtitle": "Gecorreleerde afgegane alarmen, getriageerd tot een oordeel",
       "eyebrow": "Casus",
       "search": "Filter deze pagina op titel, id, toegewezen persoon of entiteit",
       "refresh": "Vernieuwen",
@@ -712,7 +708,6 @@
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
-      "subtitle": "Welke technieken je ingeschakelde detecties dekken, en welke zijn afgegaan",
       "summaryPartial": "Dit venster bevat meer alarmgeschiedenis dan één samenvatting aankan, dus de aantallen afgegane alarmen zijn een ondergrens; kies een korter venster voor volledige aantallen.",
       "stat": {
         "firing": "Afgegane technieken",
@@ -775,7 +770,6 @@
     },
     "detections": {
       "title": "Detecties",
-      "subtitle": "Sigma-regels die als geplande detecties over je beveiligingsstreams draaien",
       "new": "Nieuwe detectie",
       "eyebrow": "Detectieregel",
       "refresh": "Detecties vernieuwen",
@@ -1073,7 +1067,6 @@
     },
     "content": {
       "title": "Inhoud",
-      "subtitle": "De detectieregels en logbronnen die met de SIEM worden meegeleverd, afgezet tegen je gegevens",
       "refresh": "Vernieuwen",
       "streamsError": "Kon je streams niet laden, dus overeenkomsten met je gegevens zijn onbekend",
       "tab": {
@@ -1219,7 +1212,6 @@
     },
     "entities": {
       "title": "Entiteiten",
-      "subtitle": "Elke gebruiker, bron-IP en host die je beveiligingsbronnen noemen",
       "view": {
         "table": "Tabel",
         "graph": "Risicografiek"
@@ -1339,7 +1331,6 @@
     },
     "ueba": {
       "title": "Gebruikersgedraganalyse",
-      "subtitle": "Elke gebruiker vergeleken met zijn eigen recente verleden",
       "windowHint": "Afgelopen {current}, vergeleken met de {baseline} daarvoor",
       "method": "Risicoscores zijn heuristieken: de laatste {current} van elke gebruiker wordt vergeleken met zijn eigen {baseline} daarvoor. Elke markering toont de cijfers die haar hebben veroorzaakt.",
       "noSources": "Geen enkele bron noemt een gebruiker",
@@ -1438,7 +1429,6 @@
     },
     "intel": {
       "title": "Threat Intel",
-      "subtitle": "Bekende kwaadaardige indicatoren, en elke plek waar ze opdoken in je beveiligingsgegevens",
       "loadFailed": "Kan indicatorlijsten niet laden",
       "add": "Indicatoren toevoegen",
       "import": "Importeren",
@@ -1607,7 +1597,6 @@
     "sources": {
       "title": "Gegevensbronnen",
       "comingSoon": "Begeleide onboarding met OCSF-normalisatiesjablonen komt eraan. Tot die tijd kun je beveiligingslogs als elke andere stream opnemen; de pagina Gebeurtenissen herkent en normaliseert ze automatisch.",
-      "subtitle": "Koppel een OCSF-pack om een stream tijdens ingestie te normaliseren, of neem het ongewijzigd op als beveiligingsbron.",
       "colStream": "Stream",
       "colSourceType": "Brontype",
       "colMapping": "Toewijzing",

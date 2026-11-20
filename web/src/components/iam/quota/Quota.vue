@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="isDark ? 'dark-theme-page' : 'light-theme-page'"
     :title="t('quota.header')"
     title-data-test="user-title-text"
-    :subtitle="t('iam.quotaPage.subtitle')"
     icon="speed"
     bleed
   >

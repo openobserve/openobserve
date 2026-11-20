@@ -27,14 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <OPageHeader
-        v-if="showTabs"
-        :title="t('rum.title')"
-        :subtitle="t('rum.subtitle')"
-        icon="devices"
-        tabs-below
-        class="shrink-0"
-      >
+      <OPageHeader v-if="showTabs" :title="t('rum.title')" icon="devices" class="shrink-0">
         <template #tabs>
           <!-- Section navigation stays live on a license-locked page. -->
           <FeatureLockExempt class="contents">

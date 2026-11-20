@@ -18,7 +18,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AiPageShell
     data-test="ai-agent-graph"
     :title="t('aiObservability.nav.agentGraph')"
-    :subtitle="t('aiObservability.subtitle.agentGraph')"
     icon="hub"
     :date-state="dateState"
     :last-run-at="graphLastRunAt"

@@ -1020,3 +1020,12 @@ export default {
   },
 };
 </script>
+
+<style scoped>
+/* keep(complex-state): the highlight spans are rendered by a child, so :deep() carries the roomier 13px JSON size to them. */
+.log_json_content,
+.log_json_content :deep(.log-highlight) {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+</style>

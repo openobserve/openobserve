@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div
           class="rounded-default grid grid-cols-[6.5rem_minmax(0,1fr)_4rem] items-center gap-1.5 px-1 py-0.5 text-xs"
-          :class="row.active ? 'bg-surface-accent-active' : ''"
+          :class="row.active ? 'bg-selected-bg' : ''"
         >
           <OTruncatedText class="text-text-body">{{ row.name }}</OTruncatedText>
           <span class="bg-surface-subtle rounded-default relative h-2">

@@ -52,49 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <LicenseSearchBanner v-if="config.isEnterprise === 'true' && config.isCloud === 'false'" />
         <LicenseExpiryBanner v-if="config.isEnterprise === 'true' && config.isCloud === 'false'" />
       </div>
-
-      <!-- Header component containing logo, navigation, and user controls -->
-      <AppHeader
-        :store="store"
-        :router="router"
-        :config="config"
-        :user="user"
-        :slack-icon="slackIcon"
-        :zo-backend-url="zoBackendUrl"
-        :lang-list="langList"
-        :selected-language="selectedLanguage"
-        :selected-org="selectedOrg"
-        :user-clicked-org="userClickedOrg"
-        :organizations="orgOptions"
-        :is-hovered="isHovered"
-        :get-btn-logo="getBtnLogo"
-        @update:selected-org="selectedOrg = $event"
-        @update:is-hovered="isHovered = $event"
-        @update-organization="updateOrganization"
-        @go-to-home="goToHome"
-        @go-to-about="goToAbout"
-        @toggleAIChat="toggleAIChat"
-        @open-slack="openSlack"
-        @navigateToOpenAPI="navigateToOpenAPI"
-        @navigate-to-docs="navigateToDocs"
-        @change-language="changeLanguage"
-        @open-predefined-themes="openPredefinedThemes"
-        @open-shortcuts="openShortcutsList"
-        @open-command-palette="commandPaletteOpen = true"
-        @toggle-mobile-nav="mobileNavOpen = !mobileNavOpen"
-        @signout="signout"
-      />
     </header>
 
     <div class="flex min-h-0 flex-1">
-      <ONavbar
+      <OSidebar
         v-if="store.state.printMode !== true && !focusMode && !store.state.kioskMode"
         class="max-md:hidden"
         :links-list="navLinks"
         :flat="store.state.solutionMode === 'security'"
         :loading="!menuReady"
-        :mini-mode="miniMode"
-        @menu-hover="handleMenuHover"
       />
 
       <!-- Not seamless: the scrim gives tap-outside-to-close a target. -->
@@ -131,132 +97,165 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="mobileNavOpen = false"
             />
           </div>
-          <ONavbar
-            class="min-h-0 flex-1 overflow-y-auto"
+          <OSidebar
+            class="min-h-0 flex-1"
             :links-list="navLinks"
             :flat="store.state.solutionMode === 'security'"
-            :visible="true"
-            @menu-hover="handleMenuHover"
+            :collapsible="false"
           />
         </div>
       </ODrawer>
 
-      <div class="flex h-full min-h-0 min-w-0 flex-1">
-        <!-- Main Panel -->
-        <main
-          data-test="main-content"
-          class="bg-surface-chrome-deeper flex min-h-0 flex-col"
-          :class="
-            store.state.kioskMode
-              ? ''
-              : focusMode
-                ? 'px-2 pb-2 max-md:px-0'
-                : 'pe-2 pb-2 max-md:pe-0'
-          "
-          :style="{
-            width:
-              focusMode || !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
-                ? '100%'
-                : store.state.isAiChatExpanded
-                  ? '50%'
-                  : '75%',
-          }"
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div
+          class="o2-app-header shrink-0"
+          :class="store.state.printMode === true || store.state.kioskMode ? 'hidden' : ''"
         >
-          <!-- Content card — all pages render inside this. The border stays present in both
+          <AppHeader
+            :store="store"
+            :router="router"
+            :config="config"
+            :user="user"
+            :slack-icon="slackIcon"
+            :zo-backend-url="zoBackendUrl"
+            :lang-list="langList"
+            :selected-language="selectedLanguage"
+            :selected-org="selectedOrg"
+            :user-clicked-org="userClickedOrg"
+            :organizations="orgOptions"
+            @update:selected-org="selectedOrg = $event"
+            @update-organization="updateOrganization"
+            @go-to-home="goToHome"
+            @go-to-about="goToAbout"
+            @toggleAIChat="toggleAIChat"
+            @open-slack="openSlack"
+            @navigateToOpenAPI="navigateToOpenAPI"
+            @navigate-to-docs="navigateToDocs"
+            @change-language="changeLanguage"
+            @open-predefined-themes="openPredefinedThemes"
+            @open-shortcuts="openShortcutsList"
+            @open-command-palette="commandPaletteOpen = true"
+            @toggle-mobile-nav="mobileNavOpen = !mobileNavOpen"
+            @signout="signout"
+          />
+        </div>
+        <div class="flex h-full min-h-0 min-w-0 flex-1">
+          <!-- Main Panel -->
+          <main
+            data-test="main-content"
+            class="bg-surface-chrome-deeper flex min-h-0 flex-col"
+            :class="
+              store.state.kioskMode
+                ? ''
+                : focusMode
+                  ? 'px-2 pb-2 max-md:px-0'
+                  : 'pe-2 pb-2 max-md:pe-0'
+            "
+            :style="{
+              width:
+                focusMode || !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
+                  ? '100%'
+                  : store.state.isAiChatExpanded
+                    ? '50%'
+                    : '75%',
+            }"
+          >
+            <!-- Content card — all pages render inside this. The border stays present in both
                themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
-          <div
-            class="bg-surface-base flex min-h-0 flex-1 flex-col overflow-hidden"
+            <div
+              class="bg-surface-base flex min-h-0 flex-1 flex-col overflow-hidden"
+              :class="[
+                store.state.kioskMode ? '' : 'rounded-surface border shadow-md',
+                isDark ? 'border-border-default' : 'border-transparent',
+              ]"
+            >
+              <div
+                v-if="isLoading && fullConfigSettled && !holdForOnboarding"
+                :key="store.state.selectedOrganization?.identifier"
+                class="o2-content-scroll h-full flex-1 overflow-y-auto"
+              >
+                <FirstDataNotice
+                  v-if="
+                    !focusMode &&
+                    firstDataNotice.visible.value &&
+                    router.currentRoute.value.name !== 'home' &&
+                    !store.state.kioskMode
+                  "
+                  class="mx-3 mt-3"
+                  :stream="firstDataNotice.stream.value"
+                  :arrived-at="firstDataNotice.arrivedAt.value"
+                  @open="firstDataNotice.open"
+                  @dismiss="firstDataNotice.dismiss"
+                />
+                <!-- Enter-only fade, skipped on a return; the body's slide lives in OPageLayout so the header stays put. -->
+                <FeatureLockBoundary :feature="lockedFeature">
+                  <SecurityPageGate v-if="securityGated" />
+                  <router-view v-else v-slot="{ Component }">
+                    <OAccessBoundary>
+                      <keep-alive :include="KEPT_ALIVE_VIEWS" @vue:unmounted="forgetKeptViews">
+                        <component
+                          :is="Component"
+                          :class="[routeEnterClass(Component), 'h-full']"
+                          @sendToAiChat="sendToAiChat"
+                        />
+                      </keep-alive>
+                    </OAccessBoundary>
+                  </router-view>
+                </FeatureLockBoundary>
+              </div>
+              <div
+                v-else
+                data-test="main-content-pending"
+                aria-busy="true"
+                class="flex h-full flex-1 flex-col gap-3 overflow-hidden p-4"
+              >
+                <OSkeleton type="text" class="h-6 w-48" />
+                <OSkeleton class="h-8 w-full" />
+                <OSkeleton v-for="n in 8" :key="n" class="h-9 w-full" />
+              </div>
+            </div>
+          </main>
+
+          <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
+          <aside
+            v-if="!focusMode"
+            v-show="store.state.isAiChatEnabled && isLoading && !store.state.kioskMode"
+            class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper shrink-0 overflow-y-auto"
             :class="[
-              store.state.kioskMode ? '' : 'rounded-surface border shadow-md',
-              isDark ? 'border-border-default' : 'border-transparent',
+              isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
+              { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
+              // The chat is a floating card in both modes — match the main content
+              // card's right/bottom gap (+ rounded-surface corners) so they read as
+              // the same card. Expanding only widens it; it never overlays the header.
+              'pe-2 pb-2',
+              isChatOverlay
+                ? 'fixed inset-x-0 bottom-0 z-50 ps-2'
+                : 'sticky top-[var(--navbar-height,2.25rem)] self-start',
+            ]"
+            :style="[
+              {
+                height: 'calc(100vh - var(--navbar-height, 2.25rem))',
+                maxWidth: '100%',
+              },
+              isChatOverlay
+                ? { width: '100%', top: 'var(--navbar-height, 2.25rem)' }
+                : // Full-screen just widens the panel (25% → 50%) beside the content —
+                  // same top position + height, so the main header stays visible.
+                  store.state.isAiChatExpanded
+                  ? { width: '50%', minWidth: '18.75rem' }
+                  : { width: '25%', minWidth: '4.688rem' },
             ]"
           >
-            <div
-              v-if="isLoading && fullConfigSettled && !holdForOnboarding"
-              :key="store.state.selectedOrganization?.identifier"
-              class="o2-content-scroll h-full flex-1 overflow-y-auto"
-            >
-              <FirstDataNotice
-                v-if="
-                  !focusMode &&
-                  firstDataNotice.visible.value &&
-                  router.currentRoute.value.name !== 'home' &&
-                  !store.state.kioskMode
-                "
-                class="mx-3 mt-3"
-                :stream="firstDataNotice.stream.value"
-                :arrived-at="firstDataNotice.arrivedAt.value"
-                @open="firstDataNotice.open"
-                @dismiss="firstDataNotice.dismiss"
-              />
-              <!-- Enter-only fade, skipped on a return; the body's slide lives in OPageLayout so the header stays put. -->
-              <FeatureLockBoundary :feature="lockedFeature">
-                <SecurityPageGate v-if="securityGated" />
-                <router-view v-else v-slot="{ Component }">
-                  <OAccessBoundary>
-                    <keep-alive :include="KEPT_ALIVE_VIEWS" @vue:unmounted="forgetKeptViews">
-                      <component
-                        :is="Component"
-                        :class="[routeEnterClass(Component), 'h-full']"
-                        @sendToAiChat="sendToAiChat"
-                      />
-                    </keep-alive>
-                  </OAccessBoundary>
-                </router-view>
-              </FeatureLockBoundary>
-            </div>
-            <div
-              v-else
-              data-test="main-content-pending"
-              aria-busy="true"
-              class="flex h-full flex-1 flex-col gap-3 overflow-hidden p-4"
-            >
-              <OSkeleton type="text" class="h-6 w-48" />
-              <OSkeleton class="h-8 w-full" />
-              <OSkeleton v-for="n in 8" :key="n" class="h-9 w-full" />
-            </div>
-          </div>
-        </main>
-
-        <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
-        <aside
-          v-if="!focusMode"
-          v-show="store.state.isAiChatEnabled && isLoading && !store.state.kioskMode"
-          class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper shrink-0 overflow-y-auto"
-          :class="[
-            isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
-            { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
-            // The chat is a floating card in both modes — match the main content
-            // card's right/bottom gap (+ rounded-surface corners) so they read as
-            // the same card. Expanding only widens it; it never overlays the header.
-            'pe-2 pb-2',
-            isChatOverlay
-              ? 'fixed inset-x-0 bottom-0 z-50 ps-2'
-              : 'sticky top-[var(--navbar-height,2.25rem)] self-start',
-          ]"
-          :style="[
-            {
-              height: 'calc(100vh - var(--navbar-height, 2.25rem))',
-              maxWidth: '100%',
-            },
-            isChatOverlay
-              ? { width: '100%', top: 'var(--navbar-height, 2.25rem)' }
-              : // Full-screen just widens the panel (25% → 50%) beside the content —
-                // same top position + height, so the main header stays visible.
-                store.state.isAiChatExpanded
-                ? { width: '50%', minWidth: '18.75rem' }
-                : { width: '25%', minWidth: '4.688rem' },
-          ]"
-        >
-          <O2AIChat
-            :header-height="40"
-            :is-open="store.state.isAiChatEnabled"
-            @close="closeChat"
-            :aiChatInputContext="aiChatInputContext"
-            :appendMode="aiChatAppendMode"
-            :aiChatPayload="aiChatPayload"
-          />
-        </aside>
+            <O2AIChat
+              :header-height="40"
+              :is-open="store.state.isAiChatEnabled"
+              @close="closeChat"
+              :aiChatInputContext="aiChatInputContext"
+              :appendMode="aiChatAppendMode"
+              :aiChatPayload="aiChatPayload"
+            />
+          </aside>
+        </div>
       </div>
     </div>
 
@@ -290,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { configFullQuery } from "@/services/config.queries";
 import { orgSettingsQuery } from "@/services/organizations.queries";
-import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
+import OSidebar from "@/lib/core/Navbar/OSidebar.vue";
 import { useRouteEnterFade } from "@/layouts/useRouteEnterFade";
 import { PAGE_ENTRANCE_KEY } from "@/lib/core/PageLayout/pageEntrance";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
@@ -395,7 +394,6 @@ import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vu
 import PasswordExpiryBanner from "@/components/common/PasswordExpiryBanner.vue";
 import LicenseExpiryBanner from "@/enterprise/components/billings/LicenseExpiryBanner.vue";
 import LicenseSearchBanner from "@/enterprise/components/billings/LicenseSearchBanner.vue";
-import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
 import {
@@ -432,7 +430,7 @@ export default defineComponent({
     LicenseExpiryBanner,
     "keep-alive": KeepAlive,
     OAccessBoundary,
-    ONavbar,
+    OSidebar,
     "router-view": RouterView,
     SlackIcon,
     ManagementIcon,
@@ -519,7 +517,6 @@ export default defineComponent({
       entering: routeEntering,
     } = useRouteEnterFade(router, KEPT_ALIVE_VIEWS);
     provide(PAGE_ENTRANCE_KEY, routeEntering);
-    const miniMode = ref(false);
     const signOutDraftsOpen = ref(false);
     const signOutDraftCount = ref(0);
     const { isMobile, lgUp } = useBreakpoint();
@@ -546,10 +543,8 @@ export default defineComponent({
     const { getStreams, resetStreams } = useStreams(t);
     useSearchWebSocket();
     const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
-    const { prefetchRoute } = useRoutePrefetch();
 
     const isMonacoEditorLoaded = ref(false);
-    const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const aiChatAppendMode = ref(true);
     const aiChatPayload = ref<{
@@ -887,9 +882,9 @@ export default defineComponent({
     const announcementBarRef = ref<HTMLElement | null>(null);
     let announcementBarObserver: ResizeObserver | null = null;
 
+    // The actions row is 48px (Header.vue h-12).
     const setNavbarHeight = (barHeightPx: number) => {
-      const barHeightRem = barHeightPx / 16;
-      document.documentElement.style.setProperty("--navbar-height", `${2.5 + barHeightRem}rem`);
+      document.documentElement.style.setProperty("--navbar-height", `${3 + barHeightPx / 16}rem`);
     };
 
     // a sign-up that never reaches onboarding still sends its one attribution event: its pick, or skipped
@@ -1412,6 +1407,7 @@ export default defineComponent({
       }
     };
 
+    // Mirrors the header selector: stage the pick, then switch.
     const verifyStreamExist = async (selectedOrgData: any) => {
       // getStreams reads the store's org when it starts, so the list belongs to that org even if the selection moves on
       const listOrg: string = store.state.selectedOrganization?.identifier ?? "";
@@ -1839,7 +1835,6 @@ export default defineComponent({
     };
 
     const expandMenu = () => {
-      // miniMode.value = false;
       if (!isMonacoEditorLoaded.value) prefetch();
     };
 
@@ -1876,17 +1871,6 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
-    const getBtnLogo = computed(() => {
-      if (isDark.value) {
-        return getImageURL("images/common/ai_icon_dark.svg");
-      }
-
-      if (isHovered.value) {
-        return getImageURL("images/common/ai_icon_dark.svg");
-      }
-
-      return getImageURL("images/common/ai_icon_gradient.svg");
-    });
     /** `value` is a query string or `{ query, autoSend?, chipName?, newChat?, context? }`; a chip never auto-sends. */
     const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
       const wasOpen = store.state.isAiChatEnabled;
@@ -1943,14 +1927,6 @@ export default defineComponent({
 
     const openPredefinedThemes = () => {
       toggleThemes();
-    };
-
-    /**
-     * Prefetch route module on menu hover
-     * @param routePath - The route path from the menu link
-     */
-    const handleMenuHover = (routePath: string) => {
-      prefetchRoute(routePath);
     };
 
     // Sync the user-clicked org with the selected org
@@ -2034,7 +2010,6 @@ export default defineComponent({
       focusMode,
       holdForOnboarding,
       isChatOverlay,
-      miniMode,
       mobileNavOpen,
       user,
       zoBackendUrl,
@@ -2057,8 +2032,6 @@ export default defineComponent({
       splitterModel,
       toggleAIChat,
       closeChat,
-      getBtnLogo,
-      isHovered,
       sendToAiChat,
       aiChatInputContext,
       aiChatAppendMode,
@@ -2072,7 +2045,6 @@ export default defineComponent({
       showShortcuts,
       openShortcutsList,
       isPredefinedThemesOpen,
-      handleMenuHover,
     };
   },
   computed: {

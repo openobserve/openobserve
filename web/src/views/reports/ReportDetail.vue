@@ -18,11 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     :title="notFound ? t('reports.history.notFoundTitle') : raw(report?.name || '')"
     icon="description"
-    :subtitle="subtitle"
     :back="backTarget"
     title-data-test="reports-reportdetail-title"
     bleed
-    tabs-below
   >
     <template #title-trail>
       <div v-if="report" class="flex items-center gap-2">
@@ -166,8 +164,7 @@ import ReportRunNowDialog from "@/components/reports/ReportRunNowDialog.vue";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { reportByIdQuery } from "@/services/reports.queries";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { formatTimestampInTimezone } from "@/utils/date";
-import { RUN_TIME_FORMAT, isOverdue, lastRunChip } from "@/utils/reports/reportRun";
+import { isOverdue, lastRunChip } from "@/utils/reports/reportRun";
 
 const { t } = useI18nTyped();
 const route = useRoute();
@@ -223,28 +220,6 @@ const frequencyText = computed<I18nText>(() => {
     default:
       return t("reports.history.everyDays", { count: n }, n);
   }
-});
-
-const subtitle = computed<I18nText>(() => {
-  const r = report.value;
-  if (!r) return raw("");
-  const tz = r.timezone || "UTC";
-  const parts: string[] = [`${frequencyText.value} (${tz})`];
-  if (r.next_run_at && r.enabled) {
-    parts.push(
-      t("reports.history.nextRunAt", {
-        time: raw(formatTimestampInTimezone(r.next_run_at, RUN_TIME_FORMAT, tz)),
-      }),
-    );
-  }
-  const dashboards = r.dashboards?.length ?? 0;
-  parts.push(t("reports.history.dashboardCount", { count: dashboards }, dashboards));
-  if (!isCached.value) {
-    const count = recipients.value.length;
-    parts.push(t("reports.history.recipientCount", { count }, count));
-  }
-  if (attachmentType.value) parts.push(attachmentType.value.toUpperCase());
-  return raw(parts.join(" · "));
 });
 
 const backTarget = computed(() => ({

@@ -94,13 +94,13 @@ export type ButtonSize =
   | "icon-lg"
   | "icon-circle"
   | "icon-circle-sm"
-  // 30×30px square — matches toolbar icon button height (share/hamburger/auto-refresh)
+  // 28px square twin of sm-toolbar
   | "icon-toolbar"
   // 26px rounded-default — compact modern icon button for panel header collapse/expand
   | "icon-panel"
   // Tall narrow vertical rectangle — 32×20px for splitter collapse/expand buttons
   | "sidebar-button"
-  // 30px labeled button — matches toolbar icon height for labeled outline toolbar buttons
+  // 28px labeled toolbar button (the sm box)
   | "sm-toolbar"
   | "xs-grouped"
   // Chip with fixed 12px font — for dashboard query builder axis field chips

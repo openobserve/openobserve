@@ -147,83 +147,20 @@ export const NAV_GROUPS: NavGroupDef[] = [
     key: "reliability",
     titleKey: "menu.reliability",
     icon: "shield",
-    parentLink: "/alerts",
-    absorbs: ["alertList", "sloList", "incidentList", "downtimes", "onCallResponses"],
+    parentLink: "/slos",
+    // Alerts and Incidents are top-level rows of their own; Reliability keeps the rest of the response workflow.
+    absorbs: ["sloList", "downtimes", "onCallResponses"],
+    // Its anchors are all optional, so it must not depend on absorbing one to exist.
+    standalone: true,
     children: [
-      // ── Alerts ──────────────────────────────────────────────────────────
-      // These four are the alerting cluster, and they carry a peer tab strip
-      // (AlertSectionTabs) on every one of their pages. Same ORDER and same
-      // LABEL in both — a rail that disagreed with the tabs would make the
-      // two feel like different places.
-      //
-      // Destinations and Templates moved out of Settings: they are alerting
-      // configuration, not deployment configuration. None of the three have a
-      // rail entry of their own, so they ride on Alerts being present —
-      // hiding `alertList` via custom_hide_menus takes its plumbing with it.
-      // "All Alerts", not "Alerts": it sits directly under an "Alerts" header,
-      // and a row repeating its own header names nothing. The peer tab uses the
-      // same string for the same reason — the page title above it says "Alerts".
-      {
-        titleKey: "alerts.allAlerts",
-        icon: "shield-alert-outline",
-        name: "alertList",
-        requires: "alertList",
-        categoryKey: "menu.alerts",
-        feature: "alerts",
-      },
-      {
-        titleKey: "alert_destinations.header",
-        icon: "location-on",
-        name: "alertDestinations",
-        requires: "alertList",
-        categoryKey: "menu.alerts",
-        feature: "alerts",
-      },
-      {
-        titleKey: "alert_templates.header",
-        icon: "description",
-        name: "alertTemplates",
-        requires: "alertList",
-        categoryKey: "menu.alerts",
-        feature: "alerts",
-      },
-      // The curated catalog you add alerts FROM — gated the same way, so
-      // hiding Alerts hides the place to get more. Last, like its tab: you go
-      // looking for it once, then work in the other three.
-      {
-        titleKey: "alert_library.header",
-        icon: "menu-book",
-        name: "alertLibrary",
-        requires: "alertList",
-        categoryKey: "menu.alerts",
-        feature: "alerts",
-      },
-      // Gated on incidentList, not alertList: external alerts only matter where Incidents is enabled.
-      {
-        titleKey: "alert_sources.header",
-        icon: "webhook",
-        name: "alertSources",
-        requires: "incidentList",
-        categoryKey: "menu.alerts",
-        feature: "incidents",
-      },
       // Response, not Alerts: these are what alerts burn against or escalate into; each `requires` so hiding one shrinks the group.
+      // Headless, so the Response heading below holds only beta items and carries the one BETA badge.
       {
         titleKey: "menu.slos",
         icon: "target",
         name: "sloList",
-        categoryKey: "menu.response",
         requires: "sloList",
         feature: "anomaly_detection",
-      },
-      {
-        titleKey: "menu.incidents",
-        icon: "notifications-active",
-        name: "incidentList",
-        categoryKey: "menu.response",
-        requires: "incidentList",
-        gate: "incidents",
-        feature: "incidents",
       },
       {
         titleKey: "menu.downtimes",
@@ -515,6 +452,60 @@ export const NAV_GROUPS: NavGroupDef[] = [
  * Service Graph carries the same enterprise gate as its in-page tab.
  */
 export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
+  alertList: [
+    // ── Alerts ──────────────────────────────────────────────────────────
+    // These four are the alerting cluster, and they carry a peer tab strip
+    // (AlertSectionTabs) on every one of their pages. Same ORDER and same
+    // LABEL in both — a rail that disagreed with the tabs would make the
+    // two feel like different places.
+    //
+    // Destinations and Templates moved out of Settings: they are alerting
+    // configuration, not deployment configuration. None of the three have a
+    // rail entry of their own, so they ride on Alerts being present —
+    // hiding `alertList` via custom_hide_menus takes its plumbing with it.
+    // "All Alerts", not "Alerts": it sits directly under an "Alerts" header,
+    // and a row repeating its own header names nothing. The peer tab uses the
+    // same string for the same reason — the page title above it says "Alerts".
+    {
+      titleKey: "alerts.allAlerts",
+      icon: "shield-alert-outline",
+      name: "alertList",
+      requires: "alertList",
+      feature: "alerts",
+    },
+    {
+      titleKey: "alert_destinations.header",
+      icon: "location-on",
+      name: "alertDestinations",
+      requires: "alertList",
+      feature: "alerts",
+    },
+    {
+      titleKey: "alert_templates.header",
+      icon: "description",
+      name: "alertTemplates",
+      requires: "alertList",
+      feature: "alerts",
+    },
+    // The curated catalog you add alerts FROM — gated the same way, so
+    // hiding Alerts hides the place to get more. Last, like its tab: you go
+    // looking for it once, then work in the other three.
+    {
+      titleKey: "alert_library.header",
+      icon: "menu-book",
+      name: "alertLibrary",
+      requires: "alertList",
+      feature: "alerts",
+    },
+    // Gated on incidentList, not alertList: external alerts only matter where Incidents is enabled.
+    {
+      titleKey: "alert_sources.header",
+      icon: "webhook",
+      name: "alertSources",
+      requires: "incidentList",
+      feature: "incidents",
+    },
+  ],
   traces: [
     {
       titleKey: "traces.spansTab",
@@ -614,7 +605,9 @@ export function groupNavLinks(
   }
 
   const entryFor = (item: NavItem): RailEntry => {
-    const subnav = NAV_SUBNAV[item.name];
+    const subnav = NAV_SUBNAV[item.name]?.filter(
+      (c) => (!c.requires || presentNames.has(c.requires)) && (!c.gate || gateOpen(c.gate)),
+    );
     if (subnav && subnav.length > 0) {
       return { type: "linkGroup", item, children: subnav };
     }

@@ -18,13 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="enrichment-tables-list-page" class="flex h-full min-h-0 flex-col">
-    <OPageLayout
-      :title="t('function.enrichmentTables')"
-      icon="dataset"
-      :subtitle="t('function.enrichmentTablesSubtitle')"
-      tabs-below
-      bleed
-    >
+    <OPageLayout :title="t('function.enrichmentTables')" icon="dataset" bleed>
       <template #header-tabs>
         <PipelineSectionTabs />
       </template>

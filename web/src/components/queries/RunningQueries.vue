@@ -15,13 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    v-if="isMetaOrg"
-    :title="t('settings.queryManagement')"
-    icon="query-stats"
-    :subtitle="t('settings.queryManagementDesc')"
-    bleed
-  >
+  <OPageLayout v-if="isMetaOrg" :title="t('settings.queryManagement')" icon="query-stats" bleed>
     <!-- One toolbar row needs desktop width; below lg the filters keep their own row. -->
     <template v-if="!lgUp" #subnav>
       <div class="px-page-edge py-2">

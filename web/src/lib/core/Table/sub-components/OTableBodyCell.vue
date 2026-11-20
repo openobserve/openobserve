@@ -489,6 +489,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
           : isAction
             ? 'overflow-clip whitespace-nowrap [overflow-clip-margin:0.25rem] has-[:focus-visible]:z-2!'
             : 'overflow-hidden text-ellipsis whitespace-nowrap',
+      meta?.mono ? 'font-mono text-xs' : '',
       meta?.cellClass ?? '',
       isTreeColumn ? 'relative' : '',
       enableCellCopy ? 'group/cell' : '',

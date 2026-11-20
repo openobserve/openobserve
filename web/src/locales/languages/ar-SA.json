@@ -1427,6 +1427,8 @@
     "selectOrganization": "يرجى اختيار مؤسسة"
   },
   "search": {
+    "liveRefreshingEvery": "Live: refreshing every {interval}",
+    "rowsPerPageLabel": "{n} / page",
     "queryFailed": "فشل الاستعلام",
     "unknownError": "خطأ غير معروف",
     "selectedLabel": "مختار",
@@ -2080,7 +2082,6 @@
   "menu": {
     "alertCalibration": "معايرة التنبيهات",
     "autoobserve": "AutoObserve",
-    "upgradeToProPlan": "الترقية إلى خطة PRO",
     "home": "الرئيسية",
     "about": "حول",
     "index": "التدفقات",
@@ -2139,7 +2140,6 @@
   },
   "profiles": {
     "title": "التوصيف",
-    "subtitle": "تتبّع استخدام المعالج والذاكرة والأقفال حسب الدالة",
     "stream": "الجدول",
     "dataSource": "مصدر البيانات",
     "service": "الخدمة",
@@ -2290,7 +2290,6 @@
     "from": "من",
     "to": "إلى",
     "title": "مراقبة المستخدمين الحقيقيين",
-    "subtitle": "مراقبة جلسات المستخدم الحقيقي، والأخطاء، وأداء الواجهة الأمامية",
     "issueColumn": "الذرية",
     "trendColumn": "الاتجاه",
     "usersColumn": "المستخدمون",
@@ -3330,7 +3329,6 @@
         "bulkDeleteMessage": "حذف {count} حدث مسمّى؟ ستعرض القمع التي تستخدمه وسم خطوة محذوفة. | حذف {count} من الأحداث المسمّاة؟ ستعرض القمع التي تستخدمها وسم خطوة محذوفة.",
         "bulkDeleteInUseMessage": "حذف {count} حدث مسمّى؟ ستعرض القمعات المحفوظة خطوة حدث محذوف لـ: {names}. | حذف {count} من الأحداث المسمّاة؟ ستعرض القمعات المحفوظة خطوة حدث محذوف لـ: {names}.",
         "notFound": "هذا الحدث المسمّى لم يعد موجودًا",
-        "editorApp": "التطبيق: {app}",
         "details": "التفاصيل",
         "opParam": "معامل URL",
         "opRef": "مضيف المرجع",
@@ -4009,11 +4007,6 @@
     "license_downgrade_limit": "سينتقل الحد اليومي من {old} إلى {new}",
     "license_downgrade_expiry": "سينتقل تاريخ الانتهاء من {old} إلى {new}",
     "license_limit_per_day": "{gb} GB/يوم",
-    "header_button": {
-      "cloud_features": "{product} الميزات",
-      "enterprise_edition": "الطبعة: إنتربرايز",
-      "get_enterprise_free": "احصل على OpenObserve إنتربرايز (مجاني)"
-    },
     "enterprise_offer": {
       "cloud": {
         "hero_title": "ميزات المؤسسات",
@@ -4208,7 +4201,14 @@
     "usageChartDate": "{month} {day}",
     "usageChartDay": "اليوم {day}",
     "usageChartUsage": "الاستخدام: {value}",
-    "startFreeTrial": "ابدأ التجربة المجانية"
+    "startFreeTrial": "ابدأ التجربة المجانية",
+    "header_button": {
+      "upgrade": "Upgrade",
+      "enterprise_tooltip": "About {product} — Enterprise edition",
+      "cloud_features": "{product} الميزات",
+      "enterprise_edition": "الطبعة: إنتربرايز",
+      "get_enterprise_free": "احصل على OpenObserve إنتربرايز (مجاني)"
+    }
   },
   "login": {
     "lockedOut": "محاولات تسجيل دخول فاشلة كثيرة جدًا. حاول مرة أخرى خلال {duration}، أو تواصل مع المسؤول لديك.",
@@ -4384,7 +4384,6 @@
     "nameInvalid": "استخدم أحرف صغيرة، أرقام، وشرطات (-) (على ألا يتجاوز عدد الأحرف {max})",
     "createFailed": "فشل إنشاء حساب الخدمة. يرجى المحاولة مرة أخرى.",
     "updateFailed": "فشل تحديث حساب الخدمة. يرجى المحاولة مرة أخرى.",
-    "headerSubtitle": "رموز الوصول البرمجية للواجهات البرمجية",
     "search": "البحث في حسابات الخدمة",
     "rotate": "تدوير الرمز",
     "deleteServiceAccount": "حذف حساب الخدمة",
@@ -4477,7 +4476,6 @@
     "mcpServerLabel": "خادم MCP",
     "mcpServerDesc": "ربط عملاء الذكاء الاصطناعي عبر {product}",
     "mcpServerHeader": "خادم MCP",
-    "mcpServerHeaderSubtitle": "اربط Claude وCursor وVS Code وعملاء الذكاء الاصطناعي الآخرين بهذه المؤسسة.",
     "invitationsDesc": "الدعوات المعلقة والمرسلة للأعضاء",
     "groupsDesc": "تجميع المستخدمين لتعيين الأدوار",
     "rolesDesc": "تحديد الأذونات وسياسات الوصول",
@@ -4910,7 +4908,6 @@
       "other": "أخرى"
     },
     "invitationList": {
-      "subtitle": "الدعوات المعلقة والمرسلة للأعضاء",
       "loadingPending": "جاري تحميل الدعوات المعلقة...",
       "failedLoadPending": "فشل تحميل الدعوات المعلقة",
       "accepting": "قبول الدعوة...",
@@ -4964,7 +4961,6 @@
       "errorCreating": "خطأ أثناء إنشاء المجموعة"
     },
     "quotaPage": {
-      "subtitle": "حدود الاستخدام المفروضة لكل دور",
       "selectOrganization": "اختر مؤسسة",
       "editQuota": "تعديل الحصة",
       "selectApiCategory": "اختر فئة API",
@@ -5091,7 +5087,6 @@
       "brand": "أزرق جريء"
     },
     "list": {
-      "subtitle": "إشعارات تُعرض في أعلى التطبيق لكل المؤسسات، أو فقط تلك التي تختارها.",
       "liveNow": "مباشر الآن",
       "liveNowEmpty": "لا توجد لافتة معروضة الآن.",
       "liveOnlyFor": "فقط لـ {orgs}",
@@ -5301,7 +5296,6 @@
     },
     "deleteField": "حذف الحقل",
     "header": "التدفقات",
-    "subtitle": "إدارة الفهرس وتكوين التدفق",
     "streamNameHelpText": "استخدم الحروف الأبجدية الرقمية، والخط السفل، والنقطتين فقط.",
     "search": "البحث في التدفقات",
     "emptyOr": "أو:",
@@ -5392,7 +5386,6 @@
   },
   "workflow": {
     "header": "سير العمل",
-    "subtitle": "أتمتة الإجراءات باستخدام المحفزات، المنطق، والوجهات",
     "create": "سير عمل جديد",
     "createSuccess": "تم إنشاء سير العمل بنجاح",
     "name": "اسم سير العمل",
@@ -6304,7 +6297,6 @@
     "functionName": "اسم الدالة",
     "remoteDestination": "وجهة بعيدة",
     "failedToLoadPipeline": "فشل تحميل مسار المعالجة",
-    "subtitle": "تحويل وثراء ومسار البيانات أثناء الطيران",
     "deleteNode": "حذف",
     "addPipeline": "مسار معالجة جديد",
     "deletePipeline": "حذف مسار المعالجة",
@@ -6553,7 +6545,6 @@
     "order": "الترتيب",
     "applyBeforeFlattening": "تطبيق قبل التسطيح",
     "header": "الدوال",
-    "subtitle": "دوال VRL القابلة لإعادة الاستخدام المطبقة في مسارات المعالجة",
     "clickTestFunctionHint": "يرجى النقر على اختبار الدالة لرؤية الأحداث",
     "add": "دالة جديدة",
     "search": "البحث في الدوال",
@@ -6577,7 +6568,6 @@
     "enterFunctionPrompt": "أدخل رسالة لتوليد الدالة",
     "associatedFunctionHeader": "الدوال المرتبطة",
     "enrichmentTables": "جداول الإثراء",
-    "enrichmentTablesSubtitle": "جداول البحث التي تثري البيانات المدمجة",
     "addEnrichmentTable": "جدول إثراء جديد",
     "updateEnrichmentTable": "تحديث جدول الإثراء",
     "searchEnrichmentTable": "البحث في جداول الإثراء",
@@ -10236,7 +10226,6 @@
     "publicLinks": {
       "panelTitle": "الروابط العامة",
       "pageTitle": "لوحات المعلومات العامة",
-      "pageSubtitle": "كل رابط عام في هذه المؤسسة",
       "panelTitleFor": "الروابط العامة — {name}",
       "intro": "يمكن لأي شخص لديه رابط عام عرض لوحة المعلومات هذه دون تسجيل الدخول.",
       "editNote": "يبقى عنوان الرابط كما هو. تظهر التغييرات على الصفحة العامة عند تحديثها التالي.",
@@ -10623,7 +10612,6 @@
     "tabOverview": "نظرة عامة",
     "tabUsage": "الاستخدام",
     "removeHomeDashboard": "إزالة لوحة المعلومات الرئيسية",
-    "subtitle": "مساحة عمل الملاحظة الخاصة بك من النظرة الأولى",
     "resources": "الموارد",
     "explore": "استكشاف"
   },
@@ -11565,7 +11553,6 @@
   },
   "alertCalibration": {
     "title": "معايرة التنبيهات",
-    "subtitle": "كيف تتصرف تنبيهاتك، استنادًا إلى سجل تشغيلها الخاص",
     "configure": "تهيئة",
     "runNow": "تشغيل الآن",
     "runNowHint": "يطلب تشغيلًا الآن بدلًا من انتظار التشغيل التالي. إذا كان هناك تشغيل مستحق أو قيد التنفيذ بالفعل، فسيستجيب للطلب بدلًا من ذلك.",
@@ -11987,7 +11974,6 @@
     "detail": {
       "title": "موجز {time}",
       "titleLoading": "موجز",
-      "subtitle": "يغطي من {start} إلى {end}، وتم إنشاؤه في {time}",
       "back": "الموجزات",
       "unavailableTitle": "الموجز غير متاح",
       "noRecords": "لم يُعثر على أي سجلات لهذا التشغيل.",
@@ -12793,7 +12779,6 @@
       "commentPlaceholder": "اكتب تعليقا...",
       "sendComment": "أرسل تعليقا",
       "title": "الحوادث",
-      "subtitle": "إدارة الحوادث وتتبعها",
       "search": "البحث في الحوادث...",
       "status": "الحالة",
       "severity": "الخطورة",
@@ -14244,7 +14229,6 @@
       "firingTotal": "قيد الإطلاق",
       "observedTotal": "المجموعات",
       "nOfMFiring": "المجموعات قيد الإطلاق: {firing} من أصل {observed}",
-      "groupedBy": "مجمعة حسب {columns}",
       "groupBy": "التجميع حسب",
       "criticalCondition": "الشرط الحرج",
       "warningCondition": "شرط التحذير",
@@ -14591,7 +14575,6 @@
         "startDateRequired": "اختر اليوم الأول."
       },
       "title": "فترات الصيانة",
-      "subtitle": "نوافذ مجدولة تُبقي التنبيهات واكتشافات الشذوذ والفحوصات الاصطناعية قيد التشغيل لكنها توقف إشعاراتها",
       "newDowntime": "فترة صيانة جديدة",
       "filterAll": "الكل",
       "filterOnce": "لمرة واحدة",
@@ -15507,7 +15490,6 @@
   },
   "alert_sources": {
     "header": "مصادر تنبيه خارجية",
-    "subtitle": "أرسل تنبيهات من Grafana أو Prometheus Alertmanager أو أي أداة يمكنها استدعاء webhook — ستظهر هنا ويتم ربطها تلقائيا بالحوادث.",
     "acceptsAnyFormat": "يقبل أي صيغة ويب هوك",
     "revealToken": "كشف الرابط الكامل",
     "hideToken": "إخفاء الرابط الكامل",
@@ -16628,9 +16610,6 @@
     "modelPricingEditor": {
       "copySuffix": " (نسخة)"
     },
-    "modelPricingList": {
-      "subtitle": "تكوين تكلفة نموذج LLM"
-    },
     "orgStorageSettings": {
       "subtitle": "خزّن بيانات هذه المؤسسة في حاوية تملكها",
       "awsCredentials": "بيانات اعتماد AWS",
@@ -16665,9 +16644,6 @@
       "settingsUpdated": "تم تحديث إعدادات المؤسسة بنجاح",
       "settingsSaveError": "إعدادات المؤسسة في حفظ الخطأ"
     },
-    "aiToolsetsPage": {
-      "subtitle": "تكوين تكاملات أدوات الذكاء الاصطناعي"
-    },
     "cipherKeysPage": {
       "subtitle": "مفاتيح تشفّر قيم الحقول الحساسة وتفك تشفيرها",
       "delete": "حذف",
@@ -16684,15 +16660,11 @@
       "bulkDeleteFailed": "فشل في حذف مفتاح التشفير {count} | فشل في حذف مفاتيح التشفير {count}",
       "bulkDeleteError": "خطأ أثناء حذف مفاتيح التشفير"
     },
-    "correlationSettingsPage": {
-      "subtitle": "تكوين الارتباط عن بعد"
-    },
     "licensePage": {
       "unexpectedError": "خطأ غير متوقع",
       "daysRemaining": "الأيام المتبقية حتى تنتهي صلاحية رخصتك: {days}"
     },
     "nodesPage": {
-      "subtitle": "عقد العنقود وصحتها",
       "to": "إلى",
       "name": "الاسم",
       "loadingData": "يرجى الانتظار أثناء تحميل البيانات...",
@@ -16780,7 +16752,6 @@
       "processingTrialExtension": "يرجى الانتظار أثناء معالجة طلب تمديد فترة التجربة...",
       "trialExtendedSuccess": "تم تمديد فترة التجربة بنجاح.",
       "extendTrialError": "فشل في تمديد فترة التجربة. يرجى المحاولة مرة أخرى.",
-      "subtitle": "إنشاء وإدارة المؤسسات",
       "addContract": "إضافة عقد",
       "extendTrialTitle": "تمديد الفترة التجريبية لـ {name}",
       "extendTrialSubtitle": "حدد فترة تمديد التجربة الجديدة.",
@@ -16994,7 +16965,6 @@
         "valueMismatch": "تم العثور على سجل TXT، لكن القيمة غير مطابقة",
         "dnsFailed": "فشل تحليل DNS"
       },
-      "pageSubtitle": "اربط نطاقات بريدك الإلكتروني، وعيّن مستخدميها للمؤسسات، وتحكم في من يمكنه الانضمام منها.",
       "linkedTab": "النطاقات المرتبطة",
       "mappingsTab": "التعيينات",
       "accessTab": "المستخدمون المحظورون",
@@ -17117,7 +17087,6 @@
       "lastRun": "آخر تشغيل",
       "lastRunAt": "وقت التشغيل",
       "nextRun": "التشغيل التالي",
-      "nextRunAt": "التشغيل التالي {time}",
       "acceptedTooltip": "قبله خادم البريد",
       "cachedTooltip": "تم تجهيز ذاكرة التخزين المؤقت للوحة؛ لا يُرسل بريد",
       "unrecordedTooltip": "لم يتم تسجيل نتيجة آخر تشغيل؛ قد تتوفر عمليات تشغيل أقدم في السجل.",
@@ -17191,9 +17160,7 @@
       "everyHours": "كل ساعة | كل {count} ساعات",
       "everyDays": "كل يوم | كل {count} أيام",
       "everyWeeks": "كل أسبوع | كل {count} أسابيع",
-      "everyMonths": "كل شهر | كل {count} أشهر",
-      "dashboardCount": "{count} لوحة | {count} لوحات",
-      "recipientCount": "{count} مستلم | {count} مستلمين"
+      "everyMonths": "كل شهر | كل {count} أشهر"
     },
     "frequencyUnits": {
       "days": "أيام",
@@ -17221,7 +17188,6 @@
     "never": "أبدا",
     "startDate": "تاريخ البدء",
     "header": "التقارير",
-    "subtitle": "التقارير المجدولة والتصديرات",
     "searchThisFolder": "هذا المجلد",
     "searchAllFolders": "جميع المجلدات",
     "reloadReports": "إعادة تحميل التقارير",
@@ -18977,7 +18943,6 @@
     },
     "unpriced": {
       "title": "فجوات التسعير",
-      "subtitle": "النماذج في تتبعات LLM الخاصة بك التي لم يكن لها سعر، أو كان لها سعر تقريبي فقط، عند الاستيعاب",
       "banner": "لم يكن لـ{count} نموذج سعر أو كان له سعر تقريبي عند الاستيعاب. قد تكون تكلفته المسجلة غير مكتملة. | لم يكن لـ{count} من النماذج سعر أو كان لها سعر تقريبي عند الاستيعاب. قد تكون تكاليفها المسجلة غير مكتملة.",
       "bannerTruncated": "{total} من النماذج في تتبعاتك لم يكن لها سعر أو كان لها سعر تقريبي عند الاستيعاب. قد تكون تكلفتها غير صحيحة. يتم عرض أعلى {shown} حسب الرموز.",
       "streamLabel": "التدفق",
@@ -19098,7 +19063,6 @@
       "tools": "الأدوات"
     },
     "promptManagement": {
-      "subtitle": "إنشاء موجّهات قابلة لإعادة الاستخدام، وإصدار نسخها، ونشرها.",
       "promptSubtitle": "موجّه {type}",
       "prompt": "موجّه",
       "promptId": "معرّف الموجّه",
@@ -19538,7 +19502,6 @@
         }
       },
       "workbench": {
-        "subtitle": "{reviewed} من {total} تمت مراجعته",
         "itemCounter": "{index} البند {total} للمراجعة",
         "prev": "البند السابق",
         "next": "البند التالي",
@@ -20018,7 +19981,6 @@
       },
       "detail": {
         "fallbackTitle": "مجموعة البيانات",
-        "meta": "العناصر: {count} · تحديث {updated}",
         "loadError": "فشل في تحميل مجموعة البيانات",
         "tryInPlayground": "جرّب في Playground",
         "tabs": {
@@ -20981,7 +20943,6 @@
       "backTo": "المزوّدون",
       "createTitle": "إنشاء مزود LLM",
       "editTitle": "تعديل مزود LLM",
-      "subtitle": "اضبط نقطة نهاية النموذج التي تستخدمها أدوات تقييم LLM judge.",
       "sectionTitle": "المزود",
       "nameLabel": "الاسم",
       "typeLabel": "نوع المزود",
@@ -22944,9 +22905,7 @@
       "usedBy": {
         "aria": "الاختبارات التي تستخدم هذا الاختبار",
         "help": "تشغّل هذه الخطوات في صفحتها الخاصة. لا يُستخدم هناك عنوان URL البدء الخاص بهذا الاختبار ولا بيئاته ولا أسراره.",
-        "viewAll": "عرض كل الاختبارات ({count})",
-        "subtitle": "{folder} · يستخدمه {count} اختبار | {folder} · يستخدمه {count} من الاختبارات",
-        "subtitleNoFolder": "يستخدمه {count} اختبار | يستخدمه {count} من الاختبارات"
+        "viewAll": "عرض كل الاختبارات ({count})"
       },
       "recordingIn": "التسجيل في {environment}",
       "needsDesktopRecorder": "يتطلب إضافة مسجّل سطح المكتب",
@@ -23157,7 +23116,6 @@
       "folder": "المجلد",
       "willBeCreatedIn": "سيتم إنشاؤه في"
     },
-    "pageSubtitle": "مراقبة وقت التشغيل والأداء ورحلات المستخدم من المواقع العالمية بشكل استباقي",
     "pageTitle": "المراقبة الاصطناعية",
     "protocolConfig": {
       "http": {
@@ -25190,7 +25148,6 @@
     "title": "SLOs",
     "notFound": "لم يتم العثور على SLO",
     "notFoundDescription": "هذا الهدف لم يعد موجودًا، أو ليس لديك حق الوصول إليه. قد يكون تم حذفه.",
-    "subtitle": "أهداف مستوى الخدمة: الأهداف، ميزانيات الأخطاء، تنبيهات معدل الاستهلاك",
     "new": "هدف خدمة جديد",
     "newTitle": "هدف خدمة جديد",
     "editTitle": "تحرير هدف الخدمة",
@@ -25208,7 +25165,6 @@
     "totalSlos": "إجمالي أهداف الخدمة",
     "noGrouping": "لا شيء (سلسلة كلية واحدة)",
     "newAlert": "تنبيه جديد",
-    "overRolling": "على مدى {window} المتجدد",
     "searchPlaceholder": "ابحث عن هدف الخدمة أو الوسم، مثل team:payments",
     "loadFailed": "تعذر تحميل أهداف الخدمة",
     "requestFailed": "فشل الطلب ({code})",
@@ -26318,7 +26274,6 @@
       "groupWorkloads": "أحمال العمل",
       "groupStorage": "التخزين",
       "groupAutoscaling": "التوسيع التلقائي",
-      "subtitle": "راقب العناقيد وأحمال العمل والموارد",
       "clusterPickerLabel": "العنقود",
       "clusterPickerLoading": "جارٍ تحميل العناقيد…",
       "clusterPickerTrigger": "العنقود: {name}",
@@ -26776,8 +26731,7 @@
       "actions": "الإجراءات"
     },
     "header": {
-      "title": "قواعد البيانات",
-      "subtitle": "استعلام الأداء والصحة عبر قواعد بياناتك"
+      "title": "قواعد البيانات"
     },
     "ai": {
       "suggestFix": "اسأل الذكاء الاصطناعي كيف يصلح هذا",
@@ -28042,7 +27996,6 @@
     "fromRotation": "من {name}",
     "ownershipMatch": "مطابق",
     "ownershipSpecificity": "الأبعاد",
-    "teamSubtitle": "{tz} · {count} عضو | {tz} · الأعضاء: {count}",
     "statOnCallNow": "المناوب الآن",
     "statRotations": "الدورات",
     "statRoutingRules": "قواعد التوجيه",
@@ -29043,7 +28996,6 @@
     "teamOpenInOnCall": "عرض الكل في المناوبة",
     "teamCoverage": "التغطية، الأيام الـ {days} القادمة",
     "teamCoverageHint": "الفجوات هي الشيء الوحيد الجدير بالنظر هنا",
-    "teamOwnsRules": "يملك {count} قاعدة توجيه | يملك {count} من قواعد التوجيه",
     "teamCoveredNow": "مُغطّى الآن",
     "teamOverview": "نظرة عامة",
     "teamAnsweredBy": "الرد بواسطة",
@@ -29736,7 +29688,6 @@
       "allClearNone": "لم يتطلب أي شيء تدخلك."
     },
     "title": "AutoObserve",
-    "subtitle": "أرسل بياناتك. يعثر OpenObserve على المشكلات ويخبرك بها، مع أفضل تقدير له للسبب. وعندما يسود الهدوء، يوضح لك ما فحصه وما لا يمكنه رؤيته.",
     "tabs": {
       "issues": "المشكلات",
       "coverage": "التغطية",
@@ -30668,7 +30619,6 @@
     },
     "issuesPage": {
       "title": "كل المشكلات",
-      "sentence": "كل مشكلة فتحتها {within}. اختر واحدة لترى ما حدث وما فعلته بشأنها.",
       "ranges": {
         "week": "آخر 7 أيام",
         "month": "آخر 30 يومًا",
@@ -32432,7 +32382,6 @@
   },
   "fleet": {
     "title": "إدارة الأساطيل",
-    "subtitle": "سجّل OpenTelemetry Collectors، وأصدِر نسخًا من تكويناتها، واطرح التغييرات بأمان",
     "addCollector": "إضافة Collector",
     "tabs": {
       "collectors": "Collectors",
@@ -32970,7 +32919,6 @@
     },
     "editor": {
       "pageTitle": "محرر التكوين",
-      "newDescription": "تكوين Collector جديد",
       "visual": "مرئي",
       "issues": "{count} مشكلة | {count} مشكلات",
       "valid": "صالح",

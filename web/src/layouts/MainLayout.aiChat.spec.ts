@@ -60,7 +60,7 @@ function mountMainLayout() {
       plugins: [store, i18n, router],
       stubs: {
         AppHeader: StubDiv,
-        ONavbar: StubDiv,
+        OSidebar: StubDiv,
         O2AIChat: ChatStub,
         WebinarBanner: StubDiv,
         AnnouncementBanner: StubDiv,

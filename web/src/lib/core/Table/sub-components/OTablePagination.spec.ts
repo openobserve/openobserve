@@ -311,7 +311,7 @@ describe("OTablePagination footer", () => {
     mountPager({ isFirstPage: false, currentPage: 2 });
     const select = wrapper.find('[data-test="o2-table-page-size-select-trigger"]');
     const selectHeight = heightOf(select.classes());
-    expect(selectHeight).toBe("h-7");
+    expect(selectHeight).toBe("h-6");
     for (const selector of PAGER) {
       expect(heightOf(wrapper.find(selector).classes()), selector).toBe(selectHeight);
     }

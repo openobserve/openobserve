@@ -260,27 +260,35 @@ describe("OButton", () => {
 
   // --- Size classes ---
 
-  it("applies the h-8.5 md size classes by default", () => {
+  it("applies the 28px sm size classes by default", () => {
     const classes = mount(OButton).classes();
-    expect(classes).toContain("h-8.5");
-    expect(classes).not.toContain("h-10");
+    expect(classes).toContain("h-7");
+    expect(classes).toContain("text-compact");
+    expect(classes).not.toContain("h-8");
+  });
+
+  it("applies the 32px md size classes", () => {
+    const classes = mount(OButton, { props: { size: "md" } }).classes();
+    expect(classes).toContain("h-8");
+    expect(classes).toContain("ps-3");
   });
 
   it("applies the h-10 cta size classes", () => {
     const classes = mount(OButton, { props: { size: "cta" } }).classes();
     expect(classes).toContain("h-10");
-    expect(classes).not.toContain("h-8.5");
+    expect(classes).not.toContain("h-8");
   });
 
   it("applies sm size classes", () => {
     const wrapper = mount(OButton, { props: { size: "sm" } });
-    // 34px control height per the design system (HANDOFF §11).
-    expect(wrapper.classes().join(" ")).toContain("h-[2.125rem]");
+    expect(wrapper.classes()).toContain("h-7");
+    expect(wrapper.classes()).toContain("ps-2.5");
   });
 
   it("applies lg size classes", () => {
     const wrapper = mount(OButton, { props: { size: "lg" } });
-    expect(wrapper.classes().join(" ")).toContain("h-12");
+    expect(wrapper.classes()).toContain("h-9");
+    expect(wrapper.classes()).toContain("text-sm");
   });
 
   it("applies icon size classes", () => {
@@ -302,10 +310,10 @@ describe("OButton", () => {
     expect(classes).toContain("w-8");
   });
 
-  it("applies icon-md size classes (h-8.5 w-8.5), matching md", () => {
+  it("applies icon-md size classes (h-8 w-8), matching md", () => {
     const classes = mount(OButton, { props: { size: "icon-md" } }).classes();
-    expect(classes).toContain("h-8.5");
-    expect(classes).toContain("w-8.5");
+    expect(classes).toContain("h-8");
+    expect(classes).toContain("w-8");
     expect(classes).not.toContain("h-10");
   });
 
@@ -316,11 +324,11 @@ describe("OButton", () => {
     expect(classes).toContain("w-12");
   });
 
-  it("sizes xs-grouped one border-pair (0.125rem) shorter than xs", () => {
-    expect(mount(OButton, { props: { size: "xs" } }).classes()).toContain("h-7");
+  it("sizes xs as a 24px box and xs-grouped at 26px", () => {
+    expect(mount(OButton, { props: { size: "xs" } }).classes()).toContain("h-6");
     const classes = mount(OButton, { props: { size: "xs-grouped" } }).classes();
     expect(classes).toContain("h-6.5");
-    expect(classes).not.toContain("h-7");
+    expect(classes).not.toContain("h-6");
   });
 
   it("sizes icon-panel as a 1.625rem square, the icon partner of xs-grouped", () => {

@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-card-glass-bg"
     data-test="profiles-page"
     :title="t('profiles.title')"
-    :subtitle="t('profiles.subtitle')"
     icon="memory"
     title-data-test="profiles-page-title"
     bleed

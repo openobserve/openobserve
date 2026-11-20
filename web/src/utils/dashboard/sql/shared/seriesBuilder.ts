@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { getDataValue } from "../../aliasUtils";
-import { getSeriesColor, getAreaStyleOverride } from "../../colorPalette";
+import {
+  getSeriesColor,
+  getAreaStyleOverride,
+  getColorPalette,
+  createDistinctSeriesColor,
+} from "../../colorPalette";
 import { getFieldLabel } from "../../fieldLabel";
 import { breakdownValueLabel } from "../../sqlProcessData";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
@@ -178,18 +183,29 @@ export function createSeriesBuilders(deps: SeriesDeps) {
     seriesData: Array<number> = [],
     seriesConfig: Record<string, any>,
     seriesName: string,
+    onlySeries = false,
+    distinctColor?: (name: string) => string | undefined,
   ): SeriesObject => {
-    const seriesColor =
-      getSeriesColor(
-        panelSchema.config.color,
-        yAxisName,
-        seriesData,
-        chartMin,
-        chartMax,
-        store.state.theme,
-        panelSchema?.config?.color?.colorBySeries,
-        panelSchema?.config,
-      ) ?? null;
+    const colorCfg = panelSchema?.config?.color;
+    // A lone series gets the first palette colour, not whatever its name hashes to.
+    const useFirstColor =
+      onlySeries &&
+      (!colorCfg?.mode || colorCfg.mode === "palette-classic-by-series") &&
+      !colorCfg?.colorBySeries?.some((m: any) => m?.value === yAxisName && m?.color);
+    const seriesColor = useFirstColor
+      ? getColorPalette(store.state.theme)[0]
+      : (distinctColor?.(yAxisName) ??
+        getSeriesColor(
+          panelSchema.config.color,
+          yAxisName,
+          seriesData,
+          chartMin,
+          chartMax,
+          store.state.theme,
+          panelSchema?.config?.color?.colorBySeries,
+          panelSchema?.config,
+        ) ??
+        null);
 
     const areaStyle = getAreaStyleOverride(
       panelSchema.type,
@@ -259,6 +275,18 @@ export function createSeriesBuilders(deps: SeriesDeps) {
       // get the unique value of the second xAxis's key
       stackedXAxisUniqueValue = getUniqueStackedXAxisValues(breakdownKey);
     }
+    const onlySeries =
+      yAxisKeys.length === 1 && (!breakDownKeys?.length || stackedXAxisUniqueValue.length === 1);
+    // Two names that hash to one slot would share a colour; the second takes the next free slot.
+    const distinctColor = createDistinctSeriesColor(
+      yAxisKeys.flatMap((yAxis: any) =>
+        breakDownKeys.length
+          ? stackedXAxisUniqueValue.map((key: any) => getYAxisLabel(yAxis, key))
+          : [getYAxisLabel(yAxis)],
+      ),
+      panelSchema?.config?.color,
+      store.state.theme,
+    );
 
     return (
       yAxisKeys
@@ -281,7 +309,14 @@ export function createSeriesBuilders(deps: SeriesDeps) {
                 yAxisGroup: index,
               };
               // Can create different method to get series
-              return getSeriesObj(yAxisName, seriesData, updatedSeriesConfig, key);
+              return getSeriesObj(
+                yAxisName,
+                seriesData,
+                updatedSeriesConfig,
+                key,
+                onlySeries,
+                distinctColor,
+              );
             });
           } else {
             const seriesData = getAxisDataFromKey(yAxis);
@@ -289,7 +324,14 @@ export function createSeriesBuilders(deps: SeriesDeps) {
               ...seriesConfig,
               yAxisGroup: index,
             };
-            return getSeriesObj(yAxisName, seriesData, updatedSeriesConfig, "");
+            return getSeriesObj(
+              yAxisName,
+              seriesData,
+              updatedSeriesConfig,
+              "",
+              onlySeries,
+              distinctColor,
+            );
           }
         })
         .flat() || []

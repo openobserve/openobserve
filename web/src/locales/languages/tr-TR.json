@@ -1427,6 +1427,8 @@
     "selectOrganization": "Lütfen bir kuruluş seçin"
   },
   "search": {
+    "liveRefreshingEvery": "Live: refreshing every {interval}",
+    "rowsPerPageLabel": "{n} / page",
     "queryFailed": "Sorgu başarısız oldu",
     "unknownError": "Bilinmeyen hata",
     "selectedLabel": "seçili",
@@ -2080,7 +2082,6 @@
   "menu": {
     "alertCalibration": "Uyarı Kalibrasyonu",
     "autoobserve": "AutoObserve",
-    "upgradeToProPlan": "PRO Planına Yükselt",
     "home": "Ana Sayfa",
     "about": "Hakkında",
     "index": "Akışlar",
@@ -2139,7 +2140,6 @@
   },
   "profiles": {
     "title": "Profiller",
-    "subtitle": "Fonksiyon bazında CPU, bellek ve kilit kullanımını izleyin",
     "stream": "Akış",
     "dataSource": "Veri kaynağı",
     "service": "Hizmet",
@@ -2290,7 +2290,6 @@
     "from": "Başlangıç",
     "to": "Bitiş",
     "title": "Gerçek Kullanıcı İzleme",
-    "subtitle": "Gerçek kullanıcı oturumlarını, hataları ve ön uç performansını izleyin",
     "issueColumn": "Sorun",
     "trendColumn": "Eğilim",
     "usersColumn": "Kullanıcılar",
@@ -3330,7 +3329,6 @@
         "bulkDeleteMessage": "{count} adlandırılmış olay silinsin mi? Bunu kullanan huniler silinmiş adım etiketi gösterir. | {count} adlandırılmış olay silinsin mi? Bunları kullanan huniler silinmiş adım etiketi gösterir.",
         "bulkDeleteInUseMessage": "{count} adlandırılmış olay silinsin mi? Kayıtlı huniler şunlar için Silinmiş olay adımı gösterecek: {names}. | {count} adlandırılmış olay silinsin mi? Kayıtlı huniler şunlar için Silinmiş olay adımı gösterecek: {names}.",
         "notFound": "Bu adlandırılmış olay artık mevcut değil",
-        "editorApp": "Uygulama: {app}",
         "details": "Ayrıntılar",
         "opParam": "URL parametresi",
         "opRef": "Yönlendiren ana bilgisayar",
@@ -4009,11 +4007,6 @@
     "license_downgrade_limit": "Günlük limit {old} değerinden {new} değerine geçer",
     "license_downgrade_expiry": "Son kullanma tarihi {old} tarihinden {new} tarihine taşınır",
     "license_limit_per_day": "{gb} GB/gün",
-    "header_button": {
-      "cloud_features": "{product} Özellikleri",
-      "enterprise_edition": "Baskı: Kurumsal",
-      "get_enterprise_free": "OpenObserve Enterprise'ı edinin (Ücretsiz)"
-    },
     "enterprise_offer": {
       "cloud": {
         "hero_title": "Kurumsal Özellikler",
@@ -4208,7 +4201,14 @@
     "usageChartDate": "{month} {day}",
     "usageChartDay": "Gün {day}",
     "usageChartUsage": "Kullanım: {value}",
-    "startFreeTrial": "Ücretsiz denemeye başla"
+    "startFreeTrial": "Ücretsiz denemeye başla",
+    "header_button": {
+      "upgrade": "Upgrade",
+      "enterprise_tooltip": "About {product} — Enterprise edition",
+      "cloud_features": "{product} Özellikleri",
+      "enterprise_edition": "Baskı: Kurumsal",
+      "get_enterprise_free": "OpenObserve Enterprise'ı edinin (Ücretsiz)"
+    }
   },
   "login": {
     "lockedOut": "Çok fazla başarısız oturum açma denemesi. {duration} sonra tekrar deneyin veya yöneticinizle iletişime geçin.",
@@ -4384,7 +4384,6 @@
     "nameInvalid": "Küçük harfler, rakamlar ve tireler kullanın (en fazla {max} karakter)",
     "createFailed": "Hizmet hesabı oluşturulamadı. Lütfen tekrar deneyin.",
     "updateFailed": "Hizmet hesabı güncellenemedi. Lütfen tekrar deneyin.",
-    "headerSubtitle": "API'ler için programlı erişim token'ları",
     "search": "Hizmet hesabı ara",
     "rotate": "Token'ı Yenile",
     "deleteServiceAccount": "Hizmet Hesabını Sil",
@@ -4477,7 +4476,6 @@
     "mcpServerLabel": "MCP Sunucusu",
     "mcpServerDesc": "AI istemcilerini {product} üzerinden bağlayın",
     "mcpServerHeader": "MCP Sunucusu",
-    "mcpServerHeaderSubtitle": "Claude, Cursor, VS Code ve diğer AI istemcilerini bu kuruluşa bağlayın.",
     "invitationsDesc": "Bekleyen ve gönderilen üye davetleri",
     "groupsDesc": "Rol atamak için kullanıcıları gruplandırın",
     "rolesDesc": "İzinleri ve erişim ilkelerini tanımlayın",
@@ -4910,7 +4908,6 @@
       "other": "Diğer"
     },
     "invitationList": {
-      "subtitle": "Bekleyen ve gönderilen üye davetleri",
       "loadingPending": "Bekleyen davetler yükleniyor...",
       "failedLoadPending": "Bekleyen davetler yüklenemedi",
       "accepting": "Davet kabul ediliyor...",
@@ -4964,7 +4961,6 @@
       "errorCreating": "Grup oluşturulurken hata oluştu"
     },
     "quotaPage": {
-      "subtitle": "Kullanım limitleri role göre uygulanır",
       "selectOrganization": "Kuruluş Seç",
       "editQuota": "Kotayı Düzenle",
       "selectApiCategory": "API Kategorisi Seç",
@@ -5091,7 +5087,6 @@
       "brand": "Canlı mavi"
     },
     "list": {
-      "subtitle": "Uygulamanın üst kısmında her kuruluş için ya da yalnızca seçtikleriniz için gösterilen bildirimler.",
       "liveNow": "Şu anda canlı",
       "liveNowEmpty": "Şu anda gösterilen bir banner yok.",
       "liveOnlyFor": "Yalnızca {orgs} için",
@@ -5301,7 +5296,6 @@
     },
     "deleteField": "Alanı sil",
     "header": "Akışlar",
-    "subtitle": "Dizin yönetimi ve akış yapılandırması",
     "streamNameHelpText": "Yalnızca alfanümerik karakterler, alt çizgi ve iki nokta üst üste nokta kullanın.",
     "search": "Akış ara",
     "emptyOr": "Veya:",
@@ -5392,7 +5386,6 @@
   },
   "workflow": {
     "header": "İş Akışları",
-    "subtitle": "Tetikleyiciler, Mantık ve Hedeflerle Eylemleri Otomatikleştirin",
     "create": "Yeni iş akışı",
     "createSuccess": "İş akışı başarıyla oluşturuldu",
     "name": "İş akışı adı",
@@ -6304,7 +6297,6 @@
     "functionName": "Fonksiyon Adı",
     "remoteDestination": "Uzak Hedef",
     "failedToLoadPipeline": "İşlem hattı yüklenemedi",
-    "subtitle": "Uçuşta verileri dönüştürün, zenginleştirin ve yönlendirin",
     "deleteNode": "Sil",
     "addPipeline": "Yeni işlem hattı",
     "deletePipeline": "İşlem Hattını Sil",
@@ -6553,7 +6545,6 @@
     "order": "Sipariş",
     "applyBeforeFlattening": "Düzleştirmeden Önce Uygula",
     "header": "Fonksiyonlar",
-    "subtitle": "İşlem hatlarında uygulanan yeniden kullanılabilir VRL fonksiyonları",
     "clickTestFunctionHint": "Olayları görmek için lütfen Fonksiyonu Test Et'e tıklayın",
     "add": "Yeni fonksiyon oluştur",
     "search": "Fonksiyon ara",
@@ -6577,7 +6568,6 @@
     "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin",
     "associatedFunctionHeader": "İlişkili Fonksiyonlar",
     "enrichmentTables": "Zenginleştirme Tabloları",
-    "enrichmentTablesSubtitle": "Alınan verileri zenginleştiren arama tabloları",
     "addEnrichmentTable": "Zenginleştirme Tablosu Ekle",
     "updateEnrichmentTable": "Zenginleştirme tablosunu güncelle",
     "searchEnrichmentTable": "Zenginleştirme tablosu ara",
@@ -10236,7 +10226,6 @@
     "publicLinks": {
       "panelTitle": "Herkese açık bağlantılar",
       "pageTitle": "Herkese açık gösterge panoları",
-      "pageSubtitle": "Bu kuruluştaki tüm herkese açık bağlantılar",
       "panelTitleFor": "Herkese açık bağlantılar — {name}",
       "intro": "Herkese açık bağlantıya sahip olan herkes oturum açmadan bu gösterge panosunu görüntüleyebilir.",
       "editNote": "Bağlantının adresi aynı kalır. Değişiklikler bir sonraki güncellemede herkese açık sayfada görünür.",
@@ -10623,7 +10612,6 @@
     "tabOverview": "Genel Bakış",
     "tabUsage": "Kullanımı",
     "removeHomeDashboard": "Ana sayfa gösterge panosunu kaldır",
-    "subtitle": "Bir bakışta gözlemlenebilirlik çalışma alanınız",
     "resources": "Kaynaklar",
     "explore": "Keşfet"
   },
@@ -11565,7 +11553,6 @@
   },
   "alertCalibration": {
     "title": "Uyarı Kalibrasyonu",
-    "subtitle": "Uyarılarınızın kendi çalıştırma geçmişlerinden ölçülen davranışı",
     "configure": "Yapılandır",
     "runNow": "Şimdi çalıştır",
     "runNowHint": "Bir sonrakini beklemek yerine şimdi çalıştırma ister. Bir çalıştırmanın zamanı zaten gelmişse veya devam ediyorsa bunun yerine isteği yanıtlar.",
@@ -11987,7 +11974,6 @@
     "detail": {
       "title": "{time} Özeti",
       "titleLoading": "Özet",
-      "subtitle": "{start} ile {end} arasını kapsar, {time} oluşturuldu",
       "back": "Özetler",
       "unavailableTitle": "Özet kullanılamıyor",
       "noRecords": "Bu çalıştırma için kayıt bulunamadı.",
@@ -12793,7 +12779,6 @@
       "commentPlaceholder": "Bir yorum yazın...",
       "sendComment": "Yorumu gönder",
       "title": "Vakalar",
-      "subtitle": "Vaka yönetimi ve takibi",
       "search": "Vakaları ara...",
       "status": "Durum",
       "severity": "Önem derecesi",
@@ -14244,7 +14229,6 @@
       "firingTotal": "Tetiklenen",
       "observedTotal": "Gruplar",
       "nOfMFiring": "{firing} / {observed} grup tetikleniyor",
-      "groupedBy": "{columns} sütununa göre gruplandı",
       "groupBy": "Gruplandır",
       "criticalCondition": "Kritik koşul",
       "warningCondition": "Uyarı koşulu",
@@ -14591,7 +14575,6 @@
         "startDateRequired": "İlk günü seçin."
       },
       "title": "Bakım pencereleri",
-      "subtitle": "Uyarıları, anomali algılamalarını ve sentetik kontrolleri çalışır durumda tutan ancak bildirimlerini durduran planlanmış pencereler",
       "newDowntime": "Yeni bakım penceresi",
       "filterAll": "Tümü",
       "filterOnce": "Tek seferlik",
@@ -15507,7 +15490,6 @@
   },
   "alert_sources": {
     "header": "Harici Uyarı Kaynakları",
-    "subtitle": "Grafana, Prometheus Alertmanager veya webhook çağırabilen herhangi bir araçtan uyarı gönderin — burada görünecekler ve otomatik olarak Vakalarla ilişkilendirilecekler.",
     "acceptsAnyFormat": "her türlü webhook biçimini kabul eder",
     "revealToken": "Tam URL'yi göster",
     "hideToken": "Tam URL'yi gizle",
@@ -16628,9 +16610,6 @@
     "modelPricingEditor": {
       "copySuffix": " (Kopyala)"
     },
-    "modelPricingList": {
-      "subtitle": "LLM model maliyet yapılandırması"
-    },
     "orgStorageSettings": {
       "subtitle": "Bu kuruluşun verilerini size ait bir bucket'ta saklayın",
       "awsCredentials": "AWS kimlik bilgileri",
@@ -16665,9 +16644,6 @@
       "settingsUpdated": "Kuruluş ayarları başarıyla güncellendi",
       "settingsSaveError": "Kuruluş ayarları kaydedilirken hata oluştu"
     },
-    "aiToolsetsPage": {
-      "subtitle": "AI araç entegrasyonlarını yapılandır"
-    },
     "cipherKeysPage": {
       "subtitle": "Hassas alan değerlerini şifreleyen ve şifresini çözen anahtarlar",
       "delete": "Sil",
@@ -16684,15 +16660,11 @@
       "bulkDeleteFailed": "{count} şifreleme anahtarı silinemedi | {count} şifreleme anahtarı silinemedi",
       "bulkDeleteError": "Şifreleme anahtarları silinirken hata oluştu"
     },
-    "correlationSettingsPage": {
-      "subtitle": "Telemetri korelasyon yapılandırması"
-    },
     "licensePage": {
       "unexpectedError": "beklenmeyen hata",
       "daysRemaining": "Lisansınızın süresi dolana kadar {days} gün kaldı"
     },
     "nodesPage": {
-      "subtitle": "Küme düğümleri ve sağlık durumları",
       "to": "ile",
       "name": "Ad",
       "loadingData": "Veriler yüklenirken lütfen bekleyin...",
@@ -16780,7 +16752,6 @@
       "processingTrialExtension": "Deneme süresi uzatma isteği işlenirken lütfen bekleyin...",
       "trialExtendedSuccess": "Deneme süresi başarıyla uzatıldı.",
       "extendTrialError": "Deneme süresi uzatılamadı. Lütfen tekrar deneyin.",
-      "subtitle": "Kuruluş oluştur ve yönet",
       "addContract": "Sözleşme Ekle",
       "extendTrialTitle": "{name} için Deneme Süresini Uzat",
       "extendTrialSubtitle": "Yeni deneme uzatma süresini ayarlayın.",
@@ -16994,7 +16965,6 @@
         "valueMismatch": "TXT kaydı bulundu ancak değeri eşleşmiyor",
         "dnsFailed": "DNS çözümlemesi başarısız oldu"
       },
-      "pageSubtitle": "E-posta alan adlarınızı bağlayın, kullanıcılarını kuruluşlarla eşleyin ve hangilerinin katılabileceğini kontrol edin.",
       "linkedTab": "Bağlı alan adları",
       "mappingsTab": "Eşlemeler",
       "accessTab": "Engellenen kullanıcılar",
@@ -17117,7 +17087,6 @@
       "lastRun": "Son çalışma",
       "lastRunAt": "Çalıştı",
       "nextRun": "Sonraki çalışma",
-      "nextRunAt": "sonraki çalışma {time}",
       "acceptedTooltip": "Posta sunucusu tarafından kabul edildi",
       "cachedTooltip": "Pano önbelleği ısıtıldı; e-posta gönderilmez",
       "unrecordedTooltip": "Son çalıştırma sonucu kaydedilmedi; eski çalıştırmalar Geçmiş'te mevcut olabilir.",
@@ -17191,9 +17160,7 @@
       "everyHours": "Her saat | Her {count} saatte",
       "everyDays": "Her gün | Her {count} günde",
       "everyWeeks": "Her hafta | Her {count} haftada",
-      "everyMonths": "Her ay | Her {count} ayda",
-      "dashboardCount": "{count} pano | {count} pano",
-      "recipientCount": "{count} alıcı | {count} alıcı"
+      "everyMonths": "Her ay | Her {count} ayda"
     },
     "frequencyUnits": {
       "days": "Gün",
@@ -17221,7 +17188,6 @@
     "never": "Asla",
     "startDate": "Başlangıç Tarihi",
     "header": "Raporlar",
-    "subtitle": "Zamanlanmış raporlar ve dışa aktarmalar",
     "searchThisFolder": "Bu klasör",
     "searchAllFolders": "Tüm klasörler",
     "reloadReports": "Raporları yeniden yükle",
@@ -18977,7 +18943,6 @@
     },
     "unpriced": {
       "title": "Fiyatlandırma boşlukları",
-      "subtitle": "LLM izlerinizde veri alımı sırasında fiyatı olmayan veya yalnızca yaklaşık fiyatı olan modeller",
       "banner": "{count} modelin veri alımı sırasında fiyatı yoktu veya yaklaşık bir fiyatı vardı. Kaydedilen maliyeti eksik olabilir. | {count} modelin veri alımı sırasında fiyatı yoktu veya yaklaşık bir fiyatı vardı. Kaydedilen maliyetleri eksik olabilir.",
       "bannerTruncated": "İzlerinizdeki {total} modelin veri alımı sırasında fiyatı yoktu veya yaklaşık bir fiyatı vardı. Maliyetleri hatalı olabilir. Token sayısına göre en üst {shown} tanesi gösteriliyor.",
       "streamLabel": "Akış",
@@ -19098,7 +19063,6 @@
       "tools": "Araçlar"
     },
     "promptManagement": {
-      "subtitle": "Yeniden kullanılabilir istemler oluşturun, sürümleyin ve yayınlayın.",
       "promptSubtitle": "{type} istemi",
       "prompt": "İstem",
       "promptId": "İstem Kimliği",
@@ -19538,7 +19502,6 @@
         }
       },
       "workbench": {
-        "subtitle": "{reviewed} / {total} incelendi",
         "itemCounter": "İncelenecek öğe: {index} / {total}",
         "prev": "Önceki öğe",
         "next": "Sonraki öğe",
@@ -20018,7 +19981,6 @@
       },
       "detail": {
         "fallbackTitle": "Veri Seti",
-        "meta": "{count} öğe · {updated} güncellendi",
         "loadError": "Veri seti yüklenemedi",
         "tryInPlayground": "Playground'da dene",
         "tabs": {
@@ -20981,7 +20943,6 @@
       "backTo": "Sağlayıcılar",
       "createTitle": "LLM Sağlayıcısı Oluştur",
       "editTitle": "LLM Sağlayıcısını Düzenle",
-      "subtitle": "LLM hakemi puanlayıcılarının kullandığı model uç noktasını yapılandırın.",
       "sectionTitle": "Sağlayıcı",
       "nameLabel": "İsim",
       "typeLabel": "Sağlayıcı tipi",
@@ -22944,9 +22905,7 @@
       "usedBy": {
         "aria": "Bunu kullanan testler",
         "help": "Bu adımları kendi sayfalarında çalıştırırlar. Bu testin Başlangıç URL'si, ortamları ve gizli anahtarları orada kullanılmaz.",
-        "viewAll": "Tüm {count} testi görüntüle",
-        "subtitle": "{folder} · {count} test tarafından kullanılıyor | {folder} · {count} test tarafından kullanılıyor",
-        "subtitleNoFolder": "{count} test tarafından kullanılıyor | {count} test tarafından kullanılıyor"
+        "viewAll": "Tüm {count} testi görüntüle"
       },
       "recordingIn": "{environment} ortamında kaydediliyor",
       "needsDesktopRecorder": "Masaüstü kaydedici uzantısını gerektirir",
@@ -23157,7 +23116,6 @@
       "folder": "klasör",
       "willBeCreatedIn": "İçinde oluşturulacak"
     },
-    "pageSubtitle": "Küresel konumlardan çalışma süresini, performansı ve kullanıcı yolculuklarını proaktif olarak izleyin",
     "pageTitle": "Sentetikler",
     "protocolConfig": {
       "http": {
@@ -25190,7 +25148,6 @@
     "title": "SLO'lar",
     "notFound": "SLO bulunamadı",
     "notFoundDescription": "Bu SLO artık mevcut değil veya ona erişiminiz yok. Silinmiş olabilir.",
-    "subtitle": "Hizmet düzeyi hedefleri: hedefler, hata bütçeleri, tükenme hızı uyarıları",
     "new": "Yeni SLO",
     "newTitle": "Yeni SLO",
     "editTitle": "SLO'yu Düzenle",
@@ -25208,7 +25165,6 @@
     "totalSlos": "Toplam SLO",
     "noGrouping": "Yok (tek bir genel seri)",
     "newAlert": "Yeni uyarı",
-    "overRolling": "kayan {window} üzerinde",
     "searchPlaceholder": "SLO veya etiket ara, örn. team:payments",
     "loadFailed": "SLO'lar yüklenemedi",
     "requestFailed": "İstek başarısız oldu ({code})",
@@ -26318,7 +26274,6 @@
       "groupWorkloads": "İş Yükleri",
       "groupStorage": "Depolama",
       "groupAutoscaling": "Otomatik Ölçeklendirme",
-      "subtitle": "Kümeleri, iş yüklerini ve kaynakları izleyin",
       "clusterPickerLabel": "Küme",
       "clusterPickerLoading": "Kümeler yükleniyor…",
       "clusterPickerTrigger": "Küme: {name}",
@@ -26776,8 +26731,7 @@
       "actions": "Eylemler"
     },
     "header": {
-      "title": "Veritabanları",
-      "subtitle": "Veritabanlarınızdaki sorgu performansı ve sağlığı"
+      "title": "Veritabanları"
     },
     "ai": {
       "suggestFix": "Bunu nasıl düzelteceğini AI'ya sor",
@@ -28042,7 +27996,6 @@
     "fromRotation": "{name} rotasyonundan",
     "ownershipMatch": "Eşleşme",
     "ownershipSpecificity": "Boyutlar",
-    "teamSubtitle": "{tz} · {count} üye | {tz} · {count} üye",
     "statOnCallNow": "Şu an nöbette",
     "statRotations": "Rotasyonlar",
     "statRoutingRules": "Yönlendirme kuralları",
@@ -29043,7 +28996,6 @@
     "teamOpenInOnCall": "Tümünü On-Call'da görüntüle",
     "teamCoverage": "Sonraki {days} gün için kapsam",
     "teamCoverageHint": "Burada bakmaya değer tek şey boşluklardır",
-    "teamOwnsRules": "{count} yönlendirme kuralına sahiptir | {count} yönlendirme kuralına sahiptir",
     "teamCoveredNow": "Şu anda nöbetçi var",
     "teamOverview": "Genel Bakış",
     "teamAnsweredBy": "Yanıtlayan",
@@ -29736,7 +29688,6 @@
       "allClearNone": "Müdahale gereken bir şey yok."
     },
     "title": "AutoObserve",
-    "subtitle": "Verinizi gönderin. OpenObserve sorunları bulur ve en iyi neden değerlendirmesiyle birlikte size bildirir. Sessiz olduğunda, neleri kontrol ettiğini ve neleri göremediğini gösterir.",
     "tabs": {
       "issues": "Sorunlar",
       "coverage": "Kapsam",
@@ -30668,7 +30619,6 @@
     },
     "issuesPage": {
       "title": "Tüm sorunlar",
-      "sentence": "{within} açtığım her sorun. Ne olduğunu ve bu konuda ne yaptığımı görmek için birini seçin.",
       "ranges": {
         "week": "Son 7 gün",
         "month": "Son 30 gün",
@@ -32432,7 +32382,6 @@
   },
   "fleet": {
     "title": "Filo yönetimi",
-    "subtitle": "OpenTelemetry toplayıcılarını kaydedin, yapılandırmalarını sürümleyin ve değişiklikleri güvenle dağıtın",
     "addCollector": "Toplayıcı ekle",
     "tabs": {
       "collectors": "Toplayıcılar",
@@ -32970,7 +32919,6 @@
     },
     "editor": {
       "pageTitle": "Yapılandırma düzenleyicisi",
-      "newDescription": "Yeni toplayıcı yapılandırması",
       "visual": "Görsel",
       "issues": "{count} sorun | {count} sorun",
       "valid": "Geçerli",

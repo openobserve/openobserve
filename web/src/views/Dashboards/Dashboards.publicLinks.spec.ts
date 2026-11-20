@@ -165,18 +165,6 @@ describe("Dashboards.vue public links entry", () => {
     expect(router.currentRoute.value.query.folder).toBe("default");
   });
 
-  it("shows the public links subtitle on the public view and the dashboards one elsewhere", async () => {
-    const subtitle = (w: VueWrapper) => w.find('[data-test="page-subtitle"]').text();
-    wrapper = await mountAt(router, true);
-    expect(subtitle(wrapper)).toBe(i18n.global.t("dashboard.subtitle"));
-
-    await pick(wrapper, PUBLIC_ID);
-    expect(subtitle(wrapper)).toBe("Every public link in this organization");
-
-    await pick(wrapper, "default");
-    expect(subtitle(wrapper)).toBe(i18n.global.t("dashboard.subtitle"));
-  });
-
   it("imports into the Default folder from the public view, which has no folder of its own", async () => {
     wrapper = await mountAt(router, true, { folder: PUBLIC_ID });
     const push = vi.spyOn(router, "push");

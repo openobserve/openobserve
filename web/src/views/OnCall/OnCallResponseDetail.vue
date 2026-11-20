@@ -5,7 +5,6 @@
     :title="title"
     title-min-width
     icon="notifications-active"
-    tabs-below
     :back="{
       label: t('oncall.backToResponses'),
       to: { name: 'onCallResponses', query: { org_identifier: orgId } },

@@ -17,7 +17,7 @@ import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { fillMissingTimestamps } from "./shared/dataProcessor";
 import { buildXAxis, buildYAxis, buildTooltip } from "./shared/axisBuilder";
 import { buildDynamicGrid } from "./shared/gridBuilder";
-import { getSeriesColor } from "../colorPalette";
+import { createDistinctSeriesColor, getSeriesColor } from "../colorPalette";
 import { buildSeriesMarkLine } from "./shared/markLines";
 import { lineThicknessOf } from "../promqlChartSeriesProps";
 import { getScatterSymbolSize } from "../scatterPointStyle";
@@ -59,6 +59,13 @@ export class TimeSeriesConverter implements PromQLChartConverter {
     // Get series props based on chart type
     const seriesProps = this.getSeriesPropsBasedOnChartType(chartType, panelSchema);
 
+    // Two names that hash to one slot would share a colour; the second takes the next free slot.
+    const distinctColor = createDistinctSeriesColor(
+      processedData.flatMap((q) => q.series.map((s) => String(s.name))),
+      config?.color,
+      store.state.theme,
+    );
+
     // Build series for each query
     processedData.forEach((queryData) => {
       queryData.series.forEach((seriesData) => {
@@ -68,16 +75,18 @@ export class TimeSeriesConverter implements PromQLChartConverter {
         // Get color for series
         let seriesColor;
         try {
-          seriesColor = getSeriesColor(
-            config?.color,
-            seriesData.name,
-            seriesData.values.map(([, val]) => val),
-            chartMin,
-            chartMax,
-            store.state.theme,
-            config?.color?.colorBySeries,
-            config,
-          );
+          seriesColor =
+            distinctColor(String(seriesData.name)) ??
+            getSeriesColor(
+              config?.color,
+              seriesData.name,
+              seriesData.values.map(([, val]) => val),
+              chartMin,
+              chartMax,
+              store.state.theme,
+              config?.color?.colorBySeries,
+              config,
+            );
         } catch (error) {
           console.warn("Failed to get series color:", error);
           seriesColor = undefined; // Fallback to default color

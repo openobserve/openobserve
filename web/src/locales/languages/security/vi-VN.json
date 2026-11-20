@@ -116,7 +116,6 @@
     },
     "overview": {
       "title": "Tổng quan SOC",
-      "subtitle": "Những gì đang kích hoạt, những gì đang mở và liệu các nguồn của bạn có còn báo cáo hay không",
       "autoRefreshOn": "Tự động làm mới mỗi phút đang bật",
       "autoRefreshOff": "Tự động làm mới đang tắt",
       "historyError": "Không thể tải lịch sử phát hiện: {reason}",
@@ -165,7 +164,6 @@
     },
     "events": {
       "title": "Sự kiện bảo mật",
-      "subtitle": "Truy tìm trên dữ liệu telemetry bảo mật đã chuẩn hóa",
       "run": "Chạy",
       "hideSidebar": "Ẩn trường",
       "showSidebar": "Hiện trường",
@@ -348,7 +346,6 @@
     },
     "alerts": {
       "title": "Cảnh báo",
-      "subtitle": "Mỗi lần một phát hiện kích hoạt, cùng bằng chứng đằng sau nó",
       "eyebrow": "Phát hiện đang kích hoạt",
       "range": {
         "1h": "1h",
@@ -463,7 +460,6 @@
     },
     "cases": {
       "title": "Vụ việc",
-      "subtitle": "Các lần kích hoạt tương quan, được phân loại để đưa ra kết luận",
       "eyebrow": "Vụ việc",
       "search": "Lọc trang này theo tiêu đề, id, người phụ trách hoặc thực thể",
       "refresh": "Làm mới",
@@ -712,7 +708,6 @@
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
-      "subtitle": "Các kỹ thuật mà những phát hiện đang bật của bạn bao phủ, và kỹ thuật nào đã kích hoạt",
       "summaryPartial": "Khoảng thời gian này có nhiều lịch sử cảnh báo hơn mức một bản tóm tắt có thể chứa, nên số lần kích hoạt chỉ là giới hạn dưới; hãy chọn khoảng thời gian ngắn hơn để có số liệu đầy đủ.",
       "stat": {
         "firing": "Kỹ thuật đang kích hoạt",
@@ -775,7 +770,6 @@
     },
     "detections": {
       "title": "Phát hiện",
-      "subtitle": "Quy tắc Sigma chạy dưới dạng phát hiện theo lịch trên các stream bảo mật của bạn",
       "new": "Phát hiện mới",
       "eyebrow": "Quy tắc phát hiện",
       "refresh": "Làm mới phát hiện",
@@ -1073,7 +1067,6 @@
     },
     "content": {
       "title": "Nội dung",
-      "subtitle": "Các quy tắc phát hiện và nguồn nhật ký đi kèm SIEM, được đối chiếu với dữ liệu của bạn",
       "refresh": "Làm mới",
       "streamsError": "Không thể tải các stream của bạn, nên chưa xác định được các kết quả khớp với dữ liệu của bạn",
       "tab": {
@@ -1219,7 +1212,6 @@
     },
     "entities": {
       "title": "Thực thể",
-      "subtitle": "Mọi người dùng, IP nguồn và máy chủ mà các nguồn bảo mật của bạn đề cập",
       "view": {
         "table": "Bảng",
         "graph": "Biểu đồ rủi ro"
@@ -1339,7 +1331,6 @@
     },
     "ueba": {
       "title": "Phân tích hành vi người dùng",
-      "subtitle": "Mỗi người dùng được so sánh với quá khứ gần đây của chính họ",
       "windowHint": "Giai đoạn {current} gần nhất, so với {baseline} trước đó",
       "method": "Điểm rủi ro mang tính heuristic: {current} gần nhất của mỗi người dùng được so sánh với {baseline} trước đó của chính họ. Mỗi dấu hiệu đều hiển thị các con số đã làm nó tăng.",
       "noSources": "Không có nguồn nào chứa trường người dùng",
@@ -1438,7 +1429,6 @@
     },
     "intel": {
       "title": "Tình báo mối đe dọa",
-      "subtitle": "Các chỉ báo xấu đã biết, và mọi nơi chúng xuất hiện trong dữ liệu bảo mật của bạn",
       "loadFailed": "Không thể tải danh sách chỉ báo",
       "add": "Thêm chỉ báo",
       "import": "Nhập",
@@ -1607,7 +1597,6 @@
     "sources": {
       "title": "Nguồn dữ liệu",
       "comingSoon": "Quy trình thiết lập có hướng dẫn với các mẫu chuẩn hóa OCSF sắp ra mắt. Trong thời gian đó, hãy tiếp nhận nhật ký bảo mật như bất kỳ stream nào; trang Sự kiện sẽ tự động nhận diện và chuẩn hóa chúng.",
-      "subtitle": "Đính kèm gói OCSF để chuẩn hóa stream khi tiếp nhận, hoặc đưa nó vào làm nguồn bảo mật nguyên trạng.",
       "colStream": "stream",
       "colSourceType": "Loại nguồn",
       "colMapping": "Ánh xạ",

@@ -2,10 +2,8 @@
   <OPageLayout
     bleed
     data-test="oncall-team-detail-page"
-    :subtitle="subtitle"
     icon="group-work"
     title-overflow="visible"
-    tabs-below
     :back="{
       label: t('oncall.backToTeams'),
       to: { name: 'onCallTeams', query: { org_identifier: orgId } },
@@ -810,18 +808,6 @@ const memberCount = computed(() => overview.value?.members ?? members.value.leng
 /// `null` until the roster has been read: an empty array on a page still
 /// loading would announce "this team has nobody in it" about every team.
 const hasMembers = computed<boolean | null>(() => (loaded.value ? members.value.length > 0 : null));
-
-const subtitle = computed(() => {
-  if (!team.value) return undefined;
-  const rules = ruleCount.value;
-  const base = t(
-    "oncall.teamSubtitle",
-    { tz: team.value.timezone, count: memberCount.value },
-    memberCount.value,
-  );
-  if (rules === null) return base;
-  return raw(`${base} · ${t("oncall.teamOwnsRules", { count: rules }, rules)}`);
-});
 
 /// Pages this team was woken by, inside the activity window.
 const recentPages = computed(() => {

@@ -9,7 +9,6 @@
        navigation, so drop this component's own back chevron + "Add Function"
        subtitle — they read as a competing, mid-flow page header. -->
   <OPageHeader
-    :subtitle="embedded ? undefined : t('function.addFunction')"
     title-overflow="visible"
     :back="
       embedded

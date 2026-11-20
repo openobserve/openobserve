@@ -24,8 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :title="t('alerts.header')"
       icon="shield-alert-outline"
-      :subtitle="t('alerts.subtitle')"
-      tabs-below
     >
       <!-- The header names the GROUP the four tabs form — "Alerts" — not the
            page; the active tab says which sibling you are on. Same title,

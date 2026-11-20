@@ -330,8 +330,7 @@ const fieldClasses = computed(() => [
   hasError.value
     ? "border-datepicker-error-border"
     : "border-datepicker-border hover:border-datepicker-hover-border",
-  "focus-within:border-datepicker-focus-border",
-  "focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
+  "focus-within:ring-2 focus-within:ring-focus-ring-accent",
   isDisabled.value
     ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60 cursor-not-allowed"
     : "",

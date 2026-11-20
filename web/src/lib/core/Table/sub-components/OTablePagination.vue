@@ -68,12 +68,10 @@ function swallowActivation(event: Event, inactive: boolean): void {
   event.stopPropagation();
 }
 
-function requestPage(event: "first-page" | "prev-page" | "next-page" | "last-page"): void {
+function requestPage(event: "prev-page" | "next-page"): void {
   if (pagingInactive.value) return;
-  if (event === "first-page") emit("first-page");
-  else if (event === "prev-page") emit("prev-page");
-  else if (event === "next-page") emit("next-page");
-  else emit("last-page");
+  if (event === "prev-page") emit("prev-page");
+  else emit("next-page");
 }
 
 // Menus these wrappers open are portaled outside them, so an inactive wrapper closes them and blocks their items.
@@ -238,7 +236,7 @@ const selectionLabel = computed(() => {
         :aria-hidden="rangeHidden ? 'true' : undefined"
         data-test="o2-table-pagination-info"
       >
-        {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }}
+        {{ showingFrom }}–{{ showingTo }} {{ t("search.of") }}
         {{ totalCount.toLocaleString() }}{{ totalCountExact ? "" : "+" }}
       </span>
       <div
@@ -264,38 +262,22 @@ const selectionLabel = computed(() => {
         @click.capture="swallowActivation($event, pagingInactive)"
         @keydown.capture="swallowActivation($event, pagingInactive)"
       >
-        <span class="whitespace-nowrap max-md:hidden">{{ t("search.recordsPerPage") }}</span>
         <OSelect
           v-model="pageSizeModel"
           :options="pageSizeSelectOptions"
           :searchable="false"
-          size="xs"
+          size="sm"
           :aria-label="t('search.recordsPerPage')"
           data-test="o2-table-page-size-select"
         />
       </div>
 
-      <nav class="flex items-center gap-1" :aria-label="t('components.pagination.pagination')">
+      <!-- Same compact pager as OPagination (prev, current, next), so every pager reads alike. -->
+      <nav
+        class="rounded-default border-button-outline-border bg-button-outline-bg inline-flex items-center gap-0.5 border p-px" :aria-label="t('components.pagination.pagination')">
         <OButton
-          variant="outline"
-          size="icon-xs-sq"
-          class="max-lg:h-6 max-lg:w-6"
-          :disabled="isFirstPage || stale"
-          focusable-unavailable
-          :aria-label="t('search.firstPage')"
-          data-test="o2-table-first-page-btn"
-          :aria-disabled="isFirstPage || pagingInactive ? 'true' : undefined"
-          @click="requestPage('first-page')"
-        >
-          <OIcon name="first-page" size="sm" />
-          <template v-if="stale && !isFirstPage" #unavailable-reason>{{
-            t("common.loading")
-          }}</template>
-        </OButton>
-        <OButton
-          variant="outline"
-          size="icon-xs-sq"
-          class="max-lg:h-6 max-lg:w-6"
+          variant="ghost"
+          size="icon-chip"
           :disabled="isFirstPage || stale"
           focusable-unavailable
           :aria-label="t('components.pagination.previousPage')"
@@ -303,15 +285,20 @@ const selectionLabel = computed(() => {
           :aria-disabled="isFirstPage || pagingInactive ? 'true' : undefined"
           @click="requestPage('prev-page')"
         >
-          <OIcon name="chevron-left" size="sm" />
+          <OIcon name="fast-rewind" size="sm" />
           <template v-if="stale && !isFirstPage" #unavailable-reason>{{
             t("common.loading")
           }}</template>
         </OButton>
+        <span
+          class="text-compact bg-pagination-item-active-bg text-pagination-item-active-text ring-selected-border rounded-default flex h-6 min-w-6 items-center justify-center px-1 tabular-nums ring-1 ring-inset"
+          aria-current="page"
+          data-test="o2-table-current-page"
+          >{{ currentPage }}</span
+        >
         <OButton
-          variant="outline"
-          size="icon-xs-sq"
-          class="max-lg:h-6 max-lg:w-6"
+          variant="ghost"
+          size="icon-chip"
           :disabled="isLastPage || stale"
           focusable-unavailable
           :aria-label="t('components.pagination.nextPage')"
@@ -319,24 +306,7 @@ const selectionLabel = computed(() => {
           :aria-disabled="isLastPage || pagingInactive ? 'true' : undefined"
           @click="requestPage('next-page')"
         >
-          <OIcon name="chevron-right" size="sm" />
-          <template v-if="stale && !isLastPage" #unavailable-reason>{{
-            t("common.loading")
-          }}</template>
-        </OButton>
-        <OButton
-          v-if="totalCountExact"
-          variant="outline"
-          size="icon-xs-sq"
-          class="max-lg:h-6 max-lg:w-6"
-          :disabled="isLastPage || stale"
-          focusable-unavailable
-          :aria-label="t('search.lastPage')"
-          data-test="o2-table-last-page-btn"
-          :aria-disabled="isLastPage || pagingInactive ? 'true' : undefined"
-          @click="requestPage('last-page')"
-        >
-          <OIcon name="last-page" size="sm" />
+          <OIcon name="fast-forward" size="sm" />
           <template v-if="stale && !isLastPage" #unavailable-reason>{{
             t("common.loading")
           }}</template>

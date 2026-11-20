@@ -15,7 +15,7 @@
 
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { type SQLContext } from "../shared/types";
-import { chartAxisTextColor, chartColor } from "../../../chartTheme";
+import { chartAxisTextColor, chartCrosshairLabel } from "../../../chartTheme";
 import { escapeHtml } from "@/utils/html";
 import { createSeriesOverrideLookup } from "../../seriesOverrides";
 import { sortTooltipParams } from "../../tooltipSort";
@@ -53,7 +53,7 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
     options.xAxis = options.xAxis.slice(0, 1);
     options.tooltip.axisPointer.label = {
       show: true,
-      backgroundColor: chartColor("--color-chart-crosshair-bg"),
+      ...chartCrosshairLabel(),
       label: {
         fontsize: 12,
         precision: panelSchema.config?.decimals,

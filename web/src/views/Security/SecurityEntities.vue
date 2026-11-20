@@ -784,7 +784,6 @@ const noSources = computed(
 <template>
   <OPageLayout
     :title="t('siem.entities.title')"
-    :subtitle="t('siem.entities.subtitle')"
     icon="groups"
     bleed
     title-data-test="security-entities-title"

@@ -17,9 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="traces-latency-heatmap"
-    class="border-border-default bg-surface-base rounded-default flex h-full min-h-0 flex-col overflow-hidden border"
+    class="border-border-subtle bg-surface-card rounded-default flex h-full min-h-0 flex-col overflow-hidden border"
   >
-    <PanelBar class="w-full justify-between gap-2" data-test="traces-latency-heatmap-title">
+    <PanelBar
+      class="h-7! min-h-7! w-full shrink-0 justify-between gap-2 border-b-0! bg-transparent! py-0!"
+      data-test="traces-latency-heatmap-title"
+    >
       <span class="flex min-w-0 items-center">
         <span class="truncate">{{ t("traces.latencyHeatmap.title") }}</span>
         <TracesRedCaptionInfo v-if="caption?.length" panel="duration" :lines="caption" />
@@ -34,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="shrink-0"
             data-test="traces-duration-actions-btn"
           >
-            <OIcon name="more-vert" size="sm" />
+            <OIcon name="more-vert" size="sm" class="size-4!" />
           </OButton>
         </template>
         <ODropdownItem
@@ -58,6 +61,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-busy="refetching ? 'true' : undefined"
       data-test="traces-latency-heatmap-body"
     >
+      <div
+        class="text-text-secondary text-2xs absolute top-0 right-2 z-1 flex h-4 items-center gap-1"
+        data-test="traces-latency-heatmap-legend"
+        :aria-label="
+          colorBy === 'errors'
+            ? t('traces.latencyHeatmap.legend.errors')
+            : t('traces.latencyHeatmap.legend.spans')
+        "
+      >
+        <span>{{ t("traces.latencyHeatmap.legend.fewer") }}</span>
+        <span class="flex gap-0.5" aria-hidden="true">
+          <span
+            v-for="step in LEGEND_STEPS"
+            :key="step"
+            class="h-1.5 w-3"
+            :class="[colorBy === 'errors' ? 'bg-status-error-text' : 'bg-chart-series-1', step]"
+          />
+        </span>
+        <span>{{ t("traces.latencyHeatmap.legend.more") }}</span>
+      </div>
       <LoadingProgress
         :loading="status === 'loading' || refetching"
         :loading-progress-percentage="0"
@@ -93,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-latency-heatmap-no-data"
         class="h-full"
       />
-      <!-- ChartRenderer escape hatch (ui-architect "Charts / graphs", fixed-grid case): empty cells kept and index → bucket box mapping, which the heatmap converter cannot do -->
+      <!-- ChartRenderer preserves empty duration rows and maps category brushes back to histogram buckets. -->
       <ChartRenderer
         v-else-if="status === 'ready'"
         :data="chartData"
@@ -225,8 +248,15 @@ import TracesRedCaptionInfo from "./TracesRedCaptionInfo.vue";
 import LatencyHeatmapColorToggle, {
   type LatencyHeatmapColorBy,
 } from "./LatencyHeatmapColorToggle.vue";
-import { chartColor, chartTextColor, chartAxisLine, dataZoomBrushStyle } from "@/utils/chartTheme";
+import {
+  chartSeriesPrimary,
+  chartColor,
+  chartTextColor,
+  chartAxisLine,
+  dataZoomBrushStyle,
+} from "@/utils/chartTheme";
 import { heatmapLargeGridDefaults } from "@/utils/dashboard/heatmapDefaults";
+import { TRACES_CHART_GRID as GRID } from "./tracesChartLayout";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { escapeHtml } from "@/utils/html";
 import {
@@ -290,14 +320,32 @@ const emit = defineEmits<{
   (e: "refresh-failed"): void;
 }>();
 
-const { t } = useI18nTyped();
+const { t, mergeLocaleMessage } = useI18nTyped();
+mergeLocaleMessage("en-us", {
+  traces: {
+    latencyHeatmap: {
+      legend: {
+        fewer: "Fewer",
+        more: "More",
+        spans: "Span density: fewer to more within each time bucket",
+        errors: "Error share: fewer to more",
+      },
+    },
+  },
+});
 const store = useStore();
 const { isDark } = useTheme();
 const { aiIconSrc } = useAiIcon();
 
+const LEGEND_STEPS = [
+  "opacity-20",
+  "opacity-40 dark:opacity-35",
+  "opacity-60 dark:opacity-50",
+  "opacity-80 dark:opacity-65",
+  "opacity-100 dark:opacity-80",
+];
+
 const MINUTE_US = 60 * 1_000_000;
-// ECharts canvas sizes are pixel numbers with no CSS cascade, and no chart size tokens exist.
-const GRID = { left: 52, right: 8, top: 8, bottom: 22 };
 const DAY_US = 24 * 3600 * 1_000_000;
 
 const status = ref<"idle" | "loading" | "ready" | "empty" | "error">("idle");
@@ -412,8 +460,11 @@ const options = computed(() => {
   if (!g) return {};
   const textColor = chartTextColor();
   const byErrors = colorBy.value === "errors";
+  // Dark tops out one step lower so the table stays the brightest content (still 4.2:1+).
+  const peakAlpha = isDark.value ? 0.8 : 1;
   return {
     animation: false,
+    backgroundColor: "transparent",
     grid: GRID,
     tooltip: {
       trigger: "item",
@@ -442,7 +493,7 @@ const options = computed(() => {
       splitArea: { show: false },
       axisTick: { show: false },
       axisLine: { lineStyle: { color: chartAxisLine() } },
-      axisLabel: { color: textColor, fontSize: 10 },
+      axisLabel: { color: textColor, fontSize: 11 },
     },
     yAxis: {
       type: "category",
@@ -450,7 +501,7 @@ const options = computed(() => {
       splitArea: { show: false },
       axisTick: { show: false },
       axisLine: { lineStyle: { color: chartAxisLine() } },
-      axisLabel: { color: textColor, fontSize: 10 },
+      axisLabel: { color: textColor, fontSize: 11 },
     },
     visualMap: byErrors
       ? [
@@ -460,9 +511,12 @@ const options = computed(() => {
             dimension: 4,
             min: 0,
             max: 1,
-            inRange: { color: [chartColor("--color-status-error-text")], colorAlpha: [0.2, 1] },
+            inRange: {
+              color: [chartColor("--color-status-error-text")],
+              colorAlpha: [0.2, peakAlpha],
+            },
           },
-          // ECharts refuses a heatmap series without a visual map, so the neutral series gets a constant one.
+          // Zero-error cells retain the span footprint without suggesting errors.
           {
             show: false,
             seriesIndex: 1,
@@ -477,7 +531,7 @@ const options = computed(() => {
           dimension: 2,
           min: 0,
           max: 1,
-          inRange: { color: [chartColor("--color-latency-p95")], colorAlpha: [0.2, 1] },
+          inRange: { color: [chartSeriesPrimary()], colorAlpha: [0.2, peakAlpha] },
         },
     toolbox: {
       show: true,

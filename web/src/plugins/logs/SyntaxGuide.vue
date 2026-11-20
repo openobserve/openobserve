@@ -18,17 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODropdown side="bottom" align="start">
     <template #trigger>
       <div>
-        <!-- Menu-item style: full-width, left-aligned, badge icon — used when placed inside a dropdown -->
         <OButton
           v-if="menuItem"
           data-cy="syntax-guide-button"
           variant="ghost"
           size="sm"
-          class="rounded-default! h-auto! w-full! justify-start! gap-2! px-3! py-1.5! font-normal!"
+          class="rounded-default! h-8! min-h-8! w-full! justify-start! gap-2! px-3! py-1! font-normal!"
         >
           <template #icon-left>
             <span
-              class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+              class="text-text-secondary inline-flex size-4 shrink-0 items-center justify-center"
             >
               <OIcon name="help" size="sm" />
             </span>
@@ -39,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           v-else-if="toolbar"
           data-cy="syntax-guide-button"
-          variant="outline"
+          variant="ghost"
           :size="label ? 'sm-toolbar' : 'icon-toolbar'"
           :class="sqlmode ? 'sql-mode' : 'normal-mode'"
         >

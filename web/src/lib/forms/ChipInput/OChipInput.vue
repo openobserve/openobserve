@@ -85,9 +85,9 @@ const caretPlaceholder = computed(() =>
 const fieldClasses = computed(() => [
   "rounded-default border px-1.5 py-0.75 transition-[border-color,box-shadow] duration-150",
   props.disabled
-    ? "bg-input-disabled-bg border-input-disabled-border border-dashed"
+    ? "bg-input-bg border-input-border opacity-50 cursor-not-allowed"
     : "bg-input-bg border-input-border hover:border-input-border-hover",
-  showList.value ? "border-input-border-focus ring-focus-ring-accent ring-[0.125rem]" : "",
+  showList.value ? "ring-focus-ring-accent ring-2" : "",
 ]);
 
 const sizeClasses = computed(() => {

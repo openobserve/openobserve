@@ -1282,8 +1282,8 @@ export default defineComponent({
       store.commit("clearTempThemeColors");
 
       const currentMode = isDark.value ? "dark" : "light";
-      const defaultLight = store.state.defaultThemeColors?.light || "#3F7994";
-      const defaultDark = store.state.defaultThemeColors?.dark || "#5B9FBE";
+      const defaultLight = store.state.defaultThemeColors?.light || "#5A64DB";
+      const defaultDark = store.state.defaultThemeColors?.dark || "#8B8DF0";
 
       const savedLight =
         localStorage.getItem("customLightColor") ||

@@ -247,7 +247,7 @@ const timelineChartOptions = computed(() => {
       axisLine: { lineStyle: { color: axisLine } },
       axisLabel: {
         color: axisText,
-        fontSize: 10,
+        fontSize: 11,
         interval: (index: number) => index === 0 || index === times.length - 1,
         formatter: (v: any) => fmtTsShort(Number(v)),
         showMinLabel: true,

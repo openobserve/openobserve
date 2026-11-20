@@ -435,7 +435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="bg-card-glass-bg flex h-full min-h-0 flex-col overflow-hidden">
         <!-- Tabs & Search Bar -->
         <div
-          class="border-border-default bg-card-glass-bg! flex items-center justify-between border-b bg-white py-0"
+          class="border-border-default bg-card-glass-bg! flex items-center justify-between border-b py-0"
         >
           <div
             class="trace-details-view-tabs ms-[0.325rem] flex items-center space-x-4 py-[0.325rem]"

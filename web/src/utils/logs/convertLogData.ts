@@ -4,10 +4,18 @@ import {
   classicColorPaletteDarkTheme,
 } from "@/utils/dashboard/colorPalette";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
-import { dataZoomBrushStyle } from "@/utils/chartTheme";
+import {
+  chartBg,
+  chartSeriesPrimary,
+  chartAxisLine,
+  chartCrosshairLabel,
+  chartGridLine,
+  chartTextColor,
+  chartTooltipStyle,
+  dataZoomBrushStyle,
+} from "@/utils/chartTheme";
 import { resolveSeverityFieldValue } from "@/utils/logs/statusParser";
 import { BREAKDOWN_EMPTY_LABEL, BREAKDOWN_EMPTY_VALUE } from "@/utils/logs/constants";
-import { getDefaultTheme } from "@/constants/themes";
 
 export const convertLogData = (
   x: any,
@@ -17,8 +25,10 @@ export const convertLogData = (
     unparsed_x_data: any;
     timezone: string;
     itemStyle?: any;
+    modern?: boolean;
   },
 ) => {
+  const modern = !!params.modern;
   const options: any = {
     title: {
       left: "center",
@@ -32,10 +42,8 @@ export const convertLogData = (
       containLabel: true,
       left: "20",
       right: "20",
-      // 8 rather than 5: `containLabel` reserves room for the axis labels but
-      // not for the half of the topmost y-axis label that sits above its tick,
-      // which clipped that number against the top of the histogram strip.
-      top: "8",
+      // `containLabel` skips the half of the top y label above its tick, so keep room for it.
+      top: "6",
       bottom: "5",
     },
     tooltip: {
@@ -46,34 +54,35 @@ export const convertLogData = (
       // overflow. confine:false lets it extend past the chart bounds.
       appendToBody: true,
       confine: false,
-      textStyle: {
-        fontSize: 12,
-      },
+      ...(modern ? chartTooltipStyle() : { textStyle: { fontSize: 12 } }),
       axisPointer: {
         type: "cross",
         label: {
           show: true,
-          fontsize: 12,
+          fontSize: 12,
+          ...(modern ? chartCrosshairLabel() : {}),
         },
       },
     },
     xAxis: {
       type: "time",
+      ...(modern ? MODERN_X_AXIS() : {}),
     },
     yAxis: {
       type: "value",
       axisLine: {
-        show: true,
+        show: !modern,
       },
+      ...(modern ? { splitLine: modernSplitLine() } : {}),
       axisPointer: {
         label: {
           precision: 0,
         },
       },
-      splitNumber: 3,
-      minInterval: 1,
+      ...countAxisTicks(Math.max(0, ...[...y].map((v: any) => Number(v) || 0))),
       axisLabel: {
         formatter: formatCountAxisLabel,
+        ...(modern ? modernAxisLabel() : {}),
       },
     },
     toolbox: {
@@ -102,12 +111,13 @@ export const convertLogData = (
           y[index] || 0,
         ]),
         type: "bar",
+        ...(modern ? MODERN_BAR_LAYOUT : {}),
         emphasis: { focus: "series" },
         itemStyle: params.itemStyle
           ? params.itemStyle
           : {
-              // Reads the applied `dark` class because this runs outside component scope, where useTheme() is unavailable.
-              color: getThemeAccentColor(document.documentElement.classList.contains("dark")),
+              color: chartSeriesPrimary(),
+              ...(modern ? MODERN_BAR_STYLE : {}),
             },
       },
     ],
@@ -140,21 +150,22 @@ const getSeriesHash = (seriesName: string, palette: string[]): number => {
 // Semantic colors for recognized log-level / status categories.
 // Keys are lowercase; lookup normalizes the category before matching.
 // Must stay aligned with STATUS_COLORS / STATUS_COLORS_DARK in statusParser.ts.
+// Light steps are darker so each bar keeps 3:1 on the card at 0.85 opacity.
 const SEMANTIC_COLORS_LIGHT: Record<string, string> = {
   // severity / log_level / level — severity axis
   fatal: "#E53935",
   emergency: "#E53935",
   alert: "#ea580c",
   critical: "#F4511E",
-  error: "#EF5350",
-  warn: "#FB8C00",
-  warning: "#FB8C00",
+  error: "#D64541",
+  warn: "#B8650A",
+  warning: "#B8650A",
   notice: "#16a34a",
-  info: "#1E88E5",
-  debug: "#00ACC1",
+  info: "#2F7FD0",
+  debug: "#0E8A99",
   trace: "#90A4AE",
   // status — job/task pipeline axis
-  failure: "#EF5350",
+  failure: "#D64541",
   timeout: "#FF7043",
   cancelled: "#9E9E9E",
   pending: "#FFC107",
@@ -162,7 +173,7 @@ const SEMANTIC_COLORS_LIGHT: Record<string, string> = {
   ok: "#43A047",
 };
 
-const SEMANTIC_COLORS_DARK: Record<string, string> = {
+export const SEMANTIC_COLORS_DARK: Record<string, string> = {
   fatal: "#E07070",
   emergency: "#E07070",
   alert: "#ea580c",
@@ -189,14 +200,37 @@ export const formatCount = (value: number): string => {
 };
 
 export const formatCountAxisLabel = (value: number): string =>
-  Math.abs(value) < 1_000 ? String(value) : formatUnitValue(getUnitValue(value, "numbers", "", 2));
+  Math.abs(value) < 1_000 ? String(value) : formatUnitValue(getUnitValue(value, "numbers", "", 0));
 
-// The applied theme writes the accent on <body> in dark mode and on <html> in light mode.
-const getThemeAccentColor = (isDarkMode: boolean): string => {
-  const target = isDarkMode ? document.body : document.documentElement;
-  const accent = getComputedStyle(target).getPropertyValue("--color-theme-accent").trim();
-  return accent || getDefaultTheme()[isDarkMode ? "dark" : "light"].themeColor;
+// Rounds up to an even count of compact units (9.1K -> 10K), so max and mid ticks need no decimals.
+export const compactCeil = (max: number): number => {
+  if (!(max > 0)) return 2;
+  const unit = 1000 ** Math.max(0, Math.floor(Math.log10(max) / 3));
+  return Math.ceil(max / (2 * unit)) * 2 * unit;
 };
+
+// Three ticks (0, mid, max): fixed interval, because ECharts' nice-number split skips the mid for maxes like 8K.
+const countAxisTicks = (dataMax: number) => {
+  const max = compactCeil(dataMax);
+  return { min: 0, max, interval: max / 2 };
+};
+
+// Full strength: the cyan series-1 bar at 0.85 drops under 3:1 on the light card.
+const MODERN_BAR_STYLE = { borderRadius: [2, 2, 0, 0] };
+// A time axis with many buckets would otherwise shrink bars to hairlines.
+const MODERN_BAR_LAYOUT = { barCategoryGap: "30%", barMinWidth: 2 };
+
+// Canvas cannot read CSS, so the axis colors follow the tokens resolved at call time.
+const modernAxisLabel = () => ({ color: chartTextColor(), fontSize: 11 });
+const modernSplitLine = () => ({
+  show: true,
+  lineStyle: { color: chartGridLine(), type: "dashed", width: 1 },
+});
+const MODERN_X_AXIS = () => ({
+  axisLabel: { ...modernAxisLabel(), margin: 3 },
+  axisLine: { lineStyle: { color: chartAxisLine() } },
+  axisTick: { show: false },
+});
 
 const getSemanticColor = (
   label: unknown,
@@ -220,9 +254,10 @@ const getSemanticColor = (
 export const convertStackedLogData = (
   xData: number[],
   breakdownSeries: Map<string, number[]>,
-  params: { title: any; timezone: string; breakdownField?: string | null },
+  params: { title: any; timezone: string; breakdownField?: string | null; modern?: boolean },
   isDarkTheme: boolean,
 ): { options: any } => {
+  const modern = !!params.modern;
   const palette = isDarkTheme ? classicColorPaletteDarkTheme : classicColorPaletteLightTheme;
 
   const series = [...breakdownSeries.entries()].map(([category, values]) => {
@@ -234,6 +269,7 @@ export const convertStackedLogData = (
       name: label,
       type: "bar",
       stack: "total",
+      ...(modern ? MODERN_BAR_LAYOUT : {}),
       emphasis: { focus: "series" },
       data: xData.map((ts, i) => [
         params.timezone !== "UTC" ? toZonedTime(ts, params.timezone) : ts,
@@ -241,13 +277,17 @@ export const convertStackedLogData = (
       ]),
       itemStyle: {
         color: isEmpty
-          ? getThemeAccentColor(isDarkTheme)
+          ? chartSeriesPrimary()
           : getSemanticColor(label, isDarkTheme, palette, params.breakdownField),
+        ...(modern ? MODERN_BAR_STYLE : {}),
+        // A card-colour seam between stacked segments, so adjacent levels are not told apart by hue alone.
+        ...(modern ? { borderColor: chartBg(), borderWidth: 1 } : {}),
       },
     };
   });
 
-  const textColor = isDarkTheme ? "#e0e0e0" : "#222";
+  const tooltipStyle = chartTooltipStyle();
+  const textColor = tooltipStyle.textStyle.color || (isDarkTheme ? "#e0e0e0" : "#222");
 
   const esc = (s: string) =>
     String(s)
@@ -263,10 +303,9 @@ export const convertStackedLogData = (
         containLabel: true,
         left: "20",
         right: "20",
-        // Matches convertLogData: 3 extra pixels so the topmost y-axis number
-        // is not clipped by the top of the histogram strip.
-        top: "8",
-        bottom: series.length > 1 ? "20" : "5",
+        top: "6",
+        // Legend band only: keeps the plot at 56px+ inside the 92px strip.
+        bottom: series.length > 1 ? "13" : "5",
       },
       tooltip: {
         show: true,
@@ -279,12 +318,11 @@ export const convertStackedLogData = (
         // !important is required because ECharts writes inline styles.
         extraCssText:
           "max-width: min(25rem, calc(100vw - 1.5rem)) !important; max-height: 20vh !important; overflow-y: auto !important; overflow-x: hidden !important; white-space: normal !important;",
-        backgroundColor: isDarkTheme ? "#1e1e2e" : "#ffffff",
-        borderColor: isDarkTheme ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)",
+        ...tooltipStyle,
         textStyle: { fontSize: 12, color: textColor },
         axisPointer: {
           type: "cross",
-          label: { show: true, fontSize: 12 },
+          label: { show: true, fontSize: 12, ...(modern ? chartCrosshairLabel() : {}) },
         },
         formatter: (tooltipParams: any[]) => {
           if (!tooltipParams?.length) return "";
@@ -313,20 +351,30 @@ export const convertStackedLogData = (
       legend: {
         show: series.length > 1,
         bottom: 0,
+        padding: [0, 5],
+        itemHeight: 8,
         type: "scroll",
         // ECharts measures legend text on canvas, so the width is a pixel number.
-        textStyle: { fontSize: 11, width: 120, overflow: "truncate" },
+        textStyle: { fontSize: 12, width: 120, overflow: "truncate" },
         tooltip: { show: true },
       },
-      xAxis: { type: "time" },
+      xAxis: { type: "time", ...(modern ? MODERN_X_AXIS() : {}) },
       yAxis: {
         type: "value",
-        axisLine: { show: true },
+        axisLine: { show: !modern },
+        ...(modern ? { splitLine: modernSplitLine() } : {}),
         axisPointer: { label: { precision: 0 } },
-        splitNumber: 3,
-        minInterval: 1,
+        ...countAxisTicks(
+          Math.max(
+            0,
+            ...xData.map((_, i) =>
+              [...breakdownSeries.values()].reduce((sum, v) => sum + (v[i] ?? 0), 0),
+            ),
+          ),
+        ),
         axisLabel: {
           formatter: formatCountAxisLabel,
+          ...(modern ? modernAxisLabel() : {}),
         },
       },
       toolbox: {

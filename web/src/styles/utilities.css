@@ -224,3 +224,65 @@
   background-image: radial-gradient(var(--color-border-strong) 0.0625rem, transparent 0.0625rem);
   background-size: 1.125rem 1.125rem;
 }
+
+/* Logs results strip is plain text: muted labels, body values, a stronger event count. */
+.logs-strip-chip {
+  color: var(--color-text-secondary) !important;
+}
+.logs-strip-chip .font-semibold {
+  color: var(--color-text-body);
+}
+.logs-strip-chip--lead .font-semibold {
+  color: var(--color-text-heading);
+}
+
+/* The select owns its trigger DOM; both results bars share this compact menu treatment. */
+@utility results-page-select {
+  & [role="combobox"] {
+    height: 1.5rem !important;
+    margin: 0 !important;
+    padding-block: 0 !important;
+    font-size: var(--text-compact) !important;
+    font-weight: var(--font-normal) !important;
+    color: var(--color-text-body) !important;
+    /* eslint-disable-next-line local/no-hardcoded-px -- reserved hairline keeps every state the same box */
+    border: 1px solid transparent !important;
+    box-shadow: none !important;
+    background-color: transparent !important;
+  }
+
+  & [role="combobox"]:not(:disabled):is(:hover, [data-state="open"]) {
+    background-color: var(--color-button-ghost-hover-bg) !important;
+  }
+
+  & [role="combobox"] + div > span {
+    color: var(--color-text-secondary) !important;
+  }
+
+  & [role="combobox"] + div > span > svg {
+    width: 0.75rem !important;
+    height: 0.75rem !important;
+  }
+}
+
+@utility log-level-rail {
+  & .o2-table-row-with-status > td:first-child::before {
+    left: 0 !important;
+    top: 0.0625rem !important;
+    bottom: 0.0625rem !important;
+    width: 0.1875rem !important;
+    height: auto;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  & [data-test="o2-table-expand-cell"] > button {
+    position: relative;
+    left: 0.4375rem;
+  }
+
+  &.log-level-rail--wrap td[data-test^="o2-table-cell-"],
+  &.log-level-rail--wrap [data-test="o2-table-expand-cell"] {
+    vertical-align: top;
+  }
+}

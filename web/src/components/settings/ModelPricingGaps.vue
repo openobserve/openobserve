@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dataTest: 'model-pricing-gaps-back-btn',
     }"
     :title="t('modelPricing.unpriced.title')"
-    :subtitle="t('modelPricing.unpriced.subtitle')"
     bleed
   >
     <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">

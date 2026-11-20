@@ -55,4 +55,16 @@ describe("OText", () => {
     expect(wrapped.classes()).toContain("leading-normal");
     expect(wrapped.classes()).not.toContain("leading-none");
   });
+  it.each([
+    { variant: "page-title", classes: ["text-lg", "font-semibold", "tracking-[-0.01em]"] },
+    { variant: "section", classes: ["text-xs", "font-medium", "text-typography-section"] },
+    { variant: "panel-title", classes: ["text-compact", "font-semibold"] },
+    { variant: "card-title", classes: ["text-sm", "font-semibold"] },
+    { variant: "label", classes: ["text-compact", "font-medium", "text-typography-body"] },
+    { variant: "meta", classes: ["text-xs", "font-normal", "text-typography-meta"] },
+  ] as const)("styles $variant to the heading table", ({ variant, classes }) => {
+    const wrapper = mount(OText, { props: { variant }, slots: { default: "x" } });
+
+    expect(wrapper.classes()).toEqual(expect.arrayContaining([...classes]));
+  });
 });

@@ -101,7 +101,7 @@ describe("OFailedPill", () => {
       ["h-6", "h-6!"],
       ["border-status-error-text", "border-status-error-text!"],
       ["bg-status-error-bg", "bg-status-error-bg!"],
-      ["text-xs", "text-xs"],
+      ["text-xs", "text-xs!"],
     ]) {
       expect(pill.get('[data-test="pill"]').classes()).toContain(pillClass);
       expect(box.classes()).toContain(buttonClass);

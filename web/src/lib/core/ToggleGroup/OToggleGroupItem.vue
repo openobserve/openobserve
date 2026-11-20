@@ -76,9 +76,9 @@ const dropIndicatorClass = computed<string>(() => {
 });
 
 const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
-  md: "h-9 gap-2 px-3 text-sm max-md:px-2",
-  sm: "h-7 gap-1.5 px-2.5 text-xs max-md:px-1.5",
-  toolbar: "h-7 gap-1.5 px-3 text-xs max-[85.5rem]:px-2.5 max-md:px-1.5",
+  md: "h-6 gap-2 px-3 text-compact max-md:px-2",
+  sm: "h-6 gap-1.5 px-2.5 text-compact max-md:px-1.5",
+  toolbar: "h-6 gap-1.5 px-2.5 text-compact max-md:px-1.5",
   xs: "h-5 gap-2 px-1.5 text-xs max-md:px-1",
 };
 
@@ -88,7 +88,7 @@ function lockClass(icon: string): string | undefined {
 
 // Icon size mirrors the toggle size
 const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | "md"> = {
-  md: "md",
+  md: "sm",
   sm: "sm",
   toolbar: "sm",
   xs: "xs",
@@ -169,17 +169,17 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
         // Active fill: normally painted per-item. When the group animates the
         // selection (opt-in), a single sliding indicator paints the fill instead,
         // so suppress the per-item background and just keep the active text colour.
-        !isAnimated && 'data-[state=on]:bg-toggle-item-active-bg data-[state=on]:shadow-xs',
+        !isAnimated && 'data-[state=on]:bg-toggle-item-active-bg',
+        // No weight change on select: bold text would widen the item and shift the row.
         'data-[state=on]:text-toggle-item-active-text',
         // Gated off while focused so the focus ring keeps its own width and colour.
         !isAnimated &&
           'data-[state=on]:not-focus-visible:ring-toggle-item-active-border data-[state=on]:not-focus-visible:ring-1 data-[state=on]:not-focus-visible:ring-inset',
         // Sit above the sliding indicator so the icon/label stay readable.
         isAnimated && 'relative z-10',
-        // Focus ring
-        'focus-visible:ring-toggle-focus-ring focus-visible:ring-2 focus-visible:ring-inset',
+        'focus-visible:outline-focus-ring-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid',
         // Disabled — cursor is on the wrapper span; pointer-events-none prevents hover/active styles
-        'data-disabled:text-toggle-item-disabled data-disabled:opacity-60',
+        'data-disabled:opacity-50',
         'data-disabled:pointer-events-none',
         // Reorderable — `relative` anchors the absolute insertion line below
         isReorderable ? 'relative cursor-grab active:cursor-grabbing' : '',

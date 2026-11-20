@@ -177,7 +177,7 @@
           </p>
           <ul class="m-0 flex list-none flex-col gap-2 p-0">
             <li
-              class="bg-card-bg rounded-default border border-[color-mix(in_srgb,var(--color-accent,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent,#3F7994)_5%,var(--color-card-bg))]! p-[0.75rem_0.875rem]"
+              class="bg-card-bg rounded-default border border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-bg))]! p-[0.75rem_0.875rem]"
             >
               <div class="flex items-center gap-2">
                 <span

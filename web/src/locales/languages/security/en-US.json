@@ -116,7 +116,6 @@
     },
     "overview": {
       "title": "SOC Overview",
-      "subtitle": "What fired, what is open, and whether your sources are still reporting",
       "autoRefreshOn": "Auto-refresh every minute is on",
       "autoRefreshOff": "Auto-refresh is off",
       "historyError": "Could not load detection history: {reason}",
@@ -165,7 +164,6 @@
     },
     "events": {
       "title": "Security Events",
-      "subtitle": "Hunt across normalized security telemetry",
       "run": "Run",
       "hideSidebar": "Hide fields",
       "showSidebar": "Show fields",
@@ -348,7 +346,6 @@
     },
     "alerts": {
       "title": "Alerts",
-      "subtitle": "Every time a detection fired, and the evidence behind it",
       "eyebrow": "Detection firing",
       "range": {
         "1h": "1h",
@@ -463,7 +460,6 @@
     },
     "cases": {
       "title": "Cases",
-      "subtitle": "Correlated firings, triaged to a verdict",
       "eyebrow": "Case",
       "search": "Filter this page by title, id, assignee or entity",
       "refresh": "Refresh",
@@ -712,7 +708,6 @@
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
-      "subtitle": "Which techniques your enabled detections cover, and which fired",
       "summaryPartial": "This window has more alert history than one summary can hold, so firing counts are a lower bound; pick a shorter window for complete numbers.",
       "stat": {
         "firing": "Techniques firing",
@@ -775,7 +770,6 @@
     },
     "detections": {
       "title": "Detections",
-      "subtitle": "Sigma rules running as scheduled detections over your security streams",
       "new": "New detection",
       "eyebrow": "Detection rule",
       "refresh": "Refresh detections",
@@ -1073,7 +1067,6 @@
     },
     "content": {
       "title": "Content",
-      "subtitle": "The detection rules and log sources that ship with the SIEM, set against your data",
       "refresh": "Refresh",
       "streamsError": "Could not load your streams, so matches to your data are unknown",
       "tab": {
@@ -1219,7 +1212,6 @@
     },
     "entities": {
       "title": "Entities",
-      "subtitle": "Every user, source IP and host your security sources mention",
       "view": {
         "table": "Table",
         "graph": "Risk graph"
@@ -1339,7 +1331,6 @@
     },
     "ueba": {
       "title": "User Behavior Analytics",
-      "subtitle": "Each user compared with their own recent past",
       "windowHint": "Last {current}, compared with the {baseline} before it",
       "method": "Risk scores are heuristics: each user's last {current} is compared with their own {baseline} before it. Every flag shows the numbers that raised it.",
       "noSources": "No source names a user",
@@ -1438,7 +1429,6 @@
     },
     "intel": {
       "title": "Threat Intel",
-      "subtitle": "Known-bad indicators, and every place they showed up in your security data",
       "loadFailed": "Could not load indicator lists",
       "add": "Add indicators",
       "import": "Import",
@@ -1607,7 +1597,6 @@
     "sources": {
       "title": "Data Sources",
       "comingSoon": "Guided onboarding with OCSF normalization templates is coming. Until then, ingest security logs as any stream; the Events page identifies and normalizes them automatically.",
-      "subtitle": "Attach an OCSF pack to normalize a stream at ingest, or include it as a security source as-is.",
       "colStream": "Stream",
       "colSourceType": "Source type",
       "colMapping": "Mapping",

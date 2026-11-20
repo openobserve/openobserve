@@ -116,7 +116,6 @@
     },
     "overview": {
       "title": "SOC Genel Bakış",
-      "subtitle": "Nelerin tetiklendiği, nelerin açık olduğu ve kaynaklarınızın hâlâ raporlama yapıp yapmadığı",
       "autoRefreshOn": "Her dakika otomatik yenileme açık",
       "autoRefreshOff": "Otomatik yenileme kapalı",
       "historyError": "Algılama geçmişi yüklenemedi: {reason}",
@@ -165,7 +164,6 @@
     },
     "events": {
       "title": "Güvenlik Olayları",
-      "subtitle": "Normalleştirilmiş güvenlik telemetrisi üzerinde avlanın",
       "run": "Çalıştır",
       "hideSidebar": "Alanları gizle",
       "showSidebar": "Alanları göster",
@@ -348,7 +346,6 @@
     },
     "alerts": {
       "title": "Uyarılar",
-      "subtitle": "Her algılama tetiklendiğinde, arkasındaki kanıtlarla birlikte.",
       "eyebrow": "Algılama tetiklenmesi",
       "range": {
         "1h": "1sa",
@@ -463,7 +460,6 @@
     },
     "cases": {
       "title": "Vakalar",
-      "subtitle": "İlişkilendirilmiş tetiklenmeler, bir sonuca bağlanmak üzere triyaj edilir",
       "eyebrow": "Vaka",
       "search": "Bu sayfayı başlık, id, atanan kişi veya varlığa göre filtrele",
       "refresh": "Yenile",
@@ -712,7 +708,6 @@
     },
     "mitrePage": {
       "title": "MITRE ATT&CK",
-      "subtitle": "Etkin tespitlerinizin hangi teknikleri kapsadığı ve hangilerinin tetiklendiği",
       "summaryPartial": "Bu pencerede tek bir özetin alabileceğinden daha fazla uyarı geçmişi var; bu nedenle tetiklenme sayıları alt sınırdır. Tam sayılar için daha kısa bir pencere seçin.",
       "stat": {
         "firing": "Tetiklenen teknikler",
@@ -775,7 +770,6 @@
     },
     "detections": {
       "title": "Algılamalar",
-      "subtitle": "Güvenlik akışlarınız üzerinde zamanlanmış algılamalar olarak çalışan Sigma kuralları",
       "new": "Yeni algılama",
       "eyebrow": "Algılama kuralı",
       "refresh": "Algılamaları yenile",
@@ -1073,7 +1067,6 @@
     },
     "content": {
       "title": "İçerik",
-      "subtitle": "SIEM ile birlikte gelen, verilerinizle eşleştirilen algılama kuralları ve günlük kaynakları",
       "refresh": "Yenile",
       "streamsError": "Akışlarınız yüklenemediği için verilerinizle eşleşenler bilinmiyor",
       "tab": {
@@ -1219,7 +1212,6 @@
     },
     "entities": {
       "title": "Varlıklar",
-      "subtitle": "Güvenlik kaynaklarınızın bahsettiği her kullanıcı, kaynak IP ve ana bilgisayar",
       "view": {
         "table": "Tablo",
         "graph": "Risk grafiği"
@@ -1339,7 +1331,6 @@
     },
     "ueba": {
       "title": "Kullanıcı Davranışı Analizi",
-      "subtitle": "Her kullanıcı kendi yakın geçmişiyle karşılaştırılır",
       "windowHint": "Son {current}, bundan önceki {baseline} ile karşılaştırılır",
       "method": "Risk puanları sezgiseldir: her kullanıcının son {current} dönemi, kendi öncesindeki {baseline} dönemiyle karşılaştırılır. Her işaret, onu yükselten sayıları gösterir.",
       "noSources": "Hiçbir kaynakta kullanıcı adı yok",
@@ -1438,7 +1429,6 @@
     },
     "intel": {
       "title": "Tehdit İstihbaratı",
-      "subtitle": "Bilinen kötü amaçlı göstergeler ve bunların güvenlik verilerinizde göründüğü her yer",
       "loadFailed": "Gösterge listeleri yüklenemedi",
       "add": "Gösterge ekle",
       "import": "İçe aktar",
@@ -1607,7 +1597,6 @@
     "sources": {
       "title": "Veri kaynakları",
       "comingSoon": "OCSF normalleştirme şablonlarıyla rehberli kurulum yakında geliyor. O zamana kadar güvenlik günlüklerini herhangi bir akış olarak alın; Olaylar sayfası bunları otomatik olarak tanımlar ve normalleştirir.",
-      "subtitle": "Veri alımı sırasında bir akışı normalleştirmek için bir OCSF paketi iliştirin veya olduğu gibi güvenlik kaynağı olarak dahil edin.",
       "colStream": "Akış",
       "colSourceType": "Kaynak türü",
       "colMapping": "Eşleme",

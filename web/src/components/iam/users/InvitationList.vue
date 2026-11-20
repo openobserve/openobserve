@@ -15,12 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OPageLayout
-    :title="t('iam.invitations')"
-    :subtitle="t('iam.invitationList.subtitle')"
-    icon="mail"
-    bleed
-  >
+  <OPageLayout :title="t('iam.invitations')" icon="mail" bleed>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable

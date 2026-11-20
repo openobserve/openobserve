@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // timing waterfall, and assertion outcomes. No steps/screenshots/replay
 // (those are browser-run concepts).
 import { computed, onMounted, ref, watch } from "vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -253,7 +253,6 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
     <template #header v-if="!drawerMode">
       <OPageHeader
         class=""
-        :subtitle="raw(run ? fmtTs(run.timestamp) : '')"
         :back="{
           label: t('synthetics.results.monitors'),
           to: backTo,

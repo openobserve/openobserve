@@ -92,7 +92,6 @@ const isDestructiveIcon = computed<boolean>(() =>
   >
     <!-- img: prefix → external image -->
     <img v-if="isImgIcon" :src="imgSrc" :alt="label || ''" class="size-full object-contain" />
-    <!-- Registry icon (Material Symbols, regular weight — the main-branch look). -->
     <component v-else-if="iconComponent" :is="iconComponent" class="size-full" />
     <slot />
   </span>

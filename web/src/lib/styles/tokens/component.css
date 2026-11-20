@@ -81,7 +81,7 @@
   --color-button-ghost-muted-active-bg: var(--color-surface-accent-active);
   --color-button-ghost-muted-focus-ring: var(--color-focus-ring-accent);
 
-  /* Button — ghost-subtle (secondary text, 60 % opacity at rest, full on hover) */
+  /* Button — ghost-subtle (secondary text at rest, body on hover) */
   --color-button-ghost-subtle-text: var(--color-text-secondary);
   --color-button-ghost-subtle-hover-bg: var(--color-surface-accent-hover);
   --color-button-ghost-subtle-active-bg: var(--color-surface-accent-active);
@@ -595,6 +595,7 @@
   --color-input-disabled-border: var(--color-border-default);
   --color-input-disabled-text: var(--color-text-secondary);
   --color-input-focus-ring: var(--color-focus-ring-accent);
+  --color-input-focus-glow: color-mix(in srgb, var(--color-accent) 20%, transparent);
   --color-input-text: var(--color-text-heading);
   --color-input-placeholder: var(--color-text-placeholder);
   /* text-heading (not text-secondary) so labels don't read as disabled/hint text */
@@ -662,6 +663,7 @@
   --color-switch-track-on: var(
     --color-primary-500
   ); /* ON-track fill — solid primary-500, fixed both themes (matches switch-border) */
+  --color-switch-track-off: var(--color-border-control);
   --color-switch-disabled-border: var(--color-grey-300);
   --color-switch-disabled-thumb: var(--color-grey-300);
   --color-switch-border-off-neutral: var(--color-grey-500);
@@ -1404,8 +1406,15 @@
   --color-button-secondary-foreground: var(--color-button-secondary-foreground);
   --color-button-secondary-focus-ring: var(--color-button-secondary-focus-ring);
 
+  /* Selected state (one tone app-wide) */
+  --color-selected-bg: var(--color-selected-bg);
+  --color-selected-fg: var(--color-selected-fg);
+  --color-selected-border: var(--color-selected-border);
+  --color-button-secondary-border: var(--color-button-secondary-border);
+
   /* Button — outline */
   --color-button-outline-text: var(--color-button-outline-text);
+  --color-button-outline-bg: var(--color-button-outline-bg);
   --color-button-outline-border: var(--color-button-outline-border);
   --color-button-outline-hover-bg: var(--color-button-outline-hover-bg);
   --color-button-outline-hover-border: var(--color-button-outline-hover-border);
@@ -1568,6 +1577,7 @@
   --color-input-disabled-border: var(--color-input-disabled-border);
   --color-input-disabled-text: var(--color-input-disabled-text);
   --color-input-focus-ring: var(--color-input-focus-ring);
+  --color-input-focus-glow: var(--color-input-focus-glow);
   --color-input-text: var(--color-input-text);
   --color-input-placeholder: var(--color-input-placeholder);
   --color-input-label: var(--color-input-label);
@@ -1617,6 +1627,7 @@
   --color-switch-thumb-off: var(--color-switch-thumb-off);
   --color-switch-thumb-on: var(--color-switch-thumb-on);
   --color-switch-track-on: var(--color-switch-track-on);
+  --color-switch-track-off: var(--color-switch-track-off);
   --color-switch-disabled-border: var(--color-switch-disabled-border);
   --color-switch-disabled-thumb: var(--color-switch-disabled-thumb);
   --color-switch-border-off-neutral: var(--color-switch-border-off-neutral);
@@ -1753,8 +1764,11 @@
 
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg: var(--color-field-list-row-hover-bg);
+  --color-field-list-group-bg: var(--color-field-list-group-bg);
+  --color-field-list-row-selected-bg: var(--color-field-list-row-selected-bg);
+  --color-field-list-row-selected-text: var(--color-field-list-row-selected-text);
   --color-field-list-group-text: var(--color-field-list-group-text);
-  --color-field-list-label-text: var(--color-text-heading);
+  --color-field-list-label-text: var(--color-field-list-label-text);
   --color-field-list-label-icon: var(--color-field-list-label-icon);
   --color-field-list-drag-icon: var(--color-field-list-drag-icon);
   --color-field-list-expand-icon: var(--color-field-list-expand-icon);

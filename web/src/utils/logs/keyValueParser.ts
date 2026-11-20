@@ -13,40 +13,61 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export const LIGHT_MODE_COLORS = {
-  key: "#B71C1C", // red color for keys
-  stringValue: "#047857", // Softer green for strings - easy on eyes
-  numberValue: "#2563EB", // Royal blue for numbers - distinct from red keys
-  booleanValue: "#6D28D9", // Soft purple for booleans - distinct but calm
-  objectValue: "#4B5563", // Neutral gray for objects - subtle and professional
-  arrayValue: "#0E7490", // Calm teal for arrays - professional and clear
-  nullValue: "#6B7280", // Medium gray for null - appropriately muted
-  // Semantic types for log data
-  url: "#1D4ED8", // Strong blue for URLs - clearly indicates links
-  ip: "#D97706", // Bold amber for IP addresses - highly visible
-  email: "#9333EA", // Vivid purple for emails - distinct and readable
-  timestamp: "#2563EB", // Dark red for timestamps - important and visible
-  uuid: "#047857", // Dark teal for UUIDs - unique and readable
-  path: "#4338CA", // Deep indigo for file paths - system-related and clear
+import { escapeHtml } from "@/utils/html";
+
+// Theme-aware CSS vars from log-highlighting.css, so both themes share one calm palette.
+const SYNTAX_COLORS = {
+  key: "var(--log-syntax-key)",
+  stringValue: "var(--log-syntax-value)",
+  numberValue: "var(--log-syntax-accent)",
+  booleanValue: "var(--log-syntax-value)",
+  objectValue: "var(--log-syntax-value)",
+  arrayValue: "var(--log-syntax-value)",
+  nullValue: "var(--log-syntax-value)",
+  url: "var(--log-syntax-value)",
+  ip: "var(--log-syntax-value)",
+  email: "var(--log-syntax-value)",
+  timestamp: "var(--log-syntax-value)",
+  uuid: "var(--log-syntax-value)",
+  path: "var(--log-syntax-value)",
 } as const;
 
-export const DARK_MODE_COLORS = {
-  key: "#f67a7aff", // Lighter red for dark mode - same family as light mode but softer
-  stringValue: "#6EE7B7", // Soft mint green - easy to read
-  numberValue: "#60A5FA", // Light blue for numbers - easy to read in dark mode
-  booleanValue: "#A5B4FC", // Lavender - subtle but distinct
-  objectValue: "#D1D5DB", // Light gray - clear but not harsh
-  arrayValue: "#67E8F9", // Soft cyan - fresh but not glaring
-  nullValue: "#9CA3AF", // Medium gray - appropriately subtle
-  // Semantic types for log data
-  url: "#93C5FD", // Consistent with key color
-  ip: "#FCD34D", // Soft gold - warm and clear
-  email: "#C4B5FD", // Soft purple - gentle but readable
-  timestamp: "#60A5FA", // Consistent with number color
-  uuid: "#6EE7B7", // Consistent with string color
-  path: "#BAE6FD", // Ice blue - system-like but gentle
-} as const;
+export const LIGHT_MODE_COLORS = SYNTAX_COLORS;
+export const DARK_MODE_COLORS = SYNTAX_COLORS;
 
 export function getThemeColors(isDark: boolean) {
   return isDark ? DARK_MODE_COLORS : LIGHT_MODE_COLORS;
+}
+
+export function findLogKeyRanges(text: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  const tokens = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[A-Za-z_][\w.-]*/g;
+  for (const match of text.matchAll(tokens)) {
+    const start = match.index;
+    const end = start + match[0].length;
+    if (start > 0 && !/[\s{[,(;]/.test(text[start - 1])) continue;
+    if (!/^\s*[:=](?!\/\/)/.test(text.slice(end))) continue;
+    ranges.push([start, end]);
+  }
+  return ranges;
+}
+
+// Search matches are already split out; intersect key ranges only with the remaining text.
+export function renderLogTextWithKeys(
+  text: string,
+  ranges: Array<[number, number]>,
+  offset = 0,
+): string {
+  let result = "";
+  let cursor = 0;
+  for (const [from, to] of ranges) {
+    if (to <= offset) continue;
+    if (from >= offset + text.length) break;
+    const start = Math.max(from - offset, 0);
+    const end = Math.min(to - offset, text.length);
+    result += escapeHtml(text.slice(cursor, start));
+    result += `<span class="log-embedded-key">${escapeHtml(text.slice(start, end))}</span>`;
+    cursor = end;
+  }
+  return result + escapeHtml(text.slice(cursor));
 }

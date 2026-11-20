@@ -43,7 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class=""
         :title="raw(displayMonitorName)"
         title-data-test="synthetics-run-detail-title"
-        :subtitle="raw(currentRun.timestamp)"
         :back="{
           label: t('synthetics.results.monitors'),
           onClick: goBack,
