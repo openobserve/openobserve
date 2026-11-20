@@ -5353,6 +5353,8 @@
     "addToInterestingFields": "Dodaj do interesujących pól",
     "viewPatternsCount": "Wyświetl {count} wzorzec | Wyświetl {count} wzorców",
     "addPattern": "Dodaj wzorzec",
+    "sdrNonStringFieldWarning": "Wzorce stosowane podczas wyszukiwania dotyczą tylko pól tekstowych, więc ten wzorzec nie jest stosowany. Użyj zamiast tego wzorca stosowanego podczas pobierania danych.",
+    "sdrPartitionKeyWarning": "Klucz partycji przechowuje surową wartość w ścieżce pliku, więc jego wzorzec stosowany podczas wyszukiwania nie jest stosowany. Usuń wzorzec lub klucz partycji.",
     "editStream": "Edytuj strumień",
     "createNewStream": "Utwórz nowy strumień",
     "errorWhileDeletingStreams": "Błąd podczas usuwania strumieni.",

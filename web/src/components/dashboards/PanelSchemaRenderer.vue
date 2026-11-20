@@ -1037,6 +1037,11 @@ export default defineComponent({
           : index,
       );
 
+    // SQL buffers hold one row array per query; PromQL buffers hold { result } objects.
+    const bufferHasRows = (buffer: any) =>
+      !!buffer?.length &&
+      buffer.some((q: any) => q?.result?.length > 0 || (Array.isArray(q) && q.length > 0));
+
     // One rule for filteredData and the series mapping; null means data passes through untouched.
     const keptDataIndexes = computed((): number[] | null => {
       if (!data.value || !hiddenQueries.value?.length || !Array.isArray(data.value)) return null;
@@ -1594,10 +1599,7 @@ export default defineComponent({
       // resize observer, etc.) can't replace it with an empty 0-series result
       // before the first streaming chunk arrives. The streaming overlay path
       // (applyOverlay=true) and loading=false final renders are unaffected.
-      const hasRows =
-        data.value?.length > 0 &&
-        (data.value[0]?.result?.length > 0 ||
-          (Array.isArray(data.value[0]) && data.value[0].length > 0));
+      const hasRows = bufferHasRows(filteredData.value);
       const hasOldChart = panelData.value?.options?.series?.length > 0;
       if (!applyOverlay && loading.value && !hasRows && hasOldChart) {
         return;
@@ -1914,12 +1916,7 @@ export default defineComponent({
           };
 
         // Check if this is the first chunk with actual data
-        // SQL queries have data.value[0] as an array of hits (not an object with .result)
-        // PromQL queries have data.value[0] as an object with .result property
-        const hasData =
-          data.value?.length > 0 &&
-          (data.value[0]?.result?.length > 0 ||
-            (Array.isArray(data.value[0]) && data.value[0].length > 0));
+        const hasData = bufferHasRows(filteredData.value);
         // An emptied buffer is a new run: no conversion started before it may land.
         if (!data.value?.length) conversionGeneration++;
 
@@ -2236,7 +2233,7 @@ export default defineComponent({
         return loading.value && panelData.value?.options?.series?.length > 0 ? "" : "No Data";
       }
 
-      const hasRawData = data.value?.length && data.value[0]?.length;
+      const hasRawData = bufferHasRows(filteredData.value);
 
       // During data buffer reset (executor clears state.data before reload),
       // suppress "No Data" only while still loading to avoid flicker.
@@ -2286,9 +2283,13 @@ export default defineComponent({
       // Metric/gauge series are always created by the converter
       // (they use renderItem, not data arrays), so check the raw Y value.
       if (type === "metric" || type === "gauge") {
-        const firstRow = data.value[0]?.[0];
-        const yAlias = panelSchema.value.queries[0].fields.y.map((it: any) => it.alias || []);
-        return yAlias.every((y: any) => getDataValue(firstRow, y) != null) ? "" : "No Data";
+        const queries = filteredPanelSchema.value.queries ?? [];
+        const hasValue = (filteredData.value ?? []).some((rows: any, i: number) => {
+          if (!queries[i]) return false;
+          const yAlias = (queries[i].fields?.y ?? []).map((it: any) => it.alias || []);
+          return yAlias.every((y: any) => getDataValue(rows?.[0], y) != null);
+        });
+        return hasValue ? "" : "No Data";
       }
 
       // For all other chart types (line, area, bar, scatter, heatmap, etc.),

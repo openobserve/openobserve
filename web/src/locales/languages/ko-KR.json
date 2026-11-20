@@ -5353,6 +5353,8 @@
     "addToInterestingFields": "관심 필드에 추가",
     "viewPatternsCount": "{count}개 패턴 보기 | {count}개 패턴 보기",
     "addPattern": "패턴 추가",
+    "sdrNonStringFieldWarning": "검색 시점 패턴은 문자열 필드에만 적용되므로 이 패턴은 적용되지 않습니다. 대신 수집 시점 패턴을 사용하세요.",
+    "sdrPartitionKeyWarning": "파티션 키는 파일 경로에 원래 값을 담고 있으므로 검색 시점 패턴이 적용되지 않습니다. 패턴 또는 파티션 키를 제거하세요.",
     "editStream": "스트림 편집",
     "createNewStream": "새 스트림 생성",
     "errorWhileDeletingStreams": "스트림 삭제 중 오류가 발생했습니다.",

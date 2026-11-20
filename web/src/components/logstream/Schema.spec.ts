@@ -420,6 +420,28 @@ describe("Schema Component Tests", () => {
       expect(indices).toContain("hashPartition_16");
     });
 
+    it("flags a search-time pattern the scan cannot enforce", () => {
+      const searchPattern = { field: "f", policy: "Redact", apply_at: "AtSearch" };
+      wrapper.vm.patternAssociations = {
+        msg: [searchPattern],
+        code: [searchPattern],
+        region: [searchPattern],
+        ingested: [{ ...searchPattern, apply_at: "AtIngestion" }],
+        observed: [{ ...searchPattern, policy: "Detect" }],
+      };
+
+      expect(wrapper.vm.sdrConflict({ name: "msg", type: "Utf8View" })).toBeUndefined();
+      expect(wrapper.vm.sdrConflict({ name: "code", type: "Int64" })).toBe(
+        i18n.global.t("logStream.sdrNonStringFieldWarning"),
+      );
+      expect(
+        wrapper.vm.sdrConflict({ name: "region", type: "Utf8", index_type: ["keyPartition"] }),
+      ).toBe(i18n.global.t("logStream.sdrPartitionKeyWarning"));
+      expect(wrapper.vm.sdrConflict({ name: "ingested", type: "Int64" })).toBeUndefined();
+      expect(wrapper.vm.sdrConflict({ name: "observed", type: "Int64" })).toBeUndefined();
+      expect(wrapper.vm.isStringFieldType("LargeUtf8")).toBe(true);
+    });
+
     // Test 18: updateDefinedSchemaFields function - removing fields
     it("should update defined schema fields when removing", () => {
       wrapper.vm.indexData.defined_schema_fields = ["field1", "field2", "field3"];
