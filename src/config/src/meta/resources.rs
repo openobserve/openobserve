@@ -212,8 +212,6 @@ pub struct SourceResult {
     pub status: SourceStatus,
     pub has_more: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub next_cursor: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<SourceReason>,
 }
 
@@ -222,7 +220,7 @@ pub struct SearchQuery {
     pub q: String,
     pub types: Vec<ResourceKind>,
     pub limit: usize,
-    pub cursor: Option<String>,
+    pub offset: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

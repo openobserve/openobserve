@@ -16,43 +16,34 @@
 use std::{
     cmp::Ordering,
     collections::BTreeSet,
-    sync::Arc,
     time::{Duration, Instant},
 };
 
-use config::{
-    meta::resources::{
-        MatchTier, ResourceHit, ResourceKind, SearchQuery, SearchResponse, SourceReason,
-        SourceResult, SourceStatus,
-    },
-    utils::time::now_micros,
+use config::meta::resources::{
+    MatchTier, ResourceHit, ResourceKind, SearchQuery, SearchResponse, SourceReason, SourceResult,
+    SourceStatus,
 };
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    ResourceAccess, SearchError,
-    catalog::{Catalog, Ready, Snapshot},
-    cursor::{self, Cursor, CursorScope, SortKey},
+    ResourceAccess,
+    catalog::Snapshot,
     matching::{IndexedRecord, PreparedQuery},
 };
 
 pub(super) const SCAN_BUDGET: Duration = Duration::from_millis(150);
 
 pub(super) struct SearchWork {
-    pub catalog: Arc<Catalog>,
-    pub org: String,
-    pub subject: String,
     pub query: SearchQuery,
     pub prepared: PreparedQuery,
     pub access: Vec<ResourceAccess>,
-    pub cursor: Option<Cursor>,
     pub snapshots: Vec<(ResourceKind, Snapshot)>,
     pub deadline: Instant,
     pub cancelled: CancellationToken,
 }
 
 impl SearchWork {
-    pub fn execute(mut self) -> Result<SearchResponse, SearchError> {
+    pub fn execute(mut self) -> SearchResponse {
         let mut snapshots = std::mem::take(&mut self.snapshots);
         let mut response = SearchResponse {
             hits: Vec::new(),
@@ -74,32 +65,24 @@ impl SearchWork {
                 response.sources.push(unavailable(kind, reason));
                 continue;
             }
-            match snapshot.unwrap_or(Snapshot::Unavailable(SourceReason::Loading)) {
-                Snapshot::Unavailable(reason) => response.sources.push(unavailable(kind, reason)),
-                Snapshot::Busy => response.sources.push(partial(kind)),
-                Snapshot::Ready(data) => self.source(&data, access, &mut response)?,
+            match snapshot.unwrap_or(Err(SourceReason::Loading)) {
+                Err(reason) => response.sources.push(unavailable(kind, reason)),
+                Ok(rows) => self.source(&rows, access, &mut response),
             }
         }
-        Ok(response)
+        response
     }
 
     fn source(
         &self,
-        ready: &Ready,
+        rows: &[IndexedRecord],
         access: &ResourceAccess,
         response: &mut SearchResponse,
-    ) -> Result<(), SearchError> {
-        let generation = self.catalog.generation(ready.version);
-        if self
-            .cursor
-            .as_ref()
-            .is_some_and(|cursor| cursor.generation != generation)
-        {
-            return Err(SearchError::SearchChanged);
-        }
+    ) {
+        let keep = self.query.offset + self.query.limit;
         let mut selected = BTreeSet::new();
         let mut complete = true;
-        for (index, row) in ready.records.rows.iter().enumerate() {
+        for (index, row) in rows.iter().enumerate() {
             if index % 64 == 0 && (self.cancelled.is_cancelled() || Instant::now() >= self.deadline)
             {
                 complete = false;
@@ -113,93 +96,44 @@ impl SearchWork {
                 };
                 Some(tier)
             };
-            let candidate = Candidate { row, tier };
-            if self
-                .cursor
-                .as_ref()
-                .is_some_and(|cursor| candidate.at_or_before(&cursor.last))
-                || !(access.predicate)(&row.summary)
-            {
+            if !(access.predicate)(&row.summary) {
                 continue;
             }
-            selected.insert(candidate);
-            if selected.len() > self.query.limit + 1 {
+            selected.insert(Candidate { row, tier });
+            if selected.len() > keep + 1 {
                 selected.pop_last();
             }
         }
-        let has_more = selected.len() > self.query.limit;
+        let has_more = selected.len() > keep;
         if has_more {
             selected.pop_last();
         }
-        let mut source = SourceResult {
+        let partial = !complete || access.partial;
+        response.sources.push(SourceResult {
             kind: access.kind,
-            status: SourceStatus::Complete,
-            has_more: Some(has_more),
-            next_cursor: None,
+            status: if partial {
+                SourceStatus::Partial
+            } else {
+                SourceStatus::Complete
+            },
+            has_more: (!partial).then_some(has_more),
             reason: None,
-        };
-        if !complete || access.partial {
-            source.status = SourceStatus::Partial;
-            source.has_more = None;
-        }
-        if complete
-            && !access.partial
-            && has_more
-            && self.query.types.len() == 1
-            && let Some(last) = selected.last()
-        {
-            let scope = CursorScope {
-                subject: &self.subject,
-                org: &self.org,
-                kind: access.kind,
-                query: &self.prepared.original,
-            };
-            source.next_cursor = Some(cursor::encode(
-                &scope,
-                &generation,
-                last.sort_key(),
-                now_micros(),
-            )?);
-        }
-        response
-            .hits
-            .extend(selected.into_iter().map(|candidate| ResourceHit {
-                summary: candidate.row.summary.clone(),
-                match_tier: candidate.tier,
-            }));
-        response.sources.push(source);
-        Ok(())
+        });
+        response.hits.extend(
+            selected
+                .into_iter()
+                .skip(self.query.offset)
+                .map(|candidate| ResourceHit {
+                    summary: candidate.row.summary.clone(),
+                    match_tier: candidate.tier,
+                }),
+        );
     }
 }
 
 struct Candidate<'a> {
     row: &'a IndexedRecord,
     tier: Option<MatchTier>,
-}
-
-impl Candidate<'_> {
-    fn sort_key(&self) -> SortKey {
-        SortKey {
-            tier: self.tier,
-            name: self.row.normalized_name.clone(),
-            kind: self.row.summary.kind,
-            id: self.row.summary.id.clone(),
-        }
-    }
-
-    fn at_or_before(&self, key: &SortKey) -> bool {
-        (
-            self.tier,
-            self.row.normalized_name.as_str(),
-            self.row.summary.kind.as_str(),
-            self.row.summary.id.as_str(),
-        ) <= (
-            key.tier,
-            key.name.as_str(),
-            key.kind.as_str(),
-            key.id.as_str(),
-        )
-    }
 }
 
 impl Ord for Candidate<'_> {
@@ -236,17 +170,6 @@ pub(super) fn unavailable(kind: ResourceKind, reason: SourceReason) -> SourceRes
         kind,
         status: SourceStatus::Unavailable,
         has_more: None,
-        next_cursor: None,
         reason: Some(reason),
-    }
-}
-
-fn partial(kind: ResourceKind) -> SourceResult {
-    SourceResult {
-        kind,
-        status: SourceStatus::Partial,
-        has_more: None,
-        next_cursor: None,
-        reason: None,
     }
 }

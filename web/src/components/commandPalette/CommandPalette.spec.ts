@@ -19,7 +19,7 @@ const result: ResourceSearchResponse = {
     name: `payment ${i}`,
     route_ref: { function_name: `payment${i}` },
   })),
-  sources: [{ type: "function", status: "complete", has_more: true, next_cursor: "next" }],
+  sources: [{ type: "function", status: "complete", has_more: true }],
   took_ms: 1,
 };
 async function setup() {

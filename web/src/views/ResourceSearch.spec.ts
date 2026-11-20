@@ -10,7 +10,7 @@ import ResourceSearch from "./ResourceSearch.vue";
 vi.mock("@/services/resources", () => ({ default: { search: vi.fn() } }));
 const result: ResourceSearchResponse = {
   hits: [{ type: "function", id: "pay", name: "Payment", route_ref: { function_name: "pay" } }],
-  sources: [{ type: "function", status: "complete", has_more: true, next_cursor: "cursor-next" }],
+  sources: [{ type: "function", status: "complete", has_more: true }],
   took_ms: 1,
 };
 const wrappers: ReturnType<typeof mount>[] = [];
@@ -49,29 +49,23 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 describe("Resource search continuation", () => {
-  it("preserves conditions on next page and restarts after generation changes", async () => {
-    vi.mocked(resources.search)
-      .mockResolvedValueOnce(result)
-      .mockRejectedValueOnce({ isAxiosError: true, response: { status: 409 } })
-      .mockResolvedValue(result);
+  it("pages by offset with the same conditions and goes back to the first page", async () => {
     const { wrapper, router } = await setup();
     await wrapper.get('[data-test="resource-search-next"]').trigger("click");
     await flushPromises();
     await vi.advanceTimersByTimeAsync(200);
     await flushPromises();
-    expect(vi.mocked(resources.search).mock.calls[1][1]).toMatchObject({
+    expect(vi.mocked(resources.search).mock.calls.at(-1)?.[1]).toMatchObject({
       q: "pay",
       types: ["function"],
-      cursor: "cursor-next",
+      offset: 20,
     });
-    expect(wrapper.text()).toContain("Resources changed");
     expect(router.currentRoute.value.query).toMatchObject({ q: "pay", type: "function" });
-    const restart = wrapper.findAll("button").find((b) => b.text() === "Search again")!;
-    await restart.trigger("click");
+    await wrapper.get('[data-test="resource-search-previous"]').trigger("click");
     await flushPromises();
     await vi.advanceTimersByTimeAsync(200);
     await flushPromises();
-    expect(vi.mocked(resources.search).mock.calls.at(-1)?.[1].cursor).toBeUndefined();
+    expect(vi.mocked(resources.search).mock.calls.at(-1)?.[1].offset).toBeUndefined();
   });
   it("does not describe an unavailable source as no matches", async () => {
     vi.mocked(resources.search).mockResolvedValue({

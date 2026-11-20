@@ -43,7 +43,6 @@ export interface ResourceSource {
   type: ResourceKind;
   status: "complete" | "partial" | "unavailable";
   has_more: boolean | null;
-  next_cursor?: string;
   reason?:
     | "loading"
     | "disabled"
@@ -61,5 +60,5 @@ export interface ResourceSearchParams {
   q: string;
   types?: ResourceKind[];
   limit?: number;
-  cursor?: string;
+  offset?: number;
 }

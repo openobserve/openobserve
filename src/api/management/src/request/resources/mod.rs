@@ -53,14 +53,13 @@ struct SearchFailure {
         ("q" = Option<String>, Query, description = "Name or stable identity, at most 256 normalized Unicode characters"),
         ("types" = Option<String>, Query, description = "Comma-separated resource types"),
         ("limit" = Option<usize>, Query, description = "Per-type limit, default 20, maximum 100"),
-        ("cursor" = Option<String>, Query, description = "Continuation cursor for one explicit resource type")
+        ("offset" = Option<usize>, Query, description = "Hits to skip, for one explicit resource type, at most 10000")
     ),
     responses(
         (status = 200, description = "Resource summaries and per-source completeness", body = config::meta::resources::SearchResponse),
         (status = 400, description = "Invalid search parameters"),
         (status = 401, description = "Authentication required"),
         (status = 403, description = "Organization access denied"),
-        (status = 409, description = "Catalog changed; restart the search"),
         (status = 429, description = "Search capacity exhausted"),
         (status = 503, description = "Search unavailable")
     ),
@@ -102,7 +101,7 @@ pub async fn search(
         query.types.retain(|kind| permissions::enabled(*kind));
     }
     let access = permissions::resolve(&org, &subject.user_id, &query.types).await;
-    match resources::search(&org, &subject.user_id, query, access).await {
+    match resources::search(&org, query, access).await {
         Ok(mut result) => {
             result.took_ms = start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
             ([(header::CACHE_CONTROL, "private, no-store")], Json(result)).into_response()
@@ -110,11 +109,6 @@ pub async fn search(
         Err(SearchError::InvalidQuery(error)) => {
             failure(StatusCode::BAD_REQUEST, "invalid_query", error)
         }
-        Err(SearchError::SearchChanged) => failure(
-            StatusCode::CONFLICT,
-            "search_changed",
-            "Search changed; restart with the same conditions",
-        ),
         Err(SearchError::Overloaded) => failure(
             StatusCode::TOO_MANY_REQUESTS,
             "overloaded",

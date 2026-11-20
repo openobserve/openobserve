@@ -2,7 +2,6 @@
 import { computed, onMounted, onScopeDispose, nextTick, ref, toRef, watch } from "vue";
 import { RouterLink, useRouter, type NavigationFailure, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
-import { isAxiosError } from "axios";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -176,11 +175,6 @@ const activeId = computed(() => {
   const entry = entries.value.find((entry) => entry.id === activeKey.value);
   return entry ? optionId(entry) : undefined;
 });
-const errorText = computed(() =>
-  isAxiosError(search.error.value) && search.error.value.response?.status === 409
-    ? t("commandPalette.changed")
-    : t("commandPalette.failed"),
-);
 const incomplete = computed(() => search.data.value?.sources.some((s) => s.status !== "complete"));
 const localGroups = computed(() =>
   [
@@ -482,7 +476,7 @@ onScopeDispose(() => {
         role="status"
       >
         <OText variant="meta">{{
-          search.error.value ? errorText : t("commandPalette.partial")
+          search.error.value ? t("commandPalette.failed") : t("commandPalette.partial")
         }}</OText
         ><OButton
           variant="secondary"

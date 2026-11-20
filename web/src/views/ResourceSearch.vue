@@ -2,7 +2,6 @@
 import { computed, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { isAxiosError } from "axios";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { RESOURCE_KINDS, type ResourceKind, type ResourceHit } from "@/ts/interfaces/resources";
 import { useResourceSearch } from "@/components/commandPalette/useResourceSearch";
@@ -27,17 +26,15 @@ function selectedType(value: unknown): ResourceKind {
 }
 const type = ref<ResourceKind | "all">(selectedType(route.query.type));
 const query = ref(typeof route.query.q === "string" ? route.query.q : "");
-const cursor = ref<string>();
-const previous = ref<(string | undefined)[]>([]);
+const PAGE_SIZE = 20;
+const page = ref(0);
+const offset = computed(() => page.value * PAGE_SIZE);
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const subject = computed<string>(() => store.state.userInfo?.email ?? "");
 const open = ref(true);
-const search = useResourceSearch({ open, org, subject, query, type, cursor });
+const search = useResourceSearch({ open, org, subject, query, type, offset, limit: PAGE_SIZE });
 const rows = computed(() => search.data.value?.hits ?? []);
 const source = computed(() => search.data.value?.sources.find((s) => s.type === type.value));
-const changed = computed(
-  () => isAxiosError(search.error.value) && search.error.value.response?.status === 409,
-);
 const columns = computed<OTableColumnDef<ResourceHit>[]>(() => [
   { id: "name", header: t("common.name"), accessorKey: "name" },
   { id: "folder_name", header: t("dashboard.folder"), accessorKey: "folder_name", hideable: true },
@@ -47,22 +44,16 @@ function changeType(value: unknown) {
   type.value = selectedType(value);
 }
 function next() {
-  if (source.value?.next_cursor) {
-    previous.value.push(cursor.value);
-    cursor.value = source.value.next_cursor;
-  }
+  if (source.value?.has_more) page.value += 1;
 }
 function back() {
-  if (previous.value.length) cursor.value = previous.value.pop();
+  if (page.value > 0) page.value -= 1;
 }
 function searchAgain() {
-  if (cursor.value) cursor.value = undefined;
-  else void search.refetch();
-  previous.value = [];
+  void search.refetch();
 }
 watch([query, type, org], () => {
-  cursor.value = undefined;
-  previous.value = [];
+  page.value = 0;
   if (route.name === "resourceSearch")
     void router.replace({
       name: "resourceSearch",
@@ -152,7 +143,7 @@ watch(
       <template #error
         ><OEmptyState
           size="block"
-          :title="changed ? t('commandPalette.changed') : t('commandPalette.failed')"
+          :title="t('commandPalette.failed')"
           :action-label="t('commandPalette.searchAgain')"
           @action="searchAgain"
       /></template>
@@ -165,14 +156,14 @@ watch(
             <OButton
               variant="secondary"
               size="sm"
-              :disabled="!previous.length || search.pending.value"
+              :disabled="page === 0 || search.pending.value"
               data-test="resource-search-previous"
               @click="back"
               >{{ t("common.previous") }}</OButton
             ><OButton
               variant="secondary"
               size="sm"
-              :disabled="!source?.next_cursor || search.pending.value"
+              :disabled="!source?.has_more || search.pending.value"
               data-test="resource-search-next"
               @click="next"
               >{{ t("common.next") }}</OButton

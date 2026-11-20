@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::{BTreeMap, VecDeque},
-    str::FromStr,
-};
+use std::str::FromStr;
 
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use config::meta::{
@@ -26,7 +23,7 @@ use config::meta::{
 };
 use infra::{
     db::{Event, get_orm_client_rw},
-    table::folders::{folder_type_from_i16, folder_type_into_i16},
+    table::folders::folder_type_from_i16,
 };
 use sea_orm::{ConnectionTrait, FromQueryResult, Statement, Value};
 use serde::Deserialize;
@@ -36,8 +33,6 @@ const MAX_PAGE_SIZE: usize = 1000;
 // Alert attributes are read only to derive the SIEM marker.
 const MAX_ROW_TEXT: usize = 256 * 1024;
 pub const PAGE_SIZE: usize = 512;
-// Caps bind parameters per refresh statement; a stream id binds at most three.
-const REFRESH_BATCH: usize = 256;
 // Key prefixes parse_event_key maps to catalog changes.
 const EVENT_PREFIXES: [&str; 12] = [
     "/alert_composites/",
@@ -79,64 +74,6 @@ impl SourceRead {
         })
     }
 
-    fn refresh(org: &str, kind: ResourceKind, ids: &[String]) -> Self {
-        let mut values = vec![org.into()];
-        let mut terms = vec![format!(
-            "id IN ({})",
-            bind(&mut values, ids.iter().cloned())
-        )];
-        if kind == ResourceKind::Stream {
-            // Schema versions are rows keyed `{type}/{name}/{version}`; grouping prefixes by
-            // length keeps one substr per length, and the cast is needed by Postgres.
-            let mut prefixes = BTreeMap::<usize, Vec<String>>::new();
-            for id in ids {
-                let prefix = format!("{id}/");
-                prefixes
-                    .entry(prefix.chars().count())
-                    .or_default()
-                    .push(prefix);
-            }
-            for (len, group) in prefixes {
-                values.push((len as i64).into());
-                let n = values.len();
-                let list = bind(&mut values, group);
-                terms.push(format!("substr(id, 1, CAST(${n} AS INTEGER)) IN ({list})"));
-            }
-        }
-        Self {
-            sql: format!(
-                "SELECT {} FROM ({}) AS r WHERE {} ORDER BY id",
-                summary_columns(),
-                selection(kind),
-                terms.join(" OR ")
-            ),
-            values,
-        }
-    }
-
-    fn folders(org: &str, after: Option<&str>, limit: usize) -> Result<Self> {
-        ensure!(
-            (1..=MAX_PAGE_SIZE).contains(&limit),
-            "invalid folder page size"
-        );
-        let types = ResourceKind::ALL
-            .into_iter()
-            .filter_map(ResourceKind::folder_type)
-            .map(|folder_type| folder_type_into_i16(folder_type).to_string())
-            .collect::<Vec<_>>()
-            .join(",");
-        Ok(Self {
-            sql: format!(
-                "SELECT id,folder_id,name,type AS kind FROM folders WHERE org=$1 AND type IN ({types}) AND id>$2 ORDER BY id LIMIT $3"
-            ),
-            values: vec![
-                org.into(),
-                after.unwrap_or("").into(),
-                (limit as i64).into(),
-            ],
-        })
-    }
-
     fn statement<C: ConnectionTrait>(&self, conn: &C) -> Statement {
         Statement::from_sql_and_values(
             conn.get_database_backend(),
@@ -146,38 +83,26 @@ impl SourceRead {
     }
 }
 
+/// The catalog entries an event makes stale; no org means every org.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ResourceChange {
-    Resource {
-        org: String,
-        kind: ResourceKind,
-        id: String,
-    },
-    GlobalResource {
-        kind: ResourceKind,
-        id: String,
-    },
-    Folder {
-        org: String,
-        kind: ResourceKind,
-    },
-    Scope {
-        kinds: Vec<ResourceKind>,
-    },
-    InvalidateAll,
+pub struct ResourceChange {
+    pub org: Option<String>,
+    pub kinds: Vec<ResourceKind>,
+}
+
+impl ResourceChange {
+    pub fn covers(&self, org: &str, kind: ResourceKind) -> bool {
+        self.org.as_deref().is_none_or(|own| own == org) && self.kinds.contains(&kind)
+    }
 }
 
 pub struct ResourceEvents {
     receiver: mpsc::Receiver<Event>,
-    pending: VecDeque<ResourceChange>,
 }
 
 impl ResourceEvents {
     pub async fn next(&mut self) -> Result<ResourceChange> {
         loop {
-            if let Some(change) = self.pending.pop_front() {
-                return Ok(change);
-            }
             let event = self
                 .receiver
                 .recv()
@@ -188,28 +113,20 @@ impl ResourceEvents {
                 Event::Empty => continue,
             };
             match parse_event_key(&key) {
-                Ok(changes) => self.pending.extend(changes),
+                Ok(Some(change)) => return Ok(change),
+                Ok(None) => {}
                 Err(error) => {
-                    log::warn!("[RESOURCE SEARCH] invalidating catalogs on event {key}: {error}");
-                    self.pending.push_back(ResourceChange::InvalidateAll);
+                    log::warn!(
+                        "[RESOURCE SEARCH] marking every catalog stale on event {key}: {error}"
+                    );
+                    return Ok(ResourceChange {
+                        org: None,
+                        kinds: ResourceKind::ALL.into(),
+                    });
                 }
             }
         }
     }
-}
-
-#[derive(Debug)]
-pub struct FolderPage {
-    pub items: Vec<(ResourceKind, String, String)>,
-    pub next: Option<String>,
-}
-
-#[derive(Debug, FromQueryResult)]
-struct FolderRow {
-    id: String,
-    folder_id: String,
-    name: String,
-    kind: i16,
 }
 
 #[derive(Debug, FromQueryResult)]
@@ -341,10 +258,7 @@ pub async fn subscribe() -> Result<ResourceEvents> {
         Some(receiver) if receivers.is_empty() => receiver,
         last => merge(receivers.into_iter().chain(last)),
     };
-    Ok(ResourceEvents {
-        receiver,
-        pending: VecDeque::new(),
-    })
+    Ok(ResourceEvents { receiver })
 }
 
 pub async fn load_page(
@@ -355,21 +269,6 @@ pub async fn load_page(
 ) -> Result<SummaryPage> {
     require_sql_store()?;
     load_page_with(get_orm_client_rw().await, org, kind, after, limit).await
-}
-
-/// Re-reads `ids`; an id with no row in the result was deleted or left the org.
-pub async fn refresh(
-    org: &str,
-    kind: ResourceKind,
-    ids: &[String],
-) -> Result<Vec<ResourceSummary>> {
-    require_sql_store()?;
-    refresh_with(get_orm_client_rw().await, org, kind, ids).await
-}
-
-pub async fn folder_page(org: &str, after: Option<&str>, limit: usize) -> Result<FolderPage> {
-    require_sql_store()?;
-    folder_page_with(get_orm_client_rw().await, org, after, limit).await
 }
 
 fn require_sql_store() -> Result<()> {
@@ -401,68 +300,12 @@ async fn load_page_with<C: ConnectionTrait>(
     Ok(SummaryPage { items, next })
 }
 
-async fn refresh_with<C: ConnectionTrait>(
-    conn: &C,
-    org: &str,
-    kind: ResourceKind,
-    ids: &[String],
-) -> Result<Vec<ResourceSummary>> {
-    let mut found = Vec::with_capacity(ids.len());
-    let mut seen = hashbrown::HashSet::with_capacity(ids.len());
-    for chunk in ids.chunks(REFRESH_BATCH) {
-        let read = SourceRead::refresh(org, kind, chunk);
-        let rows = SummaryRow::find_by_statement(read.statement(conn))
-            .all(conn)
-            .await?;
-        for row in rows {
-            if let Some(summary) = row.into_summary(org, kind)
-                && seen.insert(summary.id.clone())
-            {
-                found.push(summary);
-            }
-        }
-    }
-    Ok(found)
-}
-
-async fn folder_page_with<C: ConnectionTrait>(
-    conn: &C,
-    org: &str,
-    after: Option<&str>,
-    limit: usize,
-) -> Result<FolderPage> {
-    let read = SourceRead::folders(org, after, limit)?;
-    let rows = FolderRow::find_by_statement(read.statement(conn))
-        .all(conn)
-        .await?;
-    let next = (rows.len() == limit).then(|| rows[limit - 1].id.clone());
-    let items = rows
-        .into_iter()
-        .map(|row| {
-            let kind = folder_type_from_i16(row.kind)
-                .and_then(ResourceKind::from_folder_type)
-                .context("invalid resource folder kind")?;
-            Ok((kind, row.folder_id, row.name))
-        })
-        .collect::<Result<Vec<_>>>()?;
-    Ok(FolderPage { items, next })
-}
-
 fn summary_columns() -> String {
     format!(
         "id,name,folder_id,folder_name,enabled,\
          CASE WHEN length(attributes) <= {MAX_ROW_TEXT} THEN attributes END AS attributes,alert_type,\
          COALESCE(length(attributes),0) > {MAX_ROW_TEXT} AS oversized"
     )
-}
-
-fn bind(values: &mut Vec<Value>, items: impl IntoIterator<Item = String>) -> String {
-    let mut list = Vec::new();
-    for item in items {
-        values.push(item.into());
-        list.push(format!("${}", values.len()));
-    }
-    list.join(",")
 }
 
 fn selection(kind: ResourceKind) -> &'static str {
@@ -556,46 +399,39 @@ fn merge(receivers: impl Iterator<Item = mpsc::Receiver<Event>>) -> mpsc::Receiv
     rx
 }
 
-fn parse_event_key(key: &str) -> Result<Vec<ResourceChange>> {
+fn parse_event_key(key: &str) -> Result<Option<ResourceChange>> {
+    const ACCOUNTS: [ResourceKind; 2] = [ResourceKind::User, ResourceKind::ServiceAccount];
     let parts = key.trim_start_matches('/').split('/').collect::<Vec<_>>();
     match parts.as_slice() {
-        ["folders", org, folder_type, folder_id] if !org.is_empty() && !folder_id.is_empty() => {
+        ["folders", org, folder_type, folder_id] => {
             let folder_type = folder_type
                 .parse()
                 .ok()
                 .and_then(folder_type_from_i16)
                 .context("invalid folder type")?;
-            Ok(ResourceKind::from_folder_type(folder_type)
-                .map(|kind| ResourceChange::Folder {
-                    org: (*org).into(),
-                    kind,
-                })
-                .into_iter()
-                .collect())
+            match ResourceKind::from_folder_type(folder_type) {
+                Some(kind) => scoped(org, folder_id, &[kind]),
+                None => Ok(None),
+            }
         }
-        ["alert_composites", org, id] | ["anomaly_detection", "config", org, id] => {
-            scoped_change(org, ResourceKind::Alert, (*id).into())
+        ["alerts", org, id]
+        | ["alert_composites", org, id]
+        | ["anomaly_detection", "config", org, id] => scoped(org, id, &[ResourceKind::Alert]),
+        ["dashboards", org, id] => scoped(org, id, &[ResourceKind::Dashboard]),
+        ["function", org, rest @ ..] => scoped(org, &rest.join("/"), &[ResourceKind::Function]),
+        ["schema", org, _, name, ..] => scoped(org, name, &[ResourceKind::Stream]),
+        ["synthetics", "check", org, id] => scoped(org, id, &[ResourceKind::Synthetic]),
+        ["org_users", "single", org, email] => scoped(org, email, &ACCOUNTS),
+        ["pipelines", _] => Ok(Some(ResourceChange {
+            org: None,
+            kinds: vec![ResourceKind::Pipeline],
+        })),
+        ["user_record", _] | ["org_users", "many", "user", _] | ["user_bulk_refresh", ""] => {
+            Ok(Some(ResourceChange {
+                org: None,
+                kinds: ACCOUNTS.into(),
+            }))
         }
-        ["dashboards", org, id] => scoped_change(org, ResourceKind::Dashboard, (*id).into()),
-        ["alerts", org, id] => scoped_change(org, ResourceKind::Alert, (*id).into()),
-        ["function", org, rest @ ..] => scoped_change(org, ResourceKind::Function, rest.join("/")),
-        ["schema", org, signal, name, ..] => {
-            scoped_change(org, ResourceKind::Stream, format!("{signal}/{name}"))
-        }
-        ["synthetics", "check", org, id] => {
-            scoped_change(org, ResourceKind::Synthetic, (*id).into())
-        }
-        ["pipelines", id] => Ok(vec![ResourceChange::GlobalResource {
-            kind: ResourceKind::Pipeline,
-            id: (*id).into(),
-        }]),
-        ["user_record", email] | ["org_users", "many", "user", email] => {
-            Ok(account_changes(None, email))
-        }
-        ["org_users", "single", org, email] => Ok(account_changes(Some(org), email)),
-        ["user_bulk_refresh", ""] => Ok(vec![ResourceChange::Scope {
-            kinds: vec![ResourceKind::User, ResourceKind::ServiceAccount],
-        }]),
         [
             "dashboards" | "alerts" | "alert_composites" | "folders" | "function" | "schema"
             | "pipelines" | "user_record" | "org_users",
@@ -603,37 +439,19 @@ fn parse_event_key(key: &str) -> Result<Vec<ResourceChange>> {
         ]
         | ["anomaly_detection", "config", ..]
         | ["synthetics", "check", ..] => bail!("malformed resource event"),
-        _ => Ok(vec![]),
+        _ => Ok(None),
     }
 }
 
-fn scoped_change(org: &str, kind: ResourceKind, id: String) -> Result<Vec<ResourceChange>> {
+fn scoped(org: &str, id: &str, kinds: &[ResourceKind]) -> Result<Option<ResourceChange>> {
     ensure!(
         !org.is_empty() && !id.is_empty(),
         "empty resource event identity"
     );
-    Ok(vec![ResourceChange::Resource {
-        org: org.into(),
-        kind,
-        id,
-    }])
-}
-
-fn account_changes(org: Option<&str>, email: &str) -> Vec<ResourceChange> {
-    [ResourceKind::User, ResourceKind::ServiceAccount]
-        .into_iter()
-        .map(|kind| match org {
-            Some(org) => ResourceChange::Resource {
-                org: org.into(),
-                kind,
-                id: email.into(),
-            },
-            None => ResourceChange::GlobalResource {
-                kind,
-                id: email.into(),
-            },
-        })
-        .collect()
+    Ok(Some(ResourceChange {
+        org: Some(org.into()),
+        kinds: kinds.into(),
+    }))
 }
 
 #[cfg(test)]
@@ -661,69 +479,8 @@ mod tests {
         conn
     }
 
-    fn ids(values: &[&str]) -> Vec<String> {
-        values.iter().map(|v| (*v).to_owned()).collect()
-    }
-
     #[tokio::test]
-    async fn refresh_reads_many_ids_per_statement_and_drops_missing_ones() {
-        let conn = fixture().await;
-        for sql in [
-            "INSERT INTO dashboards VALUES ('a','pk1','Alpha','body'),('b','pk2','Beta','body'),('c','pk3','Other org','body')",
-            "INSERT INTO meta VALUES ('schema','org','logs/payment',0,''),('schema','org','logs/payment/7',1,''),('schema','org','logs/pay',0,''),('schema','org','logs/solo/3',1,'')",
-        ] {
-            conn.execute_unprepared(sql).await.unwrap();
-        }
-        let read = SourceRead::refresh("org", ResourceKind::Dashboard, &ids(&["a", "b"]));
-        assert_eq!(read.values.len(), 3);
-        let rows = refresh_with(
-            &conn,
-            "org",
-            ResourceKind::Dashboard,
-            &ids(&["b", "missing", "c", "a"]),
-        )
-        .await
-        .unwrap();
-        let mut found = rows.iter().map(|r| r.id.as_str()).collect::<Vec<_>>();
-        found.sort_unstable();
-        assert_eq!(found, ["a", "b"]);
-
-        let many = (0..REFRESH_BATCH + 3)
-            .map(|i| format!("x{i}"))
-            .chain(ids(&["a"]));
-        let rows = refresh_with(
-            &conn,
-            "org",
-            ResourceKind::Dashboard,
-            &many.collect::<Vec<_>>(),
-        )
-        .await
-        .unwrap();
-        assert_eq!(rows.len(), 1);
-
-        let read = SourceRead::refresh(
-            "org",
-            ResourceKind::Stream,
-            &ids(&["logs/a", "logs/b", "logs/ccc"]),
-        );
-        assert_eq!(read.values.len(), 1 + 3 + 2 + 3);
-        assert_eq!(read.sql.matches("CAST(").count(), 2);
-        let streams = refresh_with(
-            &conn,
-            "org",
-            ResourceKind::Stream,
-            &ids(&["logs/payment", "logs/solo"]),
-        )
-        .await
-        .unwrap();
-        assert_eq!(
-            streams.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
-            ["logs/payment", "logs/solo"]
-        );
-    }
-
-    #[tokio::test]
-    async fn dashboard_projection_pages_and_refreshes_current_folder_without_reading_body() {
+    async fn dashboard_projection_pages_by_id_without_reading_body() {
         let conn = fixture().await;
         conn.execute_unprepared("INSERT INTO dashboards VALUES ('a','pk1','Alpha','malformed JSON'),('b','pk2','Beta','body'),('c','pk3','Other org','body')").await.unwrap();
         let page = load_page_with(&conn, "org", ResourceKind::Dashboard, None, 1)
@@ -752,32 +509,6 @@ mod tests {
         .await
         .unwrap();
         assert!(end.items.is_empty() && end.next.is_none());
-        conn.execute_unprepared(
-            "UPDATE dashboards SET folder_id='pk2',title='Renamed' WHERE dashboard_id='a'",
-        )
-        .await
-        .unwrap();
-        let rows = refresh_with(&conn, "org", ResourceKind::Dashboard, &ids(&["a"]))
-            .await
-            .unwrap();
-        let row = &rows[0];
-        assert_eq!(row.name, "Renamed");
-        assert_eq!(row.folder_name.as_deref(), Some("Staging"));
-        assert!(
-            refresh_with(&conn, "org", ResourceKind::Dashboard, &ids(&["c"]))
-                .await
-                .unwrap()
-                .is_empty()
-        );
-        conn.execute_unprepared("DELETE FROM dashboards WHERE dashboard_id='a'")
-            .await
-            .unwrap();
-        assert!(
-            refresh_with(&conn, "org", ResourceKind::Dashboard, &ids(&["a"]))
-                .await
-                .unwrap()
-                .is_empty()
-        );
     }
 
     #[tokio::test]
@@ -830,17 +561,6 @@ mod tests {
                 .map(|r| r.id.as_str())
                 .collect::<Vec<_>>(),
             vec!["logs/payment", "traces/payment"]
-        );
-        assert!(
-            !refresh_with(
-                &conn,
-                "org",
-                ResourceKind::Stream,
-                &ids(&["traces/payment"])
-            )
-            .await
-            .unwrap()
-            .is_empty()
         );
     }
 
@@ -933,37 +653,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn folder_name_projection_pages_with_kind_and_public_identity() {
-        let conn = fixture().await;
-        let mut after = None;
-        let mut items = Vec::new();
-        loop {
-            let page = folder_page_with(&conn, "org", after.as_deref(), 1)
-                .await
-                .unwrap();
-            assert!(page.items.len() <= 1);
-            items.extend(page.items);
-            after = page.next;
-            if after.is_none() {
-                break;
-            }
-        }
-        assert_eq!(items.len(), 4);
-        assert!(items.contains(&(
-            ResourceKind::Dashboard,
-            "public1".into(),
-            "Production".into()
-        )));
-        assert!(items.contains(&(ResourceKind::Alert, "alerts".into(), "Alert folder".into())));
-        assert!(items.contains(&(
-            ResourceKind::Synthetic,
-            "synthetics".into(),
-            "Probe folder".into()
-        )));
-        assert!(!items.iter().any(|(_, id, _)| id == "other"));
-    }
-
-    #[tokio::test]
     async fn oversized_alert_attributes_are_skipped_without_reading_them() {
         let conn = fixture().await;
         conn.execute_unprepared(
@@ -1037,66 +726,55 @@ mod tests {
                 .unwrap();
         }
         drop(sender);
-        let mut events = ResourceEvents {
-            receiver,
-            pending: VecDeque::new(),
-        };
-        assert_eq!(events.next().await.unwrap(), ResourceChange::InvalidateAll);
+        let mut events = ResourceEvents { receiver };
+        let all = events.next().await.unwrap();
+        assert!(all.org.is_none() && all.kinds.len() == ResourceKind::ALL.len());
         assert_eq!(
             events.next().await.unwrap(),
-            ResourceChange::Resource {
-                org: "org".into(),
-                kind: ResourceKind::Dashboard,
-                id: "d1".into(),
+            ResourceChange {
+                org: Some("org".into()),
+                kinds: vec![ResourceKind::Dashboard],
             }
         );
         assert!(events.next().await.is_err());
     }
 
     #[test]
-    fn event_parser_preserves_scopes_without_using_payload_or_repurposing_empty() {
-        let changes = parse_event_key("/dashboards/org/id").unwrap();
-        assert!(
-            matches!(&changes[0],ResourceChange::Resource{org,kind:ResourceKind::Dashboard,id} if org=="org"&&id=="id")
-        );
-        assert!(
-            matches!(&parse_event_key("/pipelines/id").unwrap()[0],ResourceChange::GlobalResource{kind:ResourceKind::Pipeline,id} if id=="id")
-        );
+    fn event_parser_marks_scopes_without_using_payload() {
+        let change = |key| parse_event_key(key).unwrap().unwrap();
+        assert!(change("/dashboards/org/id").covers("org", ResourceKind::Dashboard));
+        assert!(!change("/dashboards/org/id").covers("other", ResourceKind::Dashboard));
+        assert!(change("/pipelines/id").covers("any", ResourceKind::Pipeline));
+        let account = change("/user_record/u@example.invalid");
+        assert!(account.covers("any", ResourceKind::User));
+        assert!(account.covers("any", ResourceKind::ServiceAccount));
         assert_eq!(
-            parse_event_key("/user_record/u@example.invalid")
-                .unwrap()
-                .len(),
-            2
+            change("/folders/org/1/ops"),
+            ResourceChange {
+                org: Some("org".into()),
+                kinds: vec![ResourceKind::Alert],
+            }
         );
-        assert_eq!(
-            parse_event_key("/folders/org/1/ops").unwrap(),
-            vec![ResourceChange::Folder {
-                org: "org".into(),
-                kind: ResourceKind::Alert,
-            }]
-        );
-        assert!(parse_event_key("/folders/org/6/ops").unwrap().is_empty());
+        assert!(parse_event_key("/folders/org/6/ops").unwrap().is_none());
         assert!(parse_event_key("/folders/org/x/ops").is_err());
         for key in [
             "/alert_composites/org/c1",
             "/anomaly_detection/config/org/c1",
         ] {
-            assert!(
-                matches!(&parse_event_key(key).unwrap()[0],ResourceChange::Resource{org,kind:ResourceKind::Alert,id} if org=="org"&&id=="c1")
-            );
+            assert!(change(key).covers("org", ResourceKind::Alert));
         }
         assert!(
             parse_event_key("/anomaly_detection/write_intent/w1")
                 .unwrap()
-                .is_empty()
+                .is_none()
         );
-        assert!(parse_event_key("/unrelated/org/id").unwrap().is_empty());
+        assert!(parse_event_key("/unrelated/org/id").unwrap().is_none());
         assert!(parse_event_key("/dashboards/malformed").is_err());
     }
 
     #[test]
-    fn every_kind_has_an_event_that_marks_it_dirty() {
-        // A kind without an event key is never refreshed after its cold build.
+    fn every_kind_has_an_event_that_marks_it_stale() {
+        // A kind without an event key is only rebuilt when its snapshot ages out.
         for kind in ResourceKind::ALL {
             let key = match kind {
                 ResourceKind::Dashboard => "/dashboards/org/d1",
@@ -1107,15 +785,8 @@ mod tests {
                 ResourceKind::Synthetic => "/synthetics/check/org/c1",
                 ResourceKind::User | ResourceKind::ServiceAccount => "/org_users/single/org/u@x",
             };
-            let changes = parse_event_key(key).unwrap();
-            assert!(
-                changes.iter().any(|change| matches!(
-                    change,
-                    ResourceChange::Resource { kind: k, .. }
-                        | ResourceChange::GlobalResource { kind: k, .. } if *k == kind
-                )),
-                "{kind} is not refreshed by {key}"
-            );
+            let change = parse_event_key(key).unwrap().unwrap();
+            assert!(change.covers("org", kind), "{kind} is not marked by {key}");
         }
     }
 }

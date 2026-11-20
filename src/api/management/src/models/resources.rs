@@ -18,13 +18,15 @@ use std::str::FromStr;
 use config::meta::resources::{ResourceKind, SearchQuery};
 use serde::Deserialize;
 
+const MAX_OFFSET: usize = 10_000;
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SearchParams {
     pub q: Option<String>,
     pub types: Option<String>,
     pub limit: Option<usize>,
-    pub cursor: Option<String>,
+    pub offset: Option<usize>,
 }
 
 impl SearchParams {
@@ -55,21 +57,18 @@ impl SearchParams {
         if !(1..=100).contains(&limit) {
             return Err("limit must be between 1 and 100");
         }
-        if self.cursor.is_some() && types.len() != 1 {
-            return Err("a cursor requires exactly one resource type");
+        let offset = self.offset.unwrap_or(0);
+        if offset > 0 && types.len() != 1 {
+            return Err("an offset requires exactly one resource type");
         }
-        if self
-            .cursor
-            .as_ref()
-            .is_some_and(|cursor| cursor.len() > 8 * 1024)
-        {
-            return Err("cursor exceeds 8 KiB");
+        if offset > MAX_OFFSET {
+            return Err("offset exceeds 10000");
         }
         Ok(SearchQuery {
             q,
             types,
             limit,
-            cursor: self.cursor,
+            offset,
         })
     }
 }
@@ -82,13 +81,13 @@ mod tests {
         q: Option<&str>,
         types: Option<&str>,
         limit: Option<usize>,
-        cursor: Option<String>,
+        offset: Option<usize>,
     ) -> SearchParams {
         SearchParams {
             q: q.map(String::from),
             types: types.map(String::from),
             limit,
-            cursor,
+            offset,
         }
     }
 
@@ -99,13 +98,8 @@ mod tests {
             params(Some(" "), None, None, None),
             params(Some("x"), Some("dashboard,unknown"), None, None),
             params(Some("x"), None, Some(101), None),
-            params(Some("x"), None, None, Some("cursor".into())),
-            params(
-                Some("x"),
-                Some("dashboard"),
-                None,
-                Some("a".repeat(8 * 1024 + 1)),
-            ),
+            params(Some("x"), None, None, Some(20)),
+            params(Some("x"), Some("dashboard"), None, Some(MAX_OFFSET + 1)),
         ] {
             assert!(invalid.into_query().is_err());
         }

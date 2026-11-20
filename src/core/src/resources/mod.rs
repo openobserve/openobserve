@@ -14,18 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod catalog;
-mod cursor;
 mod matching;
-mod records;
 mod scan;
 
 use std::{sync::Arc, time::Instant};
 
-use catalog::{Catalog, Limits, Readers};
+use catalog::{Catalog, Limits};
 use config::meta::resources::{
     ResourceKind, ResourceSummary, SearchQuery, SearchResponse, SourceReason,
 };
-use cursor::CursorScope;
 use matching::PreparedQuery;
 pub use matching::normalize;
 use scan::{SCAN_BUDGET, SearchWork, unavailable};
@@ -45,8 +42,6 @@ pub struct ResourceAccess {
 pub enum SearchError {
     #[error("{0}")]
     InvalidQuery(String),
-    #[error("search_changed")]
-    SearchChanged,
     #[error("resource search is overloaded")]
     Overloaded,
     #[error("resource search is unavailable")]
@@ -55,26 +50,10 @@ pub enum SearchError {
 
 pub async fn search(
     org: &str,
-    subject: &str,
     query: SearchQuery,
     access: Vec<ResourceAccess>,
 ) -> Result<SearchResponse, SearchError> {
     let prepared = PreparedQuery::new(&query.q)?;
-    let cursor = if let Some(value) = &query.cursor {
-        let scope = CursorScope {
-            subject,
-            org,
-            kind: query.types[0],
-            query: &prepared.original,
-        };
-        Some(cursor::decode(
-            value,
-            &scope,
-            config::utils::time::now_micros(),
-        )?)
-    } else {
-        None
-    };
     let enabled = query
         .types
         .iter()
@@ -114,7 +93,7 @@ pub async fn search(
                 max_bytes: config::get_config().limit.resource_catalog_max_bytes,
                 ..Limits::default()
             };
-            let catalog = Catalog::new(Readers::production(), limits);
+            let catalog = Catalog::new(catalog::production_reader(), limits);
             tokio::spawn(catalog::watch(Arc::downgrade(&catalog), events));
             Ok::<_, SearchError>(catalog)
         })
@@ -126,20 +105,14 @@ pub async fn search(
         .clone()
         .try_acquire_owned()
         .map_err(|_| SearchError::Overloaded)?;
-    let deadline = Instant::now() + SCAN_BUDGET;
-    let snapshots = catalog.read(org, &enabled, deadline).await;
     let cancelled = CancellationToken::new();
     let _cancel_on_drop = cancelled.clone().drop_guard();
     let work = SearchWork {
-        catalog,
-        org: org.into(),
-        subject: subject.into(),
+        snapshots: catalog.read(org, &enabled),
         query,
         prepared,
         access,
-        cursor,
-        snapshots,
-        deadline,
+        deadline: Instant::now() + SCAN_BUDGET,
         cancelled,
     };
     tokio::task::spawn_blocking(move || {
@@ -147,7 +120,7 @@ pub async fn search(
         work.execute()
     })
     .await
-    .map_err(|_| SearchError::ServiceUnavailable)?
+    .map_err(|_| SearchError::ServiceUnavailable)
 }
 
 #[cfg(test)]
@@ -158,12 +131,11 @@ mod tests {
     async fn denied_source_returns_unavailable_without_starting_a_catalog() {
         let result = search(
             "org",
-            "user@example.invalid",
             SearchQuery {
                 q: "payment".into(),
                 types: vec![ResourceKind::Function],
                 limit: 20,
-                cursor: None,
+                offset: 0,
             },
             vec![ResourceAccess {
                 kind: ResourceKind::Function,
