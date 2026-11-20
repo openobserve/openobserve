@@ -795,6 +795,24 @@ function dropKeptCount(results: any) {
   searchObj.meta.resultGrid.showPagination = false;
 }
 
+// The total a run counted, or the one it kept from the run before when its own count failed.
+function keptTotalOf(results: any): number | undefined {
+  if (!results || results.countFailed) return undefined;
+  return results.total ?? results.lastTotal ?? undefined;
+}
+
+// A failed count keeps the last count of this dataset, never the page size, and reports a failed refresh.
+function keepLastCount(results: any): boolean {
+  searchObj.meta.refreshFailedAt = Date.now();
+  if (results.lastTotal == null) {
+    results.countFailed = true;
+    return false;
+  }
+  results.total = results.lastTotal;
+  searchObj.meta.resultGrid.showPagination = results.lastTotal > 0;
+  return true;
+}
+
 function fetchTracesCount() {
   const queryReq = searchObj.data.queryPayload;
   const results = searchObj.data.queryResults;
@@ -860,6 +878,9 @@ function fetchTracesCount() {
       error: (_payload: any, err: any) => {
         // The count is a best-effort badge; the main search reports its own failures.
         console.warn("Failed to fetch traces count", err);
+        const current =
+          searchObj.data.queryResults === results && currentCountTraceId === countTraceId;
+        if (current && keepLastCount(results)) landed = true;
         settle();
       },
       complete: (_payload: any) => {
@@ -982,6 +1003,7 @@ async function getQueryData(
         total: null,
         countPending: true,
         errorCount: sameDataset ? searchObj.data.queryResults?.errorCount : undefined,
+        lastTotal: sameDataset ? keptTotalOf(searchObj.data.queryResults) : undefined,
         from: 0,
         size: queryReq.query.size,
         took: 0,

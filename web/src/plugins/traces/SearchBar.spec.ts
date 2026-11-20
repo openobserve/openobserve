@@ -1115,6 +1115,20 @@ describe("SearchBar", () => {
       expect(wrapper.emitted("drill-down")).toHaveLength(1);
     });
 
+    it("is aria-disabled and inert to clicks when the search found nothing", async () => {
+      applySearch();
+      const hits = searchObjInstance.data.queryResults.hits;
+      searchObjInstance.data.queryResults.hits = [];
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const btn = wrapper.find('[data-test="insights-button"]');
+      expect(btn.attributes("aria-disabled")).toBe("true");
+      await btn.trigger("click");
+      expect(wrapper.emitted("drill-down")).toBeUndefined();
+      searchObjInstance.data.queryResults.hits = hits;
+    });
+
     it("should be hidden when the org has no trace streams", async () => {
       applySearch();
       searchObjInstance.data.stream.streamLists = [];

@@ -4845,6 +4845,46 @@ describe("Index.vue (Main Traces Page)", () => {
       err.mockRestore();
       mockSearchObj.data.queryPayload = null;
     });
+
+    it.each([
+      ["keeps the last count of the dataset", 200, { total: 200 }],
+      ["has no count when none was kept", undefined, { total: null, countFailed: true }],
+    ])("on a failed count %s and reports a failed refresh", async (_name, lastTotal, expected) => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      mockSearchObj.data.queryPayload = { query: { start_time: 1, end_time: 2 } };
+      const results = { hits: new Array(25).fill({}), total: null, countPending: true, lastTotal };
+      mockSearchObj.data.queryResults = results;
+      mockSearchObj.meta.refreshFailedAt = null;
+      mockFetchQueryDataWithHttpStream.mockClear();
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      wrapper.vm.fetchTracesCount();
+      const [, handlers] = mockFetchQueryDataWithHttpStream.mock.calls.at(-1) as any[];
+      handlers.error({}, { content: { message: "network error" } });
+
+      expect(results).toMatchObject({ ...expected, countPending: false });
+      expect(!!(results as any).countFailed).toBe(lastTotal === undefined);
+      expect(mockSearchObj.meta.refreshFailedAt).toEqual(expect.any(Number));
+      warn.mockRestore();
+      mockSearchObj.data.queryPayload = null;
+      mockSearchObj.meta.refreshFailedAt = null;
+    });
   });
 
   describe("URL writes around leaving Traces", () => {

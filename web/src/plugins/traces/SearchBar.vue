@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="insights-button"
             variant="outline"
             size="xs"
-            :disabled="searchObj.loading"
+            :disabled="searchObj.loading || !searchObj.data.queryResults?.hits?.length"
             focusable-unavailable
             @click="$emit('drill-down')"
           >
