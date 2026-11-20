@@ -393,6 +393,17 @@ describe("transport binding (AC4.1, P2 records)", () => {
     });
   });
 
+  it("a replacing run clears the histogram loading the replaced run left behind", () => {
+    openGrid();
+    fakeSearchObj.value.loadingHistogram = true;
+    fakeSearchObj.value.loadingHistogramProgressPercentage = 40;
+
+    openGrid();
+
+    expect(fakeSearchObj.value.loadingHistogram).toBe(false);
+    expect(fakeSearchObj.value.loadingHistogramProgressPercentage).toBe(0);
+  });
+
   it("sends nothing for a follow-up of a replaced generation", () => {
     const connection = useSearchConnection((key: string) => key as any);
     const old = openGrid();
