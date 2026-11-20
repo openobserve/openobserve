@@ -70,7 +70,7 @@ function urlPoint(value: string, env: Env): Alt<Point>[] {
   const iso = whole(scanIso(value, 0));
   if (iso.length > 0) return iso;
   if (value === "now") return [{ v: { p: "now" } }];
-  const math = scanDateMath(value, 0, env.nowUs, env.zone, env.pack.firstDay);
+  const math = scanDateMath(value, 0, env.nowUs, env.zone);
   return math && math.end === value.length ? math.alts : [];
 }
 

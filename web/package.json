@@ -153,6 +153,7 @@
     "jsdom": "^27.4.0",
     "msw": "^2.15.0",
     "npm-run-all": "^4.1.5",
+    "pako": "^1.0.11",
     "patch-package": "^8.0.1",
     "postcss": "^8.5.30",
     "postcss-html": "^2.0.0",
