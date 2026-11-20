@@ -1308,6 +1308,7 @@ const useRoutes = () => {
       props: (to: any) => ({ token: to.params.token }),
       meta: {
         titleKey: "routeTitles.sharedChat",
+        navLink: "/",
       },
       beforeEnter: withFeatureGate("aiAssistant", (to: any, from: any, next: any) => next()),
     },
