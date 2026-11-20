@@ -14601,6 +14601,7 @@
         "noSyntheticsFolderAccess": "您無權存取合成監控資料夾。",
         "tags": "標籤",
         "tagPlaceholder": "key:value",
+        "alertTagsHint": "告警必須具備每一個標籤。",
         "tagsHint": "檢查必須具備每一個標籤。",
         "removeBlock": "移除此區塊",
         "specificItems": "特定項目",

@@ -80,7 +80,7 @@ impl Downtime {
 pub struct DowntimeTarget {
     pub module: TargetModule,
     pub folders: TargetFolders,
-    /// Synthetics only.
+    /// Read only when the module has tags (alerts and synthetics); any one listed tag matches.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -147,8 +147,9 @@ impl TargetModule {
         !matches!(self, Self::Synthetics)
     }
 
+    /// Modules whose items carry tags a target can name: alerts and synthetics.
     pub fn has_tags(self) -> bool {
-        matches!(self, Self::Synthetics)
+        matches!(self, Self::Alerts | Self::Synthetics)
     }
 }
 
@@ -913,6 +914,14 @@ mod tests {
             assert_eq!(event.as_str(), name);
             assert_eq!(serde_json::to_value(event).unwrap(), name);
         }
+    }
+
+    #[test]
+    fn alerts_and_synthetics_take_tag_targets() {
+        assert!(TargetModule::Alerts.has_tags());
+        assert!(TargetModule::Synthetics.has_tags());
+        assert!(!TargetModule::AnomalyDetections.has_tags());
+        assert!(!TargetModule::Slos.has_tags());
     }
 
     #[test]

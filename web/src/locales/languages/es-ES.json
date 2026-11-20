@@ -14606,6 +14606,7 @@
         "noSyntheticsFolderAccess": "No tienes acceso a las carpetas de Sintéticos.",
         "tags": "Etiquetas",
         "tagPlaceholder": "clave:valor",
+        "alertTagsHint": "Cada etiqueta debe estar en la alerta.",
         "tagsHint": "Cada etiqueta debe estar en la comprobación.",
         "removeBlock": "Eliminar este bloque",
         "specificItems": "Elementos específicos",

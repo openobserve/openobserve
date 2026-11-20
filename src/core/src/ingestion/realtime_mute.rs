@@ -444,6 +444,7 @@ fn push_row(org: &str, now: i64, entry: &mut AlertEntry, row: Row, signature: Op
                 &scope.alert_id,
                 &scope.folder_id,
                 dims,
+                &alert.tags,
                 group_key.as_deref(),
                 now,
             )
@@ -476,6 +477,7 @@ async fn finish_entry(org: &str, now: i64, key: &str, entry: AlertEntry) -> Trig
             &scope.alert_id,
             &scope.folder_id,
             dims,
+            &alert.tags,
             group_key,
             now,
         )

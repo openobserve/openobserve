@@ -14606,6 +14606,7 @@
         "noSyntheticsFolderAccess": "Synthetics 폴더에 대한 접근 권한이 없습니다.",
         "tags": "태그",
         "tagPlaceholder": "key:value",
+        "alertTagsHint": "모든 태그가 알림에 있어야 합니다.",
         "tagsHint": "모든 태그가 검사에 있어야 합니다.",
         "removeBlock": "이 블록 제거",
         "specificItems": "특정 항목",

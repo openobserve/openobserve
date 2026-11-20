@@ -82,9 +82,10 @@ pub fn active_for_alert(
     alert_id: &str,
     folder_id: &str,
     dims: &HashMap<String, String>,
+    tags: &[String],
     now: i64,
 ) -> Option<ActiveDowntime> {
-    let item = enterprise::item(alert_id, folder_id, dims, &[]);
+    let item = enterprise::item(alert_id, folder_id, dims, tags);
     enterprise::active_in(
         &db::downtimes::list_cached(org),
         config::meta::downtimes::TargetModule::Alerts,
@@ -99,6 +100,7 @@ pub fn active_for_alert(
     _alert_id: &str,
     _folder_id: &str,
     _dims: &HashMap<String, String>,
+    _tags: &[String],
     _now: i64,
 ) -> Option<ActiveDowntime> {
     None
@@ -111,12 +113,13 @@ pub fn active_for_alert_group(
     alert_id: &str,
     folder_id: &str,
     dims: &HashMap<String, String>,
+    tags: &[String],
     group_key: &str,
     now: i64,
 ) -> Option<ActiveDowntime> {
     use o2_enterprise::enterprise::downtimes::scope::GroupScope;
 
-    let item = enterprise::item(alert_id, folder_id, dims, &[]);
+    let item = enterprise::item(alert_id, folder_id, dims, tags);
     enterprise::active_scoped(
         &db::downtimes::list_cached(org),
         config::meta::downtimes::TargetModule::Alerts,
@@ -133,6 +136,7 @@ pub fn active_for_alert_group(
     _alert_id: &str,
     _folder_id: &str,
     _dims: &HashMap<String, String>,
+    _tags: &[String],
     _group_key: &str,
     _now: i64,
 ) -> Option<ActiveDowntime> {
@@ -146,12 +150,13 @@ pub fn active_for_alert_key(
     alert_id: &str,
     folder_id: &str,
     dims: &HashMap<String, String>,
+    tags: &[String],
     group_key: Option<&str>,
     now: i64,
 ) -> Option<ActiveDowntime> {
     match group_key {
-        Some(key) => active_for_alert_group(org, alert_id, folder_id, dims, key, now),
-        None => active_for_alert(org, alert_id, folder_id, dims, now),
+        Some(key) => active_for_alert_group(org, alert_id, folder_id, dims, tags, key, now),
+        None => active_for_alert(org, alert_id, folder_id, dims, tags, now),
     }
 }
 
@@ -162,11 +167,12 @@ pub fn chip_for_alert(
     alert_id: &str,
     folder_id: &str,
     dims: &HashMap<String, String>,
+    tags: &[String],
     now: i64,
 ) -> Option<ActiveDowntime> {
     use o2_enterprise::enterprise::downtimes::scope::GroupScope;
 
-    let item = enterprise::item(alert_id, folder_id, dims, &[]);
+    let item = enterprise::item(alert_id, folder_id, dims, tags);
     enterprise::active_scoped(
         &db::downtimes::list_cached(org),
         config::meta::downtimes::TargetModule::Alerts,
@@ -184,10 +190,11 @@ pub fn active_for_alert_except(
     alert_id: &str,
     folder_id: &str,
     dims: &HashMap<String, String>,
+    tags: &[String],
     now: i64,
     except: &str,
 ) -> Option<ActiveDowntime> {
-    let item = enterprise::item(alert_id, folder_id, dims, &[]);
+    let item = enterprise::item(alert_id, folder_id, dims, tags);
     enterprise::active_in_except(
         &db::downtimes::list_cached(org),
         config::meta::downtimes::TargetModule::Alerts,

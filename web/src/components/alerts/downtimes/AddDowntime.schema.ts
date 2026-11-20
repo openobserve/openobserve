@@ -27,6 +27,7 @@ import {
   groupLimitLost,
   buildSchedule,
   hasIdentity,
+  hasTags,
   type DowntimeFormValues,
   type NotifyFormValues,
   type ScheduleFormValues,
@@ -128,7 +129,7 @@ const capIssues = (
       message: t("alerts.downtimes.validation.tooManyFolders", { max: MAX_FOLDERS_PER_TARGET }),
     });
   }
-  if (m === "synthetics" && tv.tags_open && tv.tags.length > MAX_TAGS_PER_TARGET) {
+  if (hasTags(m) && tv.tags_open && tv.tags.length > MAX_TAGS_PER_TARGET) {
     issues.push({
       path: at("tags"),
       message: t("alerts.downtimes.validation.tooManyTags", { max: MAX_TAGS_PER_TARGET }),
@@ -158,7 +159,7 @@ const targetIssues = (
         message: t("alerts.downtimes.validation.foldersRequired"),
       });
     }
-    if (m === "synthetics" && tv.tags_open && tv.tags.length === 0) {
+    if (hasTags(m) && tv.tags_open && tv.tags.length === 0) {
       issues.push({ path: at("tags"), message: t("alerts.downtimes.validation.tagsRequired") });
     }
     if (tv.ids_open && tv.ids.length === 0) {

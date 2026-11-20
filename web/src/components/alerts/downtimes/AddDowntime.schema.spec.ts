@@ -126,6 +126,16 @@ describe("AddDowntime schema", () => {
     expect(atCap["targets.synthetics.tags"]).toBeUndefined();
   });
 
+  it("checks the alerts' tags as it checks the synthetics' tags", () => {
+    const v = valid();
+    v.targets.alerts.tags_open = true;
+    expect(errorsOf(v)["targets.alerts.tags"]).toBe(gt("alerts.downtimes.validation.tagsRequired"));
+    v.targets.alerts.tags = Array.from({ length: 17 }, (_, i) => `t:${i}`);
+    expect(errorsOf(v)["targets.alerts.tags"]).toBe("Add at most 16 tags.");
+    v.targets.alerts.tags = ["component:payments"];
+    expect(errorsOf(v)).toEqual({});
+  });
+
   it("names the condition caps of 32 pairs and depth 3", () => {
     const pair = { type: "pair" as const, key: "service", operator: "=" as const, value: "p" };
     const v = valid();

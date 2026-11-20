@@ -146,6 +146,10 @@ const emptyTarget = (): TargetFormValues => ({
 
 export const hasIdentity = (module: TargetModule): boolean => module !== "synthetics";
 
+/** Modules whose items carry tags a target can name; a target's tags match any one of them. */
+export const hasTags = (module: TargetModule): boolean =>
+  module === "alerts" || module === "synthetics";
+
 /** The next full hour on the wall clock of `timezone`, so a zone at a half-hour offset or DST step still starts on :00. */
 export function nextFullHourMs(nowMs: number, timezone: string): number {
   // Every UTC offset and DST step is a multiple of 15 minutes, so a full local hour falls on a 15-minute UTC boundary.
@@ -273,7 +277,7 @@ export function unnarrowedModules(values: DowntimeFormValues): TargetModule[] {
     const tv = values.targets[m];
     if (!tv.folders.includes(ALL_FOLDERS)) return false;
     if (tv.ids_open && tv.ids.length) return false;
-    if (m === "synthetics" && tv.tags_open && tv.tags.length) return false;
+    if (hasTags(m) && tv.tags_open && tv.tags.length) return false;
     return !(hasIdentity(m) && conditionApplies);
   });
 }
@@ -285,7 +289,7 @@ const buildTarget = (module: TargetModule, tv: TargetFormValues): DowntimeTarget
       ? { kind: "all" }
       : { kind: "some", folder_ids: [...tv.folders] },
   };
-  if (module === "synthetics" && tv.tags_open && tv.tags.length) target.tags = [...tv.tags];
+  if (hasTags(module) && tv.tags_open && tv.tags.length) target.tags = [...tv.tags];
   if (tv.ids_open && tv.ids.length) target.ids = [...tv.ids];
   if (module === "slos") target.slo_mode = tv.slo_mode;
   // The server omits the default, so sending only `none` keeps a saved row and its edit equal.

@@ -14606,6 +14606,7 @@
         "noSyntheticsFolderAccess": "合成モニタリングフォルダへのアクセス権がありません。",
         "tags": "タグ",
         "tagPlaceholder": "key:value",
+        "alertTagsHint": "すべてのタグがアラートに含まれている必要があります。",
         "tagsHint": "すべてのタグがチェックに含まれている必要があります。",
         "removeBlock": "このブロックを削除",
         "specificItems": "特定の項目",
