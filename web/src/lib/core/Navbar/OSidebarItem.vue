@@ -69,9 +69,7 @@ const isToggle = computed(
   () => !props.locked && (!props.to || (props.expanded !== undefined && !props.collapsed)),
 );
 const iconClass = computed(() =>
-  props.active || props.childActive
-    ? "text-selected-fg"
-    : "text-text-secondary group-hover/nav:text-text-body",
+  props.active || props.childActive ? "text-selected-fg" : "text-text-secondary",
 );
 
 const rootAttrs = computed<Record<string, unknown>>(() => {
@@ -95,8 +93,8 @@ const rowClass = computed(() => [
   props.active
     ? "bg-selected-bg text-selected-fg! font-semibold ring-1 ring-inset ring-selected-border"
     : props.childActive
-      ? "bg-transparent hover:bg-surface-subtle-hover font-normal text-text-heading!"
-      : "bg-transparent hover:bg-surface-subtle-hover hover:text-text-body! font-normal text-text-body!",
+      ? "bg-transparent hover:bg-surface-hover font-normal text-text-heading!"
+      : "bg-transparent hover:bg-surface-hover hover:text-text-body! font-normal text-text-body!",
   props.locked || props.paywalled ? "opacity-70" : "",
 ]);
 
@@ -127,7 +125,7 @@ function onKeydown(event: KeyboardEvent) {
     @click.capture="onClick"
     @keydown="onKeydown"
   >
-    <OIcon v-if="icon" :name="icon" size="sm" class="size-4.5! shrink-0" :class="iconClass" />
+    <OIcon v-if="icon" :name="icon" size="sm" class="size-4! shrink-0" :class="iconClass" />
     <span
       class="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none"
       :class="collapsed ? 'opacity-0' : 'opacity-100'"

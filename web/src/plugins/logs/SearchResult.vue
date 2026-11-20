@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="flex flex-none items-center justify-end gap-1 pe-2 max-md:ms-auto">
+        <div class="results-bar-quiet flex flex-none items-center justify-end gap-1.5 pe-2 max-md:ms-auto">
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
@@ -216,24 +216,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- INLINE BUTTONS (wider container) -->
           <template v-else>
-            <span
-              v-if="dataFresh"
-              class="bg-status-success-text size-1.5 shrink-0 rounded-full"
-              aria-hidden="true"
-              data-test="logs-result-fresh-dot"
-            />
-            <!-- One filled chip; the whole chip is the refresh target. -->
             <ORefreshButton
               layout="inline"
               variant="ghost"
-              class="toolbar-btn-rest gap-1.5! ps-1! pe-2! text-xs!"
+              class="toolbar-btn-rest gap-1.5! ps-2! pe-2! text-xs!"
               :last-run-at="searchObj.meta.lastRunAt"
               :loading="searchObj.loading || histogramSettling"
               :disabled="searchObj.loading || histogramSettling"
               @click="$emit('run-query')"
             />
             <!-- Action buttons -->
-            <div v-if="inspectAvailable || showWrapBtn" class="inline-flex items-center gap-0.5">
+            <div v-if="inspectAvailable || showWrapBtn" class="inline-flex items-center gap-1.5">
               <OButton
                 v-if="inspectAvailable"
                 variant="ghost"
@@ -252,19 +245,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
               <OButton
                 v-if="showWrapBtn"
+                as="div"
                 variant="ghost"
-                :size="showActionLabels ? 'sm-toolbar' : 'icon-toolbar'"
+                size="sm-toolbar"
                 class="toolbar-btn-rest"
-                :class="searchObj.meta.toggleSourceWrap ? '' : 'border! border-transparent!'"
-                :active="searchObj.meta.toggleSourceWrap"
-                :aria-pressed="searchObj.meta.toggleSourceWrap ? 'true' : 'false'"
-                @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
                 data-test="logs-search-result-wrap-table-content-btn"
+                @click="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
               >
-                <OIcon name="wrap-text" size="sm" />
-                <span v-if="showActionLabels" class="whitespace-nowrap">{{
-                  t("common.wrap")
-                }}</span>
+                <OSwitch
+                  class="dark:[&_[role=switch][data-state=checked]]:bg-button-primary! [&_[role=switch]>span]:shadow-none!"
+                  v-model="searchObj.meta.toggleSourceWrap"
+                  :aria-label="t('search.messageWrapContent')"
+                  size="sm"
+                  @click.stop
+                />
+                <OIcon name="wrap-text" size="sm" class="shrink-0" />
                 <OTooltip :content="t('search.messageWrapContent')" />
               </OButton>
             </div>
@@ -296,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="getPageData('recordsPerPage')"
             >
               <template #trigger>
-                {{ t("search.rowsPerPageLabel", { n: searchObj.meta.resultGrid.rowsPerPage }) }}
+                {{ searchObj.meta.resultGrid.rowsPerPage }}
               </template>
             </OSelect>
             <span v-if="gridLockReason" id="logs-page-size-reason" class="sr-only">{{
@@ -1056,6 +1051,7 @@ import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButto
 import { extractSeverity } from "@/utils/sourceEventSeverity";
 import config from "@/aws-exports";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { quickModeHiddenFieldCount } from "@/utils/query/quickModeFieldList";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1112,6 +1108,7 @@ export default defineComponent({
   components: {
     LogLineLinkPopover,
     ORefreshButton,
+    OSwitch,
     OButton,
     ODrawer,
     OSpinner,
@@ -1872,18 +1869,7 @@ export default defineComponent({
       }
     });
 
-    // Same 30s "fresh" window as the refresh button's own staleness dot.
-    const freshNow = ref(Date.now());
-    const freshTimer = setInterval(() => (freshNow.value = Date.now()), 5000);
-    const dataFresh = computed(
-      () =>
-        !searchObj.loading &&
-        !!searchObj.meta.lastRunAt &&
-        freshNow.value - searchObj.meta.lastRunAt < 30_000,
-    );
-
     onBeforeUnmount(() => {
-      clearInterval(freshTimer);
       window.removeEventListener("themeColorChanged", handleThemeColorChange);
       containerResizeObserver?.disconnect();
       histogramResizeObserver?.disconnect();
@@ -3240,7 +3226,6 @@ export default defineComponent({
     const openLogDetailsByRow = (row: any) => openLogDetails(row, logsRowIndex(row));
 
     return {
-      dataFresh,
       noFtsRecoverySchemas,
       noFtsRecoveryTerm,
       gridLockReason,

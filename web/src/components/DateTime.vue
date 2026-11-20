@@ -19,14 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="info"
     class="date-time-container inline-flex items-stretch [&_button:focus-visible]:z-1"
     :class="{
-      'gap-0.5': !hideRangeShift,
       'w-full [&>*]:flex-1': fieldAppearance,
     }"
   >
     <OTooltip v-if="!hideRangeShift" :content="t('common.previous')">
       <OButton
         data-test="date-time-prev-btn"
-        class="toolbar-btn-rest"
+        class="toolbar-btn-rest rounded-e-none!"
         variant="ghost"
         size="icon-xs-sq"
         icon-left="chevron-left"
@@ -61,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'border-border-button! enabled:hover:border-border-control!':
               fieldAppearance || variant === 'outline',
             'w-full': fieldAppearance,
+            '-ms-px rounded-none!': !hideRangeShift,
           }"
           class="max-md:max-w-full max-md:min-w-0"
           :disabled="disable"
@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OTooltip v-if="!hideRangeShift" :content="t('common.next')">
       <OButton
         data-test="date-time-next-btn"
-        class="toolbar-btn-rest"
+        class="toolbar-btn-rest -ms-px rounded-s-none!"
         variant="ghost"
         size="icon-xs-sq"
         icon-left="chevron-right"

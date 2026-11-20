@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="changeRowsPerPage"
           >
             <template #trigger>
-              {{ t("search.rowsPerPageLabel", { n: searchObj.meta.resultGrid.rowsPerPage }) }}
+              {{ searchObj.meta.resultGrid.rowsPerPage }}
             </template>
           </OSelect>
           <OPagination

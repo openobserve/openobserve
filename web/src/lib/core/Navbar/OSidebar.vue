@@ -597,7 +597,7 @@ const selfLogoSrc = computed(() =>
         <OIcon
           :name="collapsed ? 'left-panel-open' : 'left-panel-close'"
           size="sm"
-          class="text-text-secondary group-hover/nav:text-text-body size-4.5! shrink-0"
+          class="text-text-secondary size-4! shrink-0"
         />
         <span
           class="min-w-0 flex-1 truncate transition-opacity duration-150 motion-reduce:transition-none"

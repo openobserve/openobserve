@@ -214,7 +214,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-pressed="store.state.isAiChatEnabled && !aiLicenseLocked ? 'true' : 'false'"
               :class="store.state.isAiChatEnabled && !aiLicenseLocked ? 'ai-btn-active' : ''"
             >
-              <OIcon name="auto-awesome" size="sm" />
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+                class="text-text-secondary size-4 shrink-0"
+              >
+                <path
+                  d="M12 2c-.78 5.16-4.84 9.22-10 10 5.16.78 9.22 4.84 10 10 .78-5.16 4.84-9.22 10-10-5.16-.78-9.22-4.84-10-10"
+                />
+              </svg>
               <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" class="-end-2! -top-1!" />
               <OTooltip
                 side="bottom"
