@@ -20,13 +20,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="logs-build-query-page"
   >
     <OBanner
-      v-if="freeTextNotice"
+      v-if="incompleteFilterNotice && !isCustomQuery"
+      variant="warning"
+      icon="warning"
+      dense
+      data-test="logs-build-incomplete-filter-notice"
+    >
+      {{ t("search.filterNotChartableNotice", { custom: t("panel.custom") }) }}
+    </OBanner>
+    <OBanner
+      v-else-if="freeTextNotice && !isCustomQuery"
       variant="info"
       icon="info"
       dense
       data-test="logs-build-free-text-notice"
     >
-      {{ heldFilter ? t("search.searchQueryEmptyOrInvalid") : t("search.freeTextBuildNotice") }}
+      {{ noticeText }}
     </OBanner>
     <OBanner
       v-if="parserLoadFailed || retryingParser"
@@ -82,7 +91,7 @@ import {
   parsedQueryToPanelFields,
 } from "@/utils/query/sqlQueryParser";
 import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
-import { parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
+import { extractWhereClause, parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useNotifications from "@/composables/useNotifications";
@@ -143,6 +152,7 @@ interface Props {
   searchQuery?: string;
   /** Selected stream name */
   selectedStream?: string;
+  selectedStreamType?: string;
   /** Selected date time */
   selectedDateTime?: {
     start_time: number | string;
@@ -164,6 +174,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   searchQuery: "",
   selectedStream: "",
+  selectedStreamType: "logs",
   selectedDateTime: undefined,
   isFirstToggle: true,
   isSqlMode: true,
@@ -193,6 +204,7 @@ const router = useRouter();
 const panelEditorRef = ref<any>(null);
 const showAddToDashboardDialog = ref(false);
 const freeTextNotice = ref(false);
+const incompleteFilterNotice = ref(false);
 const parserLoadFailed = ref(false);
 const retryingParser = ref(false);
 const needsFilterInit = () =>
@@ -208,6 +220,12 @@ const {
   makeAutoSQLQuery,
   validatePanel,
 } = useDashboardPanelData("build", t);
+
+const isCustomQuery = computed(() => !!dashboardPanelData.data.queries[0]?.customQuery);
+
+const noticeText = computed(() =>
+  props.heldFilter ? t("search.searchQueryEmptyOrInvalid") : t("search.freeTextBuildNotice"),
+);
 
 const runBlocked = computed(
   () =>
@@ -237,6 +255,7 @@ const restoreConfigFromUrl = (): {
   config?: any;
   fields?: any;
   joins?: any[];
+  limit?: number;
   customQuery?: boolean;
   query?: string;
 } => {
@@ -256,6 +275,7 @@ const restoreConfigFromUrl = (): {
       config: decoded.config,
       fields: decoded.fields,
       joins: decoded.joins,
+      limit: decoded.limit,
       customQuery: decoded.customQuery,
       query: decoded.query,
     };
@@ -272,6 +292,7 @@ const restoreConfigFromUrl = (): {
 const initializeFromQuery = async () => {
   const seq = ++initSeq;
   freeTextNotice.value = false;
+  incompleteFilterNotice.value = false;
   parserLoadFailed.value = false;
   filterInitPending.value = needsFilterInit();
   holdGeneratedQuery.value = !props.isSqlMode && props.freeTextFilter;
@@ -320,7 +341,8 @@ const initializeFromQuery = async () => {
     const savedFields = urlConfig.fields;
     dashboardPanelData.data.queries[0].fields.stream =
       savedFields.stream || props.selectedStream || "";
-    dashboardPanelData.data.queries[0].fields.stream_type = savedFields.stream_type || "logs";
+    dashboardPanelData.data.queries[0].fields.stream_type =
+      savedFields.stream_type || props.selectedStreamType || "logs";
     dashboardPanelData.data.queries[0].fields.x = savedFields.x || [];
     dashboardPanelData.data.queries[0].fields.y = savedFields.y || [];
     dashboardPanelData.data.queries[0].fields.breakdown = savedFields.breakdown || [];
@@ -331,6 +353,7 @@ const initializeFromQuery = async () => {
     if (urlConfig.joins) {
       dashboardPanelData.data.queries[0].joins = urlConfig.joins;
     }
+    dashboardPanelData.data.queries[0].config.limit = urlConfig.limit ?? 0;
     if (urlConfig.query) {
       dashboardPanelData.data.queries[0].query = urlConfig.query;
     }
@@ -362,7 +385,7 @@ const initializeFromQuery = async () => {
     const freeTextFilter = props.freeTextFilter;
     if (props.selectedStream) {
       dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
-      dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+      dashboardPanelData.data.queries[0].fields.stream_type = props.selectedStreamType || "logs";
       await updateGroupedFields();
       if (seq !== initSeq) return;
     }
@@ -388,7 +411,8 @@ const initializeFromQuery = async () => {
       }
       const { filter, complete } = parsed;
       if (seq !== initSeq) return;
-      if (freeTextFilter && (!whereClause?.trim() || !complete)) {
+      if ((freeTextFilter && !whereClause?.trim()) || !complete) {
+        incompleteFilterNotice.value = !freeTextFilter;
         freeTextNotice.value = true;
         filterInitPending.value = false;
         emit("initialized");
@@ -421,7 +445,7 @@ const initializeFromQuery = async () => {
   if (isEmptyOrSelectAll) {
     if (props.selectedStream) {
       dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
-      dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+      dashboardPanelData.data.queries[0].fields.stream_type = props.selectedStreamType || "logs";
       await updateGroupedFields();
     }
     dashboardPanelData.data.queries[0].customQuery = false;
@@ -441,7 +465,7 @@ const initializeFromQuery = async () => {
     // Complex query - use custom mode
     if (props.selectedStream) {
       dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
-      dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+      dashboardPanelData.data.queries[0].fields.stream_type = props.selectedStreamType || "logs";
     }
     dashboardPanelData.data.queries[0].query = props.searchQuery;
     dashboardPanelData.data.queries[0].customQuery = true;
@@ -451,17 +475,30 @@ const initializeFromQuery = async () => {
     }
     dashboardPanelData.data.config.table_dynamic_columns = true;
   } else {
+    // Stay in custom mode while parsing, or the empty builder writes its own SQL over the query.
+    const searchQuery = props.searchQuery;
+    dashboardPanelData.data.queries[0].query = searchQuery;
+    dashboardPanelData.data.queries[0].customQuery = true;
+    holdGeneratedQuery.value = true;
     try {
       // Try to parse the query
-      const parsed = await parseSQL(props.searchQuery, "logs");
+      const parsed = await parseSQL(searchQuery, props.selectedStreamType || "logs");
+      if (seq !== initSeq) return;
+      holdGeneratedQuery.value = false;
 
-      if (parsed.customQuery) {
+      const sqlWhere = parsed.customQuery ? "" : await extractWhereClause(props.searchQuery);
+      // A WHERE the builder cannot hold would chart every row, so run the SQL as written.
+      const whereHeld =
+        !!sqlWhere.trim() && !(await parseWhereClauseToFilterChecked(sqlWhere)).complete;
+
+      if (parsed.customQuery || whereHeld) {
         // Parsing failed or complex query detected
         if (props.selectedStream) {
           dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
-          dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+          dashboardPanelData.data.queries[0].fields.stream_type =
+            props.selectedStreamType || "logs";
         }
-        dashboardPanelData.data.queries[0].query = props.searchQuery;
+        dashboardPanelData.data.queries[0].query = searchQuery;
         dashboardPanelData.data.queries[0].customQuery = true;
         // Use table chart with dynamic columns for custom mode (unless chart type from URL)
         if (shouldAutoSelectChartType) {
@@ -475,7 +512,8 @@ const initializeFromQuery = async () => {
         // Set stream from parsed query or fallback to selected stream
         const streamName = panelFields.stream || props.selectedStream;
         dashboardPanelData.data.queries[0].fields.stream = streamName;
-        dashboardPanelData.data.queries[0].fields.stream_type = panelFields.stream_type || "logs";
+        dashboardPanelData.data.queries[0].fields.stream_type =
+          panelFields.stream_type || props.selectedStreamType || "logs";
 
         // Apply parsed fields to builder
         dashboardPanelData.data.queries[0].fields.x = panelFields.x;
@@ -488,6 +526,7 @@ const initializeFromQuery = async () => {
         if (panelFields.joins && panelFields.joins.length > 0) {
           dashboardPanelData.data.queries[0].joins = panelFields.joins;
         }
+        dashboardPanelData.data.queries[0].config.limit = panelFields.limit;
 
         // Auto-select chart type based on fields (unless chart type from URL):
         // - If useTableChart flag is set (more than 2 GROUP BY fields) → use "table" chart
@@ -512,13 +551,15 @@ const initializeFromQuery = async () => {
         }
       }
     } catch (error) {
+      if (seq !== initSeq) return;
+      holdGeneratedQuery.value = false;
       console.error("Error parsing query:", error);
       // Fall back to custom mode
       if (props.selectedStream) {
         dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
-        dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+        dashboardPanelData.data.queries[0].fields.stream_type = props.selectedStreamType || "logs";
       }
-      dashboardPanelData.data.queries[0].query = props.searchQuery;
+      dashboardPanelData.data.queries[0].query = searchQuery;
       dashboardPanelData.data.queries[0].customQuery = true;
       // Use table chart with dynamic columns for custom mode (unless chart type from URL on first toggle)
       if (shouldAutoSelectChartType) {
@@ -679,5 +720,7 @@ defineExpose({
   runBlocked,
   panelEditorRef,
   dashboardPanelData,
+  freeTextNotice,
+  incompleteFilterNotice,
 });
 </script>

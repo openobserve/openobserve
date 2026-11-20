@@ -80,7 +80,7 @@ export const convertSunburstData = (
   pointMenu = false,
 ) => {
   const config = panelSchema?.config ?? {};
-  const nodes = buildTreemapNodes(panelSchema, Array.isArray(data) ? data : []);
+  const { nodes } = buildTreemapNodes(panelSchema, Array.isArray(data) ? data : []);
   if (!nodes.length) return { options: { series: [] }, extras: { panelId: panelSchema?.id } };
 
   paintByPalette(nodes, config, store?.state?.theme);

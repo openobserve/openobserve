@@ -90,8 +90,10 @@ import { MetricsExplorerPage } from "./metricsPages/metricsExplorerPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
+import { ServiceVersionsPage } from "./tracesPages/serviceVersionsPage.js";
 import { ProfilesPage } from "./profilesPages/profilesPage.js";
 import { DatabaseMonitoringPage } from "./dbmPages/databaseMonitoringPage.js";
+import { KubernetesPage } from "./infraPages/kubernetesPage.js";
 import { RumPage } from "./rumPages/rumPage.js";
 import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
 import { RumPerformancePage } from "./rumPages/rumPerformancePage.js";
@@ -158,11 +160,18 @@ const FleetInstallPage = require("./fleetPages/fleetInstallPage.js");
 const FleetConfigPage = require("./fleetPages/fleetConfigPage.js");
 const FleetRolloutPage = require("./fleetPages/fleetRolloutPage.js");
 const FleetSeed = require("./fleetPages/fleetSeed.js");
+const SecurityPage = require("./securityPages/securityPage.js");
+const SecuritySeed = require("./securityPages/securitySeed.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
 import { LogsToolbarPinsPage } from "./logsPages/logsToolbarPinsPage.js";
 import { SearchHistoryPage } from "./logsPages/searchHistoryPage.js";
+import { LogsSavedViewsMenuPage } from "./logsPages/logsSavedViewsMenuPage.js";
+import { LogsRecentSearchesPage } from "./logsPages/logsRecentSearchesPage.js";
+import { LogsAutoRefreshPage } from "./logsPages/logsAutoRefreshPage.js";
+import { AlertPromqlEditorDialogPage } from "./alertsPages/alertPromqlEditorDialogPage.js";
+import { TraceFlameGraphPage } from "./tracesPages/traceFlameGraphPage.js";
 import UnflattenedPage from "./logsPages/unflattened.js";
 
 // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
@@ -287,10 +296,19 @@ class PageManager {
     this.fleetRolloutPage = new FleetRolloutPage(page);
     this.fleetSeed = new FleetSeed(page);
 
+    // ===== SECURITY PAGE OBJECTS =====
+    this.securityPage = new SecurityPage(page);
+    this.securitySeed = new SecuritySeed(page);
+
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
     this.logsToolbarPinsPage = new LogsToolbarPinsPage(page);
     this.searchHistoryPage = new SearchHistoryPage(page);
+    this.logsSavedViewsMenuPage = new LogsSavedViewsMenuPage(page);
+    this.logsRecentSearchesPage = new LogsRecentSearchesPage(page);
+    this.logsAutoRefreshPage = new LogsAutoRefreshPage(page);
+    this.alertPromqlEditorDialogPage = new AlertPromqlEditorDialogPage(page);
+    this.traceFlameGraphPage = new TraceFlameGraphPage(page);
     this.streamsPage = new StreamsPage(page);
     this.alertTemplatesPage = new AlertTemplatesPage(page);
     this.alertDestinationsPage = new AlertDestinationsPage(page);
@@ -312,8 +330,10 @@ class PageManager {
     this.tracesPage = new TracesPage(page);
     this.serviceGraphPage = new ServiceGraphPage(page);
     this.servicesCatalogPage = new ServicesCatalogPage(page);
+    this.serviceVersionsPage = new ServiceVersionsPage(page);
     this.profilesPage = new ProfilesPage(page);
     this.databaseMonitoringPage = new DatabaseMonitoringPage(page);
+    this.kubernetesPage = new KubernetesPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);
     this.reportFoldersPage = new ReportFoldersPage(page);

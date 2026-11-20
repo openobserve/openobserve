@@ -514,6 +514,42 @@ mod tests {
     }
 
     #[test]
+    fn the_session_replay_writer_reaches_only_its_log_stream_as_usage() {
+        use config::meta::stream::SESSION_REPLAY_RESOURCES_STREAM as stream;
+        let writer = Some(FeatureWriter::SessionReplay);
+        let ok = writer_req("demo-org", StreamType::Logs, stream, IngestionType::Usage);
+        let (org, user, _) = resolve_caller(writer, None, Some("demo-org"), &ok).unwrap();
+        assert_eq!(org, "demo-org");
+        assert_eq!(user, IngestUser::SystemJob(SystemJobType::SessionReplay));
+        let denied = [
+            writer_req("demo-org", StreamType::Logs, stream, IngestionType::Json),
+            writer_req(
+                "demo-org",
+                StreamType::Metrics,
+                stream,
+                IngestionType::Usage,
+            ),
+            writer_req(
+                "demo-org",
+                StreamType::Logs,
+                "_rumdata",
+                IngestionType::Usage,
+            ),
+            writer_req(
+                "demo-org",
+                StreamType::Logs,
+                "_o2_dbm_server",
+                IngestionType::Usage,
+            ),
+        ];
+        for req in denied {
+            assert!(resolve_caller(writer, None, Some("demo-org"), &req).is_err());
+        }
+        let other_org = writer_req("other", StreamType::Logs, stream, IngestionType::Usage);
+        assert!(resolve_caller(writer, None, Some("demo-org"), &other_org).is_err());
+    }
+
+    #[test]
     fn the_autoobserve_writer_reaches_only_autoobserve_streams_in_meta() {
         let writer = Some(FeatureWriter::AutoObserve);
         let meta = config::META_ORG_ID;

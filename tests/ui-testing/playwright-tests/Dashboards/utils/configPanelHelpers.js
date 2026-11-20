@@ -6,7 +6,7 @@
 
 import * as crypto from "crypto";
 import { setupTestDashboard, deleteDashboard } from "./dashCreation.js";
-import { ingestionForMaps } from "./dashIngestion.js";
+import { ingestionForMaps, ingestionForStateTimeline } from "./dashIngestion.js";
 import testLogger from '../../utils/test-logger.js';
 
 // ---------------------------------------------------------------------------
@@ -315,6 +315,69 @@ export async function setupBarGaugePanelWithConfig(page, pm, dashboardName, pane
   await buildPanel(page, pm, dashboardName, { chartType: "bar-gauge", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("Bar gauge panel with config ready", { dashboardName, panelName });
+}
+
+/** State timeline panel — max(state_code) over time with one row per host; config sidebar opened. */
+export async function setupStateTimelinePanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  const streamName = "e2e_state_timeline";
+  await ingestionForStateTimeline(page, streamName);
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType("state-timeline");
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream(streamName);
+  // State timeline seeds only the time axis; the state and the row field are picked by the user.
+  await pm.chartTypeSelector.searchAndAddField("state_code", "y");
+  await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "max");
+  await pm.chartTypeSelector.searchAndAddField("host", "b");
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("State timeline panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * Distribution (histogram) panel over the raw values of a numeric field — config sidebar opened and ready.
+ * The panel has no X axis; pass breakdownField to stack the buckets by that field's values.
+ */
+export async function setupDistributionPanelWithConfig(page, pm, dashboardName, {
+  panelName = "Test Panel",
+  yField = "code",
+  breakdownField = null,
+} = {}) {
+  await buildPanel(page, pm, dashboardName, {
+    chartType: "distribution",
+    panelName,
+    yField,
+    breakdownField,
+  });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Distribution panel with config ready", { dashboardName, panelName, yField, breakdownField });
+}
+
+// Sunburst panel with the config sidebar open; Size keeps the seeded count. The editor opens as a bar and
+// seeds histogram(_timestamp) on X, which the switch to sunburst keeps, so it is removed first.
+export async function setupSunburstPanelWithConfig(page, pm, dashboardName, {
+  panelName = "Test Panel",
+  groupFields = ["kubernetes_namespace_name"],
+  subGroupField = null,
+} = {}) {
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType("sunburst");
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream("e2e_automate");
+  await pm.chartTypeSelector.removeFieldIfPresent("x_axis_1", "x");
+  for (const field of groupFields) {
+    await pm.chartTypeSelector.searchAndAddField(field, "x");
+  }
+  if (subGroupField) {
+    await pm.chartTypeSelector.searchAndAddField(subGroupField, "b");
+  }
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Sunburst panel with config ready", { dashboardName, panelName, groupFields, subGroupField });
 }
 
 /**

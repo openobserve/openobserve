@@ -866,6 +866,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="showPatternDetails"
         :selectedPattern="selectedPattern"
         :totalPatterns="patternNavTotal"
+        :filterBlockedReason="
+          showPatternDetails ? filterBlockedReason(selectedPattern?.pattern) : null
+        "
         @navigate="navigatePatternDetail"
         @filter-value="addWildcardValueToSearch"
         @add-to-search="addPatternToSearch"
@@ -927,13 +930,16 @@ import { formatLargeNumber } from "@/utils/formatters";
 import { CUSTOM_THEME_NAME, THEME_STORAGE_KEYS } from "@/constants/themes";
 import useLogs from "../../composables/useLogs";
 import { BREAKDOWN_EMPTY_LABEL, BREAKDOWN_EMPTY_VALUE } from "@/utils/logs/constants";
-import { getEmptyBreakdownFilter } from "@/utils/logs/breakdownFilter";
+import { emptyValueFieldType, getEmptyBreakdownFilter } from "@/utils/logs/breakdownFilter";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
 import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
-import { extractConstantsFromPattern } from "@/plugins/logs/patterns/patternUtils";
+import {
+  extractConstantsFromPattern,
+  FILTER_BLOCKED_MESSAGE,
+} from "@/plugins/logs/patterns/patternUtils";
 import {
   convertLogData,
   convertStackedLogData,
@@ -1392,6 +1398,7 @@ export default defineComponent({
       navigatePatternDetail,
       navTotal: patternNavTotal,
       addPatternToSearch,
+      filterBlockedReason,
       addWildcardValueToSearch,
       buildSinglePatternAlertPrefill,
     } = usePatternActions();
@@ -1405,11 +1412,14 @@ export default defineComponent({
      * surface.
      */
     const createAlertFromPattern = (pattern: any) => {
-      const launched = openAlertCreation(buildSinglePatternAlertPrefill(pattern));
+      const blocked = filterBlockedReason(pattern);
+      const launched = !blocked && openAlertCreation(buildSinglePatternAlertPrefill(pattern));
       if (!launched) {
         toast({
           variant: "warning",
-          message: t("logs.patternList.alertBroadMatch"),
+          message: t(
+            blocked ? FILTER_BLOCKED_MESSAGE[blocked] : "logs.patternList.alertBroadMatch",
+          ),
         });
       }
     };
@@ -1428,6 +1438,7 @@ export default defineComponent({
         streamName: searchObj.data.stream.selectedStream[0],
         window: props.queryWindowUs as { start: number; end: number } | undefined,
         lastQuery: patternsState.value?.lastQuery,
+        allTemplates: (patternsState.value?.patterns?.patterns ?? []).map((p: any) => p.template),
       });
     });
 
@@ -1743,9 +1754,14 @@ export default defineComponent({
       if (rawValue === BREAKDOWN_EMPTY_VALUE) {
         const quote = (f: string) =>
           searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(f) : f;
-        const fieldType = searchObj.data.stream.selectedStreamFields.find(
-          (f: { name: string; dataType?: string }) => f.name === field,
-        )?.dataType;
+        const fieldType = emptyValueFieldType(
+          field,
+          searchObj.data.stream.selectedStreamFields.find(
+            (f: { name: string; dataType?: string }) => f.name === field,
+          )?.dataType,
+          searchObj.data.streamResults?.list ?? [],
+          searchObj.data.stream.selectedStream,
+        );
         searchObj.data.stream.addToFilterMode = "append";
         searchObj.data.stream.addToFilter = getEmptyBreakdownFilter(
           field,
@@ -1895,12 +1911,25 @@ export default defineComponent({
         };
         correlationContext.value = context;
 
+        // Calculate time range: ±5 minutes from log timestamp
+        // context.timestamp is in microseconds - pass microseconds directly (like TracesAnalysisDashboard)
+        const timeWindowMicros = 5 * 60 * 1000000; // 5 minutes in microseconds
+        const startTimeMicros = context.timestamp - timeWindowMicros;
+        let endTimeMicros = context.timestamp + timeWindowMicros;
+
+        // Cap end time to current UTC time (never allow future timestamps)
+        const currentTimeMicros = Date.now() * 1000; // Current time in microseconds
+        if (endTimeMicros > currentTimeMicros) {
+          endTimeMicros = currentTimeMicros;
+        }
+
         // Fetch correlation data
         const result = await findRelatedTelemetry(
           context,
           "logs",
           5, // 5 minute time window
           searchObj.data.stream.selectedStream[0],
+          { start: startTimeMicros, end: endTimeMicros },
         );
 
         if (!result) {
@@ -1921,18 +1950,6 @@ export default defineComponent({
         }
 
         // Prepare props for the dashboard
-        // Calculate time range: ±5 minutes from log timestamp
-        // context.timestamp is in microseconds - pass microseconds directly (like TracesAnalysisDashboard)
-        const timeWindowMicros = 5 * 60 * 1000000; // 5 minutes in microseconds
-        const startTimeMicros = context.timestamp - timeWindowMicros;
-        let endTimeMicros = context.timestamp + timeWindowMicros;
-
-        // Cap end time to current UTC time (never allow future timestamps)
-        const currentTimeMicros = Date.now() * 1000; // Current time in microseconds
-        if (endTimeMicros > currentTimeMicros) {
-          endTimeMicros = currentTimeMicros;
-        }
-
         // Extract FTS fields from stream settings
         const ftsFields =
           searchObj.data.stream.selectedStreamFields
@@ -1992,20 +2009,6 @@ export default defineComponent({
             endTime: endTimeMicros,
           },
         };
-
-        // Show info notification if no metrics found (but don't prevent setting props)
-        if (
-          !result.correlationData.related_streams.metrics ||
-          result.correlationData.related_streams.metrics.length === 0
-        ) {
-          console.warn("[SearchResult] No metric streams found for correlation");
-          toast({
-            variant: "info",
-            message: t("logs.searchResult.noMetricStreams", {
-              service: result.correlationData.display_name || result.correlationData.service_name,
-            }),
-          });
-        }
 
         // For inline expanded logs, open the correlation dashboard as a dialog
         // For DetailTable drawer, the data is passed via props (tabs are already visible)
@@ -2560,7 +2563,7 @@ export default defineComponent({
 
     const addSearchTerm = (
       field: string | number,
-      field_value: string | number | boolean,
+      field_value: string | number | boolean | null,
       action: string,
     ) => {
       const searchExpression = getFilterExpressionByFieldType(field, field_value, action);
@@ -2966,11 +2969,11 @@ export default defineComponent({
       () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
     );
 
-    const toSearchTermValue = (value: unknown): string | number | boolean => {
+    const toSearchTermValue = (value: unknown): string | number | boolean | null => {
       if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
         return value;
       }
-      if (value === null || value === undefined) return "null";
+      if (value === null || value === undefined) return null;
       return JSON.stringify(value);
     };
 
@@ -3288,6 +3291,7 @@ export default defineComponent({
       patternVolumeContext,
       patternWindowTotal,
       addPatternToSearch,
+      filterBlockedReason,
       addWildcardValueToSearch,
       createAlertFromPattern,
       extractConstantsFromPattern,

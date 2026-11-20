@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick, reactive } from "vue";
 import { flushPromises, shallowMount } from "@vue/test-utils";
 import i18n from "@/locales";
+import { gt } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
 import autoobserve, { type AutoObserveIncidentItem } from "@/services/autoobserve";
 import LivePaged from "@/components/autoobserve/live/LivePaged.vue";
@@ -26,11 +27,13 @@ import TopBar from "@/components/autoobserve/v2/TopBar.vue";
 import TopBarStatus from "@/components/autoobserve/v2/TopBarStatus.vue";
 import PageFooter from "@/components/autoobserve/v2/PageFooter.vue";
 import ChangesPage from "@/components/autoobserve/v2/ChangesPage.vue";
+import CoverageBar from "@/components/autoobserve/v2/CoverageBar.vue";
 import HistoryDrawer from "@/components/autoobserve/v2/HistoryDrawer.vue";
 import SettingsDrawer from "@/components/autoobserve/v2/SettingsDrawer.vue";
 import LiveIssues from "@/components/autoobserve/live/LiveIssues.vue";
 import AllSuggestionsDrawer from "@/components/autoobserve/live/AllSuggestionsDrawer.vue";
 import HowItWorksDrawer from "@/components/autoobserve/v2/HowItWorksDrawer.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import AutoObserve2 from "./AutoObserve2.vue";
 
 // Reactive, so a test can change the URL under a mounted view as the router would.
@@ -46,6 +49,11 @@ vi.mock("vue-router", async (importOriginal) => ({
 
 vi.mock("@/services/autoobserve", () => ({
   default: { coverage: vi.fn(), suggestions: vi.fn(), incidents: vi.fn() },
+}));
+
+const runCta = vi.fn();
+vi.mock("@/components/autoobserve/insight/useInsightActions", () => ({
+  useInsightActions: () => ({ run: runCta, dismiss: vi.fn(), pendingId: { value: null } }),
 }));
 
 vi.stubGlobal(
@@ -68,7 +76,10 @@ const PageLayoutStub = {
 
 const mountView = () =>
   shallowMount(AutoObserve2, {
-    global: { plugins: [i18n, store], stubs: { OPageLayout: PageLayoutStub } },
+    global: {
+      plugins: [i18n, store],
+      stubs: { OPageLayout: PageLayoutStub, OTruncatedText: false },
+    },
   });
 
 // The router is mocked, so a push or replace is applied to the query by hand, as the router would.
@@ -327,7 +338,7 @@ describe("AutoObserve2 coverage page learning line", () => {
     Object.assign(routeQuery, { page: "coverage" });
   });
 
-  it("counts the learning service and its own streams, as the page lists them", async () => {
+  it("counts an unwatched learning service as a gap, and only its own streams as learning", async () => {
     const ready = (Date.now() + 5 * 86_400_000) * 1000;
     vi.mocked(autoobserve.coverage).mockResolvedValue(
       data(
@@ -338,7 +349,7 @@ describe("AutoObserve2 coverage page learning line", () => {
     const wrapper = mountView();
     await flushPromises();
     const sentence = wrapper.find('[data-test="autoobserve2-coverage-sentence"]').text();
-    expect(sentence).toContain("of your 1 service");
+    expect(wrapper.findComponent(CoverageBar).props()).toMatchObject({ gaps: 1, learning: 0 });
     expect(sentence).toMatch(/\b1 stream\b/);
     expect(sentence).not.toMatch(/\b9 streams\b/);
   });
@@ -349,6 +360,95 @@ describe("AutoObserve2 coverage page learning line", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="autoobserve2-coverage-sentence"]').text()).not.toContain(
       "Learning",
+    );
+  });
+});
+
+describe("AutoObserve2 coverage page verdict", () => {
+  const svc = (i: number, covered: boolean) => ({
+    service_id: `s${i}`,
+    service_name: `svc-${i}`,
+    cluster: "prod",
+    namespace: "default",
+    streams: [{ type: "logs", name: `logs_${i}` }],
+    traffic_per_hour: 100 - i,
+    cells: Object.fromEntries(
+      ["errors", "latency", "absence"].map((c) => [
+        c,
+        { state: covered ? "covered" : "none", evidence: [], counts: {} },
+      ]),
+    ),
+  });
+  const respond = (rows: unknown[]) =>
+    vi.mocked(autoobserve.coverage).mockResolvedValue({
+      data: { view: "strict", pass_at: null, refreshed_at: null, quality: null, classes: [], rows },
+    } as never);
+  const line = (w: ReturnType<typeof mountView>, test: string) =>
+    w.find(`[data-test="autoobserve2-coverage-${test}"]`);
+
+  beforeEach(() => {
+    for (const key of Object.keys(routeQuery)) delete routeQuery[key];
+    Object.assign(routeQuery, { page: "coverage" });
+    runCta.mockReset();
+  });
+
+  it("states the gaps and opens no-data drafts for the busiest ten", async () => {
+    respond(Array.from({ length: 12 }, (_, i) => svc(i, false)));
+    const wrapper = mountView();
+    await flushPromises();
+    const add = wrapper.findComponent('[data-test="autoobserve2-coverage-add-alert"]');
+    add.vm.$emit("click");
+    const [, cta] = runCta.mock.calls[0];
+    expect(cta.target.request.rows.map((r: { key: string }) => r.key)).toEqual(
+      Array.from({ length: 10 }, (_, i) => `s${i}:no_data`),
+    );
+  });
+
+  it("fits the late sub-line and learning text in the lines the skeleton held", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    let resolve = (_: unknown) => {};
+    vi.mocked(autoobserve.coverage).mockReturnValue(new Promise((r) => (resolve = r)) as never);
+    const wrapper = mountView();
+    await vi.advanceTimersByTimeAsync(400);
+    const held = wrapper.findAll('[data-test="autoobserve2-coverage-sentence-skeleton"]').length;
+    const ready = (Date.now() + 5 * 86_400_000) * 1000;
+    // Gaps, partly watched services and learning streams, so the verdict renders its longest sub-line.
+    const rows = Array.from({ length: 30 }, (_, i) => {
+      const row = svc(i, false);
+      if (i % 2) row.cells.errors = { ...row.cells.errors, state: "covered" };
+      return {
+        ...row,
+        traffic_per_hour: i % 3 ? 100 - i : null,
+        streams: [{ type: "logs", name: `logs_${i}`, learning_until: i % 2 ? ready : null }],
+      };
+    });
+    resolve({
+      data: { view: "strict", pass_at: null, refreshed_at: null, quality: null, classes: [], rows },
+    });
+    await vi.advanceTimersByTimeAsync(400);
+    vi.useRealTimers();
+    await flushPromises();
+    const sentence = line(wrapper, "sentence");
+    for (const part of [
+      gt("autoobserve.coverageLive.verdict.share", { count: "15", top: "10", share: "100%" }),
+      gt("autoobserve.coverageLive.verdict.partly", { count: "15" }, 15),
+      gt("autoobserve.coverageLive.verdict.unknown", { count: "5" }, 5),
+    ])
+      expect(sentence.text()).toContain(String(part));
+    expect(sentence.text()).toMatch(/\b15 streams\b/);
+    expect(sentence.findComponent(OTruncatedText).props("lines")).toBe(held);
+  });
+
+  it("with every service watched says so and offers nothing to add", async () => {
+    respond([svc(0, true), svc(1, true)]);
+    const wrapper = mountView();
+    await flushPromises();
+    expect(line(wrapper, "sentence").text()).toContain(
+      String(gt("autoobserve.coverageLive.verdict.allWatched", { count: "2" }, 2)),
+    );
+    expect(line(wrapper, "add-alert").exists()).toBe(false);
+    expect(line(wrapper, "cta-note").text()).toContain(
+      String(gt("autoobserve.coverageLive.verdict.nothingToAdd")),
     );
   });
 });

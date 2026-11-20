@@ -40,6 +40,8 @@ import {
   mapHistogram,
   mapHistogramSplit,
   deriveKpiFromHistogram,
+  applySlotUptime,
+  buildSlotUptimeSql,
   mapRun,
   evidenceOriginTs,
   evidenceSeverity,
@@ -1879,6 +1881,135 @@ describe("confirm jobs in uptime", () => {
       start + 60_000_000,
     );
     expect(bucket.uptimePct).toBe(100);
+  });
+
+  describe("one result per slot (run, location, device, engine)", () => {
+    const start = Date.UTC(2026, 0, 1) * 1000; // micros
+    const key = new Date(start / 1000).toISOString().slice(0, 19);
+    const nextUs = start + 60_000_000;
+    const nextKey = new Date(nextUs / 1000).toISOString().slice(0, 19);
+    const fields = new Set([
+      "trigger_type",
+      "run_id",
+      "execution_id",
+      "location",
+      "device",
+      "engine",
+      "environment",
+    ]);
+
+    it("should show 50% when desktop passes, mobile fails, and the confirm job repeats both", () => {
+      // 4 rows, 2 up, 2 confirm rows: the row estimate gives 100%.
+      const histogram = [
+        { ts: key, total_runs: 4, passed_runs: 2, failed_runs: 2, confirm_runs: 2 },
+      ];
+      expect(deriveKpiFromHistogram(histogram, null, null).uptimePct).toBe(100);
+      // The server counts 2 slots: desktop up, mobile down.
+      const fixed = applySlotUptime(
+        histogram,
+        [{ bucket_us: start, slot_up: 1, slot_measured: 2 }],
+        false,
+      );
+      expect(deriveKpiFromHistogram(fixed, null, null).uptimePct).toBe(50);
+      expect(mapHistogram(fixed, start, start + 60_000_000)[0].uptimePct).toBe(50);
+      // The run counts the tiles show do not change.
+      expect(deriveKpiFromHistogram(fixed, null, null).totalRuns).toBe(4);
+    });
+
+    it("should take uptime from the slot query alone when the histogram read fewer rows", () => {
+      // The histogram missed desktop's confirm row, which was saved before the slot query ran.
+      const histogram = [
+        { ts: key, total_runs: 3, passed_runs: 1, failed_runs: 2, confirm_runs: 1 },
+      ];
+      const fixed = applySlotUptime(
+        histogram,
+        [{ bucket_us: start, slot_up: 1, slot_measured: 2 }],
+        false,
+      );
+      expect(deriveKpiFromHistogram(fixed, null, null).uptimePct).toBe(50);
+    });
+
+    it("should stay correct for any number of confirmed runs", () => {
+      // 201 runs where desktop always passes and mobile always fails.
+      const histogram = [
+        { ts: key, total_runs: 804, passed_runs: 402, failed_runs: 402, confirm_runs: 402 },
+      ];
+      const fixed = applySlotUptime(
+        histogram,
+        [{ bucket_us: start, slot_up: 201, slot_measured: 402 }],
+        false,
+      );
+      expect(deriveKpiFromHistogram(fixed, null, null).uptimePct).toBe(50);
+    });
+
+    it("should add a bucket the histogram does not have, and leave buckets without slots empty", () => {
+      const histogram = [
+        { ts: key, total_runs: 2, passed_runs: 1, failed_runs: 1, confirm_runs: 0 },
+      ];
+      const fixed = applySlotUptime(
+        histogram,
+        [
+          { bucket_us: start, slot_up: 0, slot_measured: 0 },
+          { bucket_us: nextUs, slot_up: 1, slot_measured: 1 },
+        ],
+        false,
+      );
+      const buckets = mapHistogram(fixed, start, start + 120_000_000);
+      expect(buckets.find((b) => b.tsMs === start / 1000)?.uptimePct).toBeNull();
+      expect(buckets.find((b) => b.tsMs === nextUs / 1000)?.uptimePct).toBe(100);
+      expect(fixed.find((r) => r.ts === nextKey)?.total_runs).toBe(0);
+    });
+
+    it("should correct each environment on its own when the chart splits by environment", () => {
+      const histogram = [
+        {
+          ts: key,
+          environment: "prod",
+          total_runs: 4,
+          passed_runs: 2,
+          failed_runs: 2,
+          confirm_runs: 2,
+        },
+        { ts: key, environment: "stage", total_runs: 1, passed_runs: 1, confirm_runs: 0 },
+      ];
+      const fixed = applySlotUptime(
+        histogram,
+        [
+          { bucket_us: start, environment: "prod", slot_up: 1, slot_measured: 2 },
+          { bucket_us: start, environment: "stage", slot_up: 1, slot_measured: 1 },
+        ],
+        true,
+      );
+      const { blended, byEnv } = mapHistogramSplit(fixed, start, start + 60_000_000);
+      expect(byEnv.get("prod")![0].uptimePct).toBe(50);
+      expect(byEnv.get("stage")![0].uptimePct).toBe(100);
+      // 2 of 3 results: prod desktop, prod mobile, stage.
+      expect(blended[0].uptimePct).toBeCloseTo(66.667, 2);
+    });
+
+    it("should build the slot query only when the stream has the slot key fields", () => {
+      expect(buildSlotUptimeSql("m", "1 minute", new Set(["trigger_type"]))).toBeNull();
+      const sql = buildSlotUptimeSql("m", "1 minute", fields, "prod", true)!;
+      expect(sql).toContain("% 60000000 as bucket_us, environment");
+      expect(sql).toContain(
+        "GROUP BY CASE WHEN run_id IS NULL OR run_id = '' THEN execution_id ELSE run_id END, location, device, engine, environment",
+      );
+      expect(sql).toContain("environment = 'prod'");
+      // A row without trigger_type (older probes) counts as an original row.
+      expect(sql).toContain("WHEN (trigger_type IS NULL OR trigger_type != 'confirm') AND status");
+      // Environment stays in the slot key when the chart does not split, so a run that tested
+      // two environments counts one result for each.
+      const unsplit = buildSlotUptimeSql("m", "1 minute", fields)!;
+      expect(unsplit).toContain("location, device, engine, environment\n) slots");
+      expect(unsplit).toContain("GROUP BY bucket_us\n");
+      // Absent fields stay out of the slot key, because the search API rejects them.
+      const noDevice = buildSlotUptimeSql(
+        "m",
+        "1 minute",
+        new Set(["trigger_type", "run_id", "execution_id"]),
+      )!;
+      expect(noDevice).not.toContain("device");
+    });
   });
 
   it("should ask for confirm rows only when the stream has the field", () => {

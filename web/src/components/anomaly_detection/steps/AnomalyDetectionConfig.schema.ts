@@ -117,6 +117,28 @@ export interface AnomalyStoredInterval {
   parsed: boolean;
 }
 
+/** The function a stored custom_sql row carries, as the edit fetch returned it. */
+export interface AnomalyStoredSqlFunction {
+  detection_function: string;
+  detection_function_field?: string | null;
+}
+
+/** The value column a stored custom_sql function declares, once the query no longer names it: the server reads it as authoritative. */
+export const anomalyMissingValueColumn = (
+  c: { query_mode?: string; custom_sql?: string | null },
+  storedSql: AnomalyStoredSqlFunction | null,
+): string | null => {
+  if (c.query_mode !== "custom_sql" || !storedSql) return null;
+  const declared = (
+    storedSql.detection_function_field ||
+    /\(([^)]*)\)\s*$/.exec(storedSql.detection_function)?.[1] ||
+    ""
+  ).trim();
+  if (!declared || declared === "*") return null;
+  // Substring on purpose: a quoted or dotted alias ("p99.ms") has no word boundary to split on.
+  return (c.custom_sql ?? "").includes(declared) ? null : declared;
+};
+
 /** The stored governing triple, captured once from the edit-fetch response (D4). */
 export interface AnomalyStoredIntervals {
   histogram: AnomalyStoredInterval;
@@ -210,6 +232,7 @@ export const createAnomalyDetectionConfigSchema = (
   t: Translator,
   getTimestampColumn: () => string = () => "_timestamp",
   getStoredIntervals: () => AnomalyStoredIntervals | null = () => null,
+  getStoredSqlFunction: () => AnomalyStoredSqlFunction | null = () => null,
 ) =>
   makeAnomalyDetectionConfigBase(t).superRefine((value, ctx) => {
     if (value.query_mode === "custom_sql") {
@@ -229,6 +252,16 @@ export const createAnomalyDetectionConfigSchema = (
             column: getTimestampColumn(),
           }),
         });
+      } else {
+        // Blocked, not rewritten to count: that rewrite saves and then fails every training run.
+        const missing = anomalyMissingValueColumn(value, getStoredSqlFunction());
+        if (missing) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["custom_sql"],
+            message: t("alerts.anomaly.valueColumnMissing", { column: missing }),
+          });
+        }
       }
     }
 
@@ -360,6 +393,11 @@ export const anomalyNoticeBadgeKeys = (
       return {
         labelKey: "alerts.anomaly.noticeRetrain",
         tooltipKeys: ["alerts.anomaly.noticeRetrainTooltip"],
+      };
+    case "duplicate_rows":
+      return {
+        labelKey: "alerts.anomaly.noticeDuplicateRows",
+        tooltipKeys: ["alerts.anomaly.noticeDuplicateRowsTooltip"],
       };
     default:
       return null;

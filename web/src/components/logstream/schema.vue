@@ -52,23 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <div v-if="indexData.schema">
-      <div class="m-0 p-0">
-        <div @submit.prevent="onSubmit">
+    <div v-if="indexData.schema" class="h-full">
+      <div class="m-0 h-full p-0">
+        <div class="h-full" @submit.prevent="onSubmit">
           <!-- we will show loading state here -->
-          <div
-            v-if="loadingState"
-            class="flex h-full w-full items-center justify-center"
-            style="min-height: calc(100vh - 3.75rem)"
-          >
+          <div v-if="loadingState" class="flex h-full w-full items-center justify-center">
             <OSpinner size="md" />
           </div>
           <!-- if we have data and no loading then we will show the data otherwise we will show the loading state -->
-          <div
-            v-else
-            class="indexDetailsContainer flex min-h-0 w-full flex-col"
-            style="height: calc(100vh - 3.75rem)"
-          >
+          <div v-else class="indexDetailsContainer flex h-full min-h-0 w-full flex-col">
             <!-- this the grid section the tiles section -->
             <div class="stats-grid mb-2 grid grid-cols-4 gap-2 max-md:grid-cols-2">
               <!-- Docs Count Tile -->
@@ -285,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="filterField"
                           data-cy="schema-index-field-search-input"
                           class="no-border o2-search-input ms-auto"
-                          :placeholder="t('search.searchField')"
+                          :placeholder="t('logStream.searchFieldOrIndexType')"
                         />
                         <OButton
                           v-if="isSchemaUDSEnabled"
@@ -1130,10 +1122,6 @@ export default defineComponent({
       if (!filterField.value && activeTab.value !== "schemaFields") return rows;
 
       const searchTerm = filterField.value?.toLowerCase() || "";
-      const labelToValueMap: Record<string, string> = {};
-      streamIndexType.forEach(({ label, value }: any) => {
-        labelToValueMap[label.toLowerCase()] = value;
-      });
 
       return rows.filter((row: any) => {
         if (activeTab.value === "schemaFields") {
@@ -1141,9 +1129,7 @@ export default defineComponent({
         }
         if (!searchTerm) return true;
         if (row.name.toLowerCase().includes(searchTerm)) return true;
-        return (row.index_type || []).some(
-          (t: string) => t.toLowerCase().includes(searchTerm) || labelToValueMap[searchTerm] === t,
-        );
+        return indexTypeMatches(row, searchTerm);
       });
     });
 
@@ -1269,6 +1255,25 @@ export default defineComponent({
         value: "hashPartition_128",
       },
     ];
+    const indexTypeLabels = new Map(streamIndexType.map(({ label, value }) => [value, label]));
+
+    // Built-in (env default) FTS and secondary index fields are not stored in index_type.
+    const displayedIndexTypes = (row: SchemaField): string[] => {
+      const types = new Set(row.index_type || []);
+      if (store.state.zoConfig.default_fts_keys?.includes(row.name)) types.add("fullTextSearchKey");
+      if (store.state.zoConfig.default_secondary_index_fields?.includes(row.name))
+        types.add("secondaryIndexKey");
+      return [...types];
+    };
+
+    // Matches the label shown in the select (current locale) or the stored value.
+    const indexTypeMatches = (row: SchemaField, searchTerm: string) =>
+      displayedIndexTypes(row).some(
+        (value) =>
+          value.toLowerCase().includes(searchTerm) ||
+          !!indexTypeLabels.get(value)?.toLowerCase().includes(searchTerm),
+      );
+
     const { getStream, getUpdatedSettings } = useStreams(t);
 
     onBeforeMount(() => {
@@ -1894,12 +1899,6 @@ export default defineComponent({
       var filtered: any[] = [];
       const searchTerm = field?.toLowerCase() || "";
 
-      // Map labels -> values for index types
-      const labelToValueMap: Record<string, string> = {};
-      streamIndexType.forEach(({ label, value }) => {
-        labelToValueMap[label.toLowerCase()] = value;
-      });
-
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
         let match = false;
@@ -1914,16 +1913,8 @@ export default defineComponent({
               if (row.name.toLowerCase().includes(searchTerm)) {
                 match = true;
               }
-              // Match by index_type (convert search label to value)
-              else if (
-                row.index_type.some((t: string) => {
-                  // check if search is label
-                  return (
-                    t.toLowerCase().includes(searchTerm) || // direct match with stored value
-                    labelToValueMap[searchTerm] === t // label ? value match
-                  );
-                })
-              ) {
+              // Match by index_type
+              else if (indexTypeMatches(row, searchTerm)) {
                 match = true;
               }
             }
@@ -1937,11 +1928,7 @@ export default defineComponent({
               match = true;
             }
             // Match by index_type
-            else if (
-              row.index_type.some((t: string) => {
-                return t.toLowerCase().includes(searchTerm) || labelToValueMap[searchTerm] === t;
-              })
-            ) {
+            else if (indexTypeMatches(row, searchTerm)) {
               match = true;
             }
           }
@@ -2476,21 +2463,8 @@ export default defineComponent({
     //this is used to compute the index_type value based on the env
     //so instead of directly showing the value of the index_type we will add the values of fulltextsearchkey and secondaryindexkey if it is set by the env
     //and if it is not set by the env then we will not add the values of fulltextsearchkey and secondaryindexkey becuase those will be already there and we don't want to show them twice
-    const computedIndexType = (props: { row: SchemaField }) => {
-      return computed(() => {
-        let keysToBeDisplayed = props.row.index_type || [];
-        // return the actual index_type value from the row
-        //merge env fts and secondary index keys
-        //check for the props.row.name is in the env fts and secondary index keys
-        if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1) {
-          keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "fullTextSearchKey"])];
-        }
-        if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1) {
-          keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "secondaryIndexKey"])];
-        }
-        return keysToBeDisplayed || [];
-      });
-    };
+    const computedIndexType = (props: { row: SchemaField }) =>
+      computed(() => displayedIndexTypes(props.row));
     //this function is used to check if the option is present in the default env
     //if present then we will return true else false
     //this is used to show the tooltip in the select for disabled options

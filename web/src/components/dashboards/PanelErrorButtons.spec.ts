@@ -501,6 +501,17 @@ describe("PanelErrorButtons", () => {
       wrapper.unmount();
     });
 
+    it("counts treemap rows skipped for a size that is not a positive number", async () => {
+      const wrapper = mountAttached({ treemapNotice: { skippedRows: 2 } });
+      const chip = wrapper.find('[data-test="panel-notice-chip-skipped-rows"]');
+      expect(chip.text()).toBe("2 rows skipped");
+      await openTooltip(chip.element);
+      expect(bubble()?.textContent).toContain(
+        "2 rows have a size that is not a positive number, so they are not drawn or counted in the totals.",
+      );
+      wrapper.unmount();
+    });
+
     it("shows server partial and client interruption as separate chips", () => {
       const wrapper = mountAttached({
         serverPartial: true,

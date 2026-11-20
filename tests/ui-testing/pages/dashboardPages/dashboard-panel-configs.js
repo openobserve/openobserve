@@ -166,6 +166,36 @@ export default class DashboardPanelConfigs {
     this.barGaugeOrientationTrigger = page.locator('[data-test="dashboard-config-bar_gauge_orientation-trigger"]');
     this.barGaugeShowUnfilled = page.locator('[data-test="dashboard-config-bar_gauge_show_unfilled"]');
 
+    //State timeline locators
+    // Base test ids of the state timeline OSelects / toggle group; "-trigger" and "-option" derive from them.
+    this.stateTimelineDisplayId = "dashboard-config-state_timeline_display";
+    this.stateTimelineRowSortId = "dashboard-config-state-timeline-row-sort";
+    this.stateTimelineTooltipModeId = "dashboard-config-state-timeline-tooltip-mode";
+    this.stateValueAlignId = "dashboard-config-state_value_align";
+    this.stateTimelineDisplay = page.locator(`[data-test="${this.stateTimelineDisplayId}"]`);
+    this.stateTimelineDisplayTrigger = page.locator(`[data-test="${this.stateTimelineDisplayId}-trigger"]`);
+    this.stateTimelineRowSort = page.locator(`[data-test="${this.stateTimelineRowSortId}"]`);
+    this.stateTimelineRowSortTrigger = page.locator(`[data-test="${this.stateTimelineRowSortId}-trigger"]`);
+    this.stateTimelineTooltipMode = page.locator(`[data-test="${this.stateTimelineTooltipModeId}"]`);
+    this.stateTimelineTooltipModeTrigger = page.locator(`[data-test="${this.stateTimelineTooltipModeId}-trigger"]`);
+    this.stateTimelineShowStateText = page.locator('[data-test="dashboard-config-state-timeline-show-state-text"]');
+    this.stateValueAlign = page.locator(`[data-test="${this.stateValueAlignId}"]`);
+    this.stateValueAlignOptions = page.locator(`[data-test="${this.stateValueAlignId}-option"]`);
+    //Distribution locators (OInput wrapper, its inner -field input and -error message)
+    this.distributionBucketCount = page.locator('[data-test="dashboard-config-distribution_bucket_count"]');
+    this.distributionBucketCountField = page.locator('[data-test="dashboard-config-distribution_bucket_count-field"]');
+    this.distributionBucketCountError = page.locator('[data-test="dashboard-config-distribution_bucket_count-error"]');
+    this.distributionBucketSize = page.locator('[data-test="dashboard-config-distribution_bucket_size"]');
+    this.distributionBucketSizeField = page.locator('[data-test="dashboard-config-distribution_bucket_size-field"]');
+    this.distributionBucketSizeError = page.locator('[data-test="dashboard-config-distribution_bucket_size-error"]');
+    this.distributionBucketOffset = page.locator('[data-test="dashboard-config-distribution_bucket_offset"]');
+    this.distributionBucketOffsetField = page.locator('[data-test="dashboard-config-distribution_bucket_offset-field"]');
+    this.queryLimitField = page.locator('[data-test="dashboard-config-limit-field"]');
+
+    //Sunburst locators (OSwitch wrapper and its -btn role="switch" control)
+    this.sunburstShowLabels = page.locator('[data-test="dashboard-config-sunburst_show_labels"]');
+    this.sunburstShowLabelsBtn = page.locator('[data-test="dashboard-config-sunburst_show_labels-btn"]');
+
     //Map locators
     this.mapType = page.locator('[data-test="dashboard-config-map-type"]');
 
@@ -1343,6 +1373,51 @@ export default class DashboardPanelConfigs {
     await this.selectConfigOption("dashboard-config-bar_gauge_orientation", label);
   }
 
+  // ========== State timeline ==========
+
+  async selectStateTimelineDisplay(label) {
+    await this.selectConfigOption(this.stateTimelineDisplayId, label);
+  }
+
+  async selectStateTimelineRowSort(label) {
+    await this.selectConfigOption(this.stateTimelineRowSortId, label);
+  }
+
+  async selectStateTimelineTooltipMode(label) {
+    await this.selectConfigOption(this.stateTimelineTooltipModeId, label);
+  }
+
+  async getStateTimelineDisplayOptionLabels() {
+    return this.getConfigSelectOptionLabels(this.stateTimelineDisplayId);
+  }
+
+  async getStateTimelineRowSortOptionLabels() {
+    return this.getConfigSelectOptionLabels(this.stateTimelineRowSortId);
+  }
+
+  async getStateTimelineTooltipModeOptionLabels() {
+    return this.getConfigSelectOptionLabels(this.stateTimelineTooltipModeId);
+  }
+
+  async selectStateValueAlign(label, value) {
+    await this.scrollSidebarToElement(this.stateValueAlign);
+    await this._clickVirtualOption(this.stateValueAlignId, label);
+    await expect(this.stateValueAlign).toHaveAttribute("data-test-selected-value", value);
+  }
+
+  /** Assert the state text alignment's committed value, retrying while a reopened panel hydrates. */
+  async expectStateValueAlign(value) {
+    await this.scrollSidebarToElement(this.stateValueAlign);
+    await expect(this.stateValueAlign).toHaveAttribute("data-test-selected-value", value, { timeout: 15000 });
+  }
+
+  /** Labels of the state text alignment items; the Default item names the mode's fallback. */
+  async getStateValueAlignOptionLabels() {
+    await this.scrollSidebarToElement(this.stateValueAlign);
+    await this.stateValueAlignOptions.first().waitFor({ state: "visible", timeout: 10000 });
+    return this.stateValueAlignOptions.evaluateAll((els) => els.map((el) => el.getAttribute("data-test-label")));
+  }
+
   /** Assert a config OSelect's committed value, retrying while a reopened panel hydrates. */
   async expectConfigSelectValue(trigger, value) {
     await this.scrollSidebarToElement(trigger);
@@ -2264,6 +2339,50 @@ export default class DashboardPanelConfigs {
     await this.heatmapYMaxField.fill(max);
     await expect(this.heatmapYMinField).toHaveValue(min);
     await expect(this.heatmapYMaxField).toHaveValue(max);
+  }
+
+  /**
+   * Fill a distribution number input and confirm the value stuck. An empty string clears it,
+   * which drops the key from the panel config so the chart falls back to its default.
+   */
+  async _setDistributionNumber(field, value) {
+    await this.scrollSidebarToElement(field);
+    await field.fill(value);
+    await expect(field).toHaveValue(value, { timeout: 5000 });
+  }
+
+  async setDistributionBucketCount(value) {
+    await this._setDistributionNumber(this.distributionBucketCountField, value);
+  }
+
+  async setDistributionBucketSize(value) {
+    await this._setDistributionNumber(this.distributionBucketSizeField, value);
+  }
+
+  async setDistributionBucketOffset(value) {
+    await this._setDistributionNumber(this.distributionBucketOffsetField, value);
+  }
+
+  /** Assert the three bucket inputs hold the given values ("" = unset, showing the default placeholder). */
+  async expectDistributionBuckets({ count = "", size = "", offset = "" } = {}) {
+    await this.scrollSidebarToElement(this.distributionBucketCount);
+    await expect(this.distributionBucketCountField).toHaveValue(count);
+    await expect(this.distributionBucketSizeField).toHaveValue(size);
+    await expect(this.distributionBucketOffsetField).toHaveValue(offset);
+  }
+
+  /** Assert the sunburst "Show labels" switch is on (true) or off (false). */
+  async expectSunburstShowLabels(on) {
+    await this.scrollSidebarToElement(this.sunburstShowLabels);
+    await expect(this.sunburstShowLabelsBtn).toHaveAttribute("aria-checked", on ? "true" : "false");
+  }
+
+  /** Turn the sunburst "Show labels" switch on or off; a no-op when it is already in that state. */
+  async setSunburstShowLabels(on) {
+    await this.scrollSidebarToElement(this.sunburstShowLabels);
+    const current = (await this.sunburstShowLabelsBtn.getAttribute("aria-checked")) === "true";
+    if (current !== on) await this.sunburstShowLabelsBtn.click();
+    await this.expectSunburstShowLabels(on);
   }
 
   async toggleHeatmapHistogramMode() {

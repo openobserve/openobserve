@@ -597,6 +597,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @series-limit-update="handleSeriesLimitUpdate"
         @region-join-update="handleRegionJoinUpdate"
         @sankey-notice-update="handleSankeyNoticeUpdate"
+        @treemap-notice-update="handleTreemapNoticeUpdate"
         @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -1033,6 +1034,7 @@ export default defineComponent({
       panelDiagnostics,
       seriesLimit,
       sankeyNotice,
+      treemapNotice,
       maxQueryRangeWarning,
       noticeProps,
       handleResultMetadataUpdate,
@@ -1040,6 +1042,7 @@ export default defineComponent({
       handleSeriesLimitUpdate,
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
+      handleTreemapNoticeUpdate,
     } = usePanelNotices(() => store.state.timezone);
 
     // to store and show when the panel was last loaded
@@ -1130,6 +1133,7 @@ export default defineComponent({
         !!noticeProps.value.regionJoin ||
         !!sankeyNotice.value?.returnLinks ||
         !!sankeyNotice.value?.skippedRows ||
+        !!treemapNotice.value?.skippedRows ||
         !!panelDiagnostics.value?.serverPartial ||
         injectedPartial.value ||
         !!panelDiagnostics.value?.functionErrors?.length ||
@@ -1705,6 +1709,7 @@ export default defineComponent({
       handleSeriesLimitUpdate,
       handleRegionJoinUpdate,
       handleSankeyNoticeUpdate,
+      handleTreemapNoticeUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
       panelNoticeProps,

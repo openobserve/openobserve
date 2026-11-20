@@ -103,23 +103,22 @@ impl VisitorMut for ColumnVisitor<'_> {
     }
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let Some(order_by) = query.order_by.as_mut()
-            && let OrderByKind::Expressions(exprs) = &mut order_by.kind
+        let projection: &[SelectItem] = match query.body.as_ref() {
+            SetExpr::Select(select) => &select.projection,
+            _ => &[],
+        };
+        if let Some(order_by) = query.order_by.as_ref()
+            && let OrderByKind::Expressions(exprs) = &order_by.kind
         {
-            for order in exprs.iter_mut() {
-                let mut name_visitor = FieldNameVisitor::new();
-                let _ = order.expr.visit(&mut name_visitor);
-                if name_visitor.field_names.len() == 1 {
-                    let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
-                    self.order_by.push((
-                        expr_name,
-                        if order.options.asc.unwrap_or(true) {
-                            OrderBy::Asc
-                        } else {
-                            OrderBy::Desc
-                        },
-                    ));
-                }
+            for order in exprs {
+                self.order_by.push((
+                    order_by_key_name(&order.expr, projection),
+                    if order.options.asc.unwrap_or(true) {
+                        OrderBy::Asc
+                    } else {
+                        OrderBy::Desc
+                    },
+                ));
             }
         }
         if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
@@ -183,6 +182,43 @@ impl VisitorMut for ColumnVisitor<'_> {
         }
         ControlFlow::Continue(())
     }
+}
+
+/// Names an ORDER BY key by the column it sorts on; an ordinal or an aliased SELECT expression
+/// resolves to that item. A key with no single column keeps its text, so no key is dropped.
+fn order_by_key_name(expr: &Expr, projection: &[SelectItem]) -> String {
+    let mut expr = match select_item_at_ordinal(expr, projection) {
+        Some(SelectItem::ExprWithAlias { alias, .. }) => return alias.value.clone(),
+        Some(SelectItem::UnnamedExpr(item)) => item.clone(),
+        _ => expr.clone(),
+    };
+    let mut name_visitor = FieldNameVisitor::new();
+    let _ = expr.visit(&mut name_visitor);
+    if name_visitor.field_names.len() == 1 {
+        return name_visitor.field_names.into_iter().next().unwrap();
+    }
+    let text = expr.to_string();
+    projection
+        .iter()
+        .find_map(|item| match item {
+            SelectItem::ExprWithAlias { expr, alias } if expr.to_string() == text => {
+                Some(alias.value.clone())
+            }
+            _ => None,
+        })
+        .unwrap_or(text)
+}
+
+fn select_item_at_ordinal<'a>(expr: &Expr, projection: &'a [SelectItem]) -> Option<&'a SelectItem> {
+    let Expr::Value(ValueWithSpan {
+        value: Value::Number(ordinal, _),
+        ..
+    }) = expr
+    else {
+        return None;
+    };
+    let ordinal = ordinal.to_string().parse::<usize>().ok()?;
+    projection.get(ordinal.checked_sub(1)?)
 }
 
 fn has_wildcard(set: &SetExpr) -> bool {
@@ -392,6 +428,62 @@ mod tests {
     }
 
     #[test]
+    fn test_column_visitor_records_every_order_by_key() {
+        let histogram = "histogram(_timestamp) AS ts, count(*) AS tn";
+        let cases = [
+            ("name", "", vec![]),
+            ("name", "ORDER BY lower(name)", vec![("name", OrderBy::Asc)]),
+            (
+                "name",
+                "ORDER BY name || age",
+                vec![("name || age", OrderBy::Asc)],
+            ),
+            (
+                histogram,
+                "ORDER BY ts ASC, tn DESC",
+                vec![("ts", OrderBy::Asc), ("tn", OrderBy::Desc)],
+            ),
+            (
+                histogram,
+                "ORDER BY 1 ASC, 2 DESC",
+                vec![("ts", OrderBy::Asc), ("tn", OrderBy::Desc)],
+            ),
+            (
+                histogram,
+                "ORDER BY count(*) DESC, ts",
+                vec![("tn", OrderBy::Desc), ("ts", OrderBy::Asc)],
+            ),
+            (
+                "name, count(*)",
+                "ORDER BY count(*) DESC",
+                vec![("count(*)", OrderBy::Desc)],
+            ),
+            (
+                "name, count(*)",
+                "ORDER BY 1, 2 DESC",
+                vec![("name", OrderBy::Asc), ("count(*)", OrderBy::Desc)],
+            ),
+            ("name", "ORDER BY 2", vec![("2", OrderBy::Asc)]),
+            ("*", "ORDER BY 1", vec![("1", OrderBy::Asc)]),
+        ];
+        for (select, order_by, expected) in cases {
+            let sql = format!("SELECT {select} FROM users {order_by}");
+            let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+                .unwrap()
+                .pop()
+                .unwrap();
+            let schemas = make_schemas();
+            let mut visitor = ColumnVisitor::new(&schemas);
+            let _ = statement.visit(&mut visitor);
+            let expected: Vec<_> = expected
+                .into_iter()
+                .map(|(field, order)| (field.to_string(), order))
+                .collect();
+            assert_eq!(visitor.order_by, expected, "{sql}");
+        }
+    }
+
+    #[test]
     fn test_column_visitor_no_tests_when_no_schema_match() {
         let sql = "SELECT unknown_col FROM users";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
@@ -428,8 +520,7 @@ mod tests {
     }
 
     #[test]
-    fn test_column_visitor_order_by_compound_expr_skipped() {
-        // ORDER BY expression with multiple fields → field_names.len() != 1 → order_by skipped
+    fn test_column_visitor_order_by_multiple_keys() {
         let sql = "SELECT name FROM users ORDER BY name, age";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()

@@ -56,16 +56,22 @@ export const recentCompletionItems = (
   if (!matches.length) return [];
   const line = position.lineNumber;
   const lastLine = model.getLineCount();
-  // Monaco only takes a one-line range around the caret, so the other lines go through extra edits.
-  const otherLines: { range: Range; text: string }[] = [];
-  if (line > 1) {
-    otherLines.push({
-      range: { startLineNumber: 1, startColumn: 1, endLineNumber: line, endColumn: 1 },
+  // The range starts at the caret, so Monaco has no typed word to score these rows on and ranks them last.
+  // Monaco takes a one-line range only, so the text before the caret and the other lines go through extra edits.
+  const otherText: { range: Range; text: string }[] = [];
+  if (line > 1 || position.column > 1) {
+    otherText.push({
+      range: {
+        startLineNumber: 1,
+        startColumn: 1,
+        endLineNumber: line,
+        endColumn: position.column,
+      },
       text: "",
     });
   }
   if (line < lastLine) {
-    otherLines.push({
+    otherText.push({
       range: {
         startLineNumber: line,
         startColumn: model.getLineMaxColumn(line),
@@ -87,14 +93,14 @@ export const recentCompletionItems = (
       detail: description,
       insertText: query,
       filterText: typedOnLine,
-      sortText: `\u0000${String(index).padStart(2, "0")}`,
+      sortText: `\uffff${String(index).padStart(2, "0")}`,
       range: {
         startLineNumber: line,
-        startColumn: 1,
+        startColumn: position.column,
         endLineNumber: line,
         endColumn: model.getLineMaxColumn(line),
       },
-      additionalTextEdits: otherLines,
+      additionalTextEdits: otherText,
     };
   });
 };

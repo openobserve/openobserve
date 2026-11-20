@@ -1787,13 +1787,121 @@ LIMIT 1`;
 }
 
 /**
- * Uptime over the results that tested the site. A confirm job and the failure it re-tested are
- * one result, so each confirm row removes one result: a passing confirm stays in `up` and takes
- * the failure's place. A pair split across two buckets can leave more up results than results.
+ * Uptime estimate from row counts, used when [`applySlotUptime`] did not run. A confirm job and
+ * the failure it re-tested are one result, so each confirm row removes one result: a passing
+ * confirm stays in `up` and takes the failure's place. This is exact for a check with one
+ * device, but not when a confirm job re-tests a device that passed. A pair split across two
+ * buckets can leave more up results than results.
  */
 function uptimePercent(up: number, measured: number, confirmRuns: number): number | null {
   const results = Math.max(measured - confirmRuns, up);
   return results > 0 ? (up / results) * 100 : null;
+}
+
+/** Uptime from the slot counts of [`buildSlotUptimeSql`]. */
+function slotUptimePercent(up: number, measured: number): number | null {
+  return measured > 0 ? (up / measured) * 100 : null;
+}
+
+/**
+ * Uptime with one result per slot: one run, location, device and engine (and environment).
+ *
+ * A confirm job keeps the run_id of its run and re-tests every device of the failed job, so the
+ * row counts count a device that passed twice. Example: desktop passes and mobile fails, and the
+ * confirm job gives the same answers. The rows hold 2 up results of 4, and the row estimate
+ * (4 - 2 confirm rows = 2 results) shows 100%. Here a slot's answer is the confirm row's when it
+ * tested the site, otherwise the original answer, so the result is 1 of 2, which is 50%.
+ *
+ * One query does all the counting on the server, so the answer does not depend on how many
+ * confirm runs the window holds, and up and measured come from the same read. A slot counts in
+ * the bucket of its first row, aligned to the epoch the same way [`mapHistogram`] aligns
+ * buckets. Rows without a run_id (older rows, reaper rows) are each their own slot. With
+ * `splitByEnvironment`, the outer query also groups by environment; the inner slot always
+ * includes it when the stream has the field.
+ *
+ * Returns `null` when the stream lacks a field the slot key needs; uptime then uses the estimate.
+ */
+export function buildSlotUptimeSql(
+  monitorId: string,
+  interval: string,
+  schemaFields: Set<string>,
+  environment?: string,
+  splitByEnvironment = false,
+): string | null {
+  if (!["trigger_type", "run_id", F.executionId].every((f) => schemaFields.has(f))) {
+    return null;
+  }
+  const id = escapeSqlLiteral(monitorId);
+  const stepUs = intervalSeconds(interval) * 1_000_000;
+  const envCol = splitByEnvironment ? ", environment" : "";
+  // Environment is part of the slot even when the chart does not split by it: one run can test
+  // two environments with the same location and device.
+  const keyCols = [F.location, F.device, F.engine, F.environment]
+    .filter((f) => schemaFields.has(f))
+    .map((f) => `, ${f}`)
+    .join("");
+  const up = `${F.status} IN ('${STATUS_VALUES.passed}', '${STATUS_VALUES.warning}')`;
+  const tested = `${F.status} != '${STATUS_VALUES.error}'`;
+  const confirm = `trigger_type = 'confirm'`;
+  // Older probes wrote no trigger_type, and `NOT (NULL = 'confirm')` is NULL, so name NULL here.
+  const original = `(trigger_type IS NULL OR trigger_type != 'confirm')`;
+  return `SELECT bucket_us${envCol},
+  SUM(CASE WHEN conf_tested = 1 THEN conf_up ELSE orig_up END) as slot_up,
+  SUM(CASE WHEN conf_tested = 1 OR orig_tested = 1 THEN 1 ELSE 0 END) as slot_measured
+FROM (
+  SELECT MIN(${F.timestamp}) - MIN(${F.timestamp}) % ${stepUs} as bucket_us${envCol},
+    MAX(CASE WHEN ${confirm} AND ${tested} THEN 1 ELSE 0 END) as conf_tested,
+    MAX(CASE WHEN ${confirm} AND ${up} THEN 1 ELSE 0 END) as conf_up,
+    MAX(CASE WHEN ${original} AND ${tested} THEN 1 ELSE 0 END) as orig_tested,
+    MAX(CASE WHEN ${original} AND ${up} THEN 1 ELSE 0 END) as orig_up
+  FROM ${TABLE}
+  WHERE ${F.monitorId} = '${id}'${environmentPredicate(environment)}
+  GROUP BY CASE WHEN run_id IS NULL OR run_id = '' THEN ${F.executionId} ELSE run_id END${keyCols}
+) slots
+GROUP BY bucket_us${envCol}
+ORDER BY bucket_us`;
+}
+
+/**
+ * Puts the slot counts of [`buildSlotUptimeSql`] on the histogram rows, and returns new rows.
+ *
+ * Every returned row has `slot_counted = 1`, so uptime reads `slot_up / slot_measured` and
+ * ignores the row estimate. A slot bucket the histogram does not have (a row saved between the
+ * two queries) becomes a row with zero run counts, so its uptime still shows.
+ */
+export function applySlotUptime(
+  histogramRows: Record<string, unknown>[],
+  slotRows: Record<string, unknown>[],
+  splitByEnvironment: boolean,
+): Record<string, unknown>[] {
+  const keyOf = (ts: string, env: string) => `${ts}\u0000${splitByEnvironment ? env : ""}`;
+  const rows: Record<string, unknown>[] = histogramRows.map((h) => ({
+    ...h,
+    slot_up: 0,
+    slot_measured: 0,
+    slot_counted: 1,
+  }));
+  const byKey = new Map(rows.map((r) => [keyOf(str(r.ts), str(r.environment)), r]));
+  for (const s of slotRows) {
+    const ts = new Date(num(s.bucket_us) / 1000).toISOString().slice(0, 19);
+    const key = keyOf(ts, str(s.environment));
+    let row = byKey.get(key);
+    if (!row) {
+      row = {
+        ts,
+        ...(splitByEnvironment ? { environment: str(s.environment) } : {}),
+        total_runs: 0,
+        slot_up: 0,
+        slot_measured: 0,
+        slot_counted: 1,
+      };
+      byKey.set(key, row);
+      rows.push(row);
+    }
+    row.slot_up = num(row.slot_up) + num(s.slot_up);
+    row.slot_measured = num(row.slot_measured) + num(s.slot_measured);
+  }
+  return rows;
 }
 
 /**
@@ -1819,11 +1927,15 @@ export function deriveKpiFromHistogram(
   const warningRuns = sum("warning_runs");
   const errorRuns = sum("error_runs");
   const confirmRuns = sum("confirm_runs");
+  const slotCounted = buckets.some((b) => num(b.slot_counted) > 0);
   const lastRunTsRaw = rawLastRun ? num(rawLastRun.ts) : 0;
   return {
     // P6a — `error` is excluded from BOTH sides, same as before: it means "we
     // could not look", not "the service was down".
-    uptimePct: uptimePercent(passedRuns + warningRuns, totalRuns - errorRuns, confirmRuns) ?? 0,
+    uptimePct:
+      (slotCounted
+        ? slotUptimePercent(sum("slot_up"), sum("slot_measured"))
+        : uptimePercent(passedRuns + warningRuns, totalRuns - errorRuns, confirmRuns)) ?? 0,
     p95Ms: num(p95Row?.p95_duration),
     passedRuns,
     warningRuns,
@@ -2278,7 +2390,10 @@ export function mapHistogram(
       tsMs: Number.isFinite(tsMs) ? tsMs : 0,
       avgMs: measured > 0 ? num(hit.avg_duration) : null,
       p95Ms: measured > 0 ? num(hit.p95_duration) : null,
-      uptimePct: uptimePercent(passed + warning, measured, num(hit.confirm_runs)),
+      uptimePct:
+        num(hit.slot_counted) > 0
+          ? slotUptimePercent(num(hit.slot_up), num(hit.slot_measured))
+          : uptimePercent(passed + warning, measured, num(hit.confirm_runs)),
       warningRuns: num(hit.warning_runs),
       failedRuns: num(hit.failed_runs),
       errorRuns: num(hit.error_runs),
@@ -2324,6 +2439,9 @@ export function mapHistogramSplit(
       "failed_runs",
       "error_runs",
       "confirm_runs",
+      "slot_up",
+      "slot_measured",
+      "slot_counted",
       "retried_runs",
       "flaky_runs",
       "degraded_runs",

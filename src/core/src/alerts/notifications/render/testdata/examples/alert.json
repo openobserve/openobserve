@@ -1,151 +1,171 @@
 {
   "slack_firing": {
-    "blocks": [
+    "attachments": [
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "*<https://example.openobserve.ai/alerts/sample|🔴 Sample CPU alert firing>*"
-        }
-      },
-      {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "cpu &gt; 80 for 10m"
-        }
-      },
-      {
-        "type": "section",
-        "fields": [
+        "color": "#E01E5A",
+        "blocks": [
           {
-            "type": "mrkdwn",
-            "text": "*Level*\nCritical"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://example.openobserve.ai/alerts/sample|🔴 Sample CPU alert firing>*"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Event*\nFiring"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "cpu &gt; 80 for 10m"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Stream*\napp_logs"
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Level*\nCritical"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nFiring"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Stream*\napp_logs"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Threshold*\n &gt;= 80"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Value*\n92.5"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Time*\n2026-08-01 10:10:00 UTC"
+              }
+            ]
           },
           {
-            "type": "mrkdwn",
-            "text": "*Threshold*\n &gt;= 80"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Value*\n92.5"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Time*\n2026-08-01 10:10:00 UTC"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "`host` web-1 · `cpu` 92.5\n`host` web-2 · `cpu` 88.1"
+            }
           }
         ]
       },
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "`host` web-1 · `cpu` 92.5\n`host` web-2 · `cpu` 88.1"
-        }
-      },
-      {
-        "type": "actions",
-        "elements": [
+        "color": "#E01E5A",
+        "blocks": [
           {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "View logs"
-            },
-            "url": "https://example.openobserve.ai/alerts/sample",
-            "style": "primary"
-          },
-          {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open alert"
-            },
-            "url": "https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default"
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "View logs"
+                },
+                "url": "https://example.openobserve.ai/alerts/sample",
+                "style": "primary"
+              },
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open alert"
+                },
+                "url": "https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default"
+              }
+            ]
           }
         ]
       }
     ]
   },
   "slack_resolved": {
-    "blocks": [
+    "attachments": [
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "*<https://example.openobserve.ai/alerts/sample|🟢 Sample CPU alert firing>*"
-        }
-      },
-      {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "cpu &gt; 80 for 10m"
-        }
-      },
-      {
-        "type": "section",
-        "fields": [
+        "color": "#2EB67D",
+        "blocks": [
           {
-            "type": "mrkdwn",
-            "text": "*Level*\nOk"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "*<https://example.openobserve.ai/alerts/sample|🟢 Sample CPU alert resolved>*"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Event*\nResolved"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "cpu &gt; 80 for 10m"
+            }
           },
           {
-            "type": "mrkdwn",
-            "text": "*Stream*\napp_logs"
+            "type": "section",
+            "fields": [
+              {
+                "type": "mrkdwn",
+                "text": "*Level*\nOk"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Event*\nResolved"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Stream*\napp_logs"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Threshold*\n &gt;= 80"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Value*\n92.5"
+              },
+              {
+                "type": "mrkdwn",
+                "text": "*Time*\n2026-08-01 10:10:00 UTC"
+              }
+            ]
           },
           {
-            "type": "mrkdwn",
-            "text": "*Threshold*\n &gt;= 80"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Value*\n92.5"
-          },
-          {
-            "type": "mrkdwn",
-            "text": "*Time*\n2026-08-01 10:10:00 UTC"
+            "type": "section",
+            "text": {
+              "type": "mrkdwn",
+              "text": "`host` web-1 · `cpu` 92.5\n`host` web-2 · `cpu` 88.1"
+            }
           }
         ]
       },
       {
-        "type": "section",
-        "text": {
-          "type": "mrkdwn",
-          "text": "`host` web-1 · `cpu` 92.5\n`host` web-2 · `cpu` 88.1"
-        }
-      },
-      {
-        "type": "actions",
-        "elements": [
+        "color": "#2EB67D",
+        "blocks": [
           {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "View logs"
-            },
-            "url": "https://example.openobserve.ai/alerts/sample",
-            "style": "primary"
-          },
-          {
-            "type": "button",
-            "text": {
-              "type": "plain_text",
-              "text": "Open alert"
-            },
-            "url": "https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default"
+            "type": "actions",
+            "elements": [
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "View logs"
+                },
+                "url": "https://example.openobserve.ai/alerts/sample",
+                "style": "primary"
+              },
+              {
+                "type": "button",
+                "text": {
+                  "type": "plain_text",
+                  "text": "Open alert"
+                },
+                "url": "https://example.openobserve.ai/web/alerts/detail/sample?org_identifier=default"
+              }
+            ]
           }
         ]
       }

@@ -27,6 +27,7 @@
 
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { SAMPLE_CAP } from "./constants";
+import { quoteStream } from "@/composables/firstEvent/confirmQuery";
 
 /**
  * Build the SQL for a uniform-random raw-sample of LLM spans in a window.
@@ -56,7 +57,7 @@ export function buildRawSampleSql(
   const agentClause = agentFilter ? ` AND (${agentFilter})` : "";
   return (
     `SELECT duration, gen_ai_usage_cost as cost ` +
-    `FROM "${stream}" ` +
+    `FROM ${quoteStream(stream)} ` +
     `WHERE _timestamp >= ${startMicros} AND _timestamp <= ${endMicros} ` +
     `AND gen_ai_operation_name IS NOT NULL${agentClause} ` +
     `ORDER BY rand() LIMIT ${cap}`

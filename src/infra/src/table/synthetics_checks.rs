@@ -269,6 +269,29 @@ pub async fn list<C: ConnectionTrait>(
     Ok(checks)
 }
 
+/// Of `ids`, those in one of the folders with these primary keys.
+pub async fn ids_in_folders<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    ids: &[String],
+    folder_pks: &[String],
+) -> Result<std::collections::HashSet<String>, errors::Error> {
+    if ids.is_empty() || folder_pks.is_empty() {
+        return Ok(Default::default());
+    }
+    Ok(Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Id.is_in(ids))
+        .filter(Column::FolderId.is_in(folder_pks))
+        .into_tuple::<String>()
+        .all(conn)
+        .await?
+        .into_iter()
+        .collect())
+}
+
 pub async fn count<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -335,6 +358,26 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
         }
     }
     Ok(out)
+}
+
+/// Location ids any synthetic in the org runs from, across every folder.
+pub async fn location_ids_in_use<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> Result<std::collections::HashSet<String>, errors::Error> {
+    let rows: Vec<serde_json::Value> = Entity::find()
+        .select_only()
+        .column(Column::Locations)
+        .filter(Column::OrgId.eq(org_id))
+        .into_tuple()
+        .all(conn)
+        .await?;
+    Ok(rows
+        .iter()
+        .filter_map(|locs| locs.as_array())
+        .flatten()
+        .filter_map(|v| v.as_str().map(String::from))
+        .collect())
 }
 
 /// Every synthetic in an org, fully decoded; fails closed on a bad row, unlike `list`.
@@ -1254,7 +1297,8 @@ pub async fn apply_replicated_streaks<C: ConnectionTrait>(
 
 /// For a message from an older producer: marks the row unsigned and moves its recovery stamp past
 /// `now`, whatever `run_ts` the row holds. The stamp never goes down, so no mark armed before this
-/// can match again. Safe to run twice.
+/// can match again. Safe to run twice. Moves `updated_at`, so the status page rebuilder reads the
+/// row again and drops the hold at its next tick.
 async fn void_recovery_stamp<C: ConnectionTrait>(
     conn: &C,
     id: &str,
@@ -1268,6 +1312,7 @@ async fn void_recovery_stamp<C: ConnectionTrait>(
             Expr::col(Column::StatusRecoveredAt).add(1),
         )
         .col_expr(Column::StatusStreakSig, Expr::value(UNSIGNED))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::Id.eq(id))
         .filter(Column::StatusRecoveredAt.gt(now))
         .exec(conn)
@@ -1275,6 +1320,7 @@ async fn void_recovery_stamp<C: ConnectionTrait>(
     Entity::update_many()
         .col_expr(Column::StatusRecoveredAt, Expr::value(now + 1))
         .col_expr(Column::StatusStreakSig, Expr::value(UNSIGNED))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::Id.eq(id))
         .filter(Column::StatusRecoveredAt.lte(now))
         .exec(conn)
@@ -1307,11 +1353,21 @@ async fn apply_replicated_recovery<C: ConnectionTrait>(
 
 /// After the job cluster claim moves to this cluster: moves every recovery stamp past `now` and
 /// disarms every false alarm hold, so no hold from the old owner can match a new stamp. Safe to
-/// run twice. A marked failure that still goes on then opens a new incident.
+/// run twice, and safe to run on two nodes at once. A marked failure that still goes on then
+/// opens a new incident.
+///
+/// The signature covers the stamp. A failing row moves in one update that also signs it for its
+/// new stamp when it was signed, so a false alarm mark made right after the reset can hold, and
+/// no reader or overlapping reset sees the new stamp with the old signature. Rows that do not
+/// fail move in bulk: no hold applies to them, so their signature does not matter until the next
+/// run signs them again.
 pub async fn reset_false_alarm_holds<C: ConnectionTrait>(
     conn: &C,
     now: i64,
 ) -> Result<(), errors::Error> {
+    for row in failing_stamp_rows(conn).await? {
+        move_failing_row(conn, Some(row), now).await?;
+    }
     // Two updates, so no SQL dialect needs GREATEST. The order matters: the second one sets
     // values that the first one would move again.
     Entity::update_many()
@@ -1320,16 +1376,149 @@ pub async fn reset_false_alarm_holds<C: ConnectionTrait>(
             Expr::col(Column::StatusRecoveredAt).add(1),
         )
         .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::StatusDownRuns.eq(0))
         .filter(Column::StatusRecoveredAt.gt(now))
         .exec(conn)
         .await?;
     Entity::update_many()
         .col_expr(Column::StatusRecoveredAt, Expr::value(now + 1))
         .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::StatusDownRuns.eq(0))
         .filter(Column::StatusRecoveredAt.lte(now))
         .exec(conn)
         .await?;
-    super::status_pages::disarm_false_alarm_holds(conn).await
+    // A row that started to fail after the first read kept its old stamp in both bulk updates.
+    for row in failing_stamp_rows(conn).await? {
+        if row.recovered_at <= now {
+            move_failing_row(conn, Some(row), now).await?;
+        }
+    }
+    super::status_pages::disarm_false_alarm_holds(conn).await?;
+    Ok(())
+}
+
+/// The columns that one stamp move reads and compares.
+#[derive(Clone, Debug)]
+pub(crate) struct StampRow {
+    pub(crate) id: String,
+    down_runs: i32,
+    up_runs: i32,
+    run_ts: i64,
+    run_class: i32,
+    pub(crate) recovered_at: i64,
+    sig: i64,
+}
+
+type StampTuple = (String, i32, i32, i64, i32, i64, i64);
+
+fn stamp_query() -> sea_orm::Select<Entity> {
+    Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .column(Column::StatusDownRuns)
+        .column(Column::StatusUpRuns)
+        .column(Column::StatusRunTs)
+        .column(Column::LastRunClass)
+        .column(Column::StatusRecoveredAt)
+        .column(Column::StatusStreakSig)
+}
+
+fn stamp_row(
+    (id, down_runs, up_runs, run_ts, run_class, recovered_at, sig): StampTuple,
+) -> StampRow {
+    StampRow {
+        id,
+        down_runs,
+        up_runs,
+        run_ts,
+        run_class,
+        recovered_at,
+        sig,
+    }
+}
+
+async fn failing_stamp_rows<C: ConnectionTrait>(conn: &C) -> Result<Vec<StampRow>, errors::Error> {
+    Ok(stamp_query()
+        .filter(Column::StatusDownRuns.gt(0))
+        .into_tuple::<StampTuple>()
+        .all(conn)
+        .await?
+        .into_iter()
+        .map(stamp_row)
+        .collect())
+}
+
+pub(crate) async fn read_stamp_row<C: ConnectionTrait>(
+    conn: &C,
+    id: &str,
+) -> Result<Option<StampRow>, errors::Error> {
+    Ok(stamp_query()
+        .filter(Column::Id.eq(id))
+        .into_tuple::<StampTuple>()
+        .one(conn)
+        .await?
+        .map(stamp_row))
+}
+
+/// Moves the stamp of one row the way [`reset_false_alarm_holds`] does, in one update that keeps
+/// the row signed if it was signed and leaves it unsigned otherwise. The update applies only to
+/// the values it read. If another write came first, it reads the row again and retries, so an
+/// overlapping reset moves the stamp once more and signs the final value. After a few lost races
+/// it gives up and leaves the row as the other writer left it.
+pub(crate) async fn move_failing_row<C: ConnectionTrait>(
+    conn: &C,
+    first: Option<StampRow>,
+    now: i64,
+) -> Result<(), errors::Error> {
+    let Some(mut row) = first else {
+        return Ok(());
+    };
+    let id = row.id.clone();
+    for _ in 0..5 {
+        let moved = if row.recovered_at > now {
+            row.recovered_at + 1
+        } else {
+            now + 1
+        };
+        let signed = row.sig
+            == streak_sig(
+                row.down_runs,
+                row.up_runs,
+                row.run_ts,
+                row.run_class,
+                row.recovered_at,
+            );
+        let sig = if signed {
+            streak_sig(row.down_runs, row.up_runs, row.run_ts, row.run_class, moved)
+        } else {
+            UNSIGNED
+        };
+        let res = Entity::update_many()
+            .col_expr(Column::StatusRecoveredAt, Expr::value(moved))
+            .col_expr(Column::StatusStreakSig, Expr::value(sig))
+            // A rebuilder that read the row before this write must read it again.
+            .col_expr(
+                Column::UpdatedAt,
+                Expr::value(config::utils::time::now_micros().max(now + 1)),
+            )
+            .filter(Column::Id.eq(id.as_str()))
+            .filter(Column::StatusDownRuns.eq(row.down_runs))
+            .filter(Column::StatusUpRuns.eq(row.up_runs))
+            .filter(Column::StatusRunTs.eq(row.run_ts))
+            .filter(Column::LastRunClass.eq(row.run_class))
+            .filter(Column::StatusRecoveredAt.eq(row.recovered_at))
+            .filter(Column::StatusStreakSig.eq(row.sig))
+            .exec(conn)
+            .await?;
+        if res.rows_affected > 0 {
+            return Ok(());
+        }
+        match read_stamp_row(conn, &id).await? {
+            Some(r) => row = r,
+            None => return Ok(()),
+        }
+    }
+    Ok(())
 }
 
 /// The alert bookkeeping a completed run needs in order to decide whether to
@@ -1750,6 +1939,10 @@ impl ApplyCheckFilters for sea_orm::Select<Entity> {
         let mut q = self;
         if let Some(folder_id) = &params.folder_id {
             q = q.filter(Column::FolderId.eq(folder_id.clone()));
+        }
+        // An empty set renders as `1 = 2`, so no listable folder lists no check.
+        if let Some(folder_ids) = &params.listable_folder_ids {
+            q = q.filter(Column::FolderId.is_in(folder_ids.clone()));
         }
         if let Some(check_type) = &params.check_type {
             q = q.filter(Column::SyntheticsType.eq(check_type_to_str(check_type)));
@@ -2468,6 +2661,112 @@ pub(crate) mod tests {
         let am: ActiveModel = model.into();
         am.reset_all().insert(&db).await.unwrap();
         db
+    }
+
+    /// A cross-folder list holds only checks in listable folders, in the total and the page;
+    /// a public folder id resolves within its own org and folder type.
+    #[tokio::test]
+    async fn listable_folders_bound_the_count_and_the_page() {
+        use config::meta::folder::FolderType::{Alerts, Synthetics};
+        use sea_orm::Schema;
+
+        use crate::table::{entity::folders as f, folders as folder_table};
+
+        let db = db_with_one_check(0).await;
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(f::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        for (pk, org, slug, kind) in [
+            ("folder-1", "org1", "default", Synthetics),
+            ("folder-2", "org1", "team", Synthetics),
+            ("folder-3", "org1", "ops", Synthetics),
+            ("alert-pk", "org1", "team", Alerts),
+            ("other-pk", "org2", "team", Synthetics),
+        ] {
+            f::ActiveModel {
+                id: Set(pk.into()),
+                org: Set(org.into()),
+                folder_id: Set(slug.into()),
+                name: Set(slug.into()),
+                description: Set(None),
+                icon: Set(None),
+                r#type: Set(folder_table::folder_type_into_i16(kind)),
+            }
+            .insert(&db)
+            .await
+            .unwrap();
+            let check = Model {
+                id: format!("in-{pk}"),
+                name: format!("Check {pk}"),
+                folder_id: pk.into(),
+                locations: serde_json::json!([format!("loc-{pk}")]),
+                ..make_model()
+            };
+            ActiveModel::from(check)
+                .reset_all()
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+
+        let cases: [(&[&str], &[&str], u64); 2] =
+            [(&["team", "ops"], &["in-folder-3"], 2), (&[], &[], 0)];
+        for (slugs, want, total) in cases {
+            let slugs: Vec<String> = slugs.iter().map(|s| s.to_string()).collect();
+            let pks = folder_table::get_pks_by_names(&db, "org1", &slugs, Synthetics)
+                .await
+                .unwrap();
+            let params = ListSyntheticsParams {
+                listable_folder_ids: Some(pks.clone()),
+                page: Some(1),
+                page_size: Some(1),
+                ..Default::default()
+            };
+            let mut ids: Vec<String> = list(&db, "org1", &params)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|c| c.id)
+                .collect();
+            ids.sort();
+            assert_eq!(ids, want, "{slugs:?}");
+            assert_eq!(
+                count(&db, "org1", &params).await.unwrap(),
+                total,
+                "{slugs:?}"
+            );
+            let all: Vec<String> = ["mon-1", "in-folder-2", "in-alert-pk"]
+                .map(String::from)
+                .into();
+            let mut visible: Vec<_> = ids_in_folders(&db, "org1", &all, &pks)
+                .await
+                .unwrap()
+                .into_iter()
+                .collect();
+            visible.sort();
+            let visible_want: &[&str] = if slugs.is_empty() {
+                &[]
+            } else {
+                &["in-folder-2"]
+            };
+            assert_eq!(visible, visible_want, "{slugs:?}");
+        }
+        // Delete guards read this, so it must not shrink to the caller's folders.
+        let mut in_use: Vec<_> = location_ids_in_use(&db, "org1")
+            .await
+            .unwrap()
+            .into_iter()
+            .collect();
+        in_use.sort();
+        let in_use_want = [
+            "aws-us-east-1",
+            "loc-alert-pk",
+            "loc-folder-1",
+            "loc-folder-2",
+            "loc-folder-3",
+            "loc-other-pk",
+        ];
+        assert_eq!(in_use, in_use_want);
     }
 
     /// The gap state is what makes each gap send one notice pair across restarts and nodes, so

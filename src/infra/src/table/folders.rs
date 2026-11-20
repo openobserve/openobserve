@@ -16,7 +16,7 @@
 use config::meta::folder::{Folder, FolderType};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
-    IntoActiveModel, QueryFilter, QueryOrder, Set, TryIntoModel,
+    IntoActiveModel, QueryFilter, QueryOrder, QuerySelect, Set, TryIntoModel,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -159,6 +159,7 @@ pub async fn put(
         }
     };
 
+    publish_put(org_id, folder_type, &model.folder_id).await;
     Ok((model_ksuid(&model)?, model.into()))
 }
 
@@ -174,10 +175,15 @@ pub async fn get_or_create(
     folder: Folder,
     folder_type: FolderType,
 ) -> Result<(Ksuid, Folder, bool), errors::Error> {
-    get_or_create_with(get_orm_client_rw().await, org_id, folder, folder_type).await
+    let created =
+        get_or_create_with(get_orm_client_rw().await, org_id, folder, folder_type).await?;
+    if created.2 {
+        publish_put(org_id, folder_type, &created.1.folder_id).await;
+    }
+    Ok(created)
 }
 
-/// [`get_or_create`] on a given connection.
+/// [`get_or_create`] on a given connection; the caller publishes the change once it commits.
 pub async fn get_or_create_with<C: ConnectionTrait>(
     client: &C,
     org_id: &str,
@@ -221,22 +227,26 @@ pub async fn delete(
     folder_id: &str,
     folder_type: FolderType,
 ) -> Result<(), errors::Error> {
-    delete_with(get_orm_client_rw().await, org_id, folder_id, folder_type).await
+    if delete_with(get_orm_client_rw().await, org_id, folder_id, folder_type).await? {
+        publish_delete(org_id, folder_type, folder_id).await;
+    }
+    Ok(())
 }
 
+/// [`delete`] on a given connection; returns whether a row went, and the caller publishes it.
 pub async fn delete_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     folder_id: &str,
     folder_type: FolderType,
-) -> Result<(), errors::Error> {
-    Entity::delete_many()
+) -> Result<bool, errors::Error> {
+    let deleted = Entity::delete_many()
         .filter(Column::Org.eq(org_id))
         .filter(Column::FolderId.eq(folder_id))
         .filter(Column::Type.eq(folder_type_into_i16(folder_type)))
         .exec(conn)
         .await?;
-    Ok(())
+    Ok(deleted.rows_affected > 0)
 }
 
 /// Returns the primary-key `id` of the folder identified by its name and type.
@@ -305,6 +315,27 @@ pub async fn get_public_ids_by_pks<C: ConnectionTrait>(
         .await?
         .into_iter()
         .map(|model| (model.id, model.folder_id))
+        .collect())
+}
+
+/// Primary keys of the `folder_type` folders with these public ids; unknown ids are skipped.
+pub async fn get_pks_by_names<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    folder_ids: &[String],
+    folder_type: FolderType,
+) -> Result<Vec<String>, sea_orm::DbErr> {
+    if folder_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    Ok(Entity::find()
+        .filter(Column::Org.eq(org_id))
+        .filter(Column::Type.eq(folder_type_into_i16(folder_type)))
+        .filter(Column::FolderId.is_in(folder_ids))
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|model| model.id)
         .collect())
 }
 
@@ -377,11 +408,49 @@ async fn list_models(
         .await
 }
 
+/// Sent after the write is durable; a failure is logged because the folder already changed.
+async fn publish_put(org_id: &str, folder_type: FolderType, folder_id: &str) {
+    if let Err(e) =
+        crate::coordinator::folders::emit_put_event(org_id, folder_type, folder_id).await
+    {
+        log::error!("[FOLDERS] put event failed for {org_id}/{folder_id}: {e}");
+    }
+}
+
+async fn publish_delete(org_id: &str, folder_type: FolderType, folder_id: &str) {
+    if let Err(e) =
+        crate::coordinator::folders::emit_delete_event(org_id, folder_type, folder_id).await
+    {
+        log::error!("[FOLDERS] delete event failed for {org_id}/{folder_id}: {e}");
+    }
+}
+
 /// Deletes all folders of the org and returns each one's `(folder_id, type)`.
 pub async fn delete_by_org(org_id: &str) -> Result<Vec<(String, i16)>, errors::Error> {
     let client = get_orm_client_rw().await;
+    // Events go first: a failed one leaves the rows, so the teardown retry finds them again.
+    let listed: Vec<(String, i16)> = Entity::find()
+        .select_only()
+        .column(Column::FolderId)
+        .column(Column::Type)
+        .filter(Column::Org.eq(org_id))
+        .into_tuple()
+        .all(client)
+        .await?;
+    for (folder_id, kind) in &listed {
+        if let Some(folder_type) = folder_type_from_i16(*kind) {
+            crate::coordinator::folders::emit_delete_event(org_id, folder_type, folder_id).await?;
+        }
+    }
     let delete = Entity::delete_many().filter(Column::Org.eq(org_id));
-    Ok(super::delete_returning(client, delete, &[Column::FolderId, Column::Type]).await?)
+    let deleted: Vec<(String, i16)> =
+        super::delete_returning(client, delete, &[Column::FolderId, Column::Type]).await?;
+    for (folder_id, kind) in &deleted {
+        if let Some(folder_type) = folder_type_from_i16(*kind) {
+            publish_delete(org_id, folder_type, folder_id).await;
+        }
+    }
+    Ok(deleted)
 }
 
 #[cfg(test)]

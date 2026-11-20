@@ -401,6 +401,26 @@ describe("useTraces", () => {
   // getUrlQueryParams
   // -------------------------------------------------------------------------
   describe("getUrlQueryParams", () => {
+    it("keeps the anomaly banner parameters of the current URL", () => {
+      const saved = mockCurrentRoute.value.query;
+      mockCurrentRoute.value.query = {
+        ...saved,
+        from_anomaly: "a1",
+        anomaly_filter_applied: "0",
+        anomaly_measure: "count(*) per 15 min",
+      };
+      try {
+        const { getUrlQueryParams, resetSearchObj } = useTraces();
+        resetSearchObj();
+        const params = getUrlQueryParams(false);
+        expect(params.from_anomaly).toBe("a1");
+        expect(params.anomaly_filter_applied).toBe("0");
+        expect(params.anomaly_measure).toBe("count(*) per 15 min");
+      } finally {
+        mockCurrentRoute.value.query = saved;
+      }
+    });
+
     it("includes stream from selectedStream.value", () => {
       const { searchObj, getUrlQueryParams, resetSearchObj } = useTraces();
       resetSearchObj();
@@ -845,6 +865,26 @@ describe("useTraces", () => {
       expect(mockSearch).not.toHaveBeenCalled();
     });
 
+    it("matches a stream dimension filter on each alias of it the stream holds", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-1c", null);
+
+      await navigateToCorrelatedLogs({
+        ...correlationProps(),
+        logStreams: [
+          {
+            stream_name: "app-logs",
+            filters: { namespace: "prod" },
+            filter_aliases: { namespace: ["k8s_namespace_name"] },
+          },
+        ],
+      });
+
+      expect(pushedQuery()).toBe(
+        "(namespace = 'prod' or k8s_namespace_name = 'prod') and span_id = 'span-1c'",
+      );
+    });
+
     it("stays put and reports none when no stream holds the trace", async () => {
       mockSearch.mockResolvedValue({ data: { hits: [{ zo_count: 0 }] } });
       const { navigateToCorrelatedLogs } = useTraces();
@@ -1234,6 +1274,18 @@ describe("useTraces", () => {
       const { tracesShareURL, resetSearchObj } = useTraces();
       resetSearchObj();
       expect(tracesShareURL.value).toMatch(/^https?:\/\//);
+    });
+
+    it("leaves trace_id out when the page has none", () => {
+      const route = mockCurrentRoute.value;
+      mockCurrentRoute.value = { ...route, query: {} };
+      try {
+        const { tracesShareURL, resetSearchObj } = useTraces();
+        resetSearchObj();
+        expect(new URL(tracesShareURL.value).searchParams.has("trace_id")).toBe(false);
+      } finally {
+        mockCurrentRoute.value = route;
+      }
     });
   });
 

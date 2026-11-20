@@ -156,6 +156,46 @@ impl Function for WithoutFileArgument {
     }
 }
 
+/// A runtime failure of a query function on a row or array; an intentional `abort` is flagged.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VrlFailure {
+    detail: String,
+    reason: String,
+    aborted: bool,
+}
+
+/// Tallies rows on which a query function failed at runtime, so a search can report
+/// one `function_error` message instead of silently returning the original rows.
+#[derive(Debug, Default)]
+pub struct VrlRunErrors {
+    total: usize,
+    failed: usize,
+    first: Option<String>,
+}
+
+impl VrlRunErrors {
+    pub fn record(&mut self, failure: Option<VrlFailure>) {
+        self.record_rows(1, failure);
+    }
+
+    /// An error fails all `rows` of the call; an intentional abort fails none.
+    pub fn record_rows(&mut self, rows: usize, failure: Option<VrlFailure>) {
+        self.total += rows;
+        if let Some(failure) = failure.filter(|f| !f.aborted) {
+            self.failed += rows;
+            self.first.get_or_insert(failure.reason);
+        }
+    }
+
+    pub fn message(&self) -> Option<String> {
+        let first = self.first.as_ref()?;
+        Some(format!(
+            "Query function failed on {} of {} rows: {first}",
+            self.failed, self.total
+        ))
+    }
+}
+
 pub fn register_global_enrichment_table<T>(name: impl Into<String>, table: T)
 where
     T: Table + Send + Sync + 'static,
@@ -275,6 +315,17 @@ pub fn apply_vrl_fn(
     org_id: &str,
     stream_name: &[String],
 ) -> (json::Value, Option<String>) {
+    let (value, failure) = apply_vrl_fn_checked(runtime, vrl_runtime, row, org_id, stream_name);
+    (value, failure.map(|f| f.detail))
+}
+
+pub fn apply_vrl_fn_checked(
+    runtime: &mut Runtime,
+    vrl_runtime: &VRLResultResolver,
+    row: json::Value,
+    org_id: &str,
+    stream_name: &[String],
+) -> (json::Value, Option<VrlFailure>) {
     let mut metadata = vrl::value::Value::from(BTreeMap::new());
     metadata.insert("org_id", vrl::value::Value::from(org_id.to_string()));
     metadata.insert(
@@ -314,8 +365,13 @@ pub fn apply_vrl_fn(
                     "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row."
                 );
                 // Return only error message without sensitive record data
-                let clean_err = format!("{org_id}/{stream_name:?} vrl failed: {err:?}");
-                (row, Some(clean_err))
+                let detail = format!("{org_id}/{stream_name:?} vrl failed: {err:?}");
+                let failure = VrlFailure {
+                    detail,
+                    reason: first_line(&err.to_string()),
+                    aborted: false,
+                };
+                (row, Some(failure))
             }
         },
         Err(err) => {
@@ -332,10 +388,19 @@ pub fn apply_vrl_fn(
                 "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row."
             );
             // Return only error message without sensitive record data
-            let clean_err = format!("{org_id}/{stream_name:?} vrl runtime error: {err:?}");
-            (row, Some(clean_err))
+            let detail = format!("{org_id}/{stream_name:?} vrl runtime error: {err:?}");
+            let failure = VrlFailure {
+                detail,
+                reason: first_line(&err.to_string()),
+                aborted: matches!(err, vrl::compiler::runtime::Terminate::Abort(_)),
+            };
+            (row, Some(failure))
         }
     }
+}
+
+fn first_line(msg: &str) -> String {
+    msg.lines().next().unwrap_or_default().to_string()
 }
 
 pub fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
@@ -723,5 +788,92 @@ mod tests {
                 "{source}"
             );
         }
+    }
+
+    fn failure(reason: &str, aborted: bool) -> VrlFailure {
+        VrlFailure {
+            detail: format!("detail {reason}"),
+            reason: reason.to_string(),
+            aborted,
+        }
+    }
+
+    fn run_rows(code: &str, inputs: &[&str]) -> VrlRunErrors {
+        let program = compile_vrl_function(code, "vrl_crate_test").unwrap();
+        let resolver = VRLResultResolver {
+            program: program.program.clone(),
+            fields: program.fields.clone(),
+        };
+        let mut runtime = init_vrl_runtime();
+        let streams = vec!["s".to_string()];
+        let mut errors = VrlRunErrors::default();
+        for m in inputs {
+            let row = json::json!({ "m": m });
+            let (_, f) =
+                apply_vrl_fn_checked(&mut runtime, &resolver, row, "vrl_crate_test", &streams);
+            errors.record(f);
+        }
+        errors
+    }
+
+    #[test]
+    fn run_errors_report_nothing_when_no_row_failed() {
+        let mut errors = VrlRunErrors::default();
+        errors.record(None);
+        errors.record(None);
+        assert_eq!(errors.message(), None);
+    }
+
+    #[test]
+    fn run_errors_count_failed_rows_and_keep_first_error() {
+        let mut errors = VrlRunErrors::default();
+        errors.record(None);
+        errors.record(Some(failure("first", false)));
+        errors.record(Some(failure("second", false)));
+        assert_eq!(
+            errors.message().as_deref(),
+            Some("Query function failed on 2 of 3 rows: first")
+        );
+    }
+
+    #[test]
+    fn run_errors_fail_every_row_of_a_whole_array_call() {
+        let mut errors = VrlRunErrors::default();
+        errors.record_rows(5, Some(failure("boom", false)));
+        assert_eq!(
+            errors.message().as_deref(),
+            Some("Query function failed on 5 of 5 rows: boom")
+        );
+    }
+
+    #[test]
+    fn run_errors_ignore_an_empty_successful_array_call() {
+        let mut errors = VrlRunErrors::default();
+        errors.record_rows(0, None);
+        assert_eq!(errors.message(), None);
+    }
+
+    #[test]
+    fn run_errors_do_not_count_an_intentional_abort() {
+        let mut errors = VrlRunErrors::default();
+        errors.record(Some(failure("aborted", true)));
+        assert_eq!(errors.message(), None);
+    }
+
+    #[test]
+    fn apply_vrl_fn_flags_runtime_failure_on_only_the_bad_row() {
+        let errors = run_rows(".x = parse_json!(.m)", &["{\"a\":1}", "not json"]);
+        assert_eq!(
+            errors.message().as_deref(),
+            Some(
+                "Query function failed on 1 of 2 rows: function call error for \"parse_json\" at (5:20): unable to parse json: expected ident at line 1 column 2"
+            )
+        );
+    }
+
+    #[test]
+    fn apply_vrl_fn_does_not_flag_an_intentional_abort() {
+        let errors = run_rows("if .m == \"skip\" { abort }\n.", &["skip", "keep"]);
+        assert_eq!(errors.message(), None);
     }
 }

@@ -145,7 +145,7 @@ describe("health checks", () => {
         name: "modelPricingGaps",
         query: { stream: "default", org_identifier: "org1" },
       },
-      feature: "modelPricing",
+      feature: null,
     });
     expect(fixTarget("missing_agent_identity", "default", "org1")).toMatchObject({
       kind: "route",
