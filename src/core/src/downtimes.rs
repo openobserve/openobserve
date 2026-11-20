@@ -4106,27 +4106,30 @@ mod tests {
         let now = now_micros();
         let conn = infra::db::get_orm_client_rw().await;
         let mut versions = HashMap::new();
-        for id in ["stale", "current", "absent"] {
+        // Rows are keyed by id alone, so a fixed id would move another test's row into this org.
+        let id_of = |name: &str| format!("{org}_{name}");
+        for name in ["stale", "current", "absent"] {
+            let id = id_of(name);
             let mut mute = row(
                 vec![TargetModule::AnomalyDetections],
                 now - HOUR,
                 now + 10 * HOUR,
             );
-            mute.id = id.to_string();
+            mute.id = id.clone();
             mute.org = org.clone();
             infra::table::downtimes::put_with(conn, &mute)
                 .await
                 .unwrap();
-            let stored = infra::table::downtimes::get_rw(&org, id)
+            let stored = infra::table::downtimes::get_rw(&org, &id)
                 .await
                 .unwrap()
                 .unwrap();
-            versions.insert(id, stored.version);
+            versions.insert(name, stored.version);
         }
-        let live = |id: &'static str| {
-            let org = org.clone();
+        let live = |name: &'static str| {
+            let (org, id) = (org.clone(), id_of(name));
             async move {
-                let stored = infra::table::downtimes::get_rw(&org, id)
+                let stored = infra::table::downtimes::get_rw(&org, &id)
                     .await
                     .unwrap()
                     .unwrap();
@@ -4134,7 +4137,7 @@ mod tests {
             }
         };
 
-        let refused = cancel(&org, root, "stale", Some(versions["stale"] - 1)).await;
+        let refused = cancel(&org, root, &id_of("stale"), Some(versions["stale"] - 1)).await;
         assert!(
             matches!(refused, Err(DowntimeError::Conflict(_))),
             "{refused:?}"
@@ -4144,13 +4147,13 @@ mod tests {
             "a refused cancel leaves the downtime live"
         );
 
-        let ended = cancel(&org, root, "current", Some(versions["current"]))
+        let ended = cancel(&org, root, &id_of("current"), Some(versions["current"]))
             .await
             .unwrap();
         assert!(ended.cancelled_at.is_some());
         assert!(!live("current").await);
 
-        cancel(&org, root, "absent", None).await.unwrap();
+        cancel(&org, root, &id_of("absent"), None).await.unwrap();
         assert!(
             !live("absent").await,
             "a caller with no version still cancels"
