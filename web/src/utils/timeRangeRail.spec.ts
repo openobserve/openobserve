@@ -22,6 +22,7 @@ import {
   formatRecentDuration,
   formatRecentRange,
   formatRecentRangeLabel,
+  formatSpanLimit,
 } from "./timeRangeRail";
 import { parseCalendarToken } from "./dashboard/calendarPeriods";
 
@@ -243,5 +244,17 @@ describe("timeRangeRail", () => {
   it("has no year chip, even though the resolver still accepts a calendar:year token", () => {
     expect(CALENDAR_RAIL_ITEMS.some((item) => item.token.startsWith("calendar:year:"))).toBe(false);
     expect(parseCalendarToken("calendar:year:-1")).not.toBeNull();
+  });
+});
+
+describe("formatSpanLimit", () => {
+  it.each([
+    [72, "en-US", "3 days"],
+    [24, "en-US", "1 day"],
+    [36, "en-US", "36 hours"],
+    [1, "en-US", "1 hour"],
+    [72, "de-DE", "3 Tage"],
+  ])("reads %i hours in %s as %s", (hours, locale, text) => {
+    expect(formatSpanLimit(hours, locale)).toBe(text);
   });
 });

@@ -6,7 +6,7 @@ const PageManager = require('../../pages/page-manager.js');
  * E2E coverage for the DateTime picker's Custom relative range validation
  * (web/src/components/DateTime.vue): the hard minimum of 1 + whole-number
  * truncation, the per-unit ~10-year upper cap, empty-value restore on blur,
- * re-capping when the unit changes, and the max_query_range restriction clamp.
+ * re-capping when the unit changes, and the max_query_range validity gate.
  *
  * The custom value input/unit select had no data-test; these were added in
  * DateTime.vue (testability-only) so OInput/OSelect can derive the `-field` /
@@ -153,7 +153,7 @@ test.describe('DateTime Custom Relative Range Validation testcases', () => {
     });
 
     // TC-05
-    test('should clamp the custom value and narrow the unit list under a max query range restriction', {
+    test('should block an over-limit custom value and narrow the unit list under a max query range restriction', {
       tag: ['@date-time-custom-range', '@all', '@P1']
     }, async () => {
       testLogger.info('Verifying restriction clamp and narrowed unit list');
@@ -165,15 +165,20 @@ test.describe('DateTime Custom Relative Range Validation testcases', () => {
         ['d', 'w', 'M']
       );
 
-      // With hours selected, an over-limit value clamps to the 2-hour restriction.
+      // With hours selected, an over-limit value is kept as typed, refused, and the reason shown.
+      const labelBefore = await pm.dateTimePickerPage.getTriggerLabel();
       await pm.dateTimePickerPage.setCustomValue('10');
-      await pm.dateTimePickerPage.expectCustomValue('2');
+      await pm.dateTimePickerPage.expectCustomValue('10');
+      await expect(pm.dateTimePickerPage.gateMessage).toContainText(
+        "Longer than this stream's 2 hours query limit."
+      );
+      expect(await pm.dateTimePickerPage.getTriggerLabel()).toBe(labelBefore);
 
       // Preset cells beyond the 2-hour limit render disabled.
       await pm.dateTimePickerPage.expectPresetDisabled('3-h');
       await pm.dateTimePickerPage.expectPresetDisabled('6-h');
 
-      testLogger.info('Restriction clamp and narrowed unit list verified');
+      testLogger.info('Restriction gate and narrowed unit list verified');
     });
   });
 });

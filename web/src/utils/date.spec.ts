@@ -25,6 +25,8 @@ import {
   isInvalidDate,
   convertUnixToDateFormat,
   convertDateToTimestamp,
+  MAX_RANGE_TEXT_UNITS,
+  matchRelativePeriod,
 } from "./date";
 
 describe("Date Utilities", () => {
@@ -367,6 +369,13 @@ describe("Date Utilities", () => {
     it("should return undefined for empty period", () => {
       const result = getConsumableRelativeTime("");
       expect(result).toBeUndefined();
+    });
+
+    it("reads a period only from its start and ignores one over the input cap", () => {
+      expect(matchRelativePeriod("15m")?.slice(1)).toEqual(["15", "m"]);
+      expect(matchRelativePeriod("x15m")).toBeNull();
+      expect(matchRelativePeriod(`${"1".repeat(MAX_RANGE_TEXT_UNITS)}m`)).toBeNull();
+      expect(getConsumableRelativeTime(`15m${" ".repeat(MAX_RANGE_TEXT_UNITS)}`)).toBeUndefined();
     });
 
     describe("calendar tokens", () => {

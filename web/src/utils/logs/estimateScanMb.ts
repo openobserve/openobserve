@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { RELATIVE_PERIOD_PATTERN } from "@/utils/date";
+import { matchRelativePeriod } from "@/utils/date";
 import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
 
 export const MICROS_PER_MINUTE = 60 * 1_000_000;
@@ -118,7 +118,7 @@ export function periodToMicros(period: string): number | null {
   const calendar = resolveCalendarPeriod(period);
   if (calendar) return calendar.endTime - calendar.startTime;
   // Same pattern the search resolves the period with, so the guard never sizes a window the search reads differently.
-  const match = RELATIVE_PERIOD_PATTERN.exec(period ?? "");
+  const match = matchRelativePeriod(period);
   if (!match) return null;
   return Number(match[1]) * UNIT_MICROS[match[2]];
 }
