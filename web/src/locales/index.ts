@@ -74,9 +74,21 @@ export const getLocale = () => {
   return "en-us";
 };
 
+/** French treats every |n| < 2, including 0, as singular; three-form messages are "zero | one | many". */
+export const frenchPluralRule = (choice: number, choicesLength: number): number => {
+  const count = Math.abs(choice);
+  if (choicesLength === 2) return count < 2 ? 0 : 1;
+  if (choicesLength === 3) {
+    if (choice === 0) return 0;
+    return count < 2 ? 1 : 2;
+  }
+  return Math.min(count, Math.max(choicesLength - 1, 0));
+};
+
 const i18n = createI18n({
   locale: getLocale(),
   fallbackLocale: "en-us",
+  pluralRules: { fr: frenchPluralRule },
   messages: {
     "en-us": {
       ...enLocale,
