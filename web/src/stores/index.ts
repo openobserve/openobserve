@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resolveThemeMode } from "@/utils/themePreference";
 import type { I18nText } from "@/types/i18n";
 import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 
@@ -111,7 +112,7 @@ const store = createStore({
     organizations: [],
     currentuser: useLocalCurrentUser() ? useLocalCurrentUser() : {},
     searchCollapsibleSection: 20,
-    theme: localStorage.getItem("theme") === "dark" ? "dark" : "light",
+    theme: resolveThemeMode(),
     printMode: false,
     kioskMode: false,
     // A per-screen theme forced by a kiosk URL; never persisted as the user's preference.

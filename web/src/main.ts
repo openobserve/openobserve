@@ -39,6 +39,7 @@ import { buildVersionChecker, isChunkLoadError } from "./utils/buildVersionCheck
 import { queryClient, setMutationNotifier } from "./composables/query/queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
+import { watchSystemTheme } from "@/utils/themePreference";
 import { raw } from "@/types/i18n";
 import { bindAccess } from "@/composables/useAccessStore";
 import { installFetchLicenseReceiver } from "@/services/licenseDenialReceiver";
@@ -48,6 +49,16 @@ installFetchLicenseReceiver();
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
 bootstrapTheme();
+// With the "system" preference, an OS light/dark switch flips the app live; a kiosk override stays put.
+watchSystemTheme((mode) => {
+  if (store.state.themeOverride) return;
+  try {
+    localStorage.setItem("theme", mode);
+  } catch {
+    // Storage blocked: the mode still applies for this page.
+  }
+  store.dispatch("appTheme", mode);
+});
 
 const activeLocale = getLocale();
 applyDocumentLocale(activeLocale);
