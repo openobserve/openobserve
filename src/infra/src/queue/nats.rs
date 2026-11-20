@@ -177,6 +177,7 @@ impl super::Queue for NatsQueue {
             &stream.cached_info().config,
             config.max_age.map(|_| max_age),
             config.duplicate_window,
+            config.max_bytes.map(max_bytes_of),
         )
         .await;
         Ok(())
@@ -265,6 +266,31 @@ impl super::Queue for NatsQueue {
     async fn purge(&self, _topic: &str, _sequence: usize) -> Result<()> {
         Ok(())
     }
+
+    async fn sequence_range(&self, topic: &str) -> Result<queue::SequenceRange> {
+        let stream_name = format!("{}{}", self.prefix, format_key(topic));
+        let client = try_get_nats_client().await?.clone();
+        let mut stream = jetstream::new(client)
+            .get_stream(&stream_name)
+            .await
+            .map_err(|e| Error::Message(format!("failed to get NATS stream {stream_name}: {e}")))?;
+        let info = stream.info().await.map_err(|e| {
+            Error::Message(format!("failed to read NATS stream {stream_name}: {e}"))
+        })?;
+        let state = &info.state;
+        // a new stream reports first 0, so derive "past the last" from the message count
+        let first = if state.messages == 0 {
+            state.last_sequence + 1
+        } else {
+            state.first_sequence
+        };
+        let created_us = info.created.unix_timestamp_nanos() / 1_000;
+        Ok(queue::SequenceRange {
+            first,
+            last: state.last_sequence,
+            created_us: i64::try_from(created_us).unwrap_or(i64::MAX),
+        })
+    }
 }
 
 fn stream_config(
@@ -279,7 +305,7 @@ fn stream_config(
         retention: config.retention_policy.into(),
         storage: config.storage_type.into(),
         num_replicas: nats.replicas,
-        max_bytes: nats.queue_max_size,
+        max_bytes: config.max_bytes.map_or(nats.queue_max_size, max_bytes_of),
         max_age,
         ..Default::default()
     };
@@ -295,24 +321,28 @@ async fn reconcile_stream(
     current: &jetstream::stream::Config,
     max_age: Option<Duration>,
     duplicate_window: Option<Duration>,
+    max_bytes: Option<i64>,
 ) {
-    let Some(updated) = stream_update(current, max_age, duplicate_window) else {
+    let Some(updated) = stream_update(current, max_age, duplicate_window, max_bytes) else {
         return;
     };
     match jetstream.update_stream(&updated).await {
         Ok(_) => log::info!(
-            "[NATS:queue] stream {} updated: max_age {:?} -> {:?}, duplicate_window {:?} -> {:?}",
+            "[NATS:queue] stream {} updated: max_age {:?} -> {:?}, duplicate_window {:?} -> {:?}, max_bytes {} -> {}",
             current.name,
             current.max_age,
             updated.max_age,
             current.duplicate_window,
-            updated.duplicate_window
+            updated.duplicate_window,
+            current.max_bytes,
+            updated.max_bytes
         ),
         Err(e) => log::warn!(
-            "[NATS:queue] failed to update stream {} to max_age {:?}, duplicate_window {:?}: {e}",
+            "[NATS:queue] failed to update stream {} to max_age {:?}, duplicate_window {:?}, max_bytes {}: {e}",
             current.name,
             updated.max_age,
-            updated.duplicate_window
+            updated.duplicate_window,
+            updated.max_bytes
         ),
     }
 }
@@ -322,13 +352,19 @@ fn stream_update(
     current: &jetstream::stream::Config,
     max_age: Option<Duration>,
     duplicate_window: Option<Duration>,
+    max_bytes: Option<i64>,
 ) -> Option<jetstream::stream::Config> {
     let updated = jetstream::stream::Config {
         max_age: max_age.unwrap_or(current.max_age),
         duplicate_window: duplicate_window.unwrap_or(current.duplicate_window),
+        max_bytes: max_bytes.unwrap_or(current.max_bytes),
         ..current.clone()
     };
     (updated != *current).then_some(updated)
+}
+
+fn max_bytes_of(max_bytes: u64) -> i64 {
+    i64::try_from(max_bytes).unwrap_or(i64::MAX)
 }
 
 fn get_deliver_policy(deliver_policy: Option<queue::DeliverPolicy>) -> DeliverPolicy {
@@ -427,6 +463,8 @@ mod tests {
         assert_eq!(built.max_age, Duration::from_secs(60));
         assert_eq!(built.subjects, ["o2_slack_inbound", "o2_slack_inbound.*"]);
 
+        assert_eq!(built.max_bytes, nats.queue_max_size);
+
         let plain = queue::QueueConfigBuilder::new().build();
         let built = stream_config("o2_other", &plain, Duration::from_secs(60), nats);
         assert_eq!(
@@ -434,20 +472,27 @@ mod tests {
             jetstream::stream::Config::default().duplicate_window,
             "without a window the server default applies"
         );
+
+        let capped = queue::QueueConfigBuilder::new()
+            .max_bytes(256 * 1024 * 1024)
+            .build();
+        let built = stream_config("o2_capped", &capped, Duration::from_secs(60), nats);
+        assert_eq!(built.max_bytes, 256 * 1024 * 1024);
     }
 
     #[test]
     fn test_max_age_update_none_when_equal() {
         let current = existing_stream_config(Duration::from_secs(3600));
-        assert!(stream_update(&current, Some(Duration::from_secs(3600)), None).is_none());
-        assert!(stream_update(&current, None, None).is_none());
+        assert!(stream_update(&current, Some(Duration::from_secs(3600)), None, None).is_none());
+        assert!(stream_update(&current, None, None, None).is_none());
+        assert!(stream_update(&current, None, None, Some(current.max_bytes)).is_none());
     }
 
     #[test]
     fn test_duplicate_window_is_reconciled_on_an_existing_stream() {
         let hour = Duration::from_secs(3600);
         let current = existing_stream_config(hour);
-        let updated = stream_update(&current, None, Some(hour)).unwrap();
+        let updated = stream_update(&current, None, Some(hour), None).unwrap();
         assert_eq!(updated.duplicate_window, hour);
         assert_eq!(
             jetstream::stream::Config {
@@ -456,15 +501,28 @@ mod tests {
             },
             current
         );
-        assert!(stream_update(&updated, Some(hour), Some(hour)).is_none());
-        let both = stream_update(&current, Some(2 * hour), Some(hour)).unwrap();
+        assert!(stream_update(&updated, Some(hour), Some(hour), None).is_none());
+        let both = stream_update(&current, Some(2 * hour), Some(hour), None).unwrap();
         assert_eq!((both.max_age, both.duplicate_window), (2 * hour, hour));
+
+        let capped = stream_update(&current, None, None, Some(256 << 20)).unwrap();
+        assert_eq!(
+            jetstream::stream::Config {
+                max_bytes: current.max_bytes,
+                ..capped.clone()
+            },
+            current
+        );
+        assert_eq!(capped.max_bytes, 256 << 20);
+        assert!(stream_update(&capped, None, None, Some(256 << 20)).is_none());
+        let changed = stream_update(&capped, None, None, Some(512 << 20)).unwrap();
+        assert_eq!(changed.max_bytes, 512 << 20);
     }
 
     #[test]
     fn test_max_age_update_changes_only_max_age() {
         let current = existing_stream_config(Duration::from_secs(60 * 24 * 3600));
-        let updated = stream_update(&current, Some(Duration::from_secs(3600)), None).unwrap();
+        let updated = stream_update(&current, Some(Duration::from_secs(3600)), None, None).unwrap();
         assert_eq!(updated.max_age, Duration::from_secs(3600));
         assert_eq!(
             jetstream::stream::Config {

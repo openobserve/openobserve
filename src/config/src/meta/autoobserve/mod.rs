@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod envelope;
+pub mod ingest_counts;
 pub mod marks;
 
 /// The AutoObserve engine's kv namespace; the generic `/kv` handler cannot read or write it.
