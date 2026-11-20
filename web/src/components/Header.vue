@@ -145,6 +145,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <!-- end left side -->
 
+    <div
+      v-if="securityAccess.canOpen.value"
+      class="ms-3 flex shrink-0 items-center md:max-xl:min-w-0 md:max-xl:shrink"
+    >
+      <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
+    </div>
+
     <div class="flex min-w-0 flex-1 justify-center px-3 max-md:px-1">
       <OButton
         variant="outline"
@@ -522,6 +529,8 @@ import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import SampleDataHeaderChip from "@/components/sampleData/SampleDataHeaderChip.vue";
+import SolutionSwitcher from "./SolutionSwitcher.vue";
+import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -539,6 +548,7 @@ export default defineComponent({
     EnterpriseUpgradeDialog,
     OrganizationSelector,
     SampleDataHeaderChip,
+    SolutionSwitcher,
     LinkedAccountsDialog,
     OButton,
     OShortcut,
@@ -624,6 +634,7 @@ export default defineComponent({
     "signout",
   ],
   setup(props, { emit }) {
+    const securityAccess = useSecurityAccess();
     const { t } = useI18nTyped();
     const { featureName } = useFeatureNames();
     const router = useRouter();
@@ -855,6 +866,7 @@ export default defineComponent({
     };
 
     return {
+      securityAccess,
       isDark,
       t,
       raw,
