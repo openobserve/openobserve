@@ -14977,6 +14977,12 @@
       "quickMuteTooltip": "Quick mute from an alert",
       "endedLabel": "ended"
     },
+    "lease": {
+      "temporary": "Temporary, created by {who}, ends at {time}",
+      "incidentsOn": "Incident creation turned on by {who} until {time}",
+      "incidentsOff": "Incident creation turned off by {who} until {time}",
+      "why": "{label}. Why: {reason}"
+    },
     "ack": {
       "acknowledge": "Acknowledge",
       "acknowledgeGroups": "All {count} firing group | All {count} firing groups",

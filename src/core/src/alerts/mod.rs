@@ -58,6 +58,7 @@ pub mod external_alerts;
 pub mod incident_title;
 #[cfg(feature = "enterprise")]
 pub mod incidents;
+pub mod leases;
 pub mod lifecycle;
 #[cfg(feature = "enterprise")]
 pub mod membership_provider;

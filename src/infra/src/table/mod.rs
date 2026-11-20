@@ -29,6 +29,7 @@ pub mod alert_calibration;
 pub mod alert_composites;
 pub mod alert_eval_intervals;
 pub mod alert_incidents;
+pub mod alert_leases;
 #[cfg(test)]
 mod alert_slack_postgres_tests;
 pub mod alert_states;
