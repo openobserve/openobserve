@@ -244,6 +244,15 @@ describe("ConfigPanel logs settings", { timeout: 30_000 }, () => {
     expect(field!.props("placeholder")).toBe("Default (auto from data)");
   });
 
+  it("logs: an unknown order shows as itself and Default clears it", async () => {
+    const panel = await mountPanel("logs", { logs_order: "random" });
+    const order = selectFor("dashboard-config-logs_order");
+    expect(order.props("modelValue")).toBe("random");
+    expect(order.text()).toContain("random");
+    await pick("dashboard-config-logs_order", "Default (Newest first)");
+    expect("logs_order" in panel.data.config).toBe(false);
+  });
+
   it("logs: the order flips an untouched starter query and leaves hand-written SQL alone", async () => {
     const starter = 'SELECT * FROM "demo_app" ORDER BY _timestamp DESC LIMIT 100';
     const panel = await mountPanel("logs", {}, (draft) => {

@@ -331,6 +331,35 @@ describe("ConfigPanel chart type settings", { timeout: 30_000 }, () => {
     expect("state_timeline_display" in panel.data.config).toBe(false);
   });
 
+  it("state timeline: an unknown Display value shows as itself and Default clears it", async () => {
+    const panel = mountPanel("state-timeline", { state_timeline_display: "grid" });
+    await flushPromises();
+    const display = select("dashboard-config-state_timeline_display")!;
+    expect(display.props("modelValue")).toBe("grid");
+    expect(display.text()).toContain("grid");
+    expect(display.text()).not.toContain("Default (Bands)");
+    display.vm.$emit("update:modelValue", display.props("options")[0].value);
+    await flushPromises();
+    expect("state_timeline_display" in panel.data.config).toBe(false);
+    expect(display.props("modelValue")).toBe("__auto__");
+  });
+
+  it("gauge: an unknown Shape value selects no choice and Default clears it", async () => {
+    const panel = mountPanel("gauge", { gauge_style: "dial" });
+    await flushPromises();
+    const items = wrapper!.findAll('[data-test="dashboard-config-gauge_style-option"]');
+    expect(items.length).toBeGreaterThan(1);
+    expect(items.some((item) => item.attributes("data-state") === "on")).toBe(false);
+    await pick("dashboard-config-gauge_style", items[0].attributes("data-test-label")!);
+    expect("gauge_style" in panel.data.config).toBe(false);
+  });
+
+  it("line: a state timeline tooltip mode in the shared key still reads as Default", async () => {
+    mountPanel("line", { tooltip_mode: "all_rows" });
+    await flushPromises();
+    expect(select("dashboard-config-tooltip_mode")!.props("modelValue")).toBe("__auto__");
+  });
+
   it("state timeline cells: hides merge gaps and keeps the state text switch", async () => {
     mountPanel("state-timeline", { state_timeline_display: "cells" });
     await flushPromises();

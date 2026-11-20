@@ -51,9 +51,15 @@ export const useHtmlPanelConfig = (dashboardPanelData: any) => {
   const listModel = (key: string) =>
     computed<string[]>(() => (Array.isArray(config.value[key]) ? config.value[key] : []));
   // Default drops the key, so a panel left on it follows whatever the default behaviour is at render time.
+  // An unknown stored value shows as itself, so picking Default is a change that clears it.
   const choiceModel = <T extends string>(key: string, allowed: readonly T[]) =>
     computed({
-      get: (): string => (allowed.includes(config.value[key]) ? config.value[key] : DEFAULT_CHOICE),
+      get: (): string => {
+        const value = config.value[key];
+        return value === undefined || value === null || value === ""
+          ? DEFAULT_CHOICE
+          : String(value);
+      },
       set: (value: string) => {
         if (allowed.includes(value as T)) config.value[key] = value;
         else delete config.value[key];

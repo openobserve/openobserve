@@ -59,6 +59,41 @@ describe("panelValidation", () => {
       expect(errors).toEqual([]);
     });
 
+    describe("unsupported panel setting values", () => {
+      const withPanel = (type: string, config: Record<string, unknown>) => ({
+        ...validDashboard,
+        tabs: [
+          {
+            ...validDashboard.tabs[0],
+            panels: [{ ...validDashboard.tabs[0].panels[0], type, config }],
+          },
+        ],
+      });
+      const gridError = 'Panel panel-001: Unsupported value "grid" for Display';
+
+      it("the JSON editor check lists an unsupported choice by its setting label", () => {
+        const dashboard = withPanel("state-timeline", { state_timeline_display: "grid" });
+        expect(validateDashboardJson(gt, dashboard, { checkConfigChoices: true })).toContain(
+          gridError,
+        );
+      });
+
+      it("the JSON editor check lists unsupported list entries and passes supported values", () => {
+        const errors = validateDashboardJson(
+          gt,
+          withPanel("table", { table_density: "compact", table_footer_calcs: ["sum", "median"] }),
+          { checkConfigChoices: true },
+        );
+        expect(errors).toEqual(['Panel panel-001: Unsupported value "median" for Footer']);
+      });
+
+      it("the import check leaves unsupported values alone", () => {
+        const dashboard = withPanel("state-timeline", { state_timeline_display: "grid" });
+        expect(validateDashboardJson(gt, dashboard)).not.toContain(gridError);
+        expect(validateDashboardJson(gt, dashboard).join()).not.toContain("Unsupported value");
+      });
+    });
+
     it("accepts a numeric layout.i of 0", () => {
       const tabs = [
         {
@@ -678,18 +713,35 @@ describe("validatePanel on metric, gauge, pie, table, heatmap, state timeline an
 
   it("rejects unsupported choices and list entries", () => {
     expect(run("metric", { stat_text_mode: "ratio" })).toEqual([
-      gt("dashboard.utils.unsupportedConfigValue", { setting: "stat_text_mode", value: "ratio" }),
+      gt("dashboard.utils.unsupportedConfigValue", {
+        setting: gt("dashboard.statTextMode"),
+        value: "ratio",
+      }),
     ]);
     expect(run("table", { table_footer_calcs: ["sum", "median"] })).toEqual([
       gt("dashboard.utils.unsupportedConfigValue", {
-        setting: "table_footer_calcs",
+        setting: gt("dashboard.tableFooterCalcs"),
         value: "median",
       }),
     ]);
     expect(run("gauge", { gauge_style: "dial" })).toHaveLength(1);
     expect(run("state-timeline", { state_value_align: "justify" })).toHaveLength(1);
     expect(run("state-timeline", { state_timeline_display: "cells" })).toEqual([]);
-    expect(run("state-timeline", { state_timeline_display: "grid" })).toHaveLength(1);
+    expect(run("state-timeline", { state_timeline_display: "grid" })).toEqual([
+      'Unsupported value "grid" for Display',
+    ]);
+  });
+
+  it("names each setting by the label its control shows", () => {
+    expect(run("funnel", { funnel_orient: "diagonal" })).toEqual([
+      'Unsupported value "diagonal" for Orientation',
+    ]);
+    expect(run("pie", { sort_order: "random" })).toEqual([
+      'Unsupported value "random" for Slice order',
+    ]);
+    expect(run("alert-list", { alert_list_state: ["firing", "lost"] })).toEqual([
+      'Unsupported value "lost" for States',
+    ]);
   });
 
   it("rejects out-of-range numbers", () => {

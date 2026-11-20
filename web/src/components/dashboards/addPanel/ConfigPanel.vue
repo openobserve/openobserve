@@ -3872,10 +3872,19 @@ export default defineComponent({
       if (text) config()[key] = text;
       else delete config()[key];
     };
-    // Default drops the key, so a panel left on it follows whatever the default behaviour is at render time.
-    const choiceModel = <T extends string>(key: string, allowed: readonly T[]) =>
+    // Default drops the key; an unknown stored value shows as itself, so picking Default still clears it.
+    // `sharedWith` holds what another chart type stores in the same key; those read as Default.
+    const choiceModel = <T extends string>(
+      key: string,
+      allowed: readonly T[],
+      sharedWith: readonly string[] = [],
+    ) =>
       computed({
-        get: (): string => (allowed.includes(config()[key]) ? config()[key] : TOGGLE_AUTO),
+        get: (): string => {
+          const value = config()[key];
+          const unset = value === undefined || value === null || value === "";
+          return unset || sharedWith.includes(value) ? TOGGLE_AUTO : String(value);
+        },
         set: (v: string) => {
           if (allowed.includes(v as T)) config()[key] = v;
           else delete config()[key];
@@ -3905,7 +3914,11 @@ export default defineComponent({
       ],
       DEFAULT_STATE_TIMELINE_DISPLAY,
     );
-    const tooltipModeModel = choiceModel("tooltip_mode", ["segment", "all_rows"]);
+    const tooltipModeModel = choiceModel(
+      "tooltip_mode",
+      ["segment", "all_rows"],
+      ["single", "all", "hidden"],
+    );
     const tooltipModeOptions = withDefault(
       [
         { label: t("dashboard.stateTimelineTooltipSegment"), value: "segment" },
@@ -3913,7 +3926,11 @@ export default defineComponent({
       ],
       DEFAULT_STATE_TOOLTIP_MODE,
     );
-    const chartTooltipModeModel = choiceModel("tooltip_mode", ["single", "all", "hidden"]);
+    const chartTooltipModeModel = choiceModel(
+      "tooltip_mode",
+      ["single", "all", "hidden"],
+      ["segment", "all_rows"],
+    );
     const chartTooltipModeOptions = withDefault(
       [
         { label: t("dashboard.chartTooltipSingle"), value: "single" },
