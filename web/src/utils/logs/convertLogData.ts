@@ -161,7 +161,8 @@ const SEMANTIC_COLORS_LIGHT: Record<string, string> = {
   warn: "#B8650A",
   warning: "#B8650A",
   notice: "#16a34a",
-  info: "#2F7FD0",
+  // Info is most of the volume, so it is the softest hue; warn and error stay strong enough to stand out against it.
+  info: "#5E95DE",
   debug: "#0E8A99",
   trace: "#90A4AE",
   // status — job/task pipeline axis
@@ -182,7 +183,7 @@ export const SEMANTIC_COLORS_DARK: Record<string, string> = {
   warn: "#D4944A",
   warning: "#D4944A",
   notice: "#16a34a",
-  info: "#4D8FD4",
+  info: "#5B8FD0",
   debug: "#3DAAB8",
   trace: "#7A9BAA",
   failure: "#D95C5C",
@@ -218,7 +219,7 @@ const countAxisTicks = (dataMax: number) => {
 // Full strength: the cyan series-1 bar at 0.85 drops under 3:1 on the light card.
 const MODERN_BAR_STYLE = { borderRadius: [2, 2, 0, 0] };
 // A time axis with many buckets would otherwise shrink bars to hairlines.
-const MODERN_BAR_LAYOUT = { barCategoryGap: "30%", barMinWidth: 2 };
+const MODERN_BAR_LAYOUT = { barCategoryGap: "15%", barMinWidth: 2 };
 
 // Canvas cannot read CSS, so the axis colors follow the tokens resolved at call time.
 const modernAxisLabel = () => ({ color: chartTextColor(), fontSize: 11 });
@@ -260,7 +261,17 @@ export const convertStackedLogData = (
   const modern = !!params.modern;
   const palette = isDarkTheme ? classicColorPaletteDarkTheme : classicColorPaletteLightTheme;
 
-  const series = [...breakdownSeries.entries()].map(([category, values]) => {
+  // ECharts stacks the first series at the bottom: severities stack error, warn, info, debug, so errors form the baseline.
+  const SEVERITY_RANK: Record<string, number> = {
+    fatal: 0, critical: 0, error: 1, err: 1, warn: 2, warning: 2, info: 3, debug: 4, trace: 5,
+  };
+  const rank = (c: unknown) => SEVERITY_RANK[String(c ?? "").trim().toLowerCase()] ?? 9;
+  const entries = [...breakdownSeries.entries()];
+  const ordered = entries.some(([c]) => rank(c) < 9)
+    ? [...entries].sort(([a], [b]) => rank(a) - rank(b))
+    : entries;
+
+  const series = ordered.map(([category, values]) => {
     // Explicit check so a numeric 0 stays a real category; case is kept as the source sent it.
     const isEmpty =
       category === null || category === undefined || category === BREAKDOWN_EMPTY_VALUE;
@@ -303,9 +314,9 @@ export const convertStackedLogData = (
         containLabel: true,
         left: "20",
         right: "20",
-        top: "6",
-        // Legend band only: keeps the plot at 56px+ inside the 92px strip.
-        bottom: series.length > 1 ? "13" : "5",
+        // A breakdown's legend sits on one line at the top right, so the axis keeps the bottom.
+        top: series.length > 1 ? "22" : "6",
+        bottom: "5",
       },
       tooltip: {
         show: true,
@@ -350,12 +361,25 @@ export const convertStackedLogData = (
       },
       legend: {
         show: series.length > 1,
-        bottom: 0,
+        top: 0,
+        right: 16,
         padding: [0, 5],
+        // Small square swatches and quiet axis-coloured labels, so the key reads as a caption, not a row of bars.
+        icon: "roundRect",
+        itemWidth: 8,
         itemHeight: 8,
+        itemGap: 14,
         type: "scroll",
+        // An all-caps level (DEBUG, INFO) shows as a word; other breakdown values keep their case.
+        formatter: (name: string) =>
+          /^[A-Z]{2,}$/.test(name) ? name.charAt(0) + name.slice(1).toLowerCase() : name,
         // ECharts measures legend text on canvas, so the width is a pixel number.
-        textStyle: { fontSize: 12, width: 120, overflow: "truncate" },
+        textStyle: {
+          fontSize: 11,
+          width: 120,
+          overflow: "truncate",
+          ...(modern ? { color: modernAxisLabel().color } : {}),
+        },
         tooltip: { show: true },
       },
       xAxis: { type: "time", ...(modern ? MODERN_X_AXIS() : {}) },

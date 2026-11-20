@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex h-full max-h-full w-full flex-col overflow-hidden" ref="searchListContainer">
       <!-- Section header: static at top -->
       <div
-        class="border-card-glass-border bg-card-glass-bg flex min-h-8 shrink-0 items-center border-b max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
+        class="border-card-glass-border bg-card-glass-bg flex min-h-10 shrink-0 items-center border-b max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       >
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
@@ -437,7 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Same no-data treatment as dashboard panels (PanelSchemaRenderer);
-               inline min-height/padding overridden to fit the 5.75rem strip. -->
+               inline min-height/padding overridden to fit the 7.75rem strip. -->
           <OEmptyState
             v-else-if="histogramView.phase === 'empty'"
             size="inline"
@@ -611,7 +611,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     !searchObj.meta.showHistogram ||
                     (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
                       ? 'min-h-full!'
-                      : 'min-h-[calc(100%-5.75rem)]!',
+                      : 'min-h-[calc(100%-7.75rem)]!',
                     showStaleRows ? 'pointer-events-none' : '',
                     rowsDimmed ? STALE_DIM : '',
                     searchObj.meta.toggleSourceWrap ? 'logs-results-otable--wrap' : '',
@@ -844,7 +844,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             !searchObj.meta.showHistogram ||
             (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
               ? 'min-h-full!'
-              : 'min-h-[calc(100%-5.75rem)]!',
+              : 'min-h-[calc(100%-7.75rem)]!',
           ]"
         >
           <!-- Patterns List -->
@@ -3707,7 +3707,7 @@ export default defineComponent({
 }
 
 .histogram-container--visible {
-  height: 5.75rem;
+  height: 7.75rem;
   opacity: 1;
   transition: all 0.3s ease-in-out;
 }
@@ -3723,12 +3723,12 @@ export default defineComponent({
   /* Explicit height (not just max-height): the ChartRenderer inside sizes
      with h-full, and a percentage height collapses to 0 against an
      auto-height parent — which renders an empty histogram strip. */
-  height: 5.75rem;
+  height: 7.75rem;
   border-radius: 0.5rem;
 }
 
 .histogram-empty {
-  height: 5.75rem;
+  height: 7.75rem;
   border-radius: 0.5rem;
 }
 
@@ -3747,7 +3747,7 @@ export default defineComponent({
     --hsk-shimmer: color-mix(in srgb, var(--color-white) 6%, transparent);
   }
 
-  height: 5.75rem;
+  height: 7.75rem;
   display: flex;
   flex-direction: column;
   padding-top: 0.25rem;

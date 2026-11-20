@@ -25,7 +25,7 @@
   --color-grey-950: #09090b;
 
   /* Surface ladder, darker to lighter: shell < card < raised. */
-  --color-surface-shell: #e8eaee;
+  --color-surface-shell: #e1e4ea;
   --color-surface-card: #fbfbfc;
   --color-surface-panel: #f5f6f8;
   --color-surface-band: #eceef2;
