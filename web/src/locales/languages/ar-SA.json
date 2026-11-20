@@ -8191,6 +8191,7 @@
     "deleteDashboardsConfirmTitle": "حذف اللوحات",
     "deleteDashboardsConfirmMsg": "هل أنت متأكد أنك تريد حذف لوحة {count}؟ | هل أنت متأكد أنك تريد حذف اللوحات {count}؟",
     "deleteDashboardsConfirmMsgPublicLinks": "هل أنت متأكد من حذف {count} لوحة معلومات؟ ستتوقف روابطها العامة عن العمل وسيتم حذفها. | هل أنت متأكد من حذف {count} لوحات معلومات؟ ستتوقف روابطها العامة عن العمل وسيتم حذفها.",
+    "deleteDashboardReportsWarning": "سيؤدي الحذف أيضًا إلى حذف هذا التقرير: {names} | سيؤدي الحذف أيضًا إلى حذف هذه التقارير ({count}): {names}",
     "edit": "تعديل اللوحة",
     "duplicate": "نسخ اللوحة",
     "move_to_another_folder": "نقل إلى مجلد آخر",

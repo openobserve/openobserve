@@ -8191,6 +8191,7 @@
     "deleteDashboardsConfirmTitle": "Dashboards löschen",
     "deleteDashboardsConfirmMsg": "Möchten Sie wirklich {count} Dashboard löschen? | Möchten Sie wirklich {count} Dashboards löschen?",
     "deleteDashboardsConfirmMsgPublicLinks": "Sind Sie sicher, dass Sie {count} Dashboard löschen möchten? Seine öffentlichen Links funktionieren nicht mehr und werden gelöscht. | Sind Sie sicher, dass Sie {count} Dashboards löschen möchten? Ihre öffentlichen Links funktionieren nicht mehr und werden gelöscht.",
+    "deleteDashboardReportsWarning": "Beim Löschen wird auch dieser Bericht gelöscht: {names} | Beim Löschen werden auch diese {count} Berichte gelöscht: {names}",
     "edit": "Dashboard bearbeiten",
     "duplicate": "Dashboard duplizieren",
     "move_to_another_folder": "In einen anderen Ordner verschieben",

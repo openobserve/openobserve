@@ -8191,6 +8191,7 @@
     "deleteDashboardsConfirmTitle": "Delete Dashboards",
     "deleteDashboardsConfirmMsg": "Are you sure you want to delete {count} dashboard? | Are you sure you want to delete {count} dashboards?",
     "deleteDashboardsConfirmMsgPublicLinks": "Are you sure you want to delete {count} dashboard? Its public links will stop working and be deleted. | Are you sure you want to delete {count} dashboards? Their public links will stop working and be deleted.",
+    "deleteDashboardReportsWarning": "การลบจะลบรายงานนี้ด้วย: {names} | การลบจะลบรายงาน {count} รายการนี้ด้วย: {names}",
     "edit": "Edit Dashboard",
     "duplicate": "Duplicate Dashboard",
     "move_to_another_folder": "Move to another Folder",

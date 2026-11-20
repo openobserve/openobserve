@@ -8191,6 +8191,7 @@
     "deleteDashboardsConfirmTitle": "대시보드 삭제",
     "deleteDashboardsConfirmMsg": "대시보드 {count}개를 삭제하시겠습니까? | 대시보드 {count}개를 삭제하시겠습니까?",
     "deleteDashboardsConfirmMsgPublicLinks": "대시보드 {count}개를 삭제하시겠습니까? 공개 링크가 작동을 중단하고 삭제됩니다. | 대시보드 {count}개를 삭제하시겠습니까? 공개 링크가 작동을 중단하고 삭제됩니다.",
+    "deleteDashboardReportsWarning": "삭제하면 이 보고서도 삭제됩니다: {names} | 삭제하면 이 보고서 {count}개도 삭제됩니다: {names}",
     "edit": "대시보드 편집",
     "duplicate": "대시보드 복제",
     "move_to_another_folder": "다른 폴더로 이동",
