@@ -255,6 +255,12 @@ function dismiss() {
   editor.onEscape();
 }
 
+/** Focus left the bar, e.g. for Run query: a half-built chip is applied so the run uses it. */
+function onLeave() {
+  editor.commitPending();
+  close();
+}
+
 /** The user is done with the bar: empty groups go and the caret returns to the end. */
 function close() {
   dismiss();
@@ -411,7 +417,7 @@ const draftOperator = computed(() => {
     @escape="onEscape"
     @dismiss="dismiss"
     @close="close"
-    @leave="close"
+    @leave="onLeave"
     @activate="onActivate"
   >
     <template #default="{ caret }">
