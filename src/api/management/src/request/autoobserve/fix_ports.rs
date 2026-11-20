@@ -21,13 +21,16 @@ use async_trait::async_trait;
 use config::{
     meta::{
         destinations::{DestinationType, Module},
-        downtimes::{AlertMuteConflict, AlertMuteRequest, Downtime, MuteSource},
+        downtimes::{
+            AlertMuteConflict, AlertMuteRequest, Downtime, DowntimeSchedule, DowntimeStatus,
+            MuteSource,
+        },
         oncall::SubjectType,
         triggers::{ScheduledTriggerData, TriggerModule, TriggerStatus},
     },
     utils::time::now_micros,
 };
-use infra::table::{entity::oncall_responses, incident_membership};
+use infra::table::{downtimes::IdleRun, entity::oncall_responses, incident_membership};
 use o2_enterprise::enterprise::{
     alert_calibration_service::applied::{Fence, Patched},
     autoobserve::{
@@ -36,7 +39,8 @@ use o2_enterprise::enterprise::{
         fixes::builtin,
         insight::FieldPatch,
         ports::{
-            AlertRow, AlertWrite, DestinationRow, Evaluation, FixPort, MuteAnswer, MuteRow, PageRow,
+            AlertRow, AlertWrite, DestinationRow, Evaluation, FixPort, MuteAnswer, MuteRow,
+            PageRow, UNMUTE_MARGIN_US,
         },
     },
     downtimes::schedule,
@@ -147,12 +151,18 @@ impl FixPort for LiveFixPort {
         alert_id: &str,
         (downtime_id, version): (&str, i64),
         actor: &str,
+        idle: Option<&Evaluation>,
     ) -> anyhow::Result<MuteAnswer> {
         let target = match ack::resolve_target(org, alert_id).await {
             Ok(target) => target,
             Err(e) => return ack_answer(e),
         };
-        match mute::unmute(&target, downtime_id, Some(version), actor).await {
+        let idle = idle.map(|ev| IdleRun {
+            alert_id,
+            claim_epoch: ev.claim_epoch,
+            margin_us: UNMUTE_MARGIN_US,
+        });
+        match mute::unmute(&target, downtime_id, Some(version), actor, idle).await {
             Ok(row) => Ok(MuteAnswer::Done(mute_row(&row))),
             Err(e) => mute_answer(e),
         }
@@ -203,6 +213,14 @@ impl FixPort for LiveFixPort {
         live_mutes(org, alert_id).await
     }
 
+    async fn mute_in_force(&self, org: &str, downtime_id: &str) -> anyhow::Result<bool> {
+        let now = now_micros();
+        let Some(row) = infra::table::downtimes::get_rw(org, downtime_id).await? else {
+            return Ok(false);
+        };
+        Ok(still_mutes(&row.schedule, row.cancelled_at, now))
+    }
+
     async fn evaluation(&self, org: &str, alert_id: &str) -> anyhow::Result<Option<Evaluation>> {
         // The scheduler read answers a failed read like a missing row; both, like a row it can't
         // decode, keep the snooze.
@@ -217,6 +235,7 @@ impl FixPort for LiveFixPort {
             next_run_us: trigger.next_run_at,
             running: trigger.status == TriggerStatus::Processing,
             realtime: trigger.is_realtime,
+            claim_epoch: trigger.claim_epoch,
         }))
     }
 
@@ -399,6 +418,15 @@ async fn live_mutes(org: &str, alert_id: &str) -> anyhow::Result<Vec<MuteRow>> {
         .collect())
 }
 
+/// Scheduled counts: a row between its windows mutes again at the next one.
+fn still_mutes(s: &DowntimeSchedule, cancelled_at: Option<i64>, now: i64) -> bool {
+    cancelled_at.is_none_or(|at| at > now)
+        && matches!(
+            schedule::status(s, None, now),
+            DowntimeStatus::Active | DowntimeStatus::Scheduled
+        )
+}
+
 fn mute_row(row: &Downtime) -> MuteRow {
     MuteRow {
         downtime_id: row.id.clone(),
@@ -455,6 +483,7 @@ fn kind_of(t: &DestinationType) -> String {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::downtimes::Repeat;
     use infra::table::entity::{alert_incident_alerts, alert_incidents};
     use sea_orm::{ActiveModelTrait, Database, IntoActiveModel, Schema};
 
@@ -639,6 +668,47 @@ mod tests {
         ];
         for (typed, want) in kinds {
             assert_eq!(kind_of(&http(typed.clone())), want, "{typed}");
+        }
+    }
+
+    #[test]
+    fn a_downtime_mutes_until_it_has_no_window_left() {
+        const DAY: i64 = 1_795_132_800_000_000;
+        const H: i64 = 3_600_000_000;
+        let once = |from: i64, to: i64| DowntimeSchedule {
+            repeat: Repeat::None,
+            starts_at: DAY + from * H,
+            ends_at: Some(DAY + to * H),
+            timezone: "UTC".into(),
+            start_time_local: None,
+            duration_secs: (to - from) * 3_600,
+            weekdays: vec![],
+        };
+        let daily = |ends_at: Option<i64>| DowntimeSchedule {
+            repeat: Repeat::Daily,
+            starts_at: DAY - 120 * H,
+            ends_at,
+            timezone: "UTC".into(),
+            start_time_local: Some("09:00".into()),
+            duration_secs: 3_600,
+            weekdays: vec![],
+        };
+        let now = DAY + 12 * H;
+        let rows = [
+            ("in its window", once(11, 13), None, true),
+            ("past its end", once(0, 1), None, false),
+            ("between recurring windows", daily(None), None, true),
+            (
+                "past its last recurring day",
+                daily(Some(DAY - 48 * H)),
+                None,
+                false,
+            ),
+            ("cancelled", once(11, 13), Some(now - H / 2), false),
+            ("cancelled later", once(11, 13), Some(now + H / 2), true),
+        ];
+        for (case, s, cancelled_at, want) in rows {
+            assert_eq!(still_mutes(&s, cancelled_at, now), want, "{case}");
         }
     }
 }
