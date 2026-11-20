@@ -9779,6 +9779,7 @@
       "seriesCapChipFallback": "Серии ограничены",
       "seriesCapTitle": "Достигнут лимит серий",
       "seriesCapBody": "Показано серий: {shown} из {total}. Максимум серий на диаграмме: {cap}.",
+      "seriesCapBodyPerQuery": "Показано серий: {shown} из {total}. Максимум серий на запрос: {cap}.",
       "seriesCapBodyCapped": "Показано серий: {shown} (всего не менее {total}). Результаты были ограничены лимитом строк.",
       "seriesCapBodyPartial": "Показано серий: {shown} (всего не менее {total}). Сервер вернул частичные результаты.",
       "unmatchedRegionsChip": "{count} не на карте | {count} не на карте",

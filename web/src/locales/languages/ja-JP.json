@@ -9779,6 +9779,7 @@
       "seriesCapChipFallback": "シリーズ数制限",
       "seriesCapTitle": "シリーズ数の上限に達しました",
       "seriesCapBody": "{total} シリーズ中 {shown} を表示しています。チャートは最大 {cap} シリーズまで描画します。",
+      "seriesCapBodyPerQuery": "{total} シリーズ中 {shown} を表示しています。各クエリは最大 {cap} シリーズまで描画します。",
       "seriesCapBodyCapped": "少なくとも {total} シリーズ中 {shown} を表示しています。結果は行数の上限で打ち切られました。",
       "seriesCapBodyPartial": "少なくとも {total} シリーズ中 {shown} を表示しています。サーバーが部分的な結果を返しました。",
       "unmatchedRegionsChip": "{count} 件が地図上にありません | {count} 件が地図上にありません",

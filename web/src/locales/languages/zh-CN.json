@@ -9779,6 +9779,7 @@
       "seriesCapChipFallback": "序列受限",
       "seriesCapTitle": "已达序列上限",
       "seriesCapBody": "正在显示 {total} 个序列中的 {shown} 个。图表最多绘制 {cap} 个序列。",
+      "seriesCapBodyPerQuery": "正在显示 {total} 个序列中的 {shown} 个。每个查询最多绘制 {cap} 个序列。",
       "seriesCapBodyCapped": "正在显示至少 {total} 个序列中的 {shown} 个。结果受行数上限限制。",
       "seriesCapBodyPartial": "正在显示至少 {total} 个序列中的 {shown} 个。服务器返回了部分结果。",
       "unmatchedRegionsChip": "{count} 个未在地图上 | {count} 个未在地图上",

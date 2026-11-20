@@ -9779,6 +9779,7 @@
       "seriesCapChipFallback": "السلاسل محدودة",
       "seriesCapTitle": "تم الوصول إلى حد السلاسل",
       "seriesCapBody": "السلاسل المعروضة: {shown} من أصل {total}. الحد الأقصى لعدد السلاسل التي يرسمها المخطط: {cap}.",
+      "seriesCapBodyPerQuery": "السلاسل المعروضة: {shown} من أصل {total}. الحد الأقصى لعدد السلاسل التي يرسمها كل استعلام: {cap}.",
       "seriesCapBodyCapped": "السلاسل المعروضة: {shown} من أصل {total} على الأقل. تم تقييد النتائج عند حد الصفوف.",
       "seriesCapBodyPartial": "السلاسل المعروضة: {shown} من أصل {total} على الأقل. أعاد الخادم نتائج جزئية.",
       "unmatchedRegionsChip": "{count} خارج الخريطة | {count} خارج الخريطة",

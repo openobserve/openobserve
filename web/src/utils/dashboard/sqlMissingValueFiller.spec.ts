@@ -15,6 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fillMissingValues } from "./sqlMissingValueFiller";
+import { NULL_BREAKDOWN_VALUE } from "./sqlProcessData";
 
 // Mock date-fns-tz: toZonedTime shifts the date so its local representation
 // equals the requested timezone. For "UTC", local getHours() = UTC hours.
@@ -289,6 +290,29 @@ describe("fillMissingValues", () => {
       service: "frontend",
       value: 200,
     });
+  });
+
+  it("keeps the NULL and empty breakdown rows of one time slot apart", () => {
+    const processedData = [
+      { ts: "2024-01-15T10:00:00", service: NULL_BREAKDOWN_VALUE, value: 8 },
+      { ts: "2024-01-15T10:00:00", service: "", value: 4 },
+    ];
+    const result = fillMissingValues(
+      processedData,
+      makePanelSchema("line"),
+      makeResultMetaData(60),
+      makeMetadata(),
+      ["ts"],
+      ["value"],
+      [],
+      ["service"],
+      null,
+    );
+
+    expect(result.map((row: Record<string, unknown>) => [row.service, row.value])).toEqual([
+      [NULL_BREAKDOWN_VALUE, 8],
+      ["", 4],
+    ]);
   });
 
   it("inserts null entry with breakdown when data is missing for the time slot", () => {
