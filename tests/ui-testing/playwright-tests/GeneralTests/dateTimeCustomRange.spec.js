@@ -170,7 +170,7 @@ test.describe('DateTime Custom Relative Range Validation testcases', () => {
       await pm.dateTimePickerPage.setCustomValue('10');
       await pm.dateTimePickerPage.expectCustomValue('10');
       await expect(pm.dateTimePickerPage.gateMessage).toContainText(
-        "Longer than this stream's 2 hours query limit."
+        "Longer than this stream's query limit of 2 hours."
       );
       expect(await pm.dateTimePickerPage.getTriggerLabel()).toBe(labelBefore);
 

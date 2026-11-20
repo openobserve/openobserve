@@ -27,6 +27,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { localeFileMap } from "@/locales";
 import { MAX_RANGE_TEXT_UNITS } from "@/utils/date";
 import {
+  formatDay,
   formatInstant,
   formatRangeText,
   formatSpan,
@@ -61,6 +62,22 @@ interface StatusNote {
   warn: boolean;
 }
 
+interface CapFix {
+  reading: TimeRangeReading;
+  fixes: TimeRangeReading[];
+  overCap: boolean;
+}
+
+const US_PER_S = 1_000_000;
+const UNIT_NAMES: Record<RelativeUnit, string> = {
+  s: "second",
+  m: "minute",
+  h: "hour",
+  d: "day",
+  w: "week",
+  M: "month",
+};
+
 const props = defineProps<{
   zone: string;
   locale: string;
@@ -71,8 +88,8 @@ const props = defineProps<{
   units: RelativeUnit[];
   canCopy: boolean;
   spanLimit: string;
-  /** The longest rolling range the picker keeps for a reading over its cap, else null. */
-  capRolling?: (reading: TimeRangeReading) => TimeRangeReading | null;
+  /** The longest rolling ranges the picker keeps for a reading over its cap (two in a repeated hour), else null. */
+  capRolling?: (reading: TimeRangeReading) => TimeRangeReading[] | null;
 }>();
 
 const emit = defineEmits<{
@@ -101,18 +118,70 @@ const bar = useTimeRangeInput({
   }),
 });
 
-const capOf = (reading: TimeRangeReading) => props.capRolling?.(reading) ?? null;
+const unitName = (count: number, unit: string) =>
+  new Intl.NumberFormat(localeFileMap[bar.pack.value.locale] ?? "en-US", {
+    style: "unit",
+    unit,
+    unitDisplay: "long",
+  }).format(count);
 
-// The picker cannot keep a rolling range over its cap, so it offers the capped range instead.
-const overCap = computed(() => {
+// The parser names "last 11 years" by the typed unit, so the capped row swaps in the capped count.
+const cappedName = (reading: TimeRangeReading, cap: TimeRangeReading): string | undefined => {
+  const from = reading.rolling;
+  const to = cap.rolling;
+  if (!reading.name || !from || !to) return undefined;
+  const inYears = from.unit === "M" && from.value % 12 === 0 && to.value % 12 === 0;
+  const typed = inYears ? unitName(from.value / 12, "year") : "";
+  if (typed && reading.name.includes(typed))
+    return reading.name.replace(typed, unitName(to.value / 12, "year"));
+  const plain = unitName(from.value, UNIT_NAMES[from.unit]);
+  return reading.name.includes(plain)
+    ? reading.name.replace(plain, unitName(to.value, UNIT_NAMES[to.unit]))
+    : undefined;
+};
+
+const capsOf = (reading: TimeRangeReading): TimeRangeReading[] | null => {
+  const caps = props.capRolling?.(reading);
+  if (!caps?.length) return null;
+  const name = cappedName(reading, caps[0]);
+  return caps.map((cap) => ({ ...cap, name, blocked: undefined }));
+};
+
+const withinSpan = (readings: TimeRangeReading[]) =>
+  props.limits.maxSpanUs === undefined ||
+  readings.every((r) => r.endUs - r.startUs <= props.limits.maxSpanUs!);
+
+// The picker cannot keep a rolling range over its cap, nor a stream-limit fix over it,
+// so it offers the capped range instead.
+const capFix = computed<CapFix | null>(() => {
   const res = bar.result.value;
-  return res.state === "valid" ? capOf(res.reading) : null;
+  const readings =
+    res.state === "valid" ? [res.reading] : res.state === "ambiguous" ? res.readings : [];
+  const fixes = readings.length && readings.every((r) => capsOf(r)) ? capsOf(readings[0]) : null;
+  if (fixes) return { reading: readings[0], fixes, overCap: true };
+  if (res.state !== "blocked" || res.reason !== "max-span" || !res.fix || !capsOf(res.fix))
+    return null;
+  const own = capsOf(res.reading);
+  return {
+    reading: res.reading,
+    fixes: own && withinSpan(own) ? own : capsOf(res.fix)!,
+    overCap: false,
+  };
 });
 
 const result = computed<TimeRangeParseResult>(() => {
   const res = bar.result.value;
-  if (res.state !== "valid" || !overCap.value) return res;
-  return { state: "blocked", reason: "max-span", reading: res.reading, fix: overCap.value };
+  const cap = capFix.value;
+  if (!cap) return res;
+  const [fix, ...rest] = cap.fixes;
+  const others = res.state === "blocked" ? (res.others ?? []) : [];
+  return {
+    state: "blocked",
+    reason: "max-span",
+    reading: cap.reading,
+    fix,
+    others: [...rest, ...others],
+  };
 });
 const state = computed(() => result.value.state);
 
@@ -143,7 +212,9 @@ const instantWindowText = (
 ): StatusNote => {
   const time = instantText(note.instantUs);
   const before = note.instantUs - reading.startUs;
-  const after = reading.endUs - note.instantUs;
+  // A window cut at now within a second of the stamp reads as ending at the stamp.
+  const after =
+    Math.abs(reading.endUs - note.instantUs) < US_PER_S ? 0 : reading.endUs - note.instantUs;
   if (before === note.halfWidthUs && after === note.halfWidthUs)
     return {
       text: t("timeRangeInput.instantWindow", {
@@ -152,8 +223,16 @@ const instantWindowText = (
       }),
       warn: true,
     };
+  if (after < 0)
+    return {
+      text: t("timeRangeInput.instantWindowEnded", {
+        gap: formatSpan(-after, props.intlLocale),
+        time,
+      }),
+      warn: true,
+    };
   const duration = formatSpan(before, props.intlLocale);
-  if (after <= 0)
+  if (after === 0)
     return { text: t("timeRangeInput.instantWindowBefore", { duration, time }), warn: true };
   return {
     text: t("timeRangeInput.instantWindowClipped", {
@@ -235,13 +314,28 @@ const typedInstant = (reading: TimeRangeReading): number | null => {
   return note?.kind === "instant-window" ? note.instantUs : null;
 };
 
+const convertedOffsets = (reading: TimeRangeReading) =>
+  reading.notes.flatMap((n) => (n.kind === "converted" ? [n.fromOffset] : []));
+
+// In a mixed-zone range only one end has the ambiguous abbreviation, so its offset names the row.
+const zoneChoiceOffset = (reading: TimeRangeReading, readings: TimeRangeReading[]) => {
+  const own = convertedOffsets(reading);
+  const differs = own.findIndex((o, i) => readings.some((r) => convertedOffsets(r)[i] !== o));
+  return own[differs === -1 ? 0 : differs];
+};
+
+const capLabel = (reading: TimeRangeReading, index: number) =>
+  t(index === 0 ? "timeRangeInput.firstTime" : "timeRangeInput.secondTime", {
+    offset: reading.startOffset,
+  });
+
 const rowLabel = (reading: TimeRangeReading, index: number, readings: TimeRangeReading[]) => {
   const res = result.value;
   if (res.state === "ambiguous" && res.reason === "day-month-order" && index < 2)
     return orderLabel(index);
   if (res.state === "ambiguous" && res.reason === "zone-abbreviation") {
-    const note = reading.notes.find((n) => n.kind === "converted");
-    if (note?.kind === "converted") return raw(`UTC${note.fromOffset}`);
+    const offset = zoneChoiceOffset(reading, readings);
+    if (offset) return raw(`UTC${offset}`);
   }
   if (res.state === "ambiguous" && res.reason === "repeated-hour") {
     const end = repeatedEnd(readings);
@@ -271,7 +365,7 @@ const toRow = (
     range: label === range ? "" : range,
     duration: durationOf(reading.startUs, reading.endUs),
     hint,
-    blocked: reading.blocked ?? (capOf(reading) ? "max-span" : undefined),
+    blocked: reading.blocked ?? (capsOf(reading) ? "max-span" : undefined),
   };
 };
 
@@ -283,16 +377,25 @@ const rows = computed<ReadingRow[]>(() => {
   if (res.state !== "blocked") return [];
   const list = [...(res.fix ? [res.fix] : []), ...(res.others ?? [])];
   const hint = res.reason === "max-span" ? t("timeRangeInput.longestAllowed") : undefined;
-  return list.map((r, i) => toRow(r, i, list, res.fix && i === 0 ? hint : undefined));
+  const fixCount = capFix.value?.fixes.length ?? (res.fix ? 1 : 0);
+  return list.map((r, i) => {
+    const row = toRow(r, i, list, i < fixCount ? hint : undefined);
+    if (fixCount < 2 || i >= fixCount) return row;
+    const label = capLabel(r, i);
+    return { ...row, label, range: rangeOf(r.startUs, r.endUs) };
+  });
 });
 
 const blockedMessage = (res: Extract<TimeRangeParseResult, { state: "blocked" }>) => {
   const { reading } = res;
-  if (overCap.value) return t("timeRangeInput.overCap");
+  if (capFix.value?.overCap) return t("timeRangeInput.overCap");
   if (res.reason === "max-span") return t("timeRangeInput.blockedSpan", { limit: props.spanLimit });
   if (res.reason === "future")
     return t("timeRangeInput.blockedFuture", {
-      date: instantText(reading.endUs > bar.nowUs.value ? reading.endUs : reading.startUs),
+      date: instantText(
+        typedInstant(reading) ??
+          (reading.endUs > bar.nowUs.value ? reading.endUs : reading.startUs),
+      ),
     });
   if (res.reason === "after-max")
     return t("timeRangeInput.blockedAfterMax", { date: instantText(reading.endUs) });
@@ -326,11 +429,12 @@ const ambiguousMessage = (res: Extract<TimeRangeParseResult, { state: "ambiguous
     const first = res.readings[0];
     const us =
       typedInstant(first) ?? (repeatedEnd(res.readings) === "start" ? first.startUs : first.endUs);
-    const time = formatInstant(us, props.zone, props.intlLocale, bar.nowUs.value, false);
+    // A rolling start inherits now's milliseconds, which mean nothing in a which-hour question.
+    const time = formatInstant(us, props.zone, props.intlLocale, bar.nowUs.value, false, false);
     if (res.reason === "am-pm") return t("timeRangeInput.ambiguousAmPm", { time });
     return t("timeRangeInput.ambiguousRepeat", {
       time,
-      date: formatInstant(us, props.zone, props.intlLocale, bar.nowUs.value, true),
+      date: formatDay(us, props.zone, props.intlLocale, bar.nowUs.value),
     });
   }
   return t("timeRangeInput.ambiguousOrder", { text: bar.text.value.trim() });
@@ -560,7 +664,11 @@ defineExpose({
     <div class="flex min-w-0 items-center gap-2" :class="isMessage ? 'max-sm:items-start' : ''">
       <div
         class="flex min-h-6 min-w-0 flex-1 items-center gap-2 overflow-hidden text-xs whitespace-nowrap tabular-nums"
-        :class="isMessage ? 'max-sm:items-start max-sm:py-1 max-sm:whitespace-normal' : ''"
+        :class="
+          isMessage
+            ? 'max-sm:items-start max-sm:py-1 max-sm:whitespace-normal'
+            : 'max-sm:flex-wrap max-sm:gap-y-0.5 max-sm:py-1'
+        "
         data-test="date-time-range-status"
         :data-state="state"
         aria-live="polite"
@@ -630,7 +738,7 @@ defineExpose({
           >
           <span
             v-if="summary.note"
-            class="min-w-0 truncate max-sm:hidden"
+            class="min-w-0 truncate max-sm:basis-full max-sm:whitespace-normal"
             :class="summary.note.warn ? 'text-status-warning-text' : 'text-text-secondary'"
             data-test="date-time-range-note"
             :data-warn="summary.note.warn || undefined"
@@ -685,7 +793,7 @@ defineExpose({
         :aria-disabled="row.blocked ? true : undefined"
         :data-blocked="row.blocked"
         :data-test="`date-time-range-reading-${i}`"
-        class="flex min-w-0 items-center gap-2 px-3 py-1.5 tabular-nums"
+        class="flex min-w-0 items-center gap-2 px-3 py-1.5 tabular-nums max-sm:flex-wrap max-sm:gap-y-0.5"
         :class="[
           highlighted === i ? 'bg-surface-accent-active' : '',
           row.blocked ? 'opacity-50' : 'hover:bg-surface-accent-hover cursor-pointer',
@@ -695,16 +803,18 @@ defineExpose({
       >
         <span
           class="text-text-heading text-compact font-medium"
-          :class="row.range ? 'shrink-0' : 'min-w-0 truncate'"
+          :class="
+            row.range ? 'shrink-0 max-sm:min-w-0 max-sm:shrink max-sm:truncate' : 'min-w-0 truncate'
+          "
           >{{ row.label }}</span
         >
-        <span v-if="row.range" class="text-text-secondary min-w-0 truncate text-xs"
+        <span
+          v-if="row.range"
+          class="text-text-secondary min-w-0 truncate text-xs max-sm:order-last max-sm:basis-full max-sm:whitespace-normal"
           ><bdi>{{ row.range }}</bdi></span
         >
         <span class="ms-auto flex shrink-0 items-center gap-1.5">
-          <span v-if="row.hint" class="text-text-secondary text-2xs max-md:hidden">{{
-            row.hint
-          }}</span>
+          <span v-if="row.hint" class="text-text-secondary text-2xs">{{ row.hint }}</span>
           <OBadge v-if="row.duration" variant="default-soft" size="sm">{{ row.duration }}</OBadge>
         </span>
       </div>

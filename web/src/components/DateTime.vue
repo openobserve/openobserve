@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
-            'md:min-w-71.5': !disableRelative && selectedType === 'absolute',
+            'md:min-w-71.5': !disableRelative && selectedType === 'absolute' && !showRangeZoom,
             'w-fit': disableRelative,
             'h-auto! rounded-none! border-0!': !hideRangeShift,
             'md:px-2!': showRangeZoom,
@@ -505,7 +505,7 @@ import useTimeRangeHistory from "@/composables/useTimeRangeHistory";
 import { localeFileMap } from "@/locales";
 import { checkTimeRange } from "@/utils/timeRangeInput/check";
 import { addDays, addMonths } from "@/utils/timeRangeInput/civil";
-import { resolveCivil, wallAt } from "@/utils/timeRangeInput/zone";
+import { offsetAtInstant, offsetLabel, resolveCivil, wallAt } from "@/utils/timeRangeInput/zone";
 import { formatTimeRangeInput, type FormattableRange } from "@/utils/timeRangeInput/format";
 import type { RangeLimits, RelativeUnit, TimeRangeReading } from "@/utils/timeRangeInput/types";
 import { registerTimeRangePicker } from "@/utils/timeRangeShortcut";
@@ -518,8 +518,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 
 const MICROS_PER_SECOND = 1_000_000;
 const DAY_END_TIME = "23:59:59";
-// A trigger inside the top inset, as in a drawer header, reads as detached, so the picker keeps hiding off;
-// it closes on ancestor scroll instead.
+// Clears a drawer header above the trigger. A trigger inside it would read as detached, so the
+// popover's hide-when-detached is off and the panel closes on ancestor scroll or resize instead.
 const POPOVER_COLLISION_PADDING = { top: 48, right: 8, bottom: 8, left: 8 };
 // Largest custom relative range per unit (~10 years), so a typo can't produce an absurd or overflowing range.
 const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
@@ -527,7 +527,7 @@ const MAX_CUSTOM_RELATIVE_VALUE: Record<string, number> = {
   m: 5_256_000,
   h: 87_600,
   d: 3_650,
-  w: 520,
+  w: 521,
   M: 120,
 };
 
@@ -2030,15 +2030,33 @@ export default defineComponent({
       calendarToken.value = token;
     };
 
-    // The capped copy is what the picker can keep; null when the reading is within the cap.
-    const capRolling = (reading: TimeRangeReading): TimeRangeReading | null => {
+    const offsetOf = (us: number, fallback: string) => {
+      try {
+        return offsetLabel(offsetAtInstant(zone.value, us));
+      } catch {
+        return fallback;
+      }
+    };
+
+    // The capped copies the picker can keep, both when the capped start is a repeated hour; null within the cap.
+    const capRolling = (reading: TimeRangeReading): TimeRangeReading[] | null => {
       if (reading.kind !== "rolling" || !reading.rolling) return null;
       const { unit, value } = reading.rolling;
       const cap = MAX_CUSTOM_RELATIVE_VALUE[unit];
       if (cap === undefined || value <= cap) return null;
-      const startUs = rollingStartUs(cap, unit, reading.endUs);
-      if (Number.isNaN(startUs)) return null;
-      return { ...reading, rolling: { unit, value: cap }, startUs, name: undefined, notes: [] };
+      const earlier = rollingStartUs(cap, unit, reading.endUs);
+      if (Number.isNaN(earlier)) return null;
+      const later = rollingStartUs(cap, unit, reading.endUs, "later");
+      const capped = (startUs: number): TimeRangeReading => ({
+        ...reading,
+        rolling: { unit, value: cap },
+        startUs,
+        startOffset: offsetOf(startUs, reading.startOffset),
+        name: undefined,
+        notes: [],
+        blocked: undefined,
+      });
+      return later === earlier ? [capped(earlier)] : [capped(earlier), capped(later)];
     };
 
     const stageReading = (reading: TimeRangeReading) => {
@@ -2687,6 +2705,24 @@ export default defineComponent({
       menuOpen.value = false;
       onMenuOpenChange(false);
     };
+
+    // With hide-when-detached off, a resize that moves the trigger out of view would strand the panel.
+    const closeIfTriggerHidden = () => {
+      const trigger = (datetimeBtn.value as { $el?: Element } | null)?.$el;
+      if (!(trigger instanceof Element)) return;
+      const box = trigger.getBoundingClientRect();
+      const outside =
+        box.bottom <= 0 ||
+        box.right <= 0 ||
+        box.top >= window.innerHeight ||
+        box.left >= window.innerWidth;
+      if (outside || (box.width === 0 && box.height === 0)) closeMenu();
+    };
+    watch(menuOpen, (open) => {
+      if (open) window.addEventListener("resize", closeIfTriggerHidden);
+      else window.removeEventListener("resize", closeIfTriggerHidden);
+    });
+    onBeforeUnmount(() => window.removeEventListener("resize", closeIfTriggerHidden));
 
     // A single clicked day applies as that day.
     const commitPendingDay = (): boolean => {

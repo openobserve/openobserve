@@ -244,8 +244,9 @@ export class DateTimePickerPage {
 
     /** Reopens the panel when an auto-apply picker closed on the last action. */
     async ensurePickerOpen() {
-        // A closing panel stays visible while it animates out, so wait for that before deciding.
-        await this.panel.waitFor({ state: 'hidden', timeout: 1500 }).catch(() => {});
+        // Only a panel animating out is waited for; an open, steady one is used as it is.
+        const closing = this.page.locator('[data-o-popover-content][data-state="closed"]', { has: this.panel });
+        if (await closing.count()) await this.panel.waitFor({ state: 'hidden' });
         if (!(await this.panel.isVisible())) await this.openPicker();
     }
 

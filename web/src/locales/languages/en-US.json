@@ -34510,6 +34510,7 @@
     "instantWindow": "{duration} either side of {time}",
     "instantWindowBefore": "{duration} before {time}",
     "instantWindowClipped": "{duration} before and {after} after",
+    "instantWindowEnded": "Ends now, {gap} before {time}",
     "fixedToNow": "Ends now, won't move",
     "gateOrder": "Start must be before end.",
     "gateInvalid": "Not a valid range."
