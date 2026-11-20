@@ -731,6 +731,14 @@ describe("DateTime Component", () => {
     });
   });
 
+  it("keeps its panel shown when the trigger sits inside the top collision inset", () => {
+    wrapper = createWrapper();
+    const popover = wrapper.findComponent({ name: "OPopover" });
+    expect(popover.props("collisionPadding")).toMatchObject({ top: 48 });
+    expect(popover.props("hideWhenDetached")).toBe(false);
+    expect(popover.props("closeOnScroll")).toBe(true);
+  });
+
   describe("hideSeconds", () => {
     const units = (list: Array<{ value: string }>) => list.map((period) => period.value);
 
