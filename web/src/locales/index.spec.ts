@@ -260,12 +260,21 @@ describe("document locale", () => {
 describe("untranslated keys fall back to en-US", () => {
   it("shows English for a filterBar key the locale file lacks and keeps its translated ones", async () => {
     await loadLocaleMessages("de");
-    const t = (key: string, params?: Record<string, unknown>) =>
-      (i18n.global as any).t(key, params ?? {}, { locale: "de" });
-    expect(t("filterBar.addFilter")).toBe("Add filter");
-    expect(t("filterBar.validation.regexLength", { max: 5 })).toBe(
-      "Verwenden Sie für das Muster höchstens 5 Zeichen.",
-    );
+    // The translation bot fills every key in time, so the test removes one to model a key not yet translated.
+    const loaded = i18n.global.getLocaleMessage("de") as any;
+    const filterBar = { ...loaded.filterBar };
+    delete filterBar.addFilter;
+    i18n.global.setLocaleMessage("de", { ...loaded, filterBar });
+    try {
+      const t = (key: string, params?: Record<string, unknown>) =>
+        (i18n.global as any).t(key, params ?? {}, { locale: "de" });
+      expect(t("filterBar.addFilter")).toBe("Add filter");
+      expect(t("filterBar.validation.regexLength", { max: 5 })).toBe(
+        "Verwenden Sie für das Muster höchstens 5 Zeichen.",
+      );
+    } finally {
+      i18n.global.setLocaleMessage("de", loaded);
+    }
   });
 });
 

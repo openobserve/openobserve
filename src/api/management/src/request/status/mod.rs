@@ -37,7 +37,6 @@ use config::{
         search::{HashFileRequest, HashFileResponse},
         slack::DisabledReason,
         stream::DataRetentionDefaults,
-        user::UserRole,
     },
     stats::{CacheStats, CacheStatsAsync},
     utils::{base64, json},
@@ -535,7 +534,7 @@ pub async fn zo_config(
         None => false,
     };
     let is_org_admin = match &user_email {
-        Some(Headers(user)) => org_admin(&org_id, &user.user_id).await,
+        Some(Headers(user)) => openobserve_core::users::is_org_admin(&org_id, &user.user_id).await,
         None => false,
     };
     #[cfg(feature = "enterprise")]
@@ -935,13 +934,6 @@ fn rca_enabled_for(
 /// The search inspector is enterprise-only, so OSS never offers it even to root.
 fn search_inspector_for_edition(permitted: bool) -> bool {
     cfg!(feature = "enterprise") && permitted
-}
-
-async fn org_admin(org_id: &str, user_id: &str) -> bool {
-    is_root_user(user_id)
-        || openobserve_core::users::get_user(Some(org_id), user_id)
-            .await
-            .is_some_and(|u| matches!(u.role, UserRole::Root | UserRole::Admin))
 }
 
 /// Only enterprise builds run the transitions reaper; 0 tells the UI nothing is ever dropped.

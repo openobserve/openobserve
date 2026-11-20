@@ -28,6 +28,7 @@ import * as useDurationPercentilesModule from "@/composables/useDurationPercenti
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import { tracesSearchRunSignature } from "@/plugins/traces/tracesSearchBar.utils";
+import { isMacOS } from "@/utils/keyboardShortcuts";
 import analytics from "@/services/product_analytics";
 import queryHistory from "@/services/query_history";
 import type { QueryHistoryEntry } from "@/services/query_history";
@@ -235,7 +236,7 @@ vi.mock("@/composables/useTraces", () => ({
     getUrlQueryParams: vi.fn(() => ({})),
     applyUrlListState: mockApplyUrlListState,
     syncUrlViewState: mockSyncUrlViewState,
-    copyTracesUrl: vi.fn(),
+    copyTracesUrl: mockCopyTracesUrl,
     formatTracesMetaData: vi.fn((hits) => hits),
     setServiceColors: mockSetServiceColors,
     loadLocalLogFilterField: mockLoadLocalLogFilterField,
@@ -289,8 +290,9 @@ const { createdTracesParsers, trackTracesParser } = vi.hoisted(() => {
 });
 
 // Hoisted so tests can assert resetSearchObj was called by the component lifecycle.
-const { mockResetSearchObj } = vi.hoisted(() => ({
+const { mockResetSearchObj, mockCopyTracesUrl } = vi.hoisted(() => ({
   mockResetSearchObj: vi.fn(),
+  mockCopyTracesUrl: vi.fn(),
 }));
 
 // Hoisted so tests can control what restoreTracesStream returns.
@@ -831,6 +833,33 @@ describe("Index.vue (Main Traces Page)", () => {
 
       expect(mockSearchObj.data.editorValue).toBe("");
     });
+    it("clears a stale editor filter when the route has a stream and no query", async () => {
+      routerCurrentRouteSpy.mockReturnValue(
+        ref({
+          query: { stream: "default", period: "2h" },
+          name: "traces",
+          path: "/traces",
+        }) as typeof router.currentRoute,
+      );
+      mockSearchObj.data.editorValue = "service_name='x'";
+
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("");
+    });
+
+    it("keeps the editor when the route has no stream (bare menu link)", async () => {
+      routerCurrentRouteSpy.mockReturnValue(
+        ref({ query: {}, name: "traces", path: "/traces" }) as typeof router.currentRoute,
+      );
+      mockSearchObj.data.editorValue = "service_name='x'";
+
+      wrapper = mountIndex();
+      await flushPromises();
+
+      expect(mockSearchObj.data.editorValue).toBe("service_name='x'");
+    });
   });
 
   describe("Auto Run off (#14760)", () => {
@@ -1092,6 +1121,50 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
+  describe("Copy link shortcut", () => {
+    const pressCopyLink = async () => {
+      const modifier = isMacOS() ? { metaKey: true } : { ctrlKey: true };
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "c", shiftKey: true, ...modifier }));
+      await flushPromises();
+    };
+
+    it("copies the link only while the shown results come from the current query", async () => {
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      mockSearchObj.meta.lastRunSignature = tracesSearchRunSignature(mockSearchObj as any);
+      mockCopyTracesUrl.mockClear();
+
+      await pressCopyLink();
+      expect(mockCopyTracesUrl).toHaveBeenCalledTimes(1);
+
+      mockToast.mockClear();
+      mockSearchObj.data.editorValue = "operation_name = 'POST /checkout'";
+      await pressCopyLink();
+      expect(mockCopyTracesUrl).toHaveBeenCalledTimes(1);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "warning",
+          message: i18n.global.t("search.autoRunPersistNeedsRun"),
+        }),
+      );
+      mockSearchObj.meta.lastRunSignature = null;
+    });
+  });
+
   describe("Stream Selection", () => {
     it("should select the default stream automatically", async () => {
       wrapper = mount(Index, {
@@ -1321,7 +1394,6 @@ describe("Index.vue (Main Traces Page)", () => {
               setup() {
                 return {
                   applyFilters: mockApplyFiltersAppend,
-                  removeFilterByField: vi.fn(),
                   setEditorValue: vi.fn(),
                 };
               },
@@ -2408,7 +2480,6 @@ describe("Index.vue (Main Traces Page)", () => {
   describe("Metrics Filters Integration", () => {
     // Spies for SearchBar ref methods exposed via stub
     const mockApplyFilters = vi.fn();
-    const mockRemoveFilterByField = vi.fn();
     const mockSetEditorValue = vi.fn();
 
     function mountWithSearchBarStub() {
@@ -2423,7 +2494,6 @@ describe("Index.vue (Main Traces Page)", () => {
               setup() {
                 return {
                   applyFilters: mockApplyFilters,
-                  removeFilterByField: mockRemoveFilterByField,
                   setEditorValue: mockSetEditorValue,
                 };
               },
@@ -2440,12 +2510,21 @@ describe("Index.vue (Main Traces Page)", () => {
 
     beforeEach(() => {
       mockApplyFilters.mockReset();
-      mockRemoveFilterByField.mockReset();
       mockSetEditorValue.mockReset();
       mockSearchObj.data.editorValue = "";
       mockSearchObj.meta.metricsRangeFilters.clear();
       // Reset auto_query_enabled to undefined for each test
       delete store.state.zoConfig.auto_query_enabled;
+    });
+
+    it.each([
+      ["one branch of an OR", "service_name='a' OR span_status='ERROR'", false],
+      ["a top-level AND condition", "service_name='a' AND span_status='ERROR'", true],
+    ])("shows errors-only as on for %s: %s", async (_name, filter, on) => {
+      mockSearchObj.data.editorValue = filter;
+      wrapper = mountWithSearchBarStub();
+      await flushPromises();
+      expect(wrapper.vm.showErrorOnly).toBe(on);
     });
 
     it("should grow the query pane with the filter builder and shrink it back", async () => {
@@ -2527,25 +2606,45 @@ describe("Index.vue (Main Traces Page)", () => {
       });
     });
 
-    it("should call applyFilters with error condition when error only toggle is turned on", async () => {
+    it.each([
+      [
+        "one with a top-level OR",
+        "service_name='a' OR span_status='ERROR'",
+        "(service_name='a' OR span_status='ERROR') and span_status = 'ERROR'",
+      ],
+      [
+        "a bracketed OR",
+        "(service_name='a' OR span_status='ERROR')",
+        "(service_name='a' OR span_status='ERROR') and span_status = 'ERROR'",
+      ],
+      ["a plain AND filter", "service_name='a'", "service_name='a' and span_status = 'ERROR'"],
+    ])("turning errors-only on ANDs the condition onto %s", async (_name, filter, expected) => {
+      mockSearchObj.data.editorValue = filter;
       wrapper = mountWithSearchBarStub();
       await flushPromises();
 
       wrapper.vm.onErrorOnlyToggled(true);
       await flushPromises();
 
-      expect(mockApplyFilters).toHaveBeenCalledWith(["span_status = 'ERROR'"]);
+      expect(mockSearchObj.data.editorValue).toBe(expected);
+      expect(mockSetEditorValue).toHaveBeenLastCalledWith(expected);
     });
 
-    it("should call removeFilterByField when error only toggle is turned off", async () => {
-      wrapper = mountWithSearchBarStub();
-      await flushPromises();
+    it.each(["service_name='a' OR span_status='ERROR'", "service_name='a'", ""])(
+      "turning errors-only on then off gives back %j",
+      async (original) => {
+        mockSearchObj.data.editorValue = original;
+        wrapper = mountWithSearchBarStub();
+        await flushPromises();
 
-      wrapper.vm.onErrorOnlyToggled(false);
-      await flushPromises();
+        wrapper.vm.onErrorOnlyToggled(true);
+        wrapper.vm.onErrorOnlyToggled(false);
+        await flushPromises();
 
-      expect(mockRemoveFilterByField).toHaveBeenCalledWith("span_status");
-    });
+        expect(mockSearchObj.data.editorValue).toBe(original);
+        expect(mockSetEditorValue).toHaveBeenLastCalledWith(original);
+      },
+    );
   });
 
   describe("Splitter Behavior", () => {

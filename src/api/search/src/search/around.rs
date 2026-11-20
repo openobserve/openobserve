@@ -184,16 +184,7 @@ pub(crate) async fn around(
         .instrument(http_span)
         .await?;
 
-    let resp = merge_and_redact(
-        &fw_req,
-        org_id,
-        stream_name,
-        stream_type,
-        trace_id,
-        (&resp_forward, &resp_backward),
-        around_size,
-    )
-    .await?;
+    let resp = merge_around((&resp_forward, &resp_backward), around_size);
 
     let time = start.elapsed().as_secs_f64();
     http_report_metrics(start, org_id, stream_type, "200", "_around", "", "");
@@ -244,19 +235,14 @@ pub(crate) async fn around(
     Ok(resp)
 }
 
-/// Merges both halves through the search-time redaction the bare planner skips.
-async fn merge_and_redact(
-    fw_req: &config::meta::search::Request,
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    trace_id: &str,
+/// The backward half is newest-first, so it is reversed to keep the merged hits in order.
+fn merge_around(
     (resp_forward, resp_backward): (
         &config::meta::search::Response,
         &config::meta::search::Response,
     ),
     around_size: i64,
-) -> Result<config::meta::search::Response, infra::errors::Error> {
+) -> config::meta::search::Response {
     let mut resp = config::meta::search::Response::default();
     resp.hits.extend(resp_backward.hits.iter().rev().cloned());
     resp.hits.extend(resp_forward.hits.iter().cloned());
@@ -265,21 +251,7 @@ async fn merge_and_redact(
     resp.scan_size = resp_forward.scan_size + resp_backward.scan_size;
     resp.took = resp_forward.took + resp_backward.took;
     resp.cached_ratio = (resp_forward.cached_ratio + resp_backward.cached_ratio) / 2;
-
-    #[cfg(feature = "vectorscan")]
-    SearchService::cache::apply_regex_to_response(
-        fw_req,
-        org_id,
-        stream_name,
-        stream_type,
-        &mut resp,
-        trace_id,
-        "around",
-    )
-    .await?;
-    #[cfg(not(feature = "vectorscan"))]
-    let _ = (fw_req, org_id, stream_name, stream_type, trace_id);
-    Ok(resp)
+    resp
 }
 
 fn around_subquery_sizes(around_size: i64) -> Result<(i64, i64), infra::errors::Error> {
@@ -344,82 +316,21 @@ mod tests {
         );
     }
 
-    #[cfg(all(feature = "enterprise", feature = "vectorscan"))]
-    #[tokio::test]
-    async fn test_merge_and_redact_redacts_search_time_patterns() {
-        use arrow_schema::{DataType, Field, Schema};
-        use o2_enterprise::enterprise::re_patterns::{PATTERN_MANAGER, PatternManager};
-
-        let (org, stream) = ("around_redact_test", "app");
-        infra::db_init().await.unwrap();
-        let schema = Schema::new(vec![
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-            Field::new("msg", DataType::Utf8, true),
-        ]);
-        infra::schema::merge(org, stream, StreamType::Logs, &schema, Some(1))
-            .await
-            .unwrap();
-        let mgr = PATTERN_MANAGER
-            .get_or_init(|| async { PatternManager::empty() })
-            .await;
-        mgr.insert_pattern(infra::table::re_pattern::PatternEntry {
-            id: "around_redact_secret".to_string(),
-            name: "secret".to_string(),
-            pattern: "SECRETVAL[0-9]+".to_string(),
-            description: String::new(),
-            org: org.to_string(),
-            created_by: "test".to_string(),
-            created_at: 0,
-            updated_at: 0,
-        });
-        let association = config::meta::stream::PatternAssociation {
-            field: "msg".to_string(),
-            pattern_id: "around_redact_secret".to_string(),
-            policy: "Redact".to_string(),
-            apply_at: "AtSearch".to_string(),
+    #[test]
+    fn test_merge_around_puts_the_backward_half_first_in_order() {
+        let half = |ts: &[i64]| config::meta::search::Response {
+            hits: ts.iter().map(|t| json::json!({"_timestamp": t})).collect(),
             ..Default::default()
         };
-        mgr.update_associations(org, StreamType::Logs, stream, vec![], vec![association])
-            .unwrap();
-
-        let hit = |ts: i64| json::json!({TIMESTAMP_COL_NAME: ts, "msg": "login SECRETVAL12345 ok"});
-        let halves = |hits| config::meta::search::Response {
-            hits,
-            ..Default::default()
-        };
-        let fw_req = config::meta::search::Request {
-            query: config::meta::search::Query {
-                sql: around_base_sql(stream),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let resp = merge_and_redact(
-            &fw_req,
-            org,
-            stream,
-            StreamType::Logs,
-            "trace",
-            (&halves(vec![hit(3), hit(2)]), &halves(vec![hit(4), hit(5)])),
-            4,
-        )
-        .await
-        .unwrap();
-
-        let rows: Vec<_> = resp
+        let resp = merge_around((&half(&[3, 2]), &half(&[4, 5])), 4);
+        let order: Vec<i64> = resp
             .hits
             .iter()
-            .map(|h| {
-                (
-                    h[TIMESTAMP_COL_NAME].as_i64().unwrap(),
-                    h["msg"].as_str().unwrap(),
-                )
-            })
+            .map(|h| h["_timestamp"].as_i64().unwrap())
             .collect();
-        assert_eq!(
-            rows,
-            [5, 4, 3, 2].map(|ts| (ts, "login [REDACTED] ok")).to_vec()
-        );
+        assert_eq!(order, [5, 4, 3, 2]);
+        assert_eq!(resp.total, 4);
+        assert_eq!(resp.size, 4);
     }
 
     #[test]

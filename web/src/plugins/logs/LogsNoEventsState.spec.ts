@@ -32,7 +32,6 @@ const mountState = (relativeTimePeriod: string) =>
     props: {
       sqlMode: false,
       query: "",
-      editorValue: "",
       relativeTimePeriod,
       dateType: "relative",
     },
@@ -54,5 +53,24 @@ describe("LogsNoEventsState", () => {
 
   it("keeps the rolling wording for a rolling period", () => {
     expect(mountState("15m").text()).toContain("Past 15 Minutes");
+  });
+
+  it.each([
+    ["SELECT * FROM \"app\" WHERE level = 'x'", "Nothing matched"],
+    ['SELECT * FROM "app"', "doesn't contain any data"],
+  ])("reads the WHERE of the SQL query it is given: %s", (query, copy) => {
+    const wrapper = mount(LogsNoEventsState, {
+      props: {
+        sqlMode: true,
+        query,
+        relativeTimePeriod: "1d",
+        dateType: "relative",
+        aiEnabled: false,
+        streamDocTimeRange: { min: 1_000_000, max: 2_000_000 },
+        queryWindowUs: { start: 0, end: 3_000_000 },
+      },
+      global: { plugins: [i18n, store], stubs: { OEmptyState: OEmptyStateStub } },
+    });
+    expect(wrapper.text()).toContain(copy);
   });
 });

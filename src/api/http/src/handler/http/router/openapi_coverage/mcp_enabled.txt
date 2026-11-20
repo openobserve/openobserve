@@ -1,5 +1,5 @@
 # Operation ids published as enabled MCP tools; a change here enables or disables a tool.
-# Format: edition operationId, edition is all, oss, ent or cloud.
+# Format: edition operationId, edition is all, oss, ent, cloud or noncloud.
 all AckAlert
 all AcknowledgeIncident
 ent ActivateRemoteTaskSigningCandidate

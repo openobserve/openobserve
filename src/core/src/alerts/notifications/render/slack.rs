@@ -23,7 +23,7 @@ use super::{
 };
 use crate::alerts::notifications::{
     NotificationContext,
-    resolve::{Link, LinkRole, RenderedContent},
+    resolve::{Link, LinkRole, RenderedContent, status_color},
 };
 
 /// Block Kit's hard cap on `fields` per section block.
@@ -49,14 +49,20 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
     // be an absolute http(s) one (`dispatchable_url`), which also rules out the
     // blocked placeholder, an empty `ZO_WEB_URL` and relative paths.
     let title_url = dispatchable_url(&ctx.alert_url).unwrap_or_default();
-    if !title_url.is_empty() && !title_url.contains(['|', '>', '<']) && !c.title.contains('|') {
+    let linked = format!(
+        "*<{}|{}>*",
+        title_url,
+        escape_mrkdwn(&clamp(&c.title, HEADER_MAX)),
+    );
+    // Slack refuses the whole message for a section over its limit; the data button keeps the URL.
+    if !title_url.is_empty()
+        && !title_url.contains(['|', '>', '<'])
+        && !c.title.contains('|')
+        && linked.chars().count() <= SECTION_TEXT_MAX
+    {
         blocks.push(json!({
             "type": "section",
-            "text": {"type": "mrkdwn", "text": format!(
-                "*<{}|{}>*",
-                title_url,
-                escape_mrkdwn(&clamp(&c.title, HEADER_MAX)),
-            )}
+            "text": {"type": "mrkdwn", "text": linked}
         }));
     } else {
         // `plain_text` is not mrkdwn — Slack renders it literally, so the
@@ -126,7 +132,6 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
         }
     }
 
-    // The title's status dot carries severity, so every block sits at the top level, unstriped.
     let mut tail_blocks: Vec<Value> = Vec::new();
 
     // Slack validates every button `url` server-side and rejects the WHOLE
@@ -190,8 +195,13 @@ pub fn render_slack(c: &RenderedContent, ctx: &NotificationContext) -> Value {
         }));
     }
 
-    blocks.extend(tail_blocks);
-    json!({ "blocks": blocks })
+    // The bar repeats the title dot's color; Slack drops an attachment whose blocks are empty.
+    let color = status_color(ctx);
+    let mut attachments = vec![json!({"color": color, "blocks": blocks})];
+    if !tail_blocks.is_empty() {
+        attachments.push(json!({"color": color, "blocks": tail_blocks}));
+    }
+    json!({ "attachments": attachments })
 }
 
 /// Authored links that found no button slot, one mrkdwn element each, never cut.
@@ -364,6 +374,18 @@ pub fn strip_image_blocks_with_base(msg: &str, web_url_base: &str) -> Option<Str
     })
 }
 
+/// Test view of a rendered body: every attachment's blocks in order, as one `blocks` list.
+#[cfg(test)]
+pub(crate) fn flat_blocks(v: &Value) -> Value {
+    let blocks: Vec<Value> = v["attachments"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|a| a["blocks"].as_array().cloned().unwrap_or_default())
+        .collect();
+    json!({ "blocks": blocks })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -471,5 +493,48 @@ mod tests {
         assert!(images_undeliverable(1_000));
         assert!(images_undeliverable(1_000 + IMAGES_RETRY_SECS - 1));
         assert!(!images_undeliverable(1_000 + IMAGES_RETRY_SECS));
+    }
+
+    #[test]
+    fn the_bar_wraps_the_head_and_the_buttons_in_the_dot_color() {
+        use config::meta::alerts::notification_kind::NotificationEvent;
+
+        use super::{Link, RenderedContent};
+        let content = |links: Vec<Link>| RenderedContent {
+            title: "🟠 cpu".into(),
+            body_markdown: String::new(),
+            fields: vec![],
+            links,
+            rows: vec![],
+            row_lines: None,
+            severity: None,
+            unknown_variables: vec![],
+        };
+        let ctx = NotificationContext {
+            level: Some(config::meta::alerts::level::AlertLevel::Warning),
+            ..Default::default()
+        };
+        let v = render_slack(
+            &content(vec![Link::authored("Runbook", "https://rb.example/x")]),
+            &ctx,
+        );
+        assert!(v.get("blocks").is_none(), "{v}");
+        let attachments = v["attachments"].as_array().unwrap();
+        assert_eq!(attachments.len(), 2, "{v}");
+        assert!(attachments.iter().all(|a| a["color"] == "#F2952F"), "{v}");
+        assert_eq!(attachments[1]["blocks"][0]["type"], "actions");
+
+        let resolved = NotificationContext {
+            event: NotificationEvent::Resolved,
+            ..ctx
+        };
+        let v = render_slack(&content(vec![]), &resolved);
+        let attachments = v["attachments"].as_array().unwrap();
+        assert_eq!(
+            attachments.len(),
+            1,
+            "an attachment with no blocks is never sent: {v}"
+        );
+        assert_eq!(attachments[0]["color"], "#2EB67D");
     }
 }

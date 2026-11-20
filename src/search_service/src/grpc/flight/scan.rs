@@ -59,6 +59,10 @@ pub(super) struct StreamSearchSettings {
     pub(super) bloom_fields: Vec<String>,
     /// The request's `equal_keys` filters, not the stream's partition key settings.
     pub(super) search_partition_keys: Vec<(String, String)>,
+    /// Columns redacted at the scan: their index terms hold raw values.
+    pub(super) redacted: HashSet<String>,
+    /// An FTS field is redacted, so `_all` holds raw values and cannot answer a filter.
+    pub(super) fts_index_disabled: bool,
 }
 
 impl StreamSearchSettings {
@@ -111,7 +115,25 @@ impl StreamSearchSettings {
             index_fields,
             bloom_fields,
             search_partition_keys,
+            redacted: HashSet::new(),
+            fts_index_disabled: false,
         }
+    }
+
+    /// Keeps the index and partition pruning off every redacted column: both match raw values.
+    pub(super) fn exclude_redacted(&mut self, redacted: HashSet<String>) {
+        self.index_fields.retain(|field| !redacted.contains(field));
+        self.search_partition_keys
+            .retain(|(key, _)| !redacted.contains(key));
+        self.fts_index_disabled = self.fts_fields.iter().any(|f| redacted.contains(f));
+        self.redacted = redacted;
+    }
+
+    /// An index shortcut returning terms of a redacted field would return raw values.
+    pub(super) fn reads_redacted(&self, mode: &IndexOptimizeMode) -> bool {
+        mode.referenced_fields()
+            .iter()
+            .any(|field| self.redacted.contains(field))
     }
 
     // the index cutoff only depends on the fields the query actually reads from the index
@@ -143,6 +165,9 @@ impl StreamSearchSettings {
 
     /// FTS fields whose terms are in `_all` for every row at or after `start_time`.
     pub(super) fn fts_fields_indexed_since(&self, start_time: i64) -> HashSet<String> {
+        if self.fts_index_disabled {
+            return HashSet::new();
+        }
         self.fts_fields
             .iter()
             .filter(|field| {

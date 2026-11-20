@@ -13,18 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod explore_state;
 #[cfg(feature = "enterprise")]
 mod partitioned_search;
 
 #[cfg(feature = "enterprise")]
 use std::{
     collections::{HashMap, HashSet},
-    sync::{LazyLock, RwLock},
+    sync::{Arc, LazyLock, RwLock},
     time::{Duration, Instant},
 };
 
 use anyhow::Result;
 use chrono::Utc;
+#[cfg(feature = "enterprise")]
+use config::meta::anomaly_detection::{LEGACY_VALUE_COLUMNS, TIMESTAMP_COLUMNS};
 use config::{
     meta::{
         folder::{DEFAULT_FOLDER, FolderType},
@@ -38,7 +41,7 @@ use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
     table::anomaly_detection::config as anomaly_config_table,
 };
-use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
+use sea_orm::{IntoActiveModel, Set};
 use search_service as search;
 use serde::{Deserialize, Serialize};
 use svix_ksuid::KsuidLike;
@@ -57,22 +60,6 @@ const SERVER_ERROR_BAND: std::ops::Range<i64> = 500..600;
 /// The web form states the same floor through its own i18n key; the two are kept in step by hand.
 const WINDOW_FLOOR_RULE: &str =
     "detection_window_seconds must be at least schedule_interval plus histogram_interval";
-
-/// Value column names tried when a config declares none. Kept so configs created before
-/// `value_column` existed keep resolving exactly as they did.
-#[cfg(feature = "enterprise")]
-const LEGACY_VALUE_COLUMNS: [&str; 5] = ["value", "count", "_count", "metric", "result"];
-
-/// Timestamp column names a result row is read from, in priority order. `zo_sql_timestamp`
-/// is the histogram alias the Logs page generates, so queries copied from there train as-is.
-#[cfg(feature = "enterprise")]
-const TIMESTAMP_COLUMNS: [&str; 5] = [
-    "_timestamp",
-    "timestamp",
-    "time",
-    "time_bucket",
-    "zo_sql_timestamp",
-];
 
 /// Bounds staleness after an edit on nodes the update-path invalidation cannot reach.
 #[cfg(feature = "enterprise")]
@@ -149,6 +136,28 @@ const MAX_TRAINING_WINDOW_BUCKETS: i64 = 3_000_000;
 /// Longest destination response body kept in the alert-history error column.
 #[cfg(feature = "enterprise")]
 const REJECTION_BODY_MAX_CHARS: usize = 512;
+
+/// Slack drops a button whose URL is longer, so every explore link is held to it in full.
+#[cfg(feature = "enterprise")]
+const MAX_LINK_URL_LEN: usize = 3000;
+
+#[cfg(feature = "enterprise")]
+const UNFILTERED_LINK_LABEL: &str = "View stream around the window (detector filter not applied)";
+
+#[cfg(feature = "enterprise")]
+const DETAIL_LINK_LABEL: &str = "Open anomaly";
+
+/// A custom SQL that already selects one of these opens unchanged, so no column is shadowed.
+#[cfg(feature = "enterprise")]
+const LOGS_BAND_COLUMNS: [&str; 3] = ["min_value", "max_value", "expected_value"];
+
+/// The P1.11 save-time error; `{expr}` is the GROUP BY key that is not the time bucket.
+#[cfg(feature = "enterprise")]
+const SECOND_GROUP_KEY_ERROR: &str = "Anomaly detection reads one value per time bucket. Remove \
+                                      '{expr}' from GROUP BY, or use a filter for one value.";
+/// `GROUP BY ALL` names no key to remove, so its error names the bucket to group by instead.
+#[cfg(feature = "enterprise")]
+const GROUP_BY_ALL_ERROR: &str = "Anomaly detection reads one value per time bucket. Replace GROUP BY ALL with GROUP BY {bucket}.";
 
 #[cfg(feature = "enterprise")]
 type QueryMetadataCache = HashMap<(String, String), (partitioned_search::QueryMetadata, Instant)>;
@@ -361,6 +370,141 @@ pub struct UpdateAnomalyConfigRequest {
     /// `None` leaves stored tags untouched; `Some(vec![])` clears them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<Vec<String>>,
+}
+
+/// The alert values that an anomaly link carries for the banner of the page it opens.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct AnomalyLinkSnapshot {
+    /// The unpadded anomaly window.
+    pub start_us: i64,
+    pub end_us: i64,
+    /// "value", "absence" or "partial_drop".
+    pub kind: String,
+    /// Such as "count(*) per 15 min".
+    pub measure: String,
+    pub actual: Option<f64>,
+    pub lower: Option<f64>,
+    pub upper: Option<f64>,
+    /// The baseline of a partial drop, which has no range.
+    pub expected: Option<f64>,
+}
+
+/// One explore link; `url` is empty when the detector has no stream to open.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AnomalyExploreLink {
+    pub url: String,
+    pub label: String,
+    /// "logs", "traces" or "metrics".
+    pub target: String,
+    pub filter_applied: bool,
+}
+
+/// The page an explore link opens, chosen by the detector's stream type.
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExplorePage {
+    Logs,
+    Traces,
+    Metrics,
+}
+
+#[cfg(feature = "enterprise")]
+impl ExplorePage {
+    fn of(stream_type: &str) -> Self {
+        match stream_type {
+            "traces" => Self::Traces,
+            "metrics" => Self::Metrics,
+            _ => Self::Logs,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Logs => "logs",
+            Self::Traces => "traces",
+            Self::Metrics => "metrics",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Logs => "View logs",
+            Self::Traces => "View traces",
+            Self::Metrics => "View metrics",
+        }
+    }
+
+    /// Logs drops its raw-rows switch before the banner values; the others start at the values.
+    fn link_steps(self) -> &'static [LinkStep] {
+        const fn step(rung: LinkRung, values: bool, alt_query: bool) -> LinkStep {
+            LinkStep {
+                rung,
+                values,
+                alt_query,
+            }
+        }
+        const LOGS: [LinkStep; 4] = [
+            step(LinkRung::Filtered, true, true),
+            step(LinkRung::Filtered, true, false),
+            step(LinkRung::Filtered, false, false),
+            step(LinkRung::Unfiltered, false, false),
+        ];
+        const OTHERS: [LinkStep; 4] = [
+            step(LinkRung::Filtered, true, false),
+            step(LinkRung::Filtered, false, false),
+            step(LinkRung::Unfiltered, false, false),
+            step(LinkRung::StreamOnly, false, false),
+        ];
+        match self {
+            Self::Logs => &LOGS,
+            Self::Traces | Self::Metrics => &OTHERS,
+        }
+    }
+}
+
+/// How much of the detector a link carries; the next rung is tried while the URL is too long.
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LinkRung {
+    Filtered,
+    Unfiltered,
+    StreamOnly,
+}
+
+/// One try of the length check: the rung, whether the banner values go, and the raw-rows query.
+#[cfg(feature = "enterprise")]
+#[derive(Debug, Clone, Copy)]
+struct LinkStep {
+    rung: LinkRung,
+    values: bool,
+    alt_query: bool,
+}
+
+/// The fixed inputs of one explore link, shared by every rung.
+#[cfg(feature = "enterprise")]
+struct ExploreLinkRequest<'a> {
+    base: url::Url,
+    org_id: &'a str,
+    anomaly_id: &'a str,
+    stream_type: &'a str,
+    page: ExplorePage,
+    target: &'a o2_enterprise::enterprise::anomaly_detection::types::ExploreTarget,
+    window_end_us: i64,
+    /// The Logs band columns, from the full snapshot so they stay when the values go.
+    band: Vec<(&'static str, String)>,
+}
+
+/// The query pairs of one rung and whether they apply the detector filter.
+#[cfg(feature = "enterprise")]
+type RungPairs = (Vec<(&'static str, String)>, bool);
+
+/// The Metrics page query and the result columns its line chart plots.
+#[cfg(feature = "enterprise")]
+struct MetricsChart {
+    sql: String,
+    x: String,
+    y: String,
+    filter_applied: bool,
 }
 
 /// The band and delivery settings as they stand after a request, so one rule set serves both paths.
@@ -666,6 +810,8 @@ pub async fn create_config(
     mut req: CreateAnomalyConfigRequest,
 ) -> Result<serde_json::Value> {
     let normalized_tags = checked_create_body(&mut req)?;
+    #[cfg(feature = "enterprise")]
+    checked_create_group_by(org_id, &req).await?;
     let template = checked_template(org_id, req.template.as_deref()).await?;
     checked_destinations(org_id, &req.alert_destinations).await?;
 
@@ -846,6 +992,8 @@ pub async fn create_config(
 pub async fn check_create_config(org_id: &str, req: &CreateAnomalyConfigRequest) -> Result<()> {
     let mut req = req.clone();
     checked_create_body(&mut req)?;
+    #[cfg(feature = "enterprise")]
+    checked_create_group_by(org_id, &req).await?;
     checked_template(org_id, req.template.as_deref()).await?;
     checked_destinations(org_id, &req.alert_destinations).await?;
     folder_pk(org_id, create_folder_name(&req))
@@ -862,6 +1010,8 @@ pub async fn check_update_config(
     let existing = config_to_update(get_orm_client_rw().await, org_id, anomaly_id).await?;
     let mut req = req.clone();
     checked_update_body(&mut req, &existing)?;
+    #[cfg(feature = "enterprise")]
+    checked_update_group_by(org_id, &req, &existing).await?;
     if let Some(template) = &req.template {
         checked_template(org_id, template.as_deref()).await?;
     }
@@ -890,6 +1040,8 @@ pub async fn update_config(
     // Unchanged, which is required for SeaORM to generate UPDATE … WHERE anomaly_id = ?
     let existing = config_to_update(db, org_id, anomaly_id).await?;
     checked_update_body(&mut req, &existing)?;
+    #[cfg(feature = "enterprise")]
+    checked_update_group_by(org_id, &req, &existing).await?;
 
     let shape_changed = model_shape_changed(&existing, &req);
     let previous = existing.clone();
@@ -1084,7 +1236,9 @@ pub async fn update_config(
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
 
-    let mut updated = active_model.update(db).await?;
+    let mut updated = anomaly_config_table::save_changes(db, active_model)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     if let Some((from, to)) = moved_folders {
         repoint_folder(anomaly_id, &from, &to).await;
     }
@@ -1238,7 +1392,7 @@ pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
-    anomaly_config_table::delete(db, org_id, anomaly_id)
+    anomaly_config_table::delete_with_slack_rows(db, org_id, anomaly_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
@@ -1462,7 +1616,9 @@ pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
     active.training_started_at = Set(None);
     active.last_error = Set(Some("Training cancelled by user.".to_string()));
     active.updated_at = Set(Utc::now().timestamp_micros());
-    active.update(db).await?;
+    anomaly_config_table::save_changes(db, active)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     log::info!("[anomaly_detection {anomaly_id}] training cancelled by user");
     Ok(())
@@ -1899,7 +2055,7 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
     if req.query_mode == "custom_sql"
         && let Some(sql) = req.custom_sql.as_deref()
     {
-        validate_custom_sql_grid(sql, &req.histogram_interval)?;
+        validate_custom_sql_grid(sql, &req.histogram_interval, None)?;
     }
 
     // The COMBINED form is what the row stores, what update sees, and what the trainer reads,
@@ -2650,6 +2806,17 @@ fn validated_custom_sql(
     req: &UpdateAnomalyConfigRequest,
     existing: &infra::table::entity::anomaly_detection_config::Model,
 ) -> Result<()> {
+    match custom_sql_to_validate(req, existing) {
+        Some((sql, histogram)) => validate_custom_sql_grid(sql, &histogram, None),
+        None => Ok(()),
+    }
+}
+
+/// The SQL and interval an update must validate; None when the edit leaves them as stored.
+fn custom_sql_to_validate<'a>(
+    req: &'a UpdateAnomalyConfigRequest,
+    existing: &'a infra::table::entity::anomaly_detection_config::Model,
+) -> Option<(&'a str, String)> {
     if req
         .custom_sql
         .as_ref()
@@ -2663,22 +2830,75 @@ fn validated_custom_sql(
             .as_ref()
             .is_none_or(|v| *v == existing.query_mode)
     {
-        return Ok(());
+        return None;
     }
     let query_mode = req.query_mode.as_deref().unwrap_or(&existing.query_mode);
     // The other mode's leftover SQL is not the query the detector runs (see G4's verdict).
     if !query_mode.eq_ignore_ascii_case("custom_sql") {
-        return Ok(());
+        return None;
     }
-    let Some(sql) = req.custom_sql.as_deref().or(existing.custom_sql.as_deref()) else {
+    let sql = req
+        .custom_sql
+        .as_deref()
+        .or(existing.custom_sql.as_deref())?;
+    let (_, histogram) = merged_interval_pair(req, existing);
+    Some((sql, histogram))
+}
+
+/// P1.11 on create: the GROUP BY guard needs the stream's fields, which only a schema read gives.
+#[cfg(feature = "enterprise")]
+async fn checked_create_group_by(org_id: &str, req: &CreateAnomalyConfigRequest) -> Result<()> {
+    let Some(sql) = req
+        .custom_sql
+        .as_deref()
+        .filter(|_| req.query_mode == "custom_sql")
+    else {
         return Ok(());
     };
-    let (_, histogram) = merged_interval_pair(req, existing);
-    validate_custom_sql_grid(sql, &histogram)
+    // An unreadable schema skips the guard; the run notice still reports the dropped rows.
+    let Some(fields) = stream_field_names(org_id, "new", &req.stream_name, &req.stream_type).await
+    else {
+        return Ok(());
+    };
+    validate_custom_sql_grid(sql, &req.histogram_interval, Some(&fields)).map_err(validation_error)
+}
+
+/// P1.11 on update, only when the SQL, interval or mode changes, so an old detector still saves.
+#[cfg(feature = "enterprise")]
+async fn checked_update_group_by(
+    org_id: &str,
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    let Some((sql, histogram)) = custom_sql_to_validate(req, existing) else {
+        return Ok(());
+    };
+    let stream = group_by_stream(sql, existing);
+    let Some(fields) =
+        stream_field_names(org_id, &existing.anomaly_id, &stream, &existing.stream_type).await
+    else {
+        return Ok(());
+    };
+    validate_custom_sql_grid(sql, &histogram, Some(&fields)).map_err(validation_error)
+}
+
+/// The stream the edited SQL reads; a SQL with no single stream keeps the stored one.
+#[cfg(feature = "enterprise")]
+fn group_by_stream(
+    sql: &str,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> String {
+    stream_name_from_sql(sql, &existing.stream_type)
+        .unwrap_or_else(|_| existing.stream_name.clone())
 }
 
 /// §4.1.1: an AST walk, because substring checks lose to nesting, comments and IANA names.
-fn validate_custom_sql_grid(sql: &str, histogram_interval: &str) -> Result<()> {
+/// With `stream_fields` it also holds GROUP BY to the bucket alone (P1.11).
+fn validate_custom_sql_grid(
+    sql: &str,
+    histogram_interval: &str,
+    stream_fields: Option<&HashSet<String>>,
+) -> Result<()> {
     use std::ops::ControlFlow;
     let statements =
         sqlparser::parser::Parser::parse_sql(&sqlparser::dialect::PostgreSqlDialect {}, sql)
@@ -2705,10 +2925,18 @@ fn validate_custom_sql_grid(sql: &str, histogram_interval: &str) -> Result<()> {
                 Err(e) => ControlFlow::Break(e),
             }
         });
-    match walk {
-        ControlFlow::Continue(()) => Ok(()),
-        ControlFlow::Break(e) => Err(e),
+    if let ControlFlow::Break(e) = walk {
+        return Err(e);
     }
+    #[cfg(feature = "enterprise")]
+    if let Some(error) =
+        stream_fields.and_then(|fields| partitioned_search::custom_group_by_error(sql, fields))
+    {
+        anyhow::bail!(error);
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = stream_fields;
+    Ok(())
 }
 
 /// One `histogram()` call held to §4.1.1's four rules; every other expression passes through.
@@ -3591,23 +3819,51 @@ fn anomaly_detail_link(org_id: &str, anomaly_id: &str) -> String {
     )
 }
 
-/// Lets the reader check the anomaly against the raw data around its window.
+/// `HH:MM UTC`, the clock time of the body's "since" fragment.
 #[cfg(feature = "enterprise")]
-fn anomaly_explore_link(
-    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
-) -> (String, String) {
-    use config::utils::base64::encode_url;
-    // Keeps the whole link under common URL length limits of browsers and chat clients.
-    const MAX_QUERY_LEN: usize = 4000;
-    let none = || (String::new(), String::new());
-    let Some(target) = actx.explore.as_ref() else {
-        return none();
+fn fmt_alert_clock(us: i64) -> String {
+    chrono::DateTime::from_timestamp_micros(us)
+        .map(|dt| dt.format("%H:%M UTC").to_string())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// What the detector measures, such as "count(*) per 15 min"; empty when the target names nothing.
+#[cfg(feature = "enterprise")]
+pub fn anomaly_measure(
+    target: &o2_enterprise::enterprise::anomaly_detection::types::ExploreTarget,
+) -> String {
+    let what = match (
+        target.aggregate.as_deref().map(str::trim),
+        &target.custom_sql,
+    ) {
+        (Some(aggregate), _) if !aggregate.is_empty() => aggregate.to_string(),
+        (_, Some(_)) => "custom SQL value".to_string(),
+        _ => return String::new(),
     };
-    if actx.window_start_us == 0
-        || actx.window_end_us == 0
-        || actx.window_end_us <= actx.window_start_us
-    {
-        return none();
+    let per = parse_interval(target.histogram_interval.trim())
+        .ok()
+        .and_then(bucket_unit)
+        .map(|(n, unit)| {
+            let plural = n > 1 && matches!(unit, "hour" | "day");
+            format!(" per {n} {unit}{}", if plural { "s" } else { "" })
+        })
+        .unwrap_or_default();
+    format!("{what}{per}")
+}
+
+/// Opens the anomaly's data with the banner snapshot. Over the Slack URL limit it drops the Logs
+/// raw-rows query, then the snapshot values, then the filter, then all but the stream and time.
+#[cfg(feature = "enterprise")]
+pub fn anomaly_explore_link(
+    org_id: &str,
+    anomaly_id: &str,
+    stream_type: &str,
+    target: &o2_enterprise::enterprise::anomaly_detection::types::ExploreTarget,
+    window_end_us: i64,
+    snapshot: Option<&AnomalyLinkSnapshot>,
+) -> AnomalyExploreLink {
+    if window_end_us == 0 || window_end_us <= target.start_us {
+        return AnomalyExploreLink::default();
     }
     let cfg = config::get_config();
     let base = format!(
@@ -3615,64 +3871,438 @@ fn anomaly_explore_link(
         cfg.common.web_url.trim_end_matches('/'),
         cfg.common.base_uri
     );
-    let Ok(mut url) = url::Url::parse(&base) else {
-        return none();
+    let Ok(base) = url::Url::parse(&base) else {
+        return AnomalyExploreLink::default();
     };
-    let traces = actx.stream_type == "traces";
-    let page = if traces { "/web/traces" } else { "/web/logs" };
-    let path = format!("{}{page}", url.path().trim_end_matches('/'));
-    url.set_path(&path);
-
-    // The traces page takes a filter expression, the logs page a full SQL statement.
-    let query = target.filter.as_deref().filter(|f| !f.is_empty()).map(|f| {
-        if traces {
-            encode_url(f)
-        } else {
-            let stream = format!("\"{}\"", target.stream.replace('"', "\"\""));
-            encode_url(&format!("SELECT * FROM {stream} WHERE {f}"))
-        }
+    let req = ExploreLinkRequest {
+        base,
+        org_id,
+        anomaly_id,
+        stream_type,
+        page: ExplorePage::of(stream_type),
+        target,
+        window_end_us,
+        band: logs_band_columns(snapshot),
+    };
+    let lean = snapshot.map(|s| AnomalyLinkSnapshot {
+        measure: String::new(),
+        actual: None,
+        lower: None,
+        upper: None,
+        expected: None,
+        ..s.clone()
     });
-    let (query, too_long) = match query {
-        Some(q) if q.len() > MAX_QUERY_LEN => (None, true),
-        q => (q, false),
+    let mut last = AnomalyExploreLink::default();
+    for step in req.page.link_steps() {
+        let snap = if step.values { snapshot } else { lean.as_ref() };
+        let Some(link) = explore_link_rung(&req, *step, snap) else {
+            continue;
+        };
+        if link.url.len() <= MAX_LINK_URL_LEN {
+            return link;
+        }
+        last = link;
+    }
+    last
+}
+
+/// One rung of [`anomaly_explore_link`]; None when the rung has nothing new to offer.
+#[cfg(feature = "enterprise")]
+fn explore_link_rung(
+    req: &ExploreLinkRequest<'_>,
+    step: LinkStep,
+    snapshot: Option<&AnomalyLinkSnapshot>,
+) -> Option<AnomalyExploreLink> {
+    let (pairs, filter_applied) = match req.page {
+        ExplorePage::Logs => logs_link_pairs(req, step.rung, step.alt_query)?,
+        ExplorePage::Traces => traces_link_pairs(req, step.rung)?,
+        ExplorePage::Metrics => metrics_link_pairs(req, step.rung)?,
     };
-    let from = target.start_us.to_string();
-    let to = actx.window_end_us.to_string();
+    let mut url = req.base.clone();
+    let path = format!(
+        "{}/web/{}",
+        url.path().trim_end_matches('/'),
+        req.page.name()
+    );
+    url.set_path(&path);
     {
-        let mut pairs = url.query_pairs_mut();
-        if traces {
-            pairs
-                .append_pair("stream", &target.stream)
-                .append_pair("from", &from)
-                .append_pair("to", &to)
-                .append_pair("org_identifier", &actx.org_id)
-                .append_pair("tab", "spans")
-                .append_pair("show_histogram", "true");
-            if let Some(q) = &query {
-                pairs.append_pair("query", q);
-            }
-        } else {
-            pairs
-                .append_pair("stream_type", &actx.stream_type)
-                .append_pair("stream", &target.stream)
-                .append_pair("stream_value", &target.stream)
-                .append_pair("from", &from)
-                .append_pair("to", &to)
-                .append_pair("sql_mode", "true");
-            if let Some(q) = &query {
-                pairs.append_pair("query", q);
-            }
-            pairs
-                .append_pair("org_identifier", &actx.org_id)
-                .append_pair("show_histogram", "true");
+        let mut query = url.query_pairs_mut();
+        for (key, value) in &pairs {
+            query.append_pair(key, value);
+        }
+        query
+            .append_pair("from_anomaly", req.anomaly_id)
+            .append_pair(
+                "anomaly_filter_applied",
+                if filter_applied { "1" } else { "0" },
+            );
+        for (key, value) in snapshot.map(snapshot_pairs).unwrap_or_default() {
+            query.append_pair(key, &value);
         }
     }
-    let label = if target.filter_dropped || too_long {
-        "View stream around the window (detector filter not applied)"
+    let label = if filter_applied {
+        req.page.label()
     } else {
-        "View data around the window"
+        UNFILTERED_LINK_LABEL
     };
-    (url.to_string(), label.to_string())
+    Some(AnomalyExploreLink {
+        url: url.to_string(),
+        label: label.to_string(),
+        target: req.page.name().to_string(),
+        filter_applied,
+    })
+}
+
+/// Logs opens the detector's aggregate with the band, and `alt_query` carries its raw rows.
+/// Its unfiltered rung already is the stream and time only.
+#[cfg(feature = "enterprise")]
+fn logs_link_pairs(
+    req: &ExploreLinkRequest<'_>,
+    rung: LinkRung,
+    alt_query: bool,
+) -> Option<RungPairs> {
+    if rung == LinkRung::StreamOnly {
+        return None;
+    }
+    let t = req.target;
+    // The band belongs to the filtered data, so a dropped filter opens raw rows only.
+    let filtered = rung == LinkRung::Filtered && !t.filter_dropped;
+    let raw = logs_raw_sql(t);
+    let aggregate = filtered.then(|| logs_aggregate_sql(t, &req.band)).flatten();
+    if alt_query && aggregate.is_none() {
+        return None;
+    }
+    let query = aggregate
+        .or_else(|| detector_filter(t).filter(|_| filtered).map(|_| raw.clone()))
+        .map(|q| config::utils::base64::encode_url(&q));
+    let mut pairs = vec![
+        ("stream_type", req.stream_type.to_string()),
+        ("stream", t.stream.clone()),
+        ("stream_value", t.stream.clone()),
+        ("from", t.start_us.to_string()),
+        ("to", req.window_end_us.to_string()),
+        ("sql_mode", "true".to_string()),
+    ];
+    pairs.extend(query.map(|q| ("query", q)));
+    if alt_query {
+        pairs.push(("anomaly_alt_query", config::utils::base64::encode_url(&raw)));
+    }
+    pairs.extend([
+        ("org_identifier", req.org_id.to_string()),
+        ("show_histogram", "true".to_string()),
+        // A URL-driven type, so Logs applies this query and time over a cached search.
+        ("type", "search_scheduler".to_string()),
+    ]);
+    Some((pairs, filtered))
+}
+
+/// The raw rows the detector reads: its table and its WHERE, or the whole stream with no filter.
+#[cfg(feature = "enterprise")]
+fn logs_raw_sql(t: &o2_enterprise::enterprise::anomaly_detection::types::ExploreTarget) -> String {
+    let predicate = detector_filter(t)
+        .map(|f| format!(" WHERE {f}"))
+        .unwrap_or_default();
+    format!("SELECT * FROM {}{predicate}", quoted_stream(&t.stream))
+}
+
+/// The detector's value per bucket with the band; None when the target names no aggregate.
+#[cfg(feature = "enterprise")]
+fn logs_aggregate_sql(
+    t: &o2_enterprise::enterprise::anomaly_detection::types::ExploreTarget,
+    band: &[(&'static str, String)],
+) -> Option<String> {
+    if let Some(sql) = nonempty_text(&t.custom_sql) {
+        return Some(custom_sql_with_band(&sql, band).unwrap_or(sql));
+    }
+    let aggregate = nonempty_text(&t.aggregate)?;
+    let columns: String = band
+        .iter()
+        .map(|(name, value)| format!(", {value} AS {name}"))
+        .collect();
+    let predicate = detector_filter(t)
+        .map(|f| format!(" WHERE {f}"))
+        .unwrap_or_default();
+    Some(format!(
+        "SELECT {} AS time_bucket, {aggregate} AS value{columns} FROM {}{predicate} GROUP BY \
+         time_bucket ORDER BY time_bucket",
+        histogram_bucket(&t.histogram_interval),
+        quoted_stream(&t.stream)
+    ))
+}
+
+/// Custom SQL with the band columns added; None leaves it unchanged, as when it has its own.
+#[cfg(feature = "enterprise")]
+fn custom_sql_with_band(sql: &str, band: &[(&'static str, String)]) -> Option<String> {
+    use sqlparser::ast::{Expr, SelectItem, SetExpr, Statement};
+    if band.is_empty() {
+        return None;
+    }
+    let dialect = sqlparser::dialect::PostgreSqlDialect {};
+    let mut statements = sqlparser::parser::Parser::parse_sql(&dialect, sql).ok()?;
+    let [Statement::Query(query)] = statements.as_mut_slice() else {
+        return None;
+    };
+    let SetExpr::Select(select) = query.body.as_mut() else {
+        return None;
+    };
+    let is_band = |name: &str| LOGS_BAND_COLUMNS.contains(&name.to_ascii_lowercase().as_str());
+    let taken = select.projection.iter().any(|item| match item {
+        SelectItem::ExprWithAlias { alias, .. } => is_band(&alias.value),
+        SelectItem::UnnamedExpr(Expr::Identifier(ident)) => is_band(&ident.value),
+        SelectItem::UnnamedExpr(Expr::CompoundIdentifier(parts)) => {
+            parts.last().is_some_and(|p| is_band(&p.value))
+        }
+        SelectItem::UnnamedExpr(_) => false,
+        // A wildcard can hold a stream column of the same name.
+        _ => true,
+    });
+    if taken {
+        return None;
+    }
+    let columns: Vec<String> = band
+        .iter()
+        .map(|(name, value)| format!("{value} AS {name}"))
+        .collect();
+    let mut extra =
+        sqlparser::parser::Parser::parse_sql(&dialect, &format!("SELECT {}", columns.join(", ")))
+            .ok()?;
+    let [Statement::Query(extra)] = extra.as_mut_slice() else {
+        return None;
+    };
+    let SetExpr::Select(extra) = extra.body.as_mut() else {
+        return None;
+    };
+    select.projection.append(&mut extra.projection);
+    Some(query.to_string())
+}
+
+/// The band of the alert bucket as SQL columns: a range for a value alert, the baseline of a
+/// partial drop, nothing otherwise. A value whose text is not a finite number is left out.
+#[cfg(feature = "enterprise")]
+fn logs_band_columns(snapshot: Option<&AnomalyLinkSnapshot>) -> Vec<(&'static str, String)> {
+    let Some(s) = snapshot else {
+        return Vec::new();
+    };
+    let values = match s.kind.as_str() {
+        "value" => vec![("min_value", s.lower), ("max_value", s.upper)],
+        "partial_drop" => vec![("expected_value", s.expected)],
+        _ => Vec::new(),
+    };
+    values
+        .into_iter()
+        .filter_map(|(name, v)| v.and_then(link_number).map(|text| (name, text)))
+        .collect()
+}
+
+/// Traces reads `filter` as plain search text; an empty one clears a search left in the box.
+#[cfg(feature = "enterprise")]
+fn traces_link_pairs(req: &ExploreLinkRequest<'_>, rung: LinkRung) -> Option<RungPairs> {
+    if rung == LinkRung::StreamOnly {
+        return None;
+    }
+    let t = req.target;
+    let filtered = rung == LinkRung::Filtered;
+    let filter = detector_filter(t).filter(|_| filtered).unwrap_or_default();
+    let pairs = vec![
+        ("stream", t.stream.clone()),
+        ("from", t.start_us.to_string()),
+        ("to", req.window_end_us.to_string()),
+        ("org_identifier", req.org_id.to_string()),
+        ("tab", "spans".to_string()),
+        ("show_histogram", "true".to_string()),
+        ("filter", filter.to_string()),
+    ];
+    Some((pairs, filtered && !t.filter_dropped))
+}
+
+/// Metrics opens Visualize with the detector's own query and both chart axes.
+#[cfg(feature = "enterprise")]
+fn metrics_link_pairs(req: &ExploreLinkRequest<'_>, rung: LinkRung) -> Option<RungPairs> {
+    let t = req.target;
+    let mut pairs = vec![
+        ("org_identifier", req.org_id.to_string()),
+        ("stream_name", t.stream.clone()),
+    ];
+    let time = [
+        ("from", t.start_us.to_string()),
+        ("to", req.window_end_us.to_string()),
+    ];
+    let chart = match rung {
+        LinkRung::StreamOnly => {
+            pairs.extend(time);
+            return Some((pairs, false));
+        }
+        LinkRung::Filtered => metrics_chart(t, true)?,
+        // Custom SQL with no WHERE has no unfiltered rung; metrics_chart then gives None.
+        LinkRung::Unfiltered if t.custom_sql.is_some() || detector_filter(t).is_some() => {
+            metrics_chart(t, false)?
+        }
+        LinkRung::Unfiltered => return None,
+    };
+    pairs.extend([
+        ("query_type", "sql".to_string()),
+        ("query", config::utils::base64::encode_url(&chart.sql)),
+        (
+            "metrics_data",
+            metrics_panel_seed(&t.stream, &chart.sql, &chart.x, &chart.y),
+        ),
+    ]);
+    pairs.extend(time);
+    Some((pairs, chart.filter_applied))
+}
+
+/// The detector's custom SQL with its own axes, else its aggregate per bucket.
+#[cfg(feature = "enterprise")]
+fn metrics_chart(
+    t: &o2_enterprise::enterprise::anomaly_detection::types::ExploreTarget,
+    with_filter: bool,
+) -> Option<MetricsChart> {
+    if let Some(sql) = nonempty_text(&t.custom_sql) {
+        let sql = if with_filter {
+            sql
+        } else {
+            custom_sql_without_where(&sql)?
+        };
+        return Some(MetricsChart {
+            sql,
+            x: nonempty_text(&t.x_alias)?,
+            y: nonempty_text(&t.y_alias)?,
+            filter_applied: with_filter,
+        });
+    }
+    let aggregate = nonempty_text(&t.aggregate)?;
+    let bucket = histogram_bucket(&t.histogram_interval);
+    let filter = detector_filter(t).filter(|_| with_filter);
+    let predicate = filter.map(|f| format!(" WHERE {f}")).unwrap_or_default();
+    Some(MetricsChart {
+        sql: format!(
+            "SELECT {bucket} AS x_axis_1, {aggregate} AS y_axis_1 FROM {}{predicate} GROUP BY \
+             x_axis_1 ORDER BY x_axis_1",
+            quoted_stream(&t.stream)
+        ),
+        x: "x_axis_1".to_string(),
+        y: "y_axis_1".to_string(),
+        filter_applied: with_filter && !t.filter_dropped,
+    })
+}
+
+#[cfg(feature = "enterprise")]
+fn nonempty_text(s: &Option<String>) -> Option<String> {
+    s.as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
+/// The detector's bucket expression; no interval lets the histogram pick its own.
+#[cfg(feature = "enterprise")]
+fn histogram_bucket(interval: &str) -> String {
+    let interval = interval.trim();
+    if interval.is_empty() {
+        "histogram(_timestamp)".to_string()
+    } else {
+        format!("histogram(_timestamp, '{}')", interval.replace('\'', "''"))
+    }
+}
+
+/// Custom SQL with its WHERE removed; None when it has no WHERE or does not parse as one SELECT.
+#[cfg(feature = "enterprise")]
+fn custom_sql_without_where(sql: &str) -> Option<String> {
+    use sqlparser::ast::{SetExpr, Statement};
+    let mut statements =
+        sqlparser::parser::Parser::parse_sql(&sqlparser::dialect::PostgreSqlDialect {}, sql)
+            .ok()?;
+    let [Statement::Query(query)] = statements.as_mut_slice() else {
+        return None;
+    };
+    let SetExpr::Select(select) = query.body.as_mut() else {
+        return None;
+    };
+    select.selection.take()?;
+    Some(query.to_string())
+}
+
+/// The `metrics_data` blob (v1) that Visualize decodes; `query` alone leaves the axes empty.
+#[cfg(feature = "enterprise")]
+fn metrics_panel_seed(stream: &str, sql: &str, x: &str, y: &str) -> String {
+    let axis = |name: &str| serde_json::json!({"label": name, "alias": name, "column": name, "color": null});
+    let blob = serde_json::json!({
+        "v": 1,
+        "data": {
+            "type": "line",
+            "queryType": "sql",
+            "queries": [{
+                "query": sql,
+                "customQuery": true,
+                "fields": {
+                    "stream": stream,
+                    "stream_type": "metrics",
+                    "x": [axis(x)],
+                    "y": [axis(y)],
+                },
+            }],
+        },
+    });
+    config::utils::base64::encode_url(&blob.to_string())
+}
+
+#[cfg(feature = "enterprise")]
+fn detector_filter(
+    t: &o2_enterprise::enterprise::anomaly_detection::types::ExploreTarget,
+) -> Option<&str> {
+    t.filter.as_deref().map(str::trim).filter(|f| !f.is_empty())
+}
+
+#[cfg(feature = "enterprise")]
+fn quoted_stream(stream: &str) -> String {
+    format!("\"{}\"", stream.replace('"', "\"\""))
+}
+
+/// The banner values; a value the alert does not have is left out.
+#[cfg(feature = "enterprise")]
+fn snapshot_pairs(s: &AnomalyLinkSnapshot) -> Vec<(&'static str, String)> {
+    let mut pairs = vec![
+        ("anomaly_start", s.start_us.to_string()),
+        ("anomaly_end", s.end_us.to_string()),
+    ];
+    if !s.kind.is_empty() {
+        pairs.push(("anomaly_kind", s.kind.clone()));
+    }
+    if !s.measure.is_empty() {
+        pairs.push(("anomaly_measure", s.measure.clone()));
+    }
+    for (key, value) in [
+        ("anomaly_actual", s.actual),
+        ("anomaly_lower", s.lower),
+        ("anomaly_upper", s.upper),
+        ("anomaly_expected", s.expected),
+    ] {
+        if let Some(text) = value.and_then(link_number) {
+            pairs.push((key, text));
+        }
+    }
+    pairs
+}
+
+/// A link value to four places; None when the text is not finite, as rounding a huge one gives inf.
+#[cfg(feature = "enterprise")]
+fn link_number(v: f64) -> Option<String> {
+    let text = ((v * 10_000.0).round() / 10_000.0).to_string();
+    text.parse::<f64>()
+        .is_ok_and(f64::is_finite)
+        .then_some(text)
+}
+
+/// The count and unit of a bucket width, the largest unit that divides it.
+#[cfg(feature = "enterprise")]
+fn bucket_unit(secs: i64) -> Option<(i64, &'static str)> {
+    match secs {
+        s if s <= 0 => None,
+        s if s % 86_400 == 0 => Some((s / 86_400, "day")),
+        s if s % 3600 == 0 => Some((s / 3600, "hour")),
+        s if s % 60 == 0 => Some((s / 60, "min")),
+        s => Some((s, "sec")),
+    }
 }
 
 /// One honestly-labeled message per alert kind: a score-space deviation, a value-space
@@ -3708,9 +4338,10 @@ fn anomaly_alert_body(
         fmt_alert_us(ctx.window_end_us)
     );
     match ctx.kind {
+        // A continuing absence stores only its first bucket, so the body names no end time.
         AnomalyAlertKind::Absence => format!(
-            "no data received in window {window}, although the stream's learned schedule \
-             expected data"
+            "No data for this detector's query since {}",
+            absence_clock(ctx)
         ),
         AnomalyAlertKind::PartialDrop => {
             let worst = ctx.worst_actual_value.unwrap_or(0.0);
@@ -3729,28 +4360,111 @@ fn anomaly_alert_body(
     }
 }
 
-/// The numeric section for a scored value anomaly, degrading field by field so a cold
-/// start (no expectation) or a legacy model (no stored threshold) still reads sensibly.
+/// The headline, the reading line and the count; a fragment drops when its value is missing,
+/// and the score stays a template variable, because the body speaks in the metric's units.
 #[cfg(feature = "enterprise")]
 fn value_anomaly_body(
     ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
     window: &str,
 ) -> String {
-    let mut body = format!("{} anomalies in window {window}", ctx.anomaly_count);
-    if let Some(worst) = ctx.worst_actual_value {
-        body.push_str(&format!(" | worst value: {worst:.2}"));
-        if let Some(expected) = ctx.worst_expected {
-            body.push_str(&format!(" (expected ~{expected:.2} for this hour)"));
+    let mut parts = vec![anomaly_headline(ctx)];
+    parts.extend(reading_line(ctx));
+    parts.push(format!(
+        "{} in window {window}",
+        anomaly_count_phrase(ctx.anomaly_count)
+    ));
+    parts.join(" | ")
+}
+
+/// "Actual X, expected L-U, since HH:MM UTC", or the fragments of it the run has.
+#[cfg(feature = "enterprise")]
+fn reading_line(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> Option<String> {
+    let mut parts = Vec::new();
+    if let Some(actual) = ctx.worst_actual_value {
+        parts.push(format!("Actual {actual:.2}"));
+        if let (Some(lower), Some(upper)) = (ctx.worst_expected_lower, ctx.worst_expected_upper) {
+            parts.push(format!("expected {lower:.2}-{upper:.2}"));
         }
     }
-    if let (Some(score), Some(threshold)) = (ctx.score, ctx.threshold) {
-        body.push_str(&format!(" | score {score:.2} vs threshold {threshold:.2}"));
+    if let Some(us) = ctx.first_anomaly_us {
+        parts.push(format!("since {}", fmt_alert_clock(us)));
     }
-    // Labeled as score-space: this number is NOT "the metric was N% above normal".
-    if let Some(dev) = ctx.max_deviation_percent {
-        body.push_str(&format!(" (score {dev:.1}% over its bar)"));
+    let mut line = parts.join(", ");
+    if let Some(first) = line.get_mut(0..1) {
+        first.make_ascii_uppercase();
     }
-    body
+    (!line.is_empty()).then_some(line)
+}
+
+#[cfg(feature = "enterprise")]
+fn anomaly_count_phrase(count: i32) -> String {
+    if count == 1 {
+        "1 anomaly".to_string()
+    } else {
+        format!("{count} anomalies")
+    }
+}
+
+/// The worst point's change from its expected value in the metric's own units, one decimal.
+/// None when either side is missing or the expected value is 0.
+#[cfg(feature = "enterprise")]
+fn value_change_percent(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> Option<f64> {
+    let (actual, expected) = (ctx.worst_actual_value?, ctx.worst_expected?);
+    if expected == 0.0 || !actual.is_finite() || !expected.is_finite() {
+        return None;
+    }
+    let change = ((actual - expected) / expected.abs() * 1000.0).round() / 10.0;
+    Some(if change == 0.0 { 0.0 } else { change })
+}
+
+/// The start of an absence as the body and the headline name it.
+#[cfg(feature = "enterprise")]
+fn absence_clock(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> String {
+    fmt_alert_clock(ctx.window_start_us)
+}
+
+/// One sentence of what went wrong, in value space only: never the score, which is not the metric.
+#[cfg(feature = "enterprise")]
+fn anomaly_headline(
+    ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> String {
+    use o2_enterprise::enterprise::anomaly_detection::types::{AnomalyAlertKind, BandDirection};
+    let stream = &ctx.stream_name;
+    match ctx.kind {
+        AnomalyAlertKind::Recovery => format!("{stream} recovered"),
+        // P1.12 step 5: the body sentence, lower-cased, as the reply puts it after a prefix.
+        AnomalyAlertKind::Absence => {
+            format!(
+                "no data for this detector's query since {}",
+                absence_clock(ctx)
+            )
+        }
+        AnomalyAlertKind::Value | AnomalyAlertKind::PartialDrop => {
+            match value_change_percent(ctx) {
+                Some(change) if change > 0.0 => {
+                    format!("{stream} rose {change:.1}% above expected")
+                }
+                Some(change) if change < 0.0 => {
+                    format!("{stream} dropped {:.1}% below expected", -change)
+                }
+                _ => match ctx.worst_direction {
+                    Some(BandDirection::Above) => {
+                        format!("{stream} is above the expected range")
+                    }
+                    Some(BandDirection::Below) => {
+                        format!("{stream} is below the expected range")
+                    }
+                    None => format!("{stream} is anomalous"),
+                },
+            }
+        }
+    }
 }
 
 /// The webhook JSON body; `deviation_kind` names which space `max_deviation_percent` is in.
@@ -3794,6 +4508,8 @@ fn anomaly_alert_payload(
         "link": link,
         "message": message,
         "timestamp": chrono::Utc::now().to_rfc3339(),
+        // D20 rule 7: set by the chart attach, and empty with no reachable chart.
+        "chart_url": "",
     })
 }
 
@@ -3850,16 +4566,145 @@ pub async fn send_anomaly_alert(
     destination_id: String,
     actx: o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
 ) -> anyhow::Result<bool> {
-    use crate::alerts::notifications::notify::notify;
+    use crate::alerts::notifications::notify::{resolve, send};
     let org_id = actx.org_id.clone();
     let explicit =
         crate::alerts::notifications::org_default::load_override(&org_id, actx.template.as_deref())
             .await;
     let mut ctx = anomaly_notification_context(&actx);
-    let result = notify(&org_id, &destination_id, &explicit, None, &mut ctx)
-        .await
-        .map(|_| ());
+    let result = match resolve(&org_id, &destination_id, &explicit, ctx.kind).await {
+        Ok(resolved) => {
+            attach_anomaly_chart(&actx, &resolved, &mut ctx).await;
+            send(&org_id, &resolved, None, &mut ctx).await.map(|_| ())
+        }
+        Err(e) => Err(e),
+    };
     anomaly_send_outcome(result, &actx.anomaly_id)
+}
+
+/// D20: each Content template, and a custom one with `{chart_url}`, gets the chart. The bytes
+/// go only to the channels that carry them, and a local base drops the URL (rule 12).
+#[cfg(feature = "enterprise")]
+async fn attach_anomaly_chart(
+    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+    resolved: &crate::alerts::notifications::notify::Resolved,
+    ctx: &mut crate::alerts::notifications::NotificationContext,
+) {
+    use crate::alerts::notifications::chart;
+    if !template_wants_anomaly_chart(&resolved.effective) {
+        log::info!(
+            "[ALERT_CHART] anomaly {} template has no chart",
+            actx.anomaly_id
+        );
+        chart::chart_event("template_off");
+        return;
+    }
+    let (wants_url, wants_png) = anomaly_chart_use(
+        &resolved.effective.template.kind,
+        &resolved.destination_type,
+        chart::web_url_is_local(),
+    );
+    if !wants_url && !wants_png {
+        log::info!(
+            "[ALERT_CHART] anomaly {} sends without a chart: ZO_WEB_URL is a local or private \
+             address that the receiver cannot load",
+            actx.anomaly_id
+        );
+        chart::chart_event("local_base");
+        return;
+    }
+    let current: Vec<chart::AnomalySeriesPoint> = actx
+        .current_points
+        .iter()
+        .map(|p| chart::AnomalySeriesPoint {
+            ts_us: p.ts_us,
+            value: p.value,
+            lower: p.lower,
+            upper: p.upper,
+            is_anomaly: p.is_anomaly,
+            is_absence: p.is_absence,
+            is_partial_drop: p.is_partial_drop,
+        })
+        .collect();
+    let req = chart::AnomalyChartRequest {
+        org_id: &actx.org_id,
+        anomaly_id: &actx.anomaly_id,
+        anomaly_name: &actx.config_name,
+        stream_name: &actx.stream_name,
+        model_version: actx.model_version,
+        window_end_us: actx.window_end_us,
+        judged_end_us: actx.judged_end_us,
+        bucket_seconds: actx.bucket_seconds,
+        current: &current,
+    };
+    let Some((url, payload)) = chart::build_anomaly_chart(&req).await else {
+        return;
+    };
+    set_anomaly_chart_url(ctx, wants_url.then_some(url));
+    // Several detectors fire on one tick, so an anomaly send waits briefly for a render permit.
+    ctx.chart_png = if wants_png {
+        chart::render_png_waiting(&payload, &actx.anomaly_id)
+            .await
+            .map(Arc::new)
+    } else {
+        None
+    };
+}
+
+/// `(url, png)` a send takes of a built chart; on a local base only a byte destination of a
+/// Content template keeps it (rule 12).
+#[cfg(feature = "enterprise")]
+fn anomaly_chart_use(
+    kind: &config::meta::destinations::TemplateKind,
+    destination: &config::meta::destinations::DestinationType,
+    local_base: bool,
+) -> (bool, bool) {
+    use config::meta::destinations::{DestinationType, TemplateKind};
+
+    use crate::alerts::notifications::{ChannelFormat, derive_channel_format};
+    let slack_app = matches!(destination, DestinationType::SlackApp(_));
+    let bytes = slack_app
+        || matches!(destination, DestinationType::Email(_))
+        || matches!(derive_channel_format(destination), ChannelFormat::Discord);
+    match kind {
+        TemplateKind::Content if bytes => (true, true),
+        // A custom body carries the chart as a link, except on the Slack app, which uploads it.
+        _ => (!local_base, slack_app),
+    }
+}
+
+/// The chart URL of the send, also in the `chart_url` field of the legacy webhook body.
+#[cfg(feature = "enterprise")]
+fn set_anomaly_chart_url(
+    ctx: &mut crate::alerts::notifications::NotificationContext,
+    url: Option<String>,
+) {
+    if let Some(url) = url.clone()
+        && let Some(legacy) = ctx.legacy_payload.take()
+    {
+        ctx.legacy_payload = Some(crate::alerts::notifications::LegacyPayload::new(
+            move || {
+                let mut body = legacy.build();
+                body["chart_url"] = serde_json::Value::from(url.as_str());
+                body
+            },
+        ));
+    }
+    ctx.chart_url = url;
+}
+
+/// Each Content template charts, whatever `chart.enabled` says; a custom one only with
+/// `{chart_url}` in its body (D20 rules 2 and 3).
+#[cfg(feature = "enterprise")]
+fn template_wants_anomaly_chart(
+    effective: &crate::alerts::notifications::org_default::EffectiveTemplate,
+) -> bool {
+    use config::meta::destinations::TemplateKind;
+    let template = &effective.template;
+    match template.kind {
+        TemplateKind::Content => true,
+        TemplateKind::Custom => template.body.contains("{chart_url}"),
+    }
 }
 
 /// Unsendable destinations (missing, pipeline, no org member recipient) skip as `Ok(false)`.
@@ -3905,6 +4750,24 @@ fn anomaly_notification_context(
     };
 
     let link = anomaly_detail_link(&actx.org_id, &actx.anomaly_id);
+    let explore = alert_explore_link(actx);
+    // Without a data link the detail page takes the green button, so no second button repeats it.
+    let (alert_url, alert_url_label, alert_detail_url, alert_detail_label) =
+        if explore.url.is_empty() {
+            (
+                link.clone(),
+                DETAIL_LINK_LABEL.to_string(),
+                String::new(),
+                String::new(),
+            )
+        } else {
+            (
+                explore.url.clone(),
+                explore.label.clone(),
+                link.clone(),
+                DETAIL_LINK_LABEL.to_string(),
+            )
+        };
     let recovery = actx.kind == AnomalyAlertKind::Recovery;
     let (level, level_str) = match actx.kind {
         AnomalyAlertKind::Value => (AlertLevel::Critical, "critical"),
@@ -3941,12 +4804,14 @@ fn anomaly_notification_context(
         alert_end_time: fmt_local_us(actx.window_end_us),
         alert_start_time_millis: (actx.window_start_us / 1000).to_string(),
         alert_end_time_millis: (actx.window_end_us / 1000).to_string(),
-        alert_url: link.clone(),
-        alert_url_label: "Open detector".to_string(),
+        alert_url,
+        alert_url_label,
+        alert_detail_url,
+        alert_detail_label,
         alert_trigger_time: now,
         alert_trigger_time_str: fmt_local_us(now),
         alert_description: anomaly_alert_body(actx),
-        context_attributes: anomaly_attributes(actx, &link),
+        context_attributes: anomaly_attributes(actx, &link, &explore),
         level: Some(level),
         kind: NotificationKind::Anomaly,
         event,
@@ -3960,8 +4825,91 @@ fn anomaly_notification_context(
             escape_email_attributes: true,
             ..Default::default()
         },
+        slack_thread: anomaly_thread_hint(actx),
         ..Default::default()
     }
+}
+
+/// The data link of one alert, with the alert's own readings for the banner of the page.
+#[cfg(feature = "enterprise")]
+fn alert_explore_link(
+    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> AnomalyExploreLink {
+    let Some(target) = actx
+        .explore
+        .as_ref()
+        .filter(|_| actx.window_start_us != 0 && actx.window_end_us > actx.window_start_us)
+    else {
+        return AnomalyExploreLink::default();
+    };
+    let snapshot = alert_link_snapshot(actx, target);
+    anomaly_explore_link(
+        &actx.org_id,
+        &actx.anomaly_id,
+        &actx.stream_type,
+        target,
+        alert_link_end_us(actx),
+        snapshot.as_ref(),
+    )
+}
+
+/// An absence run window is its first empty bucket only, so its link runs to the firing run's end.
+#[cfg(feature = "enterprise")]
+fn alert_link_end_us(
+    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> i64 {
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
+    match actx.kind {
+        AnomalyAlertKind::Absence => actx.window_end_us.max(actx.judged_end_us),
+        _ => actx.window_end_us,
+    }
+}
+
+/// A recovery has no worst reading, so its link carries no snapshot; an absence carries no numbers.
+#[cfg(feature = "enterprise")]
+fn alert_link_snapshot(
+    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+    target: &o2_enterprise::enterprise::anomaly_detection::types::ExploreTarget,
+) -> Option<AnomalyLinkSnapshot> {
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
+    let (kind, readings) = match actx.kind {
+        AnomalyAlertKind::Value => ("value", true),
+        AnomalyAlertKind::PartialDrop => ("partial_drop", true),
+        AnomalyAlertKind::Absence => ("absence", false),
+        AnomalyAlertKind::Recovery => return None,
+    };
+    let reading = |v: Option<f64>| v.filter(|_| readings);
+    Some(AnomalyLinkSnapshot {
+        start_us: actx.window_start_us,
+        end_us: alert_link_end_us(actx),
+        kind: kind.to_string(),
+        measure: anomaly_measure(target),
+        actual: reading(actx.worst_actual_value),
+        lower: reading(actx.worst_expected_lower),
+        upper: reading(actx.worst_expected_upper),
+        expected: actx
+            .worst_expected
+            .filter(|_| matches!(actx.kind, AnomalyAlertKind::PartialDrop)),
+    })
+}
+
+/// The Slack app threads on this; a context from before `judged_end_us` posts one-off as before,
+/// because the leader's order check would drop an event with no data time.
+#[cfg(feature = "enterprise")]
+fn anomaly_thread_hint(
+    actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
+) -> Option<crate::alerts::notifications::context::SlackThreadHint> {
+    use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
+    (actx.judged_end_us > 0).then(|| crate::alerts::notifications::context::SlackThreadHint {
+        first_anomaly_us: actx.first_anomaly_us,
+        data_us: actx.judged_end_us,
+        bucket_end_us: actx.window_end_us,
+        gap_us: actx.thread_gap_secs.saturating_mul(1_000_000),
+        closes: actx.kind == AnomalyAlertKind::Recovery,
+        thread_headline: Some(anomaly_headline(actx)),
+        model_version: actx.model_version,
+        recovered_at_us: actx.recovered_at_us,
+    })
 }
 
 /// The anomaly variables, formatted as `value_anomaly_body` formats them.
@@ -3969,6 +4917,7 @@ fn anomaly_notification_context(
 fn anomaly_attributes(
     actx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
     link: &str,
+    explore: &AnomalyExploreLink,
 ) -> Vec<(String, String)> {
     use o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertKind;
     let two = |v: Option<f64>| v.map(|v| format!("{v:.2}")).unwrap_or_default();
@@ -3981,12 +4930,15 @@ fn anomaly_attributes(
         AnomalyAlertKind::PartialDrop => "value_below_expected",
         _ => "",
     };
-    let (explore_url, explore_label) = anomaly_explore_link(actx);
+    let bucket = bucket_unit(actx.bucket_seconds)
+        .map(|(n, unit)| format!("{n}-{unit} buckets"))
+        .unwrap_or_default();
     [
         ("anomaly_id", actx.anomaly_id.clone()),
         ("anomaly_name", actx.config_name.clone()),
         ("anomaly_kind", kind),
         ("anomaly_count", actx.anomaly_count.to_string()),
+        ("anomaly_headline", anomaly_headline(actx)),
         (
             "max_deviation_percent",
             actx.max_deviation_percent
@@ -3996,14 +4948,27 @@ fn anomaly_attributes(
         ("deviation_kind", deviation_kind.to_string()),
         ("worst_actual_value", two(actx.worst_actual_value)),
         ("worst_expected", two(actx.worst_expected)),
+        ("expected_lower", two(actx.worst_expected_lower)),
+        ("expected_upper", two(actx.worst_expected_upper)),
+        (
+            "value_change_percent",
+            value_change_percent(actx)
+                .map(|v| format!("{v:+.1}"))
+                .unwrap_or_default(),
+        ),
+        (
+            "anomaly_started",
+            actx.first_anomaly_us.map(fmt_alert_us).unwrap_or_default(),
+        ),
+        ("anomaly_bucket", bucket),
         ("score", two(actx.score)),
         ("threshold", two(actx.threshold)),
         ("anomaly_score", score_line(actx.score, actx.threshold)),
         ("window_start", fmt_alert_us(actx.window_start_us)),
         ("window_end", fmt_alert_us(actx.window_end_us)),
         ("anomaly_url", link.to_string()),
-        ("anomaly_explore_url", explore_url),
-        ("anomaly_explore_label", explore_label),
+        ("anomaly_explore_url", explore.url.clone()),
+        ("anomaly_explore_label", explore.label.clone()),
     ]
     .into_iter()
     .map(|(k, v)| (k.to_string(), v))
@@ -7505,6 +8470,16 @@ mod tests {
                 stream_type: "logs".to_string(),
                 event: Default::default(),
                 explore: None,
+                worst_expected_lower: None,
+                worst_expected_upper: None,
+                first_anomaly_us: None,
+                bucket_seconds: 0,
+                worst_direction: None,
+                thread_gap_secs: 0,
+                judged_end_us: 0,
+                model_version: None,
+                current_points: Vec::new(),
+                recovered_at_us: None,
             }
         }
 
@@ -7634,38 +8609,222 @@ mod tests {
         }
 
         #[test]
-        fn a_value_alert_shows_actual_expected_and_a_labeled_score_deviation() {
+        fn a_value_alert_leads_with_the_headline_and_the_reading_line() {
             let mut c = ctx(AnomalyAlertKind::Value);
             c.worst_actual_value = Some(612.0);
             c.worst_expected = Some(180.0);
+            c.worst_expected_lower = Some(150.0);
+            c.worst_expected_upper = Some(210.0);
+            c.first_anomaly_us = Some(c.window_start_us + 15 * 60 * 1_000_000);
             c.score = Some(3.2);
             c.threshold = Some(2.1);
             c.max_deviation_percent = Some(52.4);
+            let body = super::super::anomaly_alert_body(&c);
+            assert_eq!(
+                body,
+                "app_logs rose 240.0% above expected | Actual 612.00, expected 150.00-210.00, \
+                 since 00:15 UTC | 3 anomalies in window 2024-01-01 00:00 UTC\u{2013}2024-01-01 \
+                 01:00 UTC"
+            );
             let msg = anomaly_alert_message(&c, LINK);
             assert!(
-                msg.contains("worst value: 612.00 (expected ~180.00 for this hour)"),
-                "{msg}"
+                !msg.contains("score"),
+                "the score left the default body: {msg}"
             );
-            assert!(msg.contains("score 3.20 vs threshold 2.10"), "{msg}");
-            assert!(
-                msg.contains("(score 52.4% over its bar)"),
-                "score-space must be labeled as score-space, not bare deviation: {msg}"
-            );
-            assert!(msg.contains("2024-01-01 00:00 UTC"), "{msg}");
             assert!(msg.ends_with(&format!("details: {LINK}")), "{msg}");
         }
 
         #[test]
-        fn a_cold_start_value_alert_omits_the_expected_clause() {
+        fn the_reading_line_drops_one_fragment_at_a_time() {
             let mut c = ctx(AnomalyAlertKind::Value);
             c.worst_actual_value = Some(612.0);
-            c.max_deviation_percent = Some(52.4);
-            let msg = anomaly_alert_message(&c, LINK);
-            assert!(msg.contains("worst value: 612.00"), "{msg}");
+            let body = super::super::anomaly_alert_body(&c);
+            assert!(body.contains(" | Actual 612.00 | "), "{body}");
             assert!(
-                !msg.contains("expected"),
-                "no baseline means no expected claim: {msg}"
+                !body.contains("expected"),
+                "no baseline, no expected: {body}"
             );
+            c.first_anomaly_us = Some(c.window_start_us);
+            let body = super::super::anomaly_alert_body(&c);
+            assert!(
+                body.contains(" | Actual 612.00, since 00:00 UTC | "),
+                "{body}"
+            );
+            c.worst_actual_value = None;
+            let body = super::super::anomaly_alert_body(&c);
+            assert!(body.contains(" | Since 00:00 UTC | "), "{body}");
+            c.first_anomaly_us = None;
+            assert_eq!(
+                super::super::anomaly_alert_body(&c),
+                "app_logs is anomalous | 3 anomalies in window 2024-01-01 00:00 \
+                 UTC\u{2013}2024-01-01 01:00 UTC"
+            );
+        }
+
+        #[test]
+        fn one_anomaly_is_singular_and_more_are_plural() {
+            let mut c = ctx(AnomalyAlertKind::Value);
+            c.anomaly_count = 1;
+            assert!(super::super::anomaly_alert_body(&c).contains("| 1 anomaly in window"));
+            c.anomaly_count = 4;
+            assert!(super::super::anomaly_alert_body(&c).contains("| 4 anomalies in window"));
+        }
+
+        #[test]
+        fn the_headline_and_the_change_are_in_value_space() {
+            use o2_enterprise::enterprise::anomaly_detection::types::BandDirection;
+            let case =
+                |actual: Option<f64>, expected: Option<f64>, direction: Option<BandDirection>| {
+                    let mut c = ctx(AnomalyAlertKind::Value);
+                    c.worst_actual_value = actual;
+                    c.worst_expected = expected;
+                    c.worst_direction = direction;
+                    // A score-space deviation must never reach the headline.
+                    c.max_deviation_percent = Some(999.0);
+                    let n = super::super::anomaly_notification_context(&c);
+                    (
+                        attr_of(&n, "anomaly_headline").unwrap(),
+                        attr_of(&n, "value_change_percent").unwrap(),
+                    )
+                };
+            assert_eq!(
+                case(Some(208.0), Some(138.8), Some(BandDirection::Above)),
+                ("app_logs rose 49.9% above expected".into(), "+49.9".into())
+            );
+            assert_eq!(
+                case(Some(43.0), Some(180.0), Some(BandDirection::Below)),
+                (
+                    "app_logs dropped 76.1% below expected".into(),
+                    "-76.1".into()
+                )
+            );
+            assert_eq!(
+                case(Some(5.0), Some(0.0), Some(BandDirection::Above)),
+                ("app_logs is above the expected range".into(), String::new())
+            );
+            assert_eq!(
+                case(Some(5.0), None, Some(BandDirection::Below)),
+                ("app_logs is below the expected range".into(), String::new())
+            );
+            assert_eq!(
+                case(Some(5.0), None, None),
+                ("app_logs is anomalous".into(), String::new())
+            );
+            assert_eq!(
+                case(Some(-5.0), Some(-10.0), None),
+                ("app_logs rose 50.0% above expected".into(), "+50.0".into()),
+                "a negative expected divides by its magnitude"
+            );
+        }
+
+        #[test]
+        fn headlines_name_no_internal_stream_score_or_sigma() {
+            for kind in [
+                AnomalyAlertKind::Value,
+                AnomalyAlertKind::PartialDrop,
+                AnomalyAlertKind::Absence,
+                AnomalyAlertKind::Recovery,
+            ] {
+                let mut c = ctx(kind);
+                c.worst_actual_value = Some(1.0);
+                c.worst_expected = Some(2.0);
+                c.score = Some(3.0);
+                let n = super::super::anomaly_notification_context(&c);
+                let headline = attr_of(&n, "anomaly_headline").unwrap().to_lowercase();
+                for word in ["_anomalies", "score", "sigma"] {
+                    assert!(!headline.contains(word), "{kind:?}: {headline}");
+                }
+            }
+            let headline = |kind| {
+                attr_of(
+                    &super::super::anomaly_notification_context(&ctx(kind)),
+                    "anomaly_headline",
+                )
+                .unwrap()
+            };
+            assert_eq!(
+                headline(AnomalyAlertKind::Absence),
+                "no data for this detector's query since 00:00 UTC",
+                "the body text, with the absence start"
+            );
+            let mut absent = ctx(AnomalyAlertKind::Absence);
+            absent.judged_end_us = absent.window_end_us;
+            let hint = super::super::anomaly_notification_context(&absent).slack_thread;
+            assert_eq!(
+                hint.and_then(|h| h.thread_headline).as_deref(),
+                Some("no data for this detector's query since 00:00 UTC")
+            );
+            assert_eq!(headline(AnomalyAlertKind::Recovery), "app_logs recovered");
+        }
+
+        #[test]
+        fn the_new_variables_read_the_context_and_blank_when_missing() {
+            let mut c = ctx(AnomalyAlertKind::Value);
+            let n = super::super::anomaly_notification_context(&c);
+            for key in [
+                "expected_lower",
+                "expected_upper",
+                "value_change_percent",
+                "anomaly_started",
+                "anomaly_bucket",
+            ] {
+                assert_eq!(attr_of(&n, key), Some(String::new()), "{key}");
+            }
+            c.worst_expected_lower = Some(120.4);
+            c.worst_expected_upper = Some(157.2);
+            c.first_anomaly_us = Some(c.window_start_us);
+            c.bucket_seconds = 900;
+            let n = super::super::anomaly_notification_context(&c);
+            assert_eq!(attr_of(&n, "expected_lower").as_deref(), Some("120.40"));
+            assert_eq!(attr_of(&n, "expected_upper").as_deref(), Some("157.20"));
+            assert_eq!(
+                attr_of(&n, "anomaly_started").as_deref(),
+                Some("2024-01-01 00:00 UTC")
+            );
+            assert_eq!(
+                attr_of(&n, "anomaly_bucket").as_deref(),
+                Some("15-min buckets")
+            );
+            c.bucket_seconds = 3600;
+            let n = super::super::anomaly_notification_context(&c);
+            assert_eq!(
+                attr_of(&n, "anomaly_bucket").as_deref(),
+                Some("1-hour buckets")
+            );
+        }
+
+        #[test]
+        fn the_thread_hint_carries_both_clocks_and_closes_on_recovery() {
+            let mut c = ctx(AnomalyAlertKind::Value);
+            assert!(
+                super::super::anomaly_notification_context(&c)
+                    .slack_thread
+                    .is_none(),
+                "a context with no judged end posts one-off"
+            );
+            c.judged_end_us = c.window_end_us + 7;
+            c.thread_gap_secs = 7200;
+            c.first_anomaly_us = Some(c.window_start_us);
+            c.model_version = Some(42);
+            let hint = super::super::anomaly_notification_context(&c)
+                .slack_thread
+                .unwrap();
+            assert_eq!(hint.data_us, c.window_end_us + 7);
+            assert_eq!(hint.bucket_end_us, c.window_end_us);
+            assert_eq!(hint.gap_us, 7_200_000_000);
+            assert_eq!(hint.first_anomaly_us, Some(c.window_start_us));
+            assert_eq!(hint.model_version, Some(42));
+            assert!(!hint.closes);
+            assert_eq!(
+                hint.thread_headline.as_deref(),
+                Some("app_logs is anomalous")
+            );
+            c.kind = AnomalyAlertKind::Recovery;
+            let hint = super::super::anomaly_notification_context(&c)
+                .slack_thread
+                .unwrap();
+            assert!(hint.closes);
+            assert_eq!(hint.thread_headline.as_deref(), Some("app_logs recovered"));
         }
 
         #[test]
@@ -7688,7 +8847,14 @@ mod tests {
         #[test]
         fn an_absence_alert_has_no_numeric_framing() {
             let msg = anomaly_alert_message(&ctx(AnomalyAlertKind::Absence), LINK);
-            assert!(msg.contains("no data received"), "{msg}");
+            assert!(
+                msg.contains("No data for this detector's query since "),
+                "{msg}"
+            );
+            assert!(
+                !msg.contains('\u{2013}'),
+                "an absence names no end time: {msg}"
+            );
             assert!(
                 !msg.contains('%'),
                 "absence has no honest percentage: {msg}"
@@ -7762,8 +8928,56 @@ mod tests {
                 filter: filter.map(str::to_string),
                 filter_dropped,
                 start_us: 1_704_063_600_000_000,
+                aggregate: Some("count(*)".to_string()),
+                histogram_interval: "15m".to_string(),
+                ..Default::default()
             });
             c
+        }
+
+        fn link_with(
+            c: &AnomalyAlertContext,
+            snapshot: Option<&super::super::AnomalyLinkSnapshot>,
+        ) -> super::super::AnomalyExploreLink {
+            super::super::anomaly_explore_link(
+                &c.org_id,
+                &c.anomaly_id,
+                &c.stream_type,
+                c.explore.as_ref().expect("an explore target"),
+                c.window_end_us,
+                snapshot,
+            )
+        }
+
+        fn explore_link(c: &AnomalyAlertContext) -> (String, String) {
+            let Some(t) = c.explore.as_ref() else {
+                return (String::new(), String::new());
+            };
+            if c.window_start_us == 0 || c.window_end_us <= c.window_start_us {
+                return (String::new(), String::new());
+            }
+            let l = super::super::anomaly_explore_link(
+                &c.org_id,
+                &c.anomaly_id,
+                &c.stream_type,
+                t,
+                c.window_end_us,
+                None,
+            );
+            (l.url, l.label)
+        }
+
+        fn snapshot() -> super::super::AnomalyLinkSnapshot {
+            super::super::AnomalyLinkSnapshot {
+                start_us: 1_704_067_200_000_000,
+                end_us: 1_704_070_800_000_000,
+                kind: "value".to_string(),
+                measure: "count(*) per 15 min".to_string(),
+                actual: Some(208.0),
+                lower: Some(120.4),
+                upper: Some(157.25),
+                expected: None,
+            }
         }
 
         fn pairs(url: &str) -> (url::Url, Vec<(String, String)>) {
@@ -7779,32 +8993,50 @@ mod tests {
             p.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
         }
 
-        fn decoded_query(p: &[(String, String)]) -> String {
-            config::utils::base64::decode_url(get(p, "query").expect("query pair")).unwrap()
+        fn decoded(p: &[(String, String)], key: &str) -> String {
+            config::utils::base64::decode_url(get(p, key).expect("encoded pair")).unwrap()
         }
 
-        const FILTERED: &str = "View data around the window";
+        fn decoded_query(p: &[(String, String)]) -> String {
+            decoded(p, "query")
+        }
+
+        /// The SQL and the x and y columns of the Metrics panel seed.
+        fn panel_seed(p: &[(String, String)]) -> (String, String, String) {
+            let blob: serde_json::Value =
+                serde_json::from_str(&decoded(p, "metrics_data")).unwrap();
+            assert_eq!(blob["v"], 1);
+            assert_eq!(blob["data"]["type"], "line");
+            assert_eq!(blob["data"]["queryType"], "sql");
+            let q = &blob["data"]["queries"][0];
+            assert_eq!(q["customQuery"], true);
+            assert_eq!(q["fields"]["stream_type"], "metrics");
+            let column = |axis: &str| q["fields"][axis][0]["column"].as_str().unwrap().to_string();
+            (
+                q["query"].as_str().unwrap().to_string(),
+                column("x"),
+                column("y"),
+            )
+        }
+
         const UNFILTERED: &str = "View stream around the window (detector filter not applied)";
 
         #[test]
         fn the_logs_explore_link_carries_the_window_and_the_filter_as_sql() {
             let c = explore_ctx("logs", Some("status >= 500"), false);
-            let (url, label) = super::super::anomaly_explore_link(&c);
+            let (url, label) = explore_link(&c);
             let (u, p) = pairs(&url);
             assert!(u.path().ends_with("/web/logs"), "{url}");
-            assert_eq!(get(&p, "stream_type"), Some("logs"));
-            assert_eq!(get(&p, "stream"), Some("app_logs"));
-            assert_eq!(get(&p, "stream_value"), Some("app_logs"));
-            assert_eq!(get(&p, "from"), Some("1704063600000000"));
-            assert_eq!(get(&p, "to"), Some("1704070800000000"));
-            assert_eq!(get(&p, "sql_mode"), Some("true"));
-            assert_eq!(get(&p, "org_identifier"), Some("org"));
-            assert_eq!(get(&p, "show_histogram"), Some("true"));
             assert_eq!(
                 decoded_query(&p),
+                "SELECT histogram(_timestamp, '15m') AS time_bucket, count(*) AS value FROM \
+                 \"app_logs\" WHERE status >= 500 GROUP BY time_bucket ORDER BY time_bucket"
+            );
+            assert_eq!(
+                decoded(&p, "anomaly_alt_query"),
                 r#"SELECT * FROM "app_logs" WHERE status >= 500"#
             );
-            assert_eq!(label, FILTERED);
+            assert_eq!(label, "View logs");
             let keys: Vec<&str> = p.iter().map(|(k, _)| k.as_str()).collect();
             assert_eq!(
                 keys,
@@ -7816,54 +9048,387 @@ mod tests {
                     "to",
                     "sql_mode",
                     "query",
+                    "anomaly_alt_query",
                     "org_identifier",
-                    "show_histogram"
+                    "show_histogram",
+                    "type",
+                    "from_anomaly",
+                    "anomaly_filter_applied",
                 ]
+            );
+            assert_eq!(get(&p, "stream_type"), Some("logs"));
+            assert_eq!(get(&p, "stream"), Some("app_logs"));
+            assert_eq!(get(&p, "from"), Some("1704063600000000"));
+            assert_eq!(get(&p, "to"), Some("1704070800000000"));
+            assert_eq!(get(&p, "type"), Some("search_scheduler"));
+            assert_eq!(get(&p, "from_anomaly"), Some("id1"));
+            assert_eq!(get(&p, "anomaly_filter_applied"), Some("1"));
+        }
+
+        fn logs_sql(snapshot: Option<&super::super::AnomalyLinkSnapshot>) -> String {
+            let link = link_with(&explore_ctx("logs", Some("a = 1"), false), snapshot);
+            decoded_query(&pairs(&link.url).1)
+        }
+
+        const LOGS_AGGREGATE_HEAD: &str =
+            "SELECT histogram(_timestamp, '15m') AS time_bucket, count(*) AS value";
+        const LOGS_AGGREGATE_TAIL: &str =
+            " FROM \"app_logs\" WHERE a = 1 GROUP BY time_bucket ORDER BY time_bucket";
+
+        #[test]
+        fn the_logs_link_carries_the_alert_band_as_columns() {
+            let link = link_with(
+                &explore_ctx("logs", Some("a = 1"), false),
+                Some(&snapshot()),
+            );
+            let (_, p) = pairs(&link.url);
+            assert_eq!(
+                decoded_query(&p),
+                format!(
+                    "{LOGS_AGGREGATE_HEAD}, 120.4 AS min_value, 157.25 AS max_value\
+                     {LOGS_AGGREGATE_TAIL}"
+                )
+            );
+            assert_eq!(
+                get(&p, "anomaly_lower"),
+                Some("120.4"),
+                "same text as the SQL"
+            );
+            assert_eq!(get(&p, "anomaly_upper"), Some("157.25"));
+            assert_eq!(get(&p, "anomaly_view"), None);
+            let drop = super::super::AnomalyLinkSnapshot {
+                kind: "partial_drop".to_string(),
+                lower: None,
+                upper: None,
+                expected: Some(40.5),
+                ..snapshot()
+            };
+            assert_eq!(
+                logs_sql(Some(&drop)),
+                format!("{LOGS_AGGREGATE_HEAD}, 40.5 AS expected_value{LOGS_AGGREGATE_TAIL}")
+            );
+            let bare = format!("{LOGS_AGGREGATE_HEAD}{LOGS_AGGREGATE_TAIL}");
+            // An absence of the popover can still hold a range; its kind decides.
+            let absence = super::super::AnomalyLinkSnapshot {
+                kind: "absence".to_string(),
+                ..snapshot()
+            };
+            assert_eq!(logs_sql(Some(&absence)), bare);
+            assert_eq!(logs_sql(None), bare, "a recovery passes no snapshot");
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            c.kind = AnomalyAlertKind::Recovery;
+            let (_, p) = pairs(&super::super::alert_explore_link(&c).url);
+            assert_eq!(decoded_query(&p), bare);
+        }
+
+        #[test]
+        fn a_band_value_whose_text_is_not_finite_is_left_out() {
+            let snap = super::super::AnomalyLinkSnapshot {
+                lower: Some(f64::MAX),
+                upper: Some(f64::NAN),
+                ..snapshot()
+            };
+            assert_eq!(
+                logs_sql(Some(&snap)),
+                format!("{LOGS_AGGREGATE_HEAD}{LOGS_AGGREGATE_TAIL}")
+            );
+            let snap = super::super::AnomalyLinkSnapshot {
+                lower: Some(f64::MAX),
+                ..snapshot()
+            };
+            let link = link_with(&explore_ctx("logs", Some("a = 1"), false), Some(&snap));
+            let (_, p) = pairs(&link.url);
+            assert_eq!(
+                decoded_query(&p),
+                format!("{LOGS_AGGREGATE_HEAD}, 157.25 AS max_value{LOGS_AGGREGATE_TAIL}")
+            );
+            assert_eq!(get(&p, "anomaly_lower"), None, "inf after rounding");
+        }
+
+        fn custom_logs_ctx(sql: &str) -> AnomalyAlertContext {
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            let t = c.explore.as_mut().unwrap();
+            t.aggregate = None;
+            t.custom_sql = Some(sql.to_string());
+            t.x_alias = Some("time_bucket".to_string());
+            t.y_alias = Some("value".to_string());
+            c
+        }
+
+        #[test]
+        fn a_custom_sql_logs_link_opens_its_own_sql_with_the_band() {
+            let sql = "SELECT histogram(_timestamp, '15m') AS time_bucket, count(*) AS value FROM \
+                       \"app_logs\" WHERE a = 1 GROUP BY time_bucket";
+            let link = link_with(&custom_logs_ctx(sql), Some(&snapshot()));
+            let (_, p) = pairs(&link.url);
+            assert!(link.filter_applied);
+            assert_eq!(
+                decoded_query(&p),
+                "SELECT histogram(_timestamp, '15m') AS time_bucket, count(*) AS value, 120.4 AS \
+                 min_value, 157.25 AS max_value FROM \"app_logs\" WHERE a = 1 GROUP BY time_bucket"
+            );
+            assert_eq!(
+                decoded(&p, "anomaly_alt_query"),
+                r#"SELECT * FROM "app_logs" WHERE a = 1"#
+            );
+            for own in [
+                "SELECT histogram(_timestamp, '15m') AS time_bucket, min(x) AS MIN_VALUE FROM \
+                 \"app_logs\" WHERE a = 1 GROUP BY time_bucket",
+                "SELECT histogram(_timestamp, '15m') AS time_bucket, max_value FROM \"app_logs\" \
+                 GROUP BY time_bucket, max_value",
+                "not sql at all",
+            ] {
+                let link = link_with(&custom_logs_ctx(own), Some(&snapshot()));
+                assert_eq!(decoded_query(&pairs(&link.url).1), own, "opens unchanged");
+            }
+            let link = link_with(&custom_logs_ctx(sql), None);
+            assert_eq!(
+                decoded_query(&pairs(&link.url).1),
+                sql,
+                "no band, no rewrite"
+            );
+        }
+
+        /// `explore_target` drops the custom SQL of a UNION and flags the filter as dropped.
+        #[test]
+        fn a_dropped_filter_opens_the_raw_fallback_and_never_an_aggregate() {
+            let mut c = explore_ctx("logs", None, true);
+            c.explore.as_mut().unwrap().custom_sql = None;
+            let link = link_with(&c, Some(&snapshot()));
+            let (_, p) = pairs(&link.url);
+            assert!(!link.filter_applied);
+            assert_eq!(link.label, UNFILTERED);
+            assert_eq!(get(&p, "query"), None);
+            assert_eq!(get(&p, "anomaly_alt_query"), None);
+            assert_eq!(get(&p, "anomaly_filter_applied"), Some("0"));
+            assert_eq!(get(&p, "anomaly_lower"), Some("120.4"));
+        }
+
+        #[test]
+        fn every_link_carries_the_snapshot_for_the_banner() {
+            for stream_type in ["logs", "traces", "metrics"] {
+                let c = explore_ctx(stream_type, Some("a = 1"), false);
+                let link = link_with(&c, Some(&snapshot()));
+                let (_, p) = pairs(&link.url);
+                assert_eq!(link.target, stream_type);
+                assert!(link.filter_applied, "{stream_type}");
+                assert_eq!(get(&p, "from_anomaly"), Some("id1"), "{stream_type}");
+                assert_eq!(get(&p, "anomaly_start"), Some("1704067200000000"));
+                assert_eq!(get(&p, "anomaly_end"), Some("1704070800000000"));
+                assert_eq!(get(&p, "anomaly_kind"), Some("value"));
+                assert_eq!(get(&p, "anomaly_measure"), Some("count(*) per 15 min"));
+                assert_eq!(get(&p, "anomaly_actual"), Some("208"));
+                assert_eq!(get(&p, "anomaly_lower"), Some("120.4"));
+                assert_eq!(get(&p, "anomaly_upper"), Some("157.25"));
+            }
+            let absence = super::super::AnomalyLinkSnapshot {
+                kind: "absence".to_string(),
+                actual: None,
+                lower: None,
+                upper: None,
+                ..snapshot()
+            };
+            let link = link_with(&explore_ctx("logs", None, false), Some(&absence));
+            let (_, p) = pairs(&link.url);
+            assert_eq!(get(&p, "anomaly_kind"), Some("absence"));
+            for key in [
+                "anomaly_actual",
+                "anomaly_lower",
+                "anomaly_upper",
+                "anomaly_expected",
+            ] {
+                assert_eq!(get(&p, key), None, "a value the alert lacks is left out");
+            }
+            let drop = super::super::AnomalyLinkSnapshot {
+                kind: "partial_drop".to_string(),
+                actual: Some(12.0),
+                lower: None,
+                upper: None,
+                expected: Some(40.0),
+                ..snapshot()
+            };
+            let link = link_with(&explore_ctx("logs", None, false), Some(&drop));
+            let (_, p) = pairs(&link.url);
+            assert_eq!(get(&p, "anomaly_expected"), Some("40"));
+            assert_eq!(get(&p, "anomaly_lower"), None);
+            let long = "x".repeat(2500);
+            let link = link_with(&explore_ctx("logs", Some(&long), false), Some(&drop));
+            let (_, p) = pairs(&link.url);
+            assert_eq!(get(&p, "anomaly_expected"), None, "dropped with the values");
+        }
+
+        #[test]
+        fn the_alert_fills_the_snapshot_and_a_recovery_passes_none() {
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            c.worst_actual_value = Some(208.0);
+            c.worst_expected = Some(138.8);
+            c.worst_expected_lower = Some(120.4);
+            c.worst_expected_upper = Some(157.2);
+            let n = super::super::anomaly_notification_context(&c);
+            let (_, p) = pairs(&n.alert_url);
+            assert_eq!(get(&p, "anomaly_start"), Some("1704067200000000"));
+            assert_eq!(get(&p, "anomaly_measure"), Some("count(*) per 15 min"));
+            assert_eq!(get(&p, "anomaly_actual"), Some("208"));
+            assert_eq!(get(&p, "anomaly_upper"), Some("157.2"));
+            c.kind = AnomalyAlertKind::Recovery;
+            let n = super::super::anomaly_notification_context(&c);
+            let (_, p) = pairs(&n.alert_url);
+            assert_eq!(get(&p, "from_anomaly"), Some("id1"));
+            assert_eq!(get(&p, "anomaly_start"), None);
+            assert_eq!(get(&p, "anomaly_kind"), None);
+        }
+
+        #[test]
+        fn the_traces_link_always_sends_a_plain_filter() {
+            let c = explore_ctx("traces", Some("service_name = 'api'"), false);
+            let (url, label) = explore_link(&c);
+            let (u, p) = pairs(&url);
+            assert!(u.path().ends_with("/web/traces"), "{url}");
+            assert_eq!(get(&p, "stream"), Some("app_logs"));
+            assert_eq!(get(&p, "tab"), Some("spans"));
+            assert_eq!(get(&p, "stream_type"), None);
+            assert_eq!(get(&p, "query"), None);
+            assert_eq!(get(&p, "filter"), Some("service_name = 'api'"));
+            assert_eq!(label, "View traces");
+            let (url, label) = explore_link(&explore_ctx("traces", None, false));
+            let (_, p) = pairs(&url);
+            assert_eq!(
+                get(&p, "filter"),
+                Some(""),
+                "an empty filter clears the box"
+            );
+            assert_eq!(label, "View traces");
+            let (url, label) = explore_link(&explore_ctx("traces", None, true));
+            let (_, p) = pairs(&url);
+            assert_eq!(get(&p, "filter"), Some(""));
+            assert_eq!(get(&p, "anomaly_filter_applied"), Some("0"));
+            assert_eq!(label, UNFILTERED);
+        }
+
+        #[test]
+        fn the_metrics_link_opens_visualize_with_the_detectors_aggregate() {
+            for (aggregate, interval) in [
+                ("count(*)", "15m"),
+                ("avg(latency)", "5m"),
+                ("approx_percentile_cont(latency, 0.95)", "1h"),
+            ] {
+                let mut c = explore_ctx("metrics", Some("job = 'api'"), false);
+                let t = c.explore.as_mut().unwrap();
+                t.aggregate = Some(aggregate.to_string());
+                t.histogram_interval = interval.to_string();
+                let link = link_with(&c, None);
+                let (u, p) = pairs(&link.url);
+                assert!(u.path().ends_with("/web/metrics"), "{}", link.url);
+                assert_eq!(link.label, "View metrics");
+                assert_eq!(get(&p, "stream_name"), Some("app_logs"));
+                assert_eq!(get(&p, "query_type"), Some("sql"));
+                assert_eq!(get(&p, "from"), Some("1704063600000000"));
+                assert_eq!(get(&p, "to"), Some("1704070800000000"));
+                assert_eq!(get(&p, "org_identifier"), Some("org"));
+                let sql = format!(
+                    "SELECT histogram(_timestamp, '{interval}') AS x_axis_1, {aggregate} AS \
+                     y_axis_1 FROM \"app_logs\" WHERE job = 'api' GROUP BY x_axis_1 ORDER BY \
+                     x_axis_1"
+                );
+                assert_eq!(decoded_query(&p), sql, "{aggregate}");
+                assert_eq!(
+                    panel_seed(&p),
+                    (sql, "x_axis_1".to_string(), "y_axis_1".to_string())
+                );
+            }
+        }
+
+        #[test]
+        fn a_custom_sql_metrics_link_opens_its_own_sql_and_value_column() {
+            let sql = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value \
+                       FROM \"app_logs\" GROUP BY time_bucket";
+            let mut c = explore_ctx("metrics", None, true);
+            let t = c.explore.as_mut().unwrap();
+            t.aggregate = None;
+            t.custom_sql = Some(sql.to_string());
+            t.x_alias = Some("time_bucket".to_string());
+            t.y_alias = Some("value".to_string());
+            let link = link_with(&c, None);
+            let (_, p) = pairs(&link.url);
+            assert!(link.filter_applied, "its own SQL carries its own filter");
+            assert_eq!(decoded_query(&p), sql);
+            assert_eq!(
+                panel_seed(&p),
+                (
+                    sql.to_string(),
+                    "time_bucket".to_string(),
+                    "value".to_string()
+                )
+            );
+
+            let two = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS errs, \
+                       count(*) AS total FROM \"app_logs\" WHERE level = 'error' GROUP BY \
+                       time_bucket";
+            let t = c.explore.as_mut().unwrap();
+            t.custom_sql = Some(two.to_string());
+            t.y_alias = Some("errs".to_string());
+            let (_, p) = pairs(&link_with(&c, None).url);
+            assert_eq!(
+                panel_seed(&p),
+                (
+                    two.to_string(),
+                    "time_bucket".to_string(),
+                    "errs".to_string()
+                )
             );
         }
 
         #[test]
-        fn a_metrics_detector_links_to_the_logs_page_with_its_stream_type() {
-            let c = explore_ctx("metrics", Some("job = 'api'"), false);
-            let (url, _) = super::super::anomaly_explore_link(&c);
-            let (u, p) = pairs(&url);
-            assert!(u.path().ends_with("/web/logs"), "{url}");
-            assert_eq!(get(&p, "stream_type"), Some("metrics"));
-        }
-
-        #[test]
-        fn the_traces_explore_link_carries_the_filter_expression_only() {
-            let c = explore_ctx("traces", Some("service_name = 'api'"), false);
-            let (url, label) = super::super::anomaly_explore_link(&c);
-            let (u, p) = pairs(&url);
-            assert!(u.path().ends_with("/web/traces"), "{url}");
-            assert_eq!(get(&p, "stream"), Some("app_logs"));
-            assert_eq!(get(&p, "from"), Some("1704063600000000"));
-            assert_eq!(get(&p, "to"), Some("1704070800000000"));
-            assert_eq!(get(&p, "org_identifier"), Some("org"));
-            assert_eq!(get(&p, "tab"), Some("spans"));
-            assert_eq!(get(&p, "show_histogram"), Some("true"));
-            assert_eq!(get(&p, "stream_type"), None);
-            assert_eq!(decoded_query(&p), "service_name = 'api'");
-            assert_eq!(label, FILTERED);
-        }
-
-        #[test]
-        fn a_detector_without_a_filter_links_without_a_query() {
-            let (url, label) =
-                super::super::anomaly_explore_link(&explore_ctx("logs", None, false));
-            let (_, p) = pairs(&url);
+        fn a_metrics_link_with_no_query_opens_the_stream_and_time() {
+            let mut c = explore_ctx("metrics", Some("a = 1"), false);
+            c.explore.as_mut().unwrap().aggregate = None;
+            let link = link_with(&c, None);
+            let (u, p) = pairs(&link.url);
+            assert!(u.path().ends_with("/web/metrics"));
             assert_eq!(get(&p, "query"), None);
+            assert_eq!(get(&p, "metrics_data"), None);
+            assert_eq!(get(&p, "stream_name"), Some("app_logs"));
+            assert_eq!(link.label, UNFILTERED);
+        }
+
+        #[test]
+        fn a_detector_without_a_filter_links_its_aggregate_without_a_where() {
+            let (url, label) = explore_link(&explore_ctx("logs", None, false));
+            let (_, p) = pairs(&url);
+            assert_eq!(
+                decoded_query(&p),
+                "SELECT histogram(_timestamp, '15m') AS time_bucket, count(*) AS value FROM \
+                 \"app_logs\" GROUP BY time_bucket ORDER BY time_bucket"
+            );
+            assert_eq!(
+                decoded(&p, "anomaly_alt_query"),
+                r#"SELECT * FROM "app_logs""#
+            );
             assert_eq!(get(&p, "sql_mode"), Some("true"));
-            assert_eq!(label, FILTERED);
+            assert_eq!(get(&p, "anomaly_filter_applied"), Some("1"));
+            assert_eq!(label, "View logs");
+            // A target from before the aggregate field opens the stream as before.
+            let mut c = explore_ctx("logs", None, false);
+            c.explore.as_mut().unwrap().aggregate = None;
+            let (url, _) = explore_link(&c);
+            let (_, p) = pairs(&url);
+            assert_eq!(get(&p, "query"), None);
+            assert_eq!(get(&p, "anomaly_alt_query"), None);
         }
 
         #[test]
-        fn a_dropped_filter_gets_the_unfiltered_label() {
-            let (url, label) = super::super::anomaly_explore_link(&explore_ctx("logs", None, true));
-            let (_, p) = pairs(&url);
+        fn a_dropped_filter_gets_the_unfiltered_label_and_flag() {
+            for stream_type in ["logs", "metrics"] {
+                let link = link_with(&explore_ctx(stream_type, None, true), None);
+                let (_, p) = pairs(&link.url);
+                assert!(!link.filter_applied, "{stream_type}");
+                assert_eq!(get(&p, "anomaly_filter_applied"), Some("0"));
+                assert_eq!(link.label, UNFILTERED, "{stream_type}");
+            }
+            let (_, p) = pairs(&link_with(&explore_ctx("logs", None, true), None).url);
             assert_eq!(get(&p, "query"), None);
-            assert_eq!(label, UNFILTERED);
+            let (_, p) = pairs(&link_with(&explore_ctx("metrics", None, true), None).url);
+            assert!(!decoded_query(&p).contains("WHERE"));
         }
 
         #[test]
@@ -7871,52 +9436,229 @@ mod tests {
             let empty = (String::new(), String::new());
             let mut c = explore_ctx("logs", Some("a = 1"), false);
             c.window_start_us = 0;
-            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            assert_eq!(explore_link(&c), empty);
             let mut c = explore_ctx("logs", Some("a = 1"), false);
             c.window_end_us = 0;
-            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            assert_eq!(explore_link(&c), empty);
             let mut c = explore_ctx("logs", Some("a = 1"), false);
             c.window_end_us = c.window_start_us;
-            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            assert_eq!(explore_link(&c), empty);
             c.window_end_us = c.window_start_us - 1;
-            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            assert_eq!(explore_link(&c), empty);
             let mut c = explore_ctx("logs", Some("a = 1"), false);
             c.explore = None;
-            assert_eq!(super::super::anomaly_explore_link(&c), empty);
+            assert_eq!(explore_link(&c), empty);
         }
 
         /// A detector that scores one bucket per run gets a window one interval wide,
-        /// not a zero-width one, so the link survives the guard and `from`..`to` is the
-        /// lead-in plus that one bucket.
+        /// so the link survives the guard and `from`..`to` is the lead-in plus that bucket.
         #[test]
         fn a_one_bucket_window_keeps_the_link_and_spans_the_bucket() {
             const MIN_US: i64 = 60 * 1_000_000;
             let mut c = explore_ctx("logs", Some("a = 1"), false);
-            // Bucket 00:00..00:05 behind a 15 minute (3 x 5m) lead-in.
             c.window_start_us = 1_704_067_200_000_000;
             c.window_end_us = c.window_start_us + 5 * MIN_US;
             c.explore.as_mut().unwrap().start_us = c.window_start_us - 15 * MIN_US;
-            let (url, label) = super::super::anomaly_explore_link(&c);
-            assert!(!url.is_empty());
+            let (url, label) = explore_link(&c);
             let (_, p) = pairs(&url);
             let from: i64 = get(&p, "from").unwrap().parse().unwrap();
             let to: i64 = get(&p, "to").unwrap().parse().unwrap();
-            assert_eq!(from, c.window_start_us - 15 * MIN_US);
-            assert_eq!(to, c.window_end_us);
             assert_eq!(to - from, 20 * MIN_US);
-            assert_eq!(label, FILTERED);
+            assert_eq!(label, "View logs");
         }
 
         #[test]
-        fn an_over_long_filter_is_dropped_and_labeled() {
-            let long = "x".repeat(5000);
-            for stream_type in ["logs", "traces"] {
+        fn an_absence_alert_link_runs_to_the_end_of_the_firing_run() {
+            let mut c = explore_ctx("logs", None, false);
+            c.kind = AnomalyAlertKind::Absence;
+            let fired = c.window_end_us + 9 * 60_000_000;
+            c.judged_end_us = fired;
+            let link = super::super::alert_explore_link(&c);
+            let (_, p) = pairs(&link.url);
+            assert_eq!(get(&p, "to"), Some(fired.to_string().as_str()));
+            assert_eq!(get(&p, "anomaly_end"), Some(fired.to_string().as_str()));
+            c.kind = AnomalyAlertKind::Value;
+            let (_, p) = pairs(&super::super::alert_explore_link(&c).url);
+            assert_eq!(get(&p, "to"), Some(c.window_end_us.to_string().as_str()));
+        }
+
+        /// A catch-up run with in-range buckets before its gap: the absence starts at the gap.
+        #[test]
+        fn an_absence_starts_at_its_window_start_not_the_first_chart_point() {
+            use o2_enterprise::enterprise::anomaly_detection::types::ChartPoint;
+            let mut c = explore_ctx("logs", None, false);
+            c.kind = AnomalyAlertKind::Absence;
+            let run_start = c.window_start_us;
+            let gap = run_start + 15 * 60_000_000;
+            c.window_start_us = gap;
+            c.first_anomaly_us = Some(gap);
+            c.judged_end_us = c.window_end_us;
+            let point = |ts_us: i64, absent: bool| ChartPoint {
+                ts_us,
+                value: if absent { 0.0 } else { 100.0 },
+                lower: None,
+                upper: None,
+                is_anomaly: absent,
+                is_absence: absent,
+                is_partial_drop: false,
+            };
+            c.current_points = vec![point(run_start, false), point(gap, true)];
+            let msg = anomaly_alert_message(&c, LINK);
+            assert!(
+                msg.contains(&format!("since {}", super::super::fmt_alert_clock(gap))),
+                "{msg}"
+            );
+            let target = c.explore.clone().unwrap();
+            let snapshot = super::super::alert_link_snapshot(&c, &target).unwrap();
+            assert_eq!(snapshot.start_us, gap);
+            let (_, p) = pairs(&super::super::alert_explore_link(&c).url);
+            assert_eq!(get(&p, "anomaly_start"), Some(gap.to_string().as_str()));
+        }
+
+        #[test]
+        fn an_over_long_link_falls_back_to_the_unfiltered_stream() {
+            // Traces sends the filter as plain text, so it needs more than the base64 SQL of logs.
+            let long = "x".repeat(3200);
+            for stream_type in ["logs", "traces", "metrics"] {
                 let c = explore_ctx(stream_type, Some(&long), false);
-                let (url, label) = super::super::anomaly_explore_link(&c);
-                let (_, p) = pairs(&url);
-                assert_eq!(get(&p, "query"), None, "{stream_type}");
-                assert_eq!(label, UNFILTERED, "{stream_type}");
+                let link = link_with(&c, Some(&snapshot()));
+                let (_, p) = pairs(&link.url);
+                assert!(link.url.len() <= 3000, "{stream_type}: {}", link.url.len());
+                assert!(!link.filter_applied, "{stream_type}");
+                assert_eq!(link.label, UNFILTERED, "{stream_type}");
+                assert_eq!(get(&p, "anomaly_filter_applied"), Some("0"));
+                assert!(!link.url.contains("xxxx"), "{stream_type}");
+                assert_eq!(get(&p, "anomaly_kind"), Some("value"));
+                assert_eq!(get(&p, "anomaly_measure"), None, "values go first");
             }
+        }
+
+        #[test]
+        fn an_over_long_custom_sql_metrics_link_drops_its_where_and_keeps_the_axes() {
+            let mut c = explore_ctx("metrics", None, false);
+            let t = c.explore.as_mut().unwrap();
+            t.aggregate = None;
+            t.custom_sql = Some(format!(
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \
+                 \"app_logs\" WHERE a = '{}' GROUP BY time_bucket",
+                "x".repeat(1500)
+            ));
+            t.x_alias = Some("time_bucket".to_string());
+            t.y_alias = Some("value".to_string());
+            let link = link_with(&c, None);
+            let (_, p) = pairs(&link.url);
+            assert!(link.url.len() <= 3000, "{}", link.url.len());
+            assert!(!link.filter_applied);
+            assert_eq!(link.label, UNFILTERED);
+            let sql = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \
+                       \"app_logs\" GROUP BY time_bucket";
+            assert_eq!(decoded_query(&p), sql);
+            assert_eq!(
+                panel_seed(&p),
+                (
+                    sql.to_string(),
+                    "time_bucket".to_string(),
+                    "value".to_string()
+                )
+            );
+        }
+
+        #[test]
+        fn an_over_long_metrics_link_ends_at_the_stream_and_time() {
+            let mut c = explore_ctx("metrics", None, false);
+            let t = c.explore.as_mut().unwrap();
+            t.aggregate = None;
+            t.custom_sql = Some(format!(
+                "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value, '{}' AS \
+                 pad FROM \"app_logs\" WHERE a = 1 GROUP BY time_bucket",
+                "x".repeat(1500)
+            ));
+            t.x_alias = Some("time_bucket".to_string());
+            t.y_alias = Some("value".to_string());
+            let link = link_with(&c, None);
+            let (_, p) = pairs(&link.url);
+            assert!(link.url.len() <= 3000, "{}", link.url.len());
+            assert_eq!(get(&p, "query"), None);
+            assert_eq!(get(&p, "metrics_data"), None);
+            assert_eq!(get(&p, "stream_name"), Some("app_logs"));
+            assert_eq!(link.label, UNFILTERED);
+        }
+
+        #[test]
+        fn over_the_limit_the_values_drop_before_the_filter() {
+            let mut snap = snapshot();
+            snap.measure = "m".repeat(150);
+            for stream_type in ["traces", "metrics"] {
+                // (values kept, filter applied) as the filter grows.
+                let states = length_states(stream_type, &snap, |link, p| {
+                    assert_eq!(get(p, "anomaly_alt_query"), None, "{stream_type}");
+                    assert_eq!(get(p, "anomaly_start"), Some("1704067200000000"));
+                    assert_eq!(get(p, "anomaly_kind"), Some("value"));
+                    (get(p, "anomaly_actual").is_some(), link.filter_applied)
+                });
+                assert_eq!(
+                    states,
+                    [(true, true), (false, true), (false, false)],
+                    "{stream_type}"
+                );
+            }
+        }
+
+        /// Logs drops the raw-rows switch, then the values with the band kept, then the filter.
+        #[test]
+        fn over_the_limit_a_logs_link_follows_its_own_order() {
+            let mut snap = snapshot();
+            snap.measure = "m".repeat(150);
+            let states = length_states("logs", &snap, |link, p| {
+                let sql = get(p, "query")
+                    .map(|_| decoded_query(p))
+                    .unwrap_or_default();
+                let band = sql.contains("120.4 AS min_value, 157.25 AS max_value");
+                assert_eq!(band, sql.contains("time_bucket"), "{sql}");
+                (
+                    get(p, "anomaly_alt_query").is_some(),
+                    get(p, "anomaly_lower").is_some(),
+                    link.filter_applied,
+                    band,
+                )
+            });
+            assert_eq!(
+                states,
+                [
+                    (true, true, true, true),
+                    (false, true, true, true),
+                    (false, false, true, true),
+                    (false, false, false, false),
+                ]
+            );
+        }
+
+        /// Each distinct state of a link whose filter grows past the limit, in order.
+        fn length_states<S: PartialEq>(
+            stream_type: &str,
+            snap: &super::super::AnomalyLinkSnapshot,
+            state: impl Fn(&super::super::AnomalyExploreLink, &[(String, String)]) -> S,
+        ) -> Vec<S> {
+            let mut states: Vec<S> = Vec::new();
+            for n in (100..3200).step_by(7) {
+                let c = explore_ctx(
+                    stream_type,
+                    Some(&format!("a = '{}'", "x".repeat(n))),
+                    false,
+                );
+                let link = link_with(&c, Some(snap));
+                assert!(
+                    link.url.len() <= 3000,
+                    "{stream_type} {n}: {}",
+                    link.url.len()
+                );
+                let (_, p) = pairs(&link.url);
+                let s = state(&link, &p);
+                if states.last() != Some(&s) {
+                    states.push(s);
+                }
+            }
+            states
         }
 
         #[test]
@@ -7925,30 +9667,237 @@ mod tests {
             let mut c = explore_ctx("logs", Some("a = 1"), false);
             c.org_id = "a&b".to_string();
             c.explore.as_mut().unwrap().stream = odd.to_string();
-            let (url, _) = super::super::anomaly_explore_link(&c);
+            let (url, _) = explore_link(&c);
             let (u, p) = pairs(&url);
             assert!(u.fragment().is_none(), "{url}");
             assert_eq!(get(&p, "stream"), Some(odd));
             assert_eq!(get(&p, "stream_value"), Some(odd));
             assert_eq!(get(&p, "org_identifier"), Some("a&b"));
             assert_eq!(
-                decoded_query(&p),
+                decoded(&p, "anomaly_alt_query"),
                 r#"SELECT * FROM "my ""odd"" stream & #1 é" WHERE a = 1"#
             );
+            assert!(decoded_query(&p).contains(r#"FROM "my ""odd"" stream & #1 é" WHERE a = 1"#));
         }
 
         #[test]
-        fn the_context_exposes_the_explore_link_and_keeps_the_detail_link_as_alert_url() {
+        fn the_measure_names_the_aggregate_and_the_bucket() {
+            let mut t = explore_ctx("logs", None, false).explore.unwrap();
+            let measure =
+                |t: &o2_enterprise::enterprise::anomaly_detection::types::ExploreTarget| {
+                    super::super::anomaly_measure(t)
+                };
+            assert_eq!(measure(&t), "count(*) per 15 min");
+            t.aggregate = Some("avg(latency)".to_string());
+            t.histogram_interval = "5m".to_string();
+            assert_eq!(measure(&t), "avg(latency) per 5 min");
+            t.histogram_interval = "1h".to_string();
+            assert_eq!(measure(&t), "avg(latency) per 1 hour");
+            t.histogram_interval = "2h".to_string();
+            assert_eq!(measure(&t), "avg(latency) per 2 hours");
+            t.aggregate = None;
+            t.custom_sql = Some("SELECT ...".to_string());
+            t.histogram_interval = "15m".to_string();
+            assert_eq!(measure(&t), "custom SQL value per 15 min");
+            t.custom_sql = None;
+            assert_eq!(measure(&t), "");
+        }
+
+        #[test]
+        fn the_data_button_is_the_explore_link_and_the_detail_page_is_open_anomaly() {
             let c = explore_ctx("logs", Some("a = 1"), false);
             let n = super::super::anomaly_notification_context(&c);
             let detail = super::super::anomaly_detail_link(&c.org_id, &c.anomaly_id);
-            assert_eq!(n.alert_url, detail);
-            let (url, label) = super::super::anomaly_explore_link(&c);
-            assert_eq!(attr_of(&n, "anomaly_url"), Some(detail));
-            assert_eq!(attr_of(&n, "anomaly_explore_url"), Some(url));
-            assert_eq!(attr_of(&n, "anomaly_explore_label"), Some(label));
+            assert!(n.alert_url.contains("/web/logs?"), "{}", n.alert_url);
+            assert_eq!(n.alert_url_label, "View logs");
+            assert_eq!(n.alert_detail_url, detail);
+            assert_eq!(n.alert_detail_label, "Open anomaly");
+            assert_eq!(attr_of(&n, "anomaly_url"), Some(detail.clone()));
+            assert_eq!(
+                attr_of(&n, "anomaly_explore_url"),
+                Some(n.alert_url.clone())
+            );
+            assert_eq!(
+                attr_of(&n, "anomaly_explore_label"),
+                Some("View logs".into())
+            );
+
+            let dropped =
+                super::super::anomaly_notification_context(&explore_ctx("logs", None, true));
+            assert_eq!(dropped.alert_url_label, UNFILTERED);
+
             let bare = super::super::anomaly_notification_context(&ctx(AnomalyAlertKind::Value));
+            assert_eq!(bare.alert_url, detail);
+            assert_eq!(bare.alert_url_label, "Open anomaly");
+            assert!(bare.alert_detail_url.is_empty());
+            assert!(bare.alert_detail_label.is_empty());
             assert_eq!(attr_of(&bare, "anomaly_explore_url"), Some(String::new()));
+        }
+
+        #[test]
+        fn the_default_template_shows_one_data_button_and_the_detail_button() {
+            use crate::alerts::notifications::{
+                default_template::compiled_default_content,
+                resolve::{LinkRole, resolve_content},
+            };
+            let mut c = explore_ctx("logs", Some("a = 1"), false);
+            c.worst_actual_value = Some(208.0);
+            c.worst_expected = Some(138.8);
+            c.worst_expected_lower = Some(120.4);
+            c.worst_expected_upper = Some(157.2);
+            c.first_anomaly_us = Some(c.window_start_us);
+            c.score = Some(3.0);
+            c.threshold = Some(2.0);
+            let n = super::super::anomaly_notification_context(&c);
+            let content = resolve_content(&compiled_default_content(), &n, "slack");
+            let links: Vec<(LinkRole, String)> = content
+                .links
+                .iter()
+                .map(|l| (l.role, l.label.clone()))
+                .collect();
+            assert_eq!(
+                links,
+                [
+                    (LinkRole::Primary, "View logs".to_string()),
+                    (LinkRole::Detail, "Open anomaly".to_string())
+                ]
+            );
+            let fields: Vec<(&str, &str)> = content
+                .fields
+                .iter()
+                .map(|(l, v)| (l.as_str(), v.as_str()))
+                .collect();
+            assert!(
+                fields.contains(&("Expected", "120.40-157.20")),
+                "{fields:?}"
+            );
+            assert!(fields.contains(&("Change", "+49.9%")), "{fields:?}");
+            assert!(
+                fields.contains(&("Started", "2024-01-01 00:00 UTC")),
+                "{fields:?}"
+            );
+            assert!(!fields.iter().any(|(l, _)| *l == "Score"), "{fields:?}");
+        }
+
+        #[test]
+        fn the_webhook_legacy_link_stays_the_detail_page() {
+            use crate::alerts::notifications::notify::{Route, route};
+            let c = explore_ctx("logs", Some("a = 1"), false);
+            let n = super::super::anomaly_notification_context(&c);
+            let Route::Legacy(body) = route(&resolved_for(http("", None)), &n).unwrap() else {
+                panic!("expected the legacy body");
+            };
+            assert_eq!(
+                body["link"],
+                super::super::anomaly_detail_link(&c.org_id, &c.anomaly_id)
+            );
+        }
+
+        /// AC1.32 and AC1.21: the chart flag of a Content template no longer gates an anomaly.
+        #[test]
+        fn each_content_template_and_a_custom_one_with_chart_url_gets_the_anomaly_chart() {
+            use config::meta::destinations::{Template, TemplateKind, TemplateType};
+
+            use crate::alerts::notifications::org_default::{
+                EffectiveTemplate, TemplateSource, compiled_fallback,
+            };
+            let effective = |template: Template, source| EffectiveTemplate {
+                template,
+                source,
+                skipped: vec![],
+            };
+            let wants = super::super::template_wants_anomaly_chart;
+            assert!(wants(&effective(
+                compiled_fallback("org"),
+                TemplateSource::Compiled
+            )));
+            let content = |enabled: bool| {
+                let mut spec =
+                    crate::alerts::notifications::default_template::compiled_default_content();
+                spec.chart.enabled = enabled;
+                Template {
+                    name: format!("p1_chart_{enabled}"),
+                    kind: TemplateKind::Content,
+                    template_type: TemplateType::Http,
+                    body: serde_json::to_string(&spec).unwrap(),
+                    ..compiled_fallback("org")
+                }
+            };
+            assert!(wants(&effective(content(true), TemplateSource::Explicit)));
+            assert!(
+                wants(&effective(content(false), TemplateSource::Explicit)),
+                "chart.enabled is the switch of scheduled alerts only"
+            );
+            let custom = |body: &str| Template {
+                kind: TemplateKind::Custom,
+                body: body.to_string(),
+                ..content(true)
+            };
+            assert!(!wants(&effective(
+                custom(r#"{"text":"{alert_name}"}"#),
+                TemplateSource::Destination
+            )));
+            assert!(wants(&effective(
+                custom(r#"{"text":"{alert_name}","image":"{chart_url}"}"#),
+                TemplateSource::Destination
+            )));
+        }
+
+        /// AC1.33: a local base drops the URL on URL transports; bytes destinations keep it.
+        #[test]
+        fn a_local_base_drops_the_chart_url_of_url_transports_only() {
+            use config::meta::destinations::{DestinationType, TemplateKind};
+            let chart_use = super::super::anomaly_chart_use;
+            let email = DestinationType::Email(Default::default());
+            let app = DestinationType::SlackApp(Default::default());
+            let url_sends = [
+                http("slack", None),
+                http("teams", None),
+                http("pagerduty", None),
+                http("", None),
+            ];
+            for dest in &url_sends {
+                let c = TemplateKind::Content;
+                assert_eq!(chart_use(&c, dest, false), (true, false), "{dest:?}");
+                assert_eq!(chart_use(&c, dest, true), (false, false), "{dest:?}");
+            }
+            for dest in [&email, &app, &http("discord", None)] {
+                let c = TemplateKind::Content;
+                assert_eq!(chart_use(&c, dest, false), (true, true), "{dest:?}");
+                assert_eq!(chart_use(&c, dest, true), (true, true), "{dest:?}");
+            }
+            let custom = TemplateKind::Custom;
+            for dest in [&email, &http("discord", None), &http("slack", None)] {
+                assert_eq!(chart_use(&custom, dest, false), (true, false), "{dest:?}");
+                assert_eq!(chart_use(&custom, dest, true), (false, false), "{dest:?}");
+            }
+            assert_eq!(
+                chart_use(&custom, &app, true),
+                (false, true),
+                "the Slack app uploads the bytes of a custom template"
+            );
+        }
+
+        /// AC1.32 rule 7: the default webhook body carries `chart_url`, empty with no chart.
+        #[test]
+        fn the_legacy_webhook_body_carries_the_chart_url() {
+            use crate::alerts::notifications::notify::{Route, route};
+            let c = ctx(AnomalyAlertKind::Value);
+            let legacy = |n: &crate::alerts::notifications::NotificationContext| {
+                let Route::Legacy(body) = route(&resolved_for(http("", None)), n).unwrap() else {
+                    panic!("expected the legacy body");
+                };
+                body
+            };
+            let mut n = super::super::anomaly_notification_context(&c);
+            super::super::set_anomaly_chart_url(&mut n, None);
+            assert_eq!(legacy(&n)["chart_url"], "");
+            assert_eq!(n.chart_url, None);
+            let url = "https://o2.example/api/v2/org/alerts/charts/render?d=a&s=b";
+            super::super::set_anomaly_chart_url(&mut n, Some(url.to_string()));
+            assert_eq!(legacy(&n)["chart_url"], url);
+            assert_eq!(n.chart_url.as_deref(), Some(url));
+            assert_eq!(legacy(&n)["alert_type"], "anomaly_detection");
         }
 
         fn attr_of(
@@ -8557,7 +10506,7 @@ mod tests {
 
     mod p1_model_shape {
         use infra::table::entity::anomaly_detection_config::{Column, Entity, Model};
-        use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
+        use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 
         use super::{update_interval_validation::stored_config, *};
 
@@ -8723,7 +10672,10 @@ mod tests {
                 "WHERE op = 'update'",
             ] {
                 let sql = format!("{GRID} {clause} GROUP BY ts");
-                assert!(validate_custom_sql_grid(&sql, "5m").is_ok(), "{clause}");
+                assert!(
+                    validate_custom_sql_grid(&sql, "5m", None).is_ok(),
+                    "{clause}"
+                );
             }
         }
 
@@ -8739,7 +10691,9 @@ mod tests {
                 "INSERT INTO logs VALUES (1)",
                 "SELECT 1; DROP TABLE t",
             ] {
-                let err = validate_custom_sql_grid(sql, "5m").unwrap_err().to_string();
+                let err = validate_custom_sql_grid(sql, "5m", None)
+                    .unwrap_err()
+                    .to_string();
                 assert!(err.contains("one SELECT"), "{sql}: {err}");
             }
         }
@@ -8754,6 +10708,297 @@ mod tests {
             };
             let err = checked_create_body(&mut req).unwrap_err().to_string();
             assert!(err.contains("one SELECT"), "{err}");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    mod p1_group_by_guard {
+        use std::collections::HashSet;
+
+        use super::*;
+
+        const SELECT: &str = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value \
+                              FROM logs";
+
+        fn fields(names: &[&str]) -> HashSet<String> {
+            names.iter().map(|n| n.to_string()).collect()
+        }
+
+        fn guard(group_by: &str, stream_fields: &[&str]) -> Result<()> {
+            let sql = format!("{SELECT} {group_by}");
+            validate_custom_sql_grid(&sql, "5m", Some(&fields(stream_fields)))
+        }
+
+        #[test]
+        fn a_second_group_by_key_is_rejected_with_the_p1_11_message() {
+            let err = guard("GROUP BY time_bucket, service", &["service"])
+                .unwrap_err()
+                .to_string();
+            assert_eq!(
+                err,
+                "Anomaly detection reads one value per time bucket. Remove 'service' from GROUP \
+                 BY, or use a filter for one value."
+            );
+        }
+
+        #[test]
+        fn group_by_all_and_grouping_modifiers_are_rejected() {
+            for group_by in [
+                "GROUP BY ALL",
+                "GROUP BY ROLLUP (time_bucket, service)",
+                "GROUP BY CUBE (time_bucket, service)",
+                "GROUP BY GROUPING SETS ((time_bucket), (service))",
+                "GROUP BY service, time_bucket",
+                "GROUP BY 1, 3",
+            ] {
+                let err = guard(group_by, &["service"]).unwrap_err().to_string();
+                assert!(
+                    err.starts_with("Anomaly detection reads one value"),
+                    "{group_by}: {err}"
+                );
+            }
+        }
+
+        #[test]
+        fn group_by_all_names_the_bucket_to_group_by() {
+            let err = guard("GROUP BY ALL", &["service"]).unwrap_err().to_string();
+            assert_eq!(
+                err,
+                "Anomaly detection reads one value per time bucket. Replace GROUP BY ALL with \
+                 GROUP BY time_bucket."
+            );
+        }
+
+        #[test]
+        fn the_bucket_alone_passes_by_alias_ordinal_or_call() {
+            for group_by in [
+                "GROUP BY time_bucket",
+                "GROUP BY 1",
+                "GROUP BY histogram(_timestamp, '5m')",
+            ] {
+                assert!(guard(group_by, &["service"]).is_ok(), "{group_by}");
+            }
+        }
+
+        #[test]
+        fn a_quoted_or_qualified_timestamp_still_gets_the_group_by_check() {
+            for column in ["\"_timestamp\"", "logs._timestamp"] {
+                let select = format!(
+                    "SELECT histogram({column}, '5m') AS time_bucket, count(*) AS value FROM logs"
+                );
+                let offender = format!("{select} GROUP BY time_bucket, service");
+                let err = validate_custom_sql_grid(&offender, "5m", Some(&fields(&["service"])))
+                    .unwrap_err()
+                    .to_string();
+                assert!(err.contains("Remove 'service'"), "{column}: {err}");
+                let alone = format!("{select} GROUP BY time_bucket");
+                assert!(
+                    validate_custom_sql_grid(&alone, "5m", Some(&fields(&["service"]))).is_ok(),
+                    "{column}"
+                );
+            }
+        }
+
+        #[test]
+        fn rollup_cube_and_grouping_sets_are_rejected_also_with_a_parenthesized_bucket() {
+            let check = |projection: &str, group_by: &str| {
+                let sql = format!("SELECT {projection}, count(*) AS value FROM logs {group_by}");
+                validate_custom_sql_grid(&sql, "5m", Some(&fields(&["service"])))
+            };
+            for projection in [
+                "(histogram(_timestamp, '5m')) AS time_bucket",
+                "histogram(_timestamp, '5m') AS time_bucket",
+            ] {
+                for group_by in [
+                    "GROUP BY ROLLUP((histogram(_timestamp, '5m')), service)",
+                    "GROUP BY CUBE(time_bucket, service)",
+                    "GROUP BY GROUPING SETS ((time_bucket), (time_bucket, service))",
+                    "GROUP BY ROLLUP(time_bucket)",
+                ] {
+                    assert!(
+                        check(projection, group_by).is_err(),
+                        "{projection} {group_by}"
+                    );
+                }
+                assert!(
+                    check(projection, "GROUP BY time_bucket").is_ok(),
+                    "{projection}"
+                );
+                assert!(
+                    check(projection, "GROUP BY (histogram(_timestamp, '5m'))").is_ok(),
+                    "{projection}"
+                );
+            }
+            let mut stored =
+                custom_sql_grid_rules_stored(&format!("{SELECT} GROUP BY time_bucket"));
+            stored.histogram_interval = "5m".to_string();
+            let rollup = "SELECT (histogram(_timestamp, '5m')) AS time_bucket, count(*) AS value FROM \
+                          logs GROUP BY ROLLUP((histogram(_timestamp, '5m')), service)";
+            let edit = UpdateAnomalyConfigRequest {
+                custom_sql: Some(rollup.to_string()),
+                ..Default::default()
+            };
+            let (sql, histogram) = custom_sql_to_validate(&edit, &stored).unwrap();
+            assert!(
+                validate_custom_sql_grid(sql, &histogram, Some(&fields(&["service"]))).is_err()
+            );
+        }
+
+        #[test]
+        fn a_second_group_by_key_in_a_cte_or_a_union_branch_is_rejected() {
+            let bucketed = "SELECT histogram(_timestamp, '5m') AS time_bucket, service, \
+                            count(*) AS value FROM logs";
+            let check = |sql: String| {
+                validate_custom_sql_grid(&sql, "5m", Some(&fields(&["service"])))
+                    .map_err(|e| e.to_string())
+            };
+            let cte = |group_by: &str| {
+                format!("WITH s AS ({bucketed} {group_by}) SELECT time_bucket, value FROM s")
+            };
+            let err = check(cte("GROUP BY time_bucket, service")).unwrap_err();
+            assert!(err.contains("Remove 'service'"), "{err}");
+            assert!(check(cte("GROUP BY time_bucket")).is_ok());
+            let union = format!(
+                "{SELECT} GROUP BY time_bucket UNION ALL {bucketed} GROUP BY time_bucket, service"
+            );
+            let err = check(union).unwrap_err();
+            assert!(err.contains("Remove 'service'"), "{err}");
+            let helper = format!(
+                "WITH h AS (SELECT service, host, count(*) AS n FROM logs GROUP BY service, host) \
+                 {SELECT} GROUP BY time_bucket"
+            );
+            assert!(
+                check(helper).is_ok(),
+                "a CTE with no bucket is not a row source"
+            );
+        }
+
+        #[test]
+        fn a_second_group_by_key_in_a_from_subquery_is_rejected() {
+            let inner = "SELECT histogram(_timestamp, '5m') AS time_bucket, service, count(*) AS \
+                         value FROM logs";
+            let check = |sql: String| {
+                validate_custom_sql_grid(&sql, "5m", Some(&fields(&["service"])))
+                    .map_err(|e| e.to_string())
+            };
+            let nested = |inner_group_by: &str, outer_group_by: &str| {
+                format!(
+                    "SELECT time_bucket, max(value) AS value FROM ({inner} {inner_group_by}) s \
+                     {outer_group_by}"
+                )
+            };
+            let err = check(nested("GROUP BY time_bucket, service", "")).unwrap_err();
+            assert!(err.contains("Remove 'service'"), "{err}");
+            let err = check(nested(
+                "GROUP BY time_bucket",
+                "GROUP BY time_bucket, service",
+            ))
+            .unwrap_err();
+            assert!(err.contains("Remove 'service'"), "{err}");
+            assert!(check(nested("GROUP BY time_bucket", "GROUP BY time_bucket")).is_ok());
+            assert!(check(nested("GROUP BY 1", "")).is_ok());
+        }
+
+        #[test]
+        fn unquoted_names_match_in_any_case_and_quoted_ones_exactly() {
+            let check = |alias: &str, group_by: &str| {
+                let sql = format!(
+                    "SELECT histogram(_timestamp, '5m') AS {alias}, count(*) AS value FROM logs \
+                     GROUP BY {group_by}"
+                );
+                validate_custom_sql_grid(&sql, "5m", Some(&fields(&["service"])))
+            };
+            assert!(check("TIME_BUCKET", "time_bucket").is_ok());
+            assert!(check("time_bucket", "Time_Bucket").is_ok());
+            assert!(check("\"time_bucket\"", "time_bucket").is_ok());
+            assert!(check("\"TIME_BUCKET\"", "TIME_BUCKET").is_err());
+            assert!(check("\"TIME_BUCKET\"", "\"TIME_BUCKET\"").is_ok());
+        }
+
+        #[test]
+        fn an_alias_that_a_stream_field_shadows_is_not_the_bucket() {
+            let err = guard("GROUP BY time_bucket", &["time_bucket"])
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("Remove 'time_bucket'"), "{err}");
+        }
+
+        #[test]
+        fn without_the_stream_fields_the_guard_does_not_run() {
+            let sql = format!("{SELECT} GROUP BY time_bucket, service");
+            assert!(validate_custom_sql_grid(&sql, "5m", None).is_ok());
+            assert!(
+                validate_config_request(&{
+                    let mut req = make_valid_filters_req();
+                    req.query_mode = "custom_sql".to_string();
+                    req.filters = None;
+                    req.custom_sql = Some(sql.clone());
+                    req
+                })
+                .is_ok()
+            );
+        }
+
+        #[test]
+        fn an_unchanged_stored_sql_is_not_revalidated_and_a_changed_one_is() {
+            let stored_sql = format!("{SELECT} GROUP BY time_bucket, service");
+            let mut stored = custom_sql_grid_rules_stored(&stored_sql);
+            stored.histogram_interval = "5m".to_string();
+            let unrelated = UpdateAnomalyConfigRequest {
+                description: Some("renamed".to_string()),
+                ..Default::default()
+            };
+            assert!(custom_sql_to_validate(&unrelated, &stored).is_none());
+            let resent = UpdateAnomalyConfigRequest {
+                custom_sql: Some(stored_sql.clone()),
+                ..Default::default()
+            };
+            assert!(custom_sql_to_validate(&resent, &stored).is_none());
+            let changed_sql = format!("{SELECT} WHERE a = 1 GROUP BY time_bucket, service");
+            let changed = UpdateAnomalyConfigRequest {
+                custom_sql: Some(changed_sql.clone()),
+                ..Default::default()
+            };
+            let (sql, histogram) = custom_sql_to_validate(&changed, &stored).unwrap();
+            assert_eq!(sql, changed_sql);
+            let err = validate_custom_sql_grid(sql, &histogram, Some(&fields(&["service"])))
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("Remove 'service'"), "{err}");
+        }
+
+        #[test]
+        fn an_update_probes_the_stream_its_new_sql_reads() {
+            let mut stored =
+                custom_sql_grid_rules_stored(&format!("{SELECT} GROUP BY time_bucket"));
+            stored.stream_name = "a".to_string();
+            let sql = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM b \
+                       GROUP BY time_bucket";
+            assert_eq!(group_by_stream(sql, &stored), "b");
+            assert!(
+                validate_custom_sql_grid(sql, "5m", Some(&fields(&["service"]))).is_ok(),
+                "b has no physical time_bucket, so the alias is the bucket"
+            );
+            assert!(
+                validate_custom_sql_grid(sql, "5m", Some(&fields(&["time_bucket"]))).is_err(),
+                "a's physical time_bucket would reject it"
+            );
+            let joined = "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \
+                          b JOIN c ON b.x = c.x GROUP BY time_bucket";
+            assert_eq!(
+                group_by_stream(joined, &stored),
+                "a",
+                "no single stream keeps the stored one"
+            );
+        }
+
+        fn custom_sql_grid_rules_stored(
+            sql: &str,
+        ) -> infra::table::entity::anomaly_detection_config::Model {
+            let mut stored = update_interval_validation::stored_config();
+            stored.query_mode = "custom_sql".to_string();
+            stored.custom_sql = Some(sql.to_string());
+            stored
         }
     }
 

@@ -1789,6 +1789,7 @@ fn service_route_table() -> Router {
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))
             .route("/{org_id}/anomaly_detection/{config_id}/train", delete(anomaly_detection::cancel_training))
             .route("/{org_id}/anomaly_detection/{config_id}/history", get(anomaly_detection::get_detection_history))
+            .route("/{org_id}/anomaly_detection/{config_id}/explore", get(anomaly_detection::get_explore))
             .route("/{org_id}/anomaly_detection/history", get(alerts::history::get_all_anomaly_history))
 
             .route("/v2/{org_id}/alerts/history/summary", get(alerts::history_summary::get_alert_history_summary));
@@ -3644,8 +3645,6 @@ mod tests {
             ("POST", "/api/default/status_pages/notices/n1/updates", 403, "require an enterprise license"),
             ("POST", "/api/default/status_pages/notices/n1/mark_false_positive", 403, "require an enterprise license"),
             ("POST", "/api/default/status_pages/s1/domains", 403, "require an enterprise license"),
-            ("POST", "/api/default/llm/models", 403, "Not supported in the open source version"),
-            ("PUT", "/api/default/llm/models/m1", 403, "Not supported in the open source version"),
             ("POST", "/api/v2/default/alerts/incidents", 403, "Service incidents require the enterprise build"),
             ("PUT", "/api/default/service_identity/overrides", 403, "Service versions require the enterprise build"),
             ("POST", "/api/default/service_identity/aliases", 403, "Service versions require the enterprise build"),
@@ -3710,6 +3709,54 @@ mod tests {
             "stubs read the request before refusing:\n{}",
             wrong.join("\n")
         );
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn model_pricing_writes_reach_their_handlers_in_the_oss_build() {
+        let app = Router::new().nest("/api", service_route_table());
+        let price = |name: &str| {
+            serde_json::json!({
+                "name": name, "match_pattern": "(?i)^x$", "enabled": true,
+                "tiers": [{"name": "Default", "prices": {"input": 1e-6, "output": 2e-6}}],
+            })
+            .to_string()
+        };
+        let cases = [
+            (
+                "POST",
+                "/api/default/llm/models",
+                price(""),
+                400,
+                "Model name is required",
+            ),
+            (
+                "POST",
+                "/api/_openobserve/llm/models",
+                price("x"),
+                403,
+                "built-in org",
+            ),
+        ];
+        for (method, path, body, status, message) in cases {
+            let req = Request::builder()
+                .method(Method::from_bytes(method.as_bytes()).unwrap())
+                .uri(path)
+                .header("user_id", "root@example.com")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(body))
+                .unwrap();
+            let response = app.clone().oneshot(req).await.unwrap();
+            let got = response.status().as_u16();
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let text = String::from_utf8_lossy(&bytes);
+            assert!(
+                got == status && text.contains(message),
+                "{method} {path}: {got} {text}"
+            );
+        }
     }
 
     #[cfg(not(feature = "enterprise"))]

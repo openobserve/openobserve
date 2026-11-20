@@ -38,6 +38,7 @@ const securityAccess = vi.hoisted(() => ({ canOpen: true, licenseLocked: false }
 vi.mock("@/composables/security/useSecurityAccess", async () => {
   const { computed } = await import("vue");
   return {
+    isSecurityAlpha: () => false,
     useSecurityAccess: () => ({
       canOpen: computed(() => securityAccess.canOpen),
       licenseLocked: computed(() => securityAccess.licenseLocked),

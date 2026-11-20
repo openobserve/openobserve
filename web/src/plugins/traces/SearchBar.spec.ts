@@ -67,7 +67,10 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 // The last autoCompleteData the component created, so tests can read the stream context it was given.
-const suggestState = vi.hoisted(() => ({ autoCompleteData: null as any }));
+const suggestState = vi.hoisted(() => ({
+  autoCompleteData: null as any,
+  setValuesTimeRange: vi.fn(),
+}));
 
 vi.mock("@/composables/useSuggestions", () => ({
   default: () => ({
@@ -85,6 +88,7 @@ vi.mock("@/composables/useSuggestions", () => ({
     getSuggestions: vi.fn(),
     updateFieldKeywords: vi.fn(),
     updateStreamKeywords: vi.fn(),
+    setValuesTimeRange: suggestState.setValuesTimeRange,
   }),
 }));
 
@@ -331,6 +335,7 @@ import queryHistory from "@/services/query_history";
 import { queryClient } from "@/composables/query/queryClient";
 // ---------------------------------------------------------------------------
 import SearchBar from "@/plugins/traces/SearchBar.vue";
+import SqlFilterBuilder from "@/components/filterBar/SqlFilterBuilder.vue";
 import analytics from "@/services/product_analytics";
 import SavedViewsSubmenu from "@/components/savedViews/SavedViewsSubmenu.vue";
 import { useToolbarPins } from "@/composables/useToolbarPins";
@@ -389,6 +394,8 @@ const sharedStubs = {
       "hideNlToggle",
       "nlpMode",
       "transformGeneratedQuery",
+      "fullTextSearch",
+      "valuesTimeRange",
     ],
     emits: ["update:query", "run-query", "focus", "blur", "user-edit", "update:nlpMode"],
     setup(_: unknown, { emit }: { emit: (event: "focus") => void }) {
@@ -1531,6 +1538,54 @@ describe("SearchBar", () => {
     });
   });
 
+  describe("share link of an unrun query", () => {
+    const shareBtn = () => wrapper.find('[data-test="logs-search-bar-share-link-btn"]');
+    const markRun = () => {
+      searchObjInstance.meta.lastRunSignature = tracesSearchRunSignature(searchObjInstance);
+    };
+    const mountWithShare = () =>
+      mount(SearchBar, {
+        attachTo: "#app",
+        props: { fieldValues: {}, isLoading: false },
+        global: { plugins: [store, router], stubs: { ...sharedStubs, ShareButton: false } },
+      });
+
+    beforeEach(() => {
+      store.state.zoConfig = { ...store.state.zoConfig, web_url: "http://localhost" };
+    });
+
+    afterEach(() => {
+      store.state.zoConfig = { ...store.state.zoConfig, web_url: "" };
+    });
+
+    it("disables Share with the Logs reason once a builder chip waits for Run", async () => {
+      markRun();
+      wrapper = mountWithShare();
+      await flushPromises();
+      expect(shareBtn().attributes("aria-disabled")).toBeUndefined();
+
+      expect((wrapper.vm as any).onFilterBuilderQuery("operation_name = 'POST /checkout'")).toBe(
+        false,
+      );
+      await flushPromises();
+
+      expect(shareBtn().attributes("aria-disabled")).toBe("true");
+      expect(shareBtn().text()).toContain("search.autoRunPersistNeedsRun");
+
+      markRun();
+      await flushPromises();
+
+      expect(shareBtn().attributes("aria-disabled")).toBeUndefined();
+    });
+
+    it("disables Share before the first run", async () => {
+      wrapper = mountWithShare();
+      await flushPromises();
+
+      expect(shareBtn().attributes("aria-disabled")).toBe("true");
+    });
+  });
+
   describe("toolbar collapse stages", () => {
     let widthSpy: ReturnType<typeof mockToolbarWidth>;
     const { isPinned, togglePin } = useToolbarPins("traces");
@@ -1817,6 +1872,20 @@ describe("SearchBar", () => {
   });
 
   // -------------------------------------------------------------------------
+  describe("filter builder free text", () => {
+    afterEach(() => localStorage.removeItem("o2.traces.queryInput"));
+
+    it("never offers a search-text row, since trace streams have no full-text fields", async () => {
+      localStorage.setItem("o2.traces.queryInput", "builder");
+      searchObjInstance.meta.showQuery = true;
+      searchObjInstance.meta.sqlMode = false;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(wrapper.findComponent(SqlFilterBuilder).props("freeText")).toBe(false);
+    });
+  });
+
   describe("filter builder growth", () => {
     let rectSpy: ReturnType<typeof vi.spyOn> | undefined;
 
@@ -1971,6 +2040,51 @@ describe("SearchBar", () => {
       expect(editorProps().props("filterMode")).toBe(true);
     });
 
+    it("never offers match_all for a typed word, since trace streams have no full-text fields", async () => {
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      expect(editorProps().props("fullTextSearch")).toBe(false);
+    });
+
+    it("looks up values over the selected range, cut to its latest day", async () => {
+      const HOUR = 3_600_000_000;
+      const end = 29_000_000 * 60_000_000;
+      searchObjInstance.data.datetime.type = "absolute";
+      searchObjInstance.data.datetime.startTime = end - 7 * 24 * HOUR;
+      searchObjInstance.data.datetime.endTime = end;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      const window = { startTime: end - 24 * HOUR, endTime: end, capped: true };
+      const readRange = suggestState.setValuesTimeRange.mock.calls.at(-1)![0];
+      expect(readRange()).toEqual(window);
+      expect(editorProps().props("valuesTimeRange")).toEqual(window);
+    });
+
+    it("looks up a relative range from the time of the lookup", async () => {
+      const MINUTE = 60_000_000;
+      const end = 29_000_000 * MINUTE;
+      searchObjInstance.data.datetime.type = "relative";
+      searchObjInstance.data.datetime.startTime = end - 15 * MINUTE;
+      searchObjInstance.data.datetime.endTime = end;
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        vi.setSystemTime((end + 60 * MINUTE) / 1000);
+        const readRange = suggestState.setValuesTimeRange.mock.calls.at(-1)![0];
+        expect(readRange()).toEqual({
+          startTime: end + 45 * MINUTE,
+          endTime: end + 60 * MINUTE,
+          capped: false,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("hands the query to suggestions after 100 ms, as Logs does", async () => {
       wrapper = mountSearchBar();
       await flushPromises();
@@ -2055,13 +2169,6 @@ describe("SearchBar", () => {
     it.each([
       ["Reset", (vm: any) => vm.resetFilters()],
       ["an applied filter", (vm: any) => vm.applyFilters(["span_status = 'ERROR'"], true)],
-      [
-        "a removed filter",
-        (vm: any) => {
-          searchObjInstance.data.editorValue = "span_status = 'ERROR'";
-          vm.removeFilterByField("span_status");
-        },
-      ],
     ])("reports the query label cleared on %s", async (_name, act) => {
       wrapper = mountSearchBar({ assistantSet: new Set(["query", "time"]) });
       await flushPromises();

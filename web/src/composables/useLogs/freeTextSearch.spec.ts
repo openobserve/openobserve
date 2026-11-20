@@ -346,6 +346,17 @@ describe("freeTextWhereByStream and filterForParsing", () => {
       "match_all('timeout') and level='error'",
     );
   });
+
+  it.each([
+    ["(order = 'o1') AND msg = 'A'", `("order" = 'o1') AND msg = 'A'`],
+    ["group != 'g' or msg = 'A'", `"group" != 'g' or msg = 'A'`],
+    ["str_match(order, 'x')", `str_match("order", 'x')`],
+    [`"order" = 'o1'`, `"order" = 'o1'`],
+    ["msg = 'order by group'", "msg = 'order by group'"],
+    ["limit = 1", "limit = 1"],
+  ])("quotes a field the parser reserves, and nothing else: %s", (filter, parsed) => {
+    expect(filterForParsing(filter, new Set(["order", "group", "msg"]))).toBe(parsed);
+  });
 });
 
 describe("noFtsStreams", () => {

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::dashboards::Dashboard;
 use infra::{errors::Result, table};
 use o2_enterprise::enterprise::super_cluster::queue::{DashboardMessage, Message};
 
@@ -31,8 +32,10 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
             dashboard,
             ..
         } => {
+            let (folder_id, new_folder_id) =
+                settled_move(&org_id, folder_id, new_folder_id, &dashboard).await?;
             // `clone` is always true for super cluster
-            table::dashboards::put(
+            let dashboard = table::dashboards::put(
                 &org_id,
                 &folder_id,
                 new_folder_id.as_deref(),
@@ -40,6 +43,12 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
                 true,
             )
             .await?;
+            // Logged, not returned: a redelivered update could land after a newer one.
+            if let Some(id) = dashboard.dashboard_id()
+                && let Err(e) = infra::coordinator::dashboards::emit_put_event(&org_id, id).await
+            {
+                log::error!("[SUPER_CLUSTER:dashboards] put event failed for {org_id}/{id}: {e}");
+            }
         }
         DashboardMessage::Delete {
             org_id,
@@ -47,6 +56,8 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
             dashboard_id,
         } => {
             table::dashboards::delete_from_folder(&org_id, &folder_id, &dashboard_id).await?;
+            // Returned so the message is redelivered; deleting a missing dashboard is a no-op.
+            infra::coordinator::dashboards::emit_delete_event(&org_id, &dashboard_id).await?;
         }
         DashboardMessage::TimedAnnotationCreate {
             dashboard_id,
@@ -92,4 +103,23 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
         }
     };
     Ok(())
+}
+
+/// A redelivered move finds the dashboard already in its target folder, so it updates it there
+/// instead of recreating it in the folder it left.
+async fn settled_move(
+    org_id: &str,
+    folder_id: String,
+    new_folder_id: Option<String>,
+    dashboard: &Dashboard,
+) -> Result<(String, Option<String>)> {
+    let (Some(target), Some(id)) = (new_folder_id.as_deref(), dashboard.dashboard_id()) else {
+        return Ok((folder_id, new_folder_id));
+    };
+    match table::dashboards::get_by_id_primary(org_id, id).await? {
+        Some((current, _)) if current.folder_id == target && target != folder_id => {
+            Ok((current.folder_id, None))
+        }
+        _ => Ok((folder_id, new_folder_id)),
+    }
 }

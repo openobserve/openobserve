@@ -124,6 +124,18 @@ struct IncidentSend<'a> {
     alert_template: Option<&'a config::meta::destinations::Template>,
 }
 
+/// The incident an [`IncidentSend`] announces, as its notification shows it.
+#[cfg(feature = "enterprise")]
+struct IncidentNotice<'a> {
+    org_id: &'a str,
+    incident_id: &'a str,
+    event: &'a str,
+    title: &'a str,
+    severity: &'a str,
+    service_name: &'a str,
+    incident_url: &'a str,
+}
+
 /// Identity being correlated into an incident.
 ///
 /// Decouples correlation/incident-creation from the concrete `Alert` type so that
@@ -988,21 +1000,21 @@ async fn send_incident_notifications_inner(
         incident_id,
     );
     let subject = format!("[{event}] {title}");
+    let notice = IncidentNotice {
+        org_id,
+        incident_id,
+        event,
+        title: &title,
+        severity: &severity,
+        service_name: &service_name,
+        incident_url: &incident_url,
+    };
 
     let mut success_parts: Vec<String> = Vec::new();
     let mut err_parts: Vec<String> = Vec::new();
 
     for mut send in sends {
-        apply_incident_to_context(
-            &mut send.ctx,
-            org_id,
-            incident_id,
-            event,
-            &title,
-            &severity,
-            &service_name,
-            &incident_url,
-        );
+        apply_incident_to_context(&mut send.ctx, &notice);
         let explicit: Vec<_> = send.alert_template.into_iter().cloned().collect();
         for dest_name in &send.dest_names {
             match notify_incident_destination(org_id, dest_name, &explicit, &subject, &mut send.ctx)
@@ -1088,16 +1100,20 @@ fn incident_page_url(web_url: &str, base_uri: &str, org_id: &str, incident_id: &
 
 /// Point `ctx` at the incident: its link, and the `incident_*` template variables.
 #[cfg(feature = "enterprise")]
+#[allow(clippy::too_many_arguments)]
 fn apply_incident_to_context(
     ctx: &mut crate::alerts::notifications::NotificationContext,
-    org_id: &str,
-    incident_id: &str,
-    event: &str,
-    title: &str,
-    severity: &str,
-    service_name: &str,
-    incident_url: &str,
+    notice: &IncidentNotice<'_>,
 ) {
+    let IncidentNotice {
+        org_id,
+        incident_id,
+        event,
+        title,
+        severity,
+        service_name,
+        incident_url,
+    } = *notice;
     // The source alert's page is the object button; the incident page replaces its data link.
     let cfg = config::get_config();
     ctx.alert_detail_url = crate::alerts::notifications::context::alert_detail_url(
@@ -10866,16 +10882,16 @@ mod tests {
             episode_id: Some("alert-episode".into()),
             ..Default::default()
         };
-        apply_incident_to_context(
-            &mut ctx,
-            "default",
-            "inc_1",
-            "severity_escalated",
-            "High error rate",
-            "P1",
-            "checkout",
-            "https://o2/web/incidents/inc_1",
-        );
+        let notice = IncidentNotice {
+            org_id: "default",
+            incident_id: "inc_1",
+            event: "severity_escalated",
+            title: "High error rate",
+            severity: "P1",
+            service_name: "checkout",
+            incident_url: "https://o2/web/incidents/inc_1",
+        };
+        apply_incident_to_context(&mut ctx, &notice);
         assert_eq!(ctx.kind, NotificationKind::Incident);
         assert_eq!(ctx.event, NotificationEvent::Firing);
         assert_eq!(ctx.episode_id.as_deref(), Some("inc_1"));
@@ -10890,7 +10906,16 @@ mod tests {
             alert_url: "https://o2/web/short/ab".into(),
             ..Default::default()
         };
-        apply_incident_to_context(&mut sourced, "acme", "inc_1", "e", "t", "P1", "s", "u");
+        let notice = IncidentNotice {
+            org_id: "acme",
+            incident_id: "inc_1",
+            event: "e",
+            title: "t",
+            severity: "P1",
+            service_name: "s",
+            incident_url: "u",
+        };
+        apply_incident_to_context(&mut sourced, &notice);
         let cfg = config::get_config();
         assert_eq!(
             sourced.alert_detail_url,
@@ -13003,16 +13028,16 @@ mod tests {
             alert_level: "critical".into(),
             ..Default::default()
         };
-        super::apply_incident_to_context(
-            &mut ctx,
-            "default",
-            "inc-1",
-            "new_incident_created",
-            "go_gc_rate_high on coredns",
-            "P2",
-            "coredns",
+        let notice = super::IncidentNotice {
+            org_id: "default",
+            incident_id: "inc-1",
+            event: "new_incident_created",
+            title: "go_gc_rate_high on coredns",
+            severity: "P2",
+            service_name: "coredns",
             incident_url,
-        );
+        };
+        super::apply_incident_to_context(&mut ctx, &notice);
         assert_eq!(ctx.alert_url, incident_url);
         assert_eq!(ctx.incident_id, "inc-1");
         assert_eq!(ctx.alert_level, "P2");
@@ -13030,9 +13055,16 @@ mod tests {
             ("", None),
         ] {
             let mut other = NotificationContext::default();
-            super::apply_incident_to_context(
-                &mut other, "default", "inc-2", "e", "t", severity, "s", "u",
-            );
+            let notice = super::IncidentNotice {
+                org_id: "default",
+                incident_id: "inc-2",
+                event: "e",
+                title: "t",
+                severity,
+                service_name: "s",
+                incident_url: "u",
+            };
+            super::apply_incident_to_context(&mut other, &notice);
             assert_eq!(other.level, level, "{severity}");
         }
 
@@ -13047,7 +13079,7 @@ mod tests {
         };
         let slack: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert!(slack.get("incident").is_none(), "{body}");
-        assert!(slack["blocks"].is_array(), "{body}");
+        assert!(slack["attachments"][0]["blocks"].is_array(), "{body}");
         assert!(body.contains("incidents/inc-1"), "{body}");
 
         let custom = apply_custom_template(

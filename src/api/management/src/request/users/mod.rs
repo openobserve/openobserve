@@ -69,6 +69,8 @@ pub mod service_accounts;
 
 #[cfg(feature = "enterprise")]
 const MAX_LOGIN_USER_AGENT_BYTES: usize = 1024;
+const CLOUD_ADD_MEMBER_REFUSED: &str =
+    "On OpenObserve Cloud, add members with an invitation: POST /api/{org}/invites";
 
 /// One organization member, as the list endpoint reports them, plus their lockout state.
 ///
@@ -280,7 +282,7 @@ fn validate_org_id(org_id: &str) -> Option<&'static str> {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Users", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new user", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": !cfg!(feature = "cloud"), "description": "Create a new user", "category": "users"}))
     )
 )]
 pub async fn save(
@@ -288,6 +290,9 @@ pub async fn save(
     Headers(user_email): Headers<UserEmail>,
     axum::Json(user): axum::Json<PostUserRequest>,
 ) -> Response {
+    if cfg!(feature = "cloud") {
+        return MetaHttpResponse::forbidden(CLOUD_ADD_MEMBER_REFUSED);
+    }
     let initiator_id = user_email.user_id;
     let mut user = UserRequest::from(&user);
     user.email = user.email.trim().to_lowercase();
@@ -469,6 +474,9 @@ pub async fn add_user_to_org(
     Headers(user_email): Headers<UserEmail>,
     axum::Json(role): axum::Json<UserRoleRequest>,
 ) -> Response {
+    if cfg!(feature = "cloud") {
+        return MetaHttpResponse::forbidden(CLOUD_ADD_MEMBER_REFUSED);
+    }
     let initiator_id = user_email.user_id;
     let role = UserOrgRole::from(&role);
 
@@ -1502,6 +1510,38 @@ pub async fn list_invitations(Headers(_user_email): Headers<UserEmail>) -> Respo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "cloud")]
+    fn caller() -> Headers<UserEmail> {
+        Headers(UserEmail {
+            user_id: "admin@example.com".to_string(),
+        })
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn cloud_refuses_creating_a_user() {
+        let body: PostUserRequest = serde_json::from_value(serde_json::json!({
+            "email": "jane@example.com",
+            "password": "a-long-enough-password-1A!",
+            "role": "admin",
+        }))
+        .unwrap();
+        let resp = save(Path("acme".to_string()), caller(), axum::Json(body)).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn cloud_refuses_adding_an_existing_user() {
+        let role = UserRoleRequest {
+            role: "admin".to_string(),
+            ..Default::default()
+        };
+        let path = Path(("acme".to_string(), "jane@example.com".to_string()));
+        let resp = add_user_to_org(path, caller(), axum::Json(role)).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]

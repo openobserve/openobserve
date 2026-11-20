@@ -458,6 +458,7 @@ import { detectChunkingDirection } from "@/utils/dashboard/chunkingDirection";
 import type { SeriesLimitInfo } from "@/utils/dashboard/panelDiagnostics";
 import type { RegionJoinInfo } from "@/utils/dashboard/convertMapsData";
 import type { SankeyNotice } from "@/utils/dashboard/convertSankeyData";
+import type { TreemapNotice } from "@/utils/dashboard/convertTreemapData";
 
 interface CustomChartVariable {
   name: string;
@@ -718,6 +719,7 @@ export default defineComponent({
     "series-limit-update",
     "region-join-update",
     "sankey-notice-update",
+    "treemap-notice-update",
     "panel-diagnostics-update",
     "sparkline-warning-update",
     "is-partial-data-update",
@@ -792,6 +794,7 @@ export default defineComponent({
     const seriesLimit = ref<SeriesLimitInfo | null>(null);
     const regionJoin = shallowRef<RegionJoinInfo | null>(null);
     const sankeyNotice = ref<SankeyNotice | null>(null);
+    const treemapNotice = ref<TreemapNotice | null>(null);
 
     const chartPanelStyle = ref({
       height: "100%",
@@ -1033,6 +1036,11 @@ export default defineComponent({
           ? (metadata.value?.queries?.[index]?.panelQueryIndex ?? index)
           : index,
       );
+
+    // SQL buffers hold one row array per query; PromQL buffers hold { result } objects.
+    const bufferHasRows = (buffer: any) =>
+      !!buffer?.length &&
+      buffer.some((q: any) => q?.result?.length > 0 || (Array.isArray(q) && q.length > 0));
 
     // One rule for filteredData and the series mapping; null means data passes through untouched.
     const keptDataIndexes = computed((): number[] | null => {
@@ -1591,10 +1599,7 @@ export default defineComponent({
       // resize observer, etc.) can't replace it with an empty 0-series result
       // before the first streaming chunk arrives. The streaming overlay path
       // (applyOverlay=true) and loading=false final renders are unaffected.
-      const hasRows =
-        data.value?.length > 0 &&
-        (data.value[0]?.result?.length > 0 ||
-          (Array.isArray(data.value[0]) && data.value[0].length > 0));
+      const hasRows = bufferHasRows(filteredData.value);
       const hasOldChart = panelData.value?.options?.series?.length > 0;
       if (!applyOverlay && loading.value && !hasRows && hasOldChart) {
         return;
@@ -1732,6 +1737,7 @@ export default defineComponent({
           seriesLimit.value = panelData.value?.extras?.seriesLimit ?? null;
           regionJoin.value = panelData.value?.extras?.regionJoin ?? null;
           sankeyNotice.value = panelData.value?.extras?.sankeyNotice ?? null;
+          treemapNotice.value = panelData.value?.extras?.treemapNotice ?? null;
 
           // A new run reports its own outcome; with no run left there is nothing to report it.
           if (!showsCustomChartError.value || !customChartRun.value) {
@@ -1748,6 +1754,7 @@ export default defineComponent({
           }
           regionJoin.value = null;
           sankeyNotice.value = null;
+          treemapNotice.value = null;
           errorDetail.value = {
             message: error?.message,
             code: error?.code || "",
@@ -1756,6 +1763,7 @@ export default defineComponent({
       } else {
         regionJoin.value = null;
         sankeyNotice.value = null;
+        treemapNotice.value = null;
         // if no data is available, then show the default data
         // if there is an error config in the panel schema, then show the default data on error
         // if no default data on error is set, then show the custom error message
@@ -1908,12 +1916,7 @@ export default defineComponent({
           };
 
         // Check if this is the first chunk with actual data
-        // SQL queries have data.value[0] as an array of hits (not an object with .result)
-        // PromQL queries have data.value[0] as an object with .result property
-        const hasData =
-          data.value?.length > 0 &&
-          (data.value[0]?.result?.length > 0 ||
-            (Array.isArray(data.value[0]) && data.value[0].length > 0));
+        const hasData = bufferHasRows(filteredData.value);
         // An emptied buffer is a new run: no conversion started before it may land.
         if (!data.value?.length) conversionGeneration++;
 
@@ -2141,6 +2144,13 @@ export default defineComponent({
       },
       { immediate: true },
     );
+    watch(
+      treemapNotice,
+      (value) => {
+        emit("treemap-notice-update", value);
+      },
+      { immediate: true },
+    );
 
     watch(
       () => panelDiagnostics?.value,
@@ -2223,7 +2233,7 @@ export default defineComponent({
         return loading.value && panelData.value?.options?.series?.length > 0 ? "" : "No Data";
       }
 
-      const hasRawData = data.value?.length && data.value[0]?.length;
+      const hasRawData = bufferHasRows(filteredData.value);
 
       // During data buffer reset (executor clears state.data before reload),
       // suppress "No Data" only while still loading to avoid flicker.
@@ -2273,9 +2283,13 @@ export default defineComponent({
       // Metric/gauge series are always created by the converter
       // (they use renderItem, not data arrays), so check the raw Y value.
       if (type === "metric" || type === "gauge") {
-        const firstRow = data.value[0]?.[0];
-        const yAlias = panelSchema.value.queries[0].fields.y.map((it: any) => it.alias || []);
-        return yAlias.every((y: any) => getDataValue(firstRow, y) != null) ? "" : "No Data";
+        const queries = filteredPanelSchema.value.queries ?? [];
+        const hasValue = (filteredData.value ?? []).some((rows: any, i: number) => {
+          if (!queries[i]) return false;
+          const yAlias = (queries[i].fields?.y ?? []).map((it: any) => it.alias || []);
+          return yAlias.every((y: any) => getDataValue(rows?.[0], y) != null);
+        });
+        return hasValue ? "" : "No Data";
       }
 
       // For all other chart types (line, area, bar, scatter, heatmap, etc.),

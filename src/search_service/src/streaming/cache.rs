@@ -441,18 +441,6 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
     );
 
-    #[cfg(feature = "vectorscan")]
-    crate::cache::apply_regex_to_response(
-        req,
-        org_id,
-        all_streams,
-        stream_type,
-        &mut cached.cached_response,
-        trace_id,
-        "cached_res",
-    )
-    .await?;
-
     if is_result_array_skip_vrl {
         cached.cached_response.hits = crate::cache::apply_vrl_to_response(
             backup_query_fn.clone(),

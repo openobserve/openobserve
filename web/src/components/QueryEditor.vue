@@ -109,6 +109,7 @@
         :filter-mode="filterMode"
         :values-time-range="valuesTimeRange ?? null"
         :recent-queries="recentQueries ?? []"
+        :full-text-search="fullTextSearch"
         :transform-generated-query="transformGeneratedQuery ?? undefined"
         @update:query="handleQueryUpdate"
         @user-edit="(isBlank: boolean, wasBlank: boolean) => emit('user-edit', isBlank, wasBlank)"
@@ -159,6 +160,7 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
+import type { FieldValuesWindow } from "@/composables/fieldValueStore";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -199,8 +201,9 @@ interface Props {
   debounceTime?: number; // Debounce time for query updates (ms)
   freeTextDecorations?: { ranges: { start: number; end: number }[]; hover: I18nText } | null;
   filterMode?: boolean; // The query is a bare WHERE fragment (Logs without SQL mode)
-  valuesTimeRange?: { startTime: number; endTime: number } | null; // Range field values are looked up in (microseconds)
+  valuesTimeRange?: FieldValuesWindow | null; // Range field values are looked up in (microseconds)
   recentQueries?: string[]; // The user's recent queries, offered as clock rows while typing
+  fullTextSearch?: boolean; // False when a selected stream has no full-text search field (no match_all row)
   transformGeneratedQuery?: ((sql: string) => string | null) | null; // Page-specific write of an AI result (null result = keep the editor)
 
   // NL Mode (optional external control)
@@ -232,6 +235,7 @@ const props = withDefaults(defineProps<Props>(), {
   textPreview: false,
   showAutoComplete: true,
   releaseWheelToPage: true,
+  fullTextSearch: true,
   keywords: () => [],
   suggestions: () => [],
   debounceTime: 500,

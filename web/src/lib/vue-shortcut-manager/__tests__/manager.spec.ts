@@ -22,6 +22,31 @@ const fakeEvent = (over: Record<string, unknown>) =>
   }) as any;
 
 describe("ShortcutManager", () => {
+  it("leaves editor-consumed and IME-composing keyboard events alone", () => {
+    const manager = new ShortcutManager();
+    const handler = vi.fn();
+    manager.register({ key: "ctrl+k", handler, allowInInput: true });
+    const consumed = new KeyboardEvent("keydown", { key: "k", ctrlKey: true, cancelable: true });
+    consumed.preventDefault();
+    manager.handleKeyDown(consumed);
+    manager.handleKeyDown(
+      new KeyboardEvent("keydown", { key: "k", ctrlKey: true, isComposing: true }),
+    );
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("does not complete a sequence across an editor-consumed keystroke", () => {
+    const manager = new ShortcutManager();
+    const handler = vi.fn();
+    manager.register({ key: "g d", handler });
+    manager.handleKeyDown(new KeyboardEvent("keydown", { key: "g" }));
+    const consumed = new KeyboardEvent("keydown", { key: "x", cancelable: true });
+    consumed.preventDefault();
+    manager.handleKeyDown(consumed);
+    manager.handleKeyDown(new KeyboardEvent("keydown", { key: "d" }));
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   let manager: ShortcutManager;
 
   beforeEach(() => {

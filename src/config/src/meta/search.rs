@@ -30,6 +30,8 @@ use crate::{
 
 pub const PARTIAL_ERROR_RESPONSE_MESSAGE: &str =
     "Please be aware that the response is based on partial data";
+/// The scan-level redaction function; the scanning node recognises its own projection by it.
+pub const SDR_REDACT_UDF_NAME: &str = "sdr_redact";
 
 /// To represent the query start and end time based of partition or cache
 #[derive(Serialize, Deserialize, Clone, Debug)]
