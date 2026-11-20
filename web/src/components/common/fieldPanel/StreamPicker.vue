@@ -9,7 +9,6 @@
       :disabled="streamType === 'disabled'"
       :label="t('alerts.streamType')"
       label-position="inside"
-      :searchable="false"
       size="xs"
       :data-test="typeTestId"
       @update:model-value="onTypeChange"
