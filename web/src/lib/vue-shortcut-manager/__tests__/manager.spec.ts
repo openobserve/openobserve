@@ -34,6 +34,18 @@ describe("ShortcutManager", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it("does not complete a sequence across an editor-consumed keystroke", () => {
+    const manager = new ShortcutManager();
+    const handler = vi.fn();
+    manager.register({ key: "g d", handler });
+    manager.handleKeyDown(new KeyboardEvent("keydown", { key: "g" }));
+    const consumed = new KeyboardEvent("keydown", { key: "x", cancelable: true });
+    consumed.preventDefault();
+    manager.handleKeyDown(consumed);
+    manager.handleKeyDown(new KeyboardEvent("keydown", { key: "d" }));
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   let manager: ShortcutManager;
 
   beforeEach(() => {

@@ -273,6 +273,19 @@ describe("MonitorResults", () => {
     expect(wrapper.findComponent({ name: "SyntheticMonitorRuns" }).vm).not.toBe(firstChild);
   });
 
+  it("still loads the runs when the check itself fails to load", async () => {
+    mockSyntheticsServiceGet.mockRejectedValueOnce({ response: { status: 500 } });
+    wrapper = makeWrapper({ MonitorRuns: false, ChartRenderer: true, MonitorStatusTimeline: true });
+    await flushPromises();
+    expect(mockFetchAll).toHaveBeenCalledWith(
+      "mon-1",
+      expect.any(Number),
+      expect.any(Number),
+      undefined,
+      false,
+    );
+  });
+
   describe("page shell rendering", () => {
     it("should render the root div with data-test", async () => {
       wrapper = makeWrapper();

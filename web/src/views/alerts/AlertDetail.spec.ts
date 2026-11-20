@@ -266,6 +266,7 @@ async function mountView({
 
 describe("AlertDetail — route reuse", () => {
   let wrapper: VueWrapper | undefined;
+  beforeEach(() => vi.clearAllMocks());
   afterEach(() => wrapper?.unmount());
   it("reloads another alert in place and ignores the previous target's late reply", async () => {
     wrapper = await mountView({ alert: makeSimpleAlert() });
@@ -288,6 +289,14 @@ describe("AlertDetail — route reuse", () => {
     await flushPromises();
     expect(wrapper.text()).toContain("New alert");
     expect(wrapper.text()).not.toContain("Stale alert");
+  });
+
+  it("keeps the page when a token refresh replaces the user info for the same user", async () => {
+    wrapper = await mountView({ alert: makeSimpleAlert() });
+    expect(alertsService.get_by_alert_id).toHaveBeenCalledTimes(1);
+    store.state.userInfo = { ...store.state.userInfo };
+    await flushPromises();
+    expect(alertsService.get_by_alert_id).toHaveBeenCalledTimes(1);
   });
 });
 

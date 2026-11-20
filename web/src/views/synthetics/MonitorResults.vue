@@ -567,11 +567,6 @@ async function fetchCheck() {
       // The flaky tiles are only answerable when the check is allowed to retry.
       retries.value = Number(res.data.retries ?? res.data.settings?.retries ?? 0) || 0;
       await resolveEnvironmentNames((res.data.environments ?? []) as string[], request);
-      if (!isCurrentCheckRequest(request)) return;
-      checkTypeReady.value = true;
-      await nextTick();
-      if (!isCurrentCheckRequest(request)) return;
-      await runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
     }
   } catch (err: any) {
     if (!isCurrentCheckRequest(request)) return;
@@ -580,9 +575,13 @@ async function fetchCheck() {
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       return;
     }
-  } finally {
-    if (isCurrentCheckRequest(request)) checkTypeReady.value = true;
   }
+  if (!isCurrentCheckRequest(request)) return;
+  // Every other runs refresh waits for this flag, so a failed check read must still load the runs.
+  checkTypeReady.value = true;
+  await nextTick();
+  if (!isCurrentCheckRequest(request)) return;
+  await runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
 }
 
 /** Check env ids → the names rows are stamped with; deleted ids drop out. */

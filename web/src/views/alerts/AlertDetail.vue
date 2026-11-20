@@ -1106,7 +1106,8 @@ const loadPage = async () => {
 };
 
 watch(
-  () => [orgId.value, alertId.value, routeFolderId.value, store.state.userInfo?.email] as const,
+  // Separate sources, not one array getter: a token refresh swaps userInfo for an equal copy.
+  [orgId, alertId, routeFolderId, () => store.state.userInfo?.email],
   () => {
     detailGeneration++;
     alert.value = null;
