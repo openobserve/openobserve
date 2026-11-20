@@ -66,6 +66,8 @@ pub struct WriteGuard {
     pub fence: Option<KvFence>,
     /// The `updated_at` the save swaps in, so its caller knows its own write's time; None is now.
     pub writes_us: Option<i64>,
+    /// A lease, in any org, that must be live by the database clock when the save commits.
+    pub lease: Option<super::kv_store::LeaseFence>,
 }
 
 /// A kv row of the alert's org that the save swaps from `expected` to `written` in its transaction.
@@ -478,6 +480,11 @@ pub async fn update_where<C: TransactionTrait + ConnectionTrait>(
 
     let mut write = alerts::Entity::update(alert_am);
     if let Some(guard) = &guard {
+        if let Some(lease) = &guard.lease
+            && !lease.check_in(&txn).await?
+        {
+            return Ok(None);
+        }
         if let Some(fence) = &guard.fence {
             let expected = Some(fence.expected.as_slice());
             let swap = super::kv_store::compare_and_set_in(
@@ -2768,6 +2775,7 @@ pub(super) mod tests {
                 written_us,
                 fence: None,
                 writes_us: None,
+                lease: None,
             }
         }
 
@@ -2798,6 +2806,7 @@ pub(super) mod tests {
                     written: b"written".to_vec(),
                 }),
                 writes_us: None,
+                lease: None,
             };
             let read = last_written_us(db, ORG, &id).await.unwrap();
             let taken_back =
@@ -2828,6 +2837,53 @@ pub(super) mod tests {
             let saved = update_where(db, ORG, None, ours, Some(fenced(b"intent", read)));
             assert_eq!(saved.await.unwrap().unwrap().pending_period_sec, 120);
             assert_eq!(kv_row(db, KEY).await.as_deref(), Some(&b"written"[..]));
+        }
+
+        #[tokio::test]
+        async fn a_lease_guarded_update_writes_only_while_the_lease_lives() {
+            const LEASE: &str = "_o2_ao/lease/r1/0";
+            let db = db_with_folder().await;
+            let id = alert_id();
+            insert_alert(&db, AlertSpec::plain(&id, "a1")).await;
+            let ksuid = Ksuid::from_str(&id).unwrap();
+            let (_, mut ours) = get_by_id(&db, ORG, ksuid).await.unwrap().unwrap();
+            ours.pending_period_sec = 120;
+            // The lease row lives in another org than the alert, and only the database stamps it.
+            let lease_row = |updated_at: i64| kv_store::ActiveModel {
+                org_id: Set("_meta".to_string()),
+                key: Set(LEASE.to_string()),
+                value: Set(b"n1|2".to_vec()),
+                created_at: Set(0),
+                updated_at: Set(updated_at),
+            };
+            kv_store::Entity::insert(lease_row(0))
+                .exec(&db)
+                .await
+                .unwrap();
+            let leased = |token: &[u8]| WriteGuard {
+                lease: Some(crate::table::kv_store::LeaseFence {
+                    org_id: "_meta".to_string(),
+                    key: LEASE.to_string(),
+                    token: token.to_vec(),
+                    ttl_us: 30_000_000,
+                }),
+                ..guard(None)
+            };
+            let expired = update_where(&db, ORG, None, ours.clone(), Some(leased(b"n1|2"))).await;
+            assert!(
+                expired.unwrap().is_none(),
+                "an expired lease writes nothing"
+            );
+            kv_store::Entity::update(lease_row(i64::MAX / 2))
+                .exec(&db)
+                .await
+                .unwrap();
+            let stale = update_where(&db, ORG, None, ours.clone(), Some(leased(b"n1|1"))).await;
+            assert!(stale.unwrap().is_none(), "an older epoch writes nothing");
+            let (_, kept) = get_by_id(&db, ORG, ksuid).await.unwrap().unwrap();
+            assert_eq!(kept.pending_period_sec, 0);
+            let live = update_where(&db, ORG, None, ours, Some(leased(b"n1|2"))).await;
+            assert_eq!(live.unwrap().unwrap().pending_period_sec, 120);
         }
 
         #[tokio::test]

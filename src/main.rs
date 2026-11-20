@@ -405,6 +405,8 @@ async fn run() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     db::service_versions::begin_shutdown();
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::autoobserve::listener::shutdown().await;
 
     // stop gRPC server
     grpc_shutudown_tx.send(()).ok();

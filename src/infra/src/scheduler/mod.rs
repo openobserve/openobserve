@@ -544,7 +544,10 @@ async fn claim_statement<C: ConnectionTrait, const N: usize>(
 }
 
 /// A statement written with `?`, numbered for PostgreSQL.
-fn numbered(backend: DatabaseBackend, sql: &str) -> std::result::Result<String, sea_orm::DbErr> {
+pub(crate) fn numbered(
+    backend: DatabaseBackend,
+    sql: &str,
+) -> std::result::Result<String, sea_orm::DbErr> {
     match backend {
         DatabaseBackend::Postgres => {
             let mut n = 0;
