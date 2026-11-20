@@ -1354,16 +1354,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-toolbar"
                 :disabled="!searchObj.data.stream.selectedStream.length"
+                :aria-label="t('search.aiModeIconAlt')"
                 @click="openAiFromBuilder"
                 class="rounded-default absolute! top-0.75 z-51 size-7! min-h-7! min-w-7!"
                 :style="{ right: aiButtonRight }"
               >
-                <OIcon
-                  name="auto-awesome"
-                  size="sm"
-                  :label="t('search.aiModeIconAlt')"
-                  class="text-text-secondary"
-                />
+                <AiSparkleIcon class="text-text-secondary" />
                 <span
                   v-if="!aiAccess.allowed"
                   aria-hidden="true"
@@ -1794,6 +1790,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import AiSparkleIcon from "@/components/common/AiSparkleIcon.vue";
 // @ts-nocheck
 import { saveFunctionMutation } from "@/services/jstransform.queries";
 import {
@@ -2040,6 +2037,7 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    AiSparkleIcon,
     OPageHeaderStatus,
     CreateAlertAction,
     SqlFilterBuilder,
