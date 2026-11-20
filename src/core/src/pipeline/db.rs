@@ -297,11 +297,11 @@ pub async fn list_by_org(org: &str) -> Result<Vec<Pipeline>, PipelineError> {
 
 /// Deletes a pipeline by ID.
 pub async fn delete(pipeline_id: &str) -> Result<(), PipelineError> {
-    // remove from cache first
-    update_cache(PipelineTableEvent::Remove(pipeline_id)).await;
-
+    // Evicted before the delete and again after it: a put event re-read in between
+    // finds the row still there and would cache the deleted pipeline again.
+    emit_delete_event(pipeline_id).await;
     infra_pipeline::delete(pipeline_id).await?;
-
+    update_cache(PipelineTableEvent::Remove(pipeline_id)).await;
     Ok(())
 }
 
@@ -470,13 +470,17 @@ fn broken_pipeline_log_due(
     }
 }
 
+async fn emit_delete_event(pipeline_id: &str) {
+    if let Err(e) = infra::coordinator::pipelines::emit_delete_event(pipeline_id).await {
+        log::error!("[Pipeline] error triggering event to remove pipeline from cache: {e}");
+    }
+}
+
 /// Update STREAM_PIPELINES cache for realtime pipelines
 async fn update_cache(event: PipelineTableEvent<'_>) {
     match event {
         PipelineTableEvent::Remove(pipeline_id) => {
-            if let Err(e) = infra::coordinator::pipelines::emit_delete_event(pipeline_id).await {
-                log::error!("[Pipeline] error triggering event to remove pipeline from cache: {e}");
-            }
+            emit_delete_event(pipeline_id).await;
 
             #[cfg(feature = "enterprise")]
             if o2_enterprise::enterprise::common::config::get_config()
