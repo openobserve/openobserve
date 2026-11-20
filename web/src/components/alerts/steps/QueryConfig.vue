@@ -456,70 +456,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </OToggleGroupItem>
                         </OToggleGroup>
                         <AlertGroupByPicker
-                          v-if="builderGroupAnswer === 'each' || groupByLabels.length"
+                          v-if="builderGroupAnswer === 'each'"
                           :model-value="groupByLabels"
                           :options="groupByOptions"
                           @update:model-value="setGroupBy"
                         />
+                      </div>
+                      <!-- Both states share one grid cell, so turning the rule on or off never moves what follows. -->
+                      <div
+                        v-if="builderGroupAnswer === 'each' && groupByLabels.length"
+                        class="text-text-body grid text-sm"
+                        data-test="add-alert-group-limit"
+                      >
                         <div
-                          v-if="groupByLabels.length"
-                          class="text-text-body flex flex-wrap items-start gap-x-2 gap-y-1 text-sm"
-                          :class="
-                            builderGroupAnswer === 'one' ? '' : 'invisible h-0 w-0 overflow-hidden'
-                          "
-                          :inert="builderGroupAnswer !== 'one' || undefined"
-                          data-test="add-alert-group-limit"
+                          class="col-start-1 row-start-1 flex flex-wrap items-center gap-x-2 gap-y-1"
+                          :class="countRuleOn ? '' : 'invisible'"
+                          :inert="!countRuleOn || undefined"
+                          data-test="add-alert-group-limit-rule"
                         >
-                          <template v-if="countOperatorShown">
-                            <span class="leading-8.5">{{ t("alerts.form.group.when") }}</span>
-                            <OFormSelect
-                              :aria-label="t('alerts.form.names.comparison')"
-                              name="trigger_condition.operator"
-                              :options="plainOperators"
-                              :searchable="false"
-                              class="w-32!"
-                              :data-test="countTestIds.operator"
-                              @update:model-value="onTriggerOperatorChange"
-                            />
-                            <OFormInput
-                              :aria-label="t('alerts.alertIfNoOfEvents')"
-                              name="trigger_condition.threshold"
-                              type="number"
-                              fit-content
-                              min="1"
-                              :data-test="countTestIds.threshold"
-                              @update:model-value="onTriggerThresholdChange($event)"
-                              @blur="restoreDefaultThreshold"
-                            >
-                              <template #error />
-                            </OFormInput>
-                            <span class="leading-8.5">{{ rowsNoun }}</span>
-                          </template>
-                          <template v-else>
-                            <span class="leading-8.5">{{
-                              t("alerts.form.group.whenAtLeast")
-                            }}</span>
-                            <OFormInput
-                              :aria-label="t('alerts.form.group.countNameGroups')"
-                              name="trigger_condition.threshold"
-                              type="number"
-                              fit-content
-                              min="1"
-                              :data-test="countTestIds.threshold"
-                              @update:model-value="onTriggerThresholdChange($event)"
-                              @blur="restoreDefaultThreshold"
-                            >
-                              <template #error />
-                            </OFormInput>
-                            <span class="leading-8.5">{{
-                              t("alerts.form.group.builderOneTail", thresholdPlural)
-                            }}</span>
-                          </template>
+                          <span>{{ t("alerts.form.group.oneForAllWhen") }}</span>
+                          <OFormSelect
+                            :aria-label="t('alerts.form.names.comparison')"
+                            name="trigger_condition.operator"
+                            :options="countOperators"
+                            :searchable="false"
+                            class="w-32!"
+                            data-test="add-alert-group-limit-operator"
+                            @update:model-value="onTriggerOperatorChange"
+                          />
+                          <OFormInput
+                            :aria-label="t('alerts.form.group.countNameGroups')"
+                            name="trigger_condition.threshold"
+                            type="number"
+                            fit-content
+                            min="1"
+                            data-test="add-alert-group-limit-threshold"
+                            @update:model-value="onTriggerThresholdChange($event)"
+                            @blur="restoreDefaultThreshold"
+                          >
+                            <template #error />
+                          </OFormInput>
+                          <span>{{ t("alerts.form.group.groupsMatch", thresholdPlural) }}</span>
+                          <OButton
+                            variant="ghost"
+                            size="icon-circle-sm"
+                            :aria-label="t('alerts.form.group.oneForAllOff')"
+                            data-test="add-alert-group-limit-off"
+                            @click="setCountRule(false)"
+                          >
+                            <OIcon name="close" size="sm" />
+                          </OButton>
+                        </div>
+                        <div
+                          class="col-start-1 row-start-1 flex min-h-8.5 items-start"
+                          :class="countRuleOn ? 'invisible' : ''"
+                          :inert="countRuleOn || undefined"
+                        >
+                          <OButton
+                            variant="link"
+                            size="sm"
+                            class="h-8.5! p-0! text-start whitespace-normal!"
+                            data-test="add-alert-group-limit-on"
+                            @click="setCountRule(true)"
+                          >
+                            {{ t("alerts.form.group.oneForAll") }}
+                          </OButton>
                         </div>
                       </div>
                       <AlertMessageLine
                         v-show="
-                          (builderGroupAnswer === 'one' && groupByLabels.length) || thresholdError
+                          (builderGroupAnswer === 'each' && groupByLabels.length) || thresholdError
                         "
                         :error="thresholdError"
                         :error-data-test="countErrorTest"
@@ -1077,51 +1083,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :inert="groupAnswer !== 'one' || undefined"
                               data-test="add-alert-group-limit"
                             >
-                              <template v-if="countOperatorShown">
-                                <span class="leading-8.5">{{ t("alerts.form.group.when") }}</span>
-                                <OFormSelect
-                                  :aria-label="t('alerts.form.names.comparison')"
-                                  name="trigger_condition.operator"
-                                  :options="plainOperators"
-                                  :searchable="false"
-                                  class="w-32!"
-                                  :data-test="countTestIds.operator"
-                                  @update:model-value="onTriggerOperatorChange"
-                                />
-                                <OFormInput
-                                  :aria-label="t('alerts.form.group.countNameSeries')"
-                                  name="trigger_condition.threshold"
-                                  type="number"
-                                  fit-content
-                                  min="1"
-                                  :data-test="countTestIds.threshold"
-                                  @update:model-value="onTriggerThresholdChange($event)"
-                                  @blur="restoreDefaultThreshold"
-                                >
-                                  <template #error />
-                                </OFormInput>
-                                <span class="leading-8.5">{{ t("alerts.form.group.series") }}</span>
-                              </template>
-                              <template v-else>
-                                <span class="leading-8.5">{{
-                                  t("alerts.form.group.whenAtLeast")
-                                }}</span>
-                                <OFormInput
-                                  :aria-label="t('alerts.form.group.countNameSeries')"
-                                  name="trigger_condition.threshold"
-                                  type="number"
-                                  fit-content
-                                  min="1"
-                                  :data-test="countTestIds.threshold"
-                                  @update:model-value="onTriggerThresholdChange($event)"
-                                  @blur="restoreDefaultThreshold"
-                                >
-                                  <template #error />
-                                </OFormInput>
-                                <span class="leading-8.5">{{
-                                  t("alerts.form.group.promqlOneTail", thresholdPlural)
-                                }}</span>
-                              </template>
+                              <span class="leading-8.5">{{ t("alerts.form.group.when") }}</span>
+                              <OFormSelect
+                                :aria-label="t('alerts.form.names.comparison')"
+                                name="trigger_condition.operator"
+                                :options="countOperators"
+                                :searchable="false"
+                                class="w-32!"
+                                :data-test="countTestIds.operator"
+                                @update:model-value="onTriggerOperatorChange"
+                              />
+                              <OFormInput
+                                :aria-label="t('alerts.form.group.countNameSeries')"
+                                name="trigger_condition.threshold"
+                                type="number"
+                                fit-content
+                                min="1"
+                                :data-test="countTestIds.threshold"
+                                @update:model-value="onTriggerThresholdChange($event)"
+                                @blur="restoreDefaultThreshold"
+                              >
+                                <template #error />
+                              </OFormInput>
+                              <span class="leading-8.5">{{
+                                t("alerts.form.group.promqlOneTail", thresholdPlural)
+                              }}</span>
                             </div>
                           </div>
                           <AlertMessageLine
@@ -1513,6 +1499,7 @@ import {
 import { ALERT_SUGGESTIONS_KEY } from "@/composables/alerts/useAlertSuggestions";
 import { localeFileMap } from "@/locales";
 import { applyColumnFix, unknownColumnFix } from "@/utils/alerts/sqlErrorFix";
+import { countComparisonOptions } from "@/utils/alerts/countComparison";
 import { dataNoun, formatNumber, joinListMore, valueRangeText } from "@/utils/alerts/alertCopy";
 import { metricPromql } from "@/utils/alerts/alertIntents";
 import {
@@ -2366,15 +2353,7 @@ export default defineComponent({
       get: () => fv("trigger_condition.threshold"),
       set: (v) => setFV("trigger_condition.threshold", v),
     });
-    // The count sentences read "at least"; a saved count with any other comparison keeps its picker.
-    const countOperatorShown = ref(false);
-    watch(
-      triggerOperator,
-      (op) => {
-        if (op && op !== ">=") countOperatorShown.value = true;
-      },
-      { immediate: true },
-    );
+    const countOperators = computed(() => countComparisonOptions(t));
     // (Removed a mount-time `props.triggerCondition.threshold = 1` reset that
     // mutated the readonly form read-view — it silently failed (no-op) and only
     // logged a warning. The measure-mode "reset to >= 1 when group-by is empty"
@@ -3155,8 +3134,14 @@ export default defineComponent({
     // "One per" picked before any field: the picker opens, and the alert splits once a field is ticked.
     const groupEachWanted = ref(false);
     const builderGroupAnswer = computed(() =>
-      groupEachWanted.value || (isMultiAlert.value && groupByLabels.value.length) ? "each" : "one",
+      groupEachWanted.value || groupByLabels.value.length ? "each" : "one",
     );
+    // Grouped without one alert per group is the count rule: one alert once N groups cross.
+    const countRuleOn = computed(() => groupByLabels.value.length > 0 && !isMultiAlert.value);
+    const setCountRule = (on: boolean) => {
+      onGroupAnswer(on ? "one" : "each");
+      if (on && !(Number(triggerThreshold.value) >= 1)) triggerThreshold.value = 1;
+    };
     const builderEachLabel = computed(() =>
       groupByLabels.value.length
         ? t("alerts.form.group.eachOfPlain", {
@@ -3175,6 +3160,7 @@ export default defineComponent({
     };
     // Unticking every field is "One alert"; a total becomes a count per the first field, as one pick did.
     const setGroupBy = (labels: string[]) => {
+      const keepCountRule = countRuleOn.value;
       if (!labels.length) {
         groupEachWanted.value = false;
         clearGroupBy();
@@ -3186,7 +3172,7 @@ export default defineComponent({
         agg.group_by = [...labels];
       });
       emitAggregationUpdate();
-      if (groupEachWanted.value && !isMultiAlert.value) onGroupAnswer("each");
+      if (groupEachWanted.value && !isMultiAlert.value && !keepCountRule) onGroupAnswer("each");
     };
 
     // The choice only appears once a group-by exists, so normalise then —
@@ -3769,7 +3755,7 @@ export default defineComponent({
       () =>
         !!props.sectionTargets &&
         localTab.value === "custom" &&
-        props.isRealTime === "false" &&
+        (props.isRealTime === "false" || props.isRealTime === "true") &&
         !!props.generatedSqlQuery &&
         !!tiers?.isVisible("generatedSql"),
     );
@@ -3784,6 +3770,7 @@ export default defineComponent({
       v === "" || v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Number(v);
     // Readers look for the threshold in a HAVING the server never writes, so the row says where it applies.
     const generatedSqlThreshold = computed(() => {
+      if (props.isRealTime === "true") return t("alerts.form.generatedSql.realtime");
       const base = { sql: props.generatedSqlQuery ?? "", grouped: groupByLabels.value.length > 0 };
       if (selectedFunction.value === "total_events")
         return generatedSqlNote({ ...base, value: numberOrNull(triggerThreshold.value) }, t);
@@ -4186,7 +4173,9 @@ export default defineComponent({
           return;
         }
         // In measure mode with empty group-by, always reset to >= 1 (field is disabled, user can't edit it)
-        const inMeasureMode = selectedFunction.value !== "total_events";
+        // SQL and PromQL count rows and series with these fields, so only Filters resets them.
+        const inMeasureMode =
+          localTab.value === "custom" && selectedFunction.value !== "total_events";
         const groupByEmpty = isEventBased.value
           ? !hasLogGroupByFields.value
           : !hasMetricGroupByFields.value;
@@ -4401,7 +4390,9 @@ export default defineComponent({
       groupAnswer,
       countErrorTest,
       countTestIds,
-      countOperatorShown,
+      countOperators,
+      countRuleOn,
+      setCountRule,
       onGroupAnswer,
       builderGroupAnswer,
       builderEachLabel,

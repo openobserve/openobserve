@@ -26,6 +26,9 @@ import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { defineComponent, nextTick, reactive, ref } from "vue";
 import QueryConfig from "./QueryConfig.vue";
 import i18n from "@/locales";
+import { cloneDeep } from "lodash-es";
+import { getAlertPayload } from "@/utils/alerts/alertPayload";
+import { countComparisonWords } from "@/utils/alerts/countComparison";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -2381,12 +2384,13 @@ describe("QueryConfig.vue", () => {
     });
 
     it.each([
-      ["custom", true],
-      ["sql", false],
-      ["promql", false],
-    ])("Show generated SQL in %s mode: %s", (tab, shown) => {
+      ["custom", "false", true],
+      ["custom", "true", true],
+      ["sql", "false", false],
+      ["promql", "false", false],
+    ])("Show generated SQL in %s mode, real-time %s: %s", (tab, isRealTime, shown) => {
       remount(
-        { ...sectioned, tab, streamType: "metrics", generatedSqlQuery: "SELECT 1" },
+        { ...sectioned, tab, isRealTime, streamType: "metrics", generatedSqlQuery: "SELECT 1" },
         {},
         tiersWith(["generatedSql"]),
       );
@@ -2394,6 +2398,11 @@ describe("QueryConfig.vue", () => {
       // The theme-aware code block, not a fixed dark one, with its copy button.
       if (shown)
         expect(host.find('[data-test="alert-query-preview-copy-btn"]').exists()).toBe(true);
+      // Real-time has no window or threshold, so its note says so instead of where a threshold applies.
+      if (isRealTime === "true")
+        expect(host.find('[data-test="add-alert-generated-sql-threshold"]').text()).toBe(
+          i18n.global.t("alerts.form.generatedSql.realtime"),
+        );
     });
 
     it.each([
@@ -3015,6 +3024,132 @@ describe("QueryConfig.vue", () => {
         multi_alert: false,
       });
     });
+
+    it("One per fields can send one alert once N groups cross, saved and read back like main's having-groups", async () => {
+      remount({ ...sectioned, columns });
+      await flushPromises();
+      await host.find('[data-test="add-alert-group-question-each"]').trigger("click");
+      host
+        .findComponent({ name: "AlertGroupByPicker" })
+        .vm.$emit("update:modelValue", ["service", "status"]);
+      await flushPromises();
+      const rule = () => host.find('[data-test="add-alert-group-limit-rule"]');
+      expect(rule().attributes("inert")).toBeDefined();
+
+      await host.find('[data-test="add-alert-group-limit-on"]').trigger("click");
+      await host.find('[data-test="add-alert-group-limit-threshold"] input').setValue("3");
+      await flushPromises();
+      const saved = cloneDeep(hostForm().state.values);
+      const payload = getAlertPayload({ ...saved, context_attributes: [], description: "" }, {
+        store: mockStore,
+        isAggregationEnabled: { value: true },
+        getSelectedTab: { value: "custom" },
+        beingUpdated: false,
+      } as any);
+      expect(payload.query_condition.aggregation).toMatchObject({
+        group_by: ["service", "status"],
+        multi_alert: false,
+      });
+      expect(payload.trigger_condition).toMatchObject({ operator: ">=", threshold: 3 });
+
+      remount(
+        {
+          ...sectioned,
+          columns,
+          beingUpdated: true,
+          isAggregationEnabled: true,
+          inputData: { ...mockInputData, aggregation: saved.query_condition.aggregation },
+        },
+        {
+          query_condition: saved.query_condition,
+          trigger_condition: saved.trigger_condition,
+          logGroupBy: saved.logGroupBy,
+        },
+      );
+      await flushPromises();
+      expect(wrapper.vm.builderGroupAnswer).toBe("each");
+      expect(rule().attributes("inert")).toBeUndefined();
+      await host.find('[data-test="add-alert-group-limit-off"]').trigger("click");
+      await flushPromises();
+      expect(hostForm().getFieldValue("query_condition.aggregation.multi_alert")).toBe(true);
+      expect(hostForm().getFieldValue("trigger_condition")).toMatchObject({
+        operator: ">=",
+        threshold: 1,
+      });
+    });
+
+    it.each([">=", ">", "<=", "<", "=", "!="])(
+      "the group count offers %s with its own words in Filters and PromQL",
+      async (op) => {
+        const label = countComparisonWords(op, i18n.global.t as any);
+        const grouped = {
+          function: "count",
+          group_by: ["service"],
+          multi_alert: false,
+          having: { column: "service", operator: ">=", value: 1 },
+        };
+        remount(
+          {
+            ...sectioned,
+            columns,
+            isAggregationEnabled: true,
+            inputData: { ...mockInputData, aggregation: grouped },
+          },
+          {
+            query_condition: { ...hostDefaults().query_condition, aggregation: grouped },
+            logGroupBy: ["service"],
+          },
+        );
+        await flushPromises();
+        const picker = host.findComponent('[data-test="add-alert-group-limit-operator"]') as any;
+        expect(picker.props("options").map((o: any) => o.value)).toContain(op);
+        picker.vm.$emit("update:modelValue", op);
+        hostForm().setFieldValue("trigger_condition.operator", op);
+        await flushPromises();
+        expect(hostForm().getFieldValue("trigger_condition.operator")).toBe(op);
+        expect(host.find('[data-test="add-alert-group-limit"]').text()).toContain(String(label));
+
+        const measure = {
+          function: "avg",
+          group_by: [],
+          having: { column: "value", operator: ">=", value: 1 },
+        };
+        remount(
+          {
+            ...sectioned,
+            tab: "promql",
+            streamType: "metrics",
+            promqlQuery: "up",
+            promqlCondition: { operator: ">=", value: 1 },
+            isAggregationEnabled: true,
+            inputData: { ...mockInputData, aggregation: measure },
+          },
+          {
+            query_condition: {
+              ...hostDefaults().query_condition,
+              type: "promql",
+              aggregation: measure,
+              promql_condition: { operator: ">=", value: 1 },
+            },
+            trigger_condition: { ...hostDefaults().trigger_condition, operator: op },
+          },
+        );
+        await flushPromises();
+        const limit = host.find('[data-test="add-alert-group-limit"]');
+        const promqlPicker = limit.findComponent(OFormSelect) as any;
+        promqlPicker.vm.$emit("update:modelValue", op);
+        hostForm().setFieldValue("trigger_condition.operator", op);
+        hostForm().setFieldValue("trigger_condition.threshold", 2);
+        // AddAlert hands the emitted trigger back as the prop; a measure on the side must not reset it.
+        await setQCProps({ triggerCondition: { ...hostForm().state.values.trigger_condition } });
+        await flushPromises();
+        expect(hostForm().getFieldValue("trigger_condition")).toMatchObject({
+          operator: op,
+          threshold: 2,
+        });
+        expect(limit.text()).toContain(String(label));
+      },
+    );
 
     it("a span duration typed in ms is stored in microseconds; a loaded one shows whole", async () => {
       const agg = (value: unknown) => ({

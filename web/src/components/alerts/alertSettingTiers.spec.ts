@@ -77,7 +77,7 @@ describe("sectionTierView: the More options line per mockup screen", () => {
       { kind: "composite", shape: "composite" },
       ["compositeWarningCounts", "compositeStalePolicy", "holdFor"],
     ],
-    ["real-time condition", "condition", { kind: "realtime" }, []],
+    ["real-time condition", "condition", { kind: "realtime" }, ["generatedSql"]],
   ])("%s", (_name, section, over, expected) => {
     expect(sectionTierView(section, state(ctx(over))).more.map((d) => d.id)).toEqual(expected);
   });

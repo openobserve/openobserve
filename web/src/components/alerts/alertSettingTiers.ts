@@ -253,6 +253,11 @@ export function tierAvailable(id: AlertSettingId, ctx: AlertTierContext): boolea
   const scheduled = ctx.kind === "scheduled";
   switch (id) {
     case "generatedSql":
+      return (
+        (scheduled || ctx.kind === "realtime") &&
+        ctx.shape === "filters" &&
+        ctx.generatedSql !== false
+      );
     case "groupBy":
       return scheduled && ctx.shape === "filters" && ctx.generatedSql !== false;
     case "vrl":
