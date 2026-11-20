@@ -241,7 +241,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
-          <ThemeSwitcher class="max-md:hidden"></ThemeSwitcher>
 
           <!-- SLACK COMMUNITY LINK -->
           <OButton
@@ -441,6 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownSeparator />
 
               <!-- Theme management -->
+              <ThemeSwitcher menu-item />
               <ODropdownItem
                 data-test="menu-link-predefined-themes-item"
                 @select="openPredefinedThemes"
