@@ -288,6 +288,12 @@ fn init_aws_config(config: StorageConfig) -> object_store::Result<object_store::
 fn init_azure_config(
     config: StorageConfig,
 ) -> object_store::Result<object_store::azure::MicrosoftAzure> {
+    azure_builder(&config).build()
+}
+
+// An empty secret_key must leave the access key unset so object_store falls
+// through to Entra ID auth (workload identity, managed identity, Azure CLI).
+fn azure_builder(config: &StorageConfig) -> object_store::azure::MicrosoftAzureBuilder {
     let cfg = get_config();
     let mut builder = object_store::azure::MicrosoftAzureBuilder::from_env()
         .with_client_options(
@@ -306,7 +312,7 @@ fn init_azure_config(
     if !config.server_url.is_empty() {
         builder = builder.with_endpoint(config.server_url.clone());
     }
-    builder.build()
+    builder
 }
 
 fn init_gcp_config(
@@ -423,6 +429,43 @@ mod tests {
         assert!(!printed.contains("AKIA-ACCESS-SECRET"), "{printed}");
         assert!(!printed.contains("SECRET-KEY-VALUE"), "{printed}");
         assert!(printed.contains("bucket") && printed.contains("http://minio"));
+    }
+
+    fn azure_config(secret_key: &str) -> StorageConfig {
+        StorageConfig {
+            name: String::new(),
+            provider: "azure".to_string(),
+            server_url: String::new(),
+            region_name: String::new(),
+            access_key: "o2account".to_string(),
+            secret_key: secret_key.to_string(),
+            bucket_name: "o2container".to_string(),
+            bucket_prefix: String::new(),
+        }
+    }
+
+    #[test]
+    fn azure_builder_without_secret_key_leaves_access_key_unset() {
+        use object_store::azure::AzureConfigKey;
+        let builder = azure_builder(&azure_config(""));
+        assert_eq!(builder.get_config_value(&AzureConfigKey::AccessKey), None);
+        assert_eq!(
+            builder.get_config_value(&AzureConfigKey::AccountName),
+            Some("o2account".to_string())
+        );
+        assert!(builder.build().is_ok());
+    }
+
+    #[test]
+    fn azure_builder_with_secret_key_uses_access_key() {
+        use object_store::azure::AzureConfigKey;
+        let key = "c2VjcmV0"; // base64("secret"); the crate rejects non-base64 keys
+        let builder = azure_builder(&azure_config(key));
+        assert_eq!(
+            builder.get_config_value(&AzureConfigKey::AccessKey),
+            Some(key.to_string())
+        );
+        assert!(builder.build().is_ok());
     }
 
     fn make_remote(prefix: &str) -> Remote {
