@@ -162,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             v-if="!toolbarMoveResetToMenu"
             data-test="logs-search-bar-reset-filters-btn"
+            class="toolbar-btn-rest"
             size="sm-toolbar"
             variant="ghost"
             @click="resetFilters"
@@ -181,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showPinnedHistogram"
             as="div"
             data-test="logs-search-bar-histogram-btn"
+            class="toolbar-btn-rest"
             size="sm-toolbar"
             variant="ghost"
             @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
@@ -201,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showPinnedSqlMode"
             as="div"
             data-test="logs-search-bar-sql-mode-pinned-btn"
+            class="toolbar-btn-rest"
             size="sm-toolbar"
             variant="ghost"
             @click="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
@@ -222,6 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showPinnedQuickMode"
             as="div"
             data-test="logs-search-bar-quick-mode-pinned-btn"
+            class="toolbar-btn-rest"
             size="sm-toolbar"
             variant="ghost"
             @click="handleQuickMode"
@@ -257,6 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #trigger>
                 <OButton
                   data-test="logs-search-bar-saved-views-pinned-list-btn"
+                  class="toolbar-btn-rest"
                   variant="ghost"
                   size="sm-toolbar"
                 >
@@ -284,6 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator vertical />
             <OButton
               data-test="logs-search-bar-saved-views-pinned-create-btn"
+              class="toolbar-btn-rest"
               :aria-label="t('search.createSavedView')"
               variant="ghost"
               size="icon-panel"
@@ -317,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="max-md:ms-auto"
+              class="toolbar-btn-rest max-md:ms-auto"
               :icon-left="toolbarMoreIconOnly ? 'more-horiz' : undefined"
               variant="ghost"
               :size="toolbarMoreIconOnly ? 'icon-toolbar' : 'sm-toolbar'"
@@ -596,7 +602,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-function-editor-pinned-btn"
           size="sm-toolbar"
           variant="ghost"
-          class="order-1"
+          class="toolbar-btn-rest order-1"
           @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
         >
           <OSwitch
@@ -702,6 +708,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButtonGroup>
             <RecentSearchesButton
               data-test="logs-search-bar-recent-searches-btn"
+              class="toolbar-btn-rest"
               @view-all="openRecentSearches"
             />
             <div
@@ -990,7 +997,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-more-options-btn"
-              class="download-logs-btn order-4"
+              class="download-logs-btn toolbar-btn-rest order-4"
               variant="ghost"
               size="icon-toolbar"
             >

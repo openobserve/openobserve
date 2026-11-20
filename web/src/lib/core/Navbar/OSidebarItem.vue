@@ -30,6 +30,8 @@ const props = withDefaults(
     /** Groups keep their destination while expanded clicks toggle their children. */
     to?: RouteLocationRaw;
     active?: boolean;
+    /** A child page is open: the parent group carries the accent icon, no fill. */
+    childActive?: boolean;
     collapsed?: boolean;
     sub?: boolean;
     /** Edition lock: inert, opens the Enterprise Features page instead. */
@@ -45,6 +47,7 @@ const props = withDefaults(
     icon: undefined,
     to: undefined,
     active: false,
+    childActive: false,
     collapsed: false,
     sub: false,
     locked: false,
@@ -66,7 +69,9 @@ const isToggle = computed(
   () => !props.locked && (!props.to || (props.expanded !== undefined && !props.collapsed)),
 );
 const iconClass = computed(() =>
-  props.active ? "text-selected-fg" : "text-text-secondary group-hover/nav:text-text-body",
+  props.active || props.childActive
+    ? "text-selected-fg"
+    : "text-text-secondary group-hover/nav:text-text-body",
 );
 
 const rootAttrs = computed<Record<string, unknown>>(() => {
@@ -83,13 +88,15 @@ const rootAttrs = computed<Record<string, unknown>>(() => {
 
 // `!` on the text colour: the global link colour rule is unlayered and would otherwise tint <a> rows.
 const rowClass = computed(() => [
-  "group/nav flex min-w-9 w-full items-center gap-2.5 overflow-hidden rounded-default text-compact [text-decoration:none]! transition-colors duration-150 motion-reduce:transition-none cursor-pointer border-0 text-start [font-family:inherit]",
+  "group/nav flex min-w-9 w-full items-center gap-2.5 overflow-hidden rounded-default text-xs [text-decoration:none]! transition-colors duration-150 motion-reduce:transition-none cursor-pointer border-0 text-start [font-family:inherit]",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent",
   props.sub ? "h-8 ps-8.5 pe-2" : "h-8 px-2",
   // Inset ring: the fill alone is 1.3:1 on the shell, so the edge carries the 3:1 state cue.
   props.active
     ? "bg-selected-bg text-selected-fg! font-semibold ring-1 ring-inset ring-selected-border"
-    : "bg-transparent hover:bg-surface-subtle-hover hover:text-text-body! font-normal text-text-body!",
+    : props.childActive
+      ? "bg-transparent hover:bg-surface-subtle-hover font-normal text-text-heading!"
+      : "bg-transparent hover:bg-surface-subtle-hover hover:text-text-body! font-normal text-text-body!",
   props.locked || props.paywalled ? "opacity-70" : "",
 ]);
 
@@ -127,7 +134,7 @@ function onKeydown(event: KeyboardEvent) {
       :aria-hidden="collapsed ? true : undefined"
     >
       <span class="min-w-0 flex-1 truncate">{{ label }}</span>
-      <BetaBadge v-if="beta" />
+      <BetaBadge v-if="beta" size="xs" class="px-1! py-px! text-[9px]! leading-none! font-medium! tracking-normal! normal-case!" />
       <OIcon
         v-if="locked || licenseLocked || paywalled"
         name="lock"
@@ -136,7 +143,7 @@ function onKeydown(event: KeyboardEvent) {
         :class="iconClass"
       />
       <OIcon
-        v-if="expanded !== undefined"
+        v-if="expanded !== undefined || flyout"
         name="sidebar-chevron-right"
         size="sm"
         class="size-4.5! shrink-0 transition-transform duration-150 motion-reduce:transition-none rtl:rotate-180"

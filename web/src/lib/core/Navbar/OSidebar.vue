@@ -224,8 +224,8 @@ const flyoutRow = computed(() => {
   return null;
 });
 
-// Inline-expanded groups already show their children, and the drawer never floats a menu.
-const canFlyout = (name: string) => props.collapsible && (collapsed.value || !expanded.has(name));
+// The rail shows group children only in the hover flyout; the drawer never floats a menu.
+const canFlyout = (_name: string) => props.collapsible;
 const isRtl = () => document.documentElement.dir === "rtl";
 
 function clearFlyoutTimers() {
@@ -324,8 +324,7 @@ const flyoutItems = () =>
 
 async function onGroupKeydown(name: string, e: KeyboardEvent) {
   const openKey = isRtl() ? "ArrowLeft" : "ArrowRight";
-  // Expanded rows keep Enter and Space for the inline toggle.
-  const activates = collapsed.value && (e.key === "Enter" || e.key === " ");
+  const activates = props.collapsible && (e.key === "Enter" || e.key === " ");
   if ((e.key === openKey || activates) && canFlyout(name)) {
     e.preventDefault();
     await openFlyout(name, e.currentTarget as HTMLElement);
@@ -411,7 +410,7 @@ const selfLogoSrc = computed(() =>
     data-test="sidebar"
     :data-collapsed="collapsed ? 'true' : undefined"
     class="bg-surface-chrome-deeper flex h-full min-h-0 shrink-0 flex-col overflow-hidden transition-[width] duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
-    :class="collapsible ? (collapsed ? 'w-13' : 'w-55') : 'w-full'"
+    :class="collapsible ? (collapsed ? 'w-13' : 'w-[155px]') : 'w-full'"
   >
     <div
       v-if="collapsible"
@@ -503,9 +502,10 @@ const selfLogoSrc = computed(() =>
                 :icon="iconFor(row.entry.item)"
                 :to="linkTo(row.group.tileLink)"
                 :active="collapsed && row.group.activeKey !== null"
+                :child-active="!collapsed && row.group.activeKey !== null"
                 :collapsed="collapsed"
-                :expanded="expanded.has(row.entry.item.name)"
-                :aria-controls="`sidebar-children-${row.entry.item.name}`"
+                :expanded="collapsible ? undefined : expanded.has(row.entry.item.name)"
+                :aria-controls="collapsible ? undefined : `sidebar-children-${row.entry.item.name}`"
                 :flyout="collapsible"
                 :aria-haspopup="collapsible ? 'menu' : undefined"
                 :data-test="`sidebar-item-${row.entry.item.name}`"
@@ -515,6 +515,7 @@ const selfLogoSrc = computed(() =>
                 @keydown="onGroupKeydown(row.entry.item.name, $event)"
               />
               <div
+                v-if="!collapsible"
                 :id="`sidebar-children-${row.entry.item.name}`"
                 class="grid transition-[grid-template-rows,opacity] duration-[220ms,150ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
                 :class="
@@ -546,7 +547,7 @@ const selfLogoSrc = computed(() =>
                       :data-test="`sidebar-section-label-${childSection.key}`"
                     >
                       {{ t(childSection.titleKey) }}
-                      <BetaBadge v-if="childSection.beta" />
+                      <BetaBadge v-if="childSection.beta" size="xs" class="px-1! py-px! text-[9px]! leading-none! font-medium! tracking-normal! normal-case!" />
                     </div>
                     <OSidebarItem
                       v-for="child in childSection.children"
@@ -587,7 +588,7 @@ const selfLogoSrc = computed(() =>
       <button
         v-if="collapsible"
         type="button"
-        class="group/nav rounded-default text-text-body hover:bg-dropdown-item-hover-bg focus-visible:ring-accent text-compact mt-0.5 flex h-8 w-full min-w-9 cursor-pointer items-center gap-2.5 overflow-hidden border-0 bg-transparent px-2 text-start [font-family:inherit] font-normal transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset motion-reduce:transition-none"
+        class="group/nav rounded-default text-text-body hover:bg-dropdown-item-hover-bg focus-visible:ring-accent text-xs mt-0.5 flex h-8 w-full min-w-9 cursor-pointer items-center gap-2.5 overflow-hidden border-0 bg-transparent px-2 text-start [font-family:inherit] font-normal transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset motion-reduce:transition-none"
         :aria-label="toggleLabel"
         :aria-expanded="!collapsed"
         data-test="sidebar-collapse-toggle"
@@ -652,7 +653,7 @@ const selfLogoSrc = computed(() =>
               :data-test="`sidebar-flyout-section-label-${childSection.key}`"
             >
               {{ t(childSection.titleKey) }}
-              <BetaBadge v-if="childSection.beta" />
+              <BetaBadge v-if="childSection.beta" size="xs" class="px-1! py-px! text-[9px]! leading-none! font-medium! tracking-normal! normal-case!" />
             </div>
             <OSidebarItem
               v-for="child in childSection.children"

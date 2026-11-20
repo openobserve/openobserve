@@ -29,10 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-refresh-interval-btn"
           size="icon-toolbar"
           variant="ghost"
-          class="relative shrink-0 overflow-visible border!"
+          class="toolbar-btn-rest relative shrink-0 overflow-visible border!"
           :class="
             isOn
-              ? 'border-live-border! bg-live-soft! text-live!'
+              ? 'border-live-border! bg-live-soft! text-live! shadow-none!'
               : 'border-transparent! text-text-secondary!'
           "
           :aria-label="triggerAriaLabel"
@@ -57,10 +57,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           data-test="logs-search-bar-refresh-interval-btn-dropdown"
           variant="ghost"
-          class="relative shrink-0 overflow-visible border!"
+          class="toolbar-btn-rest relative shrink-0 overflow-visible border!"
           :class="
             isOn
-              ? 'border-live-border! bg-live-soft! text-live!'
+              ? 'border-live-border! bg-live-soft! text-live! shadow-none!'
               : 'border-transparent! text-text-secondary!'
           "
           size="sm-toolbar"
