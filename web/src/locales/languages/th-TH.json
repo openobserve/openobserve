@@ -5353,6 +5353,8 @@
     "addToInterestingFields": "Add to interesting fields",
     "viewPatternsCount": "ดู {count} รูปแบบ | ดู {count} รูปแบบ",
     "addPattern": "Add Pattern",
+    "sdrNonStringFieldWarning": "รูปแบบขณะค้นหาใช้กับฟิลด์ข้อความเท่านั้น จึงไม่มีผลกับฟิลด์นี้ ให้ใช้รูปแบบขณะนำเข้าข้อมูลแทน",
+    "sdrPartitionKeyWarning": "คีย์พาร์ทิชันเก็บค่าดิบไว้ในเส้นทางไฟล์ รูปแบบขณะค้นหาจึงไม่มีผล ให้ลบรูปแบบหรือคีย์พาร์ทิชันออก",
     "editStream": "Edit Stream",
     "createNewStream": "Create new Stream",
     "errorWhileDeletingStreams": "Error while deleting streams.",

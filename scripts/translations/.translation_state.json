@@ -19154,6 +19154,8 @@
     "retentionDefaultForever": "5270e9be55e5f952",
     "schemaHeader": "65f6e2b8ccdbe4e8",
     "schemaSettingsTab": "3a7e31290db900ec",
+    "sdrNonStringFieldWarning": "745d80f9a5b9c37d",
+    "sdrPartitionKeyWarning": "f5cc57de314cb8fd",
     "search": "60316f28d265a254",
     "searchFieldOrIndexType": "de357e17a614b3aa",
     "selectDate": "65eb52c443af6ee5",

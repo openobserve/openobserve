@@ -5353,6 +5353,8 @@
     "addToInterestingFields": "Zu interessanten Feldern hinzufügen",
     "viewPatternsCount": "{count} Muster anzeigen | {count} Muster anzeigen",
     "addPattern": "Muster hinzufügen",
+    "sdrNonStringFieldWarning": "Suchzeit-Muster gelten nur für Textfelder, daher wird dieses nicht angewendet. Verwenden Sie stattdessen ein Erfassungszeit-Muster.",
+    "sdrPartitionKeyWarning": "Ein Partitionsschlüssel enthält seinen Rohwert im Dateipfad, daher wird sein Suchzeit-Muster nicht angewendet. Entfernen Sie das Muster oder den Partitionsschlüssel.",
     "editStream": "Stream bearbeiten",
     "createNewStream": "Neuen Stream erstellen",
     "errorWhileDeletingStreams": "Fehler beim Löschen von Streams.",

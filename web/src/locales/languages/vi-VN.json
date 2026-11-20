@@ -5353,6 +5353,8 @@
     "addToInterestingFields": "Thêm vào các trường đáng quan tâm",
     "viewPatternsCount": "Xem {count} mẫu | Xem {count} mẫu",
     "addPattern": "Thêm mẫu",
+    "sdrNonStringFieldWarning": "Mẫu khi tìm kiếm chỉ áp dụng cho trường chuỗi, nên mẫu này không được áp dụng. Hãy dùng mẫu khi nhập dữ liệu thay thế.",
+    "sdrPartitionKeyWarning": "Khóa phân vùng chứa giá trị gốc trong đường dẫn tệp, nên mẫu khi tìm kiếm của nó không được áp dụng. Hãy xóa mẫu hoặc khóa phân vùng.",
     "editStream": "Chỉnh sửa Stream",
     "createNewStream": "Tạo Stream mới",
     "errorWhileDeletingStreams": "Lỗi khi xóa các stream.",
