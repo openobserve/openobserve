@@ -473,10 +473,20 @@ export const useSearchResponseHandler = () => {
       regeratePaginationFlag = true;
     }
 
+    const rowOffset = Number(payload.meta?.rowOffset ?? 0);
+    const countHits =
+      rowOffset > 0
+        ? response.content.results.hits.map((hit: any) =>
+            hit.zo_sql_num == null
+              ? hit
+              : { ...hit, zo_sql_num: Math.max(hit.zo_sql_num - rowOffset, 0) },
+          )
+        : response.content.results.hits;
+
     if (response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs) {
-      searchObj.data.queryResults.aggs = response.content.results.hits;
+      searchObj.data.queryResults.aggs = countHits;
     } else {
-      searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+      searchObj.data.queryResults.aggs.push(...countHits);
     }
 
     refreshPagination(regeratePaginationFlag);

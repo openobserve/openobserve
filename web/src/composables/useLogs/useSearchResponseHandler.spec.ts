@@ -802,6 +802,40 @@ describe("useSearchResponseHandler", () => {
     });
   });
 
+  describe("page count for a query with an OFFSET", () => {
+    const countHits = (meta?: Record<string, unknown>) => {
+      mockState.searchObj.data.queryResults.aggs = [];
+      responseHandler.handleSearchResponse(
+        { type: "pageCount", traceId: "c", queryReq: { query: {} }, meta } as any,
+        {
+          type: "search_response_hits",
+          content: { results: { hits: [{ zo_sql_num: 600 }] } },
+        } as any,
+      );
+      return mockState.searchObj.data.queryResults.aggs;
+    };
+
+    it("takes the rows skipped by the OFFSET off the total", () => {
+      expect(countHits({ rowOffset: 5 })).toEqual([{ zo_sql_num: 595 }]);
+    });
+
+    it("never reports a negative total", () => {
+      mockState.searchObj.data.queryResults.aggs = [];
+      responseHandler.handleSearchResponse(
+        { type: "pageCount", traceId: "c", queryReq: { query: {} }, meta: { rowOffset: 5 } } as any,
+        {
+          type: "search_response_hits",
+          content: { results: { hits: [{ zo_sql_num: 2 }] } },
+        } as any,
+      );
+      expect(mockState.searchObj.data.queryResults.aggs).toEqual([{ zo_sql_num: 0 }]);
+    });
+
+    it("keeps the count as is without an OFFSET", () => {
+      expect(countHits()).toEqual([{ zo_sql_num: 600 }]);
+    });
+  });
+
   describe("updatePageCountTotal", () => {
     it("should update page count when at page boundary", () => {
       // Use mockState directly

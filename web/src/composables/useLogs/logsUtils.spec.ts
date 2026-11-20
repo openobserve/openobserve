@@ -414,6 +414,24 @@ describe("logsUtils", () => {
       expect(utils.isLimitQuery(parsedSQL as any)).toBe(true);
     });
 
+    it("should return false for an OFFSET with no LIMIT", () => {
+      const parsedSQL = { limit: { seperator: "offset", value: [{ type: "number", value: 5 }] } };
+      expect(utils.isLimitQuery(parsedSQL as any)).toBe(false);
+    });
+
+    it("should return true for LIMIT with OFFSET", () => {
+      const parsedSQL = {
+        limit: {
+          seperator: "offset",
+          value: [
+            { type: "number", value: 10 },
+            { type: "number", value: 5 },
+          ],
+        },
+      };
+      expect(utils.isLimitQuery(parsedSQL as any)).toBe(true);
+    });
+
     it("should return false when LIMIT is not present", () => {
       const parsedSQL = { limit: null };
       expect(utils.isLimitQuery(parsedSQL as any)).toBe(false);

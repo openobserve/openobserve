@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { isOffsetOnlyLimit } from "@/utils/logs/sqlOffset";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { b64EncodeUnicode, useLocalLogFilterField } from "@/utils/zincutils";
@@ -318,7 +319,10 @@ export const logsUtils = () => {
    */
   const isLimitQuery = (parsedSQL: ExtendedParsedSQLResult | null = null): boolean => {
     const limit = getOuterLimit(parsedSQL);
-    return Boolean(limit?.value && Array.isArray(limit.value) && limit.value.length > 0);
+    return (
+      Boolean(limit?.value && Array.isArray(limit.value) && limit.value.length > 0) &&
+      !isOffsetOnlyLimit(limit)
+    );
   };
 
   /**
