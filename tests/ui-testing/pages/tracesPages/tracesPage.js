@@ -1778,6 +1778,19 @@ export class TracesPage {
     return sharedUrl;
   }
 
+  async expectShareLinkDisabled(message) {
+    await expect(
+      this.page.locator(this.shareLinkButton),
+      message,
+    ).toBeDisabled();
+  }
+
+  async expectSpansFoundCount(count, timeout = 60000) {
+    await expect(
+      this.page.locator(this.tracesCountBadge).first(),
+    ).toContainText(`${count} Spans Found`, { timeout });
+  }
+
   async clickShareLinkButton() {
     await this.page.locator(this.shareLinkButton).click();
     await this.page.waitForTimeout(1000);

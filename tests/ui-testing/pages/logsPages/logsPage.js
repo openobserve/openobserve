@@ -2897,6 +2897,21 @@ export class LogsPage {
         }
     }
 
+    /** Poll the search API until the last hour of `streamName` holds exactly `expected` rows. */
+    async waitForStreamRowCount(orgId, streamName, expected, timeout = 60000) {
+        const baseUrl = process.env.INGESTION_URL.replace(/\/$/, '');
+        const sql = `SELECT count(*) AS c FROM "${streamName}"`;
+        await expect.poll(async () => {
+            const end = Date.now() * 1000;
+            const response = await this.page.request.post(`${baseUrl}/api/${orgId}/_search?type=logs`, {
+                headers: getAuthHeaders(),
+                data: { query: { sql, start_time: end - 3600 * 1e6, end_time: end + 60 * 1e6, from: 0, size: 1 } },
+            });
+            if (!response.ok()) return -1;
+            return (await response.json()).hits?.[0]?.c ?? 0;
+        }, { timeout, intervals: [1000] }).toBe(expected);
+    }
+
     // Management methods - delegate to ManagementPage
     async navigateToManagement() {
         return await this.managementPage.navigateToManagement();
@@ -3863,6 +3878,13 @@ export class LogsPage {
     async includeLogDetailFieldValue(field) {
         await this.page.locator(this.logDetailDialog).locator(`[data-test="log-details-include-exclude-field-btn-${field}"]`).click();
         await this.page.locator(this.includeFieldButton).filter({ hasText: 'Include Search Term' }).click();
+    }
+
+    /** Include Search Term from a field's menu in the detail drawer's JSON tab (the default tab). */
+    async includeLogDetailJsonFieldValue(field) {
+        const row = this.page.locator(this.logDetailDialog).locator(`[data-test="log-detail-row-${field}"]`);
+        await row.locator('[data-test="log-details-include-exclude-field-btn"]').click();
+        await this.page.locator(`${this.includeFieldButton}:visible`).first().click();
     }
 
     async clickCloseDialog() {
@@ -13233,6 +13255,184 @@ export class LogsPage {
 
     async getAroundResponses() {
         return await this.page.evaluate(() => /** @type {any} */ (window).__aroundCalls || []);
+    }
+
+    /** Start recording `_search_stream` histogram requests (`is_ui_histogram=true`); returns a getter. */
+    trackHistogramRequests() {
+        const urls = [];
+        this.page.on('request', (req) => {
+            if (req.method() === 'POST' && req.url().includes('/_search_stream') && req.url().includes('is_ui_histogram=true')) {
+                urls.push(req.url());
+            }
+        });
+        return () => [...urls];
+    }
+
+    async expectShareLinkButtonEnabled(timeout = 30000) {
+        await expect(this.page.locator(this.shareLinkButton)).toBeEnabled({ timeout });
+    }
+
+    // utils/traces-api.js createSavedView posts to ZO_BASE_URL, which is not the API when the UI is served separately.
+    async createSavedViewViaApi(viewName, data) {
+        const orgId = getOrgIdentifier() || 'default';
+        const res = await this.page.request.post(`${process.env.INGESTION_URL.replace(/\/$/, '')}/api/${orgId}/savedviews`, {
+            headers: getAuthHeaders(),
+            data: { view_name: viewName, view_type: 'logs', data },
+        });
+        expect(res.ok(), `create saved view ${viewName} -> ${res.status()}`).toBe(true);
+        return (await res.json()).view_id;
+    }
+
+    async deleteSavedViewViaApi(viewId) {
+        const orgId = getOrgIdentifier() || 'default';
+        await this.page.request.delete(`${process.env.INGESTION_URL.replace(/\/$/, '')}/api/${orgId}/savedviews/${viewId}`, { headers: getAuthHeaders() });
+    }
+
+    async findSavedViewIdViaApi(viewName, timeout = 30000) {
+        const orgId = getOrgIdentifier() || 'default';
+        let id;
+        await expect.poll(async () => {
+            const res = await this.page.request.get(`${process.env.INGESTION_URL.replace(/\/$/, '')}/api/${orgId}/savedviews`, { headers: getAuthHeaders() });
+            id = res.ok() ? ((await res.json()).views ?? []).find((v) => v.view_name === viewName)?.view_id : undefined;
+            return Boolean(id);
+        }, { timeout, message: `saved view ${viewName} never listed` }).toBe(true);
+        return id;
+    }
+
+    async setStreamMaxQueryRangeViaApi(streamName, hours) {
+        const orgId = getOrgIdentifier() || 'default';
+        const base = process.env.INGESTION_URL.replace(/\/$/, '');
+        const res = await this.page.request.put(`${base}/api/${orgId}/streams/${streamName}/settings?type=logs`, {
+            headers: getAuthHeaders(),
+            data: { max_query_range: hours },
+        });
+        expect(res.ok(), `set max_query_range=${hours} on ${streamName} -> ${res.status()}`).toBe(true);
+        await expect.poll(async () => {
+            const schema = await this.page.request.get(`${base}/api/${orgId}/streams/${streamName}/schema?type=logs`, { headers: getAuthHeaders() });
+            return schema.ok() ? (await schema.json())?.settings?.max_query_range ?? 0 : null;
+        }, { timeout: 15000 }).toBe(hours);
+    }
+
+    async applySavedViewByName(viewName) {
+        await this.clickSavedViewsExpand();
+        await this.clickSavedViewSearchInput();
+        await this.fillSavedViewSearchInput(viewName);
+        await this.clickSavedViewByTitle(viewName);
+    }
+
+    toastByVariant(variant) {
+        return this.page.locator(`[data-test-variant="${variant}"]`).first();
+    }
+
+    async openLogsWithParams(stream, params) {
+        const orgId = getOrgIdentifier() || 'default';
+        const query = new URLSearchParams({ org_identifier: orgId, stream_type: 'logs', stream, ...params });
+        await this.page.goto(`${process.env.ZO_BASE_URL}/web/logs?${query.toString()}`);
+        await this.page.locator(this.shareLinkButton).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    /** Start recording the time window of every non-histogram search request; returns a getter. */
+    trackSearchWindows() {
+        const windows = [];
+        this.page.on('request', (req) => {
+            if (req.method() !== 'POST' || !req.url().includes('/_search') || req.url().includes('is_ui_histogram')) return;
+            const q = req.postDataJSON()?.query;
+            if (q?.start_time && q?.end_time) windows.push({ start: Number(q.start_time), end: Number(q.end_time) });
+        });
+        return () => [...windows];
+    }
+
+    /** Resolves to the URL the next Share click asks the server to shorten. */
+    waitForShortUrlTarget(timeout = 30000) {
+        return this.page
+            .waitForRequest((req) => req.method() === 'POST' && /\/api\/[^/]+\/short$/.test(new URL(req.url()).pathname), { timeout })
+            .then((req) => req.postDataJSON().original_url);
+    }
+
+    /** Poll the `_values` API over the last `windowUs` until `field` offers `value`. */
+    async waitForFieldValueViaApi(streamName, field, value, windowUs, timeout = 60000) {
+        const orgId = getOrgIdentifier() || 'default';
+        const base = process.env.INGESTION_URL.replace(/\/$/, '');
+        await expect.poll(async () => {
+            const end = Date.now() * 1000;
+            const res = await this.page.request.get(
+                `${base}/api/${orgId}/${streamName}/_values?fields=${field}&size=10&start_time=${end - windowUs}&end_time=${end}&type=logs`,
+                { headers: getAuthHeaders() },
+            );
+            const body = await res.json().catch(() => ({}));
+            return (body?.hits?.[0]?.values ?? []).map((v) => v.zo_sql_key);
+        }, { message: `${field} never offered ${value}`, timeout }).toContain(value);
+    }
+
+    async expectPatternsToggleOff() {
+        await expect(this.page.locator('[data-test="logs-patterns-toggle"]')).not.toHaveAttribute('data-state', 'on');
+    }
+
+    async closeLogDetailIfOpen() {
+        const close = this.page.locator(this.closeDialog);
+        if (await close.isVisible()) await close.click();
+        await expect(this.page.locator(this.logDetailDialog)).toBeHidden();
+    }
+
+    buildIncompleteFilterNotice() {
+        return this.page.locator('[data-test="logs-build-incomplete-filter-notice"]');
+    }
+
+    async clickVisualizeRefresh() {
+        await this.page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]:visible').first().click();
+    }
+
+    drillDownNoDimensionsState() {
+        return this.page.locator('[data-test="traces-analysis-dashboard-no-dimensions"]');
+    }
+
+    drillDownStreamRow() {
+        return this.page.locator('[data-test="logs-drill-down-stream-row"]');
+    }
+
+    // The Selected chip has no data-test or role; it renders only when a brushed range is compared.
+    drillDownSelectedRangeChip() {
+        return this.page.locator('.time-range-chip.selected-chip');
+    }
+
+    async expectDateTimeButtonText(text, timeout = 15000) {
+        await expect(this.page.locator(this.dateTimeButton)).toContainText(text, { timeout });
+    }
+
+    searchStreamNotFoundMessage() {
+        return this.page.getByText('Search stream not found');
+    }
+
+    async expectBuildStreamType(pattern, timeout = 15000) {
+        await expect(this.page.locator(this.buildStreamTypeDropdown).first()).toContainText(pattern, { timeout });
+    }
+
+    async expectBuildStream(streamName, timeout = 15000) {
+        await expect(this.page.locator(this.buildStreamDropdown).first()).toContainText(streamName, { timeout });
+    }
+
+    /** The no-events copy for a filtered query, an unfiltered one, or a window with no stream data. */
+    noEventsCopy(kind) {
+        const text = {
+            withFilters: /Nothing matched/,
+            noFilters: /No events were found in/,
+            outOfRange: /time window doesn.t contain any data/,
+        }[kind];
+        return this.page.getByText(text);
+    }
+
+    async expectRunPending(timeout = 10000) {
+        await expect(this.page.locator(this.runQueryPending)).toBeVisible({ timeout });
+    }
+
+    async expectNoResultPage(pageNumber) {
+        await expect(this.page.locator(this.resultPaginationPageBtn(pageNumber))).toHaveCount(0);
+    }
+
+    /** Visible text of the results title (records chip or the plain title), whitespace-collapsed. */
+    async getVisibleResultTitleText() {
+        const title = this.page.locator(`${this.paginationRowCountTitle}:visible`).first();
+        return ((await title.textContent().catch(() => '')) || '').replace(/\s+/g, ' ').trim();
     }
 
     // Scoped to the visible title: Visualize renders a second, stale copy of SearchResult.

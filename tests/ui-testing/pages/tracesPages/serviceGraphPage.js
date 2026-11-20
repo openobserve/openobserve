@@ -518,6 +518,19 @@ export class ServiceGraphPage {
     return await table.locator('tbody tr').count();
   }
 
+  /** Waits for the side panel's first operation row to show `count`, then clicks it to hand off to Traces. */
+  async openFirstOperationTraces(nodeName, count) {
+    const row = this.page.locator(`${this.operationsTable} tbody tr`).first();
+    await expect(
+      row,
+      `${nodeName} must list its operations from the stream`,
+    ).toBeVisible({ timeout: 30000 });
+    await expect(row).toContainText(String(count));
+    // A row click hands off with no column filter; the per-column hover buttons add errors or latency bounds.
+    await row.locator("td").first().click();
+    await this.page.waitForURL(/\/traces\?/, { timeout: 15000 });
+  }
+
   async closeSidePanel() {
     await this.page.locator(this.sidePanelCloseBtn).click();
     await this.page.locator(this.sidePanel)

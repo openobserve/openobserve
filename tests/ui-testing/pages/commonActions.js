@@ -131,17 +131,18 @@ export async function clickNavUntilRoute(page, selector, pathSuffix, attempts = 
  * @param {import('@playwright/test').Page} page
  * @param {string} mode
  */
-export async function selectLogsViewMode(page, mode, timeout = 20000) {
+// `force` skips the enabled check, so a test can try a mode the page should refuse.
+export async function selectLogsViewMode(page, mode, timeout = 20000, { force = false } = {}) {
     const toggle = page.locator(`[data-test="logs-${mode}-toggle"]`);
     const dropdownBtn = page.locator('[data-test="logs-view-mode-dropdown-btn"]');
     // SearchBar.vue swaps the toggle group for a dropdown while its measured toolbar width is narrow, which can be transient.
     await toggle.or(dropdownBtn).first().waitFor({ state: 'visible', timeout });
     if (await toggle.isVisible()) {
-        await toggle.click();
+        await toggle.click({ force });
         return;
     }
     await dropdownBtn.click();
-    await page.locator(`[data-test="logs-view-mode-${mode}-item"]`).click();
+    await page.locator(`[data-test="logs-view-mode-${mode}-item"]`).click({ force });
 }
 
 /** Opens the Metrics Explorer in Visualize mode, where the panel editor lives. */
