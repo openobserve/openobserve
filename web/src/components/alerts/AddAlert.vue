@@ -703,6 +703,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :forecast-window="checkTimelineForecastWindow"
                   :query-condition="formData.query_condition"
                   :aligned="formData.trigger_condition.align_time !== false"
+                  :cron="
+                    formData.trigger_condition.frequency_type === 'cron'
+                      ? (formData.trigger_condition.cron ?? '')
+                      : null
+                  "
+                  :timezone="formData.trigger_condition.timezone"
                 />
                 <AlertSuggestionLine section="condition" anchor="end" />
                 <div
@@ -1861,7 +1867,7 @@ export default defineComponent({
 
     const showsCheckTimeline = computed(() => {
       const fd = alertForm.formData.value;
-      return fd.is_real_time === "false" && fd.trigger_condition?.frequency_type !== "cron";
+      return fd.is_real_time === "false";
     });
 
     // Mode as the subtitle, exactly as AddPanel does it ("Add Panel" / "Edit
