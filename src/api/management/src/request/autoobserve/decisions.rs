@@ -39,8 +39,10 @@ use o2_enterprise::enterprise::{
         decisions::{
             self, Access, BODY_INVALID, CAN_ACT_SHOWN, Caller, Change, Ctx, DecideBody,
             DecisionError, DecisionResult, DecisionView, Family, ListQuery, Owners, OwnersScope,
-            PreviewQuery, QUERY_INVALID, RefusalReason, Source, SubjectInfo, UndoRequest,
+            Permission, PreviewQuery, QUERY_INVALID, RefusalReason, Source, SubjectInfo,
+            UndoRequest,
         },
+        fixes::types::ActionKind,
         names::{dims, kinds},
     },
 };
@@ -95,7 +97,7 @@ impl Access for LiveAccess<'_> {
     async fn may_decide(&self, family: Family, subject: &EntityRef) -> bool {
         match family {
             Family::AlertFinding => may_dismiss(self.org_id, self.user_id).await,
-            Family::Suggestion | Family::Issue => {
+            Family::Suggestion | Family::Issue | Family::Fix => {
                 let id = subject
                     .key_dims
                     .get(dims::ENTITY_ID)
@@ -108,7 +110,7 @@ impl Access for LiveAccess<'_> {
     async fn reads_notes(&self, family: Family) -> bool {
         match family {
             Family::AlertFinding => may_dismiss(self.org_id, self.user_id).await,
-            Family::Suggestion | Family::Issue => {
+            Family::Suggestion | Family::Issue | Family::Fix => {
                 !rbac_enforced().await
                     || changes_every_mark(|resource, method| {
                         org_wide_allows(self.org_id, self.user_id, resource, method)
@@ -171,6 +173,17 @@ impl Access for LiveAccess<'_> {
         now: i64,
     ) -> anyhow::Result<Option<SuggestedChange>> {
         Ok(finding_change(self.org_id, self.user_id, id, now).await?)
+    }
+
+    /// Each action lane adds its kind's own write check here, run as `user_id`;
+    /// until then no kind can be approved.
+    async fn may_apply_fix(
+        &self,
+        _user_id: &str,
+        _kind: &ActionKind,
+        _target: &EntityRef,
+    ) -> Permission {
+        Permission::Denied(RefusalReason::Org)
     }
 }
 
@@ -738,6 +751,7 @@ mod tests {
             via: None,
             undone_at: None,
             undone_by: None,
+            fix: None,
         }
     }
 
@@ -847,6 +861,7 @@ mod tests {
             undo: UndoRequest {
                 expected_revision: 1,
                 request_id: Some("3f2c9a1e-undo".into()),
+                target: None,
             },
             preview_locked: Preview {
                 may: false,
@@ -1129,6 +1144,15 @@ mod tests {
             ) -> anyhow::Result<Option<SuggestedChange>> {
                 Ok(Some(self.change.clone()))
             }
+
+            async fn may_apply_fix(
+                &self,
+                user_id: &str,
+                kind: &ActionKind,
+                target: &EntityRef,
+            ) -> Permission {
+                self.live.may_apply_fix(user_id, kind, target).await
+            }
         }
 
         #[derive(Default)]
@@ -1400,6 +1424,7 @@ mod tests {
             let ask = UndoRequest {
                 expected_revision: done.decision.revision,
                 request_id: None,
+                target: None,
             };
             let decision_id = done.decision.decision_id.clone();
             let refused = decisions::undo(&ctx, &decision_id, &ask, now_micros()).await;
