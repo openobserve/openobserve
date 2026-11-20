@@ -256,11 +256,11 @@ onBeforeUnmount(() => {
     wide
     data-test="add-alert-check-timeline"
   >
-    <p class="text-text-body m-0 text-sm" :class="isCron ? 'min-h-15' : 'min-h-10'">
-      <span data-test="add-alert-check-timeline-caption">{{ caption }}</span>
-      <OButton
+    <!-- Pretty wrapping pulls the sentence's last word down with Show/Hide, so the link is never alone. -->
+    <p class="text-text-body m-0 text-sm text-pretty" :class="isCron ? 'min-h-15' : 'min-h-10'">
+      <span data-test="add-alert-check-timeline-caption">{{ caption }}</span
+      >&nbsp;<OButton
         variant="link"
-        class="ms-1"
         :aria-expanded="stripOpen"
         data-test="add-alert-check-timeline-toggle"
         @click="stripOpen = !stripOpen"
