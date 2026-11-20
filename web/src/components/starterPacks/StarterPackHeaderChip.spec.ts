@@ -106,6 +106,8 @@ vi.mock("@/composables/starterPacks/useStarterPackMatcher", async () => {
         packId: options?.pack?.id,
         state: ref("checking"),
         clusters: ref<string[]>([]),
+        streams: ref<string[]>([]),
+        streamTypes: ref<Record<string, string>>({}),
         check: vi.fn(),
         checkShared: vi.fn(),
       };
