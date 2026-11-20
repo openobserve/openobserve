@@ -1977,6 +1977,7 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import {
   appendSqlFilter,
+  splitUnion,
   hasFieldCondition,
   qualifyFieldConditions,
   removeFieldCondition,
@@ -5745,18 +5746,7 @@ export default defineComponent({
         // and the split is quote-unaware, so a pipe inside a term such as
         // match_all('text | error') would corrupt the query when a filter is added.
         const currentQuery = [this.searchObj.data.query];
-        let unionType: string = "";
-        if (currentQuery[0].replace("union all", "UNION ALL").includes("UNION ALL")) {
-          unionType = "UNION ALL";
-        } else if (currentQuery[0].replace("union", "UNION").includes("UNION")) {
-          unionType = "UNION";
-        }
-
-        // Use regular expression to match "UNION" or "UNION ALL" (case insensitive)
-        const unionRegex = /\bUNION ALL\b|\bUNION\b/i;
-
-        // Split the string by "UNION" or "UNION ALL" if they are present
-        const queries = currentQuery[0].split(unionRegex);
+        const { parts: queries, ops: unionOps } = splitUnion(currentQuery[0]);
 
         // Iterate over each part
         queries.forEach((query, index) => {
@@ -5773,7 +5763,7 @@ export default defineComponent({
           }
 
           if (this.searchObj.meta.sqlMode == true) {
-            if (unionType == "" && this.searchObj.data.stream.selectedStream.length > 1) {
+            if (unionOps.length === 0 && this.searchObj.data.stream.selectedStream.length > 1) {
               const parsedSQL = this.fnParsedSQL();
               const streamPrefix: string =
                 parsedSQL.from[0].as != null ? parsedSQL.from[0].as : parsedSQL.from[0].table;
@@ -5813,11 +5803,11 @@ export default defineComponent({
           queries[index] = currentQuery[0];
         });
 
-        if (unionType == "") {
-          this.searchObj.data.query = queries.join("");
-        } else {
-          this.searchObj.data.query = queries.join(` ${unionType} `);
-        }
+        this.searchObj.data.query = queries.reduce(
+          (sql, branch, index) =>
+            index === 0 ? branch : `${sql} ${unionOps[index - 1]} ${branch}`,
+          "",
+        );
         this.searchObj.data.editorValue = this.searchObj.data.query;
         this.searchObj.data.stream.addToFilter = "";
         this.searchObj.data.stream.addToFilterMode = "replace";
