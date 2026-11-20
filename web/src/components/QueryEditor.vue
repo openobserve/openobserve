@@ -94,7 +94,7 @@
         class="rounded-default absolute! top-0.75 z-100 size-7! min-h-7! min-w-7!"
         :class="props.hasExpandButton ? 'right-9' : 'right-1'"
       >
-        <OIcon name="auto-awesome" size="sm" class="text-text-secondary" />
+        <AiSparkleIcon class="text-text-secondary" />
         <span
           v-if="!aiAccess.allowed"
           aria-hidden="true"
@@ -146,6 +146,7 @@
 </template>
 
 <script setup lang="ts">
+import AiSparkleIcon from "@/components/common/AiSparkleIcon.vue";
 import { ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
