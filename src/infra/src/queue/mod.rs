@@ -52,6 +52,8 @@ pub struct QueueConfig {
     pub storage_type: StorageType,
     /// Messages published with a repeated id inside this window are dropped by the server.
     pub duplicate_window: Option<std::time::Duration>,
+    /// Overrides `nats.queue_max_size` for this topic; the memory backend ignores it.
+    pub max_bytes: Option<u64>,
 }
 
 pub struct QueueConfigBuilder {
@@ -66,6 +68,7 @@ impl QueueConfigBuilder {
                 retention_policy: RetentionPolicy::Limits,
                 storage_type: StorageType::File,
                 duplicate_window: None,
+                max_bytes: None,
             },
         }
     }
@@ -90,6 +93,11 @@ impl QueueConfigBuilder {
         self
     }
 
+    pub fn max_bytes(mut self, max_bytes: u64) -> Self {
+        self.config.max_bytes = Some(max_bytes);
+        self
+    }
+
     pub fn build(self) -> QueueConfig {
         self.config
     }
@@ -99,6 +107,15 @@ impl Default for QueueConfigBuilder {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// A topic's kept broker sequences; `first` is past `last` when it holds nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SequenceRange {
+    pub first: u64,
+    pub last: u64,
+    /// When this incarnation of the topic was created: a re-created topic restarts its sequences.
+    pub created_us: i64,
 }
 
 static DEFAULT: OnceCell<Box<dyn Queue>> = OnceCell::const_new();
@@ -172,6 +189,7 @@ pub trait Queue: Sync + Send + 'static {
         deliver_policy: Option<DeliverPolicy>,
     ) -> Result<PullConsumer>;
     async fn purge(&self, topic: &str, sequence: usize) -> Result<()>;
+    async fn sequence_range(&self, topic: &str) -> Result<SequenceRange>;
 }
 
 /// A backend-independent pull consumer returned by [`Queue::pull_consume`].
@@ -240,6 +258,7 @@ impl PullConsumer {
 /// not depend on which backend produced the message.
 pub struct Message {
     payload: Bytes,
+    sequence: Option<u64>,
     ack: AckHandle,
 }
 
@@ -255,19 +274,31 @@ impl Message {
         Self {
             // Bytes clone is a cheap refcount bump, not a payload copy
             payload: msg.payload.clone(),
+            sequence: msg.info().ok().map(|info| info.stream_sequence),
             ack: AckHandle::Nats(msg),
         }
     }
 
-    pub(crate) fn from_memory(payload: Bytes, handle: memory::MemoryAckHandle) -> Self {
+    pub(crate) fn from_memory(
+        payload: Bytes,
+        sequence: u64,
+        handle: memory::MemoryAckHandle,
+    ) -> Self {
         Self {
             payload,
+            sequence: Some(sequence),
             ack: AckHandle::Memory(handle),
         }
     }
 
     pub fn message(&self) -> &Bytes {
         &self.payload
+    }
+
+    /// The topic's broker sequence: it grows with every publish, so a skipped value is a
+    /// message removed before this consumer read it.
+    pub fn sequence(&self) -> Option<u64> {
+        self.sequence
     }
 
     pub async fn ack(&self) -> Result<()> {
