@@ -199,6 +199,10 @@ export interface SelectProps {
    * Kept only so existing call sites don't break; has no effect.
    */
   optionTooltip?: boolean;
+  /** Activating the trigger emits `trigger-click` instead of opening the options popup, for a caller that shows its own picker. */
+  triggerOnly?: boolean;
+  /** With `triggerOnly`: the caller's picker is showing, so the chevron points up. */
+  expanded?: boolean;
 }
 
 export interface SelectEmits {
@@ -217,6 +221,8 @@ export interface SelectEmits {
   (_e: "keydown", _event: KeyboardEvent): void;
   /** Fired when a header's `headerAction` button is activated, with that header option as passed in */
   (_e: "header-action", _option: SelectOption): void;
+  /** `triggerOnly` mode: the trigger was activated by click or keyboard. */
+  (_e: "trigger-click"): void;
 }
 
 export interface SelectSlots {

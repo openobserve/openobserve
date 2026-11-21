@@ -23,7 +23,7 @@ test.describe("Metrics Visualization and Chart Tests", () => {
   });
 
   // CONSOLIDATED TEST 1: All chart type selections and rendering (9 tests → 1 test, expanded to 14 chart types)
-  // Chart selector uses pattern: [data-test="selected-chart-{type}-item"]
+  // Chart list rows use [data-test="selected-chart-{type}-item"], shown after opening the Chart type select
   // Testing: line, bar, area, area-stacked, scatter, stacked, h-bar, h-stacked, pie, donut, heatmap, table, metric, gauge
   // Available (not tested): geomap, maps, html, markdown, sankey, custom_chart
   test("Verify all chart type selections render correctly", {

@@ -398,9 +398,10 @@ test.describe("Dashboard Create Alert testcases", () => {
       await pm.dashboardPanelActions.addPanelName(panelName);
       await pm.chartTypeSelector.selectChartType("scatter");
       // A silent chart-type miss leaves bar/line, which also opens the menu and would pass vacuously.
-      await expect(
-        pm.chartTypeSelector.getSelectedChartItem("scatter")
-      ).toHaveAttribute("data-selected", "true");
+      await expect(pm.chartTypeSelector.getChartTypeSelect()).toHaveAttribute(
+        "data-test-selected-value",
+        "scatter"
+      );
       await pm.chartTypeSelector.selectStreamType("logs");
       await pm.chartTypeSelector.selectStream("e2e_automate");
       // Scatter allows one X field, so the seeded histogram(_timestamp) must go first.

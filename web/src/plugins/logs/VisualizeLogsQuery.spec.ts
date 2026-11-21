@@ -247,7 +247,6 @@ describe("VisualizeLogsQuery Component", () => {
         },
         stubs: {
           PanelSidebar: true,
-          ChartSelection: true,
           FieldList: true,
           DashboardQueryBuilder: true,
           DashboardErrorsComponent: true,

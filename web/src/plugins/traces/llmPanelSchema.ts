@@ -34,7 +34,7 @@ import { toSeriesOverrideEntry } from "@/utils/dashboard/seriesOverrides";
 
 import type { LLMPanelDef } from "./config/llmInsightsPanels";
 
-/** Our internal panel type → dashboard chart type id (see ChartSelection.vue). */
+/** Our internal panel type → dashboard chart type id (see chartTypeCatalog.ts). */
 const TYPE_MAP: Record<string, string> = {
   "stacked-area": "area-stacked",
   "stacked-bar": "stacked",

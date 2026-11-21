@@ -134,6 +134,8 @@ const props = withDefaults(defineProps<SelectProps>(), {
   labelPosition: "outside",
   rowClickSingleSelect: false,
   optionTooltip: false,
+  triggerOnly: false,
+  expanded: false,
   // Intentionally no default — when undefined, the chip count is computed
   // from the live trigger width. Pass a number to force a fixed cap.
 });
@@ -766,6 +768,11 @@ function close() {
 /** Focus the trigger and open it, so a programmatic call reads as more than a ring. */
 function focus() {
   if (typeof document === "undefined") return;
+  if (props.triggerOnly) {
+    // Reka gives the popover trigger its own id, so it is reached through its wrapper.
+    (triggerWrapperRef.value ?? selectTriggerWrapperRef.value)?.querySelector("button")?.focus();
+    return;
+  }
   document.getElementById(inputId.value)?.focus();
   if (isDisabled.value) return;
   if (listboxModeEnabled.value) {
@@ -782,7 +789,7 @@ defineExpose({ close, focus });
 // event is consumed here so page-level single-letter shortcuts (logs "s",
 // "r", "h", …) never fire while the select has keyboard focus.
 function handleTriggerKeydown(e: KeyboardEvent) {
-  if (isDisabled.value) return;
+  if (isDisabled.value || props.triggerOnly) return;
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key.length !== 1 || e.key === " ") return;
   e.preventDefault();
@@ -1045,12 +1052,36 @@ const selectOpen = ref(false);
 
 const isOpen = computed(() => (listboxModeEnabled.value ? popoverOpen.value : selectOpen.value));
 
+const chevronUp = computed(() => (props.triggerOnly ? props.expanded : isOpen.value));
+
+function handlePopoverOpenChange(open: boolean) {
+  if (props.triggerOnly) {
+    if (open) emit("trigger-click");
+    return;
+  }
+  popoverOpen.value = open;
+}
+
+function handleSelectOpenChange(open: boolean) {
+  if (props.triggerOnly) {
+    if (open) emit("trigger-click");
+    return;
+  }
+  selectOpen.value = open;
+  if (open) emit("open");
+  else emit("close");
+}
+
 // Clicking the field label opens the dropdown — mirroring how clicking an
 // OInput's label focuses its input. Reka's triggers open on `pointerdown`, so
 // the `click` a native <label for> forwards never opens them; open explicitly.
 // `.prevent` (on the template handler) stops the redundant native forwarding.
 function handleLabelClick() {
   if (isDisabled.value) return;
+  if (props.triggerOnly) {
+    emit("trigger-click");
+    return;
+  }
   if (listboxModeEnabled.value) {
     popoverOpen.value = true;
   } else {
@@ -1402,7 +1433,7 @@ const fieldWidthClass = computed(() => {
     </label>
 
     <template v-if="listboxModeEnabled">
-      <PopoverRoot v-model:open="popoverOpen">
+      <PopoverRoot :open="popoverOpen" @update:open="handlePopoverOpenChange">
         <!-- An inline wrapper hugs its trigger so the absolutely placed chevron always lands on it. -->
         <div
           ref="triggerWrapperRef"
@@ -1415,7 +1446,7 @@ const fieldWidthClass = computed(() => {
             :disabled="isDisabled"
             :tabindex="inputTabindex"
             role="combobox"
-            :aria-expanded="popoverOpen"
+            :aria-expanded="triggerOnly ? expanded : popoverOpen"
             :aria-invalid="hasError || undefined"
             :aria-label="insideLabelName"
             :aria-labelledby="outsideLabelId"
@@ -1581,7 +1612,7 @@ const fieldWidthClass = computed(() => {
               :class="[
                 'text-select-icon flex items-center justify-center',
                 'transition-transform duration-150',
-                isOpen ? 'rotate-180' : '',
+                chevronUp ? 'rotate-180' : '',
               ]"
             >
               <!-- chevron-down — rotates 180° when the popover is open -->
@@ -2084,13 +2115,7 @@ const fieldWidthClass = computed(() => {
       :disabled="isDisabled"
       :name="name"
       @update:model-value="handleUpdate"
-      @update:open="
-        (v) => {
-          selectOpen = v;
-          if (v) emit('open');
-          else emit('close');
-        }
-      "
+      @update:open="handleSelectOpenChange"
     >
       <div
         ref="selectTriggerWrapperRef"
@@ -2202,7 +2227,7 @@ const fieldWidthClass = computed(() => {
             :class="[
               'text-select-icon flex items-center justify-center',
               'transition-transform duration-150',
-              isOpen ? 'rotate-180' : '',
+              chevronUp ? 'rotate-180' : '',
             ]"
           >
             <!-- chevron-down — rotates 180° when the dropdown is open -->
