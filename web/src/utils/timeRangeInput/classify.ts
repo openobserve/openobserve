@@ -68,11 +68,30 @@ function urlOutcome(text: string, env: Env): Outcome {
   const at = text.slice(0, hash < 0 ? undefined : hash).indexOf("?");
   const query = at < 0 ? "" : text.slice(at + 1, hash < 0 ? undefined : hash);
   const params = new URLSearchParams(query);
-  const [[from, f2], [to, t2], [period, p2]] = ["from", "to", "period"].map((k) =>
-    params.getAll(k),
-  );
-  // A repeated param, a lone end or a period beside both ends would leave a value unread.
-  if ((f2 ?? t2 ?? p2) !== undefined || !from !== !to || (from && to && period))
+  const fragment = hash < 0 ? "" : text.slice(hash + 1);
+  const keys = ["from", "to", "period"];
+  const [[from, f2], [to, t2], [period, p2]] = keys.map((k) => params.getAll(k));
+  const timeKey = (k: string): boolean =>
+    keys.includes(
+      [...k]
+        .filter((c) => !/^\p{Cf}$/u.test(c))
+        .join("")
+        .toLowerCase()
+        .split("=")[0],
+    );
+  // Text after a space, a second URL, a time param in the fragment, a look-alike key (`Period`,
+  // `per\u200biod`), an empty value, a repeated param, a lone end or a period beside both ends.
+  if (
+    text.includes(" ") ||
+    text.indexOf("://") !== text.lastIndexOf("://") ||
+    fragment.includes("?") ||
+    [...new URLSearchParams(fragment).keys()].some(timeKey) ||
+    [...params.keys()].some((k) => !keys.includes(k) && timeKey(k)) ||
+    [from, to, period].includes("") ||
+    (f2 ?? t2 ?? p2) !== undefined ||
+    !from !== !to ||
+    (from && to && period)
+  )
     return { t: "invalid", reason: "unreadable" };
   if (from && to) {
     const r = rangeDrafts(urlPoint(from, env), urlPoint(to, env), env);

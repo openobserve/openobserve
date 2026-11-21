@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { LocalePack } from "./schema";
+import { orClock } from "./shared/clock";
 
 export { default as tables } from "./generated/ru";
 
@@ -21,6 +22,7 @@ export const pack: LocalePack = {
   key: "ru",
   bcp47: "ru-RU",
   script: "other",
+  hooks: { orClock },
   units: {
     s: ["с", "сек", "секунда", "секунды", "секунд", "секунду"],
     m: ["м", "мин", "минута", "минуты", "минут", "минуту"],
