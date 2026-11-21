@@ -717,6 +717,27 @@ describe("SearchBar", () => {
 
       expect(wrapper.emitted("service-graph-refresh")).toBeTruthy();
     });
+
+    it("shows how long ago the Service Graph last loaded beside its refresh control", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      const lastRunAt = Date.now() - 3 * 60 * 1000;
+      wrapper = mountSearchBar({ serviceGraphLastRunAt: lastRunAt });
+      await flushPromises();
+
+      const refresh = wrapper.findComponent({ name: "ORefreshButton" });
+      expect(refresh.props("lastRunAt")).toBe(lastRunAt);
+      expect(refresh.find('[data-test="service-graph-refresh-btn"]').exists()).toBe(true);
+      // vue-i18n is mocked to return keys, so the age renders as its key.
+      expect(refresh.text()).toContain("refreshButton.minutesAgo");
+    });
+
+    it("marks the Service Graph refresh control busy while the graph loads", async () => {
+      searchObjInstance.meta.searchMode = "service-graph";
+      wrapper = mountSearchBar({ serviceGraphLoading: true });
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "ORefreshButton" }).props("loading")).toBe(true);
+    });
   });
 
   // -------------------------------------------------------------------------
