@@ -1781,8 +1781,16 @@ mod tests {
                 .map(|c| String::from_utf8(c.unwrap().to_vec()).unwrap())
                 .collect();
             let (client, server) = client_streaming(sse).await;
-            let result =
-                execute_tool(&client, "acme", tool, arguments, &DetailLevel::Summary).await;
+            let result = execute_tool(
+                &client,
+                "acme",
+                tool,
+                arguments,
+                &DetailLevel::Summary,
+                None,
+                None,
+            )
+            .await;
             let request = server.await.unwrap();
             match expected {
                 Ok(fields) => {
