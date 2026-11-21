@@ -214,7 +214,7 @@ impl Live {
 }
 
 /// One storage read a day of history is built from.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum HistoryRead {
     Pods {
         start: i64,
@@ -224,11 +224,70 @@ pub(super) enum HistoryRead {
         stream: &'static str,
         start: i64,
         end: i64,
+        scope: PodScope,
     },
     Events {
         start: i64,
         end: i64,
     },
+}
+
+/// The span pods' namespaces, pods and containers: the only K1 rows `matching_pods` can map.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(super) struct PodScope {
+    namespaces: BTreeSet<String>,
+    pods: BTreeSet<String>,
+    containers: BTreeSet<String>,
+}
+
+impl PodScope {
+    fn of<'a>(pods: impl IntoIterator<Item = &'a PodRow>) -> Self {
+        let mut scope = Self::default();
+        for pod in pods {
+            for (values, value) in [
+                (&mut scope.namespaces, &pod.k8s_namespace),
+                (&mut scope.pods, &pod.k8s_pod),
+                (&mut scope.containers, &pod.k8s_container),
+            ] {
+                if !value.is_empty() {
+                    values.insert(value.clone());
+                }
+            }
+        }
+        scope
+    }
+
+    fn covers(&self, other: &Self) -> bool {
+        other.namespaces.is_subset(&self.namespaces)
+            && other.pods.is_subset(&self.pods)
+            && other.containers.is_subset(&self.containers)
+    }
+
+    /// A K1 read narrowed to the scope, or none when no span pod can match a row.
+    fn narrow(&self, sql: &str) -> Option<String> {
+        if self.namespaces.is_empty() || self.containers.is_empty() {
+            return None;
+        }
+        let list = |values: &BTreeSet<String>| {
+            values
+                .iter()
+                .map(|value| config::utils::sql::quote_sql_string(value))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let pods = if self.pods.is_empty() {
+            String::new()
+        } else {
+            format!("pod IN ({}) OR ", list(&self.pods))
+        };
+        // A K1 row whose pod is blank, as `map_k1` trims it, matches any pod of its namespace and
+        // container.
+        Some(format!(
+            "SELECT * FROM ({sql}) AS k1 WHERE namespace IN ({}) AND container IN ({}) AND ({pods}pod IS NULL OR regexp_like(pod, '^\\s*$'))",
+            list(&self.namespaces),
+            list(&self.containers),
+        ))
+    }
 }
 
 /// An org's day of pods, K8s images and verdict events up to `end`, deduped as the reads dedupe.
@@ -336,6 +395,10 @@ impl OrgHistory {
 
     fn pods(&self) -> Vec<PodRow> {
         self.pods.values().map(|(_, _, row)| row.clone()).collect()
+    }
+
+    fn scope(&self) -> PodScope {
+        PodScope::of(self.pods.values().map(|(_, _, row)| row))
     }
 
     /// The two newest windows' images, the K1 windows detection compares.
@@ -541,6 +604,7 @@ where
     R: Fn(HistoryRead) -> Fut,
     Fut: std::future::Future<Output = anyhow::Result<Vec<serde_json::Value>>>,
 {
+    let read_for = previous.as_ref().map(OrgHistory::scope).unwrap_or_default();
     let (mut history, from) = match previous.filter(|history| history.continues(end, interval)) {
         Some(mut history) => {
             // Windows written before a restart, past the snapshot this day came from.
@@ -580,11 +644,24 @@ where
             (history, start)
         }
     };
+    for pod in pods {
+        history.merge_pod(generation, pod.clone());
+    }
+    history.end = end;
+    history.prune();
+    let scope = history.scope();
+    // The kept K1 windows hold only the pods they were read for, so a new pod reads its whole day.
+    let from = if read_for.covers(&scope) {
+        from
+    } else {
+        end - HISTORY_US
+    };
     for (index, stream) in K1_STREAMS.into_iter().enumerate() {
         let hits = read(HistoryRead::Images {
             stream,
             start: from,
             end,
+            scope: scope.clone(),
         })
         .await?;
         let ctx = WindowCtx {
@@ -597,11 +674,6 @@ where
         };
         history.put_images(index, from, end, k1_buckets(&ctx, hits)?);
     }
-    for pod in pods {
-        history.merge_pod(generation, pod.clone());
-    }
-    history.end = end;
-    history.prune();
     Ok(history)
 }
 
@@ -929,11 +1001,12 @@ async fn presence(
 ) -> anyhow::Result<(Vec<PodRow>, [Vec<K1Observation>; 2], Vec<K1Observation>)> {
     let start = end - 86_400_000_000;
     let pods = pod_rows(org, start, end, interval).await?;
+    let scope = PodScope::of(&pods);
     let mut windows = [vec![], vec![]];
     let mut images = vec![];
     for stream in K1_STREAMS {
         let (observations, history) =
-            presence_stream(org, stream, end, interval, ownership).await?;
+            presence_stream(org, stream, end, interval, &scope, ownership).await?;
         for (window, observations) in windows.iter_mut().zip(observations) {
             window.extend(observations);
         }
@@ -947,6 +1020,7 @@ async fn presence_stream(
     stream: &str,
     end: i64,
     interval: i64,
+    scope: &PodScope,
     ownership: Option<&Ownership<'_>>,
 ) -> anyhow::Result<([Vec<K1Observation>; 2], Vec<K1Observation>)> {
     let schema = infra::schema::get(org, stream, StreamType::Metrics).await?;
@@ -968,11 +1042,11 @@ async fn presence_stream(
         let hits = processor::query(
             org,
             StreamType::Metrics,
-            sql::build_k1_sql(stream, from, to, &cols).map(|sql| {
+            sql::build_k1_sql(stream, from, to, &cols).and_then(|sql| {
                 if index == 2 {
-                    bucketed_k1_sql(&sql, interval)
+                    scope.narrow(&bucketed_k1_sql(&sql, interval))
                 } else {
-                    sql
+                    scope.narrow(&sql)
                 }
             }),
             from,
@@ -1108,7 +1182,12 @@ async fn read_history(
             .map(PodRow::to_json)
             .collect()),
         HistoryRead::Events { start, end } => event_history(org, start, end).await,
-        HistoryRead::Images { stream, start, end } => {
+        HistoryRead::Images {
+            stream,
+            start,
+            end,
+            scope,
+        } => {
             let cols = infra::schema::get(org, stream, StreamType::Metrics)
                 .await?
                 .fields()
@@ -1116,7 +1195,7 @@ async fn read_history(
                 .map(|field| field.name().clone())
                 .collect();
             let sql = sql::build_k1_sql(stream, start, end, &cols)
-                .map(|sql| bucketed_k1_sql(&sql, interval));
+                .and_then(|sql| scope.narrow(&bucketed_k1_sql(&sql, interval)));
             processor::query(org, StreamType::Metrics, sql, start, end).await
         }
     }
@@ -1535,11 +1614,13 @@ mod tests {
                     stream: K1_STREAMS[0],
                     start: end - HISTORY_US,
                     end,
+                    scope: PodScope::default(),
                 },
                 HistoryRead::Images {
                     stream: K1_STREAMS[1],
                     start: end - HISTORY_US,
                     end,
+                    scope: PodScope::default(),
                 },
             ]
         };
@@ -1548,6 +1629,7 @@ mod tests {
             stream,
             start: next - 3 * interval,
             end: next,
+            scope: PodScope::default(),
         }));
         // The kept day stands for storage up to its end, so after a gap only the gap is read.
         expected.extend([
@@ -1564,6 +1646,7 @@ mod tests {
             stream,
             start: reread_from(next + interval, interval),
             end: gap,
+            scope: PodScope::default(),
         }));
         assert_eq!(*reads.lock().unwrap(), expected);
     }
@@ -1635,7 +1718,9 @@ mod tests {
                         )
                     },
                 ),
-                HistoryRead::Images { stream, start, end } => {
+                HistoryRead::Images {
+                    stream, start, end, ..
+                } => {
                     let mut hits: Vec<serde_json::Value> = Vec::new();
                     for (name, hit) in images.lock().unwrap().iter() {
                         if *name == stream
@@ -1770,7 +1855,9 @@ mod tests {
         let rebuilds = std::sync::atomic::AtomicUsize::new(0);
         let read = |request: HistoryRead| {
             let rows = match request {
-                HistoryRead::Images { stream, start, end } if stream == K1_STREAMS[0] => hits
+                HistoryRead::Images {
+                    stream, start, end, ..
+                } if stream == K1_STREAMS[0] => hits
                     .lock()
                     .unwrap()
                     .iter()
@@ -1816,6 +1903,131 @@ mod tests {
             .collect();
         assert_eq!(late.len(), 1);
         assert_eq!(late[0].window_start, first);
+    }
+
+    #[tokio::test]
+    async fn a_k1_read_narrowed_to_the_span_pods_maps_the_same_presence() {
+        let span_pod = |pod: &str| PodRow {
+            k8s_namespace: "shop".into(),
+            k8s_pod: pod.into(),
+            k8s_container: "app".into(),
+            service: "svc".into(),
+            where_key: "w".into(),
+            ..Default::default()
+        };
+        let pods = [span_pod("cart-1"), span_pod("o'brien-1")];
+        let sql = "SELECT DISTINCT namespace, pod, container, image, CAST(NULL AS VARCHAR) AS image_id, 'c1' AS k8s_cluster FROM (VALUES ('shop', 'cart-1', 'app', 'r/cart:1'), ('shop', 'o''brien-1', 'app', 'r/obrien:1'), ('shop', NULL, 'app', 'r/cart:2'), ('shop', ' \t', 'app', 'r/cart:3'), ('shop', 'cart-1', 'sidecar', 'r/envoy:1'), ('shop', 'idle-1', 'app', 'r/idle:1'), ('kube-system', 'cart-1', 'app', 'r/kube:1')) AS input(namespace, pod, container, image)";
+        let run = |sql: String| async move {
+            let batches = datafusion::prelude::SessionContext::new()
+                .sql(&sql)
+                .await
+                .unwrap()
+                .collect()
+                .await
+                .unwrap();
+            config::utils::arrow::record_batches_to_json_rows(&batches.iter().collect::<Vec<_>>())
+                .unwrap()
+                .into_iter()
+                .map(serde_json::Value::Object)
+                .collect::<Vec<_>>()
+        };
+        let ctx = WindowCtx {
+            org_id: "org".into(),
+            source_stream: K1_STREAMS[0].into(),
+            window_start: 0,
+            window_secs: 300,
+            written_at: 1,
+            cluster: "c1".into(),
+        };
+        let presence = |hits: &[serde_json::Value]| {
+            let mut mapped: Vec<_> =
+                not_serving::map_presence(&mappers::map_k1(&ctx, hits), &pods, 1)
+                    .iter()
+                    .map(|row| format!("{row:?}"))
+                    .collect();
+            mapped.sort();
+            mapped
+        };
+        let all = run(sql.into()).await;
+        let narrowed = run(PodScope::of(&pods).narrow(sql).unwrap()).await;
+        assert_eq!((all.len(), narrowed.len()), (7, 4));
+        assert_eq!(presence(&narrowed), presence(&all));
+        assert_eq!(PodScope::default().narrow(sql), None);
+    }
+
+    #[tokio::test]
+    async fn a_pod_new_to_the_kept_day_keeps_its_k1_windows_from_before_its_spans() {
+        let interval = 300_000_000;
+        let first = 1_000 * interval;
+        let span_pod = |pod: &str, end: i64| PodRow {
+            timestamp: end - interval,
+            k8s_namespace: "ns".into(),
+            k8s_pod: pod.into(),
+            k8s_container: "app".into(),
+            service: "svc".into(),
+            where_key: "w".into(),
+            ..Default::default()
+        };
+        let hits: std::sync::Mutex<Vec<serde_json::Value>> = std::sync::Mutex::default();
+        let day_reads = std::sync::atomic::AtomicUsize::new(0);
+        let read = |request: HistoryRead| {
+            let rows = match request {
+                HistoryRead::Images {
+                    stream,
+                    start,
+                    end,
+                    scope,
+                } if stream == K1_STREAMS[0] => {
+                    if start == end - HISTORY_US {
+                        day_reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    }
+                    hits.lock()
+                        .unwrap()
+                        .iter()
+                        .filter(|hit| {
+                            (start..end).contains(&hit["presence_window"].as_i64().unwrap())
+                                && scope.pods.contains(hit["pod"].as_str().unwrap())
+                        })
+                        .cloned()
+                        .collect()
+                }
+                _ => Vec::new(),
+            };
+            async move { Ok(rows) }
+        };
+        let hit = |bucket: i64, pod: &str| json!({"presence_window": bucket, "image": "registry/svc:v1", "namespace": "ns", "pod": pod, "container": "app", "k8s_cluster": "k1"});
+        let mut kept = load_history(
+            "org",
+            None,
+            first,
+            interval,
+            &[span_pod("old", first)],
+            1,
+            &read,
+        )
+        .await
+        .unwrap();
+        // The new pod runs from the first window on, but serves spans only from the sixth.
+        for window in 1..=6 {
+            let end = first + window * interval;
+            hits.lock().unwrap().push(hit(end - interval, "old"));
+            hits.lock().unwrap().push(hit(end - interval, "new"));
+            let mut pods = vec![span_pod("old", end)];
+            if window == 6 {
+                pods.push(span_pod("new", end));
+            }
+            kept = load_history("org", Some(kept), end, interval, &pods, 1, &read)
+                .await
+                .unwrap();
+        }
+        let first_new = kept
+            .images()
+            .iter()
+            .filter(|image| image.pod == "new")
+            .map(|image| image.window_start)
+            .min();
+        assert_eq!(first_new, Some(first));
+        assert_eq!(day_reads.load(std::sync::atomic::Ordering::SeqCst), 2);
     }
 
     #[tokio::test]
@@ -2018,7 +2230,7 @@ mod tests {
             .unwrap()
             .iter()
             .filter(|r| !matches!(r, HistoryRead::Images { .. }))
-            .copied()
+            .cloned()
             .collect();
         assert_eq!(
             day,
