@@ -39,6 +39,7 @@ import {
   scanZone,
   YEARS_BACK,
   zoneStart,
+  type Scanned,
 } from "./machine";
 import type { Elem, Slot, Words } from "./packs/schema";
 import type { Alt, ClockMod, ClockValue, Draft, Outcome, Point, UnitKey } from "./types";
@@ -86,15 +87,6 @@ interface Memo<T> {
   partial: boolean;
 }
 
-interface Memos {
-  point: Map<number, Memo<Alt<Point>[]>>;
-  date: Map<number, Memo<Alt<DateVal>[]>>;
-  day: Map<number, Memo<Alt<DateVal>[]>>;
-  plain: Map<number, Memo<Alt<DateVal>[]>>;
-  core: Map<number, Memo<Alt<ClockValue>[]>>;
-  clock: Map<number, Memo<Alt<ClockValue>[]>>;
-}
-
 export interface Scan {
   text: string;
   fold: string;
@@ -105,7 +97,7 @@ export interface Scan {
   wantUnit?: number;
   rangeOpen: boolean;
   furthest: number;
-  memo: Memos;
+  memo: Map<string, Memo<unknown>>;
 }
 
 export class BudgetExceeded extends Error {}
@@ -120,14 +112,6 @@ const BARE: Elem[] = [
 ];
 
 export function newScan(text: string, fold: string, env: Env): Scan {
-  const memo: Memos = {
-    point: new Map(),
-    date: new Map(),
-    day: new Map(),
-    plain: new Map(),
-    core: new Map(),
-    clock: new Map(),
-  };
   return {
     text,
     fold,
@@ -137,7 +121,7 @@ export function newScan(text: string, fold: string, env: Env): Scan {
     partial: false,
     rangeOpen: false,
     furthest: 0,
-    memo,
+    memo: new Map(),
   };
 }
 
@@ -187,13 +171,9 @@ function litAt(sc: Scan, pos: number, s: string): number {
 }
 
 // A cached hit list replays the partial flag its first computation raised.
-function memo<T>(
-  sc: Scan,
-  table: Map<number, Memo<T>>,
-  pos: number,
-  compute: () => Hit<T>[],
-): Hit<T>[] {
-  const hit = table.get(pos);
+function memo<T>(sc: Scan, table: string, pos: number, compute: () => Hit<T>[]): Hit<T>[] {
+  const key = table + pos;
+  const hit = sc.memo.get(key) as Memo<T> | undefined;
   if (hit) {
     sc.partial = sc.partial || hit.partial;
     return hit.hits;
@@ -201,7 +181,7 @@ function memo<T>(
   const before = sc.partial;
   sc.partial = false;
   const hits = compute();
-  table.set(pos, { hits, partial: sc.partial });
+  sc.memo.set(key, { hits, partial: sc.partial });
   sc.partial = before || sc.partial;
   return hits;
 }
@@ -426,10 +406,7 @@ function patternDateHits(sc: Scan, pos: number): Hit<Alt<DateVal>[]>[] {
 }
 
 function baseDateHits(sc: Scan, pos: number): Hit<Alt<DateVal>[]>[] {
-  return memo(sc, sc.memo.date, pos, () => [
-    ...numericDateHits(sc, pos),
-    ...patternDateHits(sc, pos),
-  ]);
+  return memo(sc, "date", pos, () => [...numericDateHits(sc, pos), ...patternDateHits(sc, pos)]);
 }
 
 function civilDate(c: { y: number; mo: number; d: number }): DateVal {
@@ -437,7 +414,7 @@ function civilDate(c: { y: number; mo: number; d: number }): DateVal {
 }
 
 function dayHits(sc: Scan, pos: number): Hit<Alt<DateVal>[]>[] {
-  return memo(sc, sc.memo.day, pos, () => {
+  return memo(sc, "day", pos, () => {
     const out = plainDayHits(sc, pos);
     for (const elems of sc.env.pack.pointAffixes) {
       for (const [end, c] of matchAt(sc, elems, pos)) if (c.date) out.push([end, c.date]);
@@ -448,7 +425,7 @@ function dayHits(sc: Scan, pos: number): Hit<Alt<DateVal>[]>[] {
 
 /** Day words, weekdays and dates; a point affix wraps one of these, never another affix. */
 function plainDayHits(sc: Scan, pos: number): Hit<Alt<DateVal>[]>[] {
-  return memo(sc, sc.memo.plain, pos, () => {
+  return memo(sc, "plain", pos, () => {
     const env = sc.env;
     const now = today(env);
     const out: Hit<Alt<DateVal>[]>[] = [];
@@ -484,7 +461,7 @@ function wordHours(v: ClockValue): Alt<ClockValue>[] {
 }
 
 function coreClockHits(sc: Scan, pos: number): Hit<Alt<ClockValue>[]>[] {
-  return memo(sc, sc.memo.core, pos, () => {
+  return memo(sc, "core", pos, () => {
     const out: Hit<Alt<ClockValue>[]>[] = [];
     const colon = scanColonClock(sc.text, pos);
     if (colon && !isDigit(sc.text, pos - 1)) out.push([colon.end, [{ v: colon.c }]]);
@@ -523,19 +500,22 @@ function affixedClockHits(sc: Scan, pos: number): Hit<Alt<ClockValue>[]>[] {
   return out;
 }
 
+// A 12-hour value (1-12, 0-12 in h11 packs) takes the mark's half; a day part also takes a 24-hour
+// value, unshifted and only inside its range, so hour 0 only in a part that starts at midnight.
 function withMod(alts: Alt<ClockValue>[], mod: ClockMod): Alt<ClockValue>[] {
   const out: Alt<ClockValue>[] = [];
-  for (const a of alts) {
-    const h = hourIn(a.v.h, mod.from, mod.to);
-    const ap = mod.ap;
-    if (h !== null && (ap === undefined ? a.v.h <= 12 || h === a.v.h : a.v.h >= ap && a.v.h < 13))
-      out.push({ v: { ...a.v, h, mod, bare: false } });
+  for (const { v } of alts) {
+    const h =
+      v.h < (mod.ap ?? Math.sign(mod.from)) || (mod.ap !== undefined && v.h > 12)
+        ? null
+        : hourIn(v.h, mod.from, mod.to);
+    if (h !== null) out.push({ v: { ...v, h, mod, bare: false } });
   }
   return out;
 }
 
 function clockHits(sc: Scan, pos: number): Hit<Alt<ClockValue>[]>[] {
-  return memo(sc, sc.memo.clock, pos, () => {
+  return memo(sc, "clock", pos, () => {
     const mods = sc.env.pack.mods;
     const core = (at: number) => coreClockHits(sc, at).filter(([, alts]) => !alts[0].v.article);
     const bases = (at: number) => [...core(at), ...affixedClockHits(sc, at)];
@@ -555,8 +535,9 @@ function clockHits(sc: Scan, pos: number): Hit<Alt<ClockValue>[]>[] {
         for (const [e2, alts] of bases(at)) {
           const m = withMod(alts, mod);
           if (m.length > 0) out.push([e2, m]);
-          // A clock its mark refuses stays refused however it goes on (`PM 13:30 o'clock`).
-          else sc.partial = was;
+          // A refused clock stays refused however it goes on (`PM 13:30 o'clock`), unless it is
+          // one digit typed last, which a second digit can still make fit (`PM 0` before `PM 09`).
+          else if (e2 - at > 1 || e2 < sc.len) sc.partial = was;
         }
       }
     }
@@ -600,13 +581,44 @@ function cross<A, B, T>(as: Alt<A>[], bs: Alt<B>[], make: (a: A, b: B) => T): Al
   return out;
 }
 
+/** Machine stamps at `pos`; a mark after a zoneless wall stamp binds to its clock. A phrase picks a
+ * year-less date's year after the mark itself, so only a log line marks a year-less stamp. */
+export function stampHits(sc: Scan, pos: number, log?: boolean): Scanned<Point>[] {
+  const out = scanStamp(sc.text, pos, sc.env.nowUs, sc.env.zone);
+  return [
+    ...out,
+    ...out.flatMap((s) =>
+      spaced(sc, s.end).flatMap((at) =>
+        words(sc, at, sc.env.pack.mods).map(([end, mod]) => ({
+          end,
+          alts: s.alts.flatMap((a) =>
+            a.v.p === "wall" && !a.v.clock.zone && (log || !a.tag) && !isDigit(sc.text, end)
+              ? withMod([{ v: a.v.clock }], mod).map((c) => ({ ...a, v: { ...a.v, clock: c.v } }))
+              : [],
+          ),
+        })),
+      ),
+    ),
+  ].filter((s) => s.alts.length > 0);
+}
+
+/** `fold` with every clock mark blanked, so a tail of marks and stamp characters reads as a clock. */
+export function unmarked(sc: Scan): string {
+  const keep = { ...sc };
+  let out = sc.fold;
+  for (let i = 0; i < sc.len; i++)
+    for (const [end] of words(sc, i, sc.env.pack.mods))
+      out = out.slice(0, i).padEnd(end) + out.slice(end);
+  Object.assign(sc, keep);
+  return out;
+}
+
 /** Any one point or period: a stamp, an epoch, date math, now, a day with or without a clock, a clock. */
 export function pointHits(sc: Scan, pos: number): Hit<Alt<Point>[]>[] {
-  return memo(sc, sc.memo.point, pos, () => {
+  return memo(sc, "point", pos, () => {
     const env = sc.env;
     const out: Hit<Alt<Point>[]>[] = [];
-    const stamps = scanStamp(sc.text, pos, env.nowUs, env.zone);
-    for (const s of stamps) out.push([s.end, s.alts]);
+    for (const s of stampHits(sc, pos)) out.push([s.end, s.alts]);
     for (const s of scanEpoch(sc.text, pos)) out.push([s.end, s.alts]);
     const math = scanDateMath(sc.text, pos, env.nowUs, env.zone);
     if (math && math.offsets.length + (math.snapped ? 1 : 0) > 0) {
@@ -623,11 +635,8 @@ export function pointHits(sc: Scan, pos: number): Hit<Alt<Point>[]>[] {
       out.push([end, days.map((a) => ({ v: { p: "day", ...a.v }, why: a.why, tag: a.tag }))]);
       for (const at of spaced(sc, end)) {
         for (const [e2, clocks] of clockHits(sc, at)) {
-          for (const [e3, zc] of zoned(sc, e2, clocks)) {
-            // The stamp scanner owns an ISO span it reads; a second wall reading would only conflict.
-            if (!stamps.some((s) => s.end === e3) || !isoOnly(sc, pos, end))
-              out.push([e3, cross(days, zc, (d, c): Point => ({ p: "wall", ...d, clock: c }))]);
-          }
+          for (const [e3, zc] of zoned(sc, e2, clocks))
+            out.push([e3, cross(days, zc, (d, c): Point => ({ p: "wall", ...d, clock: c }))]);
         }
       }
     }
@@ -770,10 +779,8 @@ export function rangeOutcome(sc: Scan): Outcome {
   }
   sc.partial = false;
   joinSplits(sc, found, zero);
-  sc.partial = saved;
   const drafts = distinct(found.flat());
-  if (drafts.length > 0)
-    return { t: "drafts", drafts, form: "range", why: drafts.find((d) => d.why)?.why };
+  if (drafts.length > 0) return { t: "drafts", drafts, form: "range" };
   if (zero.hit) return { t: "invalid", reason: "zero-length" };
   // Both sides read wholly but run backwards: never swapped, and no later step may claim the text.
   if (zero.reversed) return { t: "invalid", reason: "reversed" };
@@ -932,8 +939,7 @@ export function phraseOutcome(sc: Scan): Outcome {
   ];
   for (const family of families) {
     const drafts = distinct(family());
-    if (drafts.length > 0)
-      return { t: "drafts", drafts, form: "phrase", why: drafts.find((d) => d.why)?.why };
+    if (drafts.length > 0) return { t: "drafts", drafts, form: "phrase" };
   }
   const ime = pack.hooks.ime?.(sc.fold) === true;
   if (sc.partial || ime || sc.rangeOpen)

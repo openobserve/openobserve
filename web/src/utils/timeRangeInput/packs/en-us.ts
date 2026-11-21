@@ -64,7 +64,7 @@ export const pack: LocalePack = {
     thisYear: ["this year"],
     lastYear: ["last year"],
   },
-  meridiem: { am: ["am", "a.m."], pm: ["pm", "p.m."] },
+  meridiem: { am: ["am", "a. m."], pm: ["pm", "p. m."] },
   dayParts: {
     "in the morning": [0, 12],
     "in the afternoon": [12, 18],

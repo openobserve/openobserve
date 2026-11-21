@@ -100,7 +100,7 @@ export const pack: LocalePack = {
     pm: ["مساء", "مساءً", "مساءا"],
   },
   // Noon and afternoon are day parts, not marks: they also take a 24-hour clock (`١٦:٣٠ عصرا`).
-  dayParts: { ظهرا: [12, 24], عصرا: [12, 24] },
+  dayParts: { ظهرا: [12, 17], عصرا: [12, 19] },
   numberWords: {
     واحد: 1,
     واحدة: 1,
