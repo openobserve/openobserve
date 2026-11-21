@@ -453,7 +453,6 @@ const unitInText = () => [...bar.text.value].reverse().find((c) => c === "m" || 
 
 const ambiguousMessage = (res: Extract<TimeRangeParseResult, { state: "ambiguous" }>) => {
   if (res.reason === "unit-case") return t("timeRangeInput.ambiguousUnit", { unit: unitInText() });
-  if (res.reason === "log-stamps") return t("timeRangeInput.ambiguousStamps");
   if (res.reason === "zone-abbreviation") return t("timeRangeInput.ambiguousZone");
   if (res.reason === "repeated-hour" || res.reason === "am-pm") {
     const first = res.readings[0];
