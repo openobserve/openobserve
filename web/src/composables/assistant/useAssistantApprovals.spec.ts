@@ -192,9 +192,27 @@ describe("useAssistantApprovals", () => {
     expect(session.pendingApproval).toBeNull();
     const decided = outcome();
     expect(decided?.state).toBeTruthy();
-    approvals.onConfirmationRequired(sid, DELETE);
+    expect(approvals.onConfirmationRequired(sid, DELETE)).toBe(false);
     expect(session.pendingApproval).toBeNull();
     expect(outcome()).toEqual(decided);
+  });
+
+  it("knows a replayed multi-item delete card by the batch id the live stream gave it", async () => {
+    const batch: ConfirmationRequiredFrame = {
+      ...DELETE,
+      id: "apr_696f3d6b27aab825e8a7",
+      args: {
+        items: [
+          { resource_type: "alert", name: "a", id: "a1" },
+          { resource_type: "alert", name: "b", id: "a2" },
+        ],
+      },
+    };
+    const { sid, approvals, session } = setup(batch);
+    expect(held(sid)).toBe(batch.id);
+    await approvals.decide(sid, { approved: true, scope: "once" }, held(sid));
+    expect(approvals.onConfirmationRequired(sid, { ...batch })).toBe(false);
+    expect(session.pendingApproval).toBeNull();
   });
 
   it("posts a decision on the session the card was asked in, after a chat switch", async () => {

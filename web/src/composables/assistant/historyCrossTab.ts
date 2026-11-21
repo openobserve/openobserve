@@ -72,10 +72,13 @@ export function createHistoryCrossTab(ctx: HistoryCtx, records: HistoryRecords) 
           ...ownerOptions(ctx),
           ...(detail.approvals && { approvals: detail.approvals }),
         });
-        // A turn paused on a card commits nothing of its answer, so a reload's live save wins until the server catches up.
+        // A turn paused on a card commits nothing of its answer, so a reload's live save of that same running turn wins until the server catches up.
         const live = ctx.liveAhead.get(sid);
         const behind =
-          !!live && !!detail.active_turn && answerLength(messages, live.turnId) < live.length;
+          !!live &&
+          !!detail.active_turn &&
+          detail.active_turn_id === live.turnId &&
+          answerLength(messages, live.turnId) < live.length;
         if (!behind) {
           ctx.liveAhead.delete(sid);
           const kept = restored.get(sid);

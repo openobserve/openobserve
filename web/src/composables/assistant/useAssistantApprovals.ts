@@ -518,15 +518,16 @@ export function createApprovalsRuntime(deps: ApprovalsDeps): ApprovalsRuntime {
     onConfirmationRequired(sid: Sid, frame: ConfirmationRequiredFrame) {
       const session = sessionOf(sid);
       const block = approvalOf(frame);
-      if (!session || !block.id || session.pendingApproval?.id === block.id) return;
+      if (!session || !block.id || session.pendingApproval?.id === block.id) return true;
       // A resume replays the turn from its start, so a card answered here comes again.
       const decided = approvalOutcomeOf(session, block.id).outcome;
-      if (inFlight.has(keyOf(sid, block.id)) || (decided && decided.state !== "delivery_failed"))
-        return;
+      if (inFlight.has(keyOf(sid, block.id))) return true;
+      if (decided && decided.state !== "delivery_failed") return false;
       const now = deps.now();
       const ttl = block.tool === "o2_delete" ? DELETE_TTL_MS : PERMISSION_TTL_MS;
       hold(session, block, Math.min(block.expiresAt ?? now + ttl, now + MAX_CARD_MS));
       trackShown(block, sid, session.turnMeta.turnId);
+      return true;
     },
     restore(sid, card) {
       const session = sessionOf(sid);

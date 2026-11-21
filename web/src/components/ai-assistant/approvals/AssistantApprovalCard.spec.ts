@@ -869,6 +869,28 @@ describe("AssistantApprovalCard", () => {
         { id: "q1", expiresAt: Date.now() + 580_000, ...over },
       );
 
+    it("shows inline code in its heading as code, never as raw backticks (TA4-03)", async () => {
+      const card = cardOf(
+        {
+          type: "confirmation_required",
+          id: "q2",
+          tool: "ask_user",
+          kind: "question",
+          message: "Which stream should `error_rate` read, `logs` or *traces*?",
+          options: [{ id: "logs", label: "logs" }],
+        },
+        { id: "q2", expiresAt: Date.now() + 580_000 },
+      );
+      const wrapper = mountCard(card);
+      await flushPromises();
+      const heading = wrapper.get('[data-test="assistant-approval-heading"]');
+      expect(heading.text()).toBe("Which stream should error_rate read, logs or *traces*?");
+      expect(heading.findAll("code").map((code) => code.text())).toEqual(["error_rate", "logs"]);
+      expect(wrapper.get('[data-test="assistant-approval-card"]').attributes("aria-label")).toBe(
+        "Needs your answer: Which stream should error_rate read, logs or *traces*?",
+      );
+    });
+
     it("asks its question with the choices, More time and Other answer last, and no Deny", async () => {
       const wrapper = mountCard(question(), { extendable: true });
       await flushPromises();

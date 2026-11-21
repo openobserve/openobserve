@@ -1559,8 +1559,8 @@ pub(crate) mod tests {
         let events = crate::ai_chat::record_v2::tests::golden_events("v2_readtool.json");
         let fork = rewrite_ids(events.clone(), "fork-a");
         let (source, copy) = (
-            crate::ai_chat::projection::project(&events),
-            crate::ai_chat::projection::project(&fork),
+            crate::ai_chat::projection::project(&events, ""),
+            crate::ai_chat::projection::project(&fork, ""),
         );
         let id = |turns: &Value| {
             turns["turns"][0]["user_message_id"]

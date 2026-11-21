@@ -328,9 +328,29 @@ struct StreamState {
     mid_line: bool,
     /// The turn's delete requests; o2-ai asks about all of them in one card at the turn's end.
     pending_deletes: Vec<Value>,
+    /// A hidden tool call ended the last text part, so the next one may owe a paragraph break.
+    hidden_break: bool,
+    /// A visible frame ended the text block, as o2-ai's `_text_block_closed`.
+    block_closed: bool,
+    /// The answer's text as o2-ai's `response_text` records it.
+    said: String,
 }
 
 impl StreamState {
+    /// o2-ai's `_owes_hidden_break`: decided before shaping, so a fence opening the part opens a
+    /// line.
+    fn hidden_break_before(&mut self, text: &str) -> &'static str {
+        if text.is_empty() || !std::mem::take(&mut self.hidden_break) {
+            return "";
+        }
+        let owed = !self.block_closed
+            && !text.starts_with('\n')
+            && !self.said.is_empty()
+            && !self.said.ends_with('\n')
+            && !splits_open_block(&self.said);
+        if owed { "\n\n" } else { "" }
+    }
+
     /// What a text part shows: the held-out blocks stay out, as on the live stream.
     fn shape_text(&mut self, text: &str) -> String {
         let mut shown = String::new();
@@ -502,6 +522,14 @@ impl StreamState {
             redact_internal_details(&chars[..cut].iter().collect::<String>())
         };
         if !emit.is_empty() {
+            // o2-ai's `_record_text`: the saved answer splits from the block before a frame.
+            if std::mem::take(&mut self.block_closed)
+                && !self.said.is_empty()
+                && !self.said.ends_with('\n')
+            {
+                self.said.push_str("\n\n");
+            }
+            self.said.push_str(&emit);
             frames.push(json!({"type": "message_delta", "content": emit}));
         }
     }
@@ -549,6 +577,8 @@ impl StreamState {
             self.turn_call_ids.push(call_id.to_string());
         }
         let Some(mut event) = format_tool_call_event(tool_name, &tool_input) else {
+            // No frame splits the client's text block, so the next part carries the break.
+            self.hidden_break = true;
             return;
         };
         let call_info = CallInfo {
@@ -566,6 +596,7 @@ impl StreamState {
             self.step_call_ids.insert(call_id.to_string());
             event.insert("call_id".into(), Value::String(call_id.to_string()));
         }
+        self.block_closed = true;
         frames.push(Value::Object(event));
     }
 
@@ -649,6 +680,7 @@ impl StreamState {
         }
         if let Some(navigation) = navigation_frame(&result, tool_name) {
             self.last_tools_call_info = None;
+            self.block_closed = true;
             frames.push(navigation);
             return;
         }
@@ -840,7 +872,8 @@ impl Turn {
                     let hidden = part.get("synthetic").is_some_and(truthy)
                         || part.get("ignored").is_some_and(truthy);
                     if !text.is_empty() && !hidden {
-                        let shown = self.state.shape_text(text);
+                        let text = format!("{}{text}", self.state.hidden_break_before(text));
+                        let shown = self.state.shape_text(&text);
                         self.state.emit_text_delta(&shown, &mut self.frames);
                         // One text part is one block: never carry its tail into the next part.
                         self.state.flush_text_buffer(&mut self.frames);
@@ -944,7 +977,8 @@ impl Turn {
                             _ => Some(""),
                         };
                         if let Some(text) = text {
-                            let shown = self.state.shape_text(text);
+                            let text = format!("{}{text}", self.state.hidden_break_before(text));
+                            let shown = self.state.shape_text(&text);
                             self.state.emit_text_delta(&shown, &mut self.frames);
                         }
                         // One text item is one block: never carry its tail into the next.
@@ -996,7 +1030,7 @@ impl Turn {
         py_strip(&joined).to_string()
     }
 
-    fn into_value(mut self) -> Value {
+    fn into_value(mut self, o2_session_id: &str) -> Value {
         let error = self
             .error
             .as_deref()
@@ -1004,7 +1038,8 @@ impl Turn {
         if let Some(frame) = &error {
             self.frames.push(frame.clone());
         } else if !self.aborted && !self.state.pending_deletes.is_empty() {
-            self.frames.push(delete_card(&self.state.pending_deletes));
+            self.frames
+                .push(delete_card(&self.state.pending_deletes, o2_session_id));
         }
         if error.is_none() && !self.aborted && !self.query_mode {
             self.frames.extend(self.state.findings_frame());
@@ -1208,7 +1243,8 @@ impl DeleteRequest {
 }
 
 /// o2-ai's `project_events` output for ascending events, plus each turn's `first_seq`/`last_seq`.
-pub fn project(events: &[DurableEvent]) -> Value {
+/// `o2_session_id` is the chat's, so a delete card gets the id the live stream gave it.
+pub fn project(events: &[DurableEvent], o2_session_id: &str) -> Value {
     let folded = Folded::fold_v1(events);
     let mut turns = project_v1(&folded);
     let mut title = folded.title.clone();
@@ -1219,7 +1255,10 @@ pub fn project(events: &[DurableEvent]) -> Value {
         // Only a log holding 2.x records is ordered by creation, so a 1.x chat projects as before.
         turns.sort_by(|a, b| created_order(&a.created, &b.created));
     }
-    let turns: Vec<Value> = turns.into_iter().map(Turn::into_value).collect();
+    let turns: Vec<Value> = turns
+        .into_iter()
+        .map(|turn| turn.into_value(o2_session_id))
+        .collect();
     json!({"turns": turns, "title": title, "last_seq": folded.last_seq})
 }
 
@@ -1815,6 +1854,51 @@ fn keep_decision_only(frame: &mut Value) {
     if let Some(map) = frame.as_object_mut() {
         map.retain(|k, _| VIEWER_DECISION_KEYS.contains(&k.as_str()));
     }
+}
+
+/// o2-ai's `splits_open_block`: a break after `said` would land in a fenced block or a JSON string.
+fn splits_open_block(said: &str) -> bool {
+    let fence = said.split('\n').fold(None, next_fence_line);
+    fence.is_some() || in_json_string(said)
+}
+
+/// o2-ai's `_next_fence`: the fenced block open after `line`, as `(marker char, run length)`.
+fn next_fence_line(fence: Option<(char, usize)>, line: &str) -> Option<(char, usize)> {
+    let indent = line.len() - line.trim_start_matches(' ').len();
+    let rest = &line[indent.min(line.len())..];
+    let Some(marker) = rest.chars().next().filter(|c| *c == '`' || *c == '~') else {
+        return fence;
+    };
+    let run = rest.chars().take_while(|c| *c == marker).count();
+    if indent > 3 || run < 3 {
+        return fence;
+    }
+    let info = &rest[run..];
+    match fence {
+        // A backtick in a backtick fence's info string makes the line inline code instead.
+        None => (marker != '`' || !info.contains('`')).then_some((marker, run)),
+        Some((open, len)) if marker == open && run >= len && info.trim().is_empty() => None,
+        open => open,
+    }
+}
+
+/// o2-ai's `_in_json_string`: `text` starts a JSON answer and ends inside one of its strings.
+fn in_json_string(text: &str) -> bool {
+    let body = text.trim_start();
+    if !body.starts_with(['{', '[']) {
+        return false;
+    }
+    let (mut inside, mut escaped) = (false, false);
+    for c in body.chars() {
+        if escaped {
+            escaped = false;
+        } else if inside && c == '\\' {
+            escaped = true;
+        } else if c == '"' {
+            inside = !inside;
+        }
+    }
+    inside
 }
 
 /// Where `fence` opens at the start of a line; mid-line it is plain text.
@@ -2691,8 +2775,8 @@ fn delete_sentinels<'a>(
 }
 
 /// o2-ai's end-of-turn card for the turn's queued deletes; `expires_at` 0 has no known expiry.
-fn delete_card(items: &[Value]) -> Value {
-    let id = delete_batch_id("", items);
+fn delete_card(items: &[Value], o2_session_id: &str) -> Value {
+    let id = delete_batch_id(o2_session_id, items);
     // o2-ai sends 0 (no expiry); a reload must not offer a card the server no longer reports.
     let expires_at = items
         .iter()
@@ -3221,7 +3305,7 @@ mod tests {
         });
         let mut turn = Turn::default();
         turn.collect_user_parts(parts.as_object().unwrap());
-        let user = turn.into_value()["user"].clone();
+        let user = turn.into_value("")["user"].clone();
         assert_eq!(user["text"], "why errors?");
         assert_eq!(
             user["window"],
@@ -3232,7 +3316,7 @@ mod tests {
         let mut plain = Turn::default();
         let bare = json!({"p": {"type": "text", "text": "hi", "metadata": {"o2_window": {"from": "x", "to": 2}}}});
         plain.collect_user_parts(bare.as_object().unwrap());
-        let user = plain.into_value()["user"].clone();
+        let user = plain.into_value("")["user"].clone();
         assert!(user.get("window").is_none() && user.get("entry_kind").is_none());
     }
 
@@ -3360,7 +3444,7 @@ mod tests {
         assert!(names.len() >= 5, "{names:?}");
         for name in names {
             let (events, expected) = load(&name);
-            let actual = project(&events);
+            let actual = project(&events, "");
             if let Some(diff) = first_difference("", &actual, &expected) {
                 panic!("{name}: {diff}");
             }
@@ -3383,7 +3467,7 @@ mod tests {
                 json!({"id": "msg_i", "type": "idle", "outcome": "failed"}),
             ),
         ];
-        let projected = project(&events);
+        let projected = project(&events, "");
         assert_eq!(projected["turns"][0]["error_code"], "provider_error");
         assert_eq!(
             projected["turns"][0]["error"],
@@ -3400,14 +3484,14 @@ mod tests {
                 .iter()
                 .any(|e| e.data.pointer("/part/tool") == Some(&json!("record_step")))
         );
-        let projected = project(&events).to_string();
+        let projected = project(&events, "").to_string();
         assert!(!projected.contains("record_step"), "{projected}");
     }
 
     #[test]
     fn turns_carry_the_seq_range_of_their_events() {
         let (events, _) = load("structure.json");
-        let projected = project(&events);
+        let projected = project(&events, "");
         for turn in projected["turns"].as_array().unwrap() {
             let (first, last) = (
                 turn["first_seq"].as_i64().unwrap(),
@@ -3415,14 +3499,14 @@ mod tests {
             );
             assert!(0 <= first && first <= last, "{turn}");
         }
-        assert_eq!(project(&[])["last_seq"], -1);
-        assert_eq!(project(&[])["turns"], json!([]));
+        assert_eq!(project(&[], "")["last_seq"], -1);
+        assert_eq!(project(&[], "")["turns"], json!([]));
     }
 
     #[test]
     fn redaction_keeps_text_and_tool_names_only() {
         let (events, _) = load("tool_heavy.json");
-        let mut projected = project(&events);
+        let mut projected = project(&events, "");
         let full = projected.clone();
         redact(&mut projected);
         let frames = projected["turns"][0]["frames"].as_array().unwrap();
@@ -3619,12 +3703,31 @@ mod tests {
         let mut state = StreamState::default();
         assert!(state.queue_deletes(&sentinel("a1"), O2_DELETE_TOOL, "call_1", Some(5_000)));
         assert!(state.queue_deletes(&sentinel("a2"), O2_DELETE_TOOL, "call_2", Some(7_000)));
-        let card = delete_card(&state.pending_deletes);
+        let card = delete_card(&state.pending_deletes, "");
         assert_eq!(card["expires_at"], 7_000);
         assert!(card["args"]["items"][0].get("expires_at").is_none());
         let mut untimed = StreamState::default();
         assert!(untimed.queue_deletes(&sentinel("a1"), O2_DELETE_TOOL, "call_1", None));
-        assert_eq!(delete_card(&untimed.pending_deletes)["expires_at"], 0);
+        assert_eq!(delete_card(&untimed.pending_deletes, "")["expires_at"], 0);
+    }
+
+    /// o2-ai's `delete_batch_id("sid", ...)`: a stored card and its live copy share one id.
+    #[test]
+    fn a_delete_card_is_named_by_its_chat_as_the_live_stream_names_it() {
+        let sentinel = |id: &str| {
+            json!({"type": "delete_confirmation", "resource_type": "alert", "id": id})
+                .as_object()
+                .unwrap()
+                .clone()
+        };
+        let mut state = StreamState::default();
+        assert!(state.queue_deletes(&sentinel("a1"), O2_DELETE_TOOL, "call_1", None));
+        assert!(state.queue_deletes(&sentinel("a2"), O2_DELETE_TOOL, "call_2", None));
+        let card = delete_card(&state.pending_deletes, "sid");
+        assert_eq!(card["id"], "apr_696f3d6b27aab825e8a7");
+        assert_eq!(card["targets"][1]["key"], "apr_696f3d6b27aab825e8a7:1");
+        assert!(card.get("call_id").is_none());
+        assert_ne!(delete_card(&state.pending_deletes, "")["id"], card["id"]);
     }
 
     /// A 2.x log names the pending deletes and shows the cards of the 1.x log it records.
@@ -3656,8 +3759,8 @@ mod tests {
             assert!(v2.iter().all(is_v2_record), "{name}");
             assert!(!calls(&v1).is_empty(), "{name}");
             assert_eq!(calls(&v2), calls(&v1), "{name}");
-            assert!(!cards(&project(&v1)).is_empty(), "{name}");
-            assert_eq!(cards(&project(&v2)), cards(&project(&v1)), "{name}");
+            assert!(!cards(&project(&v1, "")).is_empty(), "{name}");
+            assert_eq!(cards(&project(&v2, "")), cards(&project(&v1, "")), "{name}");
         }
         // A timed delete gives both generations the same expiring card.
         let mut timed = golden_events("tool_heavy.json");
@@ -3668,12 +3771,12 @@ mod tests {
                 e.data["part"]["state"]["time"] = json!({"start": 900, "end": 1_000});
             }
         }
-        let v1_cards = cards(&project(&timed));
+        let v1_cards = cards(&project(&timed, ""));
         assert_eq!(
             v1_cards[0]["expires_at"],
             1_000 + DELETE_CONFIRMATION_TTL_MS
         );
-        assert_eq!(cards(&project(&to_v2(&timed))), v1_cards);
+        assert_eq!(cards(&project(&to_v2(&timed), "")), v1_cards);
     }
 
     /// What the web client's rendered record and the server's frames must agree on.
@@ -3921,7 +4024,7 @@ mod tests {
     #[test]
     fn a_delete_awaiting_approval_is_kept_as_its_request() {
         let (events, _) = load("tool_heavy.json");
-        let projected = project(&events);
+        let projected = project(&events, "");
         let asked: Vec<&Value> = projected["turns"]
             .as_array()
             .unwrap()
@@ -4212,7 +4315,7 @@ mod tests {
     }
 
     fn last_frames(events: &[DurableEvent]) -> Vec<Value> {
-        let projected = project(events);
+        let projected = project(events, "");
         let turns = projected["turns"].as_array().unwrap();
         turns.last().unwrap()["frames"].as_array().unwrap().clone()
     }
@@ -4402,7 +4505,7 @@ mod tests {
         ] {
             let error = json!({"name": "APIError", "data": {"message": message}});
             let events = session_answering("Partial.", "o2-ai", error);
-            let projected = project(&events);
+            let projected = project(&events, "");
             let turn = projected["turns"].as_array().unwrap().last().unwrap();
             assert_eq!(turn["error_code"], code, "{message}");
             let frame = turn["frames"]
@@ -4460,10 +4563,10 @@ mod tests {
     fn a_2x_shell_call_is_hidden_in_chat_but_stays_an_rca_row() {
         let mut events =
             crate::ai_chat::record_v2::tests::golden_events("v2_user_text_and_tools.json");
-        let projected = project(&events).to_string();
+        let projected = project(&events, "").to_string();
         assert!(projected.contains("tool_call"), "{projected}");
         events[2].data["message"]["content"][0]["name"] = json!("shell");
-        let projected = project(&events).to_string();
+        let projected = project(&events, "").to_string();
         assert!(!projected.contains("tool_call"), "{projected}");
         assert_eq!(
             crate::ai_chat::rca_thread::ThreadPart::of("shell", "completed", None),
@@ -4493,7 +4596,7 @@ mod tests {
             event_type: SESSION_UPDATED.into(),
             data: json!({"info": {"title": "Pool exhaustion"}}),
         });
-        let sorted = project(&mixed);
+        let sorted = project(&mixed, "");
         let created: Vec<Option<i64>> = sorted["turns"]
             .as_array()
             .unwrap()

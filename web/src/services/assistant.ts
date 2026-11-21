@@ -266,6 +266,10 @@ const enc = encodeURIComponent;
 const CHATS_PAGE = 50;
 // The server's largest page (`chats.rs` `MAX_PAGE`).
 const ACTIVE_CHATS_PAGE = 200;
+const PINNED_CHATS_PAGE = 200;
+const MAX_PINNED_PAGES = 10;
+// A node from before the pinned filter is asked again after this, so a rolling upgrade does not keep the filter off.
+const PINNED_IGNORED_RETRY_MS = 5 * 60_000;
 
 const inProgress = (chat: ChatSummaryWire) =>
   !!chat.active_turn || !!chat.pending_approval || chat.seen === false;
@@ -540,6 +544,39 @@ function chatApprovalOf(value: unknown): ChatApproval[] {
   ];
 }
 
+// Orgs whose server answered `pinned=true` with an unpinned row, until when it is not asked again.
+const pinnedIgnoredUntil = new Map<string, number>();
+
+// One read beside the first page in the common case; the page loads whatever this does.
+async function listPinnedChats(org: string): Promise<ChatSummaryWire[]> {
+  if ((pinnedIgnoredUntil.get(org) ?? 0) > Date.now()) return [];
+  const pinned: ChatSummaryWire[] = [];
+  const visited = new Set<string>();
+  let cursor: string | undefined;
+  let reads = 0;
+  try {
+    do {
+      if (cursor) visited.add(cursor);
+      reads += 1;
+      const res = await http().get<ChatsPage>(`/api/${enc(org)}/ai/chats`, {
+        ...ASSISTANT_REQUEST,
+        params: { limit: String(PINNED_CHATS_PAGE), pinned: "true", ...(cursor && { cursor }) },
+      });
+      const page = parseChatsPage(res.data);
+      pinned.push(...page.chats.filter((chat) => chat.pinned === true));
+      if (page.chats.some((chat) => chat.pinned !== true)) {
+        pinnedIgnoredUntil.set(org, Date.now() + PINNED_IGNORED_RETRY_MS);
+        break;
+      }
+      // The server sets a cursor only when more rows exist; a row the schema dropped never ends the walk.
+      cursor = page.next_cursor ?? undefined;
+    } while (cursor && !visited.has(cursor) && reads < MAX_PINNED_PAGES);
+  } catch {
+    // The rows read before a failure are still pinned chats.
+  }
+  return pinned;
+}
+
 const assistant = {
   /** Whether this browser's session cookie is still signed in; a 401 never logs the page out. */
   sessionAlive: async (): Promise<boolean> => {
@@ -673,15 +710,20 @@ const assistant = {
     return res.data ?? {};
   },
 
+  /** The first page also lists every pinned chat, so one older than the page stays in the Pinned group. */
   listChats: async (org: string, params: ListChatsParams = {}): Promise<ChatsPage> => {
     const query: Record<string, string> = { limit: String(params.limit ?? CHATS_PAGE) };
     if (params.cursor) query.cursor = params.cursor;
     if (params.q) query.q = params.q;
-    const res = await http().get<ChatsPage>(`/api/${enc(org)}/ai/chats`, {
-      ...ASSISTANT_REQUEST,
-      params: query,
-    });
-    return parseChatsPage(res.data);
+    const first = !params.cursor && !params.q;
+    const [res, pinned] = await Promise.all([
+      http().get<ChatsPage>(`/api/${enc(org)}/ai/chats`, { ...ASSISTANT_REQUEST, params: query }),
+      first ? listPinnedChats(org) : Promise.resolve([]),
+    ]);
+    const page = parseChatsPage(res.data);
+    const listed = new Set(page.chats.map((chat) => chat.session_id));
+    const older = pinned.filter((chat) => !listed.has(chat.session_id));
+    return older.length ? { ...page, chats: [...page.chats, ...older] } : page;
   },
 
   /** Running, waiting and recently finished chats, every page of them; a server without `state` answers its plain first page. */

@@ -81,6 +81,7 @@ const TURN_ALREADY_RUNNING: &str = "turn_already_running";
 const SIGNED_OUT: &str = "signed_out";
 /// The client's stall detector expects a sign of life at least this often (`99` §2.1).
 const TAIL_KEEPALIVE: Duration = Duration::from_secs(15);
+const TAIL_KEEPALIVE_MESSAGE: &[u8] = b": keepalive\n\n";
 /// Projections one tail read may run; more events are sent in this many batches.
 const MAX_REPLAY_STEPS: usize = 64;
 const TAIL_CHANNEL: usize = 64;
@@ -393,18 +394,22 @@ pub struct TailParams {
 /// One turn's committed events a tail holds, and the frames it has sent for them.
 struct TurnTail {
     turn_id: String,
+    /// The chat's, which names a stored delete card as the live stream named it.
+    session_id: String,
     start_seq: i64,
     /// Its rows were written no earlier, so reads start there instead of at the chat's first row.
     started_at: i64,
     /// Events past it belong to the chat's next turn.
     end_seq: Option<i64>,
     events: Vec<DurableEvent>,
-    /// The turn's frames as of `sent`, as runs.
+    /// The turn's frames as of `sent`, as runs; decisions stay out, so a late one moves no frame.
     runs: Vec<FrameRun>,
     /// The last seq whose frames were sent, or that the caller already had.
     sent: i64,
     /// The turn record's decisions, so a replayed card arrives with its answer.
     decisions: Vec<Value>,
+    /// The decisions already sent, each once, as their JSON text.
+    answered: HashSet<String>,
 }
 
 impl TurnTail {
@@ -412,6 +417,7 @@ impl TurnTail {
         let start_seq = record.start_seq.unwrap_or(NO_SEQ + 1);
         Self {
             turn_id: record.turn_id.clone(),
+            session_id: record.session_id.clone(),
             start_seq,
             started_at: record.started_at,
             end_seq: record.end_seq,
@@ -419,36 +425,62 @@ impl TurnTail {
             runs: Vec::new(),
             sent: from_seq.max(start_seq - 1),
             decisions: ai_chat_turns::decisions_of(record),
+            answered: HashSet::new(),
         }
     }
 
-    /// The frames of `events` with the decisions of the cards they hold, each after its card.
-    fn frames(&self, events: &[DurableEvent]) -> Vec<Value> {
-        let frames = turn_frames(events);
-        let asked = |id: &str| {
-            frames.iter().any(|f| {
-                f.get("type").and_then(Value::as_str) == Some("confirmation_required")
-                    && ["id", "call_id"]
-                        .iter()
-                        .any(|k| f.get(*k).and_then(Value::as_str) == Some(id))
-            })
-        };
-        // A decision whose card is live-only has no place among the stored frames.
-        let decisions: Vec<Value> = self
-            .decisions
-            .iter()
-            .filter(|d| d.get("id").and_then(Value::as_str).is_some_and(asked))
-            .cloned()
-            .collect();
-        if decisions.is_empty() {
-            return frames;
+    fn runs_of(&self, events: &[DurableEvent]) -> Vec<FrameRun> {
+        frame_runs(turn_frames(events, &self.session_id))
+    }
+
+    /// The decisions of `frame`, when it is a card, that were not sent yet.
+    fn unsent_answers(&self, frame: &Value) -> Vec<Value> {
+        if !is_card(frame) {
+            return Vec::new();
         }
-        let mut turn = serde_json::json!({ "frames": frames });
+        // A decision whose card is live-only has no place among the stored frames.
+        let answers = |id: &str| {
+            ["id", "call_id"]
+                .iter()
+                .any(|k| frame.get(*k).and_then(Value::as_str) == Some(id))
+        };
+        self.decisions
+            .iter()
+            .filter(|d| d.get("id").and_then(Value::as_str).is_some_and(answers))
+            .filter(|d| !self.answered.contains(&d.to_string()))
+            .cloned()
+            .collect()
+    }
+
+    /// The `confirmation_resolved` frames that follow `frame`, each sent only once.
+    fn answers_to(&mut self, frame: &Value) -> Vec<Value> {
+        let decisions = self.unsent_answers(frame);
+        if decisions.is_empty() {
+            return Vec::new();
+        }
+        self.answered.extend(decisions.iter().map(Value::to_string));
+        let mut turn = serde_json::json!({ "frames": [frame] });
         openobserve_core::ai_chat::projection::attach_decisions(&mut turn, &decisions);
         match turn.get_mut("frames").map(Value::take) {
-            Some(Value::Array(frames)) => frames,
+            Some(Value::Array(frames)) => frames.into_iter().skip(1).collect(),
             _ => Vec::new(),
         }
+    }
+
+    /// Answers given since their card was sent.
+    fn late_answers(&mut self) -> Vec<Value> {
+        let cards: Vec<Value> = self
+            .runs
+            .iter()
+            .filter_map(|run| match run {
+                FrameRun::Frame(frame) => Some(frame.clone()),
+                FrameRun::Text(_) => None,
+            })
+            .collect();
+        cards
+            .iter()
+            .flat_map(|card| self.answers_to(card))
+            .collect()
     }
 
     fn last_seq(&self) -> i64 {
@@ -472,30 +504,46 @@ impl TurnTail {
         // Events the caller already had are its starting point, never sent again.
         if known_before && self.events.first().is_some_and(|e| e.seq <= self.sent) {
             let known = self.events.partition_point(|e| e.seq <= self.sent);
-            self.runs = frame_runs(self.frames(&self.events[..known]));
+            self.runs = self.runs_of(&self.events[..known]);
         }
         contiguous
     }
 
     fn has_unsent(&self) -> bool {
         self.last_seq() > self.sent
+            || self.runs.iter().any(|run| match run {
+                FrameRun::Frame(frame) => !self.unsent_answers(frame).is_empty(),
+                FrameRun::Text(_) => false,
+            })
     }
 
     /// SSE messages for every held event past `sent`: each batch's frames, then its seq boundary.
     fn take_messages(&mut self) -> Vec<Bytes> {
+        let mut messages: Vec<Bytes> = self
+            .late_answers()
+            .iter()
+            .map(|frame| sse_message(self.sent, frame))
+            .collect();
         let first = self.events.partition_point(|e| e.seq <= self.sent);
         let stride = (self.events.len() - first)
             .div_ceil(MAX_REPLAY_STEPS)
             .max(1);
-        let mut messages = Vec::new();
         let mut end = first;
         while end < self.events.len() {
             end = (end + stride).min(self.events.len());
-            let runs = frame_runs(self.frames(&self.events[..end]));
+            let runs = self.runs_of(&self.events[..end]);
             let seq = self.events[end - 1].seq;
             // As on the live stream, a frame carries the last seq it comes after.
             for frame in frames_between(&self.runs, &runs) {
-                messages.push(sse_message(self.sent, &frame));
+                // The end-of-turn delete card moves down as text grows; the caller has it already.
+                let had = |run: &FrameRun| matches!(run, FrameRun::Frame(sent) if *sent == frame);
+                if is_card(&frame) && self.runs.iter().any(had) {
+                    continue;
+                }
+                let answers = self.answers_to(&frame);
+                for frame in std::iter::once(&frame).chain(&answers) {
+                    messages.push(sse_message(self.sent, frame));
+                }
             }
             messages.push(seq_boundary(seq));
             self.runs = runs;
@@ -806,7 +854,7 @@ pub(super) async fn load_turns(
     row: &Model,
     _auth: Option<&str>,
 ) -> Result<Vec<serde_json::Value>, Response> {
-    Ok(project_turns(&load_events(row).await?))
+    Ok(project_turns(&load_events(row).await?, &row.session_id))
 }
 
 /// Projected `turns` with their turn records; turns admitted after `admitted_by` are left out.
@@ -1186,7 +1234,7 @@ pub async fn get(
                 .remove(&row.session_id)
         });
     version.pending = pending.is_some();
-    let turns = project_turns(&events);
+    let turns = project_turns(&events, &row.session_id);
     // Incremental only from a copy older than the watermark whose version we can read.
     let known_seq = params
         .known_seq
@@ -2059,8 +2107,8 @@ fn login_mac(login: &str, session_id: &str, refresh_token: &str) -> String {
     registry::login_binding_mac(&format!("ai-login\n{login}\n{session_id}\n{refresh_token}"))
 }
 
-fn project_turns(events: &[DurableEvent]) -> Vec<Value> {
-    let mut projected = openobserve_core::ai_chat::projection::project(events);
+fn project_turns(events: &[DurableEvent], session_id: &str) -> Vec<Value> {
+    let mut projected = openobserve_core::ai_chat::projection::project(events, session_id);
     match projected.get_mut("turns").map(Value::take) {
         Some(Value::Array(turns)) => turns,
         _ => Vec::new(),
@@ -2507,7 +2555,10 @@ async fn follow(
     let start = tokio::time::Instant::now() + TAIL_KEEPALIVE;
     let mut keepalive = tokio::time::interval_at(start, TAIL_KEEPALIVE);
     // Events are projected at most once per flush interval, however fast they commit.
-    let mut next_flush = tokio::time::Instant::now();
+    if !send_all(&tx, replay_messages(&mut tail)).await {
+        return;
+    }
+    let mut next_flush = tokio::time::Instant::now() + flush;
     loop {
         if tail.has_unsent() && tokio::time::Instant::now() >= next_flush {
             if !send_all(&tx, tail.take_messages()).await {
@@ -2532,7 +2583,7 @@ async fn follow(
             _ = tokio::time::sleep(poll), if feed.is_none() => None,
             _ = tokio::time::sleep_until(next_flush), if tail.has_unsent() => continue,
             _ = keepalive.tick() => {
-                if tx.send(Bytes::from_static(b": keepalive\n\n")).await.is_err() {
+                if tx.send(Bytes::from_static(TAIL_KEEPALIVE_MESSAGE)).await.is_err() {
                     return;
                 }
                 continue;
@@ -2616,6 +2667,13 @@ fn next_poll(poll: Duration, flush: Duration, progressed: bool) -> Duration {
     } else {
         (poll * 2).clamp(flush, TAIL_POLL_MAX.max(flush))
     }
+}
+
+/// The stored replay, then a keepalive: the client's sign that the replay is over.
+fn replay_messages(tail: &mut TurnTail) -> Vec<Bytes> {
+    let mut messages = tail.take_messages();
+    messages.push(Bytes::from_static(TAIL_KEEPALIVE_MESSAGE));
+    messages
 }
 
 /// What is left to send, then the turn's terminal after its last seq.
@@ -2754,8 +2812,8 @@ fn stream_dropped(turn_id: &str) -> Bytes {
 }
 
 /// The frames of the turn these events are; the record's typed terminal is its only end or error.
-fn turn_frames(events: &[DurableEvent]) -> Vec<Value> {
-    project_turns(events)
+fn turn_frames(events: &[DurableEvent], session_id: &str) -> Vec<Value> {
+    project_turns(events, session_id)
         .into_iter()
         .filter_map(|turn| match turn {
             Value::Object(mut turn) => turn.remove("frames"),
@@ -2788,6 +2846,10 @@ fn frames_between(old: &[FrameRun], new: &[FrameRun]) -> Vec<Value> {
         }
     }
     rest.into_iter().map(FrameRun::into_frame).collect()
+}
+
+fn is_card(frame: &Value) -> bool {
+    frame.get("type").and_then(Value::as_str) == Some("confirmation_required")
 }
 
 fn frame_runs(frames: Vec<Value>) -> Vec<FrameRun> {
@@ -3841,6 +3903,133 @@ mod tests {
         assert_eq!(resolved.count(), 1, "a live-only card's answer stays out");
     }
 
+    fn frames_only(messages: &[(Option<i64>, Value)]) -> Vec<Value> {
+        messages
+            .iter()
+            .filter(|(_, f)| !f.is_null())
+            .map(|(_, f)| f.clone())
+            .collect()
+    }
+
+    fn count_of(frames: &[Value], kind: &str) -> usize {
+        frames.iter().filter(|f| f["type"] == kind).count()
+    }
+
+    /// A multi-item delete card names no call; the live stream's id carries the chat's session.
+    #[test]
+    fn a_tail_replays_a_multi_item_delete_card_with_its_answer() {
+        let mut events = answer_turn();
+        events.push(delete_request(6, "call_1"));
+        let mut second = delete_request(7, "call_2");
+        second.data["part"]["id"] = "prt_d2".into();
+        second.data["part"]["state"]["output"] =
+            serde_json::json!({"type": "delete_confirmation", "resource_type": "alert", "id": "a2"})
+                .to_string()
+                .into();
+        events.push(second);
+        let live_id = "apr_696f3d6b27aab825e8a7";
+        let record = TurnRecord {
+            decisions: Some(
+                serde_json::json!([{"id": live_id, "approved": true, "at": 5}]).to_string(),
+            ),
+            ..turn_record(0, None, TURN_RUNNING)
+        };
+        let frames = frames_only(&tail_from(events, &record, NO_SEQ));
+        let card = frames
+            .iter()
+            .position(is_card)
+            .expect("the card is replayed");
+        assert_eq!(frames[card]["id"], live_id);
+        assert_eq!(frames[card + 1]["type"], "confirmation_resolved");
+        assert_eq!(frames[card + 1]["id"], live_id);
+    }
+
+    /// A tail opened before the answer sends it once, and no frame it sent before again.
+    #[test]
+    fn an_answer_read_after_the_card_was_sent_is_sent_once_with_no_repeated_frame() {
+        let mut events = answer_turn();
+        events.push(delete_request(6, "call_1"));
+        let mut tail = TurnTail::new(&turn_record(0, None, TURN_RUNNING), NO_SEQ);
+        assert!(tail.push(events));
+        let first = frames_only(&messages_of(&tail.take_messages()));
+        assert_eq!(
+            (
+                count_of(&first, "confirmation_required"),
+                count_of(&first, "confirmation_resolved")
+            ),
+            (1, 0)
+        );
+        // `catch_up` read the decision while a later event was still unsent.
+        tail.decisions = vec![serde_json::json!({"id": "call_1", "approved": true, "at": 5})];
+        assert!(tail.push([text_part(7, "msg_a", "prt_3", "Deleted it.")]));
+        let rest = frames_only(&messages_of(&tail.take_messages()));
+        assert_eq!(count_of(&rest, "confirmation_resolved"), 1, "{rest:?}");
+        assert_eq!(count_of(&rest, "confirmation_required"), 0, "{rest:?}");
+        let text: String = rest.iter().filter_map(|f| f["content"].as_str()).collect();
+        assert_eq!(text.trim_start(), "Deleted it.");
+        assert!(!tail.has_unsent());
+        assert!(frames_only(&messages_of(&tail.take_messages())).is_empty());
+    }
+
+    #[test]
+    fn a_tail_sends_a_keepalive_right_after_its_stored_replay() {
+        let mut tail = TurnTail::new(&turn_record(0, None, TURN_RUNNING), NO_SEQ);
+        assert!(tail.push(answer_turn()));
+        let messages = replay_messages(&mut tail);
+        assert!(messages.len() > 1);
+        assert_eq!(messages.last().unwrap().as_ref(), b": keepalive\n\n");
+        // Nothing to replay still says the replay is over.
+        assert_eq!(
+            replay_messages(&mut tail),
+            vec![Bytes::from_static(b": keepalive\n\n")]
+        );
+    }
+
+    /// Decisions carry no seq, so a reconnect past a card gets its answer again; the client drops a
+    /// repeat.
+    #[test]
+    fn a_tail_past_an_answered_card_sends_its_answer_once() {
+        let mut events = answer_turn();
+        events.push(delete_request(6, "call_1"));
+        events.push(text_part(7, "msg_a", "prt_3", "Deleted it."));
+        let record = TurnRecord {
+            decisions: Some(
+                serde_json::json!([{"id": "call_1", "approved": true, "at": 5}]).to_string(),
+            ),
+            ..turn_record(0, None, TURN_RUNNING)
+        };
+        let mut tail = TurnTail::new(&record, 7);
+        assert!(tail.push(events));
+        let sent = frames_only(&messages_of(&tail.take_messages()));
+        assert_eq!(count_of(&sent, "confirmation_resolved"), 1, "{sent:?}");
+        assert_eq!(count_of(&sent, "confirmation_required"), 0, "{sent:?}");
+        assert!(tail.push([text_part(8, "msg_a", "prt_4", "Done.")]));
+        let rest = frames_only(&messages_of(&tail.take_messages()));
+        assert_eq!(count_of(&rest, "confirmation_resolved"), 0, "{rest:?}");
+    }
+
+    /// The caller had the card; an answer read later still reaches it, with no event to carry it.
+    #[test]
+    fn an_answer_to_a_card_the_caller_had_is_sent_without_a_new_event() {
+        let mut events = answer_turn();
+        events.push(delete_request(6, "call_1"));
+        let mut tail = TurnTail::new(&turn_record(0, None, TURN_RUNNING), 6);
+        assert!(tail.push(events));
+        assert!(!tail.has_unsent());
+        tail.decisions = vec![serde_json::json!({"id": "call_1", "approved": false, "at": 5})];
+        assert!(tail.has_unsent());
+        let sent = messages_of(&tail.take_messages());
+        assert_eq!(
+            frames_only(&sent)
+                .iter()
+                .map(|f| f["type"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            ["confirmation_resolved"]
+        );
+        assert_eq!(sent[0].0, Some(6));
+        assert!(!tail.has_unsent());
+    }
+
     #[test]
     fn an_expired_delete_confirmation_is_not_pending() {
         use openobserve_core::ai_chat::projection::DELETE_CONFIRMATION_TTL_MS;
@@ -4357,7 +4546,7 @@ mod tests {
             serde_json::json!({"info": {"id": "msg_a", "role": "assistant", "parentID": "msg_u",
                 "error": {"name": "APIError", "data": {"message": "provider down"}}}}),
         ));
-        let projected = project_turns(&events);
+        let projected = project_turns(&events, "sid");
         assert!(
             projected[0]["frames"]
                 .as_array()

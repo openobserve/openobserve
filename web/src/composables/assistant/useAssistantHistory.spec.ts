@@ -1284,6 +1284,7 @@ describe("useAssistantHistory reload of a chat waiting on an approval", () => {
     state_version: "v3",
     not_modified: false,
     active_turn: status === "running",
+    ...(status === "running" && { active_turn_id: "t1" }),
     has_more: false,
     turns: [{ turn_id: "t1", user: { text: "mute it" }, frames, status }],
   });
@@ -1622,6 +1623,43 @@ describe("useAssistantHistory reload of a chat waiting on an approval", () => {
       } as never);
       await vi.advanceTimersByTimeAsync(POLL_FAST_MS);
       expect(shown()).toContain("Logs it is.");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows the server's answer over a live save once another turn is the running one", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+      const getChat = vi
+        .spyOn(assistant, "getChat")
+        .mockResolvedValue(running([{ type: "message_delta", content: "Short." }]) as never);
+      const fake = open();
+      fake.db.rows.set(
+        1,
+        record(1, {
+          serverBacked: true,
+          liveTurnId: "t1",
+          liveSavedAt: Date.now(),
+          messages: [
+            { role: "user", content: raw("mute it"), turnId: "t1" },
+            { role: "assistant", content: raw("A much longer answer the browser kept.") },
+          ],
+        }),
+      );
+      fake.history.ensureLoaded();
+      await flushPromises();
+      await fake.history.open({ sid });
+      const shown = () =>
+        fake.store.state.sessions[sid].messages.map((m) => String(m.content)).join(" ");
+      getChat.mockResolvedValue({
+        ...running([{ type: "message_delta", content: "Short." }]),
+        active_turn_id: "t2",
+      } as never);
+      await vi.advanceTimersByTimeAsync(POLL_FAST_MS);
+      expect(shown()).toContain("Short.");
+      expect(shown()).not.toContain("much longer");
     } finally {
       vi.useRealTimers();
     }

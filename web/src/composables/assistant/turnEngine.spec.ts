@@ -1459,7 +1459,12 @@ describe("turnEngine: the SSE id rule (WP-18, D2)", () => {
     await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[0]);
     expect(h.tails[0]).toMatchObject({ fromSeq: 0 });
     wire(h.tails[0].sink, [sse(0, delta("Muting needs your OK. Muted.")), sse(1)].join(""));
+    // A replay that stalls is not over; only the tail's keepalive after it says so.
     await vi.advanceTimersByTimeAsync(1_000);
+    const stalled = h.session().messages[1].contentBlocks ?? [];
+    expect(stalled.filter((b) => b.approval?.id === "apr_live")).toHaveLength(0);
+    h.tails[0].sink.onKeepalive();
+    await settle();
     const blocks = h.session().messages[1].contentBlocks ?? [];
     expect(blocks.filter((b) => b.approval?.id === "apr_live")).toHaveLength(1);
     expect(blocks.filter((b) => b.type === "approval_result")).toHaveLength(1);
@@ -1468,6 +1473,95 @@ describe("turnEngine: the SSE id rule (WP-18, D2)", () => {
     wire(h.tails[0].sink, [sse(1, { type: "complete", persisted: true }), sse(2)].join(""));
     h.tails[0].sink.onEnd("eof");
     await expect(run).resolves.toMatchObject({ state: "done" });
+  });
+
+  it("keeps a live-only card in place when the tail has nothing stored past the cursor", async () => {
+    const approvals = { onConfirmationRequired: vi.fn(() => true), onResolved: vi.fn() };
+    const h = setup({ tail: true, approvals });
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    const card = {
+      type: "confirmation_required",
+      tool: "CreateDowntime",
+      id: "apr_live",
+      message: "Create the downtime?",
+    } as AssistantFrame;
+    wire(
+      h.last().sink,
+      [
+        sse(0, card),
+        sse(0, { type: "confirmation_resolved", id: "apr_live", approved: true } as AssistantFrame),
+      ].join(""),
+    );
+    h.end();
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[0]);
+    h.tails[0].sink.onKeepalive();
+    await settle();
+    wire(h.tails[0].sink, [sse(0, delta("Muted.")), sse(1)].join(""));
+    await settle();
+    const blocks = h.session().messages[1].contentBlocks ?? [];
+    const at = (type: string) => blocks.findIndex((b) => b.type === type);
+    expect(blocks.filter((b) => b.approval?.id === "apr_live")).toHaveLength(1);
+    expect(at("approval")).toBeGreaterThanOrEqual(0);
+    expect(at("approval")).toBeLessThan(at("text"));
+    expect(String(h.session().messages[1].content)).toBe("Muted.");
+    wire(h.tails[0].sink, [sse(1, { type: "complete", persisted: true }), sse(2)].join(""));
+    h.tails[0].sink.onEnd("eof");
+    await run;
+  });
+
+  it("puts a held id-less card back once through a resume, still waiting on it", async () => {
+    let held: string | undefined;
+    const approvals = {
+      onConfirmationRequired: vi.fn((sid: string, frame: AssistantFrame & { id?: string }) => {
+        const session = h.store.state.sessions[sid];
+        held = frame.id;
+        session.pendingApproval = {
+          id: frame.id ?? "",
+          sessionId: sid,
+          turnId: session.turnMeta.turnId ?? "",
+          kind: "permission",
+          destructive: false,
+          operation: "",
+          tool: "bash",
+          targets: [],
+          askedIn: "here",
+          grantable: false,
+          editable: false,
+          question: "",
+        };
+        return true;
+      }),
+      onResolved: vi.fn(),
+    };
+    const h = setup({ tail: true, approvals });
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    const card = { type: "confirmation_required", tool: "bash", args: { command: "ls" } };
+    wire(
+      h.last().sink,
+      [
+        sse(0, delta("Listing.")),
+        sse(0, card as AssistantFrame),
+        sse(0, card as AssistantFrame),
+      ].join(""),
+    );
+    expect(held).toBeTruthy();
+    h.end();
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[0]);
+    wire(h.tails[0].sink, [sse(0, delta("Listing.")), sse(1)].join(""));
+    h.tails[0].sink.onKeepalive();
+    await settle();
+    const cards = (h.session().messages[1].contentBlocks ?? []).filter(
+      (b) => b.type === "approval",
+    );
+    expect(cards.map((b) => b.approval?.id)).toEqual([held]);
+    expect(h.session().turn.state).toBe("awaiting_approval");
+    wire(h.tails[0].sink, [sse(1, { type: "complete", persisted: true }), sse(2)].join(""));
+    h.tails[0].sink.onEnd("eof");
+    await run;
   });
 
   it("keeps the text shown since the cursor when no tail delivers (HT-06 AC 3)", async () => {
@@ -2574,6 +2668,20 @@ describe("turn engine: approval cards", () => {
     expect(h.session().turn.state).toBe("responding.thinking");
     await vi.advanceTimersByTimeAsync(10_000);
     expect(h.session().turn.state).toBe("responding.thinking");
+  });
+
+  it("does not wait on a replayed card this chat already answered, nor end the turn at its expiry", async () => {
+    const { h, approvals } = approvalsFor(5_000);
+    approvals.onConfirmationRequired.mockImplementation(() => false);
+    const { run } = await start(h);
+    h.feed({ type: "message_delta", content: "Deleting." });
+    h.feed({ type: "confirmation_required", tool: "o2_delete", call_id: "c9", expires_at: 1 });
+    expect(approvals.onConfirmationRequired).toHaveBeenCalledTimes(1);
+    expect(h.session().turn.state).toBe("responding.writing");
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(h.session().turn.state).not.toBe("awaiting_approval");
+    h.feed({ type: "complete", persisted: true });
+    await expect(run).resolves.not.toMatchObject({ error: { code: "approval_expired" } });
   });
 
   it("follows More time: the turn's own TTL moves with the card's expiry", async () => {

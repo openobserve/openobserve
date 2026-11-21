@@ -73,7 +73,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-text-heading focus-visible:ring-assistant-focus-ring rounded-default min-w-0 text-sm font-medium break-words outline-none focus-visible:ring-2"
         data-test="assistant-approval-heading"
       >
-        {{ heading }}
+        <template v-for="(part, i) in headingParts" :key="i"
+          ><code
+            v-if="part.code"
+            class="rounded-default bg-code-bg text-code-text px-1 py-px font-mono text-xs"
+            >{{ part.text }}</code
+          ><template v-else>{{ part.text }}</template></template
+        >
       </h3>
       <OText v-if="card.askedIn === 'other_tab'" variant="meta" as="p">
         {{ t("assistant.approval.askedElsewhere") }}
@@ -466,10 +472,28 @@ const heading = computed(() => {
   const text = approvalHeading(t, shown.value, count.value);
   return question.value ? raw(stripClaimMarkers(text)) : text;
 });
+// Inline code only: a heading is one line of the model's words, never a block of markdown.
+const headingParts = computed(() =>
+  String(heading.value)
+    .split(/(`[^`\n]+`)/)
+    .filter(Boolean)
+    .map((text) =>
+      text.length > 2 && text.startsWith("`") && text.endsWith("`")
+        ? { code: true, text: text.slice(1, -1) }
+        : { code: false, text },
+    ),
+);
+// Spoken and label text says the code as words, never its backticks.
+const plainHeading = computed(() => raw(headingParts.value.map((part) => part.text).join("")));
 const groupName = computed(() =>
   question.value
-    ? t("assistant.question.needsAnswer", { question: heading.value })
-    : t("assistant.approval.needsOkName", { name: raw(lowerFirst(heading.value)) }),
+    ? t("assistant.question.needsAnswer", { question: plainHeading.value })
+    : t("assistant.approval.needsOkName", {
+        // A leading code name is spoken as written.
+        name: headingParts.value[0]?.code
+          ? plainHeading.value
+          : raw(lowerFirst(plainHeading.value)),
+      }),
 );
 const nothingSelected = computed(() => planned.value && count.value === 0);
 
@@ -645,7 +669,7 @@ const approveLabel = computed(() => {
     return verb && verb !== "delete"
       ? approvalVerbText(t, shown.value)
       : t("assistant.approval.approve");
-  if (props.card.kind !== "delete") return heading.value;
+  if (props.card.kind !== "delete") return plainHeading.value;
   const noun = t(`assistant.entity.${entity.value}`, count.value);
   return t("assistant.approval.approveDelete", { count: count.value, entity: noun });
 });
@@ -724,7 +748,7 @@ function focusDefault(): boolean {
 }
 
 function announce(moved: boolean): void {
-  const title = heading.value;
+  const title = plainHeading.value;
   const ms = remainingMs.value;
   const line = question.value
     ? groupName.value
@@ -751,7 +775,7 @@ function tick(): void {
   const key = extendsSpent.value
     ? "assistant.announce.approvalExpiringFinal"
     : "assistant.announce.approvalExpiring";
-  const line = t(key, { title: heading.value, duration: duration(ms) });
+  const line = t(key, { title: plainHeading.value, duration: duration(ms) });
   const focused = root.value?.contains(document.activeElement);
   emit("announce", focused ? line : t(idle.jumpKey(), { line, keys: t(idle.spokenKeys()) }));
 }

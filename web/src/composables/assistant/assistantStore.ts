@@ -451,7 +451,7 @@ export function inertAssistantDeps(
       close: () => undefined,
     },
     approvals: {
-      onConfirmationRequired: () => undefined,
+      onConfirmationRequired: () => true,
       decide: async () => ({ status: "failed", items: [], resolvedBy: "", resolvedAt: Date.now() }),
       withdraw: async () => undefined,
       onResolved: () => undefined,

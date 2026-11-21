@@ -1149,7 +1149,8 @@ export interface HintChannel {
 }
 
 export interface ApprovalsService {
-  onConfirmationRequired(sid: Sid, frame: ConfirmationRequiredFrame): void;
+  /** False when this chat already answered the card, so nothing waits on it. */
+  onConfirmationRequired(sid: Sid, frame: ConfirmationRequiredFrame): boolean;
   /** With `approvalId`, refused unless that card is the one pending. */
   decide(sid: Sid, decision: ApprovalDecision, approvalId?: string): Promise<ApprovalResult>;
   withdraw(sid: Sid, reason: "new_chat" | "withdrawn" | "stopped"): Promise<void>;

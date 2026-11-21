@@ -98,6 +98,7 @@ const NESTING_PREFIX = /^(?:[ \t]*(?:>|[-*+](?=[ \t])|\d{1,9}[.)](?=[ \t]))[ \t]
 const NESTING_MARKER = /[ \t]*(?:>|[-*+](?=[ \t])|\d{1,9}[.)](?=[ \t]))[ \t]*/g;
 
 const DELIMITER_RUN = /\*+|_+|~+/g;
+const WORD_CHAR = /[\p{L}\p{N}]/u;
 
 // A star in these is text: an escape, a link target, an autolink or a bare URL (its trailing punctuation excluded, as GFM does).
 const NO_EMPHASIS =
@@ -134,6 +135,9 @@ const BLOCK_END: ReadonlySet<string> = new Set([
 ]);
 
 const BLOCK_START = /^[ \t]*(?:[-*+][ \t]|\d{1,9}[.)][ \t]|#{1,6}[ \t]|\|)/;
+const QUOTE_LINE = /^ {0,3}>/;
+const QUOTE_BLANK = /^(?: {0,3}>[ \t]?)+[ \t]*$/;
+const THEMATIC_BREAK = /^ {0,3}([*_-])(?:[ \t]*\1){2,}[ \t]*$/;
 
 const MAX_LINKS = 10;
 
@@ -530,7 +534,10 @@ export function parseBlock(request: ParseRequest): ParseResult {
   linked = new Set();
   const claims: string[] = [];
   const risk = riskOf(request.text);
-  if (risk) return { ...plainResult(request.blockId, request.text), rejected: risk };
+  // Only the paragraphs too deep in emphasis lose it; the rest of the answer still renders.
+  const text = risk === "emphasis" ? withoutDeepEmphasis(request.text) : request.text;
+  if (risk && (risk !== "emphasis" || riskOf(text)))
+    return { ...plainResult(request.blockId, request.text), rejected: risk };
   budget = {
     left: Math.max(request.text.length * MAX_OUTPUT_FACTOR, MIN_OUTPUT_CAP),
     cells: 0,
@@ -539,7 +546,7 @@ export function parseBlock(request: ParseRequest): ParseResult {
   try {
     const open = request.state === "open";
     // The model's own slot characters go before lexing, so no code span or alt text can forge a slot.
-    const source = withoutFootnotes(request.text.replace(SLOT_CHARS, ""));
+    const source = withoutFootnotes(text.replace(SLOT_CHARS, ""));
     // Only a streaming or cut block is repaired; a completed one is lexed exactly as sent (X11).
     const repaired = request.state === "closed" ? { text: source, open: false } : repairEnd(source);
     const tokens = instance().lexer(repaired.text);
@@ -1134,16 +1141,24 @@ function repairTail(text: string): string {
 
 // The earlier lines of the last line's paragraph or list item, where a code span it closes may have opened.
 function inlineContextBefore(text: string, at: number): string {
-  if (BLOCK_START.test(text.slice(at))) return "";
+  let below = text.slice(at);
+  if (BLOCK_START.test(below)) return "";
   let start = at;
   while (start > 0) {
     const from = text.lastIndexOf("\n", start - 2) + 1;
     const line = text.slice(from, start - 1);
-    if (!line.trim()) break;
+    if (!line.trim() || QUOTE_BLANK.test(line) || quoteOpens(line, below)) break;
     start = from;
+    below = line;
     if (BLOCK_START.test(line)) break;
   }
   return text.slice(start, at);
+}
+
+// A quote after a line outside it starts a paragraph; quote lines go on one, and so does a lazy line after them.
+// A bare `>` line is a quote's blank line, so it ends one paragraph either way.
+function quoteOpens(above: string, line: string): boolean {
+  return QUOTE_LINE.test(line) && !QUOTE_LINE.test(above);
 }
 
 // The one backtick run no later run closes; "" when every span is closed, null when two are open.
@@ -1246,6 +1261,46 @@ export function riskOf(text: string): ShapeRisk | null {
   return null;
 }
 
+// Escapes every emphasis delimiter, outside code, of each paragraph `riskOf` finds too deep.
+function withoutDeepEmphasis(text: string): string {
+  const lines = text.split("\n");
+  const code = codeLines(lines);
+  let paragraph: number[] = [];
+  for (let i = 0; i <= lines.length; i++) {
+    const line = lines[i];
+    if (line !== undefined && !code[i] && line.trim()) {
+      paragraph.push(i);
+      continue;
+    }
+    if (openEmphasis(paragraph.map((n) => lines[n])) > MAX_NESTING) {
+      const flat = escapeDelimiters(paragraph.map((n) => lines[n]).join("\n")).split("\n");
+      paragraph.forEach((n, k) => (lines[n] = flat[k]));
+    }
+    paragraph = [];
+  }
+  return lines.join("\n");
+}
+
+// Escapes the `*_~` that could be emphasis; code, link targets, URLs, list markers and breaks keep theirs.
+function escapeDelimiters(text: string): string {
+  const masked = outsideCodespans(
+    text,
+    (part) => part.replace(NO_EMPHASIS, (span) => " ".repeat(span.length)),
+    (span) => span.replace(/[^\n]/g, " "),
+  )
+    .split("\n")
+    .map((line) => {
+      if (THEMATIC_BREAK.test(line)) return " ".repeat(line.length);
+      const prefix = NESTING_PREFIX.exec(line)?.[0].length ?? 0;
+      return " ".repeat(prefix) + line.slice(prefix);
+    })
+    .join("\n");
+  let out = "";
+  for (let i = 0; i < text.length; i++)
+    out += "*_~".includes(masked[i]) && masked[i] === text[i] ? `\\${text[i]}` : text[i];
+  return out;
+}
+
 // Fenced (also inside quotes) and indented code: what the shape check never counts, so code alone never makes a block plain.
 function codeLines(lines: string[]): boolean[] {
   const inner = lines.map((line) => line.replace(/^(?: {0,3}>[ \t]?)+/, ""));
@@ -1278,18 +1333,41 @@ function openEmphasis(lines: string[]): number {
   );
   let open: Record<string, number> = {};
   let max = 0;
+  let offset = 0;
+  const closesUnderscore = lastUnderscoreCloser(prose);
+  let above: string | undefined;
   for (const line of prose.split("\n")) {
-    if (BLOCK_START.test(line)) open = {};
+    const quoteBreak = above !== undefined && (QUOTE_BLANK.test(above) || quoteOpens(above, line));
+    if (BLOCK_START.test(line) || quoteBreak) open = {};
+    above = line;
+    const at = offset;
+    offset += line.length + 1;
     for (const run of line.matchAll(DELIMITER_RUN)) {
+      if (escaped(line, run.index)) continue;
       const char = run[0][0];
       const before = line[run.index - 1] ?? " ";
       const after = line[run.index + run[0].length] ?? " ";
+      // Per CommonMark an intraword `_` neither opens nor closes, and one no later `_` can close opens nothing.
+      const underscore = char === "_";
+      if (underscore && WORD_CHAR.test(before) && WORD_CHAR.test(after)) continue;
       if (!/\s/.test(before) && (open[char] ?? 0) > 0) open[char] -= 1;
-      else if (!/\s/.test(after)) open[char] = (open[char] ?? 0) + 1;
+      else if (!/\s/.test(after) && (!underscore || closesUnderscore > at + run.index))
+        open[char] = (open[char] ?? 0) + 1;
       max = Math.max(max, (open["*"] ?? 0) + (open._ ?? 0) + (open["~"] ?? 0));
     }
   }
   return max;
+}
+
+// Where the text's last `_` run that could close emphasis starts; -1 when none can.
+function lastUnderscoreCloser(text: string): number {
+  let last = -1;
+  for (const run of text.matchAll(/_+/g)) {
+    const before = text[run.index - 1] ?? " ";
+    const after = text[run.index + run[0].length] ?? " ";
+    if (!/\s/.test(before) && !WORD_CHAR.test(after) && !escaped(text, run.index)) last = run.index;
+  }
+  return last;
 }
 
 // Applies `edit` to the text between inline code spans; a span's backticks pair only with a run of the same length.

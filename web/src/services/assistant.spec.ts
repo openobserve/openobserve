@@ -233,6 +233,85 @@ describe("listActiveChats", () => {
   });
 });
 
+describe("listChats pinned", () => {
+  it("adds every pinned chat older than the first page, once, from one read (TA4-02)", async () => {
+    const get = vi.fn(async (_url: string, config: { params: Record<string, string> }) =>
+      config.params.pinned === "true"
+        ? {
+            data: {
+              chats: [
+                { session_id: "s1", pinned: true },
+                { session_id: "old", pinned: true },
+              ],
+            },
+          }
+        : { data: { chats: [{ session_id: "s1", pinned: true }, { session_id: "s2" }] } },
+    );
+    (http as any).mockReturnValue({ get });
+    const page = await assistant.listChats("o");
+    expect(page.chats.map((chat) => chat.session_id)).toEqual(["s1", "s2", "old"]);
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(get.mock.calls[1][1].params).toMatchObject({ pinned: "true", limit: "200" });
+    const later = await assistant.listChats("o", { cursor: "c1" });
+    expect(later.chats.map((chat) => chat.session_id)).toEqual(["s1", "s2"]);
+    expect(get).toHaveBeenCalledTimes(3);
+  });
+
+  it("reads at most 10 pinned pages, following each cursor the server sets", async () => {
+    const get = vi.fn(async (_url: string, config: { params: Record<string, string> }) => {
+      if (config.params.pinned !== "true") return { data: { chats: [] } };
+      const n = Number(config.params.cursor ?? 0);
+      return {
+        data: { chats: [{ session_id: `p${n}`, pinned: true }], next_cursor: String(n + 1) },
+      };
+    });
+    (http as any).mockReturnValue({ get });
+    const page = await assistant.listChats("capped");
+    expect(page.chats).toHaveLength(10);
+    expect(get).toHaveBeenCalledTimes(11);
+  });
+
+  it("follows the pinned pages while the server sets a cursor", async () => {
+    const full = Array.from({ length: 200 }, (_, n) => ({ session_id: `p${n}`, pinned: true }));
+    const get = vi.fn(async (_url: string, config: { params: Record<string, string> }) => {
+      if (config.params.pinned !== "true") return { data: { chats: [] } };
+      return config.params.cursor
+        ? { data: { chats: [{ session_id: "last", pinned: true }] } }
+        : { data: { chats: full, next_cursor: "p1" } };
+    });
+    (http as any).mockReturnValue({ get });
+    const page = await assistant.listChats("full");
+    expect(page.chats).toHaveLength(201);
+    expect(page.chats.at(-1)?.session_id).toBe("last");
+    expect(get).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps the page when the pinned read fails, and the pinned rows of a server that ignores `pinned`", async () => {
+    vi.useFakeTimers();
+    try {
+      const page = { data: { chats: [{ session_id: "s1" }, { session_id: "p", pinned: true }] } };
+      const failing = vi.fn(async (_url: string, config: { params: Record<string, string> }) => {
+        if (config.params.pinned === "true") throw new Error("down");
+        return page;
+      });
+      (http as any).mockReturnValue({ get: failing });
+      expect((await assistant.listChats("o1")).chats.map((c) => c.session_id)).toEqual(["s1", "p"]);
+      const ignoring = vi.fn(async () => page);
+      (http as any).mockReturnValue({ get: ignoring });
+      expect((await assistant.listChats("o2")).chats.map((c) => c.session_id)).toEqual(["s1", "p"]);
+      expect(ignoring).toHaveBeenCalledTimes(2);
+      await assistant.listChats("o2");
+      expect(ignoring).toHaveBeenCalledTimes(3);
+      // An upgraded node is asked again a while later.
+      vi.advanceTimersByTime(5 * 60_000 + 1);
+      await assistant.listChats("o2");
+      expect(ignoring).toHaveBeenCalledTimes(5);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("listActiveChats pages", () => {
   const live = (session_id: string) => ({ session_id, active_turn: true });
 

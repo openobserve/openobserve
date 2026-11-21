@@ -101,8 +101,6 @@ export const SILENCE_MS = 20_000;
 const LINGER_MS = 3_000;
 // The agent settles a stop for up to 2 s, then the server commits the cancelled frame.
 const TAIL_AFTER_STOP_MS = 5_000;
-// A tail writes its stored replay in one burst; this long without a frame means the burst is over.
-const REPLAY_SETTLE_MS = 300;
 
 /** A turn id goes on the wire at most twice: the send and one reuse (constraint 16). */
 const MAX_ID_SENDS = 2;
@@ -226,7 +224,6 @@ interface TurnRecord {
   sinceSeq: AssistantFrame[];
   /** Frames a rollback took back that no tail replays (cards stored nowhere, their answers), put back after the replay. */
   liveOnly: AssistantFrame[];
-  liveOnlyTimer?: ReturnType<typeof setTimeout>;
   cancelConfirmed?: boolean;
   cancelMs: number | null;
   /** A confirmed stop is reading the saved frames, which the stopping turn applies like a live one. */
@@ -377,6 +374,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       // A delete batch is proposed once the answer is complete, so its card still lands on that answer.
       const lateCard = frame.type === "confirmation_required" && session.turn.state === "done";
       const catchUp = rec.catchingUp && session.turn.state === "stopping";
+      let answered = false;
       if (acceptsFrames(session.turn) || lateCard || catchUp) {
         rec.stream.messages = session.messages;
         const live = { ...liveCtx(t), pendingApprovalId: session.pendingApproval?.id ?? null };
@@ -384,7 +382,12 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
           if (effect.kind === "approval") {
             // A stopped turn asks nothing more; a card replayed by the catch-up would wait on a dead turn.
             if (catchUp) continue;
-            deps.approvals?.().onConfirmationRequired(rec.sid, effect.frame);
+            // An id-less card keeps the id the reducer gave it, so a rollback puts back that same card.
+            if (effect.frame !== frame) restamp(rec, frame, effect.frame);
+            if (deps.approvals?.().onConfirmationRequired(rec.sid, effect.frame) === false) {
+              answered = true;
+              continue;
+            }
             // The stream pauses on the card, so no later save would keep it for a reload to restore.
             out.turn.push({ kind: "save" });
           } else if (effect.kind === "approval_resolved")
@@ -402,7 +405,10 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       const event =
         frame.type === "complete" && rec.notSaved ? { ...frame, persisted: false } : frame;
       const before = session.turn;
-      const next = turnReducer(session.turn, event, reducerCtx(rec));
+      // A replayed card this chat already answered waits on nothing, so it arms no expiry.
+      const next = answered
+        ? { turn: session.turn, effects: [] }
+        : turnReducer(session.turn, event, reducerCtx(rec));
       session.turn = askAgainIfMutated(next.turn, rec.stream);
       noteOutcome(session, rec, before);
       noteHandoffFailed(session, rec);
@@ -432,7 +438,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         // A frame proves admission, whatever order the transport reported them in.
         if (!tail) admit(rec, generation, { ok: true, status: 200, traceId: null });
         resume();
-        if (tail) settleLiveOnly(rec, isTerminalFrame(frame));
+        if (tail && isTerminalFrame(frame)) putBackLiveOnly(rec);
         const session = sessionOf(rec.sid);
         if (session?.turn.state === "reconnecting") dispatch(rec, { type: "tail_caught_up" });
         // Any data frame is real progress on the wire, a replayed one included; keepalives never are.
@@ -448,13 +454,17 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       },
       onKeepalive() {
         if (!current()) return;
+        // A tail's keepalive follows its stored replay, so it proves delivery and ends the replay.
+        if (tail) {
+          resume();
+          putBackLiveOnly(rec);
+        }
         runner.schedule(rec.sid, eventWork(rec, { type: "keepalive" }));
         watchSilence(rec, false);
       },
       onBoundary(id) {
         if (!current()) return;
         resume();
-        if (tail) settleLiveOnly(rec, false);
         const meta = sessionOf(rec.sid)?.turnMeta;
         const seq = Number(id);
         // Everything through `seq` was sent: the tail resumes from here.
@@ -503,6 +513,13 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     return frame;
   };
 
+  const restamp = (rec: TurnRecord, frame: AssistantFrame, stamped: AssistantFrame) => {
+    for (const frames of [rec.sinceSeq, rec.throughSeq]) {
+      const at = frames.lastIndexOf(frame);
+      if (at >= 0) frames[at] = stamped;
+    }
+  };
+
   const advance = (rec: TurnRecord, meta: TurnMeta, seq: number) => {
     meta.lastSeq = seq;
     rec.throughSeq.push(...rec.sinceSeq);
@@ -529,20 +546,11 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
     });
   };
 
-  const settleLiveOnly = (rec: TurnRecord, now: boolean) => {
-    clearTimeout(rec.liveOnlyTimer);
-    rec.liveOnlyTimer = undefined;
-    if (!rec.liveOnly.length) return;
-    if (now) putBackLiveOnly(rec);
-    else rec.liveOnlyTimer = setTimeout(() => putBackLiveOnly(rec), REPLAY_SETTLE_MS);
-  };
-
   // The card still held goes through the turn again, so the turn reads as waiting on it.
   const putBackLiveOnly = (rec: TurnRecord) => {
-    rec.liveOnlyTimer = undefined;
     const frames = rec.liveOnly;
     rec.liveOnly = [];
-    if (rec.settled) return;
+    if (rec.settled || !frames.length) return;
     for (const frame of frames) {
       rec.sinceSeq.push(frame);
       const held = sessionOf(rec.sid)?.pendingApproval?.id;
@@ -552,7 +560,11 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
           ? frameWork(rec, frame)
           : (session) => {
               rec.stream.messages = session.messages;
-              const effects = reduce(rec.stream, frame, liveCtx(t));
+              // The held card's id lets the reducer drop a second copy of an id-less card.
+              const effects = reduce(rec.stream, frame, {
+                ...liveCtx(t),
+                pendingApprovalId: held ?? null,
+              });
               mirrorExtras(session.turnMeta, rec.stream);
               const stream = effects.filter(
                 (e) => e.kind !== "approval" && e.kind !== "approval_resolved",

@@ -1135,6 +1135,34 @@ describe("reduce: typed phases (live)", () => {
     expect(odd.resolved?.outcome).toBeUndefined();
   });
 
+  it("shows an answer a reconnecting tail sends again once, and tells nobody again", () => {
+    const state = makeState({ messages: [assistant()] });
+    const card = { type: "confirmation_required", id: "c9", tool: "bash", args: { command: "ls" } };
+    reduce(state, card, live());
+    const resolved = (approved: boolean, at: number) => ({
+      type: "confirmation_resolved",
+      id: "c9",
+      approved,
+      at,
+    });
+    const told = (frame: object) =>
+      reduce(state, frame, live()).some((e) => e.kind === "approval_resolved");
+    // The live answer carries o2-ai's clock; the stored one, sent again by the tail, the server's.
+    expect(told(resolved(true, 1_000))).toBe(true);
+    expect(told({ ...resolved(true, 1_042), outcome: "failed", detail: "Alert not found" })).toBe(
+      false,
+    );
+    expect(blocksOf(state).find((b) => b.type === "approval_result")?.resolved).toMatchObject({
+      at: 1_000,
+      outcome: "failed",
+      detail: "Alert not found",
+    });
+    // A different answer to the card is news.
+    expect(told(resolved(false, 2_000))).toBe(true);
+    const results = blocksOf(state).filter((b) => b.type === "approval_result");
+    expect(results.map((b) => b.resolved?.at)).toEqual([1_000, 2_000]);
+  });
+
   it("keeps a replayed resolution's unstored grant as not saved (AE-06)", () => {
     const state = makeState({ messages: [assistant()] });
     const replay = makeCtx({ phase: "replay", isActive: false });

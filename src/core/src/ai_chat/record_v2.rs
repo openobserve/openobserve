@@ -458,7 +458,7 @@ pub(crate) mod tests {
         assert!(renamed.iter().any(|e| e.event_type == MESSAGE_UPDATED));
         assert!(!renamed.iter().any(is_v2_record));
         let project = crate::ai_chat::projection::project;
-        assert_eq!(project(&renamed), project(&v1));
+        assert_eq!(project(&renamed, ""), project(&v1, ""));
     }
 
     /// The RCA thread reads a tool error as text, so a 2.x error object becomes its message.

@@ -517,6 +517,46 @@ describe("markdown.ts strict profile", () => {
     },
   );
 
+  it("renders a list of underscore-led names as markdown (TA4-01)", () => {
+    const text = [
+      "**Logs & metadata**",
+      "- [app_logs](/web/logs?stream_type=logs&stream=app_logs) — logs, 0.06 MB",
+      "- e2e_jk_logs_6leob, _9yihx, _c1tt9, _d5ayo, _d9y8q, _gvblz, _i3s1f, _jpis2, _rsc4m, _snbi6, _tp5to, _wgf12, _yxh7n — logs",
+      "- Internal: _o2_alert_calibration_digests, _o2_service_verdicts, _rumdata, triggers",
+    ].join("\n");
+    expect(riskOf(text)).toBeNull();
+    const html = htmlOf(render(text).parts);
+    expect(html).toContain(strong("Logs &amp; metadata"));
+    expect(html).toContain("_9yihx, _c1tt9");
+  });
+
+  it("flattens only the paragraph too deep in emphasis; the rest of the answer still renders", () => {
+    const bomb = "*a ".repeat(20) + "x";
+    const block = render(`Some **bold** here.\n\n${bomb}\n\nAnd \`code_*x*\` too.`);
+    expect(block.plain).not.toBe(true);
+    const html = htmlOf(block.parts);
+    expect(html).toContain(strong("bold"));
+    expect(html).not.toContain("<em>");
+    mountHtml(html);
+    expect(document.body.textContent).toContain("*a *a");
+    expect(html).toContain("code_*x*");
+  });
+
+  it("keeps a too-deep paragraph's bullet and link target as they were", () => {
+    const text =
+      "* item " + "*a ".repeat(10) + "<https://host.example/a_b> and https://x.example/c_d";
+    const html = htmlOf(render(text).parts);
+    expect(html).toContain("<li");
+    expect(html).not.toContain("<em>");
+    expect(html).toContain('href="https://host.example/a_b"');
+    expect(html).toContain('href="https://x.example/c_d"');
+  });
+
+  it("counts the emphasis of one quote paragraph across its lines", () => {
+    expect(riskOf("> *a *a *a\n> *a *a *a\n> *a *a *a\n> x")).toBe("emphasis");
+    expect(riskOf("> *a *a *a *a *a\n>\n> *a *a *a *a *a\n> x")).toBeNull();
+  });
+
   it("keeps ordinary emphasis and shows a flattened bomb's delimiters as text", () => {
     expect(htmlOf(render("Some **bold** and *em* and snake_case_name.").parts)).toContain(
       strong("bold"),
@@ -1101,8 +1141,17 @@ describe("markdown.ts strict profile", () => {
       ["a span closed on the next line", "run `SELECT\nFROM t` now"],
       ["stars in a span closed on the next line", "run `SELECT\nFROM *t` now"],
       ["two unmatched runs", "a `b ``c"],
+      ["a quote after prose with an open tick", "run `SELECT\n> quoted line"],
+      ["a span across the lines of one quote", "> run `foo\n> bar` now"],
     ])("adds no backtick to %s", (_n, text) => {
       expect(parseAs(text, "cut")).toBe(parseAs(text, "closed"));
+    });
+
+    it("closes a cut span in a quote paragraph after a bare > line, never pairing across it", () => {
+      const text = "> see `a\n>\n> then `b";
+      expect(parseAs(text, "closed")).not.toContain("<code");
+      expect(parseAs(text, "cut")).toContain("<code");
+      expect(shown(parseAs(text, "cut"))).toContain("see `a");
     });
 
     it("closes a cut span with a run as long as its opener", () => {

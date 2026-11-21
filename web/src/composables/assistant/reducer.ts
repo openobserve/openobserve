@@ -1132,9 +1132,27 @@ function typedResolved(state: StreamState, data: any, phase: StreamPhase): Strea
     ...grantOf(data),
     ...grantNotStoredOf(data.grant),
   };
+  // A reconnecting tail sends the answers to cards the client had again; live and stored `at` come from different clocks.
+  const shown = shownAnswer(state, resolved);
+  if (shown) {
+    // The stored copy may know more, such as a failed outcome; the shown one keeps its own fields.
+    shown.resolved = { ...resolved, ...shown.resolved };
+    return [];
+  }
   appendBlock(state, { type: "approval_result", resolved });
   if (resolved.grant && resolved.approved) settleGrantedWrite(state, resolved.grant);
   return phase === "live" ? [{ kind: "approval_resolved", frame: data }] : [];
+}
+
+// The latest block about this card is this same answer, wherever in the chat it sits.
+function shownAnswer(state: StreamState, resolved: ResolvedBlockData): ContentBlock | undefined {
+  let latest: ContentBlock | undefined;
+  for (const message of state.messages)
+    for (const block of message.contentBlocks ?? [])
+      if (block.approval?.id === resolved.id || block.resolved?.id === resolved.id) latest = block;
+  const same =
+    latest?.type === "approval_result" && latest.resolved?.approved === resolved.approved;
+  return same ? latest : undefined;
 }
 
 // A stored resolution's per-target results; a malformed item is dropped, never guessed.
