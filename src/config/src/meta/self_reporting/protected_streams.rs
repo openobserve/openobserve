@@ -55,6 +55,19 @@ pub fn current_reader() -> Option<ProtectedReader> {
     READER.try_with(|reader| *reader).ok()
 }
 
+/// `fut` run as the current task's reader, for a task spawned to do this task's read.
+pub fn with_current_reader<F: std::future::Future>(
+    fut: F,
+) -> impl std::future::Future<Output = F::Output> {
+    let reader = current_reader();
+    async move {
+        match reader {
+            Some(reader) => as_reader(reader, fut).await,
+            None => fut.await,
+        }
+    }
+}
+
 /// Whether no stored alert or pipeline may see the rows of `stream_name`.
 pub fn is_read_protected_stream(stream_name: &str) -> bool {
     ProtectedReader::of(stream_name).is_some()
