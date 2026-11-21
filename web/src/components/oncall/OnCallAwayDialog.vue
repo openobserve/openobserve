@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           hide-clipboard
           show-error
           :min-date="calendarDay()"
+          :max-date="calendarDay(MAX_AHEAD_MICROS)"
           data-test="oncall-members-away-window"
           @on:timezone-change="(zone: string) => (pickedZone = zone)"
         >
@@ -132,6 +133,7 @@ import {
   zonedMidnight,
 } from "@/utils/oncall";
 import { makeOnCallAwaySchema } from "./OnCallAwayDialog.schema";
+import { MAX_AHEAD_MICROS } from "./OnCallCoverForm.schema";
 
 /** What the form holds: the window may be half-picked, which the schema exists to reject. */
 interface OnCallAwayFormValues extends Record<string, unknown> {
@@ -210,9 +212,9 @@ watch(open, (isOpen) => {
   form.reset(initialValues());
 });
 
-/// Today on the picker's clock, so no past day can be picked.
-function calendarDay(): string {
-  return toZonedInputValue(Date.now() * 1000, pickedZone.value)
+/// The picker's calendar day `aheadMicros` from now: today keeps past days out, the horizon caps how far ahead.
+function calendarDay(aheadMicros = 0): string {
+  return toZonedInputValue(Date.now() * 1000 + aheadMicros, pickedZone.value)
     .slice(0, 10)
     .replace(/-/g, "/");
 }

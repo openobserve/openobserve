@@ -14,10 +14,20 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import DateTime from "@/components/DateTime.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import {
+  barInput,
+  lastChange,
+  mountPicker,
+  openMenu,
+  press,
+  typeInBar,
+  warmRangeInput,
+  type Picker,
+} from "@/test/unit/helpers/dateTimePicker";
 
 const START = Date.parse("2026-11-04T00:00:00Z") * 1000;
 const END = Date.parse("2026-11-05T00:00:00Z") * 1000;
@@ -44,6 +54,12 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
   };
   const inMenu = (dataTest: string) =>
     document.body.querySelector(`#date-time-menu [data-test="${dataTest}"]`);
+
+  // The bar and the paste parser load lazily; warm them so a flush sees them mounted.
+  beforeAll(async () => {
+    await import("@/components/DateTimeRangeInput.vue");
+    await import("@/composables/useTimeRangeInput");
+  });
 
   beforeEach(() => {
     store.state.timezone = "UTC";
@@ -102,5 +118,74 @@ describe("DateTime pickerTimezone and hideClipboard", () => {
     expect(wrapper!.vm.selectedTime.startTime).toBe("05:30:00");
     expect(inMenu("date-time-copy-btn")).not.toBeNull();
     expect(inMenu("date-time-paste-btn")).not.toBeNull();
+  });
+});
+
+describe("DateTime zone review fixes", () => {
+  let wrapper: Picker | null = null;
+  const micros = (iso: string) => Date.parse(iso) * 1000;
+
+  beforeAll(warmRangeInput);
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true });
+    store.state.timezone = "UTC";
+    store.state.savedViewFlag = false;
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+    store.state.timezone = "UTC";
+    vi.useRealTimers();
+  });
+
+  it("resolves a rolling day in the picker zone across a DST change", async () => {
+    vi.setSystemTime(new Date("2026-03-08T16:00:00Z"));
+    store.state.timezone = "America/New_York";
+    wrapper = mountPicker({ autoApply: true });
+    await flushPromises();
+    wrapper.vm.pickRelativeChip("d", 1);
+    await flushPromises();
+
+    const change = lastChange(wrapper);
+    expect(Number(change.endTime) - Number(change.startTime)).toBe(23 * 3_600_000_000);
+  });
+
+  it.each([
+    [1, "2026-11-01T05:30:00Z"],
+    [2, "2026-11-01T06:30:00Z"],
+  ])("commits repeated-hour reading %i of a rolling day as chosen", async (downs, start) => {
+    vi.setSystemTime(new Date("2026-11-02T06:30:00Z"));
+    store.state.timezone = "America/New_York";
+    wrapper = mountPicker({ autoApply: true });
+    await openMenu(wrapper);
+    await typeInBar("1d");
+    for (let i = 0; i < downs; i++) await press(barInput(), "ArrowDown");
+    await press(barInput(), "Enter");
+
+    expect(lastChange(wrapper).relativeTimePeriod).toBe("1d");
+    expect(Math.abs(Number(lastChange(wrapper).startTime) - micros(start))).toBeLessThan(1e6);
+  });
+
+  it("keeps the applied instants when a zone change would move them into the future", async () => {
+    vi.setSystemTime(new Date("2026-10-08T03:00:00Z"));
+    wrapper = mountPicker({ autoApply: true });
+    await openMenu(wrapper);
+    wrapper.vm.selectTab("absolute");
+    wrapper.vm.selectedDate = { from: "2026/10/08", to: "2026/10/08" };
+    wrapper.vm.selectedTime = { startTime: "01:00:00", endTime: "02:00:00" };
+    await flushPromises();
+    wrapper.vm.timezone = "America/New_York";
+    await wrapper.vm.onTimezoneChange();
+    await flushPromises();
+
+    expect(lastChange(wrapper)).toMatchObject({
+      startTime: micros("2026-10-08T01:00:00Z"),
+      endTime: micros("2026-10-08T02:00:00Z"),
+    });
+    expect(wrapper.vm.gateReason).toBeNull();
   });
 });

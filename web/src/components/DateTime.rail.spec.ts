@@ -363,8 +363,8 @@ describe("DateTime rail", () => {
       expect(lastEmit().relativeTimePeriod).toBe("3h");
 
       wrapper!.vm.setRelativeTime("calendar:day:0");
-      wrapper!.vm.relativeValue = 7;
-      wrapper!.vm.onCustomPeriodSelect();
+      wrapper!.vm.customDraft = 7;
+      wrapper!.vm.commitCustom(false);
       expect(wrapper!.vm.calendarToken).toBeNull();
       expect(lastEmit().relativeTimePeriod).toBe("7h");
     });
@@ -982,7 +982,7 @@ describe("DateTime rail", () => {
     it("opens on the first rail item and keeps the rail a single Tab stop", async () => {
       vi.useRealTimers();
       seedHistory([1, 2, 3, 4, 5, 6, 7].map(hourRange));
-      createWrapper();
+      createWrapper({ hideRangeInput: true });
       await openMenu();
 
       expect(document.activeElement?.getAttribute("data-test")).toBe("date-time-rail-recent-0");
@@ -1011,7 +1011,7 @@ describe("DateTime rail", () => {
     });
 
     it("opens on the first calendar item when there is no recent range", async () => {
-      createWrapper();
+      createWrapper({ hideRangeInput: true });
       await openMenu();
 
       expect(document.activeElement?.getAttribute("data-test")).toBe(
@@ -1129,5 +1129,45 @@ describe("DateTime rail", () => {
 
       expect(el("date-time-rail-recent-0")?.getAttribute("aria-disabled")).toBe("true");
     });
+  });
+});
+
+describe("DateTime rail review fixes", () => {
+  let wrapper: VueWrapper<InstanceType<typeof DateTime>> | null = null;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
+    store.state.timezone = "UTC";
+    store.state.savedViewFlag = false;
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+    localStorage.clear();
+    store.state.timezone = IST;
+    vi.useRealTimers();
+  });
+
+  it("replays a subsecond Recent entry with its exact bounds", async () => {
+    const startUs = micros("2026-10-08T01:00:00Z") + 100_000;
+    localStorage.setItem(HISTORY_KEY, JSON.stringify([{ startUs, endUs: startUs + 300_000 }]));
+    wrapper = mount(DateTime, {
+      props: { autoApply: true, calendarPresets: true },
+      attachTo: document.body,
+      global: { plugins: [i18n, store] },
+    });
+    await flushPromises();
+    wrapper.vm.onMenuOpenChange(true);
+    wrapper.vm.menuOpen = true;
+    await flushPromises();
+    wrapper.vm.applyRecentRange("0");
+    await flushPromises();
+
+    const events = wrapper.emitted("on:date-change") as unknown[][];
+    expect(events.at(-1)![0]).toMatchObject({ startTime: startUs, endTime: startUs + 300_000 });
   });
 });

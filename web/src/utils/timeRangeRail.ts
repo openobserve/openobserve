@@ -192,3 +192,13 @@ export const exceedsRangeRestriction = (
   endUs: number,
   restrictionInHours: number,
 ): boolean => restrictionInHours > 0 && (endUs - startUs) / 3_600_000_000 > restrictionInHours;
+
+/** A span limit as "3 days" when it is whole days, else "36 hours". */
+export const formatSpanLimit = (hours: number, intlLocale: string): string => {
+  const days = hours % 24 === 0;
+  return new Intl.NumberFormat(intlLocale, {
+    style: "unit",
+    unit: days ? "day" : "hour",
+    unitDisplay: "long",
+  }).format(days ? hours / 24 : hours);
+};

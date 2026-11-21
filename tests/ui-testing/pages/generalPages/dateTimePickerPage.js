@@ -31,9 +31,17 @@ export class DateTimePickerPage {
         this.relativeTab = page.locator('[data-test="date-time-relative-tab"]');
         this.absoluteTab = page.locator('[data-test="date-time-absolute-tab"]');
 
-        // Copy / paste controls — added by PR #13374.
+        // Copy / paste controls — added by PR #13374. With the typed bar shown they sit
+        // at the end of its status line; ids are unchanged.
         this.copyBtn = page.locator('[data-test="date-time-copy-btn"]');
         this.pasteBtn = page.locator('[data-test="date-time-paste-btn"]');
+
+        // Typed range bar at the top of the panel.
+        this.rangeBarInput = page.locator('[data-test="date-time-range-input"] input');
+        this.rangeBarStatus = page.locator('[data-test="date-time-range-status"]');
+        this.gateMessage = page.locator('[data-test="date-time-gate-message"]');
+        this.zoomOutBtn = page.locator('[data-test="date-time-zoom-out-btn"]');
+        this.copyConfirm = page.locator('[data-test="copy-confirm"]');
 
         // Shift buttons — Previous / Next flank the trigger (rendered when
         // hideRangeShift is false, the default). PR #14683 caps the forward
@@ -78,9 +86,8 @@ export class DateTimePickerPage {
         this.customPeriodTrigger = this.customRow.locator('[role="combobox"]');
 
         // ==================== Expected toast messages ====================
-        // Values of common.dateRangeCopied / dateRangePasted / dateRangePasteError / dateRangePasteEmpty
+        // Values of common.dateRangePasted / dateRangePasteError / dateRangePasteEmpty
         // in web/src/locales/languages/en-US.json.
-        this.copiedToastMessage = 'Date range copied';
         this.pastedToastMessage = 'Date range pasted';
         this.pasteErrorToastMessage = 'Could not parse date range';
         this.pasteEmptyToastMessage = 'Clipboard is empty. Copy a date range first.';
@@ -218,41 +225,65 @@ export class DateTimePickerPage {
     }
 
     /**
-     * Reads the clipboard and parses the {"start_date":micros,"end_date":micros}
-     * payload that Copy writes. Fails loudly if the payload is not that shape.
+     * Reads the `<start> - <end>` ISO pair (with offsets) that Copy writes on the
+     * Absolute tab, as epoch microseconds. Fails loudly on any other shape.
      */
     async readCopiedRange() {
         const raw = await this.readClipboard();
-        let payload;
-        try {
-            payload = JSON.parse(raw);
-        } catch {
-            throw new Error(`Clipboard did not contain JSON. Got: ${raw}`);
+        const match = raw.match(/^(\S+) - (\S+)$/);
+        const toMicros = (iso) => {
+            const ms = Date.parse(iso);
+            const fraction = iso.match(/\.(\d+)/)?.[1] ?? '';
+            return ms * 1000 + Number(fraction.padEnd(6, '0').slice(3, 6) || 0);
+        };
+        if (!match || Number.isNaN(Date.parse(match[1])) || Number.isNaN(Date.parse(match[2]))) {
+            throw new Error(`Clipboard did not contain an ISO range. Got: ${raw}`);
         }
-        expect(typeof payload.start_date, `start_date in ${raw}`).toBe('number');
-        expect(typeof payload.end_date, `end_date in ${raw}`).toBe('number');
-        return payload;
+        return { start_date: toMicros(match[1]), end_date: toMicros(match[2]) };
+    }
+
+    /** Reopens the panel when an auto-apply picker closed on the last action. */
+    async ensurePickerOpen() {
+        // Only a panel animating out is waited for; an open, steady one is used as it is.
+        const closing = this.page.locator('[data-o-popover-content][data-state="closed"]', { has: this.panel });
+        if (await closing.count()) await this.panel.waitFor({ state: 'hidden' });
+        if (!(await this.panel.isVisible())) await this.openPicker();
     }
 
     /**
      * Pastes `text` and returns the range the picker resolved it to, read back
-     * through Copy. Copy resolves the selection through the picker's own timezone,
-     * so this round-trip is exact for second-aligned epoch input and free of any
-     * dependence on the runner's timezone.
+     * through Copy on the Absolute tab, whose ISO text carries the offset, so the
+     * round trip is exact and free of any dependence on the runner's timezone.
      */
     async pasteAndReadBackRange(text) {
         await this.seedClipboard(text);
         await this.clickPaste();
         await this.expectPasteSuccessToast();
+        await this.ensurePickerOpen();
+        await this.absoluteTab.click();
         await this.expectAbsolutePanelActive();
         await this.clickCopy();
         return await this.readCopiedRange();
     }
 
+    // ==================== Typed range bar ====================
+
+    async typeInRangeBar(text) {
+        await expect(this.rangeBarInput).toBeVisible();
+        await this.rangeBarInput.fill(text);
+    }
+
+    async expectRangeBarText(text, state) {
+        await expect(this.rangeBarInput).toHaveValue(text);
+        await expect(this.rangeBarInput).toBeFocused();
+        if (state) await expect(this.rangeBarStatus).toHaveAttribute('data-state', state);
+    }
+
     // ==================== Toast assertions ====================
 
-    async expectCopySuccessToast() {
-        await expect(this.toastByMessage(this.copiedToastMessage)).toBeVisible();
+    /** Copy confirms with the bubble at the button: "Copied now-15m" or "Copied with UTC+01:00". */
+    async expectCopySuccessToast(text = 'Copied') {
+        await expect(this.copyConfirm).toContainText(text);
     }
 
     async expectPasteSuccessToast() {
@@ -289,7 +320,7 @@ export class DateTimePickerPage {
 
     // ==================== Custom relative value ====================
 
-    /** Fills the custom value input and blurs so the clamp commits. */
+    /** Fills the custom value input and blurs, which commits it once. */
     async setCustomValue(value) {
         await expect(this.customValueInput).toBeVisible();
         await this.customValueInput.fill(String(value));
