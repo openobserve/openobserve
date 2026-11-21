@@ -2057,10 +2057,8 @@ export class LogsPage {
         const responseUrl = searchResponse.url();
         if (responseUrl.includes('_search_stream')) {
             testLogger.debug("[DEBUG] Received streaming response (SSE format)");
-            const responseText = await searchResponse.text();
-            testLogger.debug("[DEBUG] Streaming response text (first 200 chars):", responseText.substring(0, 200));
-            expect(responseText).toBeDefined();
-            expect(responseText.length).toBeGreaterThan(0);
+            // The page aborts the SSE fetch, so CDP may drop its body; prove rows arrived via the rendered count.
+            await this.expectPaginationRowCountVisible(30000);
         } else {
             testLogger.debug("[DEBUG] Received JSON response");
             const searchData = await searchResponse.json();
