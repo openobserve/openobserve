@@ -403,6 +403,8 @@ struct TurnTail {
     runs: Vec<FrameRun>,
     /// The last seq whose frames were sent, or that the caller already had.
     sent: i64,
+    /// The turn record's decisions, so a replayed card arrives with its answer.
+    decisions: Vec<Value>,
 }
 
 impl TurnTail {
@@ -416,6 +418,36 @@ impl TurnTail {
             events: Vec::new(),
             runs: Vec::new(),
             sent: from_seq.max(start_seq - 1),
+            decisions: ai_chat_turns::decisions_of(record),
+        }
+    }
+
+    /// The frames of `events` with the decisions of the cards they hold, each after its card.
+    fn frames(&self, events: &[DurableEvent]) -> Vec<Value> {
+        let frames = turn_frames(events);
+        let asked = |id: &str| {
+            frames.iter().any(|f| {
+                f.get("type").and_then(Value::as_str) == Some("confirmation_required")
+                    && ["id", "call_id"]
+                        .iter()
+                        .any(|k| f.get(*k).and_then(Value::as_str) == Some(id))
+            })
+        };
+        // A decision whose card is live-only has no place among the stored frames.
+        let decisions: Vec<Value> = self
+            .decisions
+            .iter()
+            .filter(|d| d.get("id").and_then(Value::as_str).is_some_and(asked))
+            .cloned()
+            .collect();
+        if decisions.is_empty() {
+            return frames;
+        }
+        let mut turn = serde_json::json!({ "frames": frames });
+        openobserve_core::ai_chat::projection::attach_decisions(&mut turn, &decisions);
+        match turn.get_mut("frames").map(Value::take) {
+            Some(Value::Array(frames)) => frames,
+            _ => Vec::new(),
         }
     }
 
@@ -440,7 +472,7 @@ impl TurnTail {
         // Events the caller already had are its starting point, never sent again.
         if known_before && self.events.first().is_some_and(|e| e.seq <= self.sent) {
             let known = self.events.partition_point(|e| e.seq <= self.sent);
-            self.runs = frame_runs(turn_frames(&self.events[..known]));
+            self.runs = frame_runs(self.frames(&self.events[..known]));
         }
         contiguous
     }
@@ -459,7 +491,7 @@ impl TurnTail {
         let mut end = first;
         while end < self.events.len() {
             end = (end + stride).min(self.events.len());
-            let runs = frame_runs(turn_frames(&self.events[..end]));
+            let runs = frame_runs(self.frames(&self.events[..end]));
             let seq = self.events[end - 1].seq;
             // As on the live stream, a frame carries the last seq it comes after.
             for frame in frames_between(&self.runs, &runs) {
@@ -2429,6 +2461,7 @@ async fn catch_up(tail: &mut TurnTail, record: &mut TurnRecord) -> Result<(), Re
             tail.end_seq = turn_end_seq(record).await;
         }
     }
+    tail.decisions = ai_chat_turns::decisions_of(record);
     let row = match row {
         Ok(Some(row)) => row,
         Ok(None) => return Ok(()),
@@ -3778,6 +3811,34 @@ mod tests {
         let both = [answer("call_1", 1), answer("call_2", 2)];
         assert_eq!(waiting_in(&events, Some(&newest), &both, 0), None);
         assert!(requests_in(&events, None).is_empty());
+    }
+
+    #[test]
+    fn a_tail_replays_an_answered_card_with_its_answer() {
+        let mut events = answer_turn();
+        events.push(delete_request(6, "call_1"));
+        let record = TurnRecord {
+            decisions: Some(
+                serde_json::json!([
+                    {"id": "call_1", "approved": true, "at": 5},
+                    {"id": "perm_live", "approved": true, "at": 6},
+                ])
+                .to_string(),
+            ),
+            ..turn_record(0, None, TURN_RUNNING)
+        };
+        let types: Vec<(String, Value)> = tail_from(events, &record, NO_SEQ)
+            .into_iter()
+            .filter(|(_, f)| !f.is_null())
+            .map(|(_, f)| (f["type"].as_str().unwrap().to_string(), f["id"].clone()))
+            .collect();
+        let card = types
+            .iter()
+            .position(|(t, _)| t == "confirmation_required")
+            .expect("the card is replayed");
+        assert_eq!(types[card + 1].0, "confirmation_resolved");
+        let resolved = types.iter().filter(|(t, _)| t == "confirmation_resolved");
+        assert_eq!(resolved.count(), 1, "a live-only card's answer stays out");
     }
 
     #[test]
