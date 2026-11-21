@@ -166,7 +166,7 @@ export interface ClockValue {
 }
 
 export type Point =
-  | { p: "instant"; us: number; notes: ZoneNote[] }
+  | { p: "instant"; us: number; notes: ZoneNote[]; clock?: ClockValue }
   | { p: "wall"; y: number; mo: number; d: number; clock: ClockValue; shared?: boolean }
   | { p: "day"; y: number; mo: number; d: number; days?: number; rel?: boolean }
   | { p: "clock"; clock: ClockValue }
