@@ -158,6 +158,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="flex shrink-0 items-center justify-end gap-1 pe-3 md:max-xl:min-w-0 md:max-xl:shrink"
     >
+      <!-- keyed by org: the chip reads one org's browser copy -->
+      <StarterPackCatalogGate
+        v-if="packsEnabled && store.state.selectedOrganization?.identifier"
+        :org="store.state.selectedOrganization.identifier"
+      >
+        <StarterPackHeaderChip :key="store.state.selectedOrganization.identifier" class="me-1" />
+      </StarterPackCatalogGate>
       <!-- SAMPLE DATA: stays visible while the org holds sample data -->
       <SampleDataHeaderChip class="me-2" />
 
@@ -520,6 +527,9 @@ import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import SampleDataHeaderChip from "@/components/sampleData/SampleDataHeaderChip.vue";
+import StarterPackCatalogGate from "@/components/starterPacks/StarterPackCatalogGate.vue";
+import StarterPackHeaderChip from "@/components/starterPacks/StarterPackHeaderChip.vue";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -538,6 +548,8 @@ export default defineComponent({
     OrganizationSelector,
     SolutionSwitcher,
     SampleDataHeaderChip,
+    StarterPackCatalogGate,
+    StarterPackHeaderChip,
     LinkedAccountsDialog,
     OButton,
     OIcon,
@@ -876,6 +888,7 @@ export default defineComponent({
     };
 
     return {
+      packsEnabled: STARTER_PACKS_ENABLED,
       securityAccess,
       isDark,
       t,

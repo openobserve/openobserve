@@ -10897,6 +10897,11 @@
       "tryOneOfThese": "Or try one of these"
     },
     "capabilities": {
+      "starter": {
+        "title": "Set up Starter Packs",
+        "description": "Dashboards, alerts and saved views built for your {packs} data.",
+        "prompt": "Which starter packs fit my data, and what will each one create?"
+      },
       "query": {
         "title": "Write a Query",
         "description": "SQL for logs, traces, RUM, or PromQL for metrics.",
@@ -10925,6 +10930,17 @@
       "promqlCpu": "Write PromQL for pods using > 80% CPU",
       "datadogToO2": "Convert this Datadog query to OpenObserve SQL",
       "lastAlertFired": "Why was my last alert fired?"
+    },
+    "starterSuggestions": {
+      "whichPacks": "Which starter packs fit my data?",
+      "setUpPack": "Set up the {pack} pack",
+      "whatInPack": "What is in the {pack} pack?",
+      "errorsLastHour": "Show me errors from the last hour"
+    },
+    "starter": {
+      "checking": "Checking your data for starter packs…",
+      "contextNote": "O2 Assistant has your matched starter packs as context.",
+      "readyWhenYouAre": "Ready when you are:"
     },
     "placeholderRotation": {
       "one": "Show me errors from the last hour…",
@@ -15113,6 +15129,381 @@
     "countIncidentIntegration": "{count} incident integration | {count} incident integrations",
     "sectionOtherConsumers": "Also used by",
     "countDowntime": "{count} downtime | {count} downtimes"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "fields": {
+          "k8s_cluster": "Cluster name",
+          "k8s_namespace_name": "Namespace",
+          "k8s_pod_name": "Pod name",
+          "k8s_node_name": "Node name",
+          "k8s_container_name": "Container name",
+          "kind": "Event kind",
+          "reason": "Event reason",
+          "message": "Event message"
+        },
+        "roles": {
+          "events": "Kubernetes events"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "Hosts"
+      },
+      "traces": {
+        "title": "Traces (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "CloudWatch metrics"
+        }
+      },
+      "genai": {
+        "title": "AI (LLM apps)"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "roles": {
+          "job_logs": "GitHub Actions job logs"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "Try the pack check again",
+    "countAlerts": "{count} alert | {count} alerts",
+    "scope": "Alert scope: {value}",
+    "scopeAll": "All clusters",
+    "scopeSeen": "All clusters · {count} seen so far: {clusters}",
+    "noPermission": "You can't create alerts in this org",
+    "askAdmin": "Ask an admin to set this up",
+    "card": {
+      "dashboards": "{count} dashboard | {count} dashboards"
+    },
+    "manifest": {
+      "leftOut": "{count} item left out | {count} items left out",
+      "tagEnterprise": "Enterprise",
+      "tagNeedsData": "Needs data",
+      "tagHaveIt": "You have it",
+      "tagUnavailable": "Unavailable",
+      "adapted": "Adapted to your data"
+    },
+    "installDialog": {
+      "title": "{made} of {total} items created",
+      "attention": "{title} · {count} needs your attention | {title} · {count} need your attention",
+      "failedReason": "Couldn't be created. Retry to try again.",
+      "kindDashboards": "Dashboards",
+      "kindAlerts": "Alerts",
+      "rowFailed": "Failed · {name}"
+    },
+    "home": {
+      "label": "Starter packs",
+      "error": "Couldn't check your data for packs",
+      "fromClusters": "from {clusters}",
+      "moreStreams": "+{count} stream | +{count} streams",
+      "moreStreamsLabel": "More matched streams",
+      "interrupted": "{title} setup stopped partway · {made} of {total} done",
+      "askAdminLine": "Starter packs fit your data. Ask an admin to add them.",
+      "heroTitle": "Data is live. Set up ready-made dashboards and alerts in about a minute",
+      "heroLead": "from {count} pack that fits your data | from {count} packs that fit your data",
+      "readyToAdd": "Ready to add",
+      "clusterKind": "cluster",
+      "connected": "Connected",
+      "moreClusters": "+{count} cluster | +{count} clusters",
+      "railClusters": "{count} cluster | {count} clusters",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "Streams this pack uses · {count}",
+      "moreStreamsChip": "+{count} more",
+      "streamTypeLogs": "logs",
+      "streamTypeMetrics": "metrics",
+      "streamTypeTraces": "traces",
+      "reviewSetUp": "Review pack",
+      "reviewSetUpLabel": "Review the {title} pack",
+      "bestStart": "Best place to start",
+      "cards": {
+        "andMore": "{list} and {count} more",
+        "panels": "{count} panel | {count} panels",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {panels} for {clusters}. | {title}: {panels} for {clusters} clusters.",
+            "fallback": "{title}: every node, pod and workload."
+          },
+          "alerts": {
+            "template": "{alert_names}. Fire for every cluster ({clusters}). Off until you turn them on.",
+            "fallback": "{alert_names}. Fire for every cluster. Off until you turn them on.",
+            "plain": "Fire for every cluster. Off until you turn them on."
+          },
+          "savedViews": {
+            "template": "Kubernetes events: every event in {stream}, one click from Logs.",
+            "fallback": "Kubernetes events, one click from Logs."
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "Host Metrics: CPU, memory and disk for each host."
+          },
+          "alerts": {
+            "template": "{alert_names}. Fire for every host. Off until you turn them on.",
+            "fallback": "Fire for every host. Off until you turn them on."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: {panels} for your data.",
+            "fallback": "{title}, built for your streams."
+          },
+          "alerts": {
+            "template": "{alert_names}. Fire across all your matching data. Off until you turn them on.",
+            "fallback": "Fire across all your matching data. Off until you turn them on."
+          },
+          "savedViews": {
+            "template": "{stream} in Logs, one click away.",
+            "fallback": "One click from Logs."
+          }
+        }
+      },
+      "previewFailed": "Couldn't load what this pack sets up. Review it to try again.",
+      "nothingFitsYet": "Nothing in this pack fits your data yet. Its items show here once their data arrives."
+    },
+    "whatGetsCreated": {
+      "subtitle": "{title} starter pack",
+      "subtitleScoped": "{title} starter pack · built for {scope}",
+      "savedIn": "Saved in the folder {folder}",
+      "skippedNote": "{count} item skipped · your existing one is kept | {count} items skipped · your existing ones are kept",
+      "nameInUse": "{name} already exists · yours is kept",
+      "skipped": "Skipped",
+      "notSeenYet": "Not seen yet",
+      "footprint": "Footprint",
+      "reachStarted": "Background queries: each started alert runs on its own schedule",
+      "reachStartedScoped": "Alert scope: {scope} · Background queries: each started alert runs on its own schedule",
+      "selectGroup": "Select all in {group}",
+      "selectRow": "Select {name}"
+    },
+    "drawer": {
+      "packTitle": "{title} pack",
+      "view": "Kubernetes view",
+      "viewPath": "Infrastructure › Kubernetes",
+      "dashboard": "{title} dashboard",
+      "dashboardNote": "Opens after setup",
+      "panelsFit": "{count} panel fits your data. Opens after setup. | {count} panels fit your data. Opens after setup.",
+      "alerts": "Alerts, off until you turn them on",
+      "savedViews": "Saved views in Logs",
+      "savedViewsNote": "Shared with everyone in this org",
+      "folder": "Folder",
+      "folderValue": "{name} (starter pack)",
+      "reach": "Background queries: None for now",
+      "reachScoped": "Alert scope: {scope} · Background queries: None for now",
+      "notIncluded": "Not included",
+      "reasonAlreadyHave": "{name}: you already have it",
+      "reasonNoData": "{name}: no data for it seen yet",
+      "reasonUnavailable": "{name}: not in the Library right now",
+      "reasonNeedsPlan": "{name}: needs the Enterprise plan",
+      "source": "From the Library at {host}. The pack built into this version works offline.",
+      "sourceOffline": "{host} can't be reached. Using the pack built into this version, which works offline.",
+      "nothingToCreate": "You already have every item in this pack",
+      "openDashboard": "Open dashboard",
+      "error": "Couldn't load what this pack creates",
+      "reasonNoFlavour": "{name}: not available for your metric names yet",
+      "loadingFit": "Checking which items fit your data",
+      "noteForbidden": "{title} · you can see this pack but not set it up",
+      "setUp": "Set up",
+      "allExist": "You already have all {count} items in this pack. Existing alerts keep their settings.",
+      "continue": "Continue",
+      "setUpCount": "Set up {count} item | Set up {count} items",
+      "undoNote": "You can undo this for 24 hours",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "Setting up {title} monitoring",
+      "summary": "{made} of {total} created",
+      "created": "Created",
+      "creating": "Creating",
+      "waiting": "Waiting",
+      "rowAlerts": "Alerts {made} of {total}",
+      "rowViews": "Saved views {made} of {total}",
+      "rowDashboards": "Dashboards {made} of {total}",
+      "retry": "Retry {count} item | Retry {count} items",
+      "finish": "Finish",
+      "interrupted": "Setup interrupted · {made} of {total} done",
+      "installError": "Setup didn't finish. Try again.",
+      "comeBack": "{made} of {total} created · you can close this and keep working. Find it again from Starter packs in the header.",
+      "alertsOnTo": "Creating · on, sending to {destination}",
+      "emailMe": "Email me ({email})",
+      "creatingOn": "Creating · on"
+    },
+    "landing": {
+      "undo": "Undo setup",
+      "remove": "Remove pack",
+      "available": "available for {hours} h",
+      "availableSoon": "available for under 1 h"
+    },
+    "undo": {
+      "title": "Undo setup?",
+      "removeTitle": "Remove pack?",
+      "left": "{hours} h left to undo",
+      "leftSoon": "Under 1 h left to undo",
+      "allOff": "All alerts are off, so nothing stops and no alert loses cover.",
+      "loseCover": "{count} live alert loses cover | {count} live alerts lose cover",
+      "removes": "Removes {count} item | Removes {count} items",
+      "failed": "Couldn't remove everything. Try again.",
+      "kept": "Kept {count} item that was changed or is still in use. Delete it on its own page. | Kept {count} items that were changed or are still in use. Delete them on their own pages."
+    },
+    "severity": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Info"
+    },
+    "adapted": {
+      "someField": "A field",
+      "flavour": "Uses the {name} version",
+      "change": "Change",
+      "streams": "Streams",
+      "fields": "Fields",
+      "version": "Version",
+      "streamCount": "{count} stream | {count} streams",
+      "fieldCount": "{count} field | {count} fields",
+      "matchedBoth": "{streams} and {fields} matched to your data",
+      "matchedOne": "{what} matched to your data",
+      "needsChoiceCount": "{count} needs your choice | {count} need your choice",
+      "notFoundCount": "{count} not found",
+      "matchedCount": "{count} matched",
+      "whichStream": "Which stream is {what}?",
+      "lookRight": "{count} looks right | {count} look right",
+      "noneFound": "No {what} found",
+      "showMore": "Show {count} more",
+      "needsChoice": "Needs a choice",
+      "severalMatch": "{count} streams look like {what}",
+      "oneMatch": "{stream} looks like {what}",
+      "sharedAsk": "Which records are {what}?",
+      "choose": "Choose",
+      "dialogFields": "{matched} of {total} fields",
+      "dialogUse": "Use {stream}",
+      "dialogUseAll": "Use all {count}",
+      "dialogUseChecked": "Use these {count}",
+      "dialogAllNote": "All: the dashboard gets a stream picker, and each alert that reads this is set up once per stream.",
+      "dialogPickFive": "Pick up to {count} streams.",
+      "dialogPickStream": "Pick the stream",
+      "dialogPickPlaceholder": "Choose a stream",
+      "dialogFiltersOn": "Reads from {stream}, only records where {field} is {value}",
+      "dialogNoValues": "No values were found for this field in the last 24 hours.",
+      "dialogSend": "Or send them to {stream}: set this header in your collector",
+      "dialogFieldTitle": "Choose the field for {what}",
+      "dialogFieldLabel": "Field in {stream}",
+      "values": "Seen: {values}",
+      "or": "or",
+      "filterTitle": "Add a filter so the pack only reads {what}",
+      "showFewer": "Show fewer"
+    },
+    "matchCheck": {
+      "checked": "Checked {when}",
+      "checkedAt": "Checked {time} (your local time)",
+      "justNow": "just now",
+      "minutesAgo": "{count} min ago",
+      "hoursAgo": "{count} h ago",
+      "daysAgo": "{count} d ago"
+    },
+    "headerChip": {
+      "label": "Starter packs",
+      "ariaLabel": "Starter packs, {count} fits your data | Starter packs, {count} fit your data",
+      "progress": "{made} of {total}",
+      "ariaLabelRunning": "Starter packs, setting up {made} of {total}"
+    },
+    "guide": {
+      "rowSavedViews": "{count} saved view | {count} saved views"
+    },
+    "stepper": {
+      "content": "Choose content",
+      "setup": "Setting up",
+      "settingUp": "Setting up…",
+      "interrupted": "Interrupted",
+      "ready": "Ready",
+      "noteRunning": "Setting up · {made} of {total} created",
+      "noteAlertsOn": "{made} of {total} created · {count} alert on | {made} of {total} created · {count} alerts on",
+      "noteAlertsOff": "{made} of {total} created · alerts off",
+      "noteAlreadyHere": "{made} of {total} created · {count} already here"
+    },
+    "alertStep": {
+      "turnOn": "Turn on the {count} pack alert | Turn on the {count} pack alerts",
+      "sendTo": "Send to",
+      "sendToEmail": "Send to: {icon} Email me — {email}",
+      "emailCreateNote": "No destination in this org yet. Set up adds an email destination for you (or reuses one that only sends to you).",
+      "noDestination": "No destination yet. Add one under Alerts → Destinations.",
+      "destinationsFailed": "Couldn't load destinations, so Send to is off. Alerts can get one later under Alerts → Destinations.",
+      "destinations": "{count} destination in this org | {count} destinations in this org",
+      "chooseDestination": "Choose a destination",
+      "pickDestination": "Choose a destination for Send to, or untick it"
+    },
+    "ready": {
+      "title": "{title} monitoring is ready"
+    },
+    "popup": {
+      "title": "Starter Packs",
+      "subtitle": "{count} pack fits data you already send | {count} packs fit data you already send",
+      "subtitleAllSetUp": "Every pack that fits your data is set up",
+      "subtitleNone": "No packs match yet",
+      "items": "{count} item | {count} items",
+      "setUpAgo": "Set up {when}",
+      "stopped": "Setup stopped partway",
+      "whatGetsCreated": "What gets created",
+      "tileDashboards": "{count} Dashboard | {count} Dashboards",
+      "tileAlerts": "{count} Alert | {count} Alerts",
+      "tileSavedViews": "{count} Saved View | {count} Saved Views",
+      "noneDashboards": "Dashboards",
+      "noneAlerts": "Alerts",
+      "noneSavedViews": "Saved Views",
+      "noneInPack": "None in this pack",
+      "sevCritical": "{count} critical",
+      "sevWarning": "{count} warning",
+      "sevInfo": "{count} info",
+      "chooseNext": "Choose which items to create on the next step",
+      "undoWindow": "Undo any setup for 24 hours",
+      "reviewSetUp": "Review Pack",
+      "viewPack": "View Pack",
+      "checkAgain": "Check Again",
+      "checkFailed": "Couldn't check. Try again",
+      "emptyTitle": "No packs match your data yet",
+      "emptyText": "Packs appear when OpenObserve sees data from a source it knows, such as Kubernetes, hosts, Docker, PostgreSQL or AWS. Send data, then check again.",
+      "back": "Back",
+      "backToPacks": "Back to Packs",
+      "keepsGoing": "You can close this. Setup keeps going."
+    },
+    "viewPack": {
+      "open": "Open",
+      "openLabel": "Open {name}",
+      "dashboard": "Dashboard",
+      "dashboards": "Dashboards",
+      "dashboardsMeta": "{count} dashboard | {count} dashboards",
+      "alerts": "Alerts",
+      "alertsMeta": "{count} · {on} on · {silent} silent",
+      "alertsMetaFailed": "{count} · {on} on · {silent} silent · {failed} not created",
+      "savedView": "Saved view · shared with everyone in this org",
+      "savedViews": "Saved views",
+      "savedViewsMeta": "{count} saved view · shared with everyone in this org | {count} saved views · shared with everyone in this org",
+      "on": "On",
+      "silent": "Silent",
+      "notCreated": "Not created",
+      "showMore": "Show {count} more",
+      "showLess": "Show less",
+      "ordinary": "These are ordinary alerts, dashboards and views. Edit or delete them on their own pages.",
+      "setUpByYou": "Set up by you {when}",
+      "setUpBy": "Set up by {who} {when}",
+      "setUpWhen": "Set up {when}",
+      "partialTitle": "{title} monitoring is set up, {count} item was not created | {title} monitoring is set up, {count} items were not created",
+      "partialNote": "The rest is ready. Retry an item below, or retry them all.",
+      "partialSubtitle": "{made} of {total} created · {failed} not created"
+    }
   },
   "alert_library": {
     "header": "Alert Library",

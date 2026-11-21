@@ -25,5 +25,6 @@ import { orgKey } from "@/composables/query/keys";
 export const dashboardKeys = {
   all: (org: string) => orgKey(org, "dashboards"),
   byFolder: (org: string, folderId: string) => orgKey(org, "dashboards", "list", folderId),
+  detail: (org: string, id: string) => orgKey(org, "dashboards", "detail", id),
   search: (org: string, title: string) => orgKey(org, "dashboards", "search", title),
 };

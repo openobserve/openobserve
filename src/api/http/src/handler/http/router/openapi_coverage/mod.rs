@@ -493,6 +493,7 @@ const ALWAYS_FORBIDDEN: &[(&str, &str, &str)] = &[
     ("oss", "DELETE", "/api/{org_id}/settings/logo"),
     ("oss", "POST", "/api/{org_id}/settings/logo/text"),
     ("oss", "DELETE", "/api/{org_id}/settings/logo/text"),
+    ("oss", "GET", "/api/{org_id}/starter_packs/catalog"),
 ];
 
 /// `Option<Json<T>>` bodies and their schema: leaving the body out works, a JSON `null` is a 422.

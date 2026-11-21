@@ -255,6 +255,8 @@ struct ConfigResponse<'a> {
     /// The clamped operator refresh floor; the share form shows each range's floor from it.
     public_dashboard_min_refresh_secs: u32,
     oncall_enabled: bool,
+    /// Not `SMTP_CLIENT.is_some()`: same value, and building it here panics on a bad host.
+    smtp_enabled: bool,
     /// Per org: an incident-only alert reaches a person, so on-call is on and the org has a team.
     incidents_page_oncall: bool,
     slack_enabled: bool,
@@ -801,6 +803,7 @@ pub async fn zo_config(
         public_dashboards_enabled: cfg.public_dashboards.enabled,
         public_dashboard_min_refresh_secs: cfg.public_dashboards.min_refresh_secs,
         oncall_enabled,
+        smtp_enabled: cfg.smtp.smtp_enabled,
         incidents_page_oncall,
         slack_enabled: slack_disabled_reason.is_none(),
         slack_disabled_reason,
@@ -3098,6 +3101,19 @@ mod tests {
             0
         };
         assert_eq!(json["alert_transitions_retention_days"], served);
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_smtp_enabled_and_no_other_smtp_detail() {
+        let json = zo_config_json().await;
+        assert_eq!(json["smtp_enabled"], get_config().smtp.smtp_enabled);
+        let smtp_keys: Vec<&String> = json
+            .as_object()
+            .unwrap()
+            .keys()
+            .filter(|k| k.contains("smtp"))
+            .collect();
+        assert_eq!(smtp_keys, vec!["smtp_enabled"]);
     }
 
     async fn zo_config_json() -> serde_json::Value {

@@ -107,6 +107,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @open="firstDataNotice.open"
           @dismiss="firstDataNotice.dismiss"
         />
+        <StarterPackCatalogGate
+          v-if="packsEnabled && activeHomeTab === 'overview'"
+          :org="store.state.selectedOrganization?.identifier"
+        >
+          <StarterPackHomeSection
+            :key="store.state.selectedOrganization?.identifier"
+            :org="store.state.selectedOrganization?.identifier"
+            @ready="homePacks = $event"
+          />
+        </StarterPackCatalogGate>
         <SampleDataHomeBanner v-if="activeHomeTab === 'overview'" class="mt-2.5 mb-1" />
         <FirstDataPanel
           v-if="flagOn && isDataTab && arrived"
@@ -204,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Overview pads itself like the Kubernetes overview, so it cancels the body inset to run edge to edge -->
           <div
             v-else-if="activeHomeTab === 'overview'"
+            v-show="!hideOverviewPanel"
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
@@ -219,6 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                already provides the border; avoids a double-bordered card). -->
           <div
             v-if="activeHomeTab === 'overview'"
+            v-show="!hideOverviewPanel"
             class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
             data-test="home-overview-panel"
           >
@@ -255,6 +267,7 @@ import {
   inject,
   nextTick,
   ref,
+  shallowRef,
   watch,
   onMounted,
   onUnmounted,
@@ -294,6 +307,10 @@ import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import analytics from "@/services/product_analytics";
+import StarterPackCatalogGate from "@/components/starterPacks/StarterPackCatalogGate.vue";
+import StarterPackHomeSection from "@/components/starterPacks/StarterPackHomeSection.vue";
+import type { HomePacks } from "@/composables/starterPacks/useHomePacks";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 
 export default defineComponent({
   name: "PageHome",
@@ -303,6 +320,10 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
     const firstDataNotice = inject(FIRST_DATA_NOTICE, null);
+    const packsEnabled = STARTER_PACKS_ENABLED;
+    const homePacks = shallowRef<HomePacks | null>(null);
+    // v-show, not v-if: Overview keeps its loaded state while the pack offer covers it.
+    const hideOverviewPanel = computed(() => packsEnabled && !!homePacks.value?.offerShown.value);
     const LS_TAB_ORDER_KEY = "o2_home_tab_order";
     const LS_ACTIVE_TAB_KEY = "o2_home_active_tab";
 
@@ -641,6 +662,9 @@ export default defineComponent({
       tabOrder,
       onTabReorder,
       isEnterpriseOrCloud,
+      packsEnabled,
+      homePacks,
+      hideOverviewPanel,
       homeChat,
       aiChatPayload,
       onSendToAiChat,
@@ -660,6 +684,8 @@ export default defineComponent({
     };
   },
   components: {
+    StarterPackCatalogGate,
+    StarterPackHomeSection,
     OverviewTab,
     UsageTab,
     O2AIChat,

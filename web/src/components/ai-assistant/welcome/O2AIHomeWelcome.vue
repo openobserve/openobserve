@@ -1,9 +1,23 @@
 <script setup lang="ts">
+import { computed, ref } from "vue";
+import { useStore } from "vuex";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
+import StarterPackCatalogGate from "@/components/starterPacks/StarterPackCatalogGate.vue";
 import WelcomeGreeting from "./WelcomeGreeting.vue";
 import CapabilityCards from "./CapabilityCards.vue";
 import PromptSuggestions from "./PromptSuggestions.vue";
+import WelcomeStarter from "./WelcomeStarter.vue";
+import type { StarterWelcomeMode, WelcomeContext } from "./starterWelcome";
 
-const emit = defineEmits<{ (e: "select-prompt", prompt: string): void }>();
+const emit = defineEmits<{
+  (e: "select-prompt", prompt: string): void;
+  (e: "select-context", prompt: string, context: WelcomeContext): void;
+  (e: "welcome-context", context: WelcomeContext | null): void;
+}>();
+
+const store = useStore();
+const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+const starterMode = ref<StarterWelcomeMode>("none");
 
 function onSelect(prompt: string) {
   emit("select-prompt", prompt);
@@ -24,8 +38,18 @@ function onSelect(prompt: string) {
       class="o2-ai-home-welcome__inner relative z-1 flex w-full max-w-240 flex-col items-center gap-6 px-6 pt-6 pb-4 max-md:gap-3 max-md:px-2 max-md:pt-1"
     >
       <WelcomeGreeting />
-      <CapabilityCards @select="onSelect" />
-      <PromptSuggestions @select="onSelect" />
+      <StarterPackCatalogGate v-if="STARTER_PACKS_ENABLED && org" :key="org" :org="org">
+        <WelcomeStarter
+          :org="org"
+          @mode="starterMode = $event"
+          @context="emit('welcome-context', $event)"
+          @select="(prompt, context) => emit('select-context', prompt, context)"
+        />
+      </StarterPackCatalogGate>
+      <template v-if="starterMode === 'none'">
+        <CapabilityCards @select="onSelect" />
+        <PromptSuggestions @select="onSelect" />
+      </template>
     </div>
   </div>
 </template>

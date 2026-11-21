@@ -27,8 +27,9 @@ vi.mock("vue-router", () => ({
   useRoute: () => ({ fullPath: "/", path: "/", name: "home", query: {}, params: {} }),
 }));
 
-// Mock image util and UUID generator
-vi.mock("@/utils/zincutils", () => ({
+// Mock image util and UUID generator; the rest stays real for the starter pack imports.
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal()),
   getImageURL: vi.fn(() => "#"),
   getUUIDv7: vi.fn(() => "test-session-id-12345"),
 }));
