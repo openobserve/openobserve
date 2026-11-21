@@ -497,11 +497,18 @@ export class MetricsBuilderPage {
 
     // The key of the first option in the open list; the option's text also carries its type.
     async firstOptionKey() {
-        const first = this.labelFilterOptions.first();
-        await first.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-        if (!(await first.isVisible().catch(() => false))) return '';
-        const testId = await first.getAttribute('data-test');
-        return testId ? testId.slice(`${LABEL_BUILDER}-suggest-item-`.length) : '';
+        const prefix = `${LABEL_BUILDER}-suggest-item-`;
+        let key = '';
+        // Built-in rows (e.g. "Start a group") use NUL-prefixed keys and render before the labels load.
+        await expect.poll(async () => {
+            const keys = await this.labelFilterOptions.evaluateAll(
+                (els, p) => els.map(el => (el.getAttribute('data-test') || '').slice(p.length)),
+                prefix
+            );
+            key = keys.find(k => k && !k.startsWith('\u0000')) || '';
+            return key;
+        }, { timeout: 15000 }).not.toBe('').catch(() => {});
+        return key;
     }
 
     /**
