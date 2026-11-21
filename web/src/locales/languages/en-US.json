@@ -2377,6 +2377,8 @@
     "bounced": "Bounced",
     "health": "Health",
     "userSession": "User & Session",
+    "userLabelOrder": "User label order",
+    "userLabelOrderOption": "{first} → {second} → {third}",
     "avgDuration": "Avg Duration",
     "bounceRate": "Bounce Rate",
     "medianDuration": "median {duration}",

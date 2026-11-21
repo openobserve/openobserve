@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { sqlIn, sqlLiteral } from "@/utils/query/sqlFilterBuilder";
+import { rumSessionUserIdentitySelect } from "@/utils/rum/sessionUserIdentity";
 import {
   BREAKDOWN_TOP,
   CONTAINER_SUFFIXES,
@@ -2142,9 +2143,9 @@ export function cohortSessionsSql(
 }
 
 export function sessionEventsProbeSql(sessionId: string, schema: Record<string, boolean>): string {
-  const email = schema.usr_email ? "MAX(usr_email)" : "CAST(NULL AS VARCHAR)";
+  const identity = rumSessionUserIdentitySelect(schema).join(", ");
   const source = schema.source ? "MIN(source)" : "CAST(NULL AS VARCHAR)";
-  return `SELECT MIN(date) AS start_time, MAX(date) AS end_time, ${email} AS user_email, ${source} AS source FROM "_rumdata" WHERE session_id = ${lit(sessionId)} LIMIT 1`;
+  return `SELECT MIN(date) AS start_time, MAX(date) AS end_time, ${identity}, ${source} AS source FROM "_rumdata" WHERE session_id = ${lit(sessionId)} LIMIT 1`;
 }
 
 const GROUPED_INCLUDE: Readonly<Record<PathsInclude, string>> = {

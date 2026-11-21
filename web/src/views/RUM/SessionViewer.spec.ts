@@ -24,9 +24,10 @@ import { createRouter, createWebHistory } from "vue-router";
 const seededSession = vi.hoisted(() => ({ extra: {} as Record<string, unknown> }));
 
 // Reactive like the real store, so computeds over the selected session follow getSession().
-vi.mock("@/composables/useSessionReplay", async () => {
+vi.mock("@/composables/useSessionReplay", async (importOriginal) => {
   const { reactive } = await import("vue");
   return {
+    ...(await importOriginal<typeof import("@/composables/useSessionReplay")>()),
     default: () => ({
       sessionState: reactive({
         data: {
@@ -36,7 +37,11 @@ vi.mock("@/composables/useSessionReplay", async () => {
             browser: "Chrome",
             os: "macOS",
             ip: "1.2.3.4",
+            user_name: null,
             user_email: "user@example.com",
+            user_id: null,
+            identity_org: "default",
+            identity_from_list: true,
             city: "San Francisco",
             country: "US",
             session_id: "session-abc",
@@ -254,6 +259,20 @@ vi.mock("@/composables/useStreamingSearch", () => ({
         return;
       }
       handlers.onActivity?.();
+      if (sql.includes("AS user_name") && sql.includes('FROM "_rumdata"')) {
+        for (const row of result) {
+          handlers.data(data, {
+            type: "search_response_metadata",
+            content: { results: {}, streaming_aggs: true },
+          });
+          handlers.data(data, {
+            type: "search_response_hits",
+            content: { results: { hits: [row] } },
+          });
+        }
+        handlers.complete(data, null);
+        return;
+      }
       handlers.data(data, {
         type: "search_response_hits",
         content: { results: { hits: result } },
@@ -291,6 +310,7 @@ import searchService from "@/services/search";
 import i18n from "@/locales";
 import { ACTIVE_WINDOW_MS, LIVE_POLL_MS } from "@/utils/rum/sessionReplayLive";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
+import { useRumSessionUserLabelOrder } from "@/composables/rum/useRumSessionUserLabelOrder";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import analytics from "@/services/product_analytics";
 
@@ -444,8 +464,7 @@ describe("SessionViewer.vue", () => {
       expect(backBtn.exists()).toBe(true);
     });
 
-    it("should show Unknown User when session has no user email initially", () => {
-      // Default sessionDetails.user_email starts as "" before session load
+    it("should show Unknown User before loading the session identity", () => {
       vi.mocked(searchService.search).mockReturnValueOnce(new Promise(() => {}));
       const pending = mountSessionViewer(router);
       expect(pending.text()).toContain("Unknown User");
@@ -1195,6 +1214,87 @@ function resetStreaming(responder: (sql: string, from: number) => any) {
   streaming.responder = responder;
   streaming.cancel?.mockClear();
 }
+
+describe("SessionViewer.vue — session user label", () => {
+  afterEach(() => {
+    seededSession.extra = {};
+    streamsMock.getStream = null;
+    resetStreaming(() => []);
+  });
+
+  it("uses the list identity for the header and side panel when it belongs to this session", async () => {
+    seededSession.extra = {
+      user_name: "Replay user",
+      user_email: "user@example.com",
+      user_id: "user-42",
+    };
+    const preference = mount(
+      defineComponent({
+        setup: () => ({ order: useRumSessionUserLabelOrder() }),
+        template: "<div />",
+      }),
+      { global: { plugins: [store] } },
+    );
+    resetStreaming(rowsResponder(fixtureRows));
+    const wrapper = await mountLoaded();
+    try {
+      expect(wrapper.find('[data-test="session-viewer-subtitle"]').text()).toContain("Replay user");
+      expect(
+        wrapper.findComponent({ name: "PlayerEventsSidebar" }).props("sessionDetails"),
+      ).toMatchObject({
+        user_label: "Replay user",
+      });
+      expect(streaming.sqls.some((sql) => sql.includes('FROM "_rumdata"'))).toBe(false);
+      expect((wrapper.vm as any).sessionState.data.selectedSession).not.toHaveProperty(
+        "identity_from_list",
+      );
+      preference.vm.order = "id-email-name";
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="session-viewer-subtitle"]').text()).toContain("user-42");
+      expect(
+        wrapper.findComponent({ name: "PlayerEventsSidebar" }).props("sessionDetails"),
+      ).toMatchObject({
+        user_label: "user-42",
+      });
+      expect(streaming.sqls.some((sql) => sql.includes('FROM "_rumdata"'))).toBe(false);
+    } finally {
+      preference.vm.order = "name-email-id";
+      preference.unmount();
+      wrapper.unmount();
+    }
+  });
+
+  it.each([
+    ["another session", { session_id: "other-session" }],
+    ["another organization", { identity_org: "other-org" }],
+    ["an empty identity snapshot", { user_name: null, user_email: " ", user_id: null }],
+    ["a previous viewer snapshot", { identity_from_list: undefined }],
+  ])("looks up the shared link's identity when the cache holds %s", async (_reason, overrides) => {
+    seededSession.extra = { user_name: "Other user", ...overrides };
+    streamsMock.getStream = async () => ({
+      name: "_rumdata",
+      schema: [{ name: "usr_id" }],
+    });
+    const replayRows = rowsResponder(fixtureRows);
+    resetStreaming((sql, from) =>
+      sql.includes('FROM "_rumdata"') ? [{}, { user_id: "employee-42" }] : replayRows(sql, from),
+    );
+    const wrapper = await mountLoaded();
+    try {
+      const subtitle = wrapper.find('[data-test="session-viewer-subtitle"]').text();
+      expect(subtitle).toContain("employee-42");
+      expect(subtitle).not.toContain("Other user");
+      expect(subtitle).not.toContain("user@example.com");
+      const identityQueries = streaming.sqls.filter((sql) => sql.includes('FROM "_rumdata"'));
+      expect(identityQueries).toHaveLength(1);
+      expect(identityQueries[0]).toContain("session-abc");
+      expect(identityQueries[0]).not.toContain("usr_name");
+      expect(identityQueries[0]).not.toContain("usr_email");
+    } finally {
+      wrapper.unmount();
+    }
+  });
+});
 
 // n segments one second apart; only the first holds a full snapshot.
 function manyRows(n: number) {
@@ -4523,6 +4623,7 @@ describe("SessionViewer.vue — events-only view for a session with no replay (A
               {
                 start_time: 1692884313968,
                 end_time: 1692884769270,
+                user_name: "Events-only user",
                 user_email: null,
                 source: "browser",
               },
@@ -4559,6 +4660,34 @@ describe("SessionViewer.vue — events-only view for a session with no replay (A
     const events = seen.find((q) => q.includes('from "_rumdata"') && q.includes("type='view'"));
     expect(events).toContain("order by date asc");
     wrapper.unmount();
+  });
+
+  it("uses the identity from the events-only session probe", async () => {
+    const wrapper = await mountEventsOnly();
+    expect(wrapper.find('[data-test="session-viewer-subtitle"]').text()).toContain(
+      "Events-only user",
+    );
+    wrapper.unmount();
+  });
+
+  it("does not reuse metadata from a previous replay on an events-only link", async () => {
+    seededSession.extra = {
+      session_id: "previous-replay",
+      browser: "Previous browser",
+      ip: "203.0.113.7",
+      city: "Previous city",
+    };
+    const wrapper = await mountEventsOnly();
+    try {
+      const subtitle = wrapper.find('[data-test="session-viewer-subtitle"]').text();
+      expect(subtitle).toContain("Events-only user");
+      expect(subtitle).not.toContain("Previous browser");
+      expect(subtitle).not.toContain("203.0.113.7");
+      expect(subtitle).not.toContain("Previous city");
+    } finally {
+      wrapper.unmount();
+      seededSession.extra = {};
+    }
   });
 
   it("shows the session duration after a reload, when the store holds no row to copy it from", async () => {

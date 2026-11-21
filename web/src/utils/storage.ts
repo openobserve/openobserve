@@ -164,3 +164,6 @@ export const useLocalWrapTracesContent = (val = "", isDelete = false) => {
 /** Reads (no `val`) or writes the hide-internal-streams flag under `key`; the ref follows other tabs' writes, `undefined` when storage is unavailable. */
 export const useLocalHideInternalStreams = (key: string, val: "" | "true" | "false" = "") =>
   useLocalStorage(key, val) as Ref<string | null> | undefined;
+
+export const useLocalRumSessionUserLabelOrder = (key: string, value = "") =>
+  useLocalStorage(key, value) as Ref<string | null> | undefined;

@@ -63,9 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("common.versionAbbreviation") }}
                 {{ rawEvent.version || t("common.unknownUser") }}
               </div>
-              <div class="flex items-center text-xs">
-                <OIcon name="mail" size="sm" class="pe-1" />
-                {{ sessionDetails.user_email || t("common.unknownUser") }}
+              <div class="flex min-w-0 items-center text-xs">
+                <OIcon name="person" size="sm" class="pe-1" />
+                <OTruncatedText>{{
+                  sessionDetails.user_label || t("common.unknownUser")
+                }}</OTruncatedText>
               </div>
               <div class="flex min-w-0 items-center text-xs">
                 <OIcon name="settings" size="sm" class="pe-1" />
@@ -565,7 +567,7 @@ const props = defineProps({
   sessionDetails: {
     type: Object,
     default: () => ({
-      user_email: "",
+      user_label: null,
       date: "",
       browser: "",
       os: "",
