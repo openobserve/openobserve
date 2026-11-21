@@ -17,25 +17,29 @@ import store from "@/stores";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { gt, raw } from "@/types/i18n";
 import { isPageLocked } from "@/composables/useFeatureLock";
+import { denialCopyKeys } from "@/utils/featureGate";
 
 // One notice per denied feature set until the page changes, so a page firing many requests does not stack toasts.
 const shown = new Set<string>();
 let pageChangedAt = 0;
 
-/** Tell the user a request was refused by the license (403 + 40001) on a page the license leaves open. */
-export function addLicenseDeniedError(features: string[], requestStartedAt = Date.now()): void {
+/** Tell the user a request was refused by the license or the org's contract on a page left open. */
+export function addLicenseDeniedError(
+  features: string[],
+  requestStartedAt = Date.now(),
+  byContract = false,
+): void {
   // A locked page shows its own message in place of the page, so only the background loads of other pages land here.
   if (requestStartedAt < pageChangedAt || isPageLocked()) return;
-  const key = [...features].sort().join(",");
+  const key = `${byContract ? "contract" : "license"}:${[...features].sort().join(",")}`;
   if (shown.has(key)) return;
   shown.add(key);
   const names = features.map((k) => store.state.zoConfig?.feature_names?.[k] ?? k).join(", ");
+  const copy = denialCopyKeys(byContract);
   toast({
     variant: "warning",
-    title: gt("featureLock.toastTitle"),
-    message: features.length
-      ? gt("featureLock.toastMessage", { features: raw(names) })
-      : gt("featureLock.toastMessageGeneric"),
+    title: gt(copy.title),
+    message: features.length ? gt(copy.message, { features: raw(names) }) : gt(copy.generic),
   });
 }
 

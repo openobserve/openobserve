@@ -195,6 +195,12 @@ const organizations = {
   revoke_external_contract: (orgIdentifier: string, targetOrgId: string) => {
     return http().delete(`/api/${orgIdentifier}/external_contract/${targetOrgId}`);
   },
+  sync_org_contract: (orgIdentifier: string, targetOrgId: string) => {
+    return http().post(`/api/${orgIdentifier}/contracts/${targetOrgId}/sync`);
+  },
+  get_contract_sync_status: (orgIdentifier: string) => {
+    return http().get(`/api/${orgIdentifier}/contracts/status`);
+  },
 
   get_cleanup_tasks: (metaOrg: string, targetOrgId: string) => {
     return http().get(`/api/${metaOrg}/org_cleanup_tasks/${targetOrgId}`);

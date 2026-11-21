@@ -195,6 +195,10 @@ async fn coverage_sweep(now: i64) -> Result<(), anyhow::Error> {
     let mut found = 0usize;
 
     for org in &orgs {
+        // the tick checks the license; an org's contract can still leave on-call out
+        if !o2_enterprise::enterprise::oncall::is_enabled_for(&org.identifier) {
+            continue;
+        }
         let gaps = match service::coverage_gaps_ahead(
             &org.identifier,
             now,

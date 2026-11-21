@@ -22,6 +22,10 @@ export type FeatureState = "enabled" | "locked" | "hidden";
 export type FeatureStates = Partial<Record<string, FeatureState>>;
 
 const LICENSE_FEATURE_NOT_ENTITLED = 40001;
+const CONTRACT_FEATURE_NOT_ENTITLED = 40002;
+
+/** The `feature_locks` map of the org config response: what locks each locked feature. */
+export type FeatureLocks = Partial<Record<string, "license" | "contract">>;
 
 /** Daily GB the backend applies to an expired license or one without an ingestion limit. */
 export const FREE_LIMIT_GB = 50;
@@ -85,17 +89,50 @@ export type ForbiddenState = boolean | string[];
 export const forbiddenState = (error: unknown): ForbiddenState =>
   licenseDeniedFeatures(error) ?? (error as RejectedResponse | undefined)?.response?.status === 403;
 
-/** Missing feature keys of a license denial (403 + 40001), or null for any other error. */
+/** Missing feature keys of a denial by the license (403 + 40001) or the org's contract (40002). */
 export const licenseDeniedFeatures = (error: unknown): string[] | null => {
   const response = (error as RejectedResponse | undefined)?.response;
-  if (response?.status !== 403 || response.data?.code !== LICENSE_FEATURE_NOT_ENTITLED) return null;
-  const detail = response.data.error_detail;
+  const code = response?.data?.code;
+  if (
+    response?.status !== 403 ||
+    (code !== LICENSE_FEATURE_NOT_ENTITLED && code !== CONTRACT_FEATURE_NOT_ENTITLED)
+  )
+    return null;
+  const detail = response.data?.error_detail;
   if (typeof detail !== "string") return [];
   return detail
     .split(",")
     .map((key) => key.trim())
     .filter(Boolean);
 };
+
+/** True for a denial by the org's contract rather than by the license. */
+export const deniedByContract = (error: unknown): boolean => {
+  const response = (error as RejectedResponse | undefined)?.response;
+  return response?.status === 403 && response.data?.code === CONTRACT_FEATURE_NOT_ENTITLED;
+};
+
+/** True when the org's contract, not the license, locks every one of these keys; a denial seen since the config loaded wins. */
+export const lockedByContract = (
+  locks: FeatureLocks | undefined,
+  keys: readonly string[],
+  denials?: ReadonlyMap<string, "license" | "contract">,
+): boolean =>
+  keys.length > 0 && keys.every((key) => (denials?.get(key) ?? locks?.[key]) === "contract");
+
+/** Locale keys of a denial's title and message, worded for what refused it. */
+export const denialCopyKeys = (byContract: boolean) =>
+  byContract
+    ? ({
+        title: "featureLock.contractToastTitle",
+        message: "featureLock.contractToastMessage",
+        generic: "featureLock.contractToastMessageGeneric",
+      } as const)
+    : ({
+        title: "featureLock.toastTitle",
+        message: "featureLock.toastMessage",
+        generic: "featureLock.toastMessageGeneric",
+      } as const);
 
 interface FeatureDefinition {
   display_name?: string;
