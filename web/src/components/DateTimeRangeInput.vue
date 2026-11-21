@@ -269,7 +269,6 @@ const noteText = (note: ZoneNote, reading: TimeRangeReading): StatusNote | null 
   if (note.kind === "converted")
     return { text: t("timeRangeInput.converted", { offset: note.fromOffset }), warn: false };
   if (note.kind === "instant-window") return instantWindowText(note, reading);
-  if (note.kind === "log-line") return { text: t("timeRangeInput.logLine"), warn: false };
   if (note.kind === "partial-retention")
     return {
       text: t("timeRangeInput.retentionHint", { date: instantText(note.keptFromUs) }),
