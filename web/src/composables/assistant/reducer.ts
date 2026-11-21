@@ -25,6 +25,7 @@ import {
   boundedFindings,
   boundedQuery,
   boundedResult,
+  answerStepCount,
   footerUsage,
   type ChartSeries,
   type FindingsData,
@@ -659,6 +660,9 @@ function reduceText(
     }
   } else if (state.textSegment === "" && state.streamingMsg && !state.streamingMsg.endsWith("\n")) {
     state.streamingMsg += "\n\n";
+  } else if (hiddenStepBetween(state.textSegment, content)) {
+    state.streamingMsg += "\n\n";
+    state.textSegment += "\n\n";
   }
 
   state.streamingMsg += content;
@@ -694,6 +698,15 @@ function reduceText(
   // ponytail: phase gate reproduces the tail-flush handler gap on purpose. Delete with the follow-up fix.
   if (ctx.phase === "stream") effects.push({ kind: "scroll", whenActive: true });
   return effects;
+}
+
+// The server drops a hidden step's frames, so two model steps arrive as "done.Next" with nothing between.
+// Tokens carry their leading space, so a sentence end glued to a capital is a step boundary outside code.
+function hiddenStepBetween(before: string, next: string): boolean {
+  if (!/[^\s.!?][.!?]$/.test(before) || !/^\p{Lu}/u.test(next)) return false;
+  const fences = before.match(/^[ \t]*(?:```|~~~)/gm)?.length ?? 0;
+  const ticks = before.slice(before.lastIndexOf("\n") + 1).match(/`/g)?.length ?? 0;
+  return fences % 2 === 0 && ticks % 2 === 0;
 }
 
 export function reduce(state: StreamState, data: any, ctx: ReducerCtx): StreamEffect[] {
@@ -743,7 +756,7 @@ export function answerProgress(state: StreamState): { steps: number; partial: bo
   const last = lastMessageOf(state);
   const blocks = last?.role === "assistant" ? (last.contentBlocks ?? []) : [];
   return {
-    steps: blocks.filter((block) => block.stepState).length,
+    steps: answerStepCount(blocks),
     partial: blocks.some((block) => block.type === "text" && !!block.text?.trim()),
   };
 }

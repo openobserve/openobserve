@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { flushPromises, mount } from "@vue/test-utils";
 import { Marked } from "marked";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
@@ -1084,6 +1087,30 @@ describe("markdown.ts strict profile", () => {
       expect(shown(parseAs("Summary: **Ingestion is", "closed"))).toContain("**Ingestion");
     });
 
+    it.each([
+      ["a link destination", "see [q](https://x.example/*foo) now"],
+      ["an autolink", "see <https://x.example/*foo> now"],
+      ["a bare URL", "see https://x.example/*foo now"],
+      ["an escaped star", "a \\*b and c"],
+    ])("keeps the stars of %s in a cut answer", (_n, text) => {
+      expect(parseAs(text, "cut")).toBe(parseAs(text, "closed"));
+    });
+
+    it.each([
+      ["a double-backtick span", "use ``a`b`` here"],
+      ["a span closed on the next line", "run `SELECT\nFROM t` now"],
+      ["stars in a span closed on the next line", "run `SELECT\nFROM *t` now"],
+      ["two unmatched runs", "a `b ``c"],
+    ])("adds no backtick to %s", (_n, text) => {
+      expect(parseAs(text, "cut")).toBe(parseAs(text, "closed"));
+    });
+
+    it("closes a cut span with a run as long as its opener", () => {
+      const code = parseAs("run ``SELECT `x` FROM", "cut");
+      expect(code).toContain("<code");
+      expect(shown(code)).toContain("SELECT `x` FROM");
+    });
+
     it("never turns a code span into a link, nor edits an indented code line", () => {
       const html = parseAs("`[safe](https://example.com) [x](unfinished", "cut");
       expect(html).not.toContain("<a");
@@ -1299,6 +1326,38 @@ describe("markdown.ts strict profile", () => {
       expect(visible(html.join(""))).toBe(visible(unsplit));
     },
   );
+
+  it("joins the parts of a list cut in two, so the stored answer reads as one list (TA3-03)", () => {
+    const text = readFileSync(join(__dirname, "__fixtures__", "ta3-r2-answer.txt"), "utf8");
+    const html = parse(text, "http://localhost:18482").parts.filter(
+      (part): part is Extract<MarkdownPart, { kind: "html" }> => part.kind === "html",
+    );
+    expect(html.length).toBeGreaterThan(1);
+    html.forEach((part, i) => expect(!!part.joinsNext).toBe(!!html[i + 1]?.joinsPrevious));
+    const at = html.findIndex((part) =>
+      part.html.includes("_o2_service_endpoint_duration_seconds_bucket: (1)"),
+    );
+    const last = html[at];
+    expect(last.joinsPrevious).toBe(true);
+    expect(html[at - 1].joinsNext).toBe(true);
+    const wrapper = mount(AssistantMarkdownPart, {
+      props: { part: last!, htmlClass: PROSE_CLASSES.html },
+      attachTo: document.body,
+    });
+    expect(wrapper.element.className).toBe(`${PROSE_CLASSES.html} ${PROSE_CLASSES.joinsPrevious}`);
+  });
+
+  it.each([
+    ["list", "- a\n".repeat(4_990), true],
+    ["run of paragraphs", "a\n\n".repeat(6_600), false],
+  ])("marks the parts of a long %s as joined only where an element was cut", (_n, text, cut) => {
+    const parts = parse(text).parts as Extract<MarkdownPart, { kind: "html" }>[];
+    expect(parts.length).toBeGreaterThan(1);
+    expect(parts.slice(1).every((part) => !!part.joinsPrevious === cut)).toBe(true);
+    expect(parts.slice(0, -1).every((part) => !!part.joinsNext === cut)).toBe(true);
+    expect(parts[0].joinsPrevious).toBeUndefined();
+    expect(parts.at(-1)!.joinsNext).toBeUndefined();
+  });
 
   it("numbers an ordered list on across its parts", () => {
     const { parts } = parse("1. item\n".repeat(2_400));

@@ -1290,6 +1290,49 @@ describe("reduce: typed phases (live)", () => {
     expect(answerProgress(state)).toEqual({ steps: 2, partial: false });
   });
 
+  it("answerProgress counts the steps as the trail rows, so Stop states the chip's count (TA3-02)", () => {
+    const state = makeState();
+    for (const id of ["a", "b", "c"]) {
+      reduce(state, { type: "tool_call", tool: "StreamSchema", call_id: id }, live());
+      reduce(state, { type: "tool_result", tool: "StreamSchema", call_id: id }, live());
+    }
+    reduce(state, { type: "step", call_id: "hidden", state: "done" }, live());
+    expect(answerProgress(state).steps).toBe(1);
+  });
+
+  it.each([
+    ["live", () => makeCtx({ phase: "live", isActive: false })],
+    ["replay", () => makeCtx({ phase: "replay", isActive: false })],
+  ])("breaks the paragraph where a hidden step split two sentences (%s, TA3-04)", (_n, ctx) => {
+    const state = makeState();
+    for (const content of [
+      "I'll set up that dashboard. First let me check the ",
+      "dashboard creation guidelines.",
+      'I\'ll create the "TA3 dash" dashboard.',
+    ])
+      reduce(state, { type: "message_delta", content }, ctx());
+    expect(blocksOf(state)[0].text).toBe(
+      "I'll set up that dashboard. First let me check the dashboard creation guidelines.\n\nI'll create the \"TA3 dash\" dashboard.",
+    );
+  });
+
+  it.each([
+    ["a word cut mid-token", ["The stream", "s are listed."], "The streams are listed."],
+    ["an abbreviation", ["See e.g.", " The docs."], "See e.g. The docs."],
+    ["code in a span", ["Call `fmt.", "Println`."], "Call `fmt.Println`."],
+    ["code in a fence", ["```go\nfmt.", "Println()\n```"], "```go\nfmt.Println()\n```"],
+    ["a number", ["Version 1.", "2 shipped."], "Version 1.2 shipped."],
+  ])("joins deltas as sent for %s", (_n, parts, joined) => {
+    const state = makeState();
+    for (const content of parts)
+      reduce(
+        state,
+        { type: "message_delta", content },
+        makeCtx({ phase: "live", isActive: false }),
+      );
+    expect(blocksOf(state)[0].text).toBe(joined);
+  });
+
   it("text before a trailing tool_call is kept", () => {
     const state = makeState();
     reduce(state, { type: "message_delta", content: "let me check" }, live());

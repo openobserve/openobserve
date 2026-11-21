@@ -432,7 +432,13 @@ export const AssistantMarkdownPart = defineComponent({
           node.dataset.test = "assistant-block-plain";
           node.replaceChildren(...textNodes(part.text, part.segments));
         } else {
-          node.className = props.htmlClass;
+          node.className = [
+            props.htmlClass,
+            part.joinsPrevious && PROSE_CLASSES.joinsPrevious,
+            part.joinsNext && PROSE_CLASSES.joinsNext,
+          ]
+            .filter(Boolean)
+            .join(" ");
           delete node.dataset.test;
           const html = sanitize(
             part.html,

@@ -399,6 +399,7 @@ describe("AssistantTranscript", () => {
       content: raw(""),
       contentBlocks: [
         { type: "tool_call", tool: "SearchSQL", stepState: "done" },
+        { type: "tool_call", tool: "StreamList", stepState: "done" },
         { type: "turn_outcome", outcome: { kind: "stopped", steps: 2 } },
       ],
     };
@@ -424,6 +425,40 @@ describe("AssistantTranscript", () => {
     expect(wrapper.get('[data-test="assistant-turn-outcome-title"]').text()).toBe(
       "Stopped after 3 steps, incomplete",
     );
+  });
+
+  it.each([
+    ["status marker", { type: "status" as const, turnStatus: "stopped" as const }],
+    [
+      "typed outcome",
+      { type: "turn_outcome" as const, outcome: { kind: "stopped" as const, steps: 17 } },
+    ],
+  ])("states the step count the trail chip opens to, from a %s (TA3-02)", (_name, end) => {
+    const schema = (name: string) => ({
+      type: "tool_call" as const,
+      tool: "StreamSchema",
+      call_id: name,
+      context: { stream_name: name },
+      success: true,
+      stepState: "done" as const,
+    });
+    const stopped: ChatMessage = {
+      role: "assistant",
+      content: raw("so far"),
+      contentBlocks: [
+        { type: "tool_call", tool: "StreamList", call_id: "l", success: true, stepState: "done" },
+        ...["a", "b", "c", "d", "e"].map(schema),
+        { type: "tool_call", tool: "", stepState: "done" },
+        { type: "tool_call", tool: "CreateAlert", pendingConfirmation: true, stepState: "running" },
+        { type: "text", text: "so far" },
+        end,
+      ],
+    };
+    const { wrapper } = mountLive(liveSession([prompt("q", "t1"), stopped]));
+    expect(wrapper.get('[data-test="assistant-turn-outcome-title"]').text()).toBe(
+      "Stopped after 2 steps, incomplete",
+    );
+    expect(wrapper.get('[data-test="assistant-queries-line"]').text()).toContain("2 steps");
   });
 
   it("says when the running turn gains an outcome, never for a chat that opens with one (U12)", async () => {

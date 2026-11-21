@@ -392,7 +392,16 @@ export function footerUsage(raw: unknown): FooterUsage | undefined {
 
 /** The answer's steps in order; a policy refusal renders as its notice, not as a row. */
 export function stepsOf(message: ChatMessage | null | undefined, org: string): StepFacts[] {
-  const blocks = (message?.contentBlocks ?? []).filter(
+  return stepsOfBlocks(message?.contentBlocks ?? [], org);
+}
+
+/** How many steps an answer took, counted as the rows its trail opens to. */
+export function answerStepCount(blocks: ContentBlock[] | null | undefined): number {
+  return trailRowCount(stepsOfBlocks(blocks ?? [], ""));
+}
+
+function stepsOfBlocks(all: ContentBlock[], org: string): StepFacts[] {
+  const blocks = all.filter(
     (block) =>
       block.type === "tool_call" &&
       !!block.tool &&

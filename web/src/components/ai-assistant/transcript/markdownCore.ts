@@ -99,6 +99,10 @@ const NESTING_MARKER = /[ \t]*(?:>|[-*+](?=[ \t])|\d{1,9}[.)](?=[ \t]))[ \t]*/g;
 
 const DELIMITER_RUN = /\*+|_+|~+/g;
 
+// A star in these is text: an escape, a link target, an autolink or a bare URL (its trailing punctuation excluded, as GFM does).
+const NO_EMPHASIS =
+  /\\[!-/:-@[-`{-~]|\]\([^)\s]*\)?|<[a-z][a-z0-9+.-]{1,31}:[^\s<>]*>?|\b(?:https?:\/\/|www\.)[^\s<]*[^\s<?!.,:*_~]/gi;
+
 // A fence rendered into the HTML is one piece, so a part never cuts it into two boxes (Q6); its code is escaped, so `</pre>` only ends it.
 const HTML_PIECE = /<pre[ >][\s\S]*?<\/pre>|<[^>]*>|[^<]+/g;
 
@@ -216,6 +220,9 @@ export const PROSE_CLASSES = {
     "text-text-body min-w-0 max-w-[90ch] text-sm leading-relaxed break-words whitespace-pre-wrap",
   /** The answer's first sentence states the conclusion, so it alone takes the heading colour at semibold. */
   lead: "text-text-heading font-medium",
+  /** A part resuming a cut element sits flush, cancelling the `gap-2` between a block's parts. */
+  joinsPrevious: "-mt-2 [&>:first-child]:mt-0! [&>:first-child>:first-child]:mt-0!",
+  joinsNext: "[&>:last-child]:mb-0!",
 } as const;
 
 export type CalloutKind = "cause" | "next" | "watch" | "note";
@@ -346,7 +353,14 @@ let linked = new Set<string>();
 
 /** A piece of a rendered block: prose HTML of at most PART_CHARS (sanitised as it mounts), a fence, or text. */
 export type MarkdownPart =
-  | { kind: "html"; key: string; html: string }
+  | {
+      kind: "html";
+      key: string;
+      html: string;
+      /** The part opens inside an element the previous part cut, or ends inside one the next part reopens. */
+      joinsPrevious?: true;
+      joinsNext?: true;
+    }
   /** Text shown as text nodes: a placeholder, or a block that is not parsed; `segments` split long runs for `<wbr>`. */
   | { kind: "text"; key: string; text: string; segments?: string[] }
   | {
@@ -368,6 +382,12 @@ interface OpenTag {
   items: number;
   // Set once a long tag continues as a span: its end tag is written as this.
   close?: string;
+}
+
+interface HtmlPiece {
+  html: string;
+  joinsPrevious?: true;
+  joinsNext?: true;
 }
 
 export type ParseState = "open" | "closed" | "cut";
@@ -808,8 +828,17 @@ function partsOf(blockId: string, tokens: Token[], lastFenceOpen: boolean): Mark
   let pending: Token[] = [];
   const flush = () => {
     if (!pending.length) return;
-    for (const html of splitHtml(breakHtmlRuns(instance().parser(pending))))
-      if (html.trim()) parts.push({ kind: "html", key: `${blockId}:${parts.length}`, html });
+    for (const { html, joinsPrevious, joinsNext } of splitHtml(
+      breakHtmlRuns(instance().parser(pending)),
+    ))
+      if (html.trim())
+        parts.push({
+          kind: "html",
+          key: `${blockId}:${parts.length}`,
+          html,
+          ...(joinsPrevious && { joinsPrevious }),
+          ...(joinsNext && { joinsNext }),
+        });
     pending = [];
   };
   const lastCode = findLastIndex(tokens, (token) => token.type === "code");
@@ -849,9 +878,10 @@ function highlightPart(part: MarkdownPart): MarkdownPart {
 }
 
 // Cuts rendered HTML into parts of at most PART_CHARS and about PART_TAGS tags, preferably after a block element, closing the open tags and reopening them in the next part (Y2).
-function splitHtml(html: string): string[] {
-  if (html.length <= PART_CHARS && (html.match(/<[a-z]/g)?.length ?? 0) <= PART_TAGS) return [html];
-  const parts: string[] = [];
+function splitHtml(html: string): HtmlPiece[] {
+  if (html.length <= PART_CHARS && (html.match(/<[a-z]/g)?.length ?? 0) <= PART_TAGS)
+    return [{ html }];
+  const parts: HtmlPiece[] = [];
   const stack: OpenTag[] = [];
   let out = "";
   let tags = 0;
@@ -863,7 +893,12 @@ function splitHtml(html: string): string[] {
   const cut = () => {
     tags = 0;
     const closing = stack.map(closer).reverse().join("");
-    parts.push(out + closing);
+    const joins = stack.length > 0;
+    parts.push({
+      html: out + closing,
+      ...(parts.at(-1)?.joinsNext && { joinsPrevious: true as const }),
+      ...(joins && { joinsNext: true as const }),
+    });
     out = stack.map(reopen).join("");
     fresh = true;
     // Closing and reopening repeat markup, so each cut spends from the block's output budget.
@@ -921,7 +956,7 @@ function splitHtml(html: string): string[] {
     if (name === "li" && stack.length) stack[stack.length - 1].items += 1;
     if (closes) stack.push(openTag(name, piece));
   }
-  if (out) parts.push(out);
+  if (out) parts.push({ html: out, ...(parts.at(-1)?.joinsNext && { joinsPrevious: true }) });
   return parts;
 }
 
@@ -1085,25 +1120,52 @@ function repairTail(text: string): string {
   if (codeLines(text.split("\n")).at(-1)) return text;
   const at = text.lastIndexOf("\n") + 1;
   const line = text.slice(at);
+  const before = inlineContextBefore(text, at);
+  // An ambiguous run (null) counts as code, so the line is left as sent.
   const keepInCode = (from: string) => (match: string, label: string, offset: number) =>
-    oddTicks(from.slice(0, offset)) ? match : label;
+    openTicks(before + from.slice(0, offset)) !== "" ? match : label;
   const unlinked = line.replace(OPEN_LINK_TARGET, keepInCode(line));
   const linked = unlinked.replace(OPEN_LINK_TEXT, keepInCode(unlinked));
-  const repaired = withoutOpenStars(oddTicks(linked) ? `${linked}\`` : linked);
+  const ticks = openTicks(before + linked);
+  const closed = ticks && !linked.endsWith("`") ? linked + ticks : linked;
+  const repaired = withoutOpenStars(closed, before);
   return repaired === line ? text : text.slice(0, at) + repaired;
 }
 
-function oddTicks(text: string): boolean {
-  return (text.match(/`/g)?.length ?? 0) % 2 === 1;
+// The earlier lines of the last line's paragraph or list item, where a code span it closes may have opened.
+function inlineContextBefore(text: string, at: number): string {
+  if (BLOCK_START.test(text.slice(at))) return "";
+  let start = at;
+  while (start > 0) {
+    const from = text.lastIndexOf("\n", start - 2) + 1;
+    const line = text.slice(from, start - 1);
+    if (!line.trim()) break;
+    start = from;
+    if (BLOCK_START.test(line)) break;
+  }
+  return text.slice(start, at);
+}
+
+// The one backtick run no later run closes; "" when every span is closed, null when two are open.
+function openTicks(text: string): string | null {
+  let open: string | null = "";
+  outsideCodespans(text, (part) => {
+    for (const run of part.matchAll(/`+/g)) {
+      const ticks = escaped(part, run.index) ? run[0].slice(1) : run[0];
+      if (ticks) open = open === "" ? ticks : null;
+    }
+    return part;
+  });
+  return open;
 }
 
 // Only a run before a letter or digit opens and only one after text closes, so `2*3`, `count(*)` and `_o2_*` stay.
-function withoutOpenStars(line: string): string {
+function withoutOpenStars(line: string, before = ""): string {
   const prose = outsideCodespans(
-    line,
-    (part) => part,
+    before + line,
+    (part) => part.replace(NO_EMPHASIS, (text) => "a".repeat(text.length)),
     (span) => span.replace(/./g, " "),
-  );
+  ).slice(before.length);
   const open: { index: number; length: number }[] = [];
   for (const run of prose.matchAll(/\*+/g)) {
     const before = prose[run.index - 1] ?? " ";

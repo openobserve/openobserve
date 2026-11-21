@@ -245,8 +245,9 @@ import type {
   QueryRef,
   Sid,
 } from "@/composables/assistant/pure";
+import { stepsOf, trailRowCount } from "@/composables/assistant/pure";
 import type { ChatMessage, ContentBlock, TurnOutcomeRecord } from "@/ts/interfaces/chat";
-import type { I18nText } from "@/types/i18n";
+import { raw, type I18nText } from "@/types/i18n";
 
 export interface AssistantTranscriptProps {
   /** Live: the session the shell shows; exactly one of `sid` and `messages`. */
@@ -321,11 +322,18 @@ export function answerOf(answers: ChatMessage[]): ChatMessage | null {
 
 /** The stored ends of a turn: typed blocks, and the replay markers `record.ts` writes for old turns. */
 export function outcomeRecordsOf(blocks: ContentBlock[]): TurnOutcomeRecord[] {
+  const answerStepCount = () =>
+    trailRowCount(stepsOf({ role: "assistant", content: raw(""), contentBlocks: blocks }, ""));
   return blocks.flatMap<TurnOutcomeRecord>((block) => {
-    if (block.type === "turn_outcome" && block.outcome) return [block.outcome];
-    // The live count is the answer's step blocks, so a reload reads the same "after N steps".
+    // "After N steps" is counted from the answer as shown, so it matches the trail chip in any record.
+    if (block.type === "turn_outcome" && block.outcome)
+      return [
+        block.outcome.kind === "stopped"
+          ? { ...block.outcome, steps: answerStepCount() }
+          : block.outcome,
+      ];
     if (block.type === "status" && block.turnStatus === "stopped")
-      return [{ kind: "stopped", steps: blocks.filter((b) => b.stepState).length }];
+      return [{ kind: "stopped", steps: answerStepCount() }];
     if (block.type === "error" && block.errorType) {
       const kind = block.errorType === "cancelled_elsewhere" ? "cancelledElsewhere" : "failed";
       return [{ kind, code: block.errorType }];
@@ -382,7 +390,6 @@ import {
   manualRouteOf,
   outcomeError,
   promptRange,
-  stepsOf,
   turnAnnotationKey,
   useAssistantName,
   windowsOf,
@@ -394,7 +401,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import AssistantHandoffMarker from "./AssistantHandoffMarker.vue";
 import AssistantHandoffSuggestion from "./AssistantHandoffSuggestion.vue";
