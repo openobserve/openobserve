@@ -311,9 +311,11 @@ mod tests {
         let hour = 3_600_000_000;
         let group = |key: &str| serde_json::json!({ "alert_id": alert_id, "group_key": key });
         let conn = infra::db::get_orm_client_rw().await;
-        let put = |id: &str, groups: serde_json::Value, version: i64| {
+        // Rows are keyed by id alone, so a fixed id would move another test's row into this org.
+        let id_of = |name: &str| format!("{org}_{name}");
+        let put = |name: &str, groups: serde_json::Value, version: i64| {
             let row: Downtime = serde_json::from_value(serde_json::json!({
-                "id": id, "org": org, "name": "Quick mute",
+                "id": id_of(name), "org": org, "name": "Quick mute",
                 "targets": [{ "module": "alerts", "folders": { "kind": "all" }, "ids": [alert_id] }],
                 "alert_groups": groups,
                 "schedule": { "repeat": "none", "starts_at": now - hour, "ends_at": now + hour,
@@ -324,19 +326,19 @@ mod tests {
             .unwrap();
             async move { infra::table::downtimes::put_with(conn, &row).await.unwrap() }
         };
-        let unmute = |id: &'static str, version: Option<i64>| {
+        let unmute = |name: &'static str, version: Option<i64>| {
             cancel_alert_mute(
-                Path((org.clone(), alert_id.clone(), id.to_string())),
+                Path((org.clone(), alert_id.clone(), id_of(name))),
                 Query(CancelDowntimeQuery { version }),
                 Headers(UserEmail {
                     user_id: root.to_string(),
                 }),
             )
         };
-        let cancelled = |id: &'static str| {
-            let org = org.clone();
+        let cancelled = |name: &'static str| {
+            let (org, id) = (org.clone(), id_of(name));
             async move {
-                let stored = infra::table::downtimes::get_rw(&org, id)
+                let stored = infra::table::downtimes::get_rw(&org, &id)
                     .await
                     .unwrap()
                     .unwrap();
