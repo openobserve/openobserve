@@ -138,6 +138,7 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
+unicode-normalization = "0.1"
 version-compare = { workspace = true, optional = true }
 config.workspace = true
 infra.workspace = true

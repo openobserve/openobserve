@@ -34463,5 +34463,29 @@
       },
       "noHighConfidence": "信頼度の高い名前はありません"
     }
+  },
+  "commandPalette": {
+    "title": "ページ、リソース、操作を検索",
+    "placeholder": "名前と ID を検索",
+    "all": "すべて",
+    "moreTypes": "その他の種類",
+    "pages": "ページ",
+    "actions": "作成",
+    "recent": "最近のアクセス",
+    "localHistory": "ローカル履歴",
+    "clearRecent": "履歴を消去",
+    "historyStorageUnavailable": "履歴を保存できません",
+    "recentUnavailable": "この項目は現在利用できません",
+    "loading": "検索中…",
+    "showMore": "さらに表示",
+    "continueSearch": "この種類を続けて検索",
+    "partial": "一部の結果は利用できません",
+    "failed": "検索を完了できませんでした",
+    "offline": "オフラインです。最近のアクセスは表示できます。",
+    "sourceUnavailable": "この種類は現在利用できません",
+    "emptyHelp": "名前または ID でリソースを検索",
+    "globalShortcut": "グローバル検索を開く",
+    "searchAgain": "再検索",
+    "resourceSearch": "リソース検索"
   }
 }

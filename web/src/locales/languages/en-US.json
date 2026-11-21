@@ -34461,5 +34461,29 @@
       },
       "noHighConfidence": "No high-confidence names"
     }
+  },
+  "commandPalette": {
+    "title": "Search pages, resources, and actions",
+    "placeholder": "Search names and IDs",
+    "all": "All",
+    "moreTypes": "More types",
+    "pages": "Pages",
+    "actions": "Create",
+    "recent": "Recent visits",
+    "localHistory": "Local history",
+    "clearRecent": "Clear recent visits",
+    "historyStorageUnavailable": "Recent visits cannot be saved",
+    "recentUnavailable": "This item is currently unavailable",
+    "loading": "Searching…",
+    "showMore": "Show more",
+    "continueSearch": "Continue searching this type",
+    "partial": "Some results are unavailable",
+    "failed": "Search could not be completed",
+    "offline": "You are offline. Recent visits are still available.",
+    "sourceUnavailable": "This resource type is currently unavailable",
+    "emptyHelp": "Enter a name or ID to search resources",
+    "globalShortcut": "Open global search",
+    "searchAgain": "Search again",
+    "resourceSearch": "Resource search"
   }
 }

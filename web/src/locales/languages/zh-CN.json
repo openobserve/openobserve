@@ -34463,5 +34463,29 @@
       },
       "noHighConfidence": "没有高置信度的名称"
     }
+  },
+  "commandPalette": {
+    "title": "搜索页面、资源和操作",
+    "placeholder": "搜索名称和 ID",
+    "all": "全部",
+    "moreTypes": "更多类型",
+    "pages": "页面",
+    "actions": "创建",
+    "recent": "最近访问",
+    "localHistory": "本地历史",
+    "clearRecent": "清除最近访问",
+    "historyStorageUnavailable": "无法保存最近访问",
+    "recentUnavailable": "此项目当前不可用",
+    "loading": "搜索中…",
+    "showMore": "显示更多",
+    "continueSearch": "继续搜索此类型",
+    "partial": "部分结果不可用",
+    "failed": "无法完成搜索",
+    "offline": "当前离线，仍可查看最近访问。",
+    "sourceUnavailable": "此资源类型当前不可用",
+    "emptyHelp": "输入名称或 ID 搜索资源",
+    "globalShortcut": "打开全局搜索",
+    "searchAgain": "重新搜索",
+    "resourceSearch": "资源搜索"
   }
 }

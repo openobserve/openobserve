@@ -1263,6 +1263,30 @@ export default defineComponent({
         page: "Dashboards",
       });
     };
+    let handledDashboardIntent = "";
+    watch(
+      () => [
+        router.currentRoute.value.query.palette_intent,
+        router.currentRoute.value.query.action,
+      ],
+      ([intent, action]) => {
+        if (
+          action !== "add" ||
+          typeof intent !== "string" ||
+          intent === handledDashboardIntent ||
+          showAddDashboardDialog.value
+        )
+          return;
+        handledDashboardIntent = intent;
+        addDashboard();
+        const query = { ...router.currentRoute.value.query };
+        delete query.action;
+        delete query.palette_intent;
+        void router.replace({ query });
+      },
+      { immediate: true },
+    );
+
     const addFolder = () => {
       isFolderEditMode.value = false;
       showAddFolderDialog.value = true;

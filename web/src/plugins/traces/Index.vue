@@ -2041,6 +2041,11 @@ watch(
     if (routeName !== "traces" || !pageActive.value) return;
     const mode = supportedTraceSearchMode(tab);
     if (mode !== searchObj.meta.searchMode) {
+      const stream = router.currentRoute.value.query.stream;
+      if (typeof stream === "string" && stream !== searchObj.data.stream.selectedStream.value) {
+        searchObj.meta.searchMode = mode;
+        return;
+      }
       onSearchModeChange(mode);
       return;
     }
@@ -2533,22 +2538,34 @@ const applyStreamChange = async (newStream: string) => {
   await onChangeStream();
 };
 
-// Back and Forward across a catalog stream switch move the shared stream, so the Traces and Spans tabs agree.
 watch(
   () => [router.currentRoute.value.name, router.currentRoute.value.query.stream] as const,
-  ([routeName, stream]) => {
+  async ([routeName, stream]) => {
     if (routeName !== "traces" || !pageActive.value || !pageLoaded) return;
-    if (activeTab.value !== "services-catalog" || typeof stream !== "string") return;
-    if (stream === searchObj.data.stream.selectedStream.value) return;
+    if (typeof stream !== "string" || stream === searchObj.data.stream.selectedStream.value) return;
     if (!searchObj.data.stream.streamLists.some((s: any) => s.value === stream)) return;
+    const org = store.state.selectedOrganization.identifier;
     searchObj.data.stream.selectedStream = { label: stream, value: stream };
-    // A stream switch clears the query, so undoing it brings back the query its entry was left with.
     const query = router.currentRoute.value.query.query;
     searchObj.data.editorValue = typeof query === "string" ? b64DecodeUnicode(query) || "" : "";
-    void extractFields().then(() => {
-      if (searchObj.data.editorValue && searchObj.data.stream.selectedStreamFields.length)
-        restoreFilters(searchObj.data.editorValue);
-    });
+    await extractFields();
+    if (
+      !pageActive.value ||
+      store.state.selectedOrganization.identifier !== org ||
+      router.currentRoute.value.query.stream !== stream ||
+      searchObj.data.stream.selectedStream.value !== stream
+    )
+      return;
+    if (searchObj.data.editorValue && searchObj.data.stream.selectedStreamFields.length)
+      restoreFilters(searchObj.data.editorValue);
+    loadLocalLogFilterField(searchObj.meta.searchMode);
+    rebuildColumns();
+    if (
+      activeTab.value !== "services-catalog" &&
+      activeTab.value !== "service-graph" &&
+      !isAutoRunOff()
+    )
+      runQueryFn(false);
   },
 );
 

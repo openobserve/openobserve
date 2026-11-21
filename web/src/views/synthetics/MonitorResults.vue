@@ -167,6 +167,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import {
+  captureRecentVisitScope,
+  recordResourceVisit,
+  removeFailedRecentVisit,
+} from "@/components/commandPalette/useRecentlyViewed";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -558,6 +563,8 @@ watch(
 
 async function fetchCheck() {
   const request = captureCheckRequest();
+  const recentScope = captureRecentVisitScope();
+  const recentId = monitorId.value;
   try {
     // Folder-scoped RBAC grants resolve through `?folder=`, so it must be sent
     // here too — RunDetail already did, and the two pages disagreed.
@@ -567,12 +574,23 @@ async function fetchCheck() {
       lastTriggeredAt.value = Number(res.data.last_triggered_at) || 0;
       checkType.value = res.data.type ?? "browser";
       checkName.value = String(res.data.name ?? "");
+      recordResourceVisit(recentScope, {
+        type: "synthetic",
+        id: recentId,
+        name: checkName.value,
+        // A URL without `?folder=` gives "", which the recent-visit store rejects.
+        route_ref: {
+          check_id: recentId,
+          folder_id: String(res.data.folder_id || request.folder || "default"),
+        },
+      });
       // The flaky tiles are only answerable when the check is allowed to retry.
       retries.value = Number(res.data.retries ?? res.data.settings?.retries ?? 0) || 0;
       await resolveEnvironmentNames((res.data.environments ?? []) as string[], request);
     }
   } catch (err: any) {
     if (!isCurrentCheckRequest(request)) return;
+    removeFailedRecentVisit(recentScope, "synthetic", recentId, err?.response?.status);
     if (err?.response?.status === 404) {
       router.push(syntheticsListRoute(navContext.value));
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });

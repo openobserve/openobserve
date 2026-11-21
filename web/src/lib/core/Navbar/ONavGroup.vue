@@ -53,7 +53,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import MenuLink from "@/components/MenuLink.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
-import { isGateOpen, useNavGateContext } from "./useNavGateContext";
+import { useNavGateContext } from "./useNavGateContext";
 import { RailNavigationMarkKey, type SubnavChild } from "./ONavbar.types";
 import {
   AIM_IDLE,
@@ -67,12 +67,12 @@ import type { Point } from "./hoverIntent";
 import { findContentFocusTarget } from "./railFocus";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { featureState } from "@/utils/featureGate";
+import { visibleNavChildren } from "./navVisibility";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { flyoutTop, needsColumns } from "./flyoutLayout";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
 import { useFeatureNames } from "@/composables/useFeatureLock";
 import {
-  checkFeatureAccess,
   buildFeatureGateContext,
   featureGateLabelKey,
   isFeatureKey,
@@ -125,29 +125,13 @@ const { featureName, featureNames } = useFeatureNames();
 const licenseState = (c: SubnavChild) =>
   c.feature ? featureState(gateContext.value.features, c.feature) : "enabled";
 
-// A child shows when its route is registered and custom_hide_menus doesn't
-// name it. A FeatureKey `gate` then decides locked vs. unlocked instead of
-// show vs. hide (dropped only if `checkFeatureAccess` says not `visible` at
-// all); a non-FeatureKey gate (plain on/off flag) keeps the old hide-on-fail
-// behavior, which also still applies on top once a FeatureKey's edition
-// check passes (e.g. On-Call hides when the admin flag is off, not just the
-// edition).
-const visibleChildren = computed<SubnavChild[]>(() =>
-  props.children
-    .filter((c) => router.hasRoute(c.name) && !gateContext.value.hiddenMenus.has(c.name))
-    .flatMap((c): SubnavChild[] => {
-      if (c.gate && isFeatureKey(c.gate)) {
-        const access = checkFeatureAccess(c.gate, buildFeatureGateContext(store.state.zoConfig));
-        if (!access.visible) return [];
-        if (!access.allowed) return [{ ...c, locked: true, lockedMessage: access.message }];
-      }
-      // The license applies once the edition allows the feature; a locked license also turns its runtime flag off.
-      const license = licenseState(c);
-      if (license === "hidden") return [];
-      if (license === "locked") return [{ ...c, locked: false, licenseLocked: true }];
-      if (!c.gate) return [{ ...c, locked: false }];
-      return isGateOpen(gateContext.value, c.gate) ? [{ ...c, locked: false }] : [];
-    }),
+const visibleChildren = computed(() =>
+  visibleNavChildren(
+    props.children,
+    gateContext.value,
+    buildFeatureGateContext(store.state.zoConfig),
+    (name) => router.hasRoute(name),
+  ),
 );
 
 // A group with no surviving child is not a group — it is an empty tile that

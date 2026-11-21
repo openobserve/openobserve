@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { routeGuard, getPath } from "@/utils/zincutils";
-import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
+import type {
+  LocationQuery,
+  LocationQueryRaw,
+  RouteLocationRaw,
+  NavigationGuardNext,
+  RouteLocationNormalized,
+} from "vue-router";
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
@@ -726,6 +732,19 @@ const useRoutes = () => {
         allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "search/resources",
+      name: "resourceSearch",
+      component: () => import("@/views/ResourceSearch.vue"),
+      meta: { titleKey: "commandPalette.resourceSearch", allowOnEmptyData: true },
+      beforeEnter(
+        to: RouteLocationNormalized,
+        from: RouteLocationNormalized,
+        next: NavigationGuardNext,
+      ) {
         routeGuard(to, from, next);
       },
     },

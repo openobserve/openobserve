@@ -34463,5 +34463,29 @@
       },
       "noHighConfidence": "Brak nazw o wysokiej pewności"
     }
+  },
+  "commandPalette": {
+    "title": "Szukaj stron, zasobów i działań",
+    "placeholder": "Szukaj nazw i identyfikatorów",
+    "all": "Wszystkie",
+    "moreTypes": "Więcej typów",
+    "pages": "Strony",
+    "actions": "Utwórz",
+    "recent": "Ostatnie wizyty",
+    "localHistory": "Historia lokalna",
+    "clearRecent": "Wyczyść ostatnie wizyty",
+    "historyStorageUnavailable": "Nie można zapisać wizyt",
+    "recentUnavailable": "Ten element jest niedostępny",
+    "loading": "Wyszukiwanie…",
+    "showMore": "Pokaż więcej",
+    "continueSearch": "Szukaj dalej tego typu",
+    "partial": "Część wyników jest niedostępna",
+    "failed": "Nie udało się ukończyć wyszukiwania",
+    "offline": "Tryb offline. Ostatnie wizyty są nadal dostępne.",
+    "sourceUnavailable": "Ten typ zasobu jest niedostępny",
+    "emptyHelp": "Wpisz nazwę lub identyfikator",
+    "globalShortcut": "Otwórz wyszukiwanie globalne",
+    "searchAgain": "Wyszukaj ponownie",
+    "resourceSearch": "Wyszukiwanie zasobów"
   }
 }

@@ -34463,5 +34463,29 @@
       },
       "noHighConfidence": "Không có tên nào có độ tin cậy cao"
     }
+  },
+  "commandPalette": {
+    "title": "Tìm trang, tài nguyên và thao tác",
+    "placeholder": "Tìm tên và ID",
+    "all": "Tất cả",
+    "moreTypes": "Loại khác",
+    "pages": "Trang",
+    "actions": "Tạo",
+    "recent": "Truy cập gần đây",
+    "localHistory": "Lịch sử cục bộ",
+    "clearRecent": "Xóa truy cập gần đây",
+    "historyStorageUnavailable": "Không thể lưu lịch sử truy cập",
+    "recentUnavailable": "Mục này hiện không khả dụng",
+    "loading": "Đang tìm…",
+    "showMore": "Hiện thêm",
+    "continueSearch": "Tiếp tục tìm loại này",
+    "partial": "Một số kết quả không khả dụng",
+    "failed": "Không thể hoàn tất tìm kiếm",
+    "offline": "Bạn đang ngoại tuyến. Vẫn xem được truy cập gần đây.",
+    "sourceUnavailable": "Loại tài nguyên này hiện không khả dụng",
+    "emptyHelp": "Nhập tên hoặc ID để tìm",
+    "globalShortcut": "Mở tìm kiếm toàn cục",
+    "searchAgain": "Tìm lại",
+    "resourceSearch": "Tìm tài nguyên"
   }
 }
