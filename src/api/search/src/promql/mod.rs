@@ -1700,17 +1700,13 @@ async fn search_streaming(
                             let message = code.get_message();
                             let error_detail = code.get_error_detail();
                             let http_response = map_error_to_http_response(&err, None);
-                            StreamResponses::Error {
-                                code: http_response.status().into(),
+                            StreamResponses::error(
+                                http_response.status().into(),
                                 message,
-                                error_detail: Some(error_detail),
-                            }
+                                Some(error_detail),
+                            )
                         }
-                        _ => StreamResponses::Error {
-                            code: 500,
-                            message: err.to_string(),
-                            error_detail: None,
-                        },
+                        _ => StreamResponses::error(500, err.to_string(), None),
                     };
                     if tx.send(Ok(err_res)).await.is_err() {
                         log::warn!(
@@ -1763,19 +1759,15 @@ async fn search_streaming(
                                 let error_detail = code.get_error_detail();
                                 let http_response = map_error_to_http_response(&err, None);
 
-                                StreamResponses::Error {
-                                    code: http_response.status().into(),
+                                StreamResponses::error(
+                                    http_response.status().into(),
                                     message,
-                                    error_detail: Some(error_detail),
-                                }
+                                    Some(error_detail),
+                                )
                             }
                         }
                     }
-                    _ => StreamResponses::Error {
-                        code: 500,
-                        message: err.to_string(),
-                        error_detail: None,
-                    },
+                    _ => StreamResponses::error(500, err.to_string(), None),
                 };
                 err_res.to_chunks()
             }

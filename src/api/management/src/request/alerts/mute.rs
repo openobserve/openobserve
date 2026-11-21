@@ -193,6 +193,7 @@ pub async fn cancel_alert_mute(
             &downtime_id,
             query.version,
             &user_email.user_id,
+            None,
         )
         .await
         {
@@ -366,6 +367,29 @@ mod tests {
         let absent = unmute("absent", None).await;
         assert_eq!(absent.status(), StatusCode::OK);
         assert!(cancelled("absent").await);
+
+        // A fix's Undo goes through the same fence: it ends only the version its snooze made.
+        use o2_enterprise::enterprise::autoobserve::ports::{FixPort, MuteAnswer};
+        let port = crate::request::autoobserve::fix_ports::LiveFixPort;
+        let snooze = id_of("snooze");
+        put("snooze", serde_json::Value::Null, 2).await;
+        let stale = port
+            .unmute(&org, &alert_id, (snooze.as_str(), 1), root, None)
+            .await;
+        assert!(matches!(stale, Ok(MuteAnswer::Changed(_))), "{stale:?}");
+        assert!(!cancelled("snooze").await);
+        assert!(port.mute_in_force(&org, &snooze).await.unwrap());
+        let live = port.mutes(&org, &alert_id).await.unwrap();
+        assert!(
+            live.iter()
+                .any(|m| m.downtime_id == snooze && m.version == 2)
+        );
+        let ended = port
+            .unmute(&org, &alert_id, (snooze.as_str(), 2), root, None)
+            .await;
+        assert!(matches!(ended, Ok(MuteAnswer::Done(_))), "{ended:?}");
+        assert!(cancelled("snooze").await);
+        assert!(!port.mute_in_force(&org, &snooze).await.unwrap());
     }
 
     #[cfg(feature = "enterprise")]

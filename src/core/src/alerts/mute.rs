@@ -30,6 +30,7 @@ use config::{
     },
     utils::time::now_micros,
 };
+use infra::table::downtimes::IdleRun;
 use o2_enterprise::enterprise::downtimes::{MAX_NAME_LEN, schedule};
 
 use crate::{
@@ -156,18 +157,19 @@ pub async fn extend(
     })
 }
 
-/// Ends a quick mute of this alert now.
+/// Ends a quick mute of this alert now; with `idle`, only while no run of it can race the end.
 pub async fn unmute(
     target: &AckTarget,
     downtime_id: &str,
     version: Option<i64>,
     actor: &str,
+    idle: Option<IdleRun<'_>>,
 ) -> Result<Downtime, MuteError> {
     downtimes::ensure_enabled()?;
     ack::authorize(target, actor, Act::Mute)
         .await
         .map_err(MuteError::from)?;
-    let after = end_seen_quick_mute(target, downtime_id, version, actor).await?;
+    let after = end_seen_quick_mute(target, downtime_id, version, actor, idle).await?;
     lifecycle::on_view_changed(&target.org_id, &target.alert_id, single_group(&after)).await;
     Ok(after)
 }
@@ -178,11 +180,12 @@ async fn end_seen_quick_mute(
     downtime_id: &str,
     version: Option<i64>,
     actor: &str,
+    idle: Option<IdleRun<'_>>,
 ) -> Result<Downtime, MuteError> {
     let row = quick_mute_of(target, downtime_id).await?;
     // The shape check ignores the groups, so a mute widened since the list loaded needs this.
     check_seen_version(version, &row)?;
-    Ok(downtimes::cancel_quick_mute(&target.org_id, actor, row).await?)
+    Ok(downtimes::cancel_quick_mute(&target.org_id, actor, row, idle).await?)
 }
 
 /// Cancels the Until-it-clears mutes a clear ends (§6.3), before anything reads downtimes for it.
@@ -702,8 +705,14 @@ mod tests {
             }
         };
 
-        let refused =
-            end_seen_quick_mute(&on, &id_of("stale"), Some(versions["stale"] - 1), "ops").await;
+        let refused = end_seen_quick_mute(
+            &on,
+            &id_of("stale"),
+            Some(versions["stale"] - 1),
+            "ops",
+            None,
+        )
+        .await;
         assert!(
             matches!(
                 refused,
@@ -715,13 +724,19 @@ mod tests {
         );
         assert!(live("stale").await, "a refused unmute leaves the mute live");
 
-        let ended = end_seen_quick_mute(&on, &id_of("current"), Some(versions["current"]), "ops")
-            .await
-            .unwrap();
+        let ended = end_seen_quick_mute(
+            &on,
+            &id_of("current"),
+            Some(versions["current"]),
+            "ops",
+            None,
+        )
+        .await
+        .unwrap();
         assert!(ended.cancelled_at.is_some());
         assert!(!live("current").await);
 
-        end_seen_quick_mute(&on, &id_of("absent"), None, "ops")
+        end_seen_quick_mute(&on, &id_of("absent"), None, "ops", None)
             .await
             .unwrap();
         assert!(
