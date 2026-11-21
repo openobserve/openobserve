@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { addDays, civilOfWall, dayStart, isValidDate, wallUs, US_PER_H } from "./civil";
+import { addDays, civilOfWall, dayStart, isValidDate, wallUs, US_PER_H, US_PER_S } from "./civil";
 import {
   hourIn,
   rangeDrafts,
@@ -39,10 +39,12 @@ import {
   scanZone,
   YEARS_BACK,
   zoneStart,
+  type Marker,
   type Scanned,
 } from "./machine";
 import type { Elem, Slot, Words } from "./packs/schema";
 import type { Alt, ClockMod, ClockValue, Draft, Outcome, Point, UnitKey } from "./types";
+import { wallAt } from "./zone";
 
 export interface DateVal {
   y: number;
@@ -139,11 +141,6 @@ export function wordy(c: number): boolean {
     (c >= 0x621 && c <= 0x652) ||
     (c >= 0x671 && c <= 0x6d3)
   );
-}
-
-/** Whether a letter, digit or `_` starts at `k`. */
-export function wordAt(text: string, k: number): boolean {
-  return /^[\p{L}\p{N}_][^]?$/u.test(text.slice(k, k + 2));
 }
 
 /** End of literal `s` at `pos`, where a space in `s` matches zero or one input space; -1 if none. */
@@ -336,8 +333,13 @@ function fullYear(sc: Scan, y: number, slot: "y" | "yy" | "ry"): number {
 }
 
 /** A year-less date is the most recent one not after today. */
-function dated(sc: Scan, y: number | undefined, mo: number, d: number): DateVal | null {
-  const now = today(sc.env);
+function dated(
+  sc: Scan,
+  y: number | undefined,
+  mo: number,
+  d: number,
+  now = today(sc.env),
+): DateVal | null {
   let year = y ?? now.y;
   const after = (): boolean =>
     !isValidDate(year, mo, d) ||
@@ -582,6 +584,21 @@ function zoned(sc: Scan, end: number, alts: Alt<ClockValue>[]): Hit<Alt<ClockVal
   return out;
 }
 
+// A year-less day under a written zone is the latest one not after today in that zone.
+function zonedDays(sc: Scan, alts: Alt<Point>[]): Alt<Point>[] {
+  return alts.flatMap((a) => {
+    const v = a.v;
+    if (v.p !== "wall" || !a.tag?.includes("yd")) return [a];
+    const { zone, offsetSec } = v.clock;
+    const nowUs = sc.env.nowUs;
+    if (zone === undefined && offsetSec === undefined) return [a];
+    const now =
+      zone !== undefined ? wallAt(zone, nowUs) : civilOfWall(nowUs, (offsetSec ?? 0) * US_PER_S);
+    const day = dated(sc, undefined, v.mo, v.d, now);
+    return day ? [{ ...a, v: { ...v, y: day.y } }] : [];
+  });
+}
+
 function spaced(sc: Scan, end: number): number[] {
   return sc.fold[end] === " " ? [end + 1, end] : [end];
 }
@@ -612,28 +629,16 @@ export function stampHits(sc: Scan, pos: number): Scanned<Point>[] {
     .filter((s) => s.alts.length > 0);
 }
 
-/** Am/pm marks (not day parts) at `pos` on clock `c`, each with its end; null when the hour can't take it. */
-export function marksOn(sc: Scan, pos: number, c: ClockValue): [number, ClockValue | null][] {
-  return words(sc, pos, sc.env.pack.mods)
-    .filter(([, mod]) => mod.ap !== undefined)
-    .map(([end, mod]) => [end, withMod([{ v: c }], mod)[0]?.v ?? null]);
-}
-
-/** Whether a word the pack knows starts at `pos`; `/` joins only two stamps, so alone it is none. */
-export function lexiconAt(sc: Scan, pos: number): boolean {
-  // A Latin word glued to a digit or `_` is another token (`pm2`); to a pack word it binds (`PMから`).
-  const ends = [
-    ...UNIVERSAL_JOINS.map((j) => [litAt(sc, pos, j)]),
-    ...words(sc, pos, sc.env.pack.lexicon),
-  ];
-  return (
-    sc.fold[pos] !== "/" &&
-    ends.some(
-      ([end]) =>
-        end > pos &&
-        (!(wordy(sc.fold.charCodeAt(end - 1)) && wordAt(sc.fold, end)) || lexiconAt(sc, end)),
-    )
-  );
+/** Am/pm marks on a clock with seconds, so a marked year-less stamp keeps its year walk by instant. */
+export function secondsMarks(sc: Scan): Marker {
+  return (at, c) =>
+    c.sec
+      ? spaced(sc, at).flatMap((p) =>
+          words(sc, p, sc.env.pack.mods).flatMap(([end, mod]): [number, ClockValue][] =>
+            mod.ap === undefined ? [] : withMod([{ v: c }], mod).map((m) => [end, m.v]),
+          ),
+        )
+      : [];
 }
 
 /** Any one point or period: a stamp, an epoch, date math, now, a day with or without a clock, a clock. */
@@ -663,7 +668,13 @@ export function pointHits(sc: Scan, pos: number): Hit<Alt<Point>[]>[] {
           const own = fixed(clocks);
           if (own.length === 0) continue;
           for (const [e3, zc] of zoned(sc, e2, own))
-            out.push([e3, cross(days, zc, (d, c): Point => ({ p: "wall", ...d, clock: c }))]);
+            out.push([
+              e3,
+              zonedDays(
+                sc,
+                cross(days, zc, (d, c): Point => ({ p: "wall", ...d, clock: c })),
+              ),
+            ]);
         }
       }
     }
@@ -675,7 +686,13 @@ export function pointHits(sc: Scan, pos: number): Hit<Alt<Point>[]>[] {
           // A bare digit glued to a word is a count with its unit (de `3mo`), never an hour on a day.
           if (at === e2 && wordy(sc.fold.charCodeAt(at)) && own.every((c) => c.v.bare)) continue;
           for (const [e3, days] of dayHits(sc, at)) {
-            out.push([e3, cross(days, own, (d, c): Point => ({ p: "wall", ...d, clock: c }))]);
+            out.push([
+              e3,
+              zonedDays(
+                sc,
+                cross(days, own, (d, c): Point => ({ p: "wall", ...d, clock: c })),
+              ),
+            ]);
           }
         }
       }

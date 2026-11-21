@@ -35,7 +35,7 @@ interface Checked {
 }
 
 const FIX_UNITS = Object.entries(ELAPSED_US) as [RelativeUnit, number][];
-const KEPT_NOTES = new Set(["dst-gap", "converted", "elapsed-chain", "instant-window", "log-line"]);
+const KEPT_NOTES = new Set(["dst-gap", "converted", "elapsed-chain", "instant-window"]);
 
 /** Clips soft ends, clamps ends within skew, then runs every check independently. */
 export function check(d: Draft, ctx: ParseContext): Checked {
