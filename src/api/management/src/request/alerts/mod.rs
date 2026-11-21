@@ -89,6 +89,7 @@ pub mod history;
 pub mod history_summary;
 pub mod incident_integrations;
 pub mod incidents;
+pub mod leases;
 pub mod mute;
 pub mod rca_runs_org;
 #[cfg(feature = "cloud")]
@@ -417,6 +418,18 @@ pub async fn create_alert(
         ));
     }
 
+    if req_body.lease.is_some()
+        && matches!(
+            req_body.alert_type,
+            Some(AlertTypeFilter::AnomalyDetection | AlertTypeFilter::Composite)
+        )
+    {
+        return MetaHttpResponse::bad_request(
+            "Only a scheduled or real-time alert can be created as a temporary alert",
+        );
+    }
+    let lease = req_body.lease.clone();
+
     // Anomaly detection path: delegate to anomaly config creation (enterprise only).
     #[cfg(feature = "enterprise")]
     if req_body.alert_type == Some(AlertTypeFilter::AnomalyDetection) {
@@ -466,10 +479,26 @@ pub async fn create_alert(
     {
         return resp;
     }
-    alert.last_edited_by = Some(user_email.user_id);
+    alert.last_edited_by = Some(user_email.user_id.clone());
 
     let client = get_orm_client_rw().await;
-    match alert::create(client, &org_id, &folder_id, alert, overwrite).await {
+    let created = match &lease {
+        Some(spec) => openobserve_core::alerts::leases::create_leased(
+            &org_id,
+            &folder_id,
+            alert,
+            overwrite,
+            spec,
+            &user_email.user_id,
+        )
+        .await
+        .map(|(alert, _)| alert)
+        .map_err(leases::error_response),
+        None => alert::create(client, &org_id, &folder_id, alert, overwrite)
+            .await
+            .map_err(Into::into),
+    };
+    match created {
         Ok(v) => {
             let warnings = save_warnings(&org_id, &v, workflows_locked(), oncall_locked()).await;
             MetaHttpResponse::json(
@@ -479,7 +508,7 @@ pub async fn create_alert(
                     .with_warnings(warnings),
             )
         }
-        Err(e) => e.into(),
+        Err(resp) => resp,
     }
 }
 
@@ -954,6 +983,7 @@ fn composite_list_item(
         active_downtime: None,
         firing_started_at: None,
         ack: None,
+        leases: vec![],
         incident: None,
         downtime_dimensions: Default::default(),
         context_attributes: None,
@@ -3478,6 +3508,7 @@ pub async fn list_alerts(
     let status_unavailable = enrich_with_run_state(&org_id, &mut list).await;
     enrich_with_composite_metadata(&org_id, &visibility, &mut list).await;
     crate::models::alerts::responses::fill_active_downtimes(&org_id, &mut list).await;
+    crate::models::alerts::responses::fill_active_leases(&org_id, &mut list).await;
 
     // Feature-scoped fields: keep destinations/template off the default list path
     // (bytes + module-scoped names) unless the dependency view explicitly opted in.

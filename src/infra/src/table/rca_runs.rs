@@ -37,7 +37,7 @@ use svix_ksuid::KsuidLike;
 pub use super::entity::rca_runs::Model;
 use super::{
     alert_incidents::CaseFilter,
-    entity::{alert_incidents, rca_runs},
+    entity::{alert_incident_alerts, alert_incidents, rca_runs},
     incident_events, rca_steering,
 };
 use crate::db::{get_orm_client_ro, get_orm_client_rw};
@@ -87,6 +87,8 @@ pub struct StartGuards<'a> {
     pub history_limit: usize,
     /// The incident's latest run the caller decided on (a Resume); any other start since wins.
     pub latest_run_id: Option<&'a str>,
+    /// Refused once the incident has any run: a decision made on an incident never analysed.
+    pub first_run: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -277,10 +279,11 @@ pub async fn start_run_with<C: TransactionTrait>(
             .and_then(|s| RunState::from_str(s).ok());
         let seen_updated_at = seen.rca_updated_at.unwrap_or_default();
         // A start since the caller's decision is the concurrent start that won.
-        if guards
-            .latest_run_id
-            .is_some_and(|latest| seen.rca_run_id.as_deref() != Some(latest))
-        {
+        let started_since = match guards.latest_run_id {
+            Some(latest) => seen.rca_run_id.as_deref() != Some(latest),
+            None => guards.first_run && seen.rca_run_id.is_some(),
+        };
+        if started_since {
             txn.rollback().await?;
             return Ok(StartResult::InFlight);
         }
@@ -570,11 +573,16 @@ fn merge_stats(
         if p.duration_ms.is_some() {
             stats.duration_ms = p.duration_ms;
         }
+        // The cost prices the calls the tokens count, so new tokens without a cost leave it
+        // unknown.
         if p.tokens.is_some() {
             stats.tokens = p.tokens.clone();
-        }
-        if p.credits.is_some() {
             stats.credits = p.credits;
+        } else if p.credits.is_some() {
+            stats.credits = p.credits;
+        }
+        if p.model.is_some() {
+            stats.model = p.model.clone();
         }
         if p.steered.is_some() {
             stats.steered = p.steered;
@@ -1207,6 +1215,31 @@ pub async fn newest_completed_for_alert(
     .await
 }
 
+/// The newest completed incident runs, re-checks left out, of the incidents the alert fired into;
+/// read on the primary, so a run that just completed is never skipped.
+pub async fn full_runs_for_alert(
+    org_id: &str,
+    alert_id: &str,
+    limit: u64,
+) -> Result<Vec<Model>, DbErr> {
+    let holding = sea_orm::sea_query::Query::select()
+        .column(alert_incident_alerts::Column::IncidentId)
+        .from(alert_incident_alerts::Entity)
+        .and_where(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .to_owned();
+    rca_runs::Entity::find()
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .filter(rca_runs::Column::SubjectType.eq(RunSubjectType::Incident.as_str()))
+        .filter(rca_runs::Column::State.eq(RunState::Completed.as_str()))
+        .filter(rca_runs::Column::Mode.ne(RunMode::Recheck.as_str()))
+        .filter(rca_runs::Column::IncidentId.in_subquery(holding))
+        .order_by_desc(rca_runs::Column::StartedAt)
+        .order_by_desc(rca_runs::Column::RunId)
+        .limit(limit.max(1))
+        .all(get_orm_client_rw().await)
+        .await
+}
+
 /// `started_at` of the incident's oldest run; pre-run reports are older than it.
 pub async fn first_started_at_for_incident(
     org_id: &str,
@@ -1675,6 +1708,7 @@ mod tests {
             cooldown_us: None,
             history_limit: 25,
             latest_run_id: None,
+            first_run: false,
         }
     }
 
@@ -2406,6 +2440,30 @@ mod tests {
 
     fn stats_of(m: &Model) -> RunStats {
         decode(m.stats.as_deref()).unwrap_or_default()
+    }
+
+    #[test]
+    fn new_tokens_replace_the_cost_and_a_cost_alone_sets_it() {
+        let priced = r#"{"tokens": {"input": 1}, "credits": 0.5, "model": "a/m"}"#;
+        let tokens = |credits| RunStats {
+            tokens: Some(serde_json::json!({"input": 2})),
+            credits,
+            ..Default::default()
+        };
+        let cost_only = RunStats {
+            credits: Some(0.0),
+            ..Default::default()
+        };
+        let cases = [
+            ("a later unpriced step", tokens(None), None),
+            ("a later priced step", tokens(Some(0.75)), Some(0.75)),
+            ("a write with no tokens", cost_only, Some(0.0)),
+        ];
+        for (name, patch, credits) in cases {
+            let merged = merge_stats(Some(priced), Some(&patch), None);
+            assert_eq!(merged.credits, credits, "{name}");
+            assert_eq!(merged.model.as_deref(), Some("a/m"), "{name}");
+        }
     }
 
     #[tokio::test]

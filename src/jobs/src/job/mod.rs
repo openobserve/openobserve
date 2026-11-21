@@ -36,6 +36,7 @@ mod ai_actions_reaper;
 mod ai_chat_retention;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
+mod alert_lease_sweep;
 #[cfg(feature = "enterprise")]
 mod alert_transitions_reaper;
 #[cfg(feature = "cloud")]
@@ -1597,6 +1598,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // can never retire on its own, because a vanished group produces no
     // observation to act on.
     alert_group_reaper::run();
+    alert_lease_sweep::run();
     // Retention for the alert availability ledger (S-16). Not job-cluster
     // gated: retention deletes do not replicate, so every region reaps its own
     // copy or it grows without bound.

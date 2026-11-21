@@ -25,7 +25,7 @@ use config::meta::downtimes::Downtime;
 use infra::{
     coordinator::downtimes as coordinator,
     table::{
-        downtimes::{self as table, Guard},
+        downtimes::{self as table, Guard, IdleRun},
         slo_backfill_jobs::Remeasure,
     },
 };
@@ -61,6 +61,24 @@ pub async fn set_if_unchanged(
     remeasures: &[Remeasure],
 ) -> Result<bool, anyhow::Error> {
     if !write(downtime, Guard::Unchanged(expected_updated_at), remeasures).await? {
+        return Ok(false);
+    }
+    reload_org(&downtime.org).await?;
+    Ok(true)
+}
+
+/// [set_if_unchanged] that commits only while the alert's scheduler row stays as `run` read it.
+pub async fn set_if_idle(
+    downtime: &Downtime,
+    expected_updated_at: i64,
+    run: IdleRun<'_>,
+    remeasures: &[Remeasure],
+) -> Result<bool, anyhow::Error> {
+    let guard = Guard::UnchangedWhileIdle {
+        updated_at: expected_updated_at,
+        run,
+    };
+    if !write(downtime, guard, remeasures).await? {
         return Ok(false);
     }
     reload_org(&downtime.org).await?;

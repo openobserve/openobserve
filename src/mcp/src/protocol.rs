@@ -23,6 +23,7 @@ use super::{
     approval,
     ledger::{self, Origin},
     response_filter::filter_response,
+    streaming::StreamedCall,
     tools::{
         get_pinned_tools, get_shared_http_client, get_tool_metadata, requires_confirmation,
         tool_search,
@@ -636,6 +637,8 @@ async fn execute_tool(
     if let Err(e) = encode_path_parameters(metadata, &mut arguments) {
         return error_result(format!("Tool execution failed: {e}"));
     }
+    let streamed = StreamedCall::prepare(&metadata.name, &mut arguments);
+    let started = std::time::Instant::now();
 
     let before = match &ledger_plan {
         Some(plan) => plan.before(auth_token).await,
@@ -673,7 +676,14 @@ async fn execute_tool(
         ));
     }
 
-    let content_text = filter_response(&metadata.name, &http_response.body, detail);
+    let body = match streamed
+        .map(|call| call.finish(&http_response.body, started.elapsed().as_millis() as usize))
+    {
+        Some(Ok(body)) => body,
+        Some(Err(text)) => return error_result(clipped(text)),
+        None => http_response.body,
+    };
+    let content_text = filter_response(&metadata.name, &body, detail);
     if content_text.len() > MAX_TOOL_RESULT_BYTES {
         return error_result(format!(
             "Result too large: {} bytes exceeds the {MAX_TOOL_RESULT_BYTES}-byte limit. Retry \
@@ -1585,5 +1595,211 @@ mod tests {
 
         assert_eq!(result.is_error, None);
         assert_eq!(text_of(&result).len(), MAX_TOOL_RESULT_BYTES);
+    }
+
+    fn operation(name: &str, method: &str, path: &str) -> rmcp_openapi::ToolMetadata {
+        let params: &[(&str, &str, Value)] = &[
+            ("org_id", "path", json!({"type": "string"})),
+            ("stream_name", "path", json!({"type": "string"})),
+            ("size", "query", json!({"type": "integer"})),
+            ("request_body", "body", json!({"type": "object"})),
+        ];
+        let used: Vec<_> = params
+            .iter()
+            .filter(|(p, location, _)| *location != "path" || path.contains(&format!("{{{p}}}")))
+            .collect();
+        rmcp_openapi::ToolMetadata {
+            name: name.to_string(),
+            title: None,
+            description: None,
+            parameters: json!({
+                "type": "object",
+                "properties": used.iter().map(|(p, _, s)| (p.to_string(), s.clone())).collect::<serde_json::Map<_, _>>(),
+            }),
+            output_schema: None,
+            method: method.to_string(),
+            path: path.to_string(),
+            security: None,
+            parameter_mappings: used
+                .iter()
+                .map(|(p, location, _)| {
+                    let mapping = rmcp_openapi::tool::ParameterMapping {
+                        sanitized_name: p.to_string(),
+                        original_name: p.to_string(),
+                        location: location.to_string(),
+                        explode: false,
+                    };
+                    (p.to_string(), mapping)
+                })
+                .collect(),
+        }
+    }
+
+    /// Answers an SSE `body` on a streaming route and 404 on any other; yields the request seen.
+    async fn client_streaming(
+        body: String,
+    ) -> (rmcp_openapi::HttpClient, tokio::task::JoinHandle<String>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let (listener, base) = loopback_listener().await;
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let (mut request, mut chunk) = (Vec::new(), [0u8; 4096]);
+            loop {
+                let text = String::from_utf8_lossy(&request).to_string();
+                if let Some((head, sent)) = text.split_once("\r\n\r\n") {
+                    let length = head
+                        .lines()
+                        .find_map(|l| {
+                            l.to_lowercase()
+                                .strip_prefix("content-length:")
+                                .map(|v| v.trim().parse::<usize>().unwrap())
+                        })
+                        .unwrap_or(0);
+                    if sent.len() >= length {
+                        break;
+                    }
+                }
+                let n = socket.read(&mut chunk).await.unwrap();
+                if n == 0 {
+                    break;
+                }
+                request.extend_from_slice(&chunk[..n]);
+            }
+            let request = String::from_utf8_lossy(&request).to_string();
+            let (status, body) = if request.lines().next().unwrap().contains("_stream") {
+                ("200 OK", body)
+            } else {
+                ("404 Not Found", "{}".to_string())
+            };
+            let head = format!(
+                "HTTP/1.1 {status}\r\ncontent-type: text/event-stream\r\ncontent-length: {}\r\n\r\n",
+                body.len()
+            );
+            let _ = socket.write_all(head.as_bytes()).await;
+            let _ = socket.write_all(body.as_bytes()).await;
+            request
+        });
+        (
+            rmcp_openapi::HttpClient::new().with_base_url(base).unwrap(),
+            server,
+        )
+    }
+
+    #[tokio::test]
+    async fn streamed_tools_fold_the_stream_into_their_one_shot_shape() {
+        use config::meta::search::{Response, StreamResponses, TimeOffset};
+
+        let tools = crate::streaming::route_through_streams(vec![
+            operation("SearchSQL", "POST", "/api/{org_id}/_search"),
+            operation("SearchStreamHttp2", "POST", "/api/{org_id}/_search_stream"),
+        ])
+        .unwrap();
+        let tool = tools.iter().find(|t| t.name == "SearchSQL").unwrap();
+        let rows = |n: usize| (0..n).map(|i| json!({"i": i})).collect::<Vec<_>>();
+        let page = |hits: Vec<Value>| StreamResponses::SearchResponse {
+            results: Response {
+                hits,
+                trace_id: "t1".to_string(),
+                ..Default::default()
+            },
+            streaming_aggs: false,
+            streaming_id: None,
+            time_offset: TimeOffset {
+                start_time: 0,
+                end_time: 1,
+            },
+        };
+        let search = |query: Value| json!({"request_body": {"query": query}});
+        let query = json!({"sql": "SELECT * FROM t", "start_time": 1, "end_time": 2, "size": 10});
+        let default_limit = config::get_config().limit.query_default_limit as usize;
+        let error = StreamResponses::Error {
+            code: 400,
+            message: "unknown field 'x'".to_string(),
+            error_detail: None,
+            hint: None,
+            suggestions: Some(vec!["xy".to_string()]),
+            trace_id: Some("t1".to_string()),
+            error_code: Some(20004),
+        };
+        // (case, arguments, events, expected fields of the result, or the error text)
+        type Case = (
+            &'static str,
+            Value,
+            Vec<StreamResponses>,
+            Result<Value, &'static str>,
+        );
+        let cases: Vec<Case> = vec![
+            (
+                "pages and hits chunks fold in order",
+                search(query.clone()),
+                vec![
+                    page(rows(2)),
+                    StreamResponses::SearchResponseHits {
+                        hits: vec![json!({"i": 2})],
+                    },
+                    page(vec![json!({"i": 3})]),
+                    StreamResponses::Done,
+                ],
+                Ok(json!({"hits": rows(4), "total": 4, "is_partial": false})),
+            ),
+            (
+                "a default-limit result is cut and flagged as `_search` does",
+                search(
+                    json!({"sql": "SELECT * FROM t", "start_time": 1, "end_time": 2, "size": 0}),
+                ),
+                vec![page(rows(default_limit + 1)), StreamResponses::Done],
+                Ok(
+                    json!({"total": default_limit, "is_partial": true, "function_error": [config::meta::search::CAPPED_RESULTS_MSG]}),
+                ),
+            ),
+            (
+                "a stream cut before it ends is partial",
+                search(query.clone()),
+                vec![page(rows(1))],
+                Ok(json!({"total": 1, "is_partial": true})),
+            ),
+            (
+                "the output format applies to the folded rows",
+                json!({"request_body": {"query": query.clone(), "agent_options": {"output_format": "csv"}}}),
+                vec![page(rows(2)), StreamResponses::Done],
+                Ok(json!({"format": "csv", "data": "i\n0\n1"})),
+            ),
+            (
+                "an error mid-stream is a tool error with its suggestions",
+                search(query.clone()),
+                vec![page(rows(1)), error, StreamResponses::Done],
+                Err(
+                    r#"Error 400: {"code":20004,"message":"unknown field 'x'","suggestions":["xy"],"trace_id":"t1"}"#,
+                ),
+            ),
+        ];
+        for (case, arguments, events, expected) in cases {
+            let sse: String = events
+                .iter()
+                .flat_map(|e| e.to_chunks())
+                .map(|c| String::from_utf8(c.unwrap().to_vec()).unwrap())
+                .collect();
+            let (client, server) = client_streaming(sse).await;
+            let result =
+                execute_tool(&client, "acme", tool, arguments, &DetailLevel::Summary).await;
+            let request = server.await.unwrap();
+            match expected {
+                Ok(fields) => {
+                    assert_eq!(result.is_error, None, "{case}: {}", text_of(&result));
+                    let body = result.structured_content.unwrap();
+                    for (key, value) in fields.as_object().unwrap() {
+                        assert_eq!(&body[key], value, "{case}: {key}");
+                    }
+                }
+                Err(text) => assert_eq!(text_of(&result), text, "{case}"),
+            }
+            if case.contains("default-limit") {
+                assert!(
+                    request.contains(&format!("\"size\":{}", default_limit + 1)),
+                    "{request}"
+                );
+            }
+        }
     }
 }

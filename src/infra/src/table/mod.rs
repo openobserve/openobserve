@@ -36,6 +36,7 @@ pub mod alert_calibration;
 pub mod alert_composites;
 pub mod alert_eval_intervals;
 pub mod alert_incidents;
+pub mod alert_leases;
 #[cfg(test)]
 mod alert_slack_postgres_tests;
 pub mod alert_states;
@@ -165,6 +166,9 @@ pub mod workflow_http_trigger_requests;
 pub mod workflow_http_triggers;
 pub mod workflows;
 
+// local mode skips the dist lock, and tests in one process migrate from many threads at once
+static MIGRATION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
     short_urls::init().await?;
@@ -172,9 +176,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
 }
 
 pub async fn migrate() -> Result<(), anyhow::Error> {
+    migrate_on(get_orm_client_ddl().await).await
+}
+
+async fn migrate_on(client: &DatabaseConnection) -> Result<(), anyhow::Error> {
+    let _turn = MIGRATION_LOCK.lock().await;
     let locker = dist_lock::lock("/database/migration", 0).await?;
     // read the history under the same lock the migrations write it under
-    run_migrations(get_orm_client_ddl().await).await?;
+    run_migrations(client).await?;
     dist_lock::unlock(&locker).await?;
     Ok(())
 }
@@ -467,6 +476,31 @@ mod tests {
         assert_eq!(settings.try_get::<i64>("", "rev").unwrap(), 4);
         assert!(!settings.try_get::<bool>("", "enabled").unwrap());
         assert_eq!(settings.try_get::<i32>("", "max_links").unwrap(), 7);
+    }
+
+    #[tokio::test]
+    async fn test_migrations_started_together_in_one_process_both_succeed() {
+        for db in migration::sqlite_and_postgres_for_test("migrate_together").await {
+            // only the first migration stays pending: the later ones read tables db_init creates
+            Migrator::install(&db).await.unwrap();
+            for m in Migrator::migrations().iter().skip(1) {
+                db.execute_unprepared(&format!(
+                    "INSERT INTO seaql_migrations (version, applied_at) VALUES ('{}', 1)",
+                    m.name()
+                ))
+                .await
+                .unwrap();
+            }
+            let (first, second) = tokio::join!(migrate_on(&db), migrate_on(&db));
+            first.unwrap();
+            second.unwrap();
+            assert!(
+                Migrator::get_pending_migrations(&db)
+                    .await
+                    .unwrap()
+                    .is_empty()
+            );
+        }
     }
 
     #[tokio::test]

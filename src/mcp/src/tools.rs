@@ -37,6 +37,7 @@ use utoipa::openapi::OpenApi;
 
 use super::{
     schema::simplify_schema,
+    streaming::route_through_streams,
     types::{MCPTool, SummaryFieldsConfig},
 };
 
@@ -521,7 +522,7 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
 
     // Only extract metadata - this is fast (~186ms for 209 tools)
     // We skip generate_openapi_tools which creates 200+ HTTP clients (~19.5s)
-    let tools_metadata = spec.to_tool_metadata(None, false, false, false)?;
+    let tools_metadata = route_through_streams(spec.to_tool_metadata(None, false, false, false)?)?;
 
     let mut tools: Vec<Arc<MCPTool>> = Vec::with_capacity(tools_metadata.len());
     let mut metadata_map: HashMap<String, rmcp_openapi::ToolMetadata> =
