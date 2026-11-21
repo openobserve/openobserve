@@ -35,6 +35,9 @@ export interface Scanned<T> {
 
 export type ZoneAlt = { zone: string } | { offsetSec: number };
 
+/** The marked readings of a stamp clock that ends at `at`, each with the end of its mark. */
+export type Marker = (at: number, c: ClockValue) => [number, ClockValue][];
+
 /** What a zone suffix follows: 0 a phrase clock or hand-typed stamp, 1 an ISO stamp, 2 a `T` or seconds. */
 export type ZoneHost = 0 | 1 | 2;
 
@@ -261,6 +264,7 @@ export function zonedPoint(
     p: "instant",
     us,
     notes: [{ kind: "converted", fromOffset: offsetLabel(zone.offsetSec) }],
+    clock: { ...clock, offsetSec: zone.offsetSec },
   };
 }
 
@@ -273,20 +277,23 @@ function withZone(
   clock: ClockValue,
   out: Scanned<Point>[],
   host: ZoneHost,
+  mark?: Marker,
 ): void {
-  out.push({ end: at, alts: [{ v: { p: "wall", y, mo, d, clock } }] });
-  const from = zoneStart(text, at, host);
-  if (from === null) return;
-  for (const z of scanZone(text, from)) {
-    out.push({
-      end: z.end,
-      alts: z.alts.map((a) => ({ v: zonedPoint(y, mo, d, clock, a.v), why: a.why, tag: a.tag })),
-    });
+  // A mark binds to the clock before any zone, so a year-less date picks its year after the mark.
+  for (const [end, c] of [[at, clock] as const, ...(mark?.(at, clock) ?? [])]) {
+    out.push({ end, alts: [{ v: { p: "wall", y, mo, d, clock: c } }] });
+    const from = zoneStart(text, end, host);
+    for (const z of from === null ? [] : scanZone(text, from)) {
+      out.push({
+        end: z.end,
+        alts: z.alts.map((a) => ({ v: zonedPoint(y, mo, d, c, a.v), why: a.why, tag: a.tag })),
+      });
+    }
   }
 }
 
 /** ISO dates and stamps: `YYYY-MM-DD`, `T` or space, a clock, then an optional zone. */
-export function scanIso(text: string, pos: number): Scanned<Point>[] {
+export function scanIso(text: string, pos: number, mark?: Marker): Scanned<Point>[] {
   const y = fixedDigits(text, pos, 4);
   const sep = text[pos + 4];
   if (y < 0 || (sep !== "-" && sep !== "/") || isDigit(text, pos - 1)) return [];
@@ -300,7 +307,7 @@ export function scanIso(text: string, pos: number): Scanned<Point>[] {
   if (t !== "T" && t !== " ") return out;
   const clock = scanColonClock(text, pos + 11);
   if (!clock) return out;
-  withZone(text, clock.end, y, mo, d, clock.c, out, t === "T" || clock.c.sec ? 2 : 1);
+  withZone(text, clock.end, y, mo, d, clock.c, out, t === "T" || clock.c.sec ? 2 : 1, mark);
   return out;
 }
 
@@ -345,7 +352,13 @@ function scanClf(text: string, pos: number): Scanned<Point>[] {
 }
 
 /** `Nov 16 09:12:33` (syslog, no year) and `Nov 16, 2026 09:12:33[.f] [zone]` (the app's display). */
-function scanMonthFirst(text: string, pos: number, nowUs: number, zone: string): Scanned<Point>[] {
+function scanMonthFirst(
+  text: string,
+  pos: number,
+  nowUs: number,
+  zone: string,
+  mark?: Marker,
+): Scanned<Point>[] {
   const mo = monthIndex(text, pos);
   if (mo < 1 || text[pos + 3] !== " " || isAlpha(text, pos - 1)) return [];
   const dl = digitRun(text, pos + 4);
@@ -364,31 +377,28 @@ function scanMonthFirst(text: string, pos: number, nowUs: number, zone: string):
   const read = (yr: number): Scanned<Point>[] => {
     const out: Scanned<Point>[] = [];
     if (isValidDate(yr, mo, d))
-      withZone(text, clock.end, yr, mo, d, clock.c, out, clock.c.sec ? 2 : 0);
+      withZone(text, clock.end, yr, mo, d, clock.c, out, clock.c.sec ? 2 : 0, mark);
     return out;
   };
   if (y >= 0) return read(y);
   // Each reading (one per zone suffix and abbreviation meaning) takes the latest year whose instant
   // is not after now; `yw` keeps a range from pairing it with a phrase date's year (`yd`).
   const year = wallAt(zone, nowUs).y;
-  const best = new Map<number, (Alt<Point> | undefined)[]>();
+  // Readings are keyed by their place in the list, since two marks can end at the same place.
+  const best: { end: number; alts: (Alt<Point> | undefined)[] }[] = [];
   const done = (): boolean =>
-    best.size > 0 && [...best.values()].every((slots) => slots.every((a) => a !== undefined));
+    best.length > 0 && best.every((slots) => slots.alts.every((a) => a !== undefined));
   for (let yr = year + 1; yr >= year - YEARS_BACK && !done(); yr--) {
-    for (const s of read(yr)) {
-      const slots = best.get(s.end) ?? s.alts.map(() => undefined);
-      best.set(s.end, slots);
+    read(yr).forEach((s, k) => {
+      const slots = (best[k] ??= { end: s.end, alts: s.alts.map(() => undefined) }).alts;
       s.alts.forEach((a, i) => {
         if (!slots[i] && !ahead(a.v, nowUs, zone)) slots[i] = { ...a, tag: joinTags(a.tag, "yw") };
       });
-    }
+    });
   }
-  const out: Scanned<Point>[] = [];
-  for (const [end, slots] of best) {
-    const alts = slots.filter((a): a is Alt<Point> => a !== undefined);
-    if (alts.length > 0) out.push({ end, alts });
-  }
-  return out;
+  return best
+    .map(({ end, alts }) => ({ end, alts: alts.filter((a): a is Alt<Point> => a !== undefined) }))
+    .filter((s) => s.alts.length > 0);
 }
 
 function ahead(p: Point, nowUs: number, zone: string): boolean {
@@ -403,8 +413,13 @@ export function scanStamp(
   pos: number,
   nowUs: number,
   zone: string,
+  mark?: Marker,
 ): Scanned<Point>[] {
-  return [...scanIso(text, pos), ...scanClf(text, pos), ...scanMonthFirst(text, pos, nowUs, zone)];
+  return [
+    ...scanIso(text, pos, mark),
+    ...scanClf(text, pos),
+    ...scanMonthFirst(text, pos, nowUs, zone, mark),
+  ];
 }
 
 /** Exactly 10/13/16/19 digits read as s/ms/µs/ns; `null` when beyond the safe-integer range. */

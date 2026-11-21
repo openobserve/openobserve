@@ -537,12 +537,18 @@ function clockHits(sc: Scan, pos: number): Hit<Alt<ClockValue>[]>[] {
           if (m.length > 0) out.push([e2, m]);
           // A refused clock stays refused however it goes on (`PM 13:30 o'clock`), unless it is
           // one digit typed last, which a second digit can still make fit (`PM 0` before `PM 09`).
-          else if (e2 - at > 1 || e2 < sc.len) sc.partial = was;
+          else if (e2 - at > 1 || e2 < sc.len || !grows(alts, mod)) sc.partial = was;
         }
       }
     }
     return out;
   });
+}
+
+function grows(alts: Alt<ClockValue>[], mod: ClockMod): boolean {
+  return alts.some(({ v }) =>
+    [...Array(10).keys()].some((k) => withMod([{ v: { ...v, h: v.h * 10 + k } }], mod).length > 0),
+  );
 }
 
 function zoned(sc: Scan, end: number, alts: Alt<ClockValue>[]): Hit<Alt<ClockValue>[]>[] {
@@ -581,25 +587,24 @@ function cross<A, B, T>(as: Alt<A>[], bs: Alt<B>[], make: (a: A, b: B) => T): Al
   return out;
 }
 
-/** Machine stamps at `pos`; a mark after a zoneless wall stamp binds to its clock. A phrase picks a
- * year-less date's year after the mark itself, so only a log line marks a year-less stamp. */
+/** Machine stamps at `pos`; a mark after a stamp clock binds to it before any zone. A phrase picks a
+ * year-less date's year itself, so only a log line marks a year-less stamp. */
 export function stampHits(sc: Scan, pos: number, log?: boolean): Scanned<Point>[] {
-  const out = scanStamp(sc.text, pos, sc.env.nowUs, sc.env.zone);
-  return [
-    ...out,
-    ...out.flatMap((s) =>
-      spaced(sc, s.end).flatMap((at) =>
-        words(sc, at, sc.env.pack.mods).map(([end, mod]) => ({
-          end,
-          alts: s.alts.flatMap((a) =>
-            a.v.p === "wall" && !a.v.clock.zone && (log || !a.tag) && !isDigit(sc.text, end)
-              ? withMod([{ v: a.v.clock }], mod).map((c) => ({ ...a, v: { ...a.v, clock: c.v } }))
-              : [],
-          ),
-        })),
+  // A dated stamp keeps its own day, so a mark that shifts the day (`昨晚`) never binds to it.
+  const mark = (at: number, c: ClockValue): [number, ClockValue][] =>
+    spaced(sc, at).flatMap((p) =>
+      words(sc, p, sc.env.pack.mods).flatMap(([end, mod]): [number, ClockValue][] =>
+        mod.shift || isDigit(sc.text, end) ? [] : withMod([{ v: c }], mod).map((m) => [end, m.v]),
       ),
-    ),
-  ].filter((s) => s.alts.length > 0);
+    );
+  return scanStamp(sc.text, pos, sc.env.nowUs, sc.env.zone, mark)
+    .map((s) => ({
+      end: s.end,
+      alts: s.alts.filter(
+        (a) => log || !(a.tag?.includes("yw") && "clock" in a.v && a.v.clock?.mod),
+      ),
+    }))
+    .filter((s) => s.alts.length > 0);
 }
 
 /** `fold` with every clock mark blanked, so a tail of marks and stamp characters reads as a clock. */

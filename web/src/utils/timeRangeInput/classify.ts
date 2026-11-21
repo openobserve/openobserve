@@ -48,7 +48,14 @@ function copyPayload(text: string): Outcome {
   }
   const { start_date: start, end_date: end } = value;
   const safe = (v: unknown): v is number => Number.isSafeInteger(v);
-  if (Object.keys(value).sort().join() !== "end_date,start_date" || !safe(start) || !safe(end))
+  // `JSON.parse` keeps the last of two equal keys, so a repeated key is refused, not overridden.
+  const once = ["start_date", "end_date"].every((k) => text.split(`"${k}"`).length === 2);
+  if (
+    !once ||
+    Object.keys(value).sort().join() !== "end_date,start_date" ||
+    !safe(start) ||
+    !safe(end)
+  )
     return { t: "invalid", reason: "unreadable" };
   if (start >= end) return { t: "invalid", reason: start === end ? "zero-length" : "reversed" };
   const draft: Draft = { startUs: start, endUs: end, softEnd: false, kind: "absolute", notes: [] };
@@ -104,26 +111,42 @@ function bareNumber(text: string, env: Env): Outcome {
   };
 }
 
+function timed(s: Scanned<Point>): boolean {
+  return s.alts.every((a) => a.v.p !== "day");
+}
+
+// Only a machine stamp starts a log line: ISO `T`, a clock with seconds, or a CLF stamp.
+function machine(line: string, s: Scanned<Point>): boolean {
+  const head = line.slice(0, s.end);
+  return (
+    /^(\d{4}[-/]\d\d[-/]\d\dT|\[?\d\d\/[a-z]{3}\/)[^]*$/i.test(head) ||
+    s.alts.every((a) => "clock" in a.v && a.v.clock?.sec)
+  );
+}
+
 /** A first line that starts with a stamp; a second stamp right after it asks which one. */
 function logLine(norm: Normalized, sc: Scan, env: Env): Outcome {
   const line = norm.firstLine;
+  // The longest timed stamp that ends at a field boundary; a stamp glued to a word is not one.
   const stampAt = (pos: number) =>
     stampHits(sc, pos, true)
-      .filter((s) => s.end <= line.length)
+      .filter((s) => timed(s) && (s.end === line.length || line[s.end] === " "))
       .sort((a, b) => b.end - a.end)[0];
   const best = stampAt(0);
-  if (!best) return { t: "none" };
-  const more = best.end === line.length ? norm.text.length > line.length : line[best.end] === " ";
+  if (!best || !machine(line, best)) return { t: "none" };
+  const more = best.end < line.length || norm.text.length > line.length;
   // The first line is a prefix of `text`, and `fold` indexes `text`, so the joins compare folded.
   const tail = (t: string): string => t.slice(best.end + 1, line.length);
-  const rest = tail(unmarked(sc));
-  // Only a timed machine stamp (ISO `T` or seconds) starts a log line; a lone mark is never its message.
-  const machine = line[10] === "T" || /^[^:]*:\d\d:\d.*$/.test(line.slice(0, best.end));
-  if (!more || !machine || /^ +$/.test(rest) || rangeTail(rest, tail(norm.text), env))
-    return { t: "none" };
+  const rest = tail(norm.fold);
+  const plain = tail(unmarked(sc));
+  // A refused mark after the clock is message text, unless a range join follows it.
+  const lead = plain.length - plain.trimStart().length;
+  const broken = (k: number) =>
+    rangeTail(rest.slice(k), plain.slice(k), tail(norm.text).slice(k), env);
+  if (!more || /^ +$/.test(plain) || broken(0) || (lead > 0 && broken(lead))) return { t: "none" };
   const stamps = [best];
   const second = stampAt(best.end + 1);
-  if (second && (second.end === line.length || line[second.end] === " ")) stamps.push(second);
+  if (second) stamps.push(second);
   const drafts = stamps.flatMap((s) => singleDrafts(s.alts, env));
   for (const d of drafts) {
     if (stamps[1]) d.why = "log-stamps";
@@ -132,9 +155,9 @@ function logLine(norm: Normalized, sc: Scan, env: Env): Outcome {
   return { t: "drafts", drafts, form: "log-line" };
 }
 
-// After a log separator (or `/`) only stamp characters and marks, shaped like an hour, clock or year
-// after `-`, make a broken range; after a word join (`to`, `bis`, `から`) any tail holding a digit does.
-function rangeTail(rest: string, raw: string, env: Env): boolean {
+// After `-`, `–` or `/` only stamp characters and marks shaped like an hour, clock or year make a broken
+// range; after any other join a tail with a digit does, or one lone word after a word join (`to noon`).
+function rangeTail(rest: string, plain: string, raw: string, env: Env): boolean {
   // The word after `{start}` in a range template (`から`, `부터`, `until`) joins a range too.
   const lits = env.pack.rangeTemplates.flatMap((elems) => {
     const at = elems.findIndex((e) => e.k === "slot" && e.s === "start");
@@ -148,16 +171,18 @@ function rangeTail(rest: string, raw: string, env: Env): boolean {
     )
       return false;
     const t = rest.slice(j.length).trimStart();
+    const from = rest.length - t.length;
     // A stamp's zone suffix (`Europe/Berlin`, `UTC`) is cut off, so it cannot hide a broken range.
-    const z = raw.slice(rest.length - t.length);
+    const z = raw.slice(from);
     const at = z.lastIndexOf(" ") + 1;
     const zoned = at > 0 && scanZone(z, at).some((x) => x.end === z.length);
-    const u = (zoned ? t.slice(0, at - 1) : t).trim();
-    const shaped = /^(\d{1,2}(:.*)?|\d{4}(-.*)?)?$/.test(u);
+    const u = plain.slice(from, zoned ? from + at - 1 : undefined).trim();
+    const shaped = /^(\d{1,2}([: ].*)?|\d{4}(-.*)?)?$/.test(u);
     const stamp = /^[\d:+.tz -]*$/.test(u);
     // The only joins that also separate log fields (`<stamp> - 200`); every other join is a range join.
     if ("-–".includes(j)) return shaped && stamp;
-    return j === "/" ? stamp : t === "" || !/^\D*$/.test(t);
+    const word = wordy(j.charCodeAt(0)) && /^\p{L}+$/u.test(t);
+    return j === "/" ? stamp : t === "" || word || !/^\D*$/.test(t);
   });
 }
 
@@ -166,7 +191,7 @@ export function classify(norm: Normalized, env: Env): { outcome: Outcome; scan: 
   const text = norm.text;
   const sc = newScan(text, norm.fold, env);
   if (text.startsWith("{")) return { outcome: copyPayload(text), scan: sc };
-  if (/^(https?:\/\/|\?)[^]*$/.test(norm.fold)) return { outcome: urlOutcome(text, env), scan: sc };
+  if (/^(https?:\/\/|\?)[^]*$/i.test(text)) return { outcome: urlOutcome(text, env), scan: sc };
   const steps: (() => Outcome)[] = [
     () => rangeOutcome(sc),
     () => (/^\d+$/.test(text) ? bareNumber(text, env) : { t: "none" }),

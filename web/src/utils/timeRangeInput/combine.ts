@@ -263,6 +263,14 @@ function inheritMod(end: Point, start: Point): Point {
   return { ...end, clock };
 }
 
+// A bare end clock is read where the start is, in its offset or zone, so the viewer's zone never
+// decides it (`09:30Z - 11` ends at 11:00Z everywhere).
+function inZone(end: Point, start: Point): Point {
+  const c = clockOf(start);
+  if (end.p !== "clock" || zonedSide(end) || !c || !zonedSide(start)) return end;
+  return { ...end, clock: { ...end.clock, offsetSec: c.offsetSec, zone: c.zone } };
+}
+
 function shared(p: Point): p is Extract<Point, { p: "clock" | "wall" }> {
   return p.p === "clock" || (p.p === "wall" && p.shared === true);
 }
@@ -311,7 +319,7 @@ function dashMismatch(a: Point, b: Point): boolean {
 // A bare digit hour (`dalle 9`) is a clock only next to another clock, never beside a date (`del 13 al 15 nov`).
 function bareMismatch(a: Point, b: Point): boolean {
   const bare = (p: Point): boolean => p.p === "clock" && p.clock.bare === true;
-  const clocked = (p: Point): boolean => p.p === "clock" || p.p === "wall";
+  const clocked = (p: Point): boolean => clockOf(p) !== undefined;
   return (bare(a) && !clocked(b)) || (bare(b) && !clocked(a));
 }
 
@@ -363,7 +371,7 @@ export function rangeDrafts(
         pmTwin(e0, s.v)
       )
         continue;
-      const e = inheritMod(e0.v, s.v);
+      const e = inZone(inheritMod(e0.v, s.v), s.v);
       const into = sameTag(s, e0) ? drafts : cross;
       for (const [a, b] of sidePairs(s.v, e, env)) {
         // An end day that closes where the start begins lies wholly before it.

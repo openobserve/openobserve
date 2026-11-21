@@ -876,7 +876,8 @@ describe("round-9 review fixes", () => {
     ["es-ES", "2026-11-16T09:00:00Z a 17"],
     ["zh-CN", "2026-11-16T09:00:00Z 到 17"],
   ])("F50: %s %s is a broken range, never a log line", async (locale, text) => {
-    expect((await run(locale, text, NOW)).state).not.toBe("valid");
+    const r = await run(locale, text, NOW);
+    expect(r.state === "valid" && r.reading.origin.form, JSON.stringify(r)).not.toBe("log-line");
   });
 
   it.each([
@@ -915,7 +916,8 @@ describe("round-9 review fixes", () => {
       ),
     ),
   )("F60: %s %s is a broken range, never a log line", async (locale, text) => {
-    expect((await run(locale, text, NOW)).state).not.toBe("valid");
+    const r = await run(locale, text, NOW);
+    expect(r.state === "valid" && r.reading.origin.form, JSON.stringify(r)).not.toBe("log-line");
   });
 
   it("F61: each meaning of a zone abbreviation takes its own year", async () => {
@@ -1552,7 +1554,7 @@ describe("typed-clock review fixes, round 2", () => {
 
   it("P2: an offset stamp with a space still ends on a bare clock", async () => {
     expect(await read("2026-11-20 00:30+05:00 to 20:30")).toEqual(
-      at("2026-11-19T19:30:00Z", "2026-11-19T20:30:00Z"),
+      at("2026-11-19T19:30:00Z", "2026-11-20T15:30:00Z"),
     );
   });
 
@@ -1601,14 +1603,100 @@ describe("typed-clock review fixes, round 2", () => {
       }
     }
   });
+
+  it("property: a range tail after a marked stamp is never dropped, and a log date is text", async () => {
+    for (const day of ["2026-11-20 ", "2026-11-20T", "Nov 20 "]) {
+      for (const clock of ["9:30:15", "09:30:00", "13:30", "09:30"]) {
+        const bare = await read(day + clock);
+        for (const mark of [" PM", " am", ""]) {
+          const stamp = day + clock + mark;
+          const refs = [bare, await read(stamp)].filter((r) => r.state === "valid");
+          for (const tail of [" to 16:30", " - 13pm+05:30", " to noon", " - 11 pm", " to 11 UTC"]) {
+            const got = await read(stamp + tail);
+            for (const ref of refs)
+              expect({ stamp, tail, got }).not.toEqual({ stamp, tail, got: ref });
+          }
+          expect(await read(`${stamp} 2026-11-19 INFO`), stamp).toEqual(
+            await read(`${stamp} INFO`),
+          );
+        }
+      }
+    }
+  });
 });
 
 describe("meridiem rule: a mark binds only to the clock beside it, and no text is dropped", () => {
   const LATER = "2026-11-21T12:00:00Z";
   const NIGHT = "2026-11-21T23:00:00Z";
   const point = (iso: string): [string, string] => [iso, iso];
-  type Want = "invalid" | "incomplete" | "blocked" | [string, string];
+  type Want = "invalid" | "incomplete" | "blocked" | "ambiguous" | [string, string];
+  const ZONES = ["UTC", "Asia/Tokyo", "Asia/Kolkata", "America/New_York"];
+  const everywhere = (text: string, want: Want): [string, string, Want, string, string][] =>
+    ZONES.map((zone) => ["en-US", text, want, LATER, zone]);
   const rows: [string, string, Want, string?, string?][] = [
+    // Round 4: a bare end after a zoned start is read in the start's zone, whatever the viewer's.
+    ...everywhere("2026-11-20 09:30Z - 11", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]),
+    ...everywhere("2026-11-20 09:30Z to 11", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]),
+    ...everywhere("2026-11-20T09:30Z - 11", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]),
+    ...everywhere("2026-11-20T09:30Z to 11", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]),
+    ...everywhere("2026-11-20T09:30Z – 11 UTC", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]),
+    ...everywhere("2026-11-20 09:30+05:30 - 11", ["2026-11-20T04:00:00Z", "2026-11-20T05:30:00Z"]),
+    ...everywhere("09:30+05:30 - 11", ["2026-11-21T04:00:00Z", "2026-11-21T05:30:00Z"]),
+    ...everywhere("09:30+05:30 to 23:59", "blocked"),
+    ...everywhere("9am IST to 5pm", "ambiguous"),
+    ...everywhere("9am IST - 11pm", "blocked"),
+    ...everywhere("2026-11-20 09:30 Asia/Tokyo - 11", [
+      "2026-11-20T00:30:00Z",
+      "2026-11-20T02:00:00Z",
+    ]),
+    // Round 4: a mark binds before the zone, and a year-less stamp picks its year after the mark.
+    ["en-US", "2026-11-20 09:30:00 PM +05:30", point("2026-11-20T16:00:00Z")],
+    [
+      "en-US",
+      "2026-11-20 09:30:00 PM +05:30",
+      point("2026-11-20T16:00:00Z"),
+      LATER,
+      "America/New_York",
+    ],
+    ["en-US", "2026-11-20 09:30:00 PM America/Los_Angeles", point("2026-11-21T05:30:00Z")],
+    ["en-US", "2026-11-20 09:30 PM +05:30", point("2026-11-20T16:00:00Z")],
+    ["en-US", "Feb 29 12:30:00 AM sshd", point("2024-02-29T00:30:00Z"), "2024-02-29T06:00:00Z"],
+    [
+      "en-US",
+      "Feb 29 12:30:00 AM sshd",
+      point("2024-02-29T05:30:00Z"),
+      "2024-02-29T06:00:00Z",
+      "America/New_York",
+    ],
+    ["en-US", "Nov 21 9:30:15 PM INFO x", point("2025-11-21T21:30:15Z")],
+    ["en-US", "Nov 21 9:30:15 PM INFO x", point("2025-11-21T12:30:15Z"), LATER, "Asia/Tokyo"],
+    ["en-US", "Nov 21 9:30:15 PM INFO x", point("2025-11-22T02:30:15Z"), LATER, "America/New_York"],
+    ["en-US", "Nov 21 21:30:15 INFO x", point("2025-11-21T21:30:15Z")],
+    // Round 4: a log line starts only with a timed machine stamp and never hides a range end.
+    ["en-US", "2026-11-20T13:30 PM to 16:30", "invalid"],
+    ["en-US", "2026-11-20T09:30Z - 13pm+05:30", "invalid"],
+    ["en-US", "2026-11-20 09:30:00 PM to noon", "invalid"],
+    ["en-US", "2026-11-20T09:30Z to noon", "invalid"],
+    ["zh-CN", "2026-11-20 20:30:00 昨晚 故障", point("2026-11-20T20:30:00Z")],
+    ["zh-TW", "2026-11-20 20:30:00 昨晚 故障", point("2026-11-20T20:30:00Z")],
+    ["en-US", "2026-W46 UTC error", "invalid"],
+    ["en-US", "2026-11-20T09:30:00Z 2026-11-19 INFO", point("2026-11-20T09:30:00Z")],
+    ...["en-US", "ja-JP", "ko-KR", "zh-CN", "ar-SA", "es-ES"].map(
+      (locale): [string, string, Want] => [
+        locale,
+        "2026-11-20 09:30:00 PM_worker ready",
+        point("2026-11-20T09:30:00Z"),
+      ],
+    ),
+    ["en-US", "[20/Nov/2026:9:30:15 +0000] INFO", point("2026-11-20T09:30:15Z")],
+    ["en-US", "[20/Nov/2026:09:30 +0000] INFO", point("2026-11-20T09:30:00Z")],
+    ["en-US", "2026-11-20T13:30:00\nPM", point("2026-11-20T13:30:00Z")],
+    ["en-US", "2026-11-20T13:30:00 PM", "invalid"],
+    ["de-DE", "gestern abends 3", "invalid"],
+    ["th-TH", "เมื่อวาน เช้า 3", "invalid"],
+    ["en-US", "hţtps://x/?period=1h", "invalid"],
+    ["en-US", "HTTPS://x/?period=1h", ["2026-11-21T11:00:00Z", "2026-11-21T12:00:00Z"]],
+    ["en-US", '{"start_date":300,"start_date":100,"end_date":200}', "invalid"],
     // Ranges never drop an end.
     ["en-US", "2026-11-20 09:30Z - 11 UTC", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]],
     ["en-US", "2026-11-20 09:30Z to 11 UTC", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]],
@@ -1619,12 +1707,12 @@ describe("meridiem rule: a mark binds only to the clock beside it, and no text i
     ["en-US", "9:30 - 13pm", "invalid"],
     ["en-US", "2026-11-20 9:30 pm-noon", "invalid"],
     ["en-US", "2026-11-20 10:00 2026-11-20 9:30 PM", "invalid"],
-    ["en-US", "2026-11-20 00:30+05:00 to 20:30", ["2026-11-19T19:30:00Z", "2026-11-19T20:30:00Z"]],
-    ["en-US", "2026-11-20 00:30+05:00 to 21:00", ["2026-11-19T19:30:00Z", "2026-11-19T21:00:00Z"]],
+    ["en-US", "2026-11-20 00:30+05:00 to 20:30", ["2026-11-19T19:30:00Z", "2026-11-20T15:30:00Z"]],
+    ["en-US", "2026-11-20 00:30+05:00 to 21:00", ["2026-11-19T19:30:00Z", "2026-11-20T16:00:00Z"]],
     [
       "en-US",
       "Nov 20, 2026 00:30+05:00 to 20:30",
-      ["2026-11-19T19:30:00Z", "2026-11-19T20:30:00Z"],
+      ["2026-11-19T19:30:00Z", "2026-11-20T15:30:00Z"],
     ],
     ["en-US", "2026-11-20 from 2026-10-02 to 2026-10-05", "invalid"],
     ["en-US", "Nov 20 from 2026-10-02 to 2026-10-05", "invalid"],
