@@ -351,6 +351,13 @@ impl StreamState {
         if owed { "\n\n" } else { "" }
     }
 
+    /// o2-ai's `_close_text_block`: the text after a card starts a line, so a fence opening it
+    /// is held out as on the live stream.
+    fn close_text_block(&mut self) {
+        self.block_closed = true;
+        self.shown_tail = Some('\n');
+    }
+
     /// What a text part shows: the held-out blocks stay out, as on the live stream.
     fn shape_text(&mut self, text: &str) -> String {
         let mut shown = String::new();
@@ -596,7 +603,7 @@ impl StreamState {
             self.step_call_ids.insert(call_id.to_string());
             event.insert("call_id".into(), Value::String(call_id.to_string()));
         }
-        self.block_closed = true;
+        self.close_text_block();
         frames.push(Value::Object(event));
     }
 
@@ -680,7 +687,7 @@ impl StreamState {
         }
         if let Some(navigation) = navigation_frame(&result, tool_name) {
             self.last_tools_call_info = None;
-            self.block_closed = true;
+            self.close_text_block();
             frames.push(navigation);
             return;
         }

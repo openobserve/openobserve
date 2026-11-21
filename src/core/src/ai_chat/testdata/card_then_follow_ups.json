@@ -1,0 +1,355 @@
+{
+ "events": [
+  {
+   "id": "evt_0",
+   "aggregateID": "ses_C",
+   "seq": 0,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "info": {
+     "id": "msg_u1",
+     "sessionID": "ses_C",
+     "role": "user",
+     "time": {
+      "created": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_1",
+   "aggregateID": "ses_C",
+   "seq": 1,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "part": {
+     "id": "prt_u1",
+     "sessionID": "ses_C",
+     "messageID": "msg_u1",
+     "type": "text",
+     "text": "why is my alert quiet"
+    }
+   }
+  },
+  {
+   "id": "evt_2",
+   "aggregateID": "ses_C",
+   "seq": 2,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "info": {
+     "id": "msg_a1",
+     "sessionID": "ses_C",
+     "role": "assistant",
+     "time": {
+      "created": 11
+     },
+     "parentID": "msg_u1"
+    }
+   }
+  },
+  {
+   "id": "evt_3",
+   "aggregateID": "ses_C",
+   "seq": 3,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "part": {
+     "id": "prt_1a",
+     "sessionID": "ses_C",
+     "messageID": "msg_a1",
+     "type": "text",
+     "text": "The alert is paused, so it may not currently fire."
+    }
+   }
+  },
+  {
+   "id": "evt_4",
+   "aggregateID": "ses_C",
+   "seq": 4,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "part": {
+     "id": "prt_1n",
+     "sessionID": "ses_C",
+     "messageID": "msg_a1",
+     "type": "tool",
+     "tool": "create_navigation",
+     "callID": "call_n1",
+     "state": {
+      "status": "running",
+      "input": {}
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_5",
+   "aggregateID": "ses_C",
+   "seq": 5,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "part": {
+     "id": "prt_1n",
+     "sessionID": "ses_C",
+     "messageID": "msg_a1",
+     "type": "tool",
+     "tool": "create_navigation",
+     "callID": "call_n1",
+     "state": {
+      "status": "completed",
+      "input": {},
+      "output": "{\"type\": \"navigation_action\", \"action\": \"navigate\", \"resource_type\": \"alert\", \"url\": \"/alerts/1\"}"
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_6",
+   "aggregateID": "ses_C",
+   "seq": 6,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "part": {
+     "id": "prt_1b",
+     "sessionID": "ses_C",
+     "messageID": "msg_a1",
+     "type": "text",
+     "text": "```follow_ups\n[\"Show the alert history\", \"Check the alert query\"]\n```"
+    }
+   }
+  },
+  {
+   "id": "evt_7",
+   "aggregateID": "ses_C",
+   "seq": 7,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "info": {
+     "id": "msg_u2",
+     "sessionID": "ses_C",
+     "role": "user",
+     "time": {
+      "created": 20
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_8",
+   "aggregateID": "ses_C",
+   "seq": 8,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "part": {
+     "id": "prt_u2",
+     "sessionID": "ses_C",
+     "messageID": "msg_u2",
+     "type": "text",
+     "text": "and the logs"
+    }
+   }
+  },
+  {
+   "id": "evt_9",
+   "aggregateID": "ses_C",
+   "seq": 9,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "info": {
+     "id": "msg_a2",
+     "sessionID": "ses_C",
+     "role": "assistant",
+     "time": {
+      "created": 21
+     },
+     "parentID": "msg_u2"
+    }
+   }
+  },
+  {
+   "id": "evt_10",
+   "aggregateID": "ses_C",
+   "seq": 10,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "part": {
+     "id": "prt_2a",
+     "sessionID": "ses_C",
+     "messageID": "msg_a2",
+     "type": "text",
+     "text": "I will search the logs."
+    }
+   }
+  },
+  {
+   "id": "evt_11",
+   "aggregateID": "ses_C",
+   "seq": 11,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "part": {
+     "id": "prt_2t",
+     "sessionID": "ses_C",
+     "messageID": "msg_a2",
+     "type": "tool",
+     "tool": "custom_tool",
+     "callID": "call_t2",
+     "state": {
+      "status": "running",
+      "input": {
+       "sql": "SELECT 1"
+      }
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_12",
+   "aggregateID": "ses_C",
+   "seq": 12,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "part": {
+     "id": "prt_2t",
+     "sessionID": "ses_C",
+     "messageID": "msg_a2",
+     "type": "tool",
+     "tool": "custom_tool",
+     "callID": "call_t2",
+     "state": {
+      "status": "completed",
+      "input": {
+       "sql": "SELECT 1"
+      },
+      "output": "{\"hits\": []}"
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_13",
+   "aggregateID": "ses_C",
+   "seq": 13,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_C",
+    "part": {
+     "id": "prt_2b",
+     "sessionID": "ses_C",
+     "messageID": "msg_a2",
+     "type": "text",
+     "text": "```follow_ups\n[\"Show the alert history\", \"Check the alert query\"]\n```"
+    }
+   }
+  }
+ ],
+ "expected": {
+  "turns": [
+   {
+    "user_message_id": "msg_u1",
+    "created": 10,
+    "user": {
+     "text": "why is my alert quiet",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "message_delta",
+      "content": "The alert is paused, so it may "
+     },
+     {
+      "type": "message_delta",
+      "content": "not currently fire."
+     },
+     {
+      "type": "navigation_action",
+      "action": "navigate",
+      "resource_type": "alert",
+      "url": "/alerts/1"
+     },
+     {
+      "type": "follow_ups",
+      "items": [
+       "Show the alert history",
+       "Check the alert query"
+      ]
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "error_code": null,
+    "first_seq": 0,
+    "last_seq": 6
+   },
+   {
+    "user_message_id": "msg_u2",
+    "created": 20,
+    "user": {
+     "text": "and the logs",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "message_delta",
+      "content": "I will "
+     },
+     {
+      "type": "message_delta",
+      "content": "search the logs."
+     },
+     {
+      "type": "tool_call",
+      "tool": "custom_tool",
+      "message": "Executing custom_tool",
+      "context": {
+       "sql": "SELECT 1"
+      },
+      "call_id": "call_t2"
+     },
+     {
+      "type": "tool_result",
+      "tool": "custom_tool",
+      "success": true,
+      "message": "custom_tool completed successfully",
+      "call_args": {
+       "sql": "SELECT 1"
+      },
+      "call_id": "call_t2"
+     },
+     {
+      "type": "follow_ups",
+      "items": [
+       "Show the alert history",
+       "Check the alert query"
+      ]
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "error_code": null,
+    "first_seq": 7,
+    "last_seq": 13
+   }
+  ],
+  "title": null,
+  "last_seq": 13
+ }
+}

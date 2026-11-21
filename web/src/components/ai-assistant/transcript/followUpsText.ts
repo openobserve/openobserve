@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// follow_ups [..] / follow_ups: [..] / a fenced json block, only as the very end of the text.
+// follow_ups [..] / follow_ups: [..] / a fenced json or follow_ups block, only as the very end of the text.
 const TRAILING =
-  /(?:^|\n)[ \t]*(?:```(?:json)?[ \t]*\n)?[ \t]*follow[_-]?ups?[ \t]*:?[ \t]*(\[[\s\S]*\])[ \t]*(?:\n[ \t]*```)?\s*$/i;
+  /(?:^|\n)[ \t]*(?:```[ \t]*follow[_-]?ups?[ \t]*\n|(?:```(?:json)?[ \t]*\n)?[ \t]*follow[_-]?ups?[ \t]*:?)[ \t]*(\[[\s\S]*\])[ \t]*(?:\n[ \t]*```)?\s*$/i;
 
 /** Splits a trailing `follow_ups [...]` of strings off an answer; anything looser is left as written. */
 export function splitFollowUps(text: string): { text: string; items: string[] } {

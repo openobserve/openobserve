@@ -29,6 +29,19 @@ describe("splitFollowUps", () => {
       expect(splitFollowUps(`${BODY}\n\n${tail}  \n`)).toEqual({ text: BODY, items: ["a", "b"] });
   });
 
+  it("strips a fence whose info string is follow_ups, as a reload after a card shows it", () => {
+    const fenced = '```follow_ups\n["Show the alert history", "Check the alert query"]\n```';
+    for (const text of [`${BODY}\n\n${fenced}`, `${BODY}\n${fenced}\n`])
+      expect(splitFollowUps(text)).toEqual({
+        text: BODY,
+        items: ["Show the alert history", "Check the alert query"],
+      });
+    expect(splitFollowUps(fenced)).toEqual({
+      text: "",
+      items: ["Show the alert history", "Check the alert query"],
+    });
+  });
+
   it("works when the whole text is the follow-ups", () => {
     expect(splitFollowUps('follow_ups ["a"]')).toEqual({ text: "", items: ["a"] });
   });
