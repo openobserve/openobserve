@@ -118,7 +118,7 @@ export const contrastLabels = (nodes: TreemapNode[]) => {
 };
 
 /** Converts SQL rows into a treemap: the x field names the outer tiles, the breakdown splits them. */
-export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
+export const convertTreemapData = (panelSchema: any, data: any, store: any, pointMenu = false) => {
   const config = panelSchema?.config ?? {};
   const rows = Array.isArray(data) ? data : [];
   // A tile adds up one measure, so a saved panel with more queries draws only its first visible one.
@@ -148,9 +148,9 @@ export const convertTreemapData = (panelSchema: any, data: any, store: any) => {
   const format = (value: unknown) =>
     formatUnitValue(getUnitValue(value, config.unit, config.unit_custom, decimals));
   const nested = nodes.some((node) => node.children?.length);
-  const hasDrilldown = (config.drilldown?.length ?? 0) > 0;
-  // A click opens the drilldown menu instead, and without the breadcrumb a zoom has no way back.
-  const zooms = !hasDrilldown && config.treemap_show_breadcrumb !== false;
+  const clickOpensMenu = pointMenu || (config.drilldown?.length ?? 0) > 0;
+  // A click opens a menu instead, and without the breadcrumb a zoom has no way back.
+  const zooms = !clickOpensMenu && config.treemap_show_breadcrumb !== false;
   const surface = chartColor("--color-surface-base");
 
   const options = {

@@ -140,6 +140,22 @@ describe("sunburst", () => {
     expect(series.nodeClick).toBe(false);
   });
 
+  it("does not re-root when a click opens the point menu", async () => {
+    const args = [
+      store,
+      { value: {} },
+      { value: null },
+      { value: [] },
+      { queries: [] },
+      {},
+      { value: [] },
+    ] as const;
+    const series = (
+      (await convertPanelData(panel({}), [rows], ...args, false, undefined, undefined, true)) as any
+    ).options.series[0];
+    expect(series.nodeClick).toBe(false);
+  });
+
   it("draws one ring without a breakdown and nothing without rows", async () => {
     const flat = (await convert(panel({ breakdown: [] }), [rows])).options.series[0];
     expect(flat.data.every((node: any) => !node.children)).toBe(true);
