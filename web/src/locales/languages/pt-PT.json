@@ -14606,6 +14606,7 @@
         "noSyntheticsFolderAccess": "Não tem acesso às pastas de sintéticos.",
         "tags": "Tags",
         "tagPlaceholder": "chave:valor",
+        "alertTagsHint": "Todas as tags têm de estar no alerta.",
         "tagsHint": "Todas as tags têm de estar na verificação.",
         "removeBlock": "Remover este bloco",
         "specificItems": "Itens específicos",

@@ -153,6 +153,24 @@ describe("DowntimeDetail", () => {
     wrapper.unmount();
   });
 
+  it("shows the tags of an alerts target and counts the alerts it matched", async () => {
+    vi.mocked(downtimes.get).mockResolvedValue({
+      data: {
+        ...detail,
+        targets: [{ module: "alerts", folders: { kind: "all" }, tags: ["component:payments"] }],
+        matched_alerts: 1,
+        affected: {
+          ...detail.affected,
+          alerts: [{ id: "a1", name: "payments-latency", folder_id: "default" }],
+        },
+      },
+    } as never);
+    const { wrapper } = await mountDetail();
+    expect(wrapper.text()).toContain("Alertsall folders · tag component:payments");
+    expect(wrapper.text()).toContain("Affected · 1");
+    wrapper.unmount();
+  });
+
   it("renders the Suppressed tab from a 200 with two hits", async () => {
     vi.mocked(downtimes.get).mockResolvedValue({ data: detail } as never);
     vi.mocked(alerts.getHistory).mockResolvedValue({

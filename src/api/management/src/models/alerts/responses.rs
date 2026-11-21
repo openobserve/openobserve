@@ -795,7 +795,7 @@ fn list_item_downtime(
     let dims = list_item_dimensions(item);
     match item.alert_type.as_str() {
         "anomaly_detection" => active_for_anomaly(org, &id, &item.folder_id, &dims, now),
-        _ => chip_for_alert(org, &id, &item.folder_id, &dims, now),
+        _ => chip_for_alert(org, &id, &item.folder_id, &dims, &item.tags, now),
     }
 }
 

@@ -1917,6 +1917,7 @@ fn composite_downtime(
         &definition.id,
         &definition.folder_id,
         &dims,
+        &tags,
         now,
     )
 }
@@ -2916,7 +2917,7 @@ async fn downtime_decision_in(
         active_in(
             cached,
             TargetModule::Alerts,
-            &item(&alert_id, folder_id, dims, &[]),
+            &item(&alert_id, folder_id, dims, &alert.tags),
             now,
         )
     })
@@ -2941,6 +2942,7 @@ pub(crate) async fn downtime_decision_except(
             &alert_id,
             folder_id,
             dims,
+            &alert.tags,
             now,
             except,
         )
@@ -3109,6 +3111,7 @@ pub(crate) async fn group_downtimes(
                 &alert_id,
                 folder_id,
                 &dims,
+                &alert.tags,
                 multi.then_some(key.as_str()),
                 now,
             )
@@ -3146,6 +3149,7 @@ async fn unmuted_identity(
             &alert_id,
             folder_id,
             dims,
+            &alert.tags,
             multi.then_some(key.as_str()),
             now,
         )
