@@ -24,7 +24,7 @@ env:
   # coverage mapping needs no DWARF; dropping debuginfo (test inherits dev) cuts compile and link time
   CARGO_PROFILE_DEV_DEBUG: "0"
   # PR UI tests: shadow = full suite, picked set only reported; on = run only the picked specs and gate changed lines.
-  UI_TEST_SELECTION: shadow
+  UI_TEST_SELECTION: on
 
 jobs:
   check_changes:
