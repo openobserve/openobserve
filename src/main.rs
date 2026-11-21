@@ -257,6 +257,9 @@ async fn run() -> Result<(), anyhow::Error> {
 
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
+            // Ingest has stopped, and the queue client lives on this runtime.
+            #[cfg(feature = "enterprise")]
+            o2_enterprise::enterprise::autoobserve::ingest_counts::shutdown().await;
             #[cfg(feature = "enterprise")]
             db::service_versions::wait_for_active_flushes().await;
             job_stopped_tx.send(()).ok();
@@ -405,6 +408,8 @@ async fn run() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     db::service_versions::begin_shutdown();
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::autoobserve::listener::shutdown().await;
 
     // stop gRPC server
     grpc_shutudown_tx.send(()).ok();

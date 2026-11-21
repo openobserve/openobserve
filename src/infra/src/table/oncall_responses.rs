@@ -1529,6 +1529,67 @@ pub async fn list_events_and_deliveries(
     all_events(response_id).await
 }
 
+/// Records of `orgs` updated at or after `since_us`, read on the caller's connection, so a
+/// poller can use the read replica.
+pub async fn list_changed_since_in<C: ConnectionTrait>(
+    conn: &C,
+    orgs: &[&str],
+    since_us: i64,
+) -> Result<Vec<Response>, errors::Error> {
+    let mut records = Vec::new();
+    for chunk in orgs.chunks(PAGE_SUBJECTS_PER_QUERY) {
+        let rows = oncall_responses::Entity::find()
+            .filter(oncall_responses::Column::OrgId.is_in(chunk.iter().copied()))
+            .filter(oncall_responses::Column::UpdatedAt.gte(since_us))
+            .order_by_asc(oncall_responses::Column::Id)
+            .all(conn)
+            .await?;
+        records.extend(rows.into_iter().filter_map(to_response));
+    }
+    Ok(records)
+}
+
+/// Records of `orgs` nobody has closed, however long ago they last changed, read on the caller's
+/// connection.
+pub async fn list_open_in<C: ConnectionTrait>(
+    conn: &C,
+    orgs: &[&str],
+) -> Result<Vec<Response>, errors::Error> {
+    let mut records = Vec::new();
+    for chunk in orgs.chunks(PAGE_SUBJECTS_PER_QUERY) {
+        let rows = oncall_responses::Entity::find()
+            .filter(oncall_responses::Column::OrgId.is_in(chunk.iter().copied()))
+            .filter(oncall_responses::Column::State.ne(ResponseState::Resolved.to_i32()))
+            .order_by_asc(oncall_responses::Column::Id)
+            .all(conn)
+            .await?;
+        records.extend(rows.into_iter().filter_map(to_response));
+    }
+    Ok(records)
+}
+
+/// Every event of `response_ids`, ledger rows included, with its record's id, read on the
+/// caller's connection.
+pub async fn list_events_of_in<C: ConnectionTrait>(
+    conn: &C,
+    response_ids: &[&str],
+) -> Result<Vec<(String, ResponseEvent)>, errors::Error> {
+    let mut events = Vec::new();
+    for chunk in response_ids.chunks(PAGE_SUBJECTS_PER_QUERY) {
+        let rows = oncall_response_events::Entity::find()
+            .filter(oncall_response_events::Column::ResponseId.is_in(chunk.iter().copied()))
+            .order_by_asc(oncall_response_events::Column::At)
+            .order_by_asc(oncall_response_events::Column::Id)
+            .all(conn)
+            .await?;
+        events.extend(rows.into_iter().filter_map(|m| {
+            let response_id = m.response_id.clone();
+            to_event(m).map(|event| (response_id, event))
+        }));
+    }
+    Ok(events)
+}
+
 /// Every page this record actually attempted, per person and per channel.
 ///
 /// The ledger the engine replays against, and the honest answer to "did the page
@@ -2448,6 +2509,64 @@ mod tests {
         assert!(events[1].templates.is_empty());
         let json = serde_json::to_value(&events[1]).unwrap();
         assert!(json.get("templates").is_none());
+    }
+
+    #[tokio::test]
+    async fn the_connection_reads_return_changed_and_open_records_and_every_event_with_its_record()
+    {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(oncall_responses::Entity),
+            schema.create_table_from_entity(oncall_response_events::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        for (id, org, updated_at, state) in [
+            ("old", "a", 1_000, ResponseState::Triggered),
+            ("new", "a", 3_000, ResponseState::Resolved),
+            ("other", "b", 3_000, ResponseState::Acknowledged),
+            ("elsewhere", "c", 5_000, ResponseState::Triggered),
+        ] {
+            let mut row = model();
+            (row.id, row.org_id, row.updated_at) = (id.into(), org.into(), updated_at);
+            row.state = state.to_i32();
+            oncall_responses::ActiveModel::from(row)
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+        let mut changed: Vec<String> = list_changed_since_in(&db, &["a", "b"], 2_000)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.id)
+            .collect();
+        changed.sort();
+        assert_eq!(changed, ["new", "other"]);
+        let open: Vec<String> = list_open_in(&db, &["a", "b"])
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|r| r.id)
+            .collect();
+        assert_eq!(open, ["old", "other"], "an open record is read however old");
+
+        let page = ResponseEvent::new(ResponseEventKind::Delivery, 10, "o2-engine", "sent")
+            .delivered_to("ana@o2.ai", Channel::Email, true);
+        let note = ResponseEvent::new(ResponseEventKind::Note, 20, "ana@o2.ai", "looking");
+        add_event_in(&db, "new", &page).await.unwrap();
+        add_event_in(&db, "new", &note).await.unwrap();
+        add_event_in(&db, "elsewhere", &note).await.unwrap();
+        let events = list_events_of_in(&db, &["new", "other"]).await.unwrap();
+        assert_eq!(
+            events,
+            [("new".to_string(), page), ("new".to_string(), note)],
+            "the ledger row the timeline hides is read too"
+        );
     }
 
     /// Reachability judges each channel on its own, so SMS failures must not be

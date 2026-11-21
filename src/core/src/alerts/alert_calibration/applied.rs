@@ -172,6 +172,7 @@ async fn write(
         fence: fence.map(|(kv, _)| kv),
         writes_us: Some(stamp),
         pending_lease: None,
+        lease: None,
     };
     match alert::update_where(conn, org, None, alert, Some(guard)).await? {
         Some(_) => Ok((

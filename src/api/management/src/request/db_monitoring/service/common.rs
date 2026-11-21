@@ -18,6 +18,13 @@
 //! and the server-vantage prologue every feature module builds on.
 
 use config::utils::time::validate_time_range;
+#[cfg(feature = "enterprise")]
+pub(crate) use openobserve_core::db_monitoring::views::{
+    build_earliest_canonical_sql, queryable_columns,
+};
+pub(crate) use openobserve_core::db_monitoring::views::{
+    escape_ident, escape_sq, present_dbm_columns,
+};
 use openobserve_core::http::map_error_to_http_response;
 
 // The models these pull in are named only from enterprise-gated bodies, so the
@@ -220,18 +227,6 @@ const MERGE_ADDITIVE: [&str; 7] = [
 ];
 
 const PERCENTILE_COLS: [&str; 3] = ["p50_ns", "p95_ns", "p99_ns"];
-
-// ─── Escaping (injection safety — every user input passes through these) ─────
-
-/// Escape a value for inclusion in a single-quoted SQL string literal.
-pub(crate) fn escape_sq(s: &str) -> String {
-    s.replace('\'', "''")
-}
-
-/// Escape a stream name for inclusion in a double-quoted SQL identifier.
-pub(crate) fn escape_ident(s: &str) -> String {
-    s.replace('"', "\"\"")
-}
 
 // ─── Scope filters ───────────────────────────────────────────────────────────
 
@@ -1423,48 +1418,6 @@ pub(super) fn dbm_event_preds(
     out
 }
 
-/// Which canonical DBM columns this stream actually has.
-///
-/// `ALL_DBM_FIELDS` is what the ingest side may WRITE, not what any given
-/// stream contains: a deployment running only the filelog recipes never emits
-/// the blocking-only columns, so they are absent from its schema. Naming an
-/// absent column in a projection fails the whole query with a schema error
-/// (not a null column), so the projection is intersected with this.
-///
-/// An unreadable schema is an ERROR, never an empty set.
-///
-/// This returned `.unwrap_or_default()` and that was a false-verdict generator:
-/// an `Err` from `infra::schema::get` (a DB/etcd blip) became the same empty
-/// `HashSet` as "this stream genuinely has no DBM columns", and both callers then
-/// stated a confident, wrong conclusion from it.
-///
-///  - Blocking degrades to the `_timestamp`-only projection while the `o2_dbm_kind = 'blocking'`
-///    filter still matches rows, so `BlockingSample::from_record` — which requires both pids —
-///    drops EVERY row, `hits` is empty, the probe runs and the page reports `not_collecting: true`.
-///    That is the operator being told their collector is broken because a schema read blipped, i.e.
-///    exactly the false alarm the design note above [`LIVENESS_PROBE_MICROS`] says must never be
-///    raised.
-///  - Deadlocks has no such guard, so it emits N events with `engine: None`, zero participants and
-///    no victim. `hits` is non-empty, so the probe is SKIPPED and the tab renders content-free rows
-///    with no diagnostic at all.
-///
-/// A stream that does not exist is not this case — `infra::schema::get` answers
-/// `Ok` with an empty schema for it (`schema/mod.rs:167`), which is the honest
-/// empty set and still yields the degraded projection. So propagating the `Err`
-/// costs the not-yet-shipped-recipe deployment nothing and buys "we could not
-/// read the schema" (a 500) in place of an invented verdict.
-pub(super) async fn present_dbm_columns(
-    org_id: &str,
-    stream_name: &str,
-) -> Result<HashSet<String>, anyhow::Error> {
-    let schema = infra::schema::get(org_id, stream_name, StreamType::Logs).await?;
-    Ok(server_vantage::ALL_DBM_FIELDS
-        .into_iter()
-        .filter(|f| schema.field_with_name(f).is_ok())
-        .map(str::to_string)
-        .collect())
-}
-
 // ─── A1 · the RAW presence gate ──────────────────────────────────────────────
 //
 // The A1 read-time fallback projects RAW vendor columns beside the canonical
@@ -1478,50 +1431,6 @@ pub(super) async fn present_dbm_columns(
 // So the raw side needs its own gate. It needs one MORE thing than the canonical
 // side does, and that is the reason this is a separate function rather than a
 // second call to `present_dbm_columns` with a different array.
-
-/// Which of `candidates` this stream can actually be QUERIED for.
-///
-/// Two independent 400s are being avoided here, and a check that catches only
-/// the first still ships a broken page:
-///
-/// 1. **Absent from the schema.** `unknown field 'x'` — the failure [`present_dbm_columns`]
-///    documents.
-/// 2. **Present in the schema but truncated out of an enabled User-Defined Schema.** *"Field exists
-///    in the stream but not in its User-Defined Schema (UDS)"*
-///    (`src/api/search/src/search/utils.rs`). Past `ZO_SCHEMA_MAX_FIELDS_TO_ENABLE_UDS` (default
-///    1000) fields, UDS auto-enables and truncates which fields stay queryable — while
-///    `infra::schema::get` keeps returning the FULL merged schema. A gate that consults only the
-///    stored schema therefore passes and then 400s at query time.
-///
-/// Variant 2 is not hypothetical for this design: the DBM stream is a shared
-/// logs stream carrying ordinary log lines (195-283 columns measured on real
-/// deployments), so crossing 1000 is realistic, and the raw vendor columns —
-/// old, and neither FTS nor index fields — are exactly the low-priority names
-/// the auto-enable truncates.
-///
-/// **An empty `uds_fields` means UDS is DISABLED, not "everything truncated".**
-/// The two are the same empty vector on the wire, and conflating them would
-/// degrade every deployment that never enabled UDS — almost all of them — to a
-/// `_timestamp`-only projection that silently shows zero deadlocks. Same
-/// false-verdict shape `present_dbm_columns` refuses for a failed schema read.
-///
-/// Pure, and takes the schema and UDS list rather than reading them, so both
-/// halves are testable without a meta store — the reason
-/// `test_present_dbm_columns_reports_errors_instead_of_empty` had to be
-/// `#[ignore]`d.
-#[cfg(feature = "enterprise")]
-pub(super) fn queryable_columns(
-    candidates: &[&str],
-    schema: &arrow_schema::Schema,
-    uds_fields: &[String],
-) -> HashSet<String> {
-    candidates
-        .iter()
-        .filter(|f| schema.field_with_name(f).is_ok())
-        .filter(|f| uds_fields.is_empty() || uds_fields.iter().any(|u| u == **f))
-        .map(|f| f.to_string())
-        .collect()
-}
 
 /// A string column, or JSON null when absent/empty.
 pub(super) fn str_or_null(row: &Value, key: &str) -> Value {
@@ -1620,28 +1529,6 @@ impl BoundaryProbe {
     pub(super) fn fallback_needed(&self, _start_time: i64) -> bool {
         self.has_raw_row
     }
-}
-
-/// SQL for the EARLIEST canonical row of one kind inside the window.
-///
-/// Ordered ASCENDING — deliberately the mirror of [`build_last_seen_sql`], which
-/// is DESC because it wants the latest. Getting this backwards returns the
-/// newest canonical row, which is inside the window by construction, so it would
-/// answer "yes, covered" for every window that has ever seen a canonical row and
-/// silently disable the fallback on the deployments that need it.
-///
-/// Bounded to the REQUESTED window rather than `MIN(_timestamp)` over all
-/// history: the unbounded form is a full scan and would cost more than the
-/// widening it saves. `LIMIT 1` over the same range the main read is about to
-/// scan is the cheapest question that answers the boundary.
-#[cfg(feature = "enterprise")]
-pub(crate) fn build_earliest_canonical_sql(stream_name: &str, kind: &str) -> String {
-    format!(
-        "SELECT _timestamp FROM \"{}\"\nWHERE {} = '{}'\nORDER BY _timestamp ASC\nLIMIT 1",
-        escape_ident(stream_name),
-        server_vantage::O2_DBM_KIND,
-        escape_sq(kind),
-    )
 }
 
 /// Everything the builder may project, gated on what the stream actually has.

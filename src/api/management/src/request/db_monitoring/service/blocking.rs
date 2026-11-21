@@ -19,6 +19,10 @@
 // The models these pull in are named only from enterprise-gated bodies, so the
 // glob is genuinely unused on OSS. Keep the import (enterprise needs it) and
 // silence the OSS-only lint rather than splitting it behind a cfg.
+pub(crate) use openobserve_core::db_monitoring::views::RawBlockingFallback;
+#[cfg(feature = "enterprise")]
+pub(crate) use openobserve_core::db_monitoring::views::build_raw_blocking_presence_sql;
+
 #[cfg_attr(not(feature = "enterprise"), allow(unused_imports))]
 use super::{super::models::*, *};
 
@@ -50,41 +54,6 @@ async fn present_raw_blocking_columns(
     Ok(raw_blocking_columns_in(&schema, &uds))
 }
 
-/// The A1 phase-2a read-time fallback for BLOCKING, carrying its schema-gated
-/// raw column set.
-///
-/// A distinct type from [`RawDeadlockFallback`] rather than one generic carrier:
-/// the two vocabularies are different arrays and the marker shapes differ (four
-/// columns vs one column with four values), so a single type would have to be
-/// told which it was holding — and the compiler can enforce that for free by
-/// making them different types. It is what stops the activity caller, which
-/// shares the builder, from being handed either one.
-///
-/// NOT `#[cfg]`-gated, for the same reason as its deadlock twin: activity is an
-/// OSS-owned ungated page calling the same builder, so the parameter's type must
-/// exist in both builds. Inert on OSS — nothing there constructs one.
-pub(crate) struct RawBlockingFallback {
-    /// Raw columns this stream can actually be queried for.
-    pub present: HashSet<String>,
-}
-
-impl RawBlockingFallback {
-    /// The marker terms for the `WHERE`, gated on the marker COLUMN's presence.
-    ///
-    /// All four blocking recipes share the single `o2_recipe` column, so unlike
-    /// the deadlock markers this is all-or-nothing: either the stream has
-    /// `o2_recipe` and all four terms are emitted, or it has none and the
-    /// widening cannot fire at all. Naming the column when it is absent is the
-    /// same whole-page 400 the projection gate exists to prevent.
-    pub(super) fn marker_terms(&self) -> Vec<String> {
-        server_vantage::BLOCKING_MARKERS
-            .into_iter()
-            .filter(|(col, _)| self.present.contains(*col))
-            .map(|(col, val)| format!("{col} = '{val}'"))
-            .collect()
-    }
-}
-
 // ─── A1.1 · the canonicalization boundary ────────────────────────────────────
 //
 // A1 shipped ALWAYS-ON: every deadlocks read widened its SQL with the raw
@@ -101,27 +70,6 @@ impl RawBlockingFallback {
 // This narrows WHICH READS adapt. It does NOT touch a stored row: adapted
 // queries only, permanently (§9). No backfill, no re-canonicalization, no
 // materializing canonical columns into stored rows.
-
-/// SQL for ANY raw-marker BLOCKING row inside the window.
-///
-/// Mirror of [`build_raw_deadlock_presence_sql`] over the blocking markers.
-/// `None` when the stream has no `o2_recipe` column: no raw blocking row can
-/// exist, so the caller reads that as "no raw rows" without running a query.
-#[cfg(feature = "enterprise")]
-pub(crate) fn build_raw_blocking_presence_sql(
-    stream_name: &str,
-    raw: &RawBlockingFallback,
-) -> Option<String> {
-    let markers = raw.marker_terms();
-    if markers.is_empty() {
-        return None;
-    }
-    Some(format!(
-        "SELECT _timestamp FROM \"{}\"\nWHERE ({})\nLIMIT 1",
-        escape_ident(stream_name),
-        markers.join(" OR "),
-    ))
-}
 
 /// Does this window need the raw BLOCKING widening?
 ///

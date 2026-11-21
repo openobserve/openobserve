@@ -499,6 +499,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     let cfg = config::get_config();
 
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        use o2_enterprise::enterprise::super_cluster::kv::scheduler::JobClusterHome;
+        infra::cluster::set_home_region_resolver(std::sync::Arc::new(JobClusterHome));
+    }
+
     // init root user
     if !db::user::root_user_exists().await {
         if cfg.auth.root_user_email.is_empty()
