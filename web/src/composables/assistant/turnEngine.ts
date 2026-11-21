@@ -835,7 +835,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
           resolve();
         },
         onBoundary(id) {
-          held.push(() => sink.onBoundary(id));
+          held.push(() => sink.onBoundary?.(id));
         },
         onEnd(reason) {
           if (reason === "eof") swapIn();
