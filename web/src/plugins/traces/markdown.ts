@@ -16,9 +16,13 @@
 import { Marked } from "marked";
 import DOMPurify from "dompurify";
 
-// Own Marked instance so we never touch the app-wide `marked` config. GFM gives
-// headings, tables, code fences, bold, lists — what LLM responses use.
-const md = new Marked({ gfm: true, breaks: false });
+// Isolate trace rendering from app-wide Markdown options.
+const md = new Marked({
+  gfm: true,
+  breaks: false,
+  // Treat literal tags as text so Markdown inside them is still parsed.
+  tokenizer: { html: () => undefined, tag: () => undefined },
+});
 
 /**
  * Render an LLM message's markdown to sanitized HTML for `v-html`. Pair with the

@@ -878,6 +878,21 @@ describe("SessionDetails — turn expand/collapse", () => {
     expect(wrapper.text()).toContain("Hi there");
   });
 
+  it("preserves placeholders and Markdown in the assistant turn detail", async () => {
+    mockFetchSessionSpans.mockResolvedValue([
+      makeSpan({
+        gen_ai_output_messages: JSON.stringify([
+          { role: "assistant", content: "**Email**: <PERSON_1>" },
+        ]),
+      }),
+    ]);
+    const wrapper = await mountComponent();
+    await expandTurn(wrapper);
+    const reply = wrapper.get(`${turnBodySelector()} .markdown-body`);
+    expect(reply.text()).toContain("<PERSON_1>");
+    expect(reply.get("strong").text()).toBe("Email");
+  });
+
   it("collapses turn body when header is clicked again", async () => {
     const wrapper = await mountComponent();
     const header = wrapper.find(turnHeaderSelector());

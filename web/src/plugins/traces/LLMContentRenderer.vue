@@ -244,8 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import DOMPurify from "dompurify";
-import { marked } from "marked";
+import { renderMarkdown as renderMarkdownHtml } from "./markdown";
 import { extractGenAiPartText } from "./genAiParts";
 
 const { t } = useI18nTyped();
@@ -685,10 +684,7 @@ const shouldFillFormattedContent = computed(() => {
   );
 });
 
-const renderMarkdown = (content: string): string => {
-  const markdownContent = toMarkdown(content);
-  return DOMPurify.sanitize(marked.parse(markdownContent) as string);
-};
+const renderMarkdown = (content: string): string => renderMarkdownHtml(toMarkdown(content));
 </script>
 
 <style scoped>
