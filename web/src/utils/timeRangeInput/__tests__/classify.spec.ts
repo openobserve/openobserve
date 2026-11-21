@@ -102,14 +102,10 @@ describe("classifier precedence", () => {
       ]);
   });
 
-  it("asks which stamp when a log line starts with two", async () => {
+  it("refuses a log line that starts with two stamps", async () => {
     const pack = await packOf("en-us");
     const r = parseTimeRangeInput(baseContext(pack, `${A} ${B} worker started`));
-    expect(r.state === "ambiguous" && r.reason).toBe("log-stamps");
-    expect(r.state === "ambiguous" && r.readings.map((x) => x.origin.form)).toEqual([
-      "log-line",
-      "log-line",
-    ]);
+    expect(r.state).toBe("invalid");
   });
 
   it("reads copy payloads and URLs strictly", async () => {
