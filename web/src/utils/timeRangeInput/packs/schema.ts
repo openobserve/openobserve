@@ -151,8 +151,6 @@ export interface CompiledPack {
   months: Words<number>;
   weekdays: Words<number>;
   mods: Words<ClockMod>;
-  /** Every word and pattern literal the pack folds, to tell grammar text from message text. */
-  lexicon: Words<null>;
   autoNames: Record<string, string>;
   nameLastN: string;
   examples: string[];
@@ -381,12 +379,8 @@ function generatedAgo(gen: GeneratedTables, pat: (s: string) => Elem[]) {
 /** Builds the matcher tables of one locale from its hand pack, its Intl tables and English. */
 export function compilePack(hand: LocalePack, gen: GeneratedTables, en?: LocalePack): CompiledPack {
   const pack = mergeEnglish(hand, en);
-  const lexicon: Word<null>[] = [];
-  const fold = (s: string): string => {
-    const f = foldText(s.normalize("NFKC"), pack.bcp47, pack.script, pack.hooks?.fold);
-    lexicon.push({ s: f, value: null });
-    return f;
-  };
+  const fold = (s: string): string =>
+    foldText(s.normalize("NFKC"), pack.bcp47, pack.script, pack.hooks?.fold);
   const pat = (s: string): Elem[] => compilePattern(s.normalize("NFKC"), fold);
   const { ago, splits } = generatedAgo(gen, pat);
   const derived = deriveUnits(splits);
@@ -466,7 +460,6 @@ export function compilePack(hand: LocalePack, gen: GeneratedTables, en?: LocaleP
     autoNames: auto.autoNames,
     nameLastN: pack.nameTemplates.lastN,
     examples: pack.examples,
-    lexicon: byLength(lexicon),
   };
 }
 

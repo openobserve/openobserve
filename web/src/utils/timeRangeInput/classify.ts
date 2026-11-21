@@ -14,29 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { rangeDrafts, singleDrafts, type Env } from "./combine";
-import {
-  epochUs,
-  scanDateMath,
-  scanEpoch,
-  scanIso,
-  scanStamp,
-  scanZone,
-  type Scanned,
-} from "./machine";
+import { epochUs, scanDateMath, scanEpoch, scanIso, scanStamp, type Scanned } from "./machine";
 import type { Normalized } from "./normalize";
 import {
-  lexiconAt,
-  marksOn,
   newScan,
   phraseOutcome,
-  pointHits,
   rangeOutcome,
   pointDrafts,
-  wordAt,
+  secondsMarks,
   type Scan,
 } from "./phrases";
 import { countCompletions, shorthandOutcome } from "./shorthand";
-import type { Alt, ClockValue, Draft, Outcome, Point } from "./types";
+import type { Alt, Draft, Outcome, Point } from "./types";
 
 // The text starts with `{`, so any JSON it holds is an object; it must have exactly the two keys.
 function copyPayload(text: string): Outcome {
@@ -75,15 +64,16 @@ function urlPoint(value: string, env: Env): Alt<Point>[] {
 }
 
 function urlOutcome(text: string, env: Env): Outcome {
-  const at = text.indexOf("?");
-  const hash = text.indexOf("#", at);
+  const hash = text.indexOf("#");
+  const at = text.slice(0, hash < 0 ? undefined : hash).indexOf("?");
   const query = at < 0 ? "" : text.slice(at + 1, hash < 0 ? undefined : hash);
   const params = new URLSearchParams(query);
   const [[from, f2], [to, t2], [period, p2]] = ["from", "to", "period"].map((k) =>
     params.getAll(k),
   );
-  // A repeated param would leave a value unread.
-  if ((f2 ?? t2 ?? p2) !== undefined) return { t: "invalid", reason: "unreadable" };
+  // A repeated param, a lone end or a period beside both ends would leave a value unread.
+  if ((f2 ?? t2 ?? p2) !== undefined || !from !== !to || (from && to && period))
+    return { t: "invalid", reason: "unreadable" };
   if (from && to) {
     const r = rangeDrafts(urlPoint(from, env), urlPoint(to, env), env);
     if (r.drafts.length > 0) return { t: "drafts", drafts: r.drafts, form: "url" };
@@ -113,58 +103,8 @@ function bareNumber(text: string, env: Env): Outcome {
   };
 }
 
-// Punctuation that may close a log field: a stamp ends at it before a space, a mark right before it.
-const CLOSE = ",;.):]";
-
-// A log line is only its leading seconds stamp with one zone and one am/pm mark; text after it that
-// starts with a digit, symbol, zone or pack word goes to the range grammar, never a guess.
-function logLine(norm: Normalized, sc: Scan, env: Env): Outcome {
-  const line = norm.firstLine;
-  const pos = line[0] === "[" ? 1 : 0;
-  const gap = (k: number) => k >= line.length || line[k] === " ";
-  const token = (k: number) => gap(k) || CLOSE.includes(line[k]);
-  // A mark glued to a word character is message text (`pm2`); glued to a sign it may start a range.
-  const glued = (k: number) => !token(k) && !wordAt(line, k);
-  const was = sc.partial;
-  let refused = false;
-  const mark = (end: number, c: ClockValue): [number, ClockValue][] =>
-    (c.sec ? [end, end + 1] : []).flatMap((p) =>
-      p > end && line[end] !== " "
-        ? []
-        : marksOn(sc, p, c).flatMap(([e, v]): [number, ClockValue][] => {
-            refused ||= e <= line.length && (glued(e) || (token(e) && !v));
-            return e <= line.length && token(e) && v ? [[e, v]] : [];
-          }),
-    );
-  const hits = scanStamp(sc.text, pos, env.nowUs, env.zone, mark).filter(
-    (s) => s.end <= line.length,
-  );
-  const end = Math.max(-1, ...hits.map((s) => s.end));
-  const alts = hits.filter((s) => s.end === end).flatMap((s) => s.alts);
-  const alone = norm.text.length === end;
-  const timed = alts.length > 0 && alts.every((a) => "clock" in a.v && a.v.clock?.sec);
-  const close = end + (CLOSE.includes(line[end]) ? 1 : 0);
-  const rest = close + (line[close] === " " ? 1 : 0);
-  const marks = marksOn(sc, rest, { h: 1, mi: 0, s: 0, us: 0, word: false });
-  const message = marks.some(([e]) => !token(e) && !glued(e));
-  const open =
-    !timed ||
-    !gap(close) ||
-    /^([+/]? ?\p{Nd}[^]*|[^\p{L}\p{N}]+)$/u.test(line.slice(rest)) ||
-    lexiconAt(sc, rest) ||
-    scanZone(line, rest + ("([".includes(line[rest]) ? 1 : 0)).length > 0 ||
-    (!message && pointHits(sc, rest).length > 0);
-  sc.partial = was;
-  // Only a seconds stamp is a log line, so a shorter one alone on its line must not reach the next.
-  if (timed ? refused : !alone && line.length === end)
-    return { t: "invalid", reason: "unreadable" };
-  if (open) return { t: "none" };
-  const drafts = singleDrafts(alts, env);
-  if (alone) return { t: "drafts", drafts, form: "iso" };
-  for (const d of drafts) d.notes = [...d.notes, { kind: "log-line" }];
-  return { t: "drafts", drafts, form: "log-line" };
-}
-
+// Every step must read the whole text, so a stamp followed by any other text (a pasted log line,
+// a second line) is never read as that stamp.
 /** Runs the §4.2 steps in order; the first step that claims the input is final. */
 export function classify(norm: Normalized, env: Env): { outcome: Outcome; scan: Scan } {
   const text = norm.text;
@@ -172,13 +112,12 @@ export function classify(norm: Normalized, env: Env): { outcome: Outcome; scan: 
   if (text.startsWith("{")) return { outcome: copyPayload(text), scan: sc };
   if (norm.url) return { outcome: urlOutcome(text, env), scan: sc };
   const steps: (() => Outcome)[] = [
-    () => logLine(norm, sc, env),
     () => rangeOutcome(sc),
     () => (/^\d+$/.test(text) ? bareNumber(text, env) : { t: "none" }),
     () => {
-      // A stamp never takes its zone from the next line.
-      if (text !== norm.firstLine) return { t: "none" };
-      const single = scanStamp(text, 0, env.nowUs, env.zone).filter((s) => s.end === text.length);
+      const single = scanStamp(text, 0, env.nowUs, env.zone, secondsMarks(sc)).filter(
+        (s) => s.end === text.length,
+      );
       const drafts = singleDrafts(
         single.flatMap((s) => s.alts),
         env,

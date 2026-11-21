@@ -154,7 +154,7 @@ export function scanColonClock(text: string, pos: number): { end: number; c: Clo
   return { end, c: { h, mi, s, us, word: false, ...(end > pos + hl + 3 ? { sec: true } : {}) } };
 }
 
-/** A signed offset up to -12:00..+14:00; a `-` one takes only minutes 00, 30 or 45. */
+/** A signed offset in the real range: -12:00..+14:00, minutes 00, 30 or 45. */
 export function scanOffset(text: string, pos: number): { end: number; sec: number } | null {
   const sign = text[pos] === "+" ? 1 : text[pos] === "-" ? -1 : 0;
   if (sign === 0) return null;
@@ -173,13 +173,7 @@ export function scanOffset(text: string, pos: number): { end: number; sec: numbe
     }
   }
   const top = sign > 0 ? 14 : 12;
-  // `-` also joins a range, so only a real offset's minutes make `-05:15` an offset.
-  if (
-    h < 0 ||
-    h > top ||
-    (h === top && mi !== 0) ||
-    (mi !== 0 && mi !== 30 && mi !== 45 && (sign < 0 || mi > 59))
-  )
+  if (h < 0 || h > top || (h === top && mi !== 0) || (mi !== 0 && mi !== 30 && mi !== 45))
     return null;
   return { end, sec: sign * (h * 3600 + mi * 60) };
 }
@@ -289,10 +283,7 @@ function withZone(
   for (const [end, c] of [[at, clock] as const, ...(mark?.(at, clock) ?? [])]) {
     out.push({ end, alts: [{ v: { p: "wall", y, mo, d, clock: c } }] });
     const from = zoneStart(text, end, host);
-    // A zone in brackets (`(UTC)`, `[+0000]`) attaches like a bare one, its closer included.
-    const shut = ")]"["([".indexOf(text[from ?? -1])];
-    for (const z of from === null ? [] : scanZone(text, from + (shut ? 1 : 0))) {
-      if (shut && text[z.end++] !== shut) continue;
+    for (const z of from === null ? [] : scanZone(text, from)) {
       out.push({
         end: z.end,
         alts: z.alts.map((a) => ({ v: zonedPoint(y, mo, d, c, a.v), why: a.why, tag: a.tag })),

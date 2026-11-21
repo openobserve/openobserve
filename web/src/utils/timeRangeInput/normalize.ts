@@ -20,7 +20,6 @@ export type FoldScript = "latin" | "arabic" | "other";
 export interface Normalized {
   text: string;
   fold: string;
-  firstLine: string;
   /** The raw text starts with an ASCII URL scheme or a query, so a fullwidth look-alike is no URL. */
   url: boolean;
 }
@@ -66,7 +65,7 @@ function mapped(nfkc: string): string {
   let hidden = "";
   for (const ch of nfkc) {
     const m = mapChar(ch.codePointAt(0) ?? 0);
-    if (/^[^\P{Cf}\p{Bidi_C}]$/u.test(m)) {
+    if (/^[^\P{Cf}\u202a-\u202e]$/u.test(m)) {
       hidden += m;
       continue;
     }
@@ -137,13 +136,6 @@ export function normalize(
   return {
     text,
     fold: foldText(text, bcp47, script, hooks.fold),
-    firstLine:
-      [...raw]
-        .map((c) => ("\r\u2028\u2029".includes(c) ? "\n" : c))
-        .join("")
-        .split("\n")
-        .map((l) => mapped(clean(l.normalize("NFKC"))))
-        .find((l) => l.length > 0) ?? "",
     url: /^\s*(https?:\/\/|[?？])[^]*$/i.test(raw),
   };
 }

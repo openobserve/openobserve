@@ -115,12 +115,10 @@ describe("DST gaps and folds", () => {
     },
   );
 
-  it("asks zone-abbreviation for a log line whose stamp ends in IST", () => {
-    const r = parse("2026-11-16 09:00:00 IST request failed", NOW, "UTC");
+  it("asks zone-abbreviation for a stamp that ends in IST", () => {
+    const r = parse("2026-11-16 09:00:00 IST", NOW, "UTC");
     expect(r.state === "ambiguous" && r.reason).toBe("zone-abbreviation");
-    expect(r.state === "ambiguous" && r.readings.every((x) => x.origin.form === "log-line")).toBe(
-      true,
-    );
+    expect(parse("2026-11-16 09:00:00 IST request failed", NOW, "UTC").state).toBe("invalid");
   });
 
   it("resolves a typed IANA zone that differs from the picker zone", () => {
