@@ -115,7 +115,60 @@ jobs:
           DELIM="hintEOF_$(openssl rand -hex 16 2>/dev/null || echo "${RANDOM}${RANDOM}${RANDOM}")"
           printf 'hint<<%s\n%s\n%s\n' "$DELIM" "$HINT" "$DELIM" >> "$GITHUB_OUTPUT"
 
+      - if: github.event_name == 'pull_request' && vars.E2E_AUTO_REGRESSION == 'true'
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - name: Leave bug fixes to the regression door (one owner per fix PR)
+        id: owner
+        if: github.event_name == 'pull_request' && vars.E2E_AUTO_REGRESSION == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ steps.ctx.outputs.pr }}
+          MERGED_AT: ${{ github.event.pull_request.merged_at }}
+        run: |
+          set -uo pipefail
+          # An inconclusive read fails the run instead of dispatching, since the regression door may still fire for this PR.
+          stuck() { echo "::error::$1; re-run this job, or dispatch by hand once it reads cleanly"; exit 1; }
+          CANDS=$(gh api graphql -F owner="${REPO%%/*}" -F name="${REPO##*/}" -F n="$PR" -f query='
+            query($owner: String!, $name: String!, $n: Int!) {
+              repository(owner: $owner, name: $name) { pullRequest(number: $n) {
+                closingIssuesReferences(first: 25) { nodes { number repository { nameWithOwner } issueType { name } labels(first: 50) { nodes { name } } } }
+              } } }' --jq '[.data.repository.pullRequest.closingIssuesReferences.nodes[]
+                | select(.repository.nameWithOwner == "openobserve/openobserve")
+                | select((.issueType.name // "") == "Bug" or any(.labels.nodes[]; .name == "☢️ Bug")) | .number | tostring] | join(" ")') \
+            || stuck "could not read the closing issues of #${PR}"
+          [ -n "$CANDS" ] || { echo "::notice::dispatching as usual: #${PR} closes no openobserve/openobserve bug"; exit 0; }
+          FILES=$(gh api --paginate "repos/${REPO}/pulls/${PR}/files" --jq '.[].filename') || stuck "could not list the files of #${PR}"
+          grep -q '^web/' <<<"$FILES" || { echo "::notice::dispatching as usual: #${PR} does not touch web/, so the regression door declines it"; exit 0; }
+          MERGED_TS=$(date -d "$MERGED_AT" +%s) || stuck "unreadable merged_at '${MERGED_AT}'"
+          # Same rule as regression-council-caller.yml (regression-fix-pr.py): a bug counts only if that door will pick this PR for it.
+          for attempt in 1 2; do
+            BUGS=""; OPEN=0
+            for N in $CANDS; do
+              OUT=$(python3 .github/scripts/regression-fix-pr.py "$N" issues) || stuck "could not read the timeline of #${N}"
+              read -r CLOSER_OK PICK SOURCE TRUSTED STATE REASON CLOSED_AT <<<"$OUT"
+              # Still open: this merge closes it next, with this PR as the closer.
+              if [ "$STATE" = "OPEN" ]; then OPEN=1; BUGS="$BUGS #$N"; continue; fi
+              [ "$REASON" = "COMPLETED" ] && [ "$PICK" = "$PR" ] || continue
+              [ "$CLOSER_OK" = "yes" ] || [ "$TRUSTED" = "yes" ] || continue
+              # A close more than the door's 30s retry before this merge was judged while this PR was unmerged.
+              [ $((MERGED_TS - $(date -d "$CLOSED_AT" +%s))) -le 30 ] || continue
+              BUGS="$BUGS #$N"
+            done
+            [ "$OPEN" = 0 ] || [ "$attempt" = 2 ] || { sleep 30; continue; }
+            break
+          done
+          [ -n "$BUGS" ] || { echo "::notice::dispatching as usual: the regression door picks no bug for #${PR}"; exit 0; }
+          # The engine applies one PR-author gate to both doors, so an author it rejects gets no test from either.
+          echo "::notice::not dispatching: #${PR} is the fix the regression door picks for bug${BUGS}, so regression-council-caller.yml owns its tests (one per bug)"
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+
       - name: Dispatch the E2E Council engine (o2-enterprise) via the org-admin PAT
+        if: steps.owner.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           PR: ${{ steps.ctx.outputs.pr }}

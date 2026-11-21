@@ -6,10 +6,16 @@ on:
     - cron: '30 17 * * *'  # 11:00 PM IST
     - cron: '30 23 * * *'  # 5:00 AM IST
   workflow_dispatch:
+  # A PR that adds or edits a RegressionSet spec runs only those specs, under the same ready-for-ci + non-draft gate as playwright.yml.
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, ready_for_review]
+    paths:
+      - "tests/ui-testing/playwright-tests/RegressionSet/**"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  # Another label's event skips every job, so it gets its own group and cannot displace a queued real run.
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event.action == 'labeled' && github.event.label.name != 'ready-for-ci' && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action == 'synchronize' }}
 
 permissions:
   contents: read
@@ -53,11 +59,14 @@ jobs:
   check_main_changed:
     timeout-minutes: 5
     name: check_main_changed
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false && (github.event.action != 'labeled' || github.event.label.name == 'ready-for-ci')) }}
     runs-on: ubuntu-latest
     permissions:
       actions: read  # for `gh run list` (last run's head_sha)
+      pull-requests: read
     outputs:
       should_run: ${{ steps.decide.outputs.should_run }}
+      pr_specs: ${{ steps.decide.outputs.pr_specs }}
     steps:
       - id: decide
         env:
@@ -67,6 +76,14 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
             echo "::notice::Manual dispatch — running regardless of main changes."
+            exit 0
+          fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            SPECS=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
+              --jq '.[] | select(.status != "removed") | .filename | select(test("^tests/ui-testing/playwright-tests/RegressionSet/[A-Za-z0-9_./-]+\\.spec\\.js$"))' | tr '\n' ' ')
+            echo "pr_specs=${SPECS}" >> "$GITHUB_OUTPUT"
+            if [ -n "${SPECS// /}" ]; then echo "should_run=true" >> "$GITHUB_OUTPUT"; echo "Changed RegressionSet specs: ${SPECS}"
+            else echo "should_run=false" >> "$GITHUB_OUTPUT"; echo "::notice::no added or edited RegressionSet spec in this PR — skipping."; fi
             exit 0
           fi
           # On a scheduled run github.sha is main's tip, so no checkout is needed.
@@ -97,8 +114,8 @@ jobs:
   build_binary:
     timeout-minutes: 45
     name: build_binary
-    needs: [check_main_changed]
-    if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
+    needs: [check_main_changed, generate_matrix]
+    if: ${{ needs.check_main_changed.outputs.should_run == 'true' && needs.generate_matrix.outputs.has_shards == 'true' }}
     runs-on:
       labels: ubicloud-standard-16
     permissions:
@@ -176,14 +193,48 @@ jobs:
       contents: read
     outputs:
       matrix: ${{ steps.gen.outputs.matrix }}
+      has_shards: ${{ steps.gen.outputs.has_shards }}
       # Kept from the earlier attempt on "Re-run failed jobs"; equal to run_attempt on "Re-run all jobs".
       attempt: ${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      # Only this step gets the org token, so the PR's checked-out scripts in the next step cannot read it.
+      - name: Fetch the ENT regression overlay
+        if: github.event_name == 'pull_request'
+        env:
+          ENT_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          # A paired PR registers its ENT-only spec on the same-named ENT branch, so read that overlay as well as main's.
+          mkdir -p "$RUNNER_TEMP/ent-overlays"; i=0
+          for REF in main "$HEAD_REF"; do
+            [ -n "$REF" ] && [ -n "$ENT_TOKEN" ] && [[ "$REF" =~ ^[A-Za-z0-9._/-]+$ ]] || continue
+            F="$RUNNER_TEMP/ent-overlays/$i.json"
+            if GH_TOKEN="$ENT_TOKEN" gh api -H "Accept: application/vnd.github.raw" "repos/openobserve/o2-enterprise/contents/tests/ui-testing/ci-matrix/ci_matrix_regression.ent.json?ref=${REF}" > "$F" 2>/dev/null; then
+              i=$((i+1))
+            else
+              rm -f "$F"; echo "::notice::ENT regression overlay not readable on ref '${REF}'"
+            fi
+          done
       - id: gen
+        env:
+          PR_SPECS: ${{ needs.check_main_changed.outputs.pr_specs }}
         run: |
           MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix_regression.json)
           if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (build-ci-matrix produced no output)"; exit 1; fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            printf '%s' "$MATRIX" > "$RUNNER_TEMP/matrix.json"; printf '%s\n' $PR_SPECS > "$RUNNER_TEMP/changed.txt"
+            OVERLAYS=()
+            for F in "$RUNNER_TEMP"/ent-overlays/*.json; do [ -f "$F" ] && OVERLAYS+=("$F"); done
+            MATRIX=$(node .github/scripts/regression-pr-matrix.js "$RUNNER_TEMP/matrix.json" "$RUNNER_TEMP/changed.txt" "${OVERLAYS[@]}") || exit 1
+            if [ "$(printf '%s' "$MATRIX" | node -e "console.log(JSON.parse(require('fs').readFileSync(0,'utf8')).include.length)")" = "0" ]; then
+              echo "::notice::every changed spec is ENT-only, so the OSS build has nothing to run"
+              echo "has_shards=false" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+          fi
+          echo "has_shards=true" >> "$GITHUB_OUTPUT"
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', '))"
 
@@ -544,7 +595,7 @@ jobs:
     timeout-minutes: 10
     name: Report to OpenObserve
     needs: [build_binary, ui_integration_tests, merge_reports]
-    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
+    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' && github.event_name != 'pull_request' }}
     runs-on:
       labels: eks-openobserve-standard-4
     permissions:
@@ -726,18 +777,26 @@ jobs:
           fi
 
   playwright_summary:
+    # playwright.yml's required check is also called playwright_summary, and PR runs of this workflow must not answer for it.
+    name: regression_playwright_summary
     timeout-minutes: 5
     runs-on:
       labels: eks-openobserve-standard-4
     permissions: {}
-    needs: [build_binary, ui_integration_tests, merge_reports]
-    if: always()
+    needs: [check_main_changed, generate_matrix, build_binary, ui_integration_tests, merge_reports]
+    # An unlabelled or draft PR skips check_main_changed, and must not take a runner for this summary.
+    if: ${{ always() && (github.event_name != 'pull_request' || needs.check_main_changed.result == 'success') }}
     steps:
       - name: Check test results
         run: |
           BUILD_OK=false
           UI_OK=false
           MERGE_OK=false
+          MATRIX_OK=false
+
+          if [ "${{ needs.generate_matrix.result }}" == "success" ] || [ "${{ needs.generate_matrix.result }}" == "skipped" ]; then
+            MATRIX_OK=true
+          fi
 
           if [ "${{ needs.build_binary.result }}" == "success" ] || [ "${{ needs.build_binary.result }}" == "skipped" ]; then
             BUILD_OK=true
@@ -753,11 +812,12 @@ jobs:
             MERGE_OK=true
           fi
 
-          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ]; then
+          if [ "$MATRIX_OK" == "true" ] && [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ]; then
             echo "All regression tests completed successfully"
             exit 0
           else
             echo "Regression tests failed:"
+            echo "  generate_matrix: ${{ needs.generate_matrix.result }}"
             echo "  build_binary: ${{ needs.build_binary.result }}"
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
             echo "  merge_reports: ${{ needs.merge_reports.result }}"
