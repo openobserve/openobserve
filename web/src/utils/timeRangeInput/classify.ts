@@ -25,19 +25,17 @@ import {
 } from "./machine";
 import type { Normalized } from "./normalize";
 import {
+  joinsAt,
+  marksOn,
   newScan,
   phraseOutcome,
   pointHits,
   rangeOutcome,
   pointDrafts,
-  stampHits,
-  UNIVERSAL_JOINS,
-  unmarked,
-  wordy,
   type Scan,
 } from "./phrases";
 import { countCompletions, shorthandOutcome } from "./shorthand";
-import type { Alt, Draft, Outcome, Point } from "./types";
+import type { Alt, ClockValue, Draft, Outcome, Point } from "./types";
 
 // The text starts with `{`, so any JSON it holds is an object; it must have exactly the two keys.
 function copyPayload(text: string): Outcome {
@@ -49,9 +47,10 @@ function copyPayload(text: string): Outcome {
   }
   const { start_date: start, end_date: end } = value;
   const safe = (v: unknown): v is number => Number.isSafeInteger(v);
-  // `JSON.parse` keeps the last of two equal keys, so the text must hold exactly two members.
+  // `JSON.parse` keeps the last of two equal keys and rounds fractions, so the text must hold exactly
+  // two integer members.
   if (
-    !/^\{ ?"[^"]*" ?:[^,}]*, ?"[^"]*" ?:[^,}]*\}$/.test(text) ||
+    !/^\{ ?"[^"]*" ?: ?-?\d+ ?, ?"[^"]*" ?: ?-?\d+ ?\}$/.test(text) ||
     Object.keys(value).sort().join() !== "end_date,start_date" ||
     !safe(start) ||
     !safe(end)
@@ -111,105 +110,56 @@ function bareNumber(text: string, env: Env): Outcome {
   };
 }
 
-function timed(s: Scanned<Point>): boolean {
-  return s.alts.every((a) => a.v.p !== "day");
-}
+// Punctuation that may close a log field: a stamp ends at it before a space, a mark right before it.
+const CLOSE = ",;.):]";
 
-// Only a machine stamp starts a log line: ISO `T`, a clock with seconds, or a CLF stamp.
-function machine(line: string, s: Scanned<Point>): boolean {
-  const head = line.slice(0, s.end);
-  return (
-    /^(\d{4}[-/]\d\d[-/]\d\dT|\[?\d\d\/[a-z]{3}\/)[^]*$/i.test(head) ||
-    s.alts.every((a) => "clock" in a.v && a.v.clock?.sec)
-  );
-}
-
-// Punctuation after a mark (`PM,`, `PM:`) binds it, since reading it as message text shifts 12 h; a
-// glued word character (`PM_x`, `pm2`) or a sign that may start an offset or range end does not.
-function bound(line: string, i: number): boolean {
-  return i >= line.length || !/^[\p{L}\p{N}_+\-–/]$/u.test(line[i]);
-}
-
-/** A first line that starts with a stamp; a second stamp right after it asks which one. */
+// A log line is only its leading seconds stamp with one zone and one am/pm mark; text after it that
+// could start a range (join, digit, zone, date or time word) goes to the range grammar, never a guess.
 function logLine(norm: Normalized, sc: Scan, env: Env): Outcome {
   const line = norm.firstLine;
-  // The longest timed stamp, unless glued to more text; then only a shorter one before a space.
-  const stampAt = (pos: number) =>
-    stampHits(sc, pos, true)
-      .filter((s) => timed(s) && s.end <= line.length)
-      .sort((a, b) => b.end - a.end)
-      .find((s, i) => (i ? !line[s.end]?.trim() : bound(line, s.end)));
-  const best = stampAt(0);
-  if (!best || !machine(line, best)) return { t: "none" };
-  const more = best.end < line.length || norm.text.length > line.length;
-  // A field ends at a space, or at a punctuation mark and the space after it.
-  const skip = (k: number): number => {
-    if (line[k]?.trim() && bound(line, k)) k++;
-    return line[k] === " " ? k + 1 : k;
-  };
-  const from = skip(best.end);
-  const plain = unmarked(sc);
-  // A refused mark after the clock is message text, unless a range join follows it or its zone.
-  let mark = from;
-  while (line[mark]?.trim() && plain[mark] === " ") mark++;
-  // Probing the tail for a range end must not leave the scan's partial flag set.
+  const pos = line[0] === "[" ? 1 : 0;
+  const at = (k: number) => String.fromCodePoint(line.codePointAt(k) ?? 32);
+  const gap = (k: number) => k >= line.length || line[k] === " ";
+  const token = (k: number) => gap(k) || CLOSE.includes(line[k]);
+  // A mark glued to a word character is message text (`pm2`); glued to a sign it may start a range.
+  const glued = (k: number) => !token(k) && !/^[\p{L}\p{N}_]$/u.test(at(k));
   const was = sc.partial;
-  const broken = [from, skip(mark)].some((k) =>
-    [k, skip(Math.max(k, ...scanZone(line, k).map((x) => x.end)))].some((at) =>
-      rangeTail(sc, at, line.length, plain, env),
-    ),
+  let refused = false;
+  const mark = (end: number, c: ClockValue): [number, ClockValue][] =>
+    (c.sec ? [end, end + 1] : []).flatMap((p) =>
+      p > end && line[end] !== " "
+        ? []
+        : marksOn(sc, p, c).flatMap(([e, v]): [number, ClockValue][] => {
+            refused ||= e <= line.length && (glued(e) || (token(e) && !v));
+            return e <= line.length && token(e) && v ? [[e, v]] : [];
+          }),
+    );
+  const hits = scanStamp(sc.text, pos, env.nowUs, env.zone, mark).filter(
+    (s) => s.end <= line.length,
   );
+  const end = Math.max(-1, ...hits.map((s) => s.end));
+  const alts = hits.filter((s) => s.end === end).flatMap((s) => s.alts);
+  const timed = alts.length > 0 && alts.every((a) => "clock" in a.v && a.v.clock?.sec);
+  const close = end + (CLOSE.includes(line[end]) ? 1 : 0);
+  const rest = close + (line[close] === " " ? 1 : 0);
+  const marks = marksOn(sc, rest, { h: 1, mi: 0, s: 0, us: 0, word: false });
+  const message = marks.some(([e]) => !token(e) && !glued(e));
+  const alone = norm.text.length === end;
+  const open =
+    !timed ||
+    !gap(close) ||
+    (rest < line.length &&
+      (/^\p{Nd}$/u.test(at(rest)) ||
+        joinsAt(sc, rest) ||
+        scanZone(line, rest).length > 0 ||
+        (!message && (marks.length > 0 || pointHits(sc, rest).length > 0))));
   sc.partial = was;
-  if (!more || /^ +$/.test(plain.slice(from, line.length)) || broken) return { t: "none" };
-  const stamps = [best];
-  const second = stampAt(best.end + 1);
-  if (second) stamps.push(second);
-  const drafts = stamps.flatMap((s) => singleDrafts(s.alts, env));
-  for (const d of drafts) {
-    if (stamps[1]) d.why = "log-stamps";
-    d.notes = [...d.notes, { kind: "log-line" }];
-  }
+  if (timed && refused) return { t: "invalid", reason: "unreadable" };
+  if (open) return { t: "none" };
+  const drafts = singleDrafts(alts, env);
+  if (alone) return { t: "drafts", drafts, form: "iso" };
+  for (const d of drafts) d.notes = [...d.notes, { kind: "log-line" }];
   return { t: "drafts", drafts, form: "log-line" };
-}
-
-// After `-`, `–` or `/` only stamp characters and marks shaped like an hour, clock or year make a broken
-// range; after any other join a digit or a word that starts a time does (`to noon`, `到中午`).
-function rangeTail(sc: Scan, at: number, end: number, plain: string, env: Env): boolean {
-  const rest = sc.fold.slice(at, end);
-  // The word after `{start}` in a range template (`から`, `부터`, `until`) joins a range too.
-  const lits = env.pack.rangeTemplates.flatMap((elems) => {
-    const i = elems.findIndex((e) => e.k === "slot" && e.s === "start");
-    const next = elems[i + 1];
-    return i >= 0 && next?.k === "lit" ? next.alts : [];
-  });
-  return [...env.pack.joins, ...lits, ...UNIVERSAL_JOINS].some((j) => {
-    // A join spelled inside a mark (es `a` in `a.m.`) is no join; `unmarked` blanked it.
-    if (
-      !rest.startsWith(j) ||
-      plain[at] === " " ||
-      (wordy(j.charCodeAt(j.length - 1)) && wordy(rest.charCodeAt(j.length)))
-    )
-      return false;
-    const t = rest.slice(j.length).trimStart();
-    const from = at + rest.length - t.length;
-    // A trailing zone suffix (`Europe/Berlin`, `UTC`, `25:00UTC`) is cut off, so it cannot hide a range.
-    const z = sc.text.slice(from, end);
-    const cut = z
-      .split("")
-      .findIndex(
-        (_, k) =>
-          " 0123456789".includes(z[k - 1]) && scanZone(z, k).some((x) => x.end === z.length),
-      );
-    const u = plain.slice(from, cut > 0 ? from + cut : end).trim();
-    const shaped = /^(\d{1,2}(:.*| +[+-].*)?|\d{4}(-.*)?)?$/.test(u);
-    const stamp = /^[\d:+.tz -]*$/.test(u);
-    // The only joins that also separate log fields (`<stamp> - 200`); every other join is a range join.
-    if ("-–".includes(j)) return shaped && stamp;
-    // A word starts a time when it starts a point or is a mark that `unmarked` blanked.
-    return j === "/"
-      ? stamp
-      : t === "" || !/^\D*$/.test(t) || plain[from] === " " || pointHits(sc, from).length > 0;
-  });
 }
 
 /** Runs the §4.2 steps in order; the first step that claims the input is final. */
@@ -219,6 +169,7 @@ export function classify(norm: Normalized, env: Env): { outcome: Outcome; scan: 
   if (text.startsWith("{")) return { outcome: copyPayload(text), scan: sc };
   if (norm.url) return { outcome: urlOutcome(text, env), scan: sc };
   const steps: (() => Outcome)[] = [
+    () => logLine(norm, sc, env),
     () => rangeOutcome(sc),
     () => (/^\d+$/.test(text) ? bareNumber(text, env) : { t: "none" }),
     () => {
@@ -231,7 +182,6 @@ export function classify(norm: Normalized, env: Env): { outcome: Outcome; scan: 
       );
       return drafts.length > 0 ? { t: "drafts", drafts, form: "iso" } : { t: "none" };
     },
-    () => logLine(norm, sc, env),
     () => {
       const out = shorthandOutcome(text, env);
       const orClock = env.pack.hooks.orClock;

@@ -106,7 +106,6 @@ export type AmbiguityReason =
   | "unit-case"
   | "repeated-hour"
   | "am-pm"
-  | "log-stamps"
   | "zone-abbreviation"
   | "bare-duration";
 

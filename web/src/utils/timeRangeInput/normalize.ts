@@ -132,7 +132,12 @@ export function normalize(
   return {
     text,
     fold: foldText(text, bcp47, script, hooks.fold),
-    firstLine: mapped(clean(raw.split("\n")[0].split("\r")[0].normalize("NFKC"))),
+    firstLine:
+      raw
+        .split("\n")
+        .flatMap((l) => l.split("\r"))
+        .map((l) => mapped(clean(l.normalize("NFKC"))))
+        .find((l) => l.length > 0) ?? "",
     url: /^\s*(https?:\/\/|[?？])[^]*$/i.test(raw),
   };
 }

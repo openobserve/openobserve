@@ -225,7 +225,7 @@ describe("silent-wrong regressions", () => {
 
   it.each([
     ["2026-11-16 09:00:00-05 ERROR x", "O", "2026-11-16T14:00:00Z"],
-    ["2026-11-16T09:00-05 ERROR x", "O", "2026-11-16T14:00:00Z"],
+    ["2026-11-16T09:00-05 ERROR x", "invalid", ""],
     ["Nov 16 09:12:33-05 sshd[1]: x", "O", "2026-11-16T14:12:33Z"],
     ["2026-11-16 09:00-11 ERROR x", "invalid", ""],
     ["2026-11-16 03:00:00-05 to 2026-11-16 04:00:00-05", "R", "2026-11-16T08:00:00Z"],
@@ -500,8 +500,7 @@ describe("post-loop review fixes", () => {
     expect((await run("en-US", "2026-11-16T09:00:00Z to 25:00", NOW)).state).toBe("invalid");
     const broken = "2025-01-01T00:00:00Z to 2025-01-02T25:00:00Z";
     expect((await run("en-US", broken, NOW)).state).toBe("invalid");
-    const log = await run("en-US", "2026-11-16 09:12:33 - INFO started", NOW);
-    expect(center(log)).toBe(isoUs("2026-11-16T09:12:33Z"));
+    expect((await run("en-US", "2026-11-16 09:12:33 - INFO started", NOW)).state).toBe("invalid");
   });
 
   it.each([
@@ -881,13 +880,19 @@ describe("round-9 review fixes", () => {
   });
 
   it.each([
-    ["en-US", "- 200"],
-    ["en-US", "- 10.0.0.5:8080"],
-    ["en-US", "- INFO up"],
-    ["en-US", "- 503 12ms"],
-    ["en-US", "- 8080 200 15"],
-    ["en-US", "– 200"],
-    ["en-US", "tomorrow 5"],
+    "- 200",
+    "- 10.0.0.5:8080",
+    "- INFO up",
+    "- 503 12ms",
+    "- 8080 200 15",
+    "– 200",
+    "tomorrow 5",
+  ])("F57: a stamp followed by %s could start a range, so it is refused", async (tail) => {
+    const r = await run("en-US", `2026-11-16T09:00:00Z ${tail}`, NOW);
+    expect(r.state, JSON.stringify(r)).toBe("invalid");
+  });
+
+  it.each([
     ["es-ES", "at 10.0.0.5:8080"],
     ["it-IT", "at 10.0.0.5:8080"],
     ["pt-PT", "at 10.0.0.5:8080"],
@@ -934,7 +939,7 @@ describe("round-9 review fixes", () => {
     expect((await run("fr-FR", "2026-11-16T09:00:00Z à", NOW)).state).toBe("incomplete");
     expect((await run("fr-FR", "2026-11-16T09:00:00Z à 25:00", NOW)).state).toBe("invalid");
     for (const text of ["2026-11-16 09:12:33 - 200", "2026-11-16T09:12:33Z - 10.0.0.5:8080"]) {
-      expect(center(await run("en-US", text, NOW)), text).toBe(isoUs("2026-11-16T09:12:33Z"));
+      expect((await run("en-US", text, NOW)).state, text).toBe("invalid");
     }
   });
 
@@ -1275,13 +1280,24 @@ describe("round 14 review fixes", () => {
 
   it.each([
     ["en-US", "/api/v1/users 200"],
-    ["en-US", "...retrying"],
-    ["en-US", "to upstream failed"],
-    ["es-ES", "a usuario conectado"],
+    ["en-US", "GET /api 200"],
+    ["en-US", "Midnight Commander started"],
   ])("F66: %s a stamp followed by %s stays a log line", async (locale, tail) => {
     const r = await run(locale, `2026-11-16T09:00:00Z ${tail}`, NOW);
     expect(center(r), JSON.stringify(r)).toBe(isoUs("2026-11-16T09:00:00Z"));
   });
+
+  it.each([
+    ["en-US", "...retrying"],
+    ["en-US", "to upstream failed"],
+    ["es-ES", "a usuario conectado"],
+  ])(
+    "F66: %s a stamp followed by %s could start a range, so it is refused",
+    async (locale, tail) => {
+      const r = await run(locale, `2026-11-16T09:00:00Z ${tail}`, NOW);
+      expect(r.state, JSON.stringify(r)).toBe("invalid");
+    },
+  );
 
   it.each([
     ["nine to nine", "2026-11-19T22:00:00Z", "zero-length"],
@@ -1626,12 +1642,73 @@ describe("typed-clock review fixes, round 2", () => {
             for (const ref of refs)
               expect({ stamp, tail, got }).not.toEqual({ stamp, tail, got: ref });
           }
-          expect(await read(`${stamp} 2026-11-19 INFO`), stamp).toEqual(
-            await read(`${stamp} INFO`),
-          );
+          expect((await read(`${stamp} 2026-11-19 INFO`)).state, stamp).toBe("invalid");
         }
       }
     }
+  });
+});
+
+describe("log-line rule", () => {
+  const LATER = "2026-11-21T12:00:00Z";
+  it("property: a log-line reading spans exactly its leading stamp alone", async () => {
+    const stamps = [
+      "2026-11-20 09:30:15",
+      "2026-11-20T09:30:15.123Z",
+      "2026-11-20 09:30:15 PM",
+      "2026-11-20 09:30:15 +05:30",
+      "2026-11-20 09:30:15 PM UTC",
+      "2026-11-20 09:30:15 IST",
+      "2026/11/20 21:30:15",
+      "Nov 20 09:30:15",
+      "Nov 21 9:30:15 PM",
+      "Nov 20, 2026 09:30:15",
+      "[20/Nov/2026:09:30:15 +0100]",
+    ];
+    const tails = [
+      " INFO started",
+      ", worker",
+      ": suspend",
+      " pm2 restarted",
+      " PM_worker",
+      " noon check",
+      " Midnight Commander",
+      " GET /api 200",
+      " to upstream",
+      " - 200",
+      " 2026-11-19 x",
+      " tomorrow",
+      " a user",
+      "\nnext line",
+    ];
+    let logLines = 0;
+    for (const zone of ["UTC", "Asia/Tokyo", "America/New_York", "Asia/Kolkata"]) {
+      for (const stamp of stamps) {
+        const alone = parseTimeRangeInput(baseContext(EN_US_TIME_RANGE_PACK, stamp, LATER, zone));
+        for (const tail of tails) {
+          const r = parseTimeRangeInput(
+            baseContext(EN_US_TIME_RANGE_PACK, stamp + tail, LATER, zone),
+          );
+          const readings =
+            r.state === "valid" ? [r.reading] : r.state === "ambiguous" ? r.readings : [];
+          if (!readings.some((x) => x.origin.form === "log-line")) continue;
+          logLines++;
+          const want =
+            alone.state === "valid"
+              ? [alone.reading]
+              : alone.state === "ambiguous"
+                ? alone.readings
+                : [];
+          expect({ stamp, tail, zone, got: readings.map(span) }).toEqual({
+            stamp,
+            tail,
+            zone,
+            got: want.map(span),
+          });
+        }
+      }
+    }
+    expect(logLines).toBeGreaterThan(200);
   });
 });
 
@@ -1690,7 +1767,7 @@ describe("meridiem rule: a mark binds only to the clock beside it, and no text i
     ["zh-CN", "2026-11-20 20:30:00 昨晚 故障", point("2026-11-20T20:30:00Z")],
     ["zh-TW", "2026-11-20 20:30:00 昨晚 故障", point("2026-11-20T20:30:00Z")],
     ["en-US", "2026-W46 UTC error", "invalid"],
-    ["en-US", "2026-11-20T09:30:00Z 2026-11-19 INFO", point("2026-11-20T09:30:00Z")],
+    ["en-US", "2026-11-20T09:30:00Z 2026-11-19 INFO", "invalid"],
     ...["en-US", "ja-JP", "ko-KR", "zh-CN", "ar-SA", "es-ES"].map(
       (locale): [string, string, Want] => [
         locale,
@@ -1699,7 +1776,7 @@ describe("meridiem rule: a mark binds only to the clock beside it, and no text i
       ],
     ),
     ["en-US", "[20/Nov/2026:9:30:15 +0000] INFO", point("2026-11-20T09:30:15Z")],
-    ["en-US", "[20/Nov/2026:09:30 +0000] INFO", point("2026-11-20T09:30:00Z")],
+    ["en-US", "[20/Nov/2026:09:30 +0000] INFO", "invalid"],
     ["en-US", "2026-11-20T13:30:00\nPM", point("2026-11-20T13:30:00Z")],
     ["en-US", "2026-11-20T13:30:00 PM", "invalid"],
     ["de-DE", "gestern abends 3", "invalid"],
@@ -1731,16 +1808,17 @@ describe("meridiem rule: a mark binds only to the clock beside it, and no text i
     ),
     ["en-US", "2026-11-20 09:30:15 PM_worker", point("2026-11-20T09:30:15Z")],
     ["en-US", "2026-11-20 09:30:15 pm2 restart", point("2026-11-20T09:30:15Z")],
-    ["en-US", "2026-11-20 09:30:15 until restart", point("2026-11-20T09:30:15Z")],
-    ["en-US", "2026-11-20 09:30:15 to do", point("2026-11-20T09:30:15Z")],
-    ["en-US", "2026-11-20T09:30:00Z through gateway", point("2026-11-20T09:30:00Z")],
-    ["en-US", "2026-11-20T09:30:00Z to upstream", point("2026-11-20T09:30:00Z")],
-    ["es-ES", "2026-11-20T09:30:00Z a usuario", point("2026-11-20T09:30:00Z")],
-    ["es-ES", "2026-11-20T09:30:00Z al servidor", point("2026-11-20T09:30:00Z")],
-    ["it-IT", "2026-11-20T09:30:00Z a server", point("2026-11-20T09:30:00Z")],
-    ["pt-BR", "2026-11-20T09:30:00Z a servidor", point("2026-11-20T09:30:00Z")],
-    ["fr-FR", "2026-11-20T09:30:00Z à serveur", point("2026-11-20T09:30:00Z")],
-    ["es-ES", "2026-11-20T21:30:15Z a.m. x", point("2026-11-20T21:30:15Z")],
+    // Round 6: text after a stamp that could start a range is refused, never read as message text.
+    ["en-US", "2026-11-20 09:30:15 until restart", "invalid"],
+    ["en-US", "2026-11-20 09:30:15 to do", "invalid"],
+    ["en-US", "2026-11-20T09:30:00Z through gateway", "invalid"],
+    ["en-US", "2026-11-20T09:30:00Z to upstream", "invalid"],
+    ["es-ES", "2026-11-20T09:30:00Z a usuario", "invalid"],
+    ["es-ES", "2026-11-20T09:30:00Z al servidor", "invalid"],
+    ["it-IT", "2026-11-20T09:30:00Z a server", "invalid"],
+    ["pt-PT", "2026-11-20T09:30:00Z a servidor", "invalid"],
+    ["fr-FR", "2026-11-20T09:30:00Z à serveur", "invalid"],
+    ["es-ES", "2026-11-20T21:30:15Z a.m. x", "invalid"],
     [
       "en-US",
       '{"\\u0073tart_date":100,"end_date":200}',
@@ -1752,14 +1830,15 @@ describe("meridiem rule: a mark binds only to the clock beside it, and no text i
       '{"\\u0073tart_date":{"x":"start_date"},"\\u0073tart_date":100,"end_date":200}',
       "invalid",
     ],
-    ["en-US", "2026-11-20T09:30:00Z - 7 200", point("2026-11-20T09:30:00Z")],
-    ["en-US", "2026-11-20T09:30 AM-10:00", point("2026-11-20T19:30:00Z")],
-    ["en-US", "2026-11-20T09:30 AM-10:00 INFO", point("2026-11-20T19:30:00Z")],
+    ["en-US", "2026-11-20T09:30:00Z - 7 200", "invalid"],
+    ["en-US", "2026-11-20T09:30 AM-10:00", ["2026-11-20T09:30:00Z", "2026-11-20T10:00:00Z"]],
+    ["en-US", "2026-11-20 9:30 AM-10:30", ["2026-11-20T09:30:00Z", "2026-11-20T10:30:00Z"]],
+    ["en-US", "2026-11-20T09:30 AM-10:00 INFO", "invalid"],
     ["en-US", "2026-11-01 from 00:30 America/New_York to 01:30", "ambiguous"],
     ["en-US", "2026-11-20T13:30:00 PM +05:30 to 16:30", "invalid"],
     ["en-US", "2026-11-20T13:30:00 PM, to 16:30", "invalid"],
     ["en-US", "2026-11-20 09:30:15 PM, to 16:30", "invalid"],
-    ["zh-CN", "2026-11-20 20:30:00 昨晚", "invalid"],
+    ["zh-CN", "2026-11-20 20:30:00 昨晚", point("2026-11-20T20:30:00Z")],
     ["en-US", "2026-11-20T09:30:00Z - 25:00UTC", "invalid"],
     ["en-US", "2026-11-20T09:30:00Z to noon UTC", "invalid"],
     ["de-DE", "2026-11-20 09:30:00 PM to noon", "invalid"],
@@ -1772,6 +1851,77 @@ describe("meridiem rule: a mark binds only to the clock beside it, and no text i
     ],
     ["en-US", "ｈｔｔｐｓ://x/?period=1h", "invalid"],
     ["en-US", "2026-11-20 09:30:15 to 12 noon", ["2026-11-20T09:30:15Z", "2026-11-20T12:00:00Z"]],
+    // Round 6: a log line is its leading seconds stamp; a truncated stamp or glued sign is refused.
+    ["en-US", "2026-11-20T09:30:00Z..", "incomplete"],
+    ["en-US", "2026-11-20T09:30:00Z→25:00", "invalid"],
+    ["en-US", "2026-11-20 13:30:15 p. m. to 16:00", "invalid"],
+    ["en-US", "2026-11-20T09:30:00Z - 11 PM.", "invalid"],
+    ["en-US", "2026-11-20T09:30:00Z - 11 PM", ["2026-11-20T09:30:00Z", "2026-11-20T23:00:00Z"]],
+    ["en-US", "2026-11-20T09:30:00+05:3", "invalid"],
+    ["en-US", "2026-11-20T09:30:00+05:3 INFO", "invalid"],
+    ["en-US", "2026-11-20T09:30:5Z", "invalid"],
+    ["en-US", "2026-11-20T09:30:00Z, 2026-11-20T11:30:00Z", "invalid"],
+    ["ja-JP", "2026-11-20 09:30:15 PM𠮷田", point("2026-11-20T09:30:15Z")],
+    ["en-US", "2026-11-20 12:00:00 Midnight Commander started", point("2026-11-20T12:00:00Z")],
+    ["de-DE", "2026-11-20 12:00:00 Midnight Commander gestartet", point("2026-11-20T12:00:00Z")],
+    ...(
+      [
+        ["es-ES", "a un servidor"],
+        ["fr-FR", "à un serveur"],
+        ["pt-PT", "a um servidor"],
+        ["de-DE", "bis zwei Knoten antworten"],
+        ["ja-JP", "より朝刊を配信"],
+        ["zh-CN", "到下午茶服务"],
+        ["ko-KR", "에서 세션 종료"],
+        ["en-US", "to PM_worker"],
+        ["en-US", "to one node"],
+        ["en-US", "until today's backup"],
+        ["en-US", "to upstream HTTP 503"],
+        ["en-US", "to November"],
+        ["en-US", "to Nov"],
+        ["es-ES", "a las"],
+      ] as [string, string][]
+    ).map(([locale, tail]): [string, string, Want] => [
+      locale,
+      `2026-11-20T09:30:00Z ${tail}`,
+      "invalid",
+    ]),
+    ["en-US", "\nNov 21 21:30:15", point("2025-11-21T21:30:15Z"), "2026-11-21T16:00:00Z"],
+    ["en-US", "2026-11-20 09:30:15 PM+15:00", "invalid"],
+    ["en-US", "2026-11-20T09:30:15\n+05:30 to 11", point("2026-11-20T09:30:15Z")],
+    ["en-US", '{"start_date":1794913200000000.1,"end_date":1794916800000000}', "invalid"],
+    ...(
+      [
+        ["fr-FR", "à midi"],
+        ["fr-FR", "à minuit"],
+        ["es-ES", "a mediodía"],
+        ["es-ES", "a medianoche"],
+        ["de-DE", "bis Mittag"],
+        ["it-IT", "a mezzogiorno"],
+        ["nl-NL", "tot middag"],
+        ["ru-RU", "до полудня"],
+      ] as [string, string][]
+    ).map(([locale, tail]): [string, string, Want] => [
+      locale,
+      `2026-11-20 09:30:15 ${tail}`,
+      "invalid",
+    ]),
+    ["en-US", "12:30 noon", "invalid"],
+    ["en-US", "12 noon", point("2026-11-21T12:00:00Z"), NIGHT],
+    ["en-US", "12:00 noon", point("2026-11-21T12:00:00Z"), NIGHT],
+    ["en-US", "12 midnight", point("2026-11-21T00:00:00Z"), NIGHT],
+    ["en-US", "00:00 midnight", point("2026-11-21T00:00:00Z"), NIGHT],
+    ["en-US", "0:30 midnight", "invalid"],
+    ...["PM-worker", "PM/api", "PM–x", "p.m.-x"].map((tail): [string, string, Want] => [
+      "en-US",
+      `2026-11-20 09:30:15 ${tail}`,
+      "invalid",
+    ]),
+    ...["PMx ready", "PMé ready", "PM_worker ready"].map((tail): [string, string, Want] => [
+      "en-US",
+      `2026-11-20 09:30:15 ${tail}`,
+      point("2026-11-20T09:30:15Z"),
+    ]),
     // Ranges never drop an end.
     ["en-US", "2026-11-20 09:30Z - 11 UTC", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]],
     ["en-US", "2026-11-20 09:30Z to 11 UTC", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]],
@@ -1800,12 +1950,12 @@ describe("meridiem rule: a mark binds only to the clock beside it, and no text i
     ],
     // Pasted log lines: a mark binds to a zoneless 12-hour stamp, else it is message text.
     ["en-US", "2026-11-20 9:30:15 PM INFO started", point("2026-11-20T21:30:15Z")],
-    ["en-US", "2026-11-20T09:30:00Z PM: suspend entry", point("2026-11-20T09:30:00Z")],
+    ["en-US", "2026-11-20T09:30:00Z PM: suspend entry", "invalid"],
     ["en-US", "2026-11-20 21:30:15 pm2 restarted app", point("2026-11-20T21:30:15Z")],
-    ["en-US", "2026-11-20 21:30:15 AM radio up", point("2026-11-20T21:30:15Z")],
-    ["en-US", "2026-11-20T21:30:15Z pm worker", point("2026-11-20T21:30:15Z")],
+    ["en-US", "2026-11-20 21:30:15 AM radio up", "invalid"],
+    ["en-US", "2026-11-20T21:30:15Z pm worker", "invalid"],
     ["ja-JP", "2026/11/20 21:30:15 午後のバッチ開始", point("2026-11-20T21:30:15Z")],
-    ["ko-KR", "2026-11-20 21:30:15 오후 작업 시작", point("2026-11-20T21:30:15Z")],
+    ["ko-KR", "2026-11-20 21:30:15 오후 작업 시작", "invalid"],
     ["en-US", "2026-11-20T13:30:00 PM", "invalid"],
     // A mark next to a clock, Latin AM/PM in every pack.
     ["en-US", "2026-11-20 9am", point("2026-11-20T09:00:00Z")],
