@@ -413,8 +413,9 @@ export function compilePack(hand: LocalePack, gen: GeneratedTables, en?: LocaleP
   ].forEach(([names, i]) => names.forEach((s) => weekdays.push({ s: fold(s), value: i })));
   const mods: Word<ClockMod>[] = [];
   const ap = gen.h11 ? 0 : 1;
-  [pack.meridiem?.am, pack.meridiem?.pm].forEach((hand, i) =>
-    [...gen.meridiem[i], ...(hand ?? [])].forEach((s) =>
+  // Pasted English stamps carry Latin AM/PM, so every pack also reads the English marks.
+  (["am", "pm"] as const).forEach((k, i) =>
+    [...gen.meridiem[i], ...(pack.meridiem?.[k] ?? []), ...(en?.meridiem?.[k] ?? [])].forEach((s) =>
       mods.push({ s: fold(s), value: { from: 12 * i, to: 12 * i + 12, shift: 0, ap } }),
     ),
   );

@@ -396,7 +396,7 @@ function sidePairs(s: Point, e: Point, env: Env): [Inst, Inst][] {
     return out;
   }
   for (const a of startInstants(s, env, e.p === "clock" ? undefined : dateOf(e, env))) {
-    const own = s.p === "instant" || (a.clock !== undefined && zonedSide(e));
+    const own = zonedSide(s) || (a.clock !== undefined && zonedSide(e));
     const day =
       e.p !== "clock" ? undefined : own ? wallFor(e.clock, a.us, env) : (a.date ?? dateOf(s, env));
     for (const b of endInstants(e, env, day)) out.push([a, b]);

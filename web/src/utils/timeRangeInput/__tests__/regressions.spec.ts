@@ -1585,11 +1585,132 @@ describe("typed-clock review fixes, round 2", () => {
     bases.push("2026-10-02 to 2026-10-05", "Oct 2 to Oct 5", "yesterday 9:30");
     for (const base of bases) {
       const plain = await read(base);
-      for (const text of [`${base} pm`, `${base} PM`, `2026-11-19 ${base}`, `${base} - 13pm`]) {
+      const decorated = [
+        `${base} pm`,
+        `${base} PM`,
+        `2026-11-19 ${base}`,
+        `${base} - 13pm`,
+        `${base} pm2 x`,
+        `${base} - 13:30 PM`,
+        `${base}Z PM: x`,
+      ];
+      for (const text of decorated) {
         const got = await read(text);
         if (plain.state === "valid" && got.state === "valid")
           expect({ text, span: got.span }).not.toEqual({ text, span: plain.span });
       }
     }
+  });
+});
+
+describe("meridiem rule: a mark binds only to the clock beside it, and no text is dropped", () => {
+  const LATER = "2026-11-21T12:00:00Z";
+  const NIGHT = "2026-11-21T23:00:00Z";
+  const point = (iso: string): [string, string] => [iso, iso];
+  type Want = "invalid" | "incomplete" | "blocked" | [string, string];
+  const rows: [string, string, Want, string?, string?][] = [
+    // Ranges never drop an end.
+    ["en-US", "2026-11-20 09:30Z - 11 UTC", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]],
+    ["en-US", "2026-11-20 09:30Z to 11 UTC", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]],
+    ["en-US", "2026-11-20 09:30Z - 11", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]],
+    ["en-US", "2026-11-20 09:30 - 13:30 PM", "invalid"],
+    ["en-US", "2026-11-20 09:30 - PM 13:30", "invalid"],
+    ["en-US", "2026-11-20 09:30 - 13pm", "invalid"],
+    ["en-US", "9:30 - 13pm", "invalid"],
+    ["en-US", "2026-11-20 9:30 pm-noon", "invalid"],
+    ["en-US", "2026-11-20 10:00 2026-11-20 9:30 PM", "invalid"],
+    ["en-US", "2026-11-20 00:30+05:00 to 20:30", ["2026-11-19T19:30:00Z", "2026-11-19T20:30:00Z"]],
+    ["en-US", "2026-11-20 00:30+05:00 to 21:00", ["2026-11-19T19:30:00Z", "2026-11-19T21:00:00Z"]],
+    [
+      "en-US",
+      "Nov 20, 2026 00:30+05:00 to 20:30",
+      ["2026-11-19T19:30:00Z", "2026-11-19T20:30:00Z"],
+    ],
+    ["en-US", "2026-11-20 from 2026-10-02 to 2026-10-05", "invalid"],
+    ["en-US", "Nov 20 from 2026-10-02 to 2026-10-05", "invalid"],
+    [
+      "en-US",
+      "2026-11-20 09:00 - 2026-11-20 17:00",
+      ["2026-11-20T14:00:00Z", "2026-11-20T22:00:00Z"],
+      LATER,
+      "America/New_York",
+    ],
+    // Pasted log lines: a mark binds to a zoneless 12-hour stamp, else it is message text.
+    ["en-US", "2026-11-20 9:30:15 PM INFO started", point("2026-11-20T21:30:15Z")],
+    ["en-US", "2026-11-20T09:30:00Z PM: suspend entry", point("2026-11-20T09:30:00Z")],
+    ["en-US", "2026-11-20 21:30:15 pm2 restarted app", point("2026-11-20T21:30:15Z")],
+    ["en-US", "2026-11-20 21:30:15 AM radio up", point("2026-11-20T21:30:15Z")],
+    ["en-US", "2026-11-20T21:30:15Z pm worker", point("2026-11-20T21:30:15Z")],
+    ["ja-JP", "2026/11/20 21:30:15 午後のバッチ開始", point("2026-11-20T21:30:15Z")],
+    ["ko-KR", "2026-11-20 21:30:15 오후 작업 시작", point("2026-11-20T21:30:15Z")],
+    ["en-US", "2026-11-20T13:30:00 PM", "invalid"],
+    // A mark next to a clock, Latin AM/PM in every pack.
+    ["en-US", "2026-11-20 9am", point("2026-11-20T09:00:00Z")],
+    ["en-US", "2026-11-20 9", point("2026-11-20T09:00:00Z")],
+    ["en-US", "2026-11-20 9:30 PM", point("2026-11-20T21:30:00Z")],
+    ["en-US", "2026-11-20 9:30 pm", point("2026-11-20T21:30:00Z")],
+    ["en-US", "Nov 20 9:30 PM", point("2026-11-20T21:30:00Z")],
+    ["en-US", "2026-11-20T09:30 PM", point("2026-11-20T21:30:00Z")],
+    ["en-US", "2026-11-20T09:30:00 PM", point("2026-11-20T21:30:00Z")],
+    ["en-US", "9:30 PM", point("2026-11-21T21:30:00Z"), NIGHT],
+    ["en-US", "12am", point("2026-11-21T00:00:00Z"), NIGHT],
+    ["en-US", "12pm", point("2026-11-21T12:00:00Z"), NIGHT],
+    ["en-US", "13:30 in the afternoon", point("2026-11-21T13:30:00Z"), NIGHT],
+    ["es-ES", "2026-11-20 9:30 p.m.", point("2026-11-20T21:30:00Z")],
+    ["es-ES", "9:30 p.m.", point("2026-11-21T21:30:00Z"), NIGHT],
+    ["ja-JP", "2026-11-20 9:30 PM", point("2026-11-20T21:30:00Z")],
+    ["ko-KR", "2026-11-20 9:30 PM", point("2026-11-20T21:30:00Z")],
+    ["zh-CN", "2026-11-20 9:30 PM", point("2026-11-20T21:30:00Z")],
+    ["tr-TR", "2026-11-20 9:30 PM", point("2026-11-20T21:30:00Z")],
+    ["ar-SA", "2026-11-20 9:30 PM", point("2026-11-20T21:30:00Z")],
+    ...["de-DE", "ja-JP", "ko-KR", "zh-CN", "tr-TR", "ar-SA"].map(
+      (locale): [string, string, Want, string] => [
+        locale,
+        "9:30 PM",
+        point("2026-11-21T21:30:00Z"),
+        NIGHT,
+      ],
+    ),
+    // Year-less month-first stamps take no mark outside a log line, and de reads no month-first date.
+    ["de-DE", "Nov 20 9:30 AM", "invalid"],
+    ["ja-JP", "昨日午後0:30", point("2026-11-20T12:30:00Z")],
+    ["ja-JP", "昨日午前0:30", point("2026-11-20T00:30:00Z")],
+    ["ja-JP", "昨日午前0:00", point("2026-11-20T00:00:00Z")],
+    ["en-US", "2026-11-20 00:30 am", "invalid"],
+    ["en-US", "2026-11-20 0:30 pm", "invalid"],
+    ["en-US", "2026-11-20 13:30 pm", "invalid"],
+    ["en-US", "2026-11-20 13:30 am", "invalid"],
+    ["en-US", "PM 13:30", "invalid"],
+    // Day parts keep an explicit 24-hour clock only inside their range.
+    ["ar-SA", "أمس ١٦:٣٠ عصرا", point("2026-11-20T16:30:00Z")],
+    ["ar-SA", "أمس 16:30 عصرا", point("2026-11-20T16:30:00Z")],
+    ["ar-SA", "أمس ٠٠:٣٠ عصرا", "invalid"],
+    ["ar-SA", "أمس ٠٠:٣٠ ظهرا", "invalid"],
+    ["ar-SA", "أمس 0:30 ظهرا", "invalid"],
+    ["ar-SA", "أمس ٢٣:٣٠ ظهرا", "invalid"],
+    ["th-TH", "เมื่อวาน เช้า 1:00", "invalid"],
+    ["de-DE", "gestern  nachmittags9:00", "invalid"],
+    ["ru-RU", "вчера  утра13:00", "invalid"],
+    // A refused one-digit hour typed last can still grow into a fit.
+    ["en-US", "yesterday PM 0", "incomplete"],
+    ["en-US", "PM 0", "incomplete"],
+    ["de-DE", "gestern abends 2", "incomplete"],
+    ["ko-KR", "어제 오후 0", "incomplete"],
+    ["th-TH", "เมื่อวาน เช้า 0", "incomplete"],
+    ["en-US", "2026-11-20 9p", "incomplete"],
+    ["en-US", "2026112009", "blocked"],
+    ["en-US", "1763600000", point("2025-11-20T00:53:20Z")],
+  ];
+
+  it.each(rows)("%s %s", async (locale, text, want, now = LATER, zone = "UTC") => {
+    const r = parseTimeRangeInput(baseContext(await packFor(locale), text, now, zone));
+    if (typeof want === "string") {
+      expect(r.state, JSON.stringify(r)).toBe(want);
+      return;
+    }
+    if (r.state !== "valid") throw new Error(`${text}: ${JSON.stringify(r)}`);
+    const [from, to] = want.map(isoUs);
+    const window = from === to ? 300_000_000 : 0;
+    expect([r.reading.startUs, r.reading.endUs]).toEqual([from - window, to + window]);
   });
 });
