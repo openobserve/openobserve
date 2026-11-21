@@ -391,7 +391,8 @@ import {
   skeletonRows,
   statusLabel,
 } from "./incidentsCopy";
-import { formatWhen, liveLoadText, liveNotice, type LiveFailure } from "./liveCopy";
+import { formatWhen, gapSplit, liveLoadText, liveNotice, type LiveFailure } from "./liveCopy";
+import type { CoverageRow } from "../aoTypes";
 import { toCoverageSource } from "./liveAdapter";
 import { useLivePaged, useLoadPhase } from "./liveModel";
 import { learningSummary, learningWaiting, type LearningStream } from "./LiveCoverageLearning";
@@ -402,7 +403,7 @@ import {
   HOME_STEP,
   RANGE_LABEL,
   allClearText,
-  cantSeeText,
+  unwatchedText,
   homeView,
   isHomePriority,
   isHomeRange,
@@ -505,13 +506,14 @@ const coverageSource = computed(() =>
     now.value,
   ),
 );
-const cantSee = computed(() =>
-  cantSeeText(
-    t,
-    locale.value,
-    coverageSource.value.rows.filter((r) => r.status?.state === "gap").map((r) => r.service),
-  ),
-);
+const cantSee = computed(() => {
+  const gaps = coverageSource.value.rows.filter((r) => r.status?.state === "gap");
+  const weak = (r: CoverageRow) => gapSplit(r.engine?.cells ?? {}).weak.length > 0;
+  return unwatchedText(t, locale.value, {
+    missing: gaps.filter((r) => !weak(r)).map((r) => r.service),
+    weak: gaps.filter(weak).map((r) => r.service),
+  });
+});
 const allClear = computed(() =>
   allClearText(
     t,

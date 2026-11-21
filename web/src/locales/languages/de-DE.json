@@ -29467,6 +29467,7 @@
         "learning": "{count} lernt noch. | {count} lernen noch."
       },
       "gapChip": "Lücke",
+      "weakLegend": "Nur ein allgemeiner Alarm",
       "checksWatched": "{count} von {total} Checks überwacht",
       "verdict": {
         "allWatched": "Ihr einzelner Service wird überwacht. | Alle {count} Services werden überwacht.",
@@ -29486,7 +29487,8 @@
     },
     "homeLive": {
       "andMore": "{count} weitere",
-      "cantSee": "AutoObserve kann {count} Service noch nicht überwachen: {names}. | AutoObserve kann {count} Services noch nicht überwachen: {names}.",
+      "nothingWatches": "Nichts überwacht bisher {count} Service: {names}. | Nichts überwacht bisher {count} Services: {names}.",
+      "weaklyWatched": "{count} Service wird nur schwach überwacht: {names}. | {count} Services werden nur schwach überwacht: {names}.",
       "cantSeeAction": "Abdeckungslücken anzeigen",
       "allClearTitle": "Keine Probleme {within}",
       "allClearDesc": "AutoObserve überwacht {count} Service und nichts erforderte Ihre Aufmerksamkeit. | AutoObserve überwacht {count} Services und nichts erforderte Ihre Aufmerksamkeit.",
@@ -30099,7 +30101,6 @@
         "insufficient": "Schwache Hinweise"
       },
       "body": {
-        "coverageGap": "Nichts überwacht {service}",
         "noAbsenceNone": "Niemand wird alarmiert, wenn {service} keine Daten mehr sendet",
         "noAbsenceWeak": "Nur ein breit gefasster Alarm würde bemerken, wenn {service} keine Daten mehr sendet",
         "noAbsenceSilent": "Die Prüfung, die bemerken würde, wenn {service} verstummt, benachrichtigt niemanden",
@@ -33526,11 +33527,14 @@
       },
       "detail": {
         "noAlert": "{check}: kein Alarm.",
+        "weakAlert": "{check}: nur ein allgemeiner Alarm ohne Servicefilter.",
         "cantMeasure": "{check}: noch nicht messbar, {service} sendet keine Traces."
       },
       "coverage_gap": {
         "headline": "Nichts überwacht {service}",
+        "headlineWeak": "{service} wird nur schwach überwacht",
         "why": "Kein Alarm überwacht {classes}.",
+        "whyWeak": "Nur ein allgemeiner Alarm ohne Servicefilter überwacht {classes}. | Nur allgemeine Alarme ohne Servicefilter überwachen {classes}.",
         "next": "Fügen Sie den Alarm hinzu, den AutoObserve entworfen hat. | Fügen Sie die {count} Alarme hinzu, die AutoObserve entworfen hat.",
         "needsTraces": "Latenz benötigt zuerst Traces.",
         "groupAdded": "Alarme für {count} Service hinzugefügt | Alarme für {count} Services hinzugefügt",

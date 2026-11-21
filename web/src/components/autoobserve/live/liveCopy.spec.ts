@@ -28,6 +28,7 @@ import {
   formatDay,
   formatWhen,
   liveCellLook,
+  LIVE_DOT,
   liveCellWord,
   liveFailureOf,
   liveGapLines,
@@ -491,11 +492,13 @@ describe("liveCellWord / liveCellLook (the coverage table's cells)", () => {
     expect(liveCellWord(gt, "silent", false, true)).toBe(coverageWord(gt, "learning"));
   });
 
-  it("draws covered green and every gap with the one amber", () => {
+  it("draws covered green, a broad alert as weak, and every gap with the one amber", () => {
     expect(liveCellLook("covered")).toBe("covered");
     expect(
       ["none", "weak", "silent", "blind", "unmapped"].map((s) => liveCellLook(s as never)),
-    ).toEqual(["gap", "gap", "gap", "gap", "gap"]);
+    ).toEqual(["gap", "weak", "gap", "gap", "gap"]);
+    expect(LIVE_DOT.weak).toBe(LIVE_DOT.gap);
+    expect(liveCellLook("weak", false, true)).toBe("learning");
   });
 });
 

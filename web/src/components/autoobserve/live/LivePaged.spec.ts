@@ -342,9 +342,7 @@ describe("LivePaged", () => {
     const w = mountCard();
     await flushPromises();
     const line = w.find(sel("cantsee"));
-    expect(line.text()).toContain(
-      "AutoObserve can't watch 5 services yet: cart, auth, mail, and 2 more.",
-    );
+    expect(line.text()).toContain("Nothing watches 5 services yet: cart, auth, mail, and 2 more.");
     expect(w.findAll(sel("cantsee"))).toHaveLength(1);
     await line.find(sel("cantsee-open")).trigger("click");
     expect(w.emitted("open-coverage")).toEqual([["attention"]]);
@@ -354,9 +352,7 @@ describe("LivePaged", () => {
     api.mockResolvedValueOnce(page([]));
     const one = mountCard();
     await flushPromises();
-    expect(one.find(sel("cantsee")).text()).toContain(
-      "AutoObserve can't watch 1 service yet: cart.",
-    );
+    expect(one.find(sel("cantsee")).text()).toContain("Nothing watches 1 service yet: cart.");
     expect(one.find(sel("empty")).exists()).toBe(true);
   });
 

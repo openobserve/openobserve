@@ -374,10 +374,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="selected = { service: row.service, signal: check }"
             >
               <OTag
-                v-if="cellLook(row, check) === 'gap'"
+                v-if="AMBER_LOOKS.has(cellLook(row, check))"
                 variant="warning-soft"
                 size="xs"
-                :label="t('autoobserve.coverageLive.gapChip')"
+                :label="
+                  cellLook(row, check) === 'weak'
+                    ? liveLookWord(t, 'weak')
+                    : t('autoobserve.coverageLive.gapChip')
+                "
               />
               <span v-else-if="cellLook(row, check) === 'learning'" class="text-text-secondary">{{
                 liveLookWord(t, "learning")
@@ -491,6 +495,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ liveLookWord(t, "gap") }}
             </li>
             <li
+              v-if="hasWeak"
+              class="flex items-center gap-1.5"
+              data-test="autoobserve-coverage-legend-weak-key"
+            >
+              <OTag variant="warning-soft" size="xs" :label="liveLookWord(t, 'weak')" />
+              {{ t("autoobserve.coverageLive.weakLegend") }}
+            </li>
+            <li
               v-if="totals.learning"
               class="flex items-center gap-1.5"
               data-test="autoobserve-coverage-legend-learning-key"
@@ -560,6 +572,7 @@ import {
   liveLookWord,
   liveNotice,
   percentText,
+  type LiveCellLook,
   type LiveCoverageState,
 } from "./live/liveCopy";
 import { useStore } from "vuex";
@@ -630,6 +643,7 @@ const FILTER_ALIAS: Record<string, CoverageFilter> = {
 };
 // Partly watched and learning appear in the legend only while some service is in them.
 const OPTIONAL_STATES: ReadonlySet<HexClass> = new Set(["partial", "learning"]);
+const AMBER_LOOKS: ReadonlySet<LiveCellLook> = new Set(["gap", "weak"]);
 const STATE_TAG: Record<ServiceState, BadgeVariant> = {
   gap: "warning-soft",
   partial: "warning-outline",
@@ -718,6 +732,10 @@ const allRows = computed(() =>
   [...props.source.rows].sort((a, b) => rank(a) - rank(b) || a.service.localeCompare(b.service)),
 );
 const totals = computed(() => props.source.totals);
+// Weak appears in the legend only while some check in the table is weak, as Learning does.
+const hasWeak = computed(() =>
+  props.source.rows.some((r) => LIVE_CHECKS.some((c) => cellLook(r, c) === "weak")),
+);
 
 const serviceStates = computed(() =>
   Object.fromEntries(allRows.value.map((r) => [r.service, serviceState(r)])),
@@ -936,7 +954,7 @@ const groupWhere = (row: CoverageGroup): I18nText => {
 };
 
 const groupGaps = (row: CoverageGroup, check: LiveCheck) =>
-  row.children.filter((c) => cellLook(c, check) === "gap").length;
+  row.children.filter((c) => AMBER_LOOKS.has(cellLook(c, check))).length;
 
 // Worst state first, so the count a reader acts on leads.
 const groupState = (row: CoverageGroup): I18nText =>

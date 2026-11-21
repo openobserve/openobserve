@@ -29467,6 +29467,7 @@
         "learning": "Usługa {count} jest jeszcze w fazie nauki. | Usługi ({count}) są jeszcze w fazie nauki."
       },
       "gapChip": "Luka",
+      "weakLegend": "Tylko ogólny alert",
       "checksWatched": "{count} z {total} testów obserwowanych",
       "verdict": {
         "allWatched": "Twoja jedyna usługa jest obserwowana. | Wszystkie usługi ({count}) są obserwowane.",
@@ -29486,7 +29487,8 @@
     },
     "homeLive": {
       "andMore": "{count} więcej",
-      "cantSee": "AutoObserve nie może jeszcze obserwować {count} usługi: {names}. | AutoObserve nie może jeszcze obserwować {count} usług: {names}.",
+      "nothingWatches": "Nic jeszcze nie obserwuje {count} usługi: {names}. | Nic jeszcze nie obserwuje {count} usług: {names}.",
+      "weaklyWatched": "{count} usługa jest obserwowana tylko słabo: {names}. | {count} usługi są obserwowane tylko słabo: {names}.",
       "cantSeeAction": "Zobacz luki w pokryciu",
       "allClearTitle": "Brak problemów {within}",
       "allClearDesc": "AutoObserve obserwuje {count} usługę i nic nie wymagało Twojej uwagi. | AutoObserve obserwuje {count} usług i nic nie wymagało Twojej uwagi.",
@@ -30099,7 +30101,6 @@
         "insufficient": "Słabe dowody"
       },
       "body": {
-        "coverageGap": "Nic nie obserwuje {service}",
         "noAbsenceNone": "Żaden alert nie zadziała, jeśli {service} przestanie wysyłać dane",
         "noAbsenceWeak": "Tylko szeroki alert zauważyłby, gdyby {service} przestał wysyłać dane",
         "noAbsenceSilent": "Test, który zauważyłby ciszę w {service}, nikogo nie powiadamia",
@@ -33526,11 +33527,14 @@
       },
       "detail": {
         "noAlert": "{check}: brak alertu.",
+        "weakAlert": "{check}: tylko ogólny alert bez filtra usługi.",
         "cantMeasure": "{check}: nie można jeszcze zmierzyć, {service} nie wysyła danych trace."
       },
       "coverage_gap": {
         "headline": "Nic nie obserwuje {service}",
+        "headlineWeak": "{service} jest obserwowany tylko słabo",
         "why": "Żaden alert nie obserwuje {classes}.",
+        "whyWeak": "Tylko ogólny alert bez filtra usługi obserwuje {classes}. | Tylko ogólne alerty bez filtra usługi obserwują {classes}.",
         "next": "Dodaj alert przygotowany przez AutoObserve. | Dodaj {count} alertów przygotowanych przez AutoObserve.",
         "needsTraces": "Latencja wymaga najpierw danych trace.",
         "groupAdded": "Dodano alerty dla {count} usługi | Dodano alerty dla {count} usług",

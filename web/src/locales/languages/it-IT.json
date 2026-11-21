@@ -29467,6 +29467,7 @@
         "learning": "{count} è ancora in apprendimento. | {count} sono ancora in apprendimento."
       },
       "gapChip": "Lacuna",
+      "weakLegend": "Solo un avviso generico",
       "checksWatched": "{count} di {total} controlli monitorati",
       "verdict": {
         "allWatched": "Il tuo unico servizio è monitorato. | Tutti i {count} servizi sono monitorati.",
@@ -29486,7 +29487,8 @@
     },
     "homeLive": {
       "andMore": "{count} altri",
-      "cantSee": "AutoObserve non può ancora monitorare {count} servizio: {names}. | AutoObserve non può ancora monitorare {count} servizi: {names}.",
+      "nothingWatches": "Nessun avviso monitora ancora {count} servizio: {names}. | Nessun avviso monitora ancora {count} servizi: {names}.",
+      "weaklyWatched": "{count} servizio è monitorato solo debolmente: {names}. | {count} servizi sono monitorati solo debolmente: {names}.",
       "cantSeeAction": "Vedi le lacune di copertura",
       "allClearTitle": "Nessun problema {within}",
       "allClearDesc": "AutoObserve monitora {count} servizio e non è richiesto alcun intervento. | AutoObserve monitora {count} servizi e non è richiesto alcun intervento.",
@@ -30099,7 +30101,6 @@
         "insufficient": "Evidenza debole"
       },
       "body": {
-        "coverageGap": "Nessuno monitora {service}",
         "noAbsenceNone": "Nessun avviso se {service} smette di inviare dati",
         "noAbsenceWeak": "Solo un avviso generico rileverebbe se {service} smette di inviare dati",
         "noAbsenceSilent": "Il controllo che rileverebbe se {service} smette di inviare dati non notifica nessuno",
@@ -33526,11 +33527,14 @@
       },
       "detail": {
         "noAlert": "{check}: nessun avviso.",
+        "weakAlert": "{check}: solo un avviso generico senza filtro sul servizio.",
         "cantMeasure": "{check}: non è ancora possibile misurare, {service} non invia tracce."
       },
       "coverage_gap": {
         "headline": "Nessun avviso monitora {service}",
+        "headlineWeak": "{service} è monitorato solo debolmente",
         "why": "Nessun avviso monitora {classes}.",
+        "whyWeak": "Solo un avviso generico senza filtro sul servizio monitora {classes}. | Solo avvisi generici senza filtro sul servizio monitorano {classes}.",
         "next": "Aggiungi l'avviso preparato da AutoObserve. | Aggiungi i {count} avvisi preparati da AutoObserve.",
         "needsTraces": "La latenza richiede prima le tracce.",
         "groupAdded": "Avvisi aggiunti per {count} servizio | Avvisi aggiunti per {count} servizi",

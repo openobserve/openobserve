@@ -29467,6 +29467,7 @@
         "learning": "{count} sigue aprendiendo. | {count} siguen aprendiendo."
       },
       "gapChip": "Brecha",
+      "weakLegend": "Solo una alerta general",
       "checksWatched": "{count} de {total} comprobaciones vigiladas",
       "verdict": {
         "allWatched": "Tu único servicio está vigilado. | Los {count} servicios están vigilados.",
@@ -29486,7 +29487,8 @@
     },
     "homeLive": {
       "andMore": "{count} más",
-      "cantSee": "AutoObserve aún no puede vigilar {count} servicio: {names}. | AutoObserve aún no puede vigilar {count} servicios: {names}.",
+      "nothingWatches": "Nada vigila aún {count} servicio: {names}. | Nada vigila aún {count} servicios: {names}.",
+      "weaklyWatched": "{count} servicio solo está vigilado débilmente: {names}. | {count} servicios solo están vigilados débilmente: {names}.",
       "cantSeeAction": "Ver huecos de cobertura",
       "allClearTitle": "Sin problemas {within}",
       "allClearDesc": "AutoObserve vigila {count} servicio y nada requirió tu atención. | AutoObserve vigila {count} servicios y nada requirió tu atención.",
@@ -30099,7 +30101,6 @@
         "insufficient": "Evidencia débil"
       },
       "body": {
-        "coverageGap": "Nada supervisa {service}",
         "noAbsenceNone": "Nada alerta si {service} deja de enviar datos",
         "noAbsenceWeak": "Solo una alerta amplia detectaría si {service} deja de enviar datos",
         "noAbsenceSilent": "La comprobación que detectaría que {service} deja de enviar datos no notifica a nadie",
@@ -33526,11 +33527,14 @@
       },
       "detail": {
         "noAlert": "{check}: sin alerta.",
+        "weakAlert": "{check}: solo una alerta general sin filtro de servicio.",
         "cantMeasure": "{check}: aún no se puede medir; {service} no envía trazas."
       },
       "coverage_gap": {
         "headline": "Nada vigila {service}",
+        "headlineWeak": "{service} solo está vigilado débilmente",
         "why": "Ninguna alerta vigila {classes}.",
+        "whyWeak": "Solo una alerta general sin filtro de servicio vigila {classes}. | Solo alertas generales sin filtro de servicio vigilan {classes}.",
         "next": "Añade la alerta que ha redactado AutoObserve. | Añade las {count} alertas que ha redactado AutoObserve.",
         "needsTraces": "La latencia necesita trazas primero.",
         "groupAdded": "Se han añadido alertas para {count} servicio | Se han añadido alertas para {count} servicios",

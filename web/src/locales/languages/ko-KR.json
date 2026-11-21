@@ -29467,6 +29467,7 @@
         "learning": "{count}개는 아직 학습 중입니다. | {count}개는 아직 학습 중입니다."
       },
       "gapChip": "공백",
+      "weakLegend": "광범위한 알림만",
       "checksWatched": "{total}개 체크 중 {count}개 모니터링 중",
       "verdict": {
         "allWatched": "서비스 1개를 모니터링 중입니다. | 서비스 {count}개를 모두 모니터링 중입니다.",
@@ -29486,7 +29487,8 @@
     },
     "homeLive": {
       "andMore": "{count}개 더",
-      "cantSee": "AutoObserve가 아직 {count}개 서비스를 모니터링할 수 없습니다: {names}. | AutoObserve가 아직 {count}개 서비스를 모니터링할 수 없습니다: {names}.",
+      "nothingWatches": "아직 {count}개 서비스를 감시하는 것이 없습니다: {names}. | 아직 {count}개 서비스를 감시하는 것이 없습니다: {names}.",
+      "weaklyWatched": "{count}개 서비스는 약하게만 감시됩니다: {names}. | {count}개 서비스는 약하게만 감시됩니다: {names}.",
       "cantSeeAction": "커버리지 격차 보기",
       "allClearTitle": "{within} 문제 없음",
       "allClearDesc": "AutoObserve가 {count}개의 서비스를 지켜보고 있으며, 조치가 필요한 항목이 없습니다. | AutoObserve가 {count}개의 서비스를 지켜보고 있으며, 조치가 필요한 항목이 없습니다.",
@@ -30099,7 +30101,6 @@
         "insufficient": "약한 근거"
       },
       "body": {
-        "coverageGap": "{service}에 대한 감시가 없습니다",
         "noAbsenceNone": "{service}의 데이터 전송이 중단되어도 알림이 발생하지 않습니다",
         "noAbsenceWeak": "{service}의 데이터 전송이 중단되어도 이를 감지하는 것은 광범위한 알림뿐입니다",
         "noAbsenceSilent": "{service}에서 데이터가 끊기는 것을 감지할 검사가 아무에게도 알림을 보내지 않습니다",
@@ -33526,11 +33527,14 @@
       },
       "detail": {
         "noAlert": "{check}: 알림 없음.",
+        "weakAlert": "{check}: 서비스 필터가 없는 광범위한 알림만 있음.",
         "cantMeasure": "{check}: 아직 측정할 수 없습니다. {service}에서 트레이스를 전송하지 않습니다."
       },
       "coverage_gap": {
         "headline": "아무도 {service}를 감시하지 않습니다.",
+        "headlineWeak": "{service}는 약하게만 감시되고 있습니다",
         "why": "{classes}에 대한 알림이 없습니다.",
+        "whyWeak": "서비스 필터가 없는 광범위한 알림만 {classes}을(를) 감시합니다. | 서비스 필터가 없는 광범위한 알림들만 {classes}을(를) 감시합니다.",
         "next": "AutoObserve가 작성한 알림을 추가하세요. | AutoObserve가 작성한 알림 {count}개를 추가하세요.",
         "needsTraces": "지연 시간은 트레이스가 먼저 필요합니다.",
         "groupAdded": "서비스 {count}개에 대한 알림을 추가했습니다 | 서비스 {count}개에 대한 알림을 추가했습니다",

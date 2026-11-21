@@ -29467,6 +29467,7 @@
         "learning": "{count} est encore en apprentissage. | {count} sont encore en apprentissage."
       },
       "gapChip": "Lacune",
+      "weakLegend": "Seulement une alerte générale",
       "checksWatched": "{count} vérifications surveillées sur {total}",
       "verdict": {
         "allWatched": "Votre service est surveillé. | Les {count} services sont surveillés.",
@@ -29486,7 +29487,8 @@
     },
     "homeLive": {
       "andMore": "{count} de plus",
-      "cantSee": "AutoObserve ne peut pas encore surveiller {count} service : {names}. | AutoObserve ne peut pas encore surveiller {count} services : {names}.",
+      "nothingWatches": "Rien ne surveille encore {count} service : {names}. | Rien ne surveille encore {count} services : {names}.",
+      "weaklyWatched": "{count} service n'est que faiblement surveillé : {names}. | {count} services ne sont que faiblement surveillés : {names}.",
       "cantSeeAction": "Voir les lacunes de couverture",
       "allClearTitle": "Aucun problème {within}",
       "allClearDesc": "AutoObserve surveille {count} service et rien n'a nécessité votre intervention. | AutoObserve surveille {count} services et rien n'a nécessité votre intervention.",
@@ -30099,7 +30101,6 @@
         "insufficient": "Preuves faibles"
       },
       "body": {
-        "coverageGap": "Rien ne surveille {service}",
         "noAbsenceNone": "Aucune alerte si {service} cesse d'envoyer des données",
         "noAbsenceWeak": "Seule une alerte générale remarquerait que {service} cesse d'envoyer des données",
         "noAbsenceSilent": "Le contrôle qui remarquerait que {service} n'envoie plus de données ne notifie personne",
@@ -33526,11 +33527,14 @@
       },
       "detail": {
         "noAlert": "{check} : aucune alerte.",
+        "weakAlert": "{check} : seulement une alerte générale sans filtre de service.",
         "cantMeasure": "{check} : impossible de mesurer pour l'instant, {service} n'envoie aucune trace."
       },
       "coverage_gap": {
         "headline": "Rien ne surveille {service}",
+        "headlineWeak": "{service} n'est que faiblement surveillé",
         "why": "Aucune alerte ne surveille {classes}.",
+        "whyWeak": "Seule une alerte générale sans filtre de service surveille {classes}. | Seules des alertes générales sans filtre de service surveillent {classes}.",
         "next": "Ajoutez l'alerte rédigée par AutoObserve. | Ajoutez les {count} alertes rédigées par AutoObserve.",
         "needsTraces": "La latence nécessite d'abord des traces.",
         "groupAdded": "Alertes ajoutées pour {count} service | Alertes ajoutées pour {count} services",

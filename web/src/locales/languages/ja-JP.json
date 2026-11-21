@@ -29467,6 +29467,7 @@
         "learning": "{count} はまだ学習中です。 | {count} はまだ学習中です。"
       },
       "gapChip": "ギャップ",
+      "weakLegend": "広範なアラートのみ",
       "checksWatched": "{total} 件中 {count} 件のチェックを監視中",
       "verdict": {
         "allWatched": "1 件のサービスを監視しています。 | {count} 件すべてのサービスを監視しています。",
@@ -29486,7 +29487,8 @@
     },
     "homeLive": {
       "andMore": "さらに {count} 件",
-      "cantSee": "AutoObserve はまだ {count} 件のサービスを監視できません: {names}。 | AutoObserve はまだ {count} 件のサービスを監視できません: {names}。",
+      "nothingWatches": "まだ {count} 件のサービスを監視しているものがありません: {names}。 | まだ {count} 件のサービスを監視しているものがありません: {names}。",
+      "weaklyWatched": "{count} 件のサービスは弱くしか監視されていません: {names}。 | {count} 件のサービスは弱くしか監視されていません: {names}。",
       "cantSeeAction": "カバレッジのギャップを表示",
       "allClearTitle": "{within} に問題はありません",
       "allClearDesc": "AutoObserve は {count} 件のサービスを監視しており、対応が必要なものはありませんでした。 | AutoObserve は {count} 件のサービスを監視しており、対応が必要なものはありませんでした。",
@@ -30099,7 +30101,6 @@
         "insufficient": "弱い根拠"
       },
       "body": {
-        "coverageGap": "{service} を監視しているものはありません",
         "noAbsenceNone": "{service} がデータ送信を停止してもアラートは発火しません",
         "noAbsenceWeak": "{service} がデータ送信を停止しても、気づくのは広範なアラートだけです",
         "noAbsenceSilent": "{service} がデータ送信を停止したことに気づくチェックは、通知先がありません",
@@ -33526,11 +33527,14 @@
       },
       "detail": {
         "noAlert": "{check}: アラートなし。",
+        "weakAlert": "{check}: サービスフィルターのない広範なアラートのみ。",
         "cantMeasure": "{check}: まだ測定できません。{service} はトレースを送信していません。"
       },
       "coverage_gap": {
         "headline": "{service} を監視しているものがありません",
+        "headlineWeak": "{service} は弱くしか監視されていません",
         "why": "{classes}を監視するアラートがありません。",
+        "whyWeak": "{classes}を監視しているのは、サービスフィルターのない広範なアラートだけです。 | {classes}を監視しているのは、サービスフィルターのない広範なアラートだけです。",
         "next": "AutoObserveが下書きしたアラートを追加します。 | AutoObserveが下書きした{count}件のアラートを追加します。",
         "needsTraces": "レイテンシの監視にはまずトレースが必要です。",
         "groupAdded": "{count}件のサービスのアラートを追加しました | {count}件のサービスのアラートを追加しました",

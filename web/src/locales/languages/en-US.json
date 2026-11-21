@@ -29471,6 +29471,7 @@
         "learning": "{count} is still learning. | {count} are still learning."
       },
       "gapChip": "Gap",
+      "weakLegend": "Only a broad alert",
       "checksWatched": "{count} of {total} checks watched",
       "verdict": {
         "allWatched": "Your 1 service is watched. | All {count} services are watched.",
@@ -29490,7 +29491,8 @@
     },
     "homeLive": {
       "andMore": "{count} more",
-      "cantSee": "AutoObserve can't watch {count} service yet: {names}. | AutoObserve can't watch {count} services yet: {names}.",
+      "nothingWatches": "Nothing watches {count} service yet: {names}. | Nothing watches {count} services yet: {names}.",
+      "weaklyWatched": "{count} service is only weakly watched: {names}. | {count} services are only weakly watched: {names}.",
       "cantSeeAction": "See coverage gaps",
       "allClearTitle": "No problems {within}",
       "allClearDesc": "AutoObserve watches {count} service and nothing needed you. | AutoObserve watches {count} services and nothing needed you.",
@@ -30103,7 +30105,6 @@
         "insufficient": "Weak evidence"
       },
       "body": {
-        "coverageGap": "Nothing watches {service}",
         "noAbsenceNone": "Nothing alerts if {service} stops sending data",
         "noAbsenceWeak": "Only a broad alert would notice if {service} stops sending data",
         "noAbsenceSilent": "The check that would notice {service} going quiet notifies no one",
@@ -33530,11 +33531,14 @@
       },
       "detail": {
         "noAlert": "{check}: no alert.",
+        "weakAlert": "{check}: only a broad alert with no service filter.",
         "cantMeasure": "{check}: can't measure yet, {service} sends no traces."
       },
       "coverage_gap": {
         "headline": "Nothing watches {service}",
+        "headlineWeak": "{service} is only weakly watched",
         "why": "No alert watches {classes}.",
+        "whyWeak": "Only a broad alert with no service filter watches {classes}. | Only broad alerts with no service filter watch {classes}.",
         "next": "Add the alert AutoObserve drafted. | Add the {count} alerts AutoObserve drafted.",
         "needsTraces": "Latency needs traces first.",
         "groupAdded": "Added alerts for {count} service | Added alerts for {count} services",

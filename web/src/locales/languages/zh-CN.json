@@ -29467,6 +29467,7 @@
         "learning": "{count} 个服务仍在学习中。 | {count} 个服务仍在学习中。"
       },
       "gapChip": "缺口",
+      "weakLegend": "仅有宽泛告警",
       "checksWatched": "已监控 {total} 项检查中的 {count} 项",
       "verdict": {
         "allWatched": "您的服务已被监控。 | 全部 {count} 个服务均已被监控。",
@@ -29486,7 +29487,8 @@
     },
     "homeLive": {
       "andMore": "还有 {count} 个",
-      "cantSee": "AutoObserve 还无法监控 {count} 个服务：{names}。 | AutoObserve 还无法监控 {count} 个服务：{names}。",
+      "nothingWatches": "尚无任何告警监控 {count} 个服务：{names}。 | 尚无任何告警监控 {count} 个服务：{names}。",
+      "weaklyWatched": "{count} 个服务仅被薄弱监控：{names}。 | {count} 个服务仅被薄弱监控：{names}。",
       "cantSeeAction": "查看覆盖缺口",
       "allClearTitle": "{within}内没有问题",
       "allClearDesc": "AutoObserve 监控 {count} 个服务，没有需要你处理的事项。 | AutoObserve 监控 {count} 个服务，没有需要你处理的事项。",
@@ -30099,7 +30101,6 @@
         "insufficient": "证据薄弱"
       },
       "body": {
-        "coverageGap": "没有任何监控覆盖 {service}",
         "noAbsenceNone": "如果 {service} 停止发送数据，不会有任何告警",
         "noAbsenceWeak": "如果 {service} 停止发送数据，只有宽泛的告警才会发现",
         "noAbsenceSilent": "能发现 {service} 停止上报的检查不会通知任何人",
@@ -33526,11 +33527,14 @@
       },
       "detail": {
         "noAlert": "{check}：无告警。",
+        "weakAlert": "{check}：只有未按服务筛选的宽泛告警。",
         "cantMeasure": "{check}：暂时无法测量，{service} 未发送任何追踪。"
       },
       "coverage_gap": {
         "headline": "没有任何告警在监控 {service}",
+        "headlineWeak": "{service} 仅被薄弱监控",
         "why": "没有告警监控 {classes}。",
+        "whyWeak": "只有一个未按服务筛选的宽泛告警在监控{classes}。 | 只有几个未按服务筛选的宽泛告警在监控{classes}。",
         "next": "添加 AutoObserve 起草的告警。 | 添加 AutoObserve 起草的 {count} 个告警。",
         "needsTraces": "延迟监控需要先有追踪数据。",
         "groupAdded": "已为 {count} 个服务添加告警 | 已为 {count} 个服务添加告警",

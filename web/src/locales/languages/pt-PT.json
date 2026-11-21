@@ -29467,6 +29467,7 @@
         "learning": "{count} ainda está a aprender. | {count} ainda estão a aprender."
       },
       "gapChip": "Lacuna",
+      "weakLegend": "Só um alerta genérico",
       "checksWatched": "{count} de {total} verificações vigiadas",
       "verdict": {
         "allWatched": "O seu serviço está vigiado. | Todos os {count} serviços estão vigiados.",
@@ -29486,7 +29487,8 @@
     },
     "homeLive": {
       "andMore": "mais {count}",
-      "cantSee": "O AutoObserve ainda não consegue vigiar {count} serviço: {names}. | O AutoObserve ainda não consegue vigiar {count} serviços: {names}.",
+      "nothingWatches": "Nada monitoriza ainda {count} serviço: {names}. | Nada monitoriza ainda {count} serviços: {names}.",
+      "weaklyWatched": "{count} serviço só é vigiado de forma fraca: {names}. | {count} serviços só são vigiados de forma fraca: {names}.",
       "cantSeeAction": "Ver lacunas de cobertura",
       "allClearTitle": "Sem problemas {within}",
       "allClearDesc": "AutoObserve monitoriza {count} serviço e nada exigiu a sua atenção. | AutoObserve monitoriza {count} serviços e nada exigiu a sua atenção.",
@@ -30099,7 +30101,6 @@
         "insufficient": "Evidência fraca"
       },
       "body": {
-        "coverageGap": "Nada monitoriza {service}",
         "noAbsenceNone": "Nada alerta se {service} deixar de enviar dados",
         "noAbsenceWeak": "Só um alerta abrangente daria conta se {service} deixar de enviar dados",
         "noAbsenceSilent": "A verificação que daria conta de {service} ficar silencioso não notifica ninguém",
@@ -33526,11 +33527,14 @@
       },
       "detail": {
         "noAlert": "{check}: sem alerta.",
+        "weakAlert": "{check}: só um alerta genérico sem filtro de serviço.",
         "cantMeasure": "{check}: ainda não é possível medir, {service} não envia traces."
       },
       "coverage_gap": {
         "headline": "Nada monitoriza {service}",
+        "headlineWeak": "{service} só é vigiado de forma fraca",
         "why": "Nenhum alerta vigia {classes}.",
+        "whyWeak": "Só um alerta genérico sem filtro de serviço vigia {classes}. | Só alertas genéricos sem filtro de serviço vigiam {classes}.",
         "next": "Adicione o alerta que o AutoObserve preparou. | Adicione os {count} alertas que o AutoObserve preparou.",
         "needsTraces": "A latência precisa primeiro de traces.",
         "groupAdded": "Alertas adicionados para {count} serviço | Alertas adicionados para {count} serviços",

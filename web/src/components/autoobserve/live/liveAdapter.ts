@@ -47,6 +47,7 @@ import {
   agoText,
   coverageWord,
   formatDay,
+  gapHeadline,
   NAMES_SHOWN,
   placeLabels,
   placeOf,
@@ -667,17 +668,8 @@ const partsFor = (t: TranslateFn, zone: Zone, s: AutoObserveSuggestion, nowMs?: 
   const service = serviceName(s);
   const why = serviceMeta(t, s);
   const body = cellsMsg(t, locale, s);
-  if (s.kind === "coverage_gap") {
-    const missing = GAP_CLASSES.filter((c) => cellsOf(s)[c]?.state !== "covered");
-    return {
-      headline: t("autoobserveLive.suggestions.body.coverageGap", {
-        service,
-        classes: classList(t, locale, missing),
-      }),
-      why,
-      body,
-    };
-  }
+  if (s.kind === "coverage_gap")
+    return { headline: gapHeadline(t, service, cellsOf(s)), why, body };
   if (s.kind === "no_absence_check")
     return {
       headline: t(NO_ABSENCE_KEY[cellsOf(s).absence?.state ?? "none"], { service }),

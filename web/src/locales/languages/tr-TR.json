@@ -29467,6 +29467,7 @@
         "learning": "{count} hâlâ öğreniyor. | {count} hâlâ öğreniyor."
       },
       "gapChip": "Boşluk",
+      "weakLegend": "Yalnızca genel bir uyarı",
       "checksWatched": "{total} kontrolden {count} tanesi izleniyor",
       "verdict": {
         "allWatched": "1 hizmetiniz izleniyor. | Tüm {count} hizmet izleniyor.",
@@ -29486,7 +29487,8 @@
     },
     "homeLive": {
       "andMore": "{count} tane daha",
-      "cantSee": "AutoObserve henüz {count} hizmeti izleyemiyor: {names}. | AutoObserve henüz {count} hizmeti izleyemiyor: {names}.",
+      "nothingWatches": "{count} hizmet için henüz hiçbir izleme yok: {names}. | {count} hizmet için henüz hiçbir izleme yok: {names}.",
+      "weaklyWatched": "{count} hizmet yalnızca zayıf şekilde izleniyor: {names}. | {count} hizmet yalnızca zayıf şekilde izleniyor: {names}.",
       "cantSeeAction": "Kapsam boşluklarını gör",
       "allClearTitle": "{within} sorun yok",
       "allClearDesc": "AutoObserve {count} hizmeti izliyor ve hiçbir şey sizin müdahalenizi gerektirmedi. | AutoObserve {count} hizmeti izliyor ve hiçbir şey sizin müdahalenizi gerektirmedi.",
@@ -30099,7 +30101,6 @@
         "insufficient": "Zayıf kanıt"
       },
       "body": {
-        "coverageGap": "{service} hizmetini izleyen hiçbir şey yok",
         "noAbsenceNone": "{service} veri göndermeyi durdurursa hiçbir uyarı tetiklenmez",
         "noAbsenceWeak": "{service} veri göndermeyi durdurursa bunu yalnızca geniş kapsamlı bir uyarı fark eder",
         "noAbsenceSilent": "{service} hizmetinin sessizleştiğini fark edecek kontrol kimseye bildirim göndermiyor",
@@ -33526,11 +33527,14 @@
       },
       "detail": {
         "noAlert": "{check}: uyarı yok.",
+        "weakAlert": "{check}: yalnızca hizmet filtresi olmayan genel bir uyarı.",
         "cantMeasure": "{check}: henüz ölçülemiyor, {service} hiç iz göndermiyor."
       },
       "coverage_gap": {
         "headline": "{service} için hiçbir izleme yok",
+        "headlineWeak": "{service} yalnızca zayıf şekilde izleniyor",
         "why": "{classes} için hiçbir uyarı yok.",
+        "whyWeak": "{classes} yalnızca hizmet filtresi olmayan genel bir uyarı tarafından izleniyor. | {classes} yalnızca hizmet filtresi olmayan genel uyarılar tarafından izleniyor.",
         "next": "AutoObserve'un hazırladığı uyarıyı ekleyin. | AutoObserve'un hazırladığı {count} uyarıyı ekleyin.",
         "needsTraces": "Gecikme için önce izler gerekir.",
         "groupAdded": "{count} hizmet için uyarı eklendi | {count} hizmet için uyarı eklendi",

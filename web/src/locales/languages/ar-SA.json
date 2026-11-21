@@ -29467,6 +29467,7 @@
         "learning": "{count} خدمة لا تزال قيد التعلّم. | {count} خدمات لا تزال قيد التعلّم."
       },
       "gapChip": "فجوة",
+      "weakLegend": "تنبيه عام فقط",
       "checksWatched": "تمت مراقبة {count} من {total} فحصًا",
       "verdict": {
         "allWatched": "خدمتك الواحدة مراقبة. | جميع الخدمات البالغ عددها {count} مراقبة.",
@@ -29486,7 +29487,8 @@
     },
     "homeLive": {
       "andMore": "{count} أخرى",
-      "cantSee": "لا يستطيع AutoObserve مراقبة {count} خدمة بعد: {names}. | لا يستطيع AutoObserve مراقبة {count} خدمات بعد: {names}.",
+      "nothingWatches": "لا شيء يراقب {count} خدمة بعد: {names}. | لا شيء يراقب {count} خدمات بعد: {names}.",
+      "weaklyWatched": "{count} خدمة مراقَبة بشكل ضعيف فقط: {names}. | {count} خدمات مراقَبة بشكل ضعيف فقط: {names}.",
       "cantSeeAction": "عرض فجوات التغطية",
       "allClearTitle": "لا توجد مشكلات {within}",
       "allClearDesc": "يراقب AutoObserve {count} خدمة ولم يتطلب أي شيء تدخلك. | يراقب AutoObserve {count} خدمات ولم يتطلب أي شيء تدخلك.",
@@ -30099,7 +30101,6 @@
         "insufficient": "دليل ضعيف"
       },
       "body": {
-        "coverageGap": "لا شيء يراقب {service}",
         "noAbsenceNone": "لا شيء يُنبّه إذا توقفت {service} عن إرسال البيانات",
         "noAbsenceWeak": "لن يلاحظ توقف {service} عن إرسال البيانات سوى تنبيه عام",
         "noAbsenceSilent": "الفحص الذي سيلاحظ صمت {service} لا يُخطر أحدًا",
@@ -33526,11 +33527,14 @@
       },
       "detail": {
         "noAlert": "{check}: لا يوجد تنبيه.",
+        "weakAlert": "{check}: تنبيه عام فقط بلا عامل تصفية للخدمة.",
         "cantMeasure": "{check}: لا يمكن القياس بعد، {service} لا يرسل أي تتبعات."
       },
       "coverage_gap": {
         "headline": "لا شيء يراقب {service}",
+        "headlineWeak": "{service} مراقَب بشكل ضعيف فقط",
         "why": "لا يوجد تنبيه يراقب {classes}.",
+        "whyWeak": "لا يراقب {classes} سوى تنبيه عام بلا عامل تصفية للخدمة. | لا يراقب {classes} سوى تنبيهات عامة بلا عامل تصفية للخدمة.",
         "next": "أضف التنبيه الذي أعدّه AutoObserve. | أضف {count} تنبيهًا أعدّها AutoObserve.",
         "needsTraces": "زمن الاستجابة يحتاج إلى التتبعات أولًا.",
         "groupAdded": "تمت إضافة تنبيهات لـ {count} خدمة | تمت إضافة تنبيهات لـ {count} خدمات",

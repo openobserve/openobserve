@@ -29467,6 +29467,7 @@
         "learning": "{count} vẫn đang học. | {count} vẫn đang học."
       },
       "gapChip": "Lỗ hổng",
+      "weakLegend": "Chỉ một cảnh báo chung",
       "checksWatched": "Đã theo dõi {count} trong {total} kiểm tra",
       "verdict": {
         "allWatched": "1 dịch vụ của bạn đã được theo dõi. | Tất cả {count} dịch vụ đã được theo dõi.",
@@ -29486,7 +29487,8 @@
     },
     "homeLive": {
       "andMore": "{count} mục nữa",
-      "cantSee": "AutoObserve chưa thể theo dõi {count} dịch vụ: {names}. | AutoObserve chưa thể theo dõi {count} dịch vụ: {names}.",
+      "nothingWatches": "Chưa có gì theo dõi {count} dịch vụ: {names}. | Chưa có gì theo dõi {count} dịch vụ: {names}.",
+      "weaklyWatched": "{count} dịch vụ chỉ được theo dõi yếu: {names}. | {count} dịch vụ chỉ được theo dõi yếu: {names}.",
       "cantSeeAction": "Xem lỗ hổng bao phủ",
       "allClearTitle": "Không có vấn đề {within}",
       "allClearDesc": "AutoObserve theo dõi {count} dịch vụ và không có gì cần bạn xử lý. | AutoObserve theo dõi {count} dịch vụ và không có gì cần bạn xử lý.",
@@ -30099,7 +30101,6 @@
         "insufficient": "Bằng chứng yếu"
       },
       "body": {
-        "coverageGap": "Không có gì theo dõi {service}",
         "noAbsenceNone": "Không có cảnh báo nào nếu {service} ngừng gửi dữ liệu",
         "noAbsenceWeak": "Chỉ có một cảnh báo chung mới nhận ra nếu {service} ngừng gửi dữ liệu",
         "noAbsenceSilent": "Bước kiểm tra có thể nhận ra khi {service} im lặng lại không thông báo cho ai",
@@ -33526,11 +33527,14 @@
       },
       "detail": {
         "noAlert": "{check}: không có cảnh báo.",
+        "weakAlert": "{check}: chỉ có một cảnh báo chung không có bộ lọc dịch vụ.",
         "cantMeasure": "{check}: chưa thể đo, {service} không gửi trace nào."
       },
       "coverage_gap": {
         "headline": "Không có gì theo dõi {service}",
+        "headlineWeak": "{service} chỉ được theo dõi yếu",
         "why": "Không có cảnh báo nào theo dõi {classes}.",
+        "whyWeak": "Chỉ một cảnh báo chung không có bộ lọc dịch vụ theo dõi {classes}. | Chỉ các cảnh báo chung không có bộ lọc dịch vụ theo dõi {classes}.",
         "next": "Thêm cảnh báo mà AutoObserve đã soạn. | Thêm {count} cảnh báo mà AutoObserve đã soạn.",
         "needsTraces": "Độ trễ cần có trace trước.",
         "groupAdded": "Đã thêm cảnh báo cho {count} dịch vụ | Đã thêm cảnh báo cho {count} dịch vụ",

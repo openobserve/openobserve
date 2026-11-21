@@ -29462,6 +29462,7 @@
         "learning": "{count} 個服務仍在學習中。 | {count} 個服務仍在學習中。"
       },
       "gapChip": "缺口",
+      "weakLegend": "僅有廣泛警示",
       "checksWatched": "已監控 {total} 項檢查中的 {count} 項",
       "verdict": {
         "allWatched": "您的 1 個服務已受監控。 | 全部 {count} 個服務都已受監控。",
@@ -29481,7 +29482,8 @@
     },
     "homeLive": {
       "andMore": "另有 {count} 個",
-      "cantSee": "AutoObserve 還無法監控 {count} 個服務：{names}。 | AutoObserve 還無法監控 {count} 個服務：{names}。",
+      "nothingWatches": "尚無任何項目監控 {count} 個服務：{names}。 | 尚無任何項目監控 {count} 個服務：{names}。",
+      "weaklyWatched": "{count} 個服務僅受到薄弱監控：{names}。 | {count} 個服務僅受到薄弱監控：{names}。",
       "cantSeeAction": "查看覆蓋缺口",
       "allClearTitle": "在 {within} 內沒有問題",
       "allClearDesc": "AutoObserve 正在監控 {count} 個服務，沒有需要你處理的事項。 | AutoObserve 正在監控 {count} 個服務，沒有需要你處理的事項。",
@@ -30094,7 +30096,6 @@
         "insufficient": "證據薄弱"
       },
       "body": {
-        "coverageGap": "沒有任何監控涵蓋 {service}",
         "noAbsenceNone": "如果 {service} 停止傳送資料，不會有任何警示",
         "noAbsenceWeak": "如果 {service} 停止傳送資料，只有廣泛的警示才會察覺",
         "noAbsenceSilent": "會察覺 {service} 停止傳送資料的檢查不會通知任何人",
@@ -33521,11 +33522,14 @@
       },
       "detail": {
         "noAlert": "{check}：無警示。",
+        "weakAlert": "{check}：只有未依服務篩選的廣泛警示。",
         "cantMeasure": "{check}：尚無法測量，{service} 未傳送任何追蹤。"
       },
       "coverage_gap": {
         "headline": "沒有任何項目在監控 {service}",
+        "headlineWeak": "{service} 僅受到薄弱監控",
         "why": "沒有任何警示監看 {classes}。",
+        "whyWeak": "只有一個未依服務篩選的廣泛警示在監看{classes}。 | 只有幾個未依服務篩選的廣泛警示在監看{classes}。",
         "next": "新增 AutoObserve 草擬的警示。 | 新增 AutoObserve 草擬的 {count} 個警示。",
         "needsTraces": "延遲需要先有追蹤資料。",
         "groupAdded": "已為 {count} 個服務新增警示 | 已為 {count} 個服務新增警示",

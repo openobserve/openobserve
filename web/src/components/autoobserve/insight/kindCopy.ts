@@ -23,7 +23,15 @@ import type {
   AutoObserveIncidentMember,
   AutoObserveSuggestion,
 } from "@/services/autoobserve";
-import { NAMES_SHOWN, formatWhen, placeLabels, placeOf } from "../live/liveCopy";
+import {
+  NAMES_SHOWN,
+  formatWhen,
+  gapHeadline,
+  gapSplit,
+  gapWhy,
+  placeLabels,
+  placeOf,
+} from "../live/liveCopy";
 import {
   heartbeatAlert,
   noDataAlert,
@@ -321,9 +329,7 @@ const gapCopy = (
   const traces = row ? !!streamOf(row, "traces") : true;
   const latencyBlocked = missing.includes("latency") && !traces;
   const stream = row ? rowStream(row) : null;
-  const why = raw(
-    `${t("insight.kind.coverage_gap.why", { classes: listOf(zone.locale, classWords(t, missing, "why"), "disjunction") })}${trafficWhy(t, zone.locale, s, "handles")}`,
-  );
+  const why = raw(`${gapWhy(t, zone.locale, cells)}${trafficWhy(t, zone.locale, s, "handles")}`);
   const nextParts = [
     drafts.length
       ? String(t("insight.kind.coverage_gap.next", { count: drafts.length }, drafts.length))
@@ -347,9 +353,9 @@ const gapCopy = (
   const traffic = num(s.evidence.traffic_per_hour);
   return {
     chip: added ? addedChip(t) : { label: t("insight.kind.chip.notWatched"), tone: "gap" },
-    headline: t("insight.kind.coverage_gap.headline", { service: raw(service) }),
+    headline: gapHeadline(t, raw(service), cells),
     why,
-    whyDetail: gapDetail(t, missing, latencyBlocked, service),
+    whyDetail: gapDetail(t, missing, gapSplit(cells).weak, latencyBlocked, service),
     next: !added && nextParts.length ? raw(nextParts.join(" ")) : null,
     cta,
     note: added ? addedNote(t, split.added.length) : null,
@@ -389,19 +395,20 @@ const gapCopy = (
 const gapDetail = (
   t: TranslateFn,
   missing: GapClass[],
+  weak: GapClass[],
   latencyBlocked: boolean,
   service: string,
 ): I18nText =>
   raw(
     missing
-      .map((c) =>
-        c === "latency" && latencyBlocked
-          ? t("insight.kind.detail.cantMeasure", {
-              check: t(`insight.kind.classes.name.${c}`),
-              service: raw(service),
-            })
-          : t("insight.kind.detail.noAlert", { check: t(`insight.kind.classes.name.${c}`) }),
-      )
+      .map((c) => {
+        const check = t(`insight.kind.classes.name.${c}`);
+        if (c === "latency" && latencyBlocked)
+          return t("insight.kind.detail.cantMeasure", { check, service: raw(service) });
+        return weak.includes(c)
+          ? t("insight.kind.detail.weakAlert", { check })
+          : t("insight.kind.detail.noAlert", { check });
+      })
       .join(" "),
   );
 

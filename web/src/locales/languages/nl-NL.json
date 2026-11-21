@@ -29467,6 +29467,7 @@
         "learning": "{count} is nog aan het leren. | {count} zijn nog aan het leren."
       },
       "gapChip": "Gat",
+      "weakLegend": "Alleen een algemeen alarm",
       "checksWatched": "{count} van {total} checks bewaakt",
       "verdict": {
         "allWatched": "Je 1 service wordt bewaakt. | Alle {count} services worden bewaakt.",
@@ -29486,7 +29487,8 @@
     },
     "homeLive": {
       "andMore": "{count} meer",
-      "cantSee": "AutoObserve kan {count} service nog niet bewaken: {names}. | AutoObserve kan {count} services nog niet bewaken: {names}.",
+      "nothingWatches": "Niets bewaakt nog {count} service: {names}. | Niets bewaakt nog {count} services: {names}.",
+      "weaklyWatched": "{count} service wordt alleen zwak bewaakt: {names}. | {count} services worden alleen zwak bewaakt: {names}.",
       "cantSeeAction": "Bekijk dekkingshiaten",
       "allClearTitle": "Geen problemen {within}",
       "allClearDesc": "AutoObserve bewaakt {count} service en niets vroeg je aandacht. | AutoObserve bewaakt {count} services en niets vroeg je aandacht.",
@@ -30099,7 +30101,6 @@
         "insufficient": "Zwak bewijs"
       },
       "body": {
-        "coverageGap": "Niets houdt {service} in de gaten",
         "noAbsenceNone": "Er is geen alarm als {service} stopt met het verzenden van gegevens",
         "noAbsenceWeak": "Alleen een breed alarm zou merken dat {service} stopt met het verzenden van gegevens",
         "noAbsenceSilent": "De controle die zou merken dat {service} stilvalt, waarschuwt niemand",
@@ -33526,11 +33527,14 @@
       },
       "detail": {
         "noAlert": "{check}: geen alarm.",
+        "weakAlert": "{check}: alleen een algemeen alarm zonder servicefilter.",
         "cantMeasure": "{check}: kan nog niet meten, {service} verstuurt geen traces."
       },
       "coverage_gap": {
         "headline": "Niets bewaakt {service}",
+        "headlineWeak": "{service} wordt alleen zwak bewaakt",
         "why": "Er is geen alarm dat {classes} bewaakt.",
+        "whyWeak": "Alleen een algemeen alarm zonder servicefilter bewaakt {classes}. | Alleen algemene alarmen zonder servicefilter bewaken {classes}.",
         "next": "Voeg het alarm toe dat AutoObserve heeft opgesteld. | Voeg de {count} alarmen toe die AutoObserve heeft opgesteld.",
         "needsTraces": "Latentie heeft eerst traces nodig.",
         "groupAdded": "Alarmen toegevoegd voor {count} service | Alarmen toegevoegd voor {count} services",
