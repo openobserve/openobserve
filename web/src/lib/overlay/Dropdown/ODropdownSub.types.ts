@@ -6,6 +6,8 @@ export interface DropdownSubProps {
   /** Secondary line under the trigger label, linked as its accessible description. */
   description?: I18nText | null;
   descriptionId?: string;
+  /** Edge of the trigger the submenu lines up with; `end` grows it upward from a bottom bar. */
+  align?: "start" | "center" | "end";
 }
 
 export interface DropdownSubEmits {

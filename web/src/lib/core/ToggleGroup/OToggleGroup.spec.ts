@@ -343,3 +343,48 @@ describe("OToggleGroup", () => {
     });
   });
 });
+
+describe("OToggleGroup labelled group", () => {
+  it("names the group by its label", () => {
+    const wrapper = mountGroup({ label: "Tier" }, [{ value: "a", label: "A" }]);
+    const group = wrapper.find('[role="group"]');
+    const labelId = group.attributes("aria-labelledby");
+    expect(labelId).toBeTruthy();
+    expect(wrapper.find(`[id="${labelId}"]`).text()).toBe("Tier");
+  });
+
+  it("marks a disabled labelled group aria-disabled, so its dimmed label counts as inactive", () => {
+    const group = (disabled: boolean) =>
+      mountGroup({ label: "Tier", disabled }, [{ value: "a", label: "A" }]).find('[role="group"]');
+    expect(group(true).attributes("aria-disabled")).toBe("true");
+    expect(group(false).attributes("aria-disabled")).toBeUndefined();
+  });
+
+  it("puts aria-describedby on the group a screen reader enters", () => {
+    const wrapper = mount(OToggleGroup, {
+      props: { label: "Tier" },
+      attrs: { "aria-describedby": "line-1" },
+      slots: { default: () => h(OToggleGroupItem, { value: "a" }, () => "A") },
+    });
+    expect(wrapper.find('[role="group"]').attributes("aria-describedby")).toBe("line-1");
+  });
+
+  it("leaves aria-describedby off the layout wrapper, which still takes the other attributes", () => {
+    const labelled = mount(OToggleGroup, {
+      props: { label: "Tier" },
+      attrs: { "aria-describedby": "line-1", "data-test": "tier", class: "mt-2" },
+      slots: { default: () => h(OToggleGroupItem, { value: "a" }, () => "A") },
+    });
+    expect(labelled.findAll("[aria-describedby]")).toHaveLength(1);
+    const wrapperEl = labelled.get('[data-test="tier"]');
+    expect(wrapperEl.attributes("role")).toBeUndefined();
+    expect(wrapperEl.attributes("aria-describedby")).toBeUndefined();
+    expect(wrapperEl.classes()).toContain("mt-2");
+    const bare = mount(OToggleGroup, {
+      attrs: { "aria-describedby": "line-1", "data-test": "tier" },
+      slots: { default: () => h(OToggleGroupItem, { value: "a" }, () => "A") },
+    });
+    expect(bare.get('[role="group"]').attributes("aria-describedby")).toBe("line-1");
+    expect(bare.get('[role="group"]').attributes("data-test")).toBe("tier");
+  });
+});

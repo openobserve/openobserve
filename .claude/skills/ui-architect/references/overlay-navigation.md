@@ -10,6 +10,7 @@ O2 overlay primitives (Dialog, Drawer, Dropdown, Popover, Tooltip) and navigatio
   - [ODrawer](#odrawer)
   - [ODropdown](#odropdown) · [ODropdownItem](#odropdownitem) · [ODropdownGroup](#odropdowngroup) · [ODropdownSeparator](#odropdownseparator)
   - [OPopover](#opopover)
+  - [OSheet](#osheet)
   - [OTooltip](#otooltip)
 - Navigation
   - [OPagination](#opagination)
@@ -27,6 +28,7 @@ O2 overlay primitives (Dialog, Drawer, Dropdown, Popover, Tooltip) and navigatio
 | **Freeform** floating content (filter form, color picker, mini info card) | **OPopover**          | Dropdown — popover keeps normal Tab order and frees arrow keys for the content    |
 | A focused **modal task** centred on screen (create/edit form, confirm)    | **ODialog**           | Drawer — dialog is for short, self-contained tasks                                |
 | A **side panel** task (details inspector, long form, contextual editor)   | **ODrawer**           | Dialog — drawer slides from an edge and can stay `seamless` (page still usable)   |
+| A **bottom sheet** below `lg` that keeps the page above visible (snaps)    | **OSheet**            | Drawer — a drawer is side-anchored and modal; a sheet snaps and stays non-modal   |
 
 Rule of thumb: **Tooltip = hint, Dropdown = action menu, Popover = anything freeform, Dialog/Drawer = modal task.** Dialog and Drawer share the exact same surface, header/footer, built-in footer buttons, and `formId` auto-loading — choose by placement (center vs edge), not capability.
 
@@ -295,6 +297,44 @@ set dimensions back to the toolbar as removable `ODimensionChip`s, so an
 unfiltered page spends one button and a filtered one shows its scope as chips).
 
 **Family:** ODropdown (menu sibling — shares overlay coordination).
+
+---
+
+### OSheet
+
+**Import:** `@/lib/overlay/Sheet/OSheet.vue` (types in `OSheet.types.ts`)
+**Use when:** Below `lg`, a panel must sit at the bottom of the screen and keep the page above it visible and usable — the assistant's container on phones and tablets. It snaps between `peek` (3.5 rem), `half` (50 dvh) and `full` (up to the app header), never a free height.
+**Don't use for:** A side panel or a long form (use **ODrawer**); a modal task (use **ODialog**); anything on desktop, where the sheet is not the pattern.
+**Key props:**
+
+- `open` (boolean — `v-model:open`), `snap` (`"peek"|"half"|"full"` — `v-model:snap`)
+- `snapPoints` (subset of the three; default all) — a drag or a button lands on the nearest one
+- `ariaLabel` (string, **required** — the dialog name; the sheet is `role="dialog" aria-modal="false"`; bind it as `v-bind="{ ariaLabel }"`, since vue-tsc reads `:aria-label` as the native attribute)
+- `expandLabel` / `collapseLabel` (`I18nText`, **required** — the handle's **Show more** / **Show less** buttons; the primitive holds no copy)
+- `anchorAbove` (selector | HTMLElement — a footer the sheet must stay above; defaults to the footer of the topmost open `ODrawer`)
+- `persistent` (boolean — default `false`; a swipe below `peek` dismisses unless set)
+- `dataTest` (prefix: `<id>`, `<id>-handle`, `<id>-expand`, `<id>-peek`)
+
+**Slots:** `header` (one row of chrome), `default` (the scrolling body), `footer`
+**Emits:** `update:open`, `update:snap`, `dismiss`
+**Behaviour:** portalled to `body` at `z-6000`, so it sits above an earlier-open drawer (equal z, later DOM) and below a later dialog, menus and toasts; heights use `dvh` with `pb-[env(safe-area-inset-bottom)]`; it follows the on-screen keyboard through `visualViewport` (`--o-sheet-kb`) and writes its covered height to `--o-assistant-inset-bottom` on `<html>` (cleared on close) so the page can pad its scroll root; no backdrop, no focus trap — the consumer moves focus in and back; reduced motion makes snaps instant. Escape is the consumer's (the assistant's ladder closes it).
+
+```vue
+<OSheet
+  :open="visible"
+  :snap="snap"
+  v-bind="{ ariaLabel: t('assistant.name') }"
+  :expand-label="t('assistant.shell.sheetExpand')"
+  :collapse-label="t('assistant.shell.sheetPeek')"
+  data-test="assistant-shell-sheet"
+  @update:snap="(next) => (snap = next)"
+  @update:open="(open) => !open && close()"
+>
+  <AssistantShell placement="sidebar" sheet />
+</OSheet>
+```
+
+**Family:** ODrawer (side-anchored, modal).
 
 ---
 

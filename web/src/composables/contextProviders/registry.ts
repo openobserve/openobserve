@@ -15,11 +15,18 @@
  * ```
  */
 
+import { shallowRef, type ShallowRef } from "vue";
+
 import type { ContextProvider, PageContext } from "./types";
 
 class ContextRegistry {
   private providers: Map<string, ContextProvider> = new Map();
   private activeProvider: string | null = null;
+  // Nested editors push over their parent and pop only their own entry (constraint 39).
+  private stack: { key: string; provider: ContextProvider }[] = [];
+
+  /** Bumped on every change, so a reactive reader re-reads the context. */
+  readonly version: ShallowRef<number> = shallowRef(0);
 
   /**
    * Register a context provider for a specific page/component
@@ -34,6 +41,19 @@ class ContextRegistry {
    */
   register(key: string, provider: ContextProvider): void {
     this.providers.set(key, provider);
+    this.bump();
+  }
+
+  /** Puts a nested editor's provider on top; the same key replaces its own earlier entry. */
+  push(key: string, provider: ContextProvider): void {
+    this.stack = [...this.stack.filter((entry) => entry.key !== key), { key, provider }];
+    this.bump();
+  }
+
+  /** Removes only this key's entry, so a parent's provider survives a child's unmount. */
+  pop(key: string): void {
+    this.stack = this.stack.filter((entry) => entry.key !== key);
+    this.bump();
   }
 
   /**
@@ -53,6 +73,7 @@ class ContextRegistry {
     if (this.activeProvider === key) {
       this.activeProvider = null;
     }
+    this.bump();
   }
 
   /**
@@ -70,11 +91,13 @@ class ContextRegistry {
     if (key === "") {
       // Allow clearing active provider
       this.activeProvider = null;
+      this.bump();
       return;
     }
 
     if (this.providers.has(key)) {
       this.activeProvider = key;
+      this.bump();
     }
   }
 
@@ -92,6 +115,42 @@ class ContextRegistry {
    * ```
    */
   async getActiveContext(): Promise<PageContext | null> {
+    return this.resolve(this.stack);
+  }
+
+  /** The context a pushed provider sits on: the entries pushed before `key`, else the page's provider. */
+  async getContextBelow(key: string): Promise<PageContext | null> {
+    const index = this.stack.findIndex((entry) => entry.key === key);
+    return this.resolve(index === -1 ? this.stack : this.stack.slice(0, index));
+  }
+
+  /**
+   * Clean up registry by removing all providers and resetting active provider
+   *
+   * Example:
+   * ```typescript
+   * cleanup(); // Clears all registered providers
+   * ```
+   */
+  cleanup(): void {
+    this.providers.clear();
+    this.activeProvider = null;
+    this.stack = [];
+    this.bump();
+  }
+
+  private async resolve(
+    stack: { key: string; provider: ContextProvider }[],
+  ): Promise<PageContext | null> {
+    const top = stack[stack.length - 1];
+    if (top) {
+      try {
+        return await top.provider.getContext();
+      } catch (error) {
+        console.error("Error getting context from pushed provider:", error);
+      }
+    }
+
     // Try active provider first
     if (this.activeProvider) {
       const provider = this.providers.get(this.activeProvider);
@@ -117,17 +176,8 @@ class ContextRegistry {
     return null;
   }
 
-  /**
-   * Clean up registry by removing all providers and resetting active provider
-   *
-   * Example:
-   * ```typescript
-   * cleanup(); // Clears all registered providers
-   * ```
-   */
-  cleanup(): void {
-    this.providers.clear();
-    this.activeProvider = null;
+  private bump(): void {
+    this.version.value += 1;
   }
 }
 

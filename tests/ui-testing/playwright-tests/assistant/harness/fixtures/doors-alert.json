@@ -1,0 +1,24 @@
+{
+  "id": "wp07doorsalert01",
+  "name": "Checkout 5xx",
+  "stream_type": "logs",
+  "stream_name": "e2e_automate",
+  "is_real_time": false,
+  "query_condition": {
+    "type": "sql",
+    "sql": "SELECT count(*) AS total FROM \"e2e_automate\" WHERE code >= 500",
+    "conditions": null
+  },
+  "trigger_condition": {
+    "period": 10,
+    "operator": ">=",
+    "threshold": 3,
+    "frequency": 5,
+    "silence": 10
+  },
+  "destinations": [
+    "email-oncall"
+  ],
+  "enabled": true,
+  "last_triggered_at": null
+}

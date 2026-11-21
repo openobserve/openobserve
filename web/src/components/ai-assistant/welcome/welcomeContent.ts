@@ -1,57 +1,118 @@
 /**
- * Static content for the O2 Assistant home-tab welcome screen.
+ * Static content for the assistant home-tab welcome screen.
  */
 
+import type { AgentId } from "@/composables/assistant";
+import type { I18nKey } from "@/types/i18n";
+
+type HomeCardId = "query" | "incident" | "dashboard" | "alert";
+type InvestigateCardId = "whyAlertFired" | "investigateIncident" | "errorSpike" | "slowService";
+
 export interface CapabilityCard {
-  /** i18n key — under aiAssistant.capabilities.<id>.{title,description,prompt} */
-  id: "query" | "incident" | "dashboard" | "alert";
+  id: string;
+  title: I18nKey;
+  description: I18nKey;
+  prompt: I18nKey;
   /** OIcon registry name */
   icon: string;
   /** Tailwind text color class for the icon (token-based) */
   iconColorClass: string;
   /** Tailwind tinted background class for the icon chip */
   iconBgClass: string;
+  /** The agent the card's prompt is for; the box picks it with the prompt. */
+  agent?: AgentId;
 }
+
+const homeText = (id: HomeCardId) => ({
+  id,
+  title: `aiAssistant.capabilities.${id}.title` as const,
+  description: `aiAssistant.capabilities.${id}.description` as const,
+  prompt: `aiAssistant.capabilities.${id}.prompt` as const,
+});
+
+const investigateText = (id: InvestigateCardId) => ({
+  id,
+  title: `autobotInvestigate.cards.${id}.title` as const,
+  description: `autobotInvestigate.cards.${id}.description` as const,
+  prompt: `autobotInvestigate.cards.${id}.prompt` as const,
+});
 
 export const CAPABILITY_CARDS: CapabilityCard[] = [
   {
-    id: "query",
+    ...homeText("query"),
     icon: "edit",
-    iconColorClass: "text-[#7B61FF]",
-    iconBgClass: "bg-[#7B61FF]/10",
+    iconColorClass: "text-ai-accent",
+    iconBgClass: "bg-ai-accent/10",
   },
   {
-    id: "incident",
+    ...homeText("incident"),
+    agent: "sre",
     icon: "warning",
-    iconColorClass: "text-[#F59E0B]",
-    iconBgClass: "bg-[#F59E0B]/10",
+    iconColorClass: "text-status-warning-text",
+    iconBgClass: "bg-status-warning-bg",
   },
   {
-    id: "dashboard",
+    ...homeText("dashboard"),
     icon: "dashboard",
-    iconColorClass: "text-[#10B981]",
-    iconBgClass: "bg-[#10B981]/10",
+    iconColorClass: "text-status-success-text",
+    iconBgClass: "bg-status-success-bg",
   },
   {
-    id: "alert",
+    ...homeText("alert"),
     icon: "notifications",
-    iconColorClass: "text-[#EF4444]",
-    iconBgClass: "bg-[#EF4444]/10",
+    iconColorClass: "text-status-error-text",
+    iconBgClass: "bg-status-error-bg",
+  },
+];
+
+/** The investigate page's starters, in place of Home's. */
+export const INVESTIGATE_CARDS: CapabilityCard[] = [
+  {
+    ...investigateText("whyAlertFired"),
+    icon: "notifications-active",
+    iconColorClass: "text-status-error-text",
+    iconBgClass: "bg-status-error-bg",
+  },
+  {
+    ...investigateText("investigateIncident"),
+    icon: "warning",
+    iconColorClass: "text-status-warning-text",
+    iconBgClass: "bg-status-warning-bg",
+  },
+  {
+    ...investigateText("errorSpike"),
+    icon: "trending-up",
+    iconColorClass: "text-ai-accent",
+    iconBgClass: "bg-ai-accent/10",
+  },
+  {
+    ...investigateText("slowService"),
+    icon: "speed",
+    iconColorClass: "text-status-success-text",
+    iconBgClass: "bg-status-success-bg",
   },
 ];
 
 export interface PromptSuggestion {
-  /** i18n key — under aiAssistant.suggestions.<id> */
+  /** i18n key — under aiAssistant.suggestions.<id>, unless `key` names another */
   id: string;
+  key?: I18nKey;
   /** OIcon name */
   icon: string;
+  /** Names the org's first own log stream as `{stream}`; hidden when the org has none. */
+  logStream?: boolean;
 }
 
 export const PROMPT_SUGGESTIONS: PromptSuggestion[] = [
   { id: "vrlParseJson", icon: "code" },
   { id: "regexRedact", icon: "code" },
-  { id: "mapStreamSchema", icon: "data-object" },
+  {
+    id: "mapStreamSchema",
+    key: "assistant.welcome.starter.mapStreamSchema",
+    icon: "data-object",
+    logStream: true,
+  },
   { id: "promqlCpu", icon: "trending-up" },
-  { id: "datadogToO2", icon: "swap-horiz" },
+  { id: "otherToolToO2", key: "assistant.welcome.starter.otherToolToO2", icon: "swap-horiz" },
   { id: "lastAlertFired", icon: "history" },
 ];

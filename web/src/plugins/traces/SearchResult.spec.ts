@@ -516,7 +516,6 @@ describe("SearchResult", () => {
         "remove-filter",
         "jump-to-stream-data",
         "error-only-toggled",
-        "ask-ai",
         "send-to-ai-chat",
         "open-mobile-fields",
       ];

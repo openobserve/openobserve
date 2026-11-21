@@ -216,6 +216,15 @@ export const NAV_GROUPS: NavGroupDef[] = [
         requires: "sloList",
         feature: "anomaly_detection",
       },
+      // Rides on Alerts like Calibration: it has no tile of its own to require.
+      {
+        titleKey: "menu.autobotInvestigate",
+        icon: "manage-search",
+        name: "autobotInvestigate",
+        categoryKey: "menu.response",
+        requires: "alertList",
+        feature: "ai_assistant",
+      },
       {
         titleKey: "menu.incidents",
         icon: "notifications-active",

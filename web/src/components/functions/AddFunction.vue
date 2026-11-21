@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex h-full min-h-0 w-full flex-col">
+  <div class="@container/page flex h-full min-h-0 w-full flex-col">
     <!-- The toolbar hosts the form-owned name + transType fields and the Save
          button (type="submit"), so it lives INSIDE the <OForm>. The editor +
          TestFunction below stay OUTSIDE the form. Inline form → Enter submits
@@ -36,18 +36,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :transform-type-options="transformTypeOptions"
         :hide-trans-type="!!forcedLanguage"
         :hide-chat="hideAiAssist"
+        :assistant="docked"
+        :dock-host="dockHost"
         @test="onTestFunction"
         @back="closeAddFunction"
         @cancel="cancelAddFunction"
-        @open:chat="openChat"
       />
     </OForm>
 
-    <div class="flex min-h-0 flex-1">
-      <div
-        class="flex min-h-0 overflow-hidden"
-        :class="[store.state.isAiChatEnabled && !isAddFunctionComponent ? 'w-3/4' : 'w-full']"
-      >
+    <div :ref="docked ? docked.dockSlot : undefined" class="flex min-h-0 flex-1">
+      <div class="flex min-h-0 w-full overflow-hidden">
         <!-- Workflows (hideTestPanel): the NDV supplies Input · Output around this
              pane, so the embedded test panel is redundant — collapse the splitter to
              an editor-only, full-width surface (no drag handle). -->
@@ -85,7 +83,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-expand-icon="!hideTestPanel"
                   :label-class="hideTestPanel ? 'ps-2' : ''"
                 />
-                <div v-show="expandState.functions" class="relative mb-1.5 min-h-0 flex-1">
+                <AiLabel
+                  v-if="docked?.proposal.label.value"
+                  :state="docked.proposal.label.value"
+                  class="pb-1"
+                  @revert="docked.proposal.revert"
+                  @ask-again="docked.dock.askAgain"
+                />
+                <div
+                  v-show="expandState.functions"
+                  ref="editorArea"
+                  class="relative mb-1.5 min-h-0 flex-1"
+                >
+                  <AssistantDiffBlock
+                    v-if="docked?.proposal.pending.value"
+                    :key="docked.proposal.pending.value.id"
+                    :proposal="docked.proposal.pending.value"
+                    class="absolute inset-0 z-1000"
+                  />
                   <!-- Unified Query Editor (with built-in AI bar) -->
                   <UnifiedQueryEditor
                     data-test="logs-vrl-function-editor"
@@ -101,33 +116,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :ai-placeholder="t('function.askAIFunctionPlaceholder')"
                     :ai-tooltip="t('function.enterFunctionPrompt')"
                     editor-height="100%"
-                    @focus="functionEditorPlaceholderFlag = false"
-                    @blur="functionEditorPlaceholderFlag = true"
                     @update:query="handleFunctionUpdate"
                     @language-change="handleLanguageChange"
-                    @toggle-nlp-mode="handleToggleNlpMode"
-                    @generation-start="handleGenerationStart"
-                    @generation-end="handleGenerationEnd"
-                    @generation-success="handleGenerationSuccess"
+                    :assistant="functionAssistant"
+                    :placeholder="
+                      !formData.function
+                        ? transType === '1'
+                          ? jsPlaceholder
+                          : vrlPlaceholder
+                        : undefined
+                    "
                   />
-                  <!-- Typewriter placeholder for an empty editor.
-                         Deliberately NOT gated on `!forcedLanguage`: a forced
-                         language is no reason to drop the placeholder. transType
-                         is locked to the forced language (see the mounted hook),
-                         so the ternary below still picks the right one, and
-                         `!formData.function` already hides this whenever a host
-                         seeded `defaultCode`. Excluding forced hosts left the
-                         pipeline Function node with a blank editor — it forces
-                         vrl but passes no defaultCode. -->
-                  <div
-                    v-if="!formData.function && functionEditorPlaceholderFlag"
-                    class="pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 pb-0 select-none"
-                  >
-                    <span
-                      class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] [text-overflow:ellipsis] whitespace-nowrap text-[var(--text-sm)]"
-                      >{{ transType === "1" ? jsPlaceholder : vrlPlaceholder }}</span
-                    >
-                  </div>
                 </div>
                 <div class="text-sm font-medium">
                   <div v-if="vrlFunctionError">
@@ -169,25 +168,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :sample-events="sampleEvents"
                 :hide-query="hideQuery"
                 :hide-ai-assist="hideAiAssist"
-                @sendToAiChat="sendToAiChat"
               />
             </div>
           </template>
         </OSplitter>
       </div>
-      <div
-        v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
-        :class="['w-1/4 max-w-full min-w-19', heightOffset ? '[--ai-chat-offset:4.6875rem]' : '']"
-      >
-        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
-        <O2AIChat
-          class="h-[calc(100vh-(112px+var(--ai-chat-offset,0px)))]"
-          :is-open="store.state.isAiChatEnabled"
-          @close="store.state.isAiChatEnabled = false"
-          :aiChatInputContext="aiChatInputContext"
-        />
-        <!-- eslint-enable local/no-hardcoded-px -->
-      </div>
+      <AssistantDock v-if="docked && dockHost" :host="docked.adapter" />
     </div>
   </div>
   <ConfirmDialog
@@ -210,7 +196,6 @@ import {
   watch,
   onUnmounted,
   defineAsyncComponent,
-  nextTick,
 } from "vue";
 
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -222,7 +207,6 @@ import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useRouter } from "vue-router";
-import O2AIChat from "@/components/O2AIChat.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useVrlPlaceholder, useJsPlaceholder } from "@/composables/useVrlPlaceholder";
@@ -235,6 +219,7 @@ import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import EditorDraftDialogs from "@/components/common/drafts/EditorDraftDialogs.vue";
+import { useDockedEditor, type DockedEditor } from "@/composables/assistant/pure";
 
 interface FunctionDraftData {
   name: string;
@@ -304,8 +289,21 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    // Inside a pipeline node the assistant docks beside the editor; on the functions page it opens the sidebar.
+    dockHost: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
+    // The assistant's parts load only where the revamp renders them, never in the flag-off chunk.
+    AiLabel: defineAsyncComponent(() => import("@/components/ai-assistant/entry/AiLabel.vue")),
+    AssistantDiffBlock: defineAsyncComponent(
+      () => import("@/components/ai-assistant/evidence/AssistantDiffBlock.vue"),
+    ),
+    AssistantDock: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantDock.vue"),
+    ),
     OSplitter,
     OForm,
     UnifiedQueryEditor: defineAsyncComponent(() => import("@/components/QueryEditor.vue")),
@@ -313,10 +311,9 @@ export default defineComponent({
     FullViewContainer,
     TestFunction,
     ConfirmDialog,
-    O2AIChat,
     EditorDraftDialogs,
   },
-  emits: ["update:list", "cancel:hideform", "sendToAiChat"],
+  emits: ["update:list", "cancel:hideform"],
   setup(props, { emit, expose }) {
     const store: any = useStore();
     const router = useRouter();
@@ -334,7 +331,6 @@ export default defineComponent({
     const indexOptions = ref([]);
     const { t } = useI18nTyped();
     const editorRef: any = ref(null);
-    const functionEditorPlaceholderFlag = ref(true);
     // Externally controlled so the AI bar only opens on explicit user action
     // (the AI toggle/close button) — VRL text never looks like a natural-
     // language query, so auto-detection here is only ever a false positive.
@@ -346,7 +342,6 @@ export default defineComponent({
     const testFunctionRef = ref<typeof TestFunction>();
     // Editor-only (workflows) starts full width; the test-panel split is locked out.
     const splitterModel = ref(props.hideTestPanel ? 100 : 50);
-    const aiChatInputContext = ref("");
     const confirmDialogMeta = ref({
       // raw("") is only the empty placeholder — the real values are assigned from t().
       title: raw(""),
@@ -429,10 +424,6 @@ export default defineComponent({
     const streamTypes = ["logs", "metrics", "traces"];
 
     const isFunctionDataChanged = ref(false);
-    const isAddFunctionComponent = computed(() =>
-      router.currentRoute.value.path.includes("functions"),
-    );
-
     watch(
       () => nameValue.value + formData.value.function,
       () => {
@@ -660,27 +651,37 @@ export default defineComponent({
       confirmDialogMeta.value.onConfirm = () => {};
       confirmDialogMeta.value.data = null;
     };
-    const openChat = (val: boolean) => {
-      store.dispatch("setIsAiChatEnabled", val);
-    };
-
-    const sendToAiChat = (value: any) => {
-      //this is for when user in pipeline add function page and click on ai chat button
-      //here we reset the value befoere setting it because if user clears the input then again click on the same value it wont trigger the watcher that is there in the child component
-      //so to force trigger we do this
-      aiChatInputContext.value = "";
-      nextTick(() => {
-        aiChatInputContext.value = value;
-      });
-      store.dispatch("setIsAiChatEnabled", true);
-      //this is for when user in functions page and click on ai chat button
-      emit("sendToAiChat", value);
-    };
-
     // Unified Query Editor: Handle function update
     const handleFunctionUpdate = (newFunction: string) => {
       formData.value.function = newFunction;
     };
+
+    const editorArea = ref<HTMLElement | null>(null);
+    const docked: DockedEditor = useDockedEditor(
+      {
+        id: "function",
+        objectKind: "function",
+        objectTitle: () =>
+          nameValue.value
+            ? t("assistant.editor.title.function", { name: raw(nameValue.value) })
+            : t("assistant.editor.title.functionNew"),
+        language: () => (transType.value === "1" ? "js" : "vrl"),
+        getBuffer: () => String(formData.value.function ?? ""),
+        getContext: () => ({
+          currentVRLQuery: String(formData.value.function ?? ""),
+          ...(nameValue.value && { functionName: nameValue.value }),
+        }),
+        isDirty: () => isFunctionDataChanged.value,
+        ...(!props.hideTestPanel && { run: () => onTestFunction() }),
+        focusEditor: () => editorArea.value?.querySelector<HTMLElement>("textarea")?.focus(),
+        write(text) {
+          formData.value.function = text;
+          editorRef.value?.replaceValue?.(text);
+        },
+        area: () => editorArea.value,
+      },
+      { dock: props.dockHost },
+    );
 
     // Unified Query Editor: Handle language change
     const handleLanguageChange = (newLanguage: "sql" | "promql" | "vrl" | "javascript") => {
@@ -690,32 +691,10 @@ export default defineComponent({
       addFunctionForm.setFieldValue("transType", tt);
     };
 
-    /**
-     * Handle NLP mode toggle from AI icon in editor
-     */
-    const handleToggleNlpMode = () => {
-      // UnifiedQueryEditor manages its own NLP mode state internally
-    };
-
-    /**
-     * Handle generation start event from UnifiedQueryEditor
-     */
-    const handleGenerationStart = () => {
-      // Can add loading indicators here if needed
-    };
-
-    /**
-     * Handle generation end event from UnifiedQueryEditor
-     */
-    const handleGenerationEnd = () => {
-      // Can remove loading indicators here if needed
-    };
-
-    /**
-     * Handle successful generation from UnifiedQueryEditor
-     */
-    const handleGenerationSuccess = (_payload: { type: string; message: string }) => {
-      // Function code is already updated via @update:query handler
+    const functionAssistant = {
+      id: "function" as const,
+      proposal: docked.proposal,
+      ...(docked.adapter.run && { run: docked.adapter.run }),
     };
 
     return {
@@ -729,7 +708,7 @@ export default defineComponent({
       compilationErr,
       indexOptions,
       editorRef,
-      functionEditorPlaceholderFlag,
+      functionAssistant,
       functionEditorNlpMode,
       vrlPlaceholder,
       jsPlaceholder,
@@ -755,16 +734,10 @@ export default defineComponent({
       transformTypeOptions,
       resetConfirmDialog,
       cancelAddFunction,
-      openChat,
-      isAddFunctionComponent,
-      sendToAiChat,
-      aiChatInputContext,
       handleFunctionUpdate,
       handleLanguageChange,
-      handleToggleNlpMode,
-      handleGenerationStart,
-      handleGenerationEnd,
-      handleGenerationSuccess,
+      docked,
+      editorArea,
     };
   },
   created() {

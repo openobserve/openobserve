@@ -1,0 +1,138 @@
+name: Assistant stack nightly (stack-oss)
+
+# The @stack-oss assistant flows on a real OSS build with no mocks; schedule and manual runs only, so no fork code and no secrets.
+on:
+  schedule:
+    - cron: "15 1 * * *"
+  workflow_dispatch:
+    inputs:
+      grep:
+        description: "Narrow the run to titles matching this regex, for example GATE-01 (empty runs every @stack-oss flow; the schedule runs the structural set)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+env:
+  COLUMNS: 150
+  ZO_ROOT_USER_EMAIL: root@example.com
+  ZO_BASE_URL: http://localhost:5080
+  INGESTION_URL: http://localhost:5080
+  ORGNAME: default
+  ZO_WEB_URL: "http://localhost:5080"
+  ASSISTANT_E2E_MODE: stack-oss
+
+jobs:
+  stack_oss:
+    name: assistant / stack-oss
+    if: github.repository == 'openobserve/openobserve'
+    timeout-minutes: 90
+    runs-on:
+      labels: ubicloud-standard-16
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - uses: ./.github/actions/github-auth
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master
+        with:
+          toolchain: nightly-2026-10-24
+          targets: x86_64-unknown-linux-gnu
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-on-failure: true
+          shared-key: playwright-release-ci
+          save-if: false
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Build binary and frontend
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+          GIT_HASH_OVERRIDE: ${{ github.sha }}
+        run: |
+          mkdir -p /tmp/dist
+          bash -c "cd web && npm ci && npm run build && cp -r ./dist/. /tmp/dist/" &
+          NPM_PID=$!
+          sed -i 's|folder = "../../web/dist/"|folder = "/tmp/dist/"|' src/web/src/lib.rs && grep -q 'folder = "/tmp/dist/"' src/web/src/lib.rs
+          cargo build --profile release-ci --target x86_64-unknown-linux-gnu
+          wait $NPM_PID
+          test -f /tmp/dist/index.html
+
+      - name: Make a throwaway root password
+        run: |
+          pass="Pw#$(openssl rand -hex 12)"
+          echo "::add-mask::$pass"
+          echo "ZO_ROOT_USER_PASSWORD=$pass" >> "$GITHUB_ENV"
+
+      - name: Start OpenObserve
+        run: ./target/x86_64-unknown-linux-gnu/release-ci/openobserve > o2.log 2>&1 &
+
+      - name: Wait for start
+        run: |
+          for i in $(seq 1 120); do
+            if curl -sf http://localhost:5080/web/login > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server failed to start in 120s"
+          exit 1
+
+      - name: Cache Playwright browser
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('tests/ui-testing/package-lock.json') }}
+
+      - name: Run the @stack-oss assistant flows
+        env:
+          ASSISTANT_E2E_GREP: ${{ github.event_name == 'schedule' && 'STACK-|SMOKE-|GATE-01|ADMIN-14' || inputs.grep }}
+        run: |
+          {
+            echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}"
+            echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}"
+            echo "ZO_BASE_URL=${ZO_BASE_URL}"
+            echo "INGESTION_URL=${INGESTION_URL}"
+            echo "ORGNAME=${ORGNAME}"
+          } > tests/ui-testing/.env
+          cd tests/ui-testing && npm ci
+          npx playwright install --with-deps chromium
+          node playwright-tests/assistant/stack/run.mjs --reporter=list,html
+
+      - name: Upload captures, axe reports and the telemetry export
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assistant-stack-oss-${{ github.run_id }}
+          path: |
+            tests/ui-testing/playwright-tests/assistant/harness/out
+            tests/ui-testing/playwright-report
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Check OpenObserve logs
+        if: always()
+        run: tail -n 300 o2.log

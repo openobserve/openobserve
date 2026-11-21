@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test-panel-id="props.data.id"
     :data-test-panel-title="props.data.title"
     :data-panel-type="props.data.type"
+    data-assistant-source-scope=""
   >
     <div
       :class="{
@@ -356,6 +357,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTooltip :content="refreshTooltip" />
         </OButton>
+        <span class="inline-flex max-md:hidden" :class="doorRevealClass">
+          <AiEntryButton v-bind="panelDoor('explain')" appearance="toolbar-icon" />
+        </span>
+        <ODropdown
+          v-if="(viewOnly || simplifiedPanelView) && aiMenuShown"
+          side="bottom"
+          align="end"
+        >
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="icon"
+              :aria-label="t('assistant.entry.panelActions')"
+              :data-test="`dashboard-panel-${props.data.title}-ai-menu`"
+            >
+              <OIcon name="more-vert" size="sm" />
+            </OButton>
+          </template>
+          <AiEntryButton v-bind="panelDoor('explain')" appearance="menu-item" />
+          <AiEntryButton v-bind="panelDoor('add_to_chat')" appearance="menu-item" />
+        </ODropdown>
         <!-- simplifiedPanelView panels are ephemeral (Insights / Drill down): delete without a confirm -->
         <OButton
           v-if="!viewOnly && simplifiedPanelView"
@@ -418,6 +440,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OButton>
           </template>
+          <AiEntryButton v-bind="panelDoor('explain')" appearance="menu-item" />
+          <AiEntryButton v-bind="panelDoor('add_to_chat')" appearance="menu-item" />
           <ODropdownItem
             v-if="!simplifiedPanelView && !isLayoutEditing"
             data-test="dashboard-edit-panel"
@@ -618,7 +642,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"
         @series-data-update="onCuratedSeriesData"
-        @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
       ></PanelSchemaRenderer>
       <PanelDataView
         v-if="showDataOverlay"
@@ -718,6 +741,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { panelBuild } from "@/components/dashboards/panelDoors";
+import { useAssistantGate } from "@/composables/assistant/pure";
 import {
   defineComponent,
   ref,
@@ -811,7 +837,6 @@ export default defineComponent({
     "onEditLayout",
     "update:runId",
     "contextmenu",
-    "sendToAiChat",
     "exploreCreateAlert",
     "exploreAddToDashboard",
   ],
@@ -845,6 +870,9 @@ export default defineComponent({
     "exploreActions",
   ],
   components: {
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
     OTag,
     OBadge,
     OSkeleton,
@@ -884,6 +912,34 @@ export default defineComponent({
     const showInlineDescription = computed(
       () => !!props.simplifiedPanelView && !props.viewOnly && !!props.data?.description,
     );
+
+    // Panel doors work in every host, view-only included: a viewer can still ask.
+    const loadedOrg = useLoadedOrg(
+      () => props.data,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    );
+    const panelDoor = (verb: "explain" | "add_to_chat") => ({
+      verb,
+      entryKind: "object_verb" as const,
+      boundOrg: loadedOrg.value,
+      objectKind: "panel" as const,
+      label: t(verb === "explain" ? "assistant.entry.explainPanel" : "assistant.entry.addPanel"),
+      tooltip: t(
+        verb === "explain" ? "assistant.entry.tooltip.explainPanel" : "assistant.entry.tooltip.add",
+      ),
+      dataTest:
+        verb === "explain" ? ("ai-entry-panel-explain" as const) : ("ai-entry-panel-add" as const),
+      objectKey: `${props.dashboardId ?? ""}:${String(props.data?.id ?? "")}`,
+      build: panelBuild(() => ({
+        org: store.state.selectedOrganization?.identifier ?? "",
+        dashboardId: props.dashboardId,
+        dashboardTitle: props.dashboardName,
+        panel: props.data,
+        time: props.selectedTimeDate,
+        variables: props.variablesData,
+        timeZone: store.state.timezone || "UTC",
+      })),
+    });
     // Curated pages stamp this; stored dashboards never carry it, so the badge
     // and the body dimming are both invisible outside them (§6.3).
     const curatedBadge = computed(
@@ -1144,6 +1200,18 @@ export default defineComponent({
       const narrowHide = hasNoticeChips.value ? "@max-[28rem]/panelbar:hidden" : "";
       if (isCurrentlyHoveredPanel.value || isMobile.value) return narrowHide;
       return `invisible pointer-events-none ${narrowHide}`.trim();
+    });
+    // The view-only menu holds only assistant items, so it goes when the doors would hide.
+    const assistantGate = useAssistantGate();
+    const aiMenuShown = computed(
+      () => !["loading", "not_entitled", "not_configured"].includes(assistantGate.value),
+    );
+    // The door stays focusable at rest, so a keyboard user reveals it by tabbing in rather than hovering.
+    const doorRevealClass = computed(() => {
+      if (isLayoutEditing.value) return "hidden";
+      const narrowHide = hasNoticeChips.value ? "@max-[28rem]/panelbar:hidden" : "";
+      if (isCurrentlyHoveredPanel.value || isMobile.value) return narrowHide;
+      return `opacity-0 focus-within:opacity-100 ${narrowHide}`.trim();
     });
 
     //for edit panel
@@ -1618,6 +1686,8 @@ export default defineComponent({
     });
 
     return {
+      panelDoor,
+      aiMenuShown,
       props,
       goToLogsLocked,
       goToLogsLockedReason,
@@ -1654,6 +1724,7 @@ export default defineComponent({
       isCurrentlyHoveredPanel,
       isLayoutEditing,
       hoverRevealClass,
+      doorRevealClass,
       previewView,
       showDataViewToggle,
       isDataView,

@@ -400,8 +400,6 @@ const wrapperClasses = computed(() => [
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
-        v-bind="controlAttrs"
-        :aria-describedby="describedBy"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
           'text-input-text placeholder:text-input-placeholder',
@@ -416,6 +414,7 @@ const wrapperClasses = computed(() => [
             ? 'pe-2'
             : 'pe-3',
         ]"
+        v-bind="{ ...controlAttrs, 'aria-describedby': describedBy, ...inputAttrs }"
         @input="handleInput"
         @blur="handleBlur"
         @focus="emit('focus', $event)"

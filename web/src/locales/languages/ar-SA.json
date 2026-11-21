@@ -808,7 +808,6 @@
     "view": "عرض",
     "compare": "مقارنة",
     "openInNewTab": "فتح في علامة تبويب جديدة",
-    "send": "إرسال",
     "copiedToClipboard": "تم نسخها إلى الحافظة",
     "customLogoAlt": "شعار المؤسسة",
     "dragToReorder": "اسحب لإعادة الترتيب",
@@ -827,7 +826,6 @@
     "copyToClipboardSuccess": "نسخة إلى الحافظة - نجاح",
     "valueCopiedToClipboard": "القيمة المنسوخة إلى الحافظة",
     "replace": "استبدال",
-    "and": "و",
     "versionAbbreviation": "V",
     "overview": "نظرة عامة",
     "network": "الشبكة",
@@ -1012,7 +1010,6 @@
     "typeAndPressEnterOrComma": "اكتب واضغط Enter أو الفاصلة",
     "confirmAction": "تأكيد الإجراء",
     "crossLinks": "الروابط المتقاطعة",
-    "writeYourPrompt": "اكتب طلبك",
     "expand": "التوسع",
     "collapse": "طي",
     "description": "الوصف",
@@ -1120,8 +1117,6 @@
     "clockNumberMinute": "الدقيقة {number}",
     "clockNumberSecond": "الثانية {number}",
     "newChat": "دردشة جديدة",
-    "collapseExpandShortcut": "{action} ({shortcut}B)",
-    "fileWithSize": "{name} ({size}KB)",
     "manageColumns": "إدارة الأعمدة",
     "manageColumnsHidden": "إدارة الأعمدة، {count} مخفية",
     "columnsHidden": "الأعمدة ({count} مخفية)",
@@ -1217,8 +1212,6 @@
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
-      "envVarField": "environment variable {name}",
-      "credentialFileField": "credential file {name}",
       "stay": "Stay",
       "discard": "Discard",
       "leaveMessageForced": "تغيّرت كلمة المرور الخاصة بك، لذا سيتم تسجيل خروجك ولا يمكن حفظ {entity}. سيتم تجاهل تغييراتك.",
@@ -1287,100 +1280,6 @@
       "leaveMessageInBrowser": "احفظ {entity}، أو احتفظ بتغييراتك في هذا المتصفح، أو تجاهلها.",
       "retentionInBrowser": "تُحفظ التغييرات في هذا المتصفح لمدة {days} من الأيام، أو حتى تسجيل خروجك. لا يُحتفظ إلا بأحدث {max} من كل نوع.",
       "dotUndated": "Unsaved draft"
-    }
-  },
-  "filterBar": {
-    "ariaLabel": "الفلترة حسب الحقل",
-    "placeholder": "الفلترة حسب الحقل، أو اكتب field=value. اضغط Enter للتشغيل",
-    "addFilter": "إضافة فلتر",
-    "searchFields": "البحث في الحقول",
-    "searchLabels": "البحث في التسميات",
-    "searchOperators": "البحث في الشروط",
-    "searchValue": "ابحث أو اكتب قيمة",
-    "searchValues": "البحث في القيم",
-    "textField": "نص",
-    "useValue": "استخدم \"{value}\"",
-    "useField": "استخدم الحقل \"{field}\"",
-    "useLabel": "استخدم التسمية \"{field}\"",
-    "searchText": "ابحث في كل النص عن \"{text}\"",
-    "emptyValue": "(فارغ)",
-    "loadingFields": "جارٍ تحميل الحقول…",
-    "noFields": "لا توجد حقول مطابقة",
-    "noValues": "لا توجد اقتراحات. اكتب قيمة واضغط Enter",
-    "noOperators": "لا توجد شروط مطابقة",
-    "removeFilter": "إزالة الفلتر",
-    "clearAll": "مسح جميع الفلاتر",
-    "toggleConnector": "التبديل بين AND و OR",
-    "selectedCount": "No values selected | {count} value selected | {count} values selected",
-    "query": "الاستعلام",
-    "builderTooltip": "أنشئ الفلاتر باختيار الحقول والشروط والقيم",
-    "queryTooltip": "اكتب الاستعلام بنفسك",
-    "queryNotParsableShort": "لا يمكن لمنشئ الفلاتر عرض هذا الاستعلام:",
-    "clearAndBuild": "المسح والبناء",
-    "clearQueryTitle": "مسح الاستعلام؟",
-    "clearQueryMessage": "تتم إزالة الاستعلام ويبدأ المنشئ فارغًا.",
-    "where": "حيث",
-    "addCondition": "إضافة شرط",
-    "addGroup": "إضافة مجموعة",
-    "startGroup": "بدء مجموعة",
-    "addBelow": "إضافة شرط أدناه",
-    "ungroup": "إلغاء التجميع",
-    "collapseGroup": "طي المجموعة",
-    "expandGroup": "توسيع المجموعة",
-    "moreInGroup": "{count} إضافية",
-    "groupHasIssues": "هناك شيء في هذه المجموعة يحتاج إلى إصلاح",
-    "chooseField": "اختر حقلًا",
-    "chooseValue": "اختر قيمة",
-    "lockedFilter": "لا يمكن تعديل هذا الفلتر هنا. يبقى كما حُفظ؛ أزله لإسقاطه",
-    "limits": {
-      "conditions": "حتى {count} فلتر | حتى {count} فلاتر",
-      "values": "حتى {count} قيمة | حتى {count} قيم"
-    },
-    "validation": {
-      "incomplete": "أكمل هذا الفلتر أو أزله",
-      "required": "أضف فلترًا واحدًا على الأقل",
-      "uniqueField": "{field} له فلتر بالفعل؛ عدّل ذلك الفلتر أو أزل هذا",
-      "oneUsageCondition": "تأخذ الطبقة شرط استخدام واحدًا؛ حوّل هذا إلى قاعدة أو أزله",
-      "rumField": "استخدم حقلًا مدمجًا أو عمودًا من أحرف صغيرة وأرقام وشرطات سفلية، حتى 128 حرفًا",
-      "valueLength": "يجب أن تتكون كل قيمة من 1 إلى {max} حرفًا",
-      "regexLength": "اجعل النمط {max} حرفًا أو أقل.",
-      "regexInvalid": "هذا النمط غير صالح أو غير مدعوم. لا يمكن استخدام البحث الأمامي أو البحث الخلفي أو المراجع الخلفية."
-    },
-    "operatorNames": {
-      "containsIgnoreCase": "يحتوي (تجاهل حالة الأحرف)",
-      "notStartsWith": "لا يبدأ بـ",
-      "notEndsWith": "لا ينتهي بـ",
-      "isEmpty": "فارغ",
-      "isNotEmpty": "غير فارغ"
-    },
-    "types": {
-      "string": "نص",
-      "number": "رقم",
-      "boolean": "قيمة منطقية"
-    },
-    "operators": {
-      "eq": "يساوي",
-      "neq": "لا يساوي",
-      "gt": "أكبر من",
-      "gte": "أكبر من أو يساوي",
-      "lt": "أقل من",
-      "lte": "أقل من أو يساوي",
-      "contains": "يحتوي على",
-      "containsIgnoreCase": "يحتوي على، مع تجاهل حالة الأحرف",
-      "notContains": "لا يحتوي على",
-      "startsWith": "يبدأ بـ",
-      "notStartsWith": "لا يبدأ بـ",
-      "endsWith": "ينتهي بـ",
-      "notEndsWith": "لا ينتهي بـ",
-      "in": "أي من",
-      "notIn": "ليس أيًا من",
-      "regex": "يطابق التعبير النمطي",
-      "notRegex": "لا يطابق التعبير النمطي",
-      "isNull": "لا يحتوي على قيمة",
-      "isNotNull": "يحتوي على قيمة",
-      "isEmpty": "فارغ أو لا يحتوي على قيمة",
-      "isNotEmpty": "يحتوي على قيمة غير فارغة",
-      "matchAll": "يطابق النص"
     }
   },
   "flow": {
@@ -1606,8 +1505,8 @@
     "userDefinedSchemaLabel": "مخطط معرف من قبل المستخدم",
     "allFieldsLabel": "جميع الحقول",
     "nlQueryGenerationFailed": "فشل في توليد استعلام. يرجى المحاولة مرة أخرى.",
-    "askAIPlaceholder": "اطلب من الذكاء الاصطناعي مساعدتك في استعلامك...",
-    "askAIFunctionPlaceholder": "اطلب من الذكاء الاصطناعي مساعدتك في دالتك...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}: مساعدة في استعلامك...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: مساعدة في دالتك...",
     "askAIPlaceholderRotation": {
       "one": "أرني أخطاء من الساعة الماضية...",
       "two": "ابحث عن استعلامات بطيئة تستغرق أكثر من 5 ثوان...",
@@ -2084,7 +1983,7 @@
     "serviceGraph": "رسم الخدمة",
     "services": "كتالوج الخدمة",
     "aiObservability": "الذكاء الاصطناعي",
-    "aiAssistant": "مساعد الذكاء الاصطناعي",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "تسجيل الخروج",
     "ingestion": "مصادر البيانات",
     "metrics": "المقاييس",
@@ -3449,7 +3348,6 @@
         "inThisView": "في هذا العرض",
         "pagesFunnelNote": "لا تزال خطوة القمع التي تذكر صفحة مخفية مطابقة.",
         "fieldMissing": "الحقل غير موجود في هذا الجدول",
-        "fieldMissingOn": "{field}: الحقل غير موجود في هذا الجدول",
         "field": "الحقل",
         "match": "المطابقة",
         "values": "القيم",
@@ -3501,7 +3399,8 @@
         "edit": "تعديل",
         "identityRowForm": "في هذه البطاقة، تُطبَّق قواعد الهوية بدءًا من أول حدث مُعرّف",
         "newUsersOnly": "المستخدمون الجدد فقط",
-        "newUsersSessionsTip": "يعمل خيار المستخدمون الجدد فقط في وضع المستخدمين"
+        "newUsersSessionsTip": "يعمل خيار المستخدمون الجدد فقط في وضع المستخدمين",
+        "fieldMissingOn": "{field}: الحقل غير موجود في هذا الجدول"
       },
       "appFilters": {
         "hiddenLabel": "مخفية بواسطة مرشحات التطبيق:",
@@ -4135,7 +4034,7 @@
           "note": "عمليات SRE الآلية والرؤى"
         },
         "ai_assistant": {
-          "name": "مساعد O2",
+          "name": "@:{'brand.autobot'}",
           "note": "المساعدة الذكية في الاستعلام والتحليل"
         },
         "anomaly_detection": {
@@ -4472,7 +4371,6 @@
     "mcpServerLabel": "خادم MCP",
     "mcpServerDesc": "ربط عملاء الذكاء الاصطناعي عبر {product}",
     "mcpServerHeader": "خادم MCP",
-    "mcpServerHeaderSubtitle": "اربط Claude وCursor وVS Code وعملاء الذكاء الاصطناعي الآخرين بهذه المؤسسة.",
     "invitationsDesc": "الدعوات المعلقة والمرسلة للأعضاء",
     "groupsDesc": "تجميع المستخدمين لتعيين الأدوار",
     "rolesDesc": "تحديد الأذونات وسياسات الوصول",
@@ -6546,7 +6444,7 @@
     "vrlfunction": "دالة VRL",
     "jsFunctionHint": "استخدم كائن `row` للوصول إلى حقول السجل وتعديلها. مثال: row.new_field = row.existing_field + 'تمت معالجته';",
     "vrlFunctionHint": "استخدم `.` لتمثيل الحدث الحالي. مثال: .new_field = .existing_field + 'تمت معالجته'",
-    "askAIFunctionPlaceholder": "اطلب من الذكاء الاصطناعي مساعدتك في دالتك...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: مساعدة في دالتك...",
     "enterFunctionPrompt": "أدخل رسالة لتوليد الدالة",
     "associatedFunctionHeader": "الدوال المرتبطة",
     "enrichmentTables": "جداول الإثراء",
@@ -6662,7 +6560,7 @@
       "rbac": "أنشئ أدوارًا مخصصة بأذونات دقيقة لفريقك.",
       "logPatterns": "اكتشف أنماط السجلات المتكررة تلقائيًا بدلًا من قراءتها سطرًا بسطر.",
       "correlation": "انتقل من سطر سجل مباشرةً إلى المقاييس والتتبعات المرتبطة به.",
-      "aiAssistant": "اطلب من الذكاء الاصطناعي كتابة الاستعلامات وشرح بياناتك بلغة بسيطة.",
+      "aiAssistant": "@:{'brand.askAutobot'}: كتابة الاستعلامات وشرح بياناتك بلغة بسيطة.",
       "alertInsights": "اطّلع على عدد مرات تفعيل التنبيه واكتشف التنبيهات المترابطة بلمحة.",
       "anomalyDetection": "اكتشف سلوك المقاييس غير المعتاد تلقائيًا قبل أن يُفعّل تنبيه عتبة.",
       "agentGraph": "اطّلع على كيفية استدعاء وكلاء الذكاء الاصطناعي وأدواتك لبعضها، مع تمثيلها في رسم بياني.",
@@ -6794,7 +6692,6 @@
       "endpointLabel": "نقطة النهاية",
       "installCheck": "تحقق من اكتمال التثبيت على {source}.",
       "stillStuck": "ما زلت متعثرًا؟",
-      "askAi": "اسأل الذكاء الاصطناعي",
       "guideDocs": "وثائق {guide}",
       "setupDocs": "وثائق الإعداد",
       "askAiPrompt": "أنا أُعدّ {guide} في OpenObserve ولم تصل أي بيانات بعد. يقول فحص الحدث الأول: {details} معرّف المؤسسة: {org}. نقطة النهاية: {endpoint}. ما الذي يجب أن أتحقق منه بعد ذلك؟",
@@ -7131,7 +7028,6 @@
       },
       "installOneClick": "أضفه إلى {client}",
       "skillsLabel": "أضف مهارة {brand} (اختياري)",
-      "skillsHint": "يعلّم مساعد الذكاء الاصطناعي الخاص بك كيفية الاستعلام عن البيانات وإنشاء التنبيهات ولوحات المعلومات في {brand}، مما يتيح له الاستفادة أكثر من أدوات MCP. شغّله في مشروعك؛ فهو يثبّتها في كل أداة ذكاء اصطناعي يجدها على جهازك.",
       "skillsRepo": "اعرض المهارات على {host}"
     },
     "manageTokensBtnLabel": "إدارة الرموز",
@@ -10530,11 +10426,9 @@
     "pipelineTitle": "مسارات المعالجة",
     "alertTitle": "تنبيهات",
     "dashboardTitle": "لوحات المعلومات",
-    "tabAiAssistant": "مساعد O2",
     "tabOverview": "نظرة عامة",
     "tabUsage": "الاستخدام",
     "removeHomeDashboard": "إزالة لوحة المعلومات الرئيسية",
-    "subtitle": "مساحة عمل الملاحظة الخاصة بك من النظرة الأولى",
     "resources": "الموارد",
     "explore": "استكشاف"
   },
@@ -10548,9 +10442,9 @@
     "recentEvents": "الأحداث الأخيرة",
     "investigate": "تحقيق →",
     "askAi": {
-      "label": "اسأل الذكاء الاصطناعي",
-      "hint": "اسأل الذكاء الاصطناعي عن هذا",
-      "labelFor": "اسأل الذكاء الاصطناعي عن {item}",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}: اسأل عن هذا",
+      "labelFor": "@:{'brand.askAutobot'}: اسأل عن {item}",
       "chip": {
         "firing": "تنبيهات قيد التنبيه",
         "failing": "قواعد فاشلة",
@@ -10718,34 +10612,7 @@
       "heading": "في النطاق الزمني المحدد"
     }
   },
-  "chatHistory": {
-    "title": "الدردشات",
-    "newChat": "دردشة جديدة",
-    "search": "البحث",
-    "noMatches": "لا توجد مباريات",
-    "noHistory": "لا يوجد سجل دردشة",
-    "delete": "حذف",
-    "clearAll": "مسح الكل",
-    "clearAllTitle": "امسح جميع المحادثات",
-    "clearAllMessage": "هذا سيحذف كل سجل الدردشة بشكل دائم. لا يمكن التراجع عن هذا الإجراء.",
-    "yesterday": "أمس",
-    "clearSearch": "مسح البحث"
-  },
   "aiChatShare": {
-    "share": "مشاركة",
-    "dialogTitle": "مشاركة الدردشة",
-    "toolDataWarning": "تتضمن الدردشات المشاركة كل مدخلات ومخرجات الأدوات من هذه المحادثة. يمكن لأي شخص يستطيع فتح الرابط قراءتها.",
-    "mode": "الوضع",
-    "modeSnapshot": "لقطة",
-    "modeLive": "مباشر",
-    "modeSnapshotHelp": "مجمّدة عند آخر رسالة مكتملة. يمكنك تحديثها لاحقًا.",
-    "modeLiveHelp": "تعرض دائمًا آخر الرسائل المكتملة.",
-    "visibility": "من يمكنه العرض",
-    "visibilityOrg": "المؤسسة",
-    "visibilityPublic": "رابط عام",
-    "visibilityOrgHelp": "الأعضاء المسجّلون في هذه المؤسسة ممن لديهم صلاحية الوصول إلى الدردشات المشاركة.",
-    "visibilityPublicHelp": "أي شخص لديه الرابط، دون الحاجة إلى تسجيل الدخول.",
-    "expiry": "ينتهي",
     "expiryNever": "أبدًا",
     "expiryHour": "خلال ساعة واحدة",
     "expiryDay": "خلال يوم واحد",
@@ -10753,15 +10620,6 @@
     "expiryMonth": "خلال 30 يومًا",
     "expiryQuarter": "خلال 90 يومًا",
     "expiryYear": "خلال سنة واحدة",
-    "createLink": "إنشاء رابط",
-    "newLink": "رابط جديد",
-    "copyLink": "نسخ الرابط",
-    "existingShares": "الروابط النشطة",
-    "noShares": "لا توجد روابط نشطة لهذه الدردشة.",
-    "refreshSnapshot": "تحديث اللقطة",
-    "switchToLive": "التبديل إلى المباشر",
-    "switchToSnapshot": "التبديل إلى اللقطة",
-    "revoke": "إلغاء",
     "linkCreated": "تم إنشاء الرابط",
     "revoked": "تم إلغاء الرابط",
     "snapshotRefreshed": "تم تحديث اللقطة",
@@ -10769,133 +10627,32 @@
     "createFailed": "تعذّر إنشاء الرابط",
     "updateFailed": "تعذّر تحديث الرابط",
     "revokeFailed": "تعذّر إلغاء الرابط",
-    "loadFailed": "تعذّر تحميل الروابط",
-    "expiresAt": "ينتهي {time}",
-    "neverExpires": "لا ينتهي أبدًا",
-    "views": "{count} مشاهدة | المشاهدات: {count}",
-    "sharedByMe": "شاركتها بنفسي",
-    "sharedByMeEmpty": "لم تشارك أي دردشات.",
-    "sharedBy": "شاركها {name}",
-    "sharedOn": "تمت المشاركة {time}",
     "notFoundTitle": "هذه الدردشة المشاركة غير متاحة",
     "notFoundDescription": "قد يكون الرابط خاطئًا أو ملغى أو منتهي الصلاحية، أو ربما حُذفت الدردشة.",
     "loadErrorTitle": "تعذّر تحميل الدردشة المشاركة",
     "unavailableTitle": "هذه الدردشة المشاركة غير متاحة مؤقتًا",
     "unavailableDescription": "تعذّر تحميل سجلّها الآن. حاول مرة أخرى بعد قليل.",
-    "historyUnavailableWarning": "يتعذّر تحميل سجل هذه المحادثة الآن، لذا سيراها من يفتح روابطها على أنها غير متاحة مؤقتًا.",
-    "updatedAt": "تم التحديث {time}",
-    "openInMyChats": "فتح في محادثاتي",
-    "forkIntoMyChats": "إنشاء نسخة في محادثاتي",
-    "forkFailed": "تعذّر إنشاء نسخة من المحادثة",
-    "forked": "تم النسخ إلى محادثاتك",
-    "forkedFromShareBanner": "تم إنشاء نسخة من المحادثة المشتركة \"{title}\". لدى المساعد رسائله السابقة كسياق؛ وهي غير معروضة هنا.",
-    "untitled": "محادثة بلا عنوان",
     "emptyChat": "لا توجد رسائل في هذه المحادثة بعد.",
     "readOnly": "للقراءة فقط",
-    "toolDataRedacted": "مدخلات الأدوات ومخرجاتها مخفية عن المشاهدين. يرون الإجابات والأدوات التي تم تشغيلها.",
-    "redactTools": "إخفاء مدخلات الأدوات ومخرجاتها",
-    "redactToolsHelp": "يرى المشاهدون أسماء الأدوات فقط. مفعّل افتراضيًا للروابط العامة.",
-    "publicExpiryHelp": "يجب ألا تتجاوز مدة صلاحية الروابط العامة بالأيام {days}.",
-    "toolsRedactedBadge": "الأدوات مخفية",
-    "toolsVisibleBadge": "بيانات الأدوات مرئية",
-    "showToolsConfirm": "هل تريد إظهار مدخلات الأدوات ومخرجاتها لأي شخص لديه هذا الرابط؟",
-    "showToolsAction": "إظهار بيانات الأدوات",
-    "showTools": "إظهار مدخلات الأدوات ومخرجاتها",
-    "hideTools": "إخفاء مدخلات الأدوات ومخرجاتها",
     "toolsShown": "أصبحت مدخلات الأدوات ومخرجاتها مرئية الآن",
-    "toolsHidden": "أصبحت مدخلات الأدوات ومخرجاتها مخفية الآن",
-    "revokeConfirm": "هل تريد إلغاء هذا الرابط؟",
-    "allShares": "كل المحادثات المشتركة",
-    "allSharesEmpty": "لا توجد محادثات مشتركة في هذه المؤسسة.",
-    "allSharesForbidden": "يمكن لمسؤولي المؤسسة فقط رؤية كل المحادثات المشتركة.",
-    "scopeMine": "الخاصة بي",
-    "scopeAll": "الكل في المؤسسة"
+    "toolsHidden": "أصبحت مدخلات الأدوات ومخرجاتها مخفية الآن"
   },
   "aiAssistant": {
-    "confirmDialog": {
-      "allow": "السماح",
-      "alwaysAllow": "دائما اسمح",
-      "no": "لا"
-    },
-    "searchChatHistory": "بحث في سجل الدردشة",
-    "deleteChatTooltip": "حذف الدردشة",
-    "noMatchingChatsFound": "لم يتم العثور على أي محادثات مطابقة",
-    "clearAllConversations": "امسح جميع المحادثات",
-    "editTitleTooltip": "تعديل العنوان",
-    "chatHistory": "تاريخ الدردشة",
-    "modelLabel": "النموذج:",
-    "editChatTitle": "تعديل عنوان الدردشة",
-    "enterChatTitle": "أدخل عنوان الدردشة",
-    "deleteChat": "حذف الدردشة",
     "deleteChatConfirmMessage": "هل أنت متأكد من أنك تريد حذف المحادثة {name}؟ لا يمكن التراجع عن هذا الإجراء.",
     "deleteChatWithLinksMessage": "هل تريد حذف المحادثة {name}؟ سيتوقف {count} رابط مشاركة نشط عن العمل. لا يمكن التراجع عن هذا الإجراء. | هل تريد حذف المحادثة {name}؟ ستتوقف {count} روابط مشاركة نشطة عن العمل. لا يمكن التراجع عن هذا الإجراء.",
-    "clearAllConversationsTitle": "امسح جميع المحادثات",
-    "clearAllConversationsMessage": "هل أنت متأكد أنك تريد إنهاء جميع المحادثات؟ لا يمكن التراجع عن هذا التصرف.",
-    "suggestion": "اقتراح",
-    "results": "النتائج",
-    "recordsSuffix": "سجلات",
-    "ms": "ms",
-    "exitCode": "رمز الخروج",
-    "stdout": "ستاوت",
-    "lines": "الخطوط",
-    "stderr": "ستدر",
-    "truncatedLabel": "مقتطع",
-    "copyQuery": "نسخ الاستعلام",
-    "stream": "التدفق",
-    "start": "ابدأ",
-    "end": "النهاية",
-    "from": "من",
-    "size": "الحجم",
-    "queryType": "نوع الاستعلام",
-    "copyVrl": "نسخ VRL",
-    "command": "القيادة",
-    "copyCommand": "نسخ الأمر",
-    "copyResults": "نسخ النتائج",
-    "total": "المجموع:",
-    "took": "استغرق:",
-    "showingFirst": "العرض أولا",
-    "inputEvents": "أحداث الإدخال",
-    "errorLabel": "خطأ:",
-    "items": "العناصر",
-    "copyItems": "نسخ العناصر",
-    "response": "الاستجابة",
-    "copyResponse": "نسخ الرد",
-    "copyContent": "نسخ المحتوى",
-    "errorMayBeTemporary": "قد يكون هذا الخطأ مؤقتا. يمكنك المحاولة مرة أخرى.",
     "creditsExhausted": "استهلكت مؤسستك جميع أرصدة الذكاء الاصطناعي الخاصة بها.",
     "creditsExhaustedWithRemedy": "استهلكت مؤسستك جميع أرصدة الذكاء الاصطناعي الخاصة بها. {remedy}",
-    "creditsLow": "تبقّى {remaining} من {limit} من أرصدة الذكاء الاصطناعي المجانية. لا يُعاد تعيينها شهريًا.",
-    "creditsCosts": "تستهلك الرسالة {chat} رصيد. يستخدم تحليل الحوادث {incident} من الأرصدة نفسها. | تستهلك الرسالة {chat} من الأرصدة. يستخدم تحليل الحوادث {incident} من الأرصدة نفسها.",
-    "backendConnectionError": "خطأ: غير قادر على الاتصال بالخلفية",
     "responseStoppedByUser": "تم إيقاف الرد من قبل المستخدم",
     "turnRunning": "لا يزال التوليد جاريًا. ستُحدَّث هذه المحادثة عند الانتهاء.",
     "turnRunningViewer": "لا يزال التوليد جاريًا. ستُحدَّث هذه الصفحة تلقائيًا.",
-    "stopTurn": "إيقاف",
-    "turnLimitReached": "هناك عدد كبير جدًا من ردود الذكاء الاصطناعي قيد التشغيل الآن. انتظر انتهاء أحدها ثم أعد المحاولة.",
-    "historyUnavailable": "تعذّر تحميل سجل هذه المحادثة الآن. قد تكون الرسائل المعروضة غير مكتملة.",
     "turnInterrupted": "تمت مقاطعة الرد قبل أن يكتمل.",
     "turnFailed": "فشل الرد.",
     "messageFailedToSend": "فشل إرسال الرسالة",
     "turnErrorCode": "رمز الخطأ: {code}",
     "viewInTarget": "عرض في {target}",
     "viewTarget": "عرض {target}",
-    "navigatedTo": "تم التنقل بنجاح إلى {page}",
-    "helpful": "مفيد",
-    "notHelpful": "غير مفيد",
-    "streamPrefix": "التدفق:",
-    "typePrefix": "النوع:",
-    "scrollToBottom": "التمرير إلى الأسفل",
     "welcome": {
-      "wave": "👋",
-      "taglineDash": "—",
-      "taglineLead": "أنا",
-      "taglineHighlight": "مساعد O2",
-      "taglineTail": ". يمكنني أن أكتب لك",
-      "taglineSql": "SQL",
-      "taglineVrl": "VRL",
-      "taglineAnd": "وأشرح لك سجلاتك، وتتبعاتك، ومقاييسك، والحوادث.",
-      "signedInAs": "تم تسجيل الدخول ك",
-      "role": "الدور",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "أو جرب واحدة من هذه"
     },
     "capabilities": {
@@ -10925,7 +10682,6 @@
       "regexRedact": "إنشاء نمط regex لتنقيب الرسائل الإلكترونية",
       "mapStreamSchema": "ارسم مخطط التدفق \"default\" الخاص بي",
       "promqlCpu": "كتابة PromQL للكبسولات باستخدام معالج > 80٪",
-      "datadogToO2": "حول هذا Datadog الاستعلام إلى OpenObserve SQL",
       "lastAlertFired": "لماذا تم إطلاق آخر تنبيه لي؟"
     },
     "placeholderRotation": {
@@ -10933,12 +10689,6 @@
       "two": "اكتب VRL لتحليل JSON من سجلات nginx...",
       "three": "بناء لوحة معلومات لصحة عقدة K8..."
     },
-    "autoNavigation": {
-      "label": "الملاحة التلقائية",
-      "enabledTooltip": "تفعيل التنقل التلقائي - مساعد O2 سيقوم بالتنقل تلقائيا بدون تأكيد",
-      "disabledTooltip": "تم تعطيل التنقل التلقائي - مساعد O2 سيطلب قبل التنقل"
-    },
-    "attachImageTooltip": "إرفاق الصور (PNG، JPEG، الحد الأقصى 2MB)",
     "greeting": {
       "morning": "صباح الخير",
       "afternoon": "مساء الخير",
@@ -10952,7 +10702,27 @@
       "night": "تعمل حتى وقت متأخر، {name}"
     },
     "aiChat": {
-      "analyzingMessages": {
+      "unexpectedError": "حدث خطأ غير متوقع",
+      "toolExecutionFailed": "فشل تنفيذ الأداة",
+      "errorOccurred": "حدث خطأ",
+      "confirmToolExecution": "هل تؤكد تنفيذ {tool}؟",
+      "entity": {
+        "alert": "تنبيه",
+        "dashboard": "لوحة المعلومات",
+        "pipeline": "مسار المعالجة",
+        "report": "التقرير",
+        "function": "الدالة",
+        "stream": "التدفق",
+        "folder": "المجلد",
+        "panel": "لوحة",
+        "user": "المستخدم",
+        "action": "الإجراء"
+      }
+    }
+  },
+  "llmObservability": {
+    "playground": {
+      "progress": {
         "analyzing": "يحلل...",
         "thinking": "أفكر...",
         "processing": "قيد المعالجة...",
@@ -10973,44 +10743,6 @@
         "stillThinking": "ما زلت أفكر...",
         "makingProgress": "أحرز تقدما...",
         "piecingTogether": "تجميع..."
-      },
-      "toolVrlValidationFailed": "فشل VRL التحقق",
-      "toolVrlValidated": "تم التحقق VRL",
-      "toolQueryFailed": "فشل الاستعلام",
-      "toolStreamSchema": "تم جلب مخطط التدفق {name}",
-      "toolGetIncident": "تم جلب الحادث {id}",
-      "toolGetAlert": "تم استدعاء التنبيه {id}",
-      "toolGetDashboard": "{id} لوحة المعلومات التي تم إحضارها",
-      "notSpecified": "غير محدد",
-      "unexpectedError": "حدث خطأ غير متوقع",
-      "toolExecutionFailed": "فشل تنفيذ الأداة",
-      "errorOccurred": "حدث خطأ",
-      "actionCancelledByUser": "تم إلغاء الإجراء من قبل المستخدم",
-      "serverResponseError": "خطأ: لا يمكن الحصول على رد من الخادم. يرجى المحاولة مرة أخرى لاحقا.",
-      "requestFailed": "خطأ: تعذّر الوصول إلى خدمة الذكاء الاصطناعي. تحقق من اتصالك وحاول مرة أخرى.",
-      "navigateConfirmQuestion": "هل يمكن السماح لمساعد O2 بالتنقل؟",
-      "confirmToolExecution": "هل تؤكد تنفيذ {tool}؟",
-      "serverErrorStatus": "خطأ في الخادم ({status})",
-      "toolQueriedStream": "تم الاستفسۈرۈش {type} ",
-      "toolResultsCount": "(النتائج: {count})",
-      "toolFoundCount": "(تم العثور {count})",
-      "allowAssistantTo": "هل أسمح لمساعد O2 ب{action}؟",
-      "allowAssistantNavigateTo": "هل أسمح لمساعد O2 بالانتقال إلى {name}؟",
-      "confirmDeleteNamedEntity": "هل أنت متأكد من أنك تريد حذف {entity} {name}؟",
-      "confirmDeleteEntity": "هل أنت متأكد من أنك تريد حذف {entity} هذا؟",
-      "toolListedFallback": "مدرج",
-      "toolFallback": "الأداة",
-      "entity": {
-        "alert": "تنبيه",
-        "dashboard": "لوحة المعلومات",
-        "pipeline": "مسار المعالجة",
-        "report": "التقرير",
-        "function": "الدالة",
-        "stream": "التدفق",
-        "folder": "المجلد",
-        "panel": "لوحة",
-        "user": "المستخدم",
-        "action": "الإجراء"
       }
     }
   },
@@ -11077,9 +10809,7 @@
     "aiExhaustedMessage": "اشترك لمواصلة استخدام الذكاء الاصطناعي. يُفاتر الاستخدام الإضافي على فاتورة هذه المؤسسة.",
     "aiContractExhaustedMessage": "اتصل بمدير حسابك لإضافة المزيد من اعتمادات الذكاء الاصطناعي",
     "aiPayerSubscribeMessage": "تتولى {payer} إدارة الفوترة لهذه المؤسسة. اطلب من أحد مسؤولي {payer} الاشتراك؛ ويُفوتَر الاستخدام الإضافي على فاتورتها.",
-    "aiFreeUsedLabel": "الأرصدة المجانية المستخدمة",
-    "aiFreeOneTime": "مخصص لمرة واحدة.",
-    "aiUsedByFeature": "المساعد وتوليد الاستعلامات: {chat} · تحليل الحوادث: {incident} · إعادة التحليل: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} وتوليد الاستعلامات: {chat} · @:{'brand.autobotInvestigate'}: {incident} · إعادة التحليل: {reanalysis}",
     "aiPaygMessage": "تم نفاد الاعتمادات المجانية — الاستخدام سيتم فوترة الاشتراك",
     "billingGroup": {
       "tabLabel": "مجموعة الفوترة",
@@ -12649,14 +12379,14 @@
       "eventsAndCommentsAppearHere": "ستظهر الأحداث والتعليقات هنا",
       "scrollToTop": "التمرير إلى الأعلى",
       "scrollToBottom": "التمرير إلى الأسفل",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "تحليل الذكاء الاصطناعي",
         "analyze": "تحليل",
-        "analyzeTooltip": "بدء تحليل بواسطة SRE الذكاء الاصطناعي لهذا الحادث",
-        "rcaDisabled": "تحليل السبب الجذري معطّل",
-        "rcaOff": "تحليل السبب الجذري متوقف",
-        "noAiSreFor": "لا يوجد SRE ذكاء اصطناعي لـ {severity}",
+        "analyzeTooltip": "بدء تحليل @:{'brand.autobotInvestigate'} لهذا الحادث",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} معطّل",
+        "rcaOff": "@:{'brand.autobotInvestigate'} متوقف",
+        "noAiSreFor": "لا يوجد @:{'brand.autobotInvestigate'} لـ {severity}",
         "investigating": "جارٍ التحقيق",
         "rerunElapsed": "إعادة تشغيل · {elapsed}",
         "noUpdateFor": "لا تحديث منذ {elapsed}",
@@ -12772,12 +12502,11 @@
       "statusUpdated": "تم تحديث حالة الحادث",
       "statusUpdateFailed": "فشل تحديث حالة الحادث",
       "rcaAnalyzeIncident": "تحليل الحادث",
-      "rcaCancel": "إلغاء",
       "rcaCancelled": "تم إلغاء التحليل",
       "rcaCancelFailed": "فشل في إلغاء التحليل",
       "rcaFailed": "فشل تحليل الذكاء الاصطناعي",
       "rcaBlocked": "لم يتم تشغيل تحليل الذكاء الاصطناعي",
-      "rcaFailedGeneric": "فشل في إجراء تحليل RCA",
+      "rcaFailedGeneric": "فشل في إجراء تحليل @:{'brand.autobotInvestigate'}",
       "rcaRetry": "إعادة محاولة التحليل",
       "rcaCopy": "نسخ التقرير",
       "rcaCopied": "تم نسخ التقرير إلى الحافظة",
@@ -12803,7 +12532,6 @@
         "composerHintPaused": "يُستأنف التشغيل عند الإرسال",
         "agentAsks": "يسأل الوكيل",
         "answerNote": "إجابتك مؤشر استرشادي وليست دليلًا. يمكنها نقل الفرضية إلى «مرجّح». تحديد السبب الجذري يحتاج إلى نتيجة أداة.",
-        "placeholderLive": "أضف سياقًا أو أعد توجيه الوكيل.",
         "placeholderPaused": "أجب الوكيل أو أضف سياقًا، مثل PR #812 في acme/checkout، نُشر حوالي 14:02.",
         "suggestions": "اقتراحات",
         "chipCheck": "افحص …",
@@ -12899,7 +12627,7 @@
         "openAnalysisTab": "فتح تحليل الحادث",
         "reportAfterRun": "يظهر التقرير بعد التشغيل.",
         "noAnalysisTitle": "لا يوجد تحليل بعد",
-        "noAnalysisText": "يفحص وكيل SRE للذكاء الاصطناعي تنبيهات هذا الحادث والبنية الطوبولوجية والتغييرات الأخيرة والتتبعات والسجلات والمقاييس، ثم يكتب تقريرًا. يمكنك متابعة عمله في سلسلة التحقيق أثناء التشغيل.",
+        "noAnalysisText": "يفحص @:{'brand.autobotInvestigate'} تنبيهات هذا الحادث والبنية الطوبولوجية والتغييرات الأخيرة والتتبعات والسجلات والمقاييس، ثم يكتب تقريرًا. يمكنك متابعة عمله في سلسلة التحقيق أثناء التشغيل.",
         "stageOf": "المرحلة {index}/{count} · {stage}",
         "cancelRun": "إلغاء التشغيل",
         "followInThread": "المتابعة في السلسلة",
@@ -12984,7 +12712,6 @@
         "contextToolset": "مجموعة أدوات الذكاء الاصطناعي",
         "leadsNotEvidence": "مؤشرات لا أدلة",
         "working": "جارٍ العمل. الرسائل المرسلة الآن ستُقرأ بعد هذا الدور.",
-        "finalNote": "هذا التقرير نهائي ولن يتغير. لإعادة توجيه الوكيل، أعد التحليل. ينشئ ذلك إصدارًا جديدًا في سجل التقارير.",
         "resumableNote": "توقف هذا التشغيل قبل اكتماله. يتابع «استئناف التشغيل» من آخر خطوة مكتملة.",
         "copy": "نسخ السلسلة",
         "copied": "تم نسخ السلسلة إلى الحافظة",
@@ -13111,7 +12838,7 @@
         "severityLoweredWithReason": "خُفّضت الخطورة من {from} إلى {to} - {reason}",
         "splitFrom": "تبين أن {alert} غير مرتبط بـ {incident}",
         "splitFromUntitled": "الحادث الذي انضم إليه",
-        "inferredByAi": "استُنتج بواسطة AI SRE",
+        "inferredByAi": "استُنتج بواسطة @:{'brand.autobot'}",
         "inferredFromAlertHistory": "مستنتج من سجل التنبيهات",
         "inferredFromServiceGraph": "مستنتج من رسم الخدمة",
         "inferredFromWorkload": "مستنتج من عبء العمل",
@@ -13279,8 +13006,6 @@
           "ruledOut": "مستبعد"
         },
         "status": {
-          "rootCause": "السبب الجذري",
-          "rootCauseNotConfirmed": "السبب الجذري · غير مؤكد",
           "contributing": "مساهم",
           "symptom": "عَرَض",
           "ruledOut": "مستبعد",
@@ -16203,7 +15928,7 @@
     "orgSubtitle": "أسماء الحقول والاحتفاظ بالبيانات والميزات التلقائية لـ {org}.",
     "passwordPolicySubtitle": "قواعد حسابات البريد الإلكتروني وكلمة المرور المحلية.",
     "cipherKeysDesc": "مفاتيح التشفير للحقول الحساسة",
-    "aiToolsetsDesc": "خوادم MCP وأدوات CLI التي يمكن لمساعد الذكاء الاصطناعي استخدامها",
+    "aiToolsetsDesc": "خوادم MCP وأدوات CLI التي يمكن لـ @:{'brand.autobot'} استخدامها",
     "regexPatternsDesc": "أنماط regex القابلة لإعادة الاستخدام للحذف",
     "domainManagementDesc": "تحليل مطالبات SSO وقيود تسجيل الدخول حسب النطاق",
     "passwordPolicy": "سياسة كلمة المرور",
@@ -16426,7 +16151,6 @@
       "namePlaceholder": "مثلا. كلمات المرور الداخلية",
       "descriptionPlaceholder": "صف نمطك لمساعدة المستخدمين على الفهم",
       "regexPatternLabel": "نمط Regex",
-      "tryAiAssistant": "جرب O2 Assistant لكتابة التعبيرات",
       "writePattern": "نمط الكتابة",
       "patternPlaceholder": "مثلا. \\d....\\d ",
       "testRegexPattern": "اختبار نمط Regex",
@@ -16541,9 +16265,6 @@
       "settingsUpdated": "تم تحديث إعدادات المؤسسة بنجاح",
       "settingsSaveError": "إعدادات المؤسسة في حفظ الخطأ"
     },
-    "aiToolsetsPage": {
-      "subtitle": "تكوين تكاملات أدوات الذكاء الاصطناعي"
-    },
     "cipherKeysPage": {
       "subtitle": "مفاتيح تشفّر قيم الحقول الحساسة وتفك تشفيرها",
       "delete": "حذف",
@@ -16603,8 +16324,6 @@
       "setAiCreditsSubtitle": "حدد بدل ائتمان الذكاء الاصطناعي مدى الحياة للمؤسسة.",
       "saveCredits": "حفظ الاعتمادات",
       "totalAiCredits": "إجمالي الاعتمادات في الذكاء الاصطناعي",
-      "aiCreditsUsed": "اعتمادات الذكاء الاصطناعي المستخدمة",
-      "aiCreditsTotal": "إجمالي اعتمادات الذكاء الاصطناعي",
       "currentlyUsedLabel": "الاستخدام الحالي:",
       "credits": "الأرصدة",
       "syntheticsBrowserStepsTab": "خطوات المتصفح",
@@ -17252,7 +16971,7 @@
         "range": "{band} · {window}",
         "filter": "تصفية حسب التحديد",
         "drillDown": "التعمق",
-        "askAi": "اسأل الذكاء الاصطناعي",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "تحديد الخريطة الحرارية · {count} امتداد | تحديد الخريطة الحرارية · {count} من الامتدادات",
         "clear": "مسح التحديد"
       }
@@ -17409,8 +17128,7 @@
       "otlp": "أرسل التتبعات عبر {product}",
       "otlpDesc": "{product1}، {product2} وأي SDK متوافق مع {product3}",
       "otelCollectorDesc": "توجيه جميع إشارات التليمترية عبر {product}",
-      "or": "أو:",
-      "askAi": "اطلب من الذكاء الاصطناعي إعداد التتبع"
+      "or": "أو:"
     },
     "collapseFields": "طي الحقول",
     "openFields": "فتح الحقول",
@@ -17432,7 +17150,6 @@
       "descOutOfRange": "نافذة الزمن الخاصة بك لا تحتوي على أي بيانات من هذا التدفق. انتقل إلى آخر مرة تم فيها رؤية البيانات.",
       "jumpToData": "انتقل إلى أحدث البيانات",
       "expandRangeDescAbsolute": "التحول إلى نطاق زمني أوسع نسبيا",
-      "askAi": "اطلب من الذكاء الاصطناعي إصلاح استعلامي",
       "selectedRange": "النطاق المختار"
     },
     "tracesFound": "تتبعات تم العثور عليها",
@@ -17463,8 +17180,8 @@
     "criticalPath": "المسار الحرج",
     "askAi": {
       "explainTrace": "اشرح التتبع",
-      "explainTraceHint": "اسأل الذكاء الاصطناعي عن أبطأ الامتدادات على المسار الحرج وكل امتداد به خطأ",
-      "askAboutSpan": "اسأل الذكاء الاصطناعي عن هذا الامتداد",
+      "explainTraceHint": "@:{'brand.askAutobot'}: اسأل عن أبطأ الامتدادات على المسار الحرج وكل امتداد به خطأ",
+      "askAboutSpan": "@:{'brand.askAutobot'}: اسأل عن هذا الامتداد",
       "spanChip": "الامتداد · {operation}",
       "traceChip": "التتبع · {operation}"
     },
@@ -18070,30 +17787,12 @@
   },
   "aiToolset": {
     "header": "مجموعات أدوات الذكاء الاصطناعي",
-    "add": "مجموعة أدوات جديدة",
-    "search": "ابحث في مجموعات أدوات الذكاء الاصطناعي",
-    "update": "تحديث مجموعة أدوات الذكاء الاصطناعي",
     "name": "الاسم",
     "nameRequired": "الاسم مطلوب",
     "nameInvalid": "يسمح فقط بالحروف والأرقام والشرطات والخطوط السفلية",
     "nameTooLong": "يجب ألا يتجاوز الاسم 256 حرفا",
     "kind": "النوع",
     "kindRequired": "النوع مطلوب",
-    "kindMcp": "خادم MCP",
-    "kindCli": "أداة CLI",
-    "kindSkill": "المهارة",
-    "description": "الوصف",
-    "actions": "الإجراءات",
-    "deleteTitle": "حذف مجموعة أدوات الذكاء الاصطناعي",
-    "deleteMessage": "هل أنت متأكد من أنك تريد حذف مجموعة أدوات الذكاء الاصطناعي {name}؟",
-    "loadFailed": "فشل في تحميل {product}. يرجى المحاولة مرة أخرى.",
-    "createFailed": "فشل في إنشاء {product}. يرجى المحاولة مرة أخرى.",
-    "updateFailed": "فشل في تحديث {product}. يرجى المحاولة مرة أخرى.",
-    "deleteFailed": "فشل في حذف {product}.",
-    "createdSuccessfully": "تم إنشاء مجموعة أدوات الذكاء الاصطناعي بنجاح",
-    "updatedSuccessfully": "تم تحديث مجموعة أدوات الذكاء الاصطناعي بنجاح",
-    "deletedSuccessfully": "تم حذف مجموعة أدوات الذكاء الاصطناعي بنجاح",
-    "mcpConfig": "إعداد خادم MCP",
     "mcpUrl": "رابط نقطة النهاية",
     "mcpUrlRequired": "يطلب رابط نقطة النهاية",
     "timeoutSeconds": "وقت مستقطع (ثواني)",
@@ -18101,24 +17800,18 @@
     "headerKey": "اسم الرأس",
     "headerValue": "قيمة الرأس",
     "addHeader": "إضافة الرأس",
-    "cliConfig": "إعداد أداة CLI",
-    "presets": "تعبئة سريعة",
     "cliCommand": "القيادة",
     "cliCommandRequired": "القيادة مطلوبة",
     "allowedSubcommands": "الأوامر الفرعية المسموح بها",
-    "subcommandsHint": "القائمة المفصولة بالفواصل، مثل الحصول عليها، وصفها، السجلات — اترك فارغا للسماح بكل",
     "maxOutputBytes": "أقصى خرج (بايتات)",
-    "requiresConfirmation": "يتطلب تأكيدا قبل التنفيذ",
     "envVars": "متغيرات البيئة",
     "envKey": "اسم المتغيرات",
     "envValue": "القيمة",
     "addEnvVar": "إضافة المتغير",
     "credentialFiles": "ملفات بيانات الاعتماد",
     "credEnvVar": "اسم Env var",
-    "credEnvVarHint": "مثلا: {example}",
     "credContentHint": "محتوى الملف الخام (مثل kubeconfig YAML)",
     "addCredFile": "إضافة ملف الاعتماد",
-    "skillConfig": "إعداد المهارة",
     "skillContent": "تعريف المهارة (ماركداون)",
     "skillContentRequired": "المحتوى المهوري مطلوب"
   },
@@ -19975,8 +19668,8 @@
         "loopExplain": "معدل التكرار العالي عادة ما يعني أن الوكيل لا يقوم بتخزين النتائج مؤقتًا أو يعيد المحاولة. افتح أسوأ التتبعات أدناه لرؤية الاستدعاءات المتكررة.",
         "failExplain": "هذه جميع رسائل الخطأ الخاصة بهذا الوكيل، من كل فئات الفشل، وليست هذه الفئة فقط. اقرأها للعثور على الحل، أو افتح تتبعًا لمعرفة مكان حدوثه.",
         "costExplain": "هذه التتبعات دفعت إنفاق هذا الوكيل. افتح الأغلى لرؤية ما تم تشغيله.",
-        "explain": "اشرح باستخدام O2 AI",
-        "explainHelp": "يحقّق O2 AI في هذه الإشارة انطلاقًا من رسائل الخطأ وأسوأ التتبعات، ويتجاوز امتدادات الذكاء الاصطناعي إلى السجلات والمقاييس وKubernetes وعمليات النشر، ويستشهد بأدلته."
+        "explain": "اشرح باستخدام @:{'brand.autobot'}",
+        "explainHelp": "يحقّق @:{'brand.autobot'} في هذه الإشارة انطلاقًا من رسائل الخطأ وأسوأ التتبعات، ويتجاوز امتدادات الذكاء الاصطناعي إلى السجلات والمقاييس وKubernetes وعمليات النشر، ويستشهد بأدلته."
       }
     },
     "versionCompare": {
@@ -21535,8 +21228,7 @@
       "shippersDesc": "{product1}، {product2}، {product3}، {product4}، {product5} والمزيد",
       "otelDesc": "OTLP محايد من البائع للسجلات والتتبع والمقاييس",
       "or": "أو:",
-      "aws": "AWS / كلاودووتش",
-      "askAi": "اطلب من الذكاء الاصطناعي إعداد الاستهلاك"
+      "aws": "AWS / كلاودووتش"
     },
     "noStream": {
       "title": "اختر تدفقًا لبدء الاستكشاف",
@@ -21555,7 +21247,6 @@
       "descOutOfRange": "نافذة الزمن الخاصة بك لا تحتوي على أي بيانات من هذا التدفق. انتقل إلى آخر مرة تم فيها رؤية البيانات.",
       "jumpToData": "انتقل إلى أحدث البيانات",
       "openHistory": "فتح سجل البحث",
-      "askAi": "اطلب من الذكاء الاصطناعي إصلاح استعلامي",
       "selectedRange": "النطاق المختار"
     },
     "chunkedContent": {
@@ -21564,11 +21255,8 @@
     },
     "jsonPreview": {
       "addIcon": "إضافة أيقونة",
-      "sendToAiChat": "أرسل إلى دردشة الذكاء الاصطناعي",
       "copy": "نسخة",
       "createRegexPattern": "إنشاء نمط Regex",
-      "regexPatternTypeTitle": "ما نوع نمط Regex الذي تريد إنشاؤه؟",
-      "regexPatternTypeLabel": "نوع نمط Regex (مثل البريد الإلكتروني، رقم الهاتف، إلخ)",
       "failedToGetOriginalData": "فشل في الحصول على البيانات الأصلية",
       "textCopiedToClipboard": "تم نسخ النص إلى الحافظة",
       "failedToCopyText": "فشل في نسخ النص"
@@ -21576,9 +21264,7 @@
     "cellActions": {
       "copy": "نسخة",
       "includeTerm": "تضمين المصطلح",
-      "excludeTerm": "استبعاد مصطلح",
-      "sendValueToAi": "إرسال قيمة إلى الذكاء الاصطناعي",
-      "sendRowToAi": "إرسال الصف إلى الذكاء الاصطناعي"
+      "excludeTerm": "استبعاد مصطلح"
     },
     "indexList": {
       "noMatchingFields": "لم يتم العثور على حقول مطابقة",
@@ -21591,8 +21277,7 @@
     },
     "detailTable": {
       "noDataAvailable": "لا توجد بيانات متوفرة.",
-      "addIcon": "إضافة أيقونة",
-      "sendToAiChat": "أرسل إلى دردشة الذكاء الاصطناعي"
+      "addIcon": "إضافة أيقونة"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "اختيار * استعلام غير مدعوم للتصور.",
@@ -21880,7 +21565,6 @@
     "copyError": "نسخ تفاصيل الخطأ",
     "copied": "تم النسخ!",
     "traceId": "معرف التتبع:",
-    "askAi": "اطلب من الذكاء الاصطناعي إصلاح استعلامي",
     "showDetail": "عرض التفاصيل",
     "hideDetail": "إخفاء التفاصيل",
     "runAs": "التشغيل باسم",
@@ -23923,9 +23607,7 @@
       "ingestionTokensRefresh": "تحديث قائمة الرموز",
       "syntheticsTokensAdd": "إنشاء رمز جديد",
       "syntheticsTokensRefresh": "تحديث قائمة الرموز",
-      "aiChatToggle": "تبديل دردشة الذكاء الاصطناعي",
       "k8sPalette": "بحث في موارد Kubernetes",
-      "aiChatClose": "إغلاق دردشة الذكاء الاصطناعي",
       "logsSaveView": "حفظ كعرض محفوظ",
       "logsExport": "تصدير النتائج بصيغة CSV",
       "tracesCopyUrl": "نسخ رابط مشاركة التتبع",
@@ -24087,7 +23769,10 @@
     "pagination": {
       "pagination": "تقسيم الصفحات",
       "previousPage": "الصفحة السابقة",
-      "nextPage": "الصفحة التالية"
+      "nextPage": "الصفحة التالية",
+      "firstPage": "الصفحة الأولى",
+      "lastPage": "الصفحة الأخيرة",
+      "recordsPerPage": "السجلات لكل صفحة"
     },
     "select": {
       "more": "المزيد",
@@ -24522,8 +24207,6 @@
     "replacementCsvFileUrl": "رابط ملف بديل CSV",
     "newCsvFileUrlHelp": "أدخل رابط URL جديد لإضافته إلى جدول الإثراء هذا",
     "replacementCsvFileUrlHelp": "أدخل عنوان URL لاستبدال جميع الروابط الموجودة",
-    "jsFunctionPlaceholder": "اكتب دالة جافاسكريپت. مثلا {example}",
-    "vrlFunctionPlaceholder": "اكتب دالة VRL. مثلا {example}",
     "functionSaved": "تم حفظ الدالة بنجاح",
     "functionCreationFailed": "فشل إنشاء الدوال",
     "functionFetchingFailed": "فشل جلب الدوال",
@@ -24535,9 +24218,6 @@
     "invalidEvents": "الأحداث غير الصالحة: {error}"
   },
   "toastMessages": {
-    "aitoolsets": {
-      "failedToLoadToolset": "فشل تحميل مجموعة الأدوات"
-    },
     "alerts": {
       "failedToNavigateToAlert": "فشل في التنقل إلى تنبيه",
       "alertNotFound": "لم يتم العثور على تنبيه",
@@ -24733,11 +24413,6 @@
       "errorFetchingRegexPatterns": "خطأ في جلب أنماط Regex"
     },
     "components": {
-      "thanksForYourFeedback": "شكرا على ملاحظاتك!",
-      "failedToReadImage": "فشل في قراءة الصورة: {error}",
-      "onlyPngAndJpegImagesAre": "تدعم فقط صور PNG وJPEG",
-      "imageExceeds2mbLimitMb": "الصورة تتجاوز حد 2 ميجابايت ({size}MB)",
-      "responseGenerationStopped": "توقف توليد الاستجابة",
       "customColorAppliedToModeSuccessfully": "تم تطبيق اللون المخصص على وضع {mode} بنجاح!",
       "appliedToModeSuccessfully": "{theme} بنجاح على وضع {mode}!",
       "failedToExportScoreConfigs": "فشل تصدير إعدادات النقاط",
@@ -26537,13 +26212,13 @@
       "subtitle": "استعلام الأداء والصحة عبر قواعد بياناتك"
     },
     "ai": {
-      "suggestFix": "اسأل الذكاء الاصطناعي كيف يصلح هذا",
-      "suggestFixHint": "يفتح مساعد الذكاء الاصطناعي بهذا الاستعلام، ومحركه، وأرقام التأخير، ويسأل عما يجب تغييره. لا يغير أي شيء بنفسه.",
-      "rowSuggestFix": "اسأل الذكاء الاصطناعي كيف يصلح هذا",
+      "suggestFix": "@:{'brand.askAutobot'}: كيف يُصلح هذا",
+      "suggestFixHint": "يفتح @:{'brand.autobot'} بهذا الاستعلام، ومحركه، وأرقام التأخير، ويسأل عما يجب تغييره. لا يغير أي شيء بنفسه.",
+      "rowSuggestFix": "@:{'brand.askAutobot'}: كيف يُصلح هذا",
       "deadlockFix": "كيف أوقف هذا الجمود؟",
-      "deadlockFixHint": "يرسل البيانات المتضاربة وأدلة ترتيب الصف إلى مساعد الذكاء الاصطناعي.",
+      "deadlockFixHint": "يرسل البيانات المتضاربة وأدلة ترتيب الصف إلى @:{'brand.autobot'}.",
       "blockingFix": "لماذا يتم الحظر هذا؟",
-      "blockingFixHint": "يرسل بيان الجلسة الجذرية، ووقت الخمول وعدد الجلسات العالقة خلفه إلى مساعد الذكاء الاصطناعي."
+      "blockingFixHint": "يرسل بيان الجلسة الجذرية، ووقت الخمول وعدد الجلسات العالقة خلفه إلى @:{'brand.autobot'}."
     },
     "filters": {
       "allEngines": "جميع المحركات",
@@ -28249,8 +27924,8 @@
     "removeStep": "إزالة الخطوة",
     "channels": "القنوات",
     "policySaved": "تم حفظ السياسة",
-    "verdictTitle": "حكم SRE بالذكاء الاصطناعي",
-    "reportTitle": "ما وجده SRE الذكاء الاصطناعي",
+    "verdictTitle": "حكم @:{'brand.autobot'}",
+    "reportTitle": "ما وجده @:{'brand.autobot'}",
     "l0P1Lead": "أرسل تنبيهًا فورًا.",
     "l0P1Desc": "يعمل تحليل الذكاء الاصطناعي بالتوازي — لا يتم تأخير الاستدعاءات الحرجة أبدًا.",
     "l0P4Lead": "تحليل الذكاء الاصطناعي فقط.",
@@ -28270,7 +27945,7 @@
     "l0MaxLevelsOption": "حتى {count} مستوى | حتى {count} مستويات",
     "l0ParallelSentence": "يتم الاستدعاء فورًا؛ ويعمل الوكيل بالتوازي",
     "l0OnlySentence": "يقوم الوكيل بالتحقيق؛ لا تُرسل تنبيهات هذه الأولوية إلا إذا نصّت مستوياتك على ذلك",
-    "l0OffSentence": "لا يعمل SRE الذكاء الاصطناعي؛ يتصرف التنبيه تمامًا كما كان بدون فرز الذكاء الاصطناعي",
+    "l0OffSentence": "لا يعمل @:{'brand.autobotInvestigate'}؛ يتصرف التنبيه تمامًا كما كان بدون فرز الذكاء الاصطناعي",
     "l0BudgetRange": "بين 30 و600 ثانية — يرفض الخادم القيم خارج هذا النطاق بدلاً من تقييدها.",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "كتم الاستدعاء",
@@ -28297,7 +27972,7 @@
     "eventKind_page": "استدعاء",
     "eventKind_ack": "إقرار",
     "eventKind_note": "ملاحظة",
-    "eventKind_rca": "تحليل السبب الجذري",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "تسليم",
     "eventKind_recovery": "تعافٍ",
     "eventKind_state": "الحالة",
@@ -28959,7 +28634,7 @@
     "ladderAddStep": "إضافة خطوة",
     "ladderRightNow": "حاليًا هذا هو",
     "ladderSameLadder": "نفس السلم",
-    "ladderL0Off": "بدون SRE الذكاء الاصطناعي",
+    "ladderL0Off": "بدون @:{'brand.autobotInvestigate'}",
     "ladderStaleDefaultTag": "لم يتعرف السلم على النوبات",
     "ladderStaleDefaultHint": "كل مستوى يستدعي الفريق بأكمله، لكن هذا الفريق لديه تناوبات — تم إنشاء السلم قبل وجودها. إضافة أو إزالة عضو تعيد تشغيل الوضع الافتراضي، أو عدّل السلم يدويًا مرة واحدة.",
     "reachShortNoSmtp": "بريد إلكتروني فقط · لا يوجد SMTP",
@@ -29295,13 +28970,8 @@
     "consentStillRequired": "الاستخدام المدفوع غير مفعّل لكل المؤسسات المطلوبة.",
     "updateFailed": "تعذّر تحديث استخدام الذكاء الاصطناعي المدفوع. حاول مرة أخرى.",
     "declinedNotice": "استخدام الذكاء الاصطناعي المدفوع معطّل، لذلك لم يُرسل هذا الطلب.",
-    "consentRequiredMessage": "نفدت الأرصدة المجانية. شغّل هذا لمتابعة استخدام الذكاء الاصطناعي.",
-    "consentScope": "يسري على المؤسسة بأكملها: المساعد وإنشاء الاستعلامات وتحليل الحوادث. يمكنك إيقافه في أي وقت من صفحة الخطط.",
+    "consentScope": "يسري على المؤسسة بأكملها: @:{'brand.autobot'} وإنشاء الاستعلامات وتحليل الحوادث. يمكنك إيقافه في أي وقت من صفحة الخطط.",
     "managePaidUsage": "تشغيل الاستخدام المدفوع",
-    "switchLabel": "استخدام الذكاء الاصطناعي المدفوع",
-    "adminsOnly": "يمكن للمسؤولين فقط تغيير هذا",
-    "waitingForPayer": "في انتظار أن تشغّلها {payer}",
-    "offHint": "تابع استخدام الذكاء الاصطناعي بعد نفاذ الأرصدة المجانية، مع الفوترة بسعر خطتك.",
     "modePayAsYouGo": "الدفع حسب الاستخدام",
     "modeConsentRequired": "التفويض مطلوب",
     "modeExhausted": "مستنفد",
@@ -29961,423 +29631,6 @@
       }
     }
   },
-  "autoobserveLive": {
-    "where": "{cluster} / {namespace}",
-    "lessThan": "<{value}",
-    "topbar": {
-      "checked": "تم الفحص {ago}",
-      "firstCheck": "الفحص الأول قيد التقدم"
-    },
-    "retry": "إعادة المحاولة",
-    "classes": {
-      "errors": "الأخطاء",
-      "latency": "زمن الاستجابة",
-      "saturation": "التشبع",
-      "absence": "يتوقف عن الإرسال",
-      "external_probe": "فحص اصطناعي",
-      "workload_health": "عمليات إعادة التشغيل",
-      "node": "العقد"
-    },
-    "classesInline": {
-      "errors": "أخطاء",
-      "latency": "زمن الاستجابة",
-      "saturation": "تشبع",
-      "absence": "غياب",
-      "external_probe": "فحوص خارجية",
-      "workload_health": "صحة أحمال العمل",
-      "node": "صحة العقد"
-    },
-    "states": {
-      "covered": "مُراقَب",
-      "weak": "ضعيف",
-      "silent": "صامت",
-      "blind": "أعمى",
-      "unmapped": "غير مُعيَّن",
-      "none": "لا شيء"
-    },
-    "monitorKinds": {
-      "alert": "التنبيه",
-      "anomaly_detector": "كاشف الشذوذ",
-      "slo": "SLO",
-      "synthetic": "اصطناعي"
-    },
-    "coverage": {
-      "summaryWatched": "{watched} من {total} تحت المراقبة · {pct}%",
-      "summaryWatchedShare": "{watched} من {total} تحت المراقبة · {pct}",
-      "splitLabel": "{watched} تحت المراقبة، {gaps} بها فجوة تغطية",
-      "stateWatched": "مُراقَب",
-      "stateGap": "فجوة تغطية",
-      "columns": {
-        "where": "الموقع",
-        "state": "الحالة",
-        "lastChecked": "آخر فحص"
-      },
-      "loading": "جارٍ تحميل التغطية",
-      "loaded": "تم تحميل التغطية",
-      "sentence": {
-        "allWatched": "أراقب خدمتك الواحدة. | أراقب جميع خدماتك البالغ عددها {total}.",
-        "allGaps": "خدمتك الواحدة بها فجوة تغطية. | جميع خدماتك البالغ عددها {total} بها فجوة تغطية.",
-        "watching": "أراقب {watched} من أصل {total} من خدماتك.",
-        "gaps": "لدى {count} فجوة تغطية. | لدى {count} فجوة تغطية.",
-        "mixed": "{watching} {gaps}"
-      },
-      "gapAdded": "تمت إضافة تنبيه لـ {checks}. سيحتسبه AutoObserve عند الفحص التالي. | تمت إضافة تنبيهات لـ {checks}. سيحتسبها AutoObserve عند الفحص التالي.",
-      "gapNone": "لا يوجد تنبيه يراقب {checks}",
-      "searchPlaceholder": "ابحث عن خدمة أو عنقود أو مساحة اسم",
-      "labelNamespace": "{name} · {namespace}",
-      "labelPlace": "{name} · {cluster} · {namespace}",
-      "noNamespace": "لا توجد مساحة اسم",
-      "noCluster": "لا يوجد عنقود",
-      "noMatch": "لا توجد خدمة أو عنقود أو مساحة اسم تطابق “{query}”",
-      "showAll": "عرض الكل",
-      "bucketThree": "3 أو أكثر",
-      "bucketTwo": "2",
-      "bucketOne": "1",
-      "filterHides": "لا توجد خدمة {state}",
-      "filterHidesSearch": "{count} خدمة تطابق “{query}”، لكنها ليست {state} | {count} من الخدمات تطابق “{query}”، لكن لا توجد أي منها {state}"
-    },
-    "cell": {
-      "noClass": "لا يفحص AutoObserve هذه الإشارة بعد",
-      "tipNoClass": "{signal}: لا يفحص AutoObserve هذا بعد",
-      "gap": {
-        "weak": "{signal}: قد ينتبه {monitor} فقط، وهو تنبيه عام، إلى مشكلة؛ لكنه غير محصور بهذه الخدمة | {signal}: قد تنتبه {monitor} فقط، وهي تنبيهات عامة، إلى مشكلة؛ لكنها غير محصورة بهذه الخدمة",
-        "silent": "{signal}: {monitor} يطابق، لكنه لا يرسل إشعارًا إلى أي أحد | {signal}: {monitor} تطابق، لكنها لا ترسل إشعارًا إلى أي أحد",
-        "blind": "{signal}: {monitor} يطابق، لكنه لا يستطيع رؤية بياناته | {signal}: {monitor} تطابق، لكنها لا تستطيع رؤية بياناتها",
-        "unmapped": "{signal}: قد يطابق {monitor}، لكن تعذّر ربط نطاقه بخدمة | {signal}: قد تطابق {monitor}، لكن تعذّر ربط نطاقها بخدمة",
-        "none": "{signal}: لا يوجد تنبيه يراقب هذا"
-      },
-      "added": "تمت الإضافة"
-    },
-    "drawer": {
-      "moreChecks": "فحوصات أخرى",
-      "chartNoData": "المخطط غير متاح بعد",
-      "monitors": "التنبيهات",
-      "monitorLine": "{kind} · {state}",
-      "noMonitor": "لا يوجد تنبيه مطابق"
-    },
-    "charts": {
-      "empty1h": "لا توجد بيانات من {service} خلال الساعة الأخيرة",
-      "empty24h": "لا توجد بيانات من {service} خلال آخر 24 ساعة",
-      "empty7d": "لا توجد بيانات من {service} خلال آخر 7 أيام",
-      "emptyPartial1h": "لا توجد بيانات من {service} في الجزء الذي تم البحث فيه من الساعة الأخيرة",
-      "emptyPartial24h": "لا توجد بيانات من {service} في الجزء الذي تم البحث فيه من آخر 24 ساعة",
-      "emptyPartial7d": "لا توجد بيانات من {service} في الجزء الذي تم البحث فيه من آخر 7 أيام",
-      "noSpanStatus": "لا توجد حالة للامتداد في {stream}",
-      "noLevel": "لا يوجد مستوى سجل في {stream}",
-      "noDuration": "لا يوجد حقل مدة في {stream}",
-      "noTraces": "يُرسَم زمن الاستجابة من التتبعات. لا ترسل {service} أيًا منها.",
-      "noMatch": "تعذّر مطابقة هذه الخدمة بتدفقاتها",
-      "failedQuery": "تعذّر تحميل هذا المخطط من {stream}",
-      "failedMatch": "تعذّر البحث عن تدفقات {service}",
-      "partial": "بيانات جزئية",
-      "wide": "يتضمن خدمات أخرى تشترك في هذا التدفق",
-      "loading": "جارٍ تحميل {metric}",
-      "summary": "{metric}، {value} الآن",
-      "summaryNone": "{metric}، لم يتم قياس أي شيء في أحدث فترة زمنية"
-    },
-    "suggestions": {
-      "serviceMeta": "{where}، حوالي {traffic} حدث في الساعة",
-      "trafficOnly": "حوالي {traffic} حدث في الساعة",
-      "kinds": {
-        "coverage_gap": "فجوة تغطية",
-        "no_absence_check": "تنبيه مفقود",
-        "silent_coverage": "لا يُخطر أحدًا",
-        "coverage_lost": "فقدان التغطية",
-        "blind_guardrail": "لا يعمل",
-        "discovery_unusable": "جودة البيانات",
-        "alert_no_destination": "لا يُخطر أحدًا",
-        "alert_notify_failed": "فشل الإشعار",
-        "other": "أخرى"
-      },
-      "severity": {
-        "high": "عالية",
-        "medium": "متوسطة"
-      },
-      "confidence": {
-        "sufficient": "دليل قوي",
-        "suggestive": "بعض الأدلة",
-        "insufficient": "دليل ضعيف"
-      },
-      "body": {
-        "coverageGap": "لا شيء يراقب {service}",
-        "noAbsenceNone": "لا شيء يُنبّه إذا توقفت {service} عن إرسال البيانات",
-        "noAbsenceWeak": "لن يلاحظ توقف {service} عن إرسال البيانات سوى تنبيه عام",
-        "noAbsenceSilent": "الفحص الذي سيلاحظ صمت {service} لا يُخطر أحدًا",
-        "noAbsenceBlind": "الفحص الذي سيلاحظ صمت {service} لا يرى بياناته",
-        "silentCoverage": "{monitor} watches {classes} on {count} service but notifies no one | {monitor} watches {classes} on {count} services but notifies no one",
-        "silentWhy": "{monitor} سيلاحظ توقف {services}، لكنه لا يُخطر أحدًا.",
-        "silentWhyNoNames": "{monitor} سيلاحظ توقف خدمة ما، لكنه لا يُخطر أحدًا.",
-        "silentNext": "أضف له وجهة.",
-        "undeliverable": "{monitor} لا يستطيع الوصول إلى {destination}",
-        "undeliverableWhy": "{destination} يستقبل تذاكر لا تنبيهات. | {destination} تستقبل تذاكر لا تنبيهات.",
-        "undeliverableNext": "أضف خطاف ويب أو بريدًا إلكترونيًا بجانبه؛ يبقى {destination}. | أضف خطاف ويب أو بريدًا إلكترونيًا بجانبها؛ يبقى {destination}.",
-        "coverageLost": "فقدت {service} تنبيه {classes} الخاص بها في {day}",
-        "blindStreamMissing": "{monitor} يقرأ {detail}، وهو غير موجود",
-        "blindNoData": "{monitor} يقرأ {detail}، وليس لديه بيانات حديثة",
-        "blindEmptyScope": "{monitor} يفلتر على صفوف لا تصل أبدًا",
-        "blindUnknownField": "{monitor} يفلتر على {field}، وهو حقل لا يحتويه تدفقه",
-        "blindIgnoredMatcher": "{monitor} يطابق على التسمية {label}، وهي تسمية لا تحتويها أي سلسلة، لذا فهو يراقب كل السلاسل",
-        "discovery": "{good} فقط من أصل {active} خدمة مكتشفة قابلة للاستخدام، لذا فإن ترتيب الفجوات جزئي",
-        "alertSyntax": "{monitor} لديه استعلام لا يمكن تحليله",
-        "alertTimeout": "{monitor} ينتهي وقته باستمرار قبل أن يكتمل",
-        "alertMemory": "{monitor} ينفد منه الذاكرة باستمرار",
-        "alertOtherError": "{monitor} يفشل باستمرار بخطأ",
-        "alertNotWorkingGeneric": "{monitor} لا يعمل",
-        "alertNoDestination": "{monitor} أُطلق ولا يُخطر أحدًا",
-        "alertNotifyFailed": "{monitor} أُطلق، وفشل {failed} من {tried} إشعار. | {monitor} أُطلق، وفشلت {failed} من {tried} إشعار.",
-        "alertNotifyFailedNoCounts": "{monitor} أُطلق، وفشلت إشعاراته.",
-        "alertStreamGone": "{monitor} يفشل باستمرار لأن تدفقه غير موجود",
-        "alertFieldGone": "{monitor} يفشل باستمرار لأن حقلًا يستخدمه غير موجود",
-        "other": "وجدت شيئًا لا تستطيع هذه الصفحة عرضه بعد"
-      },
-      "detail": {
-        "cell": "{check}: {state}",
-        "cells": "ما وجده المحرك: {cells}.",
-        "services": "تشمل الخدمات المطابقة {services}.",
-        "text": "تفاصيل المحرك: {detail}",
-        "quality": "يعمل الاكتشاف في الوضع {mode}.",
-        "none": "لم يرسل المحرك مزيدًا من التفاصيل.",
-        "joined": "{first} {rest}"
-      },
-      "analysedAt": "من تشغيل المعايرة {ago}",
-      "neverFired": "لم يُطلق أبدًا",
-      "lastFired": "آخر إطلاق {time}",
-      "accept": "قبول",
-      "dismiss": "تجاهل…",
-      "accepted": "تم القبول في هذه المعاينة؛ لم يُرسل أي شيء",
-      "dismissed": "تم التجاهل في هذه المعاينة؛ لم يُرسل أي شيء",
-      "loading": "جارٍ تحميل الاقتراحات",
-      "loaded": "تم تحميل الاقتراحات",
-      "more": "و{count} أخرى | و{count} أخرى",
-      "moreNames": "{count} أخرى | {count} أخرى",
-      "whyNext": "{why} {next}",
-      "seeAll": "عرض الكل",
-      "drawerTitle": "الاقتراحات",
-      "drawerLine": "مرتبة حسب الأهمية أولاً. افتح صفًا لمعرفة ما وجدته.",
-      "focusGone": "لم يعد هذا الاقتراح مفتوحًا.",
-      "clearKind": "عرض جميع الاقتراحات",
-      "kindEmptyTitle": "لا توجد اقتراحات مفتوحة من النوع {kind}",
-      "kindEmptyDesc": "يوجد {count} اقتراح آخر مفتوح. | توجد {count} اقتراحات أخرى مفتوحة.",
-      "folder": "المجلد {folder}",
-      "columns": {
-        "suggestion": "الاقتراح",
-        "where": "المكان",
-        "kind": "النوع",
-        "severity": "الخطورة"
-      }
-    },
-    "notice": {
-      "offTitle": "AutoObserve غير مفعّل",
-      "details": "التفاصيل",
-      "refreshFailed": "فشل التحديث عند {failedAt} · يتم عرض {what} من {dataAt}",
-      "what": {
-        "coverage": "التغطية",
-        "suggestions": "الاقتراحات",
-        "incidents": "النتائج المستدعاة",
-        "issues": "المشكلات",
-        "history": "السجل"
-      },
-      "coverage": {
-        "deniedTitle": "ليس لديك إذن لعرض التغطية",
-        "deniedDesc": "تحسب التغطية المراقبات في كل مجلد، لذا تحتاج إلى إذن لعرض جميع التنبيهات في هذه المؤسسة، وليس بعض المجلدات فقط. اطلب ذلك من مسؤول المؤسسة.",
-        "offDesc": "يقوم المسؤول بتفعيلها لهذا النشر. تظهر التغطية هنا بعد أول فحص لها.",
-        "unavailableTitle": "التغطية غير متاحة مؤقتًا",
-        "unavailableDesc": "لا يستجيب AutoObserve الآن. عادةً ما يزول هذا خلال دقيقة أو دقيقتين.",
-        "failedTitle": "تعذّر تحميل التغطية",
-        "failedDesc": "حدث خطأ أثناء تحميلها. حاول مرة أخرى بعد قليل.",
-        "noPassTitle": "لم يكتمل أي فحص خلال آخر يوم",
-        "noPassDesc": "تظهر التغطية هنا بعد انتهاء فحصي التالي لخدماتك. إذا كان AutoObserve قد فُعّل للتو، فقد يستغرق الفحص الأول بعض الوقت.",
-        "noPassAction": "كيف أفحص التغطية",
-        "noServicesTitle": "لم يتم العثور على خدمات بعد",
-        "noServicesDesc": "لم يعثر فحصي الأخير، {when}، على أي خدمات. تظهر الخدمات هنا بمجرد أن ترسل سجلات أو مقاييس أو تتبعات تحدد اسم خدمة.",
-        "noServicesAction": "كيف أجد الخدمات"
-      },
-      "suggestions": {
-        "deniedTitle": "ليس لديك إذن لعرض الاقتراحات",
-        "deniedDesc": "يتطلب عرضها إذنًا لعرض التنبيهات في هذه المؤسسة. اطلب ذلك من مسؤول المؤسسة.",
-        "offDesc": "تظهر الاقتراحات هنا بعد أن يفعّلها المسؤول لهذا النشر.",
-        "unavailableTitle": "الاقتراحات غير متاحة مؤقتًا",
-        "unavailableDesc": "لا يستجيب AutoObserve الآن. عادةً ما يزول هذا خلال دقيقة أو دقيقتين.",
-        "failedTitle": "تعذّر تحميل الاقتراحات",
-        "failedDesc": "حدث خطأ أثناء تحميلها. حاول مرة أخرى بعد قليل.",
-        "emptyTitle": "لا توجد اقتراحات الآن",
-        "emptyDesc": "سأضيف اقتراحًا هنا عندما أجد ثغرة في ما تغطيه المراقبات.",
-        "pageEmptyTitle": "تمت معالجة أفضل الاقتراحات بالفعل",
-        "pageEmptyDesc": "افتح القائمة الكاملة للاقتراحات التي لا تزال في الانتظار."
-      },
-      "history": {
-        "deniedTitle": "لا تملك الإذن لعرض السجل",
-        "deniedDesc": "يسرد السجل الحوادث التي فتحها AutoObserve، لذا يتطلب عرضه إذنًا لعرض قائمة الحوادث في هذه المؤسسة. اطلب ذلك من مسؤول المؤسسة.",
-        "offDesc": "يظهر السجل هنا بعد أن يفعّله مسؤول لهذا النشر.",
-        "unavailableTitle": "السجل غير متاح مؤقتًا",
-        "unavailableDesc": "لا يستجيب AutoObserve الآن. عادةً ما يزول هذا خلال دقيقة أو دقيقتين.",
-        "failedTitle": "تعذّر تحميل السجل",
-        "failedDesc": "حدث خطأ أثناء تحميله. حاول مرة أخرى بعد قليل."
-      },
-      "incidents": {
-        "deniedTitle": "لا تملك الإذن لعرض الاكتشافات المستدعاة",
-        "deniedDesc": "تؤدي الاكتشافات المستدعاة إلى فتح حوادث، لذا يتطلب عرضها إذنًا لعرض قائمة الحوادث في هذه المؤسسة. اطلب ذلك من مسؤول المؤسسة.",
-        "offDesc": "تظهر الاكتشافات المستدعاة هنا بعد أن يفعّلها مسؤول لهذا النشر.",
-        "unavailableTitle": "الاكتشافات المستدعاة غير متاحة مؤقتًا",
-        "unavailableDesc": "لا يستجيب AutoObserve الآن. عادةً ما يزول هذا خلال دقيقة أو دقيقتين.",
-        "failedTitle": "تعذّر تحميل الاكتشافات المستدعاة",
-        "failedDesc": "حدث خطأ أثناء تحميلها. حاول مرة أخرى بعد قليل."
-      },
-      "issues": {
-        "deniedTitle": "لا تملك الإذن لعرض المشكلات",
-        "deniedDesc": "المشكلات هي حوادث فتحها AutoObserve، لذا يتطلب عرضها إذنًا لعرض قائمة الحوادث في هذه المؤسسة. اطلب ذلك من مسؤول المؤسسة.",
-        "offDesc": "تظهر المشكلات هنا بعد أن يفعّلها مسؤول لهذا النشر.",
-        "unavailableTitle": "المشكلات غير متاحة مؤقتًا",
-        "unavailableDesc": "لا يستجيب AutoObserve الآن. عادةً ما يزول هذا خلال دقيقة أو دقيقتين.",
-        "failedTitle": "تعذّر تحميل المشكلات",
-        "failedDesc": "حدث خطأ أثناء تحميلها. حاول مرة أخرى بعد قليل."
-      }
-    },
-    "time": {
-      "justNow": "الآن",
-      "ago": "منذ {time}"
-    },
-    "history": {
-      "incident": "فُتح حادث: {title}",
-      "dismissed": "تجاهل {actor} {title}",
-      "accepted": "وضع {actor} علامة على {title} كتقرير مقصود",
-      "changed": "غيّر {actor} {title}",
-      "denied": {
-        "incidents": "لا تُسرد الحوادث: لا تملك الإذن لعرضها.",
-        "decisions": "لا تُسرد القرارات: لا تملك الإذن لعرضها."
-      },
-      "untitled": "اقتراح",
-      "openIncident": "افتح الحادث",
-      "newest": "يتم عرض أحدث {count}. الحوادث الأقدم موجودة في صفحة المشكلات.",
-      "loading": "جارٍ تحميل السجل",
-      "loaded": "تم تحميل السجل"
-    },
-    "incidents": {
-      "title": "الاكتشافات المستدعاة",
-      "subtitle": "الاكتشافات التي فتحت حادثًا لفريق المناوبة لديك، مع تحليلها.",
-      "pagingNote": "الاستدعاء معطّل لهذه المؤسسة، لذا لا يفتح AutoObserve أي حوادث.",
-      "sharedFor": "{label}: {reason}",
-      "finding": {
-        "stream_silence": "توقف {stream} ({type}) عن إرسال البيانات",
-        "stream_drop": "انخفض حجم {stream} ({type}) بشكل حاد",
-        "stream_rise": "ارتفع حجم {stream} ({type}) بشكل حاد"
-      },
-      "opened": "فُتح الحادث {when}",
-      "openIncident": "افتح الحادث",
-      "viewAnalysis": "اعرض التحليل",
-      "newFindings": "{count} اكتشاف جديد | {count} اكتشافات جديدة",
-      "showNew": "اعرض",
-      "more": "يتم عرض أحدث {count}",
-      "seeAll": "اعرض كل الحوادث",
-      "seeAllIssues": "اعرض كل المشكلات",
-      "failedDetail": {
-        "status": "فشل الطلب بالحالة {status} عند {time}.",
-        "noResponse": "لم يتلقَّ الطلب أي استجابة عند {time}."
-      },
-      "analysis": {
-        "notRunDetail": "لم يبدأ أي تحليل. افتح الحادث لبدء تحليل.",
-        "disabledDetail": "تحليل الذكاء الاصطناعي مُعطَّل في هذا النشر.",
-        "offOther": "لم يُشغَّل التحليل التلقائي لهذا الحادث.",
-        "failedDetail": "توقف التحليل قبل اكتماله. اعرضه لمعرفة التفاصيل."
-      },
-      "empty": {
-        "title": "لم يُستدعَ أحد",
-        "desc": "عند توقف التدفق أو تغيّر حجمه بشكل حاد، يظهر الحادث وتحليله هنا."
-      },
-      "emptyOff": {
-        "title": "الاستدعاء مُعطَّل",
-        "desc": "يسجّل AutoObserve نتائج التدفقات لهذه المؤسسة لكنه لا يفتح أي حوادث. يقوم المسؤول بتفعيل الاستدعاء."
-      },
-      "loading": "جارٍ تحميل النتائج المستدعاة…",
-      "loaded": "تم تحميل النتائج المستدعاة",
-      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
-      "routing": "Set up on-call routing"
-    },
-    "issues": {
-      "searchPlaceholder": "ابحث عمّا حدث أو عن تدفق",
-      "columns": {
-        "incident": "ما حدث",
-        "severity": "الخطورة",
-        "status": "الحالة",
-        "stream": "التدفق",
-        "opened": "وقت الفتح",
-        "analysis": "التحليل",
-        "page": "من تم استدعاؤه"
-      },
-      "count": "لا توجد مشكلات | {count} مشكلة | {count} مشكلات",
-      "capNote": "يتم عرض أحدث {count} مشكلة. ضيّق النطاق لرؤية الأقدم.",
-      "emptyRange": "لا توجد مشكلات {within}",
-      "streamType": "تدفق {type}",
-      "streamMore": "{stream} +{count}",
-      "filterOpen": "مفتوح",
-      "loading": "جارٍ تحميل المشكلات…",
-      "loaded": "تم تحميل المشكلات",
-      "page": {
-        "unrouted": "لم يُستدعَ أحد",
-        "failed": "فشل الاستدعاء",
-        "pending": "لم يُؤكَّد بعد"
-      },
-      "today": "اليوم",
-      "yesterday": "أمس",
-      "shared": {
-        "rcaDisabled": "كان تحليل الذكاء الاصطناعي مُعطَّلًا عند فتح هذه الحوادث.",
-        "aiUnavailable": "لم يكن تحليل الذكاء الاصطناعي متاحًا عند فتح هذه الحوادث.",
-        "quotaExceeded": "كانت المؤسسة قد بلغت حد تحليل الذكاء الاصطناعي عند فتح هذه الحوادث.",
-        "coolingDown": "كان تحليل قد اكتمل للتو، لذا لم يبدأ تحليل جديد لهذه الحوادث.",
-        "startFailed": "تعذّر بدء التحليلات.",
-        "offOther": "لم يُشغَّل التحليل التلقائي لهذه الحوادث.",
-        "disabled": "تحليل الذكاء الاصطناعي مُعطَّل في هذا النشر.",
-        "notRun": "لم يبدأ أي تحليل. افتح حادثًا لبدء تحليل.",
-        "failed": "توقفت هذه التحليلات قبل اكتمالها. اعرض أحدها لمعرفة التفاصيل."
-      }
-    },
-    "surfaces": {
-      "changes": {
-        "title": "لا توجد تغييرات بعد",
-        "desc": "يقترح AutoObserve إصلاحات لكنه لم يغيّر أي تنبيه أو إعداد. عندما يجري تغييرًا، يظهر هنا مع بيان ما إذا كان قد نجح. في الوقت الحالي، راجع اقتراحاته وطبّق ما تريد منها.",
-        "action": "راجع الاقتراحات"
-      },
-      "history": {
-        "title": "لا يوجد سجل بعد",
-        "desc": "ستُدرج هنا ما يجده AutoObserve وما يغيّره وما تقرره، الأحدث أولًا. حاليًا، تفتح نتائجه حوادث، وهي موجودة في صفحة المشكلات.",
-        "action": "افتح المشكلات"
-      },
-      "scenario": {
-        "tag": "بيانات مباشرة",
-        "text": "أنت تعرض البيانات المباشرة لهذه المؤسسة. لا تُعرض السيناريوهات النموذجية هنا.",
-        "action": "كيف يعمل"
-      },
-      "settings": {
-        "title": "لا يوجد شيء لضبطه هنا بعد",
-        "desc": "يقوم المسؤول بتفعيل AutoObserve والاستدعاء الخاص به لهذا التنصيب. سيُضبط هنا مَن يُخطَر ومدى تصرفه بمفرده بمجرد توفر أدوات التحكم تلك.",
-        "action": "كيف يعمل"
-      }
-    },
-    "paging": {
-      "title": "Paging",
-      "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
-      "routing": "On-call routing",
-      "unavailable": "Paging is turned off for this deployment.",
-      "denied": "{denied} {askAdmin}",
-      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
-      "deniedTitle": "ليس لديك إذن لعرض إعداد الاستدعاء",
-      "deniedDesc": "يُضبط الاستدعاء مرة واحدة للمؤسسة بأكملها. اطلب الوصول من مسؤول المؤسسة.",
-      "failedTitle": "تعذّر تحميل إعداد الاستدعاء",
-      "failedDesc": "حدث خطأ أثناء تحميله. أعد المحاولة بعد لحظة.",
-      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
-    },
-    "learning": {
-      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
-      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
-      "emptyTitle": "Learning your streams",
-      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
-      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
-      "until": "Learning until {date} · {streams}",
-      "streams": "Learning {count} stream | Learning {count} streams",
-      "streamUntil": "until {date}"
-    }
-  },
   "autoobserve2": {
     "nav": {
       "history": "السجل",
@@ -30771,7 +30024,7 @@
         "auth_test": "رمز البوت",
         "last_event": "الأحداث",
         "sockets": "اتصالات Socket",
-        "agent": "مساعد الذكاء الاصطناعي",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "رسالة اختبار"
       },
       "connectedOrgs": "المؤسسات المتصلة",
@@ -33082,6 +32335,517 @@
     "deletedQuery": "تم حذف {query}",
     "undo": "تراجع"
   },
+  "filterBar": {
+    "ariaLabel": "الفلترة حسب الحقل",
+    "placeholder": "الفلترة حسب الحقل، أو اكتب field=value. اضغط Enter للتشغيل",
+    "addFilter": "إضافة فلتر",
+    "searchFields": "البحث في الحقول",
+    "searchLabels": "البحث في التسميات",
+    "searchOperators": "البحث في الشروط",
+    "searchValue": "ابحث أو اكتب قيمة",
+    "searchValues": "البحث في القيم",
+    "textField": "نص",
+    "useValue": "استخدم \"{value}\"",
+    "useField": "استخدم الحقل \"{field}\"",
+    "useLabel": "استخدم التسمية \"{field}\"",
+    "searchText": "ابحث في كل النص عن \"{text}\"",
+    "emptyValue": "(فارغ)",
+    "loadingFields": "جارٍ تحميل الحقول…",
+    "noFields": "لا توجد حقول مطابقة",
+    "noValues": "لا توجد اقتراحات. اكتب قيمة واضغط Enter",
+    "noOperators": "لا توجد شروط مطابقة",
+    "removeFilter": "إزالة الفلتر",
+    "clearAll": "مسح جميع الفلاتر",
+    "toggleConnector": "التبديل بين AND و OR",
+    "selectedCount": "No values selected | {count} value selected | {count} values selected",
+    "query": "الاستعلام",
+    "builderTooltip": "أنشئ الفلاتر باختيار الحقول والشروط والقيم",
+    "queryTooltip": "اكتب الاستعلام بنفسك",
+    "queryNotParsableShort": "لا يمكن لمنشئ الفلاتر عرض هذا الاستعلام:",
+    "clearAndBuild": "المسح والبناء",
+    "clearQueryTitle": "مسح الاستعلام؟",
+    "clearQueryMessage": "تتم إزالة الاستعلام ويبدأ المنشئ فارغًا.",
+    "where": "حيث",
+    "addCondition": "إضافة شرط",
+    "addGroup": "إضافة مجموعة",
+    "startGroup": "بدء مجموعة",
+    "addBelow": "إضافة شرط أدناه",
+    "ungroup": "إلغاء التجميع",
+    "collapseGroup": "طي المجموعة",
+    "expandGroup": "توسيع المجموعة",
+    "moreInGroup": "{count} إضافية",
+    "groupHasIssues": "هناك شيء في هذه المجموعة يحتاج إلى إصلاح",
+    "chooseField": "اختر حقلًا",
+    "chooseValue": "اختر قيمة",
+    "lockedFilter": "لا يمكن تعديل هذا الفلتر هنا. يبقى كما حُفظ؛ أزله لإسقاطه",
+    "limits": {
+      "conditions": "حتى {count} فلتر | حتى {count} فلاتر",
+      "values": "حتى {count} قيمة | حتى {count} قيم"
+    },
+    "validation": {
+      "incomplete": "أكمل هذا الفلتر أو أزله",
+      "required": "أضف فلترًا واحدًا على الأقل",
+      "uniqueField": "{field} له فلتر بالفعل؛ عدّل ذلك الفلتر أو أزل هذا",
+      "oneUsageCondition": "تأخذ الطبقة شرط استخدام واحدًا؛ حوّل هذا إلى قاعدة أو أزله",
+      "rumField": "استخدم حقلًا مدمجًا أو عمودًا من أحرف صغيرة وأرقام وشرطات سفلية، حتى 128 حرفًا",
+      "valueLength": "يجب أن تتكون كل قيمة من 1 إلى {max} حرفًا",
+      "regexLength": "اجعل النمط {max} حرفًا أو أقل.",
+      "regexInvalid": "هذا النمط غير صالح أو غير مدعوم. لا يمكن استخدام البحث الأمامي أو البحث الخلفي أو المراجع الخلفية."
+    },
+    "operatorNames": {
+      "containsIgnoreCase": "يحتوي (تجاهل حالة الأحرف)",
+      "notStartsWith": "لا يبدأ بـ",
+      "notEndsWith": "لا ينتهي بـ",
+      "isEmpty": "فارغ",
+      "isNotEmpty": "غير فارغ"
+    },
+    "types": {
+      "string": "نص",
+      "number": "رقم",
+      "boolean": "قيمة منطقية"
+    },
+    "operators": {
+      "eq": "يساوي",
+      "neq": "لا يساوي",
+      "gt": "أكبر من",
+      "gte": "أكبر من أو يساوي",
+      "lt": "أقل من",
+      "lte": "أقل من أو يساوي",
+      "contains": "يحتوي على",
+      "containsIgnoreCase": "يحتوي على، مع تجاهل حالة الأحرف",
+      "notContains": "لا يحتوي على",
+      "startsWith": "يبدأ بـ",
+      "notStartsWith": "لا يبدأ بـ",
+      "endsWith": "ينتهي بـ",
+      "notEndsWith": "لا ينتهي بـ",
+      "in": "أي من",
+      "notIn": "ليس أيًا من",
+      "regex": "يطابق التعبير النمطي",
+      "notRegex": "لا يطابق التعبير النمطي",
+      "isNull": "لا يحتوي على قيمة",
+      "isNotNull": "يحتوي على قيمة",
+      "isEmpty": "فارغ أو لا يحتوي على قيمة",
+      "isNotEmpty": "يحتوي على قيمة غير فارغة",
+      "matchAll": "يطابق النص"
+    }
+  },
+  "autoobserveLive": {
+    "where": "{cluster} / {namespace}",
+    "lessThan": "<{value}",
+    "topbar": {
+      "checked": "تم الفحص {ago}",
+      "firstCheck": "الفحص الأول قيد التقدم"
+    },
+    "retry": "إعادة المحاولة",
+    "classes": {
+      "errors": "الأخطاء",
+      "latency": "زمن الاستجابة",
+      "saturation": "التشبع",
+      "absence": "يتوقف عن الإرسال",
+      "external_probe": "فحص اصطناعي",
+      "workload_health": "عمليات إعادة التشغيل",
+      "node": "العقد"
+    },
+    "classesInline": {
+      "errors": "أخطاء",
+      "latency": "زمن الاستجابة",
+      "saturation": "تشبع",
+      "absence": "غياب",
+      "external_probe": "فحوص خارجية",
+      "workload_health": "صحة أحمال العمل",
+      "node": "صحة العقد"
+    },
+    "states": {
+      "covered": "مُراقَب",
+      "weak": "ضعيف",
+      "silent": "صامت",
+      "blind": "أعمى",
+      "unmapped": "غير مُعيَّن",
+      "none": "لا شيء"
+    },
+    "monitorKinds": {
+      "alert": "التنبيه",
+      "anomaly_detector": "كاشف الشذوذ",
+      "slo": "SLO",
+      "synthetic": "اصطناعي"
+    },
+    "coverage": {
+      "summaryWatched": "{watched} من {total} تحت المراقبة · {pct}%",
+      "summaryWatchedShare": "{watched} من {total} تحت المراقبة · {pct}",
+      "splitLabel": "{watched} تحت المراقبة، {gaps} بها فجوة تغطية",
+      "stateWatched": "مُراقَب",
+      "stateGap": "فجوة تغطية",
+      "columns": {
+        "where": "الموقع",
+        "state": "الحالة",
+        "lastChecked": "آخر فحص"
+      },
+      "loading": "جارٍ تحميل التغطية",
+      "loaded": "تم تحميل التغطية",
+      "sentence": {
+        "allWatched": "أراقب خدمتك الواحدة. | أراقب جميع خدماتك البالغ عددها {total}.",
+        "allGaps": "خدمتك الواحدة بها فجوة تغطية. | جميع خدماتك البالغ عددها {total} بها فجوة تغطية.",
+        "watching": "أراقب {watched} من أصل {total} من خدماتك.",
+        "gaps": "لدى {count} فجوة تغطية. | لدى {count} فجوة تغطية.",
+        "mixed": "{watching} {gaps}"
+      },
+      "gapAdded": "تمت إضافة تنبيه لـ {checks}. سيحتسبه AutoObserve عند الفحص التالي. | تمت إضافة تنبيهات لـ {checks}. سيحتسبها AutoObserve عند الفحص التالي.",
+      "gapNone": "لا يوجد تنبيه يراقب {checks}",
+      "searchPlaceholder": "ابحث عن خدمة أو عنقود أو مساحة اسم",
+      "labelNamespace": "{name} · {namespace}",
+      "labelPlace": "{name} · {cluster} · {namespace}",
+      "noNamespace": "لا توجد مساحة اسم",
+      "noCluster": "لا يوجد عنقود",
+      "noMatch": "لا توجد خدمة أو عنقود أو مساحة اسم تطابق “{query}”",
+      "showAll": "عرض الكل",
+      "bucketThree": "3 أو أكثر",
+      "bucketTwo": "2",
+      "bucketOne": "1",
+      "filterHides": "لا توجد خدمة {state}",
+      "filterHidesSearch": "{count} خدمة تطابق “{query}”، لكنها ليست {state} | {count} من الخدمات تطابق “{query}”، لكن لا توجد أي منها {state}"
+    },
+    "cell": {
+      "noClass": "لا يفحص AutoObserve هذه الإشارة بعد",
+      "tipNoClass": "{signal}: لا يفحص AutoObserve هذا بعد",
+      "gap": {
+        "weak": "{signal}: قد ينتبه {monitor} فقط، وهو تنبيه عام، إلى مشكلة؛ لكنه غير محصور بهذه الخدمة | {signal}: قد تنتبه {monitor} فقط، وهي تنبيهات عامة، إلى مشكلة؛ لكنها غير محصورة بهذه الخدمة",
+        "silent": "{signal}: {monitor} يطابق، لكنه لا يرسل إشعارًا إلى أي أحد | {signal}: {monitor} تطابق، لكنها لا ترسل إشعارًا إلى أي أحد",
+        "blind": "{signal}: {monitor} يطابق، لكنه لا يستطيع رؤية بياناته | {signal}: {monitor} تطابق، لكنها لا تستطيع رؤية بياناتها",
+        "unmapped": "{signal}: قد يطابق {monitor}، لكن تعذّر ربط نطاقه بخدمة | {signal}: قد تطابق {monitor}، لكن تعذّر ربط نطاقها بخدمة",
+        "none": "{signal}: لا يوجد تنبيه يراقب هذا"
+      },
+      "added": "تمت الإضافة"
+    },
+    "drawer": {
+      "moreChecks": "فحوصات أخرى",
+      "chartNoData": "المخطط غير متاح بعد",
+      "monitors": "التنبيهات",
+      "monitorLine": "{kind} · {state}",
+      "noMonitor": "لا يوجد تنبيه مطابق"
+    },
+    "charts": {
+      "empty1h": "لا توجد بيانات من {service} خلال الساعة الأخيرة",
+      "empty24h": "لا توجد بيانات من {service} خلال آخر 24 ساعة",
+      "empty7d": "لا توجد بيانات من {service} خلال آخر 7 أيام",
+      "emptyPartial1h": "لا توجد بيانات من {service} في الجزء الذي تم البحث فيه من الساعة الأخيرة",
+      "emptyPartial24h": "لا توجد بيانات من {service} في الجزء الذي تم البحث فيه من آخر 24 ساعة",
+      "emptyPartial7d": "لا توجد بيانات من {service} في الجزء الذي تم البحث فيه من آخر 7 أيام",
+      "noSpanStatus": "لا توجد حالة للامتداد في {stream}",
+      "noLevel": "لا يوجد مستوى سجل في {stream}",
+      "noDuration": "لا يوجد حقل مدة في {stream}",
+      "noTraces": "يُرسَم زمن الاستجابة من التتبعات. لا ترسل {service} أيًا منها.",
+      "noMatch": "تعذّر مطابقة هذه الخدمة بتدفقاتها",
+      "failedQuery": "تعذّر تحميل هذا المخطط من {stream}",
+      "failedMatch": "تعذّر البحث عن تدفقات {service}",
+      "partial": "بيانات جزئية",
+      "wide": "يتضمن خدمات أخرى تشترك في هذا التدفق",
+      "loading": "جارٍ تحميل {metric}",
+      "summary": "{metric}، {value} الآن",
+      "summaryNone": "{metric}، لم يتم قياس أي شيء في أحدث فترة زمنية"
+    },
+    "suggestions": {
+      "serviceMeta": "{where}، حوالي {traffic} حدث في الساعة",
+      "trafficOnly": "حوالي {traffic} حدث في الساعة",
+      "kinds": {
+        "coverage_gap": "فجوة تغطية",
+        "no_absence_check": "تنبيه مفقود",
+        "silent_coverage": "لا يُخطر أحدًا",
+        "coverage_lost": "فقدان التغطية",
+        "blind_guardrail": "لا يعمل",
+        "discovery_unusable": "جودة البيانات",
+        "alert_no_destination": "لا يُخطر أحدًا",
+        "alert_notify_failed": "فشل الإشعار",
+        "other": "أخرى"
+      },
+      "severity": {
+        "high": "عالية",
+        "medium": "متوسطة"
+      },
+      "confidence": {
+        "sufficient": "دليل قوي",
+        "suggestive": "بعض الأدلة",
+        "insufficient": "دليل ضعيف"
+      },
+      "body": {
+        "coverageGap": "لا شيء يراقب {service}",
+        "noAbsenceNone": "لا شيء يُنبّه إذا توقفت {service} عن إرسال البيانات",
+        "noAbsenceWeak": "لن يلاحظ توقف {service} عن إرسال البيانات سوى تنبيه عام",
+        "noAbsenceSilent": "الفحص الذي سيلاحظ صمت {service} لا يُخطر أحدًا",
+        "noAbsenceBlind": "الفحص الذي سيلاحظ صمت {service} لا يرى بياناته",
+        "silentCoverage": "{monitor} watches {classes} on {count} service but notifies no one | {monitor} watches {classes} on {count} services but notifies no one",
+        "silentWhy": "{monitor} سيلاحظ توقف {services}، لكنه لا يُخطر أحدًا.",
+        "silentWhyNoNames": "{monitor} سيلاحظ توقف خدمة ما، لكنه لا يُخطر أحدًا.",
+        "silentNext": "أضف له وجهة.",
+        "undeliverable": "{monitor} لا يستطيع الوصول إلى {destination}",
+        "undeliverableWhy": "{destination} يستقبل تذاكر لا تنبيهات. | {destination} تستقبل تذاكر لا تنبيهات.",
+        "undeliverableNext": "أضف خطاف ويب أو بريدًا إلكترونيًا بجانبه؛ يبقى {destination}. | أضف خطاف ويب أو بريدًا إلكترونيًا بجانبها؛ يبقى {destination}.",
+        "coverageLost": "فقدت {service} تنبيه {classes} الخاص بها في {day}",
+        "blindStreamMissing": "{monitor} يقرأ {detail}، وهو غير موجود",
+        "blindNoData": "{monitor} يقرأ {detail}، وليس لديه بيانات حديثة",
+        "blindEmptyScope": "{monitor} يفلتر على صفوف لا تصل أبدًا",
+        "blindUnknownField": "{monitor} يفلتر على {field}، وهو حقل لا يحتويه تدفقه",
+        "blindIgnoredMatcher": "{monitor} يطابق على التسمية {label}، وهي تسمية لا تحتويها أي سلسلة، لذا فهو يراقب كل السلاسل",
+        "discovery": "{good} فقط من أصل {active} خدمة مكتشفة قابلة للاستخدام، لذا فإن ترتيب الفجوات جزئي",
+        "alertSyntax": "{monitor} لديه استعلام لا يمكن تحليله",
+        "alertTimeout": "{monitor} ينتهي وقته باستمرار قبل أن يكتمل",
+        "alertMemory": "{monitor} ينفد منه الذاكرة باستمرار",
+        "alertOtherError": "{monitor} يفشل باستمرار بخطأ",
+        "alertNotWorkingGeneric": "{monitor} لا يعمل",
+        "alertNoDestination": "{monitor} أُطلق ولا يُخطر أحدًا",
+        "alertNotifyFailed": "{monitor} أُطلق، وفشل {failed} من {tried} إشعار. | {monitor} أُطلق، وفشلت {failed} من {tried} إشعار.",
+        "alertNotifyFailedNoCounts": "{monitor} أُطلق، وفشلت إشعاراته.",
+        "alertStreamGone": "{monitor} يفشل باستمرار لأن تدفقه غير موجود",
+        "alertFieldGone": "{monitor} يفشل باستمرار لأن حقلًا يستخدمه غير موجود",
+        "other": "وجدت شيئًا لا تستطيع هذه الصفحة عرضه بعد"
+      },
+      "detail": {
+        "cell": "{check}: {state}",
+        "cells": "ما وجده المحرك: {cells}.",
+        "services": "تشمل الخدمات المطابقة {services}.",
+        "text": "تفاصيل المحرك: {detail}",
+        "quality": "يعمل الاكتشاف في الوضع {mode}.",
+        "none": "لم يرسل المحرك مزيدًا من التفاصيل.",
+        "joined": "{first} {rest}"
+      },
+      "analysedAt": "من تشغيل المعايرة {ago}",
+      "neverFired": "لم يُطلق أبدًا",
+      "lastFired": "آخر إطلاق {time}",
+      "accept": "قبول",
+      "dismiss": "تجاهل…",
+      "accepted": "تم القبول في هذه المعاينة؛ لم يُرسل أي شيء",
+      "dismissed": "تم التجاهل في هذه المعاينة؛ لم يُرسل أي شيء",
+      "loading": "جارٍ تحميل الاقتراحات",
+      "loaded": "تم تحميل الاقتراحات",
+      "more": "و{count} أخرى | و{count} أخرى",
+      "moreNames": "{count} أخرى | {count} أخرى",
+      "whyNext": "{why} {next}",
+      "seeAll": "عرض الكل",
+      "drawerTitle": "الاقتراحات",
+      "drawerLine": "مرتبة حسب الأهمية أولاً. افتح صفًا لمعرفة ما وجدته.",
+      "focusGone": "لم يعد هذا الاقتراح مفتوحًا.",
+      "clearKind": "عرض جميع الاقتراحات",
+      "kindEmptyTitle": "لا توجد اقتراحات مفتوحة من النوع {kind}",
+      "kindEmptyDesc": "يوجد {count} اقتراح آخر مفتوح. | توجد {count} اقتراحات أخرى مفتوحة.",
+      "folder": "المجلد {folder}",
+      "columns": {
+        "suggestion": "الاقتراح",
+        "where": "المكان",
+        "kind": "النوع",
+        "severity": "الخطورة"
+      }
+    },
+    "notice": {
+      "offTitle": "AutoObserve غير مفعّل",
+      "details": "التفاصيل",
+      "refreshFailed": "فشل التحديث عند {failedAt} · يتم عرض {what} من {dataAt}",
+      "what": {
+        "coverage": "التغطية",
+        "suggestions": "الاقتراحات",
+        "incidents": "النتائج المستدعاة",
+        "issues": "المشكلات",
+        "history": "السجل"
+      },
+      "coverage": {
+        "deniedTitle": "ليس لديك إذن لعرض التغطية",
+        "deniedDesc": "تحسب التغطية المراقبات في كل مجلد، لذا تحتاج إلى إذن لعرض جميع التنبيهات في هذه المؤسسة، وليس بعض المجلدات فقط. اطلب ذلك من مسؤول المؤسسة.",
+        "offDesc": "يقوم المسؤول بتفعيلها لهذا النشر. تظهر التغطية هنا بعد أول فحص لها.",
+        "unavailableTitle": "التغطية غير متاحة مؤقتًا",
+        "unavailableDesc": "لا يستجيب AutoObserve الآن. عادةً ما يزول هذا خلال دقيقة أو دقيقتين.",
+        "failedTitle": "تعذّر تحميل التغطية",
+        "failedDesc": "حدث خطأ أثناء تحميلها. حاول مرة أخرى بعد قليل.",
+        "noPassTitle": "لم يكتمل أي فحص خلال آخر يوم",
+        "noPassDesc": "تظهر التغطية هنا بعد انتهاء فحصي التالي لخدماتك. إذا كان AutoObserve قد فُعّل للتو، فقد يستغرق الفحص الأول بعض الوقت.",
+        "noPassAction": "كيف أفحص التغطية",
+        "noServicesTitle": "لم يتم العثور على خدمات بعد",
+        "noServicesDesc": "لم يعثر فحصي الأخير، {when}، على أي خدمات. تظهر الخدمات هنا بمجرد أن ترسل سجلات أو مقاييس أو تتبعات تحدد اسم خدمة.",
+        "noServicesAction": "كيف أجد الخدمات"
+      },
+      "suggestions": {
+        "deniedTitle": "ليس لديك إذن لعرض الاقتراحات",
+        "deniedDesc": "يتطلب عرضها إذنًا لعرض التنبيهات في هذه المؤسسة. اطلب ذلك من مسؤول المؤسسة.",
+        "offDesc": "تظهر الاقتراحات هنا بعد أن يفعّلها المسؤول لهذا النشر.",
+        "unavailableTitle": "الاقتراحات غير متاحة مؤقتًا",
+        "unavailableDesc": "لا يستجيب AutoObserve الآن. عادةً ما يزول هذا خلال دقيقة أو دقيقتين.",
+        "failedTitle": "تعذّر تحميل الاقتراحات",
+        "failedDesc": "حدث خطأ أثناء تحميلها. حاول مرة أخرى بعد قليل.",
+        "emptyTitle": "لا توجد اقتراحات الآن",
+        "emptyDesc": "سأضيف اقتراحًا هنا عندما أجد ثغرة في ما تغطيه المراقبات.",
+        "pageEmptyTitle": "تمت معالجة أفضل الاقتراحات بالفعل",
+        "pageEmptyDesc": "افتح القائمة الكاملة للاقتراحات التي لا تزال في الانتظار."
+      },
+      "history": {
+        "deniedTitle": "لا تملك الإذن لعرض السجل",
+        "deniedDesc": "يسرد السجل الحوادث التي فتحها AutoObserve، لذا يتطلب عرضه إذنًا لعرض قائمة الحوادث في هذه المؤسسة. اطلب ذلك من مسؤول المؤسسة.",
+        "offDesc": "يظهر السجل هنا بعد أن يفعّله مسؤول لهذا النشر.",
+        "unavailableTitle": "السجل غير متاح مؤقتًا",
+        "unavailableDesc": "لا يستجيب AutoObserve الآن. عادةً ما يزول هذا خلال دقيقة أو دقيقتين.",
+        "failedTitle": "تعذّر تحميل السجل",
+        "failedDesc": "حدث خطأ أثناء تحميله. حاول مرة أخرى بعد قليل."
+      },
+      "incidents": {
+        "deniedTitle": "لا تملك الإذن لعرض الاكتشافات المستدعاة",
+        "deniedDesc": "تؤدي الاكتشافات المستدعاة إلى فتح حوادث، لذا يتطلب عرضها إذنًا لعرض قائمة الحوادث في هذه المؤسسة. اطلب ذلك من مسؤول المؤسسة.",
+        "offDesc": "تظهر الاكتشافات المستدعاة هنا بعد أن يفعّلها مسؤول لهذا النشر.",
+        "unavailableTitle": "الاكتشافات المستدعاة غير متاحة مؤقتًا",
+        "unavailableDesc": "لا يستجيب AutoObserve الآن. عادةً ما يزول هذا خلال دقيقة أو دقيقتين.",
+        "failedTitle": "تعذّر تحميل الاكتشافات المستدعاة",
+        "failedDesc": "حدث خطأ أثناء تحميلها. حاول مرة أخرى بعد قليل."
+      },
+      "issues": {
+        "deniedTitle": "لا تملك الإذن لعرض المشكلات",
+        "deniedDesc": "المشكلات هي حوادث فتحها AutoObserve، لذا يتطلب عرضها إذنًا لعرض قائمة الحوادث في هذه المؤسسة. اطلب ذلك من مسؤول المؤسسة.",
+        "offDesc": "تظهر المشكلات هنا بعد أن يفعّلها مسؤول لهذا النشر.",
+        "unavailableTitle": "المشكلات غير متاحة مؤقتًا",
+        "unavailableDesc": "لا يستجيب AutoObserve الآن. عادةً ما يزول هذا خلال دقيقة أو دقيقتين.",
+        "failedTitle": "تعذّر تحميل المشكلات",
+        "failedDesc": "حدث خطأ أثناء تحميلها. حاول مرة أخرى بعد قليل."
+      }
+    },
+    "time": {
+      "justNow": "الآن",
+      "ago": "منذ {time}"
+    },
+    "history": {
+      "incident": "فُتح حادث: {title}",
+      "dismissed": "تجاهل {actor} {title}",
+      "accepted": "وضع {actor} علامة على {title} كتقرير مقصود",
+      "changed": "غيّر {actor} {title}",
+      "denied": {
+        "incidents": "لا تُسرد الحوادث: لا تملك الإذن لعرضها.",
+        "decisions": "لا تُسرد القرارات: لا تملك الإذن لعرضها."
+      },
+      "untitled": "اقتراح",
+      "openIncident": "افتح الحادث",
+      "newest": "يتم عرض أحدث {count}. الحوادث الأقدم موجودة في صفحة المشكلات.",
+      "loading": "جارٍ تحميل السجل",
+      "loaded": "تم تحميل السجل"
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "deniedTitle": "ليس لديك إذن لعرض إعداد الاستدعاء",
+      "deniedDesc": "يُضبط الاستدعاء مرة واحدة للمؤسسة بأكملها. اطلب الوصول من مسؤول المؤسسة.",
+      "failedTitle": "تعذّر تحميل إعداد الاستدعاء",
+      "failedDesc": "حدث خطأ أثناء تحميله. أعد المحاولة بعد لحظة.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "incidents": {
+      "title": "الاكتشافات المستدعاة",
+      "subtitle": "الاكتشافات التي فتحت حادثًا لفريق المناوبة لديك، مع تحليلها.",
+      "pagingNote": "الاستدعاء معطّل لهذه المؤسسة، لذا لا يفتح AutoObserve أي حوادث.",
+      "sharedFor": "{label}: {reason}",
+      "finding": {
+        "stream_silence": "توقف {stream} ({type}) عن إرسال البيانات",
+        "stream_drop": "انخفض حجم {stream} ({type}) بشكل حاد",
+        "stream_rise": "ارتفع حجم {stream} ({type}) بشكل حاد"
+      },
+      "opened": "فُتح الحادث {when}",
+      "openIncident": "افتح الحادث",
+      "viewAnalysis": "اعرض التحليل",
+      "newFindings": "{count} اكتشاف جديد | {count} اكتشافات جديدة",
+      "showNew": "اعرض",
+      "more": "يتم عرض أحدث {count}",
+      "seeAll": "اعرض كل الحوادث",
+      "seeAllIssues": "اعرض كل المشكلات",
+      "failedDetail": {
+        "status": "فشل الطلب بالحالة {status} عند {time}.",
+        "noResponse": "لم يتلقَّ الطلب أي استجابة عند {time}."
+      },
+      "analysis": {
+        "notRunDetail": "لم يبدأ أي تحليل. افتح الحادث لبدء تحليل.",
+        "disabledDetail": "تحليل الذكاء الاصطناعي مُعطَّل في هذا النشر.",
+        "offOther": "لم يُشغَّل التحليل التلقائي لهذا الحادث.",
+        "failedDetail": "توقف التحليل قبل اكتماله. اعرضه لمعرفة التفاصيل."
+      },
+      "empty": {
+        "title": "لم يُستدعَ أحد",
+        "desc": "عند توقف التدفق أو تغيّر حجمه بشكل حاد، يظهر الحادث وتحليله هنا."
+      },
+      "emptyOff": {
+        "title": "الاستدعاء مُعطَّل",
+        "desc": "يسجّل AutoObserve نتائج التدفقات لهذه المؤسسة لكنه لا يفتح أي حوادث. يقوم المسؤول بتفعيل الاستدعاء."
+      },
+      "loading": "جارٍ تحميل النتائج المستدعاة…",
+      "loaded": "تم تحميل النتائج المستدعاة",
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "issues": {
+      "searchPlaceholder": "ابحث عمّا حدث أو عن تدفق",
+      "columns": {
+        "incident": "ما حدث",
+        "severity": "الخطورة",
+        "status": "الحالة",
+        "stream": "التدفق",
+        "opened": "وقت الفتح",
+        "analysis": "التحليل",
+        "page": "من تم استدعاؤه"
+      },
+      "count": "لا توجد مشكلات | {count} مشكلة | {count} مشكلات",
+      "capNote": "يتم عرض أحدث {count} مشكلة. ضيّق النطاق لرؤية الأقدم.",
+      "emptyRange": "لا توجد مشكلات {within}",
+      "streamType": "تدفق {type}",
+      "streamMore": "{stream} +{count}",
+      "filterOpen": "مفتوح",
+      "loading": "جارٍ تحميل المشكلات…",
+      "loaded": "تم تحميل المشكلات",
+      "page": {
+        "unrouted": "لم يُستدعَ أحد",
+        "failed": "فشل الاستدعاء",
+        "pending": "لم يُؤكَّد بعد"
+      },
+      "today": "اليوم",
+      "yesterday": "أمس",
+      "shared": {
+        "rcaDisabled": "كان تحليل الذكاء الاصطناعي مُعطَّلًا عند فتح هذه الحوادث.",
+        "aiUnavailable": "لم يكن تحليل الذكاء الاصطناعي متاحًا عند فتح هذه الحوادث.",
+        "quotaExceeded": "كانت المؤسسة قد بلغت حد تحليل الذكاء الاصطناعي عند فتح هذه الحوادث.",
+        "coolingDown": "كان تحليل قد اكتمل للتو، لذا لم يبدأ تحليل جديد لهذه الحوادث.",
+        "startFailed": "تعذّر بدء التحليلات.",
+        "offOther": "لم يُشغَّل التحليل التلقائي لهذه الحوادث.",
+        "disabled": "تحليل الذكاء الاصطناعي مُعطَّل في هذا النشر.",
+        "notRun": "لم يبدأ أي تحليل. افتح حادثًا لبدء تحليل.",
+        "failed": "توقفت هذه التحليلات قبل اكتمالها. اعرض أحدها لمعرفة التفاصيل."
+      }
+    },
+    "surfaces": {
+      "changes": {
+        "title": "لا توجد تغييرات بعد",
+        "desc": "يقترح AutoObserve إصلاحات لكنه لم يغيّر أي تنبيه أو إعداد. عندما يجري تغييرًا، يظهر هنا مع بيان ما إذا كان قد نجح. في الوقت الحالي، راجع اقتراحاته وطبّق ما تريد منها.",
+        "action": "راجع الاقتراحات"
+      },
+      "history": {
+        "title": "لا يوجد سجل بعد",
+        "desc": "ستُدرج هنا ما يجده AutoObserve وما يغيّره وما تقرره، الأحدث أولًا. حاليًا، تفتح نتائجه حوادث، وهي موجودة في صفحة المشكلات.",
+        "action": "افتح المشكلات"
+      },
+      "scenario": {
+        "tag": "بيانات مباشرة",
+        "text": "أنت تعرض البيانات المباشرة لهذه المؤسسة. لا تُعرض السيناريوهات النموذجية هنا.",
+        "action": "كيف يعمل"
+      },
+      "settings": {
+        "title": "لا يوجد شيء لضبطه هنا بعد",
+        "desc": "يقوم المسؤول بتفعيل AutoObserve والاستدعاء الخاص به لهذا التنصيب. سيُضبط هنا مَن يُخطَر ومدى تصرفه بمفرده بمجرد توفر أدوات التحكم تلك.",
+        "action": "كيف يعمل"
+      }
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
+    }
+  },
   "insight": {
     "targets": {
       "origin": "أُنشئ من اقتراح AutoObserve للخدمة {service} بتاريخ {date}.",
@@ -33145,6 +32909,175 @@
       "openSourceLogs": "يفتح السجلات على آخر صفوف {source}، من 6 ساعات قبل توقفه.",
       "addSynthetic": "يفتح نموذج الفحص الاصطناعي معبأً. لا يتم حفظ أي شيء حتى تحفظ.",
       "setUpKubernetes": "يفتح إعداد Kubernetes لعنقوده."
+    },
+    "kind": {
+      "chip": {
+        "notWatched": "فجوة التغطية",
+        "missingAlert": "تنبيه مفقود",
+        "notifiesNoOne": "لا يُخطر أحدًا",
+        "stoppedSending": "توقف عن الإرسال",
+        "dataQuality": "جودة البيانات"
+      },
+      "traffic": {
+        "handles": "يتعامل مع نحو {count} حدثًا في الساعة.",
+        "usually": "عادةً يرسل نحو {count} حدثًا في الساعة."
+      },
+      "classes": {
+        "why": {
+          "errors": "أخطائه",
+          "latency": "زمن استجابته",
+          "absence": "ما إذا كان يتوقف عن الإرسال"
+        },
+        "ai": {
+          "errors": "الأخطاء",
+          "latency": "زمن الاستجابة",
+          "absence": "التوقف"
+        },
+        "name": {
+          "errors": "الأخطاء",
+          "latency": "زمن الاستجابة",
+          "absence": "يتوقف عن الإرسال"
+        }
+      },
+      "detail": {
+        "noAlert": "{check}: لا يوجد تنبيه.",
+        "cantMeasure": "{check}: لا يمكن القياس بعد، {service} لا يرسل أي تتبعات."
+      },
+      "coverage_gap": {
+        "headline": "لا شيء يراقب {service}",
+        "why": "لا يوجد تنبيه يراقب {classes}.",
+        "next": "أضف التنبيه الذي أعدّه AutoObserve. | أضف {count} تنبيهًا أعدّها AutoObserve.",
+        "needsTraces": "زمن الاستجابة يحتاج إلى التتبعات أولًا.",
+        "groupAdded": "تمت إضافة تنبيهات لـ {count} خدمة | تمت إضافة تنبيهات لـ {count} خدمات",
+        "groupHeadline": "لا شيء يراقب {count} خدمات",
+        "groupTraffic": "تتعامل مع نحو {count} حدث في الساعة مجتمعة.",
+        "groupNext": "أضف التنبيه الذي أعدّه AutoObserve. | أضف {count} تنبيهًا أعدّها AutoObserve، في قائمة واحدة مجمّعة حسب الفريق."
+      },
+      "no_absence_check": {
+        "why": "لا شيء ينبّه إذا توقف {service} عن الإرسال.",
+        "why_weak": "فقط {monitor} سيلاحظ، وهو يراقب التدفق بأكمله.",
+        "why_blind": "{monitor} سيلاحظ، لكنه لا يرى بيانات {service}.",
+        "whySilent": "{monitor} سيلاحظ توقف {service}، لكنه لا يبلّغ أحدًا.",
+        "next": "أضف تنبيهًا لغياب البيانات: يُطلق عندما لا يرسل {service} شيئًا لمدة {minutes} دقيقة.",
+        "nextSilent": "حدّد له من يبلّغه."
+      },
+      "coverage_lost": {
+        "why": "حدث تغيير في التنبيهات التي كانت تراقبه.",
+        "next": "أعده، أو تحقق مما تغيّر في التنبيه الذي كان يراقبه."
+      },
+      "blind_guardrail": {
+        "nextStream": "وجّهه إلى التدفق الذي حلّ محل {detail}، أو احذفه.",
+        "nextScope": "تحقق من الفلتر الخاص به: كما هو مكتوب فهو لا يطابق أي شيء يجب أن يطابقه.",
+        "nextField": "أصلح الحقل الذي يفلتر عليه استعلامه."
+      },
+      "discovery_unusable": {
+        "headline": "فقط {good} من {active} خدمات اكتشفها AutoObserve قابلة للاستخدام",
+        "why": "معظم بياناتها لا تحمل اسم خدمة، لذا قائمة الفجوات غير مكتملة.",
+        "next": "أرسل service.name في تتبعاتك وسجلاتك."
+      },
+      "source_silence": {
+        "headline": "توقف {source} عن الإرسال إلى {stream}",
+        "since": "منذ {time}.",
+        "usual": "يرسل عادة نحو {count} صف في اليوم؛ وبقية {stream} استمرت في التدفق.",
+        "more": "و{count} من المصادر الأخرى في هذا التدفق. | و{count} من المصادر الأخرى في {streams} تدفقات.",
+        "nextSender": "تحقق من الوكيل أو المجمّع على {source}.",
+        "nextGap": "لقد عاد. تحقق مما فاتته الفجوة."
+      },
+      "heartbeat_on_success": {
+        "headline": "لا شيء ينبّه إذا توقفت المهمة {job} عن النجاح",
+        "why": "ظهر سطر نجاحه في اليوم الأخير. | ظهر سطر نجاحه في كل يوم من آخر {days} أيام.",
+        "next": "أضف تنبيهًا يُطلق عندما لا يظهر سطر نجاحه."
+      },
+      "cell": {
+        "falls": {
+          "weak": "فقط {monitor}، وهو تنبيه عام، يراقب {what}، وهو غير محصور بهذه الخدمة. | فقط {monitor}، وهي تنبيهات عامة، تراقب {what}، وهي غير محصورة بهذه الخدمة.",
+          "silent": "{monitor} يراقب {what}، لكنه لا يبلّغ أحدًا. | {monitor} تراقب {what}، لكنها لا تبلّغ أحدًا.",
+          "blind": "{monitor} يراقب {what}، لكنه لا يرى بيانات هذه الخدمة. | {monitor} تراقب {what}، لكنها لا ترى بيانات هذه الخدمة.",
+          "unmapped": "{monitor} قد يراقب {what}، لكن تعذّر ربط نطاقه بهذه الخدمة. | {monitor} قد تراقب {what}، لكن تعذّر ربط نطاقها بهذه الخدمة."
+        },
+        "watchWhat": {
+          "errors": "أخطاء {service}",
+          "latency": "زمن استجابة {service}",
+          "absence": "ما إذا كان {service} سيتوقف عن الإرسال"
+        },
+        "justAdded": "تمت الإضافة. سيحتسبه AutoObserve في فحنه التالي، خلال نحو 5 دقائق. | تمت الإضافة. سيحتسبها AutoObserve في فحنه التالي، خلال نحو 5 دقائق.",
+        "errorsWhy": "لا يوجد تنبيه يراقب أخطاء {service}.",
+        "errorsNext": "أضف تنبيهًا للأخطاء عند 3 أضعاف معدله المعتاد.",
+        "latencyWhy": "لا يوجد تنبيه يراقب زمن استجابة {service}.",
+        "latencyNext": "أضف تنبيهًا لزمن الاستجابة عند ضعف p95 المعتاد.",
+        "latencyNoTraces": "يُرسَم زمن الاستجابة من التتبعات. و{service} لا يرسل أيًا منها.",
+        "noMetrics": "لا تصل بيانات CPU أو الذاكرة لـ {service}، لذا لا يمكن مراقبة هذا بعد.",
+        "noRestartEvents": "لا تصل أحداث إعادة التشغيل لـ {service}، لذا لا يمكن مراقبة عمليات إعادة تشغيله بعد.",
+        "saturationWhy": "لا يوجد تنبيه يراقب الذاكرة أو CPU لـ {service}. تصل ذاكرة الحاوية في {stream}.",
+        "saturationNext": "أضف تنبيهًا للذاكرة عند 90% من حدّه.",
+        "nodeWhy": "لا يوجد تنبيه يراقب العقد التي تعمل عليها {service}. تصل بيانات العقد في {stream}.",
+        "nodeNext": "أضف تنبيهًا للعقد عند 90% من السعة.",
+        "restartsWhy": "لا يوجد تنبيه يراقب عمليات إعادة تشغيل {service}.",
+        "restartsNext": "أضف تنبيهًا يُطلق عند إعادة تشغيل الـ pods الخاصة به 3 مرات خلال 10 دقائق.",
+        "syntheticWhy": "لا شيء يفحص {service} من الخارج. يرسل الفحص الاصطناعي طلبًا كل بضع دقائق ويلاحظ الانقطاع حتى عندما لا ترسل الخدمة أي شيء.",
+        "syntheticNext": "أضف فحصًا اصطناعيًا على نقطة نهاية السلامة الخاصة به."
+      },
+      "paged": {
+        "page": {
+          "paged": "Paged {team}",
+          "pagedTeam": "Paged the on-call team",
+          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
+          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand.",
+          "pending": "استدعاء المناوبة: لم تؤكد خدمة المناوبة نداء المناوبة بعد."
+        },
+        "nextRouting": "Set up on-call routing so the next stop pages someone.",
+        "recoveredAt": "عاد في {time}.",
+        "stream_silence": {
+          "headline": "{count} streams stopped sending data",
+          "why": "No data has arrived on {stream} ({type}) since {time}.",
+          "whyMany": "{streams} have sent no data since {time}.",
+          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
+          "nextMany": "One cause is likely, such as a shared collector.",
+          "whyOne": "لم يرسل {stream} أي بيانات منذ {time}.",
+          "recovered": "{stream} ({type}) يرسل البيانات مجددًا. توقف في {time}.",
+          "recoveredMany": "{streams} ترسل البيانات مجددًا. توقفت في {time}.",
+          "recoveredSome": "ترسل مجددًا: {streams}."
+        },
+        "stream_drop": {
+          "headline": "{count} streams dropped sharply",
+          "why": "{stream} ({type}) has received much less data than usual since {time}.",
+          "whyMany": "{streams} have received much less data than usual since {time}.",
+          "next": "Check whether a sender stopped or a filter changed.",
+          "nextMany": "One cause is likely, such as a shared collector or filter.",
+          "whyOne": "تلقى {stream} بيانات أقل بكثير من المعتاد منذ {time}.",
+          "recovered": "{stream} ({type}) عاد إلى حجمه المعتاد. انخفض في {time}.",
+          "recoveredMany": "{streams} عادت إلى حجمها المعتاد. انخفضت في {time}.",
+          "recoveredSome": "عادت إلى المعتاد: {streams}."
+        },
+        "stream_rise": {
+          "headline": "{count} streams rose sharply",
+          "why": "{stream} ({type}) has received much more data than usual since {time}.",
+          "whyMany": "{streams} have received much more data than usual since {time}.",
+          "next": "Check for a retry loop or a new sender writing to it.",
+          "nextMany": "One cause is likely, such as a shared sender retrying.",
+          "whyOne": "تلقى {stream} بيانات أكثر بكثير من المعتاد منذ {time}.",
+          "recovered": "{stream} ({type}) عاد إلى حجمه المعتاد. ارتفع في {time}.",
+          "recoveredMany": "{streams} عادت إلى حجمها المعتاد. ارتفعت في {time}.",
+          "recoveredSome": "عادت إلى المعتاد: {streams}."
+        }
+      }
+    },
+    "threshold": {
+      "label": "الإطلاق عند تجاوز",
+      "errorsSuffix": "أخطاء في الساعة",
+      "latencySuffix": "مللي ثانية (p95)",
+      "errorsReason": "لم يجد AutoObserve عددًا معتادًا للأخطاء لـ {service} خلال الأيام السبعة الماضية. عيّن حدًا لإضافة هذا التنبيه.",
+      "latencyReason": "لم يجد AutoObserve زمن استجابة معتادًا لـ {service} خلال الأيام السبعة الماضية. عيّن حدًا لإضافة هذا التنبيه.",
+      "measuring": "جارٍ قياس المستوى المعتاد خلال 7 أيام…",
+      "noUsual": "لا يوجد خلال 7 أيام",
+      "notMeasured": "لم يُقس",
+      "timedOut": "استغرق القياس وقتًا طويلًا. عيّن حدًا.",
+      "placeholder": "عيّن حدًا",
+      "placeholderShort": "عيّن القيمة",
+      "required": "عيّن حدًا",
+      "invalid": "أدخل رقمًا أكبر من 0.",
+      "invalidErrors": "أدخل 0 أو أكثر.",
+      "anyErrorNote": "لم يجد AutoObserve أي أخطاء لـ {service} خلال الأيام السبعة الماضية، لذا يُطلق هذا التنبيه عند أي خطأ. ارفع الحد إذا كانت بعض الأخطاء طبيعية."
     },
     "bulk": {
       "alertsPage": "التنبيهات",
@@ -33321,6 +33254,32 @@
         "appliedEditor": "Saved and recorded for {title}.",
         "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
       },
+      "apply": {
+        "edit": "Edit in alert editor",
+        "button": "Apply",
+        "where": "Folder {folder} · notifies {destinations}",
+        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
+        "whereNoOne": "المجلد {folder} · لا يُخطر أحدًا",
+        "whereTeamNoOne": "المجلد {folder} · الفريق {team} · لا يُخطر أحدًا",
+        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
+        "acknowledgedFirst": "لن ترسل {count} من أصل {of} من حالات قيد الإطلاق التي تم الإقرار بها تنبيهًا بعد الآن، وأولها في {first}. تحقق منها قبل التطبيق.",
+        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
+        "changed": "This alert changed. Open it to review.",
+        "offerChanged": "تم تحديث التغيير المقترح. راجعه مرة أخرى.",
+        "reviewAgain": "راجع مرة أخرى",
+        "loading": "Checking what this changes…",
+        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
+        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
+        "cardNote": "Shows what changes before anything is saved.",
+        "gone": "This suggestion is no longer available. Open the alert to review it."
+      },
+      "applied": {
+        "title": "Applied changes",
+        "by": "by {actor} at {when}",
+        "undoneBy": "تم التراجع عنه بواسطة {actor} في {when}",
+        "undone": "Undone",
+        "you": "you"
+      },
       "undone": {
         "one": "تم التراجع: أُظهر {title} مرة أخرى.",
         "many": "تم التراجع: أُظهر {count} عنصر مرة أخرى. | تم التراجع: أُظهرت {count} عناصر مرة أخرى.",
@@ -33383,32 +33342,6 @@
         "range": "{from}–{to} من {total}",
         "previous": "الصفحة السابقة",
         "next": "الصفحة التالية"
-      },
-      "apply": {
-        "edit": "Edit in alert editor",
-        "button": "Apply",
-        "where": "Folder {folder} · notifies {destinations}",
-        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
-        "whereNoOne": "المجلد {folder} · لا يُخطر أحدًا",
-        "whereTeamNoOne": "المجلد {folder} · الفريق {team} · لا يُخطر أحدًا",
-        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
-        "acknowledgedFirst": "لن ترسل {count} من أصل {of} من حالات قيد الإطلاق التي تم الإقرار بها تنبيهًا بعد الآن، وأولها في {first}. تحقق منها قبل التطبيق.",
-        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
-        "changed": "This alert changed. Open it to review.",
-        "offerChanged": "تم تحديث التغيير المقترح. راجعه مرة أخرى.",
-        "reviewAgain": "راجع مرة أخرى",
-        "loading": "Checking what this changes…",
-        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
-        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
-        "cardNote": "Shows what changes before anything is saved.",
-        "gone": "This suggestion is no longer available. Open the alert to review it."
-      },
-      "applied": {
-        "title": "Applied changes",
-        "by": "by {actor} at {when}",
-        "undoneBy": "تم التراجع عنه بواسطة {actor} في {when}",
-        "undone": "Undone",
-        "you": "you"
       }
     },
     "cta": {
@@ -33426,7 +33359,7 @@
       "openService": "افتح الخدمة",
       "reviewServices": "راجع الخدمات",
       "openInCalibration": "افتح في معايرة التنبيهات",
-      "askAi": "اسأل الذكاء الاصطناعي",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "اسأل المشرفين",
       "dismiss": "تجاهل…",
       "markIntendedReport": "ضع علامة كتقرير متوقّع",
@@ -33494,175 +33427,6 @@
       "calibration": {
         "failure": "التنبيه {alert} {what}. اقترح استعلامًا مصححًا، واعرضه عليّ، ولا تحفظ حتى أطلب ذلك."
       }
-    },
-    "kind": {
-      "chip": {
-        "notWatched": "فجوة التغطية",
-        "missingAlert": "تنبيه مفقود",
-        "notifiesNoOne": "لا يُخطر أحدًا",
-        "stoppedSending": "توقف عن الإرسال",
-        "dataQuality": "جودة البيانات"
-      },
-      "traffic": {
-        "handles": "يتعامل مع نحو {count} حدثًا في الساعة.",
-        "usually": "عادةً يرسل نحو {count} حدثًا في الساعة."
-      },
-      "classes": {
-        "why": {
-          "errors": "أخطائه",
-          "latency": "زمن استجابته",
-          "absence": "ما إذا كان يتوقف عن الإرسال"
-        },
-        "ai": {
-          "errors": "الأخطاء",
-          "latency": "زمن الاستجابة",
-          "absence": "التوقف"
-        },
-        "name": {
-          "errors": "الأخطاء",
-          "latency": "زمن الاستجابة",
-          "absence": "يتوقف عن الإرسال"
-        }
-      },
-      "detail": {
-        "noAlert": "{check}: لا يوجد تنبيه.",
-        "cantMeasure": "{check}: لا يمكن القياس بعد، {service} لا يرسل أي تتبعات."
-      },
-      "coverage_gap": {
-        "headline": "لا شيء يراقب {service}",
-        "why": "لا يوجد تنبيه يراقب {classes}.",
-        "next": "أضف التنبيه الذي أعدّه AutoObserve. | أضف {count} تنبيهًا أعدّها AutoObserve.",
-        "needsTraces": "زمن الاستجابة يحتاج إلى التتبعات أولًا.",
-        "groupAdded": "تمت إضافة تنبيهات لـ {count} خدمة | تمت إضافة تنبيهات لـ {count} خدمات",
-        "groupHeadline": "لا شيء يراقب {count} خدمات",
-        "groupTraffic": "تتعامل مع نحو {count} حدث في الساعة مجتمعة.",
-        "groupNext": "أضف التنبيه الذي أعدّه AutoObserve. | أضف {count} تنبيهًا أعدّها AutoObserve، في قائمة واحدة مجمّعة حسب الفريق."
-      },
-      "no_absence_check": {
-        "why": "لا شيء ينبّه إذا توقف {service} عن الإرسال.",
-        "why_weak": "فقط {monitor} سيلاحظ، وهو يراقب التدفق بأكمله.",
-        "why_blind": "{monitor} سيلاحظ، لكنه لا يرى بيانات {service}.",
-        "whySilent": "{monitor} سيلاحظ توقف {service}، لكنه لا يبلّغ أحدًا.",
-        "next": "أضف تنبيهًا لغياب البيانات: يُطلق عندما لا يرسل {service} شيئًا لمدة {minutes} دقيقة.",
-        "nextSilent": "حدّد له من يبلّغه."
-      },
-      "coverage_lost": {
-        "why": "حدث تغيير في التنبيهات التي كانت تراقبه.",
-        "next": "أعده، أو تحقق مما تغيّر في التنبيه الذي كان يراقبه."
-      },
-      "blind_guardrail": {
-        "nextStream": "وجّهه إلى التدفق الذي حلّ محل {detail}، أو احذفه.",
-        "nextScope": "تحقق من الفلتر الخاص به: كما هو مكتوب فهو لا يطابق أي شيء يجب أن يطابقه.",
-        "nextField": "أصلح الحقل الذي يفلتر عليه استعلامه."
-      },
-      "discovery_unusable": {
-        "headline": "فقط {good} من {active} خدمات اكتشفها AutoObserve قابلة للاستخدام",
-        "why": "معظم بياناتها لا تحمل اسم خدمة، لذا قائمة الفجوات غير مكتملة.",
-        "next": "أرسل service.name في تتبعاتك وسجلاتك."
-      },
-      "source_silence": {
-        "headline": "توقف {source} عن الإرسال إلى {stream}",
-        "since": "منذ {time}.",
-        "usual": "يرسل عادة نحو {count} صف في اليوم؛ وبقية {stream} استمرت في التدفق.",
-        "more": "و{count} من المصادر الأخرى في هذا التدفق. | و{count} من المصادر الأخرى في {streams} تدفقات.",
-        "nextSender": "تحقق من الوكيل أو المجمّع على {source}.",
-        "nextGap": "لقد عاد. تحقق مما فاتته الفجوة."
-      },
-      "heartbeat_on_success": {
-        "headline": "لا شيء ينبّه إذا توقفت المهمة {job} عن النجاح",
-        "why": "ظهر سطر نجاحه في اليوم الأخير. | ظهر سطر نجاحه في كل يوم من آخر {days} أيام.",
-        "next": "أضف تنبيهًا يُطلق عندما لا يظهر سطر نجاحه."
-      },
-      "cell": {
-        "falls": {
-          "weak": "فقط {monitor}، وهو تنبيه عام، يراقب {what}، وهو غير محصور بهذه الخدمة. | فقط {monitor}، وهي تنبيهات عامة، تراقب {what}، وهي غير محصورة بهذه الخدمة.",
-          "silent": "{monitor} يراقب {what}، لكنه لا يبلّغ أحدًا. | {monitor} تراقب {what}، لكنها لا تبلّغ أحدًا.",
-          "blind": "{monitor} يراقب {what}، لكنه لا يرى بيانات هذه الخدمة. | {monitor} تراقب {what}، لكنها لا ترى بيانات هذه الخدمة.",
-          "unmapped": "{monitor} قد يراقب {what}، لكن تعذّر ربط نطاقه بهذه الخدمة. | {monitor} قد تراقب {what}، لكن تعذّر ربط نطاقها بهذه الخدمة."
-        },
-        "watchWhat": {
-          "errors": "أخطاء {service}",
-          "latency": "زمن استجابة {service}",
-          "absence": "ما إذا كان {service} سيتوقف عن الإرسال"
-        },
-        "justAdded": "تمت الإضافة. سيحتسبه AutoObserve في فحنه التالي، خلال نحو 5 دقائق. | تمت الإضافة. سيحتسبها AutoObserve في فحنه التالي، خلال نحو 5 دقائق.",
-        "errorsWhy": "لا يوجد تنبيه يراقب أخطاء {service}.",
-        "errorsNext": "أضف تنبيهًا للأخطاء عند 3 أضعاف معدله المعتاد.",
-        "latencyWhy": "لا يوجد تنبيه يراقب زمن استجابة {service}.",
-        "latencyNext": "أضف تنبيهًا لزمن الاستجابة عند ضعف p95 المعتاد.",
-        "latencyNoTraces": "يُرسَم زمن الاستجابة من التتبعات. و{service} لا يرسل أيًا منها.",
-        "noMetrics": "لا تصل بيانات CPU أو الذاكرة لـ {service}، لذا لا يمكن مراقبة هذا بعد.",
-        "noRestartEvents": "لا تصل أحداث إعادة التشغيل لـ {service}، لذا لا يمكن مراقبة عمليات إعادة تشغيله بعد.",
-        "saturationWhy": "لا يوجد تنبيه يراقب الذاكرة أو CPU لـ {service}. تصل ذاكرة الحاوية في {stream}.",
-        "saturationNext": "أضف تنبيهًا للذاكرة عند 90% من حدّه.",
-        "nodeWhy": "لا يوجد تنبيه يراقب العقد التي تعمل عليها {service}. تصل بيانات العقد في {stream}.",
-        "nodeNext": "أضف تنبيهًا للعقد عند 90% من السعة.",
-        "restartsWhy": "لا يوجد تنبيه يراقب عمليات إعادة تشغيل {service}.",
-        "restartsNext": "أضف تنبيهًا يُطلق عند إعادة تشغيل الـ pods الخاصة به 3 مرات خلال 10 دقائق.",
-        "syntheticWhy": "لا شيء يفحص {service} من الخارج. يرسل الفحص الاصطناعي طلبًا كل بضع دقائق ويلاحظ الانقطاع حتى عندما لا ترسل الخدمة أي شيء.",
-        "syntheticNext": "أضف فحصًا اصطناعيًا على نقطة نهاية السلامة الخاصة به."
-      },
-      "paged": {
-        "page": {
-          "paged": "Paged {team}",
-          "pagedTeam": "Paged the on-call team",
-          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
-          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand.",
-          "pending": "استدعاء المناوبة: لم تؤكد خدمة المناوبة نداء المناوبة بعد."
-        },
-        "nextRouting": "Set up on-call routing so the next stop pages someone.",
-        "recoveredAt": "عاد في {time}.",
-        "stream_silence": {
-          "headline": "{count} streams stopped sending data",
-          "why": "No data has arrived on {stream} ({type}) since {time}.",
-          "whyMany": "{streams} have sent no data since {time}.",
-          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
-          "nextMany": "One cause is likely, such as a shared collector.",
-          "whyOne": "لم يرسل {stream} أي بيانات منذ {time}.",
-          "recovered": "{stream} ({type}) يرسل البيانات مجددًا. توقف في {time}.",
-          "recoveredMany": "{streams} ترسل البيانات مجددًا. توقفت في {time}.",
-          "recoveredSome": "ترسل مجددًا: {streams}."
-        },
-        "stream_drop": {
-          "headline": "{count} streams dropped sharply",
-          "why": "{stream} ({type}) has received much less data than usual since {time}.",
-          "whyMany": "{streams} have received much less data than usual since {time}.",
-          "next": "Check whether a sender stopped or a filter changed.",
-          "nextMany": "One cause is likely, such as a shared collector or filter.",
-          "whyOne": "تلقى {stream} بيانات أقل بكثير من المعتاد منذ {time}.",
-          "recovered": "{stream} ({type}) عاد إلى حجمه المعتاد. انخفض في {time}.",
-          "recoveredMany": "{streams} عادت إلى حجمها المعتاد. انخفضت في {time}.",
-          "recoveredSome": "عادت إلى المعتاد: {streams}."
-        },
-        "stream_rise": {
-          "headline": "{count} streams rose sharply",
-          "why": "{stream} ({type}) has received much more data than usual since {time}.",
-          "whyMany": "{streams} have received much more data than usual since {time}.",
-          "next": "Check for a retry loop or a new sender writing to it.",
-          "nextMany": "One cause is likely, such as a shared sender retrying.",
-          "whyOne": "تلقى {stream} بيانات أكثر بكثير من المعتاد منذ {time}.",
-          "recovered": "{stream} ({type}) عاد إلى حجمه المعتاد. ارتفع في {time}.",
-          "recoveredMany": "{streams} عادت إلى حجمها المعتاد. ارتفعت في {time}.",
-          "recoveredSome": "عادت إلى المعتاد: {streams}."
-        }
-      }
-    },
-    "threshold": {
-      "label": "الإطلاق عند تجاوز",
-      "errorsSuffix": "أخطاء في الساعة",
-      "latencySuffix": "مللي ثانية (p95)",
-      "errorsReason": "لم يجد AutoObserve عددًا معتادًا للأخطاء لـ {service} خلال الأيام السبعة الماضية. عيّن حدًا لإضافة هذا التنبيه.",
-      "latencyReason": "لم يجد AutoObserve زمن استجابة معتادًا لـ {service} خلال الأيام السبعة الماضية. عيّن حدًا لإضافة هذا التنبيه.",
-      "measuring": "جارٍ قياس المستوى المعتاد خلال 7 أيام…",
-      "noUsual": "لا يوجد خلال 7 أيام",
-      "notMeasured": "لم يُقس",
-      "timedOut": "استغرق القياس وقتًا طويلًا. عيّن حدًا.",
-      "placeholder": "عيّن حدًا",
-      "placeholderShort": "عيّن القيمة",
-      "required": "عيّن حدًا",
-      "invalid": "أدخل رقمًا أكبر من 0.",
-      "invalidErrors": "أدخل 0 أو أكثر.",
-      "anyErrorNote": "لم يجد AutoObserve أي أخطاء لـ {service} خلال الأيام السبعة الماضية، لذا يُطلق هذا التنبيه عند أي خطأ. ارفع الحد إذا كانت بعض الأخطاء طبيعية."
     }
   },
   "serviceVersions": {
@@ -34463,5 +34227,8 @@
       },
       "noHighConfidence": "لا توجد أسماء بثقة عالية"
     }
+  },
+  "assistant": {
+    "composer": {}
   }
 }

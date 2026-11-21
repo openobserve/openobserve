@@ -92,7 +92,7 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
     );
 
     expect(groups(wrapper)).toEqual([
-      ["Explains the incident", ["Root cause", "Contributing", "Symptom"]],
+      ["Explains the incident", ["Confirmed", "Contributing", "Symptom"]],
       ["Not confirmed", ["Blocked"]],
       ["Ruled out", ["Ruled out", "Ruled out"]],
     ]);
@@ -134,12 +134,12 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
     expect(wrapper.findAll("code").map((code) => code.text())).toContain("GET /api/data");
   });
 
-  it("frame C: Not confirmed first, and a root_cause hypothesis reads 'Root cause · not confirmed' (VE18)", () => {
+  it("frame C: Not confirmed first, and an unconfirmed root_cause hypothesis reads 'Likely', never 'Root cause'", () => {
     const wrapper = mountList(rcaRunSummaryInconclusive());
 
     expect(groups(wrapper)).toEqual([
       ["Not confirmed", ["Inconclusive", "Inconclusive"]],
-      ["Explains the incident", ["Root cause · not confirmed"]],
+      ["Explains the incident", ["Likely"]],
     ]);
     // A long status label wraps inside the status column instead of spilling over.
     const pill = wrapper.findComponent({ name: "RcaPill" });
@@ -209,6 +209,8 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
     await chip.trigger("click");
 
     const card = wrapper.find('[data-status="contributing"] [data-test="rca-evidence-card"]');
+    expect(card.find('[data-test="rca-evidence-query"]').exists()).toBe(false);
+    await card.get('[data-test="rca-evidence-show-query"]').trigger("click");
     expect(card.text()).toContain("max(db_pool_in_use");
     expect(chip.attributes("aria-expanded")).toBe("true");
   });
@@ -222,7 +224,7 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
   describe("04 H16, SG31: hypothesis actions on a steerable run", () => {
     const mountOne = (
       status: RcaHypothesisStatus,
-      extra: { pending?: Map<string, string>; sending?: boolean } = {},
+      extra: { pending?: Map<string, string>; sending?: boolean; live?: boolean } = {},
     ) =>
       mount(RcaHypotheses, {
         props: {
@@ -280,6 +282,16 @@ describe("RcaHypotheses (03 VE11, VE12, VE18, VE36; F8)", () => {
     it("no pending line once the action is read", () => {
       expect(mountOne("testing").find('[data-test="rca-hypothesis-pending"]').exists()).toBe(false);
     });
+
+    it.each<RcaHypothesisStatus>(["testing", "root_cause", "ruled_out"])(
+      "a finished %s hypothesis offers no Disprove, Reopen or Test first",
+      (status) => {
+        const wrapper = mountOne(status, { live: false });
+
+        expect(actionLabels(wrapper)).toEqual([]);
+        expect(wrapper.text()).not.toMatch(/Disprove|Reopen|Test first/);
+      },
+    );
   });
 
   it("no hypotheses: the empty line", () => {

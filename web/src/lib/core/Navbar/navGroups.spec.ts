@@ -299,6 +299,7 @@ describe("groupNavLinks", () => {
       "alertLibrary",
       "alertSources",
       "sloList",
+      "autobotInvestigate",
       "incidentList",
       "alertCalibration",
     ]);
@@ -341,7 +342,7 @@ describe("groupNavLinks", () => {
     const response = reliability?.children
       .filter((c) => c.categoryKey === "menu.response")
       .map((c) => c.name);
-    expect(response).toEqual(["sloList", "incidentList", "alertCalibration"]);
+    expect(response).toEqual(["sloList", "autobotInvestigate", "incidentList", "alertCalibration"]);
     expect(reliability?.children.filter((c) => !c.categoryKey)).toEqual([]);
   });
 
@@ -362,6 +363,7 @@ describe("groupNavLinks", () => {
       "alertTemplates",
       "alertLibrary",
       "sloList",
+      "autobotInvestigate",
     ]);
   });
 
@@ -377,6 +379,7 @@ describe("groupNavLinks", () => {
       "alertDestinations",
       "alertTemplates",
       "alertLibrary",
+      "autobotInvestigate",
       "alertCalibration",
     ]);
   });
@@ -839,6 +842,21 @@ describe("groupNavLinks", () => {
 });
 
 describe("ship guards (AC-15, AC-22, D-27)", () => {
+  it("puts the investigate page between SLOs and Incidents under Response, behind the AI license and with no BETA", () => {
+    const children = NAV_GROUPS.find((g) => g.key === "reliability")!.children;
+    const names = children.map((c) => c.name);
+    expect(names.indexOf("autobotInvestigate")).toBe(names.indexOf("sloList") + 1);
+    expect(names.indexOf("incidentList")).toBe(names.indexOf("autobotInvestigate") + 1);
+    const item = children.find((c) => c.name === "autobotInvestigate")!;
+    expect(item).toMatchObject({
+      titleKey: "menu.autobotInvestigate",
+      categoryKey: "menu.response",
+      feature: "ai_assistant",
+    });
+    expect(item.beta).toBeFalsy();
+    expect(item.icon).not.toBe(children.find((c) => c.name === "sloList")!.icon);
+  });
+
   it("keeps the Reliability flyout children exactly: My on-call after Routing, no Policies row (AC-15, D-8, S9)", () => {
     const reliability = NAV_GROUPS.find((g) => g.key === "reliability")!;
     expect(reliability.children.map((c) => c.name)).toEqual([
@@ -848,6 +866,7 @@ describe("ship guards (AC-15, AC-22, D-27)", () => {
       "alertLibrary",
       "alertSources",
       "sloList",
+      "autobotInvestigate",
       "incidentList",
       "downtimes",
       "alertCalibration",

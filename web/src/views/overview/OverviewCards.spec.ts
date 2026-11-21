@@ -33,6 +33,7 @@ import type {
   OverviewSection,
   OverviewStreamsData,
 } from "@/ts/interfaces/overview";
+import en from "@/locales/languages/en-US.json";
 
 const global = { plugins: [i18n, store] };
 const base = { pending: false, failed: false };
@@ -1102,7 +1103,9 @@ describe("Ask AI on the overview cards", () => {
 
     it("names the box in the label and omits the level where it means nothing", async () => {
       const w = mountAlerts();
-      expect(ask(w, "box-critical").attributes("aria-label")).toBe("Ask AI about Critical level");
+      expect(ask(w, "box-critical").attributes("aria-label")).toBe(
+        `${en.brand.askAutobot} about Critical level`,
+      );
       await ask(w, "box-incidents").trigger("click");
       expect(w.emitted("askAi")).toEqual([[{ kind: "count", topic: "incidents", count: 6 }]]);
     });
@@ -1131,7 +1134,7 @@ describe("Ask AI on the overview cards", () => {
       expect(btn.exists()).toBe(true);
       expect(btn.element.closest('[data-test="overview-alerts-firing-high_cpu"]')).toBeNull();
       await btn.trigger("click");
-      expect(btn.attributes("aria-label")).toBe("Ask AI about high_cpu");
+      expect(btn.attributes("aria-label")).toBe(`${en.brand.askAutobot} about high_cpu`);
       expect(w.emitted("askAi")![0][0]).toEqual({
         kind: "alert",
         alert: o.alerts.data!.firing[0],
@@ -1166,7 +1169,7 @@ describe("Ask AI on the overview cards", () => {
       expect(btn.element.closest('[data-test="overview-data-health-row-pipelines"]')).toBeNull();
       await btn.trigger("click");
       expect(w.emitted("askAi")).toEqual([[{ kind: "count", topic: "pipelines", count: 2 }]]);
-      expect(btn.attributes("aria-label")).toContain("Ask AI about ");
+      expect(btn.attributes("aria-label")).toContain(`${en.brand.askAutobot} about `);
       expect(w.emitted("open")).toBeUndefined();
     });
 

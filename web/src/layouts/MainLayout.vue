@@ -66,14 +66,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :selected-org="selectedOrg"
         :user-clicked-org="userClickedOrg"
         :organizations="orgOptions"
-        :is-hovered="isHovered"
-        :get-btn-logo="getBtnLogo"
         @update:selected-org="selectedOrg = $event"
-        @update:is-hovered="isHovered = $event"
         @update-organization="updateOrganization"
         @go-to-home="goToHome"
         @go-to-about="goToAbout"
-        @toggleAIChat="toggleAIChat"
         @open-slack="openSlack"
         @navigateToOpenAPI="navigateToOpenAPI"
         @navigate-to-docs="navigateToDocs"
@@ -141,39 +137,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </ODrawer>
 
       <div class="flex h-full min-h-0 min-w-0 flex-1">
+        <AssistantSkipLink />
         <!-- Main Panel -->
         <main
           data-test="main-content"
+          tabindex="-1"
           class="bg-surface-chrome-deeper flex min-h-0 flex-col"
-          :class="
-            store.state.kioskMode
-              ? ''
-              : focusMode
-                ? 'px-2 pb-2 max-md:px-0'
-                : 'pe-2 pb-2 max-md:pe-0'
-          "
-          :style="{
-            width:
-              focusMode || !store.state.isAiChatEnabled || isChatOverlay || store.state.kioskMode
-                ? '100%'
-                : store.state.isAiChatExpanded
-                  ? '50%'
-                  : '75%',
-          }"
+          :class="mainPanelClasses"
         >
-          <!-- Content card — all pages render inside this. The border stays present in both
-               themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
-          <div
-            class="bg-surface-base flex min-h-0 flex-1 flex-col overflow-hidden"
-            :class="[
-              store.state.kioskMode ? '' : 'rounded-surface border shadow-md',
-              isDark ? 'border-border-default' : 'border-transparent',
-            ]"
-          >
+          <div :class="pageCardClasses(!!store.state.kioskMode, isDark)">
+            <HomeReturnBar v-if="!store.state.kioskMode" />
             <div
               v-if="isLoading && fullConfigSettled && !holdForOnboarding"
               :key="store.state.selectedOrganization?.identifier"
-              class="o2-content-scroll h-full flex-1 overflow-y-auto"
+              :class="['o2-content-scroll h-full flex-1 overflow-y-auto', ASSISTANT_INSET_CLASSES]"
             >
               <FirstDataNotice
                 v-if="
@@ -197,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <component
                         :is="Component"
                         :class="[routeEnterClass(Component), 'h-full']"
-                        @sendToAiChat="sendToAiChat"
+                        @sendToAiChat="relayToChat"
                       />
                     </keep-alive>
                   </OAccessBoundary>
@@ -217,45 +194,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </main>
 
-        <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
-        <aside
-          v-if="!focusMode"
-          v-show="store.state.isAiChatEnabled && isLoading && !store.state.kioskMode"
-          class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper shrink-0 overflow-y-auto"
-          :class="[
-            isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
-            { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
-            // The chat is a floating card in both modes — match the main content
-            // card's right/bottom gap (+ rounded-surface corners) so they read as
-            // the same card. Expanding only widens it; it never overlays the header.
-            'pe-2 pb-2',
-            isChatOverlay
-              ? 'fixed inset-x-0 bottom-0 z-50 ps-2'
-              : 'sticky top-[var(--navbar-height,2.25rem)] self-start',
-          ]"
-          :style="[
-            {
-              height: 'calc(100vh - var(--navbar-height, 2.25rem))',
-              maxWidth: '100%',
-            },
-            isChatOverlay
-              ? { width: '100%', top: 'var(--navbar-height, 2.25rem)' }
-              : // Full-screen just widens the panel (25% → 50%) beside the content —
-                // same top position + height, so the main header stays visible.
-                store.state.isAiChatExpanded
-                ? { width: '50%', minWidth: '18.75rem' }
-                : { width: '25%', minWidth: '4.688rem' },
-          ]"
-        >
-          <O2AIChat
-            :header-height="40"
-            :is-open="store.state.isAiChatEnabled"
-            @close="closeChat"
-            :aiChatInputContext="aiChatInputContext"
-            :appendMode="aiChatAppendMode"
-            :aiChatPayload="aiChatPayload"
-          />
-        </aside>
+        <!-- A focus-mode route (onboarding) has no AI panel, as it has no header AI button. -->
+        <template v-if="!store.state.kioskMode && !focusMode">
+          <AssistantSidebarHost />
+          <AssistantWindowLayer v-if="store.state.printMode !== true" />
+        </template>
       </div>
     </div>
 
@@ -289,7 +232,12 @@ import { useRouteEnterFade } from "@/layouts/useRouteEnterFade";
 import { PAGE_ENTRANCE_KEY } from "@/lib/core/PageLayout/pageEntrance";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { securityNavLinks as buildSecurityNavLinks } from "@/utils/security/nav";
-import { featureState, menuState, streamTypeFeature, type FeatureState } from "@/utils/featureGate";
+import {
+  featureState,
+  menuState,
+  routeLicenseFeature,
+  type FeatureState,
+} from "@/utils/featureGate";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
 import OAccessBoundary from "@/components/access/OAccessBoundary.vue";
@@ -323,6 +271,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
+import { pageCardClasses } from "@/layouts/pageCard";
 import { useRoute, useRouter, RouterView } from "vue-router";
 import { solutionModeForPath } from "@/utils/security/solutionMode";
 import { useSecurityAccess } from "@/composables/security/useSecurityAccess";
@@ -331,6 +280,7 @@ import config from "../aws-exports";
 import { setLanguage } from "../utils/cookies";
 import { getLocale, loadSecurityMessages, securityMessagesRevision } from "../locales";
 
+import { assistantSignOut } from "@/utils/assistant/assistantSignOut";
 import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
@@ -377,7 +327,6 @@ import {
 import { openobserveRum } from "@openobserve/browser-rum";
 import { initBrowserRum } from "@/utils/rum/initBrowserRum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
-import O2AIChat from "@/components/O2AIChat.vue";
 import PaidOverageConsentDialog from "@/components/PaidOverageConsentDialog.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
@@ -392,11 +341,20 @@ import {
   markFullConfigLoaded,
   registerFullConfigLoader,
 } from "@/composables/useFullConfigLoad";
-import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { isAutoObserveEnabled } from "@/components/autoobserve/autoObserveGate";
 
 // Back from a drill-out (Analytics to Session Viewer, Traces to a trace or its logs) must land on the same results without rerunning them.
 const KEPT_ALIVE_VIEWS = ["AppAnalytics", "AppTraces"];
+
+// The assistant's sheet and floating card write their footprint here, so Tab never lands under them (`95` §6).
+const ASSISTANT_INSET_CLASSES = [
+  // eslint-disable-next-line local/no-hardcoded-px -- unit conversion of the unitless inset the sheet writes
+  "max-lg:pb-[calc(var(--o-assistant-inset-bottom,0)*1px)] max-lg:scroll-pb-[calc(var(--o-assistant-inset-bottom,0)*1px)]",
+  // eslint-disable-next-line local/no-hardcoded-px -- unit conversion of the unitless inset the floating card writes
+  "lg:scroll-pe-[calc(var(--o-assistant-inset-end,0)*1px)]",
+];
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -423,7 +381,6 @@ export default defineComponent({
     ManagementIcon,
     ThemeSwitcher,
     PredefinedThemes,
-    O2AIChat,
     PaidOverageConsentDialog,
     ShortcutCheatsheet,
     CommunitySlackInvite,
@@ -444,6 +401,17 @@ export default defineComponent({
     DashboardSaveConflictDialog: defineAsyncComponent(
       () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
     ),
+    // Async, so the layout's chunk does not carry the assistant.
+    AssistantSidebarHost: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantSidebarHost.vue"),
+    ),
+    AssistantWindowLayer: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantWindowLayer.vue"),
+    ),
+    AssistantSkipLink: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantSkipLink.vue"),
+    ),
+    HomeReturnBar: defineAsyncComponent(() => import("@/components/goto/HomeReturnBar.vue")),
   },
   methods: {
     navigateToDocs() {
@@ -466,7 +434,11 @@ export default defineComponent({
       }
       this.performSignout();
     },
-    performSignout() {
+    async performSignout() {
+      const invoker = document.querySelector<HTMLElement>(
+        '[data-test="header-my-account-profile-icon"]',
+      );
+      if ((await assistantSignOut({ invoker })) === "cancel") return;
       void signOutThroughLeaveGuards(this.$router, this.store);
     },
     goToHome() {
@@ -507,8 +479,7 @@ export default defineComponent({
     const miniMode = ref(false);
     const signOutDraftsOpen = ref(false);
     const signOutDraftCount = ref(0);
-    const { isMobile, lgUp } = useBreakpoint();
-    // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
+    const { isMobile } = useBreakpoint();
     // Focus-mode routes (e.g. onboarding) keep the header but drop the side menu, the AI panel and the banners.
     const focusMode = computed(() => router.currentRoute.value.meta?.focusMode === true);
     // A first cloud login may be sent to onboarding: show no page until that is decided, so the
@@ -516,7 +487,6 @@ export default defineComponent({
     const holdForOnboarding = ref(
       config.isCloud === "true" && isFirstLoginOf(store.state.userInfo?.email),
     );
-    const isChatOverlay = computed(() => !lgUp.value);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
 
@@ -534,18 +504,6 @@ export default defineComponent({
     const { prefetchRoute } = useRoutePrefetch();
 
     const isMonacoEditorLoaded = ref(false);
-    const isHovered = ref(false);
-    const aiChatInputContext = ref("");
-    const aiChatAppendMode = ref(true);
-    const aiChatPayload = ref<{
-      text: string;
-      autoSend: boolean;
-      id: number;
-      chipName?: string;
-      newChat?: boolean;
-      context?: Record<string, unknown> | null;
-      prompt?: string;
-    } | null>(null);
     let customOrganization = Object.prototype.hasOwnProperty.call(
       router.currentRoute.value.query,
       "org_identifier",
@@ -566,11 +524,8 @@ export default defineComponent({
     const features = computed(() => store.state.zoConfig?.features);
     // `route.meta` merges every matched record, so a gated parent locks its child pages too.
     const lockedFeature = computed<string | null>(() => {
-      const { meta, query } = router.currentRoute.value;
-      const key = meta?.licenseFeatureFromStreamType
-        ? streamTypeFeature(query.stream_type as string | undefined)
-        : meta?.licenseFeature;
-      return typeof key === "string" && featureState(features.value, key) === "locked" ? key : null;
+      const key = routeLicenseFeature(router.currentRoute.value);
+      return key && featureState(features.value, key) === "locked" ? key : null;
     });
     const isIncidentsEnabled = computed(
       () => isEnterpriseOrCloud && !!store.state.zoConfig.incidents_enabled,
@@ -1124,7 +1079,8 @@ export default defineComponent({
 
     const updateAutoObserveMenu = () => {
       const existingIndex = linksList.value.findIndex((link) => link.name === "autoobserve");
-      if (config.isEnterprise != "true" || !isExperimentalEnabled.value) {
+      const enabled = isAutoObserveEnabled(config.isEnterprise, store.state.zoConfig);
+      if (!enabled) {
         if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
         return;
       }
@@ -1341,6 +1297,11 @@ export default defineComponent({
     }
 
     const updateOrganization = async () => {
+      // The assistant settles running answers first; Cancel keeps the current org.
+      if ((await assistantOrgSwitch()) === "cancel") {
+        selectedOrg.value = store.state.selectedOrganization;
+        return;
+      }
       const targetOrg = { ...selectedOrg.value };
       const keepCurrent = () => {
         const current = store.state.selectedOrganization;
@@ -1394,6 +1355,27 @@ export default defineComponent({
         store.state.organizationData.isDataIngested == false
       ) {
         await verifyStreamExist(targetOrg);
+      }
+    };
+
+    const assistantOrgSwitch = async (): Promise<"proceed" | "cancel"> => {
+      const next = selectedOrg.value?.identifier;
+      const email = store.state.userInfo?.email;
+      if (!next || next === store.state.selectedOrganization?.identifier || !email)
+        return "proceed";
+      // A chunk that fails to load after a deploy must not strand the selector on an org the store never took.
+      try {
+        const [{ assistantLifecycle }, { computeUserOrgKey }] = await Promise.all([
+          import("@/composables/assistant"),
+          import("@/utils/userOrgKey"),
+        ]);
+        const userOrgKey = await computeUserOrgKey(email, next);
+        const invoker = document.querySelector<HTMLElement>(
+          '[data-test="navbar-organizations-select-trigger"]',
+        );
+        return await assistantLifecycle.onOrgSwitch({ org: next, userOrgKey }, { invoker });
+      } catch {
+        return "proceed";
       }
     };
 
@@ -1832,99 +1814,16 @@ export default defineComponent({
       window.open(slackURL, "_blank");
     };
 
-    const toggleAIChat = () => {
-      // ai_enabled arrives with the async /config response, so it can't gate registration.
-      if (!store.state.zoConfig.ai_enabled) return;
-      // On the home page, switch to the AI tab instead of opening the side panel
-      if (router.currentRoute.value.name === "home") {
-        window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
-        return;
-      }
-      if (!store.state.isAiChatEnabled) {
-        // Closed → Open inline sidebar
-        store.dispatch("setIsAiChatEnabled", true);
-        store.dispatch("setIsAiChatExpanded", false);
-      } else if (!store.state.isAiChatExpanded) {
-        // Inline sidebar → Close
-        store.dispatch("setIsAiChatEnabled", false);
-        store.dispatch("setIsAiChatExpanded", false);
-      } else {
-        // Expanded overlay → Back to inline sidebar
-        store.dispatch("setIsAiChatExpanded", false);
-      }
-      window.dispatchEvent(new Event("resize"));
-    };
+    // A page's `sendToAiChat` payload goes through the one door as chips and text.
+    const relayToChat = (value: unknown, _append = true, autoSend = false) =>
+      void import("@/composables/assistant").then((m) =>
+        m.openAssistant(m.legacyRelayArgs(value, autoSend)),
+      );
 
-    const closeChat = () => {
-      store.dispatch("setIsAiChatEnabled", false);
-      store.dispatch("setIsAiChatExpanded", false);
-      window.dispatchEvent(new Event("resize"));
-    };
-
-    const getBtnLogo = computed(() => {
-      if (isDark.value) {
-        return getImageURL("images/common/ai_icon_dark.svg");
-      }
-
-      if (isHovered.value) {
-        return getImageURL("images/common/ai_icon_dark.svg");
-      }
-
-      return getImageURL("images/common/ai_icon_gradient.svg");
-    });
-    /** `value` is a query string or `{ query, autoSend?, chipName?, newChat?, context? }`; a chip never auto-sends. */
-    const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
-      const wasOpen = store.state.isAiChatEnabled;
-      if (!wasOpen) {
-        store.dispatch("setIsAiChatEnabled", true);
-      }
-
-      // Support object payload { query, autoSend } from OverviewTab
-      let text = value;
-      let shouldAutoSend = autoSend;
-      let handoff: {
-        chipName: string;
-        newChat: boolean;
-        context: Record<string, unknown> | null;
-        prompt?: string;
-      } | null = null;
-      if (value && typeof value === "object" && "query" in value) {
-        text = value.query;
-        shouldAutoSend = value.autoSend ?? false;
-        if (typeof value.chipName === "string" && value.chipName) {
-          handoff = {
-            chipName: value.chipName,
-            newChat: !!value.newChat,
-            context: value.context && typeof value.context === "object" ? value.context : null,
-            ...(typeof value.prompt === "string" && value.prompt ? { prompt: value.prompt } : {}),
-          };
-        }
-      }
-
-      aiChatAppendMode.value = append;
-
-      if (handoff) {
-        // Named-chip hand-off: O2AIChat builds the chip itself, so the legacy "Log Entry" channel stays silent.
-        const payload = { text, autoSend: false, id: Date.now(), ...handoff };
-        // A chat opened just now mounts on the next render; deliver after it so its watcher sees the change.
-        if (wasOpen) aiChatPayload.value = payload;
-        else nextTick(() => (aiChatPayload.value = payload));
-        return;
-      }
-
-      // Deliver text + autoSend atomically in a single object so O2AIChat
-      // watcher always sees both values together — no timing race.
-      aiChatPayload.value = { text, autoSend: shouldAutoSend, id: Date.now() };
-
-      // Keep legacy aiChatInputContext in sync for other callers
-      aiChatInputContext.value = "";
-      nextTick(() => {
-        aiChatInputContext.value = text;
-        nextTick(() => {
-          aiChatInputContext.value = "";
-        });
-      });
-    };
+    const mainPanelClasses = computed(() => [
+      "min-w-0 flex-1 outline-none",
+      store.state.kioskMode ? "" : "pe-2 pb-2 max-md:pe-0",
+    ]);
 
     const openPredefinedThemes = () => {
       toggleThemes();
@@ -1950,32 +1849,18 @@ export default defineComponent({
     // Path, not the full route: a query-only change (time range, filters) stays on the same page.
     watch(() => router.currentRoute.value.path, clearLicenseDenials);
 
-    // Home page has its own inline AI tab (see toggleAIChat's home special-case
-    // above), so the sidebar chat panel is redundant there — close it on
-    // arrival so we don't show both the sidebar and the home AI tab at once.
-    watch(
-      () => router.currentRoute.value.name,
-      (routeName) => {
-        if (routeName === "home" && store.state.isAiChatEnabled) {
-          closeChat();
-        }
-      },
-    );
-
     const showShortcuts = ref(false);
     const openShortcutsList = () => {
       showShortcuts.value = true;
     };
 
-    // ── Global shortcuts: AI Chat ─────────────────────────────────────────
-    // O2 AI is enterprise-only: on OSS the Ctrl+B binding must not exist at all.
-    if (config.isEnterprise == "true") {
-      useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
-    }
-
     return {
       signOutDraftsOpen,
       signOutDraftCount,
+      ASSISTANT_INSET_CLASSES,
+      pageCardClasses,
+      relayToChat,
+      mainPanelClasses,
       isDark,
       t,
       raw,
@@ -1999,7 +1884,6 @@ export default defineComponent({
       isMobile,
       focusMode,
       holdForOnboarding,
-      isChatOverlay,
       miniMode,
       mobileNavOpen,
       user,
@@ -2021,14 +1905,6 @@ export default defineComponent({
       openSlack,
       settings: "settings",
       splitterModel,
-      toggleAIChat,
-      closeChat,
-      getBtnLogo,
-      isHovered,
-      sendToAiChat,
-      aiChatInputContext,
-      aiChatAppendMode,
-      aiChatPayload,
       userClickedOrg,
       verifyStreamExist,
       filterMenus,

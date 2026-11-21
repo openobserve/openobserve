@@ -56,7 +56,8 @@ cmd_check() {
 
 cmd_merge() {
     echo "Merging shard reports from .vitest-reports..."
-    npx vitest --merge-reports --coverage --run
+    # Merging every shard's v8 coverage outgrows Node's default ~2GB heap on the CI runner.
+    NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=4096" npx vitest --merge-reports --coverage --run
     check_thresholds
 }
 

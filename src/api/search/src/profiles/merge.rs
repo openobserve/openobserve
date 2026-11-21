@@ -95,7 +95,7 @@ pub(crate) struct StackSet {
         (status = 500, description = "Failure")
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-mcp" = json!({"enabled": true, "readOnlyHint": true})),
         ("x-o2-ratelimit" = json!({"module": "Profiles", "operation": "create"}))
     )
 )]

@@ -88,6 +88,20 @@ describe("Search Service", () => {
       );
     });
 
+    it("encodes the page type, so a value cannot add search parameters", async () => {
+      const params = {
+        org_identifier: "test-org",
+        query: { query: { sql: "SELECT 1" } },
+        page_type: "logs&search_type=dashboards#",
+      };
+      await search.search(params);
+      expect(mockHttp.post).toHaveBeenLastCalledWith(
+        "/api/test-org/_search?type=logs%26search_type%3Ddashboards%23&search_type=ui&use_cache=true",
+        params.query,
+        { transformResponse: [expect.any(Function)] },
+      );
+    });
+
     it("should add dashboard parameters to URL", async () => {
       const params = {
         org_identifier: "test-org",

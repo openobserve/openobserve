@@ -1207,6 +1207,37 @@ describe("OrganizationManagement.vue", () => {
     });
   });
 
+  describe("assistant allowance floor", () => {
+    it("keeps loading until the forced retry after a 409 below_usage resolves", async () => {
+      let finish: (value: unknown) => void = () => {};
+      mockSetQuotaUsageLimit
+        .mockRejectedValueOnce({
+          response: { status: 409, data: { code: "below_usage", used: 900, limit: 500 } },
+        })
+        .mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+      mockConfirmFn.mockResolvedValue(true);
+      wrapper = createWrapper();
+      wrapper.vm.toggleUsageLimitsDialog({
+        name: "Acme",
+        identifier: "acme",
+        credits_used: 100,
+        credits_limit: 5000,
+      });
+      const pending = wrapper.vm.submitAiCredits({ creditsLimit: 500 });
+      await vi.waitFor(() => expect(mockSetQuotaUsageLimit).toHaveBeenCalledTimes(2));
+      expect(mockSetQuotaUsageLimit).toHaveBeenLastCalledWith("default", "ai_credits", {
+        org_id: "acme",
+        limit: 500,
+        force: true,
+      });
+      expect(wrapper.vm.loading).toBe(true);
+      finish({ data: { used: 900, limit: 500 } });
+      await pending;
+      expect(wrapper.vm.loading).toBe(false);
+      expect(wrapper.vm.usageLimitsRow.credits_limit).toBe(500);
+    });
+  });
+
   describe("synthetics step allowance tab", () => {
     it("opens with the selected organization's current step limit", async () => {
       wrapper = createWrapper();

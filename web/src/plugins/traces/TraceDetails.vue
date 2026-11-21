@@ -493,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="explainTrace"
             >
               <template #icon-left>
-                <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+                <AssistantSpark :size="16" />
               </template>
               {{ t("traces.askAi.explainTrace") }}
               <OTooltip side="bottom" :content="t('traces.askAi.explainTraceHint')" />
@@ -784,6 +784,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="trace-details-sidebar"
                   :span="spanMap[effectiveSpanId as string]"
                   :logs-at-us="logsAtUs"
+                  :parent-operation="parentOperationOf(effectiveSpanId)"
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
                   :stream-name="currentTraceStreamName"
@@ -851,6 +852,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <TraceDetailsSidebar
                   data-test="trace-details-dag-sidebar"
                   :span="spanMap[effectiveSpanId as string]"
+                  :parent-operation="parentOperationOf(effectiveSpanId)"
                   :baseTracePosition="baseTracePosition"
                   :search-query="searchQuery"
                   :stream-name="currentTraceStreamName"
@@ -1133,7 +1135,7 @@ import TraceHeader from "./TraceHeader.vue";
 import TraceErrorSpansMenu from "./components/TraceErrorSpansMenu.vue";
 import { errorSpansDeepestFirst } from "./utils/traceErrorSummary";
 import { buildTraceAiPayload, type AiChatHandoff } from "./utils/traceAiPayload";
-import { useAiIcon } from "@/composables/useAiIcon";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
@@ -1454,6 +1456,7 @@ export default defineComponent({
     },
   },
   components: {
+    AssistantSpark,
     ShareButton,
     OPageHeader,
     FeatureLockExempt,
@@ -2359,7 +2362,6 @@ export default defineComponent({
       },
     );
 
-    const { aiIconSrc } = useAiIcon();
     const askAiVisible = computed(
       () => props.showAskAi && config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
     );
@@ -2616,6 +2618,11 @@ export default defineComponent({
 
     const hoveredSpanId = ref("");
     const effectiveSpanId = computed(() => hoveredSpanId.value || selectedSpanId.value);
+    const parentOperationOf = (spanId: string | null | undefined): string | undefined => {
+      const parentId = spanId ? spanMap.value[spanId]?.reference_parent_span_id : undefined;
+      const parent = parentId ? spanMap.value[parentId] : undefined;
+      return parent?.operation_name ? String(parent.operation_name) : undefined;
+    };
 
     /**
      * A sidebar tab requested explicitly by an interaction, as opposed to the
@@ -3739,12 +3746,12 @@ export default defineComponent({
       { active: toRef(props, "shortcutsActive") },
     );
     return {
+      parentOperationOf,
       router,
       t,
       raw,
       showCriticalPath,
       setShowCriticalPath,
-      aiIconSrc,
       askAiVisible,
       relayToAiChat,
       explainTrace,

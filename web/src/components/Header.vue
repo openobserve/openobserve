@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
             <img
               data-test="header-openobserve-logo"
-              class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
+              class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80 max-md:max-w-24"
               :src="
                 getImageURL(
                   isDark
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <img
             data-test="header-openobserve-logo"
-            class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80"
+            class="openobserve-logo block h-8 max-w-37.5 cursor-pointer transition-opacity duration-200 hover:opacity-80 max-md:max-w-24"
             :src="
               getImageURL(
                 isDark
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       v-if="securityAccess.canOpen.value"
-      class="ms-3 flex shrink-0 items-center md:max-xl:min-w-0 md:max-xl:shrink"
+      class="ms-3 flex shrink-0 items-center max-md:ms-1 md:max-xl:min-w-0 md:max-xl:shrink"
     >
       <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
     </div>
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- RIGHT SIDE: Controls -->
     <div
-      class="flex shrink-0 items-center justify-end gap-1 pe-3 md:max-xl:min-w-0 md:max-xl:shrink"
+      class="flex shrink-0 items-center justify-end gap-1 pe-3 max-md:min-w-0 max-md:shrink max-md:pe-1.5 md:max-xl:min-w-0 md:max-xl:shrink"
     >
       <!-- SAMPLE DATA: stays visible while the org holds sample data -->
       <SampleDataHeaderChip class="me-2" />
@@ -182,7 +182,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- HEADER MENU: Contains all header navigation and user controls -->
-      <div class="header-menu flex items-center gap-x-2 md:max-xl:min-w-0">
+      <div
+        class="header-menu flex items-center gap-x-2 max-md:min-w-0 max-md:gap-x-1 md:max-xl:min-w-0"
+      >
         <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
         <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ingestion_quota_used >= 85"
@@ -239,43 +241,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select="handleOrgSelection"
         />
 
-        <div class="header-utility-icons flex items-center gap-x-2 md:max-xl:shrink-0">
-          <!-- AI CHAT TOGGLE: Enterprise/Cloud feature to toggle AI chat panel.
-           Leads the utility-icon cluster, set off by a separator from the
-           org selector so it reads as the primary action in this group.
-           Shown locked (not hidden) in builds that don't unlock it. -->
-          <template v-if="aiButtonVisible || aiLicenseLocked">
-            <OButton
-              variant="ghost"
-              size="icon-toolbar"
-              @click="aiLicenseLocked ? openLockedAiAssistant() : toggleAIChat()"
-              :data-test="aiLicenseLocked ? 'menu-link-ai-locked' : 'menu-link-ai-item'"
-              :aria-label="aiButtonLabel"
-              class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
-              :class="store.state.isAiChatEnabled && !aiLicenseLocked ? 'ai-btn-active' : ''"
-              @mouseenter="handleMouseEnter"
-              @mouseleave="handleMouseLeave"
-            >
-              <img
-                alt=""
-                :src="getBtnLogo"
-                class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
-              />
-              <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" class="-end-2! -top-1!" />
-              <OTooltip
-                side="bottom"
-                align="center"
-                :content="aiButtonLabel"
-                :shortcut-id="aiAccess.allowed && !aiLicenseLocked ? 'aiChatToggle' : undefined"
-              />
-            </OButton>
-          </template>
-          <span
-            v-else-if="aiSlotPending"
-            aria-hidden="true"
-            class="size-[1.875rem] shrink-0"
-            data-test="header-ai-slot-placeholder"
-          />
+        <div
+          class="header-utility-icons flex items-center gap-x-2 max-md:shrink-0 max-md:gap-x-1 md:max-xl:shrink-0"
+        >
+          <!-- AI ASSISTANT: leads the utility-icon cluster; a license that lacks it shows the lock. -->
+          <OButton
+            v-if="aiLicenseLocked"
+            variant="ghost"
+            size="icon-toolbar"
+            @click="openLockedAiAssistant"
+            data-test="menu-link-ai-locked"
+            :aria-label="aiButtonLabel"
+            class="relative"
+          >
+            <AssistantSpark :size="20" />
+            <OLockBadge class="-end-2! -top-1!" />
+            <OTooltip side="bottom" align="center" :content="aiButtonLabel" />
+          </OButton>
+          <AssistantHeaderButton v-else-if="aiAssistantShown" />
 
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
           <ThemeSwitcher class="max-md:hidden"></ThemeSwitcher>
@@ -499,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, computed, nextTick, ref } from "vue";
+import { defineAsyncComponent, defineComponent, PropType, computed, nextTick, ref } from "vue";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
@@ -514,6 +497,7 @@ import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
@@ -532,6 +516,10 @@ import { chartColor } from "@/utils/chartTheme";
 export default defineComponent({
   name: "HeaderComponent",
   components: {
+    // Async, so the header's chunk does not carry the assistant.
+    AssistantHeaderButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantHeaderButton.vue"),
+    ),
     OPageHeaderStatus,
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
@@ -541,6 +529,7 @@ export default defineComponent({
     LinkedAccountsDialog,
     OButton,
     OIcon,
+    AssistantSpark,
     OLockBadge,
     OTooltip,
     ODropdown,
@@ -604,24 +593,12 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       required: true,
     },
-    // AI button hover state
-    isHovered: {
-      type: Boolean,
-      required: true,
-    },
-    // AI button logo based on state
-    getBtnLogo: {
-      type: String,
-      required: true,
-    },
   },
   emits: [
     "update:selectedOrg",
-    "update:isHovered",
     "updateOrganization",
     "goToHome",
     "goToAbout",
-    "toggleAIChat",
     "openSlack",
     "navigateToOpenAPI",
     "navigateToDocs",
@@ -722,11 +699,6 @@ export default defineComponent({
       event.stopPropagation();
     };
 
-    // AI chat toggle — shown locked (not hidden) in builds that don't unlock
-    // it. Same `ai_enabled`-is-an-admin-preference-not-an-upsell-target
-    // reasoning as QueryEditor.vue's floating AI icon: an entitled org that's
-    // turned AI off still never sees the button at all.
-    //
     // NOT `buildFeatureGateContext()` — that reads the `@/aws-exports`
     // singleton directly, but this component takes edition info as its own
     // `config` PROP (so a host can inject it / tests can override it) rather
@@ -748,23 +720,19 @@ export default defineComponent({
         Boolean(props.store.state.zoConfig.ai_enabled),
       ),
     );
-    const aiButtonLabel = computed(() => {
-      if (!aiAccess.value.allowed) {
-        return t("featureLock.availableInEnterprise", { feature: t("menu.aiAssistant") });
-      }
-      if (!aiLicenseLocked.value) return t("menu.aiAssistant");
-      return t("featureLock.headerLocked", {
+    const aiButtonLabel = computed(() =>
+      t("featureLock.headerLocked", {
         feature: featureName("ai_assistant") ?? t("featureLock.thisFeature"),
-      });
-    });
-    const aiButtonVisible = computed(
-      () => !focusMode.value && (!aiAccess.value.allowed || aiAssistantState.value === "enabled"),
-    );
-    const aiSlotPending = computed(
-      () => aiAccess.value.allowed && !props.store.state.zoConfig?.version,
+      }),
     );
     const aiLicenseLocked = computed(
       () => !focusMode.value && aiAccess.value.allowed && aiAssistantState.value === "locked",
+    );
+    // With AI off the assistant's own gate shows admins its setup card, so only a menu hidden while AI is on hides it.
+    const aiAssistantShown = computed(
+      () =>
+        !focusMode.value &&
+        !(aiAssistantState.value === "hidden" && props.store.state.zoConfig?.ai_enabled === true),
     );
 
     // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
@@ -817,14 +785,6 @@ export default defineComponent({
       emit("goToAbout");
     };
 
-    const toggleAIChat = () => {
-      if (!aiAccess.value.allowed) {
-        openEnterpriseDialog();
-        return;
-      }
-      emit("toggleAIChat");
-    };
-
     const openLockedAiAssistant = () => {
       router.push({
         path: featureLockedPath("ai_assistant"),
@@ -860,15 +820,6 @@ export default defineComponent({
       emit("signout");
     };
 
-    // Handle mouse hover events for AI button
-    const handleMouseEnter = () => {
-      emit("update:isHovered", true);
-    };
-
-    const handleMouseLeave = () => {
-      emit("update:isHovered", false);
-    };
-
     // Handle organization selection from the OrganizationSelector menu
     const handleOrgSelection = (org: any) => {
       emit("update:selectedOrg", org);
@@ -883,7 +834,6 @@ export default defineComponent({
       featureName,
       getImageURL,
       enterpriseButtonText,
-      aiSlotPending,
       ingestionQuotaPercentage,
       ingestionQuotaColor,
       showEnterpriseDialog,
@@ -896,14 +846,11 @@ export default defineComponent({
       goToHome,
       homeUrl,
       goToAbout,
-      toggleAIChat,
-      aiAssistantState,
       openLockedAiAssistant,
-      aiAccess,
       aiButtonLabel,
-      aiButtonVisible,
       focusMode,
       aiLicenseLocked,
+      aiAssistantShown,
       linkedAccountsVisible,
       showLinkedAccounts,
       openSlack,
@@ -913,8 +860,6 @@ export default defineComponent({
       openPredefinedThemes,
       openShortcuts,
       signout,
-      handleMouseEnter,
-      handleMouseLeave,
       handleOrgSelection,
       openEnterpriseDialog,
     };

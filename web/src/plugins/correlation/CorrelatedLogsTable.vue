@@ -228,22 +228,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-hover-actions="{ row, column, active }">
-              <O2AIContextAddBtn
-                v-if="active && column.id === correlatedTimestampCol"
-                class="size-6!"
-                :imageHeight="'14'"
-                :imageWidth="'14'"
-                @send-to-ai-chat="handleSendToAiChat(JSON.stringify(row))"
-              />
+              <template v-if="active && column.id === correlatedTimestampCol">
+                <O2AIContextAddBtn
+                  v-if="assistantDoorsShown"
+                  class="size-6!"
+                  :imageHeight="'14'"
+                  :imageWidth="'14'"
+                  @send-to-ai-chat="addDoorToChat(correlatedRowDoor(row), userOrgKey)"
+                />
+              </template>
               <CellActions
                 v-else-if="active && column.meta?.closable && row[column.id] != null"
                 :column="column"
                 :row="row"
                 :selected-stream-fields="selectedFields"
                 :hide-search-term-actions="hideSearchTermActions"
+                :door-context="() => correlatedDoorBase(row)"
                 @copy="handleCopy"
                 @add-search-term="handleAddSearchTerm"
-                @send-to-ai-chat="handleSendToAiChat"
               />
             </template>
 
@@ -260,7 +262,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @add-search-term="handleAddSearchTerm"
                 @view-trace="handleViewTrace(row)"
                 @show-correlation="handleNestedCorrelation"
-                @send-to-ai-chat="handleSendToAiChat"
               />
             </template>
           </OTable>
@@ -359,7 +360,15 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import OTable from "@/lib/core/Table/OTable.vue";
 import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import {
+  addDoorToChat,
+  currentUserOrgKey,
+  logRowBuild,
+  useAssistantDoorShown,
+  type LogsDoorBase,
+} from "@/plugins/logs/logsDoors";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { resolveLogSeverity, severityIndicatorColor } from "@/utils/logs/statusParser";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
@@ -383,7 +392,6 @@ const props = defineProps<CorrelatedLogsProps>();
 
 // Emits
 const emit = defineEmits<{
-  sendToAiChat: [value: any];
   addSearchTerm: [field: string | number, fieldValue: string | number | boolean, action: string];
 }>();
 
@@ -1015,9 +1023,34 @@ const handleCopy = (log: any, copyAsJson: boolean = true) => {
   });
 };
 
-const handleSendToAiChat = (value: any) => {
-  emit("sendToAiChat", value);
-};
+const loadedOrg = useLoadedOrg(
+  () => pagedResults.value,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
+const assistantDoorsShown = useAssistantDoorShown();
+const userOrgKey = currentUserOrgKey();
+
+// Correlated rows come from the incident's streams and window, not the Logs search.
+const correlatedDoorBase = (row: Record<string, unknown>): LogsDoorBase => ({
+  org: store.state.selectedOrganization?.identifier ?? "",
+  stream: String(row._stream_name ?? jsonPreviewStreamName.value ?? ""),
+  streamType: "logs",
+  range: {
+    from: Math.round(props.timeRange.startTime / 1000),
+    to: Math.round(props.timeRange.endTime / 1000),
+  },
+  timeZone: store.state.timezone || "UTC",
+  query: "",
+  mode: "filter",
+  timestampField: correlatedTimestampCol.value,
+});
+
+const correlatedRowDoor = (row: Record<string, unknown>) => ({
+  entryKind: "object_verb" as const,
+  boundOrg: loadedOrg.value,
+  objectKind: "log_row" as const,
+  build: logRowBuild(() => correlatedDoorBase(row), row),
+});
 
 const handleAddSearchTerm = (
   field: string | number,

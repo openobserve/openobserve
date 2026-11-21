@@ -191,6 +191,7 @@
      }
     ],
     "error": null,
+    "error_code": null,
     "first_seq": 0,
     "last_seq": 3
    },
@@ -217,6 +218,7 @@
      }
     ],
     "error": null,
+    "error_code": null,
     "first_seq": 4,
     "last_seq": 9
    }

@@ -34,7 +34,6 @@ const mountState = (relativeTimePeriod: string) =>
       query: "",
       relativeTimePeriod,
       dateType: "relative",
-      aiEnabled: false,
     },
     global: { plugins: [i18n, store], stubs: { OEmptyState: OEmptyStateStub } },
   });

@@ -384,6 +384,16 @@ describe("Dashboards Service", () => {
     });
   });
 
+  describe("listAcrossFolders", () => {
+    it("sends an empty title and no folder, which the API answers with every folder (M1-R)", async () => {
+      await dashboards.listAcrossFolders("test-org");
+
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/test-org/dashboards", {
+        params: { title: "" },
+      });
+    });
+  });
+
   describe("list_Folders", () => {
     it("should list folders for organization", async () => {
       await dashboards.list_Folders("test-org");

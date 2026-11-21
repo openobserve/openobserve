@@ -220,7 +220,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-by="searchObj.meta.resultGrid.sortBy"
           :sort-order="searchObj.meta.resultGrid.sortOrder"
           :search-mode="searchObj.meta.searchMode"
-          :ai-enabled="aiEnabled"
           :stream-doc-time-range="streamDocTimeRange"
           :query-window-us="queryWindowUs"
           :row-href="traceDetailsHref"
@@ -232,8 +231,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @sort-change="changeSortBy"
           @remove-filter="$emit('remove-filter')"
           @jump-to-stream-data="(from, to) => $emit('jump-to-stream-data', from, to)"
-          @ask-ai="$emit('ask-ai')"
-          @send-to-ai-chat="(v) => $emit('send-to-ai-chat', v)"
         />
       </div>
     </div>
@@ -340,7 +337,6 @@ export default defineComponent({
     "remove-filter",
     "jump-to-stream-data",
     "error-only-toggled",
-    "ask-ai",
     "send-to-ai-chat",
     "open-mobile-fields",
   ],

@@ -27,6 +27,10 @@ import AddUser from "@/components/iam/users/AddUser.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
+// No answer is running, so the assistant lets the sign-out through without building its runtime.
+vi.mock("@/composables/assistant", () => ({
+  assistantLifecycle: { onSignOut: async () => "proceed" },
+}));
 vi.mock("@/aws-exports", () => ({
   default: {
     isCloud: "false",

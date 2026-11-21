@@ -352,6 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Cell explorer drawer -->
     <ODrawer
       v-model:open="cellDrawer.open"
+      inset-beside
       side="right"
       :width="85"
       bleed
@@ -368,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :start-time="cellDrawer.startTime"
         :end-time="cellDrawer.endTime"
         :base-where="cellDrawer.baseWhere"
-        @send-to-ai-chat="onCellSendToAiChat"
+        :panel-title="panelSchema?.title"
       />
     </ODrawer>
   </div>
@@ -726,7 +727,6 @@ export default defineComponent({
     "contextmenu",
     "show-legends",
     "format-column",
-    "sendToAiChat",
     "painted",
     "chart-click",
   ],
@@ -2584,6 +2584,7 @@ export default defineComponent({
       return { options: { backgroundColor: "transparent" } };
     });
 
+    // Only the assistant's doors need the panel usable beside this drawer; without them it stays the base modal.
     const cellDrawer = ref<{
       open: boolean;
       field: string;
@@ -2730,12 +2731,6 @@ export default defineComponent({
       }
     }
 
-    // Opening the AI chat: close the cell explorer so the two panels don't overlap.
-    function onCellSendToAiChat(value: unknown, append?: boolean) {
-      onCellDrawerOpenChange(false);
-      emit("sendToAiChat", value, append);
-    }
-
     // Called directly by the search icon so it works even with a panel drilldown config.
     // Off with drilldowns, so the anonymous public page never opens the logs drawer.
     async function exploreCellInLogs(alias: string, value: unknown, row: any) {
@@ -2870,7 +2865,6 @@ export default defineComponent({
       hideContextMenu,
       handleCreateAlert,
       cellDrawer,
-      onCellSendToAiChat,
       exploreCellInLogs,
       ensureDrilldownSchema,
       panelBaseWhere,

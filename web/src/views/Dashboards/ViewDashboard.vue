@@ -622,7 +622,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @searchRequestTraceIds="searchRequestTraceIds"
           :runId="runId"
           @update:runId="updateRunId"
-          @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
         />
         <DashboardSettings
           v-model:open="showDashboardSettingsDialog"
@@ -801,6 +800,7 @@ import {
 } from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
+import { useAssistantDashboardWrites } from "./assistantDashboardWrites";
 import {
   getManager,
   getShortcutDef,
@@ -862,7 +862,7 @@ const DeployMarkersUnavailable = defineAsyncComponent(
 
 export default defineComponent({
   name: "ViewDashboard",
-  emits: ["onDeletePanel", "sendToAiChat"],
+  emits: ["onDeletePanel"],
   components: {
     OBanner,
     OPageLayout,
@@ -1245,6 +1245,7 @@ export default defineComponent({
         undefined,
         false,
         currentDashboardData,
+        getAppliedGlobalTime,
       );
       contextRegistry.register("dashboards", dashboardProvider);
       contextRegistry.setActive("dashboards");
@@ -2771,6 +2772,14 @@ export default defineComponent({
     onMounted(() => {
       onDashboardEvent(handleAiDashboardEvent);
     });
+    useAssistantDashboardWrites(
+      () => String(route.query.dashboard ?? ""),
+      () =>
+        handleAiDashboardEvent({
+          type: "dashboard_updated",
+          dashboardId: String(route.query.dashboard ?? ""),
+        }),
+    );
 
     onUnmounted(() => {
       document.removeEventListener("fullscreenchange", onFullscreenChange);

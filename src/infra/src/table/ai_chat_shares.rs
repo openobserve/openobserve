@@ -46,6 +46,7 @@ pub struct NewShare<'a> {
     pub visibility: &'a str,
     pub expires_at: Option<i64>,
     pub redact_tools: bool,
+    pub hide_attachments: bool,
 }
 
 /// The settings an owner may change on a share; all are written as given.
@@ -55,6 +56,7 @@ pub struct ShareSettings {
     pub snapshot_seq: Option<i64>,
     pub expires_at: Option<i64>,
     pub redact_tools: bool,
+    pub hide_attachments: bool,
 }
 
 fn db_err(e: impl ToString) -> errors::Error {
@@ -122,6 +124,7 @@ pub async fn insert_with<C: ConnectionTrait>(
         created_at: Set(now),
         updated_at: Set(now),
         redact_tools: Set(share.redact_tools),
+        hide_attachments: Set(share.hide_attachments),
     };
     Entity::insert(record).exec(conn).await.map_err(db_err)?;
     get_with(conn, share.org_id, &id)
@@ -253,6 +256,10 @@ pub async fn update_with<C: ConnectionTrait>(
         .col_expr(Column::SnapshotSeq, Expr::value(settings.snapshot_seq))
         .col_expr(Column::ExpiresAt, Expr::value(settings.expires_at))
         .col_expr(Column::RedactTools, Expr::value(settings.redact_tools))
+        .col_expr(
+            Column::HideAttachments,
+            Expr::value(settings.hide_attachments),
+        )
         .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.eq(id))
@@ -475,6 +482,7 @@ mod tests {
             visibility: VISIBILITY_ORG,
             expires_at,
             redact_tools: false,
+            hide_attachments: false,
         }
     }
 
@@ -507,6 +515,7 @@ mod tests {
             created_at: 1,
             updated_at: 1,
             redact_tools: false,
+            hide_attachments: false,
         }
     }
 
@@ -578,6 +587,7 @@ mod tests {
             snapshot_seq: Some(7),
             expires_at: None,
             redact_tools: true,
+            hide_attachments: true,
         };
         assert!(
             update_with(&db, ORG, &live.id, &settings, 20)
@@ -586,8 +596,13 @@ mod tests {
         );
         let row = get_with(&db, ORG, &live.id).await.unwrap().unwrap();
         assert_eq!(
-            (row.mode.as_str(), row.snapshot_seq, row.redact_tools),
-            (MODE_SNAPSHOT, Some(7), true)
+            (
+                row.mode.as_str(),
+                row.snapshot_seq,
+                row.redact_tools,
+                row.hide_attachments
+            ),
+            (MODE_SNAPSHOT, Some(7), true, true)
         );
 
         assert!(revoke_with(&db, ORG, &live.id, 30).await.unwrap());

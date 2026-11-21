@@ -32,6 +32,10 @@ import {
 } from "@/utils/drafts/editorDraftStore";
 import { stopSessionServices } from "@/utils/sessionServices";
 
+// No answer is running, so the assistant lets the sign-out through at once.
+vi.mock("@/composables/assistant", () => ({
+  assistantLifecycle: { onSignOut: async () => "proceed" },
+}));
 vi.mock("@/services/config", () => ({
   default: { get_config_full: vi.fn(() => new Promise(() => {})) },
 }));
@@ -108,7 +112,10 @@ const mountLayoutWithEditor = async () => {
         stubs: {
           AppHeader: AppHeaderStub,
           ONavbar: StubDiv,
-          O2AIChat: StubDiv,
+          AssistantSidebarHost: StubDiv,
+          AssistantWindowLayer: StubDiv,
+          AssistantSkipLink: StubDiv,
+          HomeReturnBar: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,
           ShortcutCheatsheet: StubDiv,

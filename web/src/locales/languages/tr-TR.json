@@ -808,7 +808,6 @@
     "view": "Görüntüle",
     "compare": "Karşılaştır",
     "openInNewTab": "Yeni sekmede aç",
-    "send": "Gönder",
     "copiedToClipboard": "Panoya kopyalandı",
     "customLogoAlt": "Kuruluş logosu",
     "dragToReorder": "Sıralamak için sürükleyin",
@@ -827,7 +826,6 @@
     "copyToClipboardSuccess": "Panoya kopyala - Başarılı",
     "valueCopiedToClipboard": "Değer panoya kopyalandı",
     "replace": "Değiştir",
-    "and": "ve",
     "versionAbbreviation": "V",
     "overview": "Genel Bakış",
     "network": "Ağ",
@@ -1012,7 +1010,6 @@
     "typeAndPressEnterOrComma": "Yazın ve Enter veya virgüle basın",
     "confirmAction": "Eylemi Onayla",
     "crossLinks": "Çapraz Bağlantılar",
-    "writeYourPrompt": "İsteminizi yazın",
     "expand": "Genişletin",
     "collapse": "Daralt",
     "description": "Açıklama",
@@ -1120,8 +1117,6 @@
     "clockNumberMinute": "{number} dakika",
     "clockNumberSecond": "{number} saniye",
     "newChat": "Yeni Sohbet",
-    "collapseExpandShortcut": "{action} ({shortcut}B)",
-    "fileWithSize": "{name} ({size}KB)",
     "manageColumns": "Sütunları yönet",
     "manageColumnsHidden": "Sütunları yönet, {count} gizli",
     "columnsHidden": "Sütunlar ({count} gizli)",
@@ -1217,8 +1212,6 @@
       "reenterField": "Re-enter this value: your change was not kept in the draft.",
       "reenterBeforeSave": "Re-enter the changes that were not kept in the draft before saving.",
       "headerField": "{name} header",
-      "envVarField": "environment variable {name}",
-      "credentialFileField": "credential file {name}",
       "stay": "Stay",
       "discard": "Discard",
       "leaveMessageForced": "Parolanız değişti, bu nedenle oturumunuz kapatılıyor ve bu {entity} kaydedilemeyecek. Üzerinde yaptığınız değişiklikler atılacak.",
@@ -1287,100 +1280,6 @@
       "leaveMessageInBrowser": "{entity} kaydedin, değişikliklerinizi bu tarayıcıda tutun veya atın.",
       "retentionInBrowser": "Değişiklikler bu tarayıcıda {days} gün boyunca veya oturumu kapatana kadar saklanır. Her türden yalnızca en yeni {max} tanesi saklanır.",
       "dotUndated": "Unsaved draft"
-    }
-  },
-  "filterBar": {
-    "ariaLabel": "Alana göre filtrele",
-    "placeholder": "Alana göre filtreleyin veya alan=değer yazın. Çalıştırmak için Enter'a basın",
-    "addFilter": "Filtre ekle",
-    "searchFields": "Alan ara",
-    "searchLabels": "Etiket ara",
-    "searchOperators": "Koşul ara",
-    "searchValue": "Bir değer arayın veya yazın",
-    "searchValues": "Değer ara",
-    "textField": "Metin",
-    "useValue": "\"{value}\" kullan",
-    "useField": "\"{field}\" alanını kullan",
-    "useLabel": "\"{field}\" etiketini kullan",
-    "searchText": "Tüm metinde \"{text}\" ara",
-    "emptyValue": "(boş)",
-    "loadingFields": "Alanlar yükleniyor…",
-    "noFields": "Eşleşen alan yok",
-    "noValues": "Öneri yok. Bir değer yazın ve Enter'a basın",
-    "noOperators": "Eşleşen koşul yok",
-    "removeFilter": "Filtreyi kaldır",
-    "clearAll": "Tüm filtreleri temizle",
-    "toggleConnector": "AND ve OR arasında geçiş yap",
-    "selectedCount": "Değer seçilmedi | {count} değer seçildi | {count} değer seçildi",
-    "query": "Sorgu",
-    "builderTooltip": "Alanları, koşulları ve değerleri seçerek filtreler oluşturun",
-    "queryTooltip": "Sorguyu kendiniz yazın",
-    "queryNotParsableShort": "Oluşturucu bu sorguyu gösteremiyor:",
-    "clearAndBuild": "Temizle ve oluştur",
-    "clearQueryTitle": "Sorgu temizlensin mi?",
-    "clearQueryMessage": "Sorgu kaldırılır ve oluşturucu boş başlar.",
-    "where": "Koşul",
-    "addCondition": "Koşul ekle",
-    "addGroup": "Grup ekle",
-    "startGroup": "Grup başlat",
-    "addBelow": "Aşağıya koşul ekle",
-    "ungroup": "Grubu çöz",
-    "collapseGroup": "Grubu daralt",
-    "expandGroup": "Grubu genişlet",
-    "moreInGroup": "{count} tane daha",
-    "groupHasIssues": "Bu gruptaki bir şeyin düzeltilmesi gerekiyor",
-    "chooseField": "Bir alan seçin",
-    "chooseValue": "Bir değer seçin",
-    "lockedFilter": "Bu filtre burada düzenlenemez. Kaydedildiği gibi tutulur; kaldırmak için silin",
-    "limits": {
-      "conditions": "En fazla {count} filtre | En fazla {count} filtre",
-      "values": "En fazla {count} değer | En fazla {count} değer"
-    },
-    "validation": {
-      "incomplete": "Bu filtreyi tamamlayın veya kaldırın",
-      "required": "En az bir filtre ekleyin",
-      "uniqueField": "{field} için zaten bir filtre var; onu düzenleyin veya bunu kaldırın",
-      "oneUsageCondition": "Bir kademe bir kullanım koşulu alır; bunu bir kurala dönüştürün veya kaldırın",
-      "rumField": "Yerleşik bir alan veya küçük harfler, rakamlar ve alt çizgilerden oluşan en fazla 128 karakterlik bir sütun kullanın",
-      "valueLength": "Her değer 1 ile {max} karakter arasında olmalıdır",
-      "regexLength": "Deseni en fazla {max} karakterle sınırlayın.",
-      "regexInvalid": "Bu desen geçersiz veya desteklenmiyor. İleriye bakma, geriye bakma ve geri başvurular kullanılamaz."
-    },
-    "operatorNames": {
-      "containsIgnoreCase": "İçerir (büyük/küçük harf yok sayılır)",
-      "notStartsWith": "İle başlamaz",
-      "notEndsWith": "İle bitmez",
-      "isEmpty": "Boş",
-      "isNotEmpty": "Boş değil"
-    },
-    "types": {
-      "string": "Metin",
-      "number": "Sayı",
-      "boolean": "Boole"
-    },
-    "operators": {
-      "eq": "eşittir",
-      "neq": "eşit değildir",
-      "gt": "büyüktür",
-      "gte": "büyük veya eşittir",
-      "lt": "küçüktür",
-      "lte": "küçük veya eşit",
-      "contains": "içerir",
-      "containsIgnoreCase": "içerir, büyük/küçük harf farkı gözetmeden",
-      "notContains": "içermez",
-      "startsWith": "ile başlar",
-      "notStartsWith": "ile başlamaz",
-      "endsWith": "ile biter",
-      "notEndsWith": "ile bitmez",
-      "in": "şunlardan biri",
-      "notIn": "şunlardan hiçbiri",
-      "regex": "regex ile eşleşir",
-      "notRegex": "regex ile eşleşmez",
-      "isNull": "değeri yok",
-      "isNotNull": "değeri var",
-      "isEmpty": "boş veya değeri yok",
-      "isNotEmpty": "boş olmayan bir değeri var",
-      "matchAll": "metinle eşleşir"
     }
   },
   "flow": {
@@ -1606,8 +1505,8 @@
     "userDefinedSchemaLabel": "Kullanıcı Tanımlı Şema",
     "allFieldsLabel": "Tüm Alanlar",
     "nlQueryGenerationFailed": "Sorgu oluşturulamadı. Lütfen tekrar deneyin.",
-    "askAIPlaceholder": "Yapay zekadan sorgunuzla ilgili yardım isteyin...",
-    "askAIFunctionPlaceholder": "Yapay zekadan fonksiyonunuza yardım etmesini isteyin...",
+    "askAIPlaceholder": "@:{'brand.askAutobot'}: sorgunuzla ilgili yardım alın...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: fonksiyonunuzla ilgili yardım alın...",
     "askAIPlaceholderRotation": {
       "one": "Bana son saatteki hataları göster...",
       "two": "5 saniyeden fazla süren yavaş sorguları bulun...",
@@ -2084,7 +1983,7 @@
     "serviceGraph": "Hizmet Grafiği",
     "services": "Hizmet Kataloğu",
     "aiObservability": "Yapay Zeka",
-    "aiAssistant": "Yapay Zeka Asistanı",
+    "aiAssistant": "@:{'brand.askAutobot'}",
     "signOut": "Oturumu Kapat",
     "ingestion": "Veri kaynakları",
     "metrics": "Metrikler",
@@ -3449,7 +3348,6 @@
         "inThisView": "Bu görünümde",
         "pagesFunnelNote": "Gizli bir sayfayı adlandıran bir huni adımı yine de eşleşir.",
         "fieldMissing": "bu akışta olmayan alan",
-        "fieldMissingOn": "{field}: bu akışta olmayan alan",
         "field": "Alan",
         "match": "Eşleşme",
         "values": "Değerler",
@@ -3501,7 +3399,8 @@
         "edit": "Düzenle",
         "identityRowForm": "Bu kartta, kimlik kuralları ilk tanımlanan olaydan itibaren geçerlidir.",
         "newUsersOnly": "Yalnızca yeni kullanıcılar",
-        "newUsersSessionsTip": "Yalnızca yeni kullanıcılar, Kullanıcılar modunda çalışır"
+        "newUsersSessionsTip": "Yalnızca yeni kullanıcılar, Kullanıcılar modunda çalışır",
+        "fieldMissingOn": "{field}: bu akışta olmayan alan"
       },
       "appFilters": {
         "hiddenLabel": "Uygulama filtreleri tarafından gizlendi:",
@@ -4135,7 +4034,7 @@
           "note": "Otomatik SRE işlemleri ve içgörüleri"
         },
         "ai_assistant": {
-          "name": "Yapay Zeka Asistanı",
+          "name": "@:{'brand.autobot'}",
           "note": "Akıllı sorgu ve analiz yardımı"
         },
         "anomaly_detection": {
@@ -4472,7 +4371,6 @@
     "mcpServerLabel": "MCP Sunucusu",
     "mcpServerDesc": "AI istemcilerini {product} üzerinden bağlayın",
     "mcpServerHeader": "MCP Sunucusu",
-    "mcpServerHeaderSubtitle": "Claude, Cursor, VS Code ve diğer AI istemcilerini bu kuruluşa bağlayın.",
     "invitationsDesc": "Bekleyen ve gönderilen üye davetleri",
     "groupsDesc": "Rol atamak için kullanıcıları gruplandırın",
     "rolesDesc": "İzinleri ve erişim ilkelerini tanımlayın",
@@ -6546,7 +6444,7 @@
     "vrlfunction": "VRL Fonksiyonu",
     "jsFunctionHint": "Günlük alanlarına erişmek ve değiştirmek için `row` nesnesini kullanın. Örnek: Row.new_field = Row.existing_field + 'processed';",
     "vrlFunctionHint": "Geçerli olayı temsil etmek için `.` tuşunu kullanın. Örnek: .new_field = .existing_field + 'işlenmiş'",
-    "askAIFunctionPlaceholder": "Yapay zekadan fonksiyonunuza yardım etmesini isteyin...",
+    "askAIFunctionPlaceholder": "@:{'brand.askAutobot'}: fonksiyonunuzla ilgili yardım alın...",
     "enterFunctionPrompt": "Fonksiyon oluşturmak için bir istem girin",
     "associatedFunctionHeader": "İlişkili Fonksiyonlar",
     "enrichmentTables": "Zenginleştirme Tabloları",
@@ -6662,7 +6560,7 @@
       "rbac": "Ekibiniz için ince ayarlı izinlere sahip özel roller oluşturun.",
       "logPatterns": "Satır satır okumak yerine yinelenen günlük desenlerini otomatik olarak tespit edin.",
       "correlation": "Bir günlük satırından doğrudan ilgili metriklerine ve izlerine atlayın.",
-      "aiAssistant": "Yapay zekadan sorgu yazmasını ve verilerinizi sade bir dille açıklamasını isteyin.",
+      "aiAssistant": "@:{'brand.askAutobot'}: sorgu yazdırın ve verilerinizi sade bir dille açıklatın.",
       "alertInsights": "Bir uyarının ne sıklıkla tetiklendiğini görün ve ilişkili uyarıları bir bakışta tespit edin.",
       "anomalyDetection": "Sıra dışı metrik davranışını, bir eşik uyarısı tetiklemeden önce otomatik olarak yakalayın.",
       "agentGraph": "Yapay zeka ajanlarınızın ve araçlarınızın birbirini nasıl çağırdığını grafik olarak görselleştirilmiş halde görün.",
@@ -6794,7 +6692,6 @@
       "endpointLabel": "Uç nokta",
       "installCheck": "{source} üzerinde kurulumun tamamlandığını kontrol edin.",
       "stillStuck": "Hâlâ takıldınız mı?",
-      "askAi": "Yapay Zeka'ya Sor",
       "guideDocs": "{guide} dokümanları",
       "setupDocs": "Kurulum dokümanları",
       "askAiPrompt": "OpenObserve'da {guide} kuruyorum ve henüz hiçbir veri ulaşmadı. İlk olay kontrolü şunu söylüyor: {details} Org kimliği: {org}. Uç nokta: {endpoint}. Bundan sonra neyi kontrol etmeliyim?",
@@ -7131,7 +7028,6 @@
       },
       "installOneClick": "{client} öğesine ekle",
       "skillsLabel": "{brand} becerisini ekleyin (isteğe bağlı)",
-      "skillsHint": "Yapay zeka asistanınıza {brand} içinde nasıl sorgulama yapacağını, uyarı oluşturacağını ve gösterge panoları kuracağını öğretir; böylece MCP araçlarından daha fazla yararlanır. Projenizde çalıştırın; makinenizde bulduğu her yapay zeka aracına bunları yükler.",
       "skillsRepo": "{host} üzerindeki becerileri görüntüleyin"
     },
     "manageTokensBtnLabel": "Token'ları Yönet",
@@ -10530,11 +10426,9 @@
     "pipelineTitle": "İşlem hatları",
     "alertTitle": "Uyarılar",
     "dashboardTitle": "Gösterge panoları",
-    "tabAiAssistant": "O2 AI Asistanı",
     "tabOverview": "Genel Bakış",
     "tabUsage": "Kullanımı",
     "removeHomeDashboard": "Ana sayfa gösterge panosunu kaldır",
-    "subtitle": "Bir bakışta gözlemlenebilirlik çalışma alanınız",
     "resources": "Kaynaklar",
     "explore": "Keşfet"
   },
@@ -10548,9 +10442,9 @@
     "recentEvents": "Son olaylar",
     "investigate": "Araştırın→",
     "askAi": {
-      "label": "Yapay Zeka'ya Sor",
-      "hint": "Yapay Zeka'ya bunu sor",
-      "labelFor": "Yapay Zeka'ya {item} hakkında sor",
+      "label": "@:{'brand.askAutobot'}",
+      "hint": "@:{'brand.askAutobot'}: bunu sor",
+      "labelFor": "@:{'brand.askAutobot'}: {item} hakkında sor",
       "chip": {
         "firing": "Tetiklenmiş uyarılar",
         "failing": "Başarısız kurallar",
@@ -10718,34 +10612,7 @@
       "heading": "Seçilen zaman aralığında"
     }
   },
-  "chatHistory": {
-    "title": "Sohbetler",
-    "newChat": "Yeni sohbet",
-    "search": "Ara",
-    "noMatches": "Eşleşme yok",
-    "noHistory": "Sohbet geçmişi yok",
-    "delete": "Sil",
-    "clearAll": "Tümünü temizle",
-    "clearAllTitle": "Tüm sohbetleri temizle",
-    "clearAllMessage": "Bu, tüm sohbet geçmişini kalıcı olarak silecektir. Bu işlem geri alınamaz.",
-    "yesterday": "Dün",
-    "clearSearch": "Aramayı temizle"
-  },
   "aiChatShare": {
-    "share": "Paylaş",
-    "dialogTitle": "Sohbeti paylaş",
-    "toolDataWarning": "Paylaşılan sohbetler bu konuşmadaki tüm araç girdilerini ve çıktılarını içerir. Bağlantıyı açabilen herkes bunları okuyabilir.",
-    "mode": "Mod",
-    "modeSnapshot": "Anlık görüntü",
-    "modeLive": "Canlı",
-    "modeSnapshotHelp": "En son tamamlanan mesajda sabitlenir. Daha sonra yenileyebilirsiniz.",
-    "modeLiveHelp": "Her zaman en son tamamlanan mesajları gösterir.",
-    "visibility": "Kimler görüntüleyebilir",
-    "visibilityOrg": "Kuruluş",
-    "visibilityPublic": "Herkese açık bağlantı",
-    "visibilityOrgHelp": "Paylaşılan sohbetlere erişimi olan bu kuruluşun oturum açmış üyeleri.",
-    "visibilityPublicHelp": "Bağlantıya sahip herkes, oturum açması gerekmez.",
-    "expiry": "Bitiş",
     "expiryNever": "Asla",
     "expiryHour": "1 saat içinde",
     "expiryDay": "1 gün içinde",
@@ -10753,15 +10620,6 @@
     "expiryMonth": "30 gün içinde",
     "expiryQuarter": "90 gün içinde",
     "expiryYear": "1 yıl içinde",
-    "createLink": "Bağlantı oluştur",
-    "newLink": "Yeni bağlantı",
-    "copyLink": "Bağlantıyı kopyala",
-    "existingShares": "Etkin bağlantılar",
-    "noShares": "Bu sohbetin etkin bağlantısı yok.",
-    "refreshSnapshot": "Anlık görüntüyü yenile",
-    "switchToLive": "Canlıya geç",
-    "switchToSnapshot": "Anlık görüntüye geç",
-    "revoke": "İptal et",
     "linkCreated": "Bağlantı oluşturuldu",
     "revoked": "Bağlantı iptal edildi",
     "snapshotRefreshed": "Anlık görüntü güncellendi",
@@ -10769,133 +10627,32 @@
     "createFailed": "Bağlantı oluşturulamadı",
     "updateFailed": "Bağlantı güncellenemedi",
     "revokeFailed": "Bağlantı iptal edilemedi",
-    "loadFailed": "Bağlantılar yüklenemedi",
-    "expiresAt": "Bitiş: {time}",
-    "neverExpires": "Asla sona ermez",
-    "views": "{count} görüntüleme | {count} görüntüleme",
-    "sharedByMe": "Benim paylaştıklarım",
-    "sharedByMeEmpty": "Hiçbir sohbet paylaşmadınız.",
-    "sharedBy": "{name} tarafından paylaşıldı",
-    "sharedOn": "Paylaşılma: {time}",
     "notFoundTitle": "Bu paylaşılan sohbet kullanılamıyor",
     "notFoundDescription": "Bağlantı hatalı, iptal edilmiş veya süresi dolmuş olabilir ya da sohbet silinmiş olabilir.",
     "loadErrorTitle": "Paylaşılan sohbet yüklenemedi",
     "unavailableTitle": "Bu paylaşılan sohbet geçici olarak kullanılamıyor",
     "unavailableDescription": "Geçmişi şu anda yüklenemedi. Birazdan tekrar deneyin.",
-    "historyUnavailableWarning": "Bu sohbetin geçmişi şu anda yüklenemiyor, dolayısıyla bağlantılarını açan kişiler sohbeti geçici olarak kullanılamıyor şeklinde görecek.",
-    "updatedAt": "{time} tarihinde güncellendi",
-    "openInMyChats": "Sohbetlerimde aç",
-    "forkIntoMyChats": "Sohbetlerime kopyala",
-    "forkFailed": "Sohbet kopyalanamadı",
-    "forked": "Sohbetlerinize kopyalandı",
-    "forkedFromShareBanner": "Paylaşılan \"{title}\" sohbetinden kopyalandı. Asistanın bağlam olarak önceki mesajları var; bunlar burada gösterilmez.",
-    "untitled": "Başlıksız sohbet",
     "emptyChat": "Bu sohbette henüz mesaj yok.",
     "readOnly": "Salt okunur",
-    "toolDataRedacted": "Araç girdileri ve çıktıları görüntüleyenlerden gizlenir. Yalnızca yanıtları ve hangi araçların çalıştığını görürler.",
-    "redactTools": "Araç girdilerini ve çıktılarını gizle",
-    "redactToolsHelp": "Görüntüleyenler yalnızca araç adlarını görür. Herkese açık bağlantılar için varsayılan olarak açıktır.",
-    "publicExpiryHelp": "Herkese açık bağlantılar {days} gün içinde sona ermelidir.",
-    "toolsRedactedBadge": "Araçlar gizli",
-    "toolsVisibleBadge": "Araç verileri görünür",
-    "showToolsConfirm": "Bu bağlantıya sahip herkese araç girdileri ve çıktıları gösterilsin mi?",
-    "showToolsAction": "Araç verilerini göster",
-    "showTools": "Araç girdilerini ve çıktılarını göster",
-    "hideTools": "Araç girdilerini ve çıktılarını gizle",
     "toolsShown": "Araç girdileri ve çıktıları artık görünür",
-    "toolsHidden": "Araç girdileri ve çıktıları artık gizli",
-    "revokeConfirm": "Bu bağlantı iptal edilsin mi?",
-    "allShares": "Tüm paylaşılan sohbetler",
-    "allSharesEmpty": "Bu kuruluşta paylaşılan sohbet yok.",
-    "allSharesForbidden": "Tüm paylaşılan sohbetleri yalnızca kuruluş yöneticileri görebilir.",
-    "scopeMine": "Benim",
-    "scopeAll": "Kuruluştaki tümü"
+    "toolsHidden": "Araç girdileri ve çıktıları artık gizli"
   },
   "aiAssistant": {
-    "confirmDialog": {
-      "allow": "İzin Ver",
-      "alwaysAllow": "Her Zaman İzin Ver",
-      "no": "Hayır"
-    },
-    "searchChatHistory": "Sohbet geçmişinde ara",
-    "deleteChatTooltip": "Sohbeti sil",
-    "noMatchingChatsFound": "Eşleşen sohbet bulunamadı",
-    "clearAllConversations": "Tüm konuşmaları temizle",
-    "editTitleTooltip": "Başlığı düzenle",
-    "chatHistory": "Sohbet Geçmişi",
-    "modelLabel": "Model:",
-    "editChatTitle": "Sohbet Başlığını Düzenle",
-    "enterChatTitle": "Sohbet başlığını girin",
-    "deleteChat": "Sohbeti Sil",
     "deleteChatConfirmMessage": "{name} sohbetini silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
     "deleteChatWithLinksMessage": "{name} sohbeti silinsin mi? {count} etkin paylaşım bağlantısı çalışmayı durduracak. Bu işlem geri alınamaz. | {name} sohbeti silinsin mi? {count} etkin paylaşım bağlantısı çalışmayı durduracak. Bu işlem geri alınamaz.",
-    "clearAllConversationsTitle": "Tüm Konuşmaları Temizle",
-    "clearAllConversationsMessage": "Tüm konuşmaları temizlemek istediğinize emin misiniz? Bu işlem geri alınamaz.",
-    "suggestion": "Öneri",
-    "results": "Sonuçlar",
-    "recordsSuffix": "kayıt",
-    "ms": "ms",
-    "exitCode": "Çıkış kodu",
-    "stdout": "Stdout",
-    "lines": "satır",
-    "stderr": "Stderr",
-    "truncatedLabel": "kısaltıldı",
-    "copyQuery": "Sorguyu kopyala",
-    "stream": "Akış",
-    "start": "Başlangıç",
-    "end": "Bitiş",
-    "from": "İtibaren",
-    "size": "Boyut",
-    "queryType": "Sorgu Türü",
-    "copyVrl": "VRL'yi kopyala",
-    "command": "Komut",
-    "copyCommand": "Komutu kopyala",
-    "copyResults": "Sonuçları kopyala",
-    "total": "Toplam:",
-    "took": "Süre:",
-    "showingFirst": "İlk",
-    "inputEvents": "Girdi Olayları",
-    "errorLabel": "hata:",
-    "items": "Öğeler",
-    "copyItems": "Öğeleri kopyala",
-    "response": "Yanıt",
-    "copyResponse": "Yanıtı kopyala",
-    "copyContent": "İçeriği kopyala",
-    "errorMayBeTemporary": "Bu hata geçici olabilir. Tekrar deneyebilirsiniz.",
     "creditsExhausted": "Kuruluşunuz tüm yapay zeka kredilerini kullandı.",
     "creditsExhaustedWithRemedy": "Kuruluşunuz tüm yapay zeka kredilerini kullandı. {remedy}",
-    "creditsLow": "{limit} ücretsiz yapay zeka kredisinden {remaining} kaldı. Aylık olarak sıfırlanmaz.",
-    "creditsCosts": "Bir mesaj {chat} kredi kullanır. Vaka analizi aynı kredilerden {incident} kullanır. | Bir mesaj {chat} kredi kullanır. Vaka analizi aynı kredilerden {incident} kullanır.",
-    "backendConnectionError": "Hata: Backend'e bağlanılamıyor",
     "responseStoppedByUser": "Yanıt kullanıcı tarafından durduruldu",
     "turnRunning": "Hâlâ oluşturuluyor. Bu sohbet tamamlandığında güncellenir.",
     "turnRunningViewer": "Hâlâ oluşturuluyor. Bu sayfa kendi kendine güncellenir.",
-    "stopTurn": "Durdur",
-    "turnLimitReached": "Şu anda çok fazla Yapay Zeka yanıtı çalışıyor. Birinin bitmesini bekleyip tekrar deneyin.",
-    "historyUnavailable": "Bu sohbetin geçmişi şu anda yüklenemedi. Gösterilen mesajlar eksik olabilir.",
     "turnInterrupted": "Yanıt tamamlanmadan kesintiye uğradı.",
     "turnFailed": "Yanıt başarısız oldu.",
     "messageFailedToSend": "Mesaj gönderilemedi",
     "turnErrorCode": "Hata kodu: {code}",
     "viewInTarget": "{target} içinde görüntüle",
     "viewTarget": "{target} görüntüle",
-    "navigatedTo": "{page} sayfasına başarıyla gidildi",
-    "helpful": "Faydalı",
-    "notHelpful": "Faydalı değil",
-    "streamPrefix": "Akış:",
-    "typePrefix": "Tür:",
-    "scrollToBottom": "En alta kaydır",
     "welcome": {
-      "wave": "👋",
-      "taglineDash": "—",
-      "taglineLead": "Ben",
-      "taglineHighlight": "O2 Asistanı",
-      "taglineTail": ". Senin yazabilirim",
-      "taglineSql": "SQL",
-      "taglineVrl": "VRL",
-      "taglineAnd": "ve günlükleriniz, izleriniz, metrikleriniz ve vakalarınız arasında size yol gösterir.",
-      "signedInAs": "Olarak oturum açtı",
-      "role": "Rol",
+      "taglineHighlight": "@:{'brand.askAutobot'}",
       "tryOneOfThese": "Veya bunlardan birini deneyin"
     },
     "capabilities": {
@@ -10925,7 +10682,6 @@
       "regexRedact": "E-postaları düzenlemek için bir regex kalıbı oluşturun",
       "mapStreamSchema": "\"default\" akış şemamı eşle",
       "promqlCpu": "> %80 CPU kullanan bölmeler için PromQL yazın",
-      "datadogToO2": "Bu Datadog sorgusunu OpenObserve SQL'e dönüştürün",
       "lastAlertFired": "Son uyarım neden tetiklendi?"
     },
     "placeholderRotation": {
@@ -10933,12 +10689,6 @@
       "two": "NGINX günlüklerinden JSON'u ayrıştırmak için VRL yazın...",
       "three": "K8s düğüm sağlığı için bir gösterge panosu oluşturun..."
     },
-    "autoNavigation": {
-      "label": "Otomatik Navigasyon",
-      "enabledTooltip": "Otomatik navigasyon etkin - O2 Asistanı onay olmadan otomatik olarak gezinecek",
-      "disabledTooltip": "Otomatik navigasyon devre dışı - O2 Assistant gezinmeden önce soracak"
-    },
-    "attachImageTooltip": "Görüntüleri ekleyin (PNG, JPEG, maks. 2MB)",
     "greeting": {
       "morning": "Günaydın",
       "afternoon": "Tünaydın",
@@ -10952,7 +10702,27 @@
       "night": "Geç saate kadar çalışıyorsunuz, {name}"
     },
     "aiChat": {
-      "analyzingMessages": {
+      "unexpectedError": "Beklenmeyen bir hata oluştu",
+      "toolExecutionFailed": "Araç yürütmesi başarısız oldu",
+      "errorOccurred": "Bir hata oluştu",
+      "confirmToolExecution": "{tool} çalıştırılmasını onaylıyor musunuz?",
+      "entity": {
+        "alert": "Uyarı",
+        "dashboard": "Pano",
+        "pipeline": "İşlem Hattı",
+        "report": "rapor",
+        "function": "Fonksiyon",
+        "stream": "akış",
+        "folder": "Klasör",
+        "panel": "Panel",
+        "user": "Kullanıcı",
+        "action": "Eylem"
+      }
+    }
+  },
+  "llmObservability": {
+    "playground": {
+      "progress": {
         "analyzing": "Analiz ediliyor...",
         "thinking": "Düşünülüyor...",
         "processing": "İşleniyor...",
@@ -10973,44 +10743,6 @@
         "stillThinking": "Hâlâ düşünülüyor...",
         "makingProgress": "İlerleme kaydediliyor...",
         "piecingTogether": "Parçalar birleştiriliyor..."
-      },
-      "toolVrlValidationFailed": "VRL doğrulaması başarısız oldu",
-      "toolVrlValidated": "VRL doğrulandı",
-      "toolQueryFailed": "Sorgu başarısız oldu",
-      "toolStreamSchema": "{name} akış şeması alındı",
-      "toolGetIncident": "{id} vakası alındı",
-      "toolGetAlert": "Uyarı {id} alındı",
-      "toolGetDashboard": "Pano {id} alındı",
-      "notSpecified": "Belirtilmedi",
-      "unexpectedError": "Beklenmeyen bir hata oluştu",
-      "toolExecutionFailed": "Araç yürütmesi başarısız oldu",
-      "errorOccurred": "Bir hata oluştu",
-      "actionCancelledByUser": "Eylem kullanıcı tarafından iptal edildi",
-      "serverResponseError": "Hata: Sunucudan yanıt alınamıyor. Lütfen daha sonra tekrar deneyin.",
-      "requestFailed": "Hata: Yapay Zeka hizmetine ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.",
-      "navigateConfirmQuestion": "O2 Assistant'ın gezinmesine izin verilsin mi?",
-      "confirmToolExecution": "{tool} çalıştırılmasını onaylıyor musunuz?",
-      "serverErrorStatus": "Sunucu hatası ({status})",
-      "toolQueriedStream": "Sorgulandı {type} ",
-      "toolResultsCount": "({count} sonuç)",
-      "toolFoundCount": "({count} bulundu)",
-      "allowAssistantTo": "O2 Assistant'ın {action} yapmasına izin verilsin mi?",
-      "allowAssistantNavigateTo": "O2 Assistant'ın {name} sayfasına gitmesine izin verilsin mi?",
-      "confirmDeleteNamedEntity": "{name} {entity} öğesini silmek istediğinizden emin misiniz?",
-      "confirmDeleteEntity": "Bu {entity} öğesini silmek istediğinizden emin misiniz?",
-      "toolListedFallback": "Listelendi",
-      "toolFallback": "Araç",
-      "entity": {
-        "alert": "Uyarı",
-        "dashboard": "Pano",
-        "pipeline": "İşlem Hattı",
-        "report": "rapor",
-        "function": "Fonksiyon",
-        "stream": "akış",
-        "folder": "Klasör",
-        "panel": "Panel",
-        "user": "Kullanıcı",
-        "action": "Eylem"
       }
     }
   },
@@ -11077,9 +10809,7 @@
     "aiExhaustedMessage": "Yapay zekayı kullanmaya devam etmek için abone olun. Daha fazla kullanım bu kuruluşun faturasına yansıtılır.",
     "aiContractExhaustedMessage": "Daha fazla AI kredisi eklemek için hesap yöneticinizle iletişime geçin",
     "aiPayerSubscribeMessage": "Bu kuruluşun faturalandırması {payer} tarafından yönetilir. Abone olmak için {payer} yöneticisinden isteyin; daha fazla kullanım onun faturasına yansıtılır.",
-    "aiFreeUsedLabel": "kullanılan ücretsiz krediler",
-    "aiFreeOneTime": "Tek seferlik bir hak.",
-    "aiUsedByFeature": "Asistan ve sorgu oluşturma: {chat} · Vaka analizi: {incident} · Yeniden analiz: {reanalysis}",
+    "aiUsedByFeature": "@:{'brand.autobot'} ve sorgu oluşturma: {chat} · @:{'brand.autobotInvestigate'}: {incident} · Yeniden analiz: {reanalysis}",
     "aiPaygMessage": "Ücretsiz krediler tükendi — kullanım aboneliğe faturalandırılır",
     "billingGroup": {
       "tabLabel": "Faturalandırma Grubu",
@@ -12649,14 +12379,14 @@
       "eventsAndCommentsAppearHere": "Olaylar ve yorumlar burada görünecek",
       "scrollToTop": "En üste kaydır",
       "scrollToBottom": "En alta kaydır",
-      "aiSreBadge": "AI SRE",
+      "aiSreBadge": "@:{'brand.autobotInvestigate'}",
       "aiAnalysis": {
         "column": "Yapay Zeka analizi",
         "analyze": "Analiz Et",
-        "analyzeTooltip": "Bu vaka için Yapay Zeka SRE analizi başlat",
-        "rcaDisabled": "RCA devre dışı",
-        "rcaOff": "RCA kapalı",
-        "noAiSreFor": "{severity} için Yapay Zeka SRE yok",
+        "analyzeTooltip": "Bu vaka için @:{'brand.autobotInvestigate'} analizi başlat",
+        "rcaDisabled": "@:{'brand.autobotInvestigate'} devre dışı",
+        "rcaOff": "@:{'brand.autobotInvestigate'} kapalı",
+        "noAiSreFor": "{severity} için @:{'brand.autobotInvestigate'} yok",
         "investigating": "İnceleniyor",
         "rerunElapsed": "yeniden çalıştırma · {elapsed}",
         "noUpdateFor": "{elapsed} boyunca güncelleme yok",
@@ -12772,12 +12502,11 @@
       "statusUpdated": "Vaka durumu güncellendi",
       "statusUpdateFailed": "Vaka durumu güncellenemedi",
       "rcaAnalyzeIncident": "Vakayı analiz et",
-      "rcaCancel": "İptal",
       "rcaCancelled": "Analiz iptal edildi",
       "rcaCancelFailed": "Analiz iptal edilemedi",
       "rcaFailed": "AI analizi başarısız oldu",
       "rcaBlocked": "Yapay Zeka analizi çalışmadı",
-      "rcaFailedGeneric": "RCA analizi gerçekleştirilemedi",
+      "rcaFailedGeneric": "@:{'brand.autobotInvestigate'} analizi gerçekleştirilemedi",
       "rcaRetry": "Analizi yeniden dene",
       "rcaCopy": "Raporu kopyala",
       "rcaCopied": "Rapor panoya kopyalandı",
@@ -12803,7 +12532,6 @@
         "composerHintPaused": "Gönderdiğinizde çalıştırma devam eder",
         "agentAsks": "Aracı soruyor",
         "answerNote": "Yanıtınız bir ipucu, kanıt değil. Hipotezi Olası seviyesine taşıyabilir. Kök neden için bir araç sonucu gerekir.",
-        "placeholderLive": "Bağlam ekleyin veya aracıyı yönlendirin.",
         "placeholderPaused": "Aracıya yanıt verin veya bağlam ekleyin, ör. acme/checkout içinde PR #812, 14:02 civarında dağıtıldı.",
         "suggestions": "Öneriler",
         "chipCheck": "Kontrol et …",
@@ -12899,7 +12627,7 @@
         "openAnalysisTab": "Vaka Analizini Aç",
         "reportAfterRun": "Rapor, çalıştırmadan sonra görünür.",
         "noAnalysisTitle": "Henüz analiz yok",
-        "noAnalysisText": "Yapay Zeka SRE Ajanı bu vakanın uyarılarını, topolojisini, son değişikliklerini, izlerini, günlüklerini ve metriklerini kontrol eder, ardından bir rapor yazar. Çalışırken yaptıklarını İnceleme ileti dizisinde takip edebilirsiniz.",
+        "noAnalysisText": "@:{'brand.autobotInvestigate'} bu vakanın uyarılarını, topolojisini, son değişikliklerini, izlerini, günlüklerini ve metriklerini kontrol eder, ardından bir rapor yazar. Çalışırken yaptıklarını İnceleme ileti dizisinde takip edebilirsiniz.",
         "stageOf": "Aşama {index}/{count} · {stage}",
         "cancelRun": "Çalıştırmayı iptal et",
         "followInThread": "İleti dizisinde takip et",
@@ -12984,7 +12712,6 @@
         "contextToolset": "Yapay Zeka Araç Seti",
         "leadsNotEvidence": "İpuçları, kanıt değil",
         "working": "Çalışıyor. Şimdi gönderilen mesajlar bu turdan sonra okunur.",
-        "finalNote": "Bu rapor nihaidir ve değişmez. Ajanı yönlendirmek için Yeniden Analiz Et'i kullanın. Bu işlem, Rapor geçmişinde yeni bir sürüm oluşturur.",
         "resumableNote": "Bu çalıştırma bitmeden durdu. Çalıştırmayı sürdür, son tamamlanan adımdan devam eder.",
         "copy": "İnceleme dizisini kopyala",
         "copied": "İnceleme dizisi panoya kopyalandı",
@@ -13111,7 +12838,7 @@
         "severityLoweredWithReason": "Önem derecesi {from} seviyesinden {to} seviyesine düşürüldü - {reason}",
         "splitFrom": "{alert} öğesinin {incident} ile ilgisiz olduğu tespit edildi",
         "splitFromUntitled": "katıldığı vaka",
-        "inferredByAi": "AI SRE tarafından çıkarıldı",
+        "inferredByAi": "@:{'brand.autobot'} tarafından çıkarıldı",
         "inferredFromAlertHistory": "Uyarı geçmişinden çıkarıldı",
         "inferredFromServiceGraph": "Hizmet grafiğinden çıkarıldı",
         "inferredFromWorkload": "İş yükünden çıkarıldı",
@@ -13279,8 +13006,6 @@
           "ruledOut": "Elendi"
         },
         "status": {
-          "rootCause": "Kök neden",
-          "rootCauseNotConfirmed": "Kök neden · doğrulanmadı",
           "contributing": "Katkıda bulunan",
           "symptom": "Semptom",
           "ruledOut": "Elendi",
@@ -16203,7 +15928,7 @@
     "orgSubtitle": "{org} için alan adları, veri saklama ve otomatik özellikler.",
     "passwordPolicySubtitle": "Yerleşik e-posta ve parola hesapları için kurallar.",
     "cipherKeysDesc": "Hassas alanlar için şifreleme anahtarları",
-    "aiToolsetsDesc": "Yapay zeka asistanının kullanabileceği MCP sunucuları ve CLI araçları",
+    "aiToolsetsDesc": "@:{'brand.autobot'}'un kullanabileceği MCP sunucuları ve CLI araçları",
     "regexPatternsDesc": "Maskeleme için yeniden kullanılabilir regex desenleri",
     "domainManagementDesc": "SSO talep ayrıştırma ve alan adına göre oturum açma kısıtlamaları",
     "passwordPolicy": "Parola İlkesi",
@@ -16426,7 +16151,6 @@
       "namePlaceholder": "Örn. Dahili Parolalar",
       "descriptionPlaceholder": "Kullanıcıların anlaması için deseninizi açıklayın",
       "regexPatternLabel": "Regex Deseni",
-      "tryAiAssistant": "İfadeler yazmak için O2 Asistanını deneyin",
       "writePattern": "Desen Yaz",
       "patternPlaceholder": "Örn. \\d....\\d ",
       "testRegexPattern": "Regex Desenini Test Et",
@@ -16541,9 +16265,6 @@
       "settingsUpdated": "Kuruluş ayarları başarıyla güncellendi",
       "settingsSaveError": "Kuruluş ayarları kaydedilirken hata oluştu"
     },
-    "aiToolsetsPage": {
-      "subtitle": "AI araç entegrasyonlarını yapılandır"
-    },
     "cipherKeysPage": {
       "subtitle": "Hassas alan değerlerini şifreleyen ve şifresini çözen anahtarlar",
       "delete": "Sil",
@@ -16603,8 +16324,6 @@
       "setAiCreditsSubtitle": "Kuruluşun ömür boyu AI kredi limitini ayarlayın.",
       "saveCredits": "Kredileri Kaydet",
       "totalAiCredits": "Toplam AI Kredileri",
-      "aiCreditsUsed": "Kullanılan AI Kredileri",
-      "aiCreditsTotal": "AI Kredileri Toplamı",
       "currentlyUsedLabel": "Şu anda kullanılan:",
       "credits": "kredi",
       "syntheticsBrowserStepsTab": "Tarayıcı Adımları",
@@ -17252,7 +16971,7 @@
         "range": "{band} · {window}",
         "filter": "Seçime göre filtrele",
         "drillDown": "Ayrıntıya in",
-        "askAi": "Yapay Zeka'ya Sor",
+        "askAi": "@:{'brand.askAutobot'}",
         "askAiChip": "Isı haritası seçimi · {count} span | Isı haritası seçimi · {count} span",
         "clear": "Seçimi temizle"
       }
@@ -17409,8 +17128,7 @@
       "otlp": "{product} ile iz gönderin",
       "otlpDesc": "{product1}, {product2} ve {product3} ile uyumlu herhangi bir SDK",
       "otelCollectorDesc": "Tüm telemetri sinyallerini {product} üzerinden yönlendirin",
-      "or": "Veya:",
-      "askAi": "Yapay zekadan izleme ayarlamasını isteyin"
+      "or": "Veya:"
     },
     "collapseFields": "Alanları Daralt",
     "openFields": "Alanları aç",
@@ -17432,7 +17150,6 @@
       "descOutOfRange": "Zaman pencereniz bu akıştan herhangi bir veri içermiyor. Verinin en son görüldüğü zamana geçin.",
       "jumpToData": "En son verilere geç",
       "expandRangeDescAbsolute": "Daha geniş bir göreceli zaman aralığına geçin",
-      "askAi": "AI'dan sorgumu düzeltmesini isteyin",
       "selectedRange": "Seçilen aralık"
     },
     "tracesFound": "Bulunan İzler",
@@ -17463,8 +17180,8 @@
     "criticalPath": "Kritik yol",
     "askAi": {
       "explainTrace": "İzi açıkla",
-      "explainTraceHint": "Kritik yoldaki en yavaş span'ler ve tüm hatalı span'ler hakkında yapay zekaya sor",
-      "askAboutSpan": "Bu span hakkında yapay zekaya sor",
+      "explainTraceHint": "@:{'brand.askAutobot'}: kritik yoldaki en yavaş span'ler ve tüm hatalı span'ler hakkında sor",
+      "askAboutSpan": "@:{'brand.askAutobot'}: bu span hakkında sor",
       "spanChip": "Span · {operation}",
       "traceChip": "İz · {operation}"
     },
@@ -18070,30 +17787,12 @@
   },
   "aiToolset": {
     "header": "Yapay Zeka Araç Setleri",
-    "add": "Yeni araç seti",
-    "search": "Yapay zeka araç setlerini ara",
-    "update": "AI Araç Setini Güncelle",
     "name": "İsim",
     "nameRequired": "İsim zorunludur",
     "nameInvalid": "Yalnızca harflere, rakamlara, kısa çizgilere ve alt çizgilere izin verilir",
     "nameTooLong": "İsim 256 karakteri geçmemelidir",
     "kind": "Tür",
     "kindRequired": "Tür gereklidir",
-    "kindMcp": "MCP Sunucusu",
-    "kindCli": "CLI Aracı",
-    "kindSkill": "Yetenek",
-    "description": "Açıklama",
-    "actions": "Eylemler",
-    "deleteTitle": "AI Araç Setini Sil",
-    "deleteMessage": "{name} Yapay Zeka araç setini silmek istediğinizden emin misiniz?",
-    "loadFailed": "{product} yüklenemedi. Lütfen tekrar deneyin.",
-    "createFailed": "{product} oluşturulamadı. Lütfen tekrar deneyin.",
-    "updateFailed": "{product} güncellenemedi. Lütfen tekrar deneyin.",
-    "deleteFailed": "{product} silinemedi.",
-    "createdSuccessfully": "Yapay Zeka Araç Seti başarıyla oluşturuldu",
-    "updatedSuccessfully": "AI Araç Seti başarıyla güncellendi",
-    "deletedSuccessfully": "AI Araç Seti başarıyla silindi",
-    "mcpConfig": "MCP sunucu yapılandırması",
     "mcpUrl": "Uç nokta URL'si",
     "mcpUrlRequired": "Bitiş noktası URL'si gereklidir",
     "timeoutSeconds": "Zaman aşımı (saniye)",
@@ -18101,24 +17800,18 @@
     "headerKey": "Başlık adı",
     "headerValue": "Başlık değeri",
     "addHeader": "Başlık ekle",
-    "cliConfig": "CLI aracı yapılandırması",
-    "presets": "Hızlı doldurma",
     "cliCommand": "Komut",
     "cliCommandRequired": "Komut gerekli",
     "allowedSubcommands": "İzin verilen alt komutlar",
-    "subcommandsHint": "Virgülle ayrılmış liste, örn. get, describe, logs — tümüne izin vermek için boş bırakın",
     "maxOutputBytes": "Maksimum çıktı (bayt)",
-    "requiresConfirmation": "Yürütmeden önce onay isteyin",
     "envVars": "Ortam değişkenleri",
     "envKey": "Değişken adı",
     "envValue": "Değer",
     "addEnvVar": "Değişken ekle",
     "credentialFiles": "Kimlik bilgisi dosyaları",
     "credEnvVar": "Ortam değişkeni adı",
-    "credEnvVarHint": "örn. {example}",
     "credContentHint": "Ham dosya içeriği (örn. kubeconfig YAML)",
     "addCredFile": "Kimlik bilgisi dosyası ekle",
-    "skillConfig": "Beceri yapılandırması",
     "skillContent": "Beceri tanımı (Markdown)",
     "skillContentRequired": "Beceri içeriği gereklidir"
   },
@@ -19975,8 +19668,8 @@
         "loopExplain": "Yüksek tekrar oranı genellikle ajanın sonuçları önbelleğe almadığı veya yeniden denediği anlamına gelir. Tekrarlanan çağrıları görmek için aşağıdaki en kötü izleri açın.",
         "failExplain": "Bunlar, yalnızca bu sınıfa ait olanlar değil, bu ajanın her hata sınıfından gelen tüm hata mesajlarıdır. Düzeltmeyi bulmak için bunları okuyun ya da nerede gerçekleştiğini görmek için bir iz açın.",
         "costExplain": "Bu izler bu ajanın harcamasını tetikledi. Nelerin çalıştığını görmek için en pahalı olanları açın.",
-        "explain": "O2 AI ile açıkla",
-        "explainHelp": "O2 AI bu sinyali hata mesajlarından ve en kötü izlerinden yola çıkarak inceler; AI span'larının ötesine geçerek günlüklere, metriklere, Kubernetes'e ve dağıtımlara ulaşır ve kanıtlarını sunar."
+        "explain": "@:{'brand.autobot'} ile açıkla",
+        "explainHelp": "@:{'brand.autobot'} bu sinyali hata mesajlarından ve en kötü izlerinden yola çıkarak inceler; AI span'larının ötesine geçerek günlüklere, metriklere, Kubernetes'e ve dağıtımlara ulaşır ve kanıtlarını sunar."
       }
     },
     "versionCompare": {
@@ -21535,8 +21228,7 @@
       "shippersDesc": "{product1}, {product2}, {product3}, {product4}, {product5} ve daha fazlası",
       "otelDesc": "Günlükler, izler ve metrikler için sağlayıcıdan bağımsız OTLP veri alımı",
       "or": "Veya:",
-      "aws": "AWS/CloudWatch",
-      "askAi": "AI'dan alımı ayarlamasını isteyin"
+      "aws": "AWS/CloudWatch"
     },
     "noStream": {
       "title": "Keşfetmeye başlamak için bir akış seçin",
@@ -21555,7 +21247,6 @@
       "descOutOfRange": "Zaman pencereniz bu akıştan herhangi bir veri içermiyor. Verinin en son görüldüğü zamana geçin.",
       "jumpToData": "En son verilere geç",
       "openHistory": "Arama geçmişini aç",
-      "askAi": "AI'dan sorgumu düzeltmesini isteyin",
       "selectedRange": "Seçilen aralık"
     },
     "chunkedContent": {
@@ -21564,11 +21255,8 @@
     },
     "jsonPreview": {
       "addIcon": "Simge ekle",
-      "sendToAiChat": "AI Sohbet'e Gönder",
       "copy": "Kopyala",
       "createRegexPattern": "Regex deseni oluştur",
-      "regexPatternTypeTitle": "Oluşturmak istediğiniz regex deseninin türü nedir?",
-      "regexPatternTypeLabel": "Regex deseninin türü (ör. e-posta, telefon numarası, vb.)",
       "failedToGetOriginalData": "Orijinal veri alınamadı",
       "textCopiedToClipboard": "Metin panoya kopyalandı",
       "failedToCopyText": "Metin kopyalanamadı"
@@ -21576,9 +21264,7 @@
     "cellActions": {
       "copy": "Kopyala",
       "includeTerm": "Terim Dahil Et",
-      "excludeTerm": "Terim Hariç Tut",
-      "sendValueToAi": "Değeri AI'ya Gönder",
-      "sendRowToAi": "Satırı AI'ya Gönder"
+      "excludeTerm": "Terim Hariç Tut"
     },
     "indexList": {
       "noMatchingFields": "Eşleşen alan bulunamadı",
@@ -21591,8 +21277,7 @@
     },
     "detailTable": {
       "noDataAvailable": "Kullanılabilir veri yok.",
-      "addIcon": "Simge ekle",
-      "sendToAiChat": "AI Sohbetine Gönder"
+      "addIcon": "Simge ekle"
     },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "SELECT * sorgusu görselleştirme için desteklenmiyor.",
@@ -21880,7 +21565,6 @@
     "copyError": "Hata ayrıntılarını kopyala",
     "copied": "Kopyalandı!",
     "traceId": "İz Kimliği:",
-    "askAi": "AI'dan sorgumu düzeltmesini isteyin",
     "showDetail": "Ayrıntıları göster",
     "hideDetail": "Ayrıntıları gizle",
     "runAs": "Şu olarak çalıştır",
@@ -23923,9 +23607,7 @@
       "ingestionTokensRefresh": "Token listesini yenile",
       "syntheticsTokensAdd": "Yeni token oluştur",
       "syntheticsTokensRefresh": "Token listesini yenile",
-      "aiChatToggle": "AI sohbetini aç/kapat",
       "k8sPalette": "Kubernetes kaynaklarını ara",
-      "aiChatClose": "AI sohbetini kapat",
       "logsSaveView": "Kayıtlı görünüm olarak kaydet",
       "logsExport": "Sonuçları CSV olarak dışa aktarın",
       "tracesCopyUrl": "İz paylaşım URL'sini kopyala",
@@ -24087,7 +23769,10 @@
     "pagination": {
       "pagination": "Sayfalama",
       "previousPage": "Önceki sayfa",
-      "nextPage": "Sonraki sayfa"
+      "nextPage": "Sonraki sayfa",
+      "firstPage": "İlk sayfa",
+      "lastPage": "Son sayfa",
+      "recordsPerPage": "Sayfa başına kayıtlar"
     },
     "select": {
       "more": "daha fazla",
@@ -24522,8 +24207,6 @@
     "replacementCsvFileUrl": "Değiştirme CSV Dosya URL'si",
     "newCsvFileUrlHelp": "Bu zenginleştirme tablosuna eklemek için yeni bir URL girin",
     "replacementCsvFileUrlHelp": "Mevcut tüm URL'leri değiştirmek için bir URL girin",
-    "jsFunctionPlaceholder": "Bir JS fonksiyonu yazın. örn. {example}",
-    "vrlFunctionPlaceholder": "Bir VRL fonksiyonu yazın. örn. {example}",
     "functionSaved": "Fonksiyon başarıyla kaydedildi",
     "functionCreationFailed": "Fonksiyon oluşturma başarısız oldu",
     "functionFetchingFailed": "Fonksiyon getirme başarısız oldu",
@@ -24535,9 +24218,6 @@
     "invalidEvents": "Geçersiz olaylar: {error}"
   },
   "toastMessages": {
-    "aitoolsets": {
-      "failedToLoadToolset": "Araç seti yüklenemedi"
-    },
     "alerts": {
       "failedToNavigateToAlert": "Uyarıya gidilemedi",
       "alertNotFound": "Uyarı bulunamadı",
@@ -24733,11 +24413,6 @@
       "errorFetchingRegexPatterns": "Regex desenleri alınırken hata"
     },
     "components": {
-      "thanksForYourFeedback": "Geri bildiriminiz için teşekkürler!",
-      "failedToReadImage": "Görüntü okunamadı: {error}",
-      "onlyPngAndJpegImagesAre": "Yalnızca PNG ve JPEG görüntüleri desteklenir",
-      "imageExceeds2mbLimitMb": "Görüntü 2MB sınırını aşıyor ({size}MB)",
-      "responseGenerationStopped": "Yanıt oluşturma durduruldu",
       "customColorAppliedToModeSuccessfully": "Özel renk {mode} moduna başarıyla uygulandı!",
       "appliedToModeSuccessfully": "{theme} teması {mode} moduna başarıyla uygulandı!",
       "failedToExportScoreConfigs": "Puan yapılandırmaları dışa aktarılamadı",
@@ -26537,13 +26212,13 @@
       "subtitle": "Veritabanlarınızdaki sorgu performansı ve sağlığı"
     },
     "ai": {
-      "suggestFix": "Bunu nasıl düzelteceğini AI'ya sor",
-      "suggestFixHint": "Bu sorgu, motoru ve gecikme değerleriyle AI asistanını açar ve neyin değiştirileceğini sorar. Kendisi hiçbir şeyi değiştirmez.",
-      "rowSuggestFix": "Bunu nasıl düzelteceğini AI'ya sor",
+      "suggestFix": "@:{'brand.askAutobot'}: bunu nasıl düzelteceğini sor",
+      "suggestFixHint": "@:{'brand.autobot'} bu sorgu, motoru ve gecikme değerleriyle açılır ve neyin değiştirileceğini sorar. Kendisi hiçbir şeyi değiştirmez.",
+      "rowSuggestFix": "@:{'brand.askAutobot'}: bunu nasıl düzelteceğini sor",
       "deadlockFix": "Bu kilitlenmeyi nasıl durdurabilirim?",
-      "deadlockFixHint": "Hem çakışan ifadeleri hem de satır sırası kanıtını AI asistanına gönderir.",
+      "deadlockFixHint": "Hem çakışan ifadeleri hem de satır sırası kanıtını @:{'brand.autobot'} hizmetine gönderir.",
       "blockingFix": "Bu neden engelliyor?",
-      "blockingFixHint": "Kök oturumun ifadesini, boşta kalma süresini ve arkasında bekleyen oturum sayısını AI asistanına gönderir."
+      "blockingFixHint": "Kök oturumun ifadesini, boşta kalma süresini ve arkasında bekleyen oturum sayısını @:{'brand.autobot'} hizmetine gönderir."
     },
     "filters": {
       "allEngines": "Tüm motorlar",
@@ -28249,8 +27924,8 @@
     "removeStep": "Adımı kaldır",
     "channels": "Kanallar",
     "policySaved": "Politika kaydedildi",
-    "verdictTitle": "Yapay Zeka SRE kararı",
-    "reportTitle": "Yapay Zeka SRE'nin buldukları",
+    "verdictTitle": "@:{'brand.autobot'} kararı",
+    "reportTitle": "@:{'brand.autobot'} bulguları",
     "l0P1Lead": "Hemen uyar.",
     "l0P1Desc": "Yapay zeka analizi paralel çalışır — kritik çağrılar asla geciktirilmez.",
     "l0P4Lead": "Yalnızca yapay zeka analizi.",
@@ -28270,7 +27945,7 @@
     "l0MaxLevelsOption": "en fazla {count} seviye | en fazla {count} seviye",
     "l0ParallelSentence": "hemen çağrı yapılır; ajan da paralel çalışır",
     "l0OnlySentence": "ajan araştırır; bu öncelik yalnızca seviyeleriniz öyle diyorsa çağrı gönderir",
-    "l0OffSentence": "Yapay Zeka SRE çalışmaz; çağrı, Yapay Zeka triyajı olmadan olduğu gibi tam olarak davranır",
+    "l0OffSentence": "@:{'brand.autobotInvestigate'} çalışmaz; çağrı, Yapay Zeka triyajı olmadan olduğu gibi tam olarak davranır",
     "l0BudgetRange": "30 ile 600 saniye arasında — sunucu, bu aralığın dışındaki değerleri sınır değerlerine sabitlemek yerine reddeder",
     "l0BudgetInvalidNotSaved": "The hold budget must be between 30 and 600 seconds.",
     "l0AllowSuppress": "Çağrıyı bastır",
@@ -28297,7 +27972,7 @@
     "eventKind_page": "Çağrı",
     "eventKind_ack": "Onay",
     "eventKind_note": "Not",
-    "eventKind_rca": "RCA",
+    "eventKind_rca": "@:{'brand.autobotInvestigate'}",
     "eventKind_handoff": "Devir",
     "eventKind_recovery": "Düzelme",
     "eventKind_state": "Durum",
@@ -28959,7 +28634,7 @@
     "ladderAddStep": "Adım ekle",
     "ladderRightNow": "Şu anda bu",
     "ladderSameLadder": "aynı merdiven",
-    "ladderL0Off": "Yapay Zeka SRE yok",
+    "ladderL0Off": "@:{'brand.autobotInvestigate'} yok",
     "ladderStaleDefaultTag": "Merdiven rotasyonları hiç öğrenmedi",
     "ladderStaleDefaultHint": "Her seviye tüm ekibi çağırır, ancak bu ekibin rotasyonları var — merdiven, rotasyonlar oluşturulmadan önce oluşturulmuş. Üye eklemek veya çıkarmak varsayılanı yeniden çalıştırır, ya da merdiveni elle bir kez düzenleyin.",
     "reachShortNoSmtp": "yalnızca e-posta · SMTP aktarımı yok",
@@ -29295,13 +28970,8 @@
     "consentStillRequired": "Ücretli kullanım gerekli tüm kuruluşlar için etkinleştirilmedi.",
     "updateFailed": "Ücretli Yapay Zeka kullanımı güncellenemedi. Tekrar deneyin.",
     "declinedNotice": "Ücretli Yapay Zeka kullanımı kapalı olduğundan bu istek gönderilmedi.",
-    "consentRequiredMessage": "Ücretsiz krediler tükendi. Yapay Zeka'yı kullanmaya devam etmek için bunu açın.",
-    "consentScope": "Tüm kuruluş için geçerlidir: Asistan, sorgu oluşturma ve vaka analizi. Planlar sayfasından istediğiniz zaman kapatabilirsiniz.",
+    "consentScope": "Tüm kuruluş için geçerlidir: @:{'brand.autobot'}, sorgu oluşturma ve vaka analizi. Planlar sayfasından istediğiniz zaman kapatabilirsiniz.",
     "managePaidUsage": "Ücretli kullanımı aç",
-    "switchLabel": "Ücretli Yapay Zeka kullanımı",
-    "adminsOnly": "Bunu yalnızca yöneticiler değiştirebilir",
-    "waitingForPayer": "{payer} açana kadar bekleniyor",
-    "offHint": "Ücretsiz krediler tükendikten sonra Yapay Zeka'yı kullanmaya devam edin; planınızın ücreti üzerinden faturalandırılır.",
     "modePayAsYouGo": "Kullandıkça öde",
     "modeConsentRequired": "Onay gerekli",
     "modeExhausted": "Tükendi",
@@ -29961,423 +29631,6 @@
       }
     }
   },
-  "autoobserveLive": {
-    "where": "{cluster} / {namespace}",
-    "lessThan": "<{value}",
-    "topbar": {
-      "checked": "{ago} önce kontrol edildi",
-      "firstCheck": "İlk kontrol sürüyor"
-    },
-    "retry": "Yeniden dene",
-    "classes": {
-      "errors": "Hatalar",
-      "latency": "Gecikme",
-      "saturation": "Doygunluk",
-      "absence": "Göndermeyi durdurur",
-      "external_probe": "Sentetik kontrol",
-      "workload_health": "Yeniden başlatmalar",
-      "node": "Düğümler"
-    },
-    "classesInline": {
-      "errors": "hatalar",
-      "latency": "gecikme",
-      "saturation": "doygunluk",
-      "absence": "yokluk",
-      "external_probe": "harici problar",
-      "workload_health": "iş yükü sağlığı",
-      "node": "düğüm sağlığı"
-    },
-    "states": {
-      "covered": "İzleniyor",
-      "weak": "Zayıf",
-      "silent": "Sessiz",
-      "blind": "Kör",
-      "unmapped": "Eşlenmemiş",
-      "none": "Yok"
-    },
-    "monitorKinds": {
-      "alert": "Uyarı",
-      "anomaly_detector": "Anomali dedektörü",
-      "slo": "SLO",
-      "synthetic": "Sentetik"
-    },
-    "coverage": {
-      "summaryWatched": "{watched}/{total} izleniyor · {pct}%",
-      "summaryWatchedShare": "{watched}/{total} izleniyor · {pct}",
-      "splitLabel": "{watched} tanesi izleniyor, {gaps} tanesinde kapsam boşluğu var",
-      "stateWatched": "İzleniyor",
-      "stateGap": "Kapsam boşluğu",
-      "columns": {
-        "where": "Konum",
-        "state": "Durum",
-        "lastChecked": "Son kontrol"
-      },
-      "loading": "Kapsam yükleniyor",
-      "loaded": "Kapsam yüklendi",
-      "sentence": {
-        "allWatched": "1 hizmetinizi izliyorum. | {total} hizmetinizin tamamını izliyorum.",
-        "allGaps": "1 hizmetinizde kapsam boşluğu var. | {total} hizmetinizin tamamında kapsam boşluğu var.",
-        "watching": "{total} hizmetinizden {watched} tanesini izliyorum.",
-        "gaps": "{count} tanesinde kapsam boşluğu var. | {count} tanesinde kapsam boşluğu var.",
-        "mixed": "{watching} {gaps}"
-      },
-      "gapAdded": "{checks} için uyarı eklendi. AutoObserve bunu bir sonraki kontrolünde sayar. | {checks} için uyarılar eklendi. AutoObserve bunları bir sonraki kontrolünde sayar.",
-      "gapNone": "{checks} için izleyen uyarı yok",
-      "searchPlaceholder": "Hizmet, küme veya ad alanı ara",
-      "labelNamespace": "{name} · {namespace}",
-      "labelPlace": "{name} · {cluster} · {namespace}",
-      "noNamespace": "ad alanı yok",
-      "noCluster": "küme yok",
-      "noMatch": "“{query}” ile eşleşen hizmet, küme veya ad alanı yok",
-      "showAll": "Tümünü göster",
-      "bucketThree": "3 veya daha fazla",
-      "bucketTwo": "2",
-      "bucketOne": "1",
-      "filterHides": "Hiçbir hizmet {state} değil",
-      "filterHidesSearch": "{count} hizmet “{query}” ile eşleşiyor, ancak {state} değil | {count} hizmet “{query}” ile eşleşiyor, ancak hiçbiri {state} değil"
-    },
-    "cell": {
-      "noClass": "AutoObserve bu sinyali henüz denetlemiyor",
-      "tipNoClass": "{signal}: AutoObserve bunu henüz denetlemiyor",
-      "gap": {
-        "weak": "{signal}: yalnızca {monitor}, geniş kapsamlı bir uyarı, bir sorunu fark edebilir; ancak bu hizmete özel değil | {signal}: yalnızca {monitor}, geniş kapsamlı uyarılar, bir sorunu fark edebilir; ancak bu hizmete özel değiller",
-        "silent": "{signal}: {monitor} eşleşiyor, ancak kimseye bildirim göndermiyor | {signal}: {monitor} eşleşiyor, ancak kimseye bildirim göndermiyorlar",
-        "blind": "{signal}: {monitor} eşleşiyor, ancak verisini göremiyor | {signal}: {monitor} eşleşiyor, ancak verilerini göremiyorlar",
-        "unmapped": "{signal}: {monitor} eşleşebilir, ancak kapsamı bir hizmete bağlanamadı | {signal}: {monitor} eşleşebilir, ancak kapsamları bir hizmete bağlanamadı",
-        "none": "{signal}: bunu izleyen uyarı yok"
-      },
-      "added": "Eklendi"
-    },
-    "drawer": {
-      "moreChecks": "Diğer denetimler",
-      "chartNoData": "Grafik henüz kullanılamıyor",
-      "monitors": "Uyarılar",
-      "monitorLine": "{kind} · {state}",
-      "noMonitor": "Eşleşen uyarı yok"
-    },
-    "charts": {
-      "empty1h": "Son bir saatte {service} hizmetinden veri yok",
-      "empty24h": "Son 24 saatte {service} hizmetinden veri yok",
-      "empty7d": "Son 7 günde {service} hizmetinden veri yok",
-      "emptyPartial1h": "Son bir saatin aranan kısmında {service} hizmetinden veri yok",
-      "emptyPartial24h": "Son 24 saatin aranan kısmında {service} hizmetinden veri yok",
-      "emptyPartial7d": "Son 7 günün aranan kısmında {service} hizmetinden veri yok",
-      "noSpanStatus": "{stream} içinde span durumu yok",
-      "noLevel": "{stream} içinde günlük düzeyi yok",
-      "noDuration": "{stream} içinde süre alanı yok",
-      "noTraces": "Gecikme, izlerden grafiklenir. {service} hiç iz göndermiyor.",
-      "noMatch": "Bu hizmet, akışlarıyla eşleştirilemiyor",
-      "failedQuery": "Bu grafik {stream} akışından yüklenemedi",
-      "failedMatch": "{service} hizmetinin akışlarına bakılamadı",
-      "partial": "Kısmi veri",
-      "wide": "Bu akışı paylaşan diğer hizmetleri içerir",
-      "loading": "{metric} yükleniyor",
-      "summary": "{metric}, şu anda {value}",
-      "summaryNone": "{metric}, en yeni kovada hiçbir ölçüm yok"
-    },
-    "suggestions": {
-      "serviceMeta": "{where}, saatte yaklaşık {traffic} olay",
-      "trafficOnly": "Saatte yaklaşık {traffic} olay",
-      "kinds": {
-        "coverage_gap": "Kapsam boşluğu",
-        "no_absence_check": "Eksik uyarı",
-        "silent_coverage": "Kimseye bildirim göndermiyor",
-        "coverage_lost": "Kapsam kayboldu",
-        "blind_guardrail": "Çalışmıyor",
-        "discovery_unusable": "Veri kalitesi",
-        "alert_no_destination": "Kimseye bildirim göndermiyor",
-        "alert_notify_failed": "Bildirim başarısız",
-        "other": "Diğer"
-      },
-      "severity": {
-        "high": "Yüksek",
-        "medium": "Orta"
-      },
-      "confidence": {
-        "sufficient": "Güçlü kanıt",
-        "suggestive": "Kısmi kanıt",
-        "insufficient": "Zayıf kanıt"
-      },
-      "body": {
-        "coverageGap": "{service} hizmetini izleyen hiçbir şey yok",
-        "noAbsenceNone": "{service} veri göndermeyi durdurursa hiçbir uyarı tetiklenmez",
-        "noAbsenceWeak": "{service} veri göndermeyi durdurursa bunu yalnızca geniş kapsamlı bir uyarı fark eder",
-        "noAbsenceSilent": "{service} hizmetinin sessizleştiğini fark edecek kontrol kimseye bildirim göndermiyor",
-        "noAbsenceBlind": "{service} hizmetinin sessizleştiğini fark edecek kontrol onun verisini göremiyor",
-        "silentCoverage": "{monitor}, {classes} için {count} hizmeti izliyor ancak kimseye bildirim göndermiyor | {monitor}, {classes} için {count} hizmeti izliyor ancak kimseye bildirim göndermiyor",
-        "silentWhy": "{monitor}, {services} hizmetlerinin durduğunu fark eder ancak kimseye bildirim göndermez.",
-        "silentWhyNoNames": "{monitor}, bir hizmetin durduğunu fark eder ancak kimseye bildirim göndermez.",
-        "silentNext": "Ona bir hedef verin.",
-        "undeliverable": "{monitor}, {destination} hedefine ulaşamıyor",
-        "undeliverableWhy": "{destination} uyarı değil, talep alır. | {destination} uyarı değil, talep alır.",
-        "undeliverableNext": "Yanına bir webhook veya e-posta ekleyin; {destination} kalsın. | Yanlarına bir webhook veya e-posta ekleyin; {destination} kalsın.",
-        "coverageLost": "{service}, {classes} uyarısını {day} tarihinde kaybetti",
-        "blindStreamMissing": "{monitor}, var olmayan {detail} bilgisini okuyor",
-        "blindNoData": "{monitor}, son verisi olmayan {detail} bilgisini okuyor",
-        "blindEmptyScope": "{monitor}, hiçbir zaman gelmeyen satırlara göre filtreliyor",
-        "blindUnknownField": "{monitor}, akışında bulunmayan {field} alanına göre filtreliyor",
-        "blindIgnoredMatcher": "{monitor}, hiçbir seride bulunmayan {label} etiketine göre eşleşiyor, bu yüzden tüm serileri izliyor",
-        "discovery": "Keşfedilen hizmetlerden yalnızca {good} tanesi kullanılabilir; toplam {active} hizmet olduğundan boşluk sıralamaları kısmi kalır.",
-        "alertSyntax": "{monitor} ayrıştırılamayan bir sorgu içeriyor",
-        "alertTimeout": "{monitor} tamamlanmadan sürekli zaman aşımına uğruyor",
-        "alertMemory": "{monitor} sürekli bellek yetersizliği yaşıyor",
-        "alertOtherError": "{monitor} sürekli bir hatayla başarısız oluyor",
-        "alertNotWorkingGeneric": "{monitor} çalışmıyor",
-        "alertNoDestination": "{monitor} tetiklendi ve kimseye bildirim göndermiyor",
-        "alertNotifyFailed": "{monitor} tetiklendi ve {failed} tanesi, denenen {tried} bildirimden başarısız oldu. | {monitor} tetiklendi ve {failed} tanesi, denenen {tried} bildirimden başarısız oldu.",
-        "alertNotifyFailedNoCounts": "{monitor} tetiklendi ve bildirimleri başarısız oldu.",
-        "alertStreamGone": "{monitor} sürekli başarısız oluyor çünkü akışı mevcut değil",
-        "alertFieldGone": "{monitor} sürekli başarısız oluyor çünkü kullandığı bir alan mevcut değil",
-        "other": "Bu sayfanın henüz gösteremediği bir şey buldum"
-      },
-      "detail": {
-        "cell": "{check}: {state}",
-        "cells": "Motorun bulduğu: {cells}.",
-        "services": "Eşleştiği hizmetler arasında {services} var.",
-        "text": "Motor ayrıntısı: {detail}",
-        "quality": "Keşif {mode} modunda çalışıyor.",
-        "none": "Motor başka ayrıntı göndermedi.",
-        "joined": "{first} {rest}"
-      },
-      "analysedAt": "Kalibrasyon çalıştırmasından: {ago}",
-      "neverFired": "Hiç tetiklenmedi",
-      "lastFired": "Son tetiklenme: {time}",
-      "accept": "Kabul et",
-      "dismiss": "Yoksay…",
-      "accepted": "Bu önizlemede kabul edildi; hiçbir şey gönderilmedi",
-      "dismissed": "Bu önizlemede yoksayıldı; hiçbir şey gönderilmedi",
-      "loading": "Öneriler yükleniyor",
-      "loaded": "Öneriler yüklendi",
-      "more": "ve {count} tane daha | ve {count} tane daha",
-      "moreNames": "{count} tane daha | {count} tane daha",
-      "whyNext": "{why} {next}",
-      "seeAll": "Tümünü gör",
-      "drawerTitle": "Öneriler",
-      "drawerLine": "En önemli olan en üstte olacak şekilde sıralanır. Bulduğumu görmek için bir satırı açın.",
-      "focusGone": "Bu öneri artık açık değil.",
-      "clearKind": "Tüm önerileri göster",
-      "kindEmptyTitle": "{kind} türünde açık öneri yok",
-      "kindEmptyDesc": "{count} başka öneri açık. | {count} başka öneri açık.",
-      "folder": "Klasör {folder}",
-      "columns": {
-        "suggestion": "Öneri",
-        "where": "Nerede",
-        "kind": "Tür",
-        "severity": "Önem derecesi"
-      }
-    },
-    "notice": {
-      "offTitle": "AutoObserve açık değil",
-      "details": "Ayrıntılar",
-      "refreshFailed": "{failedAt} tarihinde yenileme başarısız oldu · {dataAt} tarihli {what} gösteriliyor",
-      "what": {
-        "coverage": "kapsam",
-        "suggestions": "öneriler",
-        "incidents": "çağrı gönderilen bulgular",
-        "issues": "sorunlar",
-        "history": "geçmiş"
-      },
-      "coverage": {
-        "deniedTitle": "Kapsamı görme izniniz yok",
-        "deniedDesc": "Kapsam her klasördeki monitörleri sayar; bu nedenle yalnızca bazı klasörlerdeki değil, bu kuruluştaki tüm uyarıları görme izni gerektirir. Bunun için bir kuruluş yöneticisinden izin isteyin.",
-        "offDesc": "Bir yönetici bunu bu dağıtım için açar. Kapsam, ilk kontrolünden sonra burada görünür.",
-        "unavailableTitle": "Kapsam geçici olarak kullanılamıyor",
-        "unavailableDesc": "AutoObserve şu anda yanıt vermiyor. Bu genellikle bir iki dakika içinde düzelir.",
-        "failedTitle": "Kapsam yüklenemedi",
-        "failedDesc": "Yüklenirken bir sorun oluştu. Birazdan tekrar deneyin.",
-        "noPassTitle": "Son bir günde hiçbir kontrol tamamlanmadı",
-        "noPassDesc": "Kapsam, hizmetlerinizi bir sonraki kontrolüm tamamlandıktan sonra burada görünür. AutoObserve yeni açıldıysa ilk kontrol biraz zaman alabilir.",
-        "noPassAction": "Kapsamı nasıl kontrol ederim",
-        "noServicesTitle": "Henüz hizmet bulunamadı",
-        "noServicesDesc": "Son kontrolüm ({when}) hiçbir hizmet bulamadı. Hizmetler, bir hizmet adı belirten günlükler, metrikler veya izler gönderdiklerinde burada görünür.",
-        "noServicesAction": "Hizmetleri nasıl bulurum"
-      },
-      "suggestions": {
-        "deniedTitle": "Önerileri görme izniniz yok",
-        "deniedDesc": "Onları görmek, bu kuruluştaki uyarıları görme izni gerektirir. Bunun için bir kuruluş yöneticisinden izin isteyin.",
-        "offDesc": "Öneriler, bir yönetici bunu bu dağıtım için açtıktan sonra burada görünür.",
-        "unavailableTitle": "Öneriler geçici olarak kullanılamıyor",
-        "unavailableDesc": "AutoObserve şu anda yanıt vermiyor. Bu genellikle bir iki dakika içinde düzelir.",
-        "failedTitle": "Öneriler yüklenemedi",
-        "failedDesc": "Yüklenirken bir sorun oluştu. Birazdan tekrar deneyin.",
-        "emptyTitle": "Şu anda öneri yok",
-        "emptyDesc": "Monitörlerinizin kapsamadığı bir boşluk bulduğumda buraya bir tane ekleyeceğim.",
-        "pageEmptyTitle": "En önemli öneriler zaten ele alındı",
-        "pageEmptyDesc": "Hâlâ bekleyenler için tam listeyi açın."
-      },
-      "history": {
-        "deniedTitle": "Geçmişi görme izniniz yok",
-        "deniedDesc": "Geçmiş, AutoObserve'un açtığı vakaları listeler; bu nedenle geçmişi görmek için bu kuruluştaki vakaları listeleme izni gerekir. Bunun için bir kuruluş yöneticisinden izin isteyin.",
-        "offDesc": "Geçmiş, bir yönetici bu dağıtım için etkinleştirdikten sonra burada görünür.",
-        "unavailableTitle": "Geçmiş geçici olarak kullanılamıyor",
-        "unavailableDesc": "AutoObserve şu anda yanıt vermiyor. Bu genellikle bir iki dakika içinde düzelir.",
-        "failedTitle": "Geçmiş yüklenemedi",
-        "failedDesc": "Yüklenirken bir sorun oluştu. Birazdan tekrar deneyin."
-      },
-      "incidents": {
-        "deniedTitle": "Çağrı gönderen bulguları görme izniniz yok",
-        "deniedDesc": "Çağrı gönderen bulgular vaka açar; bu nedenle bunları görmek için bu kuruluştaki vakaları listeleme izni gerekir. Bunun için bir kuruluş yöneticisinden izin isteyin.",
-        "offDesc": "Çağrı gönderen bulgular, bir yönetici bu dağıtım için etkinleştirdikten sonra burada görünür.",
-        "unavailableTitle": "Çağrı gönderen bulgular geçici olarak kullanılamıyor",
-        "unavailableDesc": "AutoObserve şu anda yanıt vermiyor. Bu genellikle bir iki dakika içinde düzelir.",
-        "failedTitle": "Çağrı gönderen bulgular yüklenemedi",
-        "failedDesc": "Bunlar yüklenirken bir sorun oluştu. Birazdan tekrar deneyin."
-      },
-      "issues": {
-        "deniedTitle": "Sorunları görme izniniz yok",
-        "deniedDesc": "Sorunlar AutoObserve'un açtığı vakalardır; bu nedenle bunları görmek için bu kuruluştaki vakaları listeleme izni gerekir. Bunun için bir kuruluş yöneticisinden izin isteyin.",
-        "offDesc": "Sorunlar, bir yönetici bu dağıtım için etkinleştirdikten sonra burada görünür.",
-        "unavailableTitle": "Sorunlar geçici olarak kullanılamıyor",
-        "unavailableDesc": "AutoObserve şu anda yanıt vermiyor. Bu genellikle bir iki dakika içinde düzelir.",
-        "failedTitle": "Sorunlar yüklenemedi",
-        "failedDesc": "Bunlar yüklenirken bir sorun oluştu. Birazdan tekrar deneyin."
-      }
-    },
-    "time": {
-      "justNow": "az önce",
-      "ago": "{time} önce"
-    },
-    "history": {
-      "incident": "Bir vaka açıldı: {title}",
-      "dismissed": "{actor}, {title} öğesini yok saydı",
-      "accepted": "{actor}, {title} öğesini amaçlanan rapor olarak işaretledi",
-      "changed": "{actor}, {title} öğesini değiştirdi",
-      "denied": {
-        "incidents": "Vakalar listelenmiyor: bunları görme izniniz yok.",
-        "decisions": "Kararlar listelenmiyor: bunları görme izniniz yok."
-      },
-      "untitled": "bir öneri",
-      "openIncident": "Vakayı aç",
-      "newest": "En yeni {count} tanesi gösteriliyor. Daha eski vakalar Sorunlar sayfasında.",
-      "loading": "Geçmiş yükleniyor",
-      "loaded": "Geçmiş yüklendi"
-    },
-    "incidents": {
-      "title": "Çağrı gönderen bulgular",
-      "subtitle": "Nöbet ekibiniz için vaka açan ve analizini içeren bulgular.",
-      "pagingNote": "Bu kuruluşta çağrı gönderme kapalı, bu nedenle AutoObserve vaka açmaz.",
-      "sharedFor": "{label}: {reason}",
-      "finding": {
-        "stream_silence": "{stream} ({type}) veri göndermeyi durdurdu",
-        "stream_drop": "{stream} ({type}) hacmi keskin şekilde düştü",
-        "stream_rise": "{stream} ({type}) hacmi keskin şekilde arttı"
-      },
-      "opened": "Vaka {when} açıldı",
-      "openIncident": "Vakayı aç",
-      "viewAnalysis": "Analizi görüntüle",
-      "newFindings": "{count} yeni bulgu | {count} yeni bulgu",
-      "showNew": "Göster",
-      "more": "En yeni {count} tanesi gösteriliyor",
-      "seeAll": "Tüm vakaları gör",
-      "seeAllIssues": "Tüm sorunları gör",
-      "failedDetail": {
-        "status": "İstek {time} tarihinde {status} durumuyla başarısız oldu.",
-        "noResponse": "İstek {time} tarihinde yanıt almadı."
-      },
-      "analysis": {
-        "notRunDetail": "Henüz hiçbir analiz başlatılmadı. Başlatmak için vakayı açın.",
-        "disabledDetail": "Bu dağıtım için yapay zeka analizi kapalı.",
-        "offOther": "Bu vaka için otomatik analiz çalışmadı.",
-        "failedDetail": "Analiz tamamlanmadan durdu. Ayrıntılar için görüntüleyin."
-      },
-      "empty": {
-        "title": "Henüz kimseye çağrı gönderilmedi",
-        "desc": "Bir akış durduğunda veya hacmi keskin biçimde değiştiğinde, vakası ve analizi burada görünür."
-      },
-      "emptyOff": {
-        "title": "Çağrı gönderme kapalı",
-        "desc": "AutoObserve bu kuruluş için akış bulgularını kaydeder ancak vaka açmaz. Çağrı göndermeyi bir yönetici açar."
-      },
-      "loading": "Çağrı gönderilen bulgular yükleniyor…",
-      "loaded": "Çağrı gönderilen bulgular yüklendi",
-      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
-      "routing": "Set up on-call routing"
-    },
-    "issues": {
-      "searchPlaceholder": "Ne olduğunu veya bir akışı arayın",
-      "columns": {
-        "incident": "Ne oldu",
-        "severity": "Önem derecesi",
-        "status": "Durum",
-        "stream": "Akış",
-        "opened": "Açılma",
-        "analysis": "Analiz",
-        "page": "Kime çağrı gönderildi"
-      },
-      "count": "Sorun yok | {count} sorun | {count} sorun",
-      "capNote": "En yeni {count} sorun gösteriliyor. Daha eskileri görmek için aralığı daraltın.",
-      "emptyRange": "{within} sorun yok",
-      "streamType": "{type} akışı",
-      "streamMore": "{stream} +{count}",
-      "filterOpen": "Açık",
-      "loading": "Sorunlar yükleniyor…",
-      "loaded": "Sorunlar yüklendi",
-      "page": {
-        "unrouted": "Kimseye çağrı gönderilmedi",
-        "failed": "Çağrı gönderme başarısız",
-        "pending": "Henüz onaylanmadı"
-      },
-      "today": "Bugün",
-      "yesterday": "Dün",
-      "shared": {
-        "rcaDisabled": "Bu vakalar açıldığında yapay zeka analizi kapalıydı.",
-        "aiUnavailable": "Bu vakalar açıldığında yapay zeka analizi kullanılamıyordu.",
-        "quotaExceeded": "Bu vakalar açıldığında kuruluş yapay zeka analizi sınırına ulaşmıştı.",
-        "coolingDown": "Az önce bir analiz çalışmıştı, bu nedenle bu vakalar için yeni bir analiz başlatılmadı.",
-        "startFailed": "Analizler başlatılamadı.",
-        "offOther": "Bu vakalar için otomatik analiz çalışmadı.",
-        "disabled": "Bu dağıtım için yapay zeka analizi kapalı.",
-        "notRun": "Henüz hiçbir analiz başlatılmadı. Başlatmak için bir vaka açın.",
-        "failed": "Bu analizler tamamlanmadan durdu. Ayrıntılar için birini görüntüleyin."
-      }
-    },
-    "surfaces": {
-      "changes": {
-        "title": "Henüz değişiklik yok",
-        "desc": "AutoObserve düzeltmeler önerir ancak hiçbir uyarıyı veya ayarı değiştirmez. Bir değişiklik yaptığında, işe yarayıp yaramadığıyla birlikte burada görünür. Şimdilik önerilerini gözden geçirin ve istediklerinizi uygulayın.",
-        "action": "Önerileri gözden geçir"
-      },
-      "history": {
-        "title": "Henüz geçmiş yok",
-        "desc": "AutoObserve'un ne bulduğu, neyi değiştirdiği ve sizin ne karar verdiğiniz burada listelenir, en yeniler önce. Bugün bulguları vaka açar ve bunlar Sorunlar sayfasında yer alır.",
-        "action": "Sorunları aç"
-      },
-      "scenario": {
-        "tag": "Canlı veri",
-        "text": "Bu kuruluşun canlı verisini görüyorsunuz. Örnek senaryolar burada gösterilmez.",
-        "action": "Nasıl çalışır"
-      },
-      "settings": {
-        "title": "Burada henüz ayarlanacak bir şey yok",
-        "desc": "Bir yönetici bu dağıtım için AutoObserve'u ve çağrı göndermeyi etkinleştirir. Kime bildirim göndereceği ve ne ölçüde kendi başına hareket edeceği, bu kontroller mevcut olduğunda burada ayarlanacak.",
-        "action": "Nasıl çalışır"
-      }
-    },
-    "paging": {
-      "title": "Paging",
-      "label": "Page on-call when a stream stops",
-      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
-      "routing": "On-call routing",
-      "unavailable": "Paging is turned off for this deployment.",
-      "denied": "{denied} {askAdmin}",
-      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
-      "deniedTitle": "Çağrı gönderme ayarını görme izniniz yok",
-      "deniedDesc": "Çağrı gönderme tüm kuruluş için bir kez ayarlanır. Erişim için bir kuruluş yöneticisinden isteyin.",
-      "failedTitle": "Çağrı gönderme ayarı yüklenemedi",
-      "failedDesc": "Yüklenirken bir sorun oluştu. Biraz sonra tekrar deneyin.",
-      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
-    },
-    "learning": {
-      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
-      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
-      "emptyTitle": "Learning your streams",
-      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
-      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
-      "until": "Learning until {date} · {streams}",
-      "streams": "Learning {count} stream | Learning {count} streams",
-      "streamUntil": "until {date}"
-    }
-  },
   "autoobserve2": {
     "nav": {
       "history": "Geçmiş",
@@ -30771,7 +30024,7 @@
         "auth_test": "Bot token",
         "last_event": "Olaylar",
         "sockets": "Socket'ler",
-        "agent": "Yapay Zeka Asistanı",
+        "agent": "@:{'brand.autobot'}",
         "test_post": "Test gönderisi"
       },
       "connectedOrgs": "Bağlı kuruluşlar",
@@ -33082,6 +32335,517 @@
     "deletedQuery": "{query} silindi",
     "undo": "Geri al"
   },
+  "filterBar": {
+    "ariaLabel": "Alana göre filtrele",
+    "placeholder": "Alana göre filtreleyin veya alan=değer yazın. Çalıştırmak için Enter'a basın",
+    "addFilter": "Filtre ekle",
+    "searchFields": "Alan ara",
+    "searchLabels": "Etiket ara",
+    "searchOperators": "Koşul ara",
+    "searchValue": "Bir değer arayın veya yazın",
+    "searchValues": "Değer ara",
+    "textField": "Metin",
+    "useValue": "\"{value}\" kullan",
+    "useField": "\"{field}\" alanını kullan",
+    "useLabel": "\"{field}\" etiketini kullan",
+    "searchText": "Tüm metinde \"{text}\" ara",
+    "emptyValue": "(boş)",
+    "loadingFields": "Alanlar yükleniyor…",
+    "noFields": "Eşleşen alan yok",
+    "noValues": "Öneri yok. Bir değer yazın ve Enter'a basın",
+    "noOperators": "Eşleşen koşul yok",
+    "removeFilter": "Filtreyi kaldır",
+    "clearAll": "Tüm filtreleri temizle",
+    "toggleConnector": "AND ve OR arasında geçiş yap",
+    "selectedCount": "Değer seçilmedi | {count} değer seçildi | {count} değer seçildi",
+    "query": "Sorgu",
+    "builderTooltip": "Alanları, koşulları ve değerleri seçerek filtreler oluşturun",
+    "queryTooltip": "Sorguyu kendiniz yazın",
+    "queryNotParsableShort": "Oluşturucu bu sorguyu gösteremiyor:",
+    "clearAndBuild": "Temizle ve oluştur",
+    "clearQueryTitle": "Sorgu temizlensin mi?",
+    "clearQueryMessage": "Sorgu kaldırılır ve oluşturucu boş başlar.",
+    "where": "Koşul",
+    "addCondition": "Koşul ekle",
+    "addGroup": "Grup ekle",
+    "startGroup": "Grup başlat",
+    "addBelow": "Aşağıya koşul ekle",
+    "ungroup": "Grubu çöz",
+    "collapseGroup": "Grubu daralt",
+    "expandGroup": "Grubu genişlet",
+    "moreInGroup": "{count} tane daha",
+    "groupHasIssues": "Bu gruptaki bir şeyin düzeltilmesi gerekiyor",
+    "chooseField": "Bir alan seçin",
+    "chooseValue": "Bir değer seçin",
+    "lockedFilter": "Bu filtre burada düzenlenemez. Kaydedildiği gibi tutulur; kaldırmak için silin",
+    "limits": {
+      "conditions": "En fazla {count} filtre | En fazla {count} filtre",
+      "values": "En fazla {count} değer | En fazla {count} değer"
+    },
+    "validation": {
+      "incomplete": "Bu filtreyi tamamlayın veya kaldırın",
+      "required": "En az bir filtre ekleyin",
+      "uniqueField": "{field} için zaten bir filtre var; onu düzenleyin veya bunu kaldırın",
+      "oneUsageCondition": "Bir kademe bir kullanım koşulu alır; bunu bir kurala dönüştürün veya kaldırın",
+      "rumField": "Yerleşik bir alan veya küçük harfler, rakamlar ve alt çizgilerden oluşan en fazla 128 karakterlik bir sütun kullanın",
+      "valueLength": "Her değer 1 ile {max} karakter arasında olmalıdır",
+      "regexLength": "Deseni en fazla {max} karakterle sınırlayın.",
+      "regexInvalid": "Bu desen geçersiz veya desteklenmiyor. İleriye bakma, geriye bakma ve geri başvurular kullanılamaz."
+    },
+    "operatorNames": {
+      "containsIgnoreCase": "İçerir (büyük/küçük harf yok sayılır)",
+      "notStartsWith": "İle başlamaz",
+      "notEndsWith": "İle bitmez",
+      "isEmpty": "Boş",
+      "isNotEmpty": "Boş değil"
+    },
+    "types": {
+      "string": "Metin",
+      "number": "Sayı",
+      "boolean": "Boole"
+    },
+    "operators": {
+      "eq": "eşittir",
+      "neq": "eşit değildir",
+      "gt": "büyüktür",
+      "gte": "büyük veya eşittir",
+      "lt": "küçüktür",
+      "lte": "küçük veya eşit",
+      "contains": "içerir",
+      "containsIgnoreCase": "içerir, büyük/küçük harf farkı gözetmeden",
+      "notContains": "içermez",
+      "startsWith": "ile başlar",
+      "notStartsWith": "ile başlamaz",
+      "endsWith": "ile biter",
+      "notEndsWith": "ile bitmez",
+      "in": "şunlardan biri",
+      "notIn": "şunlardan hiçbiri",
+      "regex": "regex ile eşleşir",
+      "notRegex": "regex ile eşleşmez",
+      "isNull": "değeri yok",
+      "isNotNull": "değeri var",
+      "isEmpty": "boş veya değeri yok",
+      "isNotEmpty": "boş olmayan bir değeri var",
+      "matchAll": "metinle eşleşir"
+    }
+  },
+  "autoobserveLive": {
+    "where": "{cluster} / {namespace}",
+    "lessThan": "<{value}",
+    "topbar": {
+      "checked": "{ago} önce kontrol edildi",
+      "firstCheck": "İlk kontrol sürüyor"
+    },
+    "retry": "Yeniden dene",
+    "classes": {
+      "errors": "Hatalar",
+      "latency": "Gecikme",
+      "saturation": "Doygunluk",
+      "absence": "Göndermeyi durdurur",
+      "external_probe": "Sentetik kontrol",
+      "workload_health": "Yeniden başlatmalar",
+      "node": "Düğümler"
+    },
+    "classesInline": {
+      "errors": "hatalar",
+      "latency": "gecikme",
+      "saturation": "doygunluk",
+      "absence": "yokluk",
+      "external_probe": "harici problar",
+      "workload_health": "iş yükü sağlığı",
+      "node": "düğüm sağlığı"
+    },
+    "states": {
+      "covered": "İzleniyor",
+      "weak": "Zayıf",
+      "silent": "Sessiz",
+      "blind": "Kör",
+      "unmapped": "Eşlenmemiş",
+      "none": "Yok"
+    },
+    "monitorKinds": {
+      "alert": "Uyarı",
+      "anomaly_detector": "Anomali dedektörü",
+      "slo": "SLO",
+      "synthetic": "Sentetik"
+    },
+    "coverage": {
+      "summaryWatched": "{watched}/{total} izleniyor · {pct}%",
+      "summaryWatchedShare": "{watched}/{total} izleniyor · {pct}",
+      "splitLabel": "{watched} tanesi izleniyor, {gaps} tanesinde kapsam boşluğu var",
+      "stateWatched": "İzleniyor",
+      "stateGap": "Kapsam boşluğu",
+      "columns": {
+        "where": "Konum",
+        "state": "Durum",
+        "lastChecked": "Son kontrol"
+      },
+      "loading": "Kapsam yükleniyor",
+      "loaded": "Kapsam yüklendi",
+      "sentence": {
+        "allWatched": "1 hizmetinizi izliyorum. | {total} hizmetinizin tamamını izliyorum.",
+        "allGaps": "1 hizmetinizde kapsam boşluğu var. | {total} hizmetinizin tamamında kapsam boşluğu var.",
+        "watching": "{total} hizmetinizden {watched} tanesini izliyorum.",
+        "gaps": "{count} tanesinde kapsam boşluğu var. | {count} tanesinde kapsam boşluğu var.",
+        "mixed": "{watching} {gaps}"
+      },
+      "gapAdded": "{checks} için uyarı eklendi. AutoObserve bunu bir sonraki kontrolünde sayar. | {checks} için uyarılar eklendi. AutoObserve bunları bir sonraki kontrolünde sayar.",
+      "gapNone": "{checks} için izleyen uyarı yok",
+      "searchPlaceholder": "Hizmet, küme veya ad alanı ara",
+      "labelNamespace": "{name} · {namespace}",
+      "labelPlace": "{name} · {cluster} · {namespace}",
+      "noNamespace": "ad alanı yok",
+      "noCluster": "küme yok",
+      "noMatch": "“{query}” ile eşleşen hizmet, küme veya ad alanı yok",
+      "showAll": "Tümünü göster",
+      "bucketThree": "3 veya daha fazla",
+      "bucketTwo": "2",
+      "bucketOne": "1",
+      "filterHides": "Hiçbir hizmet {state} değil",
+      "filterHidesSearch": "{count} hizmet “{query}” ile eşleşiyor, ancak {state} değil | {count} hizmet “{query}” ile eşleşiyor, ancak hiçbiri {state} değil"
+    },
+    "cell": {
+      "noClass": "AutoObserve bu sinyali henüz denetlemiyor",
+      "tipNoClass": "{signal}: AutoObserve bunu henüz denetlemiyor",
+      "gap": {
+        "weak": "{signal}: yalnızca {monitor}, geniş kapsamlı bir uyarı, bir sorunu fark edebilir; ancak bu hizmete özel değil | {signal}: yalnızca {monitor}, geniş kapsamlı uyarılar, bir sorunu fark edebilir; ancak bu hizmete özel değiller",
+        "silent": "{signal}: {monitor} eşleşiyor, ancak kimseye bildirim göndermiyor | {signal}: {monitor} eşleşiyor, ancak kimseye bildirim göndermiyorlar",
+        "blind": "{signal}: {monitor} eşleşiyor, ancak verisini göremiyor | {signal}: {monitor} eşleşiyor, ancak verilerini göremiyorlar",
+        "unmapped": "{signal}: {monitor} eşleşebilir, ancak kapsamı bir hizmete bağlanamadı | {signal}: {monitor} eşleşebilir, ancak kapsamları bir hizmete bağlanamadı",
+        "none": "{signal}: bunu izleyen uyarı yok"
+      },
+      "added": "Eklendi"
+    },
+    "drawer": {
+      "moreChecks": "Diğer denetimler",
+      "chartNoData": "Grafik henüz kullanılamıyor",
+      "monitors": "Uyarılar",
+      "monitorLine": "{kind} · {state}",
+      "noMonitor": "Eşleşen uyarı yok"
+    },
+    "charts": {
+      "empty1h": "Son bir saatte {service} hizmetinden veri yok",
+      "empty24h": "Son 24 saatte {service} hizmetinden veri yok",
+      "empty7d": "Son 7 günde {service} hizmetinden veri yok",
+      "emptyPartial1h": "Son bir saatin aranan kısmında {service} hizmetinden veri yok",
+      "emptyPartial24h": "Son 24 saatin aranan kısmında {service} hizmetinden veri yok",
+      "emptyPartial7d": "Son 7 günün aranan kısmında {service} hizmetinden veri yok",
+      "noSpanStatus": "{stream} içinde span durumu yok",
+      "noLevel": "{stream} içinde günlük düzeyi yok",
+      "noDuration": "{stream} içinde süre alanı yok",
+      "noTraces": "Gecikme, izlerden grafiklenir. {service} hiç iz göndermiyor.",
+      "noMatch": "Bu hizmet, akışlarıyla eşleştirilemiyor",
+      "failedQuery": "Bu grafik {stream} akışından yüklenemedi",
+      "failedMatch": "{service} hizmetinin akışlarına bakılamadı",
+      "partial": "Kısmi veri",
+      "wide": "Bu akışı paylaşan diğer hizmetleri içerir",
+      "loading": "{metric} yükleniyor",
+      "summary": "{metric}, şu anda {value}",
+      "summaryNone": "{metric}, en yeni kovada hiçbir ölçüm yok"
+    },
+    "suggestions": {
+      "serviceMeta": "{where}, saatte yaklaşık {traffic} olay",
+      "trafficOnly": "Saatte yaklaşık {traffic} olay",
+      "kinds": {
+        "coverage_gap": "Kapsam boşluğu",
+        "no_absence_check": "Eksik uyarı",
+        "silent_coverage": "Kimseye bildirim göndermiyor",
+        "coverage_lost": "Kapsam kayboldu",
+        "blind_guardrail": "Çalışmıyor",
+        "discovery_unusable": "Veri kalitesi",
+        "alert_no_destination": "Kimseye bildirim göndermiyor",
+        "alert_notify_failed": "Bildirim başarısız",
+        "other": "Diğer"
+      },
+      "severity": {
+        "high": "Yüksek",
+        "medium": "Orta"
+      },
+      "confidence": {
+        "sufficient": "Güçlü kanıt",
+        "suggestive": "Kısmi kanıt",
+        "insufficient": "Zayıf kanıt"
+      },
+      "body": {
+        "coverageGap": "{service} hizmetini izleyen hiçbir şey yok",
+        "noAbsenceNone": "{service} veri göndermeyi durdurursa hiçbir uyarı tetiklenmez",
+        "noAbsenceWeak": "{service} veri göndermeyi durdurursa bunu yalnızca geniş kapsamlı bir uyarı fark eder",
+        "noAbsenceSilent": "{service} hizmetinin sessizleştiğini fark edecek kontrol kimseye bildirim göndermiyor",
+        "noAbsenceBlind": "{service} hizmetinin sessizleştiğini fark edecek kontrol onun verisini göremiyor",
+        "silentCoverage": "{monitor}, {classes} için {count} hizmeti izliyor ancak kimseye bildirim göndermiyor | {monitor}, {classes} için {count} hizmeti izliyor ancak kimseye bildirim göndermiyor",
+        "silentWhy": "{monitor}, {services} hizmetlerinin durduğunu fark eder ancak kimseye bildirim göndermez.",
+        "silentWhyNoNames": "{monitor}, bir hizmetin durduğunu fark eder ancak kimseye bildirim göndermez.",
+        "silentNext": "Ona bir hedef verin.",
+        "undeliverable": "{monitor}, {destination} hedefine ulaşamıyor",
+        "undeliverableWhy": "{destination} uyarı değil, talep alır. | {destination} uyarı değil, talep alır.",
+        "undeliverableNext": "Yanına bir webhook veya e-posta ekleyin; {destination} kalsın. | Yanlarına bir webhook veya e-posta ekleyin; {destination} kalsın.",
+        "coverageLost": "{service}, {classes} uyarısını {day} tarihinde kaybetti",
+        "blindStreamMissing": "{monitor}, var olmayan {detail} bilgisini okuyor",
+        "blindNoData": "{monitor}, son verisi olmayan {detail} bilgisini okuyor",
+        "blindEmptyScope": "{monitor}, hiçbir zaman gelmeyen satırlara göre filtreliyor",
+        "blindUnknownField": "{monitor}, akışında bulunmayan {field} alanına göre filtreliyor",
+        "blindIgnoredMatcher": "{monitor}, hiçbir seride bulunmayan {label} etiketine göre eşleşiyor, bu yüzden tüm serileri izliyor",
+        "discovery": "Keşfedilen hizmetlerden yalnızca {good} tanesi kullanılabilir; toplam {active} hizmet olduğundan boşluk sıralamaları kısmi kalır.",
+        "alertSyntax": "{monitor} ayrıştırılamayan bir sorgu içeriyor",
+        "alertTimeout": "{monitor} tamamlanmadan sürekli zaman aşımına uğruyor",
+        "alertMemory": "{monitor} sürekli bellek yetersizliği yaşıyor",
+        "alertOtherError": "{monitor} sürekli bir hatayla başarısız oluyor",
+        "alertNotWorkingGeneric": "{monitor} çalışmıyor",
+        "alertNoDestination": "{monitor} tetiklendi ve kimseye bildirim göndermiyor",
+        "alertNotifyFailed": "{monitor} tetiklendi ve {failed} tanesi, denenen {tried} bildirimden başarısız oldu. | {monitor} tetiklendi ve {failed} tanesi, denenen {tried} bildirimden başarısız oldu.",
+        "alertNotifyFailedNoCounts": "{monitor} tetiklendi ve bildirimleri başarısız oldu.",
+        "alertStreamGone": "{monitor} sürekli başarısız oluyor çünkü akışı mevcut değil",
+        "alertFieldGone": "{monitor} sürekli başarısız oluyor çünkü kullandığı bir alan mevcut değil",
+        "other": "Bu sayfanın henüz gösteremediği bir şey buldum"
+      },
+      "detail": {
+        "cell": "{check}: {state}",
+        "cells": "Motorun bulduğu: {cells}.",
+        "services": "Eşleştiği hizmetler arasında {services} var.",
+        "text": "Motor ayrıntısı: {detail}",
+        "quality": "Keşif {mode} modunda çalışıyor.",
+        "none": "Motor başka ayrıntı göndermedi.",
+        "joined": "{first} {rest}"
+      },
+      "analysedAt": "Kalibrasyon çalıştırmasından: {ago}",
+      "neverFired": "Hiç tetiklenmedi",
+      "lastFired": "Son tetiklenme: {time}",
+      "accept": "Kabul et",
+      "dismiss": "Yoksay…",
+      "accepted": "Bu önizlemede kabul edildi; hiçbir şey gönderilmedi",
+      "dismissed": "Bu önizlemede yoksayıldı; hiçbir şey gönderilmedi",
+      "loading": "Öneriler yükleniyor",
+      "loaded": "Öneriler yüklendi",
+      "more": "ve {count} tane daha | ve {count} tane daha",
+      "moreNames": "{count} tane daha | {count} tane daha",
+      "whyNext": "{why} {next}",
+      "seeAll": "Tümünü gör",
+      "drawerTitle": "Öneriler",
+      "drawerLine": "En önemli olan en üstte olacak şekilde sıralanır. Bulduğumu görmek için bir satırı açın.",
+      "focusGone": "Bu öneri artık açık değil.",
+      "clearKind": "Tüm önerileri göster",
+      "kindEmptyTitle": "{kind} türünde açık öneri yok",
+      "kindEmptyDesc": "{count} başka öneri açık. | {count} başka öneri açık.",
+      "folder": "Klasör {folder}",
+      "columns": {
+        "suggestion": "Öneri",
+        "where": "Nerede",
+        "kind": "Tür",
+        "severity": "Önem derecesi"
+      }
+    },
+    "notice": {
+      "offTitle": "AutoObserve açık değil",
+      "details": "Ayrıntılar",
+      "refreshFailed": "{failedAt} tarihinde yenileme başarısız oldu · {dataAt} tarihli {what} gösteriliyor",
+      "what": {
+        "coverage": "kapsam",
+        "suggestions": "öneriler",
+        "incidents": "çağrı gönderilen bulgular",
+        "issues": "sorunlar",
+        "history": "geçmiş"
+      },
+      "coverage": {
+        "deniedTitle": "Kapsamı görme izniniz yok",
+        "deniedDesc": "Kapsam her klasördeki monitörleri sayar; bu nedenle yalnızca bazı klasörlerdeki değil, bu kuruluştaki tüm uyarıları görme izni gerektirir. Bunun için bir kuruluş yöneticisinden izin isteyin.",
+        "offDesc": "Bir yönetici bunu bu dağıtım için açar. Kapsam, ilk kontrolünden sonra burada görünür.",
+        "unavailableTitle": "Kapsam geçici olarak kullanılamıyor",
+        "unavailableDesc": "AutoObserve şu anda yanıt vermiyor. Bu genellikle bir iki dakika içinde düzelir.",
+        "failedTitle": "Kapsam yüklenemedi",
+        "failedDesc": "Yüklenirken bir sorun oluştu. Birazdan tekrar deneyin.",
+        "noPassTitle": "Son bir günde hiçbir kontrol tamamlanmadı",
+        "noPassDesc": "Kapsam, hizmetlerinizi bir sonraki kontrolüm tamamlandıktan sonra burada görünür. AutoObserve yeni açıldıysa ilk kontrol biraz zaman alabilir.",
+        "noPassAction": "Kapsamı nasıl kontrol ederim",
+        "noServicesTitle": "Henüz hizmet bulunamadı",
+        "noServicesDesc": "Son kontrolüm ({when}) hiçbir hizmet bulamadı. Hizmetler, bir hizmet adı belirten günlükler, metrikler veya izler gönderdiklerinde burada görünür.",
+        "noServicesAction": "Hizmetleri nasıl bulurum"
+      },
+      "suggestions": {
+        "deniedTitle": "Önerileri görme izniniz yok",
+        "deniedDesc": "Onları görmek, bu kuruluştaki uyarıları görme izni gerektirir. Bunun için bir kuruluş yöneticisinden izin isteyin.",
+        "offDesc": "Öneriler, bir yönetici bunu bu dağıtım için açtıktan sonra burada görünür.",
+        "unavailableTitle": "Öneriler geçici olarak kullanılamıyor",
+        "unavailableDesc": "AutoObserve şu anda yanıt vermiyor. Bu genellikle bir iki dakika içinde düzelir.",
+        "failedTitle": "Öneriler yüklenemedi",
+        "failedDesc": "Yüklenirken bir sorun oluştu. Birazdan tekrar deneyin.",
+        "emptyTitle": "Şu anda öneri yok",
+        "emptyDesc": "Monitörlerinizin kapsamadığı bir boşluk bulduğumda buraya bir tane ekleyeceğim.",
+        "pageEmptyTitle": "En önemli öneriler zaten ele alındı",
+        "pageEmptyDesc": "Hâlâ bekleyenler için tam listeyi açın."
+      },
+      "history": {
+        "deniedTitle": "Geçmişi görme izniniz yok",
+        "deniedDesc": "Geçmiş, AutoObserve'un açtığı vakaları listeler; bu nedenle geçmişi görmek için bu kuruluştaki vakaları listeleme izni gerekir. Bunun için bir kuruluş yöneticisinden izin isteyin.",
+        "offDesc": "Geçmiş, bir yönetici bu dağıtım için etkinleştirdikten sonra burada görünür.",
+        "unavailableTitle": "Geçmiş geçici olarak kullanılamıyor",
+        "unavailableDesc": "AutoObserve şu anda yanıt vermiyor. Bu genellikle bir iki dakika içinde düzelir.",
+        "failedTitle": "Geçmiş yüklenemedi",
+        "failedDesc": "Yüklenirken bir sorun oluştu. Birazdan tekrar deneyin."
+      },
+      "incidents": {
+        "deniedTitle": "Çağrı gönderen bulguları görme izniniz yok",
+        "deniedDesc": "Çağrı gönderen bulgular vaka açar; bu nedenle bunları görmek için bu kuruluştaki vakaları listeleme izni gerekir. Bunun için bir kuruluş yöneticisinden izin isteyin.",
+        "offDesc": "Çağrı gönderen bulgular, bir yönetici bu dağıtım için etkinleştirdikten sonra burada görünür.",
+        "unavailableTitle": "Çağrı gönderen bulgular geçici olarak kullanılamıyor",
+        "unavailableDesc": "AutoObserve şu anda yanıt vermiyor. Bu genellikle bir iki dakika içinde düzelir.",
+        "failedTitle": "Çağrı gönderen bulgular yüklenemedi",
+        "failedDesc": "Bunlar yüklenirken bir sorun oluştu. Birazdan tekrar deneyin."
+      },
+      "issues": {
+        "deniedTitle": "Sorunları görme izniniz yok",
+        "deniedDesc": "Sorunlar AutoObserve'un açtığı vakalardır; bu nedenle bunları görmek için bu kuruluştaki vakaları listeleme izni gerekir. Bunun için bir kuruluş yöneticisinden izin isteyin.",
+        "offDesc": "Sorunlar, bir yönetici bu dağıtım için etkinleştirdikten sonra burada görünür.",
+        "unavailableTitle": "Sorunlar geçici olarak kullanılamıyor",
+        "unavailableDesc": "AutoObserve şu anda yanıt vermiyor. Bu genellikle bir iki dakika içinde düzelir.",
+        "failedTitle": "Sorunlar yüklenemedi",
+        "failedDesc": "Bunlar yüklenirken bir sorun oluştu. Birazdan tekrar deneyin."
+      }
+    },
+    "time": {
+      "justNow": "az önce",
+      "ago": "{time} önce"
+    },
+    "history": {
+      "incident": "Bir vaka açıldı: {title}",
+      "dismissed": "{actor}, {title} öğesini yok saydı",
+      "accepted": "{actor}, {title} öğesini amaçlanan rapor olarak işaretledi",
+      "changed": "{actor}, {title} öğesini değiştirdi",
+      "denied": {
+        "incidents": "Vakalar listelenmiyor: bunları görme izniniz yok.",
+        "decisions": "Kararlar listelenmiyor: bunları görme izniniz yok."
+      },
+      "untitled": "bir öneri",
+      "openIncident": "Vakayı aç",
+      "newest": "En yeni {count} tanesi gösteriliyor. Daha eski vakalar Sorunlar sayfasında.",
+      "loading": "Geçmiş yükleniyor",
+      "loaded": "Geçmiş yüklendi"
+    },
+    "paging": {
+      "title": "Paging",
+      "label": "Page on-call when a stream stops",
+      "description": "Pages go to the on-call team that owns the service, else the organization's default team. Drops and rises show on the AutoObserve home as findings and never page.",
+      "routing": "On-call routing",
+      "unavailable": "Paging is turned off for this deployment.",
+      "denied": "{denied} {askAdmin}",
+      "loadFailed": "Couldn't load the paging setting. Refresh to try again.",
+      "deniedTitle": "Çağrı gönderme ayarını görme izniniz yok",
+      "deniedDesc": "Çağrı gönderme tüm kuruluş için bir kez ayarlanır. Erişim için bir kuruluş yöneticisinden isteyin.",
+      "failedTitle": "Çağrı gönderme ayarı yüklenemedi",
+      "failedDesc": "Yüklenirken bir sorun oluştu. Biraz sonra tekrar deneyin.",
+      "later": "Who else AutoObserve notifies, and how far it acts on its own, will be set here once those controls exist."
+    },
+    "incidents": {
+      "title": "Çağrı gönderen bulgular",
+      "subtitle": "Nöbet ekibiniz için vaka açan ve analizini içeren bulgular.",
+      "pagingNote": "Bu kuruluşta çağrı gönderme kapalı, bu nedenle AutoObserve vaka açmaz.",
+      "sharedFor": "{label}: {reason}",
+      "finding": {
+        "stream_silence": "{stream} ({type}) veri göndermeyi durdurdu",
+        "stream_drop": "{stream} ({type}) hacmi keskin şekilde düştü",
+        "stream_rise": "{stream} ({type}) hacmi keskin şekilde arttı"
+      },
+      "opened": "Vaka {when} açıldı",
+      "openIncident": "Vakayı aç",
+      "viewAnalysis": "Analizi görüntüle",
+      "newFindings": "{count} yeni bulgu | {count} yeni bulgu",
+      "showNew": "Göster",
+      "more": "En yeni {count} tanesi gösteriliyor",
+      "seeAll": "Tüm vakaları gör",
+      "seeAllIssues": "Tüm sorunları gör",
+      "failedDetail": {
+        "status": "İstek {time} tarihinde {status} durumuyla başarısız oldu.",
+        "noResponse": "İstek {time} tarihinde yanıt almadı."
+      },
+      "analysis": {
+        "notRunDetail": "Henüz hiçbir analiz başlatılmadı. Başlatmak için vakayı açın.",
+        "disabledDetail": "Bu dağıtım için yapay zeka analizi kapalı.",
+        "offOther": "Bu vaka için otomatik analiz çalışmadı.",
+        "failedDetail": "Analiz tamamlanmadan durdu. Ayrıntılar için görüntüleyin."
+      },
+      "empty": {
+        "title": "Henüz kimseye çağrı gönderilmedi",
+        "desc": "Bir akış durduğunda veya hacmi keskin biçimde değiştiğinde, vakası ve analizi burada görünür."
+      },
+      "emptyOff": {
+        "title": "Çağrı gönderme kapalı",
+        "desc": "AutoObserve bu kuruluş için akış bulgularını kaydeder ancak vaka açmaz. Çağrı göndermeyi bir yönetici açar."
+      },
+      "loading": "Çağrı gönderilen bulgular yükleniyor…",
+      "loaded": "Çağrı gönderilen bulgular yüklendi",
+      "subtitleWho": "Findings that opened an incident, who was paged, and its analysis.",
+      "routing": "Set up on-call routing"
+    },
+    "issues": {
+      "searchPlaceholder": "Ne olduğunu veya bir akışı arayın",
+      "columns": {
+        "incident": "Ne oldu",
+        "severity": "Önem derecesi",
+        "status": "Durum",
+        "stream": "Akış",
+        "opened": "Açılma",
+        "analysis": "Analiz",
+        "page": "Kime çağrı gönderildi"
+      },
+      "count": "Sorun yok | {count} sorun | {count} sorun",
+      "capNote": "En yeni {count} sorun gösteriliyor. Daha eskileri görmek için aralığı daraltın.",
+      "emptyRange": "{within} sorun yok",
+      "streamType": "{type} akışı",
+      "streamMore": "{stream} +{count}",
+      "filterOpen": "Açık",
+      "loading": "Sorunlar yükleniyor…",
+      "loaded": "Sorunlar yüklendi",
+      "page": {
+        "unrouted": "Kimseye çağrı gönderilmedi",
+        "failed": "Çağrı gönderme başarısız",
+        "pending": "Henüz onaylanmadı"
+      },
+      "today": "Bugün",
+      "yesterday": "Dün",
+      "shared": {
+        "rcaDisabled": "Bu vakalar açıldığında yapay zeka analizi kapalıydı.",
+        "aiUnavailable": "Bu vakalar açıldığında yapay zeka analizi kullanılamıyordu.",
+        "quotaExceeded": "Bu vakalar açıldığında kuruluş yapay zeka analizi sınırına ulaşmıştı.",
+        "coolingDown": "Az önce bir analiz çalışmıştı, bu nedenle bu vakalar için yeni bir analiz başlatılmadı.",
+        "startFailed": "Analizler başlatılamadı.",
+        "offOther": "Bu vakalar için otomatik analiz çalışmadı.",
+        "disabled": "Bu dağıtım için yapay zeka analizi kapalı.",
+        "notRun": "Henüz hiçbir analiz başlatılmadı. Başlatmak için bir vaka açın.",
+        "failed": "Bu analizler tamamlanmadan durdu. Ayrıntılar için birini görüntüleyin."
+      }
+    },
+    "surfaces": {
+      "changes": {
+        "title": "Henüz değişiklik yok",
+        "desc": "AutoObserve düzeltmeler önerir ancak hiçbir uyarıyı veya ayarı değiştirmez. Bir değişiklik yaptığında, işe yarayıp yaramadığıyla birlikte burada görünür. Şimdilik önerilerini gözden geçirin ve istediklerinizi uygulayın.",
+        "action": "Önerileri gözden geçir"
+      },
+      "history": {
+        "title": "Henüz geçmiş yok",
+        "desc": "AutoObserve'un ne bulduğu, neyi değiştirdiği ve sizin ne karar verdiğiniz burada listelenir, en yeniler önce. Bugün bulguları vaka açar ve bunlar Sorunlar sayfasında yer alır.",
+        "action": "Sorunları aç"
+      },
+      "scenario": {
+        "tag": "Canlı veri",
+        "text": "Bu kuruluşun canlı verisini görüyorsunuz. Örnek senaryolar burada gösterilmez.",
+        "action": "Nasıl çalışır"
+      },
+      "settings": {
+        "title": "Burada henüz ayarlanacak bir şey yok",
+        "desc": "Bir yönetici bu dağıtım için AutoObserve'u ve çağrı göndermeyi etkinleştirir. Kime bildirim göndereceği ve ne ölçüde kendi başına hareket edeceği, bu kontroller mevcut olduğunda burada ayarlanacak.",
+        "action": "Nasıl çalışır"
+      }
+    },
+    "learning": {
+      "line": "Learning {count} stream. It is ready on {date}; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams. The first is ready on {date}; AutoObserve needs {days} days of history to judge a stream.",
+      "lineNoDate": "Learning {count} stream; AutoObserve needs {days} days of history to judge a stream. | Learning {count} streams; AutoObserve needs {days} days of history to judge a stream.",
+      "emptyTitle": "Learning your streams",
+      "emptyDesc": "AutoObserve needs {days} days of history to judge a stream. The stream is ready on {date}. | AutoObserve needs {days} days of history to judge a stream. The first of {count} streams is ready on {date}.",
+      "emptyDescNoDate": "AutoObserve needs {days} days of history to judge a stream. It is learning {count} stream now. | AutoObserve needs {days} days of history to judge a stream. It is learning {count} streams now.",
+      "until": "Learning until {date} · {streams}",
+      "streams": "Learning {count} stream | Learning {count} streams",
+      "streamUntil": "until {date}"
+    }
+  },
   "insight": {
     "targets": {
       "origin": "{date} tarihinde {service} için bir AutoObserve önerisinden oluşturuldu.",
@@ -33145,6 +32909,175 @@
       "openSourceLogs": "Günlükler'i {source} kaynağının son satırları üzerinde, durmasından 6 saat öncesinden başlayarak açar.",
       "addSynthetic": "Sentetik kontrol formunu doldurulmuş olarak açar. Kaydedene kadar hiçbir şey kaydedilmez.",
       "setUpKubernetes": "Kubernetes kurulumunu kendi kümesi için açar."
+    },
+    "kind": {
+      "chip": {
+        "notWatched": "Kapsam boşluğu",
+        "missingAlert": "Eksik uyarı",
+        "notifiesNoOne": "Kimseye bildirim göndermiyor",
+        "stoppedSending": "Göndermeyi durdurdu",
+        "dataQuality": "Veri kalitesi"
+      },
+      "traffic": {
+        "handles": "Saatte yaklaşık {count} olay işliyor.",
+        "usually": "Genellikle saatte yaklaşık {count} olay gönderir."
+      },
+      "classes": {
+        "why": {
+          "errors": "hataları",
+          "latency": "gecikmesi",
+          "absence": "göndermeyi durdurup durdurmadığı"
+        },
+        "ai": {
+          "errors": "hatalar",
+          "latency": "gecikme",
+          "absence": "göndermeyi durdurma"
+        },
+        "name": {
+          "errors": "Hatalar",
+          "latency": "Gecikme",
+          "absence": "Göndermeyi durdurur"
+        }
+      },
+      "detail": {
+        "noAlert": "{check}: uyarı yok.",
+        "cantMeasure": "{check}: henüz ölçülemiyor, {service} hiç iz göndermiyor."
+      },
+      "coverage_gap": {
+        "headline": "{service} için hiçbir izleme yok",
+        "why": "{classes} için hiçbir uyarı yok.",
+        "next": "AutoObserve'un hazırladığı uyarıyı ekleyin. | AutoObserve'un hazırladığı {count} uyarıyı ekleyin.",
+        "needsTraces": "Gecikme için önce izler gerekir.",
+        "groupAdded": "{count} hizmet için uyarı eklendi | {count} hizmet için uyarı eklendi",
+        "groupHeadline": "{count} hizmet için hiçbir izleme yok",
+        "groupTraffic": "Birlikte saatte yaklaşık {count} olay işliyorlar.",
+        "groupNext": "AutoObserve'un hazırladığı uyarıyı ekleyin. | AutoObserve'un hazırladığı {count} uyarıyı tek bir listede, takıma göre gruplanmış olarak ekleyin."
+      },
+      "no_absence_check": {
+        "why": "{service} göndermeyi durdurursa hiçbir uyarı tetiklenmez.",
+        "why_weak": "Bunu yalnızca {monitor} fark eder, o da tüm akışı izliyor.",
+        "why_blind": "{monitor} fark eder, ancak {service} verilerini göremiyor.",
+        "whySilent": "{monitor} {service} durduğunda fark eder, ancak kimseye bildirim göndermiyor.",
+        "next": "Veri yok uyarısı ekleyin: {service} {minutes} dakika boyunca hiçbir şey göndermezse tetiklenir.",
+        "nextSilent": "Ona bildirim gönderecek birini tanımlayın."
+      },
+      "coverage_lost": {
+        "why": "Onu izleyen uyarılarda bir şey değişti.",
+        "next": "Tekrar ekleyin veya onu izleyen uyarıda neyin değiştiğini kontrol edin."
+      },
+      "blind_guardrail": {
+        "nextStream": "Onu {detail} yerine geçen akışa yönlendirin veya silin.",
+        "nextScope": "Filtresini kontrol edin: bu haliyle olması gereken hiçbir şeyle eşleşmiyor.",
+        "nextField": "Sorgusunun filtrelediği alanı düzeltin."
+      },
+      "discovery_unusable": {
+        "headline": "AutoObserve'un bulduğu {active} hizmetten yalnızca {good} tanesi kullanılabilir",
+        "why": "Verilerinin çoğunda hizmet adı yok, bu yüzden boşluklar listesi eksik kalıyor.",
+        "next": "İzlerinizde ve günlüklerinizde service.name gönderin."
+      },
+      "source_silence": {
+        "headline": "{source}, {stream} akışına göndermeyi durdurdu",
+        "since": "{time} itibarıyla.",
+        "usual": "Genellikle günde yaklaşık {count} satır gönderiyor; {stream} akışının geri kalanı akmaya devam etti.",
+        "more": "Bu akışta {count} kaynak daha var. | {streams} akışta {count} kaynak daha var.",
+        "nextSender": "{source} üzerindeki aracıyı veya toplayıcıyı kontrol edin.",
+        "nextGap": "Geri geldi. Boşlukta nelerin atlandığını kontrol edin."
+      },
+      "heartbeat_on_success": {
+        "headline": "{job} işi başarılı olmayı bırakırsa hiçbir uyarı tetiklenmez",
+        "why": "Başarı satırı son gün içinde göründü. | Başarı satırı son {days} günün her birinde göründü.",
+        "next": "Başarı satırı görünmediğinde tetiklenecek bir uyarı ekleyin."
+      },
+      "cell": {
+        "falls": {
+          "weak": "Yalnızca geniş kapsamlı bir uyarı olan {monitor} {what} izliyor ve bu hizmete özel kapsamlanmamış. | Yalnızca geniş kapsamlı uyarılar olan {monitor} {what} izliyor ve bu hizmete özel kapsamlanmamış.",
+          "silent": "{monitor} {what} izliyor, ancak kimseye bildirim göndermiyor. | {monitor} {what} izliyor, ancak kimseye bildirim göndermiyor.",
+          "blind": "{monitor} {what} izliyor, ancak bu hizmetin verilerini göremiyor. | {monitor} {what} izliyor, ancak bu hizmetin verilerini göremiyor.",
+          "unmapped": "{monitor} {what} izliyor olabilir, ancak kapsamı bu hizmete bağlanamadı. | {monitor} {what} izliyor olabilir, ancak kapsamları bu hizmete bağlanamadı."
+        },
+        "watchWhat": {
+          "errors": "{service} hataları",
+          "latency": "{service} gecikmesi",
+          "absence": "{service} göndermeyi durdurup durdurmadığı"
+        },
+        "justAdded": "Eklendi. AutoObserve bir sonraki kontrolünde, yaklaşık 5 dakika içinde bunu sayar. | Eklendi. AutoObserve bir sonraki kontrolünde, yaklaşık 5 dakika içinde bunları sayar.",
+        "errorsWhy": "{service} hataları için hiçbir uyarı yok.",
+        "errorsNext": "Olağan hızının 3 katında bir hata uyarısı ekleyin.",
+        "latencyWhy": "{service} gecikmesi için hiçbir uyarı yok.",
+        "latencyNext": "Olağan p95 değerinin 2 katında bir gecikme uyarısı ekleyin.",
+        "latencyNoTraces": "Gecikme izlerden grafiklenir. {service} hiç iz göndermiyor.",
+        "noMetrics": "{service} için CPU veya bellek verisi gelmiyor, bu yüzden bu henüz izlenemiyor.",
+        "noRestartEvents": "{service} için yeniden başlatma olayı gelmiyor, bu yüzden yeniden başlatmaları henüz izlenemiyor.",
+        "saturationWhy": "{service} için belleği veya CPU'yu izleyen hiçbir uyarı yok. Konteyner belleği {stream} akışına geliyor.",
+        "saturationNext": "Limitinin %90'ında bir bellek uyarısı ekleyin.",
+        "nodeWhy": "{service} hizmetinin çalıştığı düğümleri izleyen bir uyarı yok. Düğüm verileri {stream} akışına gelir.",
+        "nodeNext": "Kapasitenin %90'ında bir düğüm uyarısı ekleyin.",
+        "restartsWhy": "{service} hizmetinin yeniden başlatmalarını izleyen bir uyarı yok.",
+        "restartsNext": "Pod'ları 10 dakikada 3 kez yeniden başladığında tetiklenen bir uyarı ekleyin.",
+        "syntheticWhy": "{service} hizmetini dışarıdan kontrol eden hiçbir şey yok. Sentetik kontrol birkaç dakikada bir istek gönderir ve hizmet hiçbir şey göndermese bile bir kesintiyi fark eder.",
+        "syntheticNext": "Sağlık uç noktasına bir sentetik kontrol ekleyin."
+      },
+      "paged": {
+        "page": {
+          "paged": "Paged {team}",
+          "pagedTeam": "Paged the on-call team",
+          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
+          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand.",
+          "pending": "Nöbete çağrı gönderiliyor: nöbet hizmeti çağrıyı henüz onaylamadı."
+        },
+        "nextRouting": "Set up on-call routing so the next stop pages someone.",
+        "recoveredAt": "{time} itibarıyla geri döndü.",
+        "stream_silence": {
+          "headline": "{count} streams stopped sending data",
+          "why": "No data has arrived on {stream} ({type}) since {time}.",
+          "whyMany": "{streams} have sent no data since {time}.",
+          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
+          "nextMany": "One cause is likely, such as a shared collector.",
+          "whyOne": "{stream}, {time} tarihinden beri veri göndermedi.",
+          "recovered": "{stream} ({type}) yeniden veri gönderiyor. {time} tarihinde durmuştu.",
+          "recoveredMany": "{streams} yeniden veri gönderiyor. {time} tarihinde durmuşlardı.",
+          "recoveredSome": "Yeniden gönderiyor: {streams}."
+        },
+        "stream_drop": {
+          "headline": "{count} streams dropped sharply",
+          "why": "{stream} ({type}) has received much less data than usual since {time}.",
+          "whyMany": "{streams} have received much less data than usual since {time}.",
+          "next": "Check whether a sender stopped or a filter changed.",
+          "nextMany": "One cause is likely, such as a shared collector or filter.",
+          "whyOne": "{stream}, {time} tarihinden beri normalden çok daha az veri aldı.",
+          "recovered": "{stream} ({type}) olağan hacmine döndü. Düşüş {time} tarihinde yaşandı.",
+          "recoveredMany": "{streams} olağan hacimlerine döndü. Düşüş {time} tarihinde yaşandı.",
+          "recoveredSome": "Olağan hacme dönenler: {streams}."
+        },
+        "stream_rise": {
+          "headline": "{count} streams rose sharply",
+          "why": "{stream} ({type}) has received much more data than usual since {time}.",
+          "whyMany": "{streams} have received much more data than usual since {time}.",
+          "next": "Check for a retry loop or a new sender writing to it.",
+          "nextMany": "One cause is likely, such as a shared sender retrying.",
+          "whyOne": "{stream}, {time} tarihinden beri normalden çok daha fazla veri aldı.",
+          "recovered": "{stream} ({type}) olağan hacmine döndü. Artış {time} tarihinde yaşandı.",
+          "recoveredMany": "{streams} olağan hacimlerine döndü. Artış {time} tarihinde yaşandı.",
+          "recoveredSome": "Olağan hacme dönenler: {streams}."
+        }
+      }
+    },
+    "threshold": {
+      "label": "Şu değeri aşınca tetikle",
+      "errorsSuffix": "saat başına hata",
+      "latencySuffix": "ms (p95)",
+      "errorsReason": "AutoObserve, son 7 günde {service} için olağan hata sayısı bulamadı. Bu uyarıyı eklemek için bir eşik belirleyin.",
+      "latencyReason": "AutoObserve, son 7 günde {service} için olağan gecikme bulamadı. Bu uyarıyı eklemek için bir eşik belirleyin.",
+      "measuring": "7 günlük olağan seviye ölçülüyor…",
+      "noUsual": "7 günde yok",
+      "notMeasured": "Ölçülmedi",
+      "timedOut": "Ölçüm çok uzun sürdü. Bir eşik belirleyin.",
+      "placeholder": "Eşik belirleyin",
+      "placeholderShort": "Değer belirleyin",
+      "required": "Eşik belirleyin",
+      "invalid": "0'dan büyük bir sayı girin.",
+      "invalidErrors": "0 veya daha fazla girin.",
+      "anyErrorNote": "AutoObserve, son 7 günde {service} için hata bulamadı; bu nedenle bu uyarı her hatada tetiklenir. Bazı hatalar normal ise eşiği yükseltin."
     },
     "bulk": {
       "alertsPage": "Uyarılar",
@@ -33321,6 +33254,32 @@
         "appliedEditor": "Saved and recorded for {title}.",
         "notRecorded": "Saved. This change was not recorded, so it can't be undone from AutoObserve."
       },
+      "apply": {
+        "edit": "Edit in alert editor",
+        "button": "Apply",
+        "where": "Folder {folder} · notifies {destinations}",
+        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
+        "whereNoOne": "Klasör {folder} · kimseye bildirim göndermez",
+        "whereTeamNoOne": "Klasör {folder} · ekip {team} · kimseye bildirim göndermez",
+        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
+        "acknowledgedFirst": "{of} onaylanmış tetiklenmeden {count} tanesi artık uyarı vermeyecek, ilki {first}. Uygulamadan önce kontrol edin.",
+        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
+        "changed": "This alert changed. Open it to review.",
+        "offerChanged": "Önerilen değişiklik güncellendi. Tekrar inceleyin.",
+        "reviewAgain": "Tekrar incele",
+        "loading": "Checking what this changes…",
+        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
+        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
+        "cardNote": "Shows what changes before anything is saved.",
+        "gone": "This suggestion is no longer available. Open the alert to review it."
+      },
+      "applied": {
+        "title": "Applied changes",
+        "by": "by {actor} at {when}",
+        "undoneBy": "{actor} tarafından {when} geri alındı",
+        "undone": "Undone",
+        "you": "you"
+      },
       "undone": {
         "one": "Geri alındı: {title} tekrar gösteriliyor.",
         "many": "Geri alındı: {count} öğe tekrar gösteriliyor. | Geri alındı: {count} öğe tekrar gösteriliyor.",
@@ -33383,32 +33342,6 @@
         "range": "{total} içinden {from}–{to}",
         "previous": "Önceki sayfa",
         "next": "Sonraki sayfa"
-      },
-      "apply": {
-        "edit": "Edit in alert editor",
-        "button": "Apply",
-        "where": "Folder {folder} · notifies {destinations}",
-        "whereTeam": "Folder {folder} · team {team} · notifies {destinations}",
-        "whereNoOne": "Klasör {folder} · kimseye bildirim göndermez",
-        "whereTeamNoOne": "Klasör {folder} · ekip {team} · kimseye bildirim göndermez",
-        "acknowledged": "{count} of the {of} acknowledged firings would no longer alert. Check it before applying.",
-        "acknowledgedFirst": "{of} onaylanmış tetiklenmeden {count} tanesi artık uyarı vermeyecek, ilki {first}. Uygulamadan önce kontrol edin.",
-        "note": "Only the settings above change; the rest of the alert stays as it is. You can undo it while nobody else has changed the alert.",
-        "changed": "This alert changed. Open it to review.",
-        "offerChanged": "Önerilen değişiklik güncellendi. Tekrar inceleyin.",
-        "reviewAgain": "Tekrar incele",
-        "loading": "Checking what this changes…",
-        "loadFailed": "Couldn't check what this changes, so it can't be applied here. Edit it in the alert editor instead.",
-        "offline": "Apply isn't available here yet. Edit it in the alert editor; nothing changes until you save.",
-        "cardNote": "Shows what changes before anything is saved.",
-        "gone": "This suggestion is no longer available. Open the alert to review it."
-      },
-      "applied": {
-        "title": "Applied changes",
-        "by": "by {actor} at {when}",
-        "undoneBy": "{actor} tarafından {when} geri alındı",
-        "undone": "Undone",
-        "you": "you"
       }
     },
     "cta": {
@@ -33426,7 +33359,7 @@
       "openService": "Hizmeti aç",
       "reviewServices": "Hizmetleri incele",
       "openInCalibration": "Uyarı Kalibrasyonu'nda aç",
-      "askAi": "Yapay Zeka'ya sor",
+      "askAi": "@:{'brand.askAutobot'}",
       "askAdmins": "Yöneticilere sor",
       "dismiss": "Yoksay…",
       "markIntendedReport": "Amaçlanan rapor olarak işaretle",
@@ -33494,175 +33427,6 @@
       "calibration": {
         "failure": "{alert} uyarısı {what}. Düzeltilmiş bir sorgu önerin, bana gösterin ve ben söyleyene kadar kaydetmeyin."
       }
-    },
-    "kind": {
-      "chip": {
-        "notWatched": "Kapsam boşluğu",
-        "missingAlert": "Eksik uyarı",
-        "notifiesNoOne": "Kimseye bildirim göndermiyor",
-        "stoppedSending": "Göndermeyi durdurdu",
-        "dataQuality": "Veri kalitesi"
-      },
-      "traffic": {
-        "handles": "Saatte yaklaşık {count} olay işliyor.",
-        "usually": "Genellikle saatte yaklaşık {count} olay gönderir."
-      },
-      "classes": {
-        "why": {
-          "errors": "hataları",
-          "latency": "gecikmesi",
-          "absence": "göndermeyi durdurup durdurmadığı"
-        },
-        "ai": {
-          "errors": "hatalar",
-          "latency": "gecikme",
-          "absence": "göndermeyi durdurma"
-        },
-        "name": {
-          "errors": "Hatalar",
-          "latency": "Gecikme",
-          "absence": "Göndermeyi durdurur"
-        }
-      },
-      "detail": {
-        "noAlert": "{check}: uyarı yok.",
-        "cantMeasure": "{check}: henüz ölçülemiyor, {service} hiç iz göndermiyor."
-      },
-      "coverage_gap": {
-        "headline": "{service} için hiçbir izleme yok",
-        "why": "{classes} için hiçbir uyarı yok.",
-        "next": "AutoObserve'un hazırladığı uyarıyı ekleyin. | AutoObserve'un hazırladığı {count} uyarıyı ekleyin.",
-        "needsTraces": "Gecikme için önce izler gerekir.",
-        "groupAdded": "{count} hizmet için uyarı eklendi | {count} hizmet için uyarı eklendi",
-        "groupHeadline": "{count} hizmet için hiçbir izleme yok",
-        "groupTraffic": "Birlikte saatte yaklaşık {count} olay işliyorlar.",
-        "groupNext": "AutoObserve'un hazırladığı uyarıyı ekleyin. | AutoObserve'un hazırladığı {count} uyarıyı tek bir listede, takıma göre gruplanmış olarak ekleyin."
-      },
-      "no_absence_check": {
-        "why": "{service} göndermeyi durdurursa hiçbir uyarı tetiklenmez.",
-        "why_weak": "Bunu yalnızca {monitor} fark eder, o da tüm akışı izliyor.",
-        "why_blind": "{monitor} fark eder, ancak {service} verilerini göremiyor.",
-        "whySilent": "{monitor} {service} durduğunda fark eder, ancak kimseye bildirim göndermiyor.",
-        "next": "Veri yok uyarısı ekleyin: {service} {minutes} dakika boyunca hiçbir şey göndermezse tetiklenir.",
-        "nextSilent": "Ona bildirim gönderecek birini tanımlayın."
-      },
-      "coverage_lost": {
-        "why": "Onu izleyen uyarılarda bir şey değişti.",
-        "next": "Tekrar ekleyin veya onu izleyen uyarıda neyin değiştiğini kontrol edin."
-      },
-      "blind_guardrail": {
-        "nextStream": "Onu {detail} yerine geçen akışa yönlendirin veya silin.",
-        "nextScope": "Filtresini kontrol edin: bu haliyle olması gereken hiçbir şeyle eşleşmiyor.",
-        "nextField": "Sorgusunun filtrelediği alanı düzeltin."
-      },
-      "discovery_unusable": {
-        "headline": "AutoObserve'un bulduğu {active} hizmetten yalnızca {good} tanesi kullanılabilir",
-        "why": "Verilerinin çoğunda hizmet adı yok, bu yüzden boşluklar listesi eksik kalıyor.",
-        "next": "İzlerinizde ve günlüklerinizde service.name gönderin."
-      },
-      "source_silence": {
-        "headline": "{source}, {stream} akışına göndermeyi durdurdu",
-        "since": "{time} itibarıyla.",
-        "usual": "Genellikle günde yaklaşık {count} satır gönderiyor; {stream} akışının geri kalanı akmaya devam etti.",
-        "more": "Bu akışta {count} kaynak daha var. | {streams} akışta {count} kaynak daha var.",
-        "nextSender": "{source} üzerindeki aracıyı veya toplayıcıyı kontrol edin.",
-        "nextGap": "Geri geldi. Boşlukta nelerin atlandığını kontrol edin."
-      },
-      "heartbeat_on_success": {
-        "headline": "{job} işi başarılı olmayı bırakırsa hiçbir uyarı tetiklenmez",
-        "why": "Başarı satırı son gün içinde göründü. | Başarı satırı son {days} günün her birinde göründü.",
-        "next": "Başarı satırı görünmediğinde tetiklenecek bir uyarı ekleyin."
-      },
-      "cell": {
-        "falls": {
-          "weak": "Yalnızca geniş kapsamlı bir uyarı olan {monitor} {what} izliyor ve bu hizmete özel kapsamlanmamış. | Yalnızca geniş kapsamlı uyarılar olan {monitor} {what} izliyor ve bu hizmete özel kapsamlanmamış.",
-          "silent": "{monitor} {what} izliyor, ancak kimseye bildirim göndermiyor. | {monitor} {what} izliyor, ancak kimseye bildirim göndermiyor.",
-          "blind": "{monitor} {what} izliyor, ancak bu hizmetin verilerini göremiyor. | {monitor} {what} izliyor, ancak bu hizmetin verilerini göremiyor.",
-          "unmapped": "{monitor} {what} izliyor olabilir, ancak kapsamı bu hizmete bağlanamadı. | {monitor} {what} izliyor olabilir, ancak kapsamları bu hizmete bağlanamadı."
-        },
-        "watchWhat": {
-          "errors": "{service} hataları",
-          "latency": "{service} gecikmesi",
-          "absence": "{service} göndermeyi durdurup durdurmadığı"
-        },
-        "justAdded": "Eklendi. AutoObserve bir sonraki kontrolünde, yaklaşık 5 dakika içinde bunu sayar. | Eklendi. AutoObserve bir sonraki kontrolünde, yaklaşık 5 dakika içinde bunları sayar.",
-        "errorsWhy": "{service} hataları için hiçbir uyarı yok.",
-        "errorsNext": "Olağan hızının 3 katında bir hata uyarısı ekleyin.",
-        "latencyWhy": "{service} gecikmesi için hiçbir uyarı yok.",
-        "latencyNext": "Olağan p95 değerinin 2 katında bir gecikme uyarısı ekleyin.",
-        "latencyNoTraces": "Gecikme izlerden grafiklenir. {service} hiç iz göndermiyor.",
-        "noMetrics": "{service} için CPU veya bellek verisi gelmiyor, bu yüzden bu henüz izlenemiyor.",
-        "noRestartEvents": "{service} için yeniden başlatma olayı gelmiyor, bu yüzden yeniden başlatmaları henüz izlenemiyor.",
-        "saturationWhy": "{service} için belleği veya CPU'yu izleyen hiçbir uyarı yok. Konteyner belleği {stream} akışına geliyor.",
-        "saturationNext": "Limitinin %90'ında bir bellek uyarısı ekleyin.",
-        "nodeWhy": "{service} hizmetinin çalıştığı düğümleri izleyen bir uyarı yok. Düğüm verileri {stream} akışına gelir.",
-        "nodeNext": "Kapasitenin %90'ında bir düğüm uyarısı ekleyin.",
-        "restartsWhy": "{service} hizmetinin yeniden başlatmalarını izleyen bir uyarı yok.",
-        "restartsNext": "Pod'ları 10 dakikada 3 kez yeniden başladığında tetiklenen bir uyarı ekleyin.",
-        "syntheticWhy": "{service} hizmetini dışarıdan kontrol eden hiçbir şey yok. Sentetik kontrol birkaç dakikada bir istek gönderir ve hizmet hiçbir şey göndermese bile bir kesintiyi fark eder.",
-        "syntheticNext": "Sağlık uç noktasına bir sentetik kontrol ekleyin."
-      },
-      "paged": {
-        "page": {
-          "paged": "Paged {team}",
-          "pagedTeam": "Paged the on-call team",
-          "unrouted": "Nobody was paged: when it stopped, no on-call team owned this service and the org had no default team.",
-          "failed": "Paging failed: the on-call service did not accept the page. Open the incident to page someone by hand.",
-          "pending": "Nöbete çağrı gönderiliyor: nöbet hizmeti çağrıyı henüz onaylamadı."
-        },
-        "nextRouting": "Set up on-call routing so the next stop pages someone.",
-        "recoveredAt": "{time} itibarıyla geri döndü.",
-        "stream_silence": {
-          "headline": "{count} streams stopped sending data",
-          "why": "No data has arrived on {stream} ({type}) since {time}.",
-          "whyMany": "{streams} have sent no data since {time}.",
-          "next": "Check the sender or collector that writes it. The incident resolves once data arrives again.",
-          "nextMany": "One cause is likely, such as a shared collector.",
-          "whyOne": "{stream}, {time} tarihinden beri veri göndermedi.",
-          "recovered": "{stream} ({type}) yeniden veri gönderiyor. {time} tarihinde durmuştu.",
-          "recoveredMany": "{streams} yeniden veri gönderiyor. {time} tarihinde durmuşlardı.",
-          "recoveredSome": "Yeniden gönderiyor: {streams}."
-        },
-        "stream_drop": {
-          "headline": "{count} streams dropped sharply",
-          "why": "{stream} ({type}) has received much less data than usual since {time}.",
-          "whyMany": "{streams} have received much less data than usual since {time}.",
-          "next": "Check whether a sender stopped or a filter changed.",
-          "nextMany": "One cause is likely, such as a shared collector or filter.",
-          "whyOne": "{stream}, {time} tarihinden beri normalden çok daha az veri aldı.",
-          "recovered": "{stream} ({type}) olağan hacmine döndü. Düşüş {time} tarihinde yaşandı.",
-          "recoveredMany": "{streams} olağan hacimlerine döndü. Düşüş {time} tarihinde yaşandı.",
-          "recoveredSome": "Olağan hacme dönenler: {streams}."
-        },
-        "stream_rise": {
-          "headline": "{count} streams rose sharply",
-          "why": "{stream} ({type}) has received much more data than usual since {time}.",
-          "whyMany": "{streams} have received much more data than usual since {time}.",
-          "next": "Check for a retry loop or a new sender writing to it.",
-          "nextMany": "One cause is likely, such as a shared sender retrying.",
-          "whyOne": "{stream}, {time} tarihinden beri normalden çok daha fazla veri aldı.",
-          "recovered": "{stream} ({type}) olağan hacmine döndü. Artış {time} tarihinde yaşandı.",
-          "recoveredMany": "{streams} olağan hacimlerine döndü. Artış {time} tarihinde yaşandı.",
-          "recoveredSome": "Olağan hacme dönenler: {streams}."
-        }
-      }
-    },
-    "threshold": {
-      "label": "Şu değeri aşınca tetikle",
-      "errorsSuffix": "saat başına hata",
-      "latencySuffix": "ms (p95)",
-      "errorsReason": "AutoObserve, son 7 günde {service} için olağan hata sayısı bulamadı. Bu uyarıyı eklemek için bir eşik belirleyin.",
-      "latencyReason": "AutoObserve, son 7 günde {service} için olağan gecikme bulamadı. Bu uyarıyı eklemek için bir eşik belirleyin.",
-      "measuring": "7 günlük olağan seviye ölçülüyor…",
-      "noUsual": "7 günde yok",
-      "notMeasured": "Ölçülmedi",
-      "timedOut": "Ölçüm çok uzun sürdü. Bir eşik belirleyin.",
-      "placeholder": "Eşik belirleyin",
-      "placeholderShort": "Değer belirleyin",
-      "required": "Eşik belirleyin",
-      "invalid": "0'dan büyük bir sayı girin.",
-      "invalidErrors": "0 veya daha fazla girin.",
-      "anyErrorNote": "AutoObserve, son 7 günde {service} için hata bulamadı; bu nedenle bu uyarı her hatada tetiklenir. Bazı hatalar normal ise eşiği yükseltin."
     }
   },
   "serviceVersions": {
@@ -34463,5 +34227,8 @@
       },
       "noHighConfidence": "Yüksek güvenilirlikli ad yok"
     }
+  },
+  "assistant": {
+    "composer": {}
   }
 }

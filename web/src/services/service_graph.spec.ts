@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import serviceGraphService from "@/services/service_graph";
+import serviceGraphService, {
+  servicesTrend,
+  type ServicesTrendResponse,
+} from "@/services/service_graph";
+import { servicesTrendQuery, serviceTopologyQuery } from "@/services/service_graph.queries";
+import { topologyKeys } from "@/services/service_graph.querykeys";
 import http from "@/services/http";
 
 vi.mock("@/services/http", () => ({
@@ -392,6 +397,113 @@ describe("service_graph service", () => {
       expect(mockHttpInstance.get).toHaveBeenCalledTimes(2);
       expect(topology.data.nodes).toHaveLength(2);
       expect(edgeHistory.data.history).toHaveLength(1);
+    });
+  });
+
+  describe("servicesTrend", () => {
+    const URL = "/api/test-org/traces/service_graph/services/trend";
+    const BODY: ServicesTrendResponse = {
+      window: { start_time: 1, end_time: 2 },
+      baseline_window: { start_time: 0, end_time: 1 },
+      data_until: 2,
+      source: "v4",
+      step_micros: 300_000_000,
+      partial: false,
+      warnings: [],
+      services: [
+        {
+          service: "checkout-api",
+          current: { requests: 100, failed: 6, error_rate: 6, p99_latency_ns: null },
+          baseline: {
+            error_rate: 0.4,
+            p99_latency_ns: 1_000,
+            requests_per_min: 3,
+            covered_hours: 24,
+          },
+          p99_ratio: null,
+          error_rate_delta: 5.6,
+          signal: "errors",
+          included: false,
+          series: [],
+        },
+      ],
+      total_services: 4,
+      degraded_total: 1,
+    };
+    const httpError = (status: number) =>
+      Object.assign(new Error(`HTTP ${status}`), { response: { status } });
+
+    it("sends every param with the server's names, include sorted and comma-joined", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: BODY });
+      const result = await servicesTrend("test-org", {
+        start: 1_700_000_000_000_000,
+        end: 1_700_003_600_000_000,
+        baselineHours: 24,
+        stream: "default",
+        limit: 12,
+        include: ["payments", "checkout-api"],
+      });
+      expect(result).toEqual(BODY);
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(URL, {
+        params: {
+          start_time: 1_700_000_000_000_000,
+          end_time: 1_700_003_600_000_000,
+          baseline_hours: 24,
+          stream_name: "default",
+          limit: 12,
+          include: "checkout-api,payments",
+        },
+        silentForbidden: true,
+      });
+    });
+
+    it("omits unset params, an empty include and the 'all' stream", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: BODY });
+      await servicesTrend("test-org", { stream: "all", include: [] });
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(URL, { params: {}, silentForbidden: true });
+    });
+
+    it.each([403, 404])("returns null on %s", async (status) => {
+      mockHttpInstance.get.mockRejectedValue(httpError(status));
+      await expect(servicesTrend("test-org")).resolves.toBeNull();
+    });
+
+    it.each([400, 500])("rethrows %s", async (status) => {
+      const error = httpError(status);
+      mockHttpInstance.get.mockRejectedValue(error);
+      await expect(servicesTrend("test-org")).rejects.toBe(error);
+    });
+
+    it("rethrows an error without a response", async () => {
+      const error = new Error("network");
+      mockHttpInstance.get.mockRejectedValue(error);
+      await expect(servicesTrend("test-org")).rejects.toBe(error);
+    });
+
+    it("keys include as a sorted set under the topology scope, with topology's stale time", () => {
+      const a = servicesTrendQuery("o1", {
+        start: 0,
+        end: 60_000_000_000_000,
+        include: ["b", "a"],
+      });
+      const b = servicesTrendQuery("o1", {
+        start: 0,
+        end: 60_000_000_000_000,
+        include: ["a", "b"],
+      });
+      expect(a.queryKey).toEqual(b.queryKey);
+      expect(a.queryKey.slice(0, 4)).toEqual(topologyKeys.all("o1"));
+      expect(a.staleTime).toBe(
+        serviceTopologyQuery("o1", { startTime: 0, endTime: 60_000_000_000_000 }).staleTime,
+      );
+      const other = servicesTrendQuery("o1", { start: 0, end: 60_000_000_000_000, include: ["a"] });
+      expect(other.queryKey).not.toEqual(a.queryKey);
+    });
+
+    it("resolves the query to null on a 404 so the Overview falls back", async () => {
+      mockHttpInstance.get.mockRejectedValue(httpError(404));
+      const options = servicesTrendQuery("o1", { limit: 12 });
+      await expect((options.queryFn as () => Promise<unknown>)()).resolves.toBeNull();
     });
   });
 });

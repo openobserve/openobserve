@@ -528,6 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTable
                   v-show="!showTableSkeleton"
                   ref="searchTableRef"
+                  focus-toolbar
                   :columns="tableColumns"
                   :data="tableRows"
                   :wrap="searchObj.meta.toggleSourceWrap"
@@ -536,7 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :streaming="isResultsStreaming || showStaleRows"
                   :data-stale-rows="showStaleRows ? 'true' : undefined"
                   :row-key="logsRowKey"
-                  :row-height="20"
+                  :row-height="logsRowHeight"
                   virtual-scroll
                   skeleton-on-refetch
                   :fill-height="false"
@@ -609,24 +610,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Per-cell hover actions: AI button on the timestamp cell; copy /
                  add-search-term on closable field cells. -->
-                  <template #cell-hover-actions="{ row, column, value, active }">
-                    <O2AIContextAddBtn
-                      v-if="active && !contextMenuOpen && column.id === logsTimestampCol"
-                      data-test="logs-search-result-ai-btn"
-                      @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
-                    />
-                    <CellActions
-                      v-else-if="active && !contextMenuOpen && showLogCellActions(column, row)"
-                      :column="column"
-                      :row="row"
-                      :value="value"
-                      :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
-                      :hide-search-term-actions="false"
-                      :hide-ai="column.id === 'source'"
-                      copy-in-place
-                      @add-search-term="addSearchTerm"
-                      @send-to-ai-chat="sendToAiChat"
-                    />
+                  <template #cell-hover-actions="{ row, column, value, active, menu }">
+                    <ODropdown v-if="menu">
+                      <template #trigger>
+                        <OButton
+                          variant="ghost"
+                          size="icon-sm"
+                          class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                          :aria-label="t('assistant.entry.rowActions')"
+                          data-test="logs-search-result-row-menu"
+                        >
+                          <OIcon name="more-vert" size="sm" />
+                        </OButton>
+                      </template>
+                      <ODropdownItem
+                        icon-left="content-copy"
+                        class="max-md:min-h-11 pointer-coarse:min-h-11"
+                        data-test="logs-search-result-row-menu-copy"
+                        @select="copyLogToClipboard(row)"
+                      >
+                        {{ t("logs.cellActions.copy") }}
+                      </ODropdownItem>
+                    </ODropdown>
+                    <template v-else-if="active && !contextMenuOpen">
+                      <template v-if="column.id === logsTimestampCol">
+                        <ToolbarAddToChat
+                          v-if="assistantDoorsShown"
+                          data-test="logs-search-result-ai-btn"
+                          :door="() => logRowDoor(row)"
+                          :user-org-key="userOrgKey"
+                        />
+                      </template>
+                      <CellActions
+                        v-else-if="showLogCellActions(column, row)"
+                        :bound-org="doorBoundOrg"
+                        :column="column"
+                        :row="row"
+                        :value="value"
+                        :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
+                        :hide-search-term-actions="false"
+                        :hide-ai="column.id === 'source'"
+                        copy-in-place
+                        @add-search-term="addSearchTerm"
+                      />
+                    </template>
                   </template>
 
                   <!-- Expanded row → JSON preview -->
@@ -655,6 +682,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <JsonPreview
                       :value="row"
+                      :bound-org="doorBoundOrg"
                       :index="logsRowIndex(row)"
                       class="px-2 py-1.5"
                       mode="expanded"
@@ -665,7 +693,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @add-search-term="addSearchTerm"
                       @view-trace="redirectToTraces(row)"
                       @show-correlation="openLogDetailsWithCorrelation"
-                      @send-to-ai-chat="sendToAiChat"
                     />
                   </template>
                 </OTable>
@@ -752,22 +779,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OContextMenuItem>
               </template>
 
-              <template v-if="aiEnabled">
+              <template v-if="assistantDoorsShown">
                 <OContextMenuSeparator />
-                <OContextMenuItem
-                  icon-left="auto-awesome"
-                  data-test="log-context-menu-ai-value"
-                  @select="sendToAiChat(JSON.stringify(contextCell.value))"
-                >
-                  {{ t("logs.cellActions.sendValueToAi") }}
-                </OContextMenuItem>
-                <OContextMenuItem
-                  icon-left="auto-awesome"
-                  data-test="log-context-menu-ai-row"
-                  @select="sendToAiChat(JSON.stringify(contextCell.row), true)"
-                >
-                  {{ t("logs.cellActions.sendRowToAi") }}
-                </OContextMenuItem>
+                <AiEntryButton v-bind="logFieldDoor(contextCell)" appearance="menu-item" />
+                <AiEntryButton v-bind="logRowDoor(contextCell.row)" appearance="menu-item" />
               </template>
             </template>
           </OContextMenu>
@@ -803,6 +818,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- end combined scroll area -->
 
       <ODrawer
+        inset-beside
         bleed
         lazy
         data-test="logs-search-result-detail-dialog"
@@ -817,6 +833,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DetailTable
           v-if="detailRow"
           :key="'dialog_' + detailOpenSeq"
+          :bound-org="doorBoundOrg"
           :model-value="detailRow"
           :stream-type="searchObj.data.stream.streamType"
           :correlation-props="correlationDashboardProps"
@@ -843,7 +860,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @add:table="addFieldToTable"
           @close="onDetailUserClose"
           @view-trace="redirectToTraces(detailRow)"
-          @sendToAiChat="sendToAiChat"
           @closeTable="closeTable"
           @load-correlation="openCorrelationFromLog"
         />
@@ -986,6 +1002,16 @@ import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { extractSeverity } from "@/utils/sourceEventSeverity";
 import config from "@/aws-exports";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import ToolbarAddToChat from "@/plugins/logs/data-table/ToolbarAddToChat.vue";
+import {
+  currentUserOrgKey,
+  logFieldBuild,
+  logRowBuild,
+  logsDoorBase,
+  rowKeyOf,
+  useAssistantDoorShown,
+} from "@/plugins/logs/logsDoors";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { quickModeHiddenFieldCount } from "@/utils/query/quickModeFieldList";
@@ -1013,7 +1039,6 @@ import {
   noFtsRecoveryTerm as recoveryTerm,
 } from "@/composables/useLogs/freeTextSearch";
 import LogsMissingStreamBanner from "@/plugins/logs/LogsMissingStreamBanner.vue";
-import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import {
   severityFieldTextClass,
@@ -1058,7 +1083,10 @@ export default defineComponent({
     CellActions,
     LogsMissingStreamBanner,
     LogsTableSkeleton,
-    O2AIContextAddBtn,
+    ToolbarAddToChat,
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
     JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
     TelemetryCorrelationDashboard: defineAsyncComponent(
       () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -1084,7 +1112,6 @@ export default defineComponent({
     "expandlog",
     "update:recordsPerPage",
     "update:columnSizes",
-    "sendToAiChat",
     "run-query",
     "jump-to-stream-data",
     "open-mobile-fields",
@@ -2717,10 +2744,6 @@ export default defineComponent({
       pct: SKELETON_HEIGHTS[i % SKELETON_HEIGHTS.length],
     }));
 
-    const sendToAiChat = (value: any, append: boolean = true) => {
-      emit("sendToAiChat", value, append);
-    };
-
     const closeTable = () => {
       searchObj.meta.showDetailTab = false;
       endSharedDetail();
@@ -2963,11 +2986,44 @@ export default defineComponent({
       return isFilterableLogField(columnId, searchObj.data.stream.selectedStreamFields);
     });
 
-    // Mirrors O2AIContextAddBtn's own gate — the AI actions only exist on
-    // enterprise builds with AI turned on in the backend config.
-    const aiEnabled = computed(
-      () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
+    const loadedOrg = useLoadedOrg(
+      () => searchObj.data.queryResults?.hits,
+      () => store.state.selectedOrganization?.identifier ?? "",
     );
+    const doorBoundOrg = computed(() => loadedOrg.value);
+    const coarsePointer =
+      typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)")?.matches;
+    const logsRowHeight = computed(() => (coarsePointer || isMobile.value ? 44 : 20));
+    const doorBase = (row?: Record<string, unknown>) => () =>
+      logsDoorBase(searchObj, store.state, row);
+
+    const logRowDoor = (row: Record<string, unknown>) => ({
+      verb: "add_to_chat" as const,
+      entryKind: "object_verb" as const,
+      boundOrg: loadedOrg.value,
+      objectKind: "log_row" as const,
+      label: t("assistant.entry.addLogRow"),
+      tooltip: t("assistant.entry.tooltip.add"),
+      dataTest: "ai-entry-log-row-add" as const,
+      build: logRowBuild(doorBase(row), row),
+      objectKey: rowKeyOf(row, logsTimestampCol.value),
+    });
+
+    // The separator goes with the doors: shown ready or locked, hidden otherwise (AiEntryButton's states).
+    const assistantDoorsShown = useAssistantDoorShown();
+    const userOrgKey = currentUserOrgKey();
+
+    const logFieldDoor = (cell: ContextCell) => ({
+      verb: "add_to_chat" as const,
+      entryKind: "object_verb" as const,
+      boundOrg: loadedOrg.value,
+      objectKind: "log_field" as const,
+      label: t("assistant.entry.addField"),
+      tooltip: t("assistant.entry.tooltip.add"),
+      dataTest: "ai-entry-log-field-add" as const,
+      build: logFieldBuild(doorBase(cell.row), cell.columnId, cell.value, cell.row),
+      objectKey: `${rowKeyOf(cell.row, logsTimestampCol.value)}:${cell.columnId}`,
+    });
 
     const toSearchTermValue = (value: unknown): string | number | boolean | null => {
       if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
@@ -3141,6 +3197,12 @@ export default defineComponent({
     const openLogDetailsByRow = (row: any) => openLogDetails(row, logsRowIndex(row));
 
     return {
+      doorBoundOrg,
+      logsRowHeight,
+      logRowDoor,
+      logFieldDoor,
+      assistantDoorsShown,
+      userOrgKey,
       noFtsRecoverySchemas,
       noFtsRecoveryTerm,
       gridLockReason,
@@ -3218,7 +3280,6 @@ export default defineComponent({
       isFunctionErrorOpen,
       contextCell,
       contextCellIsStreamField,
-      aiEnabled,
       toSearchTermValue,
       handleTableContextMenu,
       handleCellContextMenu,
@@ -3272,7 +3333,6 @@ export default defineComponent({
       refreshPagination,
       refreshJobPagination,
       skeletonBarHeights,
-      sendToAiChat,
       closeTable,
       getPartitionPaginations,
       getSocketPaginations,

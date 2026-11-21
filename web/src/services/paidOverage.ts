@@ -15,6 +15,8 @@ export interface PaidOverageOrganizationStatus {
   org_id: string;
   enabled: boolean;
   can_manage: boolean;
+  /** Who allowed paid usage, once the server records it. */
+  enabled_by?: { email?: unknown; at?: unknown } | null;
 }
 
 export interface PaidOverageStatus {

@@ -23,24 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          bottom divider reaches the card edges (like Data Sources / Pipelines) —
          a padded root insets the header and makes it read as a floating bar.
          Padding is reintroduced on the body wrapper below the header instead. -->
-    <OPageLayout
-      :title="t('menu.home')"
-      :subtitle="t('home.subtitle')"
-      icon="home"
-      :tabs-below="tabOrder.length > 1"
-      bleed
-    >
-      <template v-if="isMobile && activeHomeTab === 'ai' && !aiLocked" #actions>
-        <OButton
-          variant="outline"
-          size="sm"
-          data-test="home-mobile-chats-toggle"
-          @click="mobileChatsOpen = true"
-        >
-          <template #icon-left><OIcon name="menu" size="sm" /></template>
-          {{ t("chatHistory.title") }}
-        </OButton>
-      </template>
+    <OPageLayout :title="t('menu.home')" icon="home" :tabs-below="tabOrder.length > 1" bleed>
       <!-- Top-level page header: module icon + "Home" title, with the home tabs
            rendered as a full-width strip below (tabsBelow). The header owns its
            own bottom divider when tabs are present; when only a single tab
@@ -52,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="activeHomeTab"
           align="left"
           reorderable
+          :class="{ invisible: !homePrefsReady }"
           data-test="home-tab-bar"
           @change="onTabChange"
           @reorder="onTabReorder"
@@ -122,50 +106,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :features="['ai_assistant']"
           data-test="home-ai-locked"
         />
-        <!-- O2 AI Assistant tab -->
-        <div
-          v-else-if="activeHomeTab === 'ai'"
-          class="home-ai-panel flex min-h-0 flex-1 flex-row overflow-hidden max-md:flex-col"
-        >
-          <HomeChatHistory class="max-md:hidden" @load-chat="onLoadChat" @new-chat="onNewChat" />
-          <O2AIChat
-            ref="homeChat"
-            :is-open="true"
-            :header-height="0"
-            :centered-start="true"
-            :ai-chat-payload="aiChatPayload"
-          />
-          <ODrawer
-            v-if="isMobile"
-            v-model:open="mobileChatsOpen"
-            side="left"
-            size="sm"
-            bleed
-            seamless
-            anchor="header.app-page-header"
-            anchor-edge="bottom"
-            data-test="home-mobile-chats-drawer"
-          >
-            <HomeChatHistory
-              class="w-full!"
-              @load-chat="
-                (chat) => {
-                  onLoadChat(chat);
-                  mobileChatsOpen = false;
-                }
-              "
-              @new-chat="
-                () => {
-                  onNewChat();
-                  mobileChatsOpen = false;
-                }
-              "
-            />
-          </ODrawer>
-        </div>
 
+        <HomeViewSkeleton v-if="!homePrefsReady" />
+        <!-- The hero's own rail and no chat bar, so a sent question stays on the same Home -->
+        <div
+          v-else-if="aiHome && threadId !== null"
+          class="-mx-2.5 -mb-2.5 flex min-h-0 flex-1 overflow-hidden"
+          data-test="home-full-thread"
+        >
+          <HomeThreadContext :asked-on-home="threadAskedOnHome" />
+          <aside
+            v-if="threadRail"
+            :aria-label="t('assistant.history.title')"
+            :class="HOME_RAIL_CLASS"
+            data-test="assistant-home-chats"
+          >
+            <HomeChatsRail thread @close="threadView?.focusEntry()" />
+          </aside>
+          <AssistantView
+            ref="threadView"
+            :chat-id="threadId"
+            bare
+            :class="[
+              'h-full min-w-0 flex-1',
+              threadHandoff && 'motion-safe:animate-[assistant-fade-up_0.25s_ease-out_both]',
+            ]"
+          />
+        </div>
+        <div
+          v-else-if="aiFirstRun"
+          class="min-h-0 flex-1 overflow-y-auto pt-2.5"
+          data-test="home-ai-first-run"
+        >
+          <HomeNoDataContext />
+          <AgentHomeFirstRun class="mb-4" />
+        </div>
         <FirstDataPanel
-          v-if="flagOn && isDataTab"
+          v-else-if="flagOn && isDataTab"
           v-slot="{ layout, statusLine }"
           signal="any"
           variant="compact"
@@ -191,15 +168,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="block"
               data-test="home-no-access-empty-state"
             />
-            <HomeNoDataState
-              v-else
-              :tab="activeHomeTab === 'usage' ? 'usage' : 'overview'"
-              :alternatives-only="layout === 'card'"
-            >
-              <template v-if="layout === 'status'" #status>
-                <component :is="statusLine" />
+            <template v-else>
+              <template v-if="activeHomeTab === 'ai'">
+                <HomeNoDataContext />
+                <AgentHomeFirstRun class="mb-4" />
               </template>
-            </HomeNoDataState>
+              <HomeNoDataState
+                :tab="activeHomeTab === 'usage' ? 'usage' : 'overview'"
+                :alternatives-only="layout === 'card'"
+              >
+                <template v-if="layout === 'status'" #status>
+                  <component :is="statusLine" />
+                </template>
+              </HomeNoDataState>
+            </template>
+          </div>
+          <div
+            v-else-if="aiHome"
+            class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
+            data-test="home-ai-panel"
+          >
+            <AssistantHomeTab />
           </div>
           <!-- Overview pads itself like the Kubernetes overview, so it cancels the body inset to run edge to edge -->
           <div
@@ -215,6 +204,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </FirstDataPanel>
 
         <template v-else>
+          <div
+            v-if="aiHome"
+            class="-mx-2.5 -mb-2.5 min-h-0 flex-1 overflow-hidden"
+            data-test="home-ai-panel"
+          >
+            <AssistantHomeTab />
+          </div>
           <!-- Overview tab (no inner card-container — the outer section panel
                already provides the border; avoids a double-bordered card). -->
           <div
@@ -251,32 +247,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import {
   computed,
+  defineAsyncComponent,
   defineComponent,
+  effectScope,
   inject,
-  nextTick,
+  onScopeDispose,
   ref,
   watch,
+  onDeactivated,
   onMounted,
   onUnmounted,
+  shallowRef,
+  type PropType,
 } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import config from "../aws-exports";
 import OverviewTab from "@/views/OverviewTab.vue";
 import UsageTab from "@/views/UsageTab.vue";
-import O2AIChat from "@/components/O2AIChat.vue";
 import LicenseDeniedState from "@/components/common/LicenseDeniedState.vue";
 import { menuState } from "@/utils/featureGate";
 import type { AiChatHandoff } from "@/plugins/traces/utils/traceAiPayload";
-import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
@@ -294,6 +291,144 @@ import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import analytics from "@/services/product_analytics";
+import {
+  AI_HOME_TAB,
+  ASSISTANT_SURFACES_SELECTOR,
+  HOME_TAB_QUERY_KEY,
+  THREAD_QUERY_KEY,
+  threadParam,
+} from "@/composables/assistant/pure";
+import type { GateCode } from "@/composables/assistant/pure";
+import { aiTabMode, gateHidesAiTab, HOME_RAIL_CLASS, railGate } from "@/views/home/homeState";
+import { useThreadUrlSync } from "@/views/home/useThreadUrl";
+import { isFullConfigLoaded } from "@/services/config.queries";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { overviewFocusListening, requestOverviewFocus } from "@/composables/goto/goToRequests";
+import {
+  useHomeContextProvider,
+  useHomeWindowProvider,
+} from "@/composables/contextProviders/homeContextProvider";
+import type { OverviewNowSnapshot } from "@/composables/contextProviders/types";
+import { threadPeriodOf } from "@/views/home/homeUrl";
+
+// Past this the tabs show in their default order; a key that resolves later never reorders them.
+const HOME_PREFS_WAIT_MS = 1_500;
+
+/** Set by Back to Home: this visit opens that tab whatever the saved one, and the key is dropped. */
+const HOME_RETURN_TAB_KEY = "home_tab";
+
+/** What the assistant sees while the first-data layout replaces the Overview. */
+export const NO_DATA_SNAPSHOT: OverviewNowSnapshot = {
+  rows: [],
+  noData: true,
+  selectedKey: null,
+  window: { start: 0, end: 0 },
+  services: { available: false, partial: false, dataUntil: null, window: null, allRegions: false },
+};
+
+const HomeNoDataContext = defineComponent({
+  name: "HomeNoDataContext",
+  setup() {
+    // Nothing was asked over Home's range here, so a question keeps the window its chip shows.
+    useHomeContextProvider(
+      () => NO_DATA_SNAPSHOT,
+      useStore(),
+      () => null,
+    );
+    return () => null;
+  },
+});
+
+// A thread at Full density on Home keeps the window it had in a panel or window over Home; one asked from the Ask box never had Home's.
+const HomeThreadContext = defineComponent({
+  name: "HomeThreadContext",
+  props: { askedOnHome: { type: Function as PropType<() => boolean>, required: true } },
+  setup(props) {
+    const route = useRoute();
+    useHomeWindowProvider(useStore(), () =>
+      props.askedOnHome() ? null : threadPeriodOf(route.query),
+    );
+    return () => null;
+  },
+});
+
+/** One dynamic import per mount, shared by the gate and the tab prefs. */
+function loadAssistant() {
+  return import("@/composables/assistant");
+}
+
+/** The assistant gate, read once the assistant chunk loads. */
+function useAssistantGate(assistant: ReturnType<typeof loadAssistant>) {
+  const gate = ref<GateCode>("loading");
+  const scope = effectScope();
+  onScopeDispose(() => scope.stop());
+  void assistant.then(
+    ({ useAssistantCapability }) => {
+      if (!scope.active) return;
+      scope.run(() => {
+        const capability = useAssistantCapability();
+        watch(capability.gate, (value) => (gate.value = value), { immediate: true });
+      });
+    },
+    () => (gate.value = "unhealthy"),
+  );
+  return gate;
+}
+
+/** Home's tab state under the signed-in user+org; `ready` holds the tabs back until it is applied once. */
+function useHomeTabPrefs(
+  assistant: ReturnType<typeof loadAssistant>,
+  apply: (prefs: { order?: string[]; active?: string | null }) => void,
+) {
+  const ready = ref(false);
+  const scope = effectScope();
+  let key: string | null = null;
+  // A tab the user saved or picked is never overridden by the gate settling.
+  let picked = false;
+  const pending: { order?: string[]; active?: string }[] = [];
+  let writer: ((userOrgKey: string, delta: { order?: string[]; active?: string }) => void) | null =
+    null;
+  const fallback = setTimeout(() => (ready.value = true), HOME_PREFS_WAIT_MS);
+  const settle = () => {
+    clearTimeout(fallback);
+    ready.value = true;
+  };
+  onScopeDispose(() => {
+    clearTimeout(fallback);
+    scope.stop();
+  });
+  void assistant.then(({ assistantStore, migrateHome, writeHome }) => {
+    if (!scope.active) return;
+    writer = writeHome;
+    scope.run(() =>
+      watch(
+        () => assistantStore.state.userOrgKey,
+        (userOrgKey) => {
+          if (!userOrgKey || userOrgKey === key) return;
+          const orgSwitch = key !== null;
+          key = userOrgKey;
+          if (!ready.value || orgSwitch) {
+            const prefs = migrateHome(userOrgKey);
+            picked = picked || !!prefs.active;
+            apply(prefs);
+          }
+          settle();
+          pending.splice(0).forEach((delta) => writeHome(userOrgKey, delta));
+        },
+        { immediate: true },
+      ),
+    );
+  }, settle);
+  return {
+    ready,
+    picked: () => picked,
+    save(delta: { order?: string[]; active?: string }) {
+      if (delta.active) picked = true;
+      if (key && writer) writer(key, delta);
+      else pending.push(delta);
+    },
+  };
+}
 
 export default defineComponent({
   name: "PageHome",
@@ -301,12 +436,21 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
+    const route = useRoute();
     const { t } = useI18nTyped();
     const firstDataNotice = inject(FIRST_DATA_NOTICE, null);
-    const LS_TAB_ORDER_KEY = "o2_home_tab_order";
-    const LS_ACTIVE_TAB_KEY = "o2_home_active_tab";
 
     const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
+    const assistantModule = loadAssistant();
+    const aiGate = useAssistantGate(assistantModule);
+    useThreadUrlSync(assistantModule);
+    const requestedTab = (): string | null => {
+      const value = route.query[HOME_RETURN_TAB_KEY] ?? route.query[HOME_TAB_QUERY_KEY];
+      if (threadParam(route.query) !== null) return AI_HOME_TAB;
+      return typeof value === "string" && value ? value : null;
+    };
+    // A tab named in the URL holds for this visit only, so it never becomes the saved tab.
+    const forcedTab = ref<string | null>(requestedTab());
 
     const { homeDashboard, clearHomeDashboard, updateLabel, isLoadedFor, load } =
       useHomeDashboard(t);
@@ -321,17 +465,25 @@ export default defineComponent({
       ),
     );
     const aiLocked = computed(() => aiState.value === "locked");
+    const configLoaded = computed(() => isFullConfigLoaded(store.state.zoConfig));
     const tabLockReason = (id: string) => {
       if (id === "ai" && aiLocked.value) return aiLockedReason.value;
       if (id.startsWith("dash:") && dashboardsLocked.value) return dashboardsLockedReason.value;
       return undefined;
     };
 
+    const aiMode = computed(() =>
+      aiTabMode({
+        gate: aiGate.value,
+        isEnterprise: config.isEnterprise === "true",
+        isCloud: config.isCloud === "true",
+        menu: aiState.value,
+        configLoaded: configLoaded.value,
+      }),
+    );
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string; closable?: boolean }[] = [];
-      if (isEnterpriseOrCloud && aiState.value !== "hidden") {
-        tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
-      }
+      if (aiMode.value !== "hidden") tabs.push({ id: "ai", label: t("home.agent.tabLabel") });
       // Always reachable — Incidents/Services inside render locked (not
       // hidden) in a build that doesn't unlock them (see OverviewTab.vue).
       tabs.push({ id: "overview", label: t("home.tabOverview") });
@@ -365,7 +517,7 @@ export default defineComponent({
       const cleared = clearHomeDashboard(org);
       // Active tab no longer exists in the recomputed set → fall back to first.
       if (!DEFAULT_TABS.value.find((tb) => tb.id === activeHomeTab.value)) {
-        activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
+        activeHomeTab.value = firstTab();
       }
       return cleared;
     }
@@ -415,27 +567,22 @@ export default defineComponent({
       analytics.track("home_tab_switched", { tab });
     }
 
+    // The user's saved order, applied again whenever the set of tabs changes.
+    let savedOrder: string[] = [];
     function loadTabOrder() {
-      try {
-        const saved = localStorage.getItem(LS_TAB_ORDER_KEY);
-        if (saved) {
-          const ids: string[] = JSON.parse(saved);
-          const ordered = ids
-            .map((id) => DEFAULT_TABS.value.find((t) => t.id === id))
-            .filter(Boolean) as { id: string; label: string }[];
-          // append any new tabs not yet in saved order
-          DEFAULT_TABS.value.forEach((t) => {
-            if (!ordered.find((o) => o.id === t.id)) ordered.push(t);
-          });
-          return ordered;
-        }
-      } catch {
-        /* ignore: fall back to default tab order */
-      }
-      return [...DEFAULT_TABS.value];
+      const ordered = savedOrder
+        .map((id) => DEFAULT_TABS.value.find((tab) => tab.id === id))
+        .filter(Boolean) as { id: string; label: string }[];
+      DEFAULT_TABS.value.forEach((tab) => {
+        if (!ordered.find((o) => o.id === tab.id)) ordered.push(tab);
+      });
+      return ordered;
     }
 
     const tabOrder = ref(loadTabOrder());
+    // Home opens on the AI tab only where the assistant can be used; elsewhere on Overview.
+    const firstTab = () =>
+      aiMode.value !== "default" ? "overview" : (tabOrder.value[0]?.id ?? "overview");
 
     // DEFAULT_TABS depends on zoConfig.ai_enabled, which arrives asynchronously
     // from the backend /config response. Re-sync tabOrder whenever the set of
@@ -457,56 +604,155 @@ export default defineComponent({
       return `dash:${pin.folderId}:${pin.dashboardId}`;
     }
 
-    const storedActiveTab = localStorage.getItem(LS_ACTIVE_TAB_KEY);
-    const savedActiveTab = storedActiveTab && pinTabFor(storedActiveTab);
     const isAvailableTab = (id: string) => DEFAULT_TABS.value.some((tb) => tb.id === id);
-    const pinnedTabPending = ref(
-      !!savedActiveTab?.startsWith("dash:") &&
-        !isAvailableTab(savedActiveTab) &&
-        !isLoadedFor(store.state.selectedOrganization?.identifier),
-    );
+    // The saved tab arrives with the per-user prefs, which set this when it names a pin still loading.
+    const pinnedTabPending = ref(false);
     const activeHomeTab = ref(
-      savedActiveTab && (pinnedTabPending.value || isAvailableTab(savedActiveTab))
-        ? savedActiveTab
-        : tabOrder.value[0].id,
+      forcedTab.value && isAvailableTab(forcedTab.value) ? forcedTab.value : firstTab(),
     );
-    if (pinnedTabPending.value) {
-      const stopHold = watch(
-        () => [
-          isAvailableTab(pinTabFor(activeHomeTab.value)),
-          isLoadedFor(store.state.selectedOrganization?.identifier),
-        ],
-        ([available, loaded]) => {
-          if (!available && !loaded) return;
-          pinnedTabPending.value = false;
-          activeHomeTab.value = available
-            ? pinTabFor(activeHomeTab.value)
-            : (tabOrder.value[0]?.id ?? "usage");
-          stopHold();
-        },
-      );
+    watch(
+      () => [
+        pinnedTabPending.value,
+        isAvailableTab(pinTabFor(activeHomeTab.value)),
+        isLoadedFor(store.state.selectedOrganization?.identifier),
+      ],
+      ([pending, available, loaded]) => {
+        if (!pending || (!available && !loaded)) return;
+        pinnedTabPending.value = false;
+        activeHomeTab.value = available ? pinTabFor(activeHomeTab.value) : firstTab();
+      },
+    );
+
+    // A tab Home picked by itself (the gate settling) is shown but never saved as the user's choice.
+    let autoTab: string | null = null;
+    const setAutoTab = (tab: string) => {
+      autoTab = tab;
+      activeHomeTab.value = tab;
+    };
+    // The AI tab was asked for (a link or the saved prefs) before the config made it available.
+    let pendingAi = forcedTab.value === AI_HOME_TAB && activeHomeTab.value !== AI_HOME_TAB;
+    // The saved tab a link held back, applied if the link turns out to name a tab this Home never gets.
+    let heldPrefActive: string | null = null;
+
+    watch(activeHomeTab, (val) => {
+      const auto = autoTab === val;
+      autoTab = null;
+      if (forcedTab.value === val || auto) return;
+      dropStaleTabQuery(val);
+      forcedTab.value = null;
+      pendingAi = false;
+      homePrefs.save({ active: val });
+    });
+
+    // Leaving the tab a link named drops `tab` (and the AI tab's thread), so a reload opens the saved tab.
+    function dropStaleTabQuery(val: string): void {
+      const named = route.query[HOME_TAB_QUERY_KEY];
+      const thread = threadParam(route.query) !== null;
+      const staleTab = typeof named === "string" && named !== val;
+      if (!staleTab && !(thread && val !== AI_HOME_TAB)) return;
+      const query = { ...route.query };
+      if (val !== AI_HOME_TAB) delete query[THREAD_QUERY_KEY];
+      delete query[HOME_TAB_QUERY_KEY];
+      void router.replace({ query }).catch(() => undefined);
     }
 
-    // An org with no stream at all opens on Overview's setup state, not the assistant; that choice
-    // is the app's, so it is not saved as the user's tab.
-    let skipSave = false;
-    watch(activeHomeTab, (val) => {
-      if (skipSave) {
-        skipSave = false;
+    // `?tab=ai&thread=` shows that chat at Full density inside the AI tab.
+    const threadId = computed(() => threadParam(route.query));
+    const aiHome = computed(() => activeHomeTab.value === AI_HOME_TAB && !aiLocked.value);
+    // A thread opened while Home is on screen settles in once; a pasted link or a kept-alive return lands still.
+    const threadHandoff = ref(false);
+    watch(threadId, (id, was) => (threadHandoff.value = id !== null && was === null));
+    onDeactivated(() => (threadHandoff.value = false));
+    const assistantStore =
+      shallowRef<Awaited<ReturnType<typeof loadAssistant>>["assistantStore"]>();
+    void assistantModule.then(
+      (m) => (assistantStore.value = m.assistantStore),
+      () => undefined,
+    );
+    // Called at each page read, so the thread's window follows the chat on screen.
+    const threadAskedOnHome = () => {
+      const state = assistantStore.value?.state;
+      const sid = threadParam(route.query) || state?.shell.activeSid;
+      return !!sid && state?.sessions[sid]?.origin.entryKind === "home_launcher";
+    };
+
+    // A thread link or Back to Home can land while Home is already mounted on another tab.
+    watch(
+      () => [route.query[HOME_RETURN_TAB_KEY], route.query[HOME_TAB_QUERY_KEY], threadId.value],
+      () => {
+        const tab = requestedTab();
+        if (tab && isAvailableTab(tab)) {
+          forcedTab.value = tab;
+          pinnedTabPending.value = false;
+          activeHomeTab.value = tab;
+        }
+        if (route.query[HOME_RETURN_TAB_KEY] === undefined) return;
+        const query = { ...route.query };
+        delete query[HOME_RETURN_TAB_KEY];
+        void router.replace({ query }).catch(() => undefined);
+      },
+      { immediate: true },
+    );
+    // The gate resolves after mount: a hidden AI tab hands Home to Overview, a usable one opens if it was asked for or nothing was picked.
+    watch(aiMode, (mode, was) => {
+      if (mode === "hidden") {
+        // A config still arriving reads as hidden too, so a link waits for the AI tab unless the gate itself refused.
+        if (activeHomeTab.value === AI_HOME_TAB) {
+          pendingAi = pendingAi || forcedTab.value === AI_HOME_TAB;
+          setAutoTab("overview");
+        }
+        dropRefusedAiLink();
         return;
       }
-      localStorage.setItem(LS_ACTIVE_TAB_KEY, val);
+      if (pendingAi) {
+        pendingAi = false;
+        if (forcedTab.value === AI_HOME_TAB) activeHomeTab.value = AI_HOME_TAB;
+        else setAutoTab(AI_HOME_TAB);
+        return;
+      }
+      const becameUsable = was !== "default" && mode === "default";
+      const untouched = !homePrefs.picked() && !forcedTab.value;
+      if (becameUsable && untouched && activeHomeTab.value === "overview") setAutoTab(AI_HOME_TAB);
     });
-    const { hasAnyStream, isFetching } = useOrgHasUserData(
+    // The tab can be hidden from setup (Open Source, a loaded AI-off config), so the refusal is also watched on its inputs.
+    watch(() => [aiGate.value, aiState.value, configLoaded.value], dropRefusedAiLink);
+    dropRefusedAiLink();
+
+    // A link to the AI tab is dropped only when it can never open here: Open Source, a refusing gate, or a loaded config that hides AI.
+    function dropRefusedAiLink(): void {
+      const final =
+        !isEnterpriseOrCloud ||
+        gateHidesAiTab(aiGate.value) ||
+        (configLoaded.value && aiState.value === "hidden");
+      if (!pendingAi || !final) return;
+      pendingAi = false;
+      if (forcedTab.value !== AI_HOME_TAB) return;
+      forcedTab.value = null;
+      dropStaleTabQuery(activeHomeTab.value);
+      if (heldPrefActive) applyHeldPref(heldPrefActive);
+      heldPrefActive = null;
+    }
+
+    // Same rules as the prefs callback: an unloaded pinned dashboard waits for its pin instead of being dropped.
+    function applyHeldPref(active: string): void {
+      if (isAvailableTab(active)) return setAutoTab(active);
+      if (!active.startsWith("dash:") || isLoadedFor(store.state.selectedOrganization?.identifier))
+        return;
+      setAutoTab(active);
+      pinnedTabPending.value = true;
+    }
+
+    const { hasAnyStream, hasUserData, isFetching } = useOrgHasUserData(
       () => store.state.selectedOrganization?.identifier ?? "",
     );
     // O2's own streams count, so the _meta org keeps the assistant; a stale cached list may be out of date
     watch(
       [hasAnyStream, isFetching],
       ([has, fetching]) => {
-        if (has !== false || fetching || activeHomeTab.value !== "ai") return;
-        skipSave = true;
-        activeHomeTab.value = "overview";
+        if (has !== false || fetching || activeHomeTab.value !== AI_HOME_TAB) return;
+        // A link that names the AI tab is the user's ask, so only the default landing moves.
+        if (forcedTab.value === AI_HOME_TAB) return;
+        setAutoTab("overview");
       },
       { immediate: true },
     );
@@ -532,7 +778,7 @@ export default defineComponent({
     watch(homeDashboard, (pin) => {
       if (pinnedTabPending.value || !activeHomeTab.value.startsWith("dash:")) return;
       if (!pin || pin.dashboardId !== parsePinnedTabId(activeHomeTab.value).dashboardId) {
-        activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
+        activeHomeTab.value = firstTab();
         return;
       }
       const nextId = `dash:${pin.folderId}:${pin.dashboardId}`;
@@ -565,57 +811,87 @@ export default defineComponent({
       order.splice(toIdx, 0, moved);
 
       tabOrder.value = order;
-      localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map((t) => t.id)));
+      savedOrder = order.map((t) => t.id);
+      homePrefs.save({ order: savedOrder });
     }
 
-    const homeChat = ref<any>(null);
-    function onLoadChat(id: number) {
-      homeChat.value?.loadChat(id);
-    }
-    function onNewChat() {
-      homeChat.value?.addNewChat();
-    }
+    // Tab state is per user+org in `o2.assistant.home:{userOrgKey}`, read once the key resolves (constraint 56).
+    const homePrefs = useHomeTabPrefs(assistantModule, (prefs) => {
+      if (prefs.order?.length) {
+        savedOrder = prefs.order;
+        tabOrder.value = loadTabOrder();
+      }
+      // A saved pinned tab follows the pin to its current folder.
+      const active = prefs.active && pinTabFor(prefs.active);
+      if (forcedTab.value) {
+        heldPrefActive = active ?? null;
+        return;
+      }
+      if (active && isAvailableTab(active)) {
+        activeHomeTab.value = active;
+      } else if (active === AI_HOME_TAB) {
+        pendingAi = true;
+      } else if (
+        active?.startsWith("dash:") &&
+        !isLoadedFor(store.state.selectedOrganization?.identifier)
+      ) {
+        activeHomeTab.value = active;
+        pinnedTabPending.value = true;
+      }
+    });
+    const homePrefsReady = homePrefs.ready;
 
-    const aiChatPayload = ref<{
-      text: string;
-      autoSend: boolean;
-      id: number;
-      chipName: string;
-      newChat: boolean;
-      context: Record<string, unknown>;
-    } | null>(null);
-
-    // The chat mounts with the AI tab, so the payload waits a tick for its watcher to see the change.
+    // Ask AI opens a new chat in the AI tab with the chip and the question in the input.
     function onSendToAiChat(handoff: AiChatHandoff) {
       if (aiLocked.value) return;
-      const payload = {
-        text: handoff.query,
-        autoSend: false,
-        id: Date.now(),
-        chipName: handoff.chipName,
-        newChat: handoff.newChat,
-        context: handoff.context,
-      };
-      activeHomeTab.value = "ai";
-      nextTick(() => (aiChatPayload.value = payload));
+      activeHomeTab.value = AI_HOME_TAB;
+      void assistantModule.then((m) =>
+        m.openAssistant({ ...m.legacyRelayArgs(handoff), container: "full" }),
+      );
     }
 
-    function onSwitchTab(e: Event) {
-      const tab = (e as CustomEvent).detail;
-      if (DEFAULT_TABS.value.find((t) => t.id === tab)) {
-        activeHomeTab.value = tab;
-      }
-    }
-    onMounted(() => window.addEventListener("o2:home-switch-tab", onSwitchTab));
-    onUnmounted(() => window.removeEventListener("o2:home-switch-tab", onSwitchTab));
+    // One `/` binding for Home, so launchers swapping in and out never unbind each other; the visible one answers the request.
+    const inAssistantSurface = () => !!document.activeElement?.closest(ASSISTANT_SURFACES_SELECTOR);
+    const focusInAssistant = ref(inAssistantSurface());
+    const syncAssistantFocus = () => {
+      focusInAssistant.value = inAssistantSurface();
+    };
+    useShortcuts([{ id: "homeFocusAsk", handler: () => void requestOverviewFocus() }], undefined, {
+      active: computed(
+        () =>
+          aiHome.value &&
+          threadId.value === null &&
+          overviewFocusListening.value &&
+          !focusInAssistant.value,
+      ),
+    });
+    onMounted(() => {
+      // Children mount before this hook, so a surface that took focus during mount is seen here.
+      syncAssistantFocus();
+      document.addEventListener("focusin", syncAssistantFocus);
+      document.addEventListener("focusout", syncAssistantFocus);
+    });
+    onUnmounted(() => {
+      document.removeEventListener("focusin", syncAssistantFocus);
+      document.removeEventListener("focusout", syncAssistantFocus);
+    });
 
-    const { isMobile } = useBreakpoint();
-    const mobileChatsOpen = ref(false);
+    const { lgUp } = useBreakpoint();
+    // Below lg the hero draws no rail either, so the chat's own New Chat icon stands in for it.
+    const threadRail = computed(() => lgUp.value && railGate(aiGate.value));
+    const threadView = ref<{ focusEntry(): void } | null>(null);
 
     // the first-data takeover replaces Overview and Usage only behind the empty-data flag; flag off is BASE Home
     const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_data === true);
     const isDataTab = computed(
-      () => activeHomeTab.value === "overview" || activeHomeTab.value === "usage",
+      () =>
+        activeHomeTab.value === "overview" ||
+        activeHomeTab.value === "usage" ||
+        (aiHome.value && threadId.value === null),
+    );
+    // Without the takeover flag nothing else notices an empty org, so the AI tab reads the stream lists itself.
+    const aiFirstRun = computed(
+      () => !flagOn.value && aiHome.value && threadId.value === null && hasUserData.value === false,
     );
     const arrived = ref<FirstEventResult>();
     const openArrived = () => {
@@ -630,28 +906,31 @@ export default defineComponent({
     };
 
     return {
+      threadId,
+      threadAskedOnHome,
+      threadHandoff,
+      threadRail,
+      threadView,
+      HOME_RAIL_CLASS,
+      aiHome,
+      homePrefsReady,
       t,
       store,
       config,
       firstDataNotice,
-      isMobile,
-      mobileChatsOpen,
       activeHomeTab,
       pinnedTabPending,
       tabOrder,
       onTabReorder,
       isEnterpriseOrCloud,
-      homeChat,
-      aiChatPayload,
       onSendToAiChat,
-      onLoadChat,
-      onNewChat,
       parsePinnedTabId,
       onPinnedLabel,
       onPinnedUnavailable,
       onCloseTab,
       onTabChange,
       flagOn,
+      aiFirstRun,
       isDataTab,
       arrived,
       openArrived,
@@ -660,18 +939,20 @@ export default defineComponent({
     };
   },
   components: {
+    HomeNoDataContext,
+    HomeThreadContext,
+    AssistantView: defineAsyncComponent(() => import("@/views/AssistantView.vue")),
+    HomeChatsRail: defineAsyncComponent(() => import("@/views/home/HomeChatsRail.vue")),
+    AgentHomeFirstRun: defineAsyncComponent(() => import("@/views/home/AgentHomeFirstRun.vue")),
+    AssistantHomeTab: defineAsyncComponent(() => import("@/views/home/AssistantHomeTab.vue")),
     OverviewTab,
     UsageTab,
-    O2AIChat,
     LicenseDeniedState,
-    HomeChatHistory,
     OTabs,
     OTab,
     OTooltip,
     OPageLayout,
-    OButton,
     OIcon,
-    ODrawer,
     PinnedDashboardTab,
     FirstDataPanel,
     FirstDataNotice,

@@ -1,0 +1,14 @@
+{
+  "_source": "B-07 typed query frame (00 §18)",
+  "_item": "B-07",
+  "frame": {
+    "type": "query",
+    "language": "sql",
+    "text": "SELECT service_name, http_status, count(*) AS errors FROM \"default\" WHERE level = 'error' GROUP BY service_name, http_status ORDER BY errors DESC",
+    "validated": true,
+    "time_range": {
+      "from": 1760000000000000,
+      "to": 1760000900000000
+    }
+  }
+}

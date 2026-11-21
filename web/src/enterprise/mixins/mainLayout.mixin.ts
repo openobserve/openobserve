@@ -11,6 +11,7 @@ import { expireSession } from "@/utils/sessionServices";
 import organizationService from "@/services/organizations";
 import userService from "@/services/users";
 import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
+import { assistantSignOut } from "@/utils/assistant/assistantSignOut";
 
 const MainLayoutCloudMixin = {
   setup() {
@@ -127,7 +128,9 @@ const MainLayoutCloudMixin = {
     };
 
     // The server refused this user's organizations: the session ends as an expired one does, with no leave dialog offering a Save that cannot work.
-    const signout = () => {
+    const signout = async () => {
+      // A 403 forces this sign-out, so the assistant asks nothing but still cancels and purges.
+      await assistantSignOut({ forced: true });
       // In every build, since expireSession leaves the backend auth cookie in place.
       invalidateLoginData();
       expireSession(store);

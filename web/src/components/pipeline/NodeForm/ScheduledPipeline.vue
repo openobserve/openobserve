@@ -18,12 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="scheduled-pipeline-container h-full w-full">
     <!-- <OSeparator /> -->
 
-    <div class="stepper-header mb-2 flex h-full w-full">
-      <div
-        :class="store.state.isAiChatEnabled ? 'w-[75%]' : 'w-full'"
-        class="flex"
-        style="height: 100% !important"
-      >
+    <div :ref="docked ? docked.dockSlot : undefined" class="stepper-header mb-2 flex h-full w-full">
+      <div class="flex w-full" style="height: 100% !important">
         <!-- Collapsed field list bar (shown when hidden) -->
         <div
           v-if="collapseFields"
@@ -725,7 +721,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="tab === 'sql' ? t('pipeline.sqlQuery') : t('pipeline.promqlQuery')"
                     />
                   </span>
-                  <div class="relative">
+                  <AiLabel
+                    v-if="docked?.proposal.label.value"
+                    :state="docked.proposal.label.value"
+                    class="px-2 py-1"
+                    @revert="docked.proposal.revert"
+                    @ask-again="docked.dock.askAgain"
+                  />
+                  <div ref="editorArea" class="relative">
+                    <AssistantDiffBlock
+                      v-if="docked?.proposal.pending.value"
+                      :key="docked.proposal.pending.value.id"
+                      :proposal="docked.proposal.pending.value"
+                      class="absolute inset-0 z-1000"
+                    />
                     <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                     <UnifiedQueryEditor
                       v-show="expandState.query"
@@ -749,10 +758,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                       @blur="onBlurQueryEditor"
                       editor-height="calc(100vh - 190px)"
+                      :assistant="scheduledAssistant"
+                      :placeholder="scheduledAssistant ? editorPlaceholder : undefined"
                     />
                     <!-- eslint-enable local/no-hardcoded-px -->
                     <div
-                      v-if="!query && queryEditorPlaceholderFlag && expandState.query"
+                      v-if="
+                        !scheduledAssistant &&
+                        !query &&
+                        queryEditorPlaceholderFlag &&
+                        expandState.query
+                      "
                       class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
                     >
                       <span
@@ -798,16 +814,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :expand-on-row-click="true"
                       :cell-overflow-tooltip="false"
                       data-test="scheduled-pipeline-sql-preview-table"
+                      focus-toolbar
                     >
                       <!-- eslint-enable local/no-hardcoded-px -->
                       <template #cell-source="{ row }">
                         <span class="font-mono text-xs">{{ JSON.stringify(row) }}</span>
                       </template>
-                      <template #cell-hover-actions="{ row, column, active }">
-                        <O2AIContextAddBtn
-                          v-if="active && column.id === '_timestamp'"
-                          data-test="scheduled-pipeline-send-to-ai-btn"
-                          @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
+                      <template #cell-hover-actions="{ row, column, active, menu }">
+                        <ODropdown v-if="menu">
+                          <template #trigger>
+                            <OButton
+                              variant="ghost"
+                              size="icon-sm"
+                              class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                              :aria-label="t('assistant.entry.rowActions')"
+                              data-test="scheduled-pipeline-preview-row-menu"
+                            >
+                              <OIcon name="more-vert" size="sm" />
+                            </OButton>
+                          </template>
+                          <AiEntryButton v-bind="previewRowDoor(row)" appearance="menu-item" />
+                        </ODropdown>
+                        <AiEntryButton
+                          v-else-if="active && column.id === previewTimestampColumn"
+                          v-bind="previewRowDoor(row)"
+                          appearance="toolbar-icon"
                         />
                       </template>
                       <template #expansion="{ row }">
@@ -820,7 +851,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :hide-view-related="true"
                           :hide-search-term-actions="true"
                           @copy="copyLogToClipboard"
-                          @send-to-ai-chat="sendToAiChat"
                         />
                       </template>
                     </OTable>
@@ -916,21 +946,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- query-eidtor-part -->
       </div>
 
-      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
-      <div
-        class="ms-2 w-1/4 max-w-full"
-        v-if="store.state.isAiChatEnabled"
-        style="min-width: 4.6875rem; height: calc(100vh - 70px) !important"
-      >
-        <O2AIChat
-          style="height: calc(100vh - 70px) !important"
-          :is-open="store.state.isAiChatEnabled"
-          @close="store.state.isAiChatEnabled = false"
-          :aiChatInputContext="aiChatInputContext"
-          :appendMode="aiChatAppendMode"
-        />
-        <!-- eslint-enable local/no-hardcoded-px -->
-      </div>
+      <AssistantDock v-if="docked" :host="docked.adapter" />
     </div>
   </div>
 </template>
@@ -950,9 +966,7 @@ import {
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import useTheme from "@/composables/useTheme";
 import {
-  getImageURL,
   timestampToTimezoneDate,
   formatTimeWithSuffix,
   b64EncodeUnicode,
@@ -964,9 +978,14 @@ import { copyToClipboard } from "@/utils/clipboard";
 import CronExpressionParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
-import O2AIChat from "@/components/O2AIChat.vue";
+import {
+  useDockedEditor,
+  type DockedEditor,
+  type QueryEditorAssistant,
+} from "@/composables/assistant/pure";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -991,7 +1010,8 @@ import {
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import JsonPreview from "@/plugins/logs/JsonPreview.vue";
-import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { rowKeyOf } from "@/plugins/logs/logsDoors";
 import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
 
 import config from "../../../aws-exports";
@@ -1005,7 +1025,6 @@ import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
-import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import {
   getFieldFromExpression,
@@ -1194,7 +1213,6 @@ const query = ref(
 const collapseFields = ref(false);
 
 const store = useStore();
-const { isDark } = useTheme();
 
 const queryEditorPlaceholderFlag = ref(true);
 const pipelineEditorRef: any = ref(null);
@@ -1233,15 +1251,11 @@ const dateTime = ref<{
 });
 const streamFields: any = ref([]);
 const previewPromqlQueryRef: any = ref(null);
-const isHovered = ref(false);
 const loading = ref(false);
 const streamsLoading = ref(false);
 // Flag to prevent the "stream changed → generate default query" watch from
 // firing when the stream name is updated programmatically from the SQL text.
 const isSyncingStreamFromQuery = ref(false);
-
-const aiChatInputContext = ref("");
-const aiChatAppendMode = ref(true);
 
 const userDefinedFields = ref<any[]>([]);
 
@@ -1447,59 +1461,12 @@ watch(
   },
 );
 
-// Watch for stream name changes and update context provider
-watch(selectedStreamName, (newStreamName) => {
-  const contextProvider = createPipelinesContextProvider(
-    pipelineObj,
-    store,
-    newStreamName,
-    selectedStreamType.value,
-    tab.value,
-  );
-  contextRegistry.register("pipelines", contextProvider);
-});
-
-// Watch for stream type changes and update context provider
-watch(selectedStreamType, (newStreamType) => {
-  const contextProvider = createPipelinesContextProvider(
-    pipelineObj,
-    store,
-    selectedStreamName.value,
-    newStreamType,
-    tab.value,
-  );
-  contextRegistry.register("pipelines", contextProvider);
-});
-
-// Watch for query type changes and update context provider
-watch(tab, (newTab) => {
-  const contextProvider = createPipelinesContextProvider(
-    pipelineObj,
-    store,
-    selectedStreamName.value,
-    selectedStreamType.value,
-    newTab,
-  );
-  contextRegistry.register("pipelines", contextProvider);
-});
-
 onBeforeMount(async () => {
   await importSqlParser();
 });
 
 onMounted(async () => {
   await getStreamList();
-
-  // Initialize context provider for AI queries
-  const contextProvider = createPipelinesContextProvider(
-    pipelineObj,
-    store,
-    selectedStreamName.value,
-    selectedStreamType.value,
-    tab.value,
-  );
-  contextRegistry.register("pipelines", contextProvider);
-  contextRegistry.setActive("pipelines");
 
   setTimeout(() => {
     if (tab.value === "sql" && query.value != "") {
@@ -1523,8 +1490,6 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   removeAiContextHandler();
-  contextRegistry.unregister("pipelines");
-  contextRegistry.setActive("");
 });
 
 const importSqlParser = async () => {
@@ -2456,22 +2421,7 @@ const updateDelay = (val: any) => {
   emits("update:delay", val);
 };
 
-const toggleAIChat = () => {
-  const isEnabled = !store.state.isAiChatEnabled;
-  store.dispatch("setIsAiChatEnabled", isEnabled);
-};
-
-const getBtnLogo = computed(() => {
-  if (isHovered.value || store.state.isAiChatEnabled) {
-    return getImageURL("images/common/ai_icon_dark.svg");
-  }
-
-  return isDark.value
-    ? getImageURL("images/common/ai_icon_dark.svg")
-    : getImageURL("images/common/ai_icon_gradient.svg");
-});
-
-// [START] O2 AI Context Handler
+// [START] AI Context Handler
 
 const registerAiContextHandler = () => {
   registerAiChatHandler(getContext);
@@ -2528,18 +2478,117 @@ const removeAiContextHandler = () => {
   removeAiChatHandler();
 };
 
-// [END] O2 AI Context Handler
+// [END] AI Context Handler
 
-const sendToAiChat = (value: any, append: boolean = true) => {
-  aiChatAppendMode.value = append;
-  aiChatInputContext.value = value;
-  store.dispatch("setIsAiChatEnabled", true);
+const loadedOrg = useLoadedOrg(
+  () => rows.value,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
+const AiLabel = defineAsyncComponent(() => import("@/components/ai-assistant/entry/AiLabel.vue"));
+const AssistantDiffBlock = defineAsyncComponent(
+  () => import("@/components/ai-assistant/evidence/AssistantDiffBlock.vue"),
+);
+const AssistantDock = defineAsyncComponent(
+  () => import("@/components/ai-assistant/shell/AssistantDock.vue"),
+);
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+// The org's timestamp column, not the literal `_timestamp`.
+const previewTimestampColumn = computed(
+  () => store.state.zoConfig?.timestamp_column || "_timestamp",
+);
 
-  // Clear context after setting to prevent accumulation
-  nextTick(() => {
-    aiChatInputContext.value = "";
+const previewRowDoor = (row: Record<string, unknown>) => ({
+  verb: "add_to_chat" as const,
+  entryKind: "object_verb" as const,
+  boundOrg: loadedOrg.value,
+  objectKind: "log_row" as const,
+  thread: "current" as const,
+  dockHost: "scheduled_query" as const,
+  label: t("assistant.entry.addPreviewRow"),
+  tooltip: t("assistant.entry.tooltip.add"),
+  dataTest: "ai-entry-pipeline-preview-add" as const,
+  objectKey: rowKeyOf(row, previewTimestampColumn.value),
+  build: async () => {
+    const now = Date.now();
+    const from = Number(dateTime.value.startTime) / 1000;
+    const to = Number(dateTime.value.endTime) / 1000;
+    return (await import("@/utils/assistant/prompts")).buildLogRowPrompt({
+      org: store.state.selectedOrganization?.identifier ?? "",
+      stream: selectedStreamName.value || "",
+      row,
+      timestampField: previewTimestampColumn.value,
+      range: from > 0 && to > 0 ? { from, to } : { from: now - 15 * 60_000, to: now },
+      timeZone: store.state.timezone || "UTC",
+      query: String(query.value ?? ""),
+      mode: "sql",
+      source: {
+        kind: "pipeline",
+        name: String(pipelineObj.currentSelectedPipeline?.name ?? ""),
+      },
+    });
+  },
+});
+
+const editorArea = ref<HTMLElement | null>(null);
+const openedWithQuery = query.value ?? "";
+const docked: DockedEditor | null = scheduledQueryHost();
+const scheduledAssistant: QueryEditorAssistant | null = docked
+  ? {
+      id: "scheduled_query",
+      proposal: docked.proposal,
+      get stream() {
+        return String(selectedStreamName.value ?? "");
+      },
+      get streamType() {
+        return String(selectedStreamType.value ?? "");
+      },
+      get timeRange() {
+        const minutes = Number(triggerData.value.period);
+        if (!Number.isFinite(minutes) || minutes <= 0) return undefined;
+        const to = Date.now();
+        return { from: to - minutes * 60_000, to, period: `${minutes}m` };
+      },
+      run: () => void runQuery(),
+    }
+  : null;
+
+function scheduledQueryHost(): DockedEditor {
+  const nodeEdited = form.useStore((s: { isDirty: boolean }) => s.isDirty);
+  return useDockedEditor({
+    id: "scheduled_query",
+    objectKind: "pipeline_node",
+    objectTitle: () => {
+      const pipeline = String(pipelineObj.currentSelectedPipeline?.name ?? "");
+      return pipeline
+        ? t("assistant.editor.title.queryNode", { pipeline: raw(pipeline) })
+        : t("assistant.editor.title.queryNodeNew");
+    },
+    language: () => (tab.value === "promql" ? "promql" : "sql"),
+    getBuffer: () => String(query.value ?? ""),
+    getContext: () => ({
+      ...createPipelinesContextProvider(
+        pipelineObj,
+        store,
+        selectedStreamName.value,
+        selectedStreamType.value,
+        tab.value,
+      ).getContext(),
+      ...(tab.value === "sql"
+        ? { currentSQLQuery: String(query.value ?? "") }
+        : { currentQuery: String(query.value ?? "") }),
+    }),
+    isDirty: () => !!nodeEdited.value || String(query.value ?? "") !== openedWithQuery,
+    run: () => void runQuery(),
+    focusEditor: () => editorArea.value?.querySelector<HTMLElement>("textarea")?.focus(),
+    write(text) {
+      updateQueryValue(text);
+      pipelineEditorRef.value?.replaceValue?.(text);
+    },
+    area: () => editorArea.value,
   });
-};
+}
 
 defineExpose({
   tab,
@@ -2590,14 +2639,8 @@ defineExpose({
   copyToClipboard,
   updateDelay,
   delayCondition,
-  toggleAIChat,
-  isHovered,
-  getBtnLogo,
   isFullscreen,
   handleFullScreen,
-  sendToAiChat,
-  aiChatInputContext,
-  aiChatAppendMode,
   effectiveKeywords,
   effectiveSuggestions,
   streamsLoading,

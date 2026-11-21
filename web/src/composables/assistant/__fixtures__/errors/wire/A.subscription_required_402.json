@@ -1,0 +1,12 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chat.rs:239-252 (cloud) with src/core/src/trial_quota.rs:365-370",
+  "shape": "A",
+  "status": 402,
+  "body": {
+    "code": 402,
+    "message": "Free trial quota exhausted (500/500 used). Subscribe to continue using this feature.",
+    "error_type": "ai_credits_exhausted",
+    "remedy": "subscribe",
+    "payer_org_id": null
+  }
+}

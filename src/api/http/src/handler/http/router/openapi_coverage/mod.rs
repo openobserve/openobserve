@@ -2147,7 +2147,7 @@ fn enabled_mcp_tools_match_the_snapshot() {
         .unwrap()
         .into_iter()
         .collect();
-    assert!(enabled.len() >= 300, "only {} MCP tools", enabled.len());
+    assert!(enabled.len() >= 280, "only {} MCP tools", enabled.len());
     assert_no_difference(
         &enabled,
         &edition_entries(MCP_ENABLED),

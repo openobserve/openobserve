@@ -78,7 +78,6 @@ const mountSearchResult = async () => {
         ChartRenderer: true,
         SanitizedHtmlRenderer: true,
         CellActions: true,
-        O2AIContextAddBtn: true,
         PatternDetailsDialog: true,
         ODrawer: true,
         OContextMenu: oContextMenuStub,

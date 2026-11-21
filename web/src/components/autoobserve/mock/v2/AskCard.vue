@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="rounded-default relative flex flex-col gap-2 overflow-hidden border"
       :class="
         inline
-          ? 'bg-badge-warning-soft-bg/40 border-badge-warning-ol-border/40 px-3 py-2.5'
+          ? 'bg-surface-base border-border-subtle px-3 py-2.5'
           : 'bg-surface-base border-border-subtle py-3.5 ps-4 pe-3.5 shadow-xs'
       "
     >
@@ -88,9 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <p class="text-text-secondary text-sm leading-relaxed text-pretty">
           {{ request.copy ? request.copy.why : t(copyKey("why")) }}
-          <button
-            type="button"
-            class="text-accent focus-visible:ring-focus-ring-accent rounded-default inline-flex items-center gap-0.5 font-medium whitespace-nowrap hover:underline focus-visible:ring-2 focus-visible:outline-none"
+          <OButton
+            variant="ghost-primary"
+            size="xs"
             :aria-expanded="expanded"
             :aria-controls="`autoobserve2-request-more-${request.id}`"
             :data-test="`autoobserve2-request-more-${testId}`"
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ expanded ? t("autoobserve2.needs.less") : t("autoobserve2.needs.more") }}
             <OIcon :name="expanded ? 'expand-less' : 'expand-more'" size="xs" />
-          </button>
+          </OButton>
         </p>
         <p
           v-if="expanded"
@@ -162,13 +162,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t(request.no) }}
         </OButton>
+        <AiEntryButton
+          verb="ask"
+          entry-kind="autoobserve_card"
+          object-kind="none"
+          thread="new"
+          :object-key="request.id"
+          :build="buildContinue"
+          :label="t('assistant.oncall.continue')"
+          :tooltip="t('assistant.autoobserve.continueTooltip', { product })"
+          data-test="ai-entry-autoobserve-ask-ask"
+        />
       </div>
     </article>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from "vue";
+import { computed, defineAsyncComponent, nextTick, ref } from "vue";
+import { useStore } from "vuex";
+import { useAssistantName } from "@/composables/assistant/pure";
+import { buildAutoObserveAskPrompt } from "@/utils/assistant/prompts/autoobserve";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -180,6 +194,11 @@ import { KIND_LOOK, type ChangeKind } from "@/components/autoobserve/mock/v2/cha
 const props = defineProps<{ request: Request; inline?: boolean }>();
 
 const { t } = useI18nTyped();
+const vuex = useStore();
+const { product } = useAssistantName();
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
 
 const LABEL: Record<RequestKind, I18nKey> = {
   fixNow: "autoobserve2.needs.labels.fixNow",
@@ -221,11 +240,14 @@ const testId = computed(() =>
 );
 
 const doneText = computed(() => {
-  const { id, doneSettled, doneYes, doneNo } = props.request;
+  const { id, doneNo } = props.request;
   const decision = decisions[id];
   if (!decision) return raw("");
-  if (decision === "yes" && doneSettled && phases[id] === "fixed") return say(t, doneSettled);
-  return say(t, decision === "yes" ? doneYes : doneNo);
+  if (decision === "yes")
+    return phases[id] === "fixed"
+      ? t("autoobserve2.needs.sampleComplete")
+      : t("autoobserve2.needs.sampleApplied", { headline: t(copyKey("headline")) });
+  return say(t, doneNo);
 });
 
 // The pressed button unmounts with the card, so focus moves to its counterpart instead of falling to the page.
@@ -247,4 +269,14 @@ const onUndo = () => {
   announcement.value = t("autoobserve2.needs.undone");
   void focusAction("yes");
 };
+
+function buildContinue() {
+  const prompt = buildAutoObserveAskPrompt({
+    org: vuex.state.selectedOrganization?.identifier ?? "",
+    id: props.request.id,
+    title: t(copyKey("headline")),
+    body: [t(copyKey("why")), say(t, props.request.body)].join("\n\n"),
+  });
+  return { text: prompt.text, chips: prompt.chips, title: prompt.title };
+}
 </script>

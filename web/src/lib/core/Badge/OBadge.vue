@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BadgeProps, BadgeEmits, BadgeSlots } from "./OBadge.types";
-import { computed, useSlots } from "vue";
+import { computed, useAttrs, useSlots } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OIcon from "../Icon/OIcon.vue";
 import { iconRegistry } from "../Icon/OIcon.icons";
@@ -15,6 +15,7 @@ const props = withDefaults(defineProps<BadgeProps>(), {
   clickable: false,
   disabled: false,
   removable: false,
+  labelButton: false,
 });
 
 const emit = defineEmits<BadgeEmits>();
@@ -22,6 +23,7 @@ const emit = defineEmits<BadgeEmits>();
 defineSlots<BadgeSlots>();
 
 const slots = useSlots();
+const attrs = useAttrs();
 const { t } = useI18nTyped();
 
 /** True when the left icon area should render (slot OR icon prop). */
@@ -47,6 +49,18 @@ const hasTrailing = computed(() => {
  *  button, and a button inside a button is invalid markup that browsers repair
  *  by hoisting the inner one out of the chip. */
 const tag = computed(() => (props.clickable && !props.removable ? "button" : "span"));
+
+// A role="button" chip holding the ✕ is a nested control (axe nested-interactive), so the label becomes the button.
+const split = computed(() => props.clickable && props.removable && props.labelButton);
+const LABEL_ATTR = /^(aria-|role$|tabindex$|data-test$)/;
+const rootAttrs = computed(() =>
+  split.value
+    ? Object.fromEntries(Object.entries(attrs).filter(([k]) => !LABEL_ATTR.test(k)))
+    : attrs,
+);
+const labelAttrs = computed(() =>
+  Object.fromEntries(Object.entries(attrs).filter(([k]) => LABEL_ATTR.test(k))),
+);
 
 // ── Variant class map ─────────────────────────────────────────────────────
 // Each entry is a complete token-based class string. No inline colours.
@@ -234,6 +248,12 @@ const classes = computed(() => [
       "focus-visible:ring-badge-focus-ring",
       "focus-visible:ring-offset-1",
     ].join(" "),
+  split.value &&
+    [
+      "has-[>button:first-of-type:focus-visible]:ring-2",
+      "has-[>button:first-of-type:focus-visible]:ring-badge-focus-ring",
+      "has-[>button:first-of-type:focus-visible]:ring-offset-1",
+    ].join(" "),
   // Disabled — always mutes regardless of clickable
   props.disabled && "opacity-40 pointer-events-none",
 ]);
@@ -266,12 +286,12 @@ function handleRemove(e: MouseEvent): void {
     :is="tag"
     :type="clickable ? 'button' : undefined"
     :disabled="clickable && disabled ? true : undefined"
-    :aria-disabled="disabled || undefined"
-    :tabindex="clickable && !disabled && tag !== 'button' ? 0 : undefined"
+    :aria-disabled="(!split && disabled) || undefined"
+    :tabindex="clickable && !disabled && tag !== 'button' && !split ? 0 : undefined"
     :class="classes"
-    v-bind="$attrs"
+    v-bind="rootAttrs"
     @click="handleClick"
-    @keydown="handleKeydown"
+    @keydown="split ? undefined : handleKeydown($event)"
   >
     <!-- Leading status dot (7px solid, inherits the badge's foreground colour). -->
     <span
@@ -302,7 +322,17 @@ function handleRemove(e: MouseEvent): void {
     </template>
 
     <!-- Badge label -->
-    <slot />
+    <button
+      v-if="split"
+      type="button"
+      :disabled="disabled || undefined"
+      class="inline-flex min-w-0 cursor-pointer items-center gap-[inherit] focus-visible:outline-none"
+      v-bind="labelAttrs"
+      @keydown="handleKeydown"
+    >
+      <slot />
+    </button>
+    <slot v-else />
 
     <!--
       Trailing segment — rendered when either the #trailing slot or count prop is set.
@@ -332,7 +362,7 @@ function handleRemove(e: MouseEvent): void {
         'focus-visible:ring-badge-focus-ring focus-visible:ring-2 focus-visible:outline-none',
         'disabled:pointer-events-none disabled:opacity-40',
       ]"
-      data-test="o2-badge-remove"
+      :data-test="removeDataTest ?? 'o2-badge-remove'"
       @click="handleRemove"
     >
       <OIcon name="close" size="xs" />

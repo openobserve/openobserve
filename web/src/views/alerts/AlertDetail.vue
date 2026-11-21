@@ -327,6 +327,7 @@
           <OTabPanel v-if="isMultiAlert" name="groups" stretch>
             <AlertGroupsTable
               :groups="groupData?.list || []"
+              :alert="alert ?? undefined"
               :loading="loadingGroups"
               :load-error="groupsLoadError"
               :alert-id="alertId"
@@ -511,6 +512,11 @@ import {
   sloIdOf,
 } from "@/utils/alerts/sloAlertRouting";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { contextRegistry } from "@/composables/contextProviders/registry";
+import {
+  ALERT_DETAIL_CONTEXT_KEY,
+  createAlertDetailContextProvider,
+} from "@/composables/contextProviders/alertDetailContextProvider";
 import type {
   AckView,
   AlertGroup,
@@ -1097,6 +1103,30 @@ const editAlert = () => {
     },
   });
 };
+
+const assistantAlertState = computed(() => {
+  if (!listRow.value) return "";
+  if (listRow.value.enabled === false) return "disabled";
+  return isFiringNow.value ? "firing" : "ok";
+});
+
+contextRegistry.register(
+  ALERT_DETAIL_CONTEXT_KEY,
+  createAlertDetailContextProvider(
+    () => ({
+      alertId: alertId.value,
+      alert: unavailable.value ? null : alert.value,
+      state: assistantAlertState.value,
+    }),
+    store,
+  ),
+);
+contextRegistry.setActive(ALERT_DETAIL_CONTEXT_KEY);
+
+onBeforeUnmount(() => {
+  contextRegistry.unregister(ALERT_DETAIL_CONTEXT_KEY);
+  contextRegistry.setActive("");
+});
 
 // Mount, route changes and Retry share it, so a recovered page loads what the first load skipped.
 const loadPage = async () => {

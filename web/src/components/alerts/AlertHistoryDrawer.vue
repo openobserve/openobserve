@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer
+    inset-beside
     data-test="alert-history-drawer"
     bleed
     :open="open"
@@ -76,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #header-right>
       <div class="col-auto flex items-center gap-1">
+        <AiEntryButton v-if="alertDetails && lgUp" v-bind="headerDoor" appearance="toolbar-icon" />
         <DateTime
           :class="activeTab !== 'history' ? 'invisible' : ''"
           ref="dateTimeRef"
@@ -94,6 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Content -->
     <div class="flex h-full min-h-0 flex-col" v-if="alertDetails">
+      <div v-if="!lgUp" class="flex justify-end px-2 pt-2">
+        <AiEntryButton v-bind="headerDoor" appearance="chip" />
+      </div>
       <!-- Tab Panels -->
       <OTabPanels
         v-model="activeTab"
@@ -167,13 +172,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </span>
                     </div>
                     <!-- Normal row -->
-                    <span v-else class="inline-flex cursor-default">
-                      <OTag
-                        type="alertState"
-                        :value="row.status"
-                        data-test="alert-history-status-chip"
-                      />
-                      <OTooltip v-if="row.error" :max-width="'18.75rem'" :content="row.error" />
+                    <span v-else class="inline-flex cursor-default items-center gap-1">
+                      <span class="inline-flex">
+                        <OTag
+                          type="alertState"
+                          :value="row.status"
+                          data-test="alert-history-status-chip"
+                        />
+                        <OTooltip v-if="row.error" :max-width="'18.75rem'" :content="row.error" />
+                      </span>
+                      <template v-if="alertDetails && rowIsFiring(String(row.status ?? ''))">
+                        <AiEntryButton
+                          v-bind="firingDoor(row, 'troubleshoot')"
+                          appearance="toolbar-icon"
+                        />
+                        <AiEntryButton
+                          v-bind="firingDoor(row, 'add_to_chat')"
+                          appearance="toolbar-icon"
+                        />
+                      </template>
                     </span>
                   </template>
 
@@ -377,7 +394,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { conditionSummary, isFiringOutcome, isOkOutcome } from "@/utils/alerts/runOutcome";
@@ -400,10 +417,59 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import AlertHistoryTimeline from "./AlertHistoryTimeline.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { alertBuild, alertFiringBuild } from "@/components/alerts/alertDoors";
 
 // Composables
 const { t } = useI18nTyped();
 const store = useStore();
+
+const { lgUp } = useBreakpoint();
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+const alertRecord = () => ({ ...(props.alertDetails ?? {}), id: props.alertId });
+// The header asks why the alert fires; each evaluation row asks about that one firing.
+const headerDoor = computed(() => ({
+  verb: "troubleshoot" as const,
+  entryKind: "object_verb" as const,
+  boundOrg: loadedOrg.value,
+  objectKind: "alert" as const,
+  label: t("assistant.entry.troubleshootAlert"),
+  tooltip: t("assistant.entry.tooltip.troubleshootAlert"),
+  dataTest: "ai-entry-alert-troubleshoot" as const,
+  build: alertBuild(alertRecord, "troubleshoot", store.state),
+}));
+const firingDoor = (row: Record<string, any>, verb: "troubleshoot" | "add_to_chat") => ({
+  verb,
+  entryKind: "object_verb" as const,
+  boundOrg: loadedOrg.value,
+  objectKind: "alert_firing" as const,
+  label: t(
+    verb === "troubleshoot" ? "assistant.entry.troubleshootAlert" : "assistant.entry.addFiring",
+  ),
+  tooltip: t(
+    verb === "troubleshoot"
+      ? "assistant.entry.tooltip.troubleshootAlert"
+      : "assistant.entry.tooltip.add",
+  ),
+  dataTest:
+    verb === "troubleshoot"
+      ? ("ai-entry-alert-firing-troubleshoot" as const)
+      : ("ai-entry-alert-firing-add" as const),
+  objectKey: `${props.alertId}:${String(row.timestamp ?? "")}`,
+  build: alertFiringBuild(() => {
+    const ms = (us: unknown) => Math.round(Number(us) / 1000);
+    const from = ms(row.start_time);
+    const to = ms(row.end_time);
+    return {
+      alert: alertRecord(),
+      firedAt: ms(row.timestamp) || Date.now(),
+      ...(from > 0 && to > 0 && { window: { from, to } }),
+    };
+  }, store.state),
+});
 
 // Props & Emits
 interface Props {
@@ -414,6 +480,10 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const loadedOrg = useLoadedOrg(
+  () => props.alertDetails,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
 
 const isAnomaly = computed(() => props.alertType === "anomaly_detection");
 

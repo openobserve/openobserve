@@ -23,6 +23,7 @@ use std::{
     time::Duration,
 };
 
+use common::meta::organization::{AiDataSharingLevel, OrgAiSettings};
 use config::{
     meta::{
         alerts::{
@@ -63,7 +64,10 @@ use o2_enterprise::enterprise::{
             lease::{self, LeaseError, TurnLease},
             spawn_headless_turn,
         },
-        client::{QueryRequest, RCA_AGENT_TYPE, SESSION_ID_HEADER, get_agent_client},
+        client::{
+            HealthResponse, POLICY_CONTEXT_KEY, QueryRequest, RCA_AGENT_TYPE, SESSION_ID_HEADER,
+            get_agent_client,
+        },
         toolsets::{CliEntry, McpEntry, SkillEntry, push::load_agent_tools},
     },
     alerts::rca_service,
@@ -88,11 +92,11 @@ use crate::ai_chat::{
     admission::{self, AdmitError, AdmittedTurn},
     cancel::cancel_chat_turn,
     fork,
+    projection::Folded,
     rca_ledger::{RunTranscript, TranscriptQuestion, decode_run},
-    rca_thread::{
-        SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread, updated_part,
-    },
+    rca_thread::{SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread},
     read_committed_events,
+    record_v2::{event_parts, record_message},
 };
 
 /// The user text of the one continuation turn.
@@ -317,13 +321,7 @@ impl RcaTurnError {
 
     /// A turn that never started may legitimately have no session row.
     pub fn is_start_code(code: &str) -> bool {
-        [
-            admission::TURN_LIMIT,
-            ERROR_CREDENTIALS,
-            ERROR_AGENT_UNAVAILABLE,
-            ERROR_BUSY,
-        ]
-        .contains(&code)
+        config::meta::alerts::rca_runs::is_refusal_code(code)
     }
 }
 
@@ -467,16 +465,16 @@ async fn start_turn(
     )
     .await?;
 
-    // The turn ends at `rca_timeout_secs`; o2-ai warns the agent before it, so a long
-    // investigation submits what it found instead of failing `timeout` with no report.
-    let mut context = run.context.clone();
-    if let Some(fields) = context.as_object_mut() {
-        fields.insert(
-            TURN_SECONDS_FIELD.to_string(),
-            serde_json::Value::from(get_o2_config().incidents.rca_timeout_secs),
-        );
-    }
-    let mut request = QueryRequest::new(prompt, context);
+    let settings = crate::ai_policy::org_settings(&run.org_id)
+        .await
+        .inspect_err(|e| {
+            log::warn!(
+                "[RCA] org {} assistant settings unreadable: {e}",
+                run.org_id
+            );
+        })
+        .ok();
+    let mut request = rca_request(prompt, &run.context, settings.as_ref());
     request.mcps = (!mcps.is_empty()).then_some(mcps);
     request.clis = (!clis.is_empty()).then_some(clis);
     request.skills = (!skills.is_empty()).then_some(skills);
@@ -501,6 +499,7 @@ async fn start_turn(
         run.org_id.clone(),
         run.run_id.clone(),
         row.session_id.clone(),
+        row.last_committed_seq,
     );
     let identity = TurnIdentity {
         org_id: run.org_id.clone(),
@@ -538,16 +537,41 @@ async fn start_turn(
 }
 
 /// Bound the agent health probe independently of the streaming timeout.
-async fn probe_health<T, E: std::fmt::Display>(
-    probe: impl Future<Output = Result<T, E>>,
+async fn probe_health<E: std::fmt::Display>(
+    probe: impl Future<Output = Result<HealthResponse, E>>,
 ) -> Result<(), RcaTurnError> {
     match tokio::time::timeout(HEALTH_CHECK_TIMEOUT, probe).await {
-        Ok(Ok(_)) => Ok(()),
+        Ok(Ok(health)) if health.is_healthy() => Ok(()),
+        Ok(Ok(_)) => Err(RcaTurnError::AgentUnavailable(
+            "health check answered but the agent is not healthy".to_string(),
+        )),
         Ok(Err(e)) => Err(RcaTurnError::AgentUnavailable(format!("{e:#}"))),
         Err(_) => Err(RcaTurnError::AgentUnavailable(
             "health check timed out".to_string(),
         )),
     }
+}
+
+/// The agent request of an RCA turn, bound to the org's data and permission levels.
+fn rca_request(prompt: String, context: &Value, settings: Option<&OrgAiSettings>) -> QueryRequest {
+    // The turn ends at `rca_timeout_secs`; o2-ai warns the agent before it, so a long
+    // investigation submits what it found instead of failing `timeout` with no report.
+    let mut context = context.clone();
+    if let Some(fields) = context.as_object_mut() {
+        fields.insert(
+            TURN_SECONDS_FIELD.to_string(),
+            serde_json::Value::from(get_o2_config().incidents.rca_timeout_secs),
+        );
+        fields.insert(POLICY_CONTEXT_KEY.to_string(), rca_policy(settings));
+    }
+    QueryRequest::new(prompt, context)
+}
+
+/// The org's data level only (strictest if unreadable); without a tier o2-ai keeps RCA's signed
+/// writes.
+fn rca_policy(settings: Option<&OrgAiSettings>) -> Value {
+    let level = settings.map_or(AiDataSharingLevel::Schema, |s| s.data_sharing_level);
+    json!({ "data_sharing_level": level.as_str() })
 }
 
 /// Expose only the context actually provided to this run.
@@ -1578,16 +1602,17 @@ struct RunUsage {
 impl RunUsage {
     fn of(events: &[DurableEvent]) -> Self {
         // A part is updated many times; its last update holds the step's cost.
-        let mut costs: HashMap<&str, Option<f64>> = HashMap::new();
+        let mut costs: HashMap<String, Option<f64>> = HashMap::new();
         let mut model = None;
         for event in events {
-            if let Some(part) = updated_part(event) {
+            for part in event_parts(event) {
                 if part.get("type").and_then(Value::as_str) == Some("step-finish")
                     && let Some(id) = part.get("id").and_then(Value::as_str)
                 {
-                    costs.insert(id, part.get("cost").and_then(Value::as_f64));
+                    costs.insert(id.to_string(), part.get("cost").and_then(Value::as_f64));
                 }
-            } else if event.event_type.starts_with("message.updated") {
+            }
+            if event.event_type.starts_with("message.updated") {
                 let info = &event.data["info"];
                 let text = |k: &str| info[k].as_str().filter(|v| !v.is_empty());
                 if text("role") == Some("assistant")
@@ -1613,29 +1638,41 @@ impl RunUsage {
 struct Progress {
     parts: Vec<(String, ThreadPart)>,
     tokens: Vec<(String, Tokens)>,
+    /// The message of each part id a 2.x record carries.
+    recorded_in: HashMap<String, String>,
 }
 
 impl Progress {
     fn of(events: &[DurableEvent]) -> Self {
         let mut progress = Self::default();
-        for part in events.iter().filter_map(updated_part) {
-            let Some(id) = part.get("id").and_then(Value::as_str) else {
-                continue;
-            };
-            if part.get("type").and_then(Value::as_str) == Some("step-finish") {
-                if let Some(tokens) = Tokens::of(part) {
-                    progress.tokens.push((id.to_string(), tokens));
-                }
-                continue;
-            }
-            if let Some(call) = ToolPart::of(part) {
-                let kind = call.kind();
-                if kind != ThreadPart::Hidden {
-                    progress.parts.push((id.to_string(), kind));
-                }
+        for event in events {
+            let message = record_message(event).and_then(|m| m.get("id")?.as_str());
+            for part in event_parts(event) {
+                progress.add(&part, message);
             }
         }
         progress
+    }
+
+    fn add(&mut self, part: &Map<String, Value>, message: Option<&str>) {
+        let Some(id) = part.get("id").and_then(Value::as_str) else {
+            return;
+        };
+        if let Some(message) = message {
+            self.recorded_in.insert(id.to_string(), message.to_string());
+        }
+        if part.get("type").and_then(Value::as_str) == Some("step-finish") {
+            if let Some(tokens) = Tokens::of(part) {
+                self.tokens.push((id.to_string(), tokens));
+            }
+            return;
+        }
+        if let Some(call) = ToolPart::of(part) {
+            let kind = call.kind();
+            if kind != ThreadPart::Hidden {
+                self.parts.push((id.to_string(), kind));
+            }
+        }
     }
 
     fn is_empty(&self) -> bool {
@@ -1656,6 +1693,8 @@ struct Tally {
     tool_calls: HashSet<String>,
     tokens: HashMap<String, Tokens>,
     stage: Option<&'static str>,
+    /// Messages committed before the turn: o2-ai re-records a changed one whole, already counted.
+    held: HashSet<String>,
 }
 
 impl Tally {
@@ -1682,7 +1721,24 @@ impl Tally {
     /// Adds a batch; returns whether any count changed and whether the stage changed.
     fn apply(&mut self, progress: Progress) -> (bool, bool) {
         let (mut changed, mut stage_changed) = (false, false);
-        for (id, kind) in progress.parts {
+        // A held message's parts are dropped whole; the finalizer's recount restores any it gained.
+        let held = |id: &str| {
+            progress
+                .recorded_in
+                .get(id)
+                .is_some_and(|message| self.held.contains(message))
+        };
+        let parts: Vec<_> = progress
+            .parts
+            .into_iter()
+            .filter(|(id, _)| !held(id))
+            .collect();
+        let tokens: Vec<_> = progress
+            .tokens
+            .into_iter()
+            .filter(|(id, _)| !held(id))
+            .collect();
+        for (id, kind) in parts {
             match kind {
                 ThreadPart::Step(stage) => {
                     let latest = if self.steps.insert(id.clone()) {
@@ -1720,7 +1776,7 @@ impl Tally {
                 ThreadPart::Hidden => {}
             }
         }
-        for (id, tokens) in progress.tokens {
+        for (id, tokens) in tokens {
             changed |= self.tokens.insert(id, tokens) != Some(tokens);
         }
         (changed, stage_changed)
@@ -1752,9 +1808,9 @@ impl Tally {
     }
 }
 
-pub fn observer(org_id: String, run_id: String, session_id: String) -> OnCommit {
+pub fn observer(org_id: String, run_id: String, session_id: String, held_seq: i64) -> OnCommit {
     let (tx, rx) = mpsc::unbounded_channel();
-    tokio::spawn(watch_progress(org_id, run_id, session_id, rx));
+    tokio::spawn(watch_progress(org_id, run_id, session_id, held_seq, rx));
     Arc::new(move |events: &[DurableEvent]| {
         let progress = Progress::of(events);
         if !progress.is_empty() {
@@ -1768,9 +1824,10 @@ async fn watch_progress(
     org_id: String,
     run_id: String,
     session_id: String,
+    held_seq: i64,
     rx: mpsc::UnboundedReceiver<Progress>,
 ) {
-    let tally = match runs_table::get_rw(&org_id, &run_id).await {
+    let mut tally = match runs_table::get_rw(&org_id, &run_id).await {
         Ok(Some(run)) => Tally::resumed(&run),
         Ok(None) => return,
         Err(e) => {
@@ -1778,6 +1835,14 @@ async fn watch_progress(
             Tally::default()
         }
     };
+    if held_seq >= 0 {
+        match read_session(&org_id, Some(&session_id)).await {
+            Ok((events, _)) => tally.held = held_messages(&events, held_seq),
+            Err(e) => {
+                log::warn!("[RCA_TURN] cannot read session {session_id} of run {run_id}: {e}")
+            }
+        }
+    }
     let refused = write_progress(tally, rx, &run_id, |patch| {
         rca_runs::update_run(&org_id, &run_id, patch)
     })
@@ -1785,6 +1850,12 @@ async fn watch_progress(
     if refused {
         stop_turn(&org_id, &session_id).await;
     }
+}
+
+/// The messages of the events up to `seq`.
+fn held_messages(events: &[DurableEvent], seq: i64) -> HashSet<String> {
+    let end = events.partition_point(|event| event.seq <= seq);
+    Folded::fold(&events[..end]).infos.keys().cloned().collect()
 }
 
 /// The loop of [watch_progress]; `write` is the run's progress write.
@@ -2326,6 +2397,27 @@ mod tests {
             incident_row, new_incident, start, stored, timeline,
         },
     };
+
+    #[test]
+    fn an_rca_turn_carries_the_orgs_data_level_and_no_write_tier() {
+        let settings = OrgAiSettings {
+            permission_tier: common::meta::organization::AiPermissionTier::Propose,
+            data_sharing_level: AiDataSharingLevel::Aggregates,
+            ..Default::default()
+        };
+        let request = rca_request("p".into(), &json!({"run_id": "r1"}), Some(&settings));
+        // A tier or grants would make o2-ai card RCA's writes on a session nobody watches.
+        assert_eq!(
+            request.context["policy"],
+            json!({"data_sharing_level": "aggregates"})
+        );
+        assert_eq!(request.context["run_id"], "r1");
+        let unread = rca_request("p".into(), &json!({}), None);
+        assert_eq!(
+            unread.context["policy"],
+            json!({"data_sharing_level": "schema"})
+        );
+    }
 
     // ---- the prompt ----
 
@@ -3441,7 +3533,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_health_probe_that_never_answers_is_agent_unavailable() {
         let began = Instant::now();
-        let result = probe_health(std::future::pending::<anyhow::Result<()>>()).await;
+        let result = probe_health(std::future::pending::<anyhow::Result<HealthResponse>>()).await;
         assert_eq!(began.elapsed(), HEALTH_CHECK_TIMEOUT);
         assert_eq!(
             result,
@@ -3453,8 +3545,9 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn a_health_probe_answer_decides_before_the_deadline() {
-        let refused =
-            probe_health(async { Err::<(), _>(anyhow::anyhow!("503 Service Unavailable")) });
+        let refused = probe_health(async {
+            Err::<HealthResponse, _>(anyhow::anyhow!("503 Service Unavailable"))
+        });
         assert_eq!(
             refused.await,
             Err(RcaTurnError::AgentUnavailable(
@@ -3464,10 +3557,27 @@ mod tests {
         let began = Instant::now();
         let late_ok = probe_health(async {
             tokio::time::sleep(HEALTH_CHECK_TIMEOUT - Duration::from_millis(1)).await;
-            Ok::<_, anyhow::Error>(())
+            Ok::<_, anyhow::Error>(health("healthy"))
         });
         assert_eq!(late_ok.await, Ok(()));
         assert!(began.elapsed() < HEALTH_CHECK_TIMEOUT);
+    }
+
+    fn health(status: &str) -> HealthResponse {
+        serde_json::from_value(json!({ "status": status })).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_200_health_answer_that_reports_unhealthy_is_agent_unavailable() {
+        let unhealthy = probe_health(async { Ok::<_, anyhow::Error>(health("unhealthy")) });
+        assert_eq!(
+            unhealthy.await,
+            Err(RcaTurnError::AgentUnavailable(
+                "health check answered but the agent is not healthy".to_string()
+            ))
+        );
+        let ok = probe_health(async { Ok::<_, anyhow::Error>(health("ok")) });
+        assert_eq!(ok.await, Ok(()));
     }
 
     // ---- the continuation's start retries ----
@@ -3725,6 +3835,28 @@ mod tests {
             let summary = patch.summary.unwrap();
             assert_eq!(summary.tool_calls, Some(VISIBLE_TOOL_CALLS));
         }
+    }
+
+    /// o2-ai re-records a changed message whole; one committed before the turn is counted already.
+    #[test]
+    fn the_observer_skips_re_records_of_held_messages() {
+        let events = rca_session();
+        let copies = crate::ai_chat::record_v2::tests::to_v2(&events);
+        let mut fresh = Tally::default();
+        fresh.apply(Progress::of(&copies));
+        assert_eq!(
+            fresh.patch().stats.unwrap().tool_calls,
+            Some(VISIBLE_TOOL_CALLS)
+        );
+
+        assert!(held_messages(&events, -1).is_empty());
+        let mut resumed = Tally {
+            held: held_messages(&events, events.last().unwrap().seq),
+            ..Default::default()
+        };
+        assert_eq!(resumed.apply(Progress::of(&copies)), (false, false));
+        let stats = resumed.patch().stats.unwrap();
+        assert_eq!((stats.steps, stats.tool_calls), (Some(0), Some(0)));
     }
 
     fn step_counts(events: &[DurableEvent]) -> (Option<u32>, Option<u32>, u32) {
@@ -4101,6 +4233,11 @@ mod tests {
             end_seq: None,
             started_at,
             ended_at,
+            first_event_at: None,
+            version_of: None,
+            decisions: None,
+            agent_type: None,
+            handoff_from: None,
         }
     }
 

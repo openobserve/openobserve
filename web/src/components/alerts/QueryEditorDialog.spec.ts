@@ -94,11 +94,6 @@ async function mountComp(props: Record<string, any> = {}) {
           props: ["name", "label", "isExpanded"],
           emits: ["update:isExpanded"],
         },
-        O2AIChat: {
-          template: '<div class="stub-ai-chat"></div>',
-          props: ["headerHeight", "isOpen"],
-          emits: ["close"],
-        },
       },
     },
   });
@@ -436,11 +431,6 @@ describe("QueryEditorDialog - ODrawer Migration", () => {
             props: ["name", "label", "isExpanded"],
             emits: ["update:isExpanded"],
           },
-          O2AIChat: {
-            template: '<div class="stub-ai-chat"></div>',
-            props: ["headerHeight", "isOpen"],
-            emits: ["close"],
-          },
         },
       },
     });
@@ -611,7 +601,6 @@ describe("QueryEditorDialog - autocomplete wiring reaches the editor", () => {
             props: ["name", "label", "isExpanded"],
             emits: ["update:isExpanded"],
           },
-          O2AIChat: { template: "<div />", props: ["headerHeight", "isOpen"], emits: ["close"] },
         },
       },
     });

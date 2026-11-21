@@ -95,37 +95,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           {{ raw("Node.js") }}
         </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip
-          v-if="aiEnabled"
-          variant="ai"
-          data-test="traces-no-data-ask-ai-btn"
-          @click="emit('ask-ai')"
-        >
-          <img :src="aiIconSrc" class="h-3.5 w-3.5 shrink-0" alt="" />
-          {{ t("traces.noData.askAi") }}
-        </EmptyStateIngestionChip>
+        <AiEntryButton v-bind="setupDoor" appearance="chip" />
       </div>
     </template>
   </OEmptyState>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { tracingSetupBuild } from "@/plugins/traces/tracesDoors";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
-import { useAiIcon } from "@/composables/useAiIcon";
 import { getImageURL } from "@/utils/zincutils";
 
 const props = defineProps<{
-  aiEnabled: boolean;
   /** Under FirstDataPanel's card: only the cards and chips, under an "Or start another way" caption. */
   alternativesOnly?: boolean;
 }>();
-const emit = defineEmits<{ "ask-ai": [] }>();
 
 defineSlots<{
   /** A line between the description and the cards. */
@@ -135,7 +125,19 @@ defineSlots<{
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
-const { aiIconSrc } = useAiIcon();
+
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+const setupDoor = computed(() => ({
+  verb: "troubleshoot" as const,
+  entryKind: "empty_state" as const,
+  objectKind: "empty_result" as const,
+  label: t("assistant.entry.setUpTracing"),
+  tooltip: t("assistant.entry.tooltip.noStream"),
+  dataTest: "ai-entry-trace-no-stream-troubleshoot" as const,
+  build: tracingSetupBuild(),
+}));
 
 const orgQuery = computed(() => ({
   org_identifier: store.state.selectedOrganization?.identifier,

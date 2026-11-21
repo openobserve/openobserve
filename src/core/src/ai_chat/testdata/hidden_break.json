@@ -1,0 +1,779 @@
+{
+ "events": [
+  {
+   "id": "evt_0",
+   "aggregateID": "ses_H",
+   "seq": 0,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "info": {
+     "id": "msg_u1",
+     "sessionID": "ses_H",
+     "role": "user",
+     "time": {
+      "created": 10
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_1",
+   "aggregateID": "ses_H",
+   "seq": 1,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_u1",
+     "sessionID": "ses_H",
+     "messageID": "msg_u1",
+     "type": "text",
+     "text": "turn 1"
+    }
+   }
+  },
+  {
+   "id": "evt_2",
+   "aggregateID": "ses_H",
+   "seq": 2,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "info": {
+     "id": "msg_a1",
+     "sessionID": "ses_H",
+     "role": "assistant",
+     "time": {
+      "created": 11
+     },
+     "parentID": "msg_u1"
+    }
+   }
+  },
+  {
+   "id": "evt_3",
+   "aggregateID": "ses_H",
+   "seq": 3,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_1a",
+     "sessionID": "ses_H",
+     "messageID": "msg_a1",
+     "type": "text",
+     "text": "Let me check the guidelines."
+    }
+   }
+  },
+  {
+   "id": "evt_4",
+   "aggregateID": "ses_H",
+   "seq": 4,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_1s",
+     "sessionID": "ses_H",
+     "messageID": "msg_a1",
+     "type": "tool",
+     "callID": "call_s1",
+     "tool": "skill",
+     "state": {
+      "status": "running",
+      "input": {}
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_5",
+   "aggregateID": "ses_H",
+   "seq": 5,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_1s",
+     "sessionID": "ses_H",
+     "messageID": "msg_a1",
+     "type": "tool",
+     "callID": "call_s1",
+     "tool": "skill",
+     "state": {
+      "status": "completed",
+      "input": {},
+      "output": "ok"
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_6",
+   "aggregateID": "ses_H",
+   "seq": 6,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_1b",
+     "sessionID": "ses_H",
+     "messageID": "msg_a1",
+     "type": "text",
+     "text": "I'll create the dashboard."
+    }
+   }
+  },
+  {
+   "id": "evt_7",
+   "aggregateID": "ses_H",
+   "seq": 7,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "info": {
+     "id": "msg_u2",
+     "sessionID": "ses_H",
+     "role": "user",
+     "time": {
+      "created": 20
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_8",
+   "aggregateID": "ses_H",
+   "seq": 8,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_u2",
+     "sessionID": "ses_H",
+     "messageID": "msg_u2",
+     "type": "text",
+     "text": "turn 2"
+    }
+   }
+  },
+  {
+   "id": "evt_9",
+   "aggregateID": "ses_H",
+   "seq": 9,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "info": {
+     "id": "msg_a2",
+     "sessionID": "ses_H",
+     "role": "assistant",
+     "time": {
+      "created": 21
+     },
+     "parentID": "msg_u2"
+    }
+   }
+  },
+  {
+   "id": "evt_10",
+   "aggregateID": "ses_H",
+   "seq": 10,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_2a",
+     "sessionID": "ses_H",
+     "messageID": "msg_a2",
+     "type": "text",
+     "text": "Summary."
+    }
+   }
+  },
+  {
+   "id": "evt_11",
+   "aggregateID": "ses_H",
+   "seq": 11,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_2s",
+     "sessionID": "ses_H",
+     "messageID": "msg_a2",
+     "type": "tool",
+     "callID": "call_s2",
+     "tool": "skill",
+     "state": {
+      "status": "running",
+      "input": {}
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_12",
+   "aggregateID": "ses_H",
+   "seq": 12,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_2s",
+     "sessionID": "ses_H",
+     "messageID": "msg_a2",
+     "type": "tool",
+     "callID": "call_s2",
+     "tool": "skill",
+     "state": {
+      "status": "completed",
+      "input": {},
+      "output": "ok"
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_13",
+   "aggregateID": "ses_H",
+   "seq": 13,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_2b",
+     "sessionID": "ses_H",
+     "messageID": "msg_a2",
+     "type": "text",
+     "text": "```follow_ups\n[\"Show the errors\"]\n```"
+    }
+   }
+  },
+  {
+   "id": "evt_14",
+   "aggregateID": "ses_H",
+   "seq": 14,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "info": {
+     "id": "msg_u3",
+     "sessionID": "ses_H",
+     "role": "user",
+     "time": {
+      "created": 30
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_15",
+   "aggregateID": "ses_H",
+   "seq": 15,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_u3",
+     "sessionID": "ses_H",
+     "messageID": "msg_u3",
+     "type": "text",
+     "text": "turn 3"
+    }
+   }
+  },
+  {
+   "id": "evt_16",
+   "aggregateID": "ses_H",
+   "seq": 16,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "info": {
+     "id": "msg_a3",
+     "sessionID": "ses_H",
+     "role": "assistant",
+     "time": {
+      "created": 31
+     },
+     "parentID": "msg_u3"
+    }
+   }
+  },
+  {
+   "id": "evt_17",
+   "aggregateID": "ses_H",
+   "seq": 17,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_3a",
+     "sessionID": "ses_H",
+     "messageID": "msg_a3",
+     "type": "text",
+     "text": "```sql\nSELECT *"
+    }
+   }
+  },
+  {
+   "id": "evt_18",
+   "aggregateID": "ses_H",
+   "seq": 18,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_3s",
+     "sessionID": "ses_H",
+     "messageID": "msg_a3",
+     "type": "tool",
+     "callID": "call_s3",
+     "tool": "skill",
+     "state": {
+      "status": "running",
+      "input": {}
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_19",
+   "aggregateID": "ses_H",
+   "seq": 19,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_3s",
+     "sessionID": "ses_H",
+     "messageID": "msg_a3",
+     "type": "tool",
+     "callID": "call_s3",
+     "tool": "skill",
+     "state": {
+      "status": "completed",
+      "input": {},
+      "output": "ok"
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_20",
+   "aggregateID": "ses_H",
+   "seq": 20,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_3b",
+     "sessionID": "ses_H",
+     "messageID": "msg_a3",
+     "type": "text",
+     "text": "FROM logs\n```"
+    }
+   }
+  },
+  {
+   "id": "evt_21",
+   "aggregateID": "ses_H",
+   "seq": 21,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "info": {
+     "id": "msg_u4",
+     "sessionID": "ses_H",
+     "role": "user",
+     "time": {
+      "created": 40
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_22",
+   "aggregateID": "ses_H",
+   "seq": 22,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_u4",
+     "sessionID": "ses_H",
+     "messageID": "msg_u4",
+     "type": "text",
+     "text": "turn 4"
+    }
+   }
+  },
+  {
+   "id": "evt_23",
+   "aggregateID": "ses_H",
+   "seq": 23,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "info": {
+     "id": "msg_a4",
+     "sessionID": "ses_H",
+     "role": "assistant",
+     "time": {
+      "created": 41
+     },
+     "parentID": "msg_u4"
+    }
+   }
+  },
+  {
+   "id": "evt_24",
+   "aggregateID": "ses_H",
+   "seq": 24,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_4a",
+     "sessionID": "ses_H",
+     "messageID": "msg_a4",
+     "type": "text",
+     "text": "{\"answer\": \"partial"
+    }
+   }
+  },
+  {
+   "id": "evt_25",
+   "aggregateID": "ses_H",
+   "seq": 25,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_4s",
+     "sessionID": "ses_H",
+     "messageID": "msg_a4",
+     "type": "tool",
+     "callID": "call_s4",
+     "tool": "skill",
+     "state": {
+      "status": "running",
+      "input": {}
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_26",
+   "aggregateID": "ses_H",
+   "seq": 26,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_4s",
+     "sessionID": "ses_H",
+     "messageID": "msg_a4",
+     "type": "tool",
+     "callID": "call_s4",
+     "tool": "skill",
+     "state": {
+      "status": "completed",
+      "input": {},
+      "output": "ok"
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_27",
+   "aggregateID": "ses_H",
+   "seq": 27,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_4b",
+     "sessionID": "ses_H",
+     "messageID": "msg_a4",
+     "type": "text",
+     "text": " rest\"}"
+    }
+   }
+  },
+  {
+   "id": "evt_28",
+   "aggregateID": "ses_H",
+   "seq": 28,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "info": {
+     "id": "msg_u5",
+     "sessionID": "ses_H",
+     "role": "user",
+     "time": {
+      "created": 50
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_29",
+   "aggregateID": "ses_H",
+   "seq": 29,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_u5",
+     "sessionID": "ses_H",
+     "messageID": "msg_u5",
+     "type": "text",
+     "text": "turn 5"
+    }
+   }
+  },
+  {
+   "id": "evt_30",
+   "aggregateID": "ses_H",
+   "seq": 30,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "info": {
+     "id": "msg_a5",
+     "sessionID": "ses_H",
+     "role": "assistant",
+     "time": {
+      "created": 51
+     },
+     "parentID": "msg_u5"
+    }
+   }
+  },
+  {
+   "id": "evt_31",
+   "aggregateID": "ses_H",
+   "seq": 31,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_5a",
+     "sessionID": "ses_H",
+     "messageID": "msg_a5",
+     "type": "text",
+     "text": "Line one.\n"
+    }
+   }
+  },
+  {
+   "id": "evt_32",
+   "aggregateID": "ses_H",
+   "seq": 32,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_5s",
+     "sessionID": "ses_H",
+     "messageID": "msg_a5",
+     "type": "tool",
+     "callID": "call_s5",
+     "tool": "skill",
+     "state": {
+      "status": "running",
+      "input": {}
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_33",
+   "aggregateID": "ses_H",
+   "seq": 33,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_5s",
+     "sessionID": "ses_H",
+     "messageID": "msg_a5",
+     "type": "tool",
+     "callID": "call_s5",
+     "tool": "skill",
+     "state": {
+      "status": "completed",
+      "input": {},
+      "output": "ok"
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_34",
+   "aggregateID": "ses_H",
+   "seq": 34,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_H",
+    "part": {
+     "id": "prt_5b",
+     "sessionID": "ses_H",
+     "messageID": "msg_a5",
+     "type": "text",
+     "text": "Line two."
+    }
+   }
+  }
+ ],
+ "expected": {
+  "turns": [
+   {
+    "user_message_id": "msg_u1",
+    "created": 10,
+    "user": {
+     "text": "turn 1",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "message_delta",
+      "content": "Let me "
+     },
+     {
+      "type": "message_delta",
+      "content": "check the guidelines."
+     },
+     {
+      "type": "message_delta",
+      "content": "\n\nI'll "
+     },
+     {
+      "type": "message_delta",
+      "content": "create the dashboard."
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "error_code": null,
+    "first_seq": 0,
+    "last_seq": 6
+   },
+   {
+    "user_message_id": "msg_u2",
+    "created": 20,
+    "user": {
+     "text": "turn 2",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "message_delta",
+      "content": "Summary."
+     },
+     {
+      "type": "message_delta",
+      "content": "\n\n"
+     },
+     {
+      "type": "follow_ups",
+      "items": [
+       "Show the errors"
+      ]
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "error_code": null,
+    "first_seq": 7,
+    "last_seq": 13
+   },
+   {
+    "user_message_id": "msg_u3",
+    "created": 30,
+    "user": {
+     "text": "turn 3",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "message_delta",
+      "content": "```sql\nSELECT *"
+     },
+     {
+      "type": "message_delta",
+      "content": "FROM logs\n```"
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "error_code": null,
+    "first_seq": 14,
+    "last_seq": 20
+   },
+   {
+    "user_message_id": "msg_u4",
+    "created": 40,
+    "user": {
+     "text": "turn 4",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "message_delta",
+      "content": "{\"answer\": \"partial"
+     },
+     {
+      "type": "message_delta",
+      "content": " rest\"}"
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "error_code": null,
+    "first_seq": 21,
+    "last_seq": 27
+   },
+   {
+    "user_message_id": "msg_u5",
+    "created": 50,
+    "user": {
+     "text": "turn 5",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "message_delta",
+      "content": "Line one.\n"
+     },
+     {
+      "type": "message_delta",
+      "content": "Line two."
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "error_code": null,
+    "first_seq": 28,
+    "last_seq": 34
+   }
+  ],
+  "title": null,
+  "last_seq": 34
+ }
+}

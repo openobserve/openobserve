@@ -345,54 +345,6 @@ describe("Functions.vue", () => {
     });
   });
 
-  describe("Event Handling", () => {
-    it("should emit sendToAiChat event when sendToAiChat method is called", async () => {
-      wrapper = await createWrapper();
-
-      const testValue = { message: "test message" };
-      (wrapper.vm as any).sendToAiChat(testValue);
-
-      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
-      expect(wrapper.emitted("sendToAiChat")?.[0]).toEqual([testValue, false]);
-    });
-
-    it("should emit sendToAiChat with append=true when second arg is true", async () => {
-      wrapper = await createWrapper();
-
-      const testValue = { message: "test" };
-      (wrapper.vm as any).sendToAiChat(testValue, true);
-
-      expect(wrapper.emitted("sendToAiChat")?.[0]).toEqual([testValue, true]);
-    });
-  });
-
-  describe("Computed Properties", () => {
-    it("should compute routeName from current route", async () => {
-      wrapper = await createWrapper({}, "pipelines");
-      expect((wrapper.vm as any).routeName).toBe("pipelines");
-    });
-
-    it("should compute showPipelineActions as true on pipelines route", async () => {
-      wrapper = await createWrapper({}, "pipelines");
-      expect((wrapper.vm as any).showPipelineActions).toBe(true);
-    });
-
-    it("should compute showPipelineActions as false on functionList route", async () => {
-      wrapper = await createWrapper({}, "functionList");
-      expect((wrapper.vm as any).showPipelineActions).toBe(false);
-    });
-
-    it("should compute isDetailView as true for pipelineEditor", async () => {
-      wrapper = await createWrapper({}, "pipelineEditor");
-      expect((wrapper.vm as any).isDetailView).toBe(true);
-    });
-
-    it("should compute isDetailView as false for pipelines", async () => {
-      wrapper = await createWrapper({}, "pipelines");
-      expect((wrapper.vm as any).isDetailView).toBe(false);
-    });
-  });
-
   describe("Store Integration", () => {
     it("should access store state correctly", async () => {
       wrapper = await createWrapper();

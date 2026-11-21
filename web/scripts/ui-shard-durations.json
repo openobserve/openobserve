@@ -1159,7 +1159,6 @@
 "src/composables/useAnalyzingMessage.spec.ts":0.7,
 "src/composables/useAnnouncementBanners.spec.ts":1.4,
 "src/composables/useAutoName.spec.ts":1.1,
-"src/composables/useAutoNavigationPreferences.spec.ts":0.8,
 "src/composables/useBreakpoint.spec.ts":1.1,
 "src/composables/useChatHistory.spec.ts":1.2,
 "src/composables/useChatHistoryList.spec.ts":1.7,

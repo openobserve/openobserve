@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { scrubAuthParams } from "./scrubAuthParams";
+import { scrubAuthParams, scrubSharePath, scrubShareTokens } from "./scrubAuthParams";
 
 describe("scrubAuthParams", () => {
   it("redacts the SSO callback tokens in the hash and keeps the other markers", () => {
@@ -76,5 +76,55 @@ describe("scrubAuthParams", () => {
   it("does not touch parameters that merely contain the token names", () => {
     const url = "/web/tokens?id_token_name=prod&use_code=true";
     expect(scrubAuthParams(url)).toBe(url);
+  });
+});
+
+describe("scrubSharePath", () => {
+  it.each([
+    [
+      "https://o2.example.com/web/ai/public/tok-abc123?x=1",
+      "https://o2.example.com/web/ai/public/:token?x=1",
+    ],
+    [
+      "/web/ai/shared/tok-abc123?org_identifier=default",
+      "/web/ai/shared/:token?org_identifier=default",
+    ],
+    [
+      "https://o2.example.com/api/public/ai_chats/tok-abc123?known_seq=4",
+      "https://o2.example.com/api/public/ai_chats/:token?known_seq=4",
+    ],
+    [
+      "https://o2.example.com/api/default/ai/shared/tok-abc123/fork",
+      "https://o2.example.com/api/default/ai/shared/:token/fork",
+    ],
+    [
+      "https://o2.example.com/web/login?redirect=https%3A%2F%2Fo2.example.com%2Fweb%2Fai%2Fpublic%2FAbC123tok",
+      "https://o2.example.com/web/login?redirect=https%3A%2F%2Fo2.example.com%2Fweb%2Fai%2Fpublic%2F:token",
+    ],
+    [
+      "/web/login?redirect=%2fweb%2fai%2fshared%2fAbC123tok%3Forg_identifier%3Ddefault",
+      "/web/login?redirect=%2fweb%2fai%2fshared%2f:token%3Forg_identifier%3Ddefault",
+    ],
+    [
+      "/web/login?next=%252Fweb%252Fai%252Fpublic%252FAbC123tok&x=1",
+      "/web/login?next=%252Fweb%252Fai%252Fpublic%252F:token&x=1",
+    ],
+  ])("replaces the token in %s", (url, scrubbed) => {
+    expect(scrubSharePath(url)).toBe(scrubbed);
+  });
+
+  it("leaves other URLs and empty values alone", () => {
+    expect(scrubSharePath("/web/logs?stream=default")).toBe("/web/logs?stream=default");
+    expect(scrubSharePath(undefined)).toBeUndefined();
+  });
+
+  it("scrubs the resource, error resource and action target of a RUM event", () => {
+    const event = {
+      resource: { url: "/api/public/ai_chats/tok-1" },
+      error: { resource: { url: "/api/default/ai/shared/tok-2" } },
+      action: { target: { name: "Open /web/ai/public/tok-3" } },
+    };
+    scrubShareTokens(event);
+    expect(JSON.stringify(event)).not.toMatch(/tok-\d/);
   });
 });

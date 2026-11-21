@@ -204,6 +204,7 @@ const mockSearchObj: any = {
 
 // ── Import component AFTER all vi.mock calls ─────────────────────────────────
 import IndexList from "@/plugins/traces/IndexList.vue";
+import en from "@/locales/languages/en-US.json";
 
 // ── Reusable mount factory ────────────────────────────────────────────────────
 function mountIndexList(props: Record<string, unknown> = {}) {
@@ -483,6 +484,35 @@ describe("IndexList Component", () => {
       wrapper = mountIndexList();
       await flushPromises();
       expect(label()).toBeTruthy();
+    });
+  });
+
+  describe("Set by assistant", () => {
+    const tag = () => wrapper.find('[data-test="traces-assistant-set-stream"]');
+
+    it("labels the stream the assistant set", async () => {
+      expect(tag().exists()).toBe(false);
+      wrapper.unmount();
+      wrapper = mountIndexList({ assistantSet: new Set(["stream"]) });
+      await flushPromises();
+      expect(tag().text()).toContain("Set by assistant");
+      expect(tag().attributes("aria-label")).toBe(`Stream was set by ${en.brand.autobot}`);
+    });
+
+    it("reports the label cleared when the user picks another stream", async () => {
+      wrapper.unmount();
+      wrapper = mountIndexList({ assistantSet: new Set(["stream", "time"]) });
+      await flushPromises();
+      wrapper.vm.onStreamChange("other");
+      expect(wrapper.emitted("assistant-set-cleared")).toEqual([["stream"]]);
+    });
+
+    it("reports nothing when the stream was not the assistant's", async () => {
+      wrapper.unmount();
+      wrapper = mountIndexList({ assistantSet: new Set(["time"]) });
+      await flushPromises();
+      wrapper.vm.onStreamChange("other");
+      expect(wrapper.emitted("assistant-set-cleared")).toBeUndefined();
     });
   });
 

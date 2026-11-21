@@ -54,7 +54,8 @@ describe("on-call locale messages", () => {
   // `{'@'}`, or compilation throws.
   it("escapes every literal @", () => {
     const offenders = oncallMessages.filter(
-      ([, text]) => text.includes("@") && !text.includes("{'@'}"),
+      ([, text]) =>
+        text.replace(/@:\{'brand\.[^']*'\}/g, "").includes("@") && !text.includes("{'@'}"),
     );
     expect(offenders).toEqual([]);
   });

@@ -1,10 +1,28 @@
-import { describe, it, expect } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { computed, onScopeDispose } from "vue";
+
+import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+
+import ShortcutCheatsheet from "../ShortcutCheatsheet.vue";
 import {
   getShortcutDef,
+  getShortcutDisplay,
   SHORTCUT_MODULES,
   SHORTCUT_REGISTRY,
   type ShortcutCapabilities,
 } from "../shortcutRegistry";
+import enUS from "@/locales/languages/en-US.json";
+
+const { capabilityDisposed } = vi.hoisted(() => ({ capabilityDisposed: vi.fn() }));
+
+vi.mock("@/composables/assistant", () => ({
+  useAssistantCapability: () => {
+    onScopeDispose(capabilityDisposed);
+    return { assistantCanChat: computed(() => true) };
+  },
+}));
 
 const OSS: ShortcutCapabilities = {
   isEnterprise: false,
@@ -16,6 +34,7 @@ const OSS: ShortcutCapabilities = {
   rbacEnabled: false,
   aiEnabled: false,
   downtimesEnabled: false,
+  assistantCanChat: false,
 };
 const ENTERPRISE: ShortcutCapabilities = {
   isEnterprise: true,
@@ -27,6 +46,7 @@ const ENTERPRISE: ShortcutCapabilities = {
   rbacEnabled: true,
   aiEnabled: true,
   downtimesEnabled: true,
+  assistantCanChat: true,
 };
 const CLOUD: ShortcutCapabilities = {
   isEnterprise: false,
@@ -38,6 +58,7 @@ const CLOUD: ShortcutCapabilities = {
   rbacEnabled: true,
   aiEnabled: true,
   downtimesEnabled: true,
+  assistantCanChat: true,
 };
 
 /** Mirrors ShortcutCheatsheet: a page shows unless its gate rejects the caps. */
@@ -218,24 +239,6 @@ describe("shortcut cheatsheet OSS gating", () => {
   });
 });
 
-describe("aiChatToggle entry visibility", () => {
-  it("is hidden on OSS (the shortcut is never registered there)", () => {
-    expect(entryVisible("aiChatToggle", OSS)).toBe(false);
-  });
-
-  it("is hidden on cloud — the AI chat shortcut is enterprise-only", () => {
-    expect(entryVisible("aiChatToggle", CLOUD)).toBe(false);
-  });
-
-  it("is hidden on enterprise when ai_enabled is off (the handler no-ops)", () => {
-    expect(entryVisible("aiChatToggle", { ...ENTERPRISE, aiEnabled: false })).toBe(false);
-  });
-
-  it("is shown only on enterprise with ai_enabled on", () => {
-    expect(entryVisible("aiChatToggle", ENTERPRISE)).toBe(true);
-  });
-});
-
 describe("synthetics journey search shortcut", () => {
   it("registers syntheticsJourneyFocusSearch on /", () => {
     expect(getShortcutDef("syntheticsJourneyFocusSearch")).toMatchObject({
@@ -292,5 +295,109 @@ describe("row navigation entries (item 4a)", () => {
     expect(getShortcutDef("tracePrevSpan")?.descriptionKey).toBe(
       "shortcuts.actions.tracePrevVisibleSpan",
     );
+  });
+});
+
+describe("assistant entries", () => {
+  it("shows the rows only while the assistant can chat, and never assistantClose", () => {
+    expect(entryVisible("assistantOpen", ENTERPRISE)).toBe(true);
+    expect(entryVisible("assistantOpen", { ...ENTERPRISE, assistantCanChat: false })).toBe(false);
+    expect(entryVisible("assistantOpen", { ...ENTERPRISE, aiEnabled: false })).toBe(false);
+    expect(entryVisible("assistantClose", ENTERPRISE)).toBe(false);
+    expect(visibleModuleTitles(ENTERPRISE)).toContain("shortcuts.modules.assistant");
+  });
+
+  it("binds the chords of 10 §6.1 with their scopes and input flags", () => {
+    expect(getShortcutDef("assistantOpen")).toMatchObject({
+      keyForWindows: "ctrl+i",
+      keyForMac: "meta+i",
+      skipInInput: false,
+      scope: undefined,
+    });
+    expect(getShortcutDef("assistantClose")).toMatchObject({
+      key: "escape",
+      scope: "assistant",
+      allowInInput: true,
+    });
+    expect(getShortcutDef("assistantHistory")).toMatchObject({
+      keyForWindows: "ctrl+shift+h",
+      keyForMac: "meta+shift+h",
+      scope: undefined,
+      allowInInput: true,
+    });
+    expect(getShortcutDef("assistantHelper")).toBeUndefined();
+    expect(getShortcutDef("assistantGoToAnswer")).toMatchObject({
+      keyForWindows: "ctrl+up",
+      keyForMac: "meta+up",
+      scope: "assistantComposer",
+    });
+    expect(getShortcutDef("editorTabFocusMode")).toMatchObject({
+      keyForWindows: "ctrl+m",
+      keyForMac: "ctrl+shift+m",
+      scope: "editor",
+    });
+    for (const id of [
+      "assistantComposerSend",
+      "assistantComposerNewline",
+      "assistantComposerRecall",
+    ])
+      expect(getShortcutDef(id), id).toBeUndefined();
+  });
+});
+
+describe("getShortcutDisplay (K1)", () => {
+  it("shows the Mac binding of a pair that is not the plain Ctrl→⌘ swap", () => {
+    expect(getShortcutDisplay("editorTabFocusMode", true)).toBe("control+shift+m");
+    expect(getShortcutDisplay("editorTabFocusMode", false)).toBe("ctrl+m");
+  });
+
+  it("keeps the shared form when the Mac binding only swaps Ctrl for ⌘, in any order", () => {
+    expect(getShortcutDisplay("assistantOpen", true)).toBe("ctrl+i");
+    const redo = SHORTCUT_REGISTRY.flatMap((g) => g.shortcuts).find(
+      (e) => e.keyForWindows === "ctrl+shift+z" && e.keyForMac === "shift+meta+z",
+    );
+    expect(getShortcutDisplay(redo!.id, true)).toBe("ctrl+shift+z");
+  });
+});
+
+describe("cheatsheet with the assistant", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("names the product through {product} and stops its capability reader on unmount", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: true };
+    const wrapper = mount(ShortcutCheatsheet, {
+      props: { open: true },
+      attachTo: document.body,
+      global: { plugins: [store, i18n] },
+    });
+    await flushPromises();
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain(`Open ${enUS.brand.autobot}`),
+    );
+    expect(document.body.textContent).toContain(`${enUS.brand.autobot} composer`);
+    expect(document.body.textContent).not.toContain("{product}");
+    expect(capabilityDisposed).not.toHaveBeenCalled();
+    wrapper.unmount();
+    expect(capabilityDisposed).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the Threads bar chord as modifiers plus a period, not a sequence", async () => {
+    store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: true };
+    const wrapper = mount(ShortcutCheatsheet, {
+      props: { open: true },
+      attachTo: document.body,
+      global: { plugins: [store, i18n] },
+    });
+    await flushPromises();
+    const row = () =>
+      document.querySelector('[data-test="shortcut-cheatsheet-row-threadsBarOpen"]');
+    await vi.waitFor(() => expect(row()).not.toBeNull());
+    const keys = [...row()!.querySelectorAll("kbd")].map((k) => k.textContent?.trim());
+    expect(keys.at(-1)).toBe(".");
+    expect(keys).toHaveLength(3);
+    expect(row()!.textContent).not.toContain("then");
+    wrapper.unmount();
   });
 });

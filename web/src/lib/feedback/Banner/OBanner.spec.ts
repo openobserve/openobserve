@@ -127,3 +127,24 @@ describe("OBanner — meta and footer slots", () => {
     expect(content.element.parentElement?.textContent).toContain("Message");
   });
 });
+
+describe("OBanner — role", () => {
+  it("derives status, and alert for warning and error, when no role is given", () => {
+    expect(mount(OBanner, { global: { stubs } }).attributes("role")).toBe("status");
+    expect(
+      mount(OBanner, { props: { variant: "error" }, global: { stubs } }).attributes("role"),
+    ).toBe("alert");
+    expect(
+      mount(OBanner, { props: { variant: "error-soft" }, global: { stubs } }).attributes("role"),
+    ).toBe("status");
+  });
+
+  it("takes presentation where a live region already speaks the sentence", () => {
+    const wrapper = mount(OBanner, {
+      props: { variant: "error", role: "presentation" },
+      slots: { default: "Failed" },
+      global: { stubs },
+    });
+    expect(wrapper.attributes("role")).toBe("presentation");
+  });
+});

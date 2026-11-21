@@ -16,7 +16,10 @@
 //! Downtime handlers: enterprise-only (D1), 403 in the OSS build and while the flag is off.
 
 #[cfg(feature = "enterprise")]
-use axum::{Json, extract::Query};
+use axum::{
+    Json,
+    extract::{Query, rejection::JsonRejection},
+};
 use axum::{extract::Path, response::Response};
 use config::meta::downtimes::{
     CancelDowntimeQuery, CreateDowntimeResponse, Downtime, DowntimeDetail, DowntimeRequest,
@@ -100,10 +103,14 @@ pub async fn create_downtime(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Query(folder): Query<FolderQuery>,
     Headers(user_email): Headers<UserEmail>,
-    #[cfg(feature = "enterprise")] Json(req): Json<DowntimeRequest>,
+    #[cfg(feature = "enterprise")] body: Result<Json<DowntimeRequest>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        let req = match body_of(body) {
+            Ok(req) => req,
+            Err(response) => return response,
+        };
         let mut req = req;
         if let Some(folder) = folder.folder.filter(|f| !f.is_empty()) {
             req.folder_id = folder;
@@ -188,7 +195,7 @@ pub async fn preview_downtime(
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-mcp" = json!({"enabled": true, "readOnlyHint": true})),
         ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "create"}))
     )
 )]
@@ -226,7 +233,7 @@ pub async fn downtime_resources(
         (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true})),
+        ("x-o2-mcp" = json!({"enabled": true, "readOnlyHint": true})),
         ("x-o2-ratelimit" = json!({"module": "Downtimes", "operation": "create"}))
     )
 )]
@@ -314,10 +321,14 @@ pub async fn get_downtime(
 pub async fn update_downtime(
     Path((org_id, downtime_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
-    #[cfg(feature = "enterprise")] Json(req): Json<DowntimeRequest>,
+    #[cfg(feature = "enterprise")] body: Result<Json<DowntimeRequest>, JsonRejection>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        let req = match body_of(body) {
+            Ok(req) => req,
+            Err(response) => return response,
+        };
         respond(
             openobserve_core::downtimes::update(&org_id, &user_email.user_id, &downtime_id, req)
                 .await,
@@ -576,6 +587,17 @@ pub async fn delete_downtime(
     }
 }
 
+/// A body serde rejects, such as `targets: [null]`, is a 400 whose text names the field path.
+#[cfg(feature = "enterprise")]
+fn body_of<T>(body: Result<Json<T>, JsonRejection>) -> Result<T, Response> {
+    use axum::response::IntoResponse;
+    body.map(|Json(body)| body)
+        .map_err(|rejection| match rejection {
+            JsonRejection::JsonDataError(e) => MetaHttpResponse::bad_request(e.body_text()),
+            other => other.into_response(),
+        })
+}
+
 #[cfg(not(feature = "enterprise"))]
 pub(crate) fn not_supported() -> Response {
     MetaHttpResponse::forbidden("Not Supported")
@@ -657,6 +679,54 @@ mod tests {
         for response in responses {
             assert_eq!(response.status(), StatusCode::FORBIDDEN);
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_null_target_is_a_400_naming_the_field() {
+        use axum::{body::Body, extract::FromRequest, http::Request};
+        let body = r#"{"targets":[null],"schedule":{"repeat":"none","starts_at":1,"ends_at":2,"timezone":"UTC","duration_secs":60}}"#;
+        let request = Request::builder()
+            .method("POST")
+            .uri("/")
+            .header("content-type", "application/json")
+            .body(Body::from(body))
+            .unwrap();
+        let rejected = Json::<DowntimeRequest>::from_request(request, &()).await;
+        let response = body_of(rejected).unwrap_err();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let text = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let text = String::from_utf8_lossy(&text);
+        assert!(text.contains("targets[0]"), "{text}");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn other_body_rejections_keep_their_status() {
+        use axum::{body::Body, extract::FromRequest, http::Request};
+        let oversized = Request::builder()
+            .method("POST")
+            .uri("/")
+            .header("content-type", "application/json")
+            .body(Body::from(vec![b' '; 3 * 1024 * 1024]))
+            .unwrap();
+        let rejected = Json::<DowntimeRequest>::from_request(oversized, &()).await;
+        assert_eq!(
+            body_of(rejected).unwrap_err().status(),
+            StatusCode::PAYLOAD_TOO_LARGE
+        );
+        let untyped = Request::builder()
+            .method("POST")
+            .uri("/")
+            .body(Body::from("{}"))
+            .unwrap();
+        let rejected = Json::<DowntimeRequest>::from_request(untyped, &()).await;
+        assert_eq!(
+            body_of(rejected).unwrap_err().status(),
+            StatusCode::UNSUPPORTED_MEDIA_TYPE
+        );
     }
 
     #[cfg(feature = "enterprise")]

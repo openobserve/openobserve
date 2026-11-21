@@ -1,0 +1,22 @@
+[
+  {
+    "role": "user",
+    "content": "Which model are you?",
+    "sentAt": 1772418240000,
+    "turnId": "t-model-1"
+  },
+  {
+    "role": "assistant",
+    "content": "I run on claude-3-5-sonnet and sometimes gemini-1.5-pro.",
+    "contentBlocks": [
+      {
+        "type": "text",
+        "text": "I run on claude-3-5-sonnet and sometimes gemini-1.5-pro."
+      },
+      {
+        "type": "footer",
+        "footer": {}
+      }
+    ]
+  }
+]

@@ -19,6 +19,12 @@ import registryDefault, { contextRegistry } from "./registry";
 import { createAlertsContextProvider } from "./alertsContextProvider";
 import { createDashboardsContextProvider } from "./dashboardsContextProvider";
 import { createDefaultContextProvider } from "./defaultContextProvider";
+import {
+  HOME_CONTEXT_KEY,
+  createHomeContextProvider,
+  homeContextOf,
+  useHomeContextProvider,
+} from "./homeContextProvider";
 import { createIncidentsContextProvider } from "./incidentsContextProvider";
 import { createLogsContextProvider } from "./logsContextProvider";
 import { createPipelinesContextProvider } from "./pipelinesContextProvider";
@@ -34,5 +40,12 @@ describe("contextProviders index exports", () => {
     expect(moduleExports.createIncidentsContextProvider).toBe(createIncidentsContextProvider);
     expect(moduleExports.createLogsContextProvider).toBe(createLogsContextProvider);
     expect(moduleExports.createPipelinesContextProvider).toBe(createPipelinesContextProvider);
+  });
+
+  it("re-exports the Home provider, its composable and its registry key", () => {
+    expect(moduleExports.createHomeContextProvider).toBe(createHomeContextProvider);
+    expect(moduleExports.useHomeContextProvider).toBe(useHomeContextProvider);
+    expect(moduleExports.homeContextOf).toBe(homeContextOf);
+    expect(moduleExports.HOME_CONTEXT_KEY).toBe(HOME_CONTEXT_KEY);
   });
 });

@@ -101,16 +101,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon :name="isExpanded(group.id) ? 'expand-more' : 'chevron-right'" size="sm" />
             </OButton>
           </div>
+          <p
+            v-if="group.description && isExpanded(group.id)"
+            class="text-text-secondary px-1.5 pt-1 text-xs"
+            :data-test="`edit-role-module-rail-group-desc-${group.id}`"
+          >
+            {{ group.description }}
+          </p>
           <OTab
             v-for="module in isExpanded(group.id) ? group.modules : []"
             :key="module.key"
             :name="module.key"
             class="w-full"
             :title="rowTooltip(module)"
+            :aria-describedby="module.description ? `module-desc-${module.key}` : undefined"
             :data-test="`edit-role-module-rail-item-${module.key}`"
           >
             <OIcon :name="module.icon" size="sm" class="o-tab__icon shrink-0" />
-            <span class="o-tab__label min-w-0 flex-1 truncate text-left">
+            <span v-if="module.description" class="flex min-w-0 flex-1 flex-col text-left">
+              <span class="o-tab__label truncate">{{ module.label }}</span>
+              <span
+                :id="`module-desc-${module.key}`"
+                class="text-text-secondary text-xs font-normal whitespace-normal"
+                :data-test="`edit-role-module-rail-desc-${module.key}`"
+                >{{ module.description }}</span
+              >
+            </span>
+            <span v-else class="o-tab__label min-w-0 flex-1 truncate text-left">
               {{ module.label }}
             </span>
             <!-- The label must stay readable, so the row only signals unsaved changes; the pane shows the counts. -->
@@ -166,6 +183,10 @@ export type RailModule = {
   icon: IconName;
   groupId: string;
   groupLabel: I18nText;
+  /** One sentence under the label, read after it; wraps instead of truncating. */
+  description?: I18nText;
+  /** Shown once under the group heading. */
+  groupDescription?: I18nText;
   granted: number;
   added: number;
   removed: number;
@@ -188,7 +209,12 @@ const scope = ref("all");
 const grantedCount = computed(() => props.modules.filter((module) => module.granted > 0).length);
 
 const visibleGroups = computed(() => {
-  const groups: { id: string; label: I18nText; modules: RailModule[] }[] = [];
+  const groups: {
+    id: string;
+    label: I18nText;
+    description?: I18nText;
+    modules: RailModule[];
+  }[] = [];
 
   props.modules.forEach((module) => {
     if (scope.value === "granted" && !module.granted) return;
@@ -196,7 +222,13 @@ const visibleGroups = computed(() => {
 
     const last = groups[groups.length - 1];
     if (last && last.id === module.groupId) last.modules.push(module);
-    else groups.push({ id: module.groupId, label: module.groupLabel, modules: [module] });
+    else
+      groups.push({
+        id: module.groupId,
+        label: module.groupLabel,
+        description: module.groupDescription,
+        modules: [module],
+      });
   });
 
   return groups;

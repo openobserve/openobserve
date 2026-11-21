@@ -27,7 +27,7 @@ const INPUT_ROLES = ["textbox", "combobox", "searchbox", "spinbutton"];
  * Single-letter shortcuts should guard with this to avoid firing while typing.
  *
  * Catches native inputs, any contentEditable element (ProseMirror,
- * RichTextInput, inline-editable table cells, etc.), and custom widgets that
+ * inline-editable table cells, etc.), and custom widgets that
  * expose an input-like ARIA role — regardless of which component built them.
  *
  * @param target Element to test instead of `document.activeElement`. Event

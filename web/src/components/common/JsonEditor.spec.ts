@@ -58,9 +58,6 @@ const globalConfig = {
         '<div class="monaco-editor" data-test="common-json-editor" @update:query="$emit(\'update:query\', $event)"><slot /></div>',
       emits: ["update:query"],
     },
-    O2AIChat: {
-      template: '<div class="o2-ai-chat"><slot /></div>',
-    },
   },
 };
 
@@ -69,7 +66,6 @@ describe("JsonEditor", () => {
 
   beforeEach(() => {
     store.state.theme = "light";
-    store.state.isAiChatEnabled = false;
     store.state.zoConfig = {
       ...store.state.zoConfig,
       sql_mode: false,
@@ -400,84 +396,15 @@ describe("JsonEditor", () => {
     });
   });
 
-  // ─── toggleAIChat ────────────────────────────────────────────────────────────
+  // ─── AI toggle placement ─────────────────────────────────────────────────────
 
-  describe("toggleAIChat", () => {
-    it("toggles isAiChatEnabled from false to true in store", async () => {
-      store.state.isAiChatEnabled = false;
-      wrapper = createWrapper();
-      (wrapper.vm as any).toggleAIChat();
-      await nextTick();
-      expect(store.state.isAiChatEnabled).toBe(true);
-    });
-
-    it("toggles isAiChatEnabled from true to false in store", async () => {
-      store.state.isAiChatEnabled = true;
-      wrapper = createWrapper();
-      (wrapper.vm as any).toggleAIChat();
-      await nextTick();
-      expect(store.state.isAiChatEnabled).toBe(false);
-    });
-  });
-
-  // ─── AI chat conditional rendering ───────────────────────────────────────────
-
-  describe("AI chat conditional rendering", () => {
-    it("renders O2AIChat stub when isAiChatEnabled is true", async () => {
-      store.state.isAiChatEnabled = true;
-      wrapper = createWrapper();
-      await nextTick();
-      expect(wrapper.find(".o2-ai-chat").exists()).toBe(true);
-    });
-
-    it("does not render O2AIChat when isAiChatEnabled is false", async () => {
-      store.state.isAiChatEnabled = false;
-      wrapper = createWrapper();
-      await nextTick();
-      expect(wrapper.find(".o2-ai-chat").exists()).toBe(false);
-    });
-
+  describe("AI toggle placement", () => {
     it("renders AI toggle button when isEnterprise and ai_enabled", async () => {
       store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: true };
       wrapper = createWrapper();
       // AI toggle button has been moved to the parent ODrawer header slot, not inside JsonEditor
       const aiBtn = wrapper.find('[data-test="menu-link-ai-item"]');
       expect(aiBtn.exists()).toBe(false);
-    });
-  });
-
-  // ─── getBtnLogo computed ─────────────────────────────────────────────────────
-
-  describe("getBtnLogo computed", () => {
-    it("returns dark AI icon when hovered", async () => {
-      wrapper = createWrapper();
-      (wrapper.vm as any).isHovered = true;
-      await nextTick();
-      expect((wrapper.vm as any).getBtnLogo).toContain("ai_icon_dark.svg");
-    });
-
-    it("returns dark AI icon when AI chat is enabled", async () => {
-      store.state.isAiChatEnabled = true;
-      wrapper = createWrapper();
-      expect((wrapper.vm as any).getBtnLogo).toContain("ai_icon_dark.svg");
-    });
-
-    it("returns dark AI icon for dark theme when not hovered", async () => {
-      store.state.theme = "dark";
-      store.state.isAiChatEnabled = false;
-      wrapper = createWrapper();
-      (wrapper.vm as any).isHovered = false;
-      await nextTick();
-      expect((wrapper.vm as any).getBtnLogo).toContain("ai_icon_dark.svg");
-    });
-
-    it("returns light AI icon when not hovered, AI disabled, light theme", async () => {
-      store.state.theme = "light";
-      store.state.isAiChatEnabled = false;
-      wrapper = createWrapper();
-      (wrapper.vm as any).isHovered = false;
-      await nextTick();
-      expect((wrapper.vm as any).getBtnLogo).toContain("ai_icon_gradient.svg");
     });
   });
 
@@ -554,11 +481,6 @@ describe("JsonEditor", () => {
     it("initializes isValidJson to true", () => {
       wrapper = createWrapper();
       expect((wrapper.vm as any).isValidJson).toBe(true);
-    });
-
-    it("initializes isHovered to false", () => {
-      wrapper = createWrapper();
-      expect((wrapper.vm as any).isHovered).toBe(false);
     });
 
     it("initializes storedFields as empty object", () => {

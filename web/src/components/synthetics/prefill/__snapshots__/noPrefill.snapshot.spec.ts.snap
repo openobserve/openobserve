@@ -21,8 +21,8 @@ exports[`synthetic check form without an AutoObserve prefill > renders the confi
         <o-button-stub variant="outline" size="sm" disabled="false" focusableunavailable="false" loading="false" spinner="true" active="false" type="button" block="false" aschild="false" as="button" data-test="synthetics-check-details-add-tag-btn"></o-button-stub>
       </div>
       <div class="flex flex-wrap gap-2">
-        <o-tag-stub size="xs" type="selectionChip" hidezerocount="false" clickable="false" disabled="false" removable="false" emptylabel="—" class="px-2"></o-tag-stub>
-        <o-tag-stub size="xs" type="selectionChip" hidezerocount="false" clickable="false" disabled="false" removable="false" emptylabel="—" class="px-2"></o-tag-stub>
+        <o-tag-stub size="xs" type="selectionChip" hidezerocount="false" clickable="false" disabled="false" removable="false" labelbutton="false" emptylabel="—" class="px-2"></o-tag-stub>
+        <o-tag-stub size="xs" type="selectionChip" hidezerocount="false" clickable="false" disabled="false" removable="false" labelbutton="false" emptylabel="—" class="px-2"></o-tag-stub>
       </div>
     </div>
   </div>

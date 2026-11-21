@@ -30,6 +30,8 @@ export interface DropdownProps {
   sideOffset?: DropdownMenuContentProps["sideOffset"];
   /** Extra class(es) for the content (menu) element — e.g. to match trigger width. */
   contentClass?: string;
+  /** Session replay masks the portalled content, which sits outside any masked ancestor. */
+  privacy?: "mask";
   /**
    * Outside-click persistence. Controls how many outside-click events must
    * happen before this dropdown actually dismisses:

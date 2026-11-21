@@ -143,6 +143,8 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-sampling-priority"),
             X_O2_ASSISTANT_SESSION_ID,
             X_O2_ASSISTANT_TURN_ID,
+            // The assistant's turn tail resumes from it after a stop or a reload.
+            header::HeaderName::from_static("last-event-id"),
             // The public dashboard viewer polls conditionally.
             header::IF_NONE_MATCH,
         ])
@@ -735,6 +737,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     if get_o2_config().common.audit_enabled
         && !(after_org.ends_with("_stream")
             || path.ends_with("ai/chat_stream")
+            // The handler writes its own record: the body is the prompt, its images and context.
+            || path.ends_with("ai/chat")
             || common::meta::ingestion_routes::is_ingestion_write(
                 &http_method,
                 &path,
@@ -861,6 +865,71 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     response.headers_mut().remove(ERROR_HEADER);
     response
+}
+
+/// The chat, confirm and cancel routes drive the assistant itself; `/{org}/mcp` checks each tool.
+fn assistant_approval_exempt(path: &str) -> bool {
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    matches!(
+        segments.as_slice(),
+        [_org, "mcp"]
+            | [_org, "ai", "chat" | "chat_stream"]
+            | [_org, "ai", "confirm", _]
+            | [_org, "ai", "chats", _, "cancel"]
+    )
+}
+
+/// The assistant's REST changes (its approved deletes) run only with o2-ai's signed approval.
+pub async fn assistant_approval_middleware(request: Request, next: Next) -> Response {
+    let method = request.method().clone();
+    let changes = matches!(
+        method,
+        Method::POST | Method::PUT | Method::PATCH | Method::DELETE
+    );
+    let path = request.uri().path();
+    let exempt = assistant_approval_exempt(path);
+    if !changes || exempt || !request.headers().contains_key(X_O2_ASSISTANT_SESSION_ID) {
+        return next.run(request).await;
+    }
+    let origin = match openobserve_mcp::ledger::Origin::checked(request.headers()) {
+        Ok(origin) => origin,
+        Err(problem) => return common::meta::http::HttpResponse::bad_request(problem),
+    };
+    let target = format!(
+        "/api{}",
+        request
+            .uri()
+            .path_and_query()
+            .map_or(path, |target| target.as_str())
+    );
+    let mut segments = path.split('/').filter(|segment| !segment.is_empty());
+    let org_id = match segments.next() {
+        Some("v2") => segments.next(),
+        first => first,
+    }
+    .unwrap_or_default()
+    .to_string();
+    let (parts, body) = request.into_parts();
+    let limit = get_config().limit.req_payload_limit;
+    let Ok(body) = axum::body::to_bytes(body, limit).await else {
+        return common::meta::http::HttpResponse::bad_request("Request body is too large");
+    };
+    let checked = openobserve_mcp::approval::check_rest(
+        &org_id,
+        method.as_str(),
+        &target,
+        &body,
+        origin.as_ref(),
+    )
+    .await;
+    let request = Request::from_parts(parts, axum::body::Body::from(body));
+    match checked {
+        Ok(()) => next.run(request).await,
+        Err(refused) => {
+            log::warn!("[ai] refused assistant {method} {target}: {refused}");
+            common::meta::http::HttpResponse::forbidden(refused.to_string())
+        }
+    }
 }
 
 /// Handler for /metrics endpoint
@@ -1248,6 +1317,14 @@ pub fn config_routes() -> Router {
 #[cfg(feature = "enterprise")]
 fn ai_chat_routes(router: Router) -> Router {
     router
+        .route(
+            "/{org_id}/ai/capabilities",
+            get(ai::capabilities::get_capabilities),
+        )
+        .route(
+            "/{org_id}/ai/capabilities/test",
+            post(ai::capabilities::test_capabilities),
+        )
         .route("/{org_id}/ai/chat", post(ai::chat::chat))
         .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
         .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
@@ -1259,6 +1336,8 @@ fn ai_chat_routes(router: Router) -> Router {
             "/{org_id}/ai/chats",
             get(ai::chats::list).delete(ai::chats::delete_all),
         )
+        .route("/{org_id}/ai/chats/import", post(ai::chats::import))
+        .route("/{org_id}/ai/chats/seeded", post(ai::seeded::create_seeded))
         .route(
             "/{org_id}/ai/chats/{session_id}",
             get(ai::chats::get)
@@ -1268,6 +1347,14 @@ fn ai_chat_routes(router: Router) -> Router {
         .route(
             "/{org_id}/ai/chats/{session_id}/cancel",
             post(ai::chat::cancel),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}/branch",
+            post(ai::branch::branch),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}/turns/{turn_id}/stream",
+            get(ai::chats::stream_turn),
         )
         .route(
             "/{org_id}/ai/chats/{session_id}/shares",
@@ -1280,6 +1367,21 @@ fn ai_chat_routes(router: Router) -> Router {
         )
         .route("/{org_id}/ai/shared/{token}", get(ai::shares::get_shared))
         .route("/{org_id}/ai/shared/{token}/fork", post(ai::shares::fork))
+        .route(
+            "/{org_id}/ai/settings",
+            get(ai::settings::get_settings).put(ai::settings::put_settings),
+        )
+        .route("/{org_id}/ai/grants", get(ai::grants::list_grants))
+        .route("/{org_id}/ai/grants/{id}", delete(ai::grants::delete_grant))
+        .route("/{org_id}/ai/activity", get(ai::activity::list_activity))
+        .route(
+            "/{org_id}/ai/activity/{id}/undo",
+            post(ai::activity::undo_action),
+        )
+        .route(
+            "/{org_id}/ai/access_requests",
+            post(ai::access_requests::create_access_request),
+        )
 }
 
 #[cfg(feature = "enterprise")]
@@ -1580,6 +1682,7 @@ fn service_route_table() -> Router {
         .route("/v2/{org_id}/alerts/tags", get(alerts::list_alert_tags))
         .route("/v2/{org_id}/alerts/history", get(alerts::history::get_alert_history))
         .route("/v2/{org_id}/alerts/auto_investigate/decisions", get(alerts::auto_investigate::list_auto_investigate_decisions))
+        .route("/v2/{org_id}/alerts/rca_runs", get(alerts::rca_runs_org::list_org_rca_runs))
 
         // Alerts - incidents must be before alerts to avoid route conflicts
         .route("/v2/{org_id}/alerts/incidents", get(alerts::incidents::list_incidents).post(alerts::incidents::create_incident))
@@ -2032,7 +2135,8 @@ fn service_route_table() -> Router {
 
             // AI
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
-            .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
+            .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).patch(ai::toolsets::patch).delete(ai::toolsets::delete))
+            .route("/{org_id}/ai/toolsets/{id}/test", post(ai::toolsets::test))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))
@@ -2422,6 +2526,7 @@ fn with_service_layers(router: Router) -> Router {
         .layer(middleware::from_fn(memory_breaker_middleware))
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
+        .layer(middleware::from_fn(assistant_approval_middleware))
         // Between auth and audit: it needs the email authentication resolves, and a request it
         // refuses never reached a handler, so there is nothing for the audit trail to record.
         .layer(middleware::from_fn(password_policy_middleware))
@@ -2513,6 +2618,7 @@ fn search_routes_with(llm_eval: bool) -> Router {
             .route("/{org_id}/search_jobs/{job_id}/retry", post(search::search_job::retry_job))
             .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
             .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
+            .route("/{org_id}/traces/service_graph/services/trend", get(traces::get_services_trend))
             .route("/{org_id}/traces/agent_signals", get(traces::get_agent_signals))
             .route("/{org_id}/traces/agent_signals/compare", post(traces::compare_agent_versions))
             .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns));
@@ -5520,7 +5626,7 @@ mod tests {
             .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
             .header(
                 header::ACCESS_CONTROL_REQUEST_HEADERS,
-                "content-type,traceparent,x-o2-assistant-session-id,x-o2-assistant-turn-id",
+                "content-type,traceparent,x-o2-assistant-session-id,x-o2-assistant-turn-id,last-event-id",
             )
             .body(Body::empty())
             .unwrap();
@@ -5537,10 +5643,54 @@ mod tests {
             "traceparent",
             X_O2_ASSISTANT_SESSION_ID.as_str(),
             X_O2_ASSISTANT_TURN_ID.as_str(),
+            "last-event-id",
         ] {
             assert!(
                 allowed.split(',').any(|h| h.trim() == name),
                 "{name} missing from access-control-allow-headers: {allowed}"
+            );
+        }
+    }
+
+    #[test]
+    fn assistant_approval_exempts_only_chat_confirm_cancel_and_mcp() {
+        for path in [
+            "/default/ai/chat",
+            "/default/ai/chat_stream",
+            "/default/ai/confirm/s1",
+            "/default/ai/chats/s1/cancel",
+            "/mcp/ai/chat",
+            "/default/mcp",
+            "/default/mcp/",
+            "/ai/mcp",
+            "/v2/ai/chat",
+        ] {
+            assert!(assistant_approval_exempt(path), "{path} should be exempt");
+        }
+        for path in [
+            "/default/streams/ai/data_by_time_range",
+            "/default/streams/ai/delete_fields",
+            "/default/streams/ai/settings",
+            "/default/streams/mcp",
+            "/default/functions/mcp",
+            "/ai/streams/logs/settings",
+            "/ai/alerts/a1",
+            "/mcp/streams/logs",
+            "/v2/default/ai/chat",
+            "/v2/streams/ai/settings",
+            "/v2/default/alerts/a1",
+            "/default/mcp/extra",
+            "/ai/ai/settings",
+            "/default/ai/settings",
+            "/default/ai/toolsets/t1",
+            "/default/ai/grants/g1",
+            "/default/ai/chats/s1/shares",
+            "/default/ai/activity/a1/undo",
+            "/",
+        ] {
+            assert!(
+                !assistant_approval_exempt(path),
+                "{path} must need approval"
             );
         }
     }
@@ -6218,6 +6368,7 @@ mod tests {
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/events",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs",
             "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}",
+            "GET /v2/{org_id}/alerts/rca_runs",
             "GET /v2/{org_id}/alerts/tags",
             "GET /v2/{org_id}/alerts/{alert_id}",
             "GET /v2/{org_id}/alerts/{alert_id}/groups",

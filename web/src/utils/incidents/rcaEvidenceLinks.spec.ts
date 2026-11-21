@@ -67,6 +67,18 @@ describe("rcaEvidenceLink (03 VE29)", () => {
     expect(q.period).toBeUndefined();
   });
 
+  it("pins the exact SQL link query (key order and values)", () => {
+    const link = rcaEvidenceLink(
+      { signal: "logs", streams: ["a", "b"], sql: SQL, start_us: START_US, end_us: END_US },
+      "default",
+    );
+    expect(JSON.stringify(routeOf(link).query)).toBe(
+      '{"org_identifier":"default","stream_type":"logs","refresh":"0","sql_mode":"true","quick_mode":"false","show_histogram":"true","type":"rca_evidence_query","stream":"a,b","from":"1760000000000000","to":"1760001800000000","query":"U0VMRUNUIGNvdW50KCopIEZST00gImNoZWNrb3V0X2FwaSIgV0hFUkUgbXNnIExJS0UgJyV0aW1lb3V04oaSJSc=","fn_editor":"false"}',
+    );
+    const noRange = rcaEvidenceLink({ signal: "logs", streams: ["a"], sql: "SELECT 1" }, "default");
+    expect(routeOf(noRange).query.period).toBe("1h");
+  });
+
   it("SQL on metrics or traces keeps the signal as stream_type and label, and joins streams with ','", () => {
     const link = rcaEvidenceLink(
       {

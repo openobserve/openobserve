@@ -44,6 +44,7 @@ import {
   statusLabel,
 } from "./incidentsCopy";
 import { liveFailureOf, liveNotice, refreshFailedText, type LiveFailure } from "./liveCopy";
+import en from "@/locales/languages/en-US.json";
 
 const FIXTURE = fixture as unknown as AutoObserveIncidentList;
 const item = (i: number) => FIXTURE.items[i];
@@ -124,10 +125,14 @@ describe("analysisLine", () => {
 
   it("a run that did not start says why in words", () => {
     const lines = [
-      [analysisLine(gt, item(3), true), "RCA off", "No AI SRE for P2"],
+      [
+        analysisLine(gt, item(3), true),
+        `${en.brand.autobotInvestigate} off`,
+        `No ${en.brand.autobotInvestigate} for P2`,
+      ],
       [
         analysisLine(gt, item(4), false),
-        "RCA disabled",
+        `${en.brand.autobotInvestigate} disabled`,
         "AI analysis is turned off for this deployment.",
       ],
       [
@@ -137,7 +142,7 @@ describe("analysisLine", () => {
       ],
       [
         analysisLine(gt, withRun(4, { not_run_reason: "budget_x" }), true),
-        "RCA off",
+        `${en.brand.autobotInvestigate} off`,
         "Automatic analysis did not run for this incident.",
       ],
     ] as const;

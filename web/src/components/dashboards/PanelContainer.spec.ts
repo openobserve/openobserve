@@ -42,6 +42,13 @@ vi.mock("@/services/short_url", () => ({
   },
 }));
 
+// Gate is "available" by default so the view-only AI menu renders; one case flips it.
+const assistantGate = vi.hoisted(() => ({ value: "available" }));
+vi.mock("@/composables/assistant/pure", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/composables/assistant/pure")>()),
+  useAssistantGate: () => assistantGate,
+}));
+
 // Mock addPanel utility
 vi.mock("@/utils/commons", () => ({
   addPanel: vi.fn().mockResolvedValue(undefined),
@@ -808,11 +815,31 @@ describe("PanelContainer", () => {
       expect(dropdown.exists()).toBe(true);
     });
 
-    it("should hide dropdown menu in view-only mode", () => {
+    it("should keep only the assistant door menu in view-only mode", () => {
       wrapper = createWrapper({ viewOnly: true });
 
       const dropdown = wrapper.findComponent({ name: "ODropdown" });
-      expect(dropdown.exists()).toBe(false);
+      expect(dropdown.exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-edit-panel"]').exists()).toBe(false);
+    });
+  });
+
+  describe("AI menu gate", () => {
+    afterEach(() => {
+      assistantGate.value = "available";
+    });
+
+    it("shows no AI menu trigger in view-only mode when the assistant is not configured", () => {
+      assistantGate.value = "not_configured";
+      wrapper = createWrapper({ viewOnly: true });
+
+      expect(wrapper.find('[data-test$="-ai-menu"]').exists()).toBe(false);
+    });
+
+    it("shows the AI menu trigger in view-only mode when the assistant is available", () => {
+      wrapper = createWrapper({ viewOnly: true });
+
+      expect(wrapper.find('[data-test$="-ai-menu"]').exists()).toBe(true);
     });
   });
 
@@ -2346,10 +2373,11 @@ describe("PanelContainer", () => {
       expect(wrapper.find('[data-test="dashboard-panel-drag"]').exists()).toBe(true);
     });
 
-    it("should hide dropdown menu when simplifiedPanelView is true", () => {
+    it("should keep only the assistant door menu when simplifiedPanelView is true", () => {
       wrapper = createWrapper({ simplifiedPanelView: true });
 
-      expect(wrapper.findComponent({ name: "ODropdown" }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "ODropdown" }).exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-edit-panel"]').exists()).toBe(false);
     });
 
     it("should show dropdown menu when simplifiedPanelView is false", () => {

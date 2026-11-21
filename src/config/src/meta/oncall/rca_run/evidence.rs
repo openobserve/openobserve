@@ -22,7 +22,8 @@ use utoipa::ToSchema;
 use super::{EvidenceLedger, Polarity, Strength, TimeWindow};
 use crate::meta::{
     oncall::confidence::{
-        CallLog, SignalClass, ToolCallRecord, UnverifiedCitation, is_prometheus_tool, signal_class,
+        CallLog, KEY_ARG_MAX_BYTES, SignalClass, ToolCallRecord, UnverifiedCitation, cut_bytes,
+        is_prometheus_tool, signal_class,
     },
     sql::resolve_stream_names,
 };
@@ -36,6 +37,13 @@ const SQL_TOOLS: [&str; 4] = [
 ];
 const GET_LATEST_TRACES: &str = "GetLatestTraces";
 const PROMQL_INSTANT_QUERY: &str = "PrometheusQuery";
+
+/// Row fields whose text is a change's diff.
+const CHANGE_DIFF_FIELDS: [&str; 2] = ["config_diff", "diff"];
+/// Prefixes of a row field that holds a value before a change.
+const OLD_VALUE_PREFIXES: [&str; 3] = ["previous_", "prev_", "old_"];
+/// Prefixes of a row field that holds the value after a change, besides the bare field name.
+const NEW_VALUE_PREFIXES: [&str; 2] = ["new_", "current_"];
 
 fn is_sql_tool(tool: &str) -> bool {
     SQL_TOOLS.contains(&tool)
@@ -343,6 +351,22 @@ pub fn summarize_result(tool: &str, output: &Value) -> (String, Option<u64>) {
     })
 }
 
+/// The SQL result rows that record a change, as JSON lines cut to 4 KB; `None` when no row does.
+pub fn change_rows(tool: &str, output: &Value) -> Option<String> {
+    if !is_sql_tool(tool) {
+        return None;
+    }
+    let body = decode_output(output);
+    let rows: Vec<String> = body
+        .get("hits")?
+        .as_array()?
+        .iter()
+        .filter(|row| row.as_object().is_some_and(is_change_record))
+        .map(Value::to_string)
+        .collect();
+    (!rows.is_empty()).then(|| cut_bytes(&rows.join("\n"), KEY_ARG_MAX_BYTES).to_string())
+}
+
 /// Span (µs) of the in-range data timestamps a successful result shows; `None` without a range or
 /// times.
 pub fn observed_window(tool: &str, output: &Value, target: &EvidenceTarget) -> Option<TimeWindow> {
@@ -449,6 +473,38 @@ fn text_micros(cell: &str) -> Option<i64> {
     crate::utils::time::parse_str_to_time(cell)
         .ok()
         .map(|t| t.timestamp_micros())
+}
+
+/// Text only, so a computed numeric delta such as `LAG(count) AS previous_count` is no change.
+fn change_text<'a>(row: &'a serde_json::Map<String, Value>, field: &str) -> Option<&'a str> {
+    row.get(field)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+}
+
+/// A row with a diff, or a field's old value next to a different new value.
+fn is_change_record(row: &serde_json::Map<String, Value>) -> bool {
+    if CHANGE_DIFF_FIELDS
+        .iter()
+        .any(|f| change_text(row, f).is_some())
+    {
+        return true;
+    }
+    row.keys().any(|key| {
+        let Some(old) = change_text(row, key) else {
+            return false;
+        };
+        OLD_VALUE_PREFIXES
+            .iter()
+            .filter_map(|p| key.strip_prefix(p))
+            .filter(|field| !field.is_empty())
+            .any(|field| {
+                std::iter::once(field.to_string())
+                    .chain(NEW_VALUE_PREFIXES.iter().map(|p| format!("{p}{field}")))
+                    .any(|new| change_text(row, &new).is_some_and(|new| new != old))
+            })
+    })
 }
 
 /// The first word of each command in a shell line.
@@ -1401,5 +1457,41 @@ mod tests {
             .map(|e| (e.number, e.call_id.as_str(), e.citations.len()))
             .collect();
         assert_eq!(numbered, [(1, "c1", 2), (2, "c_other", 1)]);
+    }
+
+    /// A SearchSQL output as o2-ai's tool part carries it: the search response as a JSON string.
+    #[test]
+    fn change_rows_need_a_diff_or_an_old_and_new_value() {
+        let output =
+            |hits: Value| Value::String(json!({"took": 4, "hits": hits, "total": 1}).to_string());
+        let deploy = json!({"_timestamp": 1_792_140_000_000_000_i64, "service": "inventory-svc",
+            "version": "v3.8.1", "previous_version": "v3.8.0", "author": "dev.priya",
+            "change_summary": "Tune DB pool", "config_diff": "DB_POOL_MAX_SIZE: 50 -> 5"});
+        let rows = change_rows(SQL, &output(json!([deploy.clone()]))).unwrap();
+        assert!(rows.contains("v3.8.1"), "{rows}");
+
+        let mut versions_only = deploy.clone();
+        versions_only.as_object_mut().unwrap().remove("config_diff");
+        assert!(change_rows(SQL, &output(json!([versions_only]))).is_some());
+        let flag = json!({"flag": "checkout_v2", "old_value": "off", "new_value": "on"});
+        assert!(change_rows(SQL, &output(json!([flag]))).is_some());
+
+        for not_a_change in [
+            json!({"service": "inventory-svc", "change_summary": "Tune DB pool"}),
+            json!({"version": "v3.8.1", "previous_version": "v3.8.1"}),
+            json!({"version": "v3.8.1", "previous_version": ""}),
+            json!({"count": 463, "previous_count": 12, "diff": 451}),
+            json!({"level": "error", "message": "pool exhausted"}),
+        ] {
+            assert_eq!(
+                change_rows(SQL, &output(json!([not_a_change.clone()]))),
+                None,
+                "{not_a_change}"
+            );
+        }
+        assert_eq!(
+            change_rows("GetLatestTraces", &output(json!([deploy]))),
+            None
+        );
     }
 }

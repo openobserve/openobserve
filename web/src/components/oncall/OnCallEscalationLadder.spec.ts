@@ -79,7 +79,7 @@ const l0 = (over: Partial<PreviewL0> = {}): PreviewL0 => ({
   mode: "gate",
   triage_budget_seconds: 90,
   available: true,
-  summary: "The AI SRE triages first. The first level is held for up to 90s.",
+  summary: "Triage runs first. The first level is held for up to 90s.",
   allow_suppress: false,
   allow_promotion: true,
   allow_downgrade: true,

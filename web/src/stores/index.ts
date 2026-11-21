@@ -28,6 +28,7 @@ import { editorDraftSessionEnded, resumeEditorDraftSession } from "@/utils/draft
 import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 import config from "@/aws-exports";
+import { setOrgTimeZoneSource } from "@/utils/formatters";
 import { setDeployTimeZone } from "@/utils/deployTimeZone";
 
 const pos = window.location.pathname.indexOf("/web/");
@@ -130,8 +131,6 @@ const store = createStore({
     allApiLimitsByOrgId: {},
     allRoleLimitsByOrgIdByRole: {},
     modulesToDisplay: {},
-    isAiChatEnabled: false,
-    isAiChatExpanded: false,
     isWebinarBannerVisible: false,
     currentChatTimestamp: null as number | null,
     chatUpdated: false,
@@ -357,11 +356,9 @@ const store = createStore({
     setModulesToDisplay(state, payload) {
       state.modulesToDisplay = payload;
     },
-    setIsAiChatEnabled(state, payload) {
-      state.isAiChatEnabled = payload;
-    },
-    setIsAiChatExpanded(state, payload) {
-      state.isAiChatExpanded = payload;
+    setRegexPatternHandoff(state, payload: { prompt: string; testValue: string }) {
+      state.organizationData.regexPatternPrompt = payload.prompt;
+      state.organizationData.regexPatternTestValue = payload.testValue;
     },
     setIsWebinarBannerVisible(state, payload) {
       state.isWebinarBannerVisible = payload;
@@ -617,12 +614,6 @@ const store = createStore({
     setModulesToDisplay(context, payload) {
       context.commit("setModulesToDisplay", payload);
     },
-    setIsAiChatEnabled(context, payload) {
-      context.commit("setIsAiChatEnabled", payload);
-    },
-    setIsAiChatExpanded(context, payload) {
-      context.commit("setIsAiChatExpanded", payload);
-    },
     setIsWebinarBannerVisible(context, payload) {
       context.commit("setIsWebinarBannerVisible", payload);
     },
@@ -645,5 +636,6 @@ const store = createStore({
 
 // Zone-less calendar resolves (query builders, guards) must use the zone the picker shows.
 setPickerTimezoneSource(() => store.state.timezone);
+setOrgTimeZoneSource(() => store.state.timezone);
 
 export default store;

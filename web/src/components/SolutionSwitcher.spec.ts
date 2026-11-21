@@ -75,3 +75,39 @@ describe("SolutionSwitcher alpha tag", () => {
     expect(w.findAll('[data-test="alpha-badge"]')).toHaveLength(0);
   });
 });
+
+describe("SolutionSwitcher trigger tooltip", () => {
+  const tooltipDisabled = (w: ReturnType<typeof mountSwitcher>) =>
+    w.findComponent({ name: "OTooltip" }).props("disabled");
+
+  it("stays shut while the menu is open and when focus returns to the trigger after a pick", async () => {
+    const w = mountSwitcher("observability");
+    const dropdown = w.findComponent({ name: "ODropdown" });
+    expect(tooltipDisabled(w)).toBe(false);
+    dropdown.vm.$emit("update:open", true);
+    await w.vm.$nextTick();
+    expect(tooltipDisabled(w)).toBe(true);
+    // Opening moves the pointer and focus into the menu, off the trigger.
+    const trigger = w.get('[data-test="solution-switcher"]');
+    await trigger.trigger("mouseleave");
+    await trigger.trigger("blur");
+    expect(tooltipDisabled(w)).toBe(true);
+    dropdown.vm.$emit("update:open", false);
+    await w.vm.$nextTick();
+    expect(tooltipDisabled(w)).toBe(true);
+  });
+
+  it("comes back once the trigger loses focus or the pointer leaves it", async () => {
+    const w = mountSwitcher("observability");
+    const dropdown = w.findComponent({ name: "ODropdown" });
+    const trigger = w.get('[data-test="solution-switcher"]');
+    dropdown.vm.$emit("update:open", true);
+    dropdown.vm.$emit("update:open", false);
+    await trigger.trigger("blur");
+    expect(tooltipDisabled(w)).toBe(false);
+    dropdown.vm.$emit("update:open", true);
+    dropdown.vm.$emit("update:open", false);
+    await trigger.trigger("mouseleave");
+    expect(tooltipDisabled(w)).toBe(false);
+  });
+});

@@ -1,0 +1,287 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { computed, inject, type ComputedRef } from "vue";
+import type { Router } from "vue-router";
+import type { Store } from "vuex";
+
+import {
+  runtimeHandle,
+  useAssistantGate,
+  type ContextChip,
+  type OpenAssistantArgs,
+  type OpenAssistantResult,
+} from "@/composables/assistant/pure";
+import type { LogRowInput } from "@/utils/assistant/prompts";
+import { OTableToolbarOwnerKey } from "@/lib/core/Table/OTable.types";
+
+/** What every Logs door prompt reads from the page; built at click time, never at render. */
+export type LogsDoorBase = Omit<LogRowInput, "row" | "source">;
+
+type Payload = OpenAssistantArgs["payload"];
+
+// A regex is written from one value; the test input takes this much of it.
+const REGEX_SAMPLE_CHARS = 2_000;
+
+interface LogsSearchShape {
+  organizationIdentifier?: string;
+  meta?: { sqlMode?: boolean };
+  data?: {
+    query?: unknown;
+    editorValue?: unknown;
+    stream?: { selectedStream?: string[]; streamType?: string };
+    datetime?: { startTime?: number; endTime?: number };
+  };
+}
+
+interface StoreShape {
+  selectedOrganization?: { identifier?: string };
+  timezone?: string;
+  zoConfig?: { timestamp_column?: string };
+}
+
+/** The Logs page's stream, absolute window (µs → ms), zone, query and mode for a door's prompt. */
+export function logsDoorBase(
+  searchObj: LogsSearchShape,
+  state: StoreShape,
+  row?: Record<string, unknown>,
+): LogsDoorBase {
+  const sqlMode = !!searchObj.meta?.sqlMode;
+  const data = searchObj.data ?? {};
+  const query = String(
+    (sqlMode ? data.editorValue || data.query : data.query || data.editorValue) ?? "",
+  );
+  const rowStream = typeof row?._stream_name === "string" ? row._stream_name : "";
+  const now = Date.now();
+  return {
+    // The org the results were loaded under, so a page left over from another org is refused.
+    org: searchObj.organizationIdentifier || state.selectedOrganization?.identifier || "",
+    stream: rowStream || data.stream?.selectedStream?.[0] || "",
+    streamType: data.stream?.streamType || "logs",
+    range: {
+      from: Math.round(Number(data.datetime?.startTime ?? 0) / 1000) || now - 15 * 60_000,
+      to: Math.round(Number(data.datetime?.endTime ?? 0) / 1000) || now,
+    },
+    timeZone: state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    query,
+    mode: sqlMode ? "sql" : "filter",
+    timestampField: state.zoConfig?.timestamp_column || "_timestamp",
+  };
+}
+
+/** Add a row to chat; the builders load only when a door is used. */
+export function logRowBuild(base: () => LogsDoorBase, row: Record<string, unknown>) {
+  return async (): Promise<Payload> =>
+    (await import("@/utils/assistant/prompts")).buildLogRowPrompt({ ...base(), row });
+}
+
+/** Add field to chat: `{field, value}` with its row for the time and id. */
+export function logFieldBuild(
+  base: () => LogsDoorBase,
+  field: string,
+  value: unknown,
+  row?: Record<string, unknown>,
+) {
+  return async (): Promise<Payload> =>
+    (await import("@/utils/assistant/prompts")).buildLogFieldPrompt({
+      ...base(),
+      field,
+      value,
+      row,
+    });
+}
+
+/** Create regex pattern from a value: the prompt waits for the regex drawer's dock, never the sidebar. */
+export async function regexFieldHandoff(
+  base: LogsDoorBase,
+  field: string,
+  sample: unknown,
+  go: (handoff: { prompt: string; sample: string }) => void,
+): Promise<void> {
+  const [{ buildRegexFieldPrompt, fieldValueOf }, { queueDockStage }] = await Promise.all([
+    import("@/utils/assistant/prompts"),
+    import("@/composables/assistant"),
+  ]);
+  // A secret-named field's value is redacted here too, since the drawer's test value reaches the model's context.
+  const value = fieldValueOf(field, sample);
+  const text = typeof value === "string" ? value : JSON.stringify(value ?? "");
+  const build = buildRegexFieldPrompt({
+    org: base.org,
+    stream: base.stream,
+    streamType: base.streamType,
+    field,
+    sample: text.slice(0, REGEX_SAMPLE_CHARS),
+    range: base.range,
+  });
+  queueDockStage(
+    "regex",
+    { chips: build.chips, text: build.text },
+    { entryKind: "object_verb", objectKind: "log_field" },
+  );
+  go({ prompt: build.text, sample: text.slice(0, REGEX_SAMPLE_CHARS) });
+}
+
+/** The regex hand-off's navigation: the drawer closes, the patterns page opens with the prompt and sample waiting. */
+export function regexPatternsOpener(
+  store: Store<any>,
+  router: Router,
+  close: () => void,
+): (handoff: { prompt: string; sample: string }) => void {
+  return (handoff) => {
+    close();
+    store.commit("setRegexPatternHandoff", { prompt: handoff.prompt, testValue: handoff.sample });
+    void router.push({
+      path: "/settings/regex_patterns",
+      query: { org_identifier: store.state.selectedOrganization.identifier, from: "logs" },
+    });
+  };
+}
+
+/** Troubleshoot empty results: every selected stream, the absolute range, the mode. */
+export function emptyResultBuild(base: () => LogsDoorBase, streams: () => string[]) {
+  return async (): Promise<Payload> => {
+    const page = base();
+    return (await import("@/utils/assistant/prompts")).buildEmptyResultPrompt({
+      org: page.org,
+      streams: streams(),
+      mode: page.mode,
+      query: page.query ?? "",
+      range: page.range,
+      timeZone: page.timeZone,
+    });
+  };
+}
+
+/** Troubleshoot this query: the error as plain text in a chip, the query and range in the text. */
+export function queryErrorBuild(
+  base: () => LogsDoorBase,
+  streams: () => string[],
+  error: () => string,
+) {
+  return async (): Promise<Payload> => {
+    const page = base();
+    return (await import("@/utils/assistant/prompts")).buildQueryErrorPrompt({
+      org: page.org,
+      streams: streams(),
+      streamType: page.streamType,
+      language: page.mode === "sql" ? "SQL" : "filter",
+      query: page.query ?? "",
+      error: error(),
+      range: page.range,
+      timeZone: page.timeZone,
+    });
+  };
+}
+
+/** Help me set up ingestion: the org and the stream type, never the fix-my-filter prompt. */
+export function noStreamBuild(org: () => string, streamType: () => string) {
+  return async (): Promise<Payload> =>
+    (await import("@/utils/assistant/prompts")).buildNoStreamPrompt({
+      org: org(),
+      streamType: streamType(),
+    });
+}
+
+/** What an Add to chat button sends: the object's builder and the org its rows were loaded under. */
+export interface ChatDoor {
+  entryKind: OpenAssistantArgs["entryKind"];
+  objectKind: OpenAssistantArgs["objectKind"];
+  build: () => Payload | Promise<Payload>;
+  boundOrg?: string;
+}
+
+// Ready and locked gates show the button (a locked click opens the locked panel); others hide it.
+const LOCKED_GATES: string[] = ["no_permission", "off_for_org"];
+const DOOR_GATES = ["available", "unhealthy", ...LOCKED_GATES];
+
+/** Whether the Add to chat buttons show for the current assistant gate. */
+export function useAssistantDoorShown(): ComputedRef<boolean> {
+  const gate = useAssistantGate();
+  return computed(() => DOOR_GATES.includes(gate.value));
+}
+
+/** The user and org a host was mounted under, for `addDoorToChat`; null before the assistant loads. */
+export const currentUserOrgKey = (): string | null =>
+  runtimeHandle().value?.store.state.userOrgKey ?? null;
+
+/** The cell whose toolbar holds the caller, for `addDoorToChat`; call it in the setup of a component inside the toolbar. */
+export function useToolbarInvoker(): () => HTMLElement | null {
+  const owner = inject(OTableToolbarOwnerKey, null);
+  return () => owner?.() ?? null;
+}
+
+/** Add to chat: stage the door's chips, stamped with its bound org, in the current chat and open it. */
+export async function addDoorToChat(
+  door: ChatDoor,
+  userOrgKey?: string | null,
+  toolbarCell?: HTMLElement | null,
+): Promise<OpenAssistantResult> {
+  // The chat returns focus to the clicked button when it closes; a cell toolbar unmounts on blur, so its cell stands in.
+  const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const invoker = toolbarCell ?? focused;
+  const [built, { openAssistant }] = await Promise.all([
+    door.build(),
+    import("@/composables/assistant"),
+  ]);
+  const stamp = (chip: ContextChip): ContextChip =>
+    chip.ref && door.boundOrg ? { ...chip, ref: { ...chip.ref, org: door.boundOrg } } : chip;
+  const chips = (built?.chips ?? []).map(stamp);
+  const result = await openAssistant({
+    entryKind: door.entryKind,
+    entryVerb: "add_to_chat",
+    objectKind: door.objectKind,
+    intent: chips.length ? "stage" : "open",
+    thread: "current",
+    payload: { chips },
+    reveal: true,
+    invoker,
+    ...(userOrgKey && { userOrgKey }),
+  });
+  // openAssistant refuses a locked gate silently; the locked panel says why, as the header button does.
+  if (!result.ok && LOCKED_GATES.includes(result.reason)) {
+    const { openLockedPanel } = await import("@/components/ai-assistant/shell/lockedPanel");
+    openLockedPanel(invoker);
+  }
+  return result;
+}
+
+/** A cheap, stable key for the object behind an Add door, so its "In chat" tick never outlives it. */
+export function rowKeyOf(row: Record<string, unknown>, timestampField = "_timestamp"): string {
+  if (row._o2_id != null) return String(row._o2_id);
+  // Rows without an id can share a stream and timestamp, so their content tells them apart.
+  return `${String(row._stream_name ?? "")}:${String(row[timestampField] ?? "")}:${contentHash(row)}`;
+}
+
+function contentHash(row: Record<string, unknown>): string {
+  let text: string;
+  try {
+    text = JSON.stringify(
+      Object.keys(row)
+        .sort()
+        .map((key) => [key, row[key]]),
+    );
+  } catch {
+    text = Object.keys(row)
+      .sort()
+      .map((key) => `${key}=${String(row[key])}`)
+      .join("\u0000");
+  }
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}

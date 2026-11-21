@@ -1,0 +1,12 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chat.rs:239-252 (cloud) with src/core/src/trial_quota.rs:1376-1382",
+  "shape": "A",
+  "status": 402,
+  "body": {
+    "code": 402,
+    "message": "AI credit limit exhausted. Contact your account manager to add more credits.",
+    "error_type": "ai_credits_exhausted",
+    "remedy": "contact_account_manager",
+    "payer_org_id": null
+  }
+}

@@ -175,25 +175,25 @@
               {{ crossLink.name }}
             </ODropdownItem>
           </template>
+          <AiEntryButton
+            v-bind="fieldDoor(String(key), value[key])"
+            appearance="menu-item"
+            reveal
+            @opened="closeOnAdd"
+          />
+          <AiEntryButton
+            v-if="regexDoorShown"
+            v-bind="regexDoor(String(key), value[key])"
+            appearance="menu-item"
+          />
+          <!-- Without the assistant the field still opens the regex editor with its value to test. -->
           <ODropdownItem
-            v-if="store.state.zoConfig.ai_enabled"
-            data-test="send-to-ai-chat-btn"
-            @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
-          >
-            <template #icon-left>
-              <img :src="getBtnLogo" width="14" height="14" alt="" />
-            </template>
-            {{ t("logs.jsonPreview.sendToAiChat") }}
-            <template v-if="!aiAssistantAccess.allowed" #icon-right>
-              <OIcon name="lock" size="xs" class="lock-chip shrink-0" />
-            </template>
-          </ODropdownItem>
-          <ODropdownItem
+            v-else
             data-test="redirect-to-regex-pattern-btn"
-            @select.stop="createRegexPatternFromLogs(key, value[key])"
+            @select.stop="regexHandoff(String(key), value[key])"
           >
             <template #icon-left>
-              <img :src="regexIcon" width="14" height="14" alt="" />
+              <img :src="regexIconForContextMenu" width="14" height="14" alt="" />
             </template>
             {{ t("regex_patterns.create_regex_pattern_field") }}
             <template v-if="!regexPatternsAccess.allowed" #icon-right>
@@ -240,7 +240,8 @@
         </div>
         <div
           class="hover:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-3 py-1.5 [transition:background-color_0.2s]"
-          @click="handleCreateRegex"
+          data-test="ai-entry-regex-field-ask-menu"
+          @click="handoffSelection()"
         >
           <img
             :src="regexIconForContextMenu"
@@ -252,23 +253,6 @@
         </div>
       </div>
     </div>
-    <ODialog
-      data-test="json-preview-regex-pattern-dialog"
-      v-if="regexPatternsAccess.allowed"
-      v-model:open="typeOfRegexPattern"
-      size="lg"
-      :title="t('logs.jsonPreview.regexPatternTypeTitle')"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('confirmDialog.ok')"
-      @click:secondary="typeOfRegexPattern = false"
-      @click:primary="confirmRegexPatternType"
-    >
-      <OInput
-        data-test="regex-pattern-type-input"
-        v-model="regexPatternType"
-        :label="t('logs.jsonPreview.regexPatternTypeLabel')"
-      />
-    </ODialog>
   </div>
 </template>
 
@@ -289,13 +273,23 @@ import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
 import { useTheme } from "@/composables/useTheme";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
 import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
-import { defineAsyncComponent } from "vue";
+import { defineAsyncComponent, type PropType } from "vue";
+import { useAssistantGate } from "@/composables/assistant/pure";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import {
+  logFieldBuild,
+  logsDoorBase,
+  regexFieldHandoff,
+  regexPatternsOpener,
+  rowKeyOf,
+  type LogsDoorBase,
+} from "@/plugins/logs/logsDoors";
 import config from "@/aws-exports";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -307,13 +301,11 @@ import { crossLinkQueryText } from "@/composables/useLogs/freeTextSearch";
 import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { COPY_CONFIRM_MS } from "@/lib/feedback/Toast/copyConfirm";
@@ -325,6 +317,11 @@ import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamName
 export default {
   name: "JsonPreview",
   props: {
+    /** The org the host loaded this row under; its doors carry it so a stale row is refused. */
+    boundOrg: {
+      type: String,
+      default: undefined,
+    },
     value: {
       type: Object,
       required: true,
@@ -377,15 +374,22 @@ export default {
       type: Boolean,
       default: false,
     },
+    /** The page a field door describes; defaults to the Logs search and this row. */
+    doorContext: {
+      type: Function as PropType<() => LogsDoorBase>,
+      default: undefined,
+    },
   },
   components: {
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
     NotEqualIcon,
     EqualIcon,
     AppTabs,
     LogsHighLighting,
     ChunkedContent,
     OButton,
-    ODialog,
     OIcon,
     ODropdown,
     ODropdownItem,
@@ -393,7 +397,6 @@ export default {
     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     OSpinner,
     OTooltip,
-    OInput,
     OSelect,
   },
   emits: [
@@ -401,7 +404,6 @@ export default {
     "addSearchTerm",
     "addFieldToTable",
     "view-trace",
-    "sendToAiChat",
     "closeTable",
     "show-correlation",
   ],
@@ -416,9 +418,6 @@ export default {
     const router = useRouter();
 
     const queryEditorRef = ref<any>();
-
-    const typeOfRegexPattern = ref(false);
-    const regexPatternType = ref("");
 
     const previewId = ref("");
     const schemaToBeSearch = ref({});
@@ -823,27 +822,62 @@ export default {
       return t("common.addFieldToTable");
     };
 
-    const sendToAiChat = (value: string, append: boolean = true) => {
-      if (!aiAssistantAccess.value.allowed) {
-        openUpgradeDialog();
+    const loadedOrg = useLoadedOrg(
+      () => props.value,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    );
+    const fieldDoorBase = (): LogsDoorBase => {
+      if (props.doorContext) return props.doorContext();
+      const base = logsDoorBase(searchObj, store.state, props.value);
+      return props.streamName ? { ...base, stream: props.streamName } : base;
+    };
+    // As on main, Add opens the chat and closes the drawer around this preview.
+    const closeOnAdd = (result: { ok: boolean }) => {
+      if (result.ok) emit("closeTable");
+    };
+    const fieldDoor = (key: string, fieldValue: unknown) => ({
+      verb: "add_to_chat" as const,
+      entryKind: "object_verb" as const,
+      boundOrg: props.boundOrg ?? loadedOrg.value,
+      objectKind: "log_field" as const,
+      label: t("assistant.entry.addField"),
+      tooltip: t("assistant.entry.tooltip.add"),
+      dataTest: "ai-entry-log-field-add" as const,
+      build: logFieldBuild(fieldDoorBase, key, fieldValue, props.value),
+      objectKey: `${rowKeyOf(props.value)}:${key}`,
+    });
+
+    // The field menu shows the AI regex door only while the assistant can take it.
+    const gate = useAssistantGate();
+    const regexDoorShown = computed(() => ["available", "unhealthy"].includes(gate.value));
+    // The regex drawer receives the prompt in its own dock; the sidebar never also gets it.
+    const openRegexPatterns = regexPatternsOpener(store, router, () => emit("closeTable"));
+    const regexHandoff = (field: string, sample: unknown) => {
+      if (!regexPatternsAccess.value.allowed) return openUpgradeDialog();
+      return regexFieldHandoff(fieldDoorBase(), field, sample, openRegexPatterns);
+    };
+    const regexDoor = (key: string, fieldValue: unknown) => ({
+      verb: "ask" as const,
+      entryKind: "object_verb" as const,
+      boundOrg: props.boundOrg ?? loadedOrg.value,
+      objectKind: "log_field" as const,
+      label: t("assistant.entry.createRegex"),
+      tooltip: t("assistant.entry.tooltip.createRegex"),
+      dataTest: "ai-entry-regex-field-ask" as const,
+      build: () => undefined,
+      handoff: () => regexHandoff(key, fieldValue),
+    });
+    const handoffSelection = () => {
+      showMenu.value = false;
+      const bound = props.boundOrg ?? loadedOrg.value;
+      // A row left on screen after an org switch never hands its text to the next org's regex editor.
+      if (bound && bound !== store.state.selectedOrganization?.identifier) {
+        toast({ variant: "default", message: t("assistant.entry.orgChanged") });
         return;
       }
-      emit("closeTable");
-      emit("sendToAiChat", value, append);
+      void regexHandoff("", selectedText.value);
     };
 
-    const getBtnLogo = computed(() => {
-      return isDark.value
-        ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon_gradient.svg");
-    });
-    const regexIcon = computed(() => {
-      return getImageURL(
-        isDark.value
-          ? "images/regex_pattern/regex_icon_dark.svg"
-          : "images/regex_pattern/regex_icon_light.svg",
-      );
-    });
     const regexIconForContextMenu = computed(() => {
       return getImageURL(
         isDark.value
@@ -851,55 +885,6 @@ export default {
           : "images/regex_pattern/regex_icon_light.svg",
       );
     });
-
-    const createRegexPatternFromLogs = (key: string, value: string) => {
-      if (!regexPatternsAccess.value.allowed) {
-        openUpgradeDialog();
-        return;
-      }
-      emit("closeTable");
-      // Prompt text handed to the assistant — model input, deliberately English.
-      const promptToBeAdded = raw(
-        `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`,
-      );
-
-      router.push({
-        path: "/settings/regex_patterns",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          from: "logs",
-        },
-      });
-      store.state.organizationData.regexPatternPrompt = promptToBeAdded;
-      store.state.organizationData.regexPatternTestValue = value;
-      emit("sendToAiChat", promptToBeAdded);
-    };
-
-    const handleCreateRegex = () => {
-      showMenu.value = false;
-      typeOfRegexPattern.value = true;
-    };
-
-    const confirmRegexPatternType = () => {
-      typeOfRegexPattern.value = false;
-      emit("closeTable");
-      // inputMessage.value = `Create a regex pattern for ${store.state.organizationData.customRegexPatternFromLogs.key} field that contains the following value: "${store.state.organizationData.customRegexPatternFromLogs.value}" which should be a type of ${store.state.organizationData.customRegexPatternFromLogs.type} from the ${store.state.organizationData.customRegexPatternFromLogs.stream} stream`;
-
-      const PromptToBeAdded = raw(
-        `Create a regex pattern for the following value: "${selectedText.value}" which should be a type of ${regexPatternType.value} from the ${searchObj.data.stream.selectedStream[0]} stream`,
-      );
-
-      store.state.organizationData.regexPatternPrompt = PromptToBeAdded;
-      store.state.organizationData.regexPatternTestValue = selectedText.value;
-      router.push({
-        path: "/settings/regex_patterns",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          from: "logs",
-        },
-      });
-      emit("sendToAiChat", PromptToBeAdded);
-    };
 
     const copySelectedText = (event?: MouseEvent) => {
       if (selectedText.value && props.copyInPlace) {
@@ -997,21 +982,19 @@ export default {
       getOriginalData,
       getTracesStreams,
       addOrRemoveLabel,
-      sendToAiChat,
-      getBtnLogo,
+      regexDoor,
+      regexDoorShown,
+      regexHandoff,
+      handoffSelection,
+      fieldDoor,
+      closeOnAdd,
       config,
-      regexIcon,
-      createRegexPatternFromLogs,
       showMenu,
       menuX,
       menuY,
       selectedText,
-      handleCreateRegex,
       copySelectedText,
       regexIconForContextMenu,
-      typeOfRegexPattern,
-      regexPatternType,
-      confirmRegexPatternType,
       getContentSize,
       getDisplayValue,
       getCrossLinksForField,

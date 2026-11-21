@@ -19,64 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Page title is supplied by the parent Billing.vue OPageHeader; no local title here. -->
     <TrialPeriod v-if="!isChildOrg" class="mb-3" currentPage="billing"></TrialPeriod>
     <!-- AI Credits card: shown to child orgs too, whose AI use draws on the same credits -->
-    <div
-      v-if="aiUsage"
-      class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default mb-3 flex w-full flex-col gap-2 border px-4 py-2.5 text-left shadow-none transition-shadow duration-200 hover:shadow-sm"
-    >
-      <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <img alt="" :src="aiIcon" class="size-5 opacity-80" />
-        <div class="text-text-heading text-sm leading-5 font-semibold">
-          {{ t("billing.aiCredits") }}
-        </div>
-        <OTag type="aiMode" :value="aiUsage.mode" class="w-fit" />
-        <OProgressBar
-          :value="aiUsageRatio"
-          size="sm"
-          :variant="aiUsageVariant"
-          class="min-w-24 flex-1 max-md:order-last max-md:basis-full"
-        />
-        <div class="text-text-heading ms-auto text-sm leading-5 font-semibold">
-          {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }}
-          {{ t("billing.aiFreeUsedLabel") }}
-        </div>
-      </div>
-      <div class="text-text-secondary flex flex-wrap gap-x-3 text-xs">
-        <span>{{ t("billing.aiFreeOneTime") }}</span>
-        <span v-if="aiUsage.used_by_feature" data-test="billing-ai-used-by-feature">
-          {{
-            t("billing.aiUsedByFeature", {
-              chat: aiUsage.used_by_feature.chat,
-              incident: aiUsage.used_by_feature.incident,
-              reanalysis: aiUsage.used_by_feature.incident_reanalysis,
-            })
-          }}
-        </span>
-      </div>
-      <div v-if="aiUsage.mode === 'exhausted'" class="text-status-error-text text-compact">
-        {{
-          aiUsage.requires_additional_credits
-            ? t("billing.aiContractExhaustedMessage")
-            : aiUsage.payer_org_id
-              ? t("billing.aiPayerSubscribeMessage", { payer: aiUsage.payer_org_id })
-              : t("billing.aiExhaustedMessage")
-        }}
-        <OButton
-          v-if="aiUsage.requires_additional_credits"
-          variant="ghost"
-          size="sm"
-          class="ms-1"
-          data-test="billing-ai-contact-sales"
-          @click="contactSales"
-        >
-          {{ t("billing.contactLabel") }}
-        </OButton>
-      </div>
-      <PaidAiUsageControl
-        :mode="aiUsage.mode"
-        class="border-border-default border-t pt-2"
-        @change="fetchAiUsage"
-      />
-    </div>
+    <AssistantCreditsCard class="mb-4" @subscribe="scrollToPlans" />
     <!-- Managed billing empty state for child orgs -->
     <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <div
@@ -154,7 +97,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="loading" class="text-center text-xl font-medium font-semibold">
         <OSpinner size="md" class="mx-auto mt-3 block text-center" />
       </div>
-      <div v-else class="grid grid-cols-2 gap-x-3 max-lg:grid-cols-1 max-lg:gap-y-3">
+      <div
+        v-else
+        id="billing-plans"
+        class="grid grid-cols-2 gap-x-3 max-lg:grid-cols-1 max-lg:gap-y-3"
+      >
         <ProPlan
           :planType="planType"
           :billingProvider="billingProvider"
@@ -180,26 +127,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineAsyncComponent, defineComponent, ref, computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import BillingService, { type AiUsage } from "@/services/billings";
-import PaidAiUsageControl from "./PaidAiUsageControl.vue";
+import BillingService from "@/services/billings";
+
+// Async, so the assistant runtime loads apart from the plans page.
+const AssistantCreditsCard = defineAsyncComponent(() => import("./AssistantCreditsCard.vue"));
 import analytics from "@/services/product_analytics";
 import { useStore } from "vuex";
-import useTheme from "@/composables/useTheme";
-import { useLocalOrganization, getImageURL } from "@/utils/zincutils";
+import { useLocalOrganization } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
 import { siteURL } from "@/constants/config";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { featureState } from "@/utils/featureGate";
 
 function isStripeCheckoutReferrer(referrer: string): boolean {
   try {
@@ -216,11 +161,9 @@ export default defineComponent({
     ProPlan,
     TrialPeriod,
     OSpinner,
-    OProgressBar,
     OIcon,
-    OTag,
     OButton,
-    PaidAiUsageControl,
+    AssistantCreditsCard,
   },
 
   emits: ["update:proSubscription"],
@@ -232,7 +175,6 @@ export default defineComponent({
     this.loading = true;
     this.fetchMembership();
     // Credits and pricing load independently: neither may hold back the other or the plans.
-    this.fetchAiUsage();
     this.fetchPricingData();
     await this.loadSubscription();
   },
@@ -255,15 +197,8 @@ export default defineComponent({
           // membership not available
         });
     },
-    async fetchAiUsage() {
-      // A locked assistant answers with a license 403, which would raise the license popup here.
-      if (featureState(this.store.state.zoConfig?.features, "ai_assistant") !== "enabled") return;
-      try {
-        const orgId = this.store.state.selectedOrganization.identifier;
-        this.aiUsage = (await BillingService.get_ai_usage(orgId)).data;
-      } catch {
-        // AI usage is not available.
-      }
+    scrollToPlans() {
+      document.getElementById("billing-plans")?.scrollIntoView({ block: "start" });
     },
     contactSales() {
       window.open(siteURL.contactSales, "_blank");
@@ -415,7 +350,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
-    const { isDark } = useTheme();
     const frmPayment = ref();
     const planType = ref("");
     const isActiveSubscription = ref(false);
@@ -428,23 +362,6 @@ export default defineComponent({
     const currentPlanDetail = ref();
     const billingProvider = ref("");
     const subscriptionType = ref("");
-    const aiUsage = ref<AiUsage | null>(null);
-    const aiIcon = computed(() =>
-      isDark.value
-        ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon_gradient.svg"),
-    );
-    const aiUsageRatio = computed(() => {
-      if (!aiUsage.value || !aiUsage.value.credits_limit) return 0;
-      return Math.min(aiUsage.value.credits_used / aiUsage.value.credits_limit, 1);
-    });
-    // A full bar is healthy once paid usage carries on; only a blocked org is in danger.
-    const aiUsageVariant = computed(() => {
-      const mode = aiUsage.value?.mode;
-      if (mode === "exhausted") return "danger";
-      if (mode === "consent_required") return "warning";
-      return mode === "free" && aiUsageRatio.value >= 0.8 ? "warning" : "default";
-    });
     const proPlanFeatures: any = ref([]);
     const enterprisePlanFeatures: any = ref([]);
     const proPlanPricingOptions: any = ref([]);
@@ -483,10 +400,6 @@ export default defineComponent({
       currentPlanDetail,
       billingProvider,
       subscriptionType,
-      aiUsage,
-      aiIcon,
-      aiUsageRatio,
-      aiUsageVariant,
       proPlanFeatures,
       enterprisePlanFeatures,
       proPlanPricingOptions,

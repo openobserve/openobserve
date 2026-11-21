@@ -686,14 +686,20 @@
      },
      {
       "type": "error",
-      "error": "ProviderError",
-      "recoverable": false
+      "error_type": "unknown",
+      "error": "An unexpected error occurred. Please try again or contact support if this persists.",
+      "recoverable": false,
+      "code": "unknown",
+      "message": "An unexpected error occurred. Please try again or contact support if this persists.",
+      "retryable": true,
+      "action": "retry"
      },
      {
       "type": "complete"
      }
     ],
-    "error": "ProviderError",
+    "error": "An unexpected error occurred. Please try again or contact support if this persists.",
+    "error_code": "unknown",
     "first_seq": 2,
     "last_seq": 10
    },
@@ -707,14 +713,20 @@
     "frames": [
      {
       "type": "error",
-      "error": "X",
-      "recoverable": false
+      "error_type": "unknown",
+      "error": "An unexpected error occurred. Please try again or contact support if this persists.",
+      "recoverable": false,
+      "code": "unknown",
+      "message": "An unexpected error occurred. Please try again or contact support if this persists.",
+      "retryable": true,
+      "action": "retry"
      },
      {
       "type": "cancelled"
      }
     ],
-    "error": "X",
+    "error": "An unexpected error occurred. Please try again or contact support if this persists.",
+    "error_code": "unknown",
     "first_seq": 11,
     "last_seq": 15
    },
@@ -737,6 +749,7 @@
      }
     ],
     "error": null,
+    "error_code": null,
     "first_seq": 18,
     "last_seq": 26
    },
@@ -753,6 +766,7 @@
      }
     ],
     "error": null,
+    "error_code": null,
     "first_seq": 30,
     "last_seq": 31
    },
@@ -777,6 +791,7 @@
      }
     ],
     "error": null,
+    "error_code": null,
     "first_seq": 27,
     "last_seq": 41
    },
@@ -793,6 +808,7 @@
      }
     ],
     "error": null,
+    "error_code": null,
     "first_seq": 42,
     "last_seq": 43
    }

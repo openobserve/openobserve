@@ -33,7 +33,7 @@ const mountState = (props: Record<string, unknown> = {}, withStatus = false) => 
     state: { selectedOrganization: { identifier: "acme-prod" }, theme: "light" },
   });
   wrapper = mount(LogsNoDataState, {
-    props: { aiEnabled: true, ...props },
+    props,
     slots: withStatus
       ? { status: () => h("span", { "data-test": "status-line" }, "Waiting for your first logs") }
       : {},
@@ -82,6 +82,5 @@ describe("LogsNoDataState", () => {
     expect(wrapper.text()).not.toContain("There's no data in this organization yet");
     expect(wrapper.find('[data-test="logs-no-data-curl-card"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="logs-no-data-kubernetes-btn"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="logs-no-data-ask-ai-btn"]').exists()).toBe(true);
   });
 });

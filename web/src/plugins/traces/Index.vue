@@ -82,6 +82,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
               @filter-builder-growth="filterBuilderGrowth = $event"
               @drill-down="searchResultRef?.openComparison()"
+              :assistant-set="assistantSet"
+              @assistant-set-cleared="onAssistantSetCleared"
             />
           </div>
         </template>
@@ -106,6 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServicesCatalog
                 ref="servicesCatalogRef"
                 class="h-full"
+                :initial-service="initialService ?? undefined"
+                :service-handoff="serviceHandoff"
                 @view-traces="handleServicesCatalogViewTraces"
                 @request:stream-change="onChildStreamChangeRequest"
                 @jump-to-stream-data="onJumpToPanelStreamData"
@@ -140,6 +144,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="h-full"
                       @update:changeStream="onChangeStream"
                       @update:selectedFields="updateFieldVisibility"
+                      :assistant-set="assistantSet"
+                      @assistant-set-cleared="onAssistantSetCleared"
                     />
                   </div>
                 </template>
@@ -159,10 +165,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @detected="onFirstDataDetected"
                     >
                       <TracesNoDataState
-                        :ai-enabled="isAiEnabled"
                         :alternatives-only="layout === 'panel'"
                         data-test="traces-no-streams-in-org-text"
-                        @ask-ai="onAskAiSetupTracing"
                       >
                         <template v-if="layout === 'status'" #status>
                           <component :is="statusLine" />
@@ -178,12 +182,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error-code="tracesErrorCode"
                         :error-msg="searchObj.data.errorMsg"
                         :error-detail="searchObj.data.errorDetail"
-                        :ai-enabled="isAiEnabled"
                         :resource-name="searchObj.data.stream.selectedStream.value"
                         size="hero"
-                        @ask-ai="onAskAiTracing"
                         @configure-resource="onConfigureTracesStream"
-                      />
+                      >
+                        <template #ai-door>
+                          <AiEntryButton v-bind="tracesErrorDoor" appearance="chip" />
+                        </template>
+                      </QueryErrorState>
                     </div>
                     <div
                       v-else-if="!searchObj.loadingStream && !isStreamSelected"
@@ -237,7 +243,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @remove-filter="onRemoveTracesFilter"
                         @jump-to-stream-data="onJumpToTracesStreamData"
                         @error-only-toggled="onErrorOnlyToggled"
-                        @ask-ai="onAskAiTracing"
                         @send-to-ai-chat="sendToAiChat"
                         @open-mobile-fields="mobileFieldsOpen = true"
                       />
@@ -271,6 +276,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="h-full"
           @update:changeStream="onChangeStream"
           @update:selectedFields="updateFieldVisibility"
+          :assistant-set="assistantSet"
+          @assistant-set-cleared="onAssistantSetCleared"
         />
       </div>
     </ODrawer>
@@ -308,7 +315,15 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { tracesDoorBase, tracingQueryBuild } from "@/plugins/traces/tracesDoors";
 import { useRouter } from "vue-router";
+import {
+  ASSISTANT_SET_QUERY_KEY,
+  decodeAssistantSet,
+  encodeAssistantSet,
+  type AssistantSetField,
+} from "@/composables/assistant/pure";
+import { HOME_RETURN_QUERY_KEY } from "@/composables/goto/homeReturn";
 
 import useTraces from "@/composables/useTraces";
 import { contextRegistry, createTracesContextProvider } from "@/composables/contextProviders";
@@ -334,7 +349,6 @@ import { logsErrorMessage } from "@/utils/common";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
-import { describePeriod } from "@/utils/dashboard/calendarPeriods";
 import { cloneDeep } from "lodash-es";
 import { computed } from "vue";
 import useStreams from "@/composables/useStreams";
@@ -418,7 +432,12 @@ const activeTab = computed(() => {
 const router = useRouter();
 trackPendingNavigation(router);
 const { t } = useI18nTyped();
-// Bubbles AI-chat requests up to MainLayout, which opens the O2AIChat panel.
+// The filters an assistant link set; each leaves once the user changes that control.
+const assistantSet = ref<Set<AssistantSetField>>(new Set());
+const initialService = ref<string | null>(null);
+// Bumped per URL read that names a service, so a kept-alive catalog re-applies a second link, even to the same name.
+const serviceHandoff = ref(0);
+// Bubbles Ask AI requests up to MainLayout, which opens the assistant.
 const emit = defineEmits(["sendToAiChat"]);
 const {
   searchObj,
@@ -773,7 +792,7 @@ function buildSearch(reuseLastWindow = false) {
 
     req.query.sql = b64EncodeUnicode(req.query.sql);
 
-    const queryParams = getUrlQueryParams();
+    const queryParams = { ...getUrlQueryParams(), ...carriedQuery() };
 
     if (canWriteTracesUrl()) router.push({ query: queryParams });
     return req;
@@ -1633,6 +1652,28 @@ const sortNeedsSchema = () => {
   return !!sortBy && sortBy !== "start_time" && sortBy !== "duration";
 };
 
+// An assistant link applies its stream, window and filter but never runs them.
+const fromAssistant = () => router.currentRoute.value.query.type === "ai_chat_query";
+
+// A service link lands on the catalog, which loads its own rows once the stream and handoff change.
+const serviceLinked = () => typeof router.currentRoute.value.query.service === "string";
+
+// A second assistant link to the open page changes only its query, so the reused page re-applies on the nonce.
+watch(
+  () => router.currentRoute.value.query.t,
+  async (nonce, previous) => {
+    // A link to another page lands here before onDeactivated; a hidden page loads on activation.
+    if (router.currentRoute.value.name !== "traces") return;
+    if (!pageActive.value || !nonce || nonce === previous) return;
+    if (fromAssistant()) {
+      restoreUrlQueryParams();
+      await loadPageData();
+    } else if (serviceLinked()) {
+      restoreUrlQueryParams();
+    }
+  },
+);
+
 /** `leftOrg`: the org an org switch left; a URL still on that org is the page's own sync, not a shared link. */
 async function loadPageData({ leftOrg = "" } = {}) {
   const generation = pageGeneration;
@@ -1665,7 +1706,7 @@ async function loadPageData({ leftOrg = "" } = {}) {
   if (generation !== pageGeneration) return;
   pageLoaded = true;
   pendingLanding = null;
-  if (searchObj.data.stream.selectedStream.value) {
+  if (searchObj.data.stream.selectedStream.value && !fromAssistant()) {
     // Only a restore from recent searches is a user run; any other landing runs without recording.
     if (landing) {
       if (landing.run) searchData();
@@ -1914,7 +1955,8 @@ function restoreUrlQueryParams() {
 
   if (queryParams.query) {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
-  } else if (queryParams.stream) {
+  } else if (fromAssistant() || queryParams.stream) {
+    // A link with no filter means none, so the last visit's text must not run under its name.
     searchObj.data.editorValue = "";
   }
 
@@ -1928,6 +1970,37 @@ function restoreUrlQueryParams() {
   }
 
   pendingUrlPage = applyUrlListState(queryParams).currentPage;
+  assistantSet.value = decodeAssistantSet(queryParams[ASSISTANT_SET_QUERY_KEY]);
+  initialService.value =
+    typeof queryParams.service === "string" && queryParams.service ? queryParams.service : null;
+  if (initialService.value) serviceHandoff.value++;
+}
+
+// A search rebuilds the query from search state, which knows nothing of the way back or the assistant's labels.
+function carriedQuery(): Record<string, string> {
+  const carried: Record<string, string> = {};
+  const homeReturn = router.currentRoute.value.query[HOME_RETURN_QUERY_KEY];
+  if (typeof homeReturn === "string") carried[HOME_RETURN_QUERY_KEY] = homeReturn;
+  if (assistantSet.value.size > 0)
+    carried[ASSISTANT_SET_QUERY_KEY] = encodeAssistantSet([...assistantSet.value]);
+  return carried;
+}
+
+// The preselect is for the visit the link opened; coming back to the tab shows the user's own catalog.
+watch(activeTab, (tab, previous) => {
+  if (previous === "services-catalog" && tab !== previous) initialService.value = null;
+});
+
+function onAssistantSetCleared(field: AssistantSetField) {
+  if (!assistantSet.value.has(field)) return;
+  // A user stream change also empties the editor, so the query is no longer the assistant's either.
+  const dropped: AssistantSetField[] = field === "stream" ? ["stream", "query"] : [field];
+  const next = new Set([...assistantSet.value].filter((f) => !dropped.includes(f)));
+  assistantSet.value = next;
+  const query = { ...router.currentRoute.value.query };
+  if (next.size > 0) query[ASSISTANT_SET_QUERY_KEY] = encodeAssistantSet([...next]);
+  else delete query[ASSISTANT_SET_QUERY_KEY];
+  if (canWriteTracesUrl()) void router.replace({ query });
 }
 
 const onSplitterUpdate = () => {
@@ -1987,6 +2060,7 @@ const setHistogramDate = async (date: any) => {
 const onMetricsEditorFilterSet = (text: string) => {
   searchObj.data.editorValue = text;
   searchBarRef.value?.setEditorValue?.(text);
+  onAssistantSetCleared("query");
   if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
@@ -1994,6 +2068,7 @@ const onMetricsEditorFilterSet = (text: string) => {
 const onMetricsEditorFilterRun = (text: string) => {
   searchObj.data.editorValue = text;
   searchBarRef.value?.setEditorValue?.(text);
+  onAssistantSetCleared("query");
   if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
 };
 
@@ -2176,43 +2251,27 @@ const queryWindowUs = computed<{ start: number; end: number } | undefined>(() =>
   return undefined;
 });
 
-// Relay AI-chat requests from row cell actions (carrying an explicit message)
-// straight up to MainLayout's O2AIChat panel.
+// Relay the metrics dashboard's Ask AI up to MainLayout, which opens the assistant.
 const sendToAiChat = (value: any, append: boolean = true) => {
   emit("sendToAiChat", value, append);
 };
 
-// "Ask AI" from the no-events / error empty state: build a natural-language
-// prompt describing the failed traces query, then open the AI chat with it.
-// Mirrors the logs page's onAskAiFixQuery.
-const onAskAiTracing = () => {
-  const filter = searchObj.data.editorValue?.trim() || "(none)";
-
-  // errorMsg may contain HTML (e.g. a <br><span>TraceID…</span>) — strip to text.
-  const el = document.createElement("div");
-  el.innerHTML = searchObj.data.errorMsg || "";
-  const errorText = (el.textContent ?? "").trim();
-  const errorContext = errorText ? ` Error: ${errorText}.` : "";
-
-  // Model input, not screen copy — kept English so the assistant reads the same
-  // wording regardless of the user's locale.
-  const outcome = errorContext
-    ? raw(`The traces query produced an error.${errorContext}`)
-    : raw(`The traces query ran successfully but returned no results.`);
-
-  const mode = searchObj.meta.searchMode === "spans" ? "spans" : "traces";
-  const stream = searchObj.data.stream.selectedStream?.value || "unknown";
-  const period = searchObj.data.datetime.relativeTimePeriod;
-  const timeRange = period ? describePeriod(period) : "custom";
-
-  emit(
-    "sendToAiChat",
-    raw(
-      `${outcome} I am searching ${mode}. The filter expression is: ${filter}. This is a WHERE-clause filter — not a full SQL query. Stream: ${stream}. Time range: ${timeRange}. Can you help me adjust the filter to get results?`,
-    ),
-    false,
-  );
-};
+// The traces error state's door: the error goes in a chip, the range is absolute.
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
+const tracesErrorDoor = computed(() => ({
+  verb: "troubleshoot" as const,
+  entryKind: "empty_state" as const,
+  objectKind: "query_error" as const,
+  label: t("assistant.entry.troubleshootQuery"),
+  tooltip: t("assistant.entry.tooltip.troubleshootQuery"),
+  dataTest: "ai-entry-query-error-troubleshoot" as const,
+  build: tracingQueryBuild(
+    () => tracesDoorBase(searchObj, store.state),
+    () => String(searchObj.data.errorMsg ?? ""),
+  ),
+}));
 
 const onConfigureTracesStream = () => {
   const stream = searchObj.data.stream.selectedStream?.value;
@@ -2224,18 +2283,6 @@ const firstDataArrival = ref<FirstEventResult | null>(null);
 const onFirstDataDetected = async (result: FirstEventResult) => {
   firstDataArrival.value = result;
   await loadPageData();
-};
-
-// "Ask AI" from the no-streams empty state: open the AI chat asking how to
-// start sending traces, instead of navigating away to the ingestion page.
-const onAskAiSetupTracing = () => {
-  emit(
-    "sendToAiChat",
-    raw(
-      `I don't have any trace streams in OpenObserve yet and want to start sending traces. How do I instrument my services to send traces (e.g. via OpenTelemetry / OTLP)?`,
-    ),
-    false,
-  );
 };
 
 /**
@@ -2473,6 +2520,9 @@ const applyTracesView = async (view: TracesSavedView, run: boolean) => {
   const query = { ...router.currentRoute.value.query, tab: view.searchMode };
   delete query.trace_id;
   delete query.span_id;
+  // The view replaces the stream, query and window, so none of them is the assistant's any more.
+  if (assistantSet.value.size > 0) assistantSet.value = new Set();
+  delete query[ASSISTANT_SET_QUERY_KEY];
   if (canWriteTracesUrl()) await router.replace({ query });
   if (seq !== savedViewApplySeq) return;
 

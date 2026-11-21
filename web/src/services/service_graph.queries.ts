@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { queryOptions } from "@tanstack/vue-query";
-import serviceGraphService from "./service_graph";
-import type { TopologyRange } from "./service_graph";
+import serviceGraphService, { servicesTrend } from "./service_graph";
+import type { ServicesTrendParams, TopologyRange } from "./service_graph";
 import { topologyKeys } from "./service_graph.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
@@ -23,5 +23,12 @@ export const serviceTopologyQuery = (org: string, range: TopologyRange) =>
   queryOptions({
     queryKey: topologyKeys.current(org, range),
     queryFn: async () => (await serviceGraphService.getCurrentTopology(org, range)).data,
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
+export const servicesTrendQuery = (org: string, params: ServicesTrendParams) =>
+  queryOptions({
+    queryKey: topologyKeys.servicesTrend(org, params),
+    queryFn: () => servicesTrend(org, params),
     staleTime: MEDIUM_STALE_TIME,
   });

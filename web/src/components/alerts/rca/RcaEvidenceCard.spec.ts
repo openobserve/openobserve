@@ -16,8 +16,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 
-const { push, toastMock } = vi.hoisted(() => ({ push: vi.fn(), toastMock: vi.fn() }));
+const { push, toastMock, fetchStream, cancelStream } = vi.hoisted(() => ({
+  push: vi.fn(),
+  toastMock: vi.fn(),
+  fetchStream: vi.fn(),
+  cancelStream: vi.fn(),
+}));
 vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
+vi.mock("@/composables/useStreamingSearch", async (importActual) => {
+  const actual = await importActual<typeof import("@/composables/useStreamingSearch")>();
+  return {
+    default: () => ({
+      ...actual.default(),
+      fetchQueryDataWithHttpStream: fetchStream,
+      cancelStreamQueryBasedOnRequestId: cancelStream,
+    }),
+  };
+});
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
 
 import i18n from "@/locales";
@@ -56,6 +71,8 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
     push.mockReset();
     toastMock.mockReset();
     writeText.mockReset().mockResolvedValue(undefined);
+    fetchStream.mockReset();
+    cancelStream.mockReset();
   });
 
   afterEach(() => vi.restoreAllMocks());
@@ -76,9 +93,7 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
       }),
     );
 
-    expect(byTest(wrapper, "rca-evidence-query").text()).toBe(
-      "SELECT count(*) FROM \"checkout_api\" WHERE level = 'error'",
-    );
+    expect(byTest(wrapper, "rca-evidence-query").exists()).toBe(false);
     const citations = wrapper.findAll('[data-test="rca-evidence-citation"]');
     const links = citations.map((c) => c.find('[data-test="rca-evidence-citation-hypothesis"]'));
     // The sole root cause is named by its role; the statement stays in the tooltip.
@@ -235,6 +250,8 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
       );
 
       expect(byTest(wrapper, "rca-evidence-open").exists()).toBe(false);
+      expect(byTest(wrapper, "rca-evidence-show-result").exists()).toBe(false);
+      await byTest(wrapper, "rca-evidence-show-query").trigger("click");
       expect(byTest(wrapper, "rca-evidence-query").text()).toBe(command);
       await byTest(wrapper, "rca-evidence-copy").trigger("click");
       await flushPromises();
@@ -305,5 +322,144 @@ describe("RcaEvidenceCard (03 VE23–VE29)", () => {
     const citation = byTest(wrapper, "rca-evidence-citation");
     expect(citation.text()).not.toContain("`");
     expect(citation.find("code").text()).toBe("GET /api/data");
+  });
+
+  describe("v7: visual first, the query behind Show query, the result on click", () => {
+    type Handlers = {
+      data: (request: unknown, frame: unknown) => void;
+      complete: (request: unknown, frame: unknown) => void;
+      error: (request: unknown, error: unknown) => void;
+    };
+    const handlersOf = (call = 0) => fetchStream.mock.calls[call][1] as Handlers;
+
+    it("Show query reveals the stored query and hides it again", async () => {
+      const wrapper = mountCard(rcaEvidenceEntry());
+      const toggle = byTest(wrapper, "rca-evidence-show-query");
+
+      expect(toggle.text()).toBe("Show query");
+      expect(toggle.attributes("aria-expanded")).toBe("false");
+      await toggle.trigger("click");
+      expect(byTest(wrapper, "rca-evidence-query").text()).toBe(
+        "SELECT count(*) FROM \"checkout_api\" WHERE level = 'error'",
+      );
+      await toggle.trigger("click");
+      expect(byTest(wrapper, "rca-evidence-query").exists()).toBe(false);
+    });
+
+    it("nothing runs on its own; Show result streams the stored SQL once", async () => {
+      const entry = rcaEvidenceEntry();
+      const wrapper = mountCard(entry);
+      await flushPromises();
+
+      expect(fetchStream).not.toHaveBeenCalled();
+      expect(byTest(wrapper, "rca-evidence-visual").element).toBe(
+        wrapper.find('[data-test="rca-evidence-card"] > *').element,
+      );
+      await byTest(wrapper, "rca-evidence-show-result").trigger("click");
+
+      expect(fetchStream).toHaveBeenCalledTimes(1);
+      const [request] = fetchStream.mock.calls[0];
+      expect(request).toMatchObject({
+        type: "search",
+        org_id: "default",
+        pageType: "logs",
+        queryReq: {
+          encoding: "base64",
+          query: { start_time: entry.link.start_us, end_time: entry.link.end_us, size: 5 },
+        },
+      });
+      expect(atob(request.queryReq.query.sql)).toBe(entry.link.sql);
+      expect(byTest(wrapper, "rca-evidence-result-loading").exists()).toBe(true);
+    });
+
+    it("renders the streamed hits as a table of at most 5 rows", async () => {
+      const wrapper = mountCard(rcaEvidenceEntry());
+      await byTest(wrapper, "rca-evidence-show-result").trigger("click");
+      const { default: realStreaming } = await vi.importActual<
+        typeof import("@/composables/useStreamingSearch")
+      >("@/composables/useStreamingSearch");
+      const frame = realStreaming().wsMapper.search_response_hits(
+        "t1",
+        { results: { hits: [{ service: "checkout", errors: 1284 }], total: 1 } },
+        "search_response_hits",
+      );
+
+      handlersOf().data({}, frame);
+      handlersOf().complete({}, null);
+      await flushPromises();
+
+      const table = byTest(wrapper, "rca-evidence-result-table");
+      expect(table.text()).toContain("checkout");
+      expect(table.text()).toContain("1284");
+    });
+
+    it("a failed run says so and offers Retry, which runs again", async () => {
+      const wrapper = mountCard(rcaEvidenceEntry());
+      await byTest(wrapper, "rca-evidence-show-result").trigger("click");
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+      handlersOf().error({}, { content: { message: "boom" } });
+      await flushPromises();
+      const error = byTest(wrapper, "rca-evidence-result-error");
+      expect(error.exists()).toBe(true);
+      await error.find("button").trigger("click");
+      expect(fetchStream).toHaveBeenCalledTimes(2);
+    });
+
+    it("a PromQL entry streams a range and draws each series with its latest value", async () => {
+      const wrapper = mountCard(
+        rcaEvidenceEntry({
+          kind: "PromQL",
+          target: "metrics",
+          link: {
+            signal: "metrics",
+            streams: [],
+            promql: "histogram_quantile(0.95, payments_latency_bucket)",
+            start_us: 1_731_110_400_000_000,
+            end_us: 1_731_111_660_000_000,
+          },
+        }),
+      );
+      await byTest(wrapper, "rca-evidence-show-result").trigger("click");
+
+      expect(fetchStream.mock.calls[0][0]).toMatchObject({
+        type: "promql",
+        queryReq: { query: "histogram_quantile(0.95, payments_latency_bucket)", step: "21s" },
+      });
+      handlersOf().data(
+        {},
+        {
+          type: "promql_response",
+          content: {
+            results: {
+              result_type: "matrix",
+              result: [
+                {
+                  metric: { __name__: "p95", service: "payments" },
+                  values: [
+                    [1_731_110_400, "812"],
+                    [1_731_110_460, "905"],
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      );
+      handlersOf().complete({}, null);
+      await flushPromises();
+
+      const series = byTest(wrapper, "rca-evidence-result-series");
+      expect(series.text()).toContain('p95{service="payments"}');
+      expect(series.text()).toContain("905");
+    });
+
+    it("a logs entry without a stored window has no Show result", () => {
+      const wrapper = mountCard(
+        rcaEvidenceEntry({ link: { signal: "logs", streams: ["a"], sql: "SELECT 1" } }),
+      );
+
+      expect(byTest(wrapper, "rca-evidence-show-result").exists()).toBe(false);
+    });
   });
 });

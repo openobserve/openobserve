@@ -171,7 +171,6 @@ describe("ScheduledPipeline Component", () => {
           },
           OTable: true,
           PreviewPromqlQuery: true,
-          O2AIChat: true,
           FullViewContainer: true,
         },
       },
@@ -193,7 +192,6 @@ describe("ScheduledPipeline Component", () => {
           timestamp_column: "_timestamp",
           all_fields_name: "_all",
         },
-        isAiChatEnabled: false,
         organizationData: {
           functions: [
             { name: "avg", description: "Average function", function: "avg(value)" },
@@ -346,12 +344,6 @@ describe("ScheduledPipeline Component", () => {
       await child.collapseFieldList();
       expect(child.collapseFields).toBe(true);
       expect(child.splitterModel).toBe(0);
-    });
-
-    it("handles AI chat toggle", async () => {
-      await child.toggleAIChat();
-      await nextTick();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
     });
 
     it("updates expand states correctly", async () => {
@@ -1145,12 +1137,6 @@ describe("ScheduledPipeline Component", () => {
     it("copyLogToClipboard serialises the row to JSON by default", () => {
       expect(typeof child.copyLogToClipboard).toBe("function");
       expect(() => child.copyLogToClipboard({ a: 1 })).not.toThrow();
-    });
-
-    it("sendToAiChat enables the AI chat panel (wired to the timestamp AI button + JsonPreview)", async () => {
-      child.sendToAiChat(JSON.stringify({ a: 1 }), true);
-      await nextTick();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
     });
   });
 });

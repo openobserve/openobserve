@@ -1373,14 +1373,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon-toolbar"
                 :disabled="!searchObj.data.stream.selectedStream.length"
                 @click="openAiFromBuilder"
-                class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-1 z-51 h-7! min-h-7! w-7! min-w-7! hover:shadow-md"
+                :aria-label="t('search.aiModeIconAlt')"
+                class="rounded-default border-card-glass-border! absolute! top-0.75 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
                 :style="{ right: aiButtonRight }"
               >
-                <img
-                  :src="aiIcon"
-                  :alt="t('search.aiModeIconAlt')"
-                  class="h-4.5 w-4.5 group-hover:brightness-0 group-hover:invert"
-                />
+                <AssistantSpark :size="16" :muted="!searchObj.data.stream.selectedStream.length" />
                 <span
                   v-if="!aiAccess.allowed"
                   aria-hidden="true"
@@ -1843,6 +1840,7 @@ import { useTheme } from "@/composables/useTheme";
 import useBreakpoint from "@/composables/useBreakpoint";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -2057,6 +2055,7 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    AssistantSpark,
     OPageHeaderStatus,
     CreateAlertAction,
     SqlFilterBuilder,
@@ -2421,13 +2420,13 @@ export default defineComponent({
       const corner = searchObj.meta.showTransformEditor ? 0.25 : 2.375;
       return `${aiButtonShown.value ? corner + 2.125 : corner}rem`;
     });
-    const aiIcon = computed(() =>
-      getImageURL(
-        isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
-      ),
-    );
-    const openAiFromBuilder = () =>
-      (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
+    // The query editor loads async, so a click that beats it opens AI mode through the flag the editor reads.
+    const openAiFromBuilder = () => {
+      const editor = queryEditorRef.value as { openAiMode?: () => void } | null;
+      if (editor?.openAiMode) editor.openAiMode();
+      else if (!aiAccess.value.allowed) openUpgradeDialog();
+      else searchObj.meta.nlpMode = true;
+    };
     const filterBuilderFields = computed(() =>
       toFilterFields(
         searchObj.data.stream.selectedStreamFields ?? [],
@@ -5510,7 +5509,6 @@ export default defineComponent({
       aiAccess,
       aiButtonShown,
       aiButtonRight,
-      aiIcon,
       openAiFromBuilder,
       filterBuilderToggleRight,
       filterBuilderFields,

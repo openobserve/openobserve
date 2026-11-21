@@ -7,6 +7,8 @@ import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent 
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useI18nTyped, raw } from "@/types/i18n";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import type { LogsDoorBase } from "@/plugins/logs/logsDoors";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -38,6 +40,9 @@ import { extractSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 const DetailTable = defineAsyncComponent(() => import("@/plugins/logs/DetailTable.vue"));
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
 
 const props = defineProps<{
   stream: string;
@@ -47,15 +52,53 @@ const props = defineProps<{
   startTime: number; // microseconds
   endTime: number; // microseconds
   baseWhere?: string; // panel's own WHERE, AND-combined with the clicked cell
+  /** The panel the cell came from, named in the cell door's prompt. */
+  panelTitle?: string;
 }>();
-
-const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+
+// Doors open the assistant directly in every host, with no relay through ViewDashboard.
+const loadedOrg = useLoadedOrg(
+  () => props.value,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
+const cellDoorBase = (): LogsDoorBase => ({
+  org: orgId.value,
+  stream: props.stream,
+  streamType: props.streamType || "logs",
+  range: { from: Math.round(rangeStart.value / 1000), to: Math.round(rangeEnd.value / 1000) },
+  timeZone: store.state.timezone || "UTC",
+  query: props.baseWhere ?? "",
+  mode: "filter",
+  timestampField: store.state.zoConfig?.timestamp_column || "_timestamp",
+});
+const cellDoor = (verb: "explain" | "add_to_chat") => ({
+  verb,
+  entryKind: "object_verb" as const,
+  boundOrg: loadedOrg.value,
+  objectKind: "log_field" as const,
+  label: t(verb === "explain" ? "assistant.entry.explainField" : "assistant.entry.addField"),
+  tooltip: t(
+    verb === "explain" ? "assistant.entry.tooltip.explainField" : "assistant.entry.tooltip.add",
+  ),
+  dataTest:
+    verb === "explain"
+      ? ("ai-entry-panel-cell-explain" as const)
+      : ("ai-entry-panel-cell-add" as const),
+  objectKey: `${props.stream}:${props.field}:${String(props.value)}`,
+  build: async () =>
+    (await import("@/utils/assistant/prompts")).buildLogFieldPrompt({
+      ...cellDoorBase(),
+      field: props.field,
+      value: props.value,
+      ...(props.panelTitle && { panelTitle: props.panelTitle }),
+    }),
+});
 
 const SQL_IDENT = /^[A-Za-z_][A-Za-z0-9_.]*$/;
 const paramsValid = computed(() => SQL_IDENT.test(props.field) && SQL_IDENT.test(props.stream));
@@ -791,6 +834,8 @@ function openInLogs() {
       <!-- ── Toolbar: datetime picker + open-in-logs + run ───── -->
       <div class="border-border-default flex min-w-0 shrink-0 flex-col border-b">
         <div class="flex min-w-0 items-center gap-2 px-2 pt-3 pb-2">
+          <AiEntryButton v-bind="cellDoor('explain')" />
+          <AiEntryButton v-bind="cellDoor('add_to_chat')" />
           <div class="flex-1" />
           <DateTime
             default-type="absolute"
@@ -1027,7 +1072,7 @@ function openInLogs() {
           @load-correlation="openCorrelationFromLog"
           @showPrevDetail="goPrev"
           @showNextDetail="goNext"
-          @sendToAiChat="(v: unknown, a?: boolean) => emit('sendToAiChat', v, a)"
+          :door-context="cellDoorBase"
         >
           <template #panel-insights>
             <!-- Global loading bar -->

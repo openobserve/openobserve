@@ -80,7 +80,8 @@ interface AccessShellStore {
 }
 
 interface Activation {
-  el: Element;
+  // Weak: a clicked control's page may unmount, and a strong hold would keep its whole detached tree alive.
+  el: WeakRef<Element>;
   at: number;
 }
 
@@ -1190,15 +1191,19 @@ function onActivation(event: Event): void {
   const el =
     event.target instanceof Element ? event.target.closest("button,[role=button],a") : null;
   if (!el) return;
-  activations = [...activations.filter((a) => a.el !== el), { el, at }].slice(-ACTIVATION_HISTORY);
+  activations = [
+    ...activations.filter((a) => a.el.deref() !== el),
+    { el: new WeakRef(el), at },
+  ].slice(-ACTIVATION_HISTORY);
 }
 
 // Newest first: a confirm button that is closing gives way to the row control that opened its dialog.
 function anchorCandidates(): Element[] {
   const now = Date.now();
   return activations
-    .filter((a) => now - a.at <= ACTIVATION_WINDOW_MS && isAnchorable(a.el))
-    .map((a) => a.el)
+    .filter((a) => now - a.at <= ACTIVATION_WINDOW_MS)
+    .map((a) => a.el.deref())
+    .filter((el): el is Element => !!el && isAnchorable(el))
     .reverse();
 }
 

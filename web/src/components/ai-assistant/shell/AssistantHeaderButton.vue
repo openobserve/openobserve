@@ -1,0 +1,646 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <OSkeleton
+    v-if="view.state === 'loading'"
+    type="rect"
+    class="size-7.5 shrink-0 max-md:size-11 pointer-coarse:size-11"
+    data-test="assistant-header-skeleton"
+  />
+  <template v-else-if="view.state !== 'hidden'">
+    <OButton
+      ref="button"
+      variant="ghost"
+      size="icon-toolbar"
+      data-test="menu-link-ai-item"
+      data-entry="ai-entry-header-ask"
+      :data-state="view.state"
+      :aria-label="view.name"
+      :class="[
+        'relative max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
+        view.state === 'open' ? OPEN_CLASS : '',
+      ]"
+      @click="onClick"
+    >
+      <span class="relative inline-flex">
+        <AssistantSpark
+          :size="20"
+          :working="view.state === 'working'"
+          :muted="view.state === 'off'"
+        />
+        <!-- Anchored by its start edge so a needs-you count grows away from the icon, not over it -->
+        <span
+          v-if="view.signal"
+          data-test="assistant-header-status-anchor"
+          class="absolute start-4 -top-1 inline-flex"
+        >
+          <AssistantStatusDot
+            :state="view.signal"
+            :count="view.count"
+            data-test="assistant-header-status-light"
+          />
+        </span>
+        <span
+          v-else-if="view.badge"
+          aria-hidden="true"
+          class="rounded-default bg-surface-base text-text-secondary absolute -end-1.5 -top-1.5 inline-flex size-3.5 items-center justify-center"
+        >
+          <OIcon :name="assistantGlyph[view.badge]" size="xs" />
+        </span>
+      </span>
+      <!-- A visible container already says the state, and the bubble covered its bar; the name keeps it (D1) -->
+      <OTooltip
+        side="bottom"
+        :content="view.tooltip"
+        :shortcut-id="shortcutId"
+        :disabled="anyVisible"
+      />
+    </OButton>
+    <OPopover
+      :open="lockedOpen && mdUp"
+      :anchor="lockedOpen && mdUp ? buttonEl() : null"
+      side="bottom"
+      align="end"
+      :aria-label="
+        lockedGate === 'off_for_org'
+          ? t('assistant.gate.offForOrg.title', { product })
+          : t('assistant.gate.noPermission.title', { product })
+      "
+      @update:open="onLockedOpen"
+    >
+      <AssistantGateState
+        v-if="lockedOpen && mdUp"
+        :reason="lockedGate"
+        size="popover"
+        :is-admin="capability.isAdmin"
+        :context="{ org }"
+        focus-on-mount
+        @action="onLockedAction"
+      />
+    </OPopover>
+    <AssistantStatusRegion
+      v-if="shortcutId"
+      ref="region"
+      data-test="assistant-header-status-region"
+    />
+    <ODialog
+      v-if="lgUp"
+      :open="!!dialogGate"
+      size="md"
+      :title="t('assistant.name')"
+      data-test="assistant-header-gate-dialog"
+      @update:open="(open) => !open && closeDialog()"
+    >
+      <AssistantGateState
+        v-if="dialogGate"
+        :reason="dialogGate"
+        size="hero"
+        :is-admin="capability.isAdmin"
+        :context="{ org }"
+        @action="onGateAction"
+      />
+    </ODialog>
+    <OSheet
+      v-else
+      :open="!!dialogGate"
+      :snap="sheetSnap"
+      :snap-points="['half', 'full']"
+      v-bind="{ ariaLabel: t('assistant.name') }"
+      :expand-label="t('assistant.shell.sheetExpand')"
+      :collapse-label="t('assistant.shell.sheetPeek')"
+      data-test="assistant-header-gate-sheet"
+      @update:snap="(snap) => (sheetSnap = snap)"
+      @update:open="(open) => !open && closeDialog()"
+    >
+      <template #header>
+        <div class="flex justify-end px-2">
+          <AssistantIconButton
+            :label="t('assistant.gate.close')"
+            :icon="assistantGlyph.close"
+            data-test="assistant-header-gate-sheet-close"
+            @click="closeDialog"
+          />
+        </div>
+      </template>
+      <AssistantGateState
+        v-if="dialogGate"
+        :reason="dialogGate"
+        size="hero"
+        :is-admin="capability.isAdmin"
+        :context="{ org }"
+        focus-on-mount
+        @action="onGateAction"
+      />
+    </OSheet>
+    <ODialog
+      :open="gateLearnOpen"
+      size="md"
+      :title="t('assistant.name')"
+      data-test="assistant-header-learn-dialog"
+      @update:open="(open) => !open && closeLearn()"
+    >
+      <AssistantGateState
+        v-if="gateLearnOpen"
+        reason="not_entitled"
+        size="hero"
+        learn-only
+        :is-admin="capability.isAdmin"
+        :context="{ org }"
+        @action="(cta) => cta === 'close' && closeLearn()"
+      />
+    </ODialog>
+  </template>
+</template>
+
+<script lang="ts">
+import type { AssistantSignal } from "@/components/ai-assistant/common/AssistantStatusDot.types";
+import type { AssistantSession, GateReason } from "@/composables/assistant";
+import type { I18nText } from "@/types/i18n";
+
+export type HeaderButtonState =
+  "loading" | "hidden" | "idle" | "open" | "working" | "needs_you" | "unread" | "locked" | "off";
+
+/** Hidden turns raise one quiet toast; the header region is the one speaker, so the toast is silent. */
+export const HEADER_TOAST_MS = 6_000;
+
+const AT_REST: ReadonlySet<string> = new Set(["idle", "done", "failed", "refused", "stopped"]);
+
+// The spark keeps its gradient, so open reads by a deeper tint and an accent hairline, never as hover.
+const OPEN_CLASS = "bg-button-ghost-active-bg! ring-button-outline-hover-border ring-1 ring-inset";
+
+interface HeaderView {
+  state: HeaderButtonState;
+  name: I18nText;
+  tooltip: I18nText;
+  signal: AssistantSignal | null;
+  count?: number;
+  badge: "locked" | "notSetUp" | null;
+  /** The pitch or setup card a click opens instead of the container. */
+  dialog: GateReason | null;
+}
+
+function needsYou(session: AssistantSession): boolean {
+  const state = session.turn.state;
+  return state === "awaiting_approval" || state === "awaiting_consent" || !!session.pendingApproval;
+}
+
+function isRunning(session: AssistantSession): boolean {
+  return !AT_REST.has(session.turn.state);
+}
+</script>
+
+<script setup lang="ts">
+import { computed, nextTick, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useStore } from "vuex";
+
+import { provideAssistantSurface } from "@/components/ai-assistant/common/assistantSurface";
+import AssistantIconButton from "@/components/ai-assistant/common/AssistantIconButton.vue";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
+import AssistantStatusDot from "@/components/ai-assistant/common/AssistantStatusDot.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import AssistantGateState, {
+  gateLearnOpen,
+  type GateCta,
+} from "@/components/ai-assistant/gate/AssistantGateState.vue";
+import {
+  fullThreadLocation,
+  isFullThreadRoute,
+  isHomeAskShown,
+} from "@/composables/assistant/pure";
+import {
+  openAssistant,
+  openWindowsOf,
+  sessionView,
+  setLauncherDismissed,
+  useAssistantCapability,
+  useAssistantHistory,
+  useAssistantName,
+  useAssistantOpenChord,
+  useAssistantPlacement,
+  useAssistantRuns,
+  useAssistantStore,
+} from "@/composables/assistant";
+import useBreakpoint from "@/composables/useBreakpoint";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSheet from "@/lib/overlay/Sheet/OSheet.vue";
+import type { SheetSnap } from "@/lib/overlay/Sheet/OSheet.types";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { trackAssistant, type AiEventProps } from "@/services/assistantAnalytics";
+import { raw, useI18nTyped } from "@/types/i18n";
+
+import AssistantStatusRegion from "./AssistantStatusRegion.vue";
+import { useLockedPanel } from "./lockedPanel";
+
+// Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
+provideAssistantSurface();
+
+const { t } = useI18nTyped();
+const { product } = useAssistantName();
+const store = useAssistantStore();
+const runs = useAssistantRuns();
+const history = useAssistantHistory();
+const capability = useAssistantCapability();
+const placement = useAssistantPlacement(store);
+const lockedPanel = useLockedPanel();
+// The open chord lives here, not in the async host, so it works from the moment the button does.
+useAssistantOpenChord({ gate: capability.gate, assistantCanChat: capability.assistantCanChat });
+const route = useRoute();
+const router = useRouter();
+const vuex = useStore();
+const { lgUp, mdUp } = useBreakpoint();
+const button = ref<InstanceType<typeof OButton> | null>(null);
+const region = ref<InstanceType<typeof AssistantStatusRegion> | null>(null);
+const dialogGate = ref<GateReason | null>(null);
+const lockedOpen = ref(false);
+const sheetSnap = ref<SheetSnap>("half");
+const toasted = new Set<string>();
+
+const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
+const visible = computed(() => placement.isVisible.value || !!lockedPanel.value);
+const anyVisible = computed(() => visible.value || store.anyContainerVisible());
+const shortcutId = computed(() =>
+  capability.assistantCanChat.value ? "assistantOpen" : undefined,
+);
+// Ephemeral turns answer in their own surface, so they never toast or light the header.
+const mine = computed(() =>
+  Object.values(store.state.sessions).filter(
+    (s) => s.userOrgKey === store.state.userOrgKey && !s.record.ephemeral,
+  ),
+);
+
+// The chat list's "Needs you" reads the runs, which also hold other tabs' and devices' chats; the badge counts the same.
+const waitingSids = computed(
+  () =>
+    new Set([
+      ...mine.value.filter(needsYou).map((session) => session.sid),
+      ...runs.rows.value
+        .filter((row) => row.group === "needs_you" && !row.otherOrg)
+        .map((row) => row.sid),
+    ]),
+);
+
+const view = computed<HeaderView>(() => gateView() ?? lightView());
+const lockedGate = computed<GateReason>(() =>
+  capability.gate.value === "off_for_org" ? "off_for_org" : "no_permission",
+);
+
+// A chat another tab or device lights may be known only by its history row; else no title is claimed.
+function knownTitle(sid: string | null): I18nText | null {
+  if (!sid) return null;
+  const session = store.state.sessions[sid];
+  if (session) return session.title ?? t("assistant.thread.newChatTitle");
+  return history.rows.value.find((row) => row.sid === sid)?.title ?? null;
+}
+
+function titleOf(sid: string | null): I18nText {
+  return knownTitle(sid) ?? t("assistant.thread.newChatTitle");
+}
+
+function plain(state: HeaderButtonState, name: I18nText, tooltip: I18nText): HeaderView {
+  return { state, name, tooltip, signal: null, badge: null, dialog: null };
+}
+
+function gateView(): HeaderView | null {
+  const gate = capability.gate.value;
+  const p = { product };
+  if (gate === "loading") return plain("loading", raw(""), raw(""));
+  if (gate === "not_entitled")
+    return {
+      ...plain(
+        "locked",
+        t("assistant.header.enterpriseName", p),
+        t("assistant.gate.notEntitled.tooltip", p),
+      ),
+      badge: "locked",
+      dialog: "not_entitled",
+    };
+  if (gate === "not_configured") {
+    if (!capability.value.isAdmin) return plain("hidden", raw(""), raw(""));
+    return {
+      ...plain("off", t("assistant.header.offName", p), t("assistant.gate.notConfigured.title", p)),
+      badge: "notSetUp",
+      dialog: "not_configured",
+    };
+  }
+  if (gate === "no_permission" || gate === "off_for_org")
+    return {
+      ...plain(
+        "locked",
+        t("assistant.header.lockedName", p),
+        t("assistant.gate.noPermission.tooltip"),
+      ),
+      badge: "locked",
+    };
+  const light = store.headerLight.value.state;
+  if (gate === "unhealthy" && (light === "idle" || light === "open"))
+    return {
+      ...plain(
+        "off",
+        t("assistant.header.unavailableName", p),
+        t("assistant.gate.unhealthy.tooltip", p),
+      ),
+      dialog: capability.value.source === "capabilities" ? "unhealthy" : null,
+    };
+  return null;
+}
+
+function lightView(): HeaderView {
+  const light = store.headerLight.value;
+  if (light.state === "needs_you") return needsYouView(light.sid);
+  if (light.state === "working") return workingView(light.sid);
+  if (light.state === "unread") return unreadView(light.sid, light.failed);
+  if (light.state === "open" || visible.value) return openView();
+  const name = t("assistant.header.tooltip", { product });
+  return plain("idle", name, name);
+}
+
+function needsYouView(sid: string | null): HeaderView {
+  const p = { product };
+  const open = visible.value;
+  const waiting = waitingSids.value.size;
+  const session = sid ? store.state.sessions[sid] : undefined;
+  const consent = session?.turn.state === "awaiting_consent";
+  const name =
+    waiting > 0
+      ? t(open ? "assistant.header.needsYouCountNameOpen" : "assistant.header.needsYouCountName", {
+          ...p,
+          count: waiting,
+        })
+      : t(open ? "assistant.header.needsYouNameOpen" : "assistant.header.needsYouName", p);
+  return {
+    ...plain(
+      "needs_you",
+      name,
+      consent ? t("assistant.turn.waitingConsent") : t("assistant.notice.decision"),
+    ),
+    signal: "attention",
+    ...(waiting > 0 && { count: waiting }),
+  };
+}
+
+function workingView(sid: string | null): HeaderView {
+  const running = mine.value.filter(isRunning).length;
+  const name = t(
+    visible.value ? "assistant.header.answeringNameOpen" : "assistant.header.answeringName",
+    { product },
+  );
+  const title = knownTitle(sid);
+  const tooltip =
+    running > 1
+      ? t("assistant.header.stateRunningCount", { count: running }, running)
+      : title
+        ? t("assistant.header.stateWorking", { title })
+        : name;
+  return { ...plain("working", name, tooltip), signal: "working" };
+}
+
+function unreadView(sid: string | null, failed: boolean): HeaderView {
+  const p = { product };
+  const title = { title: titleOf(sid) };
+  return failed
+    ? {
+        ...plain(
+          "unread",
+          t("assistant.header.failedName", p),
+          t("assistant.header.stateFailed", title),
+        ),
+        signal: "failed",
+      }
+    : {
+        ...plain(
+          "unread",
+          t("assistant.header.readyName", p),
+          t("assistant.header.stateDone", title),
+        ),
+        signal: "unread",
+      };
+}
+
+// The label names what a click does: close the sidebar, or bring windows-only users to a sidebar chat.
+function openView(): HeaderView {
+  const p = { product };
+  const shown = store.state.shell.placement.kind;
+  if (shown === "sidebar") {
+    const name = t("assistant.shell.close", p);
+    return plain("open", name, name);
+  }
+  if (shown === "hidden" && openWindowsOf(store.state.shell).length) {
+    const name = t("assistant.header.goTo", p);
+    return plain("open", name, name);
+  }
+  return plain("open", t("assistant.header.nameOpen", p), t("assistant.header.stateOpen", p));
+}
+
+function buttonEl(): HTMLElement | null {
+  return (button.value?.$el as HTMLElement | undefined) ?? null;
+}
+
+function onClick(): void {
+  const current = view.value;
+  if (current.dialog) {
+    dialogGate.value = current.dialog;
+    sheetSnap.value = "half";
+    return;
+  }
+  // A locked user gets the gate where they clicked, never an empty container (D7 decision 2).
+  if (current.state === "locked") {
+    if (isFullThreadRoute(route)) return;
+    if (mdUp.value) lockedOpen.value = true;
+    else {
+      dialogGate.value = lockedGate.value;
+      sheetSnap.value = "half";
+    }
+    return;
+  }
+  setLauncherDismissed(store.state.userOrgKey, false);
+  if (toggleSidebar()) return;
+  openOnLitSession(buttonEl());
+}
+
+// The container rule comes before the light: the button toggles the sidebar, and windows alone get a sidebar on a new chat (shell spec §5, E1–E2).
+function toggleSidebar(): boolean {
+  const { placement: shown } = store.state.shell;
+  if (shown.kind === "sidebar") {
+    trackAssistant("ai_container_closed", { reason: "close" });
+    store.close("close");
+    return true;
+  }
+  if (shown.kind !== "hidden" || !openWindowsOf(store.state.shell).length) return false;
+  void openAssistant({
+    entryKind: "header_button",
+    entryVerb: "ask",
+    objectKind: "none",
+    intent: "open",
+    thread: "new",
+    container: "sidebar",
+    invoker: buttonEl(),
+  });
+  return true;
+}
+
+// A lit session is the one the click is about, so the container opens on it (SH-07 AC 4–5).
+function openOnLitSession(invoker: HTMLElement | null, sid?: string): void {
+  const light = store.headerLight.value;
+  const target = sid ?? (light.state !== "open" && light.state !== "idle" ? light.sid : null);
+  // Home's AI tab has its own chat, so a windowed chat opens full-page there instead of in a window.
+  if (target && store.windowOf(target) && isHomeAskShown(route)) {
+    store.open({ kind: "full" }, { sid: target, focus: "composer" });
+    return void router.push(fullThreadLocation(target, route.query));
+  }
+  // A lit chat in a window opens where it lives: raised, or back from the tray.
+  if (store.windowOf(target)) return store.restoreWindow(target as string);
+  // A chat only the server knows (another tab or device) is read in before the container opens on it.
+  const run = target && !store.state.sessions[target] ? runRow(target) : null;
+  if (run) return void runs.open(run, { focus: "card", invoker });
+  if (target && store.state.sessions[target]) store.setActive(target);
+  void openAssistant({
+    entryKind: sid ? "toast" : "header_button",
+    entryVerb: "ask",
+    objectKind: "none",
+    intent: "open",
+    thread: "current",
+    invoker,
+  });
+}
+
+function runRow(sid: string) {
+  return runs.rows.value.find((row) => row.sid === sid && !row.otherOrg) ?? null;
+}
+
+function closeDialog(): void {
+  dialogGate.value = null;
+  buttonEl()?.focus();
+}
+
+function onGateAction(cta: GateCta): void {
+  if (cta === "close" || cta === "see_plans" || cta === "open_settings") closeDialog();
+  if (cta !== "learn_more" || dialogGate.value === "not_entitled") return;
+  // Focus stays put, so the closing sheet never hands it to the button and dismisses the dialog opening after it.
+  dialogGate.value = null;
+  void nextTick(() => (gateLearnOpen.value = true));
+}
+
+function onLockedOpen(open: boolean): void {
+  lockedOpen.value = open;
+  if (!open) buttonEl()?.focus();
+}
+
+// Ask an admin opens its own popover from the gate, so only the actions that leave close it.
+function onLockedAction(cta: GateCta): void {
+  if (cta === "learn_more" || cta === "open_settings") onLockedOpen(false);
+}
+
+function closeLearn(): void {
+  gateLearnOpen.value = false;
+  buttonEl()?.focus();
+}
+
+function lightName(): AiEventProps["ai_status_light"]["state"] {
+  const light = store.headerLight.value;
+  return light.state === "unread" && light.failed ? "failed" : light.state;
+}
+
+function isShown(sid: string): boolean {
+  const session = store.state.sessions[sid];
+  return !!session && sessionView(session, store.state.shell).visible;
+}
+
+function announceLight(): void {
+  const light = store.headerLight.value;
+  const session = light.sid ? store.state.sessions[light.sid] : undefined;
+  if (!session || isShown(session.sid)) return;
+  const params = { product, title: titleOf(session.sid) };
+  if (light.state === "needs_you")
+    region.value?.announce(t("assistant.header.announceNeedsYou", params));
+  else if (light.state === "unread")
+    region.value?.announce(
+      t(
+        light.failed ? "assistant.header.announceFailed" : "assistant.header.announceReady",
+        params,
+      ),
+    );
+  else if (light.state === "working" && !session.turnMeta.ownedByThisTab)
+    region.value?.announce(t("assistant.header.announceWorkingElsewhere", params));
+}
+
+// One quiet toast per hidden turn: done answers and decisions waiting on the user.
+function toastHidden(): void {
+  for (const session of mine.value) {
+    const turnId = session.turnMeta.turnId;
+    if (!turnId || isShown(session.sid)) continue;
+    // A waiting chat speaks through the header light, so only a finished answer toasts.
+    const kind = toastKind(session);
+    if (!kind || toasted.has(`${turnId}:${kind}`)) continue;
+    toasted.add(`${turnId}:${kind}`);
+    showToast(session.sid, kind);
+  }
+}
+
+function toastKind(session: AssistantSession): "ready" | "failed" | null {
+  if (!session.unread || needsYou(session)) return null;
+  if (session.turn.state === "done") return "ready";
+  return session.turn.state === "failed" || session.turn.state === "refused" ? "failed" : null;
+}
+
+function showToast(sid: string, kind: "ready" | "failed"): void {
+  let opened = false;
+  const title = { title: titleOf(sid) };
+  toast({
+    variant: "default",
+    message:
+      kind === "failed"
+        ? t("assistant.header.toastFailed", title)
+        : t("assistant.header.toastReady", title),
+    timeout: HEADER_TOAST_MS,
+    mask: true,
+    live: "off",
+    action: {
+      label: t("assistant.header.open"),
+      handler: () => {
+        opened = true;
+        trackAssistant("ai_toast", { kind, action: "open" });
+        openOnLitSession(null, sid);
+      },
+    },
+    onDismiss: () => {
+      if (!opened) trackAssistant("ai_toast", { kind, action: "dismiss" });
+    },
+  });
+}
+
+watch(lightName, (state) => trackAssistant("ai_status_light", { state }));
+watch(
+  () => [
+    store.headerLight.value.state,
+    store.headerLight.value.sid,
+    store.headerLight.value.failed,
+  ],
+  announceLight,
+);
+watch(
+  () =>
+    mine.value.map((s) => [s.turnMeta.turnId, s.turn.state, s.unread, needsYou(s), isShown(s.sid)]),
+  toastHidden,
+  { deep: true },
+);
+</script>

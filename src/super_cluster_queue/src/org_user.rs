@@ -19,7 +19,10 @@ use db::org_users as db_org_users;
 use infra::{
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{Error, Result},
-    table::org_users::{self, OrgUserPut},
+    table::{
+        ai_grants,
+        org_users::{self, OrgUserPut},
+    },
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
@@ -190,12 +193,89 @@ async fn delete(msg: Message) -> Result<()> {
             log::error!("[SUPER_CLUSTER:sync] Failed to delete org user: {user_email}, error: {e}");
             return Err(e);
         }
-    } else if let Err(e) = org_users::remove(org_id, user_email).await {
-        log::error!(
-            "[SUPER_CLUSTER:sync] Failed to delete org user: {org_id}/{user_email}, error: {e}"
-        );
-        return Err(e);
+        forget_grants(None, user_email).await;
+    } else {
+        if let Err(e) = org_users::remove(org_id, user_email).await {
+            log::error!(
+                "[SUPER_CLUSTER:sync] Failed to delete org user: {org_id}/{user_email}, error: {e}"
+            );
+            return Err(e);
+        }
+        forget_grants(Some(org_id), user_email).await;
     }
     let _ = delete_from_db_coordinator(&msg.key, false, true, None).await;
     Ok(())
+}
+
+/// A member removed on another cluster keeps no standing assistant approval here either.
+pub(crate) async fn forget_grants(org_id: Option<&str>, user_email: &str) {
+    if let Err(e) = ai_grants::delete_for_member(org_id, user_email).await {
+        log::error!(
+            "[SUPER_CLUSTER:sync] cannot remove the assistant grants of {user_email} in {org_id:?}: {e}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use infra::table::ai_grants::NewGrant;
+    use tokio::sync::OnceCell;
+
+    use super::*;
+
+    async fn meta_store() {
+        static ONCE: OnceCell<()> = OnceCell::const_new();
+        ONCE.get_or_init(|| async {
+            std::fs::create_dir_all(&config::get_config().common.data_db_dir).unwrap();
+            infra::db::create_table().await.unwrap();
+            infra::db_init().await.unwrap();
+            infra::table::migrate().await.unwrap();
+        })
+        .await;
+    }
+
+    fn grant<'a>(org_id: &'a str, user_email: &'a str) -> NewGrant<'a> {
+        NewGrant {
+            org_id,
+            user_email,
+            tool: "UpdateAlert",
+            operation: "update",
+            scope: ai_grants::SCOPE_ALWAYS,
+            chat_id: None,
+            granted_by: user_email,
+        }
+    }
+
+    fn removal(key: String) -> Message {
+        Message::new(key, None, None, false, MessageType::OrgUserDelete)
+    }
+
+    async fn holders(org_id: &str) -> Vec<String> {
+        let grants = ai_grants::list(org_id, None).await.unwrap();
+        grants.into_iter().map(|g| g.user_email).collect()
+    }
+
+    #[tokio::test]
+    async fn a_replicated_membership_removal_drops_the_members_grants() {
+        meta_store().await;
+        let org = format!("sc{}", config::utils::time::now_micros());
+        let other = format!("{org}b");
+        for (org_id, email) in [
+            (&org, "Gone@x.io"),
+            (&org, "stays@x.io"),
+            (&other, "gone@x.io"),
+        ] {
+            ai_grants::insert(&grant(org_id, email), 1).await.unwrap();
+        }
+        process(removal(format!("/org_users/single/{org}/gone@x.io")))
+            .await
+            .unwrap();
+        assert_eq!(holders(&org).await, ["stays@x.io"]);
+        assert_eq!(holders(&other).await, ["gone@x.io"]);
+
+        process(removal("/org_users/many/user/gone@x.io".to_string()))
+            .await
+            .unwrap();
+        assert!(holders(&other).await.is_empty());
+    }
 }

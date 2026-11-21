@@ -1,54 +1,47 @@
 <template>
-  <!-- Flow content: OTable's hover-action toolbar owns the surface and the
-       positioning, so this is just the button row. -->
   <div
-    class="field_overlay table-cell-actions flex items-center"
+    class="field_overlay table-cell-actions flex items-center gap-1"
     :title="cellValue"
     :data-test="`log-add-data-from-column-${cellValue}`"
   >
-    <span class="mx-1">
+    <OButton
+      variant="ghost"
+      size="icon-xs-circle"
+      :aria-label="t('logs.cellActions.copy')"
+      class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+      data-test="logs-cell-actions-copy-btn"
+      @click.prevent.stop="copyLogToClipboard(cellValue)"
+    >
+      <OIcon name="content-copy" size="xs" />
+      <OTooltip :content="t('logs.cellActions.copy')" />
+    </OButton>
+    <template v-if="isStreamField && !hideSearchTermActions">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        data-test="logs-cell-actions-copy-btn"
-        @click.prevent.stop="copyLogToClipboard(cellValue)"
-        :title="t('logs.cellActions.copy')"
-        :aria-label="t('logs.cellActions.copy')"
-      >
-        <OIcon name="content-copy" size="xs" />
-      </OButton>
-    </span>
-    <span v-if="isStreamField && !hideSearchTermActions" class="me-1">
-      <OButton
-        variant="ghost"
-        size="icon-xs-circle"
-        @click.prevent.stop="addSearchTerm(column.id, cellValue, 'include')"
+        :aria-label="t('logs.cellActions.includeTerm')"
+        class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
         :data-test="`log-details-include-field-${cellValue}`"
-        :title="t('logs.cellActions.includeTerm')"
+        @click.prevent.stop="addSearchTerm(column.id, cellValue, 'include')"
       >
-        <OIcon name="" style="height: 0.5rem; width: 0.5rem">
-          <EqualIcon class="size-full" />
-        </OIcon>
+        <OIcon name="" size="xs"><EqualIcon class="size-2" /></OIcon>
+        <OTooltip :content="t('logs.cellActions.includeTerm')" />
       </OButton>
-    </span>
-    <span v-if="isStreamField && !hideSearchTermActions" class="me-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        @click.prevent.stop="addSearchTerm(column.id, cellValue, 'exclude')"
-        :title="t('logs.cellActions.excludeTerm')"
+        :aria-label="t('logs.cellActions.excludeTerm')"
+        class="max-md:min-h-11 max-md:min-w-11 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
         :data-test="`log-details-exclude-field-${cellValue}`"
+        @click.prevent.stop="addSearchTerm(column.id, cellValue, 'exclude')"
       >
-        <OIcon name="" style="height: 0.5rem; width: 0.5rem">
-          <NotEqualIcon class="size-full" />
-        </OIcon>
+        <OIcon name="" size="xs"><NotEqualIcon class="size-2" /></OIcon>
+        <OTooltip :content="t('logs.cellActions.excludeTerm')" />
       </OButton>
-    </span>
-    <!-- o2 ai context add button in the cell actions when user adds a interesting field to the table 
-     then we show some options there we need this  -->
+    </template>
     <O2AIContextAddBtn
-      v-if="!hideAi"
-      @send-to-ai-chat="sendToAiChat(JSON.stringify(cellValue))"
+      v-if="!hideAi && doorShown"
+      @send-to-ai-chat="addDoorToChat(fieldDoor(), userOrgKey, toolbarCell())"
       class="size-6! border border-solid border-white"
       :imageHeight="'14'"
       :imageWidth="'14'"
@@ -67,8 +60,26 @@ import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import { searchState } from "@/composables/useLogs/searchState";
+import { useStore } from "vuex";
+import {
+  addDoorToChat,
+  currentUserOrgKey,
+  logFieldBuild,
+  logsDoorBase,
+  useAssistantDoorShown,
+  useToolbarInvoker,
+  type LogsDoorBase,
+} from "@/plugins/logs/logsDoors";
 
 const props = defineProps({
+  /** The org the host loaded this row under; its doors carry it so a stale row is refused. */
+  boundOrg: {
+    type: String,
+    default: undefined,
+  },
   column: {
     type: Object,
     required: true,
@@ -100,6 +111,11 @@ const props = defineProps({
     type: null as unknown as PropType<unknown>,
     default: undefined,
   },
+  /** The page a field door describes; defaults to the Logs search (correlated logs pass their own). */
+  doorContext: {
+    type: Function as PropType<() => LogsDoorBase>,
+    default: undefined,
+  },
 });
 
 const cellValue = computed(() =>
@@ -108,7 +124,7 @@ const cellValue = computed(() =>
 
 const { t } = useI18nTyped();
 
-const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable", "sendToAiChat"]);
+const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable"]);
 
 const copyLogToClipboard = (value: any) => {
   if (props.copyInPlace) {
@@ -121,9 +137,29 @@ const addSearchTerm = (field: string, field_value: string | number | boolean, ac
   emit("addSearchTerm", field, field_value, action);
 };
 
-const sendToAiChat = (value: any) => {
-  emit("sendToAiChat", value);
-};
+const store = useStore();
+const searchObj = searchState().searchObj;
+const loadedOrg = useLoadedOrg(
+  () => props.row,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
+
+const doorShown = useAssistantDoorShown();
+const userOrgKey = currentUserOrgKey();
+const toolbarCell = useToolbarInvoker();
+
+// Field doors attach `{field, value}` with the field name, the stream and range as provenance.
+const fieldDoor = () => ({
+  entryKind: "object_verb" as const,
+  boundOrg: props.boundOrg ?? loadedOrg.value,
+  objectKind: "log_field" as const,
+  build: logFieldBuild(
+    () => props.doorContext?.() ?? logsDoorBase(searchObj, store.state, props.row),
+    String(props.column.id),
+    cellValue.value,
+    props.row,
+  ),
+});
 
 const isStreamField = computed(() =>
   isFilterableLogField(props.column.id, props.selectedStreamFields),

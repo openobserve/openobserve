@@ -20,9 +20,14 @@ use rmcp_openapi::error::{NetworkErrorCategory, ToolCallError, ToolCallExecution
 use serde_json::{Value, json};
 
 use super::{
+    approval,
+    ledger::{self, Origin},
     response_filter::filter_response,
     streaming::StreamedCall,
-    tools::{get_pinned_tools, get_shared_http_client, get_tool_metadata, tool_search},
+    tools::{
+        get_pinned_tools, get_shared_http_client, get_tool_metadata, requires_confirmation,
+        tool_search,
+    },
     types::*,
 };
 
@@ -36,6 +41,7 @@ const MAX_TOOL_RESULT_BYTES: usize = 1024 * 1024;
 struct RpcError {
     code: MCPErrorCode,
     message: String,
+    data: Option<Value>,
 }
 
 impl RpcError {
@@ -43,15 +49,26 @@ impl RpcError {
         Self {
             code: MCPErrorCode::InvalidParams,
             message,
+            data: None,
         }
     }
 }
 
+// An unapproved write is a typed refusal o2-ai can card; anything else is an internal error.
 impl<E: Into<anyhow::Error>> From<E> for RpcError {
     fn from(error: E) -> Self {
-        Self {
-            code: MCPErrorCode::InternalError,
-            message: error.into().to_string(),
+        let error = error.into();
+        match error.downcast_ref::<approval::ApprovalRequired>() {
+            Some(refused) => Self {
+                code: MCPErrorCode::Custom(approval::APPROVAL_REQUIRED_RPC_CODE),
+                message: refused.to_string(),
+                data: Some(refusal_data(refused)),
+            },
+            None => Self {
+                code: MCPErrorCode::InternalError,
+                message: error.to_string(),
+                data: None,
+            },
         }
     }
 }
@@ -61,6 +78,7 @@ pub async fn route_request(
     org_id: &str,
     request: MCPRequest,
     auth_token: Option<String>,
+    origin: Option<&Origin>,
 ) -> Result<MCPResponse> {
     // Validate JSON-RPC version
     if request.jsonrpc != JSONRPC_VERSION {
@@ -115,7 +133,7 @@ pub async fn route_request(
         MCPMethod::ToolsList if !mcp_enabled => Ok(json!({ "tools": [] })),
         MCPMethod::ToolsCall if !mcp_enabled => Err(anyhow!(MCP_DISABLED_MESSAGE).into()),
         MCPMethod::ToolsList => handle_tools_list().map_err(RpcError::from),
-        MCPMethod::ToolsCall => handle_tools_call(org_id, request.params, auth_token).await,
+        MCPMethod::ToolsCall => handle_tools_call(org_id, request.params, auth_token, origin).await,
         MCPMethod::ServerDiscover => handle_server_discover().map_err(RpcError::from),
         // Notifications are one-way; no response body required (HTTP layer returns 202)
         MCPMethod::NotificationsInitialized => Ok(Value::Null),
@@ -128,7 +146,7 @@ pub async fn route_request(
             }
             Ok(MCPResponse::success(request.id, value))
         }
-        Err(e) => Ok(MCPResponse::error(request.id, e.code, e.message, None)),
+        Err(e) => Ok(MCPResponse::error(request.id, e.code, e.message, e.data)),
     }
 }
 
@@ -242,6 +260,7 @@ fn handle_tools_list() -> Result<Value> {
             }),
             output_schema: None,
             annotations: None,
+            meta: None,
             http_method: String::new(),
             http_path: String::new(),
             category: None,
@@ -274,6 +293,7 @@ fn handle_tools_list() -> Result<Value> {
             }),
             output_schema: None,
             annotations: None,
+            meta: None,
             http_method: String::new(),
             http_path: String::new(),
             category: None,
@@ -306,6 +326,8 @@ fn handle_tool_search(query: &str, limit: Option<usize>) -> Result<Value> {
             title: tool.title,
             description: tool.description,
             input_schema: tool.input_schema,
+            annotations: tool.annotations,
+            meta: tool.meta,
             requires_confirmation: if tool.requires_confirmation {
                 Some(true)
             } else {
@@ -324,13 +346,31 @@ async fn handle_direct_call(
     args: Value,
     detail: &DetailLevel,
     auth_token: Option<String>,
+    origin: Option<&Origin>,
 ) -> Result<Value, RpcError> {
     // Find the tool metadata for execution
     let tool_metadata = get_tool_metadata(tool_name)
         .ok_or_else(|| RpcError::invalid_params(format!("Unknown tool: {tool_name}")))?;
+    approval::check(
+        org_id,
+        &tool_metadata.name,
+        requires_confirmation(&tool_metadata),
+        origin,
+        &args,
+    )
+    .await?;
 
-    let client = authorized_client(auth_token);
-    let result = execute_tool(&client, org_id, &tool_metadata, args, detail).await;
+    let client = authorized_client(auth_token.clone());
+    let result = execute_tool(
+        &client,
+        org_id,
+        &tool_metadata,
+        args,
+        detail,
+        auth_token.as_deref(),
+        origin,
+    )
+    .await;
 
     Ok(serde_json::to_value(result)?)
 }
@@ -341,6 +381,7 @@ async fn handle_tools_call(
     org_id: &str,
     params: Value,
     auth_token: Option<String>,
+    origin: Option<&Origin>,
 ) -> Result<Value, RpcError> {
     // Parse parameters
     let call_params: ToolsCallParams = serde_json::from_value(params)
@@ -362,7 +403,15 @@ async fn handle_tools_call(
                 serde_json::from_value(call_params.arguments).map_err(|e| {
                     RpcError::invalid_params(format!("Invalid arguments for tools_call: {e}"))
                 })?;
-            handle_direct_call(org_id, &args.tool, args.args, &args.detail, auth_token).await
+            handle_direct_call(
+                org_id,
+                &args.tool,
+                args.args,
+                &args.detail,
+                auth_token,
+                origin,
+            )
+            .await
         }
         // Pinned tools are exposed directly in tools/list and called by name.
         // Route them straight to execution with their arguments.
@@ -373,6 +422,7 @@ async fn handle_tools_call(
                 call_params.arguments,
                 &DetailLevel::default(),
                 auth_token,
+                origin,
             )
             .await
         }
@@ -572,6 +622,8 @@ async fn execute_tool(
     metadata: &rmcp_openapi::ToolMetadata,
     mut arguments: Value,
     detail: &DetailLevel,
+    auth_token: Option<&str>,
+    origin: Option<&Origin>,
 ) -> ToolsCallResult {
     // LLMs frequently hoist request-body fields to the top level of the tool
     // arguments (e.g. `tabId` on AddPanel/UpdatePanel, which the schema nests
@@ -581,11 +633,17 @@ async fn execute_tool(
     // so the underlying HTTP API contract stays untouched.
     normalize_request_body_fields(&metadata.parameters, &mut arguments);
     bind_organization(&metadata.path, &mut arguments, org_id);
+    let ledger_plan = ledger::plan(org_id, metadata, &arguments, origin);
     if let Err(e) = encode_path_parameters(metadata, &mut arguments) {
         return error_result(format!("Tool execution failed: {e}"));
     }
     let streamed = StreamedCall::prepare(&metadata.name, &mut arguments);
     let started = std::time::Instant::now();
+
+    let before = match &ledger_plan {
+        Some(plan) => plan.before(auth_token).await,
+        None => None,
+    };
 
     let http_response = match client.execute_tool_call(metadata, &arguments).await {
         Ok(response) => response,
@@ -598,6 +656,17 @@ async fn execute_tool(
             return error_result(format!("Tool execution failed: {reason}"));
         }
     };
+
+    if let Some(plan) = ledger_plan {
+        ledger::finish(
+            plan,
+            before,
+            http_response.status_code,
+            &http_response.body,
+            auth_token,
+        )
+        .await;
+    }
 
     if !http_response.is_success {
         return error_result(format!(
@@ -629,6 +698,18 @@ async fn execute_tool(
         content: vec![ToolContent::Text { text: content_text }],
         is_error: None,
     }
+}
+
+/// What o2-ai needs to card the refused call: its class as the listing announces it.
+fn refusal_data(refused: &approval::ApprovalRequired) -> Value {
+    let class = crate::tools::tool_class(&refused.tool);
+    json!({
+        "code": approval::APPROVAL_REQUIRED,
+        "tool": refused.tool,
+        "reason": refused.refusal.reason(),
+        "operation": class.map_or("update", |c| c.operation),
+        "destructive": class.is_some_and(|c| c.destructive),
+    })
 }
 
 #[cfg(test)]
@@ -928,7 +1009,7 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request("default", request, None).await.unwrap();
+        let response = route_request("default", request, None, None).await.unwrap();
         assert!(response.error.is_some());
         assert_eq!(response.error.unwrap().code, -32600);
     }
@@ -942,7 +1023,7 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request("default", request, None).await.unwrap();
+        let response = route_request("default", request, None, None).await.unwrap();
         assert!(response.error.is_some());
         assert_eq!(response.error.unwrap().code, -32601);
     }
@@ -956,7 +1037,7 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request("default", request, None).await.unwrap();
+        let response = route_request("default", request, None, None).await.unwrap();
         assert!(response.result.is_some());
         assert!(response.error.is_none());
     }
@@ -972,7 +1053,7 @@ mod tests {
             }),
         };
 
-        let response = route_request("default", request, None).await.unwrap();
+        let response = route_request("default", request, None, None).await.unwrap();
         assert!(response.error.is_none());
         let result = response.result.unwrap();
         assert_eq!(result["resultType"], json!("complete"));
@@ -1011,7 +1092,7 @@ mod tests {
             }),
         };
 
-        let response = route_request("default", request, None).await.unwrap();
+        let response = route_request("default", request, None, None).await.unwrap();
         let error = response.error.unwrap();
         assert_eq!(error.code, -32022);
         let data = error.data.unwrap();
@@ -1037,7 +1118,7 @@ mod tests {
             }),
         };
 
-        let response = route_request("default", request, None).await.unwrap();
+        let response = route_request("default", request, None, None).await.unwrap();
         let result = response.result.unwrap();
         assert_eq!(result["resultType"], json!("complete"));
         assert!(result["ttlMs"].is_u64());
@@ -1057,7 +1138,7 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request("default", request, None).await.unwrap();
+        let response = route_request("default", request, None, None).await.unwrap();
         let result = response.result.unwrap();
         let obj = result.as_object().unwrap();
         assert!(!obj.contains_key("resultType"));
@@ -1075,7 +1156,7 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request("default", request, None).await.unwrap();
+        let response = route_request("default", request, None, None).await.unwrap();
         assert!(response.result.is_some());
         assert!(response.error.is_none());
         assert_eq!(response.id, Some(Value::from(2)));
@@ -1120,7 +1201,9 @@ mod tests {
             params: Value::Null,
         };
 
-        let list_response = route_request("default", list_request, None).await.unwrap();
+        let list_response = route_request("default", list_request, None, None)
+            .await
+            .unwrap();
         assert!(list_response.result.is_some());
 
         let tools_list = list_response.result.unwrap();
@@ -1151,7 +1234,7 @@ mod tests {
             }),
         };
 
-        let search_response = route_request("default", search_request, None)
+        let search_response = route_request("default", search_request, None, None)
             .await
             .unwrap();
         assert!(search_response.result.is_some());
@@ -1172,6 +1255,30 @@ mod tests {
         assert!(obj.contains_key("tools"));
     }
 
+    #[test]
+    fn an_unapproved_write_is_a_typed_json_rpc_refusal() {
+        let refused = anyhow::Error::new(approval::ApprovalRequired {
+            tool: "UpdateAlert".into(),
+            refusal: approval::Refusal::Missing,
+        });
+        let error_response = |id: Option<Value>, error: anyhow::Error| {
+            let error = RpcError::from(error);
+            MCPResponse::error(id, error.code, error.message, error.data)
+        };
+        let response = serde_json::to_value(error_response(Some(json!(3)), refused)).unwrap();
+        assert_eq!(
+            response["error"]["code"],
+            approval::APPROVAL_REQUIRED_RPC_CODE
+        );
+        assert_eq!(response["error"]["data"]["code"], "approval_required");
+        assert_eq!(response["error"]["data"]["tool"], "UpdateAlert");
+        assert_eq!(response["error"]["data"]["reason"], "missing");
+        assert_eq!(response["error"]["data"]["operation"], "update");
+        assert_eq!(response["error"]["data"]["destructive"], false);
+        let other = serde_json::to_value(error_response(None, anyhow!("boom"))).unwrap();
+        assert_eq!(other["error"]["code"], -32603);
+    }
+
     #[tokio::test]
     async fn test_unknown_tool_call() {
         // Initialize MCP tools before testing
@@ -1187,7 +1294,7 @@ mod tests {
             }),
         };
 
-        let response = route_request("default", request, None).await.unwrap();
+        let response = route_request("default", request, None, None).await.unwrap();
         let error = response.error.unwrap();
         assert_eq!(error.code, -32602);
         assert_eq!(error.message, "Unknown tool: unknown_tool");
@@ -1209,7 +1316,7 @@ mod tests {
                 method: "tools/call".to_string(),
                 params: params.clone(),
             };
-            let response = route_request("default", request, None).await.unwrap();
+            let response = route_request("default", request, None, None).await.unwrap();
             assert_eq!(response.error.unwrap().code, -32602, "{params}");
         }
     }
@@ -1288,6 +1395,8 @@ mod tests {
             &lookup_tool(),
             arguments,
             &DetailLevel::Summary,
+            None,
+            None,
         )
         .await
     }
@@ -1672,8 +1781,16 @@ mod tests {
                 .map(|c| String::from_utf8(c.unwrap().to_vec()).unwrap())
                 .collect();
             let (client, server) = client_streaming(sse).await;
-            let result =
-                execute_tool(&client, "acme", tool, arguments, &DetailLevel::Summary).await;
+            let result = execute_tool(
+                &client,
+                "acme",
+                tool,
+                arguments,
+                &DetailLevel::Summary,
+                None,
+                None,
+            )
+            .await;
             let request = server.await.unwrap();
             match expected {
                 Ok(fields) => {

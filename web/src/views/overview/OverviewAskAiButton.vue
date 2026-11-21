@@ -22,16 +22,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click.stop="emit('ask')"
   >
     <template #icon-left>
-      <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
+      <AssistantSpark :size="16" />
     </template>
     <OTooltip :content="label ? askLabel : t('overview.askAi.hint')" />
   </OButton>
 </template>
 
 <script setup lang="ts">
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useAiIcon } from "@/composables/useAiIcon";
 import { useI18nTyped } from "@/types/i18n";
 import { computed } from "vue";
 import { useOverviewAskAi } from "./useOverviewAskAi";
@@ -44,7 +44,6 @@ const props = withDefaults(
 const emit = defineEmits<{ ask: [] }>();
 
 const { t } = useI18nTyped();
-const { aiIconSrc } = useAiIcon();
 const { visible } = useOverviewAskAi();
 const askLabel = computed(() =>
   props.label ? t("overview.askAi.labelFor", { item: props.label }) : t("overview.askAi.label"),

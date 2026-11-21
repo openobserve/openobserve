@@ -314,6 +314,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex items-center gap-2 max-lg:w-full max-lg:flex-wrap max-lg:justify-end max-lg:gap-y-1"
         >
           <OPageHeaderStatus />
+          <OTag
+            v-if="assistantSet.has('time')"
+            variant="primary-soft"
+            size="sm"
+            :icon="assistantGlyph.assistant"
+            :label="t('traces.assistantSet.label')"
+            role="note"
+            :aria-label="
+              t('traces.assistantSet.name', { field: t('traces.assistantSet.field.time') })
+            "
+            class="shrink-0"
+            data-test="traces-assistant-set-time"
+          />
           <DateTime
             ref="dateTimeRef"
             auto-apply
@@ -663,14 +676,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-search-bar-filter-builder-ai-btn"
           variant="ghost"
           size="icon-toolbar"
-          class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! absolute! top-1 right-1 z-51 h-7! min-h-7! w-7! min-w-7! hover:shadow-md"
+          :aria-label="t('search.aiModeIconAlt')"
+          class="rounded-default border-card-glass-border! absolute! top-0.75 right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
           @click="openAiFromBuilder"
         >
-          <img
-            :src="aiIcon"
-            :alt="t('search.aiModeIconAlt')"
-            class="h-4.5 w-4.5 group-hover:brightness-0 group-hover:invert"
-          />
+          <AssistantSpark :size="16" />
           <OTooltip :content="t('nlMode.toggle')" />
         </OButton>
         <UnifiedQueryEditor
@@ -723,6 +733,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="query-editor-placeholder-typewriter">{{ traceEditorPlaceholder }}</span>
         </div>
+      </div>
+      <div v-if="assistantSet.has('query')" class="flex shrink-0 items-start p-1">
+        <OTag
+          v-if="assistantSet.has('query')"
+          variant="primary-soft"
+          size="sm"
+          :icon="assistantGlyph.assistant"
+          :label="t('traces.assistantSet.label')"
+          role="note"
+          :aria-label="
+            t('traces.assistantSet.name', { field: t('traces.assistantSet.field.query') })
+          "
+          class="shrink-0"
+          data-test="traces-assistant-set-query"
+        />
       </div>
     </div>
     <RecentSearchesDrawer
@@ -778,8 +803,11 @@ import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -793,6 +821,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import useTraces from "@/composables/useTraces";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
@@ -845,8 +874,6 @@ import {
 } from "@/utils/queryHistory/recentSearches";
 import { TRACES_EXAMPLE_QUERIES } from "@/utils/queryHistory/traces";
 import type { HistoryStatus } from "@/services/query_history";
-import { useTheme } from "@/composables/useTheme";
-import { getImageURL } from "@/utils/zincutils";
 import {
   savedViewsQuery,
   createSavedViewMutation,
@@ -857,7 +884,9 @@ import {
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    AssistantSpark,
     OPageHeaderStatus,
+    OTag,
     OSeparator,
     DateTime,
     ShareButton,
@@ -898,6 +927,7 @@ export default defineComponent({
     "apply-saved-view",
     "drill-down",
     "recent-restore",
+    "assistant-set-cleared",
   ],
   props: {
     fieldValues: {
@@ -910,6 +940,11 @@ export default defineComponent({
     isLoading: {
       type: Boolean,
       default: false,
+    },
+    /** Filters the assistant set when it opened the page; each shows a label until the user changes it. */
+    assistantSet: {
+      type: Set,
+      default: () => new Set(),
     },
   },
   methods: {
@@ -985,7 +1020,12 @@ export default defineComponent({
       focusEditor();
     };
 
+    const clearAssistantSet = (field: "query" | "time") => {
+      if (props.assistantSet.has(field)) emit("assistant-set-cleared", field);
+    };
+
     const onRecentEditorEdit = (isBlank = false, wasBlank = false) => {
+      clearAssistantSet("query");
       recentFocusDismissed = false;
       recentFocusOpen.value = recentsOpenAfterEdit(
         recentFocusOpen.value,
@@ -1089,14 +1129,16 @@ export default defineComponent({
     );
     // The AI button holds the corner slot in both modes: QueryEditor's own, or the builder's copy.
     const filterBuilderToggleRight = computed(() => (isAiEnabled.value ? "2.375rem" : "0.25rem"));
-    const { isDark } = useTheme();
-    const aiIcon = computed(() =>
-      getImageURL(
-        isDark.value ? "images/common/ai_icon_dark.svg" : "images/common/ai_icon_gradient.svg",
-      ),
+    const aiAccess = computed(() =>
+      checkFeatureAccess("aiAssistant", buildFeatureGateContext(store.state.zoConfig)),
     );
-    const openAiFromBuilder = () =>
-      (queryEditorRef.value as { openAiMode?: () => void } | null)?.openAiMode?.();
+    // The query editor loads async, so a click that beats it opens AI mode through the v-model the editor reads.
+    const openAiFromBuilder = () => {
+      const editor = queryEditorRef.value as { openAiMode?: () => void } | null;
+      if (editor?.openAiMode) editor.openAiMode();
+      else if (!aiAccess.value.allowed) openUpgradeDialog();
+      else nlpMode.value = true;
+    };
     const filterBuilderFields = computed(() =>
       toFilterFields(searchObj.data.stream.selectedStreamFields ?? []),
     );
@@ -1230,6 +1272,8 @@ export default defineComponent({
 
     const updateDateTime = async (value: object) => {
       if (router.currentRoute.value.name !== "traces") return;
+      // Mount replays and programmatic sets emit too; only a user's pick takes the label away.
+      if (value.userChangedValue === true) clearAssistantSet("time");
       if (
         value.valueType == "absolute" &&
         searchObj.data.stream.selectedStream.length > 0 &&
@@ -1339,6 +1383,7 @@ export default defineComponent({
       }
       searchObj.data.editorValue = current;
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(current);
+      clearAssistantSet("query");
       // Only trigger search if not explicitly skipped
       if (!skipSearch && store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
         emit("searchdata");
@@ -1410,6 +1455,8 @@ export default defineComponent({
     const resetFilters = () => {
       appliedSavedView.value = null;
       searchObj.data.editorValue = "";
+      // A programmatic editor write raises no user-edit, so the label is cleared here.
+      clearAssistantSet("query");
       searchObj.data.advanceFiltersQuery = "";
       Object.values(searchObj.data.stream.fieldValues).forEach((field) => {
         field.selectedValues = [];
@@ -1781,6 +1828,7 @@ export default defineComponent({
       valuesWindow,
       recentExamples,
       onRecentEditorEdit,
+      assistantGlyph,
       dismissRecentFocus,
       onRecentEditorKeydown,
       openRecentSearches,
@@ -1807,7 +1855,6 @@ export default defineComponent({
       toggleFilterBuilder,
       showFilterBuilder,
       filterBuilderToggleRight,
-      aiIcon,
       openAiFromBuilder,
       filterBuilderFields,
       filterBuilderRef,

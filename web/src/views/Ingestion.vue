@@ -249,7 +249,6 @@ import { awsIntegrations, type AWSIntegration } from "@/utils/awsIntegrations";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { OPEN_TOKEN_PICKER } from "@/composables/useCredentialSnippet";
 import { useOrgCredential, type PasscodeRead } from "@/composables/useOrgCredential";
-import { FIRST_EVENT_ASK_AI } from "@/components/ingestion/firstEventAskAi";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import FeatureLockExempt from "@/components/common/FeatureLockExempt.vue";
 
@@ -265,8 +264,7 @@ export default defineComponent({
     OSelect,
     FeatureLockExempt,
   },
-  emits: ["sendToAiChat"],
-  setup(_props, { emit }) {
+  setup() {
     const { isMobile, lgUp } = useBreakpoint();
     const { t } = useI18nTyped();
     const store = useStore();
@@ -292,10 +290,6 @@ export default defineComponent({
     });
     const tokenSelectRef = ref<{ focus: () => void } | null>(null);
     provide(OPEN_TOKEN_PICKER, () => tokenSelectRef.value?.focus());
-    // A guide nested under this router-view reaches MainLayout's AI chat only through this page's emit.
-    provide(FIRST_EVENT_ASK_AI, (query: string) =>
-      emit("sendToAiChat", { query, autoSend: false }),
-    );
     const tokenOptions = computed(() => {
       const tokens = store.state.organizationData.orgTokens || [];
       const enabled = tokens.filter((t: any) => t.enabled);

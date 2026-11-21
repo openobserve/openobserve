@@ -1,0 +1,10 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chats.rs:295-303",
+  "shape": "F",
+  "status": 503,
+  "body": {
+    "code": 503,
+    "message": "This conversation's history could not be read in full; please retry",
+    "error_code": "history_unavailable"
+  }
+}

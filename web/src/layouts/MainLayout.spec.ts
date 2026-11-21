@@ -262,39 +262,6 @@ describe("MainLayout Methods and Functions", () => {
       // Test case insensitive
       expect(filteredOrganizations("TEST")).toHaveLength(1);
     });
-
-    it("should compute getBtnLogo based on state", () => {
-      const getImageURL = vi.fn((path: string) => `mock-${path}`);
-
-      const getBtnLogo = (theme: string, isHovered: boolean, isAiChatEnabled: boolean) => {
-        if (theme === "dark") {
-          if (isAiChatEnabled) {
-            return getImageURL("images/ai_icons/ai_icon_dark_enabled.svg");
-          } else if (isHovered) {
-            return getImageURL("images/ai_icons/ai_icon_dark_hovered.svg");
-          } else {
-            return getImageURL("images/ai_icons/ai_icon_dark.svg");
-          }
-        } else {
-          if (isAiChatEnabled) {
-            return getImageURL("images/ai_icons/ai_icon_enabled.svg");
-          } else if (isHovered) {
-            return getImageURL("images/ai_icons/ai_icon_hovered.svg");
-          } else {
-            return getImageURL("images/ai_icons/ai_icon.svg");
-          }
-        }
-      };
-
-      // Test dark theme default
-      expect(getBtnLogo("dark", false, false)).toContain("ai_icon_dark.svg");
-
-      // Test dark theme hovered
-      expect(getBtnLogo("dark", true, false)).toContain("ai_icon_dark_hovered.svg");
-
-      // Test dark theme enabled
-      expect(getBtnLogo("dark", false, true)).toContain("ai_icon_dark_enabled.svg");
-    });
   });
 
   describe("Organization Management", () => {
@@ -508,44 +475,6 @@ describe("MainLayout Methods and Functions", () => {
           expect.objectContaining({ usage_stream_enabled: false }),
         );
       });
-    });
-  });
-
-  describe("AI Chat Functionality", () => {
-    it("should toggle AI chat", () => {
-      const toggleAIChat = () => {
-        const isAiChatEnabled = false;
-        mockStore.dispatch("setIsAiChatEnabled", !isAiChatEnabled);
-      };
-
-      toggleAIChat();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
-    });
-
-    it("should close AI chat", () => {
-      const closeChat = () => {
-        mockStore.dispatch("setIsAiChatEnabled", false);
-      };
-
-      closeChat();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", false);
-    });
-
-    it("should enable AI chat and pass message to context", () => {
-      const sendToAiChat = (message: string, store: any) => {
-        // Enable AI chat first
-        store.dispatch("setIsAiChatEnabled", true);
-        // Set the message context for AI
-        store.dispatch("setAiChatContext", message);
-      };
-
-      const testMessage = "Test message for AI";
-      sendToAiChat(testMessage, mockStore);
-
-      // Verify AI chat is enabled
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
-      // Verify message context is set
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setAiChatContext", testMessage);
     });
   });
 
@@ -1010,23 +939,6 @@ describe("MainLayout Methods and Functions", () => {
   });
 
   describe("Theme and UI State Management", () => {
-    it("should compute button logo for light theme", () => {
-      const getImageURL = vi.fn((path: string) => `mock-${path}`);
-
-      const getBtnLogo = (theme: string, isHovered: boolean, isEnabled: boolean) => {
-        if (isHovered || isEnabled) {
-          return getImageURL("images/common/ai_icon_dark.svg");
-        }
-
-        return theme === "dark"
-          ? getImageURL("images/common/ai_icon_dark.svg")
-          : getImageURL("images/common/ai_icon.svg");
-      };
-
-      const result = getBtnLogo("light", false, false);
-      expect(result).toContain("ai_icon.svg");
-    });
-
     it("should handle theme switching", () => {
       const switchTheme = (currentTheme: string) => {
         return currentTheme === "dark" ? "light" : "dark";
@@ -1741,42 +1653,6 @@ describe("MainLayout Methods and Functions", () => {
   });
 
   describe("Event Handling - High Priority", () => {
-    it("should dispatch window resize event after AI chat toggle", () => {
-      const toggleAIChatWithResize = () => {
-        const isEnabled = false;
-        mockStore.dispatch("setIsAiChatEnabled", !isEnabled);
-
-        // Simulate window resize dispatch
-        window.dispatchEvent(new Event("resize"));
-        return true;
-      };
-
-      toggleAIChatWithResize();
-
-      // Verify that dispatchEvent was called with resize event
-      expect(window.dispatchEvent).toHaveBeenCalled();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
-    });
-
-    it("should handle AI chat input context with nextTick", async () => {
-      const sendToAiChat = async (message: string) => {
-        const trimmedMessage = message.trim();
-
-        if (!trimmedMessage) return false;
-
-        mockStore.dispatch("setIsAiChatEnabled", true);
-
-        // Simulate nextTick wait
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        return true;
-      };
-
-      const result = await sendToAiChat("  Test message  ");
-      expect(result).toBe(true);
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
-    });
-
     it("should handle multiple rapid search query changes", () => {
       let selectedOrg: any = { identifier: "org1" };
 
@@ -1918,7 +1794,10 @@ describe("MainLayout — focus-mode route", () => {
         stubs: {
           AppHeader: StubDiv,
           ONavbar: { name: "ONavbar", setup: () => () => h("nav") },
-          O2AIChat: StubDiv,
+          AssistantSidebarHost: { name: "AssistantSidebarHost", setup: () => () => h("div") },
+          AssistantWindowLayer: StubDiv,
+          AssistantSkipLink: StubDiv,
+          HomeReturnBar: StubDiv,
           WebinarBanner: { name: "WebinarBanner", setup: () => () => h("div") },
           AnnouncementBanner: StubDiv,
           ShortcutCheatsheet: StubDiv,
@@ -1937,7 +1816,6 @@ describe("MainLayout — focus-mode route", () => {
     writeFirstDataRecord("focus_org", { lastVisit: 1, hadData: false });
     store.state.organizationData.isDataIngested = false;
     (wrapper.vm as unknown as { isLoading: boolean }).isLoading = true;
-    store.state.isAiChatEnabled = true;
     await flushPromises();
     return wrapper;
   };
@@ -1948,7 +1826,6 @@ describe("MainLayout — focus-mode route", () => {
 
   afterEach(() => {
     queryClient.clear();
-    store.state.isAiChatEnabled = false;
     localStorage.clear();
   });
 
@@ -1962,7 +1839,7 @@ describe("MainLayout — focus-mode route", () => {
     expect(wrapper.findComponent({ name: "WebinarBanner" }).exists()).toBe(false);
     expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(false);
     expect(wrapper.find('[data-test="first-data-notice"]').exists()).toBe(false);
-    expect(wrapper.find("aside.o2-sidebar-right").exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "AssistantSidebarHost" }).exists()).toBe(false);
     // it mounts before the page renders, so only its absence keeps the Slack invite off onboarding
     expect(wrapper.findComponent({ name: "CommunitySlackInvite" }).exists()).toBe(false);
     wrapper.unmount();
@@ -1976,6 +1853,7 @@ describe("MainLayout — focus-mode route", () => {
     expect(wrapper.findComponent({ name: "WebinarBanner" }).exists()).toBe(true);
     expect(wrapper.find("header.o2-app-header").classes()).not.toContain("hidden");
     expect(wrapper.findComponent({ name: "ONavbar" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "AssistantSidebarHost" }).exists()).toBe(true);
     expect(wrapper.findComponent({ name: "CommunitySlackInvite" }).exists()).toBe(true);
     wrapper.unmount();
   });
@@ -2002,7 +1880,10 @@ describe("MainLayout — first-time cloud login", () => {
         stubs: {
           AppHeader: StubDiv,
           ONavbar: StubDiv,
-          O2AIChat: StubDiv,
+          AssistantSidebarHost: StubDiv,
+          AssistantWindowLayer: StubDiv,
+          AssistantSkipLink: StubDiv,
+          HomeReturnBar: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,
           ShortcutCheatsheet: StubDiv,
@@ -2341,7 +2222,10 @@ describe("MainLayout — org switch on an org-scoped page", () => {
         stubs: {
           AppHeader: StubDiv,
           ONavbar: StubDiv,
-          O2AIChat: StubDiv,
+          AssistantSidebarHost: StubDiv,
+          AssistantWindowLayer: StubDiv,
+          AssistantSkipLink: StubDiv,
+          HomeReturnBar: StubDiv,
           WebinarBanner: StubDiv,
           AnnouncementBanner: StubDiv,
           ShortcutCheatsheet: StubDiv,

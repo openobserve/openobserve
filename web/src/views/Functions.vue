@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        two page layouts and pushed their header down (a top gap). Pipelines and
        the pipeline detail sub-pages have no own-header, so the shell owns theirs. -->
   <RouterView v-if="sectionOwnsHeader" v-slot="{ Component }">
-    <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+    <component :is="Component" class="h-full" />
   </RouterView>
 
   <!-- Pipelines is a frequently-used workspace, so it has NO landing hub (that
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <RouterView v-slot="{ Component }">
         <OAccessBoundary>
-          <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+          <component :is="Component" class="h-full" />
         </OAccessBoundary>
       </RouterView>
     </div>
@@ -194,8 +194,7 @@ export default defineComponent({
     ODropdownItem,
     EditorDraftDot,
   },
-  emits: ["sendToAiChat"],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const { t } = useI18nTyped();
     const router = useRouter();
@@ -306,10 +305,6 @@ export default defineComponent({
       }
     };
 
-    const sendToAiChat = (value: any, append: boolean = false) => {
-      emit("sendToAiChat", value, append);
-    };
-
     return {
       t,
       raw,
@@ -328,7 +323,6 @@ export default defineComponent({
       goToImportPipeline,
       goToPipelineHistory,
       goToBackfillJobs,
-      sendToAiChat,
       routeName,
     };
   },

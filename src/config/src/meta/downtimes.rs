@@ -260,6 +260,18 @@ pub struct DowntimeRequest {
 }
 
 impl DowntimeRequest {
+    /// A blank id in a target's `ids` would store a target that names nothing.
+    pub fn check_target_ids(&self) -> Result<(), String> {
+        for (t, target) in self.targets.iter().enumerate() {
+            if let Some(i) = target.ids.iter().position(|id| id.trim().is_empty()) {
+                return Err(format!(
+                    "targets[{t}].ids[{i}] is empty; give the id of the item to target."
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// The alert groups the request sets; absent and `null` both read as none.
     pub fn groups(&self) -> Option<&[AlertGroupRef]> {
         self.alert_groups.as_ref().and_then(|g| g.as_deref())
@@ -1078,6 +1090,33 @@ mod tests {
         let mut recurring = request(vec![], Some("a1"), vec!["a1"]);
         recurring.schedule.repeat = Repeat::Daily;
         assert!(recurring.check_alert_targets().is_err());
+    }
+
+    #[test]
+    fn a_blank_target_id_is_rejected_naming_the_field() {
+        let request = |targets: serde_json::Value| -> DowntimeRequest {
+            serde_json::from_value(serde_json::json!({
+                "targets": targets,
+                "schedule": { "repeat": "none", "starts_at": 1, "ends_at": 2, "timezone": "UTC", "duration_secs": 60 }
+            }))
+            .unwrap()
+        };
+        let named = request(serde_json::json!([
+            { "module": "alerts", "folders": { "kind": "all" }, "ids": ["a1"] }
+        ]));
+        assert_eq!(named.check_target_ids(), Ok(()));
+        let whole_module = request(serde_json::json!([
+            { "module": "alerts", "folders": { "kind": "all" } }
+        ]));
+        assert_eq!(whole_module.check_target_ids(), Ok(()));
+        for blank in ["", "  "] {
+            let req = request(serde_json::json!([
+                { "module": "slos", "folders": { "kind": "all" }, "ids": ["s1"] },
+                { "module": "alerts", "folders": { "kind": "all" }, "ids": ["a1", blank] }
+            ]));
+            let err = req.check_target_ids().unwrap_err();
+            assert!(err.starts_with("targets[1].ids[1]"), "{err}");
+        }
     }
 
     #[test]

@@ -26,8 +26,14 @@ config.global.plugins = [...(config.global.plugins ?? []), i18n];
 const mockStore = {
   state: {
     theme: "light",
+    selectedOrganization: { identifier: "org-a" },
+    timezone: "UTC",
   },
 };
+
+vi.mock("@/composables/useLogs/searchState", () => ({
+  searchState: () => ({ searchObj: { data: { stream: {}, datetime: {} }, meta: {} } }),
+}));
 
 vi.mock("vuex", () => ({
   useStore: () => mockStore,
@@ -37,11 +43,6 @@ vi.mock("vuex", () => ({
 const globalStubs = {
   EqualIcon: { template: "<svg />" },
   NotEqualIcon: { template: "<svg />" },
-  O2AIContextAddBtn: {
-    name: "O2AIContextAddBtn",
-    template: "<div @click=\"$emit('send-to-ai-chat', 'test')\" />",
-    emits: ["send-to-ai-chat"],
-  },
 };
 
 const defaultProps = {
@@ -95,6 +96,10 @@ describe("CellActions", () => {
       const wrapper = mountComponent();
       const container = wrapper.find('[data-test="log-add-data-from-column-200"]');
       expect(container.exists()).toBe(true);
+    });
+
+    it("shows the full cell value as the row's tooltip", () => {
+      expect(mountComponent().find(".field_overlay").attributes("title")).toBe("200");
     });
   });
 
@@ -243,24 +248,6 @@ describe("CellActions", () => {
     });
   });
 
-  // ── sendToAiChat ──────────────────────────────────────────────────────────────
-  describe("sendToAiChat", () => {
-    it("emits 'sendToAiChat' with the value", () => {
-      const wrapper = mountComponent();
-      wrapper.vm.sendToAiChat(JSON.stringify("test value"));
-      const emitted = wrapper.emitted("sendToAiChat");
-      expect(emitted).toBeTruthy();
-      expect(emitted![0][0]).toBe('"test value"');
-    });
-
-    it("emits 'sendToAiChat' with JSON-stringified object", () => {
-      const wrapper = mountComponent();
-      const obj = { key: "value" };
-      wrapper.vm.sendToAiChat(JSON.stringify(obj));
-      expect(wrapper.emitted("sendToAiChat")![0][0]).toBe('{"key":"value"}');
-    });
-  });
-
   // ── Props defaults ────────────────────────────────────────────────────────────
   describe("value prop", () => {
     // Logs' `source` column is JSON.stringify(row): nothing sits under
@@ -300,16 +287,6 @@ describe("CellActions", () => {
     it("defaults selectedStreamFields to empty array when not provided", () => {
       const wrapper = mountComponent({ selectedStreamFields: [] });
       expect(wrapper.props("selectedStreamFields")).toEqual([]);
-    });
-  });
-
-  // ── O2AIContextAddBtn interaction ──────────────────────────────────────────────
-  describe("O2AIContextAddBtn interaction", () => {
-    it("renders O2AIContextAddBtn", () => {
-      const wrapper = mountComponent();
-      // O2AIContextAddBtn is always rendered
-      const btn = wrapper.findComponent({ name: "O2AIContextAddBtn" });
-      expect(btn.exists()).toBe(true);
     });
   });
 });

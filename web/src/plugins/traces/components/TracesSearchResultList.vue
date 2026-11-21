@@ -19,13 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ════════════════════ Empty State ════════════════════ -->
     <TracesNoEventsState
       v-if="noResults"
-      :ai-enabled="aiEnabled"
       :stream-doc-time-range="streamDocTimeRange"
       :query-window-us="queryWindowUs"
       data-test="traces-search-result-not-found-text"
       @remove-filter="emit('remove-filter')"
       @jump-to-stream-data="(from, to) => emit('jump-to-stream-data', from, to)"
-      @ask-ai="emit('ask-ai')"
     />
 
     <!-- ════════════════════ Traces List Section ════════════════════ -->
@@ -95,7 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @add-search-term="
                       (field, value, action) => addSearchTerm(field, value, action, row)
                     "
-                    @send-to-ai-chat="sendToAiChat"
                   />
                 </template>
 
@@ -355,8 +352,6 @@ interface Props {
   showCellActions?: boolean;
   /** Wrap long cell content instead of clipping it. Default: false. */
   wrap?: boolean;
-  /** Whether the AI copilot is enabled — gates the "Ask AI" empty-state button. */
-  aiEnabled?: boolean;
   /** Authoritative stream doc time range (µs) for the empty-state jump card. */
   streamDocTimeRange?: { min: number; max: number };
   /** Resolved query window (µs) for empty-state overlap detection. */
@@ -386,7 +381,6 @@ const props = withDefaults(defineProps<Props>(), {
   searchMode: "traces",
   showCellActions: true,
   wrap: false,
-  aiEnabled: false,
   streamDocTimeRange: undefined,
   queryWindowUs: undefined,
   scrollEl: null,
@@ -402,10 +396,8 @@ const emit = defineEmits<{
   "rows-per-page-change": [rowsPerPage: number];
   "sort-change": [sortBy: string, sortOrder: "asc" | "desc"];
   copy: [value: any];
-  "send-to-ai-chat": [value: string];
   "remove-filter": [];
   "jump-to-stream-data": [fromUs: number, toUs: number];
-  "ask-ai": [];
 }>();
 
 const copyToClipboard = (field: string, value: any) =>
@@ -460,8 +452,6 @@ const onRowLinkClick = (event: MouseEvent, row: any) => {
   event.preventDefault();
   emit("row-click", row);
 };
-
-const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 
 // ── Right-click cell actions ──────────────────────────────────────────────
 // Mirrors the logs table: the menu is anchored to the pointer so every cell can
@@ -545,6 +535,7 @@ const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
 };
 
 const { searchObj, updatedLocalLogFilterField, loadLocalLogFilterField } = useTraces();
+
 const { buildColumns } = useTracesTableColumns();
 
 const timestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");
