@@ -1206,6 +1206,22 @@ describe("turnEngine: a stopped answer catches up to what was saved (TA1-02)", (
     expect(String(h.session().messages[1].content)).toBe("A B");
   });
 
+  it("keeps the live text when the catch-up's tail stalls before its end (codex P3)", async () => {
+    const h = setup({ tail: true });
+    const { run } = await stopMidAnswer(h);
+    vi.mocked(h.client.tail).mockImplementationOnce(async (_o, _s, _t, _f, sink) => {
+      wire(
+        sink,
+        [sse(-1, { type: "tool_call", tool: "StreamList", call_id: "a" }), sse(0)].join(""),
+      );
+      return OK;
+    });
+    void h.store.stop(h.current.sid);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await expect(run).resolves.toMatchObject({ state: "stopped" });
+    expect(String(h.session().messages[1].content)).toBe("A");
+  });
+
   it("stops within the deadline when the tail never settles, even ignoring its signal", async () => {
     const h = setup({ tail: true });
     const { run } = await stopMidAnswer(h);
@@ -1414,6 +1430,44 @@ describe("turnEngine: the SSE id rule (WP-18, D2)", () => {
     expect(end).toEqual({ state: "done", saved: "server" });
     // Seq 4 is what the tail says it is: the "b" shown live but never resent does not stay on screen.
     expect(text).toBe("xazc");
+  });
+
+  it("keeps a live-only card and its answer through a resume whose tail cannot replay them", async () => {
+    const approvals = { onConfirmationRequired: vi.fn(), onResolved: vi.fn() };
+    const h = setup({ tail: true, approvals });
+    h.type("why?");
+    const run = h.store.send(h.current.sid);
+    await settle();
+    const card = {
+      type: "confirmation_required",
+      tool: "CreateDowntime",
+      id: "apr_live",
+      message: "Create the downtime?",
+    } as AssistantFrame;
+    const answered = { type: "confirmation_resolved", id: "apr_live", approved: true };
+    // With the cursor pinned where the answer started, every live frame of the turn carries id 0.
+    wire(
+      h.last().sink,
+      [
+        sse(0, delta("Muting needs your OK.")),
+        sse(0, card),
+        sse(0, answered as AssistantFrame),
+        sse(0, delta(" Muted.")),
+      ].join(""),
+    );
+    h.end();
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAYS_MS[0]);
+    expect(h.tails[0]).toMatchObject({ fromSeq: 0 });
+    wire(h.tails[0].sink, [sse(0, delta("Muting needs your OK. Muted.")), sse(1)].join(""));
+    await vi.advanceTimersByTimeAsync(1_000);
+    const blocks = h.session().messages[1].contentBlocks ?? [];
+    expect(blocks.filter((b) => b.approval?.id === "apr_live")).toHaveLength(1);
+    expect(blocks.filter((b) => b.type === "approval_result")).toHaveLength(1);
+    expect(String(h.session().messages[1].content)).toBe("Muting needs your OK. Muted.");
+    expect(approvals.onConfirmationRequired).toHaveBeenCalledTimes(1);
+    wire(h.tails[0].sink, [sse(1, { type: "complete", persisted: true }), sse(2)].join(""));
+    h.tails[0].sink.onEnd("eof");
+    await expect(run).resolves.toMatchObject({ state: "done" });
   });
 
   it("keeps the text shown since the cursor when no tail delivers (HT-06 AC 3)", async () => {

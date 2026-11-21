@@ -101,6 +101,8 @@ export const SILENCE_MS = 20_000;
 const LINGER_MS = 3_000;
 // The agent settles a stop for up to 2 s, then the server commits the cancelled frame.
 const TAIL_AFTER_STOP_MS = 5_000;
+// A tail writes its stored replay in one burst; this long without a frame means the burst is over.
+const REPLAY_SETTLE_MS = 300;
 
 /** A turn id goes on the wire at most twice: the send and one reuse (constraint 16). */
 const MAX_ID_SENDS = 2;
@@ -222,6 +224,9 @@ interface TurnRecord {
   throughSeq: AssistantFrame[];
   /** Frames applied since the cursor last moved; a tail from the cursor sends their content again. */
   sinceSeq: AssistantFrame[];
+  /** Frames a rollback took back that no tail replays (cards stored nowhere, their answers), put back after the replay. */
+  liveOnly: AssistantFrame[];
+  liveOnlyTimer?: ReturnType<typeof setTimeout>;
   cancelConfirmed?: boolean;
   cancelMs: number | null;
   /** A confirmed stop is reading the saved frames, which the stopping turn applies like a live one. */
@@ -427,6 +432,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
         // A frame proves admission, whatever order the transport reported them in.
         if (!tail) admit(rec, generation, { ok: true, status: 200, traceId: null });
         resume();
+        if (tail) settleLiveOnly(rec, isTerminalFrame(frame));
         const session = sessionOf(rec.sid);
         if (session?.turn.state === "reconnecting") dispatch(rec, { type: "tail_caught_up" });
         // Any data frame is real progress on the wire, a replayed one included; keepalives never are.
@@ -448,6 +454,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       onBoundary(id) {
         if (!current()) return;
         resume();
+        if (tail) settleLiveOnly(rec, false);
         const meta = sessionOf(rec.sid)?.turnMeta;
         const seq = Number(id);
         // Everything through `seq` was sent: the tail resumes from here.
@@ -505,6 +512,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
   // The tail resends everything past the cursor, merged and without transient frames, so the answer is rebuilt from the frames through the cursor and the tail applies on top (WP-18).
   const rollBack = (rec: TurnRecord) => {
     if (!rec.sinceSeq.length) return;
+    rec.liveOnly.push(...liveOnlyFrames(rec.sinceSeq));
     rec.sinceSeq = [];
     runner.flush(rec.sid, (session) => {
       // The engine's own blocks (the restored marker written at admission) are no frames, so they are kept and put back first, where they were.
@@ -519,6 +527,40 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       mirrorExtras(session.turnMeta, rec.stream);
       return { stream: [], turn: [] };
     });
+  };
+
+  const settleLiveOnly = (rec: TurnRecord, now: boolean) => {
+    clearTimeout(rec.liveOnlyTimer);
+    rec.liveOnlyTimer = undefined;
+    if (!rec.liveOnly.length) return;
+    if (now) putBackLiveOnly(rec);
+    else rec.liveOnlyTimer = setTimeout(() => putBackLiveOnly(rec), REPLAY_SETTLE_MS);
+  };
+
+  // The card still held goes through the turn again, so the turn reads as waiting on it.
+  const putBackLiveOnly = (rec: TurnRecord) => {
+    rec.liveOnlyTimer = undefined;
+    const frames = rec.liveOnly;
+    rec.liveOnly = [];
+    if (rec.settled) return;
+    for (const frame of frames) {
+      rec.sinceSeq.push(frame);
+      const held = sessionOf(rec.sid)?.pendingApproval?.id;
+      runner.flush(
+        rec.sid,
+        held && cardIdOf(frame) === held
+          ? frameWork(rec, frame)
+          : (session) => {
+              rec.stream.messages = session.messages;
+              const effects = reduce(rec.stream, frame, liveCtx(t));
+              mirrorExtras(session.turnMeta, rec.stream);
+              const stream = effects.filter(
+                (e) => e.kind !== "approval" && e.kind !== "approval_resolved",
+              );
+              return { stream, turn: [] };
+            },
+      );
+    }
   };
 
   const hasTail = (rec: TurnRecord) =>
@@ -779,14 +821,24 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
   const tailToEnd = (rec: TurnRecord, session: AssistantSession, signal: AbortSignal) =>
     new Promise<void>((resolve) => {
       const sink = sinkFor(rec, true);
+      // The replay is held aside until its end, so a read that stalls or fails keeps the live answer.
+      const held: (() => void)[] = [];
+      const swapIn = () => {
+        for (const apply of held.splice(0)) apply();
+      };
       const watched: FrameSink = {
         ...sink,
         onFrame(frame, id) {
-          sink.onFrame(frame, id);
-          if (frame.type === "cancelled" || frame.type === "complete" || frame.type === "error")
-            resolve();
+          held.push(() => sink.onFrame(frame, id));
+          if (!isTerminalFrame(frame)) return;
+          swapIn();
+          resolve();
+        },
+        onBoundary(id) {
+          held.push(() => sink.onBoundary(id));
         },
         onEnd(reason) {
+          if (reason === "eof") swapIn();
           sink.onEnd(reason);
           resolve();
         },
@@ -1165,6 +1217,7 @@ function newRecord(
     streamEnded: false,
     throughSeq: [],
     sinceSeq: [],
+    liveOnly: [],
     cancelMs: null,
     settled: false,
     lingering: false,
@@ -1405,6 +1458,34 @@ function freshStream(messages: AssistantSession["messages"]): StreamState {
     halted: false,
     extras: emptyExtras(),
   };
+}
+
+function isTerminalFrame(frame: AssistantFrame): boolean {
+  return frame.type === "cancelled" || frame.type === "complete" || frame.type === "error";
+}
+
+function cardIdOf(frame: AssistantFrame): string | null {
+  const f = frame as { type: string; id?: unknown; call_id?: unknown; request_id?: unknown };
+  const id = f.type === "ask_user" ? f.request_id : (f.id ?? f.call_id);
+  return typeof id === "string" && id ? id : null;
+}
+
+/** The frames no stored projection holds: cards other than delete batches, their answers, and resource changes. */
+function liveOnlyFrames(frames: AssistantFrame[]): AssistantFrame[] {
+  const cards = new Set<string>();
+  return frames.filter((frame) => {
+    const f = frame as { type: string; tool?: unknown; kind?: unknown };
+    if (f.type === "resource_changed") return true;
+    const id = cardIdOf(frame);
+    if (
+      f.type === "ask_user" ||
+      (f.type === "confirmation_required" && f.tool !== "o2_delete" && f.kind !== "delete")
+    ) {
+      if (id) cards.add(id);
+      return true;
+    }
+    return f.type === "confirmation_resolved" && !!id && cards.has(id);
+  });
 }
 
 function liveCtx(t: TranslateFn): ReducerCtx {
