@@ -319,6 +319,7 @@ function mergeEnglish(hand: LocalePack, en: LocalePack | undefined): LocalePack 
     rangeJoin: [...hand.rangeJoin, ...en.rangeJoin],
     rangeTemplates: [...hand.rangeTemplates, ...en.rangeTemplates],
     numberWords: { ...en.numberWords, ...hand.numberWords },
+    dayParts: { ...en.dayParts, ...hand.dayParts },
     articles: [...(en.articles ?? []), ...(hand.articles ?? [])],
   };
 }

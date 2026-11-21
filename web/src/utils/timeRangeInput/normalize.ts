@@ -21,6 +21,8 @@ export interface Normalized {
   text: string;
   fold: string;
   firstLine: string;
+  /** The raw text starts with an ASCII URL scheme or a query, so a fullwidth look-alike is no URL. */
+  url: boolean;
 }
 
 export const MAX_CODE_POINTS = 512;
@@ -131,6 +133,7 @@ export function normalize(
     text,
     fold: foldText(text, bcp47, script, hooks.fold),
     firstLine: mapped(clean(raw.split("\n")[0].split("\r")[0].normalize("NFKC"))),
+    url: /^\s*(https?:\/\/|[?？])[^]*$/i.test(raw),
   };
 }
 

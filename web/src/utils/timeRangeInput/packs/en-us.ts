@@ -70,6 +70,8 @@ export const pack: LocalePack = {
     "in the afternoon": [12, 18],
     "in the evening": [17, 24],
     tonight: [17, 24],
+    noon: [12, 13],
+    midnight: [0, 1],
   },
   numberWords: {
     a: 1,
