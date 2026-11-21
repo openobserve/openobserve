@@ -263,11 +263,11 @@ function inheritMod(end: Point, start: Point): Point {
   return { ...end, clock };
 }
 
-// A bare end clock is read where the start is, in its offset or zone, so the viewer's zone never
-// decides it (`09:30Z - 11` ends at 11:00Z everywhere).
+// A bare end clock, or one on the shared date, is read in the start's offset or zone, so the viewer's
+// zone never decides it (`09:30Z - 11` ends at 11:00Z everywhere).
 function inZone(end: Point, start: Point): Point {
   const c = clockOf(start);
-  if (end.p !== "clock" || zonedSide(end) || !c || !zonedSide(start)) return end;
+  if (!shared(end) || zonedSide(end) || !c || !zonedSide(start)) return end;
   return { ...end, clock: { ...end.clock, offsetSec: c.offsetSec, zone: c.zone } };
 }
 

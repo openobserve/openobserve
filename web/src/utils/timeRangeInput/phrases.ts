@@ -636,11 +636,15 @@ export function pointHits(sc: Scan, pos: number): Hit<Alt<Point>[]>[] {
     for (const [end, span] of words(sc, pos, env.pack.spanWords)) {
       out.push([end, [{ v: { p: "span", drafts: spanDrafts(span.unit, span.offset, env) } }]]);
     }
+    // A clock on a day keeps that day; a mark that shifts the day (`昨晚`) reads only on a lone clock.
+    const fixed = (alts: Alt<ClockValue>[]) => alts.filter((a) => !a.v.mod?.shift);
     for (const [end, days] of dayHits(sc, pos)) {
       out.push([end, days.map((a) => ({ v: { p: "day", ...a.v }, why: a.why, tag: a.tag }))]);
       for (const at of spaced(sc, end)) {
         for (const [e2, clocks] of clockHits(sc, at)) {
-          for (const [e3, zc] of zoned(sc, e2, clocks))
+          const own = fixed(clocks);
+          if (own.length === 0) continue;
+          for (const [e3, zc] of zoned(sc, e2, own))
             out.push([e3, cross(days, zc, (d, c): Point => ({ p: "wall", ...d, clock: c }))]);
         }
       }
@@ -648,11 +652,12 @@ export function pointHits(sc: Scan, pos: number): Hit<Alt<Point>[]>[] {
     for (const [end, clocks] of clockHits(sc, pos)) {
       for (const [e2, zc] of zoned(sc, end, clocks)) {
         out.push([e2, zc.map((c) => ({ v: { p: "clock", clock: c.v }, why: c.why, tag: c.tag }))]);
-        for (const at of spaced(sc, e2)) {
+        const own = fixed(zc);
+        for (const at of own.length > 0 ? spaced(sc, e2) : []) {
           // A bare digit glued to a word is a count with its unit (de `3mo`), never an hour on a day.
-          if (at === e2 && wordy(sc.fold.charCodeAt(at)) && zc.every((c) => c.v.bare)) continue;
+          if (at === e2 && wordy(sc.fold.charCodeAt(at)) && own.every((c) => c.v.bare)) continue;
           for (const [e3, days] of dayHits(sc, at)) {
-            out.push([e3, cross(days, zc, (d, c): Point => ({ p: "wall", ...d, clock: c }))]);
+            out.push([e3, cross(days, own, (d, c): Point => ({ p: "wall", ...d, clock: c }))]);
           }
         }
       }
@@ -708,13 +713,13 @@ function isoOnly(sc: Scan, from: number, to: number): boolean {
 }
 
 // The dash is an offset after `UTC`/`GMT`, after a clock with seconds, or when the stamp scanner reads
-// the whole text as the stamp at `k` plus a fixed offset.
+// the whole text as the stamp at `k` (with any mark) plus a fixed offset.
 function offsetLike(sc: Scan, k: number): boolean {
   const off = scanOffset(sc.text, k);
   if (!off || off.end !== sc.len) return false;
   if (["utc", "gmt"].includes(sc.fold.slice(k - 3, k))) return true;
   const left = sc.text[k - 1] === " " ? k - 1 : k;
-  const stamps = scanStamp(sc.text, 0, sc.env.nowUs, sc.env.zone);
+  const stamps = stampHits(sc, 0);
   const seconds = pointHits(sc, 0).some(
     ([end, alts]) =>
       end === sc.len &&

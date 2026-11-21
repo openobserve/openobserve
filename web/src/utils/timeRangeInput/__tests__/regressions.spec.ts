@@ -1608,10 +1608,20 @@ describe("typed-clock review fixes, round 2", () => {
     for (const day of ["2026-11-20 ", "2026-11-20T", "Nov 20 "]) {
       for (const clock of ["9:30:15", "09:30:00", "13:30", "09:30"]) {
         const bare = await read(day + clock);
-        for (const mark of [" PM", " am", ""]) {
+        const zoned = await read(`${day}${clock} +05:30 INFO`);
+        expect(await read(`${day}${clock} +05:30, INFO`), clock).toEqual(zoned);
+        if (zoned.state === "valid") expect(zoned).not.toEqual(bare);
+        for (const mark of [" PM", " am", "", " PM,", " PM."]) {
           const stamp = day + clock + mark;
           const refs = [bare, await read(stamp)].filter((r) => r.state === "valid");
-          for (const tail of [" to 16:30", " - 13pm+05:30", " to noon", " - 11 pm", " to 11 UTC"]) {
+          for (const tail of [
+            " to 16:30",
+            " - 13pm+05:30",
+            " to noon",
+            " - 11 pm",
+            " to 11 UTC",
+            " to p.m.",
+          ]) {
             const got = await read(stamp + tail);
             for (const ref of refs)
               expect({ stamp, tail, got }).not.toEqual({ stamp, tail, got: ref });
@@ -1697,6 +1707,71 @@ describe("meridiem rule: a mark binds only to the clock beside it, and no text i
     ["en-US", "hţtps://x/?period=1h", "invalid"],
     ["en-US", "HTTPS://x/?period=1h", ["2026-11-21T11:00:00Z", "2026-11-21T12:00:00Z"]],
     ["en-US", '{"start_date":300,"start_date":100,"end_date":200}', "invalid"],
+    // Round 5: a stamp or mark ends at punctuation, and a zone the end takes is its own reading's.
+    [
+      "en-US",
+      "Nov 21 11:30:00 +05:30, INFO",
+      point("2026-11-21T06:00:00Z"),
+      "2026-11-21T10:00:00Z",
+    ],
+    [
+      "ja-JP",
+      "2026-11-20 09:30 Asia/Tokyo から 11",
+      ["2026-11-20T00:30:00Z", "2026-11-20T02:00:00Z"],
+    ],
+    ["ja-JP", "2026-11-20 09:30 IST から 11", "ambiguous"],
+    ["en-US", "2026-11-20T09:30:00Z to p.m.", "invalid"],
+    ["zh-CN", "2026-11-20T09:30:00Z 到中午", "invalid"],
+    ...["PM, worker", "PM. done", "PM; x", "PM) x", "PM: suspend", "PM.", "PM | x"].map(
+      (tail): [string, string, Want] => [
+        "en-US",
+        `2026-11-20 09:30:15 ${tail}`,
+        point("2026-11-20T21:30:15Z"),
+      ],
+    ),
+    ["en-US", "2026-11-20 09:30:15 PM_worker", point("2026-11-20T09:30:15Z")],
+    ["en-US", "2026-11-20 09:30:15 pm2 restart", point("2026-11-20T09:30:15Z")],
+    ["en-US", "2026-11-20 09:30:15 until restart", point("2026-11-20T09:30:15Z")],
+    ["en-US", "2026-11-20 09:30:15 to do", point("2026-11-20T09:30:15Z")],
+    ["en-US", "2026-11-20T09:30:00Z through gateway", point("2026-11-20T09:30:00Z")],
+    ["en-US", "2026-11-20T09:30:00Z to upstream", point("2026-11-20T09:30:00Z")],
+    ["es-ES", "2026-11-20T09:30:00Z a usuario", point("2026-11-20T09:30:00Z")],
+    ["es-ES", "2026-11-20T09:30:00Z al servidor", point("2026-11-20T09:30:00Z")],
+    ["it-IT", "2026-11-20T09:30:00Z a server", point("2026-11-20T09:30:00Z")],
+    ["pt-BR", "2026-11-20T09:30:00Z a servidor", point("2026-11-20T09:30:00Z")],
+    ["fr-FR", "2026-11-20T09:30:00Z à serveur", point("2026-11-20T09:30:00Z")],
+    ["es-ES", "2026-11-20T21:30:15Z a.m. x", point("2026-11-20T21:30:15Z")],
+    [
+      "en-US",
+      '{"\\u0073tart_date":100,"end_date":200}',
+      ["1970-01-01T00:00:00.0001Z", "1970-01-01T00:00:00.0002Z"],
+    ],
+    ["en-US", '{"start_date":300,"\\u0073tart_date":100,"end_date":200}', "invalid"],
+    [
+      "en-US",
+      '{"\\u0073tart_date":{"x":"start_date"},"\\u0073tart_date":100,"end_date":200}',
+      "invalid",
+    ],
+    ["en-US", "2026-11-20T09:30:00Z - 7 200", point("2026-11-20T09:30:00Z")],
+    ["en-US", "2026-11-20T09:30 AM-10:00", point("2026-11-20T19:30:00Z")],
+    ["en-US", "2026-11-20T09:30 AM-10:00 INFO", point("2026-11-20T19:30:00Z")],
+    ["en-US", "2026-11-01 from 00:30 America/New_York to 01:30", "ambiguous"],
+    ["en-US", "2026-11-20T13:30:00 PM +05:30 to 16:30", "invalid"],
+    ["en-US", "2026-11-20T13:30:00 PM, to 16:30", "invalid"],
+    ["en-US", "2026-11-20 09:30:15 PM, to 16:30", "invalid"],
+    ["zh-CN", "2026-11-20 20:30:00 昨晚", "invalid"],
+    ["en-US", "2026-11-20T09:30:00Z - 25:00UTC", "invalid"],
+    ["en-US", "2026-11-20T09:30:00Z to noon UTC", "invalid"],
+    ["de-DE", "2026-11-20 09:30:00 PM to noon", "invalid"],
+    ["en-US", "Nov 21 09:30:00\n+05:30", point("2025-11-21T09:30:00Z"), "2026-11-21T08:00:00Z"],
+    [
+      "en-US",
+      "Nov 21 09:30:00\n+05:30 INFO",
+      point("2025-11-21T09:30:00Z"),
+      "2026-11-21T08:00:00Z",
+    ],
+    ["en-US", "ｈｔｔｐｓ://x/?period=1h", "invalid"],
+    ["en-US", "2026-11-20 09:30:15 to 12 noon", ["2026-11-20T09:30:15Z", "2026-11-20T12:00:00Z"]],
     // Ranges never drop an end.
     ["en-US", "2026-11-20 09:30Z - 11 UTC", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]],
     ["en-US", "2026-11-20 09:30Z to 11 UTC", ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"]],
@@ -1801,4 +1876,17 @@ describe("meridiem rule: a mark binds only to the clock beside it, and no text i
     const window = from === to ? 300_000_000 : 0;
     expect([r.reading.startUs, r.reading.endUs]).toEqual([from - window, to + window]);
   });
+
+  it.each(["2026-11-20 09:30 IST から 11", "2026-11-20 from 09:30 IST to 11"])(
+    "C2: each start meaning gives one range, ending in its own zone: %s",
+    async (text) => {
+      const spans = async (t: string, locale: string) => {
+        const r = parseTimeRangeInput(baseContext(await packFor(locale), t, LATER, "UTC"));
+        return r.state === "ambiguous" ? r.readings.map((x) => [x.startUs, x.endUs]) : r.state;
+      };
+      const joined = await spans("2026-11-20 09:30 IST - 11", "en-US");
+      expect(joined).toHaveLength(3);
+      expect(await spans(text, text.includes("から") ? "ja-JP" : "en-US")).toEqual(joined);
+    },
+  );
 });
