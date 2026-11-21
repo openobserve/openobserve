@@ -56,9 +56,11 @@ pub enum Object {
         id: String,
         named: bool,
     },
+    /// `toggled` is an enable or disable, which keeps the stored config.
     Pipeline {
         id: Option<String>,
         name: Option<String>,
+        toggled: bool,
     },
     Alert {
         id: Option<String>,
@@ -76,22 +78,28 @@ struct Audited {
 }
 
 impl Audited {
-    fn of(hit: &Value) -> Option<Self> {
+    fn of(hit: &Value) -> Vec<Self> {
         let text = |k: &str| hit[k].as_str().unwrap_or_default();
         let method = text("http_method");
-        let change = change_of(
+        let Some(at) = hit["_timestamp"].as_i64() else {
+            return Vec::new();
+        };
+        let changes = change_of(
             method,
             text("http_path"),
             text("http_query_params"),
             text("body"),
-        )?;
-        Some(Self {
-            at: hit["_timestamp"].as_i64()?,
-            actor: text("user_email").to_string(),
-            deleted: method.eq_ignore_ascii_case("DELETE"),
-            target: Some(text("target").to_string()).filter(|t| !t.is_empty()),
-            change,
-        })
+        );
+        changes
+            .into_iter()
+            .map(|change| Self {
+                at,
+                actor: text("user_email").to_string(),
+                deleted: method.eq_ignore_ascii_case("DELETE"),
+                target: Some(text("target").to_string()).filter(|t| !t.is_empty()),
+                change,
+            })
+            .collect()
     }
 }
 
@@ -110,10 +118,20 @@ pub async fn read_with(
     }
 }
 
-/// Maps an audited call, its path below `/api`, to the change it made; reads and acks are none.
-pub fn change_of(method: &str, path: &str, query: &str, body: &str) -> Option<Change> {
+/// Maps an audited call, its path below `/api`, to the changes it made; reads and acks are none.
+pub fn change_of(method: &str, path: &str, query: &str, body: &str) -> Vec<Change> {
     let parts: Vec<&str> = path.trim_matches('/').split('/').collect();
     let method = method.to_ascii_uppercase();
+    // One change per pipeline, so each is ranked against the streams it feeds.
+    if let ("POST", [_, "pipelines", "bulk", "enable"]) = (method.as_str(), parts.as_slice()) {
+        return body_ids(body)
+            .iter()
+            .map(|id| Change {
+                kind: ChangeKind::PipelineChanged,
+                object: pipeline_id(id, true),
+            })
+            .collect();
+    }
     let (kind, object) = match (method.as_str(), parts.as_slice()) {
         (
             "PUT",
@@ -147,16 +165,16 @@ pub fn change_of(method: &str, path: &str, query: &str, body: &str) -> Option<Ch
                 Object::Pipeline {
                     id: body_field(body, "pipeline_id").filter(|id| kept && !id.is_empty()),
                     name: body_field(body, "name"),
+                    toggled: false,
                 },
             )
         }
         ("DELETE", [_, "pipelines", id]) if *id != "bulk" => {
-            (ChangeKind::PipelineChanged, pipeline_id(id))
+            (ChangeKind::PipelineChanged, pipeline_id(id, false))
         }
-        ("PUT", [_, "pipelines", id, "enable"])
-            if query_value(query, "value").as_deref() == Some("false") =>
-        {
-            (ChangeKind::PipelineChanged, pipeline_id(id))
+        // Enabling a realtime pipeline can silence its source: it gets only rows written back.
+        ("PUT", [_, "pipelines", id, "enable"]) => {
+            (ChangeKind::PipelineChanged, pipeline_id(id, true))
         }
         ("POST", ["v2", _, "alerts"]) => (
             ChangeKind::AlertChanged,
@@ -172,9 +190,9 @@ pub fn change_of(method: &str, path: &str, query: &str, body: &str) -> Option<Ch
                 stream: body_stream(body),
             },
         ),
-        _ => return None,
+        _ => return Vec::new(),
     };
-    Some(Change { kind, object })
+    vec![Change { kind, object }]
 }
 
 async fn changes(
@@ -205,7 +223,7 @@ async fn changes(
             PROVIDER_TIMEOUT,
         )
         .await?;
-    let audited: Vec<Audited> = page.hits.iter().filter_map(Audited::of).collect();
+    let audited: Vec<Audited> = page.hits.iter().flat_map(Audited::of).collect();
     let wants = |f: fn(&Object) -> bool| audited.iter().any(|a| f(&a.change.object));
     let (names, fed, cut) = if wants(|o| matches!(o, Object::Pipeline { .. })) {
         let pipelines = lookups.pipelines(&ask.org).await?;
@@ -298,7 +316,7 @@ fn record(
             let open = link("iam/ingestionTokens", &[]).filter(|_| named);
             (subject, name, Vec::new(), open)
         }
-        Object::Pipeline { id, name } => {
+        Object::Pipeline { id, name, toggled } => {
             let named = a.target.clone().or(name);
             let created = id.is_none();
             let id = id.or_else(|| only_named(names, named.as_deref()?))?;
@@ -310,8 +328,8 @@ fn record(
                     let name = a.target.clone().unwrap_or_else(|| f.name.clone());
                     (subject, name, f.affects.clone(), open)
                 }
-                // A create cannot have cut a stream off.
-                None if created => return None,
+                // A create, or a toggle of a pipeline not in `fed`, cannot have cut a stream off.
+                None if created || (toggled && names.contains_key(&id)) => return None,
                 // Only the current config is stored, so what an edit cut off is unknown: org-wide.
                 None => {
                     let name = named.or_else(|| names.get(&id).cloned());
@@ -384,10 +402,11 @@ fn only_named(names: &BTreeMap<String, String>, name: &str) -> Option<String> {
     }
 }
 
-fn pipeline_id(id: &str) -> Object {
+fn pipeline_id(id: &str, toggled: bool) -> Object {
     Object::Pipeline {
         id: Some(id.to_string()),
         name: None,
+        toggled,
     }
 }
 
@@ -436,6 +455,34 @@ fn body_field(body: &str, key: &str) -> Option<String> {
     None
 }
 
+/// A cut body still names every id whose closing quote it kept.
+fn body_ids(body: &str) -> Vec<String> {
+    if let Ok(Value::Object(map)) = serde_json::from_str::<Value>(body) {
+        let ids = map.get("ids").and_then(Value::as_array);
+        return ids
+            .into_iter()
+            .flatten()
+            .filter_map(|id| id.as_str().map(str::to_string))
+            .collect();
+    }
+    let Some((_, list)) = body
+        .split_once("\"ids\"")
+        .and_then(|(_, r)| r.split_once('['))
+    else {
+        return Vec::new();
+    };
+    let pieces: Vec<&str> = list
+        .split(']')
+        .next()
+        .unwrap_or_default()
+        .split('"')
+        .collect();
+    (1..pieces.len().saturating_sub(1))
+        .step_by(2)
+        .map(|i| pieces[i].to_string())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::{
@@ -461,15 +508,18 @@ mod tests {
 
     #[test]
     fn audited_calls_map_to_the_change_they_made() {
-        let change = |kind, object| Some(Change { kind, object });
+        let change = |kind, object| vec![Change { kind, object }];
         let pipeline = |id: Option<&str>, name: Option<&str>| Object::Pipeline {
             id: id.map(str::to_string),
             name: name.map(str::to_string),
+            toggled: false,
         };
         let alert = |id: Option<&str>, stream: Option<EntityRef>| Object::Alert {
             id: id.map(str::to_string),
             stream,
         };
+        let toggle = |id| change(ChangeKind::PipelineChanged, pipeline_id(id, true));
+        let (p1, p2) = (toggle("p1"), toggle("p2"));
         let alert_body = r#"{"name":"5xx","stream_type":"logs","stream_name":"app","query_condition":{"sql":"SELECT"#;
         let cases = [
             (
@@ -506,7 +556,13 @@ mod tests {
                 "",
                 change(ChangeKind::StreamDeleted, Object::Stream(logs("app"))),
             ),
-            ("DELETE", "acme/streams/app/cache/results", "", "", None),
+            (
+                "DELETE",
+                "acme/streams/app/cache/results",
+                "",
+                "",
+                Vec::new(),
+            ),
             (
                 "PUT",
                 "acme/passcode",
@@ -584,17 +640,37 @@ mod tests {
                 "acme/pipelines/p1/enable",
                 "value=false",
                 "",
-                change(ChangeKind::PipelineChanged, pipeline(Some("p1"), None)),
+                toggle("p1"),
             ),
-            ("PUT", "acme/pipelines/p1/enable", "value=true", "", None),
+            (
+                "PUT",
+                "acme/pipelines/p1/enable",
+                "value=true",
+                "",
+                toggle("p1"),
+            ),
             (
                 "PUT",
                 "acme/pipelines/p1/enable",
                 "value=%66alse",
                 "",
-                change(ChangeKind::PipelineChanged, pipeline(Some("p1"), None)),
+                toggle("p1"),
             ),
-            ("DELETE", "acme/pipelines/bulk", "", "", None),
+            ("DELETE", "acme/pipelines/bulk", "", "", Vec::new()),
+            (
+                "POST",
+                "acme/pipelines/bulk/enable",
+                "value=true",
+                r#"{"ids":["p1","p2"]}"#,
+                [p1.clone(), p2].concat(),
+            ),
+            (
+                "POST",
+                "acme/pipelines/bulk/enable",
+                "value=false",
+                r#"{"ids":["p1","p"#,
+                p1,
+            ),
             (
                 "POST",
                 "v2/acme/alerts",
@@ -619,16 +695,16 @@ mod tests {
                 "",
                 change(ChangeKind::AlertChanged, alert(Some("a1"), None)),
             ),
-            ("POST", "v2/acme/alerts/a1/ack", "", "", None),
-            ("POST", "v2/acme/alerts/a1/unack", "", "", None),
+            ("POST", "v2/acme/alerts/a1/ack", "", "", Vec::new()),
+            ("POST", "v2/acme/alerts/a1/unack", "", "", Vec::new()),
             (
                 "POST",
                 "v2/acme/alerts/a1/mute",
                 "",
                 r#"{"duration":60}"#,
-                None,
+                Vec::new(),
             ),
-            ("GET", "acme/streams/app/schema", "", "", None),
+            ("GET", "acme/streams/app/schema", "", "", Vec::new()),
         ];
         for (method, path, query, body, want) in cases {
             assert_eq!(
@@ -712,6 +788,14 @@ mod tests {
             audit_row(135, "PUT", "acme/pipelines", "", r#"{"pipeline_id":"p9"}"#),
             audit_row(136, "PUT", "acme/pipelines/p1/enable", "value=false", ""),
             audit_row(137, "DELETE", "acme/pipelines/p7", "", ""),
+            audit_row(138, "PUT", "acme/pipelines/p1/enable", "value=true", ""),
+            audit_row(
+                139,
+                "POST",
+                "acme/pipelines/bulk/enable",
+                "value=true",
+                r#"{"ids":["p2","p9"]}"#,
+            ),
             audit_row(140, "PUT", "v2/acme/alerts/a1", "", "{}"),
             audit_row(142, "DELETE", "v2/acme/alerts/a7", "", ""),
             audit_row(145, "POST", "v2/acme/alerts/a1/ack", "", ""),
@@ -783,6 +867,18 @@ mod tests {
                     vec![logs("app")]
                 ),
                 (
+                    139,
+                    ChangeKind::PipelineChanged,
+                    kinds::PIPELINE,
+                    vec![logs("app")]
+                ),
+                (
+                    138,
+                    ChangeKind::PipelineChanged,
+                    kinds::PIPELINE,
+                    vec![logs("app")]
+                ),
+                (
                     137,
                     ChangeKind::PipelineChanged,
                     kinds::PIPELINE,
@@ -840,6 +936,13 @@ mod tests {
                 "{}",
                 issue.decision_id
             );
+            // Enabling a pipeline can route its source stream away, so it is a candidate cause.
+            assert_eq!(
+                ranked.iter().any(|(r, ..)| r.at == 138),
+                issue.subject == logs("app"),
+                "{}",
+                issue.decision_id
+            );
             assert!(
                 ranked
                     .iter()
@@ -862,6 +965,7 @@ mod tests {
             Some("ops")
         );
         assert_eq!(at(132).subject.key_dims[dims::ENTITY_ID], "p2");
+        assert_eq!(at(139).subject.key_dims[dims::ENTITY_ID], "p2");
         assert!(at(137).open.is_none() && at(142).open.is_none());
         assert_eq!(*search.orgs.lock().unwrap(), [META_ORG_ID]);
     }
