@@ -1602,16 +1602,17 @@ struct RunUsage {
 impl RunUsage {
     fn of(events: &[DurableEvent]) -> Self {
         // A part is updated many times; its last update holds the step's cost.
-        let mut costs: HashMap<&str, Option<f64>> = HashMap::new();
+        let mut costs: HashMap<String, Option<f64>> = HashMap::new();
         let mut model = None;
         for event in events {
-            if let Some(part) = updated_part(event) {
+            for part in event_parts(event) {
                 if part.get("type").and_then(Value::as_str) == Some("step-finish")
                     && let Some(id) = part.get("id").and_then(Value::as_str)
                 {
-                    costs.insert(id, part.get("cost").and_then(Value::as_f64));
+                    costs.insert(id.to_string(), part.get("cost").and_then(Value::as_f64));
                 }
-            } else if event.event_type.starts_with("message.updated") {
+            }
+            if event.event_type.starts_with("message.updated") {
                 let info = &event.data["info"];
                 let text = |k: &str| info[k].as_str().filter(|v| !v.is_empty());
                 if text("role") == Some("assistant")
