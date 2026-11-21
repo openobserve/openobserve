@@ -76,6 +76,8 @@ write({
   "web/src/one.spec.ts": `import { one } from "./one";`,
   "src/config/parity.json": "{}",
   "web/src/utils/parity.spec.ts": `import p from "../../../src/config/parity.json";`,
+  "src/config/shared.ts": "export const s = 1;",
+  "web/src/utils/shared.spec.ts": `import { s } from "../../../src/config/shared";`,
 });
 const base = commit();
 
@@ -122,6 +124,18 @@ test("a changed file outside web/ that a web file imports runs everything", () =
   });
   assert.equal(r.mode, "full");
   assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/parity.json");
+});
+
+test("an extensionless import of a changed file outside web/ runs everything", () => {
+  const r = run({
+    "src/config/shared.ts": "export const s = 2;",
+    "web/src/utils/a.ts": "export const a = 3;",
+  });
+  assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/shared.ts");
+});
+
+test("the shard durations file runs everything", () => {
+  assert.equal(run({ "web/scripts/ui-shard-durations.json": "{" }).mode, "full");
 });
 
 test("an added locale key selects only the specs that read locale files", () => {
