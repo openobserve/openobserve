@@ -240,6 +240,12 @@ describe("CellActions", () => {
       expect(includeBtns.length).toBe(0);
       expect(excludeBtns.length).toBe(0);
     });
+
+    it("hides only the exclude button when hideExclude is true", () => {
+      const wrapper = mountComponent({ hideExclude: true });
+      expect(wrapper.find('[data-test="log-details-include-field-200"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="log-details-exclude-field-200"]').exists()).toBe(false);
+    });
   });
 
   // ── copyLogToClipboard ─────────────────────────────────────────────────────────

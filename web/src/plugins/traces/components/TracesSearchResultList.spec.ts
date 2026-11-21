@@ -100,7 +100,14 @@ vi.mock("@/plugins/traces/composables/useTracesTableColumns", async (importOrigi
 vi.mock("@/plugins/logs/data-table/CellActions.vue", () => ({
   default: {
     name: "CellActions",
-    props: ["column", "row", "selectedStreamFields", "hideSearchTermActions", "hideAi"],
+    props: [
+      "column",
+      "row",
+      "selectedStreamFields",
+      "hideSearchTermActions",
+      "hideExclude",
+      "hideAi",
+    ],
     emits: ["copy", "add-search-term", "send-to-ai-chat"],
     template: `<div data-test="stub-cell-actions" />`,
   },
@@ -501,6 +508,29 @@ describe("TracesSearchResultList", () => {
         ).not.toBeNull();
         expect(item()).toBeNull();
       });
+
+      describe("search terms", () => {
+        const term = (action: "include" | "exclude") =>
+          wrapper.element.querySelector(`[data-test="trace-context-menu-${action}-term"]`);
+
+        beforeEach(() => {
+          sharedSearchObj.data.stream.selectedStreamFields = [
+            { name: "operation_name", isSchemaField: true },
+          ];
+        });
+
+        it("offers include but not exclude on a trace row", async () => {
+          await openMenu({ searchMode: "traces" });
+          expect(term("include")).not.toBeNull();
+          expect(term("exclude")).toBeNull();
+        });
+
+        it("offers include and exclude on a span row", async () => {
+          await openMenu({ searchMode: "spans" });
+          expect(term("include")).not.toBeNull();
+          expect(term("exclude")).not.toBeNull();
+        });
+      });
     });
   });
 
@@ -894,6 +924,14 @@ describe("TracesSearchResultList", () => {
       } finally {
         (sharedSearchObj.meta as any).sqlMode = false;
       }
+    });
+
+    it("hides the hover exclude action on a trace row and keeps it on a span row", () => {
+      wrapper = mount_({ hits: [hit], loading: false, searchMode: "traces" });
+      expect(wrapper.findComponent({ name: "CellActions" }).props("hideExclude")).toBe(true);
+      wrapper.unmount();
+      wrapper = mount_({ hits: [hit], loading: false, searchMode: "spans" });
+      expect(wrapper.findComponent({ name: "CellActions" }).props("hideExclude")).toBe(false);
     });
 
     it("should use != operator for exclude action", async () => {

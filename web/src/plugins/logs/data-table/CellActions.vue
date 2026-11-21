@@ -28,6 +28,7 @@
         <OTooltip :content="t('logs.cellActions.includeTerm')" />
       </OButton>
       <OButton
+        v-if="!hideExclude"
         variant="ghost"
         size="icon-xs-circle"
         :aria-label="t('logs.cellActions.excludeTerm')"
@@ -94,6 +95,10 @@ const props = defineProps({
     default: () => [],
   },
   hideSearchTermActions: {
+    type: Boolean,
+    default: false,
+  },
+  hideExclude: {
     type: Boolean,
     default: false,
   },

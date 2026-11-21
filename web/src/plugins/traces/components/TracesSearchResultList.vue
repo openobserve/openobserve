@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :row="row"
                     :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
                     :hide-search-term-actions="false"
+                    :hide-exclude="!offersExclude"
                     :hide-ai="true"
                     @copy="copyToClipboard(column.id, row[column.id])"
                     @add-search-term="
@@ -257,6 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OContextMenuItem>
 
               <OContextMenuItem
+                v-if="offersExclude"
                 data-test="trace-context-menu-exclude-term"
                 @select="
                   addSearchTerm(
@@ -487,6 +489,9 @@ const contextCellIsStreamField = computed(() => {
   const fields = (searchObj.data.stream.selectedStreamFields ?? []) as any[];
   return fields.find((field: any) => field.name === columnId)?.isSchemaField ?? false;
 });
+
+// A trace is listed when any of its spans matches, so != on a trace row never removes it.
+const offersExclude = computed(() => props.searchMode === "spans");
 
 // Capture-phase gate: only data cells offer actions, so right-clicking a header
 // leaves the native menu alone. reka-ui checks `defaultPrevented` before opening.
