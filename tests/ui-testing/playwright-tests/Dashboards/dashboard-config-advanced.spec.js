@@ -66,6 +66,8 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     const dashboardName = generateDashboardName();
 
     // Minutes, not a day: see seedTimeShiftMetric for why.
+    // The seed waits up to 4 min for the back-filled rows to flush.
+    test.setTimeout(480_000);
     await seedTimeShiftMetric(page.request);
 
     await buildPromQLPanel(page, pm, dashboardName, { chartType: "line", query: TIME_SHIFT_METRIC });
@@ -87,12 +89,17 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     // Assert on the saved panel: the PromQL custom-mode editor preview was seen not to draw.
     await pm.dashboardPanelActions.savePanel();
     let names = [];
-    await expect
-      .poll(async () => (names = await pm.dashboardPanelActions.getChartSeriesNames()), {
-        timeout: 30000,
-        message: "a '(10 Minutes ago)' series should be drawn next to the current one",
-      })
-      .toContainEqual(expect.stringMatching(/ \(10 Minutes ago\)$/));
+    let attempt = 0;
+    // A run that reached the back-filled window before it was readable never redraws, so each retry refreshes the dashboard.
+    await expect(async () => {
+      if (attempt++ > 0) await pm.dashboardTimeRefresh.refreshDashboard();
+      await expect
+        .poll(async () => (names = await pm.dashboardPanelActions.getChartSeriesNames()), {
+          timeout: 20000,
+          message: "a '(10 Minutes ago)' series should be drawn next to the current one",
+        })
+        .toContainEqual(expect.stringMatching(/ \(10 Minutes ago\)$/));
+    }).toPass({ timeout: 90000, intervals: [2000] });
     testLogger.info("PromQL time shift series", { names });
 
     // One seeded series → exactly one shifted copy, labelled after its current twin.

@@ -886,6 +886,11 @@ class SchemaPage {
         return (text || '').trim();
     }
 
+    // The chip renders a bare "→" until the stream stats load, so a baseline read before then is not a range.
+    async expectDocTimeRangePopulated() {
+        await expect(this.schemaTimelineDocTimeRange).toHaveText(/\d{4}.*→.*\d{4}/, { timeout: 30000 });
+    }
+
     // Assert the timezone label is non-empty
     async expectTimezoneLabelNonEmpty() {
         await expect(this.schemaTimelineTimezoneLabel).toBeVisible({ timeout: 15000 });

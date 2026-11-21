@@ -44,18 +44,51 @@ async function waitForInstantQuery(request, query, timeout = 60_000) {
     .toBeGreaterThan(0);
 }
 
-// Where 3×ZO_MAX_FILE_RETENTION_TIME is under 10m this window ends before PromQL's WAL floor, so its rows show only once flushed.
-async function waitForShiftedRange(request, query, timeout = 120_000) {
+/** Seconds between the first and last finite sample across every series of an SSE query_range body. */
+function sampleSpanSeconds(sseBody) {
+  const stamps = [];
+  const walk = (node) => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (!node || typeof node !== 'object') return;
+    for (const [key, val] of Object.entries(node)) {
+      if (key === 'values' && Array.isArray(val)) {
+        for (const pair of val) if (Array.isArray(pair) && Number.isFinite(Number(pair[1]))) stamps.push(Number(pair[0]));
+      } else walk(val);
+    }
+  };
+  for (const line of sseBody.split('\n')) {
+    if (!line.startsWith('data:')) continue;
+    try {
+      walk(JSON.parse(line.slice(5)));
+    } catch {
+      // keep-alive and non-JSON lines carry no samples
+    }
+  }
+  return stamps.length ? Math.max(...stamps) - Math.min(...stamps) : 0;
+}
+
+// Same request as a 15m panel's shifted stream; use_cache=false recomputes it and overwrites a cache entry taken before the back-filled rows were readable.
+async function waitForPanelShiftedSeries(request, offsetMinutes, timeout = 240_000) {
   await expect
     .poll(
-      () => {
-        const nowSec = Math.floor(Date.now() / 1000);
-        const range = `start=${nowSec - 25 * 60}&end=${nowSec - 10 * 60}&step=60s`;
-        return promql(request, `query_range?query=${encodeURIComponent(query)}&${range}`);
+      async () => {
+        const endUs = (Date.now() - offsetMinutes * 60_000) * 1000;
+        const startUs = endUs - 15 * 60 * 1_000_000;
+        const qs = `use_streaming=true&use_cache=false&start=${startUs}&end=${endUs}&step=0&query=${encodeURIComponent(TIME_SHIFT_METRIC)}`;
+        // A bodiless POST carrying the JSON content type is rejected with 415.
+        const res = await request.post(`${baseUrl()}/api/${org()}/prometheus/api/v1/query_range?${qs}`, {
+          headers: { ...getAuthHeaders(), 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+        if (!res.ok()) throw new Error(`shifted query_range answered ${res.status()}: ${(await res.text()).slice(0, 200)}`);
+        return sampleSpanSeconds(await res.text());
       },
-      { timeout, intervals: [1000, 2000, 5000], message: `${query} never appeared in the 10m-shifted query_range window` },
+      {
+        timeout,
+        intervals: [2000, 5000],
+        message: `${TIME_SHIFT_METRIC} samples never spanned 10m of the panel's ${offsetMinutes}m-shifted streaming window`,
+      },
     )
-    .toBeGreaterThan(0);
+    .toBeGreaterThanOrEqual(600);
 }
 
 // Shift by minutes: PromQL reads unflushed rows only for a window ending after now − 3×ZO_MAX_FILE_RETENTION_TIME (30m by default).
@@ -73,7 +106,7 @@ async function seedTimeShiftMetric(request) {
   }
   await postRows(request, rows);
   await waitForInstantQuery(request, TIME_SHIFT_METRIC);
-  await waitForShiftedRange(request, TIME_SHIFT_METRIC);
+  await waitForPanelShiftedSeries(request, 10);
 }
 
 // method has 2 values (a breakdown without topk); status pins "500" for Add-to-filter.
