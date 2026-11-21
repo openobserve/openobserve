@@ -421,7 +421,9 @@ export function compilePack(hand: LocalePack, gen: GeneratedTables, en?: LocaleP
     ),
   );
   for (const [s, [from, to, shift]] of Object.entries(pack.dayParts ?? {})) {
-    mods.push({ s: fold(s), value: { from, to, shift: shift ?? 0 } });
+    const value: ClockMod = { from, to, shift: shift ?? 0 };
+    if (shift !== undefined) value.dated = true;
+    mods.push({ s: fold(s), value });
   }
   return {
     key: pack.key,

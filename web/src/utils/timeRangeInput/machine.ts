@@ -50,22 +50,23 @@ export interface MathPoint {
 }
 
 const EN_MONTHS = "jan feb mar apr may jun jul aug sep oct nov dec".split(" ");
-// Letter abbreviations: a list of offsets (minutes) asks, an IANA name follows that zone's DST.
-const ZONE_ABBREVIATIONS: Record<string, number[] | string> = {
+// Letter abbreviations as offsets (minutes); several ask. A DST pair keeps its own fixed offset, so
+// `EST` in summer is still UTC-5 and two stamps never disagree with their written abbreviations.
+const ZONE_ABBREVIATIONS: Record<string, number[]> = {
   IST: [330, 120, 60],
   BST: [60, 360],
   AST: [-240, 180],
-  EST: "America/New_York",
-  EDT: "America/New_York",
-  CST: "America/Chicago",
-  CDT: "America/Chicago",
-  MST: "America/Denver",
-  MDT: "America/Denver",
-  PST: "America/Los_Angeles",
-  PDT: "America/Los_Angeles",
-  AKST: "America/Anchorage",
-  AKDT: "America/Anchorage",
-  HST: "Pacific/Honolulu",
+  EST: [-300],
+  EDT: [-240],
+  CST: [-360],
+  CDT: [-300],
+  MST: [-420],
+  MDT: [-360],
+  PST: [-480],
+  PDT: [-420],
+  AKST: [-540],
+  AKDT: [-480],
+  HST: [-600],
   WET: [0],
   WEST: [60],
   CET: [60],
@@ -203,11 +204,12 @@ export function scanZone(text: string, pos: number): Scanned<ZoneAlt>[] {
   while (isUpper(text, i)) i++;
   const abbr = ZONE_ABBREVIATIONS[text.slice(pos, i)];
   if (i - pos >= 2 && abbr !== undefined && bounded(i)) {
-    const why: AmbiguityReason | undefined =
-      Array.isArray(abbr) && abbr.length > 1 ? "zone-abbreviation" : undefined;
-    const alts: Alt<ZoneAlt>[] = Array.isArray(abbr)
-      ? abbr.map((m) => ({ v: { offsetSec: m * 60 }, why, tag: why && `z${m}` }))
-      : [{ v: { zone: abbr } }];
+    const why: AmbiguityReason | undefined = abbr.length > 1 ? "zone-abbreviation" : undefined;
+    const alts: Alt<ZoneAlt>[] = abbr.map((m) => ({
+      v: { offsetSec: m * 60 },
+      why,
+      tag: why && `z${m}`,
+    }));
     out.push({ end: i, alts });
   }
   if (isAlpha(text, pos)) {

@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { addDays, civilOfWall, dayStart, isValidDate, wallUs, US_PER_H, US_PER_S } from "./civil";
+import { addDays, civilOfWall, dayStart, isValidDate, wallUs, US_PER_H } from "./civil";
 import {
   hourIn,
+  latestYear,
   rangeDrafts,
   rollingDrafts,
   singleDrafts,
@@ -23,6 +24,7 @@ import {
   spanDrafts,
   today,
   weekdayDate,
+  zonedDate,
   type Env,
 } from "./combine";
 import {
@@ -37,14 +39,12 @@ import {
   scanOffset,
   scanStamp,
   scanZone,
-  YEARS_BACK,
   zoneStart,
   type Marker,
   type Scanned,
 } from "./machine";
 import type { Elem, Slot, Words } from "./packs/schema";
 import type { Alt, ClockMod, ClockValue, Draft, Outcome, Point, UnitKey } from "./types";
-import { wallAt } from "./zone";
 
 export interface DateVal {
   y: number;
@@ -52,6 +52,7 @@ export interface DateVal {
   d: number;
   /** Set only by day words, whose meaning moves with today, so only they get a calendar token. */
   rel?: boolean;
+  off?: number;
 }
 
 interface NumberHit {
@@ -333,19 +334,10 @@ function fullYear(sc: Scan, y: number, slot: "y" | "yy" | "ry"): number {
 }
 
 /** A year-less date is the most recent one not after today. */
-function dated(
-  sc: Scan,
-  y: number | undefined,
-  mo: number,
-  d: number,
-  now = today(sc.env),
-): DateVal | null {
-  let year = y ?? now.y;
-  const after = (): boolean =>
-    !isValidDate(year, mo, d) ||
-    wallUs(dayStart(year, mo, d)) > wallUs(dayStart(now.y, now.mo, now.d));
-  while (y === undefined && year > now.y - YEARS_BACK && after()) year--;
-  return isValidDate(year, mo, d) ? { y: year, mo, d } : null;
+function dated(sc: Scan, y: number | undefined, mo: number, d: number): DateVal | null {
+  if (y !== undefined) return isValidDate(y, mo, d) ? { y, mo, d } : null;
+  const year = latestYear(mo, d, today(sc.env));
+  return year === null ? null : { y: year, mo, d };
 }
 
 function numericDateHits(sc: Scan, pos: number): Hit<Alt<DateVal>[]>[] {
@@ -438,7 +430,7 @@ function plainDayHits(sc: Scan, pos: number): Hit<Alt<DateVal>[]>[] {
     const out: Hit<Alt<DateVal>[]>[] = [];
     for (const [end, offset] of words(sc, pos, env.pack.dayWords)) {
       const date = civilDate(addDays(dayStart(now.y, now.mo, now.d), offset));
-      out.push([end, [{ v: { ...date, rel: true } }]]);
+      out.push([end, [{ v: { ...date, rel: true, off: offset } }]]);
     }
     for (const [end, wd] of words(sc, pos, env.pack.weekdays))
       out.push([end, [{ v: civilDate(weekdayDate(wd, env)) }]]);
@@ -562,7 +554,9 @@ function grows(alts: Alt<ClockValue>[], mod: ClockMod): boolean {
 
 function zoned(sc: Scan, end: number, alts: Alt<ClockValue>[]): Hit<Alt<ClockValue>[]>[] {
   const out: Hit<Alt<ClockValue>[]>[] = [[end, alts]];
-  const host = alts.some((a) => a.v.sec) ? 2 : 0;
+  // A spaced signed `hh:mm` after an am/pm mark is an offset; an attached one may still end a range.
+  const marked = sc.text[end] === " " && alts.some((a) => a.v.mod?.ap !== undefined);
+  const host = alts.some((a) => a.v.sec) ? 2 : marked ? 1 : 0;
   const at = zoneStart(sc.text, end, host, true);
   const dash = at !== null && zoneStart(sc.text, end, host) === null;
   // A bare digit hour takes no signed offset: `3+4` is not 03:00 at UTC+4.
@@ -584,18 +578,10 @@ function zoned(sc: Scan, end: number, alts: Alt<ClockValue>[]): Hit<Alt<ClockVal
   return out;
 }
 
-// A year-less day under a written zone is the latest one not after today in that zone.
 function zonedDays(sc: Scan, alts: Alt<Point>[]): Alt<Point>[] {
   return alts.flatMap((a) => {
-    const v = a.v;
-    if (v.p !== "wall" || !a.tag?.includes("yd")) return [a];
-    const { zone, offsetSec } = v.clock;
-    const nowUs = sc.env.nowUs;
-    if (zone === undefined && offsetSec === undefined) return [a];
-    const now =
-      zone !== undefined ? wallAt(zone, nowUs) : civilOfWall(nowUs, (offsetSec ?? 0) * US_PER_S);
-    const day = dated(sc, undefined, v.mo, v.d, now);
-    return day ? [{ ...a, v: { ...v, y: day.y } }] : [];
+    const v = a.v.p === "wall" ? zonedDate(a.v, sc.env, a.tag) : a.v;
+    return v ? [{ ...a, v }] : [];
   });
 }
 
@@ -747,19 +733,26 @@ function isoOnly(sc: Scan, from: number, to: number): boolean {
   return scanIso(sc.text, from).some((s) => s.end === to);
 }
 
-// The dash is an offset after `UTC`/`GMT`, after a clock with seconds, or when the stamp scanner reads
-// the whole text as the stamp at `k` plus a fixed offset.
+// The dash ends the text as an offset after `UTC`/`GMT` (even an unknown one, `UTC-07:15`), after a
+// clock with seconds or, spaced, a mark, or when the stamp scanner reads it as the stamp's offset.
 function offsetLike(sc: Scan, k: number): boolean {
+  const utc = ["utc", "gmt"].includes(sc.fold.slice(k - 3, k));
+  if (utc && /^-\d\d?(:?\d\d)?$/.test(sc.text.slice(k))) return true;
   const off = scanOffset(sc.text, k);
   if (!off || off.end !== sc.len) return false;
-  if (["utc", "gmt"].includes(sc.fold.slice(k - 3, k))) return true;
   const left = sc.text[k - 1] === " " ? k - 1 : k;
   const stamps = scanStamp(sc.text, 0, sc.env.nowUs, sc.env.zone);
-  const seconds = pointHits(sc, 0).some(
-    ([end, alts]) =>
-      end === sc.len &&
-      alts.every((a) => a.v.p === "wall" && a.v.clock.sec && a.v.clock.offsetSec !== undefined),
-  );
+  const fixed = (ok: (c: ClockValue) => boolean): boolean =>
+    pointHits(sc, 0).some(
+      ([end, alts]) =>
+        end === sc.len &&
+        alts.every((a) => {
+          const c = "clock" in a.v ? a.v.clock : undefined;
+          return c?.offsetSec !== undefined && !c.dash && ok(c);
+        }),
+    );
+  const seconds =
+    fixed((c) => c.sec === true) || (left < k && fixed((c) => c.mod?.ap !== undefined));
   return (
     seconds ||
     (stamps.some((s) => s.end === left && s.alts.every((a) => a.v.p === "wall")) &&
@@ -791,6 +784,9 @@ function joinSplits(
       if (join === "-" && offsetLike(sc, k)) continue;
       const left = wholePoint(sc, 0, leftEnd);
       if (left.length === 0 || (join === "-" && left.every((a) => a.v.p === "now"))) continue;
+      // A join that opens a clock affix after a day is the clock's (es `ayer a las 10:30`).
+      const clock = pointHits(sc, k).some(([e, alts]) => e === sc.len && alts[0].v.p === "clock");
+      if (clock && left.every((a) => a.v.p === "day")) continue;
       if (rightStart >= sc.len) {
         zero.incomplete = true;
         continue;
@@ -815,7 +811,8 @@ export function rangeOutcome(sc: Scan): Outcome {
         if (!c.start || !c.end) continue;
         // A day before a range lands on its clocks; with no clock to land on it would be dropped text.
         if (c.day && ![...c.start, ...c.end].some((a) => a.v.p === "clock")) continue;
-        const r = rangeDrafts(onDay(c.start, c.day), onDay(c.end, c.day), sc.env);
+        const [start, end] = [c.start, c.end].map((p) => zonedDays(sc, onDay(p, c.day)));
+        const r = rangeDrafts(start, end, sc.env);
         zero.hit = zero.hit || r.zero;
         zero.reversed = zero.reversed || r.reversed;
         if (r.drafts.length > 0) found.push(r.drafts);

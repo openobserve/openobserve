@@ -133,6 +133,8 @@ export interface ClockMod {
   shift: number;
   /** A meridiem's lowest hour (0 in h11 locales); it takes no hour above 12, unlike a day part. */
   ap?: number;
+  /** A day part with its own day (`今晚`, `昨晚`), counted from today, never from a range start. */
+  dated?: boolean;
 }
 
 export interface ClockValue {
@@ -157,7 +159,16 @@ export interface ClockValue {
 
 export type Point =
   | { p: "instant"; us: number; notes: ZoneNote[]; clock?: ClockValue }
-  | { p: "wall"; y: number; mo: number; d: number; clock: ClockValue; shared?: boolean }
+  | {
+      p: "wall";
+      y: number;
+      mo: number;
+      d: number;
+      clock: ClockValue;
+      shared?: boolean;
+      /** Days from today of a day word (`yesterday`), so a written zone moves it to its own today. */
+      off?: number;
+    }
   | { p: "day"; y: number; mo: number; d: number; days?: number; rel?: boolean }
   | { p: "clock"; clock: ClockValue }
   | { p: "now" }

@@ -2102,6 +2102,83 @@ describe("meridiem rule: a mark binds only to the clock beside it, and no text i
     ["en-US", "?from=now-8h&period=1h", "invalid"],
     ["en-US", "?from=now-1h&to=now&period=1h", "invalid"],
     ["en-US", "https://logs.example/#notes?period=1h", "invalid"],
+    // Round 9: a year-less or day-word end follows the zone, and so the today, of a zoned start.
+    [
+      "en-US",
+      "Jan 1 1 AM Pacific/Pago_Pago to Jan 1 2 AM",
+      ["2026-01-01T12:00:00Z", "2026-01-01T13:00:00Z"],
+      "2027-01-01T05:00:00Z",
+    ],
+    [
+      "en-US",
+      "Dec 31 1 AM Etc/GMT+12 to Dec 31 2 AM",
+      ["2025-12-31T13:00:00Z", "2025-12-31T14:00:00Z"],
+      "2026-12-31T05:00:00Z",
+      "Asia/Tokyo",
+    ],
+    [
+      "en-US",
+      "Jan 1 from 00:30 Asia/Tokyo to 01:30",
+      ["2026-12-31T15:30:00Z", "2026-12-31T16:30:00Z"],
+      "2026-12-31T18:00:00Z",
+    ],
+    [
+      "en-US",
+      "Jan 1 from 08:00 Pacific/Kiritimati to 09:00",
+      ["2026-12-31T18:00:00Z", "2026-12-31T19:00:00Z"],
+      "2026-12-31T20:00:00Z",
+    ],
+    ["en-US", "today 00:30 Asia/Tokyo", point("2026-12-31T15:30:00Z"), "2026-12-31T18:00:00Z"],
+    ["en-US", "yesterday 09:00 Etc/GMT+12", point("2026-12-30T21:00:00Z"), "2027-01-01T06:00:00Z"],
+    // Round 9: a signed hh:mm after a seconds clock, or spaced after a mark, is the stamp's offset.
+    ["en-US", "2026-11-20T01:30:15 AM -05:00", point("2026-11-20T06:30:15Z")],
+    ["en-US", "2026-11-20T01:30:15 AM-05:00", point("2026-11-20T06:30:15Z")],
+    ["en-US", "2026-11-20T01:30:00 AM -05:00", point("2026-11-20T06:30:00Z")],
+    ["en-US", "2026-11-20T01:30:15 PM -05:00", point("2026-11-20T18:30:15Z")],
+    ["en-US", "2026-11-20T01:30 AM -05:00", point("2026-11-20T06:30:00Z")],
+    ["en-US", "2026-11-20T04:00:00 UTC-07:15", "invalid"],
+    ["en-US", "2026-11-20T04:00 UTC-07:15", "invalid"],
+    // Round 9: a join that opens a clock affix after a day word is the clock's.
+    ["en-US", "yesterday at 10:30", point("2026-11-20T10:30:00Z")],
+    ["es-ES", "ayer a las 10:30", point("2026-11-20T10:30:00Z")],
+    ["es-ES", "ayer a las 10:30 PM", point("2026-11-20T22:30:00Z")],
+    ["fr-FR", "hier à 10:30", point("2026-11-20T10:30:00Z")],
+    ["it-IT", "ieri alle 10:30", point("2026-11-20T10:30:00Z")],
+    ["es-ES", "ayer de 9 a 10", ["2026-11-20T09:00:00Z", "2026-11-20T10:00:00Z"]],
+    // Round 9: a day part with its own day, another zone's hour and fixed DST abbreviations.
+    ["zh-CN", "昨晚9点到今晚10点", ["2026-11-20T21:00:00Z", "2026-11-21T22:00:00Z"], NIGHT],
+    [
+      "en-US",
+      "2026-11-20 9am UTC to 8 America/Los_Angeles",
+      ["2026-11-20T09:00:00Z", "2026-11-20T16:00:00Z"],
+    ],
+    ["en-US", "2026-11-01T01:45 EST to 2026-11-01T01:15 EDT", "invalid"],
+    ["en-US", "2026-11-01T01:45 EST", point("2026-11-01T06:45:00Z")],
+    // Round 9: `5月` is May, and a duration word that is also a clock asks.
+    ...["zh-CN", "zh-TW", "ja-JP"].flatMap((l): [string, string, Want][] => [
+      [l, "5月", "incomplete"],
+      [l, "五月", "incomplete"],
+    ]),
+    ["ko-KR", "5월", "incomplete"],
+    ["zh-CN", "5个月", ["2026-06-21T12:00:00Z", "2026-11-21T12:00:00Z"]],
+    ["ru-RU", "2 часа", "ambiguous"],
+    ["nl-NL", "2 uur", "ambiguous"],
+    ["ar-SA", '{"start_date":-\u200f1,"end_date":2}', "invalid"],
+    // Round 9: a URL paste must leave no text unread.
+    ...[
+      "https://x/?period=1h&org=a zzz 2026-11-20 09:30",
+      "https://x/?period=1h&stream=logs\nhttps://x/?period=24h",
+      "https://x/?period=1h&https://x/?period=24h",
+      "https://x/?period=1h#notes?period=24h",
+      "https://x/?period=1h#&period=24h",
+      "?period=1h&Period=2h",
+      "?period=1h&period%3D2h",
+      "?period=1h&per\u200biod=24h",
+      "?period=1h&q=\uff03&period=24h",
+      "?from=&period=1h",
+      "?from=now-8h&to=now&period=",
+    ].map((t): [string, string, Want] => ["en-US", t, "invalid"]),
+    ["en-US", "https://x/web/logs?org=a&period=15m#frag", ["2026-11-21T11:45:00Z", LATER]],
   ];
 
   it.each(rows)("%s %s", async (locale, text, want, now = LATER, zone = "UTC") => {

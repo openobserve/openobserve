@@ -19,13 +19,14 @@ import {
   civilOfWall,
   dayStart,
   daysFromCivil,
+  isValidDate,
   wallUs,
   weekdayOf,
   weekStartOf,
   US_PER_S,
   type Civil,
 } from "./civil";
-import { firstInstant, UNIT_US, WINDOW_US } from "./machine";
+import { firstInstant, UNIT_US, WINDOW_US, YEARS_BACK } from "./machine";
 import type { CompiledPack } from "./packs/schema";
 import type {
   Alt,
@@ -38,7 +39,7 @@ import type {
   UnitKey,
   ZoneNote,
 } from "./types";
-import { offsetLabel, pad, resolveCivil, wallAt } from "./zone";
+import { offsetAtInstant, offsetLabel, pad, resolveCivil, wallAt } from "./zone";
 
 export interface Env {
   nowUs: number;
@@ -48,6 +49,8 @@ export interface Env {
   /** Set when a value fell outside the safe-integer µs range, so the result says out-of-range. */
   overflow?: boolean;
 }
+
+type Wall = Extract<Point, { p: "wall" }>;
 
 interface Inst {
   us: number;
@@ -71,6 +74,31 @@ const numberFormats = new Map<string, Intl.NumberFormat>();
 
 export function today(env: Env): Civil {
   return wallAt(env.zone, env.nowUs);
+}
+
+/** The year of the most recent `mo`/`d` not after the day of `now`. */
+export function latestYear(mo: number, d: number, now: Civil): number | null {
+  const last = wallUs(dayStart(now.y, now.mo, now.d));
+  for (let y = now.y; y >= now.y - YEARS_BACK; y--)
+    if (isValidDate(y, mo, d) && wallUs(dayStart(y, mo, d)) <= last) return y;
+  return null;
+}
+
+/** A year-less date (a `y` tag) or a day word under a written zone counts from today in that zone. */
+export function zonedDate(p: Wall, env: Env, tag: string | undefined): Wall | null {
+  const c = p.clock;
+  if (
+    (!yearless(tag) && p.off === undefined) ||
+    (c.zone === undefined && c.offsetSec === undefined)
+  )
+    return p;
+  const now = wallFor(c, env.nowUs, env);
+  if (p.off === undefined) {
+    const y = latestYear(p.mo, p.d, now);
+    return y === null ? null : { ...p, y };
+  }
+  const t = addDays(dayStart(now.y, now.mo, now.d), p.off);
+  return { ...p, y: t.y, mo: t.mo, d: t.d };
 }
 
 function clockText(c: Civil): string {
@@ -246,29 +274,40 @@ function singleRaw(alts: Alt<Point>[], env: Env): Draft[] {
 
 // An unpadded hour-only 1-11 end with no meridiem or date of its own takes the start's day part,
 // or, outside it, the typed hour if after the start, else the afternoon (`9am to 5`, `深夜1時から5時`).
-function inheritMod(end: Point, start: Point): Point {
+function inheritMod(end: Point, start: Point, env: Env): Point {
   const sc = clockOf(start);
   const ec = clockOf(end);
   if (!shared(end) || !sc?.mod || !ec?.hourOnly || ec.padded || ec.mod || ec.h < 1 || ec.h > 11)
     return end;
+  // Wall hours in two offsets do not compare, so an end in another zone keeps its typed hour.
+  const offset = (c: ClockValue): number =>
+    c.offsetSec ?? offsetAtInstant(c.zone ?? env.zone, env.nowUs);
+  if (zonedSide(end) && offset(ec) !== offset(sc)) return end;
   const h = hourIn(ec.h, sc.mod.from, sc.mod.to);
   const begin = sc.h * 60 + sc.mi;
   if (h === null && ec.h * 60 > begin) return end;
   const clock =
     h !== null && h * 60 > begin
-      ? { ...ec, h, mod: { ...sc.mod, shift: 0 } }
+      ? { ...ec, h, mod: { ...sc.mod, shift: 0, dated: undefined } }
       : (ec.h + 12) * 60 > begin
         ? { ...ec, h: ec.h + 12 }
         : ec;
   return { ...end, clock };
 }
 
-// A bare end clock, or one on the shared date, is read in the start's offset or zone, so the viewer's
-// zone never decides it (`09:30Z - 11` ends at 11:00Z everywhere).
-function inZone(end: Point, start: Point): Point {
+// A bare end clock, one on the shared date, or a year-less or day-word end is read in the start's
+// offset or zone, so the viewer's zone never decides it (`09:30Z - 11` ends at 11:00Z everywhere).
+function inZone(end: Point, tag: string | undefined, start: Point, env: Env): Point | null {
   const c = clockOf(start);
-  if (!shared(end) || zonedSide(end) || !c || !zonedSide(start)) return end;
-  return { ...end, clock: { ...end.clock, offsetSec: c.offsetSec, zone: c.zone } };
+  if (end.p !== "clock" && end.p !== "wall") return end;
+  const dated = end.p === "wall" && (yearless(tag) || end.off !== undefined);
+  if (!(shared(end) || dated) || zonedSide(end) || !c || !zonedSide(start)) return end;
+  const clock = { ...end.clock, offsetSec: c.offsetSec, zone: c.zone };
+  return end.p === "wall" ? zonedDate({ ...end, clock }, env, tag) : { ...end, clock };
+}
+
+function yearless(tag: string | undefined): boolean {
+  return !!tag?.split(" ").some((t) => t[0] === "y");
 }
 
 function shared(p: Point): p is Extract<Point, { p: "clock" | "wall" }> {
@@ -371,7 +410,8 @@ export function rangeDrafts(
         pmTwin(e0, s.v)
       )
         continue;
-      const e = inZone(inheritMod(e0.v, s.v), s.v);
+      const e = inZone(inheritMod(e0.v, s.v, env), e0.tag, s.v, env);
+      if (!e) continue;
       const into = sameTag(s, e0) ? drafts : cross;
       for (const [a, b] of sidePairs(s.v, e, env)) {
         // An end day that closes where the start begins lies wholly before it.
@@ -405,8 +445,13 @@ function sidePairs(s: Point, e: Point, env: Env): [Inst, Inst][] {
   }
   for (const a of startInstants(s, env, e.p === "clock" ? undefined : dateOf(e, env))) {
     const own = zonedSide(s) || (a.clock !== undefined && zonedSide(e));
+    // A day part that names its own day (`今晚`) never takes the start's date.
     const day =
-      e.p !== "clock" ? undefined : own ? wallFor(e.clock, a.us, env) : (a.date ?? dateOf(s, env));
+      e.p !== "clock" || e.clock.mod?.dated
+        ? undefined
+        : own
+          ? wallFor(e.clock, a.us, env)
+          : (a.date ?? dateOf(s, env));
     for (const b of endInstants(e, env, day)) out.push([a, b]);
   }
   return out;

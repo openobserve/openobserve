@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { LocalePack } from "./schema";
+import { orClock } from "./shared/clock";
 
 export { default as tables } from "./generated/nl";
 
@@ -63,7 +64,7 @@ export const pack: LocalePack = {
     "'s nachts": [0, 6],
   },
   articles: ["een"],
-  hooks: { marked: (typed, folded) => typed.toLowerCase() !== folded },
+  hooks: { orClock, marked: (typed, folded) => typed.toLowerCase() !== folded },
   numberWords: {
     een: 1,
     één: 1,

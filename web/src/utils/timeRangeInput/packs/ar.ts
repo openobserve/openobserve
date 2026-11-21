@@ -41,19 +41,19 @@ function dateChar(ch: string | undefined): boolean {
   );
 }
 
-// Intl writes direction marks beside the separators of numeric dates; one between two digits splits
-// a number, so it stays and fails.
+// Intl writes direction marks beside the separators of numeric dates; one between two digits, or by
+// a sign that follows no digit (`:-‏1`), stays and fails.
 function dropDateMarks(nfkc: string): string {
   const cps = [...nfkc];
   const sep = (ch: string | undefined) => ch === "/" || ch === "." || ch === "-";
+  const digit = (ch: string | undefined) => dateChar(ch) && !sep(ch);
   return cps
     .filter(
       (ch, i) =>
         !(
           MARKS.has(ch) &&
-          dateChar(cps[i - 1]) &&
-          dateChar(cps[i + 1]) &&
-          (sep(cps[i - 1]) || sep(cps[i + 1]))
+          ((sep(cps[i - 1]) && digit(cps[i - 2]) && digit(cps[i + 1])) ||
+            (sep(cps[i + 1]) && digit(cps[i + 2]) && digit(cps[i - 1])))
         ),
     )
     .join("");
