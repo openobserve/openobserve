@@ -542,6 +542,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'dashboard.deleteDashboardConfirmMsg'
       "
       :message-name="selectedDelete?.name"
+      :warning-message="singleDeleteReportsWarning"
       ok-variant="destructive"
       @update:ok="deleteDashboard"
       @update:cancel="confirmDeleteDialog = false"
@@ -571,6 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           selectedIds.length,
         )
       "
+      :warning-message="bulkDeleteReportsWarning"
       ok-variant="destructive"
       @update:ok="bulkDeleteDashboards"
       @update:cancel="confirmBulkDelete = false"
@@ -637,6 +639,7 @@ import {
   getFoldersList,
 } from "../../utils/commons";
 import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
+import { reportsQuery } from "@/services/reports.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import TemplateSuggestionCards from "@/components/dashboards/TemplateSuggestionCards.vue";
@@ -1592,8 +1595,9 @@ export default defineComponent({
       }
     };
 
-    const showDeleteDialogFn = (props: any) => {
+    const showDeleteDialogFn = async (props: any) => {
       selectedDelete.value = props.row;
+      await loadReportsForDelete();
       confirmDeleteDialog.value = true;
     };
 
@@ -1786,6 +1790,53 @@ export default defineComponent({
     const confirmBulkDelete = ref<boolean>(false);
     const bulkDeleteLoading = ref(false);
 
+    type ReportForDelete = {
+      report_id: string;
+      name: string;
+      dashboards?: { dashboard: string }[];
+    };
+    const reportsForDelete = ref<ReportForDelete[]>([]);
+
+    // Fetched fresh before the dialog opens, so a report created elsewhere is never missed or shown late.
+    const loadReportsForDelete = async () => {
+      try {
+        reportsForDelete.value = await queryClient.fetchQuery({
+          ...reportsQuery(
+            store.state.selectedOrganization.identifier,
+            { folder: undefined, isCache: undefined },
+            { silentForbidden: true },
+          ),
+          staleTime: 0,
+        });
+      } catch {
+        reportsForDelete.value = [];
+      }
+    };
+
+    const deleteReportsWarning = (dashboardIds: string[]): I18nText | undefined => {
+      const reports = new Map<string, { name: string; dashboards: string[] }>();
+      for (const report of reportsForDelete.value) {
+        const entry = reports.get(report.report_id) ?? { name: report.name, dashboards: [] };
+        entry.dashboards.push(...(report.dashboards ?? []).map((d) => d.dashboard));
+        reports.set(report.report_id, entry);
+      }
+      // The server deletes a report only when every dashboard it covers is deleted; others just lose the link.
+      const names = [...reports.values()]
+        .filter((r) => r.dashboards.length && r.dashboards.every((d) => dashboardIds.includes(d)))
+        .map((r) => r.name);
+      if (!names.length) return undefined;
+      return t(
+        "dashboard.deleteDashboardReportsWarning",
+        { count: names.length, names: names.join(", ") },
+        names.length,
+      );
+    };
+
+    const singleDeleteReportsWarning = computed(() =>
+      selectedDelete.value ? deleteReportsWarning([selectedDelete.value.id]) : undefined,
+    );
+    const bulkDeleteReportsWarning = computed(() => deleteReportsWarning(selectedIds.value));
+
     const showPlaylistDialog = ref(false);
     const playlistEntries = ref<PlaylistDialogEntry[]>([]);
 
@@ -1831,7 +1882,8 @@ export default defineComponent({
       window.open(href, "_blank", "noopener");
     };
 
-    const openBulkDeleteDialog = () => {
+    const openBulkDeleteDialog = async () => {
+      await loadReportsForDelete();
       confirmBulkDelete.value = true;
     };
 
@@ -2051,6 +2103,8 @@ export default defineComponent({
       filterQuery,
 
       deleteDashboard,
+      singleDeleteReportsWarning,
+      bulkDeleteReportsWarning,
       duplicateDashboard,
       getDashboards,
       refreshDashboards,

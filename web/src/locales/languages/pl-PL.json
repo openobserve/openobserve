@@ -8192,6 +8192,7 @@
     "deleteDashboardsConfirmTitle": "Usuń pulpity",
     "deleteDashboardsConfirmMsg": "Czy na pewno chcesz usunąć {count} pulpit? | Czy na pewno chcesz usunąć wybrane pulpity ({count})?",
     "deleteDashboardsConfirmMsgPublicLinks": "Czy na pewno chcesz usunąć {count} pulpit? Jego linki publiczne przestaną działać i zostaną usunięte. | Czy na pewno chcesz usunąć {count} pulpitów? Ich linki publiczne przestaną działać i zostaną usunięte.",
+    "deleteDashboardReportsWarning": "Usunięcie usunie też ten raport: {names} | Usunięcie usunie też te raporty ({count}): {names}",
     "edit": "Edytuj pulpit",
     "duplicate": "Duplikuj pulpit",
     "move_to_another_folder": "Przenieś do innego folderu",

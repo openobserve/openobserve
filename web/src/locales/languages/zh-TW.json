@@ -8192,6 +8192,7 @@
     "deleteDashboardsConfirmTitle": "刪除儀表板",
     "deleteDashboardsConfirmMsg": "您確定要刪除 {count} 個儀表板嗎？ | 您確定要刪除 {count} 個儀表板嗎？",
     "deleteDashboardsConfirmMsgPublicLinks": "確定要刪除 {count} 個儀表板嗎？其公開連結將停止運作並被刪除。 | 確定要刪除 {count} 個儀表板嗎？其公開連結將停止運作並被刪除。",
+    "deleteDashboardReportsWarning": "刪除操作也會刪除此報表：{names} | 刪除操作也會刪除這 {count} 個報表：{names}",
     "edit": "編輯儀表板",
     "duplicate": "複製儀表板",
     "move_to_another_folder": "移至其他資料夾",

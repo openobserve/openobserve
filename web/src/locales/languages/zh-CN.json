@@ -8192,6 +8192,7 @@
     "deleteDashboardsConfirmTitle": "删除仪表板",
     "deleteDashboardsConfirmMsg": "您确定要删除 {count} 个仪表盘吗？ | 您确定要删除 {count} 个仪表盘吗？",
     "deleteDashboardsConfirmMsgPublicLinks": "确定要删除 {count} 个仪表盘吗？其公开链接将停止工作并被删除。 | 确定要删除 {count} 个仪表盘吗？其公开链接将停止工作并被删除。",
+    "deleteDashboardReportsWarning": "删除操作还会删除此报表：{names} | 删除操作还会删除这 {count} 个报表：{names}",
     "edit": "编辑",
     "duplicate": "复制",
     "move_to_another_folder": "移至另一个文件夹",

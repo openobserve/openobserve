@@ -8192,6 +8192,7 @@
     "deleteDashboardsConfirmTitle": "Supprimer des tableaux de bord",
     "deleteDashboardsConfirmMsg": "Êtes-vous sûr de vouloir supprimer {count} tableau de bord ? | Êtes-vous sûr de vouloir supprimer {count} tableaux de bord ?",
     "deleteDashboardsConfirmMsgPublicLinks": "Voulez-vous vraiment supprimer {count} tableau de bord ? Ses liens publics cesseront de fonctionner et seront supprimés. | Voulez-vous vraiment supprimer {count} tableaux de bord ? Leurs liens publics cesseront de fonctionner et seront supprimés.",
+    "deleteDashboardReportsWarning": "La suppression supprime aussi ce rapport : {names} | La suppression supprime aussi ces {count} rapports : {names}",
     "edit": "Modifier le tableau de bord",
     "duplicate": "Dupliquer le tableau",
     "move_to_another_folder": "Déplacer vers un autre dossier",
