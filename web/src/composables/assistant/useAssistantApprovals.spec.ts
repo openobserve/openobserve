@@ -186,6 +186,17 @@ describe("useAssistantApprovals", () => {
     );
   });
 
+  it("does not hold again a card this chat already answered when a resume re-sends it", async () => {
+    const { sid, approvals, session, outcome } = setup();
+    await approvals.decide(sid, { approved: true, scope: "once" }, held(sid));
+    expect(session.pendingApproval).toBeNull();
+    const decided = outcome();
+    expect(decided?.state).toBeTruthy();
+    approvals.onConfirmationRequired(sid, DELETE);
+    expect(session.pendingApproval).toBeNull();
+    expect(outcome()).toEqual(decided);
+  });
+
   it("posts a decision on the session the card was asked in, after a chat switch", async () => {
     const { store, sid, env, approvals } = setup();
     const other = store.createSession({
