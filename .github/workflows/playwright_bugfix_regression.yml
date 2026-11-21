@@ -103,6 +103,9 @@ jobs:
       labels: ubicloud-standard-16
     permissions:
       contents: read
+    env:
+      # Must match playwright.yml's RUSTFLAGS, which are part of the shared rust-cache key.
+      RUSTFLAGS: "-C target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2 -Zthreads=8"
 
     steps:
       - name: Remove unused tools
