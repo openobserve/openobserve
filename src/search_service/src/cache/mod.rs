@@ -25,7 +25,10 @@ use config::{
         function::RESULT_ARRAY_SKIP_VRL,
         histogram_origin::histogram_bucket_offset,
         search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE, ResponseTook},
-        self_reporting::usage::{RequestStats, UsageType},
+        self_reporting::{
+            protected_streams::with_current_reader,
+            usage::{RequestStats, UsageType},
+        },
         sql::{OrderBy, resolve_stream_names},
         stream::StreamType,
     },
@@ -265,7 +268,7 @@ pub async fn search(
             let user_id = user_id.clone();
 
             let enter_span = tracing::span::Span::current();
-            let task = tokio::task::spawn(
+            let task = tokio::task::spawn(with_current_reader(
                 (async move {
                     let trace_id = trace_id.clone();
                     req.query.start_time = delta.delta_start_time;
@@ -286,7 +289,7 @@ pub async fn search(
                     SearchService::search(&trace_id, &org_id, stream_type, user_id, &req).await
                 })
                 .instrument(enter_span),
-            );
+            ));
             tasks.push(task);
         }
 

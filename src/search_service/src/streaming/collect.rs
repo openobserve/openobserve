@@ -22,6 +22,7 @@
 
 use config::meta::{
     search::{Request, Response, SearchEventType, StreamResponses},
+    self_reporting::protected_streams::with_current_reader,
     sql::OrderBy,
     stream::StreamType,
     stream_fold::fold_page,
@@ -105,7 +106,7 @@ async fn search_stream_collect(
 ) -> Result<Response, infra::errors::Error> {
     let (tx, mut rx) = mpsc::channel(EVENT_CHANNEL_SIZE);
 
-    tokio::spawn(process_search_stream_request(
+    tokio::spawn(with_current_reader(process_search_stream_request(
         trace_id.to_string(),
         org_id.to_string(),
         user_id.to_string(),
@@ -120,7 +121,7 @@ async fn search_stream_collect(
         None, // audit_ctx: the collecting caller audits at its own layer
         is_multi_stream_search,
         false, // extract_patterns
-    ));
+    )));
 
     let mut merged: Option<Response> = None;
     while let Some(event) = rx.recv().await {
@@ -148,4 +149,107 @@ async fn search_stream_collect(
     }
 
     Ok(merged.unwrap_or_default())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// No querier runs here, so a read that passes every reader check ends at the node dispatch.
+    #[tokio::test]
+    async fn only_the_calibration_reader_reads_the_digest_through_the_spawned_searches() {
+        use arrow_schema::{DataType, Field, Schema};
+        use config::{
+            TIMESTAMP_COL_NAME,
+            meta::{
+                alerts::alert_calibration::DIGEST_STREAM,
+                search::Query,
+                self_reporting::protected_streams::{ProtectedReader, as_reader},
+            },
+        };
+        use infra::{
+            errors::{Error, ErrorCodes},
+            schema::{STREAM_SCHEMAS_LATEST, SchemaCache},
+        };
+
+        infra::db::create_table().await.unwrap();
+        infra::file_list::create_table().await.unwrap();
+        let org = "collect_protected_reader";
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org}/logs/{DIGEST_STREAM}"),
+            SchemaCache::new(Schema::new(vec![Field::new(
+                TIMESTAMP_COL_NAME,
+                DataType::Int64,
+                false,
+            )])),
+        );
+        let req = Request {
+            query: Query {
+                sql: format!("SELECT * FROM \"{DIGEST_STREAM}\""),
+                start_time: 1,
+                end_time: 2,
+                size: 10,
+                ..Default::default()
+            },
+            use_cache: false,
+            ..Default::default()
+        };
+        let via_collect = || {
+            let mut req = req.clone();
+            async move {
+                search_partition_mode(
+                    "collect-protected-reader",
+                    org,
+                    "",
+                    &mut req,
+                    StreamType::Logs,
+                    vec![DIGEST_STREAM.to_string()],
+                    None,
+                    String::new(),
+                    tracing::Span::none(),
+                    false,
+                )
+                .await
+            }
+        };
+        let via_cache = || {
+            let req = req.clone();
+            async move {
+                crate::cache::search(
+                    "collect-protected-reader-delta",
+                    org,
+                    StreamType::Logs,
+                    None,
+                    &req,
+                    String::new(),
+                    true,
+                    None,
+                    false,
+                )
+                .await
+            }
+        };
+        let reader = ProtectedReader::AlertCalibration;
+        for (path, scoped, unscoped) in [
+            (
+                "collect",
+                as_reader(reader, via_collect()).await,
+                via_collect().await,
+            ),
+            (
+                "cache delta",
+                as_reader(reader, via_cache()).await,
+                via_cache().await,
+            ),
+        ] {
+            assert!(
+                matches!(scoped, Err(Error::Message(ref m)) if m == "no querier node online"),
+                "{path}: {scoped:?}"
+            );
+            assert!(
+                matches!(unscoped, Err(Error::ErrorCode(ErrorCodes::SearchStreamProtected(ref s))) if s == DIGEST_STREAM),
+                "{path}: {unscoped:?}"
+            );
+        }
+    }
 }
