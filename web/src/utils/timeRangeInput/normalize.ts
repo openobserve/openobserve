@@ -59,18 +59,23 @@ function mapChar(cp: number): string {
   return String.fromCodePoint(cp);
 }
 
+// An invisible character beside a space or an end is dropped; inside a token it stays and is refused.
 function mapped(nfkc: string): string {
   let out = "";
   let space = false;
+  let hidden = "";
   for (const ch of nfkc) {
     const m = mapChar(ch.codePointAt(0) ?? 0);
-    if (m === " ") {
-      space = out.length > 0;
+    if (/^[^\P{Cf}\p{Bidi_C}]$/u.test(m)) {
+      hidden += m;
       continue;
     }
-    if (space) out += " ";
-    space = false;
-    out += m;
+    if (m === " ") space = out.length > 0;
+    else {
+      out += (space ? " " : out && hidden) + m;
+      space = false;
+    }
+    hidden = "";
   }
   return out;
 }
@@ -133,9 +138,10 @@ export function normalize(
     text,
     fold: foldText(text, bcp47, script, hooks.fold),
     firstLine:
-      raw
+      [...raw]
+        .map((c) => ("\r\u2028\u2029".includes(c) ? "\n" : c))
+        .join("")
         .split("\n")
-        .flatMap((l) => l.split("\r"))
         .map((l) => mapped(clean(l.normalize("NFKC"))))
         .find((l) => l.length > 0) ?? "",
     url: /^\s*(https?:\/\/|[?？])[^]*$/i.test(raw),

@@ -141,6 +141,11 @@ export function wordy(c: number): boolean {
   );
 }
 
+/** Whether a letter, digit or `_` starts at `k`. */
+export function wordAt(text: string, k: number): boolean {
+  return /^[\p{L}\p{N}_][^]?$/u.test(text.slice(k, k + 2));
+}
+
 /** End of literal `s` at `pos`, where a space in `s` matches zero or one input space; -1 if none. */
 function litEnd(sc: Scan, pos: number, s: string): number {
   let i = pos;
@@ -614,16 +619,21 @@ export function marksOn(sc: Scan, pos: number, c: ClockValue): [number, ClockVal
     .map(([end, mod]) => [end, withMod([{ v: c }], mod)[0]?.v ?? null]);
 }
 
-/** Whether a range join starts at `pos`: a join word, or a template word before or after its start. */
-export function joinsAt(sc: Scan, pos: number): boolean {
-  const lits = sc.env.pack.rangeTemplates.flatMap((elems) => {
-    const i = elems.findIndex((e) => e.k === "slot" && e.s === "start");
-    return [elems[0], elems[i + 1]].flatMap((e) => (i >= 0 && e?.k === "lit" ? e.alts : []));
-  });
-  // `/` joins only two ISO stamps, so it starts a range only before a digit.
-  const slash = /^\/ ?\p{Nd}[^]*$/u.test(sc.fold.slice(pos));
-  const joins = [...sc.env.pack.joins, ...lits, ...UNIVERSAL_JOINS.filter((j) => j !== "/")];
-  return slash || joins.some((j) => litAt(sc, pos, j) >= 0);
+/** Whether a word the pack knows starts at `pos`; `/` joins only two stamps, so alone it is none. */
+export function lexiconAt(sc: Scan, pos: number): boolean {
+  // A Latin word glued to a digit or `_` is another token (`pm2`); to a pack word it binds (`PMから`).
+  const ends = [
+    ...UNIVERSAL_JOINS.map((j) => [litAt(sc, pos, j)]),
+    ...words(sc, pos, sc.env.pack.lexicon),
+  ];
+  return (
+    sc.fold[pos] !== "/" &&
+    ends.some(
+      ([end]) =>
+        end > pos &&
+        (!(wordy(sc.fold.charCodeAt(end - 1)) && wordAt(sc.fold, end)) || lexiconAt(sc, end)),
+    )
+  );
 }
 
 /** Any one point or period: a stamp, an epoch, date math, now, a day with or without a clock, a clock. */

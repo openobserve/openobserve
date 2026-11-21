@@ -25,13 +25,14 @@ import {
 } from "./machine";
 import type { Normalized } from "./normalize";
 import {
-  joinsAt,
+  lexiconAt,
   marksOn,
   newScan,
   phraseOutcome,
   pointHits,
   rangeOutcome,
   pointDrafts,
+  wordAt,
   type Scan,
 } from "./phrases";
 import { countCompletions, shorthandOutcome } from "./shorthand";
@@ -78,8 +79,11 @@ function urlOutcome(text: string, env: Env): Outcome {
   const hash = text.indexOf("#", at);
   const query = at < 0 ? "" : text.slice(at + 1, hash < 0 ? undefined : hash);
   const params = new URLSearchParams(query);
-  const from = params.get("from");
-  const to = params.get("to");
+  const [[from, f2], [to, t2], [period, p2]] = ["from", "to", "period"].map((k) =>
+    params.getAll(k),
+  );
+  // A repeated param would leave a value unread.
+  if ((f2 ?? t2 ?? p2) !== undefined) return { t: "invalid", reason: "unreadable" };
   if (from && to) {
     const r = rangeDrafts(urlPoint(from, env), urlPoint(to, env), env);
     if (r.drafts.length > 0) return { t: "drafts", drafts: r.drafts, form: "url" };
@@ -88,7 +92,6 @@ function urlOutcome(text: string, env: Env): Outcome {
       reason: r.zero ? "zero-length" : r.reversed ? "reversed" : "unreadable",
     };
   }
-  const period = params.get("period");
   if (period) {
     const out = shorthandOutcome(period, env, true);
     return out.t === "drafts" ? { ...out, form: "url" } : { t: "invalid", reason: "unreadable" };
@@ -114,15 +117,14 @@ function bareNumber(text: string, env: Env): Outcome {
 const CLOSE = ",;.):]";
 
 // A log line is only its leading seconds stamp with one zone and one am/pm mark; text after it that
-// could start a range (join, digit, zone, date or time word) goes to the range grammar, never a guess.
+// starts with a digit, symbol, zone or pack word goes to the range grammar, never a guess.
 function logLine(norm: Normalized, sc: Scan, env: Env): Outcome {
   const line = norm.firstLine;
   const pos = line[0] === "[" ? 1 : 0;
-  const at = (k: number) => String.fromCodePoint(line.codePointAt(k) ?? 32);
   const gap = (k: number) => k >= line.length || line[k] === " ";
   const token = (k: number) => gap(k) || CLOSE.includes(line[k]);
   // A mark glued to a word character is message text (`pm2`); glued to a sign it may start a range.
-  const glued = (k: number) => !token(k) && !/^[\p{L}\p{N}_]$/u.test(at(k));
+  const glued = (k: number) => !token(k) && !wordAt(line, k);
   const was = sc.partial;
   let refused = false;
   const mark = (end: number, c: ClockValue): [number, ClockValue][] =>
@@ -139,22 +141,23 @@ function logLine(norm: Normalized, sc: Scan, env: Env): Outcome {
   );
   const end = Math.max(-1, ...hits.map((s) => s.end));
   const alts = hits.filter((s) => s.end === end).flatMap((s) => s.alts);
+  const alone = norm.text.length === end;
   const timed = alts.length > 0 && alts.every((a) => "clock" in a.v && a.v.clock?.sec);
   const close = end + (CLOSE.includes(line[end]) ? 1 : 0);
   const rest = close + (line[close] === " " ? 1 : 0);
   const marks = marksOn(sc, rest, { h: 1, mi: 0, s: 0, us: 0, word: false });
   const message = marks.some(([e]) => !token(e) && !glued(e));
-  const alone = norm.text.length === end;
   const open =
     !timed ||
     !gap(close) ||
-    (rest < line.length &&
-      (/^\p{Nd}$/u.test(at(rest)) ||
-        joinsAt(sc, rest) ||
-        scanZone(line, rest).length > 0 ||
-        (!message && (marks.length > 0 || pointHits(sc, rest).length > 0))));
+    /^([+/]? ?\p{Nd}[^]*|[^\p{L}\p{N}]+)$/u.test(line.slice(rest)) ||
+    lexiconAt(sc, rest) ||
+    scanZone(line, rest + ("([".includes(line[rest]) ? 1 : 0)).length > 0 ||
+    (!message && pointHits(sc, rest).length > 0);
   sc.partial = was;
-  if (timed && refused) return { t: "invalid", reason: "unreadable" };
+  // Only a seconds stamp is a log line, so a shorter one alone on its line must not reach the next.
+  if (timed ? refused : !alone && line.length === end)
+    return { t: "invalid", reason: "unreadable" };
   if (open) return { t: "none" };
   const drafts = singleDrafts(alts, env);
   if (alone) return { t: "drafts", drafts, form: "iso" };
