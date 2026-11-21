@@ -102,7 +102,7 @@ const CHIP_ROUTES: Array<[string, string]> = [
   ["cloud", "AWSConfig"],
   ["rum", "frontendMonitoring"],
   ["llm", "ai-integrations"],
-  ["agent", "recommendedMcp"],
+  ["agent", "ai-integrations"],
 ];
 
 const session = useSampleDataSession() as unknown as {
@@ -142,7 +142,7 @@ const makeRouter = () =>
     routes: [
       { path: "/", name: "home", component: { template: "<div />" } },
       { path: "/ingestion", name: "ingestion", component: { template: "<div />" } },
-      ...CHIP_ROUTES.map(([, name]) => ({
+      ...[...new Set(CHIP_ROUTES.map(([, name]) => name))].map((name) => ({
         path: `/ingestion/${name}`,
         name,
         component: { template: "<div />" },
@@ -452,6 +452,18 @@ describe("SampleDataWelcome finish", () => {
     await click("onboarding-get-started-source-rum");
     expect(push).not.toHaveBeenCalled();
     expect(submitNewUserInfo).not.toHaveBeenCalled();
+  });
+
+  it("keeps the AI Agent chip open when MCP is unlicensed", async () => {
+    await mountAtHome({
+      version: "v0.0.0",
+      sample_data_onboarding_enabled: true,
+      features: { mcp: "locked" },
+    });
+    const push = pushSpy();
+    expect(byTest("onboarding-get-started-source-agent").attributes("disabled")).toBeUndefined();
+    await click("onboarding-get-started-source-agent");
+    expect(push).toHaveBeenCalledWith({ name: "ai-integrations", query: { org_identifier: ORG } });
   });
 
   it("Explore Other Data Sources opens the Data Sources page as a skip", async () => {

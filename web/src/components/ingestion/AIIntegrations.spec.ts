@@ -189,18 +189,25 @@ describe("AIIntegrations", () => {
       `o2.onboarding.firstSource.${store.state.selectedOrganization.identifier}`;
     afterEach(() => window.localStorage.removeItem(pickKey()));
 
-    it("pins the LLM pick as 'Your pick' in place of the landing category", () => {
+    it("lists the landing category by its own name and shows no pick row for the LLM pick", () => {
       window.localStorage.setItem(pickKey(), "llm");
       const picked = mountComponent();
-      const tab = picked.find('[data-test="ingestion-ai-pick-tab-frameworks"]');
-      expect(picked.find('[data-test="ingestion-ai-pick-group"]').text()).toBe("Your pick");
-      expect(tab.text()).toContain("LLM or AI app");
-      expect(tab.attributes("aria-selected")).toBe("true");
-      expect(picked.find('[data-test="ingestion-ai-rest-group"]').text()).toBe("Categories");
-      expect(picked.find('[data-test="ai-integrations-category-frameworks"]').exists()).toBe(false);
-      expect(picked.find('[data-test="ai-integrations-category-model-providers"]').exists()).toBe(
-        true,
+      expect(picked.find('[data-test="ingestion-ai-pick-group"]').exists()).toBe(false);
+      expect(picked.find('[data-test="ai-integrations-category-frameworks"]').text()).toBe(
+        "AI Frameworks & Agents",
       );
+      picked.unmount();
+    });
+
+    it("opens the picked category on a bare visit", () => {
+      window.localStorage.setItem(pickKey(), "llm");
+      mockReplace.mockClear();
+      const picked = mountComponent();
+      expect((picked.vm as any).selectedCategory).toBe("model-providers");
+      expect(mockReplace).toHaveBeenCalledWith({
+        name: "ai-openai-python",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
       picked.unmount();
     });
 
