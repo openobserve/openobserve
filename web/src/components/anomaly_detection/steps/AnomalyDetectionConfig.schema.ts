@@ -101,6 +101,8 @@ const INTERVAL_UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d:
 const MAX_DETECTION_WINDOW_BUCKETS = 100_000;
 /** The server's MIN_ANOMALY_SCHEDULE_SECONDS; the two rules must reject the same schedules. */
 const MIN_SCHEDULE_SECONDS = 60;
+/** The server's DATE_BIN_ORIGIN_SECS (2001-01-01T00:00:00Z), where histogram() buckets start counting. */
+const DATE_BIN_ORIGIN_SECS = 978_307_200;
 
 /** Seconds for one interval value + unit pair; null when either part is not a positive s/m/h/d interval. */
 export const anomalyIntervalSeconds = (value: number, unit: string): number | null => {
@@ -137,6 +139,32 @@ export const anomalyMissingValueColumn = (
   if (!declared || declared === "*") return null;
   // Substring on purpose: a quoted or dotted alias ("p99.ms") has no word boundary to split on.
   return (c.custom_sql ?? "").includes(declared) ? null : declared;
+};
+
+/** The default custom_sql query the form seeds for a stream. */
+export const buildAnomalyDefaultSql = (
+  streamName: string,
+  intervalValue: number | string,
+  intervalUnit: string,
+): string =>
+  `SELECT histogram(_timestamp, '${intervalValue}${intervalUnit}') AS time_bucket, count(*) AS value\nFROM "${streamName}"\nGROUP BY time_bucket\nORDER BY time_bucket`;
+
+/** True when the SQL is still the untouched default for some stream at this interval. */
+export const isAnomalyDefaultSql = (
+  sql: string,
+  intervalValue: number | string,
+  intervalUnit: string,
+): boolean => {
+  const stream = /\nFROM "([^"]*)"\n/.exec(sql)?.[1];
+  return (
+    stream !== undefined && sql === buildAnomalyDefaultSql(stream, intervalValue, intervalUnit)
+  );
+};
+
+/** True when the SQL names the stream as a whole identifier; a heuristic, so callers only warn on it. */
+export const anomalySqlReadsStream = (sql: string, streamName: string): boolean => {
+  const escaped = streamName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^\\w-])${escaped}($|[^\\w-])`).test(sql);
 };
 
 /** The stored governing triple, captured once from the edit-fetch response (D4). */
@@ -311,12 +339,32 @@ export const createAnomalyDetectionConfigSchema = (
     const windowUntouched =
       stored !== null &&
       sameInterval(stored.window, value.detection_window_value, value.detection_window_unit);
-    // The server judges this only when the schedule or the resolution changes.
+    // D9 tolerance: an unparsable stored value the user has not replaced yields no floor computation.
+    const scheduleReliable = stored === null || stored.schedule.parsed || !scheduleUntouched;
+    const histogramReliable = stored === null || stored.histogram.parsed || !histogramUntouched;
+    // Mirrors validate_interval_pair, which the server judges only when the schedule or the resolution changes.
     if (stored === null || !histogramUntouched || !scheduleUntouched) {
       const scheduleSecs = anomalyIntervalSeconds(
         value.schedule_interval_value,
         value.schedule_interval_unit,
       );
+      const histogramSecs = histogramReliable
+        ? anomalyIntervalSeconds(value.histogram_interval_value, value.histogram_interval_unit)
+        : null;
+      if (
+        histogramSecs !== null &&
+        Number.isInteger(histogramSecs) &&
+        DATE_BIN_ORIGIN_SECS % histogramSecs !== 0
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["histogram_interval_value"],
+          message: t("alerts.anomaly.histogramIntervalOrigin", {
+            interval: formatAnomalySeconds(histogramSecs),
+            remainder: formatAnomalySeconds(DATE_BIN_ORIGIN_SECS % histogramSecs),
+          }),
+        });
+      }
       if (scheduleSecs !== null && scheduleSecs < MIN_SCHEDULE_SECONDS) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -325,14 +373,38 @@ export const createAnomalyDetectionConfigSchema = (
             min: formatAnomalySeconds(MIN_SCHEDULE_SECONDS),
           }),
         });
+      } else if (
+        scheduleSecs !== null &&
+        histogramSecs !== null &&
+        scheduleReliable &&
+        Number.isInteger(scheduleSecs) &&
+        Number.isInteger(histogramSecs)
+      ) {
+        if (scheduleSecs < histogramSecs) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["schedule_interval_value"],
+            message: t("alerts.anomaly.scheduleShorterThanResolution", {
+              resolution: formatAnomalySeconds(histogramSecs),
+            }),
+          });
+        } else if (scheduleSecs % histogramSecs !== 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["schedule_interval_value"],
+            message: t("alerts.anomaly.scheduleNotResolutionMultiple", {
+              resolution: formatAnomalySeconds(histogramSecs),
+              suggestion: formatAnomalySeconds(
+                Math.ceil(scheduleSecs / histogramSecs) * histogramSecs,
+              ),
+            }),
+          });
+        }
       }
     }
     // D4 grandfathering: an untouched stored triple round-trips verbatim, so the floor judges only edits.
     const grandfathered =
       stored !== null && histogramUntouched && scheduleUntouched && windowUntouched;
-    // D9 tolerance: an unparsable stored value the user has not replaced yields no floor computation.
-    const scheduleReliable = stored === null || stored.schedule.parsed || !scheduleUntouched;
-    const histogramReliable = stored === null || stored.histogram.parsed || !histogramUntouched;
     if (!grandfathered && scheduleReliable && histogramReliable) {
       const floor = lookBackWindowFloorSeconds(
         value.schedule_interval_value,
