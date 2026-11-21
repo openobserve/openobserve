@@ -501,12 +501,14 @@ function affixedClockHits(sc: Scan, pos: number): Hit<Alt<ClockValue>[]>[] {
 }
 
 // A 12-hour value (1-12, 0-12 in h11 packs) takes the mark's half; a day part also takes a 24-hour
-// value, unshifted and only inside its range, so hour 0 only in a part that starts at midnight.
+// value inside its range. A one-hour part names an instant (noon), so it takes only a whole hour.
 function withMod(alts: Alt<ClockValue>[], mod: ClockMod): Alt<ClockValue>[] {
   const out: Alt<ClockValue>[] = [];
   for (const { v } of alts) {
     const h =
-      v.h < (mod.ap ?? Math.sign(mod.from)) || (mod.ap !== undefined && v.h > 12)
+      v.h < (mod.ap ?? Math.sign(mod.from)) ||
+      (mod.ap !== undefined && v.h > 12) ||
+      (mod.to - mod.from === 1 && v.mi + v.s + v.us > 0)
         ? null
         : hourIn(v.h, mod.from, mod.to);
     if (h !== null) out.push({ v: { ...v, h, mod, bare: false } });
@@ -588,8 +590,8 @@ function cross<A, B, T>(as: Alt<A>[], bs: Alt<B>[], make: (a: A, b: B) => T): Al
 }
 
 /** Machine stamps at `pos`; a mark after a stamp clock binds to it before any zone. A phrase picks a
- * year-less date's year itself, so only a log line marks a year-less stamp. */
-export function stampHits(sc: Scan, pos: number, log?: boolean): Scanned<Point>[] {
+ * year-less date's year itself, so it never takes a marked year-less stamp. */
+export function stampHits(sc: Scan, pos: number): Scanned<Point>[] {
   // A dated stamp keeps its own day, so a mark that shifts the day (`昨晚`) never binds to it.
   const mark = (at: number, c: ClockValue): [number, ClockValue][] =>
     spaced(sc, at).flatMap((p) =>
@@ -600,22 +602,28 @@ export function stampHits(sc: Scan, pos: number, log?: boolean): Scanned<Point>[
   return scanStamp(sc.text, pos, sc.env.nowUs, sc.env.zone, mark)
     .map((s) => ({
       end: s.end,
-      alts: s.alts.filter(
-        (a) => log || !(a.tag?.includes("yw") && "clock" in a.v && a.v.clock?.mod),
-      ),
+      alts: s.alts.filter((a) => !(a.tag?.includes("yw") && "clock" in a.v && a.v.clock?.mod)),
     }))
     .filter((s) => s.alts.length > 0);
 }
 
-/** `fold` with every clock mark blanked, so a tail of marks and stamp characters reads as a clock. */
-export function unmarked(sc: Scan): string {
-  const keep = { ...sc };
-  let out = sc.fold;
-  for (let i = 0; i < sc.len; i++)
-    for (const [end] of words(sc, i, sc.env.pack.mods))
-      out = out.slice(0, i).padEnd(end) + out.slice(end);
-  Object.assign(sc, keep);
-  return out;
+/** Am/pm marks (not day parts) at `pos` on clock `c`, each with its end; null when the hour can't take it. */
+export function marksOn(sc: Scan, pos: number, c: ClockValue): [number, ClockValue | null][] {
+  return words(sc, pos, sc.env.pack.mods)
+    .filter(([, mod]) => mod.ap !== undefined)
+    .map(([end, mod]) => [end, withMod([{ v: c }], mod)[0]?.v ?? null]);
+}
+
+/** Whether a range join starts at `pos`: a join word, or a template word before or after its start. */
+export function joinsAt(sc: Scan, pos: number): boolean {
+  const lits = sc.env.pack.rangeTemplates.flatMap((elems) => {
+    const i = elems.findIndex((e) => e.k === "slot" && e.s === "start");
+    return [elems[0], elems[i + 1]].flatMap((e) => (i >= 0 && e?.k === "lit" ? e.alts : []));
+  });
+  // `/` joins only two ISO stamps, so it starts a range only before a digit.
+  const slash = /^\/ ?\p{Nd}[^]*$/u.test(sc.fold.slice(pos));
+  const joins = [...sc.env.pack.joins, ...lits, ...UNIVERSAL_JOINS.filter((j) => j !== "/")];
+  return slash || joins.some((j) => litAt(sc, pos, j) >= 0);
 }
 
 /** Any one point or period: a stamp, an epoch, date math, now, a day with or without a clock, a clock. */
@@ -713,13 +721,13 @@ function isoOnly(sc: Scan, from: number, to: number): boolean {
 }
 
 // The dash is an offset after `UTC`/`GMT`, after a clock with seconds, or when the stamp scanner reads
-// the whole text as the stamp at `k` (with any mark) plus a fixed offset.
+// the whole text as the stamp at `k` plus a fixed offset.
 function offsetLike(sc: Scan, k: number): boolean {
   const off = scanOffset(sc.text, k);
   if (!off || off.end !== sc.len) return false;
   if (["utc", "gmt"].includes(sc.fold.slice(k - 3, k))) return true;
   const left = sc.text[k - 1] === " " ? k - 1 : k;
-  const stamps = stampHits(sc, 0);
+  const stamps = scanStamp(sc.text, 0, sc.env.nowUs, sc.env.zone);
   const seconds = pointHits(sc, 0).some(
     ([end, alts]) =>
       end === sc.len &&
