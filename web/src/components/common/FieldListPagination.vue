@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="border-card-glass-border bg-card-glass-bg w-full justify-between border-t px-1 py-px"
-    :class="showSchemaToggle || showQuickMode ? 'flex' : ''"
+    class="border-card-glass-border bg-card-glass-bg flex w-full justify-between border-t px-1 py-px"
   >
     <!-- Schema Toggle Buttons -->
     <div v-if="showSchemaToggle">
@@ -120,9 +119,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Pagination and Reset Controls -->
-    <div class="flex items-center justify-end gap-1">
+    <div class="ms-auto flex items-center justify-end gap-1">
+      <span
+        v-if="pagesNumber <= 1 && totalFieldsCount > 0"
+        class="text-2xs text-text-secondary flex h-7 items-center pe-1 whitespace-nowrap tabular-nums"
+        :data-test="`${dataTestPrefix}-fields-list-pagination-range`"
+        >{{ t("search.fieldCount", { count: totalFieldsCount }, totalFieldsCount) }}</span
+      >
       <!-- Pagination -->
-      <div v-if="pagesNumber > 1" class="flex h-7 items-start gap-0.5 pt-px">
+      <div v-else-if="pagesNumber > 1" class="flex h-7 items-start gap-0.5 pt-px">
+        <span
+          class="text-2xs text-text-secondary self-center pe-1 whitespace-nowrap tabular-nums"
+          :data-test="`${dataTestPrefix}-fields-list-pagination-range`"
+          >{{ t("search.fieldRange", rangeLabel) }}</span
+        >
         <OTooltip
           :content="t('common.totalFields', { count: totalFieldsCount })"
           max-width="18.75rem"
@@ -167,22 +177,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
 
-      <!-- Reset Fields Icon -->
-      <div class="flex items-center">
-        <OIcon
-          name="restart-alt"
-          size="sm"
-          :data-test="`${dataTestPrefix}-fields-list-reset-icon`"
-          class="cursor-pointer text-sm opacity-70 transition-opacity duration-200 hover:opacity-100!"
-          @click="$emit('reset-fields')"
-        />
+      <OButton
+        v-if="showReset"
+        variant="ghost"
+        size="icon-chip"
+        :data-test="`${dataTestPrefix}-fields-list-reset-icon`"
+        :aria-label="t('search.resetFields')"
+        @click="$emit('reset-fields')"
+      >
+        <OIcon name="restart-alt" size="sm" />
         <OTooltip
           :content="t('search.resetFields')"
           max-width="18.75rem"
           side="left"
           align="center"
         />
-      </div>
+      </OButton>
     </div>
   </div>
 </template>
@@ -211,10 +221,19 @@ interface Props {
   isFirstPage: boolean;
   isLastPage: boolean;
   totalFieldsCount: number;
+  /** Field rows per page, for the "1–50 of 102 fields" label. */
+  pageSize?: number;
+  /** Field rows the pages hold, fewer than the total while a group is collapsed. */
+  shownFieldsCount?: number;
+  /** Pages without table columns have nothing to reset. */
+  showReset?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   dataTestPrefix: "logs-page",
+  pageSize: 50,
+  shownFieldsCount: undefined,
+  showReset: true,
   showSchemaToggle: false,
   showQuickMode: false,
   useUserDefinedSchemas: "",
@@ -231,6 +250,18 @@ defineEmits<{
   "set-page": [page: number];
   "reset-fields": [];
 }>();
+
+const rangeLabel = computed(() => {
+  const start = (props.currentPage - 1) * props.pageSize + 1;
+  return {
+    start,
+    end: Math.min(
+      props.currentPage * props.pageSize,
+      props.shownFieldsCount ?? props.totalFieldsCount,
+    ),
+    total: props.totalFieldsCount,
+  };
+});
 
 // Get page numbers to display (3 at a time)
 const visiblePages = computed(() => {

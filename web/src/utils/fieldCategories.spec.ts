@@ -20,8 +20,7 @@ import {
   discoverPrefixes,
   resolveFieldGroup,
   applyFieldGrouping,
-  applyCollapseFilter,
-  shouldApplyFieldGrouping,
+  applyStreamGrouping,
   CATEGORY,
 } from "@/utils/fieldCategories";
 
@@ -187,133 +186,82 @@ describe("applyFieldGrouping", () => {
   });
 });
 
-// ---- applyCollapseFilter tests ----------------------------------------------
+// ---- applyStreamGrouping tests ----------------------------------------------
 
-describe("applyCollapseFilter", () => {
-  function field(name: string, group: string): any {
+describe("applyStreamGrouping", () => {
+  const labels = { common: "Common fields", stream: (name: string) => name.toUpperCase() };
+
+  function makeField(name: string, streams: string[]) {
     return {
       name,
-      group,
-      label: false,
       dataType: "Utf8",
       ftsKey: false,
       isSchemaField: true,
       showValues: true,
       isInterestingField: false,
-      streams: [],
-    };
-  }
-  function labelRow(group: string): any {
-    return {
-      name: group,
-      group,
-      label: true,
-      dataType: "",
-      ftsKey: false,
-      isSchemaField: false,
-      showValues: false,
-      isInterestingField: false,
-      streams: [],
+      group: "",
+      streams,
     };
   }
 
-  const rows = [
-    labelRow("http"),
-    field("http_method", "http"),
-    field("http_status", "http"),
-    labelRow("k8s"),
-    field("k8s_pod", "k8s"),
-  ];
+  const rows = (result: { label?: boolean; group: string; name: string }[]) =>
+    result.map((r) => (r.label ? `#${r.group}:${r.name}` : `${r.group}/${r.name}`));
 
-  it("returns all rows when filterTerm is non-empty (bypass collapse)", () => {
-    const expanded = { http: true, k8s: false };
-    const result = applyCollapseFilter(rows, expanded, "pod");
-    expect(result).toHaveLength(rows.length);
+  it("lists the fields every stream has first, key fields on top, then each stream's own fields", () => {
+    const result = applyStreamGrouping(
+      [
+        makeField("a", ["s1", "s2"]),
+        makeField("host", ["s1", "s2"]),
+        makeField("b", ["s1"]),
+        makeField("c", ["s2"]),
+      ],
+      ["s1", "s2"],
+      new Set(["host"]),
+      new Set(),
+      labels,
+    );
+    expect(rows(result)).toEqual([
+      "#common:Common fields",
+      "common/host",
+      "common/a",
+      "#s1:S1",
+      "s1/b",
+      "#s2:S2",
+      "s2/c",
+    ]);
   });
 
-  it("hides fields in collapsed groups when filterTerm is empty", () => {
-    const expanded = { http: true, k8s: false };
-    const result = applyCollapseFilter(rows, expanded, "");
-    const names = result.map((r: any) => r.name);
-    expect(names).toContain("http_method");
-    expect(names).toContain("http_status");
-    expect(names).not.toContain("k8s_pod");
+  it("renders no header for a stream without own fields and no common header without common fields (B1, B2)", () => {
+    const result = applyStreamGrouping(
+      [makeField("a", ["s1"]), makeField("b", ["s2"])],
+      ["s1", "s2", "s3"],
+      new Set(),
+      new Set(),
+      labels,
+    );
+    expect(rows(result)).toEqual(["#s1:S1", "s1/a", "#s2:S2", "s2/b"]);
   });
 
-  it("always keeps label rows regardless of collapse state", () => {
-    const expanded = { http: false, k8s: false };
-    const result = applyCollapseFilter(rows, expanded, "");
-    const labels = result.filter((r: any) => r.label);
-    expect(labels).toHaveLength(2);
+  it("lists a field shared by some streams once, under the first stream that has it", () => {
+    const result = applyStreamGrouping(
+      [makeField("x", ["s2", "s3"]), makeField("y", ["s1", "s2", "s3"])],
+      ["s1", "s2", "s3"],
+      new Set(),
+      new Set(),
+      labels,
+    );
+    expect(rows(result)).toEqual(["#common:Common fields", "common/y", "#s2:S2", "s2/x"]);
   });
 
-  it("shows all fields when expandGroupRows is empty (flat list, no groups)", () => {
-    const result = applyCollapseFilter(rows, {}, "");
-    expect(result).toHaveLength(rows.length);
-  });
-
-  it("returns all rows unchanged when all groups are expanded and no filter", () => {
-    const expanded = { http: true, k8s: true };
-    const result = applyCollapseFilter(rows, expanded, "");
-    expect(result).toHaveLength(rows.length);
-  });
-
-  it("treats whitespace-only filterTerm as active (bypasses collapse)", () => {
-    const expanded = { http: true, k8s: false };
-    const result = applyCollapseFilter(rows, expanded, "  ");
-    expect(result).toHaveLength(rows.length);
-  });
-});
-
-// ---- shouldApplyFieldGrouping tests -----------------------------------------
-
-describe("shouldApplyFieldGrouping", () => {
-  const aliases: FieldAlias[] = [
-    { id: "http", display: "HTTP", fields: ["http_method"], group: "http" },
-  ];
-  const index = buildSemanticIndex(aliases);
-
-  const base = {
-    semanticIndex: index,
-    streamCount: 1,
-    udsActive: false,
-    udsFieldLimit: 0,
-    totalSchemaFieldCount: 10,
-  };
-
-  it("returns true for single stream with semantic index and no UDS", () => {
-    expect(shouldApplyFieldGrouping(base)).toBe(true);
-  });
-
-  it("returns false when semanticIndex is null", () => {
-    expect(shouldApplyFieldGrouping({ ...base, semanticIndex: null })).toBe(false);
-  });
-
-  it("returns false for multiple streams (multi-stream uses per-stream label rows)", () => {
-    expect(shouldApplyFieldGrouping({ ...base, streamCount: 2 })).toBe(false);
-    expect(shouldApplyFieldGrouping({ ...base, streamCount: 3 })).toBe(false);
-  });
-
-  it("returns true when UDS is active regardless of field count", () => {
-    expect(
-      shouldApplyFieldGrouping({
-        ...base,
-        udsActive: true,
-        udsFieldLimit: 5,
-        totalSchemaFieldCount: 100,
-      }),
-    ).toBe(true);
-  });
-
-  it("returns true when UDS limit set and field count is within limit", () => {
-    expect(
-      shouldApplyFieldGrouping({ ...base, udsFieldLimit: 20, totalSchemaFieldCount: 15 }),
-    ).toBe(true);
-  });
-
-  it("returns true when UDS limit set and field count exceeds limit (grouping no longer suppressed)", () => {
-    expect(
-      shouldApplyFieldGrouping({ ...base, udsFieldLimit: 10, totalSchemaFieldCount: 50 }),
-    ).toBe(true);
+  it("pins a field whose prefix names a key group and skips header rows in the input", () => {
+    const header = { ...makeField("S1", ["s1"]), label: true, group: "s1", isSchemaField: false };
+    const result = applyStreamGrouping(
+      [header, makeField("k8s_pod", ["s1", "s2"]), makeField("a", ["s1", "s2"])],
+      ["s1", "s2"],
+      new Set(),
+      new Set(["k8s"]),
+      labels,
+    );
+    expect(rows(result)).toEqual(["#common:Common fields", "common/k8s_pod", "common/a"]);
   });
 });

@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   appendSqlFilter,
+  outerWhereSpan,
   replaceInOuterWhere,
   getFieldFromExpression,
   hasFieldCondition,
@@ -619,5 +620,51 @@ describe("appendSqlFilter trailing line break", () => {
     expect(appendSqlFilter("SELECT 1 FROM t -- c\n", "b = 2")).toBe(
       "SELECT 1 FROM t where b = 2 -- c\n",
     );
+  });
+});
+
+describe("a field's included and excluded values in one group (U6)", () => {
+  const mixed = "((level = 'a' OR level = 'b') AND level != 'c')";
+
+  it("reads the field from the nested group", () => {
+    expect(getFieldFromExpression(mixed)).toBe("level");
+  });
+
+  it("finds and replaces the whole group, whichever form held the field before", () => {
+    const base = "code = 1 AND (level = 'a' OR level = 'b') AND host = 'x'";
+    const withMixed = applyFilterToQuery(base, mixed);
+    expect(withMixed).toBe(`code = 1 AND ${mixed} AND host = 'x'`);
+    expect(hasFieldCondition(withMixed, "level")).toBe(true);
+    expect(applyFilterToQuery(withMixed, "level = 'a'")).toBe(
+      "code = 1 AND level = 'a' AND host = 'x'",
+    );
+    expect(applyFilterToQuery(withMixed, "(level != 'c' AND level != 'd')")).toBe(
+      "code = 1 AND (level != 'c' AND level != 'd') AND host = 'x'",
+    );
+  });
+
+  it("removes the whole group and keeps the other conditions", () => {
+    expect(removeFieldCondition(`code = 1 AND ${mixed}`, "level")).toBe("code = 1");
+  });
+  it("replaces and removes the null-safe form as one group", () => {
+    const safe = "((level = 'a' OR level is null) AND (level != 'c' OR level is null))";
+    const withSafe = applyFilterToQuery(`code = 1 AND ${mixed}`, safe);
+    expect(withSafe).toBe(`code = 1 AND ${safe}`);
+    expect(removeFieldCondition(withSafe, "level")).toBe("code = 1");
+  });
+});
+
+describe("outerWhereSpan", () => {
+  it("spans the outer conditions, skipping a keyword in a literal and a sub-select", () => {
+    const sql = `SELECT * FROM t WHERE m = 'no limit' AND id IN (SELECT id FROM u WHERE a = 1) ORDER BY b`;
+    const span = outerWhereSpan(sql)!;
+    expect(sql.slice(span.keyword, span.start)).toBe("WHERE");
+    expect(sql.slice(span.start, span.end).trim()).toBe(
+      "m = 'no limit' AND id IN (SELECT id FROM u WHERE a = 1)",
+    );
+  });
+
+  it("is null without a WHERE", () => {
+    expect(outerWhereSpan("SELECT * FROM t ORDER BY a")).toBeNull();
   });
 });

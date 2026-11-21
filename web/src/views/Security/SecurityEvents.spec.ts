@@ -16,6 +16,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mount, type VueWrapper } from "@vue/test-utils";
 import type { Router } from "vue-router";
+import type { FieldPanelSource, PanelField } from "@/components/common/fieldPanel/fieldPanel.types";
 import store from "@/test/unit/helpers/store";
 import { planStream, type StreamPlan } from "@/utils/security/streamPlan";
 import securityInvestigate from "@/services/securityInvestigate";
@@ -175,6 +176,7 @@ vi.mock("@/lib/overlay/Drawer/ODrawer.vue", async () => {
 });
 
 import SecurityEvents from "./SecurityEvents.vue";
+import { NULL_VALUE_KEY } from "@/components/common/fieldPanel/security/securityValueFilters";
 
 // Paging is asserted on the request, so a few rows stand in for a page and keep each table render cheap.
 const OKTA_ROWS = Array.from({ length: 5 }, (_, i) =>
@@ -693,5 +695,103 @@ describe("SecurityEvents severity, SQL results and default stream", () => {
     const w = await mountView(`?stream=__all__&period=1h&hunt_kind=ip&hunt=${ATTACKER_IP}`);
     expect(w.find('[data-test="security-events-hunt-lock"]').exists()).toBe(true);
     expect(securityInvestigate.searchEvents).not.toHaveBeenCalled();
+  });
+});
+
+describe("SecurityEvents field-list column toggle (X1)", () => {
+  const b64 = (text: string) => btoa(text);
+  const panelSource = (w: VueWrapper) =>
+    w.findComponent({ name: "StreamFieldPanel" }).props("source") as FieldPanelSource;
+  const field = (w: VueWrapper, name: string) =>
+    panelSource(w).fields.value.find((row) => row.name === name) as PanelField;
+  const table = (w: VueWrapper) => w.findComponent({ name: "SecurityEventsTable" });
+  const columnIds = (w: VueWrapper) =>
+    (table(w).props("columns") as { id: string }[]).map((c) => c.id);
+  const toggle = async (w: VueWrapper, name: string) => {
+    panelSource(w).toggleColumn!(field(w, name));
+    await settle();
+  };
+
+  it("adds exactly the clicked field to the normalised view, without switching views", async () => {
+    const w = await mountView("?stream=okta_auth&period=1h");
+    expect(table(w).props("showRaw")).toBe(false);
+    const before = columnIds(w);
+    await toggle(w, "actor_alternateid");
+    expect(columnIds(w)).toEqual([...before, "raw:actor_alternateid"]);
+    expect(table(w).props("showRaw")).toBe(false);
+    expect(panelSource(w).tableColumns?.value).toEqual(["_timestamp", "actor_alternateid"]);
+    await toggle(w, "actor_alternateid");
+    expect(columnIds(w)).toEqual(before);
+  });
+
+  it("shows _timestamp as the normalised view's Time column and never adds a second one (F5)", async () => {
+    const w = await mountView("?stream=okta_auth&period=1h");
+    const before = columnIds(w);
+    expect(before.filter((id) => id === "time")).toHaveLength(1);
+    expect(panelSource(w).tableColumns?.value).toContain("_timestamp");
+    expect(field(w, "_timestamp").columnLocked).toBe(true);
+    expect(field(w, "_timestamp").columnLockedReason).toBe("Always shown as the Time column");
+    await toggle(w, "_timestamp");
+    expect(columnIds(w)).toEqual(before);
+    table(w).vm.$emit("update:showRaw", true);
+    await settle();
+    expect(field(w, "_timestamp").columnLocked).not.toBe(true);
+    expect(field(w, "_timestamp").columnLockedReason).toBeUndefined();
+  });
+
+  it("adds and drops one column in the raw view, keeping the last one", async () => {
+    const w = await mountView("?stream=okta_auth&period=1h");
+    table(w).vm.$emit("update:showRaw", true);
+    await settle();
+    const before = columnIds(w);
+    const extra = OKTA_FIELDS.find(
+      (name) => name !== "_timestamp" && !before.includes(`raw:${name}`),
+    )!;
+    await toggle(w, extra);
+    expect(columnIds(w)).toEqual([...before, `raw:${extra}`]);
+    const shown = [...(panelSource(w).tableColumns?.value ?? [])];
+    for (const name of shown.slice(1)) await toggle(w, name);
+    expect(panelSource(w).tableColumns?.value).toEqual([shown[0]]);
+    expect(field(w, shown[0]).columnLocked).toBe(true);
+    await toggle(w, shown[0]);
+    expect(panelSource(w).tableColumns?.value).toEqual([shown[0]]);
+  });
+
+  it("adds one column to a SELECT * query's normalised view and leaves its raw grid to the query", async () => {
+    const sql = `SELECT * FROM "okta_auth"`;
+    const w = await mountView(`?stream=okta_auth&period=1h&sql_mode=true&query=${b64(sql)}`);
+    table(w).vm.$emit("update:showRaw", false);
+    await settle();
+    const before = columnIds(w);
+    await toggle(w, "actor_alternateid");
+    expect(columnIds(w)).toEqual([...before, "raw:actor_alternateid"]);
+    table(w).vm.$emit("update:showRaw", true);
+    await settle();
+    const raw = columnIds(w);
+    expect(field(w, "actor_alternateid").columnLocked).toBe(true);
+    await toggle(w, "actor_alternateid");
+    expect(columnIds(w)).toEqual(raw);
+  });
+});
+
+describe("SecurityEvents null filter chips", () => {
+  const panelSource = (w: VueWrapper) =>
+    w.findComponent({ name: "StreamFieldPanel" }).props("source") as FieldPanelSource;
+
+  it("reads Is Null / Is Not Null, and invert flips between them", async () => {
+    const w = await mountView("?stream=okta_auth&period=1h");
+    panelSource(w).addValueFilters!("actor_alternateid", [NULL_VALUE_KEY], []);
+    await settle();
+    const chip = () => w.find('[data-test="security-events-filter-0"]').text();
+    expect(chip()).toContain("actor_alternateid Is Null");
+    expect(chip()).not.toContain("= null");
+    expect(requestOf(rowSearches().at(-1)!).sql).toContain(`"actor_alternateid" IS NULL`);
+    await w.find('[data-test="security-events-filter-invert-0"]').trigger("click");
+    await settle();
+    expect(chip()).toContain("actor_alternateid Is Not Null");
+    expect(requestOf(rowSearches().at(-1)!).sql).toContain(`"actor_alternateid" IS NOT NULL`);
+    await w.find('[data-test="security-events-filter-invert-0"]').trigger("click");
+    await settle();
+    expect(chip()).toContain("actor_alternateid Is Null");
   });
 });

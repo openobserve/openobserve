@@ -1863,7 +1863,48 @@ const fieldWidthClass = computed(() => {
                         >
                           <!-- Multi-select: always-visible checkbox indicator -->
                           <template v-if="multiple">
+                            <!-- Where a row click switches, the checkbox is its own cell: a bigger target that says it adds. -->
                             <span
+                              v-if="rowClickSingleSelect"
+                              class="rounded-default hover:border-checkbox-hover-border -ms-1.5 -me-1 flex size-6 shrink-0 items-center justify-center border border-transparent"
+                              data-select-checkbox-cell
+                            >
+                              <OTooltip
+                                :content="
+                                  selectedValues.includes(filteredOptions[vRow.index].value)
+                                    ? t('components.select.removeFromSelection')
+                                    : t('components.select.addToSelection')
+                                "
+                                side="left"
+                              />
+                              <span
+                                :class="[
+                                  'flex shrink-0 items-center justify-center',
+                                  'rounded-checkbox size-3.5 border transition-colors',
+                                  selectedValues.includes(filteredOptions[vRow.index].value)
+                                    ? 'bg-checkbox-checked-bg border-checkbox-checked-border'
+                                    : 'bg-checkbox-bg border-checkbox-border',
+                                ]"
+                                aria-hidden="true"
+                                data-select-checkbox
+                              >
+                                <svg
+                                  v-if="selectedValues.includes(filteredOptions[vRow.index].value)"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  viewBox="0 0 12 12"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  class="text-checkbox-checked-fg size-full p-0.5"
+                                >
+                                  <polyline points="2,6 5,9 10,3" />
+                                </svg>
+                              </span>
+                            </span>
+                            <span
+                              v-else
                               :class="[
                                 'flex shrink-0 items-center justify-center',
                                 'rounded-checkbox size-3.5 border transition-colors',
@@ -2104,6 +2145,14 @@ const fieldWidthClass = computed(() => {
           v-bind="controlAttrs"
           :aria-describedby="mergeDescribedBy(errorDescribedBy, controlAttrs)"
           :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
+          :data-test-selected-value="
+            multiple
+              ? selectedValues.map((v) => String(v)).join(',')
+              : selectedValues[0] !== undefined
+                ? String(selectedValues[0])
+                : ''
+          "
+          :data-test-selected-label="triggerDisplayLabel"
           :class="
             isInlineAppearance
               ? inlineTriggerClasses

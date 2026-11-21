@@ -1463,6 +1463,32 @@ export default defineComponent({
       });
     };
 
+    // Inserts at the live selection, so a caret at offset 0 is honoured, and leaves the caret after the text.
+    const insertAtCursor = (text: string): boolean => {
+      const selection = editorObj?.getSelection?.();
+      if (!monaco || !selection) return false;
+      asProgrammatic(() => {
+        editorObj.pushUndoStop();
+        editorObj.executeEdits(
+          "insert-at-cursor",
+          [{ range: selection, text }],
+          (inverse: MonacoEditor.editor.IValidEditOperation[]) => {
+            const end = inverse[0].range;
+            return [
+              new monaco.Selection(
+                end.endLineNumber,
+                end.endColumn,
+                end.endLineNumber,
+                end.endColumn,
+              ),
+            ];
+          },
+        );
+        editorObj.pushUndoStop();
+      });
+      return true;
+    };
+
     /**
      * Register the provider set for a language exactly once.
      *
@@ -2333,6 +2359,7 @@ export default defineComponent({
       },
       setValue,
       replaceValue,
+      insertAtCursor,
       resetEditorLayout,
       disableSuggestionPopup,
       triggerAutoComplete,

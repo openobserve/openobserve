@@ -3,7 +3,7 @@ import { expect } from '@playwright/test';
 import { confirmDraftSignOut } from '../generalPages/draftSignOut.js';
 
 
-import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
+import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue, clickFieldRowAction } from '../commonActions.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
@@ -196,7 +196,7 @@ export class TracesPage {
     // Index List / Field List
     this.streamSelect = '[data-test="log-search-index-list-select-stream"]';
     this.fieldSearchInput = '[data-test="log-search-index-list-field-search-input"]';
-    this.fieldsTable = '[data-test="log-search-index-list-fields-table"]';
+    this.fieldsTable = '[data-test="traces-search-index-list"]';
 
     // Span Components
     this.spanBlock = '[data-test="span-block"]';
@@ -1164,7 +1164,7 @@ export class TracesPage {
 
   /**
    * Expand field in field list.
-   * Source: web/src/components/common/FieldExpansion.vue
+   * Source: web/src/components/common/fieldPanel/FieldPanelRow.vue
    *   data-test="log-search-expand-{field.name}-field-btn"
    * @param {string} fieldName - Name of field to expand
    * @returns {boolean} True if expanded successfully
@@ -1184,17 +1184,14 @@ export class TracesPage {
 
   /**
    * Add a field=value filter to the query via the field expansion's
-   * "Add to filter" button. Source: FieldExpansion.vue
+   * "Add to filter" button. Source: FieldPanelRow.vue
    *   data-test="log-search-index-list-add-{field.name}-field-btn"
    * @param {string} fieldName - Name of field
    * @returns {boolean} True if added successfully
    */
   async selectFieldValue(fieldName) {
-    const addBtn = this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`).first();
-
     try {
-      await expect(addBtn).toBeVisible({ timeout: 3000 });
-      await addBtn.click();
+      await clickFieldRowAction(this.page, fieldName, `[data-test="log-search-index-list-add-${fieldName}-field-btn"]`, { timeout: 3000 });
       await this.page.waitForTimeout(1000);
       return true;
     } catch {
@@ -2933,11 +2930,10 @@ export class TracesPage {
 
   /**
    * Get field expansion headers in the traces field list
-   * (.field-expansion-item is a framework component class, not a data-test hook)
    * @returns {Locator}
    */
   getFieldExpansionHeaders() {
-    return this.page.locator('.field-expansion-item .field-expansion-header');
+    return this.page.locator(`${this.fieldsTable} [data-test^="log-search-expand-"][data-test$="-field-btn"]`);
   }
 
   /**

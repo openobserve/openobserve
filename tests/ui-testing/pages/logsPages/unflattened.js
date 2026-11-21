@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test';
 import MonacoEditorHelper from '../../playwright-tests/utils/MonacoEditorHelper.js';
+import { clickFieldRowAction } from '../commonActions.js';
 
 class UnflattenedPage {
     constructor(page) {
@@ -39,7 +40,7 @@ class UnflattenedPage {
         this.utilitiesMenuButton = page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
         this.sqlModeToggle = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
         this.logsSearchBarQueryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
-        // FieldListPagination receives data-test-prefix="logs-page" from IndexList.vue,
+        // FieldListPagination receives data-test-prefix="logs-page" from StreamFieldPanel.vue,
         // so the rendered data-test is `${prefix}-all-fields-btn`.
         this.allFieldsButton = page.locator('[data-test="logs-page-all-fields-btn"]');
         this.logsSearchBarRefreshButton = page.locator('[data-test="logs-search-bar-refresh-btn"]');
@@ -110,13 +111,12 @@ class UnflattenedPage {
         // Scope under the logs index list to avoid potential collision with the
         // dashboard panel-editor field list (which also exposes interesting-field
         // controls in some layouts).
-        const btn = this.page
-            .locator(`[data-test="logs-search-index-list"] [data-test="log-search-index-list-interesting-${fieldName}-field-btn"]`)
-            .first();
-        await btn.waitFor({ state: 'visible' });
-        // Force-click: an adjacent tooltip icon path intermittently intercepts
-        // pointer events at the moment of click; force bypasses the overlay.
-        await btn.click({ force: true });
+        await clickFieldRowAction(
+            this.page,
+            fieldName,
+            `[data-test="log-search-index-list-interesting-${fieldName}-field-btn"]`,
+            { scope: '[data-test="logs-search-index-list"]' },
+        );
     }
 
     async expectQueryEditorContainsText(textOrRegex) {
@@ -125,7 +125,7 @@ class UnflattenedPage {
     }
 
     /**
-     * Wait for an interesting-field toggle button's `title` to flip to
+     * Wait for an interesting-field toggle button's `aria-label` to flip to
      * "Remove from interesting fields" — the DOM-side proxy for
      * `field.isInterestingField === true`. Used instead of reading Vue state
      * because `__vueParentComponent` is dev-only in Vue 3 and undefined in
@@ -136,7 +136,7 @@ class UnflattenedPage {
         const btn = this.page.locator(
             `[data-test="logs-search-index-list"] [data-test="log-search-index-list-interesting-${fieldName}-field-btn"]`
         ).first();
-        await expect(btn).toHaveAttribute('title', /remove from interesting fields/i, { timeout });
+        await expect(btn).toHaveAttribute('aria-label', /remove from interesting fields/i, { timeout });
     }
 
     /**
@@ -152,12 +152,12 @@ class UnflattenedPage {
         // Read the set of "interesting" fields from the DOM instead of walking
         // `__vueParentComponent`, which is dev-only and undefined in production
         // builds (the build CI ships). Each interesting-field toggle button's
-        // `title` flips to "Remove from interesting fields" when active. Read the
+        // `aria-label` flips to "Remove from interesting fields" when active. Read the
         // active stream from the URL — `?stream=` is set on every navigation.
         const appState = await this.page.evaluate(() => {
             const btnSelector = '[data-test="logs-search-index-list"] [data-test^="log-search-index-list-interesting-"][data-test$="-field-btn"]';
             const fields = Array.from(document.querySelectorAll(btnSelector))
-                .filter(b => /remove from interesting fields/i.test(b.getAttribute('title') || ''))
+                .filter(b => /remove from interesting fields/i.test(b.getAttribute('aria-label') || ''))
                 .map(b => {
                     const m = (b.getAttribute('data-test') || '').match(/^log-search-index-list-interesting-(.+)-field-btn$/);
                     return m ? m[1] : null;

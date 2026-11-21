@@ -341,7 +341,6 @@ export const logsUtils = () => {
     return Boolean(parsedSQL?.with && Array.isArray(parsedSQL.with) && parsedSQL.with.length > 0);
   };
 
-  // Todo: Duplicate function in IndexList.vue same for removeTraceId
   /**
    * Adds a trace ID to the search request trace-ID collection, skipping duplicates.
    *

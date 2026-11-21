@@ -144,7 +144,7 @@
             @select.stop="addSearchTerm(key, value[key], 'include')"
           >
             <template #icon-left><EqualIcon class="size-2.5" /></template>
-            {{ t("common.includeSearchTerm") }}
+            {{ t("common.include") }}
           </ODropdownItem>
           <ODropdownItem
             v-if="!hideSearchTermActions && canFilterOnField(key)"
@@ -152,7 +152,7 @@
             @select.stop="addSearchTerm(key, value[key], 'exclude')"
           >
             <template #icon-left><NotEqualIcon class="size-2.5" /></template>
-            {{ t("common.excludeSearchTerm") }}
+            {{ t("common.exclude") }}
           </ODropdownItem>
           <ODropdownItem
             v-if="key !== store.state.zoConfig.timestamp_column && !hideAddFieldToTable"

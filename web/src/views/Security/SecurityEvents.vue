@@ -24,26 +24,27 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import SecurityNotices, { type SecurityNotice } from "@/components/security/SecurityNotices.vue";
 import SecurityAccessLock from "@/components/security/SecurityAccessLock.vue";
 import { failedRequests, viewDenial } from "@/composables/useAccessStore";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
-import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
 import DateTime from "@/components/DateTime.vue";
 import SecurityEventsSources from "@/components/security/events/SecurityEventsSources.vue";
 import SecurityEventsDetected from "@/components/security/events/SecurityEventsDetected.vue";
 import SecurityEventsFilterBar from "@/components/security/events/SecurityEventsFilterBar.vue";
 import SecurityEventsFilterChips from "@/components/security/events/SecurityEventsFilterChips.vue";
-import SecurityEventsTopValues from "@/components/security/events/SecurityEventsTopValues.vue";
 import SecurityEventsHunt from "@/components/security/events/SecurityEventsHunt.vue";
 import SecurityEventsTimeline from "@/components/security/events/SecurityEventsTimeline.vue";
 import SecurityEventsTable, {
   type EventRow,
 } from "@/components/security/events/SecurityEventsTable.vue";
 import SecurityEventDrawer from "./SecurityEventDrawer.vue";
+import StreamFieldPanel from "@/components/common/fieldPanel/StreamFieldPanel.vue";
+import useSecurityFieldSource, {
+  SECURITY_FIELD_PANEL_CAPABILITIES,
+} from "@/components/common/fieldPanel/useSecurityFieldSource";
 import SecurityNewDetectionDialog, {
   type NewDetectionPreset,
 } from "@/components/security/SecurityNewDetectionDialog.vue";
@@ -104,7 +105,6 @@ import {
   useSecurityAccess,
 } from "@/composables/security/useSecurityAccess";
 import { FieldIndex } from "@/utils/security/fields";
-import { groupFields } from "@/utils/security/fieldGroups";
 import { quoteIdent } from "@/utils/security/sql";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { displayOrder, positionOf, stepRow, type NavTable } from "@/utils/security/recordNav";
@@ -215,14 +215,9 @@ interface StreamField {
   ftype: string;
 }
 const schemaFields = ref<StreamField[]>([]);
+const definedSchemaFields = ref<string[] | null>(null);
+const schemaLoading = ref(false);
 const fieldNames = computed(() => schemaFields.value.map((f) => f.name));
-
-const fieldItems = computed<FieldItem[]>(() =>
-  groupFields(schemaFields.value).flatMap(({ group, fields }) => [
-    { name: `__group_${group}`, isGroup: true, groupName: t(`siem.fieldGroup.${group}`), group },
-    ...fields.map((f) => ({ name: f.name, type: f.ftype, group })),
-  ]),
-);
 
 const PREFERRED = [
   "_timestamp",
@@ -256,14 +251,6 @@ function initColumns(fields: StreamField[]) {
             .slice(0, 6)
             .map((f) => f.name),
         ];
-}
-function toggleCol(name: string) {
-  const i = visibleCols.value.indexOf(name);
-  if (i === -1) visibleCols.value = [...visibleCols.value, name];
-  else if (visibleCols.value.length > 1)
-    visibleCols.value = visibleCols.value.filter((c) => c !== name);
-  if (selectedStream.value) saveCols(colsKey(), selectedStream.value, visibleCols.value);
-  showRaw.value = true;
 }
 
 const sqlQuery = ref(initialState.query);
@@ -344,6 +331,8 @@ function invertFilter(idx: number) {
     "!=": "=",
     contains: "not_contains",
     not_contains: "contains",
+    is_null: "is_not_null",
+    is_not_null: "is_null",
   };
   fieldFilters.value = fieldFilters.value.map((f, i) =>
     i === idx ? { ...f, op: inverse[f.op] ?? "=" } : f,
@@ -476,6 +465,56 @@ function sortFieldFor(columnId: string): string | null {
   return null;
 }
 
+// A hand-written query's rows hold what it returned, not the picker's columns.
+const rawCols = computed(() =>
+  sqlMode.value && sqlCols.value.length ? sqlCols.value : visibleCols.value,
+);
+/** Stored fields shown next to the normalised view's derived columns. */
+const extraCols = ref<string[]>([]);
+const showsRawView = computed(() => !resultMode.value && (projected.value || showRaw.value));
+// The grid then shows exactly the columns a hand-written query returned, so the field list cannot add or drop one.
+const queryOwnsColumns = computed(
+  () => resultMode.value || (showsRawView.value && sqlMode.value && sqlCols.value.length > 0),
+);
+const shownRawCols = computed(() => {
+  if (resultMode.value) return [];
+  return showsRawView.value ? rawCols.value : ["_timestamp", ...extraCols.value];
+});
+
+// The normalised view's Time column is `_timestamp`, always shown, so its eye cannot add a second one.
+const isTimeColumn = (name: string) => !showsRawView.value && name === "_timestamp";
+
+function isColumnLocked(name: string): boolean {
+  if (queryOwnsColumns.value) return true;
+  if (isTimeColumn(name)) return true;
+  // The raw view keeps at least one column.
+  return showsRawView.value && visibleCols.value.length === 1 && visibleCols.value[0] === name;
+}
+
+/** Adds or drops one field's column in the view on screen; it never switches views. */
+function toggleColumn(name: string) {
+  if (isColumnLocked(name)) return;
+  const toggled = (cols: string[]) =>
+    cols.includes(name) ? cols.filter((c) => c !== name) : [...cols, name];
+  if (!showsRawView.value) {
+    extraCols.value = toggled(extraCols.value);
+    return;
+  }
+  visibleCols.value = toggled(visibleCols.value);
+  if (selectedStream.value) saveCols(colsKey(), selectedStream.value, visibleCols.value);
+}
+
+function rawColumn(col: string): OTableColumnDef<Row> {
+  return {
+    id: col === "_timestamp" ? "time" : `raw:${col}`,
+    header: col === "_timestamp" ? t("siem.column.time") : raw(col),
+    accessorFn: (row: Row) => (col === "_timestamp" ? row.time : readRaw(row.raw, col)),
+    size: col === "_timestamp" ? 170 : 180,
+    sortable: true,
+    meta: { rawField: col },
+  };
+}
+
 const columns = computed<OTableColumnDef<Row>[]>(() => {
   if (resultMode.value) {
     return resultCols.value.map((col) => ({
@@ -487,19 +526,8 @@ const columns = computed<OTableColumnDef<Row>[]>(() => {
       meta: { rawField: col },
     }));
   }
-  // A hand-written query's rows hold what it returned, not the picker's columns.
-  const rawCols = sqlMode.value && sqlCols.value.length ? sqlCols.value : visibleCols.value;
-  if (projected.value || showRaw.value) {
-    return rawCols.map((col) => ({
-      id: col === "_timestamp" ? "time" : `raw:${col}`,
-      header: col === "_timestamp" ? t("siem.column.time") : raw(col),
-      accessorFn: (row: Row) => (col === "_timestamp" ? row.time : readRaw(row.raw, col)),
-      size: col === "_timestamp" ? 170 : 180,
-      sortable: true,
-      meta: { rawField: col },
-    }));
-  }
-  return normalizedColumns.value.map((col) => ({
+  if (projected.value || showRaw.value) return rawCols.value.map(rawColumn);
+  const derived = normalizedColumns.value.map((col) => ({
     id: col,
     header: t(`siem.column.${col}`),
     accessorKey: col,
@@ -508,6 +536,7 @@ const columns = computed<OTableColumnDef<Row>[]>(() => {
     sortable: !!sortFieldFor(col),
     meta: { isName: col === "className" },
   }));
+  return [...derived, ...extraCols.value.map(rawColumn)];
 });
 
 const currentSort = computed<EventSort | null>(() => {
@@ -649,13 +678,31 @@ function onChartZoom({ start, end }: { start: number; end: number }) {
   void runSearch();
 }
 
-const expandedField = ref<string | null>(null);
-const topValues = ref<{ value: string; count: number }[]>([]);
-const topValuesLoading = ref(false);
+const fieldSource = useSecurityFieldSource({
+  schemaFields,
+  definedSchemaFields,
+  stream: selectedStream,
+  // Before the streams land no stream is picked yet, which is not "pick one".
+  loading: computed(() => schemaLoading.value || (streamsLoading.value && !selectedStream.value)),
+  timeRange: () => timeRange.value,
+  severitySql,
+  severity: severityFilter,
+  fieldFilters,
+  sqlMode,
+  sqlQuery,
+  tableColumns: shownRawCols,
+  isColumnLocked,
+  columnLockedReason: (name: string) =>
+    isTimeColumn(name) && !queryOwnsColumns.value
+      ? t("siem.events.timeColumnAlwaysShown")
+      : undefined,
+  onToggleColumn: toggleColumn,
+  onFiltersChange: () => void runSearch(),
+});
 
 async function fetchTopValues(
   field: string,
-  limit = 10,
+  limit: number,
 ): Promise<{ value: string; count: number }[]> {
   const stream = selectedStream.value;
   if (!stream || isHunt.value) return [];
@@ -676,29 +723,6 @@ async function fetchTopValues(
   }
 }
 const builderValues = (field: string) => fetchTopValues(field, 50);
-
-async function onFieldClick(row: FieldItem) {
-  if (row.isGroup) return;
-  if (expandedField.value === row.name) {
-    expandedField.value = null;
-    topValuesLoading.value = false;
-    return;
-  }
-  expandedField.value = row.name;
-  topValues.value = [];
-  await loadTopValues(row.name);
-}
-
-let topValuesSeq = 0;
-async function loadTopValues(field: string) {
-  const seq = ++topValuesSeq;
-  topValuesLoading.value = true;
-  const values = await fetchTopValues(field);
-  // A newer load, or another field opened meanwhile, owns the panel now.
-  if (seq !== topValuesSeq || expandedField.value !== field) return;
-  topValues.value = values;
-  topValuesLoading.value = false;
-}
 
 const {
   ranked: sigmaRules,
@@ -881,6 +905,8 @@ function newestSource(): string | null {
 
 async function loadSchema(streamName: string) {
   schemaFields.value = [];
+  definedSchemaFields.value = null;
+  schemaLoading.value = true;
   try {
     const res = await securitySources.schema(orgId.value, streamName);
     if (selectedStream.value !== streamName) return;
@@ -889,12 +915,16 @@ async function loadSchema(streamName: string) {
       name: f.name,
       ftype: f.type ?? f.field_type ?? "",
     }));
+    definedSchemaFields.value = res.data?.settings?.defined_schema_fields ?? null;
+    schemaLoading.value = false;
     initColumns(schemaFields.value);
     // Identified from the schema first so severity is known before the first search.
     await detectSource(null);
     void loadClassMix(streamName);
   } catch {
     if (selectedStream.value === streamName) schemaFields.value = [];
+  } finally {
+    if (selectedStream.value === streamName) schemaLoading.value = false;
   }
 }
 
@@ -1027,7 +1057,7 @@ async function runSearch({ pageOnly = false, userRun = false } = {}) {
   } finally {
     if (seq === searchSeq) loading.value = false;
   }
-  if (expandedField.value && !pageOnly) void loadTopValues(expandedField.value);
+  if (!pageOnly) fieldSource.refreshOpenFieldValues();
   await histogramDone;
   if (activeRun === run) activeRun = null;
 }
@@ -1155,13 +1185,15 @@ watch(selectedStream, async (v) => {
   drawerEvent.value = null;
   pendingEventTs.value = null;
   pendingEventKey.value = null;
-  expandedField.value = null;
+  extraCols.value = [];
   showRules.value = false;
   sortBy.value = "time";
   sortOrder.value = "desc";
   if (v === ALL_SOURCES) {
     cancelSearch({ quiet: true });
     schemaFields.value = [];
+    definedSchemaFields.value = null;
+    schemaLoading.value = false;
     detected.value = null;
     severityExpr.value = null;
     events.value = [];
@@ -1423,13 +1455,11 @@ function widenTo(period: string) {
     </template>
 
     <template #sidebar>
-      <OFieldList
-        :fields="fieldItems"
-        :show-pagination="false"
-        :expanded-ids="expandedField ? [expandedField] : []"
-        :search-placeholder="t('siem.events.searchFields')"
+      <StreamFieldPanel
+        :capabilities="SECURITY_FIELD_PANEL_CAPABILITIES"
+        :source="fieldSource"
+        test-id-prefix="security-events"
         data-test="security-events-fields"
-        @row-click="onFieldClick"
       >
         <template #before-list>
           <SecurityEventsSources
@@ -1448,47 +1478,7 @@ function widenTo(period: string) {
             @dismiss="secSources.dismiss($event)"
           />
         </template>
-
-        <template #field-actions="{ row }">
-          <OButton
-            variant="ghost"
-            size="icon-xs"
-            :icon-left="
-              showRaw && visibleCols.includes(row.name) ? 'visibility-off' : 'view-column'
-            "
-            :data-test="`security-events-field-column-${row.name}`"
-            @click.stop="toggleCol(row.name)"
-          >
-            <OTooltip
-              :content="
-                showRaw && visibleCols.includes(row.name)
-                  ? t('siem.events.removeColumn')
-                  : t('siem.events.addColumn')
-              "
-            />
-          </OButton>
-        </template>
-
-        <template #expansion="{ row }">
-          <SecurityEventsTopValues
-            :field="row.name"
-            :values="topValues"
-            :loading="topValuesLoading"
-            :whole-stream="sqlMode"
-            @add="addFilter"
-          />
-        </template>
-
-        <template #empty>
-          {{
-            isHunt
-              ? t("siem.events.hunt.noFields")
-              : selectedStream
-                ? t("siem.events.noFields")
-                : t("siem.events.selectStreamFirst")
-          }}
-        </template>
-      </OFieldList>
+      </StreamFieldPanel>
     </template>
 
     <div class="flex min-h-0 flex-1 flex-col">

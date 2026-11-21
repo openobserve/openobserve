@@ -4,7 +4,7 @@ import { LogsQueryPage } from './logsQueryPage.js';
 import { LoginPage } from '../generalPages/loginPage.js';
 import { IngestionPage } from '../generalPages/ingestionPage.js';
 import { ManagementPage } from '../generalPages/managementPage.js';
-import { openNavFlyoutChild, clickNavUntilRoute, selectLogsViewMode } from '../commonActions.js';
+import { openNavFlyoutChild, clickNavUntilRoute, selectLogsViewMode, revealFieldRowAction, clickFieldRowAction } from '../commonActions.js';
 import { openOSelectDropdown } from '../alertsPages/oselectHelpers.js';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -186,7 +186,7 @@ export class LogsPage {
         // OFieldList search input (visible from Visualize-tab panel layouts).
         this.logSearchIndexListFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
         this.expandCode = 'Expand "code"';
-        // FieldExpansion.vue exposes the row-expand toggle as
+        // FieldPanelRow.vue exposes the row-expand toggle as
         // [data-test="log-search-expand-<field>-field-btn"]. Deterministic data-test for waits.
         this.expandCodeFieldBtn = '[data-test="log-search-expand-code-field-btn"]';
         this.logsDetailTableSearchAroundBtn = '[data-test="logs-detail-table-search-around-btn"]';
@@ -314,7 +314,7 @@ export class LogsPage {
         this.addToYAxis = '[data-test="dashboard-add-y-data"]';
         this.addToBreakdown = '[data-test="dashboard-add-b-data"]';
         this.addToFilter = '[data-test="dashboard-add-filter-data"]';
-        // PanelFieldList uses OFieldList which renders an OInput with data-test="o-field-list-search".
+        // DashboardFieldPanel uses OFieldList which renders an OInput with data-test="o-field-list-search".
         // OInput convention: wrapper carries data-test, inner native <input> carries `-field` suffix.
         // Scoped under [data-test="logs-build-query-page"] because the logs sidebar's IndexList
         // also renders an OFieldList with the same data-test, and in build mode that sidebar is
@@ -1033,7 +1033,7 @@ export class LogsPage {
             testLogger.info('selectStream: Skipping page navigation (skipNavigation=true)');
         }
 
-        // Post-OSelect-migration IndexList contract (see web/src/plugins/logs/IndexList.vue):
+        // Post-OSelect-migration IndexList contract (see web/src/components/common/fieldPanel/StreamPicker.vue):
         //  - Wrapper: [data-test="log-search-index-list-select-stream"]   (OSelect outer div)
         //  - Trigger: the inner native <button> that Reka UI's PopoverTrigger renders. A
         //    `[role="button"]` attribute selector does NOT match a native <button> — the
@@ -2280,12 +2280,9 @@ export class LogsPage {
         return usable.slice(0, count);
     }
 
-    /** Click a sidebar field's "=" icon; it only renders while its row is hovered. */
+    /** Click a sidebar field's "=" icon; it only shows while its row is hovered. */
     async addEqualsFilterForField(field) {
-        await this.page.locator(this.fieldListItem(field)).first().hover();
-        const button = this.page.locator(this.fieldEqualsButton(field)).first();
-        await button.waitFor({ state: 'visible', timeout: 10000 });
-        await button.click();
+        await clickFieldRowAction(this.page, field, this.fieldEqualsButton(field));
     }
 
     async expandFirstResultRow() {
@@ -2470,13 +2467,13 @@ export class LogsPage {
         const fieldItem = this.page.locator('[data-test^="log-search-index-list-interesting-"]').first();
         await this.ensureQuickModeState(true);
         try {
-            await fieldItem.waitFor({ state: 'visible', timeout: 20000 });
+            await fieldItem.waitFor({ state: 'attached', timeout: 20000 });
         } catch {
             // Fallback: a stray earlier toggle may have flipped quick mode off —
             // re-assert and wait once more before giving up.
             testLogger.warn('Interesting-field buttons not visible after 20s — re-asserting quick mode and waiting');
             await this.ensureQuickModeState(true);
-            await fieldItem.waitFor({ state: 'visible', timeout: 15000 });
+            await fieldItem.waitFor({ state: 'attached', timeout: 15000 });
         }
 
         await this.fillIndexFieldSearchInput(field);
@@ -2551,7 +2548,7 @@ export class LogsPage {
 
     // Kubernetes methods
     async kubernetesContainerName() {
-        // FieldExpansion.vue renders the expand toggle with data-test
+        // FieldPanelRow.vue renders the expand toggle with data-test
         // `log-search-expand-${field.name}-field-btn` — prefer explicit data-test
         // over getByLabel (§2 selector policy bans accessibility queries).
         await this.page.locator('[data-test="log-search-expand-kubernetes_container_name-field-btn"]').first().click();
@@ -3014,7 +3011,7 @@ export class LogsPage {
     }
 
     // Wait for the expand-code field-list row toggle to be visible after filtering.
-    // FieldExpansion.vue renders [data-test="log-search-expand-<field>-field-btn"].
+    // FieldPanelRow.vue renders [data-test="log-search-expand-<field>-field-btn"].
     async waitForExpandCodeButtonVisible(timeout = 10000) {
         await this.page.locator(this.expandCodeFieldBtn).waitFor({ state: 'visible', timeout });
     }
@@ -3883,7 +3880,7 @@ export class LogsPage {
     // "Add field to the table" shares the include data-test, so the menu item is picked by its label.
     async includeLogDetailFieldValue(field) {
         await this.page.locator(this.logDetailDialog).locator(`[data-test="log-details-include-exclude-field-btn-${field}"]`).click();
-        await this.page.locator(this.includeFieldButton).filter({ hasText: 'Include Search Term' }).click();
+        await this.page.locator(this.includeFieldButton).filter({ hasText: /^\s*Include\s*$/ }).click();
     }
 
     /** Include Search Term from a field's menu in the detail drawer's JSON tab (the default tab). */
@@ -5039,14 +5036,13 @@ export class LogsPage {
 
 
     async clickInterestingFieldButton(field) {
-        const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
         const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
 
         for (let attempt = 0; attempt < 5; attempt++) {
-            const visible = await btnLocator.waitFor({ state: 'visible', timeout: 8000 })
-                .then(() => true).catch(() => false);
-            if (visible) {
-                await btnLocator.click({ force: true });
+            const btnLocator = await revealFieldRowAction(this.page, field, this.interestingFieldBtn(field), { timeout: 8000 })
+                .catch(() => null);
+            if (btnLocator) {
+                await btnLocator.click();
                 return;
             }
             // Button not visible — re-apply filter to ensure field is in the list.
@@ -5056,8 +5052,7 @@ export class LogsPage {
             // Wait deterministically for the debounced filter to reflect the typed value
             await expect(inputLocator).toHaveValue(field, { timeout: 5000 }).catch(() => {});
         }
-        await btnLocator.waitFor({ state: 'visible', timeout: 8000 });
-        await btnLocator.click({ force: true });
+        await clickFieldRowAction(this.page, field, this.interestingFieldBtn(field), { timeout: 8000 });
     }
 
     /**
@@ -5066,31 +5061,29 @@ export class LogsPage {
      * action buttons, then click the interesting-field (ⓘ) toggle on that row.
      */
     async hoverAndClickInterestingFieldLast(field) {
-        await this.page.locator(this.fieldListItem(field)).last().hover();
-        await this.page.locator(this.interestingFieldBtn(field)).last().click({ force: true });
+        await clickFieldRowAction(this.page, field, this.interestingFieldBtn(field), { last: true });
     }
 
     /**
      * Idempotent version of clickInterestingFieldButton: only clicks if the field is
      * NOT already marked as interesting.  Use this when the goal is to guarantee the
-     * field is in interestingFieldList, not to toggle it.  If the button's title
+     * field is in interestingFieldList, not to toggle it.  If the button's aria-label
      * already says "Remove from interesting fields" the field is already starred and
      * we skip the click so we don't accidentally remove it.
      */
     async ensureFieldIsInteresting(field) {
-        const btnLocator = this.page.locator(this.interestingFieldBtn(field)).first();
         const inputLocator = this.page.locator(this.logSearchIndexListFieldSearchInput);
 
         for (let attempt = 0; attempt < 5; attempt++) {
-            const visible = await btnLocator.waitFor({ state: 'visible', timeout: 8000 })
-                .then(() => true).catch(() => false);
-            if (visible) {
-                const title = await btnLocator.getAttribute('title').catch(() => '');
-                if (title && title.toLowerCase().includes('remove')) {
+            const btnLocator = await revealFieldRowAction(this.page, field, this.interestingFieldBtn(field), { timeout: 8000 })
+                .catch(() => null);
+            if (btnLocator) {
+                const label = await btnLocator.getAttribute('aria-label').catch(() => '');
+                if (label && label.toLowerCase().includes('remove')) {
                     // Already interesting — nothing to do.
                     return;
                 }
-                await btnLocator.click({ force: true });
+                await btnLocator.click();
                 return;
             }
             await inputLocator.fill('');
@@ -5098,12 +5091,12 @@ export class LogsPage {
             await inputLocator.pressSequentially(field, { delay: 30 });
             await expect(inputLocator).toHaveValue(field, { timeout: 5000 }).catch(() => {});
         }
-        await btnLocator.waitFor({ state: 'visible', timeout: 8000 });
-        const title = await btnLocator.getAttribute('title').catch(() => '');
-        if (title && title.toLowerCase().includes('remove')) {
+        const btnLocator = await revealFieldRowAction(this.page, field, this.interestingFieldBtn(field), { timeout: 8000 });
+        const label = await btnLocator.getAttribute('aria-label').catch(() => '');
+        if (label && label.toLowerCase().includes('remove')) {
             return;
         }
-        await btnLocator.click({ force: true });
+        await btnLocator.click();
     }
 
     async expectInterestingFieldInEditor(field) {
@@ -5377,7 +5370,7 @@ export class LogsPage {
     }
 
     async clickExpandCode() {
-        // FieldExpansion.vue exposes the toggle as
+        // FieldPanelRow.vue exposes the toggle as
         // [data-test="log-search-expand-<field>-field-btn"] — use the data-test selector.
         return await this.page.locator(this.expandCodeFieldBtn).click();
     }
@@ -5866,7 +5859,7 @@ export class LogsPage {
             // default state; nothing to click.
         }
         // Wait for interesting field items to populate (cloud may load slowly)
-        await this.page.locator('[data-test^="log-search-index-list-interesting-"]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+        await this.page.locator('[data-test^="log-search-index-list-interesting-"]').first().waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
     }
 
     async enableQuickModeIfDisabled() {
@@ -5884,7 +5877,7 @@ export class LogsPage {
         // quick-mode signal — FieldListPagination renders it whenever the stream
         // exposes a user-defined schema (showUserDefinedSchemaToggle), regardless of
         // searchObj.meta.quickMode. The per-field interesting (star) buttons are gated
-        // purely on quickMode (FieldRow/FieldExpansion `v-if="showQuickMode"`), so we
+        // purely on quickMode (FieldPanelRow shows it only in quick mode), so we
         // must verify the actual Quick Mode switch state via the utilities menu rather
         // than infer "quick mode is on" from the sidebar toggle group. Treating the
         // toggle group as an indicator made all interesting-field tests fail on cloud/
@@ -5943,13 +5936,13 @@ export class LogsPage {
         await this.page
             .locator('[data-test^="log-search-index-list-interesting-"]')
             .first()
-            .waitFor({ state: 'visible', timeout: 8000 })
+            .waitFor({ state: 'attached', timeout: 8000 })
             .catch(() => {});
     }
 
     async clickTimestampField() {
         // Post-OFieldList migration the field row is data-test="logs-field-list-item-<field>"
-        // (FieldRow.vue:22). Click the row directly — it dispatches the field-click event.
+        // (FieldPanelRow.vue). Click the row directly — it dispatches the field-click event.
         const field = this.page.locator('[data-test="logs-field-list-item-_timestamp"]').first();
         await field.waitFor({ state: 'visible', timeout: 10000 });
         return await field.click({ force: true });
@@ -6044,17 +6037,7 @@ export class LogsPage {
     }
 
     async clickAddFieldToTableButton(fieldName) {
-        const addBtn = this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`);
-        try {
-            await addBtn.waitFor({ state: 'visible', timeout: 5000 });
-        } catch {
-            // The add button is only revealed while the field row is hovered. Under CI load
-            // the hover state can be lost (or never settled) before the click — re-hover the
-            // field row and wait again before giving up.
-            await this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`).hover().catch(() => {});
-            await addBtn.waitFor({ state: 'visible', timeout: 10000 });
-        }
-        await addBtn.click();
+        await clickFieldRowAction(this.page, fieldName, `[data-test="log-search-index-list-add-${fieldName}-field-btn"]`);
         // The add operation commits when both (a) the toggle inverts to a remove
         // button in the sidebar, and (b) the field column header appears in the
         // logs table. Wait for either signal — both fire on success.
@@ -6065,9 +6048,7 @@ export class LogsPage {
     }
 
     async clickRemoveFieldFromTableButton(fieldName) {
-        const removeBtn = this.page.locator(`[data-test="log-search-index-list-remove-${fieldName}-field-btn"]`);
-        await removeBtn.waitFor({ state: 'visible', timeout: 5000 });
-        await removeBtn.click();
+        await clickFieldRowAction(this.page, fieldName, `[data-test="log-search-index-list-remove-${fieldName}-field-btn"]`);
         // Symmetric to add: the field column header disappears AND/OR the toggle
         // reverts to an add button. Wait on either DOM convergence.
         await Promise.any([
@@ -10215,7 +10196,7 @@ export class LogsPage {
     }
 
     // ── Build tab: panel field list stream selectors ────────────────────────
-    // PanelFieldList (pageKey "build") owns these. Unlike the Visualize tab's
+    // DashboardFieldPanel (pageKey "build") owns these. Unlike the Visualize tab's
     // copy (pageKey "logs", read-only), both selects here are the user's own.
     // All locator work and every assertion lives here — specs call the semantic
     // methods only, matching the other Logs specs.

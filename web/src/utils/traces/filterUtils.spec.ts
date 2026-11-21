@@ -233,15 +233,20 @@ describe("replaceExistingFieldCondition", () => {
 // ---------------------------------------------------------------------------
 
 describe("applyFilterTerm", () => {
-  describe("null value normalisation", () => {
-    it("should convert ='null' to IS NULL before applying", () => {
+  describe("the text null", () => {
+    it("should keep ='null' a quoted text value", () => {
       const result = applyFilterTerm("error_code='null'", "");
-      expect(result).toBe("error_code is null");
+      expect(result).toBe("error_code='null'");
     });
 
-    it("should convert !='null' to IS NOT NULL before applying", () => {
+    it("should keep !='null' a quoted text value", () => {
       const result = applyFilterTerm("error_code!='null'", "");
-      expect(result).toBe("error_code is not null");
+      expect(result).toBe("error_code!='null'");
+    });
+
+    it("should apply an is null term as written", () => {
+      const result = applyFilterTerm("error_code is null", "status='a'");
+      expect(result).toBe("status='a' and error_code is null");
     });
   });
 
@@ -320,8 +325,8 @@ describe("applyFilterTerm", () => {
       expect(result).toBe("match_all('a | b') and status='error'");
     });
 
-    it("should normalise a null filter appended after a piped term", () => {
-      const result = applyFilterTerm("error_code='null'", "match_all('a | b')");
+    it("should append a null filter after a piped term", () => {
+      const result = applyFilterTerm("error_code is null", "match_all('a | b')");
       expect(result).toBe("match_all('a | b') and error_code is null");
     });
   });
@@ -738,23 +743,17 @@ describe("buildFilterTerm", () => {
   });
 
   describe("null value handling", () => {
-    it("should produce IS NULL when value is the string 'null' and operator is '='", () => {
-      expect(buildFilterTerm("error_code", "null")).toBe("error_code is null");
-    });
-
-    it("should produce IS NOT NULL when value is the string 'null' and operator is '!='", () => {
-      expect(buildFilterTerm("error_code", "null", "!=")).toBe("error_code is not null");
+    it("should quote the string 'null' as ordinary text", () => {
+      expect(buildFilterTerm("error_code", "null")).toBe("error_code = 'null'");
+      expect(buildFilterTerm("error_code", "null", "!=")).toBe("error_code != 'null'");
     });
 
     it("should produce IS NULL when value is actually null and operator is '='", () => {
-      // The function signature accepts string but the implementation handles JS null
-      expect(buildFilterTerm("error_code", null as unknown as string)).toBe("error_code is null");
+      expect(buildFilterTerm("error_code", null)).toBe("error_code is null");
     });
 
     it("should produce IS NOT NULL when value is actually null and operator is '!='", () => {
-      expect(buildFilterTerm("error_code", null as unknown as string, "!=")).toBe(
-        "error_code is not null",
-      );
+      expect(buildFilterTerm("error_code", null, "!=")).toBe("error_code is not null");
     });
   });
 
@@ -988,4 +987,27 @@ describe("removeRequiredCondition — turning errors-only off", () => {
       expect(off(mergeFilterTerm("span_status = 'ERROR'", original))).toBe(original);
     },
   );
+});
+describe("a field's included and excluded values in one group (U6)", () => {
+  const mixed = "((zebra='a' or zebra='b') and zebra!='c')";
+
+  it("reads the field from the nested group", () => {
+    expect(getFieldFromExpression(mixed)).toBe("zebra");
+  });
+
+  it("replaces the whole group on the next write instead of nesting a second one", () => {
+    const once = applyFilterTerm(mixed, "code=1 and (zebra='a' or zebra='b')");
+    expect(once).toBe(`code=1 and ${mixed}`);
+    expect(applyFilterTerm("zebra='a'", once)).toBe("code=1 and zebra='a'");
+  });
+
+  it("removes the whole group, as the values query does for the field's own condition", () => {
+    expect(removeFieldCondition(`code=1 and ${mixed}`, "zebra")).toBe("code=1");
+  });
+  it("replaces and removes the null-safe form as one group", () => {
+    const safe = "((zebra='a' or zebra is null) and (zebra!='c' or zebra is null))";
+    const withSafe = applyFilterTerm(safe, `code=1 and ${mixed}`);
+    expect(withSafe).toBe(`code=1 and ${safe}`);
+    expect(removeFieldCondition(withSafe, "zebra")).toBe("code=1");
+  });
 });

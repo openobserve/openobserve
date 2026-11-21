@@ -499,6 +499,7 @@ const contentClasses = computed(() => [
         <TooltipContent
           v-bind="forwardedAttrs"
           data-test="o-tooltip-content"
+          :data-o-tooltip-passive="hoverable ? undefined : ''"
           :side="side"
           :align="align"
           :side-offset="effectiveSideOffset"
@@ -543,6 +544,7 @@ const contentClasses = computed(() => [
           <TooltipContent
             v-bind="forwardedAttrs"
             data-test="o-tooltip-content"
+            :data-o-tooltip-passive="hoverable ? undefined : ''"
             :side="side"
             :align="align"
             :side-offset="effectiveSideOffset"

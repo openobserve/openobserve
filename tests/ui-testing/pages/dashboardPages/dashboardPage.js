@@ -59,7 +59,7 @@ export class DashboardPage {
     this.shareButton = page.locator('[data-test="dashboard-share-btn"]');
 
     // Stream & field selection locators
-    // `index-dropdown-stream` is an OSelect (PanelFieldList.vue) — clicking the
+    // `index-dropdown-stream` is an OSelect (DashboardFieldPanel.vue) — clicking the
     // wrapper opens a popover that exposes `${parent}-popover`, `${parent}-search`
     // (the filter input), and `${parent}-option` (with `data-test-value="<value>"`).
     this.streamDropdown = page.locator('[data-test="index-dropdown-stream"]');
@@ -79,7 +79,7 @@ export class DashboardPage {
     this.streamOptionE2eAutomate = page
       .locator('[data-test="index-dropdown-stream-option"][data-test-value="e2e_automate"]')
       .first();
-    // OFieldList (PanelFieldList.vue → OFieldList.vue) exposes its search box via an
+    // OFieldList (DashboardFieldPanel.vue → OFieldList.vue) exposes its search box via an
     // OInput wrapper: `o-field-list-search` is the wrapper, `o-field-list-search-field`
     // is the inner native <input> (auto-derived `-field` suffix per AGENT_RULES §4 —
     // always fill the `-field` variant). The legacy `index-field-search-input`

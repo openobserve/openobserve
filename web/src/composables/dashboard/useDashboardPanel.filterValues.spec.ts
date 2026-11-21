@@ -268,7 +268,7 @@ describe("addFilteredItem", () => {
   });
 
   it("sends nothing when the dragged field carries no stream", async () => {
-    // `PanelFieldList` builds its rows with `stream: query?.fields?.stream || null`.
+    // Query and function field rows carry no stream.
     const p = readyPanel();
     await p.addFilteredItem({ name: "client_service", stream: null } as any);
     await flushPromises();

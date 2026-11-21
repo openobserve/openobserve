@@ -144,6 +144,10 @@ vi.mock("@/composables/useTraces", () => ({
     loadTracesParser: mockLoadTracesParser,
     tracesParser: { value: { astify: vi.fn(() => ({ where: null })) } },
   }),
+  DEFAULT_TRACE_COLUMNS: {
+    spans: ["service_name", "operation_name", "duration", "span_status"],
+    traces: ["service_name", "operation_name", "duration", "spans", "status", "service_latency"],
+  },
 }));
 
 vi.mock("@/utils/streamPersist", () => ({
@@ -182,7 +186,7 @@ vi.mock("@/composables/queryHistory/useRecentSearches", () => ({
 
 const stubs = {
   "search-bar": true,
-  "index-list": true,
+  StreamFieldPanel: true,
   "search-result": { template: "<div />", methods: { getDashboardData: () => {} } },
   "service-graph": true,
   "services-catalog": true,

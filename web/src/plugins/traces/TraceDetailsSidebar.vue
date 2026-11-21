@@ -1627,6 +1627,8 @@ export default defineComponent({
       if (field === timestampField) {
         return span[timestampField] ?? displayValue;
       }
+      // The table shows a null attribute as the text "null", which would filter as a literal.
+      if (attributesForDisplay.value[field] === null) return null;
 
       return displayValue;
     };

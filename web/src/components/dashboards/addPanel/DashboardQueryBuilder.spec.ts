@@ -116,6 +116,7 @@ const mockUseDashboardPanelData = {
   isAddYAxisNotAllowed: { value: false },
   isAddZAxisNotAllowed: { value: false },
   isAddBreakdownNotAllowed: { value: false },
+  unsupportedAxes: { value: { x: false, y: false, z: false, breakdown: false } },
   isPivotMode: { value: false },
   cleanupDraggingFields: vi.fn(),
   selectedStreamFieldsBasedOnUserDefinedSchema: {

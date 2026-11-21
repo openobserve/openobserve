@@ -256,6 +256,45 @@ describe("SearchBar — adding a filter term to the query", () => {
     });
   });
 
+  describe("a field's included and excluded values from the values panel (U6, F1)", () => {
+    const steps = (q: (field: string) => string) => [
+      `(${q("level")} = 'a' OR ${q("level")} = 'b')`,
+      `((${q("level")} = 'a' OR ${q("level")} = 'b') AND ${q("level")} != 'c')`,
+      `(${q("level")} = 'a' AND ${q("level")} != 'c')`,
+      `${q("level")} != 'c'`,
+    ];
+
+    it.each([
+      ["quick mode", false, "code=200", (f: string) => f],
+      ["SQL mode", true, `SELECT * FROM "s" WHERE code=200`, (f: string) => f],
+      [
+        "SQL mode with a quoted field",
+        true,
+        `SELECT * FROM "s" WHERE code=200`,
+        (f: string) => `"${f}"`,
+      ],
+    ])("replaces the field's group on every change in %s", async (_mode, sql, start, quote) => {
+      wrapper.vm.searchObj.meta.sqlMode = sql;
+      wrapper.vm.searchObj.data.query = start;
+      const joiner = sql ? " AND " : " and ";
+      for (const filter of steps(quote)) {
+        expect(await addFilterTerm(filter)).toBe(`${start}${joiner}${filter}`);
+      }
+    });
+  });
+
+  it("replaces the + placeholder with the picked values, in quick and SQL mode (M3)", async () => {
+    wrapper.vm.searchObj.data.query = "code=200 and level=''";
+    expect(await addFilterTerm("(level = 'a' OR level = 'b')")).toBe(
+      "code=200 and (level = 'a' OR level = 'b')",
+    );
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.searchObj.data.query = `SELECT * FROM "s" WHERE code=200 AND "level"=''`;
+    expect(await addFilterTerm("level = 'a'")).toBe(
+      `SELECT * FROM "s" WHERE code=200 AND level = 'a'`,
+    );
+  });
+
   describe("free text (item 1 AC6.9)", () => {
     const stream = (name: string, fts: boolean) => ({
       name,

@@ -2322,7 +2322,7 @@ describe("SearchBar", () => {
       expect(searchObjInstance.data.editorValue).toContain("field='val'");
     });
 
-    it('should transform "field=\'null\'" to "field is null" in the filter', async () => {
+    it("should keep the text null a quoted value in the filter", async () => {
       searchObjInstance.data.editorValue = "";
       wrapper = mountSearchBar();
       await flushPromises();
@@ -2334,7 +2334,7 @@ describe("SearchBar", () => {
       await wrapper.vm.$nextTick();
       await flushPromises();
 
-      expect(searchObjInstance.data.editorValue).toContain("field is null");
+      expect(searchObjInstance.data.editorValue).toBe("field='null'");
     });
 
     it("should use the filter as the full query when there is no existing query and no pipe", async () => {

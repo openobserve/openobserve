@@ -826,6 +826,54 @@ describe("Logs Index", async () => {
     removeFieldByNameSpy.mockRestore();
   });
 
+  it("mounts the shared field panel with the logs ids and the quick-pick empty state", async () => {
+    wrapper.vm.searchObj.meta.showFields = true;
+    wrapper.vm.searchObj.data.stream.selectedStream = [];
+    await flushPromises();
+    expect(wrapper.find('[data-test="logs-search-index-list"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="logs-search-no-stream-selected"]').exists()).toBe(true);
+    expect(wrapper.vm.logsFieldPanelCapabilities).toMatchObject({
+      streamPicker: "multi",
+      values: true,
+      drag: false,
+      highlightColumns: true,
+    });
+  });
+
+  it("rewrites the SQL select list when the panel toggles an interesting field", async () => {
+    const { streamSchemaFieldsIndexMapping } = searchState();
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    wrapper.vm.searchObj.data.stream.selectedStream = ["my_stream1"];
+    wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+      { name: "field1", isSchemaField: true, streams: ["my_stream1"], isInterestingField: false },
+      { name: "field2", isSchemaField: true, streams: ["my_stream1"], isInterestingField: false },
+    ];
+    wrapper.vm.searchObj.data.stream.interestingFieldList = [];
+    streamSchemaFieldsIndexMapping.value = { field1: 0, field2: 1 };
+    wrapper.vm.searchObj.data.query = 'SELECT field1 FROM "my_stream1" WHERE field1 > 5';
+    wrapper.vm.searchObj.data.editorValue = wrapper.vm.searchObj.data.query;
+    wrapper.vm.searchObj.data.streamResults = {
+      list: [{ name: "my_stream1", schema: [{ name: "field1" }, { name: "field2" }] }],
+    };
+    wrapper.vm.searchBarRef = { updateQuery: vi.fn() };
+
+    wrapper.vm.fieldSource.toggleInteresting({
+      name: "field2",
+      dataType: "Utf8",
+      ftsKey: false,
+      isSchemaField: true,
+      showValues: true,
+      streams: ["my_stream1"],
+      isInterestingField: false,
+    });
+    await flushPromises();
+
+    expect(wrapper.vm.searchObj.data.stream.interestingFieldList).toEqual(["field2"]);
+    expect(wrapper.vm.searchObj.data.query).toBe(
+      'SELECT field1, field2 FROM "my_stream1" WHERE field1 > 5',
+    );
+  });
+
   it("Should update query when quick mode is enabled with interesting fields", async () => {
     // Setup initial state
     wrapper.vm.searchObj.meta.quickMode = true;
