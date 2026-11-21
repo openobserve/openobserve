@@ -957,7 +957,8 @@ async fn firing_incident_checked(org_id: &str, alert_id: &str) -> Result<Option<
 /// The rows an ack can name: a multi-alert's firing groups, else the alert's own row.
 async fn firing_rows(target: &AckTarget) -> Vec<(String, i64)> {
     if target.multi_alert {
-        return infra::table::alert_states::firing_groups(&target.alert_id, None)
+        let primary = infra::db::get_orm_client_rw().await;
+        return infra::table::alert_states::firing_groups_with(primary, &target.alert_id, None)
             .await
             .unwrap_or_else(|e| {
                 log::warn!(
@@ -980,10 +981,14 @@ async fn firing_rows(target: &AckTarget) -> Vec<(String, i64)> {
     }
 }
 
+/// Read from the primary: the scheduler writes a firing just before the page that prompts an ack.
 async fn current_firing(target: &AckTarget, group_key: &str) -> Result<Option<i64>, AckError> {
-    Ok(infra::table::alert_states::get(&target.alert_id, group_key)
-        .await?
-        .and_then(|s| s.firing_started_at))
+    let primary = infra::db::get_orm_client_rw().await;
+    Ok(
+        infra::table::alert_states::get_with(primary, &target.alert_id, group_key)
+            .await?
+            .and_then(|s| s.firing_started_at),
+    )
 }
 
 /// Unack reopens the silence window from the unack time, through each kind's delivery state.
