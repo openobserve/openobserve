@@ -41,7 +41,7 @@ use itertools::Itertools;
 use o2_enterprise::enterprise::search::sampling::execution::apply_sampling_to_files;
 use rayon::slice::ParallelSliceMut;
 
-use super::{index::IndexPlan, plan::StreamSource};
+use super::{index::IndexPlan, plan::StreamSource, redaction::ScanRedaction};
 use crate::{
     grpc::{QueryParams, storage, wal},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
@@ -59,6 +59,7 @@ pub(super) struct StreamSearchSettings {
     pub(super) bloom_fields: Vec<String>,
     /// The request's `equal_keys` filters, not the stream's partition key settings.
     pub(super) search_partition_keys: Vec<(String, String)>,
+    pub(super) redaction: ScanRedaction,
     /// Columns redacted at the scan: their index terms hold raw values.
     pub(super) redacted: HashSet<String>,
     /// An FTS field is redacted, so `_all` holds raw values and cannot answer a filter.
@@ -66,20 +67,25 @@ pub(super) struct StreamSearchSettings {
 }
 
 impl StreamSearchSettings {
-    pub(super) async fn load(req: &FlightSearchRequest, source: &StreamSource) -> Self {
+    /// Keeps the index and partition pruning off every redacted column: both match raw values.
+    pub(super) async fn load(
+        req: &FlightSearchRequest,
+        source: &StreamSource,
+    ) -> Result<Self, Error> {
+        let org_id = &req.query_identifier.org_id;
+        let stream_name = source.stream.stream_name();
+        let redaction =
+            ScanRedaction::load(org_id, source.stream_type, &stream_name, &source.schema).await?;
+        let redacted: HashSet<String> = redaction.redacted_columns().into_iter().collect();
         let schema_fields: HashMap<_, _> = source
             .schema
             .fields()
             .iter()
             .map(|field| (field.name(), field))
             .collect();
-        let db_schema = infra::schema::get(
-            &req.query_identifier.org_id,
-            &source.stream.stream_name(),
-            source.stream_type,
-        )
-        .await
-        .unwrap_or_else(|_| arrow_schema::Schema::empty());
+        let db_schema = infra::schema::get(org_id, &stream_name, source.stream_type)
+            .await
+            .unwrap_or_else(|_| arrow_schema::Schema::empty());
         let settings = unwrap_stream_settings(&db_schema);
         let fts_fields = get_stream_setting_fts_fields(&settings)
             .into_iter()
@@ -95,7 +101,7 @@ impl StreamSearchSettings {
             .collect_vec();
         let index_fields = get_stream_setting_index_fields(&settings, source.stream_type)
             .into_iter()
-            .filter(|v| schema_fields.contains_key(v))
+            .filter(|v| schema_fields.contains_key(v) && !redacted.contains(v))
             .collect_vec();
         let bloom_fields = get_stream_setting_bloom_filter_fields(&settings)
             .into_iter()
@@ -105,28 +111,21 @@ impl StreamSearchSettings {
             .index_info
             .equal_keys
             .iter()
-            .filter(|v| schema_fields.contains_key(&v.key))
+            .filter(|v| schema_fields.contains_key(&v.key) && !redacted.contains(&v.key))
             .map(|v| (v.key.to_string(), v.value.to_string()))
             .collect();
-        Self {
+        let fts_index_disabled = fts_fields.iter().any(|f| redacted.contains(f));
+        Ok(Self {
             settings,
             stream_type: source.stream_type,
             fts_fields,
             index_fields,
             bloom_fields,
             search_partition_keys,
-            redacted: HashSet::new(),
-            fts_index_disabled: false,
-        }
-    }
-
-    /// Keeps the index and partition pruning off every redacted column: both match raw values.
-    pub(super) fn exclude_redacted(&mut self, redacted: HashSet<String>) {
-        self.index_fields.retain(|field| !redacted.contains(field));
-        self.search_partition_keys
-            .retain(|(key, _)| !redacted.contains(key));
-        self.fts_index_disabled = self.fts_fields.iter().any(|f| redacted.contains(f));
-        self.redacted = redacted;
+            redaction,
+            redacted,
+            fts_index_disabled,
+        })
     }
 
     /// An index shortcut returning terms of a redacted field would return raw values.

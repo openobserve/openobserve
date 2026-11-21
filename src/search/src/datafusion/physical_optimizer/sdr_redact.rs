@@ -20,7 +20,11 @@ use std::{
     sync::Arc,
 };
 
+#[cfg(feature = "vectorscan")]
+use config::meta::{sql::TableReferenceExt, stream::StreamType};
 use config::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME, meta::search::SDR_REDACT_UDF_NAME};
+#[cfg(feature = "vectorscan")]
+use datafusion::common::TableReference;
 use datafusion::{
     common::{
         Result, ScalarValue,
@@ -44,6 +48,8 @@ use datafusion::{
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
     },
 };
+#[cfg(feature = "vectorscan")]
+use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
 
 use crate::datafusion::udf::fulltext::match_all::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME};
 
@@ -78,10 +84,10 @@ impl PhysicalOptimizerRule for LiftRedaction {
 #[cfg(feature = "vectorscan")]
 pub fn protected_columns(
     org_id: &str,
-    stream_type: config::meta::stream::StreamType,
+    stream_type: StreamType,
     stream_name: &str,
 ) -> HashSet<String> {
-    let Some(manager) = o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER.get() else {
+    let Some(manager) = PATTERN_MANAGER.get() else {
         return HashSet::new();
     };
     match manager.search_protection(org_id, stream_type, stream_name) {
@@ -99,12 +105,10 @@ pub fn protected_columns(
 #[cfg(feature = "vectorscan")]
 pub fn redaction_digest(
     org_id: &str,
-    stream_type: config::meta::stream::StreamType,
-    streams: &[datafusion::common::TableReference],
+    stream_type: StreamType,
+    streams: &[TableReference],
 ) -> Option<String> {
-    use config::meta::sql::TableReferenceExt;
-
-    let Some(manager) = o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER.get() else {
+    let Some(manager) = PATTERN_MANAGER.get() else {
         return Some("sdr=unavailable".to_string());
     };
     let parts: Vec<String> = streams
@@ -294,7 +298,10 @@ mod tests {
         catalog::Session,
         common::cast::as_string_array,
         datasource::{MemTable, TableProvider, TableType},
-        logical_expr::{ColumnarValue, TableProviderFilterPushDown, Volatility, create_udf},
+        logical_expr::{
+            ColumnarValue, TableProviderFilterPushDown, Volatility, create_udf,
+            expr::ScalarFunction,
+        },
         physical_plan::displayable,
         prelude::SessionContext,
     };
@@ -497,17 +504,16 @@ mod tests {
         use datafusion::logical_expr::{col, lit};
 
         let redacted = redacted_columns(&protected());
-        let match_all =
-            Expr::ScalarFunction(datafusion::logical_expr::expr::ScalarFunction::new_udf(
-                Arc::new(create_udf(
-                    MATCH_ALL_UDF_NAME,
-                    vec![DataType::Utf8],
-                    DataType::Boolean,
-                    Volatility::Immutable,
-                    Arc::new(|_: &[ColumnarValue]| unreachable!()),
-                )),
-                vec![lit("x")],
-            ));
+        let match_all = Expr::ScalarFunction(ScalarFunction::new_udf(
+            Arc::new(create_udf(
+                MATCH_ALL_UDF_NAME,
+                vec![DataType::Utf8],
+                DataType::Boolean,
+                Volatility::Immutable,
+                Arc::new(|_: &[ColumnarValue]| unreachable!()),
+            )),
+            vec![lit("x")],
+        ));
         let filters = vec![
             col("level").eq(lit("info")),
             col("msg").like(lit("%a%")),
