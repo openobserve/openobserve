@@ -34480,7 +34480,6 @@
     "blockedBeforeMin": "{date} is before the earliest date this page allows.",
     "blockedAfterMax": "{date} is after the latest date this page allows.",
     "blockedFutureMaxHint": "Pick a range that ends by {date}",
-    "ambiguousStamps": "This line has two timestamps. Pick one",
     "logLine": "Read from the timestamp at the start of the line",
     "placeholder": "Try {examples}",
     "applied": "Applied",
