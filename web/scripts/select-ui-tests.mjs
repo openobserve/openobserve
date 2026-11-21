@@ -36,7 +36,7 @@ const LOCALE = /(?:^|\/)([a-z]{2}-[A-Z]{2})\.json$/;
 const FULL = [
   /^web\/(package\.json|package-lock\.json|vite\.config\.ts|vitest[^/]*\.config\.ts|tsconfig[^/]*\.json|postcss\.config\.js|coverage\.sh)$/,
   /^web\/patches\//,
-  /^web\/scripts\/(ui-shard-sequencer\.ts|select-ui-tests\.mjs|changed-lines-coverage\.mjs|fetch-datasource-content\.mjs)$/,
+  /^web\/scripts\/(ui-shard-sequencer\.ts|ui-shard-durations\.json|select-ui-tests\.mjs|changed-lines-coverage\.mjs|fetch-datasource-content\.mjs)$/,
   /^\.github\/workflows\/unit-tests\.yml$/,
   /^\.github\/actions\/classify-changes\//,
 ];
@@ -352,8 +352,10 @@ export function select({ repo, base, head }) {
     for (const [f, t] of texts)
       for (const m of t.matchAll(/["'](\.\.?\/[^"'\s]+)["']/g)) {
         const p = posix.join("web", posix.dirname(f), m[1]);
-        if (outside.has(p))
-          return { ...full(`web/ imports a changed file outside web/: ${p}`), changed };
+        const hit = [p, ...EXTS.map((e) => p + e), ...EXTS.map((e) => `${p}/index${e}`)].find(
+          (c) => outside.has(c),
+        );
+        if (hit) return { ...full(`web/ imports a changed file outside web/: ${hit}`), changed };
       }
   const idx = new TextIndex(texts, specs);
   let switchers;
