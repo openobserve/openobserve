@@ -458,7 +458,11 @@ export const convertMinutesToCron = (minutes: number): string => {
     return "";
   }
 
-  return `0 */${minutes} * * * *`;
+  // A step larger than its field's range fires once per parent unit, so */120 minutes is hourly.
+  if (minutes < 60) return `0 */${minutes} * * * *`;
+  if (minutes % 60 === 0 && minutes / 60 < 24) return `0 0 */${minutes / 60} * * *`;
+  if (minutes % 1440 === 0 && minutes / 1440 <= 31) return `0 0 0 */${minutes / 1440} * *`;
+  return "";
 };
 
 export const processQueryMetadataErrors = (metadata: any, timezone: string = "UTC"): string => {
