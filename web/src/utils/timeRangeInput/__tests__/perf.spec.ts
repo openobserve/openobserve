@@ -20,6 +20,7 @@ import { parseTimeRangeInput } from "../index";
 import { pack as en } from "../packs/en-us";
 import { compilePack, type GeneratedTables, type LocalePack } from "../packs/schema";
 import { corpusContext, packFor, type CorpusRow } from "./helpers";
+import { timeBudget } from "./timing";
 
 const rows = corpus as CorpusRow[];
 const hands = import.meta.glob<{ pack: LocalePack; tables: GeneratedTables }>(
@@ -56,14 +57,13 @@ describe("parse and compile budgets", () => {
     process.stdout.write(
       `parse p95 ${p95.toFixed(3)} ms, max ${max.toFixed(3)} ms over ${times.length}\n`,
     );
-    expect(p95).toBeLessThan(1);
-    expect(max).toBeLessThan(20);
+    expect(p95).toBeLessThan(timeBudget(1));
+    expect(max).toBeLessThan(timeBudget(20));
   });
 
-  it("compiles each locale pack in under 5 ms (10 ms on CI)", () => {
-    // Best of 10 after a warm-up drops scheduler noise; CI runners are ~2.5x slower than a laptop
-    // even at their best, so CI gets 10 ms, still far below a pack that regressed.
-    const budget = process.env.CI === "true" ? 10 : 5;
+  it("compiles each locale pack in under 5 ms, scaled on CI", () => {
+    // Best of 10 after a warm-up drops scheduler noise.
+    const budget = timeBudget(5);
     for (const { pack, tables } of Object.values(hands)) {
       compilePack(pack, tables, en);
       let ms = Infinity;

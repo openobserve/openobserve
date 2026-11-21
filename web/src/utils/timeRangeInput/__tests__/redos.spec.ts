@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 import type { LocalePack } from "../packs/schema";
 import { nodeBundle } from "./bundle-helper";
 import { runChild } from "./child";
+import { timeBudget } from "./timing";
 
 const sources = import.meta.glob<string>(["../**/*.ts", "!../__tests__/**"], {
   query: "?raw",
@@ -222,7 +223,8 @@ describe("regex safety", () => {
     process.stdout.write(
       `hostile worst ${value.worst.toFixed(2)} ms (${value.worstText}), 2000 seeded ${value.total.toFixed(0)} ms\n`,
     );
-    expect(value.worst).toBeLessThan(25);
-    expect(value.total).toBeLessThan(2000);
+    // Catastrophic backtracking costs orders of magnitude, so a linear CI factor still catches it.
+    expect(value.worst).toBeLessThan(timeBudget(25));
+    expect(value.total).toBeLessThan(timeBudget(2000));
   }, 120_000);
 });
