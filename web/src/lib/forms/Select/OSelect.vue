@@ -1037,6 +1037,11 @@ const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
   md: "h-[2.125rem] text-sm",
 };
 
+// The value text must follow the size, or an inner text-sm overrides the trigger's text-xs.
+const valueTextClass = computed(
+  () => heightClasses[props.size ?? "md"].split(" ").find((c) => c.startsWith("text-")) ?? "",
+);
+
 // Open-state tracking. Reka's PopoverTrigger / SelectTrigger expose
 // `data-state="open"`, but Vue can't reach across components with a
 // CSS group selector without extra wiring — track a ref instead and
@@ -1483,7 +1488,7 @@ const fieldWidthClass = computed(() => {
 
               <slot name="trigger" :value="modelValue">
                 <template v-if="multiple && allSelectedLabel && allSelected">
-                  <span class="text-select-text flex-1 truncate text-start text-sm">{{
+                  <span :class="['text-select-text flex-1 truncate text-start', valueTextClass]">{{
                     allSelectedLabel
                   }}</span>
                 </template>
@@ -1518,7 +1523,9 @@ const fieldWidthClass = computed(() => {
                       // An inline trigger is a word in a sentence: it grows to fit
                       // its value. `truncate` would also zero its min-content
                       // width, letting any ancestor squeeze it to a lone ellipsis.
-                      isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
+                      isInlineAppearance
+                        ? 'whitespace-nowrap'
+                        : ['flex-1 truncate', valueTextClass],
                       labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
                       isDisabled
                         ? 'text-select-disabled-text'
@@ -2149,7 +2156,7 @@ const fieldWidthClass = computed(() => {
             <OTruncatedText
               v-else
               :class="[
-                'flex-1 text-start text-sm',
+                ['flex-1 text-start', valueTextClass],
                 labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
                 triggerTextTone,
               ]"

@@ -74,6 +74,7 @@ const stubs = {
       diffComparisonTotal: null,
       diffLabels: null,
       summaryLabel: null,
+      noZoomHint: Boolean,
       hideProfileActions: Boolean,
     },
     emits: ["search"],
@@ -239,6 +240,7 @@ describe("ProfilesCompare", () => {
 
     const sides = wrapper.findAllComponents({ name: "FlameStub" });
     expect(sides.map((side) => side.props("summaryLabel"))).toEqual(["v1.4.0", "v1.5.0"]);
+    expect(sides.map((side) => side.props("noZoomHint"))).toEqual([true, true]);
     // The first version never ran json, so its graph leaves it out. Each frame keeps both
     // sides' totals, so both graphs colour it by the same change.
     expect(sides[0].props("root")).toEqual({
@@ -281,6 +283,60 @@ describe("ProfilesCompare", () => {
     ]);
   });
 
+  it("explains percentage points and the value columns in the diff table headers", async () => {
+    const { wrapper } = mountCompare({ display: "table" });
+    await flushPromises();
+    await nextTick();
+
+    const columns = wrapper.findComponent({ name: "TableStub" }).props("columns") as {
+      id: string;
+      meta?: { headerTooltip?: string };
+    }[];
+    const tip = (id: string) => columns.find((column) => column.id === id)?.meta?.headerTooltip;
+    expect(tip("change")).toContain("percentage points (pt)");
+    expect(tip("before")).toContain("v1.4.0");
+    expect(tip("after")).toContain("v1.5.0");
+    expect(tip("afterPercent")).toContain("v1.5.0");
+    for (const id of ["change", "before", "after", "beforePercent", "afterPercent"]) {
+      expect(tip(id)).not.toMatch(/time|self/i);
+    }
+  });
+
+  it("wraps the legend and shows the colour-strength strip only for the flame displays", async () => {
+    const { wrapper } = mountCompare({ display: "table" });
+    await flushPromises();
+    expect(wrapper.get('[data-test="profiles-compare-legend"]').classes()).toContain("flex-wrap");
+    expect(wrapper.find('[data-test="profiles-compare-legend-strength"]').exists()).toBe(false);
+
+    const sides = mountCompare({ display: "sides" });
+    await flushPromises();
+    expect(sides.wrapper.find('[data-test="profiles-compare-legend-strength"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("draws a colour-strength legend from the smaller-share to the bigger-share colour", async () => {
+    const html = document.documentElement;
+    html.style.setProperty("--color-chart-series-1", "rgb(1, 0, 0)");
+    html.style.setProperty("--color-flame-grouped-fill", "rgb(2, 0, 0)");
+    html.style.setProperty("--color-status-negative", "rgb(3, 0, 0)");
+    try {
+      const { wrapper } = mountCompare();
+      await flushPromises();
+      const strip = wrapper.get('[data-test="profiles-compare-legend-strength"]');
+      expect(strip.attributes("aria-hidden")).toBe("true");
+      expect(strip.attributes("role")).toBeUndefined();
+      const gradient = (strip.element as HTMLElement).style.backgroundImage;
+      expect(gradient).toContain("rgb(1, 0, 0)");
+      expect(gradient.indexOf("rgb(2, 0, 0)")).toBeGreaterThan(gradient.indexOf("rgb(1, 0, 0)"));
+      expect(gradient.indexOf("rgb(3, 0, 0)")).toBeGreaterThan(gradient.indexOf("rgb(2, 0, 0)"));
+    } finally {
+      ["--color-chart-series-1", "--color-flame-grouped-fill", "--color-status-negative"].forEach(
+        (token) => html.style.removeProperty(token),
+      );
+    }
+  });
+
   it("swaps the sides", async () => {
     const { wrapper, state } = mountCompare();
     await flushPromises();
@@ -317,7 +373,9 @@ describe("ProfilesCompare", () => {
       await flushPromises();
       const swatches = () =>
         wrapper
-          .findAll('[data-test="profiles-compare-legend"] [aria-hidden="true"]')
+          .findAll(
+            '[data-test="profiles-compare-legend"] [aria-hidden="true"]:not([data-test="profiles-compare-legend-strength"])',
+          )
           .map((swatch) => (swatch.element as HTMLElement).style.backgroundColor);
       expect(swatches()).toEqual(["rgb(0, 0, 0)", "rgb(1, 0, 0)", "rgb(2, 0, 0)"]);
 
@@ -384,8 +442,11 @@ describe("ProfilesCompare", () => {
       await flushPromises();
       const moreSwatch = () =>
         (
-          wrapper.findAll('[data-test="profiles-compare-legend"] [aria-hidden="true"]').at(-1)
-            ?.element as HTMLElement
+          wrapper
+            .findAll(
+              '[data-test="profiles-compare-legend"] [aria-hidden="true"]:not([data-test="profiles-compare-legend-strength"])',
+            )
+            .at(-1)?.element as HTMLElement
         ).style.backgroundColor;
       expect(moreSwatch()).toBe("rgb(1, 2, 3)");
 

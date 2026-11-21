@@ -146,6 +146,23 @@ test.describe('Profiles flame graph', () => {
       await pm.profilesPage.expectFlameMenuHidden();
     });
 
+    test('Arrow keys move between frames, Enter zooms and the context-menu key opens the frame menu', { tag: ['@all', '@profiles', '@P1'] }, async () => {
+      await pm.profilesPage.gotoRef(ref, { view: 'flame' });
+      await pm.profilesPage.expectFlameViewOptions();
+      await pm.profilesPage.focusFlamePlot();
+      await pm.profilesPage.expectFlameFocusMarkerVisible(true);
+      await pm.profilesPage.expectFlameAnnounce(/Total/);
+      await pm.profilesPage.pressKey('ArrowDown');
+      await pm.profilesPage.expectFlameAnnounce(/\S/);
+      await pm.profilesPage.pressKey('Enter');
+      await pm.profilesPage.expectUrlParam('focus', 'root/0');
+      await pm.profilesPage.pressKey('ContextMenu');
+      await pm.profilesPage.expectFlameMenu(['copy-name', 'zoom-reset']);
+      await pm.profilesPage.pressEscape();
+      await pm.profilesPage.expectFlameMenuHidden();
+      await pm.profilesPage.expectFlamePlotFocused();
+    });
+
     test('Ctrl + wheel zooms the view and a drag pans it', { tag: ['@all', '@profiles', '@P2'] }, async () => {
       await pm.profilesPage.gotoRef(ref, { view: 'flame' });
       await pm.profilesPage.expectFlameGrabCursor(false);

@@ -80,7 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("profiles.diffTable") }}
           </OToggleGroupItem>
         </OToggleGroup>
-        <div class="flex items-center gap-2 text-xs" data-test="profiles-compare-legend">
+        <div
+          class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+          data-test="profiles-compare-legend"
+        >
           <span
             v-for="item in legend"
             :key="item.label"
@@ -91,6 +94,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :style="{ backgroundColor: item.color }"
               aria-hidden="true"
             />{{ item.label }}
+          </span>
+          <span
+            v-if="state.display !== 'table'"
+            class="text-text-secondary flex items-center gap-1 whitespace-nowrap"
+          >
+            <span
+              class="rounded-default inline-block h-2.5 w-16"
+              aria-hidden="true"
+              :style="{ backgroundImage: strengthGradient }"
+              data-test="profiles-compare-legend-strength"
+            />{{ t("profiles.diffLegendStrength") }}
           </span>
           <OTooltip
             :content="
@@ -164,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :search-query="searchQuery"
         :empty-label="t('profiles.noResults')"
         hide-profile-actions
+        no-zoom-hint
         :data-test="`profiles-compare-side-${side.key}`"
         @search="emit('search', $event)"
       />
@@ -279,6 +294,11 @@ const error = ref("");
 let valuesSeq = 0;
 let diffSeq = 0;
 let diffAbort: AbortController | null = null;
+
+const strengthGradient = computed(() => {
+  const { less, same, more } = diffColors.value;
+  return `linear-gradient(to right, ${less}, ${same}, ${more})`;
+});
 
 const legend = computed(() => [
   { label: t("profiles.diffLess"), color: diffColors.value.less },
@@ -477,7 +497,10 @@ const columns = computed<OTableColumnDef[]>(() => {
       accessorKey: "before",
       sortable: true,
       size: 120,
-      meta: right,
+      meta: {
+        ...right,
+        headerTooltip: t("profiles.diffValueHelp", { side: sideNames.value.baseline }),
+      },
     },
     {
       id: "after",
@@ -485,7 +508,10 @@ const columns = computed<OTableColumnDef[]>(() => {
       accessorKey: "after",
       sortable: true,
       size: 120,
-      meta: right,
+      meta: {
+        ...right,
+        headerTooltip: t("profiles.diffValueHelp", { side: sideNames.value.comparison }),
+      },
     },
     {
       id: "beforePercent",
@@ -493,7 +519,10 @@ const columns = computed<OTableColumnDef[]>(() => {
       accessorKey: "beforePercent",
       sortable: true,
       size: 110,
-      meta: right,
+      meta: {
+        ...right,
+        headerTooltip: t("profiles.diffPercentHelp", { side: sideNames.value.baseline }),
+      },
     },
     {
       id: "afterPercent",
@@ -501,7 +530,10 @@ const columns = computed<OTableColumnDef[]>(() => {
       accessorKey: "afterPercent",
       sortable: true,
       size: 110,
-      meta: right,
+      meta: {
+        ...right,
+        headerTooltip: t("profiles.diffPercentHelp", { side: sideNames.value.comparison }),
+      },
     },
     {
       id: "change",
@@ -509,7 +541,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       accessorKey: "change",
       sortable: true,
       size: 120,
-      meta: right,
+      meta: { ...right, headerTooltip: t("profiles.diffChangeHelp") },
     },
   ];
 });

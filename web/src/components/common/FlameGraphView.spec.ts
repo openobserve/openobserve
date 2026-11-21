@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { config, enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
@@ -55,6 +55,21 @@ const rightClick = async (
   await nextTick();
 };
 
+// The real dropdown portals to the body and positions itself with floating-ui, neither of which jsdom runs.
+config.global.stubs = {
+  ...config.global.stubs,
+  ODropdown: {
+    props: ["open"],
+    emits: ["update:open", "close-auto-focus"],
+    template:
+      "<div><slot name='trigger' /><div v-if='open' role='menu'><slot /></div><button data-test='dismiss' @click=\"$emit('update:open', false)\" /></div>",
+  },
+  ODropdownItem: {
+    emits: ["select"],
+    template: "<button role='menuitem' @click=\"$emit('select')\"><slot /></button>",
+  },
+};
+
 enableAutoUnmount(afterEach);
 // A click on the hint's × closes it for the tab session, which would leak into the next test.
 afterEach(() => {
@@ -63,13 +78,15 @@ afterEach(() => {
 });
 
 describe("FlameGraphView frame menu", () => {
-  it("positions the menu from the pointer relative to the root", async () => {
-    const wrapper = mount(FlameGraphView, {
+  const mountMenu = (extra: Record<string, unknown> = {}) =>
+    mount(FlameGraphView, {
+      attachTo: document.body,
       props: {
         root: { name: "main", self: 1, total: 4, children: [] },
         unitLabel: "ns",
         summaryLabel: "total",
         summaryValue: "4",
+        ...extra,
       },
       global: {
         plugins: [i18n],
@@ -81,11 +98,13 @@ describe("FlameGraphView frame menu", () => {
         },
       },
     });
+
+  it("anchors the menu at the pointer relative to the root", async () => {
+    const wrapper = mountMenu();
     await flushPromises();
     await nextTick();
 
-    const root = wrapper.element as HTMLElement;
-    viGetBoundingClientRect(root, { left: 40, top: 80 });
+    viGetBoundingClientRect(wrapper.element as HTMLElement, { left: 40, top: 80 });
     // The plot starts 10 px left of and above the pointer, so the pointer sits on the root frame.
     const plot = wrapper.get('[data-test="flame-graph-plot"]').element as HTMLElement;
     plot.getBoundingClientRect = () =>
@@ -93,59 +112,25 @@ describe("FlameGraphView frame menu", () => {
 
     await rightClick(wrapper, 140, 200);
 
-    const menu = wrapper.get('[data-test="flame-graph-frame-menu"]');
-    expect(menu.attributes("style")).toContain("left: 100px");
-    expect(menu.attributes("style")).toContain("top: 120px");
+    const anchor = wrapper.get('[data-test="flame-graph-frame-menu-anchor"]');
+    expect(anchor.attributes("style")).toContain("left: 100px");
+    expect(anchor.attributes("style")).toContain("top: 120px");
   });
 
-  it("opens the menu above and to the left of the pointer when it would be cut off", async () => {
-    const host = document.createElement("div");
-    // jsdom does not expand the overflow shorthand, so set the axis the browser reports.
-    host.style.overflowY = "auto";
-    document.body.appendChild(host);
-    const wrapper = mount(FlameGraphView, {
-      attachTo: host,
-      props: {
-        root: { name: "main", self: 1, total: 4, children: [] },
-        unitLabel: "ns",
-        summaryLabel: "total",
-        summaryValue: "4",
-      },
-      global: {
-        plugins: [i18n],
-        stubs: {
-          ChartRenderer: ChartRendererStub,
-          OButton: { template: "<button><slot /></button>" },
-          OSwitch: true,
-          OTooltip: true,
-        },
-      },
-    });
+  it("lists the same actions in the same order as the table row menu", async () => {
+    const wrapper = mountMenu();
     await flushPromises();
-    // A 300 × 300 visible box with the graph at its corner, and a 160 × 200 menu.
-    const rect = (left: number, top: number, width: number, height: number) =>
-      ({ left, top, right: left + width, bottom: top + height, width, height }) as DOMRect;
-    const spy = vi
-      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
-      .mockImplementation(function (this: HTMLElement) {
-        if (this.dataset.test === "flame-graph-frame-menu") {
-          return rect(parseFloat(this.style.left), parseFloat(this.style.top), 160, 320);
-        }
-        return rect(0, 0, 300, 300);
-      });
-
-    // On the root frame near the right edge: the menu is too wide and too tall to open down and right.
-    await rightClick(wrapper, 250, 10);
-    await flushPromises();
-
-    const style = wrapper.get('[data-test="flame-graph-frame-menu"]').attributes("style");
-    expect(style).toContain("left: 90px");
-    expect(style).toContain("top: 0px");
-    spy.mockRestore();
-    host.remove();
+    await rightClick(wrapper);
+    const items = wrapper.findAll('[role="menuitem"]').map((item) => item.text());
+    expect(items).toEqual([
+      "Copy function name",
+      "Highlight function",
+      "Function details",
+      "Show callers and callees",
+    ]);
   });
 
-  it("hides the hover tooltip while open and closes on any click outside it, the graph included", async () => {
+  it("hides the hover tooltip while open and closes when the dropdown asks to", async () => {
     // The chart instance that ChartRenderer exposes; the menu turns its tooltip off without new options.
     const chartInstance = { setOption: vi.fn(), dispatchAction: vi.fn() };
     const wrapper = mount(FlameGraphView, {
@@ -170,47 +155,25 @@ describe("FlameGraphView frame menu", () => {
     const chart = wrapper.findComponent({ name: "ChartRenderer" });
     const options = chart.props("data");
     const tooltipShown = () => chartInstance.setOption.mock.lastCall?.[0]?.tooltip?.show ?? true;
-    const openMenu = () => rightClick(wrapper);
+    const tooltip = (chart.props("data") as { options: { tooltip: Record<string, unknown> } })
+      .options.tooltip;
 
     expect(tooltipShown()).toBe(true);
-    expect((options as { options: { tooltip: { show?: boolean } } }).options.tooltip.show).not.toBe(
-      false,
-    );
     // Drawn on the body, so the scroll box around the graph cannot cut it off.
-    expect(
-      (chart.props("data") as { options: { tooltip: { appendToBody: boolean } } }).options.tooltip
-        .appendToBody,
-    ).toBe(true);
+    expect(tooltip.appendToBody).toBe(true);
     // The tooltip goes at once, with no delay or fade, so it never sits on top of the menu.
-    expect(
-      (chart.props("data") as { options: { tooltip: { hideDelay: number } } }).options.tooltip
-        .hideDelay,
-    ).toBe(0);
-    expect(
-      (chart.props("data") as { options: { tooltip: { transitionDuration: number } } }).options
-        .tooltip.transitionDuration,
-    ).toBe(0);
-    await openMenu();
+    expect(tooltip.hideDelay).toBe(0);
+    expect(tooltip.transitionDuration).toBe(0);
+    await rightClick(wrapper);
     expect(chartInstance.dispatchAction).toHaveBeenCalledWith({ type: "hideTip" });
     expect(tooltipShown()).toBe(false);
     // The frame blocks are not rebuilt for the menu.
     expect(chart.props("data")).toBe(options);
 
-    // A click inside the menu keeps it open; a click on the graph closes it.
-    wrapper
-      .get('[data-test="flame-graph-frame-menu"]')
-      .element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await nextTick();
-    expect(wrapper.find('[data-test="flame-graph-frame-menu"]').exists()).toBe(true);
-    chart.element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await wrapper.get('[data-test="dismiss"]').trigger("click");
     await nextTick();
     expect(wrapper.find('[data-test="flame-graph-frame-menu"]').exists()).toBe(false);
     expect(tooltipShown()).toBe(true);
-
-    await openMenu();
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    await nextTick();
-    expect(wrapper.find('[data-test="flame-graph-frame-menu"]').exists()).toBe(false);
   });
 });
 
@@ -721,6 +684,18 @@ describe("FlameGraphView grouped frames", () => {
       expect(lastZoom().end).toBeCloseTo(100 * Math.exp(-0.6), 5);
     });
 
+    it("keeps the hint row's height after wheel zoom hides the hint, so the graph does not jump", async () => {
+      const { wrapper, wheel } = mountWithChart();
+      await flushPromises();
+      await nextTick();
+      const hint = () => wrapper.find('[data-test="flame-graph-zoom-hint"]');
+      expect(hint().classes()).not.toContain("invisible");
+      wheel({ deltaY: -100, ctrlKey: true });
+      await nextTick();
+      expect(hint().exists()).toBe(true);
+      expect(hint().classes()).toContain("invisible");
+    });
+
     it("pans on Shift + scroll and on a drag, and a drag release is not a click", async () => {
       const { wrapper, lastZoom, wheel } = mountWithChart();
       await flushPromises();
@@ -1127,6 +1102,254 @@ describe("FlameGraphView theme and size", () => {
       breakpoint.lgUp = true;
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe("FlameGraphView keyboard, hint and deep stacks", () => {
+  const tree = {
+    name: "total",
+    total: 100,
+    children: [
+      { name: "a", total: 60, children: [{ name: "a1", total: 60, children: [] }] },
+      { name: "b", total: 40, children: [] },
+    ],
+  };
+  const mountTree = (root: object, props: Record<string, unknown> = {}) =>
+    mount(FlameGraphView, {
+      attachTo: document.body,
+      props: { root, unitLabel: "ns", summaryLabel: "total", summaryValue: "1", ...props },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          ChartRenderer: ChartRendererStub,
+          OButton: { template: "<button><slot /></button>" },
+          OSwitch: true,
+          OTooltip: true,
+        },
+      },
+    });
+  const blocksOf = (wrapper: ReturnType<typeof mountTree>) =>
+    (
+      wrapper.findComponent({ name: "ChartRenderer" }).props("data") as {
+        options: { series: { data: { block: Record<string, unknown> }[] }[] };
+      }
+    ).options.series[0].data.map((datum) => datum.block);
+  const press = async (
+    wrapper: ReturnType<typeof mountTree>,
+    key: string,
+    init: KeyboardEventInit = {},
+  ) => {
+    const plot = wrapper.get('[data-test="flame-graph-plot"]');
+    await plot.trigger("keydown", { key, ...init });
+  };
+  const focusPlot = async (wrapper: ReturnType<typeof mountTree>) => {
+    await wrapper.get('[data-test="flame-graph-plot"]').trigger("focus");
+  };
+
+  it("makes the plot a focusable group with keyboard help", async () => {
+    const wrapper = mountTree(tree);
+    await flushPromises();
+    const plot = wrapper.get('[data-test="flame-graph-plot"]');
+    expect(plot.attributes("tabindex")).toBe("0");
+    expect(plot.attributes("role")).toBe("group");
+    const help = wrapper.get(`#${plot.attributes("aria-describedby")}`);
+    expect(help.text()).toContain("arrow keys");
+  });
+
+  it("moves between frames with the arrow keys, announces them and zooms with Enter", async () => {
+    const wrapper = mountTree(tree);
+    await flushPromises();
+    await focusPlot(wrapper);
+    const announce = () => wrapper.get('[data-test="flame-graph-announce"]').text();
+    expect(announce()).toContain("total");
+
+    await press(wrapper, "ArrowDown");
+    expect(announce()).toContain("a, Total");
+    await press(wrapper, "ArrowRight");
+    expect(announce()).toContain("b, Total");
+    await press(wrapper, "ArrowUp");
+    expect(announce()).toContain("total, Total");
+    await press(wrapper, "ArrowDown");
+    await press(wrapper, "ArrowDown");
+    expect(announce()).toContain("a1, Total");
+
+    await press(wrapper, "Enter");
+    expect(wrapper.emitted("focus")).toEqual([["root/0/0"]]);
+  });
+
+  it("opens the frame menu from the Menu key and Shift+F10, but not on a grouped frame", async () => {
+    const wrapper = mountTree(tree);
+    await flushPromises();
+    await focusPlot(wrapper);
+    await press(wrapper, "ArrowDown");
+    await press(wrapper, "ContextMenu");
+    expect(wrapper.get('[data-test="flame-graph-frame-menu"]').text()).toContain("a");
+    await wrapper.get('[data-test="dismiss"]').trigger("click");
+    expect(wrapper.find('[data-test="flame-graph-frame-menu"]').exists()).toBe(false);
+    await press(wrapper, "F10", { shiftKey: true });
+    expect(wrapper.find('[data-test="flame-graph-frame-menu"]').exists()).toBe(true);
+  });
+
+  it("keeps the zoom hint outside the plot, in the page flow", async () => {
+    const wrapper = mountTree(tree);
+    await flushPromises();
+    const hint = wrapper.get('[data-test="flame-graph-zoom-hint"]');
+    expect(wrapper.get('[data-test="flame-graph-plot"]').element.contains(hint.element)).toBe(
+      false,
+    );
+    expect(hint.classes()).not.toContain("absolute");
+    expect(hint.classes()).not.toContain("sticky");
+    const position = hint.element.compareDocumentPosition(
+      wrapper.get('[data-test="flame-graph-plot"]').element,
+    );
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("stops drawing past 250 rows and tells the user to zoom into the last drawn frame", async () => {
+    let node: Record<string, unknown> = { name: "f1000", total: 10 };
+    for (let depth = 999; depth >= 1; depth--)
+      node = { name: `f${depth}`, total: 10, children: [node] };
+    const wrapper = mountTree({ name: "total", total: 10, children: [node] });
+    await flushPromises();
+    const blocks = blocksOf(wrapper);
+    expect(Math.max(...blocks.map((block) => Number(block.depth)))).toBe(249);
+    expect(blocks.at(-1)?.hint).toContain("Zoom in");
+    const plot = wrapper.get('[data-test="flame-graph-plot"]');
+    expect(plot.attributes("style")).toContain("height: 6520px");
+  });
+
+  describe("deep stacks stay reachable by zoom", () => {
+    const deepRoot = () => {
+      let node: Record<string, unknown> = { name: "f1000", total: 10 };
+      for (let depth = 999; depth >= 1; depth--)
+        node = { name: `f${depth}`, total: 10, children: [node] };
+      return { name: "total", total: 10, children: [node] };
+    };
+    const maxRows = 250 + 25;
+    const zoomInto = (wrapper: ReturnType<typeof mountTree>, id: string) => {
+      wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("click", {
+        data: { block: blocksOf(wrapper).find((block) => block.id === id) },
+      });
+      return flushPromises();
+    };
+
+    it("keeps drawing 250 rows below the zoomed frame and bounds the callers above", async () => {
+      const wrapper = mountTree(deepRoot());
+      await flushPromises();
+      (wrapper.vm as unknown as { focus: (path: string) => void }).focus(`root${"/0".repeat(400)}`);
+      await flushPromises();
+      const blocks = blocksOf(wrapper);
+      expect(blocks.length).toBeLessThanOrEqual(maxRows);
+      expect(blocks.filter((block) => block.ancestor)).toHaveLength(25);
+      expect(blocks.filter((block) => !block.ancestor)).toHaveLength(250);
+      expect(blocks.at(-1)?.hint).toContain("Zoom in");
+    });
+
+    it("reaches the deepest frame by zooming into the hinted frame again and again", async () => {
+      const wrapper = mountTree(deepRoot());
+      await flushPromises();
+      let reached = false;
+      for (let step = 0; step < 10 && !reached; step++) {
+        const blocks = blocksOf(wrapper);
+        expect(blocks.length).toBeLessThanOrEqual(maxRows);
+        reached = blocks.some((block) => block.name === "f1000");
+        if (reached) break;
+        const capped = blocks.find((block) => String(block.hint).includes("Zoom in"))!;
+        expect(capped).toBeDefined();
+        await zoomInto(wrapper, String(capped.id));
+      }
+      expect(reached).toBe(true);
+    });
+  });
+
+  it("does not enter the keyboard-focused state on a mouse click, but does on the first key", async () => {
+    const wrapper = mountTree(tree);
+    await flushPromises();
+    const plot = wrapper.get('[data-test="flame-graph-plot"]');
+    await plot.trigger("pointerdown");
+    await plot.trigger("focus");
+    await plot.trigger("pointerup");
+    expect(wrapper.get('[data-test="flame-graph-announce"]').text()).toBe("");
+    expect(wrapper.find('[data-test="flame-graph-focus-marker"]').exists()).toBe(false);
+
+    await press(wrapper, "ArrowDown");
+    expect(wrapper.get('[data-test="flame-graph-announce"]').text()).toContain("a, Total");
+  });
+
+  it("highlights the focused frame again by id after the chart repaints from a zoom", async () => {
+    const chartInstance = { setOption: vi.fn(), dispatchAction: vi.fn() };
+    const wrapper = mount(FlameGraphView, {
+      attachTo: document.body,
+      props: { root: tree, unitLabel: "ns", summaryLabel: "total", summaryValue: "1" },
+      global: {
+        plugins: [i18n],
+        stubs: {
+          ChartRenderer: {
+            ...ChartRendererStub,
+            emits: ["click", "painted"],
+            setup: () => ({ chart: chartInstance }),
+          },
+          OButton: { template: "<button><slot /></button>" },
+          OSwitch: true,
+          OTooltip: true,
+        },
+      },
+    });
+    await flushPromises();
+    await wrapper.get('[data-test="flame-graph-plot"]').trigger("focus");
+    await press(wrapper, "ArrowDown");
+    await press(wrapper, "Enter");
+    await flushPromises();
+    chartInstance.dispatchAction.mockClear();
+
+    await wrapper.findComponent({ name: "ChartRenderer" }).vm.$emit("painted");
+    const index = blocksOf(wrapper).findIndex((block) => block.id === "root/0");
+    expect(chartInstance.dispatchAction).toHaveBeenCalledWith({
+      type: "highlight",
+      seriesIndex: 0,
+      dataIndex: index,
+    });
+  });
+
+  it("re-announces the focused frame after Enter zooms into it", async () => {
+    const wrapper = mountTree(tree);
+    await flushPromises();
+    await focusPlot(wrapper);
+    await press(wrapper, "ArrowDown");
+    const announce = () => wrapper.get('[data-test="flame-graph-announce"]').text();
+    const before = announce();
+    await press(wrapper, "Enter");
+    await flushPromises();
+    expect(announce()).not.toBe(before);
+    expect(announce()).toContain("a, Total");
+  });
+
+  it("scrolls the focused frame into view and labels the frame menu with the function name", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    try {
+      const wrapper = mountTree(tree);
+      await flushPromises();
+      await focusPlot(wrapper);
+      await press(wrapper, "ArrowDown");
+      await flushPromises();
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+      await press(wrapper, "ContextMenu");
+      expect(wrapper.get('[data-test="flame-graph-frame-menu"]').attributes("aria-label")).toBe(
+        "a",
+      );
+    } finally {
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
+  });
+
+  it("draws the keyboard focus ring with the semantic token, inside the scroll box", async () => {
+    const wrapper = mountTree(tree);
+    await flushPromises();
+    const classes = wrapper.get('[data-test="flame-graph-plot"]').classes();
+    expect(classes).toContain("focus-visible:outline-focus-ring-accent");
+    expect(classes).toContain("focus-visible:-outline-offset-2");
+    expect(classes).not.toContain("focus-visible:outline-primary-500");
   });
 });
 

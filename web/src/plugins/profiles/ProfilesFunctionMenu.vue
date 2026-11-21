@@ -28,33 +28,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop
       />
     </template>
-    <ODropdownItem
-      icon-left="content-copy"
-      :data-test="`${dataTest}-copy`"
-      @select="emit('copy', name)"
-      >{{ t("profiles.copyFunctionName") }}</ODropdownItem
+    <FlameFunctionMenuItems
+      :name="name"
+      :test-ids="testIds"
+      @copy="emit('copy', $event)"
+      @search="emit('search', $event)"
+      @details="emit('details', $event)"
+      @sandwich="emit('sandwich', $event)"
     >
-    <ODropdownItem
-      icon-left="search"
-      :data-test="`${dataTest}-search`"
-      @select="emit('search', name)"
-      >{{ t("profiles.searchForFunction") }}</ODropdownItem
-    >
-    <ODropdownItem icon-left="flame" :data-test="`${dataTest}-show`" @select="emit('show')">{{
-      focusable ? t("profiles.focusInFlameGraph") : t("profiles.showInFlameGraph")
-    }}</ODropdownItem>
-    <ODropdownItem
-      icon-left="info-outline"
-      :data-test="`${dataTest}-details`"
-      @select="emit('details', name)"
-      >{{ t("profiles.functionDetails") }}</ODropdownItem
-    >
-    <ODropdownItem
-      icon-left="swap-vert"
-      :data-test="`${dataTest}-sandwich`"
-      @select="emit('sandwich', name)"
-      >{{ t("profiles.showCallersAndCallees") }}</ODropdownItem
-    >
+      <ODropdownItem icon-left="flame" :data-test="`${dataTest}-show`" @select="emit('show')">{{
+        focusable ? t("profiles.focusInFlameGraph") : t("profiles.showInFlameGraph")
+      }}</ODropdownItem>
+    </FlameFunctionMenuItems>
   </ODropdown>
 </template>
 
@@ -62,10 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { ref } from "vue";
+import FlameFunctionMenuItems from "@/components/common/FlameFunctionMenuItems.vue";
+import { computed, ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 
-defineProps<{
+const props = defineProps<{
   name: string;
   /** A Call Tree row is one call path, so the flame graph can focus on it; a Top Table row is a whole function. */
   focusable?: boolean;
@@ -81,4 +67,10 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const open = ref(false);
+const testIds = computed(() => ({
+  copy: `${props.dataTest}-copy`,
+  search: `${props.dataTest}-search`,
+  details: `${props.dataTest}-details`,
+  sandwich: `${props.dataTest}-sandwich`,
+}));
 </script>
