@@ -74,6 +74,8 @@ write({
   "web/src/one.ts": `export const one = import.meta.glob("./one/?.json");`,
   "web/src/one/a.json": "{}",
   "web/src/one.spec.ts": `import { one } from "./one";`,
+  "src/config/parity.json": "{}",
+  "web/src/utils/parity.spec.ts": `import p from "../../../src/config/parity.json";`,
 });
 const base = commit();
 
@@ -111,6 +113,15 @@ test("app code loaded by the setup file runs everything", () => {
   assert.equal(r.mode, "full");
   assert.match(r.reason, /^loaded by setupTests for every spec: web\/src\/utils\/q\.ts$/);
   assert.equal(r.setupHits, 1);
+});
+
+test("a changed file outside web/ that a web file imports runs everything", () => {
+  const r = run({
+    "src/config/parity.json": `{"a":1}`,
+    "web/src/utils/a.ts": "export const a = 3;",
+  });
+  assert.equal(r.mode, "full");
+  assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/parity.json");
 });
 
 test("an added locale key selects only the specs that read locale files", () => {

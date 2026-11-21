@@ -346,6 +346,15 @@ export function select({ repo, base, head }) {
       changed,
     };
   }
+  // The graph stops at web/, so a changed file outside it that web code imports runs everything.
+  const outside = new Set(changed.filter((p) => !p.startsWith("web/")));
+  if (outside.size)
+    for (const [f, t] of texts)
+      for (const m of t.matchAll(/["'](\.\.?\/[^"'\s]+)["']/g)) {
+        const p = posix.join("web", posix.dirname(f), m[1]);
+        if (outside.has(p))
+          return { ...full(`web/ imports a changed file outside web/: ${p}`), changed };
+      }
   const idx = new TextIndex(texts, specs);
   let switchers;
   const localeSwitchers = () =>
