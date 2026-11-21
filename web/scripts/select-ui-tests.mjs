@@ -42,7 +42,7 @@ const FULL = [
 ];
 // web/ paths outside src that vitest never loads, unless the graph says a spec imports them.
 const NO_EFFECT =
-  /^(\.gitignore|\.nvmrc|\.prettierignore|\.prettierrc\.json|\.stylelintrc\.json|[^/]*\.md|cypress\.config\.ts|eslint\.config\.js|eslint\.sh|index\.html|run_all\.sh|sbom\.json|serve\.json|env\.d\.ts)$|^(cypress|public|test-results|tests|scripts)\//;
+  /^(\.gitignore|\.nvmrc|\.prettierignore|\.prettierrc\.json|\.stylelintrc\.json|[^/]*\.md|cypress\.config\.ts|eslint\.config\.js|eslint\.sh|run_all\.sh|sbom\.json|serve\.json|env\.d\.ts)$|^(cypress|public|test-results|tests|scripts)\//;
 
 // ---------- git ----------
 const git = (repo, args, input) =>

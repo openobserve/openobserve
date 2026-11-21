@@ -134,6 +134,10 @@ test("an extensionless import of a changed file outside web/ runs everything", (
   assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/shared.ts");
 });
 
+test("index.html runs everything, since a spec reads it from disk", () => {
+  assert.equal(run({ "web/index.html": "<html></html>" }).mode, "full");
+});
+
 test("the shard durations file runs everything", () => {
   assert.equal(run({ "web/scripts/ui-shard-durations.json": "{" }).mode, "full");
 });
