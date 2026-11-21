@@ -21,6 +21,7 @@ import { OTableRowsStub, dropdownStubs } from "@/test/unit/helpers/dropdownStubs
 import alerts from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
 import type { AlertGroup } from "@/ts/interfaces/alert";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import AlertGroupsTable from "./AlertGroupsTable.vue";
 
 vi.mock("@/services/alerts", async (importOriginal) => {
@@ -79,8 +80,12 @@ const ownedBy = (key: string, mute: Record<string, unknown> = groupMute) =>
 
 let wrapper: VueWrapper<any>;
 
-const mountTable = async (props: Record<string, unknown> = {}) => {
+const mountTable = async (
+  props: Record<string, unknown> = {},
+  options: { attachTo?: Element } = {},
+) => {
   wrapper = mount(AlertGroupsTable, {
+    ...options,
     props: {
       groups,
       alertId: "a1",
@@ -311,5 +316,88 @@ describe("AlertGroupsTable row actions", () => {
     await mountTable({ muteEnabled: false });
     expect(find("alerts-alertgroupstable-mute-eu-until-clear").exists()).toBe(false);
     expect(find("alerts-alertgroupstable-ack-eu").exists()).toBe(true);
+  });
+});
+
+describe("AlertGroupsTable filter", () => {
+  const labelled: AlertGroup[] = [
+    {
+      group_key: "eu",
+      group_labels: "cluster=prod-eu",
+      labels: [{ name: "cluster", value: "prod-eu" }],
+    },
+    {
+      group_key: "us",
+      group_labels: "cluster=prod-us",
+      labels: [{ name: "cluster", value: "prod-us" }],
+    },
+    {
+      group_key: "st",
+      group_labels: "cluster=staging-eu",
+      labels: [{ name: "cluster", value: "staging-eu" }],
+    },
+  ];
+  const builder = () => wrapper.findComponent(FilterBuilder);
+  const shown = () =>
+    labelled
+      .map((g) => g.group_key)
+      .filter((key) => find(`alerts-alertgroupstable-history-${key}`).exists());
+
+  beforeEach(() => queryClient.clear());
+  afterEach(() => wrapper?.unmount());
+
+  it("offers the groups' labels and their values to pick from", async () => {
+    await mountTable({ groups: labelled });
+    expect(builder().props("profile")).toBe("alert-groups");
+    expect(builder().props("fields")).toEqual([{ name: "cluster", type: "string" }]);
+    await expect(builder().props("loadValues")!("cluster", "eu")).resolves.toEqual([
+      "prod-eu",
+      "staging-eu",
+    ]);
+  });
+
+  it("shows only the groups matching the picked conditions", async () => {
+    await mountTable({ groups: labelled });
+    builder().vm.$emit("update:modelValue", [
+      { field: "cluster", operator: "in", values: ["prod-eu", "prod-us"] },
+    ]);
+    await flushPromises();
+    expect(shown()).toEqual(["eu", "us"]);
+  });
+
+  it("turns typed label:value into a condition, as the placeholder suggests", async () => {
+    await mountTable({ groups: labelled }, { attachTo: document.body });
+    const input = () =>
+      document.body.querySelector<HTMLInputElement>(
+        '[data-test="alerts-alertgroupstable-search-search"]',
+      ) ??
+      document.body.querySelector<HTMLInputElement>(
+        '[data-test="alerts-alertgroupstable-search-input"]',
+      );
+    await find("alerts-alertgroupstable-search-input").trigger("click");
+    await flushPromises();
+    input()!.value = "cluster:prod-eu";
+    input()!.dispatchEvent(new Event("input"));
+    await flushPromises();
+    input()!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flushPromises();
+    expect(builder().props("modelValue")).toEqual([
+      { field: "cluster", operator: "eq", values: ["prod-eu"] },
+    ]);
+    expect(shown()).toEqual(["eu"]);
+  });
+
+  it("clears the filter from the filtered empty state", async () => {
+    await mountTable({ groups: labelled });
+    builder().vm.$emit("update:modelValue", [
+      { field: "cluster", operator: "eq", values: ["prod-ap"] },
+    ]);
+    await flushPromises();
+    expect(shown()).toEqual([]);
+    expect(wrapper.findComponent({ name: "OEmptyState" }).props("filtered")).toBe(true);
+    wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "clear-filters");
+    await flushPromises();
+    expect(builder().props("modelValue")).toEqual([]);
+    expect(shown()).toEqual(["eu", "us", "st"]);
   });
 });

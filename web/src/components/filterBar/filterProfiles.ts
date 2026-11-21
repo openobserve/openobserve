@@ -34,6 +34,7 @@ import {
   type FilterOperatorId,
 } from "@/utils/query/filterBar";
 import {
+  alertGroupsCodec,
   anomalyCodec,
   dashboardFilterCodec,
   dashboardVariableCodec,
@@ -79,6 +80,7 @@ export type FilterProfileName =
   | "dashboard-variable"
   | "anomaly"
   | "profiles"
+  | "alert-groups"
   | "rum-funnel"
   | "rum-exclusion"
   | "synthetics"
@@ -520,6 +522,17 @@ export const FILTER_PROFILES: Record<FilterProfileName, FilterProfile> = {
     codec: profilesCodec(),
     validation: "dropIncomplete",
     validate: profilesIssues,
+  },
+  "alert-groups": {
+    ...flat,
+    name: "alert-groups",
+    layout: "horizontal",
+    operators: forAll(["eq", "neq", "in", "not_in"]),
+    freeText: true,
+    // Rows hold one value per label, so a second = on that label would match no group.
+    limits: { uniqueFields: true },
+    codec: alertGroupsCodec(),
+    validation: "dropIncomplete",
   },
   "rum-funnel": {
     ...flat,
