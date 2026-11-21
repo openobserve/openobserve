@@ -631,6 +631,24 @@ describe("AlertConfigSummary — layout", () => {
     expect(value(threshold, "warning")).toBe("> 0.5");
   });
 
+  it("shows a PromQL threshold alert's expression as its own query row", () => {
+    const threshold = mountSummary(
+      generic({
+        type: "promql",
+        promql: "avg(x) by (region)",
+        promql_condition: { operator: ">", value: 50 },
+      }),
+    );
+    expectQueryRow(threshold, "query", "promql");
+    expect(value(threshold, "query")).toBe("avg(x) by (region)");
+    expectShortText(threshold, "condition");
+
+    const rule = mountSummary(
+      generic({ type: "promql", promql_rule_mode: true, promql: "sum(rate(errors[5m])) > 1" }),
+    );
+    expect(field(rule, "query").exists()).toBe(false);
+  });
+
   it("renders an anomaly config's custom SQL and its filters as full-row code blocks", () => {
     const sql = mountSummary(anomalyConfig({ query_mode: "custom_sql", custom_sql: SQL }));
     expectQueryRow(sql, "custom-sql", "sql");
