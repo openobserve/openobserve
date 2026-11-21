@@ -77,6 +77,9 @@ write({
   "src/config/parity.json": "{}",
   "web/src/utils/parity.spec.ts": `import p from "../../../src/config/parity.json";`,
   "src/config/shared.ts": "export const s = 1;",
+  "src/config/raw.json": "1",
+  "web/src/utils/raw.spec.ts": `import r from "../../../src/config/raw.json?inline";`,
+  "web/index.html": "<html></html>",
   "web/src/utils/shared.spec.ts": `import { s } from "../../../src/config/shared";`,
 });
 const base = commit();
@@ -135,7 +138,18 @@ test("an extensionless import of a changed file outside web/ runs everything", (
 });
 
 test("index.html runs everything, since a spec reads it from disk", () => {
-  assert.equal(run({ "web/index.html": "<html></html>" }).mode, "full");
+  assert.equal(run({ "web/index.html": "<html>2</html>" }).mode, "full");
+  assert.equal(run({ "web/index.html": null }).mode, "full");
+});
+
+test("a query-suffixed import of a changed file outside web/ runs everything", () => {
+  const r = run({ "src/config/raw.json": "2", "web/.prettierignore": "x" });
+  assert.equal(r.reason, "web/ imports a changed file outside web/: src/config/raw.json");
+});
+
+test("a change outside web/ runs the specs that read files from disk", () => {
+  const r = run({ "src/other/x.rs": "//", "web/.prettierignore": "x" });
+  assert.ok(r.specs.includes(FS_HELPER_SPEC));
 });
 
 test("the shard durations file runs everything", () => {

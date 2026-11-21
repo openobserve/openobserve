@@ -34,7 +34,7 @@ const LOCALE_SWITCH = /setLocale\(|loadLocaleMessages\(|\blocale(?:\.value)?\s*=
 const READS_SOURCE = new RegExp(`${READS_FS.source}|\\?raw\\b`);
 const LOCALE = /(?:^|\/)([a-z]{2}-[A-Z]{2})\.json$/;
 const FULL = [
-  /^web\/(package\.json|package-lock\.json|vite\.config\.ts|vitest[^/]*\.config\.ts|tsconfig[^/]*\.json|postcss\.config\.js|coverage\.sh)$/,
+  /^web\/(package\.json|package-lock\.json|vite\.config\.ts|vitest[^/]*\.config\.ts|tsconfig[^/]*\.json|postcss\.config\.js|coverage\.sh|index\.html)$/,
   /^web\/patches\//,
   /^web\/scripts\/(ui-shard-sequencer\.ts|ui-shard-durations\.json|select-ui-tests\.mjs|changed-lines-coverage\.mjs|fetch-datasource-content\.mjs)$/,
   /^\.github\/workflows\/unit-tests\.yml$/,
@@ -351,7 +351,7 @@ export function select({ repo, base, head }) {
   if (outside.size)
     for (const [f, t] of texts)
       for (const m of t.matchAll(/["'](\.\.?\/[^"'\s]+)["']/g)) {
-        const p = posix.join("web", posix.dirname(f), m[1]);
+        const p = posix.join("web", posix.dirname(f), m[1].replace(/[?#].*$/, ""));
         const hit = [p, ...EXTS.map((e) => p + e), ...EXTS.map((e) => `${p}/index${e}`)].find(
           (c) => outside.has(c),
         );
@@ -429,7 +429,7 @@ export function select({ repo, base, head }) {
     }
     return { ...full(`cannot classify ${repoPath}`), changed };
   }
-  if (changed.some((p) => p.startsWith("web/src/"))) {
+  if (changed.some((p) => p.startsWith("web/src/") || !p.startsWith("web/"))) {
     const fsSpecs = specs.filter((s) => READS_SOURCE.test(texts.get(s) ?? ""));
     const fsHelpers = [...texts].filter(([f, t]) => !specSet.has(f) && READS_FS.test(t));
     take(
