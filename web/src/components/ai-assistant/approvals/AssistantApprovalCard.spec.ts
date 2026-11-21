@@ -891,6 +891,29 @@ describe("AssistantApprovalCard", () => {
       );
     });
 
+    it("shows inline code in its option labels as code, and names them without backticks", async () => {
+      const card = cardOf(
+        {
+          type: "confirmation_required",
+          id: "q3",
+          tool: "ask_user",
+          kind: "question",
+          message: "Which streams?",
+          options: [
+            { id: "o2", label: "Focus on `_o2_*` metrics" },
+            { id: "plain", label: "Both" },
+          ],
+        },
+        { id: "q3", expiresAt: Date.now() + 580_000 },
+      );
+      const wrapper = mountCard(card);
+      await flushPromises();
+      const option = wrapper.get('[data-test="assistant-question-option-o2"]');
+      expect(option.text()).toBe("Focus on _o2_* metrics");
+      expect(option.findAll("code").map((code) => code.text())).toEqual(["_o2_*"]);
+      expect(wrapper.get('[data-test="assistant-question-option-plain"]').text()).toBe("Both");
+    });
+
     it("asks its question with the choices, More time and Other answer last, and no Deny", async () => {
       const wrapper = mountCard(question(), { extendable: true });
       await flushPromises();

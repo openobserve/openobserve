@@ -152,7 +152,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`assistant-question-option-${option.id}`"
               @click="(event: MouseEvent) => act(event, () => choose(option))"
             >
-              {{ raw(option.label) }}
+              <span class="min-w-0 text-start break-words"
+                ><template v-for="(part, i) in codeParts(option.label)" :key="i"
+                  ><code
+                    v-if="part.code"
+                    class="rounded-default bg-code-bg text-code-text px-1 py-px font-mono text-xs"
+                    >{{ raw(part.text) }}</code
+                  ><template v-else>{{ raw(part.text) }}</template></template
+                ></span
+              >
             </OButton>
           </div>
         </div>
@@ -472,17 +480,7 @@ const heading = computed(() => {
   const text = approvalHeading(t, shown.value, count.value);
   return question.value ? raw(stripClaimMarkers(text)) : text;
 });
-// Inline code only: a heading is one line of the model's words, never a block of markdown.
-const headingParts = computed(() =>
-  String(heading.value)
-    .split(/(`[^`\n]+`)/)
-    .filter(Boolean)
-    .map((text) =>
-      text.length > 2 && text.startsWith("`") && text.endsWith("`")
-        ? { code: true, text: text.slice(1, -1) }
-        : { code: false, text },
-    ),
-);
+const headingParts = computed(() => codeParts(String(heading.value)));
 // Spoken and label text says the code as words, never its backticks.
 const plainHeading = computed(() => raw(headingParts.value.map((part) => part.text).join("")));
 const groupName = computed(() =>
@@ -716,6 +714,18 @@ function approve(): void {
     scope: canAlwaysAllow(props.card) ? scope.value : "once",
     ...(planned.value && props.card.editable && { items: [...selected.value] }),
   });
+}
+
+// Inline code only: a heading or a choice is one line of the model's words, never a block of markdown.
+function codeParts(text: string): { code: boolean; text: string }[] {
+  return text
+    .split(/(`[^`\n]+`)/)
+    .filter(Boolean)
+    .map((part) =>
+      part.length > 2 && part.startsWith("`") && part.endsWith("`")
+        ? { code: true, text: part.slice(1, -1) }
+        : { code: false, text: part },
+    );
 }
 
 function choose(option: QuestionOption): void {

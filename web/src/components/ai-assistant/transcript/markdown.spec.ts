@@ -1154,6 +1154,18 @@ describe("markdown.ts strict profile", () => {
       expect(shown(parseAs(text, "cut"))).toContain("see `a");
     });
 
+    it.each([
+      ["a lone opener", "latency histograms (`"],
+      ["an opener and a space", "latency histograms (` "],
+      ["a double opener", "run ``"],
+      ["an opener after a closed span", "use `a` and `"],
+    ])("drops %s a cut answer ends on (TA5-04)", (_n, text) => {
+      const html = parseAs(text, "cut");
+      expect(shown(html)).not.toContain("`");
+      expect(html.match(/<code/g)?.length ?? 0).toBe(text.includes("`a`") ? 1 : 0);
+      expect(parseAs(text, "open")).not.toContain("`");
+    });
+
     it("closes a cut span with a run as long as its opener", () => {
       const code = parseAs("run ``SELECT `x` FROM", "cut");
       expect(code).toContain("<code");

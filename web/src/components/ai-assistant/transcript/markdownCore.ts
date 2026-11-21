@@ -1134,9 +1134,16 @@ function repairTail(text: string): string {
   const unlinked = line.replace(OPEN_LINK_TARGET, keepInCode(line));
   const linked = unlinked.replace(OPEN_LINK_TEXT, keepInCode(unlinked));
   const ticks = openTicks(before + linked);
-  const closed = ticks && !linked.endsWith("`") ? linked + ticks : linked;
+  const closed = ticks ? closeTicks(linked, ticks, before) : linked;
   const repaired = withoutOpenStars(closed, before);
   return repaired === line ? text : text.slice(0, at) + repaired;
+}
+
+// An opener the cut left with nothing after it is dropped, since an empty span would show its backticks.
+function closeTicks(line: string, ticks: string, before: string): string {
+  const bare = line.replace(/`+\s*$/, "");
+  if (bare !== line && openTicks(before + bare) === "") return bare;
+  return line.endsWith("`") ? line : line + ticks;
 }
 
 // The earlier lines of the last line's paragraph or list item, where a code span it closes may have opened.
