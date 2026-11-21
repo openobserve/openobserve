@@ -6,6 +6,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { ingestTraces } = require('../utils/trace-ingestion.js');
 
 test.describe("Traces Search testcases", () => {
   test.describe.configure({ mode: 'serial' });
@@ -18,6 +19,10 @@ test.describe("Traces Search testcases", () => {
     // Navigate to base URL with authentication
     await navigateToBase(page);
     pm = new PageManager(page);
+
+    // Global-setup traces age out of the 15m window on long shards, so each test seeds its own.
+    const seeded = await ingestTraces(page, 5);
+    expect(seeded.successful, 'traces ingested').toBeGreaterThan(0);
 
     // Post-authentication stabilization wait
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
