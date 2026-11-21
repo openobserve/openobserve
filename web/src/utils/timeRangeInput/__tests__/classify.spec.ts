@@ -90,19 +90,13 @@ describe("classifier precedence", () => {
     });
   }
 
-  it("reads <ISO> followed by text as a log line, not a range", async () => {
+  it("refuses <ISO> followed by any other text", async () => {
     const pack = await packOf("en-us");
     const r = parseTimeRangeInput(baseContext(pack, `${A} INFO moved to queue`));
-    expect(r.state === "valid" && r.reading.origin.form).toBe("log-line");
-    if (r.state === "valid")
-      expect(r.reading.notes.map((n) => n.kind)).toEqual([
-        "converted",
-        "instant-window",
-        "log-line",
-      ]);
+    expect(r.state).toBe("invalid");
   });
 
-  it("refuses a log line that starts with two stamps", async () => {
+  it("refuses two stamps followed by text", async () => {
     const pack = await packOf("en-us");
     const r = parseTimeRangeInput(baseContext(pack, `${A} ${B} worker started`));
     expect(r.state).toBe("invalid");

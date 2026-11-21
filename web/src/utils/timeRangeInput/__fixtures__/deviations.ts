@@ -18,7 +18,7 @@
 export interface Deviation {
   id: string;
   corpus: string;
-  design: { state: "invalid"; reason: "zero-length" | "out-of-range" };
+  design: { state: "invalid"; reason: "zero-length" | "out-of-range" | "unreadable" };
   reason: string;
 }
 
@@ -47,5 +47,24 @@ export const DEVIATIONS: Deviation[] = [
     corpus: "valid instant 2255-06-06T01:47:34.740993+02:00",
     design: { state: "invalid", reason: "out-of-range" },
     reason: "Same value and rule as reg-C14-01.",
+  },
+  {
+    id: "und-045",
+    corpus: "valid instant 2026-11-16T10:12:33.456+01:00",
+    design: { state: "invalid", reason: "unreadable" },
+    reason:
+      "Pasted log lines are not read: text after a stamp must parse, and `INFO request done` does not.",
+  },
+  {
+    id: "und-046",
+    corpus: "valid instant 2026-11-16T09:12:33+01:00",
+    design: { state: "invalid", reason: "unreadable" },
+    reason: "Same rule as und-045: `GET /` after the CLF stamp is unread text.",
+  },
+  {
+    id: "und-047",
+    corpus: "valid instant 2026-11-16T09:12:33+01:00",
+    design: { state: "invalid", reason: "unreadable" },
+    reason: "Same rule as und-045: `host app:` after the syslog stamp is unread text.",
   },
 ];

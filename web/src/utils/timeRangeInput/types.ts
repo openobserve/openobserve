@@ -52,15 +52,7 @@ export interface TimeRangePack {
 export type InputSource = "typed" | "paste";
 
 export type InputForm =
-  | "copy-payload"
-  | "url"
-  | "range"
-  | "log-line"
-  | "epoch"
-  | "iso"
-  | "shorthand"
-  | "date-math"
-  | "phrase";
+  "copy-payload" | "url" | "range" | "epoch" | "iso" | "shorthand" | "date-math" | "phrase";
 
 export interface ParseContext {
   text: string;
@@ -77,7 +69,6 @@ export type ZoneNote =
   | { kind: "dst-gap"; typedLocal: string; readAsLocal: string }
   | { kind: "converted"; fromOffset: string }
   | { kind: "instant-window"; instantUs: number; halfWidthUs: number }
-  | { kind: "log-line" }
   | { kind: "partial-retention"; keptFromUs: number }
   | { kind: "elapsed-chain"; totalUs: number };
 

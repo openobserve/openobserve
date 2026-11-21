@@ -41,11 +41,21 @@ function dateChar(ch: string | undefined): boolean {
   );
 }
 
-// Intl writes direction marks inside numeric dates; any other bidi control stays and fails.
+// Intl writes direction marks beside the separators of numeric dates; one between two digits splits
+// a number, so it stays and fails.
 function dropDateMarks(nfkc: string): string {
   const cps = [...nfkc];
+  const sep = (ch: string | undefined) => ch === "/" || ch === "." || ch === "-";
   return cps
-    .filter((ch, i) => !(MARKS.has(ch) && dateChar(cps[i - 1]) && dateChar(cps[i + 1])))
+    .filter(
+      (ch, i) =>
+        !(
+          MARKS.has(ch) &&
+          dateChar(cps[i - 1]) &&
+          dateChar(cps[i + 1]) &&
+          (sep(cps[i - 1]) || sep(cps[i + 1]))
+        ),
+    )
     .join("");
 }
 
