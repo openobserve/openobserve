@@ -36,6 +36,14 @@ const SQL_TOOLS: [&str; 4] = [
 ];
 const GET_LATEST_TRACES: &str = "GetLatestTraces";
 const PROMQL_INSTANT_QUERY: &str = "PrometheusQuery";
+/// Trace, service-graph and deploy reads whose `start_time`/`end_time` (µs) bound what they saw.
+const WINDOWED_TRACE_TOOLS: [&str; 5] = [
+    "GetTraceDetails",
+    "GetTraceDAG",
+    "GetServiceGraphEdgeTrend",
+    "ListServiceDeploys",
+    "GetCurrentServiceGraphTopology",
+];
 
 fn is_sql_tool(tool: &str) -> bool {
     SQL_TOOLS.contains(&tool)
@@ -140,6 +148,16 @@ pub fn evidence_target(tool: &str, input: &Value) -> EvidenceTarget {
         target.start_us = as_i64(input.get("start_time"));
         target.end_us = as_i64(input.get("end_time"));
         target.filter = non_empty_str(input.get("filter"));
+    } else if WINDOWED_TRACE_TOOLS.contains(&tool) {
+        // Query parameters are top-level arguments; a wrapped body carries them too.
+        let arg = |key: &str| {
+            input
+                .get(key)
+                .or_else(|| input.pointer(&format!("/request_body/{key}")))
+        };
+        target.streams = non_empty_str(arg("stream_name")).into_iter().collect();
+        target.start_us = as_i64(arg("start_time"));
+        target.end_us = as_i64(arg("end_time"));
     } else {
         // Shell, `cli_*` and any other tool whose key argument is its command.
         target.command =
@@ -727,7 +745,7 @@ mod tests {
             (
                 rec("c", "PrometheusSeries", "up", json!({}), 1, true),
                 "PromQL",
-                SignalClass::Metrics,
+                SignalClass::Context,
             ),
             (
                 rec("c", "GetLatestTraces", "f", json!({}), 1, true),
@@ -841,6 +859,31 @@ mod tests {
         assert_eq!(t.streams, ["default"]);
         assert_eq!((t.start_us, t.end_us), (Some(5), Some(9)));
         assert_eq!(t.filter.as_deref(), Some("service_name='checkout'"));
+
+        // Trace, graph and deploy reads bound their window, so the impact check sees it.
+        for tool in [
+            "GetTraceDetails",
+            "GetTraceDAG",
+            "GetServiceGraphEdgeTrend",
+            "ListServiceDeploys",
+            "GetCurrentServiceGraphTopology",
+        ] {
+            let t = evidence_target(
+                tool,
+                &json!({"stream_name": "default", "start_time": 5, "end_time": "9"}),
+            );
+            assert_eq!(t.streams, ["default"], "{tool}");
+            assert_eq!((t.start_us, t.end_us), (Some(5), Some(9)), "{tool}");
+        }
+        let t = evidence_target(
+            "PrometheusQueryExemplars",
+            &json!({"query": "up", "start": 1_792_144_800, "end": 1_792_145_000}),
+        );
+        assert_eq!(t.signal, SignalClass::Metrics);
+        assert_eq!(
+            (t.start_us, t.end_us),
+            (Some(1_792_144_800_000_000), Some(1_792_145_000_000_000))
+        );
 
         let t = evidence_target(BASH, &json!({"command": "git diff HEAD~1"}));
         assert_eq!(

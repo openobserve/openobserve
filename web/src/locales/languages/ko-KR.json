@@ -12882,6 +12882,22 @@
         }
       },
       "rcaRun": {
+        "region": {
+          "analyzedIn": "{region}에서 분석됨",
+          "analyzingIn": "{region}에서 분석 중",
+          "unknown": "분석 리전 알 수 없음",
+          "noLocalRun": "로컬 분석 없음; 다른 리전은 알 수 없음",
+          "tooltip": "실행 기록은 리전별로 보관됩니다. 이 실행은 {region}에서 실행되었습니다.",
+          "historyFailed": "보고서 기록을 불러올 수 없습니다.",
+          "historyFailedHint": "불러오면 리전이 표시됩니다."
+        },
+        "skipped": {
+          "title": "{time} UTC 온콜 호출: 새 실행 없음",
+          "inFlight": "실행 {number}이(가) 이미 실행 중이었습니다",
+          "coolingDown": "실행 {number}이(가) {cooldown} 대기 시간 내에 실행되었습니다",
+          "gone": "실행이 더 이상 보관되지 않음",
+          "open": "실행 {number} 열기"
+        },
         "reanalyzingFresh": "처음부터 재분석하는 중…",
         "reanalyzingBuildOnPrevious": "이전 보고서를 기반으로 작성하는 중…",
         "resumingFrom": "“{step}”부터 재개 중…",

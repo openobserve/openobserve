@@ -367,10 +367,11 @@ mod enterprise {
             skip_cooldown: true,
             oncall_subjects: None,
             context_used: None,
+            recipients: Vec::new(),
         })
         .await
         {
-            Ok(StartOutcome::Started { run_id, .. }) => run_id,
+            Ok(StartOutcome::Started { run_id }) => run_id,
             // The store guards incident subjects only; an alert run is admitted below instead.
             Ok(outcome) => {
                 return Err(AlertRcaRefusal::Failed(format!(
@@ -677,17 +678,17 @@ mod enterprise {
         let name = alert.map(|a| a.name.clone());
         let stream = alert.map(|a| a.stream_name.clone());
         let context = config::meta::oncall::RcaContext {
-            subject_type: config::meta::oncall::SubjectType::Alert,
-            subject_id: req.alert_id.clone(),
-            incident_id: None,
-            org_id: req.org_id.clone(),
-            previous_analysis: None,
             severity: alert.and_then(|a| a.priority),
-            past_causes: Vec::new(),
             alert_name: name.clone(),
             stream: stream.clone(),
             dimensions: (!dimensions.is_empty()).then_some(serde_json::Value::Object(dimensions)),
-            evidence: None,
+            fired_at_us: Some(req.firing_started_at),
+            ..config::meta::oncall::RcaContext::new(
+                config::meta::oncall::SubjectType::Alert,
+                req.alert_id.clone(),
+                req.org_id.clone(),
+            )
+            .with_first_alert(req.firing_started_at)
         };
         (
             context,
@@ -1043,6 +1044,7 @@ mod tests {
                 skip_cooldown: true,
                 oncall_subjects: None,
                 context_used: None,
+                recipients: Vec::new(),
             })
             .await
             .unwrap();

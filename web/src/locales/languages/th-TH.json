@@ -12880,6 +12880,22 @@
         }
       },
       "rcaRun": {
+        "region": {
+          "analyzedIn": "วิเคราะห์ใน {region}",
+          "analyzingIn": "กำลังวิเคราะห์ใน {region}",
+          "unknown": "ไม่ทราบภูมิภาคที่วิเคราะห์",
+          "noLocalRun": "ไม่มีการวิเคราะห์ในภูมิภาคนี้ ไม่ทราบภูมิภาคอื่น",
+          "tooltip": "ประวัติการรันจะเก็บแยกตามภูมิภาค การรันนี้ทำงานใน {region}",
+          "historyFailed": "ไม่สามารถโหลดประวัติรายงานได้",
+          "historyFailedHint": "ภูมิภาคจะแสดงเมื่อโหลดเสร็จ"
+        },
+        "skipped": {
+          "title": "การแจ้งเตือนเวรเมื่อ {time} UTC: ไม่มีการรันใหม่",
+          "inFlight": "การรัน {number} กำลังทำงานอยู่แล้ว",
+          "coolingDown": "การรัน {number} ทำงานภายในช่วงพัก {cooldown}",
+          "gone": "ไม่ได้เก็บการรันนี้แล้ว",
+          "open": "เปิดการรัน {number}"
+        },
         "reanalyzingFresh": "Re-analyzing from scratch…",
         "reanalyzingBuildOnPrevious": "Building on the previous report…",
         "resumingFrom": "Resuming from “{step}”…",

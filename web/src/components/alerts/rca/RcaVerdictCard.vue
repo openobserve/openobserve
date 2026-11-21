@@ -28,6 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :firing-scope="firingScope"
       :alerts-now="alertsNow"
       :timezone="timezone"
+      :region="region"
+      :region-display="regionDisplay"
       @open-hypothesis="$emit('open-hypothesis', $event)"
       @show-unverified="$emit('show-unverified')"
       @show-blind-spots="$emit('show-blind-spots')"
@@ -49,6 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ qualifier }}
       </span>
+      <RcaRegionTag
+        v-if="regionDisplay !== 'hidden'"
+        class="ms-auto"
+        :region="region"
+        :state="cardState === 'investigating' ? 'live' : 'terminal'"
+        :loading="regionDisplay === 'loading'"
+      />
     </div>
     <span
       v-else-if="qualifier"
@@ -468,7 +477,8 @@ import RcaInlineText from "./RcaInlineText.vue";
 import RcaPill from "./RcaPill.vue";
 import RcaStageStepper from "./RcaStageStepper.vue";
 import RcaVerdictSummary from "./RcaVerdictSummary.vue";
-import type { RcaAlertsNow, RcaFiringScope } from "./rcaLight";
+import RcaRegionTag from "./RcaRegionTag.vue";
+import type { RcaAlertsNow, RcaFiringScope, RcaRegionDisplay } from "./rcaLight";
 
 const props = withDefaults(
   defineProps<{
@@ -525,8 +535,14 @@ const props = withDefaults(
     timezone?: string;
     /** Why no new run can start: Retry stays visible, disabled, with this reason. */
     startLockedReason?: I18nText;
+    /** `context_used.serving_region` of the shown run (U8). */
+    region?: string | null;
+    /** `hidden` while the run list failed or is forbidden: no region is claimed. */
+    regionDisplay?: RcaRegionDisplay;
   }>(),
   {
+    region: null,
+    regionDisplay: "hidden",
     waitingInput: false,
     summary: null,
     stale: false,

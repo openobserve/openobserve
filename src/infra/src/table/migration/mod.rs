@@ -276,6 +276,7 @@ mod m20261219_000001_add_historical_to_alert_incidents;
 mod m20261220_000001_create_service_identity_tables;
 mod m20261221_000001_add_last_detection_at_to_alert_incidents;
 mod m20261222_000001_incident_membership_and_catalog_cleanup;
+mod m20261223_000001_create_rca_skipped_pages;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -915,6 +916,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261220_000001_create_service_identity_tables::Migration),
             Box::new(m20261221_000001_add_last_detection_at_to_alert_incidents::Migration),
             Box::new(m20261222_000001_incident_membership_and_catalog_cleanup::Migration),
+            Box::new(m20261223_000001_create_rca_skipped_pages::Migration),
         ]
     }
 }
@@ -1052,6 +1054,7 @@ mod tests {
             157,
             "m20261222_000001_incident_membership_and_catalog_cleanup",
         ),
+        (158, "m20261223_000001_create_rca_skipped_pages"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1241,6 +1244,10 @@ mod tests {
             (
                 "m20261016_000001_create_rca_runs",
                 "m20261018_000001_create_rca_steering",
+            ),
+            (
+                "m20261016_000001_create_rca_runs",
+                "m20261223_000001_create_rca_skipped_pages",
             ),
             (
                 "m20260725_000001_create_alert_states_tables",

@@ -104,6 +104,9 @@ pub enum ResumeError {
     TranscriptExpired,
     /// 503 `history_unavailable`: the transcript could not be read now; a retry may work.
     Unavailable(String),
+    /// 409 `security_case_resume_blocked`: a case (or an unclassifiable incident) never forks
+    /// its transcript; a fresh run starts without history instead.
+    SecurityCaseBlocked,
     /// 500.
     Internal(String),
 }
@@ -204,10 +207,18 @@ where
 {
     // The primary: the run may have ended just now.
     let primary = infra::db::get_orm_client_rw().await;
-    let incident = alert_incidents::get_rw(org_id, incident_id)
-        .await
-        .map_err(internal)?
-        .ok_or(ResumeError::NotFound)?;
+    let incident = match alert_incidents::get_rw(org_id, incident_id).await {
+        Ok(Some(incident)) => incident,
+        Ok(None) => return Err(ResumeError::NotFound),
+        Err(e) => {
+            log::warn!("[RCA_RESUME] cannot classify {org_id}/{incident_id}: {e}; resume refused");
+            return Err(ResumeError::SecurityCaseBlocked);
+        }
+    };
+    // F-20: classified before the source session, its events or a fork are read.
+    if incident.security_case {
+        return Err(ResumeError::SecurityCaseBlocked);
+    }
     let run = runs_table::get_rw(org_id, run_id)
         .await
         .map_err(internal)?
@@ -746,6 +757,29 @@ pub(crate) mod tests {
         let seed = prepare_read(&org, &inc, &run, read).await.0.unwrap();
         assert_eq!(seed.cut_seq, THREE_STEPS_CUT);
         assert_eq!(seed.prefix, saved[..=THREE_STEPS_CUT as usize]);
+    }
+
+    #[tokio::test]
+    async fn a_security_case_refuses_resume_before_its_transcript_is_read() {
+        let _db = db().await;
+        let (org, inc) = new_incident(None).await;
+        let run = stopped(&org, &inc, Some(ERROR_TIMEOUT)).await;
+        let (result, reads) = prepare(&org, &inc, &run, Ok(three_steps())).await;
+        assert!(
+            result.is_ok(),
+            "a normal incident still resumes: {result:?}"
+        );
+        assert_eq!(reads, 1);
+
+        infra::table::alert_incidents::mark_security_case(&org, &inc)
+            .await
+            .unwrap();
+        let (result, reads) = prepare(&org, &inc, &run, Ok(three_steps())).await;
+        assert_eq!(result.unwrap_err(), ResumeError::SecurityCaseBlocked);
+        assert_eq!(
+            reads, 0,
+            "the transcript reader is never invoked for a case"
+        );
     }
 
     async fn detail_resume_run_id(org_id: &str, incident_id: &str) -> Option<String> {

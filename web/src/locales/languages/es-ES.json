@@ -12882,6 +12882,22 @@
         }
       },
       "rcaRun": {
+        "region": {
+          "analyzedIn": "Analizado en {region}",
+          "analyzingIn": "Analizando en {region}",
+          "unknown": "región de análisis desconocida",
+          "noLocalRun": "sin análisis local; otras regiones desconocidas",
+          "tooltip": "El historial de ejecuciones se guarda por región. Esta ejecución se realizó en {region}.",
+          "historyFailed": "No se pudo cargar el historial de informes.",
+          "historyFailedHint": "Las regiones se mostrarán cuando se cargue."
+        },
+        "skipped": {
+          "title": "Aviso de guardia a las {time} UTC: sin nueva ejecución",
+          "inFlight": "La ejecución {number} ya estaba en curso",
+          "coolingDown": "La ejecución {number} se realizó dentro del periodo de espera de {cooldown}",
+          "gone": "ejecución ya no conservada",
+          "open": "Abrir ejecución {number}"
+        },
         "reanalyzingFresh": "Reanalizando desde cero…",
         "reanalyzingBuildOnPrevious": "Basándose en el informe anterior…",
         "resumingFrom": "Reanudando desde “{step}”…",

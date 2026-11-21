@@ -281,7 +281,7 @@ pub async fn list_services(
         ("Authorization" = [])
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-mcp" = json!({"enabled": true, "description": "Find the logs, metrics and traces streams of one service", "category": "service_streams"})),
         ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "create"}))
     )
 )]

@@ -128,6 +128,30 @@ impl std::fmt::Display for PageAction {
     }
 }
 
+/// OO's own check, at finalization, that the affected services recovered (D'4). Only
+/// `Healthy` lets a verdict page quieter; a missing or unknown probe pages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RecoveryVerdict {
+    Healthy,
+    Failing,
+    NoTraffic,
+    /// Traceless org, partial read, no trusted service, or a value from a newer node.
+    #[serde(other)]
+    Unknown,
+}
+
+impl RecoveryVerdict {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Healthy => "healthy",
+            Self::Failing => "failing",
+            Self::NoTraffic => "no_traffic",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
 /// The paging recommendation and its justification.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct PageRecommendation {
@@ -225,6 +249,9 @@ pub struct AnalysisVerdict {
     pub report_ref: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next_step: Option<SubmittedNextStep>,
+    /// The trusted recovery probe's verdict; absent on older rows, which never page quieter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery: Option<RecoveryVerdict>,
 }
 
 /// The model's pick from an [EvidenceBundle](super::rca::EvidenceBundle); unchecked until the
@@ -784,6 +811,8 @@ fn decide_verdict(
             }
             let action = verdict.page_recommendation.action;
             let confidence = verdict.confidence;
+            // D'5: quieter needs OO's probe to have seen recovery, beside band and opt-in.
+            let recovered = verdict.recovery == Some(RecoveryVerdict::Healthy);
             // Never `>=`: the enum declares `High` first, so a derived order would rank `Low` above
             // it.
             let refused = match action {
@@ -793,11 +822,13 @@ fn decide_verdict(
                 PageAction::Page => false,
             };
             let outcome = match action {
-                PageAction::Suppress if l0.allow_suppress && confidence == Confidence::High => {
+                PageAction::Suppress
+                    if l0.allow_suppress && confidence == Confidence::High && recovered =>
+                {
                     VerdictOutcome::Suppress
                 }
                 PageAction::Downgrade
-                    if matches!(confidence, Confidence::High | Confidence::Medium) =>
+                    if matches!(confidence, Confidence::High | Confidence::Medium) && recovered =>
                 {
                     VerdictOutcome::Page {
                         severity,
@@ -1198,6 +1229,7 @@ mod tests {
             }],
             report_ref: "inc_9/rca/1".into(),
             next_step: None,
+            recovery: Some(RecoveryVerdict::Healthy),
         }
     }
 
@@ -3435,6 +3467,7 @@ mod tests {
             proposed_actions: vec![],
             report_ref: "r".into(),
             next_step: None,
+            recovery: None,
         };
         let json = serde_json::to_string(&bare).unwrap();
         assert!(!json.contains("suspect_change"));
@@ -3596,5 +3629,163 @@ mod tests {
         assert!(v.evidence.is_empty());
         assert_eq!(v.confidence, Confidence::High);
         assert_eq!(state.grade, None);
+    }
+
+    /// D'5: Downgrade and Suppress both need OO's probe to have seen recovery; failing, absent
+    /// traffic, unknown (traceless) and a missing probe page, whatever the band (G8b).
+    #[test]
+    fn test_quieter_paging_needs_a_healthy_recovery_probe() {
+        let p = everything_enabled();
+        let quieter = |action, confidence, recovery| {
+            let mut v = verdict(action, None);
+            v.confidence = confidence;
+            v.recovery = recovery;
+            apply_verdict(
+                &p,
+                &complete(FIRED_AT, FIRED_AT + SECOND, v),
+                P3,
+                FIRED_AT + SECOND,
+            )
+        };
+        let page = VerdictOutcome::Page {
+            severity: P3,
+            promoted_from: None,
+            quieter_channels: false,
+        };
+        use RecoveryVerdict::*;
+        for recovery in [None, Some(Unknown), Some(Failing), Some(NoTraffic)] {
+            for confidence in [Confidence::High, Confidence::Medium] {
+                assert_eq!(
+                    quieter(PageAction::Downgrade, confidence, recovery),
+                    page,
+                    "{recovery:?} {confidence:?}"
+                );
+            }
+            assert_eq!(
+                quieter(PageAction::Suppress, Confidence::High, recovery),
+                page,
+                "{recovery:?}"
+            );
+        }
+        assert_eq!(
+            quieter(PageAction::Suppress, Confidence::High, Some(Healthy)),
+            VerdictOutcome::Suppress
+        );
+        assert!(
+            quieter(PageAction::Downgrade, Confidence::Medium, Some(Healthy))
+                .wants_quieter_channels()
+        );
+        // A value a newer node writes reads as unknown, so it pages.
+        let back: RecoveryVerdict = serde_json::from_str("\"recovering\"").unwrap();
+        assert_eq!(back, Unknown);
+    }
+
+    /// The native L0 policy replay (D'7): o2-ai's committed parity vectors run through this
+    /// binary's own decision with a healthy probe, and every quieter outcome pages without one.
+    /// Reads `$O2_RCA_GOLDEN_DIR/native/parity/l0_vectors.json`; skips when the env is unset.
+    #[test]
+    fn rca_l0_policy_replay() {
+        let Ok(dir) = std::env::var("O2_RCA_GOLDEN_DIR") else {
+            eprintln!("rca_l0_policy_replay skipped: O2_RCA_GOLDEN_DIR is not set");
+            return;
+        };
+        let path = std::path::Path::new(&dir).join("native/parity/l0_vectors.json");
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+        let vectors: Vec<serde_json::Value> = serde_json::from_str(&text).unwrap();
+        assert!(!vectors.is_empty(), "{} has no vectors", path.display());
+        let priority = |v: &serde_json::Value| {
+            v.as_str()
+                .map(|s| s.parse::<AlertPriority>().expect("a priority"))
+        };
+        for vector in &vectors {
+            let id = vector["id"].as_str().unwrap_or("?");
+            let input = &vector["inputs"];
+            let l0: L0Policy = serde_json::from_value(input["policy"].clone()).unwrap();
+            let severity = priority(&input["severity"]).expect("a severity");
+            let now = input["now"].as_i64().unwrap();
+            let analysis = &input["analysis"];
+            let status: AnalysisStatus =
+                serde_json::from_value(analysis["status"].clone()).unwrap();
+            let state = |recovery: Option<RecoveryVerdict>| {
+                let verdict = input["verdict_action"].as_str().map(|action| {
+                    let mut v = verdict(
+                        serde_json::from_value(serde_json::json!(action)).unwrap(),
+                        priority(&input["promotion"][1]),
+                    );
+                    v.confidence =
+                        serde_json::from_value(input["verdict_confidence"].clone()).unwrap();
+                    v.recovery = recovery;
+                    v
+                });
+                AnalysisState {
+                    status,
+                    verdict,
+                    grade: None,
+                    requested_at: analysis["requested_at"].as_i64(),
+                    completed_at: analysis["completed_at"].as_i64(),
+                }
+            };
+            let healthy = state(Some(RecoveryVerdict::Healthy));
+            let outcome = apply_verdict(&l0, &healthy, severity, now);
+            let (kind, sev, from, until) = match outcome {
+                VerdictOutcome::Hold { until } => ("hold", None, None, Some(until)),
+                VerdictOutcome::Page {
+                    severity,
+                    promoted_from,
+                    quieter_channels,
+                } => (
+                    if quieter_channels {
+                        "page_quieter"
+                    } else {
+                        "page"
+                    },
+                    Some(severity),
+                    promoted_from,
+                    None,
+                ),
+                VerdictOutcome::Suppress => ("suppress", None, None, None),
+                VerdictOutcome::FollowUp { severity } => ("follow_up", Some(severity), None, None),
+                VerdictOutcome::FailOpen { severity } => ("fail_open", Some(severity), None, None),
+            };
+            let expected = &vector["expected"];
+            assert_eq!(kind, expected["kind"].as_str().unwrap(), "{id}: kind");
+            assert_eq!(sev, priority(&expected["severity"]), "{id}: severity");
+            assert_eq!(
+                from,
+                priority(&expected["promoted_from"]),
+                "{id}: promoted_from"
+            );
+            assert_eq!(until, expected["until"].as_i64(), "{id}: until");
+            let refusal = confidence_refusal(&l0, &healthy, severity, now);
+            assert_eq!(
+                refusal.is_some(),
+                expected["refused"].as_bool().unwrap_or(false),
+                "{id}: refused"
+            );
+            assert_eq!(
+                refusal.map(|r| r.to_string()).as_deref(),
+                vector["expected_refusal"].as_str(),
+                "{id}: refusal text"
+            );
+            // Without a healthy probe nothing pages quieter; every other outcome is unchanged.
+            for recovery in [None, Some(RecoveryVerdict::Unknown)] {
+                let unproven = apply_verdict(&l0, &state(recovery), severity, now);
+                if matches!(kind, "page_quieter" | "suppress") {
+                    assert_eq!(
+                        unproven,
+                        VerdictOutcome::Page {
+                            severity,
+                            promoted_from: None,
+                            quieter_channels: false,
+                        },
+                        "{id}: {recovery:?}"
+                    );
+                } else {
+                    assert_eq!(unproven, outcome, "{id}: {recovery:?}");
+                }
+            }
+        }
+        eprintln!("rca_l0_policy_replay: {} vectors replayed", vectors.len());
     }
 }

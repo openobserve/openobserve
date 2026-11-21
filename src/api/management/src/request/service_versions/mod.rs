@@ -168,7 +168,7 @@ pub async fn services(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "list"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": true, "description": "List one service's deploys in a time range, each with its verdict badge", "category": "traces"}))
     )
 )]
 pub async fn deploys(
@@ -313,7 +313,7 @@ pub async fn delete(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Traces", "operation": "post"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": true, "description": "Compare a service version with a baseline version on traces and RUM signals", "category": "traces"}))
     )
 )]
 pub async fn compare(

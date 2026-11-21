@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="@container flex flex-nowrap items-center gap-2.5"
     :class="variant === 'report' ? 'max-md:flex-wrap' : ''"
   >
-    <ODropdown align="start" content-class="w-80">
+    <ODropdown align="start" content-class="w-100 max-w-[calc(100vw-1.5rem)]">
       <template #trigger>
         <OButton data-test="rca-run-selector" variant="outline" size="sm" class="min-w-0">
           <span
@@ -38,16 +38,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
       <ODropdownGroup :label="t('alerts.incidents.rcaHistory')">
-        <ODropdownItem
-          v-for="(item, idx) in items"
-          :key="item.runId"
-          :data-test="`rca-history-item-${idx}`"
-          :disabled="!item.openable"
-          :description="item.description"
-          @select="$emit('select-run', item.isLatest ? null : item.runId)"
-        >
-          <span :class="item.selected ? 'font-bold' : 'font-semibold'">{{ item.label }}</span>
-        </ODropdownItem>
+        <template v-for="entry in entries" :key="entry.key">
+          <ODropdownItem
+            v-if="entry.kind === 'run'"
+            :data-test="`rca-history-item-${entry.idx}`"
+            :disabled="!entry.openable"
+            :description="entry.description"
+            @select="$emit('select-run', entry.isLatest ? null : entry.runId)"
+          >
+            <span :class="entry.selected ? 'font-bold' : 'font-semibold'">{{ entry.label }}</span>
+            <template v-if="entry.regionShown" #icon-right>
+              <RcaRegionTag
+                class="ms-auto"
+                :region="entry.region"
+                :state="entry.live ? 'live' : 'terminal'"
+                :data-test="`rca-history-item-${entry.idx}-region`"
+              />
+            </template>
+          </ODropdownItem>
+          <!-- A page the run guard refused: it opens the exact covering run, never the latest. -->
+          <div v-else class="border-border-strong ms-2.5 border-s-2">
+            <ODropdownItem
+              :data-test="`rca-history-skipped-${entry.idx}`"
+              :data-covering-run-id="entry.coveringRunId"
+              :disabled="entry.gone"
+              :description="entry.description"
+              @select="$emit('select-run', entry.coveringRunId)"
+            >
+              <template #icon-left>
+                <OIcon name="redo" size="xs" class="text-text-secondary mt-1 shrink-0 self-start" />
+              </template>
+              <span class="text-compact font-semibold">{{ entry.label }}</span>
+              <template #icon-right>
+                <span
+                  :data-test="`rca-history-skipped-${entry.idx}-link`"
+                  :aria-disabled="entry.gone || undefined"
+                  class="text-compact ms-auto inline-flex shrink-0 items-center gap-0.5 self-start font-semibold"
+                  :class="entry.gone ? undefined : 'text-text-link'"
+                >
+                  {{ entry.open }}
+                  <OIcon name="arrow-forward" size="xs" />
+                </span>
+              </template>
+            </ODropdownItem>
+          </div>
+        </template>
       </ODropdownGroup>
     </ODropdown>
 
@@ -230,9 +265,11 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { RcaRunItem } from "@/services/incidents";
+import type { RcaRunItem, RcaSkippedPage } from "@/services/incidents";
+import type { RcaRunListStatus } from "@/composables/useIncidentRca";
 import { formatTimestampInTimezone } from "@/utils/date";
-import { timezoneAbbr } from "@/utils/formatters";
+import { formatMicrosDuration, timezoneAbbr } from "@/utils/formatters";
+import RcaRegionTag from "./RcaRegionTag.vue";
 import { rcaTriggerLabel } from "@/utils/incidents/rcaThread";
 
 const props = withDefaults(
@@ -264,8 +301,17 @@ const props = withDefaults(
     timezone?: string;
     /** The Markdown Copy report just put on the clipboard; null hides the preview. */
     copyPreview?: string | null;
+    /** Pages the run guard refused, shown in time order between the runs (P16). */
+    skippedPages?: RcaSkippedPage[];
+    /** Covering runs confirmed no longer kept: their notes stay, not selectable. */
+    goneRunIds?: string[];
+    /** The run list read; an unknown region is only claimed once it succeeded. */
+    listStatus?: RcaRunListStatus;
   }>(),
   {
+    skippedPages: () => [],
+    goneRunIds: () => [],
+    listStatus: "ready",
     variant: "analysis",
     timezone: "UTC",
     copyPreview: null,
@@ -300,17 +346,24 @@ const runTime = (us: number) =>
 const copyButton = ref<ComponentPublicInstance | null>(null);
 const copyAnchor = computed(() => (copyButton.value?.$el as Element | undefined) ?? null);
 
+const runNumberOf = (run: RcaRunItem, idx: number) => run.run_number ?? props.runs.length - idx;
+
 const items = computed(() =>
   props.runs.map((run, idx) => {
-    const number = props.runs.length - idx;
+    const number = runNumberOf(run, idx);
     const isLatest = run.run_id === props.latestRunId;
     const liveRun = isLatest && props.live;
     const parts: string[] = [rcaTriggerLabel(run.trigger, run.started_by)];
     if (run.state === "failed") parts.push(t("alerts.incidents.rcaRun.state.failed"));
     if (run.state === "cancelled") parts.push(t("alerts.incidents.rcaRun.state.cancelled"));
     return {
+      kind: "run" as const,
+      key: run.run_id,
+      idx,
+      at: run.started_at,
       runId: run.run_id,
       isLatest,
+      live: liveRun,
       selected: run.run_id === props.selectedRunId,
       // Completed runs open a report and runs with a record (a cancelled or failed run's
       // partial ledger) open it; the latest run is always the way back.
@@ -319,8 +372,49 @@ const items = computed(() =>
         ? t("alerts.incidents.rcaRun.runLive", { number })
         : t("alerts.incidents.rcaLight.runAt", { number, time: runTime(run.started_at) }),
       description: raw(parts.join(" · ")),
+      region: run.serving_region ?? null,
+      // A failed or forbidden list read is not an unknown region.
+      regionShown: !!run.serving_region?.trim() || props.listStatus === "ready",
     };
   }),
+);
+
+const skippedEntries = computed(() =>
+  props.skippedPages.map((page, idx) => {
+    const covering = props.runs.findIndex((run) => run.run_id === page.covering_run_id);
+    const number =
+      page.covering_run_number ??
+      (covering >= 0 ? runNumberOf(props.runs[covering], covering) : null);
+    const numberText = raw(number === null ? "?" : String(number));
+    const gone = props.goneRunIds.includes(page.covering_run_id);
+    const reason =
+      page.reason === "cooling_down"
+        ? t("alerts.incidents.rcaRun.skipped.coolingDown", {
+            number: numberText,
+            cooldown: raw(formatMicrosDuration(page.cooldown_us ?? 0)),
+          })
+        : t("alerts.incidents.rcaRun.skipped.inFlight", { number: numberText });
+    return {
+      kind: "skipped" as const,
+      key: `skipped-${page.at_us}-${idx}`,
+      idx,
+      at: page.at_us,
+      coveringRunId: page.covering_run_id,
+      gone,
+      label: t("alerts.incidents.rcaRun.skipped.title", {
+        time: raw(formatTimestampInTimezone(page.at_us, "HH:mm", "UTC")),
+      }),
+      description: gone ? raw(`${reason} · ${t("alerts.incidents.rcaRun.skipped.gone")}`) : reason,
+      open: t("alerts.incidents.rcaRun.skipped.open", { number: numberText }),
+    };
+  }),
+);
+
+/** Runs newest first, with each skipped page placed by its time. */
+const entries = computed(() =>
+  [...items.value, ...skippedEntries.value].sort(
+    (a, b) => b.at - a.at || (a.kind === "run" ? -1 : 1),
+  ),
 );
 
 const selectedItem = computed(() => items.value.find((item) => item.selected) ?? null);

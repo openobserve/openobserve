@@ -39,11 +39,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @retry="$emit('trigger-rca', { buildOnPrevious: false })"
       @open-analysis="$emit('open-analysis')"
     />
+    <RcaHistoryLoadError
+      v-if="runListStatus === 'error'"
+      class="max-w-215"
+      @retry="$emit('retry-run-list')"
+    />
     <section
-      v-else
+      v-if="!failedAnalyses"
       data-test="rca-trigger-section"
       class="rounded-default border-border-default bg-surface-base flex max-w-215 flex-col items-start gap-2 border p-6"
     >
+      <!-- Only a list that read empty says so; a failed or forbidden read claims nothing. -->
+      <RcaRegionTag v-if="runListStatus === 'ready' && history.length === 0" state="none" />
+      <RcaRegionTag v-else-if="runListStatus === 'loading'" state="none" loading />
       <h2 class="text-text-heading m-0 text-base font-bold">
         {{ t("alerts.incidents.rcaRun.noAnalysisTitle") }}
       </h2>
@@ -93,6 +101,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :has-thread="!threadRunIsV1"
       :timezone="timezone"
       :copy-preview="copyPreview"
+      :skipped-pages="skippedPages"
+      :gone-run-ids="goneRunIds"
+      :list-status="runListStatus"
       @select-run="$emit('view-run', $event)"
       @copy-report="copyReport(true)"
       @download-report="downloadReport"
@@ -192,6 +203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :cancelling="cancelling"
         :start-locked-reason="startLockedReason"
         :timezone="timezone"
+        :skipped-pages="skippedPages"
+        :gone-run-ids="goneRunIds"
+        :list-status="runListStatus"
         @select-run="$emit('view-run', $event)"
         @reanalyze="openGuidance('')"
         @cancel="$emit('cancel-rca')"
@@ -199,6 +213,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @download-report="downloadReport"
         @copy-thread="copyThread"
         @ask="ask"
+      />
+      <RcaHistoryLoadError
+        v-if="runListStatus === 'error'"
+        class="max-w-215"
+        @retry="$emit('retry-run-list')"
       />
 
       <div
@@ -257,6 +276,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :refusal="refusal"
         :reanalyze-credit-cost="reanalyzeCreditCost"
         :start-locked-reason="startLockedReason"
+        :region="shownRegion"
+        :region-display="regionDisplay"
         @cancel="$emit('cancel-rca')"
         @follow-thread="followThread"
         @retry="$emit('trigger-rca', $event)"
@@ -416,13 +437,14 @@ import type {
   RcaRunItem,
   RcaRunState,
   RcaRunStats,
+  RcaSkippedPage,
   RcaRunSummary,
   RcaSteerAction,
   RcaSteering,
   RcaSummary,
   RcaThread,
 } from "@/services/incidents";
-import type { RcaReadStatus, RcaRefusal } from "@/composables/useIncidentRca";
+import type { RcaReadStatus, RcaRefusal, RcaRunListStatus } from "@/composables/useIncidentRca";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useRcaSteering } from "@/composables/useRcaSteering";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
@@ -464,6 +486,8 @@ import {
   type RcaUnblockedLine,
 } from "@/utils/incidents/rcaSteering";
 import RcaAnalysisBar from "./rca/RcaAnalysisBar.vue";
+import RcaHistoryLoadError from "./rca/RcaHistoryLoadError.vue";
+import RcaRegionTag from "./rca/RcaRegionTag.vue";
 import RcaBlockedBanner from "./rca/RcaBlockedBanner.vue";
 import RcaBlindSpots from "./rca/RcaBlindSpots.vue";
 import RcaEvidenceList from "./rca/RcaEvidenceList.vue";
@@ -484,6 +508,7 @@ import {
   rcaOpenFindings,
   type RcaAlertsNow,
   type RcaIncidentEvent,
+  type RcaRegionDisplay,
 } from "./rca/rcaLight";
 import RcaPill from "./rca/RcaPill.vue";
 import { useTheme } from "@/composables/useTheme";
@@ -545,8 +570,17 @@ const props = withDefaults(
     alertsNow?: RcaAlertsNow | null;
     /** The incident's events, for analyses that failed before any run was stored. */
     incidentEvents?: RcaIncidentEvent[] | null;
+    /** The region-local run list read (U8): only a successful read may claim "no local analysis". */
+    runListStatus?: RcaRunListStatus;
+    /** Pages the run guard refused, for the history's skipped-run notes (P16). */
+    skippedPages?: RcaSkippedPage[];
+    /** Covering runs confirmed no longer kept. */
+    goneRunIds?: string[];
   }>(),
   {
+    runListStatus: "ready",
+    skippedPages: () => [],
+    goneRunIds: () => [],
     view: "analysis",
     firings: () => [],
     alertsNow: null,
@@ -596,6 +630,8 @@ const emit = defineEmits<{
   "open-analysis": [];
   /** Read the shown report again after a failed read. */
   "retry-report": [];
+  /** Read the run list again after a failed read. */
+  "retry-run-list": [];
 }>();
 
 const { t } = useI18nTyped();
@@ -732,6 +768,19 @@ const cardError = computed<RcaRunError | null>(() => {
 });
 
 const cardRunId = computed(() => props.viewedRun?.run_id ?? props.rca?.run_id ?? "");
+
+/** The shown run's own `serving_region` (U8); never the viewer's or the org's region. */
+const shownRegion = computed<string | null>(() => {
+  const item = props.history.find((run) => run.run_id === cardRunId.value);
+  if (item?.serving_region?.trim()) return item.serving_region;
+  const current = props.rca?.current_run;
+  if (current?.run_id === cardRunId.value) return current.context_used?.serving_region ?? null;
+  return item?.serving_region ?? null;
+});
+const regionDisplay = computed<RcaRegionDisplay>(() => {
+  if (shownRegion.value?.trim() || props.runListStatus === "ready") return "tag";
+  return props.runListStatus === "loading" ? "loading" : "hidden";
+});
 
 /** The loaded report belongs to the shown run; an earlier run's report never shows for it. */
 const ownsReport = computed(() => (props.viewedRun ?? props.reportRun)?.run_id === cardRunId.value);

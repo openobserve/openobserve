@@ -54,7 +54,10 @@ pub const COVERAGE: &[Coverage] = &[
     table("public_dashboard_org_settings", DB),
     table("public_dashboard_outbox", DB),
     table("public_dashboards", DB),
+    // Both deleted inside rca_runs::delete_by_org, before the runs they reference.
+    table("rca_delivery_obligations", DB),
     table("rca_runs", DB),
+    table("rca_skipped_pages", DB),
     table("rca_steering", DB),
     table("slack_alert_messages", DB),
     table("slack_channel_defaults", DB),

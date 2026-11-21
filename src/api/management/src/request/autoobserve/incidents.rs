@@ -26,7 +26,10 @@ use serde::Deserialize;
 use utoipa::IntoParams;
 
 use super::{deployment_disabled, page, parse_query, viewer::WebViewer};
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::auth::UserEmail};
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse, request::security::rca_scope,
+    service::auth::UserEmail,
+};
 
 #[derive(Debug, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -63,10 +66,16 @@ pub struct IncidentsQuery {
 pub async fn list_incidents(
     Path(org_id): Path<String>,
     Headers(user): Headers<UserEmail>,
+    headers: axum::http::HeaderMap,
     query: Result<Query<IncidentsQuery>, QueryRejection>,
 ) -> Response {
     if let Some(disabled) = deployment_disabled() {
         return disabled;
+    }
+    // D'4: incident analyses are history; a case or unbound RCA run reads none of them.
+    let rca = rca_scope::rca_caller(&org_id, &user.user_id, &headers).await;
+    if rca.is_rca() && !rca.history_allowed() {
+        return MetaHttpResponse::forbidden("History is not available to this analysis");
     }
     let query = match parse_query(query) {
         Ok(query) => query,
@@ -79,6 +88,9 @@ pub async fn list_incidents(
     }
     match incidents::list(&org_id, page, query.incident_id.as_deref()).await {
         Ok(mut body) => {
+            if rca.is_rca() {
+                hide_case_analyses(&org_id, &mut body.items).await;
+            }
             let viewer = WebViewer {
                 user_id: user.user_id,
             };
@@ -91,6 +103,23 @@ pub async fn list_incidents(
         Err(e) => {
             log::error!("[autoobserve] listing the incidents of {org_id} failed: {e}");
             MetaHttpResponse::internal_error("listing AutoObserve incidents failed")
+        }
+    }
+}
+
+/// SysRcaAgent never reads a case incident's analysis summary, whatever its own subject.
+async fn hide_case_analyses(org_id: &str, items: &mut [incidents::AutoObserveIncident]) {
+    for item in items {
+        if !openobserve_core::alerts::incidents::incident_history_allowed(org_id, &item.incident.id)
+            .await
+        {
+            item.investigation = incidents::InvestigationView {
+                run_id: None,
+                state: None,
+                outcome: None,
+                summary: None,
+                not_run_reason: None,
+            };
         }
     }
 }

@@ -12882,6 +12882,22 @@
         }
       },
       "rcaRun": {
+        "region": {
+          "analyzedIn": "تم التحليل في {region}",
+          "analyzingIn": "جارٍ التحليل في {region}",
+          "unknown": "منطقة التحليل غير معروفة",
+          "noLocalRun": "لا يوجد تحليل محلي؛ المناطق الأخرى غير معروفة",
+          "tooltip": "يُحفظ سجل التشغيلات لكل منطقة. تم هذا التشغيل في {region}.",
+          "historyFailed": "تعذر تحميل سجل التقارير.",
+          "historyFailedHint": "ستظهر المناطق بعد تحميله."
+        },
+        "skipped": {
+          "title": "تنبيه المناوبة في {time} UTC: لا يوجد تشغيل جديد",
+          "inFlight": "التشغيل {number} كان قيد التشغيل بالفعل",
+          "coolingDown": "تم التشغيل {number} ضمن فترة الانتظار البالغة {cooldown}",
+          "gone": "لم يعد التشغيل محفوظًا",
+          "open": "فتح التشغيل {number}"
+        },
         "reanalyzingFresh": "جارٍ إعادة التحليل من الصفر…",
         "reanalyzingBuildOnPrevious": "جارٍ البناء على التقرير السابق…",
         "resumingFrom": "استئناف من “{step}”…",

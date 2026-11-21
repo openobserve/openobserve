@@ -12882,6 +12882,22 @@
         }
       },
       "rcaRun": {
+        "region": {
+          "analyzedIn": "{region} bölgesinde analiz edildi",
+          "analyzingIn": "{region} bölgesinde analiz ediliyor",
+          "unknown": "analiz bölgesi bilinmiyor",
+          "noLocalRun": "yerel analiz yok; diğer bölgeler bilinmiyor",
+          "tooltip": "Çalıştırma geçmişi bölge başına tutulur. Bu çalıştırma {region} bölgesinde yapıldı.",
+          "historyFailed": "Rapor geçmişi yüklenemedi.",
+          "historyFailedHint": "Yüklendiğinde bölgeler gösterilir."
+        },
+        "skipped": {
+          "title": "{time} UTC nöbet çağrısı: yeni çalıştırma yok",
+          "inFlight": "Çalıştırma {number} zaten sürüyordu",
+          "coolingDown": "Çalıştırma {number}, {cooldown} bekleme süresi içinde yapıldı",
+          "gone": "çalıştırma artık tutulmuyor",
+          "open": "Çalıştırma {number} aç"
+        },
         "reanalyzingFresh": "Sıfırdan yeniden analiz ediliyor…",
         "reanalyzingBuildOnPrevious": "Önceki raporu temel alarak ilerliyor…",
         "resumingFrom": "“{step}” adımından devam ediliyor…",

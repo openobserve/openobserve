@@ -12882,6 +12882,22 @@
         }
       },
       "rcaRun": {
+        "region": {
+          "analyzedIn": "分析区域：{region}",
+          "analyzingIn": "正在 {region} 分析",
+          "unknown": "分析区域未知",
+          "noLocalRun": "无本地分析；其他区域未知",
+          "tooltip": "运行历史按区域保存。此运行在 {region} 中执行。",
+          "historyFailed": "无法加载报告历史。",
+          "historyFailedHint": "加载后将显示区域。"
+        },
+        "skipped": {
+          "title": "{time} UTC 的值班呼叫：未启动新运行",
+          "inFlight": "运行 {number} 已在运行",
+          "coolingDown": "运行 {number} 在 {cooldown} 冷却期内已运行",
+          "gone": "运行已不再保留",
+          "open": "打开运行 {number}"
+        },
         "reanalyzingFresh": "正在从头重新分析…",
         "reanalyzingBuildOnPrevious": "正在基于上一份报告继续分析…",
         "resumingFrom": "正在从“{step}”继续…",

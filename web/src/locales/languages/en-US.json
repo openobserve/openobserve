@@ -12880,6 +12880,22 @@
         }
       },
       "rcaRun": {
+        "region": {
+          "analyzedIn": "Analyzed in {region}",
+          "analyzingIn": "Analyzing in {region}",
+          "unknown": "analysis region unknown",
+          "noLocalRun": "no local analysis; other regions unknown",
+          "tooltip": "Run history is kept per region. This run ran in {region}.",
+          "historyFailed": "The report history could not be loaded.",
+          "historyFailedHint": "Regions show once it loads."
+        },
+        "skipped": {
+          "title": "On-call page at {time} UTC: no new run",
+          "inFlight": "Run {number} was already running",
+          "coolingDown": "Run {number} ran within the {cooldown} cooldown",
+          "gone": "run no longer kept",
+          "open": "Open run {number}"
+        },
         "reanalyzingFresh": "Re-analyzing from scratch…",
         "reanalyzingBuildOnPrevious": "Building on the previous report…",
         "resumingFrom": "Resuming from “{step}”…",

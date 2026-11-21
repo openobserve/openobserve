@@ -492,15 +492,32 @@ pub async fn create_security_case(
 
 /// Marks the incident a security case; idempotent, and the marker is never cleared.
 pub async fn mark_security_case(org_id: &str, id: &str) -> Result<(), errors::Error> {
+    use super::entity::rca_runs;
+
+    let txn = get_orm_client_rw()
+        .await
+        .begin()
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     alert_incidents::Entity::update_many()
         .col_expr(alert_incidents::Column::SecurityCase, Expr::value(true))
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .filter(alert_incidents::Column::Id.eq(id))
         .filter(alert_incidents::Column::SecurityCase.eq(false))
-        .exec(get_orm_client_rw().await)
+        .exec(&txn)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    Ok(())
+    rca_runs::Entity::update_many()
+        .col_expr(rca_runs::Column::Fenced, Expr::value(true))
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .filter(rca_runs::Column::IncidentId.eq(id))
+        .filter(rca_runs::Column::State.is_in(["running", "waiting_input"]))
+        .exec(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    txn.commit()
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
 /// Records that a different detection joined the case at `at`, for the analysts working it.
@@ -523,6 +540,18 @@ pub async fn security_case_of(org_id: &str, id: &str) -> Result<Option<bool>, er
         .filter(alert_incidents::Column::OrgId.eq(org_id))
         .into_tuple::<bool>()
         .one(get_orm_client_ro().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Reads the writer because the security marker is written on the primary and a replica can lag.
+pub async fn security_case_of_rw(org_id: &str, id: &str) -> Result<Option<bool>, errors::Error> {
+    alert_incidents::Entity::find_by_id(id)
+        .select_only()
+        .column(alert_incidents::Column::SecurityCase)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .into_tuple::<bool>()
+        .one(get_orm_client_rw().await)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
@@ -1322,6 +1351,48 @@ pub async fn set_rca_off_reason(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     Ok(())
+}
+
+/// Open incidents created in `[from_us, to_us)` whose analysis is off for `reason`, oldest first.
+pub async fn list_open_off_between(
+    reason: &str,
+    from_us: i64,
+    to_us: i64,
+    limit: u64,
+) -> Result<Vec<(String, String)>, errors::Error> {
+    alert_incidents::Entity::find()
+        .select_only()
+        .columns([alert_incidents::Column::OrgId, alert_incidents::Column::Id])
+        .filter(alert_incidents::Column::RcaOffReason.eq(reason))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .filter(alert_incidents::Column::CreatedAt.gte(from_us))
+        .filter(alert_incidents::Column::CreatedAt.lt(to_us))
+        .order_by_asc(alert_incidents::Column::CreatedAt)
+        .limit(limit)
+        .into_tuple::<(String, String)>()
+        .all(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Clears `rca_off_reason` only while it is still `reason`; true for the caller that cleared it.
+pub async fn clear_rca_off_reason_if(
+    org_id: &str,
+    id: &str,
+    reason: &str,
+) -> Result<bool, errors::Error> {
+    let cleared = alert_incidents::Entity::update_many()
+        .col_expr(
+            alert_incidents::Column::RcaOffReason,
+            Expr::value(Option::<String>::None),
+        )
+        .filter(alert_incidents::Column::Id.eq(id))
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::RcaOffReason.eq(reason))
+        .exec(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(cleared.rows_affected > 0)
 }
 
 /// Update incident title

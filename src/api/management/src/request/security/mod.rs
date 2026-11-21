@@ -24,6 +24,8 @@ pub mod intel;
 #[cfg(feature = "enterprise")]
 pub mod investigate;
 #[cfg(feature = "enterprise")]
+pub mod rca_scope;
+#[cfg(feature = "enterprise")]
 pub mod sigma;
 #[cfg(feature = "enterprise")]
 pub mod sources;

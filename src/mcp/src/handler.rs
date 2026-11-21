@@ -19,7 +19,7 @@ use futures_util::stream::{self, Stream};
 use serde::Serialize;
 
 use super::{
-    protocol::route_request,
+    protocol::{McpCaller, route_request_as},
     types::{MCPRequest, MCPResponse},
 };
 
@@ -114,7 +114,16 @@ pub async fn handle_mcp_request(
     request: MCPRequest,
     auth_token: Option<String>,
 ) -> Result<MCPResponse> {
-    route_request(org_id, request, auth_token).await
+    handle_mcp_request_as(org_id, request, McpCaller::from_token(auth_token)).await
+}
+
+/// [handle_mcp_request] for a caller that may carry an assistant session.
+pub async fn handle_mcp_request_as(
+    org_id: &str,
+    request: MCPRequest,
+    caller: McpCaller,
+) -> Result<MCPResponse> {
+    route_request_as(org_id, request, &caller).await
 }
 
 /// Handle an MCP request with streaming response
@@ -124,8 +133,17 @@ pub async fn handle_mcp_request_stream(
     request: MCPRequest,
     auth_token: Option<String>,
 ) -> Result<impl Stream<Item = Result<Bytes>> + use<>> {
+    handle_mcp_request_stream_as(org_id, request, McpCaller::from_token(auth_token)).await
+}
+
+/// [handle_mcp_request_stream] for a caller that may carry an assistant session.
+pub async fn handle_mcp_request_stream_as(
+    org_id: &str,
+    request: MCPRequest,
+    caller: McpCaller,
+) -> Result<impl Stream<Item = Result<Bytes>> + use<>> {
     // Process the request
-    let response = route_request(org_id, request, auth_token).await?;
+    let response = route_request_as(org_id, request, &caller).await?;
 
     // Serialize to JSON
     let json_str = serde_json::to_string(&response)?;

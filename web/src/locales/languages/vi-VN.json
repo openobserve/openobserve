@@ -12882,6 +12882,22 @@
         }
       },
       "rcaRun": {
+        "region": {
+          "analyzedIn": "Đã phân tích tại {region}",
+          "analyzingIn": "Đang phân tích tại {region}",
+          "unknown": "không rõ vùng phân tích",
+          "noLocalRun": "không có phân tích cục bộ; không rõ các vùng khác",
+          "tooltip": "Lịch sử lần chạy được lưu theo từng vùng. Lần chạy này chạy tại {region}.",
+          "historyFailed": "Không thể tải lịch sử báo cáo.",
+          "historyFailedHint": "Các vùng sẽ hiển thị khi tải xong."
+        },
+        "skipped": {
+          "title": "Thông báo trực lúc {time} UTC: không có lần chạy mới",
+          "inFlight": "Lần chạy {number} đang chạy",
+          "coolingDown": "Lần chạy {number} đã chạy trong thời gian chờ {cooldown}",
+          "gone": "lần chạy không còn được lưu",
+          "open": "Mở lần chạy {number}"
+        },
         "reanalyzingFresh": "Đang phân tích lại từ đầu…",
         "reanalyzingBuildOnPrevious": "Đang xây dựng dựa trên báo cáo trước đó…",
         "resumingFrom": "Tiếp tục từ “{step}”…",

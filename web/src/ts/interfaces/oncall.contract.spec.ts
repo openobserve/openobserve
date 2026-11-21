@@ -299,6 +299,7 @@ const RCA_MIRRORS = {
   SteerAction: "RcaSteerAction",
   SteerStatusReason: "RcaSteerStatusReason",
   ReportFormat: "RcaReportFormat",
+  SkipReason: "RcaSkippedReason",
 };
 void [_c1, _c2, _c3, _c4, _c5, _c6, _c8, _c9, _c10, _c11, _c12, _c13, _causes];
 
@@ -346,6 +347,9 @@ const SKIPPED: Record<string, string> = {
   EndedBy: "internal finalization input; the endpoint exposes OutcomeReason",
   SuspectChangeState: "agent claim stored for metrics; UI reads code-derived ShownChangeState",
   TimelineStatus: "agent input; UI reads the evidence-checked TimelineView",
+  DisproofCheckKind: "ledger-only disproof record; the run summary does not serialize checks",
+  DisproofCheckResult: "ledger-only disproof record; the run summary does not serialize checks",
+  RecoveryVerdict: "stored in the verdict for the paging decision; the UI does not branch on it",
 };
 
 // ── The re-check ────────────────────────────────────────────────────────────
