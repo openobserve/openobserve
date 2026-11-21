@@ -96,6 +96,8 @@ export function createHistoryContext(deps: HistoryDeps) {
   const storageBlocked = ref(false);
   const deletedNotice = ref<DeletedNotice | null>(null);
   const turnsBySid = new Map<Sid, LocalTurn[]>();
+  // A reload's live save of a running turn, by chat: its turn and answer length, shown until the server's is as long.
+  const liveAhead = new Map<Sid, { turnId: string; length: number }>();
   let seq = 0;
   let warnedUnkeyed = false;
   const key = () => deps.store().state.userOrgKey;
@@ -158,6 +160,7 @@ export function createHistoryContext(deps: HistoryDeps) {
   const stopIdentity = watch(key, () => {
     for (const map of [titles, pins, pending]) for (const sid of Object.keys(map)) delete map[sid];
     turnsBySid.clear();
+    liveAhead.clear();
     localLoaded.value = false;
     void reloadLocal();
   });
@@ -177,6 +180,7 @@ export function createHistoryContext(deps: HistoryDeps) {
     storageBlocked,
     deletedNotice,
     turnsBySid,
+    liveAhead,
     key,
     serverMode,
     reloadLocal,

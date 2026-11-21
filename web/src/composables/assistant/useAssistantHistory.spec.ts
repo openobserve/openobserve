@@ -878,6 +878,17 @@ describe("useAssistantHistory reload", () => {
     expect(live?.messages).toHaveLength(2);
   });
 
+  it("saves a turn paused on a card as live, so a reload shows the answer above the card (TA3-01)", async () => {
+    vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+    const fake = setup({ persistence: true });
+    await flushPromises();
+    const waiting = chat(fake, "ask me");
+    fake.store.state.sessions[waiting].turn = { state: "awaiting_approval", callId: "ask_1" };
+    await fake.history.save(waiting);
+    const row = [...fake.db.rows.values()].find((r) => r.sessionId === waiting);
+    expect(row).toMatchObject({ liveTurnId: "t1", serverBacked: true });
+  });
+
   it("keeps this browser's live save inside the grace window and the server's after it", async () => {
     vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
     vi.spyOn(assistant, "getChat").mockResolvedValue(detail([]) as never);
@@ -1552,6 +1563,68 @@ describe("useAssistantHistory reload of a chat waiting on an approval", () => {
     await fake.history.open({ sid });
     expect(fake.store.state.sessions[sid].pendingApproval).toBeNull();
     expect(cardBlock(fake)).toMatchObject({ id: "apr_1", question: frame.message });
+  });
+
+  it("keeps the prose and question a live save holds after a reload until the server commits past them (TA3-01)", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const question = approvalOf({
+        type: "confirmation_required",
+        id: "ask_1",
+        tool: "ask_user",
+        kind: "question",
+        message: "Which stream type?",
+        options: [{ id: "opt_1", label: "logs" }],
+        allow_other: true,
+        expires_at: Date.now() + 120_000,
+      });
+      vi.spyOn(assistant, "listChats").mockResolvedValue({ chats: [] });
+      const tools = [
+        { type: "tool_call", tool: "StreamList", call_id: "c1" },
+        { type: "tool_result", tool: "StreamList", call_id: "c1", success: true },
+      ];
+      const getChat = vi.spyOn(assistant, "getChat").mockResolvedValue(running(tools) as never);
+      const fake = open();
+      const live = record(1, {
+        serverBacked: true,
+        liveTurnId: "t1",
+        liveSavedAt: Date.now(),
+        messages: [
+          { role: "user", content: raw("mute it"), turnId: "t1" },
+          {
+            role: "assistant",
+            content: raw("You have 47 streams."),
+            contentBlocks: [
+              { type: "text", text: "You have 47 streams." },
+              { type: "approval", approval: question },
+            ],
+          },
+        ],
+      });
+      fake.db.rows.set(1, structuredClone(live));
+      fake.history.ensureLoaded();
+      await flushPromises();
+      await fake.history.open({ sid });
+      const shown = () =>
+        fake.store.state.sessions[sid].messages.map((m) => String(m.content)).join(" ");
+      expect(shown()).toContain("You have 47 streams.");
+      expect(fake.store.state.sessions[sid].pendingApproval?.id).toBe("ask_1");
+      await vi.advanceTimersByTimeAsync(POLL_FAST_MS);
+      expect(getChat).toHaveBeenCalledTimes(2);
+      expect(shown()).toContain("You have 47 streams.");
+      expect(cardBlock(fake)).toMatchObject({ id: "ask_1" });
+      getChat.mockResolvedValue({
+        ...running([
+          ...tools,
+          { type: "message_delta", content: "You have 47 streams. Logs it is." },
+        ]),
+        last_committed_seq: 6,
+      } as never);
+      await vi.advanceTimersByTimeAsync(POLL_FAST_MS);
+      expect(shown()).toContain("Logs it is.");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps the restored card in the answer each poll re-reads, and lets it go when the server ends it", async () => {

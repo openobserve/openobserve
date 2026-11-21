@@ -251,8 +251,9 @@ function recordFromSession(
     origin: originOf(session.origin),
     ...(pinned !== undefined && { pinned }),
     ...(server && { serverBacked: true }),
+    // A card pauses the stream, so the answer above it is in no server commit until it is answered.
     ...(server &&
-      (ended || live) &&
+      (ended || live || session.turn.state === "awaiting_approval") &&
       session.turnMeta.turnId && {
         liveTurnId: session.turnMeta.turnId,
         liveSavedAt: ctx.deps.now(),

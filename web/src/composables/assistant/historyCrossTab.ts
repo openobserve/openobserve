@@ -24,6 +24,7 @@ import type { Sid } from "./assistantStore.types";
 import { goneElsewhere, type HistoryCtx, type HistoryDeps } from "./historyContext";
 import { assistantClientId, createElsewhere, type Elsewhere } from "./historyElsewhere";
 import {
+  answerLength,
   cardEnding,
   ownerOptions,
   placeCard,
@@ -71,9 +72,16 @@ export function createHistoryCrossTab(ctx: HistoryCtx, records: HistoryRecords) 
           ...ownerOptions(ctx),
           ...(detail.approvals && { approvals: detail.approvals }),
         });
-        const kept = restored.get(sid);
-        if (kept) placeCard(messages, kept.turnId, kept.card);
-        session.messages = messages;
+        // A turn paused on a card commits nothing of its answer, so a reload's live save wins until the server catches up.
+        const live = ctx.liveAhead.get(sid);
+        const behind =
+          !!live && !!detail.active_turn && answerLength(messages, live.turnId) < live.length;
+        if (!behind) {
+          ctx.liveAhead.delete(sid);
+          const kept = restored.get(sid);
+          if (kept) placeCard(messages, kept.turnId, kept.card);
+          session.messages = messages;
+        }
       }
       settleRestored(sid, detail);
       return {

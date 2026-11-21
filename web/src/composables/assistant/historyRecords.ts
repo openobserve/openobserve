@@ -192,6 +192,12 @@ export function createHistoryRecords(ctx: HistoryCtx, list: HistoryList) {
           annotations,
         );
     markCarried(messages, detail);
+    if (ahead && cached.liveTurnId)
+      ctx.liveAhead.set(sid, {
+        turnId: cached.liveTurnId,
+        length: answerLength(messages, cached.liveTurnId),
+      });
+    else ctx.liveAhead.delete(sid);
     const turnId = detail.active_turn
       ? runningTurnOf(detail, cached?.messages)
       : detail.pending_approval
@@ -592,6 +598,11 @@ export function placeCard(
   if (known) known.approval = card;
   else answer.contentBlocks = [...(answer.contentBlocks ?? []), block];
   return true;
+}
+
+/** How much text a turn's answer shows; 0 when the turn has no answer here. */
+export function answerLength(messages: ChatMessage[], turnId: string): number {
+  return String(answerOfTurn(messages, turnId)?.content ?? "").length;
 }
 
 /** Puts back the cards only this browser saw, each with the outcome the server's record shows, so a history that drops them keeps them. */
