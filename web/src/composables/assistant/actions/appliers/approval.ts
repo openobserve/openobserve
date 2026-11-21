@@ -374,10 +374,9 @@ function itemOf(raw: unknown, card: Pick<ApprovalBlockData, "targets">): Approva
       .toLowerCase() || "object";
   const skipped = skippedApprovalItem(raw);
   const target = targetOf(item, card, name, type);
-  if (skipped) {
-    const id = target?.id ?? (typeof item.id === "string" ? item.id.slice(0, 200) : "");
-    return { type, name, ...(id && { id }), ...skipped };
-  }
+  // A create's target has no id until the server made it; its row then names it.
+  const id = target?.id || (typeof item.id === "string" ? item.id.slice(0, 200) : "");
+  if (skipped) return { type, name, ...(id && { id }), ...skipped };
   const done = item.deleted === true || item.success === true || item.status === "done";
   const status = typeof item.status_code === "number" ? item.status_code : undefined;
   const ledgerId = typeof item.ledger_id === "string" ? item.ledger_id.slice(0, 200) : "";
@@ -385,7 +384,7 @@ function itemOf(raw: unknown, card: Pick<ApprovalBlockData, "targets">): Approva
     type,
     name,
     status: done ? "done" : "failed",
-    ...(target?.id && { id: target.id }),
+    ...(id && { id }),
     ...(!done && status !== undefined && { code: String(status) }),
     ...(!done &&
       (item.detail ?? item.message) !== undefined && {

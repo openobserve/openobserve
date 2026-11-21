@@ -144,6 +144,20 @@ describe("approval applier", () => {
     ]);
   });
 
+  it("keeps the id the server gave an approved create, so the live card opens it (TA3-05)", () => {
+    const result = approvalResultOf(
+      { targets: [{ type: "dashboard", name: "TA3 dash" }] },
+      {
+        items: [{ type: "dashboard", name: "TA3 dash", id: "7529701375815450624", status: "done" }],
+      },
+      "a@b.c",
+      1,
+    );
+    expect(result?.items).toEqual([
+      { type: "dashboard", name: "TA3 dash", id: "7529701375815450624", status: "done" },
+    ]);
+  });
+
   it("maps a partial answer item by item and keeps each in the chat's action ledger", () => {
     const card = approvalOf(BATCH);
     const result = approvalResultOf(
