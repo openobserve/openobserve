@@ -27896,7 +27896,7 @@
     "teamChannelSilent": "このチームのチャンネルは意図的に未設定です。呼び出しはどこにも通知されません。",
     "slackChannelTitle": "Slack チャンネル",
     "slackChannelSetWith": "{command} で Slack チャンネルを設定",
-    "slackChannelLinkHint": "そのコマンドをその Slack チャンネルで入力してください。Slack アカウントの連携が必要です。Slack で /o2 link と入力してください。",
+    "slackChannelLinkHint": "そのコマンドをその Slack チャンネルで入力してください。Slack アカウントの連携が必要です。Slack で {command} link と入力してください。",
     "slackChannelSendTest": "テストメッセージを送信",
     "slackChannelClear": "クリア",
     "slackChannelBackup": "バックアップとしてのみ {webhook} を使用",

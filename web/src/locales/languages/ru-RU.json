@@ -27896,7 +27896,7 @@
     "teamChannelSilent": "Канал этой команды намеренно пуст — вызовы нигде не будут объявляться.",
     "slackChannelTitle": "Канал Slack",
     "slackChannelSetWith": "Укажите канал Slack с помощью {command}",
-    "slackChannelLinkHint": "Введите её в этом канале Slack. Для этого нужно связать аккаунт Slack: введите /o2 link в Slack.",
+    "slackChannelLinkHint": "Введите её в этом канале Slack. Для этого нужно связать аккаунт Slack: введите {command} link в Slack.",
     "slackChannelSendTest": "Отправить тестовое сообщение",
     "slackChannelClear": "Очистить",
     "slackChannelBackup": "Используйте {webhook} только как резервный вариант",

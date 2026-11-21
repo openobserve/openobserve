@@ -27896,7 +27896,7 @@
     "teamChannelSilent": "Dieser Teamkanal ist absichtlich leer — Alarmierungen werden nirgendwo angekündigt.",
     "slackChannelTitle": "Slack-Kanal",
     "slackChannelSetWith": "Slack-Kanal mit {command} festlegen",
-    "slackChannelLinkHint": "Geben Sie den Befehl in diesem Slack-Kanal ein. Dafür muss Ihr Slack-Konto verknüpft sein: Geben Sie in Slack /o2 link ein.",
+    "slackChannelLinkHint": "Geben Sie den Befehl in diesem Slack-Kanal ein. Dafür muss Ihr Slack-Konto verknüpft sein: Geben Sie in Slack {command} link ein.",
     "slackChannelSendTest": "Testnachricht senden",
     "slackChannelClear": "Leeren",
     "slackChannelBackup": "{webhook} nur als Backup verwenden",

@@ -80,6 +80,9 @@ import SlackCheckList, { type SlackCheckItem } from "./SlackCheckList.vue";
 import SlackPrerequisites from "./SlackPrerequisites.vue";
 import {
   createAppDefaults,
+  defaultSlackCommand,
+  isSlackCommand,
+  SLACK_APP_NAME_MAX_LENGTH,
   makeAppTokenSchema,
   makeCreateAppSchema,
   makeLinkingSchema,
@@ -233,11 +236,16 @@ const createApp = async (value: CreateAppForm): Promise<void> => {
         client_secret: value.client_secret,
         ...(value.mode === "http" ? { signing_secret: value.signing_secret } : {}),
         ...(value.mode === "socket" && value.app_token ? { app_token: value.app_token } : {}),
+        app_name: value.app_name,
+        channel_history: value.channel_history,
+        command: value.command,
       }
     : {
         mode: value.mode,
         config_refresh_token: value.config_refresh_token,
+        app_name: value.app_name,
         channel_history: value.channel_history,
+        command: value.command,
       };
   createRefusal.value = null;
   try {
@@ -265,13 +273,34 @@ const createForm = useOForm({
 });
 const mode = createForm.useStore((s) => s.values.mode);
 const channelHistory = createForm.useStore((s) => s.values.channel_history);
+const appName = createForm.useStore((s) => s.values.app_name);
+const command = createForm.useStore((s) => s.values.command);
+// The command follows the app name until the user edits it once (issue 3608).
+let filledCommand = command.value;
+let commandEdited = false;
+watch(command, (value) => {
+  if (value !== filledCommand) commandEdited = true;
+});
+watch(appName, (name) => {
+  if (commandEdited) return;
+  filledCommand = defaultSlackCommand(name);
+  createForm.setFieldValue("command", filledCommand);
+});
+const manifestParams = computed(() => ({
+  mode: mode.value,
+  name: appName.value.trim(),
+  channel_history: channelHistory.value,
+  command: command.value.trim(),
+}));
+const manifestParamsValid = computed(
+  () =>
+    isSlackCommand(manifestParams.value.command) &&
+    manifestParams.value.name.length <= SLACK_APP_NAME_MAX_LENGTH,
+);
 const manifest = useQuery(() =>
-  Object.assign(
-    slackManifestQuery(org.value, { mode: mode.value, channel_history: channelHistory.value }),
-    {
-      enabled: step.value === 2 && manual.value && !!org.value,
-    },
-  ),
+  Object.assign(slackManifestQuery(org.value, manifestParams.value), {
+    enabled: step.value === 2 && manual.value && !!org.value && manifestParamsValid.value,
+  }),
 );
 const manifestUrl = computed(() =>
   manifest.data.value ? buildSlackManifestUrlFrom(manifest.data.value) : undefined,
@@ -770,6 +799,27 @@ const nextBlocked = computed(() => {
               </template>
             </ORadio>
           </OFormRadioGroup>
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <OFormInput
+              name="app_name"
+              :label="t('slackApp.wizard.create.appName')"
+              :help-text="t('slackApp.wizard.create.appNameHelp')"
+              :maxlength="SLACK_APP_NAME_MAX_LENGTH"
+              data-test="slack-wizard-app-name"
+            />
+            <OFormInput
+              name="command"
+              :label="t('slackApp.wizard.create.command')"
+              required
+              autocomplete="off"
+              data-test="slack-wizard-command"
+            />
+          </div>
+          <OBanner variant="warning" dense icon="warning" data-test="slack-wizard-command-warning">
+            {{
+              t("slackApp.wizard.create.commandWarning", { command: raw(command.trim() || "/o2") })
+            }}
+          </OBanner>
           <OFormSwitch
             name="channel_history"
             :label="t('slackApp.wizard.create.channelHistory')"

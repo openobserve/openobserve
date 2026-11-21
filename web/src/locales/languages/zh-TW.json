@@ -27891,7 +27891,7 @@
     "teamChannelSilent": "此團隊的頻道刻意留空——呼叫通知不會在任何地方公布。",
     "slackChannelTitle": "Slack 頻道",
     "slackChannelSetWith": "使用 {command} 設定 Slack 頻道",
-    "slackChannelLinkHint": "請在該 Slack 頻道中輸入。需要先連結你的 Slack 帳號：在 Slack 中輸入 /o2 link。",
+    "slackChannelLinkHint": "請在該 Slack 頻道中輸入。需要先連結你的 Slack 帳號：在 Slack 中輸入 {command} link。",
     "slackChannelSendTest": "傳送測試訊息",
     "slackChannelClear": "清除",
     "slackChannelBackup": "僅將 {webhook} 用作備援",

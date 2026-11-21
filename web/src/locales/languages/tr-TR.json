@@ -27896,7 +27896,7 @@
     "teamChannelSilent": "Bu ekibin kanalı bilerek boş bırakılmıştır — çağrılar hiçbir yerde duyurulmayacaktır.",
     "slackChannelTitle": "Slack kanalı",
     "slackChannelSetWith": "Bir Slack kanalını {command} ile ayarlayın",
-    "slackChannelLinkHint": "Bunu o Slack kanalında yazın. Slack hesabınızın bağlı olması gerekir: Slack'te /o2 link yazın.",
+    "slackChannelLinkHint": "Bunu o Slack kanalında yazın. Slack hesabınızın bağlı olması gerekir: Slack'te {command} link yazın.",
     "slackChannelSendTest": "Test mesajı gönder",
     "slackChannelClear": "Temizle",
     "slackChannelBackup": "{webhook} yalnızca yedek olarak kullanılsın",
