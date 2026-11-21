@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { ref } from "vue";
 import DashboardJsonEditor from "./DashboardJsonEditor.vue";
+import { CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 
 // Mock dependencies
 // The component was migrated to i18n and now renders its validation/save
@@ -363,6 +364,52 @@ describe("DashboardJsonEditor", () => {
     expect(wrapper.vm.validationErrors).toContain("Save-time validation error");
     expect(mockSaveJsonDashboard.execute).not.toHaveBeenCalled();
   });
+
+  it(
+    "rejects unsupported panel setting values on edit and on save, unlike import",
+    { timeout: 30_000 },
+    async () => {
+      const mockValidate = await import("@/utils/dashboard/panelValidation");
+      const actual = await vi.importActual<typeof mockValidate>(
+        "@/utils/dashboard/panelValidation",
+      );
+      vi.mocked(mockValidate.validateDashboardJson).mockImplementation(
+        actual.validateDashboardJson,
+      );
+      const panel = {
+        id: "panel-1",
+        type: "state-timeline",
+        title: "Panel",
+        layout: { i: 1, x: 0, y: 0, w: 12, h: 6 },
+        config: { state_timeline_display: "grid" },
+      };
+      const dashboard = {
+        ...mockDashboardData,
+        version: CURRENT_DASHBOARD_SCHEMA_VERSION,
+        tabs: [{ tabId: "tab1", name: "Tab 1", panels: [panel] }],
+      };
+      expect(actual.validateDashboardJson((key: string) => key as any, dashboard)).toEqual([]);
+
+      wrapper = createWrapper();
+      wrapper.vm.handleEditorChange(JSON.stringify(dashboard));
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.validationErrors.length).toBe(1);
+      expect(wrapper.find('[data-test="dashboard-json-editor-validation-errors"]').exists()).toBe(
+        true,
+      );
+
+      wrapper.vm.isValidJson = true;
+      wrapper.vm.jsonContent = JSON.stringify(dashboard);
+      await wrapper.vm.saveChanges();
+      expect(mockValidate.validateDashboardJson).toHaveBeenLastCalledWith(
+        expect.any(Function),
+        dashboard,
+        { checkConfigChoices: true },
+      );
+      expect(wrapper.vm.validationErrors.length).toBe(1);
+      expect(mockSaveJsonDashboard.execute).not.toHaveBeenCalled();
+    },
+  );
 
   // Test 15: saveChanges should successfully save valid JSON
   it("should successfully save valid JSON", async () => {

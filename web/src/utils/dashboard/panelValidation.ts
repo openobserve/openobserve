@@ -1252,27 +1252,33 @@ const validateCartesianConfig = (
   validateScatterEncoding(t, panel, errors, isPromQLMode);
 };
 
-const PANEL_TYPE_CHOICE_KEYS: ReadonlyArray<[string, string[], readonly unknown[]]> = [
-  ["stat_text_mode", ["metric"], STAT_TEXT_MODES],
-  ["gauge_style", ["gauge"], GAUGE_STYLES],
-  ["table_density", ["table"], TABLE_DENSITIES],
-  ["state_value_align", ["state-timeline"], STATE_VALUE_ALIGNS],
-  ["bar_gauge_mode", ["bar-gauge"], BAR_GAUGE_MODES],
-  ["bar_gauge_orientation", ["bar-gauge"], BAR_GAUGE_ORIENTATIONS],
-  ["state_timeline_display", ["state-timeline"], STATE_TIMELINE_DISPLAYS],
-  ["sort_order", ["pie", "donut"], SORT_ORDERS],
-  ["boxplot_whisker", ["boxplot"], BOXPLOT_WHISKERS],
-  ["logs_order", ["logs"], LOGS_ORDERS],
-  ["funnel_sort", ["funnel"], FUNNEL_SORTS],
-  ["funnel_orient", ["funnel"], FUNNEL_ORIENTS],
-  ["node_graph_layout", ["node-graph"], NODE_GRAPH_LAYOUTS],
-  ["alert_list_sort", ["alert-list"], ALERT_LIST_SORTS],
+// [key, label, chart types, allowed values]
+const PANEL_TYPE_CHOICE_KEYS: ReadonlyArray<[string, I18nKey, string[], readonly unknown[]]> = [
+  ["stat_text_mode", "dashboard.statTextMode", ["metric"], STAT_TEXT_MODES],
+  ["gauge_style", "dashboard.gaugeStyle", ["gauge"], GAUGE_STYLES],
+  ["table_density", "dashboard.tableDensity", ["table"], TABLE_DENSITIES],
+  ["state_value_align", "dashboard.stateValueAlign", ["state-timeline"], STATE_VALUE_ALIGNS],
+  ["bar_gauge_mode", "dashboard.barGaugeMode", ["bar-gauge"], BAR_GAUGE_MODES],
+  ["bar_gauge_orientation", "dashboard.barGaugeOrientation", ["bar-gauge"], BAR_GAUGE_ORIENTATIONS],
+  [
+    "state_timeline_display",
+    "dashboard.stateTimelineDisplay",
+    ["state-timeline"],
+    STATE_TIMELINE_DISPLAYS,
+  ],
+  ["sort_order", "dashboard.pieSortOrder", ["pie", "donut"], SORT_ORDERS],
+  ["boxplot_whisker", "dashboard.boxplotWhisker", ["boxplot"], BOXPLOT_WHISKERS],
+  ["logs_order", "dashboard.logsOrder", ["logs"], LOGS_ORDERS],
+  ["funnel_sort", "dashboard.funnelSort", ["funnel"], FUNNEL_SORTS],
+  ["funnel_orient", "dashboard.barGaugeOrientation", ["funnel"], FUNNEL_ORIENTS],
+  ["node_graph_layout", "dashboard.nodeGraphLayout", ["node-graph"], NODE_GRAPH_LAYOUTS],
+  ["alert_list_sort", "dashboard.alertListSort", ["alert-list"], ALERT_LIST_SORTS],
 ];
 
-const PANEL_TYPE_LIST_KEYS: ReadonlyArray<[string, string[], readonly unknown[]]> = [
-  ["pie_label_content", ["pie", "donut"], PIE_LABEL_CONTENTS],
-  ["table_footer_calcs", ["table"], TABLE_FOOTER_CALCS],
-  ["alert_list_state", ["alert-list"], ALERT_LIST_STATES],
+const PANEL_TYPE_LIST_KEYS: ReadonlyArray<[string, I18nKey, string[], readonly unknown[]]> = [
+  ["pie_label_content", "dashboard.pieLabelContent", ["pie", "donut"], PIE_LABEL_CONTENTS],
+  ["table_footer_calcs", "dashboard.tableFooterCalcs", ["table"], TABLE_FOOTER_CALCS],
+  ["alert_list_state", "dashboard.alertListState", ["alert-list"], ALERT_LIST_STATES],
 ];
 
 // [key, label, chart types, lowest allowed, highest allowed, lowest is exclusive]
@@ -1304,20 +1310,22 @@ const PANEL_TYPE_RANGE_KEYS: ReadonlyArray<[string, I18nKey, string[], number, n
 
 const validatePanelTypeChoices = (t: TranslateFn, panel: any, errors: string[]) => {
   const config = panel.config;
-  const unsupported = (setting: string, value: unknown) =>
-    errors.push(t("dashboard.utils.unsupportedConfigValue", { setting, value: String(value) }));
-  for (const [key, types, allowed] of PANEL_TYPE_CHOICE_KEYS) {
+  const unsupported = (label: I18nKey, value: unknown) =>
+    errors.push(
+      t("dashboard.utils.unsupportedConfigValue", { setting: t(label), value: String(value) }),
+    );
+  for (const [key, label, types, allowed] of PANEL_TYPE_CHOICE_KEYS) {
     if (types.includes(panel.type) && isSetValue(config[key]) && !allowed.includes(config[key])) {
-      unsupported(key, config[key]);
+      unsupported(label, config[key]);
     }
   }
-  for (const [key, types, allowed] of PANEL_TYPE_LIST_KEYS) {
+  for (const [key, label, types, allowed] of PANEL_TYPE_LIST_KEYS) {
     if (!types.includes(panel.type) || !isSetValue(config[key])) continue;
     const values = Array.isArray(config[key]) ? config[key] : [config[key]];
     values
       .filter((value: unknown) => !allowed.includes(value))
       .forEach((value: unknown) => {
-        unsupported(key, value);
+        unsupported(label, value);
       });
   }
 };
@@ -1560,9 +1568,14 @@ export const validatePanel = (
  * Validates the dashboard JSON structure
  *
  * @param dashboardJson The dashboard JSON to validate
+ * @param options.checkConfigChoices Also reject unsupported single-choice and list panel settings
  * @returns Array of validation errors or empty array if valid
  */
-export const validateDashboardJson = (t: TranslateFn, dashboardJson: any): string[] => {
+export const validateDashboardJson = (
+  t: TranslateFn,
+  dashboardJson: any,
+  options: { checkConfigChoices?: boolean } = {},
+): string[] => {
   const errors: string[] = [];
 
   // Basic structure validation
@@ -1667,6 +1680,10 @@ export const validateDashboardJson = (t: TranslateFn, dashboardJson: any): strin
 
           // Only validate the panel fields (not stream field existence)
           validatePanelFields(t, panel, panelDetailErrors);
+          // Import skips this so dashboards saved by a newer version, with newer choices, still import.
+          if (options.checkConfigChoices && panel?.config) {
+            validatePanelTypeChoices(t, panel, panelDetailErrors);
+          }
 
           // Add panel identifier to each error
           const prefixedErrors = panelDetailErrors.map((error) =>
