@@ -214,39 +214,14 @@ impl super::Queue for NatsQueue {
     ) -> Result<Arc<mpsc::Receiver<super::Message>>> {
         let consumer = self.pull_consumer(topic, deliver_policy).await?;
         let stream_name = format!("{}{}", self.prefix, format_key(topic));
-        let mut messages = consumer.consumer.messages().await.map_err(|error| {
+        let messages = consumer.consumer.messages().await.map_err(|error| {
             Error::Message(format!(
                 "failed to start NATS consumer for {stream_name}: {error}"
             ))
         })?;
         let (tx, rx) = mpsc::channel(1024);
-        tokio::task::spawn(async move {
-            loop {
-                let message = match messages.try_next().await {
-                    Ok(Some(message)) => message,
-                    Ok(None) => {
-                        log::warn!(
-                            "Nats consumer messages for stream {} is closed",
-                            stream_name
-                        );
-                        break;
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "Failed to get nats consumer messages for stream {}: {}",
-                            stream_name,
-                            e
-                        );
-                        break;
-                    }
-                };
-                let message = super::Message::from_nats(message);
-                if let Err(error) = tx.send(message).await {
-                    log::error!("Failed to send NATS message for {stream_name}: {error}");
-                    break;
-                }
-            }
-        });
+        let messages = messages.map_ok(super::Message::from_nats);
+        tokio::task::spawn(forward(stream_name, messages, tx));
         Ok(Arc::new(rx))
     }
 
@@ -380,6 +355,33 @@ fn get_deliver_policy(deliver_policy: Option<queue::DeliverPolicy>) -> DeliverPo
         "last" | "deliverlast" | "deliver_last" => DeliverPolicy::Last,
         "new" | "delivernew" | "deliver_new" => DeliverPolicy::New,
         _ => DeliverPolicy::All,
+    }
+}
+
+async fn forward<T, E: std::fmt::Display>(
+    stream_name: String,
+    mut messages: impl futures::Stream<Item = std::result::Result<T, E>> + Unpin,
+    tx: mpsc::Sender<T>,
+) {
+    loop {
+        let next = tokio::select! {
+            _ = tx.closed() => break,
+            next = messages.try_next() => next,
+        };
+        let message = match next {
+            Ok(Some(message)) => message,
+            Ok(None) => {
+                log::warn!("Nats consumer messages for stream {stream_name} is closed");
+                break;
+            }
+            Err(e) => {
+                log::error!("Failed to get nats consumer messages for stream {stream_name}: {e}");
+                break;
+            }
+        };
+        if tx.send(message).await.is_err() {
+            break;
+        }
     }
 }
 
@@ -531,5 +533,17 @@ mod tests {
             },
             current
         );
+    }
+
+    #[tokio::test]
+    async fn a_dropped_receiver_ends_the_consumer_task_before_its_next_message() {
+        let (tx, rx) = mpsc::channel::<u8>(1);
+        let messages = futures::stream::pending::<std::result::Result<u8, String>>();
+        let task = tokio::spawn(forward("counts".to_string(), messages, tx));
+        drop(rx);
+        tokio::time::timeout(Duration::from_secs(5), task)
+            .await
+            .expect("dropping the receiver ends the task")
+            .unwrap();
     }
 }
