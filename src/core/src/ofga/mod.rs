@@ -517,9 +517,7 @@ async fn run_folder_and_data_migrations(pending: &PendingMigrations) {
 /// branches at the call site.
 fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.ownership_repair {
-        let mut keys = all_org_ownership_keys(&PendingMigrations::every_ownership_back_fill());
-        keys.extend(["pipelines", "alert_folders", "report_folders"]);
-        return keys;
+        return all_org_ownership_keys(&PendingMigrations::every_ownership_back_fill());
     }
     let mut keys = vec![];
     if pending.cipher_keys {
@@ -638,6 +636,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.incident_integrations {
         keys.push("incident_integrations");
     }
+    // Arms overlap on purpose, and OpenFGA rejects a write that names one tuple twice.
+    let mut seen = HashSet::new();
+    keys.retain(|key| seen.insert(*key));
     keys
 }
 
@@ -967,9 +968,6 @@ mod tests {
             "public_dashboards",
             "profiles",
             "incident_integrations",
-            "pipelines",
-            "alert_folders",
-            "report_folders",
         ];
         expected.sort_unstable();
         for existing in ["0.0.59", "0.0.60", "0.0.61", "0.0.62"] {
@@ -977,7 +975,6 @@ mod tests {
             assert!(pending.ownership_repair && pending.profiles, "{existing}");
             let mut keys = all_org_ownership_keys(&pending);
             keys.sort_unstable();
-            keys.dedup();
             assert_eq!(keys, expected, "{existing}");
         }
         // `get_ownership_all_org_tuple` also takes a model type name, e.g. `status_page`.
@@ -1063,5 +1060,37 @@ mod tests {
         );
         assert!(!pending_migrations("0.0.62", "0.0.62").incident_integrations);
         assert!(!pending_migrations("0.0.61", "0.0.60").incident_integrations);
+    }
+
+    #[test]
+    fn back_fill_emits_each_org_key_once_when_arms_overlap() {
+        // The 0.0.39 and 0.0.42 arms share two keys, and the 0.0.58 arm repeats playground.
+        for latest in ["0.0.53", "0.0.64"] {
+            let keys = all_org_ownership_keys(&pending_migrations(latest, "0.0.38"));
+            for key in ["annotation_queues", "datasets", "playground"] {
+                let count = keys.iter().filter(|k| **k == key).count();
+                assert_eq!(count, 1, "{key}: 0.0.38 -> {latest}");
+            }
+        }
+        // A latest past every gate fires all arms a stored version still owes.
+        for minor in 1..=64 {
+            let existing = format!("0.0.{minor}");
+            let pending = pending_migrations("0.0.999", &existing);
+            let keys = all_org_ownership_keys(&pending);
+            let unique: HashSet<&str> = keys.iter().copied().collect();
+            assert_eq!(unique.len(), keys.len(), "{existing}: {keys:?}");
+            // `init` writes these three `_all_` tuples itself.
+            let explicit = [
+                (pending.writes_pipeline_tuples(), "pipelines"),
+                (pending.writes_alert_folder_tuples(), "alert_folders"),
+                (pending.writes_report_folder_tuples(), "report_folders"),
+            ];
+            for (written_by_init, key) in explicit {
+                assert!(
+                    !(written_by_init && keys.contains(&key)),
+                    "{existing}: {key}"
+                );
+            }
+        }
     }
 }
