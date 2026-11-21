@@ -3849,6 +3849,12 @@ pub struct S3 {
     pub access_key: String,
     #[env_config(name = "ZO_S3_SECRET_KEY", default = "")]
     pub secret_key: String,
+    #[env_config(
+        name = "ZO_S3_AZURE_AUTH",
+        default = "",
+        help = "Azure Blob credential when ZO_S3_PROVIDER=azure: account_key, managed_identity or workload_identity. Empty keeps the implicit credential chain"
+    )]
+    pub azure_auth: String,
     #[env_config(name = "ZO_S3_BUCKET_NAME", default = "")]
     pub bucket_name: String,
     #[env_config(name = "ZO_S3_BUCKET_PREFIX", default = "")]
