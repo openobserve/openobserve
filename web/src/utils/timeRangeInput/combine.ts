@@ -295,15 +295,27 @@ function inheritMod(end: Point, start: Point, env: Env): Point {
   return { ...end, clock };
 }
 
-// A bare end clock, one on the shared date, or a year-less or day-word end is read in the start's
-// offset or zone, so the viewer's zone never decides it (`09:30Z - 11` ends at 11:00Z everywhere).
-function inZone(end: Point, tag: string | undefined, start: Point, env: Env): Point | null {
+// A bare end clock, one on the shared date, or a year-less or day-word side is read in the other
+// side's zone, so the viewer's zone never decides it (`09:30Z - 11` ends at 11:00Z everywhere).
+function inZone(
+  end: Point,
+  tag: string | undefined,
+  start: Point,
+  env: Env,
+  bare = true,
+): Point | null {
   const c = clockOf(start);
   if (end.p !== "clock" && end.p !== "wall") return end;
   const dated = end.p === "wall" && (yearless(tag) || end.off !== undefined);
-  if (!(shared(end) || dated) || zonedSide(end) || !c || !zonedSide(start)) return end;
+  if (!((bare && shared(end)) || dated) || zonedSide(end) || !c || !zonedSide(start)) return end;
   const clock = { ...end.clock, offsetSec: c.offsetSec, zone: c.zone };
   return end.p === "wall" ? zonedDate({ ...end, clock }, env, tag) : { ...end, clock };
+}
+
+// Both clocks of a shared day land on the start's date, even when each names its own zone.
+function shareDay(start: Point, end: Point | null): Point | null {
+  if (end?.p !== "wall" || start.p !== "wall" || !start.shared || !end.shared) return end;
+  return { ...end, y: start.y, mo: start.mo, d: start.d };
 }
 
 function yearless(tag: string | undefined): boolean {
@@ -410,10 +422,11 @@ export function rangeDrafts(
         pmTwin(e0, s.v)
       )
         continue;
-      const e = inZone(inheritMod(e0.v, s.v, env), e0.tag, s.v, env);
-      if (!e) continue;
+      const sv = inZone(s.v, s.tag, e0.v, env, false);
+      const e = sv && shareDay(sv, inZone(inheritMod(e0.v, sv, env), e0.tag, sv, env));
+      if (!sv || !e) continue;
       const into = sameTag(s, e0) ? drafts : cross;
-      for (const [a, b] of sidePairs(s.v, e, env)) {
+      for (const [a, b] of sidePairs(sv, e, env)) {
         // An end day that closes where the start begins lies wholly before it.
         if (a.us === b.us) zero = zero || e.p !== "day";
         if (a.us > b.us || (a.us === b.us && e.p === "day")) reversed = true;
@@ -426,7 +439,7 @@ export function rangeDrafts(
           fixedToNow: e.p === "now" ? true : undefined,
           notes: [...a.notes, ...b.notes],
           why: a.why ?? b.why ?? s.why ?? e0.why,
-          sinceClock: e.p === "now" ? sinceOf(s.v, a, env) : undefined,
+          sinceClock: e.p === "now" ? sinceOf(sv, a, env) : undefined,
         });
       }
     }
