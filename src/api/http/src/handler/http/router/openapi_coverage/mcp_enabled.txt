@@ -100,8 +100,10 @@ all EnableBackfillJob
 all EnableReport
 all EnableReportV2
 all EnableSlo
+all EndAlertLease
 ent EndRemoteTaskSigningGrace
 all ExportAlert
+all ExtendAlertLease
 all ExtendAlertMute
 all ExtendDowntime
 all ExtractPatterns
@@ -205,10 +207,12 @@ all GetTraceTimeRange
 all GetUserGroups
 all GetUserRoles
 all JiraDestinationSetup
+all KeepAlertLease
 all ListAlertAcks
 ent ListAlertCalibrationDismissals
 ent ListAlertCalibrationRuns
 ent ListAlertCalibrationRunsForAlert
+all ListAlertLeases
 all ListAlertTags
 all ListAlerts
 ent ListAnomalyConfigs
@@ -232,6 +236,7 @@ all ListIncidentRcaRuns
 all ListIncidents
 all ListKVKeys
 ent ListOcsfPacks
+all ListOrgAlertLeases
 ent ListRemoteTaskVersions
 ent ListRemoteTasks
 all ListReports
@@ -333,6 +338,7 @@ all SearchValues
 all ServiceAccountSave
 all ServiceAccountUpdate
 all ServiceAccountsList
+all SetAlertCreatesIncident
 all SetAnnouncementsConfig
 ent SetExperimentBaseline
 all SetFleetDesired

@@ -157,7 +157,7 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 156: add alert_incidents.last_detection_at, when a new detection joined a worked case.
 // 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
 //      service_streams rows named by the metric-name label that list no trace stream.
-pub const DB_SCHEMA_VERSION: u64 = 157;
+pub const DB_SCHEMA_VERSION: u64 = 158;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
