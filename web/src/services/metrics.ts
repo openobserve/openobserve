@@ -27,14 +27,17 @@ const labels = ({
   org_identifier,
   start_time,
   end_time,
+  match,
   signal,
 }: {
   org_identifier: string;
   start_time: number;
   end_time: number;
+  match?: string;
   signal?: AbortSignal;
 }) => {
-  const url = `/api/${org_identifier}/prometheus/api/v1/labels?start=${start_time}&end=${end_time}`;
+  const matchParam = match ? `&match[]=${encodeURIComponent(match)}` : "";
+  const url = `/api/${org_identifier}/prometheus/api/v1/labels?start=${start_time}&end=${end_time}${matchParam}`;
   return signal ? http().get(url, { signal }) : http().get(url);
 };
 
@@ -57,14 +60,15 @@ const labelValues = ({
 }: {
   org_identifier: string;
   label: string;
-  match: string;
+  match?: string;
   start_time: number;
   end_time: number;
   signal?: AbortSignal;
 }) => {
+  const matchParam = match ? `match[]=${encodeURIComponent(match)}&` : "";
   const url = `/api/${org_identifier}/prometheus/api/v1/label/${encodeURIComponent(
     label,
-  )}/values?match[]=${encodeURIComponent(match)}&start=${start_time}&end=${end_time}`;
+  )}/values?${matchParam}start=${start_time}&end=${end_time}`;
   return signal ? http().get(url, { signal }) : http().get(url);
 };
 

@@ -87,10 +87,36 @@ const importSqlParser = async () => {
   return parserImportPromise;
 };
 
+const LABEL_BASE_QUERY = "select * from 'default'";
+
+// Sets `where` on the query, ANDed after a WHERE it already has.
+const withWhereClause = (originalQuery: any, where: any) => {
+  const astOfOriginalQuery: any = parser.astify(originalQuery);
+  const newAst = {
+    ...astOfOriginalQuery,
+    where: astOfOriginalQuery.where
+      ? {
+          type: "binary_expr",
+          operator: "AND",
+          left: {
+            ...astOfOriginalQuery.where,
+            parentheses: true,
+          },
+          right: {
+            ...where,
+            parentheses: true,
+          },
+        }
+      : where,
+  };
+  const sql = parser.sqlify(newAst);
+  return sql.replace(/`/g, '"');
+};
+
 export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
   await importSqlParser();
 
-  let dummyQuery = "select * from 'default'";
+  let dummyQuery = LABEL_BASE_QUERY;
 
   for (let i = 0; i < labels.length; i++) {
     const label = labels[i];
@@ -98,39 +124,51 @@ export const addLabelsToSQlQuery = async (originalQuery: any, labels: any) => {
   }
 
   try {
-    const astOfOriginalQuery: any = parser.astify(originalQuery);
-    const astOfDummy: any = parser.astify(dummyQuery);
+    return withWhereClause(originalQuery, parser.astify(dummyQuery).where);
+  } catch (error: any) {
+    console.error("There was an error generating query:", error);
+  }
+};
 
-    // if ast already has a where clause
-    if (astOfOriginalQuery.where) {
-      const newWhereClause = {
-        type: "binary_expr",
-        operator: "AND",
-        left: {
-          ...astOfOriginalQuery.where,
-          parentheses: true,
-        },
-        right: {
-          ...astOfDummy.where,
-          parentheses: true,
-        },
-      };
-      const newAst = {
-        ...astOfOriginalQuery,
-        where: newWhereClause,
-      };
-      const sql = parser.sqlify(newAst);
-      const quotedSql = sql.replace(/`/g, '"');
-      return quotedSql;
-    } else {
-      const newAst = {
-        ...astOfOriginalQuery,
-        where: astOfDummy.where,
-      };
-      const sql = parser.sqlify(newAst);
-      const quotedSql = sql.replace(/`/g, '"');
-      return quotedSql;
-    }
+/** A filter row as `addLabelsToSQlQuery` takes it; `logicalOperator` joins it to the item before it. */
+export interface SqlLabel {
+  name?: string;
+  operator?: string;
+  value?: any;
+  logicalOperator?: string;
+}
+
+export interface SqlLabelGroup {
+  logicalOperator?: string;
+  conditions: (SqlLabel | SqlLabelGroup)[];
+}
+
+const isLabelGroup = (item: SqlLabel | SqlLabelGroup): item is SqlLabelGroup =>
+  Array.isArray((item as SqlLabelGroup).conditions);
+
+// Joined left to right without parentheses, like the panel builder's joinConditions text, so AND binds tighter than OR.
+const labelGroupWhere = async (group: SqlLabelGroup): Promise<any> => {
+  let where: any = null;
+  for (const item of group.conditions) {
+    const node = isLabelGroup(item)
+      ? await labelGroupWhere(item)
+      : parser.astify(
+          await addLabelToSQlQuery(LABEL_BASE_QUERY, item.name, item.value, item.operator),
+        ).where;
+    if (!node) continue;
+    if (isLabelGroup(item)) node.parentheses = true;
+    const operator = item.logicalOperator === "OR" ? "OR" : "AND";
+    where = where ? { type: "binary_expr", operator, left: where, right: node } : node;
+  }
+  return where;
+};
+
+/** As `addLabelsToSQlQuery`, for an AND/OR tree; each row renders exactly as it does there. */
+export const addLabelGroupToSQlQuery = async (originalQuery: any, group: SqlLabelGroup) => {
+  await importSqlParser();
+  try {
+    const where = await labelGroupWhere(group);
+    return where ? withWhereClause(originalQuery, where) : originalQuery;
   } catch (error: any) {
     console.error("There was an error generating query:", error);
   }
@@ -201,7 +239,7 @@ export const addLabelToSQlQuery = async (
       case "IN":
         operator = "IN";
         // add brackets if not present in "IN" conditions
-        value = splitQuotedString(value).map((it: any) => ({
+        value = (Array.isArray(value) ? value : splitQuotedString(value)).map((it: any) => ({
           type: "single_quote_string",
           value: escapeSingleQuotes(it),
         }));
@@ -209,7 +247,7 @@ export const addLabelToSQlQuery = async (
       case "NOT IN":
         operator = "NOT IN";
         // add brackets if not present in "NOT IN" conditions
-        value = splitQuotedString(value).map((it: any) => ({
+        value = (Array.isArray(value) ? value : splitQuotedString(value)).map((it: any) => ({
           type: "single_quote_string",
           value: escapeSingleQuotes(it),
         }));

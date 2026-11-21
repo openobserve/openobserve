@@ -20,7 +20,8 @@ import { isPlainObject, isTreePristine, rawOf, type FilterCodec } from "./types"
 
 export type AnomalyFilters = AnomalyFilter[] | EngineGroup | null;
 
-const isFlatAnd = (tree: FilterGroup): boolean =>
+/** No groups and no OR, so a flat ANDed row list holds the tree exactly. */
+export const isFlatAnd = (tree: FilterGroup): boolean =>
   tree.items.every(
     (item, index) => item.kind !== "group" && (index === 0 || item.connector === "AND"),
   );

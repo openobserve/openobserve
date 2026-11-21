@@ -1180,12 +1180,110 @@ fn variable_sources(
             continue;
         };
         let stream_type = json_stream_type(data, StreamType::Logs);
+        let query = data.get("query").and_then(|q| q.as_str());
+        // A custom query reads what its text names; its saved stream is left over from Auto.
+        if let Some(query) = query.filter(|q| !q.trim().is_empty()) {
+            let promql = data.get("query_type").and_then(|t| t.as_str()) == Some("promql");
+            sources.extend(variable_query_sources(
+                org_id,
+                query,
+                promql,
+                stream_type,
+                values,
+            ));
+            continue;
+        }
         let name = data.get("stream").and_then(|s| s.as_str());
         if let Some(source) = stream_name_source(org_id, name, stream_type, values) {
             sources.push(source);
         }
     }
     sources
+}
+
+/// A PromQL variable function reads its selector; one across every metric names no stream to check.
+fn variable_query_sources(
+    org_id: &str,
+    query: &str,
+    promql: bool,
+    stream_type: StreamType,
+    values: &HashMap<String, String>,
+) -> Vec<QuerySource> {
+    if !promql {
+        return panel_query_sources(org_id, query, QueryLanguage::Sql, stream_type, values);
+    }
+    let unparseable = |error: &str| {
+        vec![QuerySource::Unparseable {
+            org_id: org_id.to_string(),
+            source: query.to_string(),
+            error: error.to_string(),
+        }]
+    };
+    match promql_variable_expr(query) {
+        Ok(Some(expr)) => panel_query_sources(
+            org_id,
+            expr,
+            QueryLanguage::PromQl,
+            StreamType::Metrics,
+            values,
+        ),
+        Ok(None) => unparseable("the lookup spans every metric, so no stream can be checked"),
+        Err(error) => unparseable(error),
+    }
+}
+
+/// `parsePromVariableQuery`: the expression a variable function evaluates, `None` for an
+/// unscoped `label_values(label)`, `label_names()` or `metrics()`.
+fn promql_variable_expr(query: &str) -> Result<Option<&str>, &'static str> {
+    static FUNCTION: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r"(?s)^([a-z_]+)\s*\((.*)\)$").expect("variable function regex")
+    });
+    let unsupported = "not a supported PromQL variable function";
+    let caps = FUNCTION.captures(query.trim()).ok_or(unsupported)?;
+    let args = caps.get(2).map_or("", |m| m.as_str()).trim();
+    let commas = top_level_commas(args);
+    match &caps[1] {
+        "label_values" if commas.len() > 1 => Err(unsupported),
+        "label_values" => match commas.first() {
+            Some(&comma) if args[..comma].trim().is_empty() => Err(unsupported),
+            Some(&comma) => Ok(Some(args[..comma].trim())),
+            None => Ok(None),
+        },
+        "label_names" if !commas.is_empty() => Err(unsupported),
+        "label_names" => Ok(Some(args).filter(|a| !a.is_empty())),
+        "metrics" => Ok(None),
+        "query_result" if args.is_empty() => Err(unsupported),
+        "query_result" => Ok(Some(args)),
+        _ => Err(unsupported),
+    }
+}
+
+/// Byte offsets of the commas outside brackets and quotes.
+fn top_level_commas(text: &str) -> Vec<usize> {
+    let mut commas = Vec::new();
+    let mut depth = 0i32;
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+    for (i, c) in text.char_indices() {
+        if let Some(q) = quote {
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == q {
+                quote = None;
+            }
+            continue;
+        }
+        match c {
+            '"' | '\'' | '`' => quote = Some(c),
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' => depth -= 1,
+            ',' if depth == 0 => commas.push(i),
+            _ => {}
+        }
+    }
+    commas
 }
 
 #[cfg(feature = "enterprise")]
@@ -1533,6 +1631,93 @@ mod tests {
             resolved_names(&with_report)[0],
             "o1/logs/report_stream".to_string()
         );
+    }
+
+    #[test]
+    fn a_custom_variable_query_reads_the_streams_its_text_names() {
+        let custom = |query: &str, query_type: Option<&str>| {
+            json!({"type": "query_values", "name": "v", "query_data": {
+                "stream": "left_over", "stream_type": "logs", "field": "f",
+                "query": query, "query_type": query_type,
+            }})
+        };
+        let dashboard = json!({"variables": {"list": [
+            {"type": "constant", "name": "ns", "value": "prod"},
+            custom("SELECT svc FROM secrets WHERE env = '$ns'", None),
+            custom("label_values(kube_pod_info{ns=\"$ns\"}, pod)", Some("promql")),
+            custom("label_names(up)", Some("promql")),
+            custom("query_result(sum(rate(http_total[5m])))", Some("promql")),
+            custom("   ", None),
+        ]}});
+        let sources = variable_sources("o1", &dashboard, &HashMap::new());
+        assert_eq!(
+            resolved_names(&sources),
+            vec![
+                "o1/logs/secrets",
+                "o1/metrics/kube_pod_info",
+                "o1/metrics/up",
+                "o1/metrics/http_total",
+                "o1/logs/left_over",
+            ]
+        );
+        assert!(resolve_query_sources(&sources).unparseable.is_empty());
+    }
+
+    #[test]
+    fn a_promql_variable_lookup_across_every_metric_is_unparseable() {
+        for query in [
+            "label_values(job)",
+            "label_names()",
+            "metrics(.*)",
+            "label_values(up, a, b)",
+            "rate(up[5m])",
+        ] {
+            let dashboard = json!({"variables": {"list": [
+                {"type": "query_values", "name": "v", "query_data": {
+                    "stream": "up", "stream_type": "metrics", "field": "job",
+                    "query": query, "query_type": "promql"}},
+            ]}});
+            let resolved =
+                resolve_query_sources(&variable_sources("o1", &dashboard, &HashMap::new()));
+            assert!(resolved.streams.is_empty(), "{query}");
+            assert_eq!(resolved.unparseable.len(), 1, "{query}");
+        }
+    }
+
+    #[test]
+    fn editing_only_a_custom_variable_query_changes_what_it_reads() {
+        let with = |query: &str| {
+            json!({"variables": {"list": [
+                {"type": "query_values", "name": "v", "query_data": {
+                    "stream": "", "stream_type": "logs", "field": "", "query": query}},
+            ]}})
+        };
+        let before = variable_sources("o1", &with("SELECT a FROM open"), &HashMap::new());
+        let after = variable_sources("o1", &with("SELECT a FROM secret"), &HashMap::new());
+        assert_ne!(before, after);
+        assert_eq!(resolved_names(&after), vec!["o1/logs/secret"]);
+    }
+
+    #[test]
+    fn promql_variable_functions_name_the_expression_they_evaluate() {
+        let cases = [
+            (
+                "label_values(up{a=\"x,y\"}, job)",
+                Ok(Some("up{a=\"x,y\"}")),
+            ),
+            (" label_values( up , job ) ", Ok(Some("up"))),
+            ("label_values(job)", Ok(None)),
+            ("label_values(, job)", Err(())),
+            ("label_names()", Ok(None)),
+            ("label_names(up{a=\"b\"})", Ok(Some("up{a=\"b\"}"))),
+            ("metrics(^http_.*)", Ok(None)),
+            ("query_result(topk(3, up))", Ok(Some("topk(3, up)"))),
+            ("query_result()", Err(())),
+            ("up", Err(())),
+        ];
+        for (query, want) in cases {
+            assert_eq!(promql_variable_expr(query).map_err(|_| ()), want, "{query}");
+        }
     }
 
     #[test]

@@ -99,8 +99,16 @@ vi.mock("../../ConfirmDialog.vue", () => ({
   default: {
     name: "ConfirmDialog",
     template:
-      '<div data-test="confirm-dialog-mock" v-if="modelValue" :data-keypath="messageKeypath" :data-variant="okVariant"><div>{{title}}</div><div>{{message}}</div><b data-test="confirm-dialog-mock-name">{{messageName}}</b></div>',
-    props: ["modelValue", "title", "message", "messageKeypath", "messageName", "okVariant"],
+      '<div data-test="confirm-dialog-mock" v-if="modelValue" :data-keypath="messageKeypath" :data-variant="okVariant"><div>{{title}}</div><div>{{message}}</div><b data-test="confirm-dialog-mock-name">{{messageName}}</b><p data-test="confirm-dialog-mock-warning">{{warningMessage}}</p></div>',
+    props: [
+      "modelValue",
+      "title",
+      "message",
+      "messageKeypath",
+      "messageName",
+      "okVariant",
+      "warningMessage",
+    ],
     emits: ["update:ok", "update:cancel"],
   },
 }));
@@ -383,6 +391,38 @@ describe("VariableSettings", () => {
       expect(dialog.attributes("data-keypath")).toBe("dashboard.deleteVariableMsg");
       expect(dialog.attributes("data-variant")).toBe("destructive");
       expect(wrapper.find('[data-test="confirm-dialog-mock-name"]').text()).toBe("region");
+    });
+
+    it("warns which variables still refer to the one being deleted", async () => {
+      const vm = wrapper.vm as any;
+      vm.dashboardVariablesList = [
+        { name: "env", type: "custom", options: [] },
+        {
+          name: "service",
+          type: "query_values",
+          query_data: {
+            stream: "app",
+            field: "service",
+            filter: [{ name: "env", operator: "=", value: "$env" }],
+          },
+        },
+        {
+          name: "svc_custom",
+          type: "query_values",
+          query_data: { query: "SELECT service FROM app WHERE env IN ($env)" },
+        },
+        { name: "region", type: "custom", options: [] },
+      ];
+      vm.showDeleteDialogFn({ row: { name: "env" } });
+      await nextTick();
+      expect(wrapper.find('[data-test="confirm-dialog-mock-warning"]').text()).toBe(
+        "Used by service, svc_custom, which will show no values after $env is deleted.",
+      );
+
+      vm.confirmDeleteDialog = false;
+      vm.showDeleteDialogFn({ row: { name: "region" } });
+      await nextTick();
+      expect(wrapper.find('[data-test="confirm-dialog-mock-warning"]').text()).toBe("");
     });
 
     it("should show confirm dialog component when delete dialog is active", async () => {

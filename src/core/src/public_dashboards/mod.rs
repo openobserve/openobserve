@@ -2342,10 +2342,20 @@ async fn run_values(ctx: &Ctx<'_>, q: &ValuesQuery) -> Result<Vec<String>, Strin
             None,
         )
         .await?;
+    let mut columns = resp.columns.clone();
+    if columns.is_empty() {
+        let first = resp.hits.first().and_then(|hit| hit.as_object());
+        columns = first
+            .map(|row| row.keys().cloned().collect())
+            .unwrap_or_default();
+    }
+    let Some(column) = q.value_column(&columns) else {
+        return Ok(vec![]);
+    };
     Ok(resp
         .hits
         .iter()
-        .filter_map(|hit| hit.get("zo_sql_key"))
+        .filter_map(|hit| hit.get(column))
         .filter(|key| !key.is_null())
         .map(variables::js_string)
         .collect())

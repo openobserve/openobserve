@@ -15,9 +15,12 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  buildScopedDependencyGraph,
   buildVariablesDependencyGraph,
+  detectCyclesInScopedGraph,
   extractVariableNames,
   isGraphHasCycle,
+  describeVariableCycle,
 } from "./variablesDependencyUtils";
 
 describe("Variables Dependency Utils", () => {
@@ -263,6 +266,32 @@ describe("Variables Dependency Utils", () => {
       expect(graph.cluster.childVariables).toContain("pod");
       // Only query_values variables keep their childVariables
       expect(graph.namespace.childVariables).toContain("pod");
+    });
+  });
+
+  describe("describeVariableCycle", () => {
+    const describe_ = (parents: Record<string, string[]>) => {
+      const graph = Object.fromEntries(
+        Object.entries(parents).map(([name, list]) => [
+          name,
+          { parentVariables: list, childVariables: [] },
+        ]),
+      );
+      return describeVariableCycle(graph, isGraphHasCycle(graph));
+    };
+
+    it("names a variable that refers to itself", () => {
+      expect(describe_({ svc: ["svc"] })).toBe("svc can't depend on itself.");
+    });
+
+    it("names two variables that refer to each other", () => {
+      expect(describe_({ a: ["b"], b: ["a"] })).toBe("a and b depend on each other.");
+    });
+
+    it("lists only the variables in a longer loop, not those leading into it", () => {
+      expect(describe_({ x: ["a"], a: ["b"], b: ["c"], c: ["a"] })).toBe(
+        "These variables depend on each other in a loop: a → b → c → a",
+      );
     });
   });
 
@@ -872,6 +901,190 @@ describe("Variables Dependency Utils", () => {
 
       expect(graph.region.parentVariables).toContain("env");
       expect(graph.env.childVariables).toContain("region");
+    });
+  });
+
+  describe("custom query variables", () => {
+    const queryVar = (name: string, query: string) => ({
+      name,
+      type: "query_values",
+      scope: "global" as const,
+      query_data: { query },
+    });
+
+    it("reads only the custom query, not the inactive auto stream, field and filters", () => {
+      const graph = buildVariablesDependencyGraph([
+        { name: "region", type: "custom", query_data: undefined },
+        { name: "env", type: "custom", query_data: undefined },
+        {
+          name: "service",
+          type: "query_values",
+          query_data: {
+            query: "SELECT service FROM logs WHERE region = '$region'",
+            stream: "$env",
+            field: "f",
+            filter: [{ name: "x", operator: "=", value: "$env" }],
+          },
+        },
+      ]);
+      expect(graph.service.parentVariables).toEqual(["region"]);
+      expect(graph.env.childVariables).toEqual([]);
+    });
+
+    it("reads stream, field and filters when the query is blank", () => {
+      const graph = buildVariablesDependencyGraph([
+        { name: "region", type: "custom", query_data: undefined },
+        { name: "env", type: "custom", query_data: undefined },
+        {
+          name: "service",
+          type: "query_values",
+          query_data: {
+            query: "  ",
+            stream: "s",
+            field: "f",
+            filter: [{ name: "x", operator: "=", value: "$env" }],
+          },
+        },
+      ]);
+      expect(graph.service.parentVariables).toEqual(["env"]);
+    });
+
+    it("finds parents referenced in the raw query", () => {
+      const graph = buildVariablesDependencyGraph([
+        { name: "region", type: "custom", query_data: undefined },
+        { name: "cluster", type: "query_values", query_data: { stream: "s", field: "f" } },
+        queryVar(
+          "service",
+          "SELECT service FROM logs WHERE region IN ($region) AND cluster = '${cluster}'",
+        ),
+      ]);
+      expect(graph.service.parentVariables).toEqual(["region", "cluster"]);
+      expect(graph.region.childVariables).toEqual(["service"]);
+      expect(graph.cluster.childVariables).toEqual(["service"]);
+    });
+
+    it("finds parents inside a PromQL selector and ignores unknown names", () => {
+      const graph = buildVariablesDependencyGraph([
+        { name: "cluster", type: "custom", query_data: undefined },
+        queryVar(
+          "namespace",
+          'label_values(kube_pod_info{cluster="$cluster",x="$nope"}, namespace)',
+        ),
+      ]);
+      expect(graph.namespace.parentVariables).toEqual(["cluster"]);
+    });
+
+    it("detects a cycle between query variables", () => {
+      const graph = buildVariablesDependencyGraph([
+        queryVar("a", "SELECT a FROM t WHERE b = '$b'"),
+        queryVar("b", "SELECT b FROM t WHERE a = '$a'"),
+      ]);
+      expect(isGraphHasCycle(graph)).not.toBeNull();
+    });
+
+    it("links scoped query variables and detects their cycles", () => {
+      const scoped = buildScopedDependencyGraph(
+        [
+          { name: "cluster", type: "custom", scope: "global" },
+          {
+            name: "pod",
+            type: "query_values",
+            scope: "tabs",
+            tabId: "t1",
+            query_data: {
+              query: 'label_values(up{cluster="$cluster"}, pod)',
+              filter: [{ value: "$ignored" }],
+            },
+          },
+        ],
+        {},
+      );
+      expect(scoped["pod@tab@t1"].parents).toEqual(["cluster@global"]);
+      expect(scoped["cluster@global"].children).toEqual(["pod@tab@t1"]);
+
+      const cyclic = buildScopedDependencyGraph(
+        [queryVar("a", "SELECT * FROM t WHERE x = '$b'"), queryVar("b", "SELECT '$a'")],
+        {},
+      );
+      expect(detectCyclesInScopedGraph(cyclic)).not.toBeNull();
+    });
+  });
+
+  describe("nested filter groups", () => {
+    const group = {
+      filterType: "group" as const,
+      logicalOperator: "AND",
+      conditions: [
+        {
+          filterType: "condition" as const,
+          type: "condition" as const,
+          column: { field: "a" },
+          operator: "=",
+          value: "$region",
+          values: [],
+          logicalOperator: "AND",
+        },
+        {
+          filterType: "group" as const,
+          logicalOperator: "OR",
+          conditions: [
+            {
+              filterType: "condition" as const,
+              type: "condition" as const,
+              column: { field: "b" },
+              operator: "IN",
+              value: "${env}",
+              values: [],
+              logicalOperator: "AND",
+            },
+          ],
+        },
+      ],
+    };
+
+    it("finds $var references at any depth of filter_group", () => {
+      const graph = buildVariablesDependencyGraph([
+        { name: "region", type: "custom", query_data: undefined },
+        { name: "env", type: "custom", query_data: undefined },
+        {
+          name: "service",
+          type: "query_values",
+          query_data: { stream: "s", field: "f", filter_group: group },
+        },
+      ]);
+      expect(graph.service.parentVariables).toEqual(["region", "env"]);
+      expect(graph.env.childVariables).toEqual(["service"]);
+    });
+
+    it("links nested filter_group parents in the scoped graph and finds a cycle through them", () => {
+      const scoped = buildScopedDependencyGraph(
+        [
+          { name: "region", type: "custom", scope: "global" },
+          { name: "env", type: "custom", scope: "global" },
+          {
+            name: "service",
+            type: "query_values",
+            scope: "global",
+            query_data: { stream: "s", field: "f", filter_group: group },
+          },
+        ],
+        {},
+      );
+      expect(scoped["service@global"].parents).toEqual(["region@global", "env@global"]);
+
+      const cyclic = buildVariablesDependencyGraph([
+        {
+          name: "region",
+          type: "query_values",
+          query_data: { stream: "s", field: "f", filter: [{ name: "x", value: "$service" }] },
+        },
+        {
+          name: "service",
+          type: "query_values",
+          query_data: { stream: "s", field: "f", filter_group: group },
+        },
+      ]);
+      expect(isGraphHasCycle(cyclic)).not.toBeNull();
     });
   });
 });
