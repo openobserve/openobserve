@@ -345,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="traces-search-bar-cancel-btn"
                 size="sm-toolbar"
                 :title="t('search.cancel')"
-                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] rounded-e-none! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
+                class="bg-cancel-query-bg! text-button-primary-foreground! rounded-s-default! min-w-[5.875rem] shrink-0 rounded-e-none! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
                 @click="cancelQueryData"
                 >{{ t("search.cancel") }}</OButton
               >
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
                 size="sm-toolbar"
                 :title="t('search.runQuery')"
-                class="min-w-[5.875rem] [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
+                class="min-w-[5.875rem] shrink-0 [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease]"
                 :class="[
                   store.state.zoConfig.auto_query_enabled
                     ? 'rounded-s-default! rounded-e-none!'

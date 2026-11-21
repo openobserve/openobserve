@@ -260,9 +260,9 @@ const PINNED_COPY: Record<string, { tooltip: string; budgetTooltip: string; hint
   },
   "fr-FR": {
     tooltip:
-      "Chaque intervalle est comparé à une bande égale à la valeur attendue ± niveau × σ, où σ est la dispersion typique pour cette heure. Un intervalle hors de la bande est signalé comme anormal. Une bande plus large (niveau plus élevé) envoie moins d'alertes ; une bande plus étroite en envoie plus. Les modifications s'appliquent sans réentraînement.",
+      "Chaque intervalle est comparé à une bande égale à la valeur attendue ± niveau × σ, où σ est la dispersion typique pour cette heure. Un intervalle hors de la bande est signalé comme anormal. Une bande plus large (niveau plus élevé) envoie moins d'alertes ; une bande plus étroite en envoie plus. Les modifications s'appliquent sans réentraînement.",
     budgetTooltip:
-      "Le nombre maximal d'alertes que cette configuration peut délivrer, appliqué à la livraison. La détection continue de noter chaque compartiment ; une fois le budget épuisé, les alertes supplémentaires sont supprimées jusqu'à ce qu'il se reconstitue.",
+      "Le nombre maximal d'alertes que cette configuration peut envoyer, appliqué au moment de l'envoi. La détection continue d'évaluer chaque intervalle ; une fois le budget épuisé, les alertes suivantes sont bloquées jusqu'à ce qu'il se reconstitue.",
     hint: "Un intervalle est signalé lorsqu'il sort de la valeur attendue ± {k}σ.",
   },
   "it-IT": {
