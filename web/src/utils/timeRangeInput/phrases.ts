@@ -554,9 +554,7 @@ function grows(alts: Alt<ClockValue>[], mod: ClockMod): boolean {
 
 function zoned(sc: Scan, end: number, alts: Alt<ClockValue>[]): Hit<Alt<ClockValue>[]>[] {
   const out: Hit<Alt<ClockValue>[]>[] = [[end, alts]];
-  // A spaced signed `hh:mm` after an am/pm mark is an offset; an attached one may still end a range.
-  const marked = sc.text[end] === " " && alts.some((a) => a.v.mod?.ap !== undefined);
-  const host = alts.some((a) => a.v.sec) ? 2 : marked ? 1 : 0;
+  const host = alts.some((a) => a.v.sec) ? 2 : 0;
   const at = zoneStart(sc.text, end, host, true);
   const dash = at !== null && zoneStart(sc.text, end, host) === null;
   // A bare digit hour takes no signed offset: `3+4` is not 03:00 at UTC+4.
@@ -693,7 +691,12 @@ function wholePoint(sc: Scan, from: number, to: number): Alt<Point>[] {
   return out;
 }
 
-function onDay(alts: Alt<Point>[] | undefined, days: Alt<DateVal>[] | undefined): Alt<Point>[] {
+// Only the walls the shared day makes take its zoned date; a stamp keeps its own year walk.
+function onDay(
+  sc: Scan,
+  alts: Alt<Point>[] | undefined,
+  days: Alt<DateVal>[] | undefined,
+): Alt<Point>[] {
   if (!alts || !days) return alts ?? [];
   const out: Alt<Point>[] = [];
   for (const a of alts) {
@@ -701,11 +704,14 @@ function onDay(alts: Alt<Point>[] | undefined, days: Alt<DateVal>[] | undefined)
     else {
       const clock = a.v.clock;
       out.push(
-        ...days.map((d) => ({
-          v: { p: "wall" as const, ...d.v, clock, shared: true },
-          why: a.why ?? d.why,
-          tag: joinTags(a.tag, d.tag),
-        })),
+        ...zonedDays(
+          sc,
+          days.map((d) => ({
+            v: { p: "wall" as const, ...d.v, clock, shared: true },
+            why: a.why ?? d.why,
+            tag: joinTags(a.tag, d.tag),
+          })),
+        ),
       );
     }
   }
@@ -734,7 +740,7 @@ function isoOnly(sc: Scan, from: number, to: number): boolean {
 }
 
 // The dash ends the text as an offset after `UTC`/`GMT` (even an unknown one, `UTC-07:15`), after a
-// clock with seconds or, spaced, a mark, or when the stamp scanner reads it as the stamp's offset.
+// clock with seconds, or when the stamp scanner reads it as the stamp's offset.
 function offsetLike(sc: Scan, k: number): boolean {
   const utc = ["utc", "gmt"].includes(sc.fold.slice(k - 3, k));
   if (utc && /^-\d\d?(:?\d\d)?$/.test(sc.text.slice(k))) return true;
@@ -751,8 +757,7 @@ function offsetLike(sc: Scan, k: number): boolean {
           return c?.offsetSec !== undefined && !c.dash && ok(c);
         }),
     );
-  const seconds =
-    fixed((c) => c.sec === true) || (left < k && fixed((c) => c.mod?.ap !== undefined));
+  const seconds = fixed((c) => c.sec === true);
   return (
     seconds ||
     (stamps.some((s) => s.end === left && s.alts.every((a) => a.v.p === "wall")) &&
@@ -811,8 +816,7 @@ export function rangeOutcome(sc: Scan): Outcome {
         if (!c.start || !c.end) continue;
         // A day before a range lands on its clocks; with no clock to land on it would be dropped text.
         if (c.day && ![...c.start, ...c.end].some((a) => a.v.p === "clock")) continue;
-        const [start, end] = [c.start, c.end].map((p) => zonedDays(sc, onDay(p, c.day)));
-        const r = rangeDrafts(start, end, sc.env);
+        const r = rangeDrafts(onDay(sc, c.start, c.day), onDay(sc, c.end, c.day), sc.env);
         zero.hit = zero.hit || r.zero;
         zero.reversed = zero.reversed || r.reversed;
         if (r.drafts.length > 0) found.push(r.drafts);
