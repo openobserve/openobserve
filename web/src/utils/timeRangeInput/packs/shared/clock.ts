@@ -15,7 +15,7 @@
 
 import type { Draft } from "../../types";
 
-/** `15h` and vi `2 giờ` are both a clock and a duration, so they ask; fr, es, pt and vi share it. */
+/** `15h`, vi `2 giờ` and nl `2 uur` are both a clock and a duration, so they ask. */
 export function orClock(first: Draft[], other: () => Draft[]): Draft[] {
   const more = first.length > 0 ? other() : [];
   if (more.length === 0) return first;

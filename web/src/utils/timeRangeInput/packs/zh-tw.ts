@@ -35,7 +35,8 @@ export const pack: LocalePack = {
     h: ["小時", "個小時", "鐘頭", "個鐘頭"],
     d: ["天", "日"],
     w: ["週", "周", "星期", "個星期", "禮拜", "個禮拜"],
-    M: ["個月", "月"],
+    // `5月` is May, never five months.
+    M: ["個月"],
     y: ["年"],
   },
   patterns: {
