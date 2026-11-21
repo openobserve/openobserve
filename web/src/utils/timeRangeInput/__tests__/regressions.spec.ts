@@ -1701,6 +1701,7 @@ describe("typed-clock review fixes, round 2", () => {
 describe("meridiem rule: a mark binds only to the clock beside it, and no text is dropped", () => {
   const LATER = "2026-11-21T12:00:00Z";
   const NIGHT = "2026-11-21T23:00:00Z";
+  const EVE = "2026-12-31T18:00:00Z";
   const point = (iso: string): [string, string] => [iso, iso];
   type Want = "invalid" | "incomplete" | "blocked" | "ambiguous" | [string, string];
   const ZONES = ["UTC", "Asia/Tokyo", "Asia/Kolkata", "America/New_York"];
@@ -2130,12 +2131,12 @@ describe("meridiem rule: a mark binds only to the clock beside it, and no text i
     ],
     ["en-US", "today 00:30 Asia/Tokyo", point("2026-12-31T15:30:00Z"), "2026-12-31T18:00:00Z"],
     ["en-US", "yesterday 09:00 Etc/GMT+12", point("2026-12-30T21:00:00Z"), "2027-01-01T06:00:00Z"],
-    // Round 9: a signed hh:mm after a seconds clock, or spaced after a mark, is the stamp's offset.
+    // Round 9: a signed hh:mm after a seconds clock is the stamp's offset; after a minute clock it ends a range.
     ["en-US", "2026-11-20T01:30:15 AM -05:00", point("2026-11-20T06:30:15Z")],
     ["en-US", "2026-11-20T01:30:15 AM-05:00", point("2026-11-20T06:30:15Z")],
     ["en-US", "2026-11-20T01:30:00 AM -05:00", point("2026-11-20T06:30:00Z")],
     ["en-US", "2026-11-20T01:30:15 PM -05:00", point("2026-11-20T18:30:15Z")],
-    ["en-US", "2026-11-20T01:30 AM -05:00", point("2026-11-20T06:30:00Z")],
+    ["en-US", "2026-11-20T01:30 AM -05:00", ["2026-11-20T01:30:00Z", "2026-11-20T05:00:00Z"]],
     ["en-US", "2026-11-20T04:00:00 UTC-07:15", "invalid"],
     ["en-US", "2026-11-20T04:00 UTC-07:15", "invalid"],
     // Round 9: a join that opens a clock affix after a day word is the clock's.
@@ -2179,6 +2180,68 @@ describe("meridiem rule: a mark binds only to the clock beside it, and no text i
       "?from=now-8h&to=now&period=",
     ].map((t): [string, string, Want] => ["en-US", t, "invalid"]),
     ["en-US", "https://x/web/logs?org=a&period=15m#frag", ["2026-11-21T11:45:00Z", LATER]],
+    // Round 10: a day word or year-less date takes the zoned side's day and zone, on both ends.
+    [
+      "en-US",
+      "yesterday from 9am to 5pm Asia/Tokyo",
+      ["2026-12-31T00:00:00Z", "2026-12-31T08:00:00Z"],
+      EVE,
+    ],
+    [
+      "en-US",
+      "yesterday between 9am and 5pm Asia/Tokyo",
+      ["2026-12-31T00:00:00Z", "2026-12-31T08:00:00Z"],
+      EVE,
+    ],
+    [
+      "de-DE",
+      "gestern von 9 bis 17 Uhr Asia/Tokyo",
+      ["2026-12-31T00:00:00Z", "2026-12-31T08:00:00Z"],
+      EVE,
+    ],
+    [
+      "en-US",
+      "today 1am to today 2am Asia/Tokyo",
+      ["2026-12-31T16:00:00Z", "2026-12-31T17:00:00Z"],
+      EVE,
+    ],
+    [
+      "en-US",
+      "yesterday 22:00 to today 01:00 Asia/Tokyo",
+      ["2026-12-31T13:00:00Z", "2026-12-31T16:00:00Z"],
+      EVE,
+    ],
+    [
+      "en-US",
+      "Dec 31 22:00 to Dec 31 23:00 Asia/Tokyo",
+      ["2026-12-31T13:00:00Z", "2026-12-31T14:00:00Z"],
+      EVE,
+    ],
+    [
+      "en-US",
+      "Dec 31 23:00 to Jan 1 01:00 Asia/Tokyo",
+      ["2026-12-31T14:00:00Z", "2026-12-31T16:00:00Z"],
+      EVE,
+    ],
+    ["en-US", "yesterday from 9am UTC to 5pm Asia/Tokyo", "invalid", EVE],
+    [
+      "fr-FR",
+      "de Jan 1 12:00:01 Europe/London à 12:00:02",
+      ["2025-01-01T12:00:01Z", "2025-01-01T12:00:02Z"],
+      "2026-01-01T12:00:00Z",
+    ],
+    // Round 10: a mark before the clock, or after a minute clock, leaves a signed hh:mm a range end.
+    ["ja-JP", "午前9:30 -10:00", ["2026-11-21T09:30:00Z", "2026-11-21T10:00:00Z"], NIGHT],
+    ["ko-KR", "오전 9:30 -10:00", ["2026-11-21T09:30:00Z", "2026-11-21T10:00:00Z"], NIGHT],
+    [
+      "ja-JP",
+      "2026-11-20 午前9:30 -11:00",
+      ["2026-11-20T09:30:00Z", "2026-11-20T11:00:00Z"],
+      NIGHT,
+    ],
+    ["en-US", "9:30 AM -11:00", ["2026-11-21T09:30:00Z", "2026-11-21T11:00:00Z"], NIGHT],
+    ["en-US", "01:30:15 AM -05:00", point("2026-11-21T06:30:15Z")],
+    ["en-US", "2026-11-01 0:30 EDT to 1:30 EST", "invalid"],
   ];
 
   it.each(rows)("%s %s", async (locale, text, want, now = LATER, zone = "UTC") => {
@@ -2191,6 +2254,13 @@ describe("meridiem rule: a mark binds only to the clock beside it, and no text i
     const [from, to] = want.map(isoUs);
     const window = from === to ? 300_000_000 : 0;
     expect([r.reading.startUs, r.reading.endUs]).toEqual([from - window, to + window]);
+  });
+
+  it("round 10: a range keeps a zoned year-less stamp's own year walk", async () => {
+    const text = "von Nov 21 18:00:00 Europe/Berlin bis 2026-11-22T00:00:00Z";
+    const r = await run("de-DE", text, LATER, "UTC", FUTURE);
+    if (r.state !== "valid") throw new Error(JSON.stringify(r));
+    expect(span(r.reading)).toEqual(["2025-11-21T17:00:00Z", "2026-11-22T00:00:00Z"].map(isoUs));
   });
 
   it.each(["2026-11-20 09:30 IST から 11", "2026-11-20 from 09:30 IST to 11"])(
