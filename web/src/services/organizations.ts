@@ -211,6 +211,12 @@ const organizations = {
   resurrect_org: (metaOrg: string, targetOrg: string) => {
     return http().post(`/api/${metaOrg}/organizations/${targetOrg}/resurrect`);
   },
+  block_org: (metaOrg: string, targetOrg: string) => {
+    return http().post(`/api/${metaOrg}/organizations/${targetOrg}/block`);
+  },
+  unblock_org: (metaOrg: string, targetOrg: string) => {
+    return http().post(`/api/${metaOrg}/organizations/${targetOrg}/unblock`);
+  },
 
   // Org ingestion tokens
   list_org_ingestion_tokens: (orgIdentifier: string) => {

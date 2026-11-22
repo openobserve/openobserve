@@ -869,6 +869,7 @@
     "loading": "กำลังโหลด...",
     "getStartedRUM": "Get Started with RUM",
     "beta": "Beta",
+    "alpha": "อัลฟา",
     "optional": "optional",
     "play": "Play",
     "pause": "Pause",
@@ -4862,6 +4863,10 @@
       "failedToInitiateDeletion": "Failed to initiate deletion.",
       "organizationResurrected": "Organization resurrected.",
       "failedToResurrect": "Failed to resurrect.",
+      "organizationBlocked": "บล็อกองค์กรแล้ว",
+      "failedToBlock": "บล็อกไม่สำเร็จ",
+      "organizationUnblocked": "เลิกบล็อกองค์กรแล้ว",
+      "failedToUnblock": "เลิกบล็อกไม่สำเร็จ",
       "organizationUpdated": "Organization updated successfully.",
       "organizationAdded": "Organization added successfully.",
       "requestCompleted": "Request completed successfully.",
@@ -5230,7 +5235,12 @@
     "daysLeft": "{n} days left",
     "resurrect": "Resurrect organization",
     "statusActive": "Active",
-    "statusDeleting": "Deleting"
+    "statusDeleting": "Deleting",
+    "statusBlocked": "ถูกบล็อก",
+    "block": "บล็อกองค์กร",
+    "unblock": "เลิกบล็อกองค์กร",
+    "blockConfirmMessage": "บล็อก {name} หรือไม่? องค์กรจะไม่รับการนำเข้าข้อมูล การค้นหา และการลงชื่อเข้าใช้จนกว่าจะเลิกบล็อก",
+    "blockConfirmLabel": "บล็อก"
   },
   "template": {
     "search": "Search Template"
@@ -14979,6 +14989,12 @@
       "quickMuteTooltip": "Quick mute from an alert",
       "endedLabel": "ended"
     },
+    "lease": {
+      "temporary": "ชั่วคราว สร้างโดย {who} สิ้นสุดเมื่อ {time}",
+      "incidentsOn": "เปิดการสร้างเหตุการณ์ขัดข้องโดย {who} จนถึง {time}",
+      "incidentsOff": "ปิดการสร้างเหตุการณ์ขัดข้องโดย {who} จนถึง {time}",
+      "why": "{label}. เหตุผล: {reason}"
+    },
     "ack": {
       "acknowledge": "Acknowledge",
       "acknowledgeGroups": "กลุ่มที่กำลังแจ้งเตือนทั้งหมด {count} กลุ่ม | กลุ่มที่กำลังแจ้งเตือนทั้งหมด {count} กลุ่ม",
@@ -16217,6 +16233,36 @@
     "nodesDesc": "Cluster nodes and their health",
     "licenseDesc": "Enterprise license details",
     "organizationManagementDesc": "Create and manage organizations",
+    "userManagement": "การจัดการผู้ใช้",
+    "userManagementDesc": "ค้นหาผู้ใช้ในทุกองค์กรและบล็อกพวกเขา",
+    "userManagementPage": {
+      "subtitle": "ผู้ใช้ของทุกองค์กรและสถานะการบล็อก SSO",
+      "searchPlaceholder": "ค้นหาด้วยอีเมลหรือ ID ผู้ใช้",
+      "allOrganizations": "ทุกองค์กร",
+      "filterByOrganization": "กรองตามองค์กร",
+      "email": "อีเมล",
+      "organizations": "องค์กร",
+      "blockState": "สถานะการบล็อก",
+      "orgCount": "{count} องค์กร | {count} องค์กร",
+      "notBlocked": "ไม่ถูกบล็อก",
+      "blockedByEmail": "ถูกบล็อกด้วยอีเมล",
+      "blockedByDomain": "ถูกบล็อกด้วยโดเมน",
+      "block": "บล็อก",
+      "unblock": "เลิกบล็อก",
+      "blockConfirmTitle": "บล็อกผู้ใช้นี้หรือไม่",
+      "blockConfirmMessage": "{email} จะถูกเพิ่มในรายการบล็อก SSO และจะเปิดใช้ข้อจำกัดโดเมน",
+      "blocked": "บล็อก {email} แล้ว",
+      "unblocked": "เลิกบล็อก {email} แล้ว",
+      "updateFailed": "ไม่สามารถอัปเดตรายการบล็อก SSO ได้",
+      "dormantRules": "ข้อจำกัดโดเมนปิดอยู่ และการเปิดใช้จะทำให้กฎที่บันทึกไว้มีผลด้วย โปรดบล็อกผู้ใช้นี้จาก {page}",
+      "detailsTitle": "รายละเอียดผู้ใช้",
+      "userId": "ID ผู้ใช้",
+      "orgId": "ID องค์กร",
+      "orgName": "องค์กร",
+      "role": "บทบาท",
+      "noOrganizations": "ไม่ได้เป็นสมาชิกขององค์กรใด",
+      "ssoOnlyHint": "มีผลเมื่ออีเมลนี้ลงชื่อเข้าใช้ผ่าน SSO"
+    },
     "queryManagement": "Query Management",
     "scrapintervalLabel": "Scrape Interval (In Seconds) *",
     "logoLabel": "Drag & Drop Logo Image",
@@ -16471,7 +16517,8 @@
       "noEmails": "ยังไม่มีที่อยู่อีเมลที่ระบุไว้.",
       "removeDomain": "นำ {domain} ออก",
       "removeEmail": "ลบ {email}",
-      "saved": "บันทึกการตั้งค่า SSO แล้ว"
+      "saved": "บันทึกการตั้งค่า SSO แล้ว",
+      "blocksRemovedKeepsAllowRule": "นำการบล็อกออกแล้ว {domain} ยังคงใช้กฎการอนุญาตเดิม"
     },
     "general": {
       "close": "ปิด",
@@ -23848,6 +23895,7 @@
       "llmProviders": "LLM Providers",
       "aiToolsets": "AI Toolsets",
       "orgManagement": "Organization Management",
+      "userManagement": "การจัดการผู้ใช้",
       "rumErrors": "RUM — Error Tracking",
       "rumSessions": "{product} — Sessions",
       "sourceMaps": "RUM — Source Maps",
@@ -23965,6 +24013,7 @@
       "llmProvidersRefresh": "Refresh list",
       "aiToolsetsRefresh": "Refresh list",
       "orgManagementRefresh": "Refresh list",
+      "userManagementRefresh": "Refresh list",
       "rumErrorsRefresh": "Refresh list",
       "rumErrorsCopyUrl": "Copy error tracking share URL",
       "rumSessionsRefresh": "Refresh list",

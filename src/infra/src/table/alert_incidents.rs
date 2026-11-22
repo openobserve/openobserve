@@ -1768,6 +1768,21 @@ pub async fn get_incident_alerts(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// The incident's first linked firing as (alert id, alert kind), read on the primary.
+pub async fn opening_alert(incident_id: &str) -> Result<Option<(String, String)>, errors::Error> {
+    alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::AlertId)
+        .column(alert_incident_alerts::Column::AlertKind)
+        .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
+        .order_by_asc(alert_incident_alerts::Column::CreatedAt)
+        .order_by_asc(alert_incident_alerts::Column::AlertFiredAt)
+        .into_tuple()
+        .one(get_orm_client_rw().await)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 /// The incident a move out of `from_id` took the alert's firings to, named by its SplitFrom event
 /// (never its key type, which a later firing's dimensions change) and read on the primary.
 pub async fn moved_out_to(

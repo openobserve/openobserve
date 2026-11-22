@@ -869,6 +869,7 @@
     "loading": "載入中...",
     "getStartedRUM": "開始使用 RUM",
     "beta": "測試版",
+    "alpha": "Alpha 版",
     "optional": "選填",
     "play": "播放",
     "pause": "暫停",
@@ -4862,6 +4863,10 @@
       "failedToInitiateDeletion": "啟動刪除失敗。",
       "organizationResurrected": "組織已復原。",
       "failedToResurrect": "復原失敗。",
+      "organizationBlocked": "組織已封鎖。",
+      "failedToBlock": "封鎖失敗。",
+      "organizationUnblocked": "組織已解除封鎖。",
+      "failedToUnblock": "解除封鎖失敗。",
       "organizationUpdated": "組織更新成功。",
       "organizationAdded": "組織新增成功。",
       "requestCompleted": "要求已成功完成。",
@@ -5230,7 +5235,12 @@
     "daysLeft": "剩餘 {n} 天",
     "resurrect": "恢復組織",
     "statusActive": "啟用中",
-    "statusDeleting": "刪除中"
+    "statusDeleting": "刪除中",
+    "statusBlocked": "已封鎖",
+    "block": "封鎖組織",
+    "unblock": "解除封鎖組織",
+    "blockConfirmMessage": "封鎖 {name}？在解除封鎖之前，該組織將不再接受資料擷取、查詢和登入。",
+    "blockConfirmLabel": "封鎖"
   },
   "template": {
     "search": "搜尋範本"
@@ -14976,6 +14986,12 @@
       "quickMuteTooltip": "從警示快速靜音",
       "endedLabel": "已結束"
     },
+    "lease": {
+      "temporary": "暫時性，由 {who} 建立，於 {time} 結束",
+      "incidentsOn": "事件建立已由 {who} 開啟，直到 {time}",
+      "incidentsOff": "事件建立已由 {who} 關閉，直到 {time}",
+      "why": "{label}。原因：{reason}"
+    },
     "ack": {
       "acknowledge": "確認",
       "acknowledgeGroups": "全部 {count} 個觸發中群組 | 全部 {count} 個觸發中群組",
@@ -16214,6 +16230,36 @@
     "nodesDesc": "叢集節點及其健康狀態",
     "licenseDesc": "企業版授權詳細資料",
     "organizationManagementDesc": "建立與管理組織",
+    "userManagement": "使用者管理",
+    "userManagementDesc": "尋找所有組織中的使用者並封鎖他們",
+    "userManagementPage": {
+      "subtitle": "所有組織的使用者及其 SSO 封鎖狀態",
+      "searchPlaceholder": "依電子郵件或使用者 ID 搜尋",
+      "allOrganizations": "所有組織",
+      "filterByOrganization": "依組織篩選",
+      "email": "電子郵件",
+      "organizations": "組織",
+      "blockState": "封鎖狀態",
+      "orgCount": "{count} 個組織 | {count} 個組織",
+      "notBlocked": "未封鎖",
+      "blockedByEmail": "依電子郵件封鎖",
+      "blockedByDomain": "依網域封鎖",
+      "block": "封鎖",
+      "unblock": "解除封鎖",
+      "blockConfirmTitle": "要封鎖此使用者嗎？",
+      "blockConfirmMessage": "{email} 將加入 SSO 封鎖清單，並開啟網域限制。",
+      "blocked": "已封鎖 {email}",
+      "unblocked": "已解除封鎖 {email}",
+      "updateFailed": "無法更新 SSO 封鎖清單",
+      "dormantRules": "網域限制目前關閉，開啟後其中儲存的規則也會生效。請在 {page} 中封鎖此使用者。",
+      "detailsTitle": "使用者詳細資料",
+      "userId": "使用者 ID",
+      "orgId": "組織 ID",
+      "orgName": "組織",
+      "role": "角色",
+      "noOrganizations": "不屬於任何組織",
+      "ssoOnlyHint": "在此電子郵件透過 SSO 登入時生效"
+    },
     "queryManagement": "查詢管理",
     "scrapintervalLabel": "擷取間隔 (秒) *",
     "logoLabel": "拖放 Logo 圖片",
@@ -16468,7 +16514,8 @@
       "noEmails": "尚無列出的電子郵件地址。",
       "removeDomain": "移除 {domain}",
       "removeEmail": "移除 {email}",
-      "saved": "SSO 設定已儲存"
+      "saved": "SSO 設定已儲存",
+      "blocksRemovedKeepsAllowRule": "已移除封鎖。{domain} 保留其允許規則。"
     },
     "general": {
       "close": "關閉",
@@ -23845,6 +23892,7 @@
       "llmProviders": "LLM 提供者",
       "aiToolsets": "AI 工具集",
       "orgManagement": "組織管理",
+      "userManagement": "使用者管理",
       "rumErrors": "RUM — 錯誤追蹤",
       "rumSessions": "{product} — 工作階段",
       "sourceMaps": "RUM — 來源映射",
@@ -23962,6 +24010,7 @@
       "llmProvidersRefresh": "刷新列表",
       "aiToolsetsRefresh": "刷新列表",
       "orgManagementRefresh": "刷新列表",
+      "userManagementRefresh": "刷新列表",
       "rumErrorsRefresh": "刷新列表",
       "rumErrorsCopyUrl": "複製錯誤追蹤分享 URL",
       "rumSessionsRefresh": "刷新列表",

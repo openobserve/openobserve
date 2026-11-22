@@ -869,6 +869,7 @@
     "loading": "Wird geladen...",
     "getStartedRUM": "Erste Schritte mit RUM",
     "beta": "Beta",
+    "alpha": "Alpha",
     "optional": "optional",
     "play": "Abspielen",
     "pause": "Pause",
@@ -4862,6 +4863,10 @@
       "failedToInitiateDeletion": "Löschung konnte nicht eingeleitet werden.",
       "organizationResurrected": "Organisation wiederhergestellt.",
       "failedToResurrect": "Wiederherstellung fehlgeschlagen.",
+      "organizationBlocked": "Organisation gesperrt.",
+      "failedToBlock": "Sperren fehlgeschlagen.",
+      "organizationUnblocked": "Organisation entsperrt.",
+      "failedToUnblock": "Entsperren fehlgeschlagen.",
       "organizationUpdated": "Organisation erfolgreich aktualisiert.",
       "organizationAdded": "Organisation erfolgreich hinzugefügt.",
       "requestCompleted": "Anfrage erfolgreich abgeschlossen.",
@@ -5230,7 +5235,12 @@
     "daysLeft": "{n} Tage verbleibend",
     "resurrect": "Organisation wiederherstellen",
     "statusActive": "Aktiv",
-    "statusDeleting": "Wird gelöscht"
+    "statusDeleting": "Wird gelöscht",
+    "statusBlocked": "Gesperrt",
+    "block": "Organisation sperren",
+    "unblock": "Organisation entsperren",
+    "blockConfirmMessage": "{name} sperren? Bis zur Entsperrung nimmt die Organisation keine Datenaufnahme, Abfragen oder Anmeldungen mehr an.",
+    "blockConfirmLabel": "Sperren"
   },
   "template": {
     "search": "Vorlage suchen"
@@ -14981,6 +14991,12 @@
       "quickMuteTooltip": "Schnelles Stummschalten aus einem Alarm",
       "endedLabel": "beendet"
     },
+    "lease": {
+      "temporary": "Temporär, erstellt von {who}, endet um {time}",
+      "incidentsOn": "Vorfallserstellung aktiviert von {who} bis {time}",
+      "incidentsOff": "Vorfallserstellung deaktiviert von {who} bis {time}",
+      "why": "{label}. Grund: {reason}"
+    },
     "ack": {
       "acknowledge": "Quittieren",
       "acknowledgeGroups": "Alle {count} ausgelöste Gruppe | Alle {count} ausgelösten Gruppen",
@@ -16219,6 +16235,36 @@
     "nodesDesc": "Cluster-Knoten und deren Zustand",
     "licenseDesc": "Details zur Enterprise-Lizenz",
     "organizationManagementDesc": "Organisationen erstellen und verwalten",
+    "userManagement": "Benutzerverwaltung",
+    "userManagementDesc": "Benutzer in allen Organisationen finden und sperren",
+    "userManagementPage": {
+      "subtitle": "Benutzer aller Organisationen und ihr SSO-Sperrstatus",
+      "searchPlaceholder": "Nach E-Mail oder Benutzer-ID suchen",
+      "allOrganizations": "Alle Organisationen",
+      "filterByOrganization": "Nach Organisation filtern",
+      "email": "E-Mail",
+      "organizations": "Organisationen",
+      "blockState": "Sperrstatus",
+      "orgCount": "{count} Organisation | {count} Organisationen",
+      "notBlocked": "Nicht gesperrt",
+      "blockedByEmail": "Per E-Mail gesperrt",
+      "blockedByDomain": "Per Domain gesperrt",
+      "block": "Sperren",
+      "unblock": "Entsperren",
+      "blockConfirmTitle": "Diesen Benutzer sperren?",
+      "blockConfirmMessage": "{email} wird zur SSO-Sperrliste hinzugefügt, und die Domain-Einschränkungen werden aktiviert.",
+      "blocked": "{email} ist gesperrt",
+      "unblocked": "{email} ist entsperrt",
+      "updateFailed": "Die SSO-Sperrliste konnte nicht aktualisiert werden",
+      "dormantRules": "Die Domain-Einschränkungen sind aus, und beim Einschalten würden auch ihre gespeicherten Regeln gelten. Sperren Sie diesen Benutzer über {page}.",
+      "detailsTitle": "Benutzerdetails",
+      "userId": "Benutzer-ID",
+      "orgId": "Organisations-ID",
+      "orgName": "Organisation",
+      "role": "Rolle",
+      "noOrganizations": "Kein Mitglied einer Organisation",
+      "ssoOnlyHint": "Gilt, wenn sich diese E-Mail über SSO anmeldet"
+    },
     "queryManagement": "Verwaltung von Abfragen",
     "scrapintervalLabel": "Scraping Intervall (in Sekunden) *",
     "logoLabel": "Logobild per Drag & Drop",
@@ -16473,7 +16519,8 @@
       "noEmails": "Noch keine E-Mail-Adressen aufgeführt.",
       "removeDomain": "{domain} entfernen",
       "removeEmail": "{email} entfernen",
-      "saved": "SSO-Einstellungen gespeichert"
+      "saved": "SSO-Einstellungen gespeichert",
+      "blocksRemovedKeepsAllowRule": "Sperren entfernt. {domain} behält seine Zulassungsregel."
     },
     "general": {
       "close": "Schließen",
@@ -23850,6 +23897,7 @@
       "llmProviders": "LLM-Anbieter",
       "aiToolsets": "KI-Toolsets",
       "orgManagement": "Verwaltung der Organisation",
+      "userManagement": "Benutzerverwaltung",
       "rumErrors": "RUM — Fehlerverfolgung",
       "rumSessions": "{product} — Sitzungen",
       "sourceMaps": "RUM — Quellkarten",
@@ -23967,6 +24015,7 @@
       "llmProvidersRefresh": "Liste aktualisieren",
       "aiToolsetsRefresh": "Liste aktualisieren",
       "orgManagementRefresh": "Liste aktualisieren",
+      "userManagementRefresh": "Liste aktualisieren",
       "rumErrorsRefresh": "Liste aktualisieren",
       "rumErrorsCopyUrl": "Fehlerverfolgungs-Freigabe-URL kopieren",
       "rumSessionsRefresh": "Liste aktualisieren",

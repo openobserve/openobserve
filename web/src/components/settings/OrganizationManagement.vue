@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSearchInput
               data-test="org-management-search-input"
               v-model="filterQuery"
-              class="no-border o2-search-input w-64 max-md:w-auto max-md:flex-1"
+              class="no-border o2-search-input min-w-0 flex-1 max-md:min-w-40"
               :placeholder="t('settings.searchOrgs')"
             />
           </template>
@@ -138,14 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ formatCredits(row.status_steps_limit) }}
           </template>
           <template #cell-status="{ row }">
-            <OBadge
-              :variant="
-                row.status === 'pending_deletion' || row.status === 'deleting'
-                  ? 'warning'
-                  : 'success-soft'
-              "
-              size="sm"
-            >
+            <OBadge :variant="statusVariant(row)" size="sm">
               {{ statusLabel(row) }}
             </OBadge>
           </template>
@@ -272,6 +265,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OTooltip :content="t('organization.resurrect')" />
               </OButton>
+              <OButton
+                v-if="isBlockable(row)"
+                variant="ghost-destructive"
+                size="icon-xs-circle"
+                icon-left="do-not-disturb-on"
+                class="max-md:hidden"
+                :aria-label="t('organization.block')"
+                data-test="org-management-block-btn"
+                @click.stop="confirmBlockOrganization(row)"
+              >
+                <OTooltip :content="t('organization.block')" />
+              </OButton>
+              <OButton
+                v-if="row.status === 'blocked'"
+                variant="ghost"
+                size="icon-xs-circle"
+                icon-left="check-circle-outline"
+                class="max-md:hidden"
+                :aria-label="t('organization.unblock')"
+                data-test="org-management-unblock-btn"
+                @click.stop="unblockOrganization(row)"
+              >
+                <OTooltip :content="t('organization.unblock')" />
+              </OButton>
               <ODropdown side="bottom" align="end">
                 <template #trigger>
                   <OButton
@@ -366,6 +383,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="resurrectOrganization(row)"
                 >
                   <span>{{ t("organization.resurrect") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="isBlockable(row)"
+                  icon-left="do-not-disturb-on"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="org-management-block-btn-menu"
+                  @select="confirmBlockOrganization(row)"
+                >
+                  <span>{{ t("organization.block") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.status === 'blocked'"
+                  icon-left="check-circle-outline"
+                  class="md:hidden"
+                  data-test="org-management-unblock-btn-menu"
+                  @select="unblockOrganization(row)"
+                >
+                  <span>{{ t("organization.unblock") }}</span>
                 </ODropdownItem>
               </ODropdown>
             </div>
@@ -641,6 +677,9 @@ type QuotaPool =
   | "synthetics_browser_steps"
   | "synthetics_protocol_steps"
   | "synthetics_status_protocol";
+
+// The server refuses to block these, so they never offer the action.
+const UNBLOCKABLE_ORG_IDS = ["_meta", "default"];
 
 export default defineComponent({
   name: "PageAlerts",
@@ -1062,8 +1101,18 @@ export default defineComponent({
       if (row.status === "pending_deletion") return pendingLabel(row);
       if (row.status === "deleting") return t("organization.statusDeleting");
       if (row.status === "active") return t("organization.statusActive");
+      if (row.status === "blocked") return t("organization.statusBlocked");
       return row.status;
     };
+
+    const statusVariant = (row: any) => {
+      if (row.status === "pending_deletion" || row.status === "deleting") return "warning";
+      if (row.status === "blocked") return "error-soft";
+      return "success-soft";
+    };
+
+    const isBlockable = (row: any): boolean =>
+      row.status === "active" && !UNBLOCKABLE_ORG_IDS.includes(row.identifier);
 
     const pendingLabel = (row: any): string => {
       if (!row.deleted_at || !row.grace_period_days) return t("organization.pendingDeletion");
@@ -1085,6 +1134,43 @@ export default defineComponent({
         toast({
           variant: "error",
           message: e?.response?.data?.message || t("iam.listOrganizations.failedToResurrect"),
+        });
+      }
+    };
+
+    const confirmBlockOrganization = async (row: any) => {
+      const ok = await confirm({
+        title: t("organization.block"),
+        messageKeypath: "organization.blockConfirmMessage",
+        messageName: row.name,
+        confirmLabel: t("organization.blockConfirmLabel"),
+        confirmVariant: "destructive",
+        focusCancel: true,
+      });
+      if (!ok) return;
+      try {
+        await OrganizationServices.block_org(store.state.zoConfig.meta_org, row.identifier);
+        analytics.track("org_management_org_blocked");
+        toast({ variant: "success", message: t("iam.listOrganizations.organizationBlocked") });
+        getData();
+      } catch (e: any) {
+        toast({
+          variant: "error",
+          message: e?.response?.data?.message || t("iam.listOrganizations.failedToBlock"),
+        });
+      }
+    };
+
+    const unblockOrganization = async (row: any) => {
+      try {
+        await OrganizationServices.unblock_org(store.state.zoConfig.meta_org, row.identifier);
+        analytics.track("org_management_org_unblocked");
+        toast({ variant: "success", message: t("iam.listOrganizations.organizationUnblocked") });
+        getData();
+      } catch (e: any) {
+        toast({
+          variant: "error",
+          message: e?.response?.data?.message || t("iam.listOrganizations.failedToUnblock"),
         });
       }
     };
@@ -1524,7 +1610,11 @@ export default defineComponent({
       viewCleanupTasks,
       pendingLabel,
       statusLabel,
+      statusVariant,
+      isBlockable,
       resurrectOrganization,
+      confirmBlockOrganization,
+      unblockOrganization,
       store,
       // Form wiring (Options-API: schemas/defaults MUST be returned so :schema
       // resolves and validation runs).

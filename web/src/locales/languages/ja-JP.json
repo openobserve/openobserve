@@ -869,6 +869,7 @@
     "loading": "読み込み中...",
     "getStartedRUM": "RUMを始める",
     "beta": "ベータ",
+    "alpha": "アルファ",
     "optional": "オプション",
     "play": "再生",
     "pause": "一時停止",
@@ -4862,6 +4863,10 @@
       "failedToInitiateDeletion": "削除の開始に失敗しました。",
       "organizationResurrected": "組織を復活しました。",
       "failedToResurrect": "復活に失敗しました。",
+      "organizationBlocked": "組織をブロックしました。",
+      "failedToBlock": "ブロックに失敗しました。",
+      "organizationUnblocked": "組織のブロックを解除しました。",
+      "failedToUnblock": "ブロックの解除に失敗しました。",
       "organizationUpdated": "組織の更新に成功しました。",
       "organizationAdded": "組織の追加に成功しました。",
       "requestCompleted": "リクエストが正常に完了しました。",
@@ -5230,7 +5235,12 @@
     "daysLeft": "残り{n}日",
     "resurrect": "組織を復活",
     "statusActive": "有効",
-    "statusDeleting": "削除中"
+    "statusDeleting": "削除中",
+    "statusBlocked": "ブロック中",
+    "block": "組織をブロック",
+    "unblock": "組織のブロックを解除",
+    "blockConfirmMessage": "{name} をブロックしますか？ブロックを解除するまで、取り込み、クエリ、サインインを受け付けません。",
+    "blockConfirmLabel": "ブロック"
   },
   "template": {
     "search": "テンプレートを検索"
@@ -14981,6 +14991,12 @@
       "quickMuteTooltip": "アラートからのクイックミュート",
       "endedLabel": "終了"
     },
+    "lease": {
+      "temporary": "一時的、{who} により作成、{time} に終了",
+      "incidentsOn": "インシデント作成が {who} により {time} まで有効化されています",
+      "incidentsOff": "インシデント作成が {who} により {time} まで無効化されています",
+      "why": "{label}。理由: {reason}"
+    },
     "ack": {
       "acknowledge": "確認",
       "acknowledgeGroups": "すべての {count} 件の発火グループ | すべての {count} 件の発火グループ",
@@ -16219,6 +16235,36 @@
     "nodesDesc": "クラスターノードとそのヘルス状態",
     "licenseDesc": "エンタープライズライセンスの詳細",
     "organizationManagementDesc": "組織の作成と管理",
+    "userManagement": "ユーザー管理",
+    "userManagementDesc": "すべての組織のユーザーを検索してブロックします",
+    "userManagementPage": {
+      "subtitle": "すべての組織のユーザーと SSO ブロック状態",
+      "searchPlaceholder": "メールアドレスまたはユーザー ID で検索",
+      "allOrganizations": "すべての組織",
+      "filterByOrganization": "組織で絞り込み",
+      "email": "メールアドレス",
+      "organizations": "組織",
+      "blockState": "ブロック状態",
+      "orgCount": "{count} 組織 | {count} 組織",
+      "notBlocked": "ブロックされていません",
+      "blockedByEmail": "メールでブロック",
+      "blockedByDomain": "ドメインでブロック",
+      "block": "ブロック",
+      "unblock": "ブロック解除",
+      "blockConfirmTitle": "このユーザーをブロックしますか？",
+      "blockConfirmMessage": "{email} が SSO ブロックリストに追加され、ドメイン制限が有効になります。",
+      "blocked": "{email} をブロックしました",
+      "unblocked": "{email} のブロックを解除しました",
+      "updateFailed": "SSO ブロックリストを更新できませんでした",
+      "dormantRules": "ドメイン制限は無効になっており、有効にすると保存されているルールもすべて適用されます。{page} からこのユーザーをブロックしてください。",
+      "detailsTitle": "ユーザーの詳細",
+      "userId": "ユーザー ID",
+      "orgId": "組織 ID",
+      "orgName": "組織",
+      "role": "ロール",
+      "noOrganizations": "どの組織にも所属していません",
+      "ssoOnlyHint": "このメールアドレスが SSO でサインインするときに適用されます"
+    },
     "queryManagement": "クエリ管理",
     "scrapintervalLabel": "スクレイプ間隔（秒）*",
     "logoLabel": "ロゴ画像をドラッグ＆ドロップ",
@@ -16473,7 +16519,8 @@
       "noEmails": "メールアドレスはまだ登録されていません。",
       "removeDomain": "{domain} を削除",
       "removeEmail": "{email} を削除",
-      "saved": "SSO 設定を保存しました"
+      "saved": "SSO 設定を保存しました",
+      "blocksRemovedKeepsAllowRule": "ブロックを削除しました。{domain} の許可ルールは維持されます。"
     },
     "general": {
       "close": "閉じる",
@@ -23850,6 +23897,7 @@
       "llmProviders": "LLM プロバイダー",
       "aiToolsets": "AI ツールセット",
       "orgManagement": "組織管理",
+      "userManagement": "ユーザー管理",
       "rumErrors": "RUM — エラートラッキング",
       "rumSessions": "{product} — セッション",
       "sourceMaps": "RUM — ソースマップ",
@@ -23967,6 +24015,7 @@
       "llmProvidersRefresh": "リストを更新",
       "aiToolsetsRefresh": "リストを更新",
       "orgManagementRefresh": "リストを更新",
+      "userManagementRefresh": "リストを更新",
       "rumErrorsRefresh": "リストを更新",
       "rumErrorsCopyUrl": "エラートラッキング共有URLをコピー",
       "rumSessionsRefresh": "リストを更新",

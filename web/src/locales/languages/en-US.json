@@ -869,6 +869,7 @@
     "loading": "Loading...",
     "getStartedRUM": "Get Started with RUM",
     "beta": "Beta",
+    "alpha": "Alpha",
     "optional": "optional",
     "play": "Play",
     "pause": "Pause",
@@ -4862,6 +4863,10 @@
       "failedToInitiateDeletion": "Failed to initiate deletion.",
       "organizationResurrected": "Organization resurrected.",
       "failedToResurrect": "Failed to resurrect.",
+      "organizationBlocked": "Organization blocked.",
+      "failedToBlock": "Failed to block.",
+      "organizationUnblocked": "Organization unblocked.",
+      "failedToUnblock": "Failed to unblock.",
       "organizationUpdated": "Organization updated successfully.",
       "organizationAdded": "Organization added successfully.",
       "requestCompleted": "Request completed successfully.",
@@ -5230,7 +5235,12 @@
     "daysLeft": "{n} days left",
     "resurrect": "Resurrect organization",
     "statusActive": "Active",
-    "statusDeleting": "Deleting"
+    "statusDeleting": "Deleting",
+    "statusBlocked": "Blocked",
+    "block": "Block organization",
+    "unblock": "Unblock organization",
+    "blockConfirmMessage": "Block {name}? It stops accepting ingestion, queries and sign-ins until it is unblocked.",
+    "blockConfirmLabel": "Block"
   },
   "template": {
     "search": "Search Template"
@@ -14979,6 +14989,12 @@
       "quickMuteTooltip": "Quick mute from an alert",
       "endedLabel": "ended"
     },
+    "lease": {
+      "temporary": "Temporary, created by {who}, ends at {time}",
+      "incidentsOn": "Incident creation turned on by {who} until {time}",
+      "incidentsOff": "Incident creation turned off by {who} until {time}",
+      "why": "{label}. Why: {reason}"
+    },
     "ack": {
       "acknowledge": "Acknowledge",
       "acknowledgeGroups": "All {count} firing group | All {count} firing groups",
@@ -16217,6 +16233,36 @@
     "nodesDesc": "Cluster nodes and their health",
     "licenseDesc": "Enterprise license details",
     "organizationManagementDesc": "Create and manage organizations",
+    "userManagement": "User Management",
+    "userManagementDesc": "Find users in every organization and block them",
+    "userManagementPage": {
+      "subtitle": "Users of every organization and their SSO block state",
+      "searchPlaceholder": "Search by email or user ID",
+      "allOrganizations": "All organizations",
+      "filterByOrganization": "Filter by organization",
+      "email": "Email",
+      "organizations": "Organizations",
+      "blockState": "Block state",
+      "orgCount": "{count} organization | {count} organizations",
+      "notBlocked": "Not blocked",
+      "blockedByEmail": "Blocked by email",
+      "blockedByDomain": "Blocked by domain",
+      "block": "Block",
+      "unblock": "Unblock",
+      "blockConfirmTitle": "Block this user?",
+      "blockConfirmMessage": "{email} is added to the SSO blocklist, and domain restrictions are turned on.",
+      "blocked": "{email} is blocked",
+      "unblocked": "{email} is unblocked",
+      "updateFailed": "Could not update the SSO blocklist",
+      "dormantRules": "Domain restrictions are off, and turning them on would also apply the rules they hold. Block this user from {page}.",
+      "detailsTitle": "User details",
+      "userId": "User ID",
+      "orgId": "Organization ID",
+      "orgName": "Organization",
+      "role": "Role",
+      "noOrganizations": "Not a member of any organization",
+      "ssoOnlyHint": "Applies when this email signs in through SSO"
+    },
     "queryManagement": "Query Management",
     "scrapintervalLabel": "Scrape Interval (In Seconds) *",
     "logoLabel": "Drag & Drop Logo Image",
@@ -16471,7 +16517,8 @@
       "noEmails": "No email addresses listed yet.",
       "removeDomain": "Remove {domain}",
       "removeEmail": "Remove {email}",
-      "saved": "SSO settings saved"
+      "saved": "SSO settings saved",
+      "blocksRemovedKeepsAllowRule": "Blocks removed. {domain} keeps its allow rule."
     },
     "general": {
       "close": "Close",
@@ -23848,6 +23895,7 @@
       "llmProviders": "LLM Providers",
       "aiToolsets": "AI Toolsets",
       "orgManagement": "Organization Management",
+      "userManagement": "User Management",
       "rumErrors": "RUM — Error Tracking",
       "rumSessions": "{product} — Sessions",
       "sourceMaps": "RUM — Source Maps",
@@ -23965,6 +24013,7 @@
       "llmProvidersRefresh": "Refresh list",
       "aiToolsetsRefresh": "Refresh list",
       "orgManagementRefresh": "Refresh list",
+      "userManagementRefresh": "Refresh list",
       "rumErrorsRefresh": "Refresh list",
       "rumErrorsCopyUrl": "Copy error tracking share URL",
       "rumSessionsRefresh": "Refresh list",

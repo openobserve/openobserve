@@ -2328,10 +2328,34 @@ mod tests {
         assert!(all_cache_modules(true).contains(&"downtimes"));
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn with_downtimes_off_a_cache_reload_loads_no_downtime() {
+        use config::meta::folder::{DEFAULT_FOLDER, Folder, FolderType};
+        crate::request::security::tests::meta_store().await;
+        // Other tests fill the process-wide cache, so only this test's own org is asked about.
+        let org = format!("reload_off_{}", config::utils::time::now_micros());
+        let folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: String::new(),
+            icon: None,
+        };
+        infra::table::folders::get_or_create(&org, folder, FolderType::Downtimes)
+            .await
+            .unwrap();
+        let row: config::meta::downtimes::Downtime = serde_json::from_value(serde_json::json!({
+            "id": org, "org": org, "name": "stored", "targets": [],
+            "schedule": { "repeat": "none", "starts_at": 0, "timezone": "UTC", "duration_secs": 60 },
+            "created_by": "root@example.com", "created_at": 0,
+            "updated_by": "root@example.com", "updated_at": 0
+        }))
+        .unwrap();
+        infra::table::downtimes::put_with(infra::db::get_orm_client_rw().await, &row)
+            .await
+            .unwrap();
         reload_downtimes(false).await.unwrap();
-        assert!(db::downtimes::all_cached().is_empty());
+        assert!(db::downtimes::list_cached(&org).is_empty());
     }
 
     #[test]
