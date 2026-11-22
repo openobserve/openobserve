@@ -60,6 +60,8 @@ pub struct RenderQuery {
 /// payload hash. Replays — Slack's double-fetch, Teams clients re-fetching on
 /// every view — become memory reads instead of renders. ~32 × ~35 KB ≈ 1 MB.
 const CACHE_CAPACITY: usize = 32;
+/// A normal render takes milliseconds; past this the request gets the usual 404.
+const RENDER_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 /// FIFO of (payload hash, rendered PNG).
 type RenderCache = VecDeque<(u64, Arc<Vec<u8>>)>;
 static RENDER_CACHE: std::sync::LazyLock<std::sync::Mutex<RenderCache>> =
@@ -145,22 +147,34 @@ pub async fn render_chart(
 
     // Bounded render capacity: at the cap this sheds load with a 404 rather
     // than queueing — charts must never pile work onto a busy node.
-    let Ok(_permit) = chart::render_semaphore().try_acquire() else {
+    let Ok(permit) = chart::render_semaphore().try_acquire() else {
         event("over_capacity");
         return MetaHttpResponse::not_found("not found");
     };
 
-    match chart::render::render_png(&payload) {
-        Ok(png) => {
+    // The permit moves into the task, so a render that outlives the timeout keeps its slot.
+    let render = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        chart::render::render_png(&payload)
+    });
+    match tokio::time::timeout(RENDER_TIMEOUT, render).await {
+        Ok(Ok(Ok(png))) => {
             event("rendered_fetch");
             let png = Arc::new(png);
             cache_put(ckey, png.clone());
             png_response(png)
         }
-        Err(e) => {
-            // Only reachable with a validly signed payload — our own bug, not
-            // attacker input; log it, still answer 404.
+        Ok(Ok(Err(e))) => {
             log::warn!("[ALERT_CHART] fetch-time render failed: {e}");
+            MetaHttpResponse::not_found("not found")
+        }
+        Ok(Err(e)) => {
+            log::error!("[ALERT_CHART] fetch-time render task failed: {e}");
+            MetaHttpResponse::not_found("not found")
+        }
+        Err(_) => {
+            log::error!("[ALERT_CHART] fetch-time render timed out after {RENDER_TIMEOUT:?}");
+            event("render_timeout");
             MetaHttpResponse::not_found("not found")
         }
     }

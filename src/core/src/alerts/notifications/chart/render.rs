@@ -205,6 +205,10 @@ fn axis_ranges(p: &ChartPayload) -> Option<((u64, u64), (f64, f64))> {
     let pad = (y_max - y_min) * 0.15;
     y_max += pad;
     y_min -= pad * 0.3;
+    // An overflowed span (e.g. 1e308 and -1e308) makes plotters loop forever.
+    if !(y_max - y_min).is_finite() {
+        return None;
+    }
     Some(((x_min, x_max), (y_min, y_max)))
 }
 
@@ -415,6 +419,29 @@ mod tests {
         assert_eq!(red_pixels(&render_png(&p).unwrap()), 0);
         // The threshold chart still marks its trigger point.
         assert!(red_pixels(&render_png(&sample()).unwrap()) > 0);
+    }
+
+    #[test]
+    fn overflowing_value_range_is_an_error() {
+        for (hi, lo) in [(1e308, -1e308), (9e307, -9e307), (f64::MAX, 0.0)] {
+            let mut p = sample();
+            p.points[0].1 = hi;
+            p.points[1].1 = lo;
+            assert!(render_png(&p).is_err(), "{hi} / {lo}");
+        }
+        let mut p = anomaly_sample();
+        p.marks = vec![(1_700_000_000, 1e308), (1_700_000_060, -1e308)];
+        assert!(render_png(&p).is_err());
+    }
+
+    #[test]
+    fn large_finite_value_range_renders() {
+        for (hi, lo) in [(1e308, 0.0), (1e300, -1e300), (1e15, -1e15)] {
+            let mut p = sample();
+            p.points[0].1 = hi;
+            p.points[1].1 = lo;
+            assert!(render_png(&p).is_ok(), "{hi} / {lo}");
+        }
     }
 
     #[test]
