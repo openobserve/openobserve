@@ -418,9 +418,8 @@ pub struct IncidentAiUsage;
 
 #[async_trait]
 impl AiUsagePort for IncidentAiUsage {
-    #[cfg_attr(not(feature = "cloud"), allow(unused_variables))]
     async fn authorize(&self, org: &str) -> anyhow::Result<AiPermit> {
-        if let Some(off) = crate::alerts::incidents::rca_not_run_reason() {
+        if let Some(off) = crate::alerts::incidents::rca_not_run_reason(org) {
             return Ok(AiPermit::Refused(off.to_string()));
         }
         #[cfg(feature = "cloud")]
@@ -1181,7 +1180,8 @@ mod tests {
     /// Tests run without an agent target, so the incident's analysis is off and so is the port.
     #[tokio::test]
     async fn ai_usage_follows_the_incident_analysis_and_never_deducts() {
-        let off = crate::alerts::incidents::rca_not_run_reason().expect("no agent in tests");
+        let off =
+            crate::alerts::incidents::rca_not_run_reason("default").expect("no agent in tests");
         #[cfg(feature = "cloud")]
         let pool = crate::trial_quota::TrialQuotaFeature::IncidentReAnalysis.pool();
         #[cfg(feature = "cloud")]

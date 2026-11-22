@@ -114,7 +114,7 @@ impl InvestigationPort for IncidentInvestigation {
         let Some(org) = recoveries.first().map(|r| r.org.clone()) else {
             return Ok(Vec::new());
         };
-        if !incidents_enabled() {
+        if !incidents_enabled(&org) {
             return Ok(vec![false; recoveries.len()]);
         }
         let subjects: Vec<String> = recoveries.iter().map(recovery_subject).collect();
