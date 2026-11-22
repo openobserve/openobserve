@@ -373,9 +373,7 @@ fn logs_error_status(e: &infra::errors::Error) -> StatusCode {
     match e {
         Error::ResourceError(_) => StatusCode::SERVICE_UNAVAILABLE,
         Error::TrialPeriodExpired => StatusCode::TOO_MANY_REQUESTS,
-        Error::Ingestion(
-            IngestionError::OrgBlocked(_) | IngestionError::OrgBlockedByOperator(_),
-        ) => StatusCode::FORBIDDEN,
+        Error::Ingestion(IngestionError::OrgBlocked(..)) => StatusCode::FORBIDDEN,
         Error::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
         Error::IngestionError(msg) if is_retryable_admission(msg) => {
             StatusCode::SERVICE_UNAVAILABLE
@@ -595,7 +593,7 @@ mod tests {
 
     #[test]
     fn logs_admission_errors_map_to_retryable_or_final_statuses() {
-        use infra::errors::{Error, IngestionError};
+        use infra::errors::{Error, IngestionError, OrgBlockKind};
 
         for (e, status) in [
             (
@@ -604,11 +602,17 @@ mod tests {
             ),
             (Error::TrialPeriodExpired, StatusCode::TOO_MANY_REQUESTS),
             (
-                Error::from(IngestionError::OrgBlocked("acme".to_string())),
+                Error::from(IngestionError::OrgBlocked(
+                    "acme".to_string(),
+                    OrgBlockKind::Deleted,
+                )),
                 StatusCode::FORBIDDEN,
             ),
             (
-                Error::from(IngestionError::OrgBlockedByOperator("acme".to_string())),
+                Error::from(IngestionError::OrgBlocked(
+                    "acme".to_string(),
+                    OrgBlockKind::Blocked,
+                )),
                 StatusCode::FORBIDDEN,
             ),
             (
