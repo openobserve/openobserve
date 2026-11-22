@@ -1308,7 +1308,6 @@ export const useStreamFields = () => {
               showWrap: false,
               wrapContent: false,
               autoWidth: true,
-              fillRemaining: true,
             },
           });
         }

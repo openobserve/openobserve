@@ -410,7 +410,7 @@ const selfLogoSrc = computed(() =>
     data-test="sidebar"
     :data-collapsed="collapsed ? 'true' : undefined"
     class="bg-surface-chrome-deeper flex h-full min-h-0 shrink-0 flex-col overflow-hidden transition-[width] duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
-    :class="collapsible ? (collapsed ? 'w-13' : 'w-[155px]') : 'w-full'"
+    :class="collapsible ? (collapsed ? 'w-13' : 'w-[9.6875rem]') : 'w-full'"
   >
     <div
       v-if="collapsible"
@@ -547,7 +547,11 @@ const selfLogoSrc = computed(() =>
                       :data-test="`sidebar-section-label-${childSection.key}`"
                     >
                       {{ t(childSection.titleKey) }}
-                      <BetaBadge v-if="childSection.beta" size="xs" class="px-1! py-px! text-[9px]! leading-none! font-medium! tracking-normal! normal-case!" />
+                      <BetaBadge
+                        v-if="childSection.beta"
+                        size="xs"
+                        class="px-1! py-px! text-[0.5625rem]! leading-none! font-medium! tracking-normal! normal-case!"
+                      />
                     </div>
                     <OSidebarItem
                       v-for="child in childSection.children"
@@ -588,7 +592,7 @@ const selfLogoSrc = computed(() =>
       <button
         v-if="collapsible"
         type="button"
-        class="group/nav rounded-default text-text-body hover:bg-dropdown-item-hover-bg focus-visible:ring-accent text-xs mt-0.5 flex h-8 w-full min-w-9 cursor-pointer items-center gap-2.5 overflow-hidden border-0 bg-transparent px-2 text-start [font-family:inherit] font-normal transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset motion-reduce:transition-none"
+        class="group/nav rounded-default text-text-body hover:bg-dropdown-item-hover-bg focus-visible:ring-accent mt-0.5 flex h-8 w-full min-w-9 cursor-pointer items-center gap-2.5 overflow-hidden border-0 bg-transparent px-2 text-start [font-family:inherit] text-xs font-normal transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset motion-reduce:transition-none"
         :aria-label="toggleLabel"
         :aria-expanded="!collapsed"
         data-test="sidebar-collapse-toggle"
@@ -623,7 +627,7 @@ const selfLogoSrc = computed(() =>
         @keydown="onFlyoutKeydown"
       >
         <div
-          class="text-text-secondary overflow-hidden px-2 pt-1 pb-0.5 text-xs font-medium whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none"
+          class="text-text-heading text-compact overflow-hidden px-2 pt-1 pb-1 font-semibold whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none"
           aria-hidden="true"
         >
           {{ flyoutRow.entry.item.title }}
@@ -649,11 +653,15 @@ const selfLogoSrc = computed(() =>
               v-if="childSection.titleKey"
               :id="headingId('flyout', flyoutRow.entry.item.name, childSection)"
               role="presentation"
-              class="text-text-secondary flex items-center gap-1.5 overflow-hidden px-2 pt-1 pb-0.5 text-xs font-medium whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none"
+              class="text-text-secondary text-2xs flex items-center gap-1.5 overflow-hidden px-2 pt-1 pb-0.5 font-medium whitespace-nowrap transition-opacity duration-150 motion-reduce:transition-none"
               :data-test="`sidebar-flyout-section-label-${childSection.key}`"
             >
               {{ t(childSection.titleKey) }}
-              <BetaBadge v-if="childSection.beta" size="xs" class="px-1! py-px! text-[9px]! leading-none! font-medium! tracking-normal! normal-case!" />
+              <BetaBadge
+                v-if="childSection.beta"
+                size="xs"
+                class="px-1! py-px! text-[0.5625rem]! leading-none! font-medium! tracking-normal! normal-case!"
+              />
             </div>
             <OSidebarItem
               v-for="child in childSection.children"

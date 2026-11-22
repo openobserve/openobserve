@@ -131,8 +131,13 @@ function onKeydown(event: KeyboardEvent) {
       :class="collapsed ? 'opacity-0' : 'opacity-100'"
       :aria-hidden="collapsed ? true : undefined"
     >
-      <span class="min-w-0 flex-1 truncate">{{ label }}</span>
-      <BetaBadge v-if="beta" size="xs" class="px-1! py-px! text-[9px]! leading-none! font-medium! tracking-normal! normal-case!" />
+      <span class="min-w-0 truncate">{{ label }}</span>
+      <BetaBadge
+        v-if="beta"
+        size="xs"
+        class="-ms-1 shrink-0 px-1! py-px! text-[0.5625rem]! leading-none! font-medium! tracking-normal! normal-case!"
+      />
+      <span class="-ms-2.5 flex-1" aria-hidden="true" />
       <OIcon
         v-if="locked || licenseLocked || paywalled"
         name="lock"
