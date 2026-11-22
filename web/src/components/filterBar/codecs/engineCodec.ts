@@ -36,6 +36,7 @@ import {
   stamp,
   toConnector,
   valueStrings,
+  withAndRunGroups,
   type CodecContext,
   type FilterCodec,
 } from "./types";
@@ -155,7 +156,7 @@ function parseV2(group: EngineGroup, isRoot: boolean): FilterGroup {
     return stamp(makeRawNode(JSON.stringify(item)), item);
   });
   const id = isRoot ? "root" : (group.groupId ?? newFilterId());
-  return stamp(makeGroup(items, toConnector(group.logicalOperator), id), group);
+  return stamp(makeGroup(withAndRunGroups(items), toConnector(group.logicalOperator), id), group);
 }
 
 // A V1 group ANDs or ORs all of its items, so each item (nested groups too) takes the group's connector.

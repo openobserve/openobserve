@@ -16,10 +16,12 @@
 //! AutoObserve engine routes: coverage, suggestions, and the marks the alert gate reads.
 
 pub mod decisions;
+pub mod fix_ports;
 pub mod incidents;
 pub mod paging;
 pub mod review;
 pub mod slack_feed;
+pub mod viewer;
 
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -70,7 +72,7 @@ use crate::{
 
 /// Only whether a DELETE carries a body matters, so reading stops here.
 const MAX_DELETE_BODY: usize = 64 * 1024;
-const FOLDER_CHECK_CONCURRENCY: usize = 16;
+const PERMISSION_CHECK_CONCURRENCY: usize = 16;
 const DISABLED_MESSAGE: &str = "AutoObserve is disabled (O2_AUTOOBSERVE_ENABLED=false)";
 
 #[derive(Debug, Default, Deserialize, IntoParams)]
@@ -547,7 +549,7 @@ pub async fn stream_volume(
     tag = "AutoObserve",
     operation_id = "AutoObserveSuggestions",
     summary = "List suggestions",
-    description = "Each suggestion's newest state from the last 7 days, highest score first, with a stored accept or reject applied. `total` counts the matches before paging; a decision made since the last engine pass can drop an item from a status-filtered page. `last_seen_at` is when the suggestion last changed or was confirmed (at most 24 h old while current). Where alert calibration owns alert findings, an alert's broken-definition finding is listed once as `alert_not_working` from the newest calibration run, and dismissed findings are left out. Where the deployment lists them, a source that stopped sending while its stream kept flowing is listed as `source_silence`, one per outage, until a day after every source of the outage sends again.",
+    description = "Each suggestion's newest state from the last 7 days, highest score first, with a stored accept or reject applied. `total` counts the matches before paging; a decision made since the last engine pass can drop an item from a status-filtered page. `last_seen_at` is when the suggestion last changed or was confirmed (at most 24 h old while current). Where alert calibration owns alert findings, an alert's broken-definition finding is listed once as `alert_not_working` from the newest calibration run, and dismissed findings are left out. Where the deployment lists them, a source that stopped sending while its stream kept flowing is listed as `source_silence`, one per outage, until a day after every source of the outage sends again. Where issue context is on, an item that is an issue also carries `context`: what changed just before it and what it affects, limited to what the caller may read.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name"), SuggestionsQuery),
     responses(
@@ -585,6 +587,9 @@ pub async fn suggestions(
     };
     serve(|deps| async move {
         let readable = |subjects| readable_subjects(&org_id, &user.user_id, subjects);
+        let viewer = viewer::WebViewer {
+            user_id: user.user_id.clone(),
+        };
         api::suggestions(
             &deps,
             &org_id,
@@ -593,6 +598,7 @@ pub async fn suggestions(
             now_micros(),
             readable,
             &ReaderDigest(&user.user_id),
+            &viewer,
         )
         .await
     })
@@ -971,13 +977,13 @@ async fn folder_writes<W: FolderWrites>(
                 (readable || allowed).then_some((id, allowed))
             }
         })
-        .buffer_unordered(FOLDER_CHECK_CONCURRENCY)
+        .buffer_unordered(PERMISSION_CHECK_CONCURRENCY)
         .filter_map(std::future::ready)
         .collect()
         .await)
 }
 
-/// A mark whose alert is gone has no per-alert grant left, so it needs alerts PUT org-wide.
+/// A mark whose alert is gone has no per-alert grant left, so it needs a grant over every alert.
 async fn may_change_mark(org_id: &str, user_id: &str, entity_type: &str, entity_id: &str) -> bool {
     #[cfg(test)]
     if let Some(allowed) = tests::MAY_CHANGE.with(std::cell::Cell::get) {
@@ -991,7 +997,17 @@ async fn may_change_mark(org_id: &str, user_id: &str, entity_type: &str, entity_
     {
         return allowed;
     }
-    org_wide_allows(org_id, user_id, "alerts", "PUT").await
+    changes_every_mark(|resource, method| org_wide_allows(org_id, user_id, resource, method)).await
+}
+
+/// Alerts PUT org-wide, or PUT on every alert folder: `alert:_all_{org}` has no folder parent,
+/// so a role granting all folders reaches every alert only through the folder check.
+async fn changes_every_mark<F, Fut>(allows: F) -> bool
+where
+    F: Fn(&'static str, &'static str) -> Fut,
+    Fut: Future<Output = bool>,
+{
+    allows("alerts", "PUT").await || allows("alert_folders", "PUT").await
 }
 
 /// The per-alert check the alert handlers make; `None` when no alert has this id.
@@ -1362,6 +1378,36 @@ mod tests {
         assert_eq!(readable_mask(&org_reader, &[subject]).await, [true]);
     }
 
+    #[tokio::test]
+    async fn a_grant_on_every_alert_folder_changes_every_mark() {
+        let every = &[
+            ("alerts", "GET"),
+            ("alerts", "PUT"),
+            ("alert_folders", "GET"),
+            ("alert_folders", "PUT"),
+        ][..];
+        let folder_admin = &[("alert_folders", "GET"), ("alert_folders", "PUT")][..];
+        for (who, grants, want) in [
+            ("root", every, true),
+            ("base-role admin", every, true),
+            (
+                "custom-role admin with All on every folder",
+                folder_admin,
+                true,
+            ),
+            (
+                "reader of every folder",
+                &[("alert_folders", "GET")][..],
+                false,
+            ),
+            ("plain user", &[][..], false),
+        ] {
+            let allows =
+                |resource, method| std::future::ready(grants.contains(&(resource, method)));
+            assert_eq!(changes_every_mark(allows).await, want, "{who}");
+        }
+    }
+
     /// Answers the create check per folder from `allowed`; `None` stands for RBAC switched off.
     struct Writes {
         every_folder: bool,
@@ -1513,6 +1559,8 @@ mod tests {
     #[tokio::test]
     async fn without_the_engine_a_valid_request_is_a_503_and_a_bad_one_a_400() {
         ENGINE_ON.with(|on| on.set(Some(true)));
+        // RBAC is on for the whole process once any test installs the fake checker.
+        MAY_CHANGE.with(|may| may.set(Some(true)));
         let mark = "/v2/o/autoobserve/marks/protected/alert/a1";
         for (method, uri, body) in [
             ("GET", "/v2/o/autoobserve/coverage", ""),

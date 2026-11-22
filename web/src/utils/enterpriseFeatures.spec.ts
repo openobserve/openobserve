@@ -95,6 +95,13 @@ describe("enterpriseFeatures", () => {
       expect(result.message).not.toBe("");
     });
 
+    // Self-hosted but not enterprise-only: OSS clusters too, and the node API answers there.
+    it("unlocks nodes in an OSS build", () => {
+      const result = checkFeatureAccess("nodes", buildFeatureGateContext());
+      expect(result.allowed).toBe(true);
+      expect(result.visible).toBe(true);
+    });
+
     it("is visible (not hidden) on an enterprise+cloud hybrid build", () => {
       config.isEnterprise = "true";
       config.isCloud = "true";

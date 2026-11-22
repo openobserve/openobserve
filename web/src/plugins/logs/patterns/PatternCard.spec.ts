@@ -18,6 +18,8 @@ import { mount } from "@vue/test-utils";
 import PatternCard from "./PatternCard.vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
+import enUS from "@/locales/languages/en-US.json";
+import { PATTERN_VOLUME_CACHE } from "./usePatternVolume";
 
 describe("PatternCard", () => {
   let wrapper: any;
@@ -114,6 +116,35 @@ describe("PatternCard", () => {
       const percentage = wrapper.find('[data-test="pattern-card-0-percentage"]');
       expect(percentage.exists()).toBe(true);
       expect(percentage.text()).toBe("45.67%");
+    });
+  });
+
+  describe("volume without a distinct filter", () => {
+    it("shows a dash with the reason instead of the sample count", () => {
+      const w = mount(PatternCard, {
+        props: { pattern: mockPattern, index: mockIndex },
+        global: {
+          plugins: [i18n],
+          provide: {
+            store,
+            [PATTERN_VOLUME_CACHE as symbol]: {
+              request: () => Promise.resolve(),
+              get: () => ({
+                buckets: null,
+                total: null,
+                intervalSecs: null,
+                loading: false,
+                unavailableReason: "shared",
+              }),
+            },
+          },
+          stubs: { OBadge: OBadgeStub, OTooltip: OTooltipStub, OButton: OButtonStub },
+        },
+      });
+      const frequency = w.find('[data-test="pattern-card-0-frequency"]');
+      expect(frequency.text()).toBe("—");
+      expect(frequency.attributes("title")).toBe(enUS.logs.patternList.noDistinctTextTooltip);
+      w.unmount();
     });
   });
 

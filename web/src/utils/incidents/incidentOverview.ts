@@ -26,7 +26,6 @@ const MINUTE_US = 60_000_000;
 const DAY_US = 24 * 60 * MINUTE_US;
 const LANE_BUCKETS = 24;
 const AXIS_TICKS = 8;
-const PEAK_WINDOW_US = 5 * MINUTE_US;
 
 type Firing = Pick<IncidentAlert, "alert_id" | "alert_name" | "alert_fired_at"> &
   Partial<Pick<IncidentAlert, "alert_kind">>;
@@ -45,7 +44,6 @@ export interface OverviewLane {
 export interface OverviewAxisTick {
   index: number;
   label: string;
-  peak?: boolean;
   soFar?: boolean;
 }
 
@@ -57,10 +55,16 @@ export interface OverviewLanes {
   start: number;
   end: number;
   buckets: number;
-  /** The bucket holding the Timeline's peak window; null when no window holds two firings. */
-  peak: number | null;
+  /** Each bar's start, microseconds. */
+  starts: number[];
   max: number;
   ticks: OverviewAxisTick[];
+}
+
+export interface OverviewPeak {
+  at: number;
+  count: number;
+  bucketUs: number;
 }
 
 export interface AffectedService {
@@ -132,18 +136,16 @@ const tickFormat = (zone: string, start: number, end: number, size: number) => {
   return sameDay ? "HH:mm" : "MMM D, HH:mm";
 };
 
-// Every few buckets get a time; the peak and the filling bucket name themselves, and the wider "so far" keeps a gap.
-const axisTicks = (n: number, peak: number | null, open: boolean, label: (i: number) => string) => {
+// Every few buckets get a time; the filling bucket names itself, and the wider, right-aligned "so far" keeps a step clear.
+const axisTicks = (n: number, open: boolean, label: (i: number) => string) => {
   const step = Math.max(1, Math.ceil(n / AXIS_TICKS));
   const soFar = open && n > 1 ? n - 1 : -1;
   const ticks: OverviewAxisTick[] = [];
   for (let i = 0; i < n; i += step) {
-    if (i !== peak && (soFar < 0 || soFar - i > 1)) ticks.push({ index: i, label: label(i) });
+    if (soFar < 0 || soFar - i >= Math.max(2, step)) ticks.push({ index: i, label: label(i) });
   }
-  if (peak !== null) ticks.push({ index: peak, label: label(peak), peak: true });
-  if (open && n > 1 && peak !== n - 1)
-    ticks.push({ index: n - 1, label: label(n - 1), soFar: true });
-  return ticks.sort((a, b) => a.index - b.index);
+  if (soFar >= 0) ticks.push({ index: soFar, label: label(soFar), soFar: true });
+  return ticks;
 };
 
 export function overviewLanes(
@@ -183,8 +185,6 @@ export function overviewLanes(
       };
     })
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-  const peakAt = peakWindow(triggers)?.at;
-  const peak = peakAt === undefined ? null : bucketOf(starts, peakAt);
   const format = tickFormat(zone, start, end, size);
   return {
     lanes,
@@ -193,26 +193,21 @@ export function overviewLanes(
     start,
     end,
     buckets,
-    peak,
+    starts,
     max: Math.max(...lanes.flatMap((lane) => lane.counts)),
-    ticks: axisTicks(buckets, peak, open, (i) =>
-      formatTimestampInTimezone(starts[i], format, zone),
-    ),
+    ticks: axisTicks(buckets, open, (i) => formatTimestampInTimezone(starts[i], format, zone)),
   };
 }
 
-/** The 5-minute window with the most firings, from its first firing; null when no window holds two. */
-export function peakWindow(triggers: readonly Firing[]) {
-  const times = [...new Set(triggers.map((tr) => `${tr.alert_id}@${tr.alert_fired_at}`))]
-    .map((key) => Number(key.slice(key.lastIndexOf("@") + 1)))
-    .sort((a, b) => a - b);
-  let best = { at: 0, count: 0 };
-  let j = 0;
-  for (let i = 0; i < times.length; i++) {
-    while (j < times.length && times[j] < times[i] + PEAK_WINDOW_US) j++;
-    if (j - i > best.count) best = { at: times[i], count: j - i };
-  }
-  return best.count > 1 ? { ...best, windowUs: PEAK_WINDOW_US } : null;
+/** The bar with the most firings across alerts, earliest on a tie; null with one bar or under two firings. */
+export function overviewPeak(model: OverviewLanes | null): OverviewPeak | null {
+  if (!model || model.buckets < 2) return null;
+  const totals = model.starts.map((_, i) =>
+    model.lanes.reduce((sum, lane) => sum + lane.counts[i], 0),
+  );
+  const index = totals.indexOf(Math.max(...totals));
+  if (totals[index] < 2) return null;
+  return { at: model.starts[index], count: totals[index], bucketUs: model.bucketUs };
 }
 
 /** Firings a minute, or an hour when under one a minute; null over a span under a minute. */

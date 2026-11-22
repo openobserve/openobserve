@@ -32,11 +32,12 @@ function dataTestName(selector) {
 }
 
 // Picks `value` in the OSelect at `rootSelector` (optionally under `scope`) and confirms the trigger committed it.
-export async function selectOSelectOption(page, rootSelector, value, { retries = 4, scope = null } = {}) {
+export async function selectOSelectOption(page, rootSelector, value, { retries = 4, scope = null, search = false } = {}) {
     const name = dataTestName(rootSelector);
     const root = (scope ?? page).locator(rootSelector);
     const trigger = root.locator(`[data-test="${name}-trigger"]`).first();
     const option = page.locator(`[data-test="${name}-option"][data-test-value="${value}"]`).first();
+    const searchInput = page.locator(`[data-test="${name}-search"]`).first();
 
     const committed = async () => {
         const attr = await trigger.getAttribute('data-test-selected-value').catch(() => null);
@@ -49,6 +50,8 @@ export async function selectOSelectOption(page, rootSelector, value, { retries =
     for (let i = 0; i < retries; i++) {
         await openOSelectDropdown(page, root);
         try {
+            // Lists over 50 options are virtualised, so an option far down a long list is not rendered until searched for.
+            if (search) await searchInput.fill(String(value), { timeout: 5000 });
             await option.waitFor({ state: 'visible', timeout: 5000 });
             await option.click();
         } catch {

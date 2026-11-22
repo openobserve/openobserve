@@ -74,7 +74,8 @@ test.describe('Clone Composite Alerts testcases', {
   }
 
   async function openCompositeList(page) {
-    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}&folder=default`);
+    // The list opens on Firing; these fixtures never fire, so ask for every state.
+    await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}&folder=default&state=all`);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     await pm.compositeAlertsPage.openCompositeTab();
   }

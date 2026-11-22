@@ -31,6 +31,7 @@ import {
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { isLeavingRoute } from "@/utils/pendingNavigation";
+import { copyAnomalyLinkParams } from "@/utils/alerts/anomalyLinkParams";
 import {
   DEFAULT_TRACE_SEARCH_MODE,
   type MetricsRangeFilter,
@@ -392,7 +393,8 @@ const useTraces = () => {
 
     query["org_identifier"] = store.state.selectedOrganization.identifier;
 
-    query["trace_id"] = router.currentRoute.value.query.trace_id;
+    if (router.currentRoute.value.query.trace_id)
+      query["trace_id"] = router.currentRoute.value.query.trace_id;
 
     query["tab"] = searchObj.meta.searchMode;
 
@@ -400,6 +402,7 @@ const useTraces = () => {
       query["span_id"] = router.currentRoute.value.query.span_id;
 
     Object.assign(query, listUrlState());
+    copyAnomalyLinkParams(router.currentRoute.value.query, query);
 
     return query;
   }

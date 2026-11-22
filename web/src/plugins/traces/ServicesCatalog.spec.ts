@@ -4046,6 +4046,59 @@ describe("ServicesCatalog Health of the version serving now", () => {
     },
   );
 
+  it("keeps the routed service's row highlighted on the page that holds it as rows reload, until the panel closes", async () => {
+    useListViewState("servicesCatalog", {
+      filterText: "",
+      currentPage: 1,
+      rowsPerPage: 10,
+      sortBy: "service_name",
+      sortOrder: "asc",
+    });
+    const fillers = (prefix: string) =>
+      Array.from({ length: 12 }, (_, i) => ({
+        service_name: `${prefix}-svc-${String(i).padStart(2, "0")}`,
+        _is_real_service: 1,
+        total_requests: 1,
+      }));
+    let rows = [
+      ...fillers("a"),
+      { where_key: where, service_name: "rollback-api", _is_real_service: 1 },
+    ];
+    mockFetchQueryDataWithHttpStream.mockImplementation(async (req: any, callbacks: any) => {
+      if (isTraffic(String(req?.queryReq?.query?.sql))) return callbacks.complete(req, null);
+      callbacks.data(null, { type: "search_response_hits", content: { results: { hits: rows } } });
+      callbacks.complete(null, {});
+    });
+    const table = {
+      props: ["data", "activeRowIndex", "currentPage"],
+      template: `<div data-test="services-catalog-table" :data-page="currentPage" :data-active="activeRowIndex == null ? '' : data[activeRowIndex]?.service_name" />`,
+    };
+    setRouteQuery({ panel: "versions", panelSvc: "rollback-api", panelWhere: where });
+    try {
+      view = mountServicesCatalog({ stubs: { OTable: table } });
+      await flushPromises();
+      await flushPromises();
+      const tableEl = () => view!.get('[data-test="services-catalog-table"]');
+      expect(tableEl().attributes()).toMatchObject({
+        "data-active": "rollback-api",
+        "data-page": "2",
+      });
+      // Another stream's load lists the same row first.
+      rows = [rows[12], ...fillers("z")];
+      await (view.vm as any).loadServicesCatalog();
+      await flushPromises();
+      expect(tableEl().attributes()).toMatchObject({
+        "data-active": "rollback-api",
+        "data-page": "1",
+      });
+      (view.vm as any).handleCloseSidePanel();
+      await flushPromises();
+      expect(tableEl().attributes("data-active")).toBe("");
+    } finally {
+      setRouteQuery({});
+    }
+  });
+
   it("shows no Health, and counts none, when the shown version sent no requests in the window", async () => {
     vi.spyOn(serviceVersionsService, "services").mockResolvedValue({
       data: {

@@ -902,16 +902,19 @@ async fn composition_error_response(
     })
 }
 
+/// A blank override means no override.
+fn normalized_template(template: Option<String>) -> Option<String> {
+    template
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+}
+
 /// A template override must name a user template that applies to synthetics; "" clears it.
 async fn checked_template(
     org_id: &str,
     body: &mut config::meta::synthetics::Synthetic,
 ) -> Result<(), Response> {
-    body.template = body
-        .template
-        .take()
-        .map(|t| t.trim().to_string())
-        .filter(|t| !t.is_empty());
+    body.template = normalized_template(body.template.take());
     if let Some(name) = body.template.as_deref() {
         openobserve_core::alerts::templates::check_binding(
             org_id,
@@ -1065,6 +1068,40 @@ pub async fn get_synthetic(
     }
 }
 
+/// The update body: a full check, except that an absent `template` keeps the stored override.
+#[derive(Deserialize)]
+pub struct SyntheticUpdate {
+    #[serde(flatten)]
+    check: config::meta::synthetics::Synthetic,
+    /// Absent keeps the stored override; `null` or "" clears it; a name sets it.
+    #[serde(default, deserialize_with = "double_option")]
+    template: Option<Option<String>>,
+}
+
+/// `#[serde(default)]` alone decodes an explicit `null` to the outer `None`, losing "clear".
+fn double_option<'de, D, T>(de: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Deserialize::deserialize(de).map(Some)
+}
+
+impl SyntheticUpdate {
+    /// The check to save: the sent override, or the stored one when the field is absent.
+    async fn into_check(
+        self,
+        stored: impl std::future::Future<Output = anyhow::Result<Option<String>>>,
+    ) -> anyhow::Result<config::meta::synthetics::Synthetic> {
+        let mut check = self.check;
+        check.template = match self.template {
+            Some(template) => template,
+            None => stored.await?,
+        };
+        Ok(check)
+    }
+}
+
 #[utoipa::path(
     put,
     path = "/{org_id}/synthetics/{id}",
@@ -1078,7 +1115,7 @@ pub async fn get_synthetic(
         ("id" = String, Path, description = "Check ID"),
         ("folder" = Option<String>, Query, description = "Current folder ID of the synthetic (for RBAC)"),
     ),
-    request_body(content = config::meta::synthetics::Synthetic, description = "Updated synthetic definition", content_type = "application/json"),
+    request_body(content = config::meta::synthetics::Synthetic, description = "Updated synthetic definition. An absent `template` keeps the stored override; `null` or \"\" clears it.", content_type = "application/json"),
     responses(
         (status = 200, description = "Updated",   content_type = "application/json", body = config::meta::synthetics::Synthetic),
         (status = 403, description = "Forbidden"),
@@ -1094,8 +1131,11 @@ pub async fn update_synthetic(
     Path((org_id, id)): Path<(String, String)>,
     Query(_folder_query): Query<FolderQuery>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<config::meta::synthetics::Synthetic>,
+    Json(update): Json<SyntheticUpdate>,
 ) -> Response {
+    // The stored override is read only after the permission checks pass.
+    #[cfg(feature = "enterprise")]
+    let body = &update.check;
     #[cfg(feature = "enterprise")]
     if !check_permissions(
         &id,
@@ -1150,7 +1190,7 @@ pub async fn update_synthetic(
     }
 
     #[cfg(feature = "enterprise")]
-    match caller_can_read_children(&org_id, &user_email.user_id, &body, Some(id.as_str())).await {
+    match caller_can_read_children(&org_id, &user_email.user_id, body, Some(id.as_str())).await {
         Ok(None) => {}
         Ok(Some(child)) => {
             return MetaHttpResponse::forbidden(format!(
@@ -1171,7 +1211,21 @@ pub async fn update_synthetic(
     #[cfg(not(feature = "enterprise"))]
     let user_id = "";
 
-    let mut body = body;
+    let mut body = match update
+        .into_check(openobserve_synthetics::service::template_of(&org_id, &id))
+        .await
+    {
+        Ok(body) => body,
+        Err(e) => {
+            tracing::error!("[synthetics] update_synthetic: load stored template: {e}");
+            return MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                e.to_string(),
+            )
+            .into_response();
+        }
+    };
+    // A kept override is checked again, because its template can change after it was set.
     if let Err(response) = checked_template(&org_id, &mut body).await {
         return response;
     }
@@ -2648,6 +2702,98 @@ mod tests {
         ReferencedByQuery, admit_listable, composition_error_response, lacks_listable_default,
         retain_listable, stamp_undefined_placeholders,
     };
+
+    /// An update body as a client sends it; `template` is left out when `None`.
+    fn update_body(template: Option<serde_json::Value>) -> super::SyntheticUpdate {
+        let check = config::meta::synthetics::Synthetic {
+            name: "login-check".to_string(),
+            destinations: vec!["slack-ops".to_string()],
+            ..Default::default()
+        };
+        let mut value = serde_json::to_value(check).unwrap();
+        let fields = value.as_object_mut().unwrap();
+        fields.remove("template");
+        if let Some(template) = template {
+            fields.insert("template".to_string(), template);
+        }
+        serde_json::from_value(value).unwrap()
+    }
+
+    async fn resolved(body: super::SyntheticUpdate) -> Option<String> {
+        let check = body
+            .into_check(async { Ok(Some("ops-short".to_string())) })
+            .await
+            .unwrap();
+        // The rest of the check still reaches the save.
+        assert_eq!(check.name, "login-check");
+        assert_eq!(check.destinations, ["slack-ops"]);
+        check.template
+    }
+
+    #[tokio::test]
+    async fn an_update_without_template_keeps_the_stored_override() {
+        let body = update_body(None);
+        assert_eq!(body.template, None);
+        assert_eq!(resolved(body).await.as_deref(), Some("ops-short"));
+    }
+
+    #[test]
+    fn a_raw_update_body_reads_the_same_as_a_plain_check() {
+        // An alias, an unknown field and nested config, as raw JSON a client sends.
+        let raw = r#"{
+            "name": "login-check", "type": "http", "target": "https://example.com",
+            "config": {"headers": {"a": [1, 2]}}, "frequency": {"type": "minutes", "interval": 5},
+            "locations": ["us-east-1"], "enabled": true, "destinations": ["slack-ops"],
+            "cooldown_secs": 7, "client_metadata": {"x": 1}, "template": "ops-long"
+        }"#;
+        let update: super::SyntheticUpdate = serde_json::from_str(raw).unwrap();
+        let plain: config::meta::synthetics::Synthetic = serde_json::from_str(raw).unwrap();
+        assert_eq!(update.template, Some(Some("ops-long".to_string())));
+        assert_eq!(update.check.template, None);
+        let mut plain = serde_json::to_value(plain).unwrap();
+        plain.as_object_mut().unwrap().remove("template");
+        assert_eq!(serde_json::to_value(update.check).unwrap(), plain);
+    }
+
+    #[tokio::test]
+    async fn an_update_with_null_template_clears_the_override() {
+        let body = update_body(Some(serde_json::Value::Null));
+        assert_eq!(body.template, Some(None));
+        assert_eq!(resolved(body).await, None);
+    }
+
+    #[tokio::test]
+    async fn an_update_with_empty_template_clears_the_override() {
+        let template = resolved(update_body(Some(serde_json::json!("")))).await;
+        assert_eq!(template.as_deref(), Some(""));
+        // checked_template turns "" into no override before the save.
+        assert_eq!(super::normalized_template(template), None);
+        assert_eq!(
+            super::normalized_template(Some(" ops-short ".to_string())).as_deref(),
+            Some("ops-short")
+        );
+        assert_eq!(super::normalized_template(Some("   ".to_string())), None);
+    }
+
+    #[tokio::test]
+    async fn an_update_with_a_template_sets_it_without_reading_the_stored_one() {
+        let body = update_body(Some(serde_json::json!("ops-long")));
+        assert_eq!(body.template, Some(Some("ops-long".to_string())));
+        let check = body
+            .into_check(async { panic!("a sent template must not load the stored one") })
+            .await
+            .unwrap();
+        assert_eq!(check.template.as_deref(), Some("ops-long"));
+    }
+
+    #[tokio::test]
+    async fn a_failed_stored_read_fails_the_update() {
+        let body = update_body(None);
+        let result = body
+            .into_check(async { Err(anyhow::anyhow!("db down")) })
+            .await;
+        assert!(result.is_err());
+    }
 
     #[test]
     fn listing_needs_a_listable_folder_and_shows_only_listable_ones() {

@@ -232,7 +232,7 @@ export function useLogLineLink() {
       wide,
       allFieldsName: store.state.zoConfig?.all_fields_name,
     };
-    const shareQuery: Record<string, unknown> = { ...generateURLQuery(true) };
+    const shareQuery: Record<string, unknown> = { ...generateURLQuery(true, null, null, false) };
     delete shareQuery.type;
     const base = shareBase();
     const webUrl = String(store.state.zoConfig?.web_url ?? "").trim();

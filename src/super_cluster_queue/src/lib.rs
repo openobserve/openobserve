@@ -121,6 +121,14 @@ async fn service_identity_msg(msg: Message) -> infra::errors::Result<()> {
     .await
 }
 
+/// The JSON payload of a message whose type carries one struct; no payload is an error.
+pub(crate) fn payload<T: serde::de::DeserializeOwned>(msg: &Message) -> infra::errors::Result<T> {
+    let value = msg.value.as_ref().ok_or_else(|| {
+        infra::errors::Error::Message(format!("no payload in message {}", msg.key))
+    })?;
+    Ok(config::utils::json::from_slice(value)?)
+}
+
 /// Creates a super cluster queue for each super cluster topic and begins
 /// polling messages from each queue in a separate thread.
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -164,6 +172,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let scheduler_queue = SchedulerQueue {
         on_scheduler_msg: scheduler::process,
         on_oncall_msg: oncall::process,
+        on_alert_state_msg: alert_states::process,
     };
     let search_jobs_queue = SearchJobsQueue {
         on_search_job_msg: search_job::process,

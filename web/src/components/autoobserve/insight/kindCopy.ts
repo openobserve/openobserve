@@ -23,7 +23,7 @@ import type {
   AutoObserveIncidentMember,
   AutoObserveSuggestion,
 } from "@/services/autoobserve";
-import { formatWhen, placeLabels, placeOf } from "../live/liveCopy";
+import { NAMES_SHOWN, formatWhen, placeLabels, placeOf } from "../live/liveCopy";
 import {
   heartbeatAlert,
   noDataAlert,
@@ -32,7 +32,7 @@ import {
 import { draftTarget } from "./targets/alertDraft";
 import { logsForSources } from "./targets/logsTargets";
 import { notifyOf, teamOf } from "./targets/ownership";
-import type { BulkKind, BulkRow } from "./bulk/useBulkReview";
+import { usuallyFor, wasPassed, type BulkKind, type BulkRow } from "./bulk/useBulkReview";
 import { addedNote, serviceKeyOf, useRecentlyCreated } from "./bulk/useRecentlyCreated";
 import { noMatchLine } from "./bulk/bulkCopy";
 import { knownMatch } from "./targets/scopeMatch";
@@ -91,9 +91,9 @@ const GAP_CLASSES: GapClass[] = ["errors", "latency", "absence"];
 /** Six or more coverage gaps fold into one card, so a long rail never repeats one sentence per service. */
 export const GAP_GROUP_AT = 6;
 
-const GROUP_NAMES = 3;
-
 const NO_DATA_MINUTES = 15;
+// Names the coverage Add alert batch, so only its own reviews move it on.
+const COVERAGE_BATCH = "coverage-gaps";
 
 const recently = useRecentlyCreated();
 
@@ -247,12 +247,14 @@ const addedChip = (t: TranslateFn): NonNullable<KindCopy["chip"]> => ({
   tone: "info",
 });
 
-// Errors and latency rows carry no usual level: the review list measures it over 7 days when it opens.
+const bulkKey = (row: AutoObserveCoverageRow, kind: BulkKind): string =>
+  `${row.service_id}:${kind}`;
+
 const bulkRow = (row: AutoObserveCoverageRow, kind: BulkKind): BulkRow => ({
-  key: `${row.service_id}:${kind}`,
+  key: bulkKey(row, kind),
   kind,
   scope: scopeOf(row, draftStream(row, kind)),
-  usually: null,
+  usually: usuallyFor(kind, row.traffic_per_hour),
   ...ownership(row.service_name),
   ...(alertIdsOf(row).length ? { alertIds: alertIdsOf(row) } : {}),
   ...(kind === "latency" ? { inputs: { durationField: "duration", p95Ms: null } } : {}),
@@ -813,11 +815,46 @@ const groupNames = (
     const namespace = s.subject.key_dims.k8s_namespace_name;
     return namespace ? `${serviceOf(s)} (${namespace})` : serviceOf(s);
   });
-  const shown = names.slice(0, GROUP_NAMES);
+  const shown = names.slice(0, NAMES_SHOWN);
   const rest = count - shown.length;
   const more =
     rest > 0 ? [String(t("autoobserveLive.suggestions.moreNames", { count: rest }, rest))] : [];
   return { shown, named: listOf(zone.locale, [...shown, ...more], "conjunction") };
+};
+
+/** The coverage page's Add alert: no-data drafts for the next `size` gaps, busiest first, skipping ones just added or passed over. */
+export const gapNoDataReview = (
+  t: TranslateFn,
+  org: string,
+  all: AutoObserveCoverageRow[],
+  gaps: AutoObserveCoverageRow[],
+  size: number,
+): InsightCta | null => {
+  labelRows(t, all);
+  const splits = gaps.map((row) => ({ row, ...draftsOf(org, row, ["absence"]) }));
+  const open = splits.filter((d) => d.open.length);
+  const fresh = open.filter((d) => !wasPassed(org, COVERAGE_BATCH, bulkKey(d.row, "no_data")));
+  const next = fresh.length < open.length || splits.some((d) => d.added.length > 0);
+  // Once every gap was passed over, the list starts again from the busiest.
+  const batch = (fresh.length ? fresh : open).slice(0, size);
+  if (!batch.length) return null;
+  const rows = batch.map(({ row }) => bulkRow(row, "no_data"));
+  const count = rows.length;
+  const name = raw(rowLabel.get(batch[0].row) ?? batch[0].row.service_name);
+  const target: InsightTarget = {
+    type: "bulk",
+    request: {
+      kind: "no_data",
+      rows,
+      title: String(insightCtaLabel(t, "reviewAndAddAlerts")),
+      batch: COVERAGE_BATCH,
+    },
+  };
+  const note = next
+    ? t("autoobserve.coverageLive.verdict.nextNote", { count })
+    : t("autoobserve.coverageLive.verdict.note", { count, name }, count);
+  const cta = ctaOf(t, "addAlert", target, note);
+  return next ? { ...cta, label: t("autoobserve.coverageLive.verdict.next", { count }) } : cta;
 };
 
 /** Every scope the gap cards would draft an alert on, so their rows can be checked before the cards count them. */
@@ -983,7 +1020,7 @@ export const pagedFindingCopy = (
   const members = item.members ?? [];
   const many = members.length > 1;
   const names = (list: AutoObserveIncidentMember[]) => {
-    const shown = list.flatMap((m) => m.stream_name ?? []).slice(0, GROUP_NAMES);
+    const shown = list.flatMap((m) => m.stream_name ?? []).slice(0, NAMES_SHOWN);
     const rest = list.length - shown.length;
     return listOf(
       zone.locale,

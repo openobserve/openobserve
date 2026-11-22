@@ -26,6 +26,7 @@ use chrono::Utc;
 use config::{
     META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
+        agent_format,
         search::{
             AgentSearchMode, Request, ResultSchemaResponse, SearchEventType,
             SearchHistoryHitResponse, SearchHistoryRequest, SearchPartitionRequest,
@@ -69,7 +70,6 @@ use crate::common::{
     },
 };
 
-pub mod agent_format;
 pub(crate) mod around;
 pub mod error_utils;
 pub mod multi_streams;
@@ -312,6 +312,11 @@ pub async fn search(
         .await
     {
         return res;
+    }
+
+    #[cfg(feature = "enterprise")]
+    if req.clear_cache && !can_clear_cache(&org_id, user_id, stream_type, &stream_names).await {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
     }
 
     // get stream settings
@@ -1349,6 +1354,41 @@ pub(crate) async fn check_sql_stream_permissions(
         }
     }
     None
+}
+
+/// `clear_cache` rewrites a result-cache entry every user shares, so it needs edit rights.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn can_clear_cache(
+    org_id: &str,
+    user_id: &str,
+    stream_type: StreamType,
+    stream_names: &[String],
+) -> bool {
+    use o2_openfga::meta::mapping::{RESULT_LOGS_CACHE_KEY, is_cache_rbac_enabled};
+
+    let (permission_type, method) = if stream_type == StreamType::Logs && is_cache_rbac_enabled() {
+        (RESULT_LOGS_CACHE_KEY, "DELETE")
+    } else {
+        (stream_type.as_str(), "PUT")
+    };
+    for stream_name in stream_names {
+        if !openobserve_core::auth::check_permissions(
+            stream_name,
+            org_id,
+            user_id,
+            permission_type,
+            method,
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
+        {
+            return false;
+        }
+    }
+    true
 }
 
 /// Answered before any permission, so no handler streams, queues or swallows the refusal.
