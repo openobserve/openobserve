@@ -14,9 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { queryOptions } from "@tanstack/vue-query";
-import users from "./users";
+import users, { type AllUsersParams } from "./users";
+import type { UserListPage } from "@/ts/interfaces";
 import { userKeys } from "./users.querykeys";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+import { stableFilters } from "@/composables/query/queryClient";
 
 export const orgUsersQuery = (org: string) =>
   queryOptions({
@@ -40,3 +42,15 @@ export const allUserRolesQuery = (org: string) =>
     queryFn: async () => (await users.getAllUserRoles(org)).data ?? null,
     staleTime: NORMAL_STALE_TIME,
   });
+
+export const allUsersQuery = (metaOrg: string, params: AllUsersParams) => {
+  const filters = stableFilters({ ...params });
+  return queryOptions({
+    queryKey: userKeys.allUsers(metaOrg, filters),
+    queryFn: async (): Promise<UserListPage> => {
+      const page = (await users.listAllUsers(metaOrg, filters)).data;
+      return { data: page?.data ?? [], total: page?.total ?? 0 };
+    },
+    staleTime: NORMAL_STALE_TIME,
+  });
+};
