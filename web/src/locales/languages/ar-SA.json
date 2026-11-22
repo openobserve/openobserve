@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "فشل في بدء الحذف.",
       "organizationResurrected": "المؤسسة أعيد إحياؤها.",
       "failedToResurrect": "فشلت في الإحياء.",
+      "organizationBlocked": "تم حظر المؤسسة.",
+      "failedToBlock": "فشل الحظر.",
+      "organizationUnblocked": "تم إلغاء حظر المؤسسة.",
+      "failedToUnblock": "فشل إلغاء الحظر.",
       "organizationUpdated": "تم تحديث المؤسسة بنجاح.",
       "organizationAdded": "أضاف المؤسسة بنجاح.",
       "requestCompleted": "تم الانتهاء من الطلب بنجاح.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "الأيام المتبقية: {n}",
     "resurrect": "مؤسسة الإحياء",
     "statusActive": "نشط",
-    "statusDeleting": "جارٍ الحذف"
+    "statusDeleting": "جارٍ الحذف",
+    "statusBlocked": "محظورة",
+    "block": "حظر المؤسسة",
+    "unblock": "إلغاء حظر المؤسسة",
+    "blockConfirmMessage": "حظر {name}؟ لن تقبل المؤسسة استيعاب البيانات أو الاستعلامات أو تسجيلات الدخول حتى يُلغى حظرها.",
+    "blockConfirmLabel": "حظر"
   },
   "template": {
     "search": "البحث في القوالب"
@@ -14978,6 +14987,12 @@
       "moreGroups": "+{count}",
       "quickMuteTooltip": "كتم سريع من التنبيه",
       "endedLabel": "انتهى"
+    },
+    "lease": {
+      "temporary": "مؤقت، أنشأه {who}، ينتهي في {time}",
+      "incidentsOn": "تم تشغيل إنشاء الحوادث بواسطة {who} حتى {time}",
+      "incidentsOff": "تم إيقاف إنشاء الحوادث بواسطة {who} حتى {time}",
+      "why": "{label}. السبب: {reason}"
     },
     "ack": {
       "acknowledge": "تأكيد الاستلام",

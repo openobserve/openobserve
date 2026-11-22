@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "削除の開始に失敗しました。",
       "organizationResurrected": "組織を復活しました。",
       "failedToResurrect": "復活に失敗しました。",
+      "organizationBlocked": "組織をブロックしました。",
+      "failedToBlock": "ブロックに失敗しました。",
+      "organizationUnblocked": "組織のブロックを解除しました。",
+      "failedToUnblock": "ブロックの解除に失敗しました。",
       "organizationUpdated": "組織の更新に成功しました。",
       "organizationAdded": "組織の追加に成功しました。",
       "requestCompleted": "リクエストが正常に完了しました。",
@@ -5228,7 +5232,12 @@
     "daysLeft": "残り{n}日",
     "resurrect": "組織を復活",
     "statusActive": "有効",
-    "statusDeleting": "削除中"
+    "statusDeleting": "削除中",
+    "statusBlocked": "ブロック中",
+    "block": "組織をブロック",
+    "unblock": "組織のブロックを解除",
+    "blockConfirmMessage": "{name} をブロックしますか？ブロックを解除するまで、取り込み、クエリ、サインインを受け付けません。",
+    "blockConfirmLabel": "ブロック"
   },
   "template": {
     "search": "テンプレートを検索"
@@ -14978,6 +14987,12 @@
       "moreGroups": "+{count}",
       "quickMuteTooltip": "アラートからのクイックミュート",
       "endedLabel": "終了"
+    },
+    "lease": {
+      "temporary": "一時的、{who} により作成、{time} に終了",
+      "incidentsOn": "インシデント作成が {who} により {time} まで有効化されています",
+      "incidentsOff": "インシデント作成が {who} により {time} まで無効化されています",
+      "why": "{label}。理由: {reason}"
     },
     "ack": {
       "acknowledge": "確認",

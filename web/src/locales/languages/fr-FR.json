@@ -4860,6 +4860,10 @@
       "failedToInitiateDeletion": "Échec de l'initiation de la suppression.",
       "organizationResurrected": "Organisation ressuscitée.",
       "failedToResurrect": "Échec de la résurrection.",
+      "organizationBlocked": "Organisation bloquée.",
+      "failedToBlock": "Échec du blocage.",
+      "organizationUnblocked": "Organisation débloquée.",
+      "failedToUnblock": "Échec du déblocage.",
       "organizationUpdated": "Organisation mise à jour avec succès.",
       "organizationAdded": "Organisation ajoutée avec succès.",
       "requestCompleted": "Requête terminée avec succès.",
@@ -5228,7 +5232,12 @@
     "daysLeft": "{n} jours restants",
     "resurrect": "Restaurer l'organisation",
     "statusActive": "Actif",
-    "statusDeleting": "Suppression en cours"
+    "statusDeleting": "Suppression en cours",
+    "statusBlocked": "Bloquée",
+    "block": "Bloquer l'organisation",
+    "unblock": "Débloquer l'organisation",
+    "blockConfirmMessage": "Bloquer {name} ? Elle n'accepte plus l'ingestion, les requêtes ni les connexions jusqu'à son déblocage.",
+    "blockConfirmLabel": "Bloquer"
   },
   "template": {
     "search": "Rechercher un modèle"
@@ -14978,6 +14987,12 @@
       "moreGroups": "+{count}",
       "quickMuteTooltip": "Mise en sourdine rapide depuis une alerte",
       "endedLabel": "terminé"
+    },
+    "lease": {
+      "temporary": "Temporaire, créé par {who}, se termine à {time}",
+      "incidentsOn": "Création d'incidents activée par {who} jusqu'à {time}",
+      "incidentsOff": "Création d'incidents désactivée par {who} jusqu'à {time}",
+      "why": "{label}. Raison : {reason}"
     },
     "ack": {
       "acknowledge": "Prendre en charge",
