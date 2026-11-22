@@ -79,13 +79,6 @@ static FAILED_ORGS: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::de
 static RESENT_STATUSES: LazyLock<Mutex<HashMap<String, BlockedState>>> =
     LazyLock::new(Default::default);
 
-// Every status audit this test binary emitted, as `[org, actor, from, to]`.
-#[cfg(test)]
-static STATUS_AUDITS: LazyLock<Mutex<Vec<[String; 4]>>> = LazyLock::new(Default::default);
-// Orgs whose unblock eviction a test makes fail; per org, so parallel tests stay independent.
-#[cfg(test)]
-static FAILING_EVICTIONS: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
-
 type BlockedState = (String, Option<i64>, i64);
 
 /// Why an unblock failed; the two eviction failures are the server's, the rest are not retried.
@@ -1759,7 +1752,7 @@ async fn announce_removed_member(
 #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
 async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
     #[cfg(test)]
-    STATUS_AUDITS
+    tests::STATUS_AUDITS
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .push([org_id, actor, from, to].map(String::from));
@@ -2378,7 +2371,7 @@ async fn set_unblocked(org_id: &str) -> Result<(), UnblockError> {
 /// Evicts an unblocked org from every node's status cache.
 async fn evict_unblocked(org_id: &str) -> Result<(), infra::errors::Error> {
     #[cfg(test)]
-    if FAILING_EVICTIONS
+    if tests::FAILING_EVICTIONS
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
         .contains(org_id)
@@ -2863,6 +2856,13 @@ mod tests {
     ];
     /// The membership and user deletes step 600 runs, each in one transaction.
     const INFRA_ORG_USERS_SOURCE: &str = include_str!("../../../infra/src/table/org_users.rs");
+
+    // Every status audit this test binary emitted, as `[org, actor, from, to]`.
+    pub(super) static STATUS_AUDITS: LazyLock<Mutex<Vec<[String; 4]>>> =
+        LazyLock::new(Default::default);
+    // Orgs whose unblock eviction a test makes fail; per org, so parallel tests stay independent.
+    pub(super) static FAILING_EVICTIONS: LazyLock<Mutex<HashSet<String>>> =
+        LazyLock::new(Default::default);
 
     struct FailingStreamDataCleanup;
 
