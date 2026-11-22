@@ -310,24 +310,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OPopover>
         </span>
       </div>
-      <!-- Column-visibility toggle + refresh — pinned to the right end of the
-           filter bar so the catalog matches the other list pages (column
-           toggle, then refresh). Wrapped in a real element with ms-2 because
-           OTableColumnToggle's root is a reka-ui DropdownMenuRoot that renders
-           no DOM node, so a fallthrough class on it would be dropped. -->
+      <!-- A real wrapper carries ms-2: OTableColumnToggle's root is a reka-ui
+           DropdownMenuRoot that renders no DOM node, so a class on it is dropped. -->
       <div class="ms-2 flex shrink-0 items-center gap-2">
         <OTableColumnToggle
           :columns="tableColumns"
           :column-visibility="columnVisibility"
           @update:column-visibility="setColumnVisibility"
-        />
-        <ORefreshButton
-          layout="inline"
-          variant="outline"
-          :last-run-at="lastRunAt"
-          :loading="isLoading || isSearching"
-          data-test="services-catalog-refresh-btn"
-          @click="refreshCatalog"
         />
       </div>
     </div>
@@ -823,7 +812,6 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -2349,8 +2337,8 @@ async function loadServicesCatalog() {
 defineExpose({
   loadServicesCatalog,
   streamFilter,
-  refresh: loadServicesCatalog,
-  loading: isLoading,
+  refresh: refreshCatalog,
+  loading: computed(() => isLoading.value || isSearching.value),
   lastRunAt,
 });
 

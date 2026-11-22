@@ -685,7 +685,7 @@ describe("SearchBar", () => {
       expect(wrapper.find('[data-test="services-catalog-date-time-picker"]').exists()).toBe(false);
     });
 
-    it("should show the Services Catalog toolbar (DateTime) in services-catalog mode", async () => {
+    it("should show the Services Catalog toolbar (DateTime, refresh) in services-catalog mode", async () => {
       searchObjInstance.meta.searchMode = "services-catalog";
       wrapper = mountSearchBar();
       await flushPromises();
@@ -708,6 +708,40 @@ describe("SearchBar", () => {
       },
     );
 
+    it("should emit services-catalog-refresh from the toolbar refresh button in services-catalog mode", async () => {
+      searchObjInstance.meta.searchMode = "services-catalog";
+      wrapper = mountSearchBar();
+      await flushPromises();
+
+      await wrapper.find('[data-test="services-catalog-refresh-btn"]').trigger("click");
+
+      expect(wrapper.emitted("services-catalog-refresh")).toHaveLength(1);
+      expect(wrapper.emitted("service-graph-refresh")).toBeFalsy();
+    });
+
+    it.each([
+      ["service-graph", "service-graph-refresh-btn"],
+      ["services-catalog", "services-catalog-refresh-btn"],
+    ])(
+      "shows one refresh button beside the %s time picker with the tab's own load state",
+      async (mode, testId) => {
+        searchObjInstance.meta.searchMode = mode;
+        wrapper = mountSearchBar({ refreshLoading: true, refreshLastRunAt: 1_700_000_000_000 });
+        await flushPromises();
+
+        const buttons = wrapper.findAllComponents({ name: "ORefreshButton" });
+        expect(buttons).toHaveLength(1);
+        expect(buttons[0].props()).toMatchObject({
+          dataTest: testId,
+          layout: "inline",
+          loading: true,
+          lastRunAt: 1_700_000_000_000,
+        });
+        const picker = wrapper.find(`[data-test="${mode}-date-time-picker"]`).element;
+        expect(picker.nextElementSibling?.getAttribute("data-test")).toBe(testId);
+      },
+    );
+
     it("should emit service-graph-refresh when the graph refresh button is clicked", async () => {
       searchObjInstance.meta.searchMode = "service-graph";
       wrapper = mountSearchBar();
@@ -721,7 +755,7 @@ describe("SearchBar", () => {
     it("shows how long ago the Service Graph last loaded beside its refresh control", async () => {
       searchObjInstance.meta.searchMode = "service-graph";
       const lastRunAt = Date.now() - 3 * 60 * 1000;
-      wrapper = mountSearchBar({ serviceGraphLastRunAt: lastRunAt });
+      wrapper = mountSearchBar({ refreshLastRunAt: lastRunAt });
       await flushPromises();
 
       const refresh = wrapper.findComponent({ name: "ORefreshButton" });
@@ -733,7 +767,7 @@ describe("SearchBar", () => {
 
     it("marks the Service Graph refresh control busy while the graph loads", async () => {
       searchObjInstance.meta.searchMode = "service-graph";
-      wrapper = mountSearchBar({ serviceGraphLoading: true });
+      wrapper = mountSearchBar({ refreshLoading: true });
       await flushPromises();
 
       expect(wrapper.findComponent({ name: "ORefreshButton" }).props("loading")).toBe(true);

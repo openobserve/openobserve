@@ -790,8 +790,8 @@ describe("Index.vue (Main Traces Page)", () => {
 
       // SearchBar is an async component, so its stub declares no props and the values land as attributes.
       const searchBarEl = wrapper.findComponent({ name: "search-bar" });
-      expect(searchBarEl.attributes("service-graph-last-run-at")).toBe("123");
-      expect(searchBarEl.attributes("service-graph-loading")).toBe("true");
+      expect(searchBarEl.attributes("refresh-last-run-at")).toBe("123");
+      expect(searchBarEl.attributes("refresh-loading")).toBe("true");
     });
 
     it("should render the ServicesCatalog stub inline in services-catalog mode", async () => {
@@ -4128,6 +4128,96 @@ describe("Index.vue (Main Traces Page)", () => {
         ...store.state.zoConfig,
         auto_query_enabled: false,
       };
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Shared toolbar refresh for Service Graph / Services Catalog
+  // ---------------------------------------------------------------------------
+  describe("shared toolbar refresh", () => {
+    const graph = { refresh: vi.fn(), loading: ref(false), lastRunAt: ref<number | null>(null) };
+    const catalog = { refresh: vi.fn(), loading: ref(false), lastRunAt: ref<number | null>(null) };
+
+    function mountWithViews() {
+      const view = (name: string, state: typeof graph) =>
+        defineComponent({
+          name,
+          emits: ["request:stream-change", "view-traces", "jump-to-stream-data"],
+          setup(_p, { expose }) {
+            expose(state);
+            return () => h("div");
+          },
+        });
+      return mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": {
+              name: "search-bar",
+              props: ["refreshLoading", "refreshLastRunAt"],
+              template: "<div />",
+            },
+            "index-list": true,
+            "search-result": true,
+            "service-graph": view("service-graph", graph),
+            "services-catalog": view("services-catalog", catalog),
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+    }
+
+    async function openTab(mode: string) {
+      mockSearchObj.meta.searchMode = mode;
+      await flushPromises();
+    }
+
+    beforeEach(() => {
+      graph.loading.value = true;
+      graph.lastRunAt.value = 111;
+      catalog.loading.value = false;
+      catalog.lastRunAt.value = 222;
+    });
+
+    it("follows the open tab's own loading and last-run time, live, across tab switches", async () => {
+      wrapper = mountWithViews();
+      await flushPromises();
+      const bar = () => wrapper.findComponent({ name: "search-bar" });
+
+      await openTab("service-graph");
+      expect(bar().props()).toMatchObject({ refreshLoading: true, refreshLastRunAt: 111 });
+      graph.loading.value = false;
+      graph.lastRunAt.value = 333;
+      await flushPromises();
+      expect(bar().props()).toMatchObject({ refreshLoading: false, refreshLastRunAt: 333 });
+
+      await openTab("services-catalog");
+      expect(bar().props()).toMatchObject({ refreshLoading: false, refreshLastRunAt: 222 });
+      catalog.loading.value = true;
+      await flushPromises();
+      expect(bar().props("refreshLoading")).toBe(true);
+
+      await openTab("service-graph");
+      expect(bar().props()).toMatchObject({ refreshLoading: false, refreshLastRunAt: 333 });
+      // Switching tabs is not a toolbar refresh.
+      expect(graph.refresh).not.toHaveBeenCalled();
+      expect(catalog.refresh).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["service-graph", "service-graph-refresh", graph],
+      ["services-catalog", "services-catalog-refresh", catalog],
+    ])("refreshes the %s tab when the toolbar asks", async (mode, event, view) => {
+      wrapper = mountWithViews();
+      await flushPromises();
+      await openTab(mode);
+
+      wrapper.findComponent({ name: "search-bar" }).vm.$emit(event);
+      await flushPromises();
+
+      expect(view.refresh).toHaveBeenCalledTimes(1);
     });
   });
 

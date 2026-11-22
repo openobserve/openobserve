@@ -336,6 +336,45 @@ describe("ServiceGraph.vue - Cache Invalidation & Data Refresh", () => {
       expect(wrapper.find('[data-test="service-graph-loading"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="service-graph-no-data-state"]').exists()).toBe(true);
     });
+
+    it("shows the error, not the loading state, when the first load fails", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(new Error("API Error"));
+      try {
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(wrapper.vm.lastRunAt).toBeNull();
+        expect(wrapper.find('[data-test="service-graph-loading"]').exists()).toBe(false);
+        expect(wrapper.text()).toContain("API Error");
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it("keeps the last successful run time when a reload fails", async () => {
+      vi.mocked(serviceGraphService.getCurrentTopology).mockResolvedValue({
+        data: { nodes: [], edges: [] },
+      } as any);
+      wrapper = createWrapper();
+      await flushPromises();
+      const lastGood = wrapper.vm.lastRunAt;
+      expect(lastGood).toEqual(expect.any(Number));
+
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(new Error("API Error"));
+      const now = vi.spyOn(Date, "now").mockReturnValue(lastGood + 60_000);
+      try {
+        await wrapper.vm.loadServiceGraph();
+        await flushPromises();
+
+        expect(wrapper.vm.error).toBeTruthy();
+        expect(wrapper.vm.lastRunAt).toBe(lastGood);
+      } finally {
+        now.mockRestore();
+        consoleError.mockRestore();
+      }
+    });
   });
 
   describe("Toolbar Layout", () => {

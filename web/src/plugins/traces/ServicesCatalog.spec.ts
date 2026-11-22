@@ -1503,6 +1503,73 @@ describe("ServicesCatalog", () => {
   // -----------------------------------------------------------------------
   // loadServicesCatalog
   // -----------------------------------------------------------------------
+  describe("refresh (driven by the traces toolbar)", () => {
+    it("has no refresh button of its own", async () => {
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="services-catalog-refresh-btn"]').exists()).toBe(false);
+    });
+
+    it("reloads the rows and the version registry", async () => {
+      config.isEnterprise = "true";
+      const registry = vi.spyOn(serviceVersionsService, "services").mockResolvedValue({
+        data: { services: [], envs: [], verdict_status: "ok", registry_status: "ok" },
+      } as any);
+      try {
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+        mockFetchQueryDataWithHttpStream.mockClear();
+        registry.mockClear();
+
+        await wrapper.vm.refresh();
+        await flushPromises();
+
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
+        expect(registry).toHaveBeenCalledTimes(1);
+      } finally {
+        registry.mockRestore();
+        config.isEnterprise = "false";
+      }
+    });
+
+    it("keeps the last successful run time when a reload fails", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.complete(null, {});
+      });
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      const lastGood = wrapper.vm.lastRunAt;
+      expect(lastGood).toEqual(expect.any(Number));
+
+      mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+        callbacks.error(null, { type: "error", content: { message: "boom" } });
+      });
+      const now = vi.spyOn(Date, "now").mockReturnValue(lastGood + 60_000);
+      try {
+        await wrapper.vm.refresh();
+        await flushPromises();
+        expect(wrapper.vm.loadError).toBeTruthy();
+        expect(wrapper.vm.lastRunAt).toBe(lastGood);
+      } finally {
+        now.mockRestore();
+      }
+    });
+
+    it("reports loading while a reload runs behind rows already on screen", async () => {
+      wrapper = mountServicesCatalog();
+      await flushPromises();
+      wrapper.vm.isLoading = false;
+      wrapper.vm.isSearching = true;
+      await flushPromises();
+      expect(wrapper.vm.loading).toBe(true);
+
+      wrapper.vm.isSearching = false;
+      await flushPromises();
+      expect(wrapper.vm.loading).toBe(false);
+    });
+  });
+
   describe("loadServicesCatalog", () => {
     it("should call fetch with default stream when both selectedStream and localStorage are empty", async () => {
       localStorage.removeItem("servicesCatalog_streamFilter");
@@ -3518,7 +3585,7 @@ describe("ServicesCatalog", () => {
 
       const refreshedAt = loadedAt + 10 * 60 * 1000;
       vi.setSystemTime(refreshedAt);
-      await wrapper.find('[data-test="services-catalog-refresh-btn"]').trigger("click");
+      await wrapper.vm.refresh();
       await flushPromises();
 
       expect(panelRange()).toEqual(fifteenMinutesEndingAt(refreshedAt));
@@ -3555,23 +3622,21 @@ describe("ServicesCatalog", () => {
         callbacks?.error?.(null, { message: "boom" });
       });
       vi.setSystemTime(loadedAt + 10 * 60 * 1000);
-      await wrapper.find('[data-test="services-catalog-refresh-btn"]').trigger("click");
+      await wrapper.vm.refresh();
       await flushPromises();
 
       expect(wrapper.vm.loadError).toBeTruthy();
       expect(wrapper.vm.timeRange).toEqual(fifteenMinutesEndingAt(loadedAt));
     });
 
-    it("shows when the rows last loaded on the refresh control", async () => {
+    it("reports when the rows last loaded to the toolbar refresh control", async () => {
       mockOneService();
       const loadedAt = Date.UTC(2026, 0, 1, 12);
       vi.setSystemTime(loadedAt);
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      const refresh = wrapper.findComponent({ name: "ORefreshButton" });
-      expect(refresh.props("lastRunAt")).toBe(loadedAt);
-      expect(refresh.find('[data-test="services-catalog-refresh-btn"]').exists()).toBe(true);
+      expect(wrapper.vm.lastRunAt).toBe(loadedAt);
     });
   });
 

@@ -252,7 +252,7 @@
           >
             <!-- Before the first load settles an empty graph means "not fetched yet", not "no data". -->
             <div
-              v-if="loading || lastRunAt === null"
+              v-if="loading || (lastRunAt === null && !error)"
               class="flex h-full items-center justify-center"
               data-test="service-graph-loading"
             >
@@ -1695,6 +1695,7 @@ export default defineComponent({
 
         // Apply filters and render
         applyFilters();
+        lastRunAt.value = Date.now();
       } catch (err: any) {
         console.error("Failed to load service graph:", err);
 
@@ -1715,7 +1716,6 @@ export default defineComponent({
         }
       } finally {
         loading.value = false;
-        lastRunAt.value = Date.now();
       }
       if (!unmounted && loadInputsKey() !== inputs) await loadServiceGraph();
     };

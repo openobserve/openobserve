@@ -553,10 +553,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @on:date-change="updateDateTime"
             />
             <ORefreshButton
-              variant="outline"
               data-test="service-graph-refresh-btn"
-              :last-run-at="serviceGraphLastRunAt"
-              :loading="serviceGraphLoading"
+              layout="inline"
+              variant="outline"
+              size="header"
+              :loading="refreshLoading"
+              :last-run-at="refreshLastRunAt"
               @click="$emit('service-graph-refresh')"
             />
             <OToggleGroup
@@ -603,6 +605,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               calendar-presets
               class="h-8.5!"
               @on:date-change="updateDateTime"
+            />
+            <ORefreshButton
+              data-test="services-catalog-refresh-btn"
+              layout="inline"
+              variant="outline"
+              size="header"
+              :loading="refreshLoading"
+              :last-run-at="refreshLastRunAt"
+              @click="$emit('services-catalog-refresh')"
             />
           </div>
         </div>
@@ -915,13 +926,14 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    serviceGraphLastRunAt: {
-      type: Number as PropType<number | null>,
-      default: null,
-    },
-    serviceGraphLoading: {
+    // The active Service Graph / Services Catalog tab's own load state, for the shared refresh button.
+    refreshLoading: {
       type: Boolean,
       default: false,
+    },
+    refreshLastRunAt: {
+      type: Number as PropType<number | null>,
+      default: null,
     },
   },
   methods: {
