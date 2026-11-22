@@ -15,345 +15,349 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="forbidden" class="flex flex-1 items-center justify-center">
-    <OEmptyState size="hero" preset="no-access" data-test="domain-management-forbidden" />
-  </div>
   <!-- The Settings shell owns the header, scroll and gutter; the content just flows. -->
-  <div v-else class="domain_management flex flex-col gap-4">
-    <OFormSection
-      variant="plain"
-      :title="t('settings.domainManagement.claimParserTitle')"
-      :description="t('settings.domainManagement.claimParserSectionDesc')"
-      data-test="domain-management-claim-parser-title"
-    >
-      <OSettingRow
-        control-at="end"
-        :loading="!loaded"
-        :label="t('settings.domainManagement.claimParserLabel')"
-        data-test="domain-management-claim-parser-row"
+  <div class="domain_management flex flex-col gap-4">
+    <div v-if="forbidden" class="flex flex-1 items-center justify-center">
+      <OEmptyState size="hero" preset="no-access" data-test="domain-management-forbidden" />
+    </div>
+    <template v-else>
+      <OFormSection
+        variant="plain"
+        :title="t('settings.domainManagement.claimParserTitle')"
+        :description="t('settings.domainManagement.claimParserSectionDesc')"
+        data-test="domain-management-claim-parser-title"
       >
-        <template #description>
-          {{
-            t("settings.domainManagement.claimParserHelp", {
-              product1: raw("VRL"),
-              product2: raw("JavaScript"),
-            })
-          }}
-          <OButton
-            variant="link"
-            size="xs"
-            type="button"
-            data-test="domain-management-claim-parser-help-btn"
-            @click="showVrlInfo = true"
-          >
-            {{ t("settings.domainManagement.claimParserFormatLink") }}
-          </OButton>
-        </template>
-        <OSelect
-          v-model="claimParserFunction"
-          :options="functionOptions"
-          :aria-label="t('settings.domainManagement.claimParserLabel')"
-          :placeholder="t('settings.domainManagement.claimParserPlaceholder')"
-          searchable
-          clearable
-          :loading="loadingFunctions"
-          data-test="domain-management-claim-parser-select"
+        <OSettingRow
+          control-at="end"
+          :loading="!loaded"
+          :label="t('settings.domainManagement.claimParserLabel')"
+          data-test="domain-management-claim-parser-row"
         >
-          <template #empty>
-            <span>{{ t("settings.domainManagement.noFunctions") }}</span>
-          </template>
-        </OSelect>
-      </OSettingRow>
-    </OFormSection>
-
-    <OFormSection
-      variant="plain"
-      :title="t('settings.domainManagement.restrictionsTitle')"
-      :description="t('settings.domainManagement.restrictionsDesc')"
-      data-test="domain-management-domain-restrictions-title"
-    >
-      <div class="flex flex-col gap-3">
-        <div>
-          <label
-            :for="NEW_DOMAIN_INPUT_ID"
-            class="o-input-label text-compact text-input-label-text mb-1 block leading-tight font-medium"
-          >
-            {{ t("settings.domainManagement.domainLabel") }}
-          </label>
-          <OForm
-            ref="addDomainForm"
-            :schema="addDomainSchema"
-            :default-values="addDomainDefaults()"
-            validate-on="leave"
-            @submit="addDomain"
-            v-slot="{ isSubmitting }"
-            class="flex items-start gap-x-2"
-          >
-            <div class="w-field-width-md max-w-full min-w-0">
-              <OFormInput
-                :id="NEW_DOMAIN_INPUT_ID"
-                data-test="domain-management-new-domain-input"
-                name="newDomain"
-                class="domain-input"
-                :placeholder="t('settings.domainPlaceholder', { example: raw('example.com') })"
-                :help-text="t('settings.domainHint', { at_sign: '@' })"
-              />
-            </div>
+          <template #description>
+            {{
+              t("settings.domainManagement.claimParserHelp", {
+                product1: raw("VRL"),
+                product2: raw("JavaScript"),
+              })
+            }}
             <OButton
-              data-test="domain-management-add-domain-btn"
-              variant="outline"
-              size="sm-action"
-              type="submit"
-              :loading="isSubmitting"
-              >{{ t("settings.domainManagement.addDomain") }}
+              variant="link"
+              size="xs"
+              type="button"
+              data-test="domain-management-claim-parser-help-btn"
+              @click="showVrlInfo = true"
+            >
+              {{ t("settings.domainManagement.claimParserFormatLink") }}
             </OButton>
-          </OForm>
-        </div>
-
-        <p
-          v-if="loaded && domains.length === 0"
-          data-test="domain-management-no-domain-message"
-          class="text-text-secondary text-xs"
-        >
-          {{ t("settings.domainManagement.noDomains") }}
-        </p>
-        <p v-else-if="domains.length > 0" class="text-text-secondary text-xs">
-          {{ t("settings.domainConfiguredCount", { count: domains.length }) }}
-        </p>
-
-        <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
-          <div
-            v-if="domain && domain.name"
-            class="border-border-default rounded-default flex flex-col gap-3 border p-3"
-            :data-test="`domain-management-domain-card-${domain.name}`"
+          </template>
+          <OSelect
+            v-model="claimParserFunction"
+            :options="functionOptions"
+            :aria-label="t('settings.domainManagement.claimParserLabel')"
+            :placeholder="t('settings.domainManagement.claimParserPlaceholder')"
+            searchable
+            clearable
+            :loading="loadingFunctions"
+            data-test="domain-management-claim-parser-select"
           >
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <div
-                :data-test="`domain-management-domain-name-${domain.name}`"
-                class="text-text-heading min-w-40 flex-1 text-sm font-medium break-all"
-              >
-                {{ domain.name }}
-              </div>
-              <div class="w-field-width-md max-w-full">
-                <OSelect
-                  v-model="domain.policy"
-                  :options="policyOptions"
-                  :searchable="false"
-                  :aria-label="
-                    t('settings.domainManagement.accessFor', { domain: raw(domain.name) })
-                  "
-                  :data-test="`domain-management-policy-select-${domain.name}`"
+            <template #empty>
+              <span>{{ t("settings.domainManagement.noFunctions") }}</span>
+            </template>
+          </OSelect>
+        </OSettingRow>
+      </OFormSection>
+
+      <OFormSection
+        variant="plain"
+        :title="t('settings.domainManagement.restrictionsTitle')"
+        :description="t('settings.domainManagement.restrictionsDesc')"
+        data-test="domain-management-domain-restrictions-title"
+      >
+        <div class="flex flex-col gap-3">
+          <div>
+            <label
+              :for="NEW_DOMAIN_INPUT_ID"
+              class="o-input-label text-compact text-input-label-text mb-1 block leading-tight font-medium"
+            >
+              {{ t("settings.domainManagement.domainLabel") }}
+            </label>
+            <OForm
+              ref="addDomainForm"
+              :schema="addDomainSchema"
+              :default-values="addDomainDefaults()"
+              validate-on="leave"
+              @submit="addDomain"
+              v-slot="{ isSubmitting }"
+              class="flex items-start gap-x-2"
+            >
+              <div class="w-field-width-md max-w-full min-w-0">
+                <OFormInput
+                  :id="NEW_DOMAIN_INPUT_ID"
+                  data-test="domain-management-new-domain-input"
+                  name="newDomain"
+                  class="domain-input"
+                  :placeholder="t('settings.domainPlaceholder', { example: raw('example.com') })"
+                  :help-text="t('settings.domainHint', { at_sign: '@' })"
                 />
               </div>
               <OButton
-                icon-left="close"
-                variant="ghost-muted"
-                size="icon-xs-sq"
-                :aria-label="
-                  t('settings.domainManagement.removeDomain', { domain: raw(domain.name) })
-                "
-                :data-test="`domain-management-remove-domain-btn-${domain.name}`"
-                @click="removeDomain(index)"
-              >
-                <OTooltip
-                  :content="
-                    t('settings.domainManagement.removeDomain', { domain: raw(domain.name) })
-                  "
-                  side="top"
-                />
+                data-test="domain-management-add-domain-btn"
+                variant="outline"
+                size="sm-action"
+                type="submit"
+                :loading="isSubmitting"
+                >{{ t("settings.domainManagement.addDomain") }}
               </OButton>
-            </div>
+            </OForm>
+          </div>
 
-            <p
-              class="rounded-default px-2 py-1 text-xs"
-              :class="
-                isBlockPolicy(domain.policy)
-                  ? 'bg-banner-error-soft-bg text-banner-error-soft-text'
-                  : 'bg-banner-info-bg text-banner-info-text'
-              "
-              :data-test="`domain-management-policy-effect-${domain.name}`"
+          <p
+            v-if="loaded && domains.length === 0"
+            data-test="domain-management-no-domain-message"
+            class="text-text-secondary text-xs"
+          >
+            {{ t("settings.domainManagement.noDomains") }}
+          </p>
+          <p v-else-if="domains.length > 0" class="text-text-secondary text-xs">
+            {{ t("settings.domainConfiguredCount", { count: domains.length }) }}
+          </p>
+
+          <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
+            <div
+              v-if="domain && domain.name"
+              class="border-border-default rounded-default flex flex-col gap-3 border p-3"
+              :data-test="`domain-management-domain-card-${domain.name}`"
             >
-              {{ t(POLICY_EFFECT_KEYS[domain.policy], { domain: raw("@" + domain.name) }) }}
-            </p>
-
-            <!-- Keyed by policy: allow and block keep separate drafts and separate form state. -->
-            <div v-if="isListPolicy(domain.policy)" :key="domain.policy">
-              <label
-                :for="emailInputId(domain)"
-                class="o-input-label text-compact text-input-label-text mb-1 block leading-tight font-medium"
-              >
-                {{ t("settings.domainManagement.emailLabel") }}
-              </label>
-              <OForm
-                :ref="(el) => setListFormRef(domain, el)"
-                :schema="getEmailSchema(domain.name)"
-                :default-values="addEmailDefaults()"
-                validate-on="leave"
-                @submit="(v) => addListedEmail(domain, v.newEmail)"
-                v-slot="{ isSubmitting }"
-                class="flex items-start gap-x-2"
-              >
-                <div class="w-field-width-md max-w-full min-w-0">
-                  <OFormInput
-                    :id="emailInputId(domain)"
-                    :data-test="`domain-management-${listKind(domain)}-email-input-${domain.name}`"
-                    name="newEmail"
-                    class="email-input"
-                    :placeholder="
-                      t('settings.emailPlaceholder', { domain: raw('@' + domain.name) })
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <div
+                  :data-test="`domain-management-domain-name-${domain.name}`"
+                  class="text-text-heading min-w-40 flex-1 text-sm font-medium break-all"
+                >
+                  {{ domain.name }}
+                </div>
+                <div class="w-field-width-md max-w-full">
+                  <OSelect
+                    v-model="domain.policy"
+                    :options="policyOptions"
+                    :searchable="false"
+                    :aria-label="
+                      t('settings.domainManagement.accessFor', { domain: raw(domain.name) })
                     "
+                    :data-test="`domain-management-policy-select-${domain.name}`"
                   />
                 </div>
                 <OButton
-                  :data-test="
-                    domain.policy === 'block_specific'
-                      ? 'domain-management-block-email-btn'
-                      : 'domain-management-add-email-btn'
+                  icon-left="close"
+                  variant="ghost-muted"
+                  size="icon-xs-sq"
+                  :aria-label="
+                    t('settings.domainManagement.removeDomain', { domain: raw(domain.name) })
                   "
-                  variant="outline"
-                  size="sm-action"
-                  type="submit"
-                  :loading="isSubmitting"
-                  >{{ t("common.add") }}</OButton
+                  :data-test="`domain-management-remove-domain-btn-${domain.name}`"
+                  @click="removeDomain(index)"
                 >
-              </OForm>
-
-              <ul v-if="listedEmails(domain).length > 0" class="mt-2 flex flex-wrap gap-2">
-                <li
-                  v-for="(email, emailIndex) in listedEmails(domain)"
-                  :key="email"
-                  class="border-border-default bg-surface-subtle rounded-default text-text-body inline-flex items-center gap-1 border py-0.5 ps-2 pe-0.5 text-xs"
-                >
-                  <span class="break-all">{{ email }}</span>
-                  <OButton
-                    icon-left="close"
-                    variant="ghost-muted"
-                    size="icon-xs-sq"
-                    :aria-label="t('settings.domainManagement.removeEmail', { email: raw(email) })"
-                    @click="
-                      domain.policy === 'block_specific'
-                        ? removeBlockedEmail(domain, emailIndex)
-                        : removeEmail(domain, emailIndex)
+                  <OTooltip
+                    :content="
+                      t('settings.domainManagement.removeDomain', { domain: raw(domain.name) })
                     "
+                    side="top"
                   />
-                </li>
-              </ul>
-              <p v-else class="text-text-secondary mt-2 text-xs">
-                {{ t("settings.domainManagement.noEmails") }}
-              </p>
-            </div>
-          </div>
-        </template>
+                </OButton>
+              </div>
 
-        <p v-if="hasBlockPolicy" class="text-text-secondary text-xs">
-          {{ t("settings.blockedUsersHint") }}
-        </p>
-      </div>
-    </OFormSection>
-
-    <Teleport defer :to="SAVE_BAR_SLOT">
-      <OSaveBar
-        class="px-page-edge"
-        :loaded="loaded"
-        :change-count="changeCount"
-        :saving="saving || savingClaimParser"
-        data-test="domain-management-save-bar"
-        save-data-test="domain-management-save-changes-btn"
-        discard-data-test="domain-management-discard-btn"
-        @save="savePage"
-        @discard="resetForm"
-      />
-    </Teleport>
-
-    <ODrawer
-      v-model:open="showVrlInfo"
-      :title="t('settings.claimParserFunctionInfoTitle')"
-      side="right"
-      :width="40"
-    >
-      <div class="text-sm">
-        <div class="rounded-default bg-surface-subtle mb-4 p-4">
-          <div class="mb-2 font-medium">{{ t("settings.claimParserFunctionInputTitle") }}</div>
-          <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
-        </div>
-
-        <div class="rounded-default bg-surface-subtle mb-4 p-4">
-          <div class="mb-2 font-medium">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
-          <div class="mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
-          <div class="ms-4">
-            <div class="mb-1">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
-            <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
-          </div>
-        </div>
-
-        <!-- Recent Errors Section -->
-        <div
-          v-if="claimParserFunction"
-          class="rounded-default bg-surface-subtle border-s-status-negative border-s-3 p-4"
-        >
-          <div class="mb-2 flex items-center">
-            <div class="flex-1 font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
-            <div>
-              <OButton
-                icon-left="refresh"
-                variant="ghost-muted"
-                size="icon-xs-sq"
-                @click="loadRecentErrors"
-                :loading="loadingErrors"
+              <p
+                class="rounded-default px-2 py-1 text-xs"
+                :class="
+                  isBlockPolicy(domain.policy)
+                    ? 'bg-banner-error-soft-bg text-banner-error-soft-text'
+                    : 'bg-banner-info-bg text-banner-info-text'
+                "
+                :data-test="`domain-management-policy-effect-${domain.name}`"
               >
-                <OTooltip :content="t('common.refresh')" side="top" />
-              </OButton>
+                {{ t(POLICY_EFFECT_KEYS[domain.policy], { domain: raw("@" + domain.name) }) }}
+              </p>
+
+              <!-- Keyed by policy: allow and block keep separate drafts and separate form state. -->
+              <div v-if="isListPolicy(domain.policy)" :key="domain.policy">
+                <label
+                  :for="emailInputId(domain)"
+                  class="o-input-label text-compact text-input-label-text mb-1 block leading-tight font-medium"
+                >
+                  {{ t("settings.domainManagement.emailLabel") }}
+                </label>
+                <OForm
+                  :ref="(el) => setListFormRef(domain, el)"
+                  :schema="getEmailSchema(domain.name)"
+                  :default-values="addEmailDefaults()"
+                  validate-on="leave"
+                  @submit="(v) => addListedEmail(domain, v.newEmail)"
+                  v-slot="{ isSubmitting }"
+                  class="flex items-start gap-x-2"
+                >
+                  <div class="w-field-width-md max-w-full min-w-0">
+                    <OFormInput
+                      :id="emailInputId(domain)"
+                      :data-test="`domain-management-${listKind(domain)}-email-input-${domain.name}`"
+                      name="newEmail"
+                      class="email-input"
+                      :placeholder="
+                        t('settings.emailPlaceholder', { domain: raw('@' + domain.name) })
+                      "
+                    />
+                  </div>
+                  <OButton
+                    :data-test="
+                      domain.policy === 'block_specific'
+                        ? 'domain-management-block-email-btn'
+                        : 'domain-management-add-email-btn'
+                    "
+                    variant="outline"
+                    size="sm-action"
+                    type="submit"
+                    :loading="isSubmitting"
+                    >{{ t("common.add") }}</OButton
+                  >
+                </OForm>
+
+                <ul v-if="listedEmails(domain).length > 0" class="mt-2 flex flex-wrap gap-2">
+                  <li
+                    v-for="(email, emailIndex) in listedEmails(domain)"
+                    :key="email"
+                    class="border-border-default bg-surface-subtle rounded-default text-text-body inline-flex items-center gap-1 border py-0.5 ps-2 pe-0.5 text-xs"
+                  >
+                    <span class="break-all">{{ email }}</span>
+                    <OButton
+                      icon-left="close"
+                      variant="ghost-muted"
+                      size="icon-xs-sq"
+                      :aria-label="
+                        t('settings.domainManagement.removeEmail', { email: raw(email) })
+                      "
+                      @click="
+                        domain.policy === 'block_specific'
+                          ? removeBlockedEmail(domain, emailIndex)
+                          : removeEmail(domain, emailIndex)
+                      "
+                    />
+                  </li>
+                </ul>
+                <p v-else class="text-text-secondary mt-2 text-xs">
+                  {{ t("settings.domainManagement.noEmails") }}
+                </p>
+              </div>
+            </div>
+          </template>
+
+          <p v-if="hasBlockPolicy" class="text-text-secondary text-xs">
+            {{ t("settings.blockedUsersHint") }}
+          </p>
+        </div>
+      </OFormSection>
+
+      <Teleport defer :to="SAVE_BAR_SLOT">
+        <OSaveBar
+          class="px-page-edge"
+          :loaded="loaded"
+          :change-count="changeCount"
+          :saving="saving || savingClaimParser"
+          data-test="domain-management-save-bar"
+          save-data-test="domain-management-save-changes-btn"
+          discard-data-test="domain-management-discard-btn"
+          @save="savePage"
+          @discard="resetForm"
+        />
+      </Teleport>
+
+      <ODrawer
+        v-model:open="showVrlInfo"
+        :title="t('settings.claimParserFunctionInfoTitle')"
+        side="right"
+        :width="40"
+      >
+        <div class="text-sm">
+          <div class="rounded-default bg-surface-subtle mb-4 p-4">
+            <div class="mb-2 font-medium">{{ t("settings.claimParserFunctionInputTitle") }}</div>
+            <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
+          </div>
+
+          <div class="rounded-default bg-surface-subtle mb-4 p-4">
+            <div class="mb-2 font-medium">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
+            <div class="mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
+            <div class="ms-4">
+              <div class="mb-1">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
+              <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
             </div>
           </div>
 
-          <div v-if="loadingErrors" class="py-4 text-center">
-            <OSpinner size="xs" />
-          </div>
+          <!-- Recent Errors Section -->
+          <div
+            v-if="claimParserFunction"
+            class="rounded-default bg-surface-subtle border-s-status-negative border-s-3 p-4"
+          >
+            <div class="mb-2 flex items-center">
+              <div class="flex-1 font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
+              <div>
+                <OButton
+                  icon-left="refresh"
+                  variant="ghost-muted"
+                  size="icon-xs-sq"
+                  @click="loadRecentErrors"
+                  :loading="loadingErrors"
+                >
+                  <OTooltip :content="t('common.refresh')" side="top" />
+                </OButton>
+              </div>
+            </div>
 
-          <div v-else-if="recentErrors.length === 0" class="text-text-muted py-2 text-center">
-            {{ t("settings.noRecentErrors") }}
-          </div>
+            <div v-if="loadingErrors" class="py-4 text-center">
+              <OSpinner size="xs" />
+            </div>
 
-          <div v-else class="error-list max-h-100 overflow-y-auto">
-            <div
-              v-for="(error, index) in recentErrors.slice(0, 3)"
-              :key="index"
-              class="rounded-default bg-status-error-bg border-s-status-negative mb-1 border-s-2 p-2"
-            >
-              <div class="mb-1 flex items-start">
-                <OIcon name="error" size="xs" class="me-1 mt-1" />
-                <div class="flex-1">
-                  <div class="text-xs font-medium">{{ error.error_type }}</div>
-                  <div class="text-text-muted text-xs">
-                    {{ formatTimestamp(error._timestamp) }}
+            <div v-else-if="recentErrors.length === 0" class="text-text-muted py-2 text-center">
+              {{ t("settings.noRecentErrors") }}
+            </div>
+
+            <div v-else class="error-list max-h-100 overflow-y-auto">
+              <div
+                v-for="(error, index) in recentErrors.slice(0, 3)"
+                :key="index"
+                class="rounded-default bg-status-error-bg border-s-status-negative mb-1 border-s-2 p-2"
+              >
+                <div class="mb-1 flex items-start">
+                  <OIcon name="error" size="xs" class="me-1 mt-1" />
+                  <div class="flex-1">
+                    <div class="text-xs font-medium">{{ error.error_type }}</div>
+                    <div class="text-text-muted text-xs">
+                      {{ formatTimestamp(error._timestamp) }}
+                    </div>
                   </div>
                 </div>
+                <div class="text-text-secondary text-xs wrap-break-word">{{ error.error }}</div>
               </div>
-              <div class="text-text-secondary text-xs wrap-break-word">{{ error.error }}</div>
-            </div>
 
-            <!-- Show More Button -->
-            <div class="mt-2 text-center">
-              <OTooltip :content="logsLock.lockedReason.value" :disabled="!logsLock.locked.value">
-                <span class="inline-flex">
-                  <OButton
-                    :icon-left="logsLock.locked.value ? 'lock' : undefined"
-                    :icon-right="logsLock.locked.value ? undefined : 'open-in-new'"
-                    variant="ghost-primary"
-                    size="sm"
-                    :disabled="logsLock.locked.value"
-                    data-test="domain-management-view-all-errors"
-                    @click="viewAllErrors"
-                  >
-                    {{ t("common.showMore") }}
-                  </OButton>
-                </span>
-              </OTooltip>
+              <!-- Show More Button -->
+              <div class="mt-2 text-center">
+                <OTooltip :content="logsLock.lockedReason.value" :disabled="!logsLock.locked.value">
+                  <span class="inline-flex">
+                    <OButton
+                      :icon-left="logsLock.locked.value ? 'lock' : undefined"
+                      :icon-right="logsLock.locked.value ? undefined : 'open-in-new'"
+                      variant="ghost-primary"
+                      size="sm"
+                      :disabled="logsLock.locked.value"
+                      data-test="domain-management-view-all-errors"
+                      @click="viewAllErrors"
+                    >
+                      {{ t("common.showMore") }}
+                    </OButton>
+                  </span>
+                </OTooltip>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </ODrawer>
+      </ODrawer>
+    </template>
   </div>
 
   <!-- Confirm remove domain dialog -->

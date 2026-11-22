@@ -244,7 +244,9 @@ describe("DomainManagement Component", () => {
       await flushPromises();
 
       expect(refused.findComponent({ name: "OEmptyState" }).exists()).toBe(true);
-      expect(refused.find(".domain_management").exists()).toBe(false);
+      expect(refused.find('[data-test="domain-management-claim-parser-title"]').exists()).toBe(
+        false,
+      );
       refused.unmount();
     });
 
