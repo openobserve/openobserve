@@ -14988,6 +14988,12 @@
       "quickMuteTooltip": "Быстрое заглушение из оповещения",
       "endedLabel": "завершено"
     },
+    "lease": {
+      "temporary": "Временный, создан {who}, действует до {time}",
+      "incidentsOn": "Создание инцидентов включено {who} до {time}",
+      "incidentsOff": "Создание инцидентов отключено {who} до {time}",
+      "why": "{label}. Причина: {reason}"
+    },
     "ack": {
       "acknowledge": "Принять",
       "acknowledgeGroups": "Все {count} срабатывающие группы | Все {count} срабатывающих групп",

@@ -14988,6 +14988,12 @@
       "quickMuteTooltip": "Bir uyarıdan hızlı sessize alma",
       "endedLabel": "sona erdi"
     },
+    "lease": {
+      "temporary": "Geçici, {who} tarafından oluşturuldu, {time} tarihinde sona eriyor",
+      "incidentsOn": "Vaka oluşturma {who} tarafından {time} tarihine kadar açık",
+      "incidentsOff": "Vaka oluşturma {who} tarafından {time} tarihine kadar kapalı",
+      "why": "{label}. Neden: {reason}"
+    },
     "ack": {
       "acknowledge": "Üstlen",
       "acknowledgeGroups": "Tüm {count} tetiklenmiş grup | Tüm {count} tetiklenmiş grup",

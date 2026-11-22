@@ -14983,6 +14983,12 @@
       "quickMuteTooltip": "從警示快速靜音",
       "endedLabel": "已結束"
     },
+    "lease": {
+      "temporary": "暫時性，由 {who} 建立，於 {time} 結束",
+      "incidentsOn": "事件建立已由 {who} 開啟，直到 {time}",
+      "incidentsOff": "事件建立已由 {who} 關閉，直到 {time}",
+      "why": "{label}。原因：{reason}"
+    },
     "ack": {
       "acknowledge": "確認",
       "acknowledgeGroups": "全部 {count} 個觸發中群組 | 全部 {count} 個觸發中群組",

@@ -14988,6 +14988,12 @@
       "quickMuteTooltip": "كتم سريع من التنبيه",
       "endedLabel": "انتهى"
     },
+    "lease": {
+      "temporary": "مؤقت، أنشأه {who}، ينتهي في {time}",
+      "incidentsOn": "تم تشغيل إنشاء الحوادث بواسطة {who} حتى {time}",
+      "incidentsOff": "تم إيقاف إنشاء الحوادث بواسطة {who} حتى {time}",
+      "why": "{label}. السبب: {reason}"
+    },
     "ack": {
       "acknowledge": "تأكيد الاستلام",
       "acknowledgeGroups": "كل {count} مجموعة قيد الإطلاق | كل {count} مجموعات قيد الإطلاق",

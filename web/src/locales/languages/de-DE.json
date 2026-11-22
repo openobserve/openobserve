@@ -14988,6 +14988,12 @@
       "quickMuteTooltip": "Schnelles Stummschalten aus einem Alarm",
       "endedLabel": "beendet"
     },
+    "lease": {
+      "temporary": "Temporär, erstellt von {who}, endet um {time}",
+      "incidentsOn": "Vorfallserstellung aktiviert von {who} bis {time}",
+      "incidentsOff": "Vorfallserstellung deaktiviert von {who} bis {time}",
+      "why": "{label}. Grund: {reason}"
+    },
     "ack": {
       "acknowledge": "Quittieren",
       "acknowledgeGroups": "Alle {count} ausgelöste Gruppe | Alle {count} ausgelösten Gruppen",

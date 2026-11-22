@@ -14988,6 +14988,12 @@
       "quickMuteTooltip": "Snel dempen vanuit een alarm",
       "endedLabel": "beëindigd"
     },
+    "lease": {
+      "temporary": "Tijdelijk, aangemaakt door {who}, eindigt om {time}",
+      "incidentsOn": "Aanmaken van incidenten ingeschakeld door {who} tot {time}",
+      "incidentsOff": "Aanmaken van incidenten uitgeschakeld door {who} tot {time}",
+      "why": "{label}. Waarom: {reason}"
+    },
     "ack": {
       "acknowledge": "Bevestigen",
       "acknowledgeGroups": "Alle {count} groep die afgaat | Alle {count} groepen die afgaan",

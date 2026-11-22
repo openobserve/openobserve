@@ -14988,6 +14988,12 @@
       "quickMuteTooltip": "Silenciamiento rápido desde una alerta",
       "endedLabel": "finalizado"
     },
+    "lease": {
+      "temporary": "Temporal, creado por {who}, finaliza a las {time}",
+      "incidentsOn": "Creación de incidentes activada por {who} hasta {time}",
+      "incidentsOff": "Creación de incidentes desactivada por {who} hasta {time}",
+      "why": "{label}. Motivo: {reason}"
+    },
     "ack": {
       "acknowledge": "Reconocer",
       "acknowledgeGroups": "Todo el grupo disparado ({count}) | Todos los {count} grupos disparados",

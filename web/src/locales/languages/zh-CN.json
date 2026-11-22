@@ -14988,6 +14988,12 @@
       "quickMuteTooltip": "从告警快速静默",
       "endedLabel": "已结束"
     },
+    "lease": {
+      "temporary": "临时，由 {who} 创建，于 {time} 结束",
+      "incidentsOn": "事件创建已由 {who} 开启，直到 {time}",
+      "incidentsOff": "事件创建已由 {who} 关闭，直到 {time}",
+      "why": "{label}。原因：{reason}"
+    },
     "ack": {
       "acknowledge": "确认",
       "acknowledgeGroups": "全部 {count} 个触发中分组 | 全部 {count} 个触发中分组",

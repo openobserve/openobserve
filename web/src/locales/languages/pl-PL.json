@@ -14988,6 +14988,12 @@
       "quickMuteTooltip": "Szybkie wyciszenie z alertu",
       "endedLabel": "zakończone"
     },
+    "lease": {
+      "temporary": "Tymczasowe, utworzone przez {who}, wygasa o {time}",
+      "incidentsOn": "Tworzenie incydentów włączone przez {who} do {time}",
+      "incidentsOff": "Tworzenie incydentów wyłączone przez {who} do {time}",
+      "why": "{label}. Powód: {reason}"
+    },
     "ack": {
       "acknowledge": "Potwierdź",
       "acknowledgeGroups": "Wszystkie {count} wyzwolone grupy | Wszystkie {count} wyzwolone grupy",

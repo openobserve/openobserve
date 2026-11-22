@@ -14988,6 +14988,12 @@
       "quickMuteTooltip": "Mise en sourdine rapide depuis une alerte",
       "endedLabel": "terminé"
     },
+    "lease": {
+      "temporary": "Temporaire, créé par {who}, se termine à {time}",
+      "incidentsOn": "Création d'incidents activée par {who} jusqu'à {time}",
+      "incidentsOff": "Création d'incidents désactivée par {who} jusqu'à {time}",
+      "why": "{label}. Raison : {reason}"
+    },
     "ack": {
       "acknowledge": "Prendre en charge",
       "acknowledgeGroups": "Tous les {count} groupe en alerte | Tous les {count} groupes en alerte",

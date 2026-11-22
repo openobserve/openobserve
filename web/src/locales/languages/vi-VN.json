@@ -14988,6 +14988,12 @@
       "quickMuteTooltip": "Tạm tắt nhanh từ cảnh báo",
       "endedLabel": "đã kết thúc"
     },
+    "lease": {
+      "temporary": "Tạm thời, được tạo bởi {who}, kết thúc lúc {time}",
+      "incidentsOn": "Tạo sự cố được {who} bật cho đến {time}",
+      "incidentsOff": "Tạo sự cố được {who} tắt cho đến {time}",
+      "why": "{label}. Lý do: {reason}"
+    },
     "ack": {
       "acknowledge": "Tiếp nhận",
       "acknowledgeGroups": "Tất cả {count} nhóm đang kích hoạt | Tất cả {count} nhóm đang kích hoạt",

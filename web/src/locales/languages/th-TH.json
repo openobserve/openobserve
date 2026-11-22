@@ -14986,6 +14986,12 @@
       "quickMuteTooltip": "Quick mute from an alert",
       "endedLabel": "ended"
     },
+    "lease": {
+      "temporary": "ชั่วคราว สร้างโดย {who} สิ้นสุดเมื่อ {time}",
+      "incidentsOn": "เปิดการสร้างเหตุการณ์ขัดข้องโดย {who} จนถึง {time}",
+      "incidentsOff": "ปิดการสร้างเหตุการณ์ขัดข้องโดย {who} จนถึง {time}",
+      "why": "{label}. เหตุผล: {reason}"
+    },
     "ack": {
       "acknowledge": "Acknowledge",
       "acknowledgeGroups": "กลุ่มที่กำลังแจ้งเตือนทั้งหมด {count} กลุ่ม | กลุ่มที่กำลังแจ้งเตือนทั้งหมด {count} กลุ่ม",

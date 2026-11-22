@@ -14988,6 +14988,12 @@
       "quickMuteTooltip": "アラートからのクイックミュート",
       "endedLabel": "終了"
     },
+    "lease": {
+      "temporary": "一時的、{who} により作成、{time} に終了",
+      "incidentsOn": "インシデント作成が {who} により {time} まで有効化されています",
+      "incidentsOff": "インシデント作成が {who} により {time} まで無効化されています",
+      "why": "{label}。理由: {reason}"
+    },
     "ack": {
       "acknowledge": "確認",
       "acknowledgeGroups": "すべての {count} 件の発火グループ | すべての {count} 件の発火グループ",
