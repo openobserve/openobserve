@@ -421,6 +421,16 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 import domainManagement from "@/services/domainManagement";
+import {
+  buildDomainRestrictionsBody,
+  cardAfterRemoval,
+  cardsToRestrictions,
+  parseDomainRestrictions,
+  restrictionsToCards,
+  type DomainCard as Domain,
+  type DomainPolicy,
+  type DomainRestrictions,
+} from "@/utils/domainRestrictions";
 import { useRouter } from "vue-router";
 import { formatDistanceToNow } from "date-fns";
 import jstransform from "@/services/jstransform";
@@ -442,15 +452,6 @@ import {
   addEmailDefaults,
   type AddDomainForm,
 } from "./DomainManagement.schema";
-
-type DomainPolicy = "allow_all" | "allow_specific" | "block_specific" | "block_all";
-
-interface Domain {
-  name: string;
-  policy: DomainPolicy;
-  allowedEmails: string[];
-  blockedEmails: string[];
-}
 
 const NEW_DOMAIN_INPUT_ID = "domain-management-new-domain";
 
@@ -504,6 +505,8 @@ const updateMetaOrgSettings = useMutation(() =>
 );
 
 const domains = reactive<Domain[]>([]);
+// The server's config as last loaded or saved: it holds the allow rules a block card hides.
+const savedRestrictions = ref<DomainRestrictions>(parseDomainRestrictions(null));
 const saving = ref(false);
 // False until the first load settles, so the bar cannot claim changes over placeholders.
 const loaded = ref(false);
@@ -627,51 +630,8 @@ const loadDomainSettings = async () => {
     const response = await domainManagement.getDomainRestrictions(store.state.zoConfig.meta_org);
 
     if (response.data) {
-      // Decompose the flat backend model (domains + blocked_domains + blocked_emails) into one
-      // per-domain card each, keyed by domain name. Policy precedence when a domain appears in
-      // more than one list: block_all > block_specific > allow rules (block wins over allow).
-      const byDomain = new Map<string, Domain>();
-      const ensure = (name: string): Domain => {
-        const key = name.toLowerCase();
-        if (!byDomain.has(key)) {
-          byDomain.set(key, {
-            name,
-            policy: "allow_all",
-            allowedEmails: [],
-            blockedEmails: [],
-          });
-        }
-        return byDomain.get(key) as Domain;
-      };
-
-      // Allow rules
-      (response.data.domains || [])
-        .filter((d: any) => d && typeof d === "object" && d.domain)
-        .forEach((d: any) => {
-          const card = ensure(d.domain);
-          card.policy = d.allow_all_users ? "allow_all" : "allow_specific";
-          card.allowedEmails = d.allowed_emails || [];
-        });
-
-      // Blocked specific emails — grouped under their domain
-      (response.data.blocked_emails || [])
-        .filter((e: any) => typeof e === "string" && e.includes("@"))
-        .forEach((email: string) => {
-          const domainPart = email.split("@")[1];
-          const card = ensure(domainPart);
-          card.policy = "block_specific";
-          card.blockedEmails.push(email.toLowerCase());
-        });
-
-      // Blocked whole domains — highest precedence
-      (response.data.blocked_domains || [])
-        .filter((d: any) => typeof d === "string" && d)
-        .forEach((d: string) => {
-          const card = ensure(d);
-          card.policy = "block_all";
-        });
-
-      domains.splice(0, domains.length, ...Array.from(byDomain.values()));
+      savedRestrictions.value = parseDomainRestrictions(response.data);
+      domains.splice(0, domains.length, ...restrictionsToCards(savedRestrictions.value));
     }
 
     // Pre-populate the OSelect with the saved value so the configured parser is
@@ -687,6 +647,7 @@ const loadDomainSettings = async () => {
 
     const existingDomains: Domain[] = [];
 
+    savedRestrictions.value = parseDomainRestrictions(null);
     domains.splice(0, domains.length, ...existingDomains);
   }
 
@@ -732,12 +693,16 @@ const removeDomain = (index: number) => {
 const doRemoveDomain = () => {
   const index = pendingRemoveDomainIndex.value;
   if (index === null) return;
-  domains.splice(index, 1);
+  const allowCard = cardAfterRemoval(domains[index], savedRestrictions.value);
+  if (allowCard) domains.splice(index, 1, allowCard);
+  else domains.splice(index, 1);
   pendingRemoveDomainIndex.value = null;
   confirmRemoveDomainOpen.value = false;
   toast({
     variant: "success",
-    message: t("settings.domainRemoved"),
+    message: allowCard
+      ? t("settings.domainManagement.blocksRemovedKeepsAllowRule", { domain: allowCard.name })
+      : t("settings.domainRemoved"),
   });
 };
 
@@ -1016,23 +981,9 @@ const saveChanges = async ({ quiet = false } = {}): Promise<boolean> => {
       }
     }
 
-    // Compose the flat backend model from the per-domain cards.
-    const domainData: any = {
-      // Allow rules → domains[]
-      domains: domains
-        .filter((d) => d.policy === "allow_all" || d.policy === "allow_specific")
-        .map((domain) => ({
-          domain: domain.name,
-          allow_all_users: domain.policy === "allow_all",
-          allowed_emails: domain.policy === "allow_specific" ? domain.allowedEmails : [],
-        })),
-      // Whole-domain blocks → blocked_domains[]
-      blocked_domains: domains.filter((d) => d.policy === "block_all").map((domain) => domain.name),
-      // Specific blocked users → flat blocked_emails[]
-      blocked_emails: domains
-        .filter((d) => d.policy === "block_specific")
-        .flatMap((domain) => domain.blockedEmails),
-    };
+    const domainData = buildDomainRestrictionsBody(
+      cardsToRestrictions(domains, savedRestrictions.value),
+    );
 
     // Taken with the payload: cards edited while the request is pending stay unsaved.
     const sentSnapshot = domainSnapshot();
@@ -1049,6 +1000,7 @@ const saveChanges = async ({ quiet = false } = {}): Promise<boolean> => {
 
     // Persisted → this is now the clean baseline, so isDirty resets to false.
     savedSnapshot.value = sentSnapshot;
+    savedRestrictions.value = parseDomainRestrictions(domainData);
 
     emit("saved", domains);
     return true;

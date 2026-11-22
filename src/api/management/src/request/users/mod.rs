@@ -1441,6 +1441,65 @@ pub async fn decline_invitation(
     }
 }
 
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    get,
+    path = "/{org_id}/all_users",
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "ListAllUsers",
+    summary = "List users across all organizations (meta only)",
+    description = "Lists every non-root user, newest first, with the organizations each belongs to. Searching and \
+                   paging run in the database. Only accessible through the '_meta' organization, and only to the \
+                   root user or a member of '_meta'.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name (must be '_meta')"),
+        ("search" = Option<String>, Query, description = "Matches a user id exactly, or a substring of the email in any case"),
+        ("org" = Option<String>, Query, description = "Only members of this organization identifier"),
+        ("page" = Option<i64>, Query, description = "1-based page number (default 1)"),
+        ("page_size" = Option<i64>, Query, description = "Users per page (default 20, at most 100)"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = infra::table::users::UserListPage),
+        (status = 403, description = "The caller is neither the root user nor a member of '_meta'", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn all_users(
+    Headers(user_email): Headers<UserEmail>,
+    Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    if org_id != config::META_ORG_ID {
+        return MetaHttpResponse::unauthorized("not authorized to access this resource");
+    }
+    let allowed = db::user::is_root_user(&user_email.user_id)
+        || users::get_user(Some(config::META_ORG_ID), &user_email.user_id)
+            .await
+            .is_some();
+    if !allowed {
+        return MetaHttpResponse::forbidden("Not allowed");
+    }
+
+    let number = |key: &str| query.get(key).and_then(|value| value.parse::<i64>().ok());
+    let filter = infra::table::users::UserListFilter::new(
+        query.get("search").map(String::as_str),
+        query.get("org").map(String::as_str),
+        number("page"),
+        number("page_size"),
+    );
+    match infra::table::users::list_page(&filter).await {
+        Ok(page) => MetaHttpResponse::json(page),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
 #[cfg(not(feature = "cloud"))]
 #[utoipa::path(
     delete,
@@ -1539,6 +1598,74 @@ mod tests {
         let path = Path(("acme".to_string(), "jane@example.com".to_string()));
         let resp = add_user_to_org(path, caller(), axum::Json(role)).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[cfg(feature = "cloud")]
+    async fn list_all_users(caller: &str, org_id: &str, query: &[(&str, &str)]) -> Response {
+        let query = query
+            .iter()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect();
+        all_users(
+            Headers(UserEmail {
+                user_id: caller.to_string(),
+            }),
+            Path(org_id.to_string()),
+            Query(query),
+        )
+        .await
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn only_root_or_a_meta_member_lists_all_users_and_only_through_meta() {
+        let root = "root@all-users-refusal.test";
+        let org_admin = "admin@all-users-refusal.test";
+        join(config::DEFAULT_ORG, root, UserRole::Root);
+        join("all-users-acme", org_admin, UserRole::Admin);
+
+        for (caller, org_id) in [
+            (root, "all-users-acme"),
+            (root, config::DEFAULT_ORG),
+            (org_admin, "all-users-acme"),
+            (org_admin, config::META_ORG_ID),
+        ] {
+            let resp = list_all_users(caller, org_id, &[]).await;
+            assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{caller} {org_id}");
+        }
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn a_meta_member_lists_all_users_with_invalid_paging_clamped() {
+        for key in [
+            "O2_STRIPE_SECRET_KEY",
+            "O2_STRIPE_WEBHOOK_SECRET",
+            "O2_AZURE_TENANT_ID",
+            "O2_AZURE_CLIENT_ID",
+            "O2_AZURE_CLIENT_SECRET",
+        ] {
+            // SAFETY: placeholders the Cloud config demands before it loads; no test reads them.
+            unsafe { std::env::set_var(key, "test-placeholder") };
+        }
+        infra::db::create_table().await.unwrap();
+        infra::db_init().await.unwrap();
+        infra::table::migrate().await.unwrap();
+        let root = "root@all-users-allowed.test";
+        let meta_viewer = "viewer@all-users-allowed.test";
+        join(config::DEFAULT_ORG, root, UserRole::Root);
+        join(config::META_ORG_ID, meta_viewer, UserRole::Viewer);
+
+        for caller in [root, meta_viewer] {
+            for query in [
+                vec![],
+                vec![("page", "abc"), ("page_size", "-3")],
+                vec![("page", "0"), ("page_size", "100000"), ("search", "x")],
+            ] {
+                let resp = list_all_users(caller, config::META_ORG_ID, &query).await;
+                assert_eq!(resp.status(), StatusCode::OK, "{caller} {query:?}");
+            }
+        }
     }
 
     #[cfg(feature = "enterprise")]
