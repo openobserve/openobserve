@@ -28547,6 +28547,7 @@
     "domainManagement": {
       "accessFor": "ad705802d36f59a5",
       "addDomain": "d86476ae6cc9e4a5",
+      "blocksRemovedKeepsAllowRule": "4469d17edba09037",
       "claimParserFormatLink": "6874fe4b298d9868",
       "claimParserHelp": "331153bf2a47e653",
       "claimParserLabel": "53846fc1266c5ec6",
@@ -29108,7 +29109,37 @@
     "trial_expiry": "03378fba7bf9c9ae",
     "updateAiCreditsFailed": "5754421c67124875",
     "updateSyntheticsStepsFailed": "157bde22fd62f83a",
-    "usageStreamEnabledLabel": "d3e2513df5d8f8e7"
+    "usageStreamEnabledLabel": "d3e2513df5d8f8e7",
+    "userManagement": "fe45f3a1addc213e",
+    "userManagementDesc": "c06cd2ffab1bb5d0",
+    "userManagementPage": {
+      "allOrganizations": "e3002b23036a8247",
+      "block": "211d0bb8cf4f5b52",
+      "blockConfirmMessage": "dc05738d420fc3ce",
+      "blockConfirmTitle": "c00c765866f58d25",
+      "blockState": "1f8fb3b1711888e4",
+      "blocked": "a9320440537b247c",
+      "blockedByDomain": "ffc176fa28eb4f7f",
+      "blockedByEmail": "e4371934c2206790",
+      "detailsTitle": "59c972df13e46290",
+      "dormantRules": "1682fd700a248794",
+      "email": "969ccbd3cf6300ec",
+      "filterByOrganization": "f21fc3decd5c0d21",
+      "noOrganizations": "49453904f3bafb3c",
+      "notBlocked": "8625218ce52a445d",
+      "orgCount": "5445ca255ff9f4a3",
+      "orgId": "1f466322634e2d85",
+      "orgName": "d764d42592fc9687",
+      "organizations": "2730183d6b776b40",
+      "role": "14736a2eb9f4159f",
+      "searchPlaceholder": "64ace2cc3723e0c1",
+      "ssoOnlyHint": "05775b23f56a2542",
+      "subtitle": "764f84c1ad36c947",
+      "unblock": "712da63171e0c9de",
+      "unblocked": "c6fec68b7245cf88",
+      "updateFailed": "412daf98f509da0e",
+      "userId": "7967e089a7b94464"
+    }
   },
   "shortcuts": {
     "actions": {
@@ -29244,7 +29275,8 @@
       "tracesPrevRow": "0aed00c70b626486",
       "tracesRefresh": "0e91610117029a62",
       "tracesRowOpen": "1e8364c6cdef42bf",
-      "tracesSearch": "1837e00c45e8663d"
+      "tracesSearch": "1837e00c45e8663d",
+      "userManagementRefresh": "3cf8d66227384dc2"
     },
     "escKey": "52f878edb34fa14f",
     "footerClose": "310ff200149b44a3",
@@ -29331,7 +29363,8 @@
       "syntheticsJourney": "6139c8806a81156d",
       "syntheticsTokens": "7864444a72000b95",
       "traceDetail": "b5ae8e6e78ccce2f",
-      "traces": "998741a58ed2b411"
+      "traces": "998741a58ed2b411",
+      "userManagement": "fe45f3a1addc213e"
     },
     "search": "ae6ebe2f27d169ab",
     "subtitle": "ca1deb2bf3e5d8a2",
